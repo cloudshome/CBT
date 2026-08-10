@@ -466,8 +466,9 @@ the desk agent layer (health/brief/ask/graduation), the autonomous agents, the
 immune diagnostics, the RAG library Q&A, both MCP servers (SDK + zero-dep
 stdio), and the dashboard JS.
 
-On every push, GitHub Actions runs this suite automatically
-(`.github/workflows/ci.yml`) plus an offline smoke test on the sample data.
+On every push, GitHub Actions runs this suite automatically plus an offline
+smoke test on the sample data. The workflow ships as `docs/CI-workflow.yml` —
+rename it to `.github/workflows/ci.yml` to activate (see the note there).
 
 ---
 
@@ -562,8 +563,11 @@ visibly separate in the dashboard.
 
 ## 🔄 CI
 
-`.github/workflows/ci.yml` runs on every push / PR to `main`:
-Python 3.12 → install deps → `compileall` → `pytest` → offline smoke test on
+The workflow ships as **`docs/CI-workflow.yml`** — rename it to
+`.github/workflows/ci.yml` (GitHub web UI: upload the file into `.github/workflows/`)
+to activate it, since automation tokens may not create workflow files.  Once
+active it runs on every push / PR to `main`: Python 3.12 → install deps →
+`compileall` → `pytest` → offline smoke test on
 `data_samples/btcusdt_15m_sample.csv`. All tests are network-free, so CI is
 fast and deterministic.
 
@@ -715,8 +719,8 @@ crypto-brain/
 │   ├── signal_card.py       # institutional signal card (terminal rendering)
 │   └── notifiers.py         # Telegram + Discord push
 ├── web/app.py               # Flask dashboard (decision, risk gate, agents, ask, paper, learning)
-├── tests/                   # offline test-suite (250+ tests, 100% offline-capable)
-├── .github/workflows/ci.yml # auto test-runner on push
+├── tests/                   # offline test-suite (258+ tests, 100% offline-capable)
+├── docs/CI-workflow.yml     # GitHub Actions CI (rename to .github/workflows/ci.yml)
 ├── examples/example_signal.json
 └── data_samples/btcusdt_15m_sample.csv
 ```
