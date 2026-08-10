@@ -1,0 +1,34 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# data caches (keep the committed sample)
+data_samples/*.csv
+!data_samples/btcusdt_15m_sample.csv
+data_samples/backtest_report.json
+
+# sqlite learning store
+*.db
+
+# local session-continuation notes (never pushed)
+SESSION.md
+
+# tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# os
+.DS_Store
+
+# sqlite learning store + WAL sidecars
+*.db
+*.db-shm
+*.db-wal
