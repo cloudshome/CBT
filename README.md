@@ -267,9 +267,12 @@ python main.py reject 42 --note "chasing entry"
 python main.py signal 42             # full detail + lifecycle trail
 
 # 10. PAPER TRADING — safely monitor approved signals; NO real orders are sent
+python main.py preflight             # strict live/fresh-feed + safety-config gate
 python main.py paper                 # one safe live-market check now
-python main.py paper --watch         # keep checking every 30s (Ctrl+C to stop)
+python main.py paper --watch         # preflight runs automatically, then checks every 30s
 python main.py paper --watch --interval 60 --symbol XAUUSD
+# For an OFFLINE REHEARSAL only: DEMO_MODE=1 python main.py paper --watch --allow-demo
+# Demo outcomes never count as live paper evidence.
 # Immediate plans paper-fill at their stated entry after approval.
 # Conditional plans wait until a live candle reaches the planned entry.
 # SL / TP1 closes are recorded automatically in SQLite and feed `learn`.
@@ -294,6 +297,21 @@ python main.py glossary FVG          # quick term lookup
 # 15. run tests
 python -m pytest tests/ -q
 ```
+
+### 24/7 paper operations
+
+For an Ubuntu/Debian VPS, use the hardened units in `ops/systemd/` and follow
+[`docs/PAPER_TRADING_OPERATIONS.md`](docs/PAPER_TRADING_OPERATIONS.md). The
+production layout provides:
+
+- a strict fail-closed preflight before unattended paper monitoring;
+- a 15-minute watchlist scan timer that **never auto-approves** candidates;
+- a continuously supervised paper monitor with restart limits;
+- a Gunicorn dashboard bound only to `127.0.0.1`; and
+- persistent SQLite storage outside the Git checkout with backup guidance.
+
+The dashboard includes approval/write actions. Keep port 8050 private and use
+an SSH tunnel or authenticated TLS reverse proxy for remote access.
 
 ### Supported markets / aliases
 
@@ -320,7 +338,7 @@ stricter than the raw signal engine and will return `"signal":"NO TRADE"` when
 capital-preservation filters fail:
 
 * confidence below `INTELLIGENCE_MIN_CONFIDENCE` (default 80%)
-* RR below `INTELLIGENCE_MIN_RR` (default 1:2)
+* RR below `INTELLIGENCE_MIN_RR` (default 1:1.5 safety floor)
 * high-impact macro/news risk, sideways/volatile market, or HTF contradiction
 * insufficient market data
 

@@ -109,7 +109,9 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # ── Web dashboard ────────────────────────────────────────────────────────
-DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "0.0.0.0")
+# Loopback by default: the dashboard includes approval/write actions and must
+# not be exposed directly without an authenticated reverse proxy.
+DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8050"))
 
 # ── Signal database (learning store) ─────────────────────────────────────
@@ -163,7 +165,8 @@ GOLD_OWN_BUCKET = True  # gold exposure is tracked separately from crypto
 # ── Gold playbook (decision B8) ──────────────────────────────────────────
 # Sessions in UTC hours; PDH/PDL come from daily bars; US-data countdown is
 # the existing macro calendar's high-impact window.  Mode: warn | block | off.
-GOLD_SESSION_MODE = os.getenv("GOLD_SESSION_MODE", "warn").strip().lower()
+# Fail closed by default for unattended operation; local research may override.
+GOLD_SESSION_MODE = os.getenv("GOLD_SESSION_MODE", "block").strip().lower()
 GOLD_LONDON_WINDOW = (7, 16)      # UTC hours, inclusive start / exclusive end
 GOLD_NY_WINDOW = (12, 21)         # UTC hours
 GOLD_PDH_PDL = True
