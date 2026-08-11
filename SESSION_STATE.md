@@ -6,11 +6,32 @@
 > **Read first** at the start of every new session (see "Start-of-session
 > recipe" at the bottom).
 
-**Last updated:** 2026-08-11 (end of TODO-2 session, after end-of-session reconciliation pass)
+**Last updated:** 2026-08-11 (end of TODO-2 session, opening PR to consolidate P7/P8/P9 work)
 **Branch:** `arena/019ff045-sky`
-**HEAD commit:** `83cc1a4 feat(mcp): P9 capability endpoints — 5 new read-only tools (TODO-2)`
+**HEAD commit:** `3a67fbc docs(session-state): final reconciliation pass — P9 status line, TODO-1/TODO-2 marks`
 **Default branch:** `main` (last commit `99ace0d`, untouched this session)
+**PR:** being opened from `arena/019ff045-sky` → `main` at the end of this session (per user instruction).
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
+
+> **End-of-session decision (this session):**
+> The user asked: "if this session cover todo3, than go for it, els
+> stop and end this session and make PR before end this."
+>
+> **My read:** TODO-3 (CI wheel-gate) is NOT cleanly coverable in
+> this session because of three blockers:
+> 1. D4 decision in `ROADMAP_AGENT_REACH_UPGRADE.md` §4 is unanswered.
+> 2. Arena's GitHub integration cannot push under `.github/workflows/`
+>    (per the `d40ff00` commit note; the existing `ci.yml` lives at
+>    `docs/.github/workflows/ci.yml` for exactly this reason).
+> 3. There is no `pyproject.toml`; TODO-3's scope itself flags
+>    "either add a minimal pyproject.toml or scope the smoke test
+>    to `python -c 'import main'`" as a sub-decision.
+>
+> Per the user's instruction, the **else** branch applies: stop, end
+> the session, make a PR. The branch has 9 commits of substantive
+> work (P7 agent surface + P8 channels + P9 MCP endpoints + handoff
+> memory) — that's a clean, reviewable PR. TODO-3 is now a TODO-3.bis
+> note in TODO.md: doable in a future session once D4 is answered.
 
 > **Self-reflection — refined update rule (re-confirmed this session):**
 > "update SESSION_STATE.md at the START, not just at the end" is
@@ -154,21 +175,17 @@ pass" rule.
 
 ## Currently working on
 
-**Nothing — this session (TODO-2) is complete.** P9 capability
-endpoints are now 50% done: 5 new MCP tools shipped, deny list
-still enforced, 11 read-only tools total. The next session should
-start with **TODO-3: CI wheel-gate job** (see TODO.md).
+**Nothing — this session (TODO-2) is complete and the session is
+ending.** A PR is being opened from `arena/019ff045-sky` → `main`
+to consolidate the 9 commits of P7/P8/P9 work.
 
-**Self-reflection on scope (this session):** I almost over-scoped
-this session by trying to do TODO-3 (CI wheel-gate) and TODO-4
-(`desk_status()`) in the same commit. I did NOT do that because:
-- TODO-3 depends on a decision (D4: wheel-gate yes/no) that
-  requires user input per TODO-6;
-- TODO-4 is a different change with a different definition-of-done;
-- bundling them would have made the commit harder to review.
-
-**Rule confirmed:** "go next" = "the next single TODO.md item,
-and only that item".
+**End-of-session decision (this session):**
+- TODO-3 (CI wheel-gate) is **NOT** cleanly coverable here because
+  of three blockers: D4 unanswered, can't push under
+  `.github/workflows/` from Arena, no `pyproject.toml`.
+- Per the user's "if/else" instruction, the **else** branch applied:
+  stop, end the session, make a PR.
+- TODO-3 is moved to a future session (after D4 is answered).
 
 ---
 
@@ -265,22 +282,27 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-**Start the next session with TODO-3: P9 CI wheel-gate job.**
+**A PR is open from `arena/019ff045-sky` → `main` at the time of
+this writing. The next session should:**
 
-`mcp_server.py` now exposes 11 read-only tools (TODO-2 ✅). The next
-P9 item is the CI wheel-gate. **Caveat:** TODO-3 depends on the D4
-decision (wheel-gate yes/no), so the first action of the next
-session should be to confirm D4 with the user — if the answer is
-"no", TODO-3 is a no-op and we should move to TODO-4 instead.
+1. **First, confirm the PR landed and `main` is updated.** If the
+   PR was merged, the next session should branch from `main`, not
+   from this branch. If the PR is still open or was closed without
+   merging, the next session may need to address review feedback.
 
-**Suggested next-session prompt (assuming D4 = yes):**
+2. **Answer the D1–D5 decision list** in
+   `ROADMAP_AGENT_REACH_UPGRADE.md` §4 — particularly **D4** (CI
+   wheel-gate yes/no), which is a blocker for TODO-3.
+
+3. **Start TODO-3 or TODO-4** depending on the D4 answer.
+
+**Suggested next-session prompt:**
 
 > Continue the SKY project from the state in SESSION_STATE.md.
-> Confirm D4 (wheel-gate yes/no) before starting TODO-3 — the
-> decision list is in `ROADMAP_AGENT_REACH_UPGRADE.md` §4. If D4
-> = yes, add a `wheel-gate` job to `.github/workflows/ci.yml` that
-> builds the wheel, installs it in a clean venv, and runs a CLI
-> smoke test. If D4 = no, skip TODO-3 and move to TODO-4
+> First check whether the open PR (or its successor branch) has
+> been merged into main. If yes, branch from main; if no, address
+> review feedback on the open PR. Then answer D4 (wheel-gate
+> yes/no). If D4 = yes, do TODO-3. If D4 = no, skip to TODO-4
 > (`brain/agent.desk_status()` advisory). In both cases, update
 > SESSION_STATE.md + CHANGELOG.md and commit.
 

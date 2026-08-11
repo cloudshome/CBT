@@ -82,7 +82,7 @@ this content (they just don't include the channels layer).
 tools (all returned clean data), called 4 forbidden tools (all
 rejected with "not permitted").
 
-### TODO-3 · CI wheel-gate job
+### TODO-3 · CI wheel-gate job · ⏸️ BLOCKED
 
 **Why:** Agent-Reach has it; SKY doesn't. Catches duplicate-wheel
 bugs and broken packaged resources before they ship.
@@ -99,6 +99,32 @@ bugs and broken packaged resources before they ship.
 exposes a top-level `cryptobrain` import — `main.py` is at the repo
 root. Either add a minimal `pyproject.toml` or scope the smoke test
 to `python -c "import main"`. Decision belongs to TODO-6 (D4).
+
+**Blockers (per Session 2026-08-11 #4, TODO-2 self-reflection):**
+1. **D4 decision unanswered** — wheel-gate yes/no is a sub-decision
+   in `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
+2. **Arena GitHub integration cannot push under `.github/workflows/`.**
+   The existing `ci.yml` lives at `docs/.github/workflows/ci.yml`
+   for exactly this reason (per the `d40ff00` commit note). A
+   human with the `workflows` permission must activate it from the
+   GitHub UI before the wheel-gate job can run on GitHub Actions.
+3. **No `pyproject.toml`** — TODO-3's scope itself flags this as
+   a sub-decision.
+
+**Status as of end of TODO-2 session:** this session attempted to
+do TODO-3 (per the user's "if this session cover todo3, than go
+for it" instruction). The three blockers above mean TODO-3 is
+NOT cleanly coverable in a single Arena session. The user's
+fallback ("els stop and end this session and make PR before end
+this") was applied: the session stopped, this TODO.md note was
+added, and a PR was opened from `arena/019ff045-sky` → `main` to
+consolidate the P7/P8/P9 work that's already done.
+
+**TODO-3.bis (future session):** once D4 = yes, a future session
+can write the wheel-gate job *content* (e.g. as a Python script
+in `ci/wheel_gate.py` that runs locally + a `ci.yml` job spec for
+GitHub Actions). The actual push to `.github/workflows/` is a
+human action — TODO-7.
 
 ### TODO-4 · `brain/agent.desk_status()` advisory
 
