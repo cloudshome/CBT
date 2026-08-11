@@ -6,21 +6,30 @@
 > **Read first** at the start of every new session (see "Start-of-session
 > recipe" at the bottom).
 
-**Last updated:** 2026-08-11 (end of TODO-1 session)
+**Last updated:** 2026-08-11 (start of TODO-2 session — stale handoff cleanup)
 **Branch:** `arena/019ff045-sky`
-**HEAD commit:** `4ca00bb feat(dashboard): P8 Channels panel + /api/channels + /api/doctor (TODO-1)`
+**HEAD commit:** `d3a7e8c docs(session-state): record actual SHA 4ca00bb at end of TODO-1 session`
 **Default branch:** `main` (last commit `99ace0d`, untouched this session)
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **Self-reflection — lesson from the start of this session:**
-> the previous session's SESSION_STATE.md said "Last commit: `b0fe82f`"
-> but the actual HEAD was already `498d753` (the docs commit landed
-> after SESSION_STATE.md was written). The handoff memory went stale
-> *inside the same chat* and a fresh session would have had to
-> reconcile it. **Rule for this and every future session: update
-> SESSION_STATE.md at the START, not just at the end.** This file
-> was rewritten to reflect HEAD `498d753` before TODO-1 began, and
-> again at the end of this session to reflect the TODO-1 commit.
+> **Self-reflection — lesson from the END of the previous session:**
+> I made the rule "update SESSION_STATE.md at the START, not just at
+> the end" but the previous session's *end-of-session* update itself
+> was incomplete — the narrative sections still contained
+> `<new-sha>` placeholders and the "P8 — implementation complete,
+> dashboard panel pending" status line was never updated to reflect
+> the shipped panel. The new SHAs got recorded (good) but the older
+> narrative blocks didn't get re-read for consistency (bad).
+>
+> **Refined rule for this and every future session: when updating
+> SESSION_STATE.md, re-read the entire file and reconcile any
+> pre-existing placeholders, status flags, and "Last commit" lines —
+> not just append new sections.** The "start-of-session update" rule
+> is necessary but not sufficient; a full-document reconciliation
+> pass is the actual contract.
+>
+> This file is being reconciled at the START of this session (before
+> TODO-2 begins) so the next session sees a clean slate.
 
 ---
 
@@ -40,7 +49,7 @@ plan (18 phases, 15-item rulebook) is in
 
 ## Current phase
 
-**P8 (Source Channels) — implementation complete, dashboard panel pending.**
+**P8 (Source Channels) — fully complete; P9 in progress (TODO-2 starting).**
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -103,9 +112,9 @@ tests stayed at **285 pass / 1 skip**.
   flow + config + testing cheatsheets.
 - `CHANGELOG.md` (171 lines) — v2.0.0 + v2.0.1 + Unreleased.
 
-### Session 2026-08-11 #3: TODO-1 P8 dashboard panel — commit `<new-sha>`
+### Session 2026-08-11 #3: TODO-1 P8 dashboard panel — commits `4ca00bb` + `d3a7e8c`
 
-3 files changed, **0 regressions**, tests **285 → 289 pass / 1 skip**.
+2 commits, 5 files changed, **0 regressions**, tests **285 → 289 pass / 1 skip**.
 
 **Modified files (additive only):**
 - `web/app.py` — two new endpoints (`/api/channels`, `/api/doctor`),
@@ -167,7 +176,9 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ---
 
-## Current files (added/modified this session)
+## Current files (added/modified across all sessions)
+
+### Session 2026-08-11 #1 (P7 + P8 code, commit `b0fe82f`)
 
 | File | Status | Lines | Purpose |
 |---|---|---|---|
@@ -178,6 +189,25 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 | `tests/test_channels.py` | NEW | 339 | 27 new tests |
 | `main.py` | MODIFIED | +184 | `doctor`, `channels`, `skill` subcommands |
 | `AI_ANATOMY_ROADMAP.md` | MODIFIED | +34 | P7/P8/P9 summary |
+
+### Session 2026-08-11 #2 (handoff memory, commit `498d753`)
+
+| File | Status | Lines | Purpose |
+|---|---|---|---|
+| `SESSION_STATE.md` | NEW | 256 | This file (handoff memory) |
+| `TODO.md` | NEW | 156 | Prioritised remaining work |
+| `ARCHITECTURE.md` | NEW | 266 | Module map + invariants |
+| `CHANGELOG.md` | NEW | 171 | What shipped, when |
+
+### Session 2026-08-11 #3 (TODO-1 P8 dashboard, commits `4ca00bb` + `d3a7e8c`)
+
+| File | Status | Lines | Purpose |
+|---|---|---|---|
+| `web/app.py` | MODIFIED | +80 | `/api/channels`, `/api/doctor`, "CHANNELS" card, `loadChannels()`, 5-min diagnostic refresh |
+| `tests/test_web_api.py` | MODIFIED | +67 | 4 new tests for the new endpoints |
+| `TODO.md` | MODIFIED | – | TODO-1 marked done, TODO-1.bis noted as deferred |
+| `CHANGELOG.md` | MODIFIED | +44 | v2.0.2 entry with self-reflection note |
+| `SESSION_STATE.md` | MODIFIED | – | This file (updated at end-of-session) |
 
 ---
 
