@@ -6,13 +6,27 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-11
+**Last updated:** 2026-08-11 (post-merge-resolution session)
 
 ---
 
 ## 🔥 Top priority — start here in the next session
 
-### TODO-1 · P8 dashboard "Channels" panel · `web/app.py` · ✅ DONE (commit `<new-sha>`)
+### TODO-0 · Merge PR #5 · https://github.com/Azimshawon/SKY/pull/5
+
+**Status:** READY TO MERGE. PR #5 is now `MERGEABLE` (was `CONFLICTING`).
+The user/reviewer just needs to click "Merge" on the GitHub UI.
+
+**What this PR contains:** 11 commits including P7 (agent surface),
+P8 dashboard panel + channels router, P9 MCP capability endpoints
+(11 read-only tools), and handoff memory files. Conflict resolution
+completed in this session (commit `04ac6f9`).
+
+**Once merged:** the next session should branch from `main` (not from
+`arena/019ff045-sky`). Update SESSION_STATE.md to point at the new
+HEAD on main.
+
+### TODO-1 · P8 dashboard "Channels" panel · `web/app.py` · ✅ DONE (commits `4ca00bb` + `d3a7e8c`)
 
 **Status:** complete in this session.
 

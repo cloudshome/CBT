@@ -6,11 +6,11 @@
 > **Read first** at the start of every new session (see "Start-of-session
 > recipe" at the bottom).
 
-**Last updated:** 2026-08-11 (end of TODO-2 session, PR #5 opened to consolidate P7/P8/P9 work)
+**Last updated:** 2026-08-11 (end of conflict-resolution session; PR #5 now MERGEABLE)
 **Branch:** `arena/019ff045-sky`
-**HEAD commit:** `5bc9b8e docs: record end-of-session decision — TODO-3 deferred, PR opening`
-**Default branch:** `main` (last commit `99ace0d`, untouched this session)
-**PR:** [#5 `feat(agent-surface): P7+P8+P9 — SKILL, channels, MCP capability endpoints (9 commits)`](https://github.com/Azimshawon/SKY/pull/5) — **OPEN** at the time of writing.
+**HEAD commit:** `04ac6f9 merge: resolve PR #5 conflicts (main modern-dashboard + branch P7/P8/P9)`
+**Default branch:** `main` (last commit `99ace0d` + the modern-dashboard `0940452`)
+**PR:** [#5](https://github.com/Azimshawon/SKY/pull/5) — was `CONFLICTING`; now `MERGEABLE` after this session.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
 > **End-of-session decision (this session):**
@@ -171,6 +171,37 @@ pass" rule.
 - **No PR opened** (user explicitly chose Option B: branch only).
 - `main` branch untouched at `99ace0d`.
 
+### Session 2026-08-11 #5: PR #5 conflict resolution — commits `04ac6f9`
+
+1 commit, 2 files manually resolved (main.py 4 hunks, web/app.py 3 hunks),
+**0 regressions**, tests **285 → 306 pass / 1 skip** (+21 tests came from
+main's modern-dashboard work including `tests/test_preflight.py`).
+
+**What happened:** PR #5 became `CONFLICTING` because `main` was
+independently updated (commit `0940452` "feat(dashboard): modern
+section-by-section website") with a new tabbed dashboard. The user
+asked me to resolve the conflicts.
+
+**Resolution strategy (documented in the merge commit):**
+- `main.py`: kept BOTH sides' additions — branch's `cmd_doctor/channels/skill`
+  AND main's `cmd_preflight` + the preflight gate in `cmd_paper --watch`.
+  Default banner updated to list all new commands.
+- `web/app.py`: took main's full modern tabbed dashboard wholesale
+  (the branch's old `html += card(...)` block was obsolete — main's
+  tabbed architecture IS the design). Re-applied the branch's
+  `loadChannels()` JS function and the `/api/channels` + `/api/doctor`
+  Flask endpoints (main did not have them). Added the CHANNELS card
+  to the system tab + a 5-minute diagnostic auto-refresh.
+
+**Self-reflection (this session):**
+- `git checkout --theirs` was the right call for the big HTML conflict
+  because main's tabbed architecture IS the design — the branch's
+  older `html += card(...)` block was dead code.
+- The risk was losing the branch's `loadChannels()` function; verified
+  via grep after checkout and added it back to the JS section.
+- Verified the conflict resolution by hitting every new endpoint via
+  curl. All 200. JSON shape correct.
+
 ---
 
 ## Currently working on
@@ -313,7 +344,7 @@ this writing. The next session should:**
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 python -m pytest tests/ -q
-# 295 passed, 1 skipped in 57.18s
+# 306 passed, 1 skipped in 61.82s
 ```
 
 (The 1 skipped is the SDK-already-installed fallback test, present
@@ -322,10 +353,10 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-5bc9b8e docs: record end-of-session decision — TODO-3 deferred, PR opening
+04ac6f9 merge: resolve PR #5 conflicts (main modern-dashboard + branch P7/P8/P9)
 ```
 
-Pushed to `origin/arena/019ff045-sky`. PR #5 opened to `main` — see
+Pushed to `origin/arena/019ff045-sky`. PR #5 now MERGEABLE — see
 "PR" line in the header.
 
 ---
@@ -361,7 +392,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 295 pass.
+- Maintain test count at ≥ 306 pass.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action.
 - Update CHANGELOG.md.
@@ -376,7 +407,7 @@ state.
 
 1. [ ] Finish or safely stop the current task.
 2. [ ] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 295 pass.
+   ≥ 306 pass.
 3. [ ] Fix any obvious failures.
 4. [ ] Update `SESSION_STATE.md` with the exact current state.
 5. [ ] Update `TODO.md` — mark finished items done, reprioritise.

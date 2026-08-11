@@ -20,6 +20,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.4] — 2026-08-11 · branch `arena/019ff045-sky`
+
+### Added — PR #5 conflict resolution (this session)
+
+PR #5 (`feat(agent-surface): P7+P8+P9 — SKILL, channels, MCP
+capability endpoints`) was `CONFLICTING` because `main` was
+independently updated (commit `0940452` modern-dashboard) while the
+P7/P8/P9 work was in flight. This session resolves the conflicts.
+
+**main.py** (4 conflict hunks):
+- Kept BOTH sides' additions: branch's `cmd_doctor / channels /
+  skill` AND main's `cmd_preflight` + the preflight gate in
+  `cmd_paper --watch`.
+- Default banner updated to list all new commands.
+
+**web/app.py** (3 conflict hunks):
+- Took main's full modern tabbed dashboard wholesale (the branch's
+  old `html += card(...)` block was obsolete; main's tabbed
+  architecture IS the design).
+- Re-applied the branch's `loadChannels()` JS function.
+- Re-added the `/api/channels` and `/api/doctor` Flask endpoints
+  (main did not have them — they were a P8 deliverable on the
+  branch).
+- Added the CHANNELS card to the system tab.
+- Added a 5-minute diagnostic auto-refresh (channels + mcp),
+  distinct from the existing 30s scan tick.
+
+### Test count
+- 285 → **306 pass / 1 skip** (+21 from main's modern-dashboard work
+  including `tests/test_preflight.py`).
+- 0 regressions on the branch side.
+
+### Live verification
+After resolving the conflicts, started `python main.py web` and
+hit every new endpoint via curl:
+- `/` → 200
+- `/api/health` → 200
+- `/api/channels` → 200 (returns proper JSON with 4 channels)
+- `/api/doctor` → 200
+- `/api/mcp` → 200
+
+### PR status
+PR #5 went from `CONFLICTING` to `MERGEABLE`. Reviewer can now merge.
+
+### Pushed
+- Branch `arena/019ff045-sky` → `origin`. No new PR (PR #5 already
+  exists).
+
+---
+
 ## [2.0.3] — 2026-08-11 · branch `arena/019ff045-sky`
 
 ### Added — P9 MCP capability endpoints (TODO-2 complete)
