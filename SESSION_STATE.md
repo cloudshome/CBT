@@ -8,7 +8,7 @@
 
 **Last updated:** 2026-08-11 (end of TODO-1 session)
 **Branch:** `arena/019ff045-sky`
-**HEAD commit (pending this session):** `b0fe82f` → `498d753` → `<new-sha>` (TODO-1)
+**HEAD commit:** `4ca00bb feat(dashboard): P8 Channels panel + /api/channels + /api/doctor (TODO-1)`
 **Default branch:** `main` (last commit `99ace0d`, untouched this session)
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
@@ -246,7 +246,7 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-<new-sha> feat(dashboard): P8 Channels panel + /api/channels + /api/doctor
+4ca00bb feat(dashboard): P8 Channels panel + /api/channels + /api/doctor (TODO-1)
 ```
 
 Pushed to `origin/arena/019ff045-sky`. No PR opened.
