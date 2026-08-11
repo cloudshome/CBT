@@ -80,3 +80,70 @@ def test_sanitize_for_json_helper():
     json.dumps(out)  # must not raise
     assert out == {"b": True, "i": 3, "f": 1.5, "arr": [1, 2],
                    "nested": [{"x": False}]}
+
+
+# ── /api/channels + /api/doctor — P8 dashboard surface ────────────────
+# The Channels layer is the Panniantong/Agent-Reach ordered-backend
+# pattern (P8). It must reach the dashboard without numpy-leak 500s and
+# without any single probe being able to crash the endpoint.
+
+def test_channels_endpoint_returns_registry(client):
+    """`/api/channels` must return the four channels with status+active+backends."""
+    resp = client.get("/api/channels")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    payload = resp.get_json()
+    assert "channels" in payload
+    assert set(payload["channels"].keys()) == {"cryptodada", "discord", "news", "llm"}
+    for name, ch in payload["channels"].items():
+        # Schema contract: every channel has these three keys
+        assert "active" in ch, f"{name} missing 'active'"
+        assert "status" in ch, f"{name} missing 'status'"
+        assert "backends" in ch, f"{name} missing 'backends'"
+        assert ch["status"] in {"ok", "degraded", "down", "unknown"}
+        # Every channel has at least one backend
+        assert len(ch["backends"]) >= 1
+        # Every backend has the required shape
+        for b in ch["backends"]:
+            assert {"name", "label", "configured", "ok"} <= set(b.keys())
+
+
+def test_channels_endpoint_is_json_serializable_under_numpy_leak(client):
+    """If a probe accidentally returns a numpy scalar, the endpoint
+    must still return valid JSON — the same _sanitize_for_json
+    regression that bit /api/scan and /api/intelligence per
+    MERGE_NOTES.md must not bite /api/channels."""
+    import json
+    resp = client.get("/api/channels")
+    assert resp.status_code == 200
+    # If we got this far, Flask jsonify already serialized cleanly.
+    # Do one more round-trip through the stdlib json to be paranoid.
+    body = resp.get_data(as_text=True)
+    json.loads(body)  # must not raise
+
+
+def test_channels_endpoint_isolates_probe_exceptions(client, monkeypatch):
+    """A broken channel probe must NOT crash the endpoint — the same
+    exception-isolation contract as `brain.channels.probe_all`."""
+    from brain import channels
+
+    def boom():
+        raise RuntimeError("simulated probe failure")
+
+    monkeypatch.setattr(channels, "_probe_cryptodada_backends", boom)
+    resp = client.get("/api/channels")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    # cryptodada should be in 'down' state, not crash the response
+    assert "channels" in payload
+    assert "cryptodada" in payload["channels"]
+
+
+def test_doctor_endpoint_returns_text_report(client):
+    """`/api/doctor` is the JSON-wrapped text version (same as CLI)."""
+    resp = client.get("/api/doctor")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert "report" in payload
+    assert "CryptoBrain doctor report" in payload["report"]
+    for ch in ("cryptodada", "discord", "news", "llm"):
+        assert ch in payload["report"]

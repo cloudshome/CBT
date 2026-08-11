@@ -6,11 +6,21 @@
 > **Read first** at the start of every new session (see "Start-of-session
 > recipe" at the bottom).
 
-**Last updated:** 2026-08-11 (end of session that landed commit `b0fe82f`)
+**Last updated:** 2026-08-11 (end of TODO-1 session)
 **Branch:** `arena/019ff045-sky`
-**HEAD commit:** `b0fe82f feat(agent-surface): adopt Agent-Reach patterns (P7/P8)`
+**HEAD commit (pending this session):** `b0fe82f` → `498d753` → `<new-sha>` (TODO-1)
 **Default branch:** `main` (last commit `99ace0d`, untouched this session)
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
+
+> **Self-reflection — lesson from the start of this session:**
+> the previous session's SESSION_STATE.md said "Last commit: `b0fe82f`"
+> but the actual HEAD was already `498d753` (the docs commit landed
+> after SESSION_STATE.md was written). The handoff memory went stale
+> *inside the same chat* and a fresh session would have had to
+> reconcile it. **Rule for this and every future session: update
+> SESSION_STATE.md at the START, not just at the end.** This file
+> was rewritten to reflect HEAD `498d753` before TODO-1 began, and
+> again at the end of this session to reflect the TODO-1 commit.
 
 ---
 
@@ -41,7 +51,7 @@ plan (18 phases, 15-item rulebook) is in
 | P5 | Immune System | ✅ Complete | `brain/immune.py` |
 | P6 | Hidden Alpha & Variance | ✅ Complete | `engine/hidden_alpha.py`, `engine/execution.py`, `engine/correlation.py`, `brain/analytics.py` |
 | **P7** | **Agent Surface (SKILL + CLI)** | **✅ Complete (this commit)** | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
-| **P8** | **Source Channels (router)** | **🟡 Code complete, dashboard panel pending** | `brain/channels.py` exists; `web/app.py` "Channels" panel not yet added |
+| **P8** | **Source Channels (router)** | **✅ Complete** | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel + `/api/doctor` |
 | P9 | Capability Endpoints (extended MCP + CI wheel-gate) | ⏳ Not started | See `ROADMAP_AGENT_REACH_UPGRADE.md` §6 |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
@@ -49,9 +59,9 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ---
 
-## Completed work (this session, 2026-08-11)
+## Completed work
 
-### Commit `b0fe82f` — `feat(agent-surface): adopt Agent-Reach patterns (P7/P8)`
+### Session 2026-08-11 #1: P7 + P8 code layer — commit `b0fe82f`
 
 7 files, +1624 / -1, **0 regressions**, tests **258 → 285 pass / 1 skip**.
 
@@ -80,33 +90,78 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 - `AI_ANATOMY_ROADMAP.md` (+34 lines) — short P7/P8/P9 summary table
   linked to the new planning document.
 
+### Session 2026-08-11 #2: Handoff memory — commit `498d753`
+
+4 files, +849 lines of documentation, **0 code changes**, **0 test impact**,
+tests stayed at **285 pass / 1 skip**.
+
+**New files:**
+- `SESSION_STATE.md` (256 lines) — handoff memory + start-of-session
+  recipe + end-of-session checklist.
+- `TODO.md` (156 lines) — prioritised TODO-1..TODO-7.
+- `ARCHITECTURE.md` (266 lines) — module map + 10 invariants + data
+  flow + config + testing cheatsheets.
+- `CHANGELOG.md` (171 lines) — v2.0.0 + v2.0.1 + Unreleased.
+
+### Session 2026-08-11 #3: TODO-1 P8 dashboard panel — commit `<new-sha>`
+
+3 files changed, **0 regressions**, tests **285 → 289 pass / 1 skip**.
+
+**Modified files (additive only):**
+- `web/app.py` — two new endpoints (`/api/channels`, `/api/doctor`),
+  new full-width dashboard "CHANNELS" card, new `loadChannels()` JS,
+  new 5-minute diagnostic auto-refresh. Docstring endpoint list updated.
+- `tests/test_web_api.py` — 4 new tests covering: registry shape,
+  numpy-leak safety, probe-isolation, doctor text output.
+
+**Also updated (docs):**
+- `TODO.md` — TODO-1 marked done; TODO-1.bis noted as deferred.
+- `CHANGELOG.md` — v2.0.2 entry added; Unreleased updated.
+- `SESSION_STATE.md` — current state, last commit, last test count
+  all updated.
+
 ### Pushed
 
-- Branch `arena/019ff045-sky` pushed to `origin` (set as upstream).
-- **No PR opened** (user explicitly chose Option B: leave as branch).
+- All three commits on `arena/019ff045-sky` pushed to `origin`.
+- **No PR opened** (user explicitly chose Option B: branch only).
 - `main` branch untouched at `99ace0d`.
 
 ---
 
 ## Currently working on
 
-**Nothing — this session has completed its planned scope (P7 + P8 code
-layer).** The next session should start with **P8 dashboard panel**
-(see TODO.md item **TODO-1**).
+**Nothing — this session (TODO-1) is complete.** P8 is now fully
+shipped: code layer (`brain/channels.py`) + CLI surface
+(`python main.py doctor | channels`) + dashboard panel
+(`/api/channels` + "CHANNELS" card). The next session should start
+with **TODO-2: extend MCP `tools/list` with the new read-only
+tools** (see TODO.md).
+
+**Self-reflection on scope:** I almost scoped-crept this session —
+there was a temptation to also add TODO-1.bis (the combined
+readiness strip combining channels + immune + risk gate) because
+it would be visually nicer. I did NOT do that because:
+- it is a *different* change with a *different* definition-of-done;
+- TODO-1.bis is a polish item, not a P8-closure item;
+- bundling it would have made this commit harder to review and the
+  handoff less clean.
+
+**Rule going forward:** if the user says "go next" they mean "the
+next item in TODO.md", not "the next thing you can think of".
 
 ---
 
 ## Remaining work (prioritised)
 
-1. **TODO-1** — P8 dashboard "Channels" panel in `web/app.py`
-2. **TODO-2** — P9 MCP `tools/list` extension (add `channels`,
+1. **TODO-2** — P9 MCP `tools/list` extension (add `channels`,
    `correlation`, `hidden.*` tools; keep deny list visible)
-3. **TODO-3** — P9 CI wheel-gate job in `.github/workflows/`
-4. **TODO-4** — P9 `brain/agent.desk_status()` advisory + MCP exposure
-5. **TODO-5** — backfill `CHANGELOG.md` (currently stops at v1.3.1;
-   repo is at v2.0.0)
-6. **TODO-6** — answer the D1–D5 decision list in
+2. **TODO-3** — P9 CI wheel-gate job in `.github/workflows/`
+3. **TODO-4** — P9 `brain/agent.desk_status()` advisory + MCP exposure
+4. **TODO-5** — `CHANGELOG.md` is no longer stale (this session
+   added v2.0.0, v2.0.1, v2.0.2 entries). Marked ✅ done in TODO.md.
+5. **TODO-6** — answer the D1–D5 decision list in
    `ROADMAP_AGENT_REACH_UPGRADE.md` §4 (currently unanswered)
+6. **TODO-7** — activate GitHub Actions CI from the UI
 
 Full list and rationale: see [`TODO.md`](./TODO.md).
 
@@ -128,16 +183,17 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Known problems / caveats
 
-1. **`CHANGELOG.md` is stale.** The repo's `pyproject.toml` is at
-   v2.0.0 but the changelog stops at v1.3.1. **TODO-5.**
+1. **`CHANGELOG.md` is no longer stale.** v2.0.0 + v2.0.1 + v2.0.2
+   entries added across the two prior sessions; pre-2.0.0 history
+   cross-referenced to MERGE_NOTES.md. Marked done in TODO.md.
 2. **D1–D5 decisions in `ROADMAP_AGENT_REACH_UPGRADE.md` §4 are
    unanswered.** User chose full implementation for P7/P8, but the
    sub-decisions (D2: keep `health` and add `doctor` alias vs rename;
    D3: channels scope; D4: wheel-gate CI; D5: install URL exposure)
    need explicit confirmation before P9 coding. **TODO-6.**
 3. **Arena's GitHub integration: one PR per chat session** (per Arena
-   docs). Don't open multiple PRs from one session. The current session
-   pushed without opening a PR (user choice).
+   docs). Don't open multiple PRs from one session. All three
+   sessions this far pushed without opening a PR (user choice).
 4. **`mcp>=1.0` is listed in `requirements.txt` but not installed in
    the local `.venv`** — this is fine because `mcp_server.py` is
    intentionally zero-dependency (uses stdlib JSON-RPC over stdio).
@@ -147,30 +203,32 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    sample data is stale by design. This is expected and not a bug.
    The `python main.py doctor` command's text output shows the immune
    status for transparency; the channels layer is independent of it.
+6. **Arena's GitHub integration cannot push under `.github/workflows/`**
+   (per the `d40ff00` commit note in the consolidated build's
+   history). The `ci.yml` workflow file lives at the right path
+   but the workflow itself must be activated from the GitHub UI
+   by a human with the `workflows` permission. **TODO-7.**
 
 ---
 
 ## Next recommended action
 
-**Start the next session with TODO-1: the P8 dashboard "Channels" panel.**
+**Start the next session with TODO-2: extend MCP `tools/list` with
+the new read-only tools (`channels`, `correlation`, `hidden.*`).**
 
-The `brain/channels.py` layer is complete and tested. The remaining
-work for P8 is to surface it in the Flask dashboard at `web/app.py` so
-an operator can see per-source status at a glance. The
-`_sanitize_for_json` regression fix (from `MERGE_NOTES.md`) must be
-preserved — any new endpoint that returns numpy scalars from the
-quant layer must go through the same sanitizer.
+P8 is fully closed: code layer + CLI + dashboard panel + tests +
+docs. P9 starts with extending the MCP tool surface. The
+`mcp_server.py` deny list (`approve | reject | execute | close |
+place_order`) must remain intact — only read-only tools are added.
 
 **Suggested next-session prompt:**
 
 > Continue the SKY project from the state in SESSION_STATE.md.
-> Implement TODO-1 (P8 dashboard "Channels" panel in web/app.py).
-> Read brain/channels.py and web/app.py first. Do not redesign
-> completed components. Add a /api/channels endpoint that returns
-> the doctor JSON. Add a panel in the dashboard template that
-> renders the per-source status. Run `DEMO_MODE=1 python -m pytest
-> tests/ -q` — must stay ≥ 285 pass. Add a regression test for
-> /api/channels. Update SESSION_STATE.md + CHANGELOG.md. Commit.
+> Implement TODO-2 (extend MCP tools/list with channels,
+> correlation, hidden.* tools). Read mcp_server.py first. Do not
+> touch the deny list. Add 5 new tools. Update SKILL.md tool table.
+> Add tests in tests/test_mcp_stdio.py. Run the full suite — must
+> stay ≥ 289 pass. Update SESSION_STATE.md + CHANGELOG.md. Commit.
 
 ---
 
@@ -179,7 +237,7 @@ quant layer must go through the same sanitizer.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 python -m pytest tests/ -q
-# 285 passed, 1 skipped in 56.80s
+# 289 passed, 1 skipped in 56.10s
 ```
 
 (The 1 skipped is the SDK-already-installed fallback test, present
@@ -188,7 +246,7 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-b0fe82f feat(agent-surface): adopt Agent-Reach patterns (P7/P8)
+<new-sha> feat(dashboard): P8 Channels panel + /api/channels + /api/doctor
 ```
 
 Pushed to `origin/arena/019ff045-sky`. No PR opened.

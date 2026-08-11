@@ -12,35 +12,38 @@
 
 ## 🔥 Top priority — start here in the next session
 
-### TODO-1 · P8 dashboard "Channels" panel · `web/app.py`
+### TODO-1 · P8 dashboard "Channels" panel · `web/app.py` · ✅ DONE (commit `<new-sha>`)
 
-**Why:** the `brain/channels.py` router is implemented and tested, but
-it's not yet visible in the operator dashboard. Without this, the new
-`python main.py doctor` and `python main.py channels` commands work
-from the CLI but not from the web UI, which is the operator's primary
-surface.
+**Status:** complete in this session.
 
-**Scope (small, ~50–100 lines):**
-1. Add a `GET /api/channels` route in `web/app.py` that returns
-   `brain.channels.doctor_report(as_json=True)`.
-2. Add a regression test in `tests/test_web_api.py` that the endpoint
-   returns 200 and valid JSON (the same `_sanitize_for_json` regression
-   fix from `MERGE_NOTES.md` must apply).
-3. Add a "Channels" panel in the dashboard template that renders the
-   per-source status with the same data shape the CLI shows.
-4. Auto-refresh the panel every 30s (matches the existing dashboard
-   auto-refresh cadence).
+**What landed:**
+- `GET /api/channels` — JSON endpoint wrapping
+  `brain.channels.probe_all()`; exception-isolated; goes through
+  `_sanitize_for_json` (no numpy-leak 500s).
+- `GET /api/doctor` — JSON-wrapped text report (same as `python main.py doctor`).
+- Dashboard HTML gained a "CHANNELS — ordered-backend registry (P8)"
+  full-width card. JS: `loadChannels()` renders a status pill row
+  (one per channel) plus a per-channel backend table with
+  `configured / ok / detail / (active)` columns.
+- 5-minute separate auto-refresh for the channels panel (vs. the
+  30s scan tick) — channels are diagnostic state, not signal state.
+- 4 new tests in `tests/test_web_api.py`:
+  `test_channels_endpoint_returns_registry`,
+  `test_channels_endpoint_is_json_serializable_under_numpy_leak`,
+  `test_channels_endpoint_isolates_probe_exceptions`,
+  `test_doctor_endpoint_returns_text_report`.
+- Test count: 285 → **289 pass / 1 skip** (0 regressions).
 
-**Definition of done:**
-- `python main.py web` shows a "Channels" panel with cryptodada /
-  discord / news / llm rows.
-- `GET /api/channels` returns 200 with `{"channels": {...}}`.
-- `DEMO_MODE=1 python -m pytest tests/ -q` is ≥ 286 pass.
-- `SESSION_STATE.md` and `CHANGELOG.md` updated; commit + push.
+**Risk note:** the new panel is "live" but reflects the same
+`brain.channels` registry the CLI uses — so what the operator sees
+in the dashboard is the same data the agent sees in MCP, and the
+same data the CLI prints. No new source of truth, no drift.
 
-**Risk:** low. `brain/channels.py` is already exception-isolated.
-The `_sanitize_for_json` regression was already fixed in the
-consolidated build per `MERGE_NOTES.md`.
+### TODO-1.bis · (deferred) dashboard "doctor" view that combines
+channels + immune system + risk gate into a single readiness strip at
+the top of the dashboard. Out of scope for this session; the
+existing `loadHealth()` and `loadRiskGate()` cards already cover
+this content (they just don't include the channels layer).
 
 ---
 

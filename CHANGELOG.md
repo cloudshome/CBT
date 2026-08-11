@@ -13,13 +13,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Planned
-- TODO-1: P8 dashboard "Channels" panel (`web/app.py` + `/api/channels`).
 - TODO-2: Extend MCP `tools/list` with `channels`, `correlation`,
   `hidden.*` tools.
 - TODO-3: CI wheel-gate job in `.github/workflows/ci.yml`.
 - TODO-4: `brain/agent.desk_status()` advisory.
 - TODO-6: Answer D1–D5 decision list in
   `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
+
+---
+
+## [2.0.2] — 2026-08-11 · branch `arena/019ff045-sky`
+
+### Added — P8 dashboard "Channels" panel (TODO-1 complete)
+- **`GET /api/channels`** in `web/app.py` — JSON endpoint wrapping
+  `brain.channels.probe_all()`. Exception-isolated (a broken probe
+  in one channel cannot crash the endpoint); goes through
+  `_sanitize_for_json` to preserve the numpy-leak fix from
+  `MERGE_NOTES.md`. Returns `{channels: {name: {status, active,
+  backends: [...]}, ...}}`.
+- **`GET /api/doctor`** — JSON-wrapped text report. Same output
+  as `python main.py doctor`; the dashboard panel could call it
+  but uses `/api/channels` directly for the structured view.
+- **Dashboard HTML: new "CHANNELS — ordered-backend registry (P8)"
+  full-width card.** Renders a status pill row (one per channel:
+  `cryptodada / discord / news / llm`) plus a per-channel table
+  with `configured / ok / detail / (active)` columns. Visual design
+  matches the existing `MCP SERVER` card.
+- **JS: `loadChannels()`** — fetches `/api/channels`, renders the
+  card. Wired into the post-render init block.
+- **Separate 5-minute auto-refresh for diagnostic panels** (channels
+  + MCP), distinct from the 30s signal-scan tick. Channels are
+  diagnostic state, not signal state, so a slower cadence is
+  correct.
+- **4 new tests** in `tests/test_web_api.py`:
+  `test_channels_endpoint_returns_registry`,
+  `test_channels_endpoint_is_json_serializable_under_numpy_leak`,
+  `test_channels_endpoint_isolates_probe_exceptions`,
+  `test_doctor_endpoint_returns_text_report`.
+
+### Test count
+- 285 → **289 pass / 1 skip** (0 regressions).
+
+### Self-reflection (in-session)
+This session caught a stale handoff: the previous session's
+`SESSION_STATE.md` said "Last commit: b0fe82f" but the actual HEAD
+was already `498d753` (the docs commit). The handoff memory went
+stale inside the same chat. The lesson: **update SESSION_STATE.md
+at the START of every session, not just at the end.** This entry
+is the first to be documented with the rule.
+
+### Pushed
+- Branch `arena/019ff045-sky` → `origin`. No PR opened.
 
 ---
 
