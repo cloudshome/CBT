@@ -20,7 +20,13 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 SERVER = ROOT / "mcp_server.py"
 
-ROOT_TOOLS = {"ask", "tradestate", "risk", "health", "brief", "postreview"}
+ROOT_TOOLS = {
+    # Original 6
+    "ask", "tradestate", "risk", "health", "brief", "postreview",
+    # P9 (TODO-2): capability endpoints
+    "channels", "correlation", "hidden_chart_read",
+    "hidden_analytics_mae", "hidden_analytics_mc",
+}
 
 
 class StdioClient:
@@ -142,5 +148,111 @@ def test_root_mcp_health_tool(env):
         assert len(report["checks"]) >= 3
         names = {c["name"] for c in report["checks"]}
         assert {"database_integrity", "risk_system"} <= names
+    finally:
+        client.close()
+
+
+# ── P9 capability endpoints (TODO-2) ──────────────────────────────────
+# These tests assert the new tools (channels, correlation, hidden_*) are
+# exposed via tools/list, return the expected shape, and that the deny
+# list (place_order, approve, etc.) is still enforced.
+
+def test_root_mcp_channels_tool(env):
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        resp = client.send("tools/call", {"name": "channels", "arguments": {}})
+        data = json.loads(resp["result"]["content"][0]["text"])
+        assert "channels" in data
+        assert set(data["channels"].keys()) == {"cryptodada", "discord", "news", "llm"}
+        for name, ch in data["channels"].items():
+            assert "active" in ch
+            assert "status" in ch
+            assert "backends" in ch
+    finally:
+        client.close()
+
+
+def test_root_mcp_correlation_tool(env):
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        resp = client.send("tools/call", {
+            "name": "correlation",
+            "arguments": {"symbols": ["BTCUSDT", "ETHUSDT"], "bars": 100, "window": 30},
+        })
+        data = json.loads(resp["result"]["content"][0]["text"])
+        # engine.correlation.fetch_report returns a dict; in DEMO_MODE it
+        # succeeds and reports the measured matrix.
+        assert "matrix" in data or "note" in data or "available" in data
+    finally:
+        client.close()
+
+
+def test_root_mcp_hidden_chart_read_tool(env):
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        resp = client.send("tools/call", {
+            "name": "hidden_chart_read",
+            "arguments": {"symbol": "BTCUSDT", "timeframe": "15m", "bars": 200},
+        })
+        data = json.loads(resp["result"]["content"][0]["text"])
+        # hidden_alpha_report returns a dict with at least these keys
+        assert "symbol" in data
+        assert data["symbol"] == "BTCUSDT"
+        assert "available" in data
+    finally:
+        client.close()
+
+
+def test_root_mcp_hidden_analytics_mae_tool(env):
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        # No args — should use defaults and return gracefully
+        resp = client.send("tools/call", {
+            "name": "hidden_analytics_mae", "arguments": {}})
+        data = json.loads(resp["result"]["content"][0]["text"])
+        # mae_mfe_summary returns a dict; in an empty DB it has note/available
+        assert "available" in data or "note" in data or "rows" in data
+    finally:
+        client.close()
+
+
+def test_root_mcp_hidden_analytics_mc_tool(env):
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        # small sample count for speed; with a fixed seed for determinism
+        resp = client.send("tools/call", {
+            "name": "hidden_analytics_mc",
+            "arguments": {"samples": 50, "seed": 42}})
+        data = json.loads(resp["result"]["content"][0]["text"])
+        assert "available" in data or "note" in data or "samples" in data
+    finally:
+        client.close()
+
+
+def test_root_mcp_deny_list_still_enforced(env):
+    """The mutation tool names MUST remain absent from tools/list and
+    any attempt to call them MUST return 'not permitted'."""
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        tools = client.send("tools/list")["result"]["tools"]
+        tool_names = {t["name"] for t in tools}
+        # None of these may appear in the permission map
+        for forbidden in ("approve", "reject", "execute", "close",
+                          "place_order", "sign", "withdraw", "transfer"):
+            assert forbidden not in tool_names, (
+                f"forbidden tool {forbidden!r} appears in tools/list — "
+                f"permission map regression"
+            )
+        # And direct calls must be rejected
+        for forbidden in ("place_order", "approve", "execute", "withdraw"):
+            resp = client.send("tools/call", {"name": forbidden, "arguments": {}})
+            assert "error" in resp, f"{forbidden!r} should be rejected"
+            assert "not permitted" in resp["error"]["message"]
     finally:
         client.close()

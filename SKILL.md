@@ -84,10 +84,11 @@ bypasses the risk gate. The deny list is enforced at the top of
 | Coach | `python main.py coach <scan_id>` | — | Why the engine said what it said; teaching mode |
 | Agent ask | `python main.py agent ask "am i ready for micro?"` | — | Natural-language desk query (graduation gate) |
 | Agent all | `python main.py agent all` | — | One desk run: health + brief + graduation |
-| Correlation | `python main.py correlation` | — | BTC/ETH/GOLD correlation matrix + ETH/BTC beta |
-| Hidden | `python main.py hidden chart_read BTCUSDT` | — | HMM regime + CVD order flow + Kelly (advisory) |
-| Hidden | `python main.py hidden analytics mae` | — | MAE/MFE summary per setup |
-| Hidden | `python main.py hidden analytics mc --samples 2000` | — | Monte Carlo equity / drawdown distribution |
+| Channels | `python main.py channels` | `channels` | Ordered-backend registry (cryptodada / discord / news / llm) — same data the dashboard "CHANNELS" card shows |
+| Correlation | `python main.py correlation` | `correlation` | BTC/ETH/GOLD correlation matrix + ETH/BTC beta |
+| Hidden | `python main.py hidden chart_read BTCUSDT` | `hidden_chart_read` | HMM regime + CVD order flow + Kelly (advisory) |
+| Hidden | `python main.py hidden analytics mae` | `hidden_analytics_mae` | MAE/MFE summary per setup |
+| Hidden | `python main.py hidden analytics mc --samples 2000` | `hidden_analytics_mc` | Monte Carlo equity / drawdown distribution |
 
 ## How to answer with CryptoBrain
 

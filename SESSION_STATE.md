@@ -6,30 +6,22 @@
 > **Read first** at the start of every new session (see "Start-of-session
 > recipe" at the bottom).
 
-**Last updated:** 2026-08-11 (start of TODO-2 session — stale handoff cleanup)
+**Last updated:** 2026-08-11 (end of TODO-2 session)
 **Branch:** `arena/019ff045-sky`
-**HEAD commit:** `d3a7e8c docs(session-state): record actual SHA 4ca00bb at end of TODO-1 session`
+**HEAD commit:** `<new-sha>` (TODO-2 — see Last commit section below)
 **Default branch:** `main` (last commit `99ace0d`, untouched this session)
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **Self-reflection — lesson from the END of the previous session:**
-> I made the rule "update SESSION_STATE.md at the START, not just at
-> the end" but the previous session's *end-of-session* update itself
-> was incomplete — the narrative sections still contained
-> `<new-sha>` placeholders and the "P8 — implementation complete,
-> dashboard panel pending" status line was never updated to reflect
-> the shipped panel. The new SHAs got recorded (good) but the older
-> narrative blocks didn't get re-read for consistency (bad).
->
-> **Refined rule for this and every future session: when updating
-> SESSION_STATE.md, re-read the entire file and reconcile any
-> pre-existing placeholders, status flags, and "Last commit" lines —
-> not just append new sections.** The "start-of-session update" rule
-> is necessary but not sufficient; a full-document reconciliation
-> pass is the actual contract.
->
-> This file is being reconciled at the START of this session (before
-> TODO-2 begins) so the next session sees a clean slate.
+> **Self-reflection — refined update rule (re-confirmed this session):**
+> "update SESSION_STATE.md at the START, not just at the end" is
+> necessary but not sufficient. The actual contract is: **do a
+> full-document reconciliation pass every time** — re-read the
+> entire file, fix pre-existing placeholders and stale status lines,
+> not just append new sections. The previous session's end-of-session
+> update recorded the new SHAs (good) but left a `<new-sha>`
+> placeholder and a stale "P8 dashboard panel pending" line
+> un-fixed. The new pre-session reconciliation pass at the start
+> of this session fixed both.
 
 ---
 
@@ -61,7 +53,7 @@ plan (18 phases, 15-item rulebook) is in
 | P6 | Hidden Alpha & Variance | ✅ Complete | `engine/hidden_alpha.py`, `engine/execution.py`, `engine/correlation.py`, `brain/analytics.py` |
 | **P7** | **Agent Surface (SKILL + CLI)** | **✅ Complete (this commit)** | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
 | **P8** | **Source Channels (router)** | **✅ Complete** | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel + `/api/doctor` |
-| P9 | Capability Endpoints (extended MCP + CI wheel-gate) | ⏳ Not started | See `ROADMAP_AGENT_REACH_UPGRADE.md` §6 |
+| **P9** | **Capability Endpoints** | **🟡 TODO-2 done; TODO-3/4 remaining** | MCP `tools/list` extended to 11 tools (TODO-2 ✅); CI wheel-gate + `desk_status()` advisory pending (TODO-3, TODO-4) |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -116,6 +108,29 @@ tests stayed at **285 pass / 1 skip**.
 
 2 commits, 5 files changed, **0 regressions**, tests **285 → 289 pass / 1 skip**.
 
+### Session 2026-08-11 #4: TODO-2 P9 MCP capability endpoints — commits `8120dcf` + `<TODO-2-sha>`
+
+2 commits, 4 files changed, **0 regressions**, tests **289 → 295 pass / 1 skip**.
+
+**Commit `8120dcf`:** pre-session reconciliation of stale
+`SESSION_STATE.md` (the previous session's end-of-session update
+left two pre-existing inconsistencies unrepaired). 0 code changes,
+0 test impact. Documents the refined "full-document reconciliation
+pass" rule.
+
+**Commit `<TODO-2-sha>`:** actual TODO-2 work.
+- `mcp_server.py` — 5 new tools in `ALLOWED_TOOLS` (`channels`,
+  `correlation`, `hidden_chart_read`, `hidden_analytics_mae`,
+  `hidden_analytics_mc`); handler branches added in
+  `handle_tool_call`; `SERVER_VERSION` bumped `1.0.0 → 1.1.0`;
+  deny list documented in the module docstring.
+- `tests/test_mcp_stdio.py` — `ROOT_TOOLS` extended to 11 names; 6
+  new tests covering each new tool + the deny-list invariant.
+- `SKILL.md` — 5 rows in the tool table updated from `—` to the new
+  MCP tool name.
+- `TODO.md`, `CHANGELOG.md`, `SESSION_STATE.md` — documentation
+  updates (this section).
+
 **Modified files (additive only):**
 - `web/app.py` — two new endpoints (`/api/channels`, `/api/doctor`),
   new full-width dashboard "CHANNELS" card, new `loadChannels()` JS,
@@ -131,7 +146,7 @@ tests stayed at **285 pass / 1 skip**.
 
 ### Pushed
 
-- All three commits on `arena/019ff045-sky` pushed to `origin`.
+- All four sessions' commits on `arena/019ff045-sky` pushed to `origin`.
 - **No PR opened** (user explicitly chose Option B: branch only).
 - `main` branch untouched at `99ace0d`.
 
@@ -139,38 +154,34 @@ tests stayed at **285 pass / 1 skip**.
 
 ## Currently working on
 
-**Nothing — this session (TODO-1) is complete.** P8 is now fully
-shipped: code layer (`brain/channels.py`) + CLI surface
-(`python main.py doctor | channels`) + dashboard panel
-(`/api/channels` + "CHANNELS" card). The next session should start
-with **TODO-2: extend MCP `tools/list` with the new read-only
-tools** (see TODO.md).
+**Nothing — this session (TODO-2) is complete.** P9 capability
+endpoints are now 50% done: 5 new MCP tools shipped, deny list
+still enforced, 11 read-only tools total. The next session should
+start with **TODO-3: CI wheel-gate job** (see TODO.md).
 
-**Self-reflection on scope:** I almost scoped-crept this session —
-there was a temptation to also add TODO-1.bis (the combined
-readiness strip combining channels + immune + risk gate) because
-it would be visually nicer. I did NOT do that because:
-- it is a *different* change with a *different* definition-of-done;
-- TODO-1.bis is a polish item, not a P8-closure item;
-- bundling it would have made this commit harder to review and the
-  handoff less clean.
+**Self-reflection on scope (this session):** I almost over-scoped
+this session by trying to do TODO-3 (CI wheel-gate) and TODO-4
+(`desk_status()`) in the same commit. I did NOT do that because:
+- TODO-3 depends on a decision (D4: wheel-gate yes/no) that
+  requires user input per TODO-6;
+- TODO-4 is a different change with a different definition-of-done;
+- bundling them would have made the commit harder to review.
 
-**Rule going forward:** if the user says "go next" they mean "the
-next item in TODO.md", not "the next thing you can think of".
+**Rule confirmed:** "go next" = "the next single TODO.md item,
+and only that item".
 
 ---
 
 ## Remaining work (prioritised)
 
-1. **TODO-2** — P9 MCP `tools/list` extension (add `channels`,
-   `correlation`, `hidden.*` tools; keep deny list visible)
-2. **TODO-3** — P9 CI wheel-gate job in `.github/workflows/`
-3. **TODO-4** — P9 `brain/agent.desk_status()` advisory + MCP exposure
-4. **TODO-5** — `CHANGELOG.md` is no longer stale (this session
-   added v2.0.0, v2.0.1, v2.0.2 entries). Marked ✅ done in TODO.md.
-5. **TODO-6** — answer the D1–D5 decision list in
-   `ROADMAP_AGENT_REACH_UPGRADE.md` §4 (currently unanswered)
-6. **TODO-7** — activate GitHub Actions CI from the UI
+1. **TODO-3** — P9 CI wheel-gate job in `.github/workflows/`
+2. **TODO-4** — P9 `brain/agent.desk_status()` advisory + MCP exposure
+3. **TODO-5** — ✅ done (CHANGELOG.md no longer stale — v2.0.0, v2.0.1,
+   v2.0.2, v2.0.3 entries added)
+4. **TODO-6** — answer the D1–D5 decision list in
+   `ROADMAP_AGENT_REACH_UPGRADE.md` §4 (currently unanswered; D4 is
+   now a blocker for TODO-3)
+5. **TODO-7** — activate GitHub Actions CI from the UI
 
 Full list and rationale: see [`TODO.md`](./TODO.md).
 
@@ -209,6 +220,17 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 | `CHANGELOG.md` | MODIFIED | +44 | v2.0.2 entry with self-reflection note |
 | `SESSION_STATE.md` | MODIFIED | – | This file (updated at end-of-session) |
 
+### Session 2026-08-11 #4 (TODO-2 P9 MCP endpoints, commits `8120dcf` + `<TODO-2-sha>`)
+
+| File | Status | Lines | Purpose |
+|---|---|---|---|
+| `mcp_server.py` | MODIFIED | +~120 | 5 new tools in `ALLOWED_TOOLS`; 5 new handler branches in `handle_tool_call`; `SERVER_VERSION` 1.0.0→1.1.0; deny list documented in docstring |
+| `tests/test_mcp_stdio.py` | MODIFIED | +~115 | `ROOT_TOOLS` extended to 11; 6 new tests |
+| `SKILL.md` | MODIFIED | – | 5 rows in the tool table updated (was `—` in the MCP column) |
+| `TODO.md` | MODIFIED | – | TODO-2 marked done |
+| `CHANGELOG.md` | MODIFIED | +49 | v2.0.3 entry |
+| `SESSION_STATE.md` | MODIFIED | – | This file (reconciled + updated) |
+
 ---
 
 ## Known problems / caveats
@@ -243,22 +265,24 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-**Start the next session with TODO-2: extend MCP `tools/list` with
-the new read-only tools (`channels`, `correlation`, `hidden.*`).**
+**Start the next session with TODO-3: P9 CI wheel-gate job.**
 
-P8 is fully closed: code layer + CLI + dashboard panel + tests +
-docs. P9 starts with extending the MCP tool surface. The
-`mcp_server.py` deny list (`approve | reject | execute | close |
-place_order`) must remain intact — only read-only tools are added.
+`mcp_server.py` now exposes 11 read-only tools (TODO-2 ✅). The next
+P9 item is the CI wheel-gate. **Caveat:** TODO-3 depends on the D4
+decision (wheel-gate yes/no), so the first action of the next
+session should be to confirm D4 with the user — if the answer is
+"no", TODO-3 is a no-op and we should move to TODO-4 instead.
 
-**Suggested next-session prompt:**
+**Suggested next-session prompt (assuming D4 = yes):**
 
 > Continue the SKY project from the state in SESSION_STATE.md.
-> Implement TODO-2 (extend MCP tools/list with channels,
-> correlation, hidden.* tools). Read mcp_server.py first. Do not
-> touch the deny list. Add 5 new tools. Update SKILL.md tool table.
-> Add tests in tests/test_mcp_stdio.py. Run the full suite — must
-> stay ≥ 289 pass. Update SESSION_STATE.md + CHANGELOG.md. Commit.
+> Confirm D4 (wheel-gate yes/no) before starting TODO-3 — the
+> decision list is in `ROADMAP_AGENT_REACH_UPGRADE.md` §4. If D4
+> = yes, add a `wheel-gate` job to `.github/workflows/ci.yml` that
+> builds the wheel, installs it in a clean venv, and runs a CLI
+> smoke test. If D4 = no, skip TODO-3 and move to TODO-4
+> (`brain/agent.desk_status()` advisory). In both cases, update
+> SESSION_STATE.md + CHANGELOG.md and commit.
 
 ---
 
@@ -267,7 +291,7 @@ place_order`) must remain intact — only read-only tools are added.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 python -m pytest tests/ -q
-# 289 passed, 1 skipped in 56.10s
+# 295 passed, 1 skipped in 57.18s
 ```
 
 (The 1 skipped is the SDK-already-installed fallback test, present
@@ -276,7 +300,7 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-4ca00bb feat(dashboard): P8 Channels panel + /api/channels + /api/doctor (TODO-1)
+<TODO-2-sha> feat(mcp): P9 capability endpoints — 5 new read-only tools (TODO-2)
 ```
 
 Pushed to `origin/arena/019ff045-sky`. No PR opened.
@@ -314,7 +338,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 285 pass.
+- Maintain test count at ≥ 295 pass.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action.
 - Update CHANGELOG.md.
@@ -329,7 +353,7 @@ state.
 
 1. [ ] Finish or safely stop the current task.
 2. [ ] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 285 pass.
+   ≥ 295 pass.
 3. [ ] Fix any obvious failures.
 4. [ ] Update `SESSION_STATE.md` with the exact current state.
 5. [ ] Update `TODO.md` — mark finished items done, reprioritise.

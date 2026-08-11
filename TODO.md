@@ -49,28 +49,38 @@ this content (they just don't include the channels layer).
 
 ## 🟡 P9 — Capability Endpoints (after TODO-1)
 
-### TODO-2 · Extend MCP `tools/list` with the new read-only tools
+### TODO-2 · Extend MCP `tools/list` with the new read-only tools · ✅ DONE
 
-**Why:** the `mcp_server.py` tool list currently exposes 6 tools
-(`ask | tradestate | risk | health | brief | postreview`). After
-TODO-1 ships, agents should also be able to call `channels`,
-`correlation`, and the `hidden.*` family from MCP clients.
+**Status:** complete in this session.
 
-**Scope:**
-1. Add to `ALLOWED_TOOLS` in `mcp_server.py`:
-   - `channels` (wraps `brain.channels.list_channels(as_json=True)`)
-   - `correlation` (wraps `cmd_correlation`)
-   - `hidden_chart_read` (wraps `python main.py hidden chart_read`)
-   - `hidden_analytics_mae` (wraps `python main.py hidden analytics mae`)
-   - `hidden_analytics_mc` (wraps `python main.py hidden analytics mc`)
-2. Keep the deny list for `approve | reject | execute | close |
-   place_order` — these must never appear in `tools/list`.
-3. Update `SKILL.md` tool table to reflect the new MCP surface.
-4. Add tests in `tests/test_mcp_stdio.py` that the new tools appear
-   in `tools/list` and that the deny list is still intact.
+**What landed (TODO-2 commits):**
+- `mcp_server.py`: 5 new tools in `ALLOWED_TOOLS` (same
+  single-source-of-truth pattern as the existing 6):
+  - `channels` — wraps `brain.channels.list_channels(as_json=True)`
+  - `correlation` — wraps `engine.correlation.fetch_report`
+  - `hidden_chart_read` — wraps `engine.hidden_alpha.hidden_alpha_report`
+  - `hidden_analytics_mae` — wraps `brain.analytics.mae_mfe_summary`
+  - `hidden_analytics_mc` — wraps `brain.analytics.monte_carlo_equity`
+- `SERVER_VERSION` bumped `1.0.0 → 1.1.0` (capability-surface bump).
+- New docstring on the deny list — it now names the forbidden tools
+  (`approve | reject | execute | close | place_order | sign | withdraw
+  | transfer`) so the next person to edit the file knows the
+  invariant.
+- `tests/test_mcp_stdio.py`: `ROOT_TOOLS` extended; 6 new tests:
+  - `test_root_mcp_channels_tool`
+  - `test_root_mcp_correlation_tool`
+  - `test_root_mcp_hidden_chart_read_tool`
+  - `test_root_mcp_hidden_analytics_mae_tool`
+  - `test_root_mcp_hidden_analytics_mc_tool`
+  - `test_root_mcp_deny_list_still_enforced` (8 forbidden names
+    checked both in `tools/list` AND by direct call)
+- `SKILL.md` tool table: 5 new MCP names filled in (was `—`).
+- Test count: 289 → **295 pass / 1 skip** (0 regressions).
 
-**Definition of done:** ≥ 290 pass; `tools/list` exposes the 11
-read-only tools; deny list still enforced.
+**Live verification:** spawned `mcp_server.py` as a subprocess, did
+`initialize` + `tools/list` (11 tools returned), called all 5 new
+tools (all returned clean data), called 4 forbidden tools (all
+rejected with "not permitted").
 
 ### TODO-3 · CI wheel-gate job
 

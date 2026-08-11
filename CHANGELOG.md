@@ -13,12 +13,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Planned
-- TODO-2: Extend MCP `tools/list` with `channels`, `correlation`,
-  `hidden.*` tools.
 - TODO-3: CI wheel-gate job in `.github/workflows/ci.yml`.
 - TODO-4: `brain/agent.desk_status()` advisory.
 - TODO-6: Answer D1–D5 decision list in
   `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
+
+---
+
+## [2.0.3] — 2026-08-11 · branch `arena/019ff045-sky`
+
+### Added — P9 MCP capability endpoints (TODO-2 complete)
+
+`mcp_server.py` (the zero-dep stdio JSON-RPC server) now exposes 5
+new read-only tools, bringing the total from 6 to 11:
+
+| Tool | Wraps | What you get |
+|---|---|---|
+| `channels` | `brain.channels.list_channels(as_json=True)` | Ordered-backend registry (cryptodada / discord / news / llm) — same data the dashboard "CHANNELS" card and `python main.py channels --json` return |
+| `correlation` | `engine.correlation.fetch_report` | Measured BTC/ETH/GOLD rolling correlation matrix + ETH/BTC beta |
+| `hidden_chart_read` | `engine.hidden_alpha.hidden_alpha_report` | HMM latent regime + CVD order flow + Bayesian Kelly for one symbol |
+| `hidden_analytics_mae` | `brain.analytics.mae_mfe_summary` | MAE/MFE summary per setup from the paper-trade DB |
+| `hidden_analytics_mc` | `brain.analytics.monte_carlo_equity` | Monte Carlo equity + drawdown distribution from realized paper outcomes |
+
+### Changed
+- `mcp_server.py:SERVER_VERSION` bumped `1.0.0 → 1.1.0` (capability
+  surface expansion).
+- `mcp_server.py` docstring now explicitly names the deny list
+  (`approve | reject | execute | close | place_order | sign |
+  withdraw | transfer`) so the invariant is self-documenting.
+- `SKILL.md` tool table updated: 5 rows that previously had `—` in
+  the MCP column now list the new tool name.
+- `tests/test_mcp_stdio.py:ROOT_TOOLS` extended to 11 names.
+
+### Tests
+- 6 new tests in `tests/test_mcp_stdio.py`:
+  - `test_root_mcp_channels_tool`
+  - `test_root_mcp_correlation_tool`
+  - `test_root_mcp_hidden_chart_read_tool`
+  - `test_root_mcp_hidden_analytics_mae_tool`
+  - `test_root_mcp_hidden_analytics_mc_tool`
+  - `test_root_mcp_deny_list_still_enforced` — checks 8 forbidden
+    names both in `tools/list` AND by direct call
+- Test count: 289 → **295 pass / 1 skip** (0 regressions).
+
+### Self-reflection (in-session)
+- The previous session's end-of-session `SESSION_STATE.md` update
+  recorded new SHAs but left two pre-existing inconsistencies
+  unrepaired (a `<new-sha>` placeholder and a stale "P8 dashboard
+  panel pending" status line). The refined rule: when updating
+  `SESSION_STATE.md`, do a full-document reconciliation pass — not
+  just append new sections.
+- TODO-2 followed the **library-function-not-subprocess** design
+  pattern. The existing tools (`ask`, `risk`, `health`, etc.) all
+  call library functions directly, not `cmd_*` functions via
+  subprocess; the new tools follow the same pattern. This keeps the
+  surface consistent and avoids the overhead of a process per call.
+
+### Pushed
+- Branch `arena/019ff045-sky` → `origin`. No PR opened.
 
 ---
 
