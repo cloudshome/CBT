@@ -41,7 +41,7 @@ plan (18 phases, 15-item rulebook) is in
 
 ## Current phase
 
-**P8 (Source Channels) — fully complete; P9 in progress (TODO-2 starting).**
+**P8 (Source Channels) — fully complete; P9 in progress (TODO-2 done; TODO-3 next).**
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -99,7 +99,7 @@ tests stayed at **285 pass / 1 skip**.
 **New files:**
 - `SESSION_STATE.md` (256 lines) — handoff memory + start-of-session
   recipe + end-of-session checklist.
-- `TODO.md` (156 lines) — prioritised TODO-1..TODO-7.
+- `TODO.md` (156 lines) — prioritised TODO-1 ✅ + TODO-2 ✅ (done) + TODO-3..TODO-7.
 - `ARCHITECTURE.md` (266 lines) — module map + 10 invariants + data
   flow + config + testing cheatsheets.
 - `CHANGELOG.md` (171 lines) — v2.0.0 + v2.0.1 + Unreleased.
