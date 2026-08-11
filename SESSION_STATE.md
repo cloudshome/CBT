@@ -6,9 +6,9 @@
 > **Read first** at the start of every new session (see "Start-of-session
 > recipe" at the bottom).
 
-**Last updated:** 2026-08-11 (end of TODO-2 session)
+**Last updated:** 2026-08-11 (end of TODO-2 session, after end-of-session reconciliation pass)
 **Branch:** `arena/019ff045-sky`
-**HEAD commit:** `<new-sha>` (TODO-2 — see Last commit section below)
+**HEAD commit:** `83cc1a4 feat(mcp): P9 capability endpoints — 5 new read-only tools (TODO-2)`
 **Default branch:** `main` (last commit `99ace0d`, untouched this session)
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
@@ -108,7 +108,7 @@ tests stayed at **285 pass / 1 skip**.
 
 2 commits, 5 files changed, **0 regressions**, tests **285 → 289 pass / 1 skip**.
 
-### Session 2026-08-11 #4: TODO-2 P9 MCP capability endpoints — commits `8120dcf` + `<TODO-2-sha>`
+### Session 2026-08-11 #4: TODO-2 P9 MCP capability endpoints — commits `8120dcf` + `83cc1a4`
 
 2 commits, 4 files changed, **0 regressions**, tests **289 → 295 pass / 1 skip**.
 
@@ -118,7 +118,7 @@ left two pre-existing inconsistencies unrepaired). 0 code changes,
 0 test impact. Documents the refined "full-document reconciliation
 pass" rule.
 
-**Commit `<TODO-2-sha>`:** actual TODO-2 work.
+**Commit `83cc1a4`:** actual TODO-2 work.
 - `mcp_server.py` — 5 new tools in `ALLOWED_TOOLS` (`channels`,
   `correlation`, `hidden_chart_read`, `hidden_analytics_mae`,
   `hidden_analytics_mc`); handler branches added in
@@ -220,7 +220,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 | `CHANGELOG.md` | MODIFIED | +44 | v2.0.2 entry with self-reflection note |
 | `SESSION_STATE.md` | MODIFIED | – | This file (updated at end-of-session) |
 
-### Session 2026-08-11 #4 (TODO-2 P9 MCP endpoints, commits `8120dcf` + `<TODO-2-sha>`)
+### Session 2026-08-11 #4 (TODO-2 P9 MCP endpoints, commits `8120dcf` + `83cc1a4`)
 
 | File | Status | Lines | Purpose |
 |---|---|---|---|
@@ -300,7 +300,7 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-<TODO-2-sha> feat(mcp): P9 capability endpoints — 5 new read-only tools (TODO-2)
+83cc1a4 feat(mcp): P9 capability endpoints — 5 new read-only tools (TODO-2)
 ```
 
 Pushed to `origin/arena/019ff045-sky`. No PR opened.
