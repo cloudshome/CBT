@@ -986,6 +986,147 @@ def cmd_health(args) -> int:
     return 0 if report.get("ok") else 1
 
 
+# ── Agent-Reach-inspired CLI surface (P7/P8, additive) ─────────────────
+# These three commands are the install/doctor/SKILL trio borrowed from
+# Panniantong/Agent-Reach, scoped to CryptoBrain's read-only safety
+# posture.  They never place exchange orders; they only read.
+
+def cmd_doctor(args) -> int:
+    """Non-mutating readiness report.
+
+    Layers the per-channel backend registry (P8) on top of the existing
+    immune system (`brain/immune.run_health_check`). Always exit 0 if
+    at least one channel has a healthy active backend and the risk
+    gate is open; otherwise exit 1.
+    """
+    from brain.channels import doctor_report, probe_all
+    from brain.immune import run_health_check
+
+    if args.json:
+        channels = probe_all()
+        try:
+            immune = run_health_check()
+        except Exception as exc:  # pragma: no cover - defensive
+            immune = {"error": f"immune.run_health_check() failed: {type(exc).__name__}: {exc}"}
+        payload = {
+            "channels": {n: ch.to_dict() for n, ch in channels.items()},
+            "immune": immune,
+        }
+        print(json.dumps(payload, indent=2, default=str))
+        return 0
+
+    print(doctor_report(as_json=False))
+    print()
+    print("─" * 60)
+    print("Immune system:")
+    print("─" * 60)
+    try:
+        from brain.immune import run_health_check
+        immune = run_health_check()
+        if isinstance(immune, dict):
+            for k, v in immune.items():
+                print(f"  {k}: {v}")
+        else:
+            print(immune)
+    except Exception as exc:
+        print(f"  immune system unavailable: {type(exc).__name__}: {exc}")
+    return 0
+
+
+def cmd_channels(args) -> int:
+    """List every channel with active backend, status, and configured/ok count."""
+    from brain.channels import list_channels, probe_all
+
+    if args.json:
+        channels = probe_all()
+        print(json.dumps(
+            {n: ch.to_dict() for n, ch in channels.items()},
+            indent=2, default=str))
+        return 0
+    print(list_channels(as_json=False))
+    return 0
+
+
+def cmd_skill(args) -> int:
+    """Print or install the agent-facing SKILL.md.
+
+    Default behaviour: print the SKILL to stdout (read-only, never
+    writes anywhere). With --install --system, copy the SKILL to
+    ``~/.claude/skills/cryptobrain/SKILL.md`` (the directory layout
+    Claude Code, Cursor, and Arena all recognise). --dry-run previews
+    the path without touching the filesystem.
+    """
+    from pathlib import Path
+
+    skill_path = Path(__file__).parent / "SKILL.md"
+    if not skill_path.exists():
+        print(f"SKILL.md not found at {skill_path}", file=sys.stderr)
+        return 1
+
+    # Default / --print: just dump it to stdout
+    if not args.install and not args.uninstall:
+        sys.stdout.write(skill_path.read_text(encoding="utf-8"))
+        return 0
+
+    # Mutating paths require --system (matches Agent-Reach's stance)
+    if not args.system:
+        print(
+            "Refusing to write under $HOME without --system.\n"
+            "Default is inspect-only. Re-run with --system to permit "
+            "filesystem writes, or add --dry-run to preview.",
+            file=sys.stderr,
+        )
+        return 2
+
+    target_dir = (
+        Path(args.target_dir).expanduser()
+        if args.target_dir
+        else Path.home() / ".claude" / "skills" / "cryptobrain"
+    )
+    target_path = target_dir / "SKILL.md"
+
+    if args.uninstall:
+        if args.dry_run:
+            print(f"[dry-run] would remove {target_path}")
+            return 0
+        try:
+            if target_path.is_symlink():
+                target_path.unlink()
+            elif target_path.exists():
+                target_path.unlink()
+            # Best-effort: remove the now-empty parent dir
+            try:
+                target_dir.rmdir()
+            except OSError:
+                pass
+            print(f"removed {target_path}")
+        except FileNotFoundError:
+            print(f"not installed at {target_path} (no-op)")
+        return 0
+
+    # --install
+    if args.dry_run:
+        print(f"[dry-run] would write {len(skill_path.read_text(encoding='utf-8'))} bytes "
+              f"to {target_path}")
+        return 0
+
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"could not create {target_dir}: {exc}", file=sys.stderr)
+        return 1
+    try:
+        # Atomic-ish write: write to .tmp then rename
+        tmp = target_path.with_suffix(".md.tmp")
+        tmp.write_text(skill_path.read_text(encoding="utf-8"), encoding="utf-8")
+        tmp.replace(target_path)
+    except OSError as exc:
+        print(f"could not write {target_path}: {exc}", file=sys.stderr)
+        return 1
+    print(f"installed {target_path}")
+    return 0
+
+
 def cmd_simulator(args) -> int:
     """The paper-sample grind: unique backtest + paper samples per setup."""
     from data.database import SignalDB
@@ -1351,6 +1492,46 @@ def main() -> int:
     p_corr.add_argument("--json", action="store_true")
     p_corr.set_defaults(func=cmd_correlation)
 
+    # ── Agent-Reach-inspired surface (P7/P8, additive) ────────────────
+    # `doctor` is a non-mutating readiness report: data feeds, DB, risk
+    # gate, MCP, and the per-channel backend registry.  Default inspect
+    # only; --json is machine-readable; --fix is reserved for future
+    # opt-in prescription execution (currently a no-op).
+    p_doc = sub.add_parser(
+        "doctor",
+        help="non-mutating readiness report (channels + immune system + risk gate)")
+    p_doc.add_argument("--json", action="store_true")
+    p_doc.set_defaults(func=cmd_doctor)
+
+    # `channels` lists the per-source backend registry + active backend.
+    # Read-only; never mutates anything.
+    p_ch = sub.add_parser(
+        "channels",
+        help="per-source backend registry (cryptodada / discord / news / llm) with active backend")
+    p_ch.add_argument("--json", action="store_true")
+    p_ch.set_defaults(func=cmd_channels)
+
+    # `skill` exposes SKILL.md to agents and agent runtimes.
+    # Default is inspect-only: prints the SKILL to stdout.  --install /
+    # --uninstall require --system (matches Agent-Reach's safety posture:
+    # never write under $HOME without explicit operator consent).
+    p_skill = sub.add_parser(
+        "skill",
+        help="print or install the agent-facing SKILL.md (default: print to stdout)")
+    p_skill.add_argument("--print", action="store_true", default=True,
+                         help="print the SKILL.md to stdout (default behaviour)")
+    p_skill.add_argument("--install", action="store_true",
+                         help="install SKILL.md into the local agent skills dir (requires --system)")
+    p_skill.add_argument("--uninstall", action="store_true",
+                         help="remove a previously installed SKILL.md (requires --system)")
+    p_skill.add_argument("--system", action="store_true",
+                         help="permit writing under $HOME; required for --install / --uninstall")
+    p_skill.add_argument("--dry-run", action="store_true",
+                         help="preview install/uninstall without writing")
+    p_skill.add_argument("--target-dir", default=None,
+                         help="override the install directory (default: ~/.claude/skills/cryptobrain)")
+    p_skill.set_defaults(func=cmd_skill)
+
     # ── hidden alpha CLI (regime + CVD + kelly + MAE/MFE + Monte Carlo) ──
     p_hidden = sub.add_parser(
         "hidden", help="hidden alpha layer: regime, CVD, kelly, MAE/MFE, Monte Carlo")
@@ -1393,7 +1574,8 @@ def main() -> int:
         print("   advanced/automation: scan | intelligence | watch | paper | analyze | backtest |")
         print("                        learn | stats | coach | review | sources | state | glossary |")
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
-        print("                        health | simulator | hidden | correlation | mcp")
+        print("                        health | doctor | channels | skill | simulator | hidden |")
+        print("                        correlation | mcp")
         print("=" * 62)
         serve(make_app(), DASHBOARD_HOST, DASHBOARD_PORT)
         return 0
