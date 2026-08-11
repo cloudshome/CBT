@@ -6,11 +6,11 @@
 > **Read first** at the start of every new session (see "Start-of-session
 > recipe" at the bottom).
 
-**Last updated:** 2026-08-11 (end of TODO-2 session, opening PR to consolidate P7/P8/P9 work)
+**Last updated:** 2026-08-11 (end of TODO-2 session, PR #5 opened to consolidate P7/P8/P9 work)
 **Branch:** `arena/019ff045-sky`
-**HEAD commit:** `3a67fbc docs(session-state): final reconciliation pass — P9 status line, TODO-1/TODO-2 marks`
+**HEAD commit:** `5bc9b8e docs: record end-of-session decision — TODO-3 deferred, PR opening`
 **Default branch:** `main` (last commit `99ace0d`, untouched this session)
-**PR:** being opened from `arena/019ff045-sky` → `main` at the end of this session (per user instruction).
+**PR:** [#5 `feat(agent-surface): P7+P8+P9 — SKILL, channels, MCP capability endpoints (9 commits)`](https://github.com/Azimshawon/SKY/pull/5) — **OPEN** at the time of writing.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
 > **End-of-session decision (this session):**
@@ -322,10 +322,11 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-83cc1a4 feat(mcp): P9 capability endpoints — 5 new read-only tools (TODO-2)
+5bc9b8e docs: record end-of-session decision — TODO-3 deferred, PR opening
 ```
 
-Pushed to `origin/arena/019ff045-sky`. No PR opened.
+Pushed to `origin/arena/019ff045-sky`. PR #5 opened to `main` — see
+"PR" line in the header.
 
 ---
 
