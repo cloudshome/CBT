@@ -15,6 +15,7 @@ Usage:
   python main.py agent ask "am i ready for micro?"           # graduation gate
   python main.py agent all                                   # health + briefing + graduation
   python main.py health                                      # system health (+ KuCoin/OKX cross-check)
+  python main.py preflight                                   # strict live-paper operations gate
   python main.py simulator                                   # grind 100/20 sample proof
   python main.py mcp                                         # MCP server for Claude/Cursor
 """
@@ -416,6 +417,18 @@ def cmd_paper(args) -> int:
             return runner.run_once(symbol=symbol, enroll=not args.no_enroll).as_dict()
 
     if args.watch:
+        # Unattended monitoring fails closed.  Demo data can be used only when
+        # the operator explicitly labels the run as a rehearsal.
+        from brain.preflight import format_preflight, preflight_report
+        preflight = preflight_report(allow_demo=bool(getattr(args, "allow_demo", False)))
+        if args.json:
+            print(json.dumps({"event": "preflight", **preflight}, default=str))
+        else:
+            print(format_preflight(preflight))
+        if not preflight["ready"]:
+            print("[!] paper watcher not started: preflight failed", file=sys.stderr)
+            return 2
+
         print(f"Paper runner watching {symbol or 'all approved symbols'} every "
               f"{args.interval}s — Ctrl+C to stop")
         try:
@@ -986,6 +999,17 @@ def cmd_health(args) -> int:
     return 0 if report.get("ok") else 1
 
 
+def cmd_preflight(args) -> int:
+    """Strict readiness gate for unattended live-data paper operations."""
+    from brain.preflight import format_preflight, preflight_report
+    report = preflight_report(allow_demo=args.allow_demo)
+    if args.json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print(format_preflight(report))
+    return 0 if report["ready"] else 2
+
+
 def cmd_simulator(args) -> int:
     """The paper-sample grind: unique backtest + paper samples per setup."""
     from data.database import SignalDB
@@ -1134,6 +1158,10 @@ def main() -> int:
     p_paper.add_argument("--no-enroll", action="store_true",
                          help="only check existing paper trades; do not enroll new approvals")
     p_paper.add_argument("--json", action="store_true", help="machine-readable run summary")
+    p_paper.add_argument(
+        "--allow-demo", action="store_true",
+        help="allow DEMO_MODE=1 for a rehearsal; never counts as live paper evidence",
+    )
     p_paper.set_defaults(func=cmd_paper)
 
     p_src = sub.add_parser("sources", help="pull CryptoDada + Discord + news")
@@ -1320,6 +1348,17 @@ def main() -> int:
     p_health.add_argument("--json", action="store_true")
     p_health.set_defaults(func=cmd_health)
 
+    p_preflight = sub.add_parser(
+        "preflight",
+        help="strict safety/readiness gate before unattended live paper trading",
+    )
+    p_preflight.add_argument("--json", action="store_true")
+    p_preflight.add_argument(
+        "--allow-demo", action="store_true",
+        help="allow sample/synthetic data for a rehearsal (not live evidence)",
+    )
+    p_preflight.set_defaults(func=cmd_preflight)
+
     p_sim = sub.add_parser("simulator",
                            help="grind unique backtest + paper samples per setup (A6/B10)")
     p_sim.add_argument("--rounds", type=int, default=1, help="rounds to run (default 1)")
@@ -1393,7 +1432,7 @@ def main() -> int:
         print("   advanced/automation: scan | intelligence | watch | paper | analyze | backtest |")
         print("                        learn | stats | coach | review | sources | state | glossary |")
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
-        print("                        health | simulator | hidden | correlation | mcp")
+        print("                        health | preflight | simulator | hidden | correlation | mcp")
         print("=" * 62)
         serve(make_app(), DASHBOARD_HOST, DASHBOARD_PORT)
         return 0
