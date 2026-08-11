@@ -28,6 +28,8 @@ Endpoints
   GET /api/agents   desk morning briefing (every watchlist asset + gate + queue)
   GET /api/mcp      MCP server availability + tools
   POST /api/ask     natural-language question to the desk
+  GET /api/channels ordered-backend channel registry (P8; Panniantong/Agent-Reach pattern)
+  GET /api/doctor   human-readable doctor report (same as `python main.py doctor`)
 """
 from __future__ import annotations
 
@@ -780,6 +782,7 @@ function render(d){
   systemCards += card('SYSTEM HEALTH', '<div id="health"><span class="muted">loading…</span></div>');
   systemCards += card('AGENTS — MORNING BRIEFING', '<div id="agents"><span class="muted">building briefing…</span></div>', true);
   systemCards += card('MCP SERVER', '<div id="mcp"><span class="muted">loading…</span></div>');
+  systemCards += card('CHANNELS — ordered-backend registry (P8)', '<div id="channels"><span class="muted">loading…</span></div>');
   systemCards += `<div class="card" style="grid-column:1/-1"><h2>RAW JSON <span class="count">debug</span></h2><details><summary class="kbd" style="cursor:pointer">show raw JSON</summary><pre style="max-height:360px;overflow:auto;font-size:11px;white-space:pre-wrap;margin-top:8px">${esc(JSON.stringify(d,null,2))}</pre></details><div class="note" style="margin-top:8px">LLM narrative: <span style="white-space:pre-wrap">${esc(d.llm?.narrative||'Enable LLM_PROVIDER in .env, or use rule-based output.')}</span></div></div>`;
 
   const html = `
@@ -816,7 +819,7 @@ function render(d){
   switchTab(_activeTab);
   // load async sub-panels
   loadPending(); loadPaper(); loadHistory(); loadLearning(); loadSources();
-  loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist();
+  loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels();
   const symE=document.getElementById('sym'); const tfE=document.getElementById('tf');
   loadChart((symE?symE.value:'BTCUSDT').toUpperCase(), tfE?tfE.value:'15m');
 }
@@ -1098,6 +1101,43 @@ async function loadMcp(){
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
 
+// P8 ordered-backend channel registry.  Renders a per-channel
+// "active backend" indicator plus a per-backend status table.  Mirrors
+// the doctor CLI's output but adapted for the modern dashboard layout.
+async function loadChannels(){
+  const el=document.getElementById('channels'); if(!el) return;
+  try{
+    const d=await (await fetch('/api/channels')).json();
+    if(d.error || !d.channels){ el.innerHTML='<span class="err">'+(d.error||'no channels')+'</span>'; return; }
+    const STATUS_COLOR = {ok:'var(--green)', degraded:'var(--amber)', down:'var(--red)', unknown:'var(--mut)'};
+    const MARK = {ok:'✓', degraded:'○', down:'✗', unknown:'?'};
+    const chs = Object.entries(d.channels);
+    const pills = chs.map(([n, c]) => {
+      const col = STATUS_COLOR[c.status] || 'var(--mut)';
+      return `<span class="badge" style="background:${col}22;border-color:${col};color:${col}">${esc(n)} ${MARK[c.status]||'?'} ${esc(c.status)}</span>`;
+    }).join(' ');
+    const tables = chs.map(([n, c]) => {
+      const rows = (c.backends||[]).map(b => {
+        const mark = (b.configured && b.ok) ? '✓' : (b.configured ? '·' : '✗');
+        const col  = (b.configured && b.ok) ? 'var(--green)' : (b.configured ? 'var(--amber)' : 'var(--mut)');
+        const isActive = b.name === c.active;
+        const detail = b.error || b.detail || '';
+        return `<tr>
+          <td style="color:${col}">${mark}</td>
+          <td><b>${esc(b.name)}</b>${isActive?' <span class="note">(active)</span>':''}</td>
+          <td class="note">${esc(b.label)}</td>
+          <td>${b.configured?'<span class="okc">configured</span>':'<span class="muted">missing</span>'}</td>
+          <td>${b.ok?'<span class="okc">ok</span>':'<span class="muted">—</span>'}</td>
+          <td class="note">${esc(detail)}</td></tr>`;
+      }).join('');
+      return `<div style="margin-top:8px"><b>${esc(n)}</b> <span class="note">— ${esc(c.description||'')}</span>
+        <table style="margin-top:4px"><tr><th></th><th>backend</th><th>role</th><th>config</th><th>probe</th><th>detail</th></tr>${rows}</table></div>`;
+    }).join('');
+    el.innerHTML = `<div class="flex" style="margin-bottom:6px">${pills}</div>${tables}
+      <div class="note" style="margin-top:8px">P8 ordered-backend pattern (Panniantong/Agent-Reach). First configured+ok backend serves; the engine never blocks when nothing is configured. CLI: <code>python main.py channels</code> · <code>python main.py doctor</code>.</div>`;
+  }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
+
 async function askDesk(){
   const q=document.getElementById('askq'); const out=document.getElementById('askout');
   const question=(q?q.value:'').trim(); if(!question) { showToast('Type a question first','err'); return; }
@@ -1317,6 +1357,10 @@ async function coach(){
 })();
 load(true);
 setInterval(()=>{ if(document.getElementById('auto').checked) load(false, true); }, 30000);
+// Channels panel is diagnostic-state (which backend is *serving*),
+// not signal-state, so refresh on a slower 5-minute cadence — not on
+// every 30s scan tick.  Cheap: probe_all() is config-driven.
+setInterval(()=>{ loadChannels(); loadMcp(); }, 5 * 60 * 1000);
 // keep seg active state in sync on load
 try{ if(document.querySelectorAll) document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===document.getElementById('sym').value)); }catch(e){}
 try{ if(document.querySelectorAll) document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===document.getElementById('tf').value)); }catch(e){}
@@ -1663,6 +1707,38 @@ def make_app() -> Flask:
         try:
             from brain.agent import health_report
             return jsonify(health_report())
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.get("/api/channels")
+    def api_channels():
+        """P8 ordered-backend channel registry (Panniantong/Agent-Reach pattern).
+
+        Every external dependency the engine has (data sources + LLM) is a
+        *channel* with an ordered list of backend candidates. The first
+        backend that is configured and probes clean is the *active* one.
+        Channels never block the engine — when nothing is configured, the
+        channel reports ``active: "none"`` and the rest of the brain
+        continues unaffected. Probes are exception-isolated: a broken
+        backend in one channel cannot crash this endpoint.
+        """
+        try:
+            from brain.channels import probe_all
+            channels = probe_all()
+            return jsonify(_sanitize_for_json({
+                "channels": {n: ch.to_dict() for n, ch in channels.items()},
+            }))
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}",
+                            "channels": {}})
+
+    @app.get("/api/doctor")
+    def api_doctor():
+        """Human-readable doctor report — same output as `python main.py doctor`."""
+        try:
+            from brain.channels import doctor_report
+            # doctor_report returns a multi-line string in text mode
+            return jsonify({"report": doctor_report(as_json=False)})
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
 

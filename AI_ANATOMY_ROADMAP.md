@@ -164,3 +164,37 @@ When continuing in a new session or machine:
    - 🛡️ **Never bypass the human approval gate**: Machine proposes, Human approves, Paper-runner executes.
    - 📚 **Grounded answers only**: Every query response must carry explicit citations (`[cited: ...]`).
    - 🧪 **Test-driven integrity**: Keep all 171+ tests passing across all changes.
+
+---
+
+## 🛰️ Next Phases — Agent-Reach-Inspired Upgrade (P7–P9)
+
+Adopting the **operational patterns** of
+[`Panniantong/Agent-Reach`](https://github.com/Panniantong/Agent-Reach)
+(70.5k★, MIT) — *not* its web-scraping surface — so any AI agent
+(Claude, Cursor, Arena, MCP client) can discover, install, doctor, and
+route commands through CryptoBrain.
+
+| Phase | Theme | Deliverables | Status |
+|---|---|---|:---:|
+| **P7** | **Agent surface** | `SKILL.md` (≤ 250 lines) · `python main.py doctor` (alias of `health`) · `python main.py skill --install` · `docs/agent_install.md` | 🟡 Spec-only — see `ROADMAP_AGENT_REACH_UPGRADE.md` §2 |
+| **P8** | **Source channels** | `brain/channels.py` ordered-backend router (CryptoDada/Discord/news/LLM) · `python main.py channels` · dashboard "Channels" panel | 🟡 Spec-only |
+| **P9** | **Capability endpoints** | Extended MCP `tools/list` (13 read-only tools, deny list visible) · CI wheel-gate · `desk_status()` advisory | 🟡 Spec-only |
+
+**Out of scope (deliberate):** web scraping, social-platform logins,
+cookie extraction, audio transcription, third-party CLIs (`gh`,
+`mcporter`, `twitter-cli`, `rdt-cli`, `bili-cli`, `OpenCLI`,
+`ffmpeg`). CryptoBrain's universe is exchange market data + private
+CryptoDada + private Discord + RSS news. The 8 social-platform
+cookie formats Agent-Reach manages are *never used* by a trading
+engine.
+
+**Invariant preserved in every phase:** the engine can never place a
+real exchange order. Deny list enforced at the top of
+`mcp_server.handle_tool_call()`; the human-approval gate remains
+between the machine and any action.
+
+**Full planning document:** [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md)
+— includes honest alignment check, per-phase risk + rollback,
+definition-of-done per phase, and the D1–D5 decision list to
+confirm before coding starts.
