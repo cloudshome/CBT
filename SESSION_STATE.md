@@ -187,8 +187,10 @@ since the consolidated build per `MERGE_NOTES.md`.)
 
 ## Last commit
 
-Recorded after `git commit` at end of session. Look at
-`git log -1 --oneline` on `arena/019ff483-sky`.
+```
+03b9da8 feat(packaging): wheel-gate, pyproject, record D1–D5
+723bbff feat(desk): one-call desk_status advisory (TODO-4)
+```
 
 ---
 
