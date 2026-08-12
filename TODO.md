@@ -14,11 +14,11 @@
 
 ### TODO-7 · Activate GitHub Actions CI · human action
 
-The workflow file lives at `.github/workflows/ci.yml` and now includes
-a `wheel-gate` job. Arena's GitHub integration may still lack the
-`workflows` permission (per commit `d40ff00`). A human with that
-permission must confirm the workflow is enabled in the GitHub UI
-(Actions tab → CI → Enable, or re-commit the file from the UI).
+The job spec lives at `docs/wheel-gate-job.yml` (Arena's GitHub App
+token cannot update `.github/workflows/ci.yml` — the push of that
+path was rejected this session, same as `d40ff00`). A human with
+the `workflows` permission should paste the job into
+`.github/workflows/ci.yml` from the GitHub UI.
 
 Until then, run the gate locally:
 
