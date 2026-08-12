@@ -10,27 +10,47 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-12 (TODO-1.bis shipped + P10 data-infrastructure roadmap recorded)
-**Branch:** `arena/019ff4c3-sky`
+**Last updated:** 2026-08-12 (TODO-11 first grind shipped: 100/20 + sell-R bug fix + journal loop)
+**Branch:** `arena/019ff530-sky`
 **HEAD commit:** see "Last commit" below
 **Default branch:** `main` @ `f0eff12` (PR #6 merged 2026-08-12)
-**PR:** [#7](https://github.com/Azimshawon/SKY/pull/7) — this branch → `main`.
+**PR:** [#9](https://github.com/Azimshawon/SKY/pull/9) — this branch → `main`.
 Opened as the closing step of the session (the standing convention:
 work the session, open the PR before ending it).
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session's decision:** the user asked "can we work on?" and,
-> from the options offered, chose **TODO-1.bis** (the combined
-> dashboard doctor strip) with **no PR**. That was the last
-> non-blocked, non-parked item on the list, so it was implemented
-> end-to-end across all four surfaces.
+> **This session's decision:** the user asked "is this a new session?
+> let's do work" and, per the standing rhythm, the top unblocked item
+> on the list was **TODO-11 (P11 — prove the paper book)**, so that
+> is what this session did, end to end:
 >
-> **Then** the user supplied a large data-infrastructure plan (own the
-> market data, TradingView-style terminal) and asked for it to be
-> recorded for future workload, with corrections, keeping the path to
-> the aim straight. That is now **P10**, planned in
-> [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md).
-> No P10 code was written this session — planning only, deliberately.
+> 1. **Ground truth first:** ran the grind, watched `desk` say
+>    `PAPER_GRIND`, then dug into what the graduation report revealed.
+> 2. **Found + fixed a real engine bug:** sell-side wins were graded
+>    with inverted R (`(tp-entry)/risk` is negative for a short), so
+>    every sell FULL_WIN/PARTIAL_WIN counted as negative-R. This is
+>    why the first report showed sell setups at −1.6…−1.9R. After the
+>    fix the same data shows Sell Pullback **+0.540R**, FVG Retest
+>    Sell **+0.636R**; Sweep Reversal Sell is honestly breakeven
+>    (−0.033R). Regression tests added.
+> 3. **Journal loop:** every closed simulator paper trade now records
+>    a journal entry (`followed_rules=1`, mechanical execution), so
+>    graduation `compliance` reads **100%** instead of `None`.
+> 4. **Grind to a real 100/20:** all four primary setups now hold
+>    thousands of unique backtest + 100+ unique paper samples
+>    (**38,439 decided** primary samples). `learn` now produces a full
+>    per-setup × regime calibration profile from the store.
+> 5. **Precise desk reporting:** `samples counts short` /
+>    `samples expectancy short` instead of the blanket `samples
+>    short`; PAPER_GRIND advice names the exact setup + missing item.
+>
+> The graduation gate is **honestly still closed** (family +0.263R /
+> 34.1% win / PF 1.40 — below the blueprint bar; Sweep Reversal Sell
+> expectancy −0.033R is the last sample-proof gap). That is the gate
+> doing its job, not a defect — the bar is the plan, not a knob.
+>
+> **Not done this session (deliberately):** no new agents, panels, or
+> endpoints; no P10 code; no change to the graduation criteria.
 
 ---
 
@@ -61,9 +81,12 @@ below is ordered by how directly it moves those two lines.
 ## Current phase
 
 **P9 (Capability Endpoints) — complete.** Every planned P7/P8/P9 code
-item has landed. Open items: two *human* GitHub actions (TODO-7,
-TODO-8), the next *engine* item (TODO-11 / P11, paper-book proof), and
-the next *major milestone* (TODO-12 / P10, data infrastructure).
+item has landed. **P11 (paper-book proof) — first grind shipped** this
+session: 100/20 counts done, journal loop done, sell-R bug fixed; the
+graduation *gate* is honestly still closed (family below the blueprint
+bar; Sweep Reversal Sell breakeven). Open items: two *human* GitHub
+actions (TODO-7, TODO-8), and the next *major milestone* (TODO-12 /
+P10, data infrastructure).
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -76,7 +99,7 @@ the next *major milestone* (TODO-12 / P10, data infrastructure).
 | P7 | Agent Surface (SKILL + CLI) | ✅ Complete | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
-| **P11** | **Paper-book proof** | 🔜 Next | Grind to a real 100/20, journal closed trades, move the graduation gate |
+| **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
 | **P10** | **Data infrastructure + market terminal** | 📋 Planned | 12 milestones in [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
 | **P12** | **Regime-conditional backtests** | ⏸ After P10 | Years of stored data, conditioned on OI / funding / CVD |
 
@@ -127,6 +150,48 @@ wheel-gate spec to `docs/.github/workflows/ci.yml`. That path is
 **inert** — nested under `docs/`, GitHub Actions never reads it. TODO-7
 is still open and `docs/HUMAN_ACTIONS.md` now says so explicitly.
 
+### Session 2026-08-12 (this branch): TODO-11 paper-book proof — first grind
+
+Branched from `main` @ `f0eff12`. 0 regressions.
+Tests **339 → 342 pass / 1 skip** (+3). Version **2.2.0 → 2.2.1**.
+
+**The one bug the graduation report revealed (this is why we grind):**
+`data/backtester.py::_evaluate()` graded a SELL win's realized R as
+`(tp - entry) / risk` — negative for a short, so every sell
+FULL_WIN/PARTIAL_WIN was stored as a negative-R trade. Sell-side
+expectancy, win-R and PF were systematically destroyed (first report:
+Sell Pullback −1.855R, Sweep Reversal Sell −1.596R). After the fix,
+the same data shows Sell Pullback **+0.540R**, Sweep Reversal Sell
+**−0.033R** (honestly breakeven), FVG Retest Sell **+0.636R**. The
+paper runner already used `abs()`; only the backtester was wrong.
+
+**Files changed:**
+- `data/backtester.py` — `realized_r()`: side-aware R for
+  FULL_WIN/PARTIAL_WIN (BUY `(exit-entry)/risk`, SELL
+  `(entry-exit)/risk`); LOSS stays −1.0.
+- `data/simulator.py` — `_persist_paper_samples()` journals every
+  closed paper sample (`followed_rules=1`, note "simulator paper
+  sample — mechanical rule-following execution"); `graduation_status()`
+  exposes `sample_gaps`.
+- `brain/agent.py` — `_sample_proof_word()` (precise `counts short` /
+  `expectancy short` / `counts+expectancy short` label) and PAPER_GRIND
+  advice that names the exact primary setup + missing item.
+- `tests/test_backtester.py` — `test_evaluate_sell_win_full` (+2.0R),
+  `test_evaluate_sell_win_partial` (+1.0R).
+- `tests/test_simulator.py` — `test_simulate_round_journals_closed_paper_samples`.
+- `config.py` + `pyproject.toml` — version 2.2.1.
+- Docs: `TODO.md`, `CHANGELOG.md` (v2.2.1), this file.
+
+**First grind numbers (sandbox offline sample/synthetic data):**
+all four primary setups ≥ 100 backtest / ≥ 20 paper unique samples —
+Buy Pullback 9936/367, Sell Pullback 4276/184, Sweep Reversal Buy
+18711/1600, Sweep Reversal Sell 3085/280; **38,439 decided**
+primary-family samples. Graduation gate: expectancy +0.263R,
+win rate 34.1%, PF 1.40, compliance 100% — honestly below the
+blueprint bar, so the gate stays closed. `learn` now calibrates
+every setup × regime (proven pullbacks ×1.12–1.19, Breakout Buy
+dampened ×0.83).
+
 ### Prior sessions (already on `main`)
 
 - **v2.1.0 / PR #6** — `desk_status()` advisory, `next_scheduled_agent()`,
@@ -141,24 +206,37 @@ See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ## Currently working on
 
-Nothing in flight. The working tree is committed and pushed to
-`arena/019ff4c3-sky`.
+The TODO-11 grind is shipped and committed/pushed to
+`arena/019ff530-sky` (PR #9 open). Nothing in flight.
 
-**Planning landed this session (no code):**
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md` — P10, the market-data
-independence phase. It reconciles a user-supplied plan against what
-SKY already has, and records seven corrections (analytics ~80% already
-built; SQLite+Parquet not Postgres+Redis; Lightweight Charts standalone
-not React/Next; no FastAPI/Docker; liquidations can't be backfilled;
+The paper book's **counts** are done (100/20 for every primary setup,
+38,439 decided samples) and the **journal loop** is done (compliance
+100%). What is still open is the graduation gate itself: the primary
+family (+0.263R, 34.1% win, PF 1.40) is below the blueprint bar, and
+Sweep Reversal Sell (−0.033R) is the last sample-proof gap. That is
+the honest, intended state of the ladder — the next session's job is
+to grind more (ideally live) data, not to loosen the bar.
+
+**P10 planning (no code):**
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md` — the market-data independence
+phase. It reconciles a user-supplied plan against what SKY already
+has, and records seven corrections (analytics ~80% already built;
+SQLite+Parquet not Postgres+Redis; Lightweight Charts standalone not
+React/Next; no FastAPI/Docker; liquidations can't be backfilled;
 reuse the existing cross-exchange probe; one-PR-per-session).
 
 ---
 
 ## Remaining work (prioritised)
 
-1. **TODO-11 (P11)** — prove the paper book: grind `simulator` to a
-   real 100/20, journal the closed trades so `compliance` stops being
-   `None`, move the graduation line. Next *code* item. Small.
+1. **TODO-11 (P11) — continue, not start.** Counts (100/20), the
+   journal loop, and the sell-R bug fix are DONE. What remains:
+   grind more (ideally live) data and watch whether Sweep Reversal
+   Sell crosses above zero and the family expectancy climbs; decide
+   on the paper-sample collection strategy (FVG Retest types have
+   0 paper samples because the simulator takes one paper sample per
+   window — best plan only). Do **not** change the blueprint
+   graduation criteria.
 2. **TODO-12 (P10)** — data infrastructure + market terminal. The next
    *major* milestone; 12 shippable steps in
    [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md).
@@ -179,7 +257,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 1. **D1–D5 are answered.** See `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
 2. **Arena's GitHub integration: one PR per chat session.** The
    session convention is: do the work, then open **one** PR as the
-   closing step. PR #7 is this session's.
+   closing step. PR #9 is this session's.
 3. **`mcp>=1.0` is listed in `requirements.txt` but not required**
    for the zero-dep `mcp_server.py`. It is only needed for the
    SDK-based `python main.py mcp` server.
@@ -191,7 +269,18 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    job spec therefore lives at `docs/.github/workflows/ci.yml`, which
    GitHub Actions does **not** execute. Source of truth for running
    the gate is `ci/wheel_gate.py` locally (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.2.0.
+6. **`CHANGELOG.md` is current** through v2.2.1.
+7. **Sweep-reversal setups are breakeven on synthetic data.** The
+   sandbox's deterministic series are smooth random walks with drift —
+   they have no real stop-hunt structure, so sweep plans land near
+   zero expectancy (Sweep Reversal Buy +0.028R, Sell −0.033R) while
+   pullbacks carry the edge (+0.54…+0.70R). Data character, not a bug;
+   the sweep detector was audited and is symmetric/correct.
+8. **FVG Retest types have 0 paper samples.** `_persist_paper_samples`
+   takes one paper sample per window (the highest-confidence plan), so
+   setups that rarely win the confidence contest never earn paper
+   proof (FVG Retest Buy 7,480 bt / 0 pp). Outside the primary family
+   today; noted for a future collection-strategy decision.
 7. **The dashboard readiness strip lives outside `#app`.** `render()`
    replaces `#app.innerHTML` wholesale, so anything inside it would be
    destroyed on every scan. Keep the strip where it is.
@@ -211,24 +300,32 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-1. Next *code* session: start **TODO-11** (paper-book proof). Do not
-   add another AI surface — there are already five and they all agree.
+1. Next *code* session: **continue TODO-11** — the counts (100/20),
+   journal loop, and sell-R fix are done; the graduation gate is
+   honestly still closed. Run `python main.py simulator --bars N
+   --step 1` on more/live data, watch Sweep Reversal Sell and the
+   family expectancy, and journal real (non-simulator) trades as they
+   happen. Do not add another AI surface.
 2. A human does TODO-7 + TODO-8 from
    [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 3. Do **not** start Dify/LibreChat.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md, branch arena/019ff4c3-sky.
-> The readiness strip (TODO-1.bis) is done and the agent surface is
-> complete. Start TODO-11 (P11): prove the paper book. Run
-> `python main.py simulator`, grind to a real 100/20, journal the
-> closed trades, and move the graduation gate. Do not add new agents,
-> panels, or endpoints. Do not start Dify or LibreChat.
+> Continue SKY from SESSION_STATE.md, branch arena/019ff530-sky.
+> TODO-11's first grind is shipped (PR #9): all four primary setups
+> have 100/20 unique samples, closed paper trades are journaled
+> (compliance 100%), and the sell-side R sign bug in the backtester
+> is fixed. Continue TODO-11: grind more (live if possible) data and
+> watch whether Sweep Reversal Sell's expectancy crosses above zero;
+> consider the one-paper-sample-per-window collection strategy (FVG
+> Retest types have 0 paper samples). Do not change the graduation
+> criteria and do not add new agents, panels, or endpoints. Do not
+> start Dify or LibreChat.
 >
-> After P11 lands, the next major milestone is TODO-12 (P10, data
-> infrastructure) — read `docs/DATA_INFRASTRUCTURE_ROADMAP.md` in full
-> before writing any of it, and start at milestone P10.1.
+> After P11's gate moves, the next major milestone is TODO-12 (P10,
+> data infrastructure) — read `docs/DATA_INFRASTRUCTURE_ROADMAP.md` in
+> full before writing any of it, and start at milestone P10.1.
 
 ---
 
@@ -237,14 +334,22 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 339 passed, 1 skipped in 61.80s
+# 342 passed, 1 skipped in 73.09s
+```
+
+Paper-book grind + graduation (offline sample/synthetic data):
+
+```bash
+DEMO_MODE=1 .venv/bin/python main.py simulator --bars 3000 --step 1   # grind
+DEMO_MODE=1 .venv/bin/python main.py desk                             # watch the line
+DEMO_MODE=1 .venv/bin/python main.py learn                            # calibrate from the store
 ```
 
 Local wheel-gate (build + dup-check, no install):
 
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.2.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.2.1-py3-none-any.whl ; no duplicate entries
 ```
 
 Readiness strip, all four surfaces:
@@ -262,8 +367,8 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-see `git log --oneline -3` on arena/019ff4c3-sky
-(this session: one commit — feat(readiness): combined doctor strip)
+see `git log --oneline -3` on arena/019ff530-sky
+(this session: one commit — fix(backtester): sell-side R sign + TODO-11 grind/journal loop)
 ```
 
 ---
@@ -272,7 +377,7 @@ see `git log --oneline -3` on arena/019ff4c3-sky
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ff4c3-sky.
+github.com/Azimshawon/SKY, branch arena/019ff530-sky.
 
 First, inspect the GitHub repository before making changes.
 
@@ -326,5 +431,5 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` / `git push origin arena/019ff4c3-sky`.
+11. [x] `git add` / `git commit` / `git push origin arena/019ff530-sky`.
 12. [x] Open the session PR as the closing step — PR #7.

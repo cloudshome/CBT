@@ -119,6 +119,18 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
     first_sl = first(np.flatnonzero(sl_mask))
     first_tp1 = first(np.flatnonzero(tp1_mask))
 
+    # Realized R is always measured from the entry toward the exit price:
+    # BUY  → (exit - entry) / risk   (exit above entry = positive R)
+    # SELL → (entry - exit) / risk   (exit below entry = positive R)
+    # Fix (2026-08-12): sell-side wins were previously signed as (tp - entry)/risk,
+    # which is negative for a short, so every sell FULL_WIN/PARTIAL_WIN was
+    # recorded as a negative-R trade and destroyed sell-side expectancy/PF.
+    def realized_r(exit_price: float) -> float:
+        if not risk:
+            return 0.0
+        return round((exit_price - entry) / risk, 3) if is_buy \
+            else round((entry - exit_price) / risk, 3)
+
     if first_sl is not None and (first_tp1 is None or first_sl < first_tp1):
         gp.outcome = "LOSS"
         gp.rr_achieved = -1.0
@@ -130,13 +142,13 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
                 tp2_hit = bool((lows[first_tp1:] <= tp2).any())
             if tp2_hit:
                 gp.outcome = "FULL_WIN"
-                gp.rr_achieved = round((tp2 - entry) / risk, 3) if risk else 0.0
+                gp.rr_achieved = realized_r(tp2)
             else:
                 gp.outcome = "PARTIAL_WIN"
-                gp.rr_achieved = round((tp1 - entry) / risk, 3) if risk else 0.0
+                gp.rr_achieved = realized_r(tp1)
         else:
             gp.outcome = "PARTIAL_WIN"
-            gp.rr_achieved = round((tp1 - entry) / risk, 3) if risk else 0.0
+            gp.rr_achieved = realized_r(tp1)
     else:
         gp.outcome = "OPEN"
 

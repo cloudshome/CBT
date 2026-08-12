@@ -42,14 +42,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `.gitignore` — `data/store/**` excluded ahead of P10.1.
 
 ### Planned
-- TODO-11 (P11): prove the paper book — grind to a real 100/20,
-  journal closed trades, move the graduation gate. Next code item.
 - TODO-12 (P10): data infrastructure. Next major milestone.
 - TODO-7: human pastes the wheel-gate job into
   `.github/workflows/ci.yml` (the spec currently sits inert at
   `docs/.github/workflows/ci.yml` — nested under `docs/`, so GitHub
   never runs it).
 - TODO-8: human protects `main` (require PR). Token gets 403.
+
+---
+
+## [2.2.1] — 2026-08-12 · branch `arena/019ff530-sky`
+
+PATCH bump: TODO-11 (P11) paper-book proof — first grind + a real
+engine bug the graduation report revealed.
+
+### Fixed — sell-side R sign inversion (the graduation report's reveal)
+`data/backtester.py::_evaluate()` computed a **SELL** win's realized R
+as `(tp - entry) / risk`. For a short, `tp < entry`, so every sell
+`FULL_WIN` / `PARTIAL_WIN` was recorded with **negative** R — sell-side
+expectancy, win-R and profit factor were systematically destroyed.
+Before the fix the primary family's sell setups measured −1.6R…−1.9R;
+after the fix the same data shows Sell Pullback **+0.540R** and FVG
+Retest Sell **+0.636R** (Sweep Reversal Sell is honestly breakeven at
+−0.033R on synthetic data — no edge, gate correctly stays closed).
+The paper runner already used `abs()` correctly; only the backtester
+was wrong. Regression tests: `test_evaluate_sell_win_full` (+2.0R),
+`test_evaluate_sell_win_partial` (+1.0R).
+
+### Added — TODO-11 grind + journal loop
+- **Simulator journals every closed paper sample.** `_persist_paper_samples`
+  now records a journal entry per closed simulator paper trade with
+  `followed_rules=1` (mechanical execution of the engine's own plan) and a
+  transparent note. The graduation gate's `compliance` criterion
+  (1 − journal violation rate) stopped being `None` — it now reads
+  **100.0%** from real journal rows. `tests/test_simulator.py`
+  `test_simulate_round_journals_closed_paper_samples`.
+- **Precise graduation-gap reporting.** `graduation_status()` exposes
+  `sample_gaps` (the grind_verdict missing list); `python main.py desk`
+  now says `samples counts short` / `samples expectancy short` instead of
+  the blanket `samples short`, and the PAPER_GRIND advice names the exact
+  primary setup + missing item (e.g. "Sweep Reversal Sell sample proof
+  (positive expectancy)"). `brain/agent._sample_proof_word()`.
+
+### Changed
+- `config.VERSION` 2.2.0 → **2.2.1**; `pyproject.toml` to match.
+- First real grind ran on the sandbox's offline sample/synthetic data:
+  **38,439 decided primary-family samples** (all four setups ≥ 100
+  backtest / ≥ 20 paper unique samples), `learn` produced a full
+  per-setup × regime calibration profile (proven setups boosted
+  ×1.1–1.2, losing Breakout Buy dampened ×0.83), and the desk line
+  moved from "samples short · 0 decided" to "expectancy short ·
+  38,439 decided". The blueprint graduation gate remains honestly
+  CLOSED (family expectancy +0.263R < +0.50R, win rate 34.1% < 55%,
+  PF 1.40 < 1.50) — as designed until the edge clears the bar.
+
+### Known characteristics (documented, not bugs)
+- FVG Retest Buy/Sell carry thousands of backtest samples but **0 paper
+  samples**: the simulator takes one paper sample per window (the
+  highest-confidence plan), so setups that rarely win the confidence
+  contest are starved of paper proof. Outside the primary family today;
+  noted for a future collection-strategy decision.
 
 ---
 

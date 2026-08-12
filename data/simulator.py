@@ -188,6 +188,16 @@ def _persist_paper_samples(symbol: str, timeframe: str, samples: list[dict],
             sdb.close_paper_trade(trade["id"], s["outcome"], float(exit_price),
                                   float(graded.rr_achieved), "simulator",
                                   graded.ts)
+            # Journal the closed paper sample (TODO-11): the simulator's paper
+            # trade is a mechanical execution — the engine filled its own plan
+            # at the planned levels and closed at SL/TP, so it followed the
+            # system's rules by construction. Recording followed_rules=1 with
+            # a transparent note lets the graduation gate's compliance
+            # criterion (1 - violation_rate) be computed from real journal
+            # entries instead of staying None forever.
+            sdb.save_journal(scan_id, followed_rules=1, emotion="calm",
+                             mistake="none", notes="simulator paper sample — "
+                             "mechanical rule-following execution")
 
 
 def simulate_round(symbols: list[str] | None = None, timeframe: str = TIMEFRAME,
@@ -372,9 +382,11 @@ def graduation_status(progress: list[dict], compliance: float | None = None) -> 
         "compliance": compliance is not None
                       and compliance >= GRADUATION_CRITERIA["compliance"],
     }
-    samples_ok = grind_verdict(progress)["ready"]
+    verdict = grind_verdict(progress)
+    samples_ok = verdict["ready"]
     return {"ready": bool(samples_ok and all(met.values())),
             "samples_proven": bool(samples_ok),
+            "sample_gaps": verdict["missing"],
             "criteria": dict(GRADUATION_CRITERIA),
             "stats": stats, "met": met}
 

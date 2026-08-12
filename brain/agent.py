@@ -910,8 +910,13 @@ def _desk_advice(status: dict) -> dict:
         for name, ok in met.items():
             if not ok:
                 missing.append(name)
+        # The sample proof can be open for counts OR for expectancy; name
+        # exactly which primary setups are short so the advice is actionable.
+        gaps = graduation.get("sample_gaps") or []
         if not graduation.get("samples_proven", False):
-            missing.append("100/20 sample proof")
+            for m in gaps:
+                missing.append(f"{m.get('plan_type')} sample proof "
+                               f"({m.get('missing')})")
         why = ", ".join(missing) if missing else "graduation gate not met"
         return {
             "action": "PAPER_GRIND",
@@ -930,6 +935,31 @@ def _desk_advice(status: dict) -> dict:
                    "and act only on the desk decision, never the raw scan."),
         "reasons": ["risk gate open", "graduation ready", "queue empty"],
     }
+
+
+def _sample_proof_word(g: dict) -> str:
+    """Precise 'why the sample proof is open' label for the desk line.
+
+    The blanket "samples short" was misleading once the grind had tens of
+    thousands of samples: the gate can also be open because a primary setup's
+    expectancy is still <= 0 even with 100/20 counts.  Distinguish the two
+    from `graduation.sample_gaps` (the grind_verdict missing list).
+    """
+    if g.get("samples_proven"):
+        return "proven"
+    gaps = [str(m.get("missing") or "") for m in (g.get("sample_gaps") or [])]
+    if not gaps:
+        return "unproven"
+    count_short = any("no samples yet" in m or "backtest" in m or "paper" in m
+                      for m in gaps)
+    exp_short = any("positive expectancy" in m for m in gaps)
+    if count_short and exp_short:
+        return "counts+expectancy short"
+    if count_short:
+        return "counts short"
+    if exp_short:
+        return "expectancy short"
+    return "unproven"
 
 
 def format_desk_status(status: dict) -> str:
@@ -971,6 +1001,7 @@ def format_desk_status(status: dict) -> str:
     ]
     for b in gate.get("blocked_by") or []:
         lines.append(f"    ✗ {b}")
+    proof_word = _sample_proof_word(g)
     lines.extend([
         f"  today P&L    : {today_s}  ({today.get('n', 0)} trades)",
         f"  week P&L     : {week_s}  ({week.get('n', 0)} trades)",
@@ -978,8 +1009,7 @@ def format_desk_status(status: dict) -> str:
         f"  scorecard    : n={score.get('n', 0)}  win {wr_s}  "
         f"exp {exp_s}  PF {pf_s}",
         f"  graduation   : {'READY' if g.get('ready') else 'NOT READY'}  "
-        f"(samples {'proven' if g.get('samples_proven') else 'short'} · "
-        f"{gstats.get('n', 0)} decided)",
+        f"(samples {proof_word} · {gstats.get('n', 0)} decided)",
         f"  pending      : {status.get('pending_reviews', 0)} review(s)  ·  "
         f"open exposure {status.get('open_exposure', 0)}",
         f"  next agent   : {next_a.get('name', '?')} — {next_a.get('reason', '')}",

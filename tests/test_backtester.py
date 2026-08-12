@@ -68,6 +68,51 @@ def test_evaluate_sell_loss():
     assert gp.rr_achieved == -1.0
 
 
+def test_evaluate_sell_win_full():
+    """SELL plan where price first hits TP1 then TP2: FULL_WIN must be
+    POSITIVE R (entry-tp2)/risk — regression: it used to be signed as
+    (tp2-entry)/risk, i.e. negative for shorts."""
+    import pandas as pd
+    df = pd.DataFrame({
+        "ts": [1, 2, 3, 4, 5],
+        "open": [100, 99, 97, 95, 94],
+        "high": [101, 100, 98, 96, 95],
+        "low": [99, 98, 96, 94, 93],
+        "close": [100, 99, 97, 95, 94],
+        "volume": [10, 10, 10, 10, 10],
+    })
+    plan = {"type": "Immediate Sell", "action": "SELL", "entry": 100.0,
+            "stop_loss": 103.0, "take_profits": [97.0, 94.0],
+            "confidence": 70, "trigger_level": None}
+    gp = _evaluate(plan, df, i=0, horizon_bars=10)
+    assert gp.outcome == "FULL_WIN"
+    assert gp.rr_achieved == round((100.0 - 94.0) / 3.0, 3)  # +2.0R
+    assert gp.rr_achieved > 0
+    # MAE/MFE stay side-correct too
+    assert gp.max_favorable > 0 and gp.max_adverse >= 0
+
+
+def test_evaluate_sell_win_partial():
+    """SELL plan where price hits TP1 only (never TP2): PARTIAL_WIN R is
+    positive (entry-tp1)/risk."""
+    import pandas as pd
+    df = pd.DataFrame({
+        "ts": [1, 2, 3, 4, 5],
+        "open": [100, 99, 98, 97, 96],
+        "high": [101, 100, 99, 98, 97],
+        "low": [99, 98, 97, 96, 95],
+        "close": [100, 99, 98, 97, 96],
+        "volume": [10, 10, 10, 10, 10],
+    })
+    plan = {"type": "Immediate Sell", "action": "SELL", "entry": 100.0,
+            "stop_loss": 103.0, "take_profits": [97.0, 94.0],
+            "confidence": 70, "trigger_level": None}
+    gp = _evaluate(plan, df, i=0, horizon_bars=10)
+    assert gp.outcome == "PARTIAL_WIN"
+    assert gp.rr_achieved == round((100.0 - 97.0) / 3.0, 3)  # +1.0R
+    assert gp.rr_achieved > 0
+
+
 def test_evaluate_not_triggered():
     """Waiting plan whose entry level is never reached."""
     import pandas as pd

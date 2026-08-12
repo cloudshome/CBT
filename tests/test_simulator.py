@@ -56,6 +56,33 @@ def test_simulate_round_stores_unique_samples(sim_env):
     assert closed == r1["paper_added"]
 
 
+def test_simulate_round_journals_closed_paper_samples(sim_env):
+    """TODO-11: every closed simulator paper trade gets a journal entry with
+    followed_rules=1 (mechanical execution), so the graduation gate's
+    compliance criterion stops being None."""
+    from data.database import SignalDB
+    from data.simulator import simulate_round
+    from brain.journal import violation_rate
+
+    client = FakeClient(n=400, seed=13)
+    r1 = simulate_round(symbols=["BTCUSDT"], bars=400, step=8,
+                        min_confidence=50, horizons=[1], client=client)
+    assert r1["paper_added"] > 0
+
+    with SignalDB() as db:
+        n = db.conn.execute(
+            "SELECT COUNT(*) n FROM journal_entries").fetchone()["n"]
+        j = violation_rate(db)
+    assert n == r1["paper_added"]                  # one journal per paper sample
+    assert j["n"] == r1["paper_added"]
+    assert j["violation_rate"] == 0.0              # mechanical = rule-following
+    with SignalDB() as db:
+        bad = db.conn.execute(
+            "SELECT COUNT(*) n FROM journal_entries "
+            "WHERE followed_rules != 1").fetchone()["n"]
+    assert bad == 0
+
+
 def test_simulate_round_dedupes_exact_rerun(sim_env):
     """Re-simulating the same history adds ZERO samples (honest counts)."""
     from data.simulator import simulate_round

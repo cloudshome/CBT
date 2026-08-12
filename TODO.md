@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-12 (TODO-1.bis shipped; P10 data infrastructure planned)
+**Last updated:** 2026-08-12 (TODO-11 shipped: first 100/20 grind + sell-R bug fix + journal loop)
 
 ---
 
@@ -49,32 +49,50 @@ Anything that moves neither is out of scope.
 
 ## 🔥 Top priority — start here in the next session
 
-### TODO-11 · Prove the paper book · next *code* item · P11
+### TODO-11 · Prove the paper book · first grind shipped · P11
 
-The engine, the agent surface, and the readiness surface are all
-done. The thing that is **not** done is the only thing that unlocks
-real capital: `python main.py desk` still says `PAPER_GRIND` because
-graduation needs 100 unique backtest samples, 20 decided paper
-samples, positive expectancy, > 55% win rate, PF ≥ 1.5, and ≥ 90%
-rule compliance.
+**Done this session (2026-08-12, PR #9):** the grind, the journal
+loop, and the graduation-report bug are all in:
 
-Next session should grind and harden that path, not add more AI
-wrapping:
+- **Grind to a real 100/20 — done.** All four primary setups now hold
+  thousands of unique backtest samples and 100+ unique paper samples
+  (well past 100/20): Buy Pullback 9936/367, Sell Pullback 4276/184,
+  Sweep Reversal Buy 18711/1600, Sweep Reversal Sell 3085/280 —
+  **38,439 decided** primary-family samples on the sandbox's offline
+  sample/synthetic data.
+- **Journal loop — done.** Every closed simulator paper trade gets a
+  journal entry (`followed_rules=1`, mechanical execution), so
+  graduation `compliance` reads **100%** instead of `None`.
+- **Bug the report revealed — fixed.** Sell-side wins were graded with
+  inverted R (`(tp-entry)/risk` is negative for shorts), destroying
+  sell expectancy/PF. Fixed + regression tests; Sell Pullback flipped
+  from −1.9R to **+0.54R**.
+- Desk label precision: `samples expectancy short` instead of the
+  blanket `samples short`; PAPER_GRIND advice names the exact setup
+  and missing item.
 
-```bash
-python main.py simulator          # unique-sample grind
-python main.py desk               # watch the graduation line move
-```
+**Still open — the graduation gate is honestly CLOSED.** The primary
+family as a whole is +0.263R expectancy / 34.1% win rate / PF 1.40 /
+compliance 100% — positive but below the blueprint bar (≥ +0.50R,
+> 55%, ≥ 1.5). Sweep Reversal Sell is breakeven (−0.033R); sweep
+reversals show no edge on smooth synthetic data (no real stop-hunt
+structure). The pullback setups carry the real edge (+0.54…+0.70R).
 
-Concretely: run the grind to a real 100/20, journal the closed
-trades so `compliance` stops being `None`, and fix whatever the
-graduation report reveals. Do **not** add new agents or panels.
+Next session options, in order:
+1. Grind more/live data (`python main.py simulator --bars N --step 1`
+   as new bars arrive; live Binance data once network is available) —
+   watch whether Sweep Reversal Sell crosses above zero and the
+   family expectancy climbs.
+2. Consider the paper-sample collection strategy: FVG Retest types
+   carry thousands of backtest samples but **0 paper samples** because
+   the simulator takes one paper sample per window (best plan only).
+   A per-plan-type paper book would complete the store for `learn`.
+3. Do **not** change the blueprint graduation criteria to make the
+   gate pass — the bar is the plan, not a knob.
 
-**Why this comes before P10:** P11 is days of grinding code that
-already exists; P10 is weeks of new infrastructure. Finishing P11
-keeps the graduation ladder moving and gives P10's backfill a working
-proof-loop to feed. Do not let the data project become a reason to
-stop proving the edge.
+**Why this comes before P10:** P11 keeps the graduation ladder moving
+and gives P10's backfill a working proof-loop to feed. Do not let the
+data project become a reason to stop proving the edge.
 
 ### TODO-12 · P10 · Data infrastructure + market terminal · the next MAJOR milestone
 
