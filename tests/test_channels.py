@@ -335,6 +335,48 @@ def test_main_skill_uninstall_removes_written_file(tmp_path, monkeypatch):
     assert not (target / "SKILL.md").exists()
 
 
+def test_main_doctor_strip_text_runs():
+    """`python main.py doctor --strip` prints the combined verdict (TODO-1.bis)."""
+    import subprocess
+    res = subprocess.run(
+        [sys.executable, str(ROOT / "main.py"), "doctor", "--strip"],
+        capture_output=True, text=True, timeout=40, cwd=str(ROOT),
+        env={**os.environ, "DEMO_MODE": "1"},
+    )
+    assert res.returncode == 0, res.stderr
+    assert "READINESS" in res.stdout
+    for pillar in ("channels", "immune", "risk_gate"):
+        assert pillar in res.stdout
+
+
+def test_main_doctor_strip_json_is_valid():
+    import subprocess
+    res = subprocess.run(
+        [sys.executable, str(ROOT / "main.py"), "doctor", "--strip", "--json"],
+        capture_output=True, text=True, timeout=40, cwd=str(ROOT),
+        env={**os.environ, "DEMO_MODE": "1"},
+    )
+    assert res.returncode == 0, res.stderr
+    parsed = json.loads(res.stdout)
+    assert parsed["level"] in {"ok", "degraded", "blocked", "down"}
+    assert {p["name"] for p in parsed["pillars"]} == {
+        "channels", "immune", "risk_gate"}
+
+
+def test_main_doctor_json_includes_readiness():
+    """The full doctor JSON carries the strip alongside channels + immune."""
+    import subprocess
+    res = subprocess.run(
+        [sys.executable, str(ROOT / "main.py"), "doctor", "--json"],
+        capture_output=True, text=True, timeout=40, cwd=str(ROOT),
+        env={**os.environ, "DEMO_MODE": "1"},
+    )
+    assert res.returncode == 0, res.stderr
+    parsed = json.loads(res.stdout)
+    assert "channels" in parsed and "immune" in parsed
+    assert parsed["readiness"]["level"] in {"ok", "degraded", "blocked", "down"}
+
+
 # ── Roadmap document ─────────────────────────────────────────────────────
 
 def test_roadmap_exists_and_mentions_phases():

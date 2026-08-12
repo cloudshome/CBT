@@ -6,19 +6,43 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-12 (OpenHands/Dify/LibreChat distilled for SKY)
+**Last updated:** 2026-08-12 (TODO-1.bis readiness strip shipped)
 
 ---
 
 ## 🔥 Top priority — start here in the next session
 
-### TODO-7 · Activate GitHub Actions CI · human action
+### TODO-11 · Prove the paper book · next *code* item
 
-The job spec lives at `docs/wheel-gate-job.yml` (Arena's GitHub App
-token cannot update `.github/workflows/ci.yml` — the push of that
-path was rejected this session, same as `d40ff00`). A human with
-the `workflows` permission should paste the job into
-`.github/workflows/ci.yml` from the GitHub UI.
+The engine, the agent surface, and the readiness surface are all
+done. The thing that is **not** done is the only thing that unlocks
+real capital: `python main.py desk` still says `PAPER_GRIND` because
+graduation needs 100 unique backtest samples, 20 decided paper
+samples, positive expectancy, > 55% win rate, PF ≥ 1.5, and ≥ 90%
+rule compliance.
+
+Next session should grind and harden that path, not add more AI
+wrapping:
+
+```bash
+python main.py simulator          # unique-sample grind
+python main.py desk               # watch the graduation line move
+```
+
+Concretely: run the grind to a real 100/20, journal the closed
+trades so `compliance` stops being `None`, and fix whatever the
+graduation report reveals. Do **not** add new agents or panels.
+
+### TODO-7 · Activate GitHub Actions wheel-gate · human action
+
+The job spec sits at **`docs/.github/workflows/ci.yml`**, which is
+**inert** — nested under `docs/`, so GitHub Actions never reads it.
+Only the repository-root `.github/workflows/ci.yml` is executed, and
+Arena's GitHub App token cannot write that path (push rejected twice:
+`d40ff00`, and again this session's predecessor).
+
+A human with the `workflows` permission pastes the `wheel-gate` job
+from the GitHub UI. Click-path: [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 
 Until then, run the gate locally:
 
@@ -34,13 +58,6 @@ on the branch-protection API. Click-path is in
 [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 A trading risk-calc change must never land on `main` unreviewed.
 
-### TODO-1.bis · (deferred) dashboard "doctor" view
-
-A single readiness strip at the top of the dashboard combining
-channels + immune system + risk gate. Out of scope this session;
-`loadHealth()`, `loadRiskGate()`, `loadChannels()`, and the new
-`loadDesk()` cards already cover the content separately.
-
 ---
 
 ## ⏸ Parked — do not start until the gate says so
@@ -50,7 +67,7 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 ### TODO-9 · Dify as a *separate* research layer · AFTER graduation
 
 Not a SKY dependency. Deploy Dify elsewhere and point it at SKY's
-read-only surfaces (`desk`, `ask`, MCP). Start only when
+read-only surfaces (`desk`, `readiness`, `ask`, MCP). Start only when
 `python main.py agent ask "am i ready for micro?"` reports READY.
 
 ### TODO-10 · LibreChat-style chat UI · AFTER TODO-9
@@ -60,50 +77,39 @@ multi-model chat panel is still wanted after Dify.
 
 ---
 
-## ✅ Done this session (2026-08-12)
+## ✅ Done this session (2026-08-12 · `arena/019ff4c3-sky`)
 
-### TODO-4 · `brain/agent.desk_status()` advisory · ✅ DONE
+### TODO-1.bis · combined dashboard doctor strip · ✅ DONE
+
+One readiness verdict across channels + immune system + risk gate,
+rolled up **worst-first** (`ok → degraded → blocked → down`).
 
 **What landed:**
-- `desk_status()` + `format_desk_status()` in `brain/agent.py`
-- `next_scheduled_agent()` in `brain/agents.py`
-- CLI: `python main.py desk` / `desk --json`
-- MCP tool `desk_status` (`SERVER_VERSION` 1.1.0 → 1.2.0)
-- Dashboard: `GET /api/desk` + "DESK STATUS" card on the System tab
-- `ask("what should I do?")` routes to the same snapshot
-- Tests: agent / agents / mcp / web / CLI / dashboard-js
+- `brain/agent.readiness_strip()` + `format_readiness_strip()`, with
+  `_channels_pillar()` / `_immune_pillar()` / `_gate_pillar()` each
+  exception-isolated.
+- CLI: `python main.py doctor --strip` (+ `--json`); plain `doctor`
+  now leads with the strip; `doctor --json` gained a `readiness` key.
+- `GET /api/readiness` (never 500s — degrades to a JSON error).
+- MCP tool `readiness`; `SERVER_VERSION` 1.2.0 → 1.3.0 (13 tools).
+- Dashboard: colour-coded strip above **every** tab, one chip per
+  pillar, refreshed on the 5-minute diagnostic cadence.
+- Docs: SKILL.md, README, ARCHITECTURE (new invariant #10 "one
+  computation, many surfaces"), AI_ANATOMY_ROADMAP, CHANGELOG.
+- Version 2.1.0 → **2.2.0**.
+- Tests 324 → **337 pass / 1 skip** (+13).
 
-Advice is priority-ordered and capital-first:
-`CLEAR_STATE → STAND_ASIDE → REVIEW_QUEUE → JOURNAL → PAPER_GRIND → SCAN`.
+---
 
-### TODO-6 · Answer D1–D5 · ✅ DONE
+## ✅ Done in prior sessions
 
-Recorded in `ROADMAP_AGENT_REACH_UPGRADE.md` §4:
-
-| ID | Answer |
-|---|---|
-| D1 | full P7 (already shipped) |
-| D2 | keep `health`, add `doctor` alias (already shipped) |
-| D3 | 3 data sources + LLM only (already shipped) |
-| D4 | **YES** — wheel-gate |
-| D5 | **YES** — expose `docs/agent_install.md` raw URL |
-
-### TODO-3 · CI wheel-gate content · ✅ DONE (activation = TODO-7)
-
-- `pyproject.toml` (package `cryptobrain` v2.1.0, console script)
-- `cryptobrain/__init__.py` facade so `import cryptobrain` works
-- `ci/wheel_gate.py` — build, reject duplicate zip entries, optional
-  `--install` smoke test (`import cryptobrain` + `cryptobrain doctor`)
-- `wheel-gate` job added to `.github/workflows/ci.yml`
-- `tests/test_wheel_gate.py`
-
-### TODO-0 · PR #5 · ✅ MERGED
-
-Merged 2026-08-11 (`4216448`). This session branched from that HEAD.
-
-### TODO-1 · P8 dashboard Channels panel · ✅ DONE (prior session)
-### TODO-2 · MCP capability endpoints · ✅ DONE (prior session)
-### TODO-5 · CHANGELOG backfill · ✅ DONE (prior session; v2.1.0 added this session)
+- **TODO-4** `desk_status()` advisory (v2.1.0)
+- **TODO-6** D1–D5 answered — `ROADMAP_AGENT_REACH_UPGRADE.md` §4
+- **TODO-3** wheel-gate *content* (`ci/wheel_gate.py`, `pyproject.toml`)
+- **TODO-0** PR #5 merged; **PR #6** merged 2026-08-12
+- **TODO-1** P8 dashboard Channels panel
+- **TODO-2** MCP capability endpoints
+- **TODO-5** CHANGELOG backfill
 
 ---
 
@@ -111,7 +117,7 @@ Merged 2026-08-11 (`4216448`). This session branched from that HEAD.
 
 | ID | Decision | Default |
 |---|---|---|
-| TODO-7 | Paste `docs/wheel-gate-job.yml` into `.github/workflows/ci.yml` | human |
+| TODO-7 | Paste the wheel-gate job into the real `.github/workflows/ci.yml` | human |
 | TODO-8 | Protect `main` (require PR, no direct push) | human / recommend yes |
 
 D1–D5 are already recorded. Do **not** start TODO-9/TODO-10 this
@@ -136,4 +142,6 @@ session or the next.
   `docs/INFRASTRUCTURE_LAYERS.md`.
 - Splitting the desk into new "Market Analyst / Risk Manager /
   News Analyst / Code Maintenance" agents. The four existing desk
-  agents + `desk_status()` already cover that job.
+  agents + `desk_status()` + `readiness_strip()` already cover that job.
+- A *fourth* readiness surface. Channels, immune, gate, desk advice,
+  and the strip are enough; anything new reads `readiness_strip()`.

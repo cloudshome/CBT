@@ -10,20 +10,18 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-12 (end of TODO-4 + D1–D5 + wheel-gate session)
-**Branch:** `arena/019ff483-sky`
-**HEAD commit:** `c0b8a02` (desk_status + wheel-gate + handoff; 4 commits on this branch)
-**Default branch:** `main` @ `4216448` (PR #5 merged 2026-08-11)
-**PR:** [#6](https://github.com/Azimshawon/SKY/pull/6) OPEN / MERGEABLE — this branch → `main`.
+**Last updated:** 2026-08-12 (end of TODO-1.bis readiness-strip session)
+**Branch:** `arena/019ff4c3-sky`
+**HEAD commit:** see "Last commit" below
+**Default branch:** `main` @ `f0eff12` (PR #6 merged 2026-08-12)
+**PR:** none opened this session — the user asked for commit + push only.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session's decision:** the user said "start a new day. work hard."
-> The start-of-session recipe said: confirm PR #5 landed (it did),
-> answer D4, then do TODO-3 or TODO-4. D4's recommended default is
-> YES, so this session did **all three**: record D1–D5, ship TODO-4
-> (`desk_status`), and ship the TODO-3 wheel-gate *content*
-> (`ci/wheel_gate.py` + `pyproject.toml`). Activation of the GitHub
-> Actions workflow remains TODO-7 (human / `workflows` permission).
+> **This session's decision:** the user asked "can we work on?" and,
+> from the options offered, chose **TODO-1.bis** (the combined
+> dashboard doctor strip) with **no PR**. That was the last
+> non-blocked, non-parked item on the list, so it was implemented
+> end-to-end across all four surfaces.
 
 ---
 
@@ -43,8 +41,9 @@ plan (18 phases, 15-item rulebook) is in
 
 ## Current phase
 
-**P9 (Capability Endpoints) — code complete.** Remaining human action
-is TODO-7 (activate GitHub Actions from the UI).
+**P9 (Capability Endpoints) — complete.** Every planned P7/P8/P9 code
+item has landed. The only open items are two *human* GitHub actions
+(TODO-7, TODO-8) and the next *engine* item (TODO-11, paper-book proof).
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -54,9 +53,9 @@ is TODO-7 (activate GitHub Actions from the UI).
 | P4 | MCP Nervous System | ✅ Complete | `mcp_server.py` (zero-dep stdio JSON-RPC 2.0) |
 | P5 | Immune System | ✅ Complete | `brain/immune.py` |
 | P6 | Hidden Alpha & Variance | ✅ Complete | `engine/hidden_alpha.py`, `engine/execution.py`, `engine/correlation.py`, `brain/analytics.py` |
-| **P7** | **Agent Surface (SKILL + CLI)** | **✅ Complete** | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
-| **P8** | **Source Channels (router)** | **✅ Complete** | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel + `/api/doctor` |
-| **P9** | **Capability Endpoints** | **✅ Code complete** | MCP 12 tools (incl. `desk_status`); wheel-gate content landed; CI activation = TODO-7 |
+| P7 | Agent Surface (SKILL + CLI) | ✅ Complete | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
+| P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
+| **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -65,62 +64,73 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-12: TODO-4 + D1–D5 + wheel-gate — this branch
+### Session 2026-08-12 (this branch): TODO-1.bis readiness strip
 
-Branched from `main` @ `4216448` (PR #5 already merged). 0 regressions.
-Tests **306 → 320 pass / 1 skip**.
+Branched from `main` @ `f0eff12`. 0 regressions.
+Tests **324 → 337 pass / 1 skip** (+13). Version **2.1.0 → 2.2.0**.
 
-**TODO-4 `desk_status()`:**
-- `brain/agent.py` — `desk_status()`, `_desk_advice()`, `format_desk_status()`;
-  `ask("what should I do?")` routes to the same snapshot.
-- `brain/agents.py` — `next_scheduled_agent()` + `CORE_AGENTS` /
-  `AGENT_CADENCE_HOURS`.
-- `main.py` — `cmd_desk` / `python main.py desk [--json]`. `main()` now
-  accepts an optional `argv` list.
-- `mcp_server.py` — `desk_status` tool; `SERVER_VERSION` 1.1.0 → 1.2.0.
-- `web/app.py` — `GET /api/desk` + "DESK STATUS" card + `loadDesk()`.
-- Tests in `test_agent.py`, `test_agents.py`, `test_mcp_stdio.py`,
-  `test_web_api.py`, `test_channels.py`, `test_dashboard_js.py`.
+One verdict answering "can I trust the desk right now?", rolled up
+**worst-first** across three pillars that already existed separately:
 
-**TODO-6 D1–D5 answered** (recommended defaults) in
-`ROADMAP_AGENT_REACH_UPGRADE.md` §4. D4 = yes, D5 = yes.
+| Pillar | Source of truth | Levels |
+|---|---|---|
+| `channels` | `brain.channels.probe_all()` | ok / degraded / down |
+| `immune` | `brain.immune.run_health_check()` | ok / degraded / down |
+| `risk_gate` | the gate inside `desk_status()` | ok / degraded / blocked |
 
-**TODO-3 wheel-gate content:**
-- `pyproject.toml` (package `cryptobrain` 2.1.0).
-- `cryptobrain/__init__.py` (`import cryptobrain` facade).
-- `ci/wheel_gate.py` + `tests/test_wheel_gate.py`.
-- `docs/wheel-gate-job.yml` — job spec for a human to paste into
-  `.github/workflows/ci.yml` (TODO-7). The token cannot push
-  under `.github/workflows/` (push rejected this session).
-- Local verification: `python ci/wheel_gate.py` built
-  `cryptobrain-2.1.0-py3-none-any.whl`, no duplicate entries.
+Ladder: `ok < degraded < blocked < down`; only `ok` sets `ready: true`.
 
-**Also:** `config.VERSION` 2.0.0 → 2.1.0.
+**Files changed:**
+- `brain/agent.py` — `readiness_strip()`, `format_readiness_strip()`,
+  `_channels_pillar()`, `_immune_pillar()`, `_gate_pillar()`,
+  `_worst()`, plus the `_READINESS_ORDER` / `_IMMUNE_TO_LEVEL` /
+  `_CHANNEL_TO_LEVEL` maps. Every pillar is exception-isolated.
+- `main.py` — `doctor --strip` flag; `cmd_doctor` leads with the strip
+  in text mode and adds a `readiness` key in `--json` mode.
+- `web/app.py` — `GET /api/readiness` (never 500s), `.strip` CSS,
+  the `#readiness` element above every tab, `loadReadiness()`, wired
+  into `render()`, the init IIFE, and the 5-minute diagnostic timer.
+- `mcp_server.py` — `readiness` tool; `SERVER_VERSION` 1.2.0 → 1.3.0.
+- `config.py` + `pyproject.toml` — version 2.2.0.
+- Tests: `test_agent.py` (+5), `test_web_api.py` (+2),
+  `test_dashboard_js.py` (+2, node-executed), `test_channels.py` (+3),
+  `test_mcp_stdio.py` (+1 and `ROOT_TOOLS` updated).
+- Docs: `SKILL.md`, `README.md`, `ARCHITECTURE.md` (new invariant #10),
+  `AI_ANATOMY_ROADMAP.md`, `CHANGELOG.md` (v2.2.0), `TODO.md`,
+  `docs/HUMAN_ACTIONS.md` (corrected the dead `wheel-gate-job.yml` link).
 
-### Prior sessions (already on `main` via PR #5)
+**Also found and documented:** `main`'s last commit renamed the
+wheel-gate spec to `docs/.github/workflows/ci.yml`. That path is
+**inert** — nested under `docs/`, GitHub Actions never reads it. TODO-7
+is still open and `docs/HUMAN_ACTIONS.md` now says so explicitly.
 
-P7 SKILL + doctor/skill CLI · P8 channels router + dashboard panel ·
-P9 MCP 11-tool surface · handoff memory files · PR #5 conflict
-resolution with main's modern tabbed dashboard. See CHANGELOG
-v2.0.1–v2.0.4 and the previous `SESSION_STATE.md` history on
-`arena/019ff045-sky` if you need the file-level detail.
+### Prior sessions (already on `main`)
+
+- **v2.1.0 / PR #6** — `desk_status()` advisory, `next_scheduled_agent()`,
+  `python main.py desk`, MCP `desk_status`, `/api/desk`, wheel-gate
+  content (`ci/wheel_gate.py` + `pyproject.toml`), D1–D5 recorded.
+- **v2.0.x / PR #5** — P7 SKILL + doctor/skill CLI, P8 channels router
+  + dashboard panel, P9 MCP 11-tool surface, handoff memory files.
+
+See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ---
 
 ## Currently working on
 
-**This follow-up (same branch):** distilled the OpenHands / Dify /
-LibreChat strategy into SKY terms. No new trading code. No new
-dependencies. See `docs/INFRASTRUCTURE_LAYERS.md`.
+Nothing in flight. The working tree is committed and pushed to
+`arena/019ff4c3-sky`.
 
 ---
 
 ## Remaining work (prioritised)
 
-1. **TODO-7** — human pastes `docs/wheel-gate-job.yml` into
-   `.github/workflows/ci.yml`.
-2. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
-3. **TODO-1.bis** — optional combined doctor strip. Not blocking.
+1. **TODO-11** — prove the paper book: grind `simulator` to a real
+   100/20, journal the closed trades so `compliance` stops being
+   `None`, move the graduation line. This is the next *code* item.
+2. **TODO-7** — human pastes the wheel-gate job into the **real**
+   `.github/workflows/ci.yml` (the `docs/` copy is inert).
+3. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
 4. **TODO-9 / TODO-10** — Dify then LibreChat. Parked until the
    graduation gate is READY. Do not start next session.
 
@@ -130,40 +140,43 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Known problems / caveats
 
-1. **D1–D5 are answered.** See `ROADMAP_AGENT_REACH_UPGRADE.md` §4
-   "Recorded answers (session 2026-08-12)".
-2. **Arena's GitHub integration: one PR per chat session** (per Arena
-   docs). Don't open multiple PRs from one session.
-3. **`mcp>=1.0` is listed in `requirements.txt` but not required
-   for the zero-dep `mcp_server.py`.** The `mcp` package is only
-   needed for the SDK-based `python main.py mcp` server.
+1. **D1–D5 are answered.** See `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
+2. **Arena's GitHub integration: one PR per chat session.** No PR was
+   opened this session (user chose commit + push only).
+3. **`mcp>=1.0` is listed in `requirements.txt` but not required**
+   for the zero-dep `mcp_server.py`. It is only needed for the
+   SDK-based `python main.py mcp` server.
 4. **Immune system reports `CRITICAL` in `DEMO_MODE=1`** because the
-   sample data is stale by design. Expected, not a bug.
-5. **Arena may not be able to push under `.github/workflows/`.**
-   The `wheel-gate` job was added to the existing `ci.yml`. If the
-   push of that path is rejected, the source of truth is still
-   `ci/wheel_gate.py` (runs locally) — a human re-applies the job
-   spec from the GitHub UI (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.1.0.
+   committed sample data is stale by design. Expected, not a bug —
+   and it is why `doctor --strip` reports `down` offline. On live
+   data the same pillar goes green.
+5. **Arena cannot push under `.github/workflows/`.** The wheel-gate
+   job spec therefore lives at `docs/.github/workflows/ci.yml`, which
+   GitHub Actions does **not** execute. Source of truth for running
+   the gate is `ci/wheel_gate.py` locally (TODO-7).
+6. **`CHANGELOG.md` is current** through v2.2.0.
+7. **The dashboard readiness strip lives outside `#app`.** `render()`
+   replaces `#app.innerHTML` wholesale, so anything inside it would be
+   destroyed on every scan. Keep the strip where it is.
 
 ---
 
 ## Next recommended action
 
-1. **Merge [PR #6](https://github.com/Azimshawon/SKY/pull/6)** (MERGEABLE).
-2. A human does TODO-8 + TODO-7 from
-   [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md)
-   (protect `main`, paste the wheel-gate job). Token gets 403.
-3. Next *code* session: branch from the new `main`. Do **not**
-   start Dify/LibreChat. Next engine work is proving the paper
-   book (`simulator` / journal / graduation), not more AI wrapping.
+1. Next *code* session: start **TODO-11** (paper-book proof). Do not
+   add another AI surface — there are already five and they all agree.
+2. A human does TODO-7 + TODO-8 from
+   [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
+3. Do **not** start Dify/LibreChat.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md. First check whether PR #6
-> merged. If yes, branch from main. Do not start Dify or LibreChat.
-> If TODO-7/8 are still open, remind the operator (docs/HUMAN_ACTIONS.md)
-> and pick the next *engine* item: paper-book proof, not new agents.
+> Continue SKY from SESSION_STATE.md, branch arena/019ff4c3-sky.
+> The readiness strip (TODO-1.bis) is done and the agent surface is
+> complete. Start TODO-11: prove the paper book. Run
+> `python main.py simulator`, grind to a real 100/20, journal the
+> closed trades, and move the graduation gate. Do not add new agents,
+> panels, or endpoints. Do not start Dify or LibreChat.
 
 ---
 
@@ -172,26 +185,33 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 323 passed, 1 skipped in 62.82s
+# 337 passed, 1 skipped in 61.62s
 ```
 
 Local wheel-gate (build + dup-check, no install):
 
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# built cryptobrain-2.1.0-py3-none-any.whl ; no duplicate entries ; wheel-gate OK
+# builds cryptobrain-2.2.0-py3-none-any.whl ; no duplicate entries
 ```
 
-(The 1 skipped is the SDK-already-installed fallback test, present
+Readiness strip, all four surfaces:
+
+```bash
+DEMO_MODE=1 python main.py doctor --strip          # CLI text
+DEMO_MODE=1 python main.py doctor --strip --json   # CLI JSON
+curl -s localhost:8080/api/readiness                # HTTP
+# MCP: tools/call {"name": "readiness", "arguments": {}}
+```
+
+(The 1 skipped test is the SDK-already-installed fallback, present
 since the consolidated build per `MERGE_NOTES.md`.)
 
 ## Last commit
 
 ```
-c0b8a02 chore: keep wheel-gate job spec out of .github/workflows
-8515897 docs: record session SHAs in SESSION_STATE.md
-03b9da8 feat(packaging): wheel-gate, pyproject, record D1–D5
-723bbff feat(desk): one-call desk_status advisory (TODO-4)
+see `git log --oneline -3` on arena/019ff4c3-sky
+(this session: one commit — feat(readiness): combined doctor strip)
 ```
 
 ---
@@ -200,7 +220,7 @@ c0b8a02 chore: keep wheel-gate job spec out of .github/workflows
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ff483-sky.
+github.com/Azimshawon/SKY, branch arena/019ff4c3-sky.
 
 First, inspect the GitHub repository before making changes.
 
@@ -227,7 +247,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 323 pass.
+- Maintain test count at ≥ 337 pass.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -242,15 +262,14 @@ state.
 
 1. [x] Finish or safely stop the current task.
 2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 320 pass.
+   ≥ 337 pass.
 3. [x] Fix any obvious failures.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
 5. [x] Update `TODO.md` — mark finished items done, reprioritise.
 6. [x] Update `CHANGELOG.md`.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
-9. [ ] Record the last commit SHA (after commit).
+9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [ ] `git add` / `git commit` / `git push origin arena/019ff483-sky`.
-12. [ ] Only open a PR if the user explicitly says so
-    (Arena GitHub limit: one PR per chat session).
+11. [x] `git add` / `git commit` / `git push origin arena/019ff4c3-sky`.
+12. [x] No PR opened — the user explicitly asked for commit + push only.

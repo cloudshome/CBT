@@ -10,7 +10,7 @@
 **Last updated:** 2026-08-12
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.1.0` (also `pyproject.toml`).
+**Version:** `config.VERSION` = `2.2.0` (also `pyproject.toml`).
 
 ---
 
@@ -20,13 +20,13 @@
 | File | Purpose |
 |---|---|
 | `main.py` | argparse CLI dispatcher (~30 `cmd_*` subcommands) |
-| `config.py` | Env-driven config; `VERSION = "2.0.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
+| `config.py` | Env-driven config; `VERSION = "2.2.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
 | `mcp_server.py` | Zero-dep stdio JSON-RPC 2.0 MCP server (read-only tool permission map) |
 | `SKILL.md` | Agent-facing skill file (the one AI agents read first) |
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
 | `TODO.md` | Prioritised remaining work |
 | `ARCHITECTURE.md` | This file |
-| `CHANGELOG.md` | What shipped, when (current through v2.1.0) |
+| `CHANGELOG.md` | What shipped, when (current through v2.2.0) |
 | `BLUEPRINT.md` | The 4-step path from paper to real capital |
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
@@ -36,18 +36,18 @@
 ### `brain/` — the desk brain
 | Module | Purpose | Used by |
 |---|---|---|
-| `agent.py` | `health_report`, `format_health`, `desk_status`, `format_desk_status` | `cmd_health`, `cmd_desk`, MCP `desk_status`, `/api/desk` |
+| `agent.py` | `health_report`, `format_health`, `desk_status`, `format_desk_status`, `readiness_strip`, `format_readiness_strip` | `cmd_health`, `cmd_desk`, `cmd_doctor`, MCP `desk_status` / `readiness`, `/api/desk`, `/api/readiness` |
 | `agents.py` | Autonomous desk agents (morning, watchdog, paper-reviewer, weekly-review), audit-logged to `agent_runs` | `cmd_agent` |
 | `analytics.py` | MAE/MFE summary, Monte Carlo equity/drawdown | `hidden analytics mae/mc` |
 | `ask.py` | RAG query with grounded citations | `cmd_ask`, MCP `ask` |
 | `brief.py` | Cross-asset morning brief + post-trade reviews | `cmd_brief`, `cmd_postreview`, `cmd_agent morning` |
 | `calibrator.py` | Self-improvement profile from graded backtests | `cmd_learn` |
-| `channels.py` | **NEW (P8)** ordered-backend router for cryptodada / discord / news / llm | `cmd_doctor`, `cmd_channels` |
+| `channels.py` | **P8** ordered-backend router for cryptodada / discord / news / llm | `cmd_doctor`, `cmd_channels`, `readiness_strip` |
 | `coach.py` | Why-the-engine-said-what teaching mode | `cmd_coach` |
 | `context.py` | Macro, FOMC/CPI/NFP, fear&greed, BTC dominance, equities | `analyze_full` |
 | `decision.py` | BUY/SELL/NO_TRADE decision logic | `analyze_full` |
 | `full_pipeline.py` | The end-to-end analysis pipeline | `cmd_scan`, `cmd_intelligence` |
-| `immune.py` | Staleness, DB integrity, risk gates, behavioral flags, calibration drift | `cmd_health`, `cmd_doctor` |
+| `immune.py` | Staleness, DB integrity, risk gates, behavioral flags, calibration drift | `cmd_health`, `cmd_doctor`, `readiness_strip` |
 | `institutional_score.py` | Institutional desk-style scoring | `intelligence` |
 | `journal.py` | Professional trading journal | `cmd_journal` |
 | `library.py` | RAG knowledge index | `ask` |
@@ -101,7 +101,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 41 test modules, 323 pass / 1 skip
+### `tests/` — 41 test modules, 337 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
@@ -158,7 +158,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 323 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 337 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -171,7 +171,16 @@
 9. **SESSION_STATE.md is updated at the end of every session.**
    See "End-of-session checklist" in SESSION_STATE.md.
 
-10. **No web scraping of social platforms.** Out of scope per
+10. **One computation, many surfaces.** A verdict the operator can
+    read (readiness, desk advice, doctor, channels) is computed **once**
+    in `brain/` and rendered by the CLI, `/api/*`, MCP, and the
+    dashboard. No surface may compute its own version — that is how
+    two screens start disagreeing about whether it is safe to trade.
+    `brain.agent.readiness_strip()` is the reference example: CLI
+    `doctor --strip`, `GET /api/readiness`, and MCP `readiness` all
+    return the exact same payload.
+
+11. **No web scraping of social platforms.** Out of scope per
     `ROADMAP_AGENT_REACH_UPGRADE.md` §5. Don't add dependencies on
     `browser-cookie3`, `playwright` (only for the CryptoDada
     connector, which already exists), `yt-dlp`, `ffmpeg`, or any

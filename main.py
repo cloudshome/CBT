@@ -1032,18 +1032,44 @@ def cmd_doctor(args) -> int:
     from brain.channels import doctor_report, probe_all
     from brain.immune import run_health_check
 
+    # --strip: the combined one-line-per-pillar verdict (TODO-1.bis).
+    # Same payload the dashboard strip and MCP `readiness` tool render.
+    if getattr(args, "strip", False):
+        from brain.agent import format_readiness_strip, readiness_strip
+        strip = readiness_strip()
+        if args.json:
+            print(json.dumps(strip, indent=2, default=str))
+        else:
+            print(format_readiness_strip(strip))
+        return 0
+
     if args.json:
         channels = probe_all()
         try:
             immune = run_health_check()
         except Exception as exc:  # pragma: no cover - defensive
             immune = {"error": f"immune.run_health_check() failed: {type(exc).__name__}: {exc}"}
+        try:
+            from brain.agent import readiness_strip
+            strip = readiness_strip()
+        except Exception as exc:  # pragma: no cover - defensive
+            strip = {"error": f"readiness_strip() failed: {type(exc).__name__}: {exc}"}
         payload = {
             "channels": {n: ch.to_dict() for n, ch in channels.items()},
             "immune": immune,
+            "readiness": strip,
         }
         print(json.dumps(payload, indent=2, default=str))
         return 0
+
+    # Lead with the combined strip so the operator sees one verdict before
+    # the per-channel detail, then the existing full report.
+    try:
+        from brain.agent import format_readiness_strip, readiness_strip
+        print(format_readiness_strip(readiness_strip()))
+        print()
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"readiness strip unavailable: {type(exc).__name__}: {exc}\n")
 
     print(doctor_report(as_json=False))
     print()
@@ -1564,6 +1590,9 @@ def main(argv: list[str] | None = None) -> int:
         "doctor",
         help="non-mutating readiness report (channels + immune system + risk gate)")
     p_doc.add_argument("--json", action="store_true")
+    p_doc.add_argument("--strip", action="store_true",
+                       help="print only the combined readiness strip "
+                            "(one line per pillar) instead of the full report")
     p_doc.set_defaults(func=cmd_doctor)
 
     # `channels` lists the per-source backend registry + active backend.

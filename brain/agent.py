@@ -990,3 +990,183 @@ def format_desk_status(status: dict) -> str:
     if detail:
         lines.append(f"               {detail}")
     return "\n".join(lines)
+
+
+# ── readiness strip (TODO-1.bis) ─────────────────────────────────────────
+# One combined "doctor" verdict across the three independent readiness
+# surfaces the desk already reports separately:
+#
+#   channels  (brain/channels.probe_all)  — can I still see the world?
+#   immune    (brain/immune.run_health_check) — is the machine itself sane?
+#   risk gate (inside desk_status)        — am I allowed to trade?
+#
+# The strip does not invent a fourth source of truth: every pillar reads
+# the same library function the CLI / MCP / dashboard already read, so no
+# surface can drift from another.  Read-only; never places an order.
+
+#: Worst-first severity ladder. Index = how bad; higher wins the rollup.
+_READINESS_ORDER = ("ok", "degraded", "blocked", "down")
+
+#: immune.run_health_check() status → readiness level.
+_IMMUNE_TO_LEVEL = {"OK": "ok", "WARN": "degraded", "CRITICAL": "down"}
+
+#: channels.Channel.status → readiness level.
+_CHANNEL_TO_LEVEL = {"ok": "ok", "degraded": "degraded",
+                     "down": "down", "unknown": "degraded"}
+
+
+def _worst(levels) -> str:
+    """Roll a list of readiness levels up to the worst one present."""
+    worst = "ok"
+    for lvl in levels:
+        if _READINESS_ORDER.index(lvl) > _READINESS_ORDER.index(worst):
+            worst = lvl
+    return worst
+
+
+def _channels_pillar() -> dict:
+    """Channel pillar: how many source channels have a live backend."""
+    try:
+        from brain.channels import probe_all
+        channels = probe_all()
+    except Exception as exc:
+        return {"name": "channels", "level": "down", "headline": "channels unavailable",
+                "detail": f"{type(exc).__name__}: {exc}", "items": []}
+
+    items = []
+    for name, ch in channels.items():
+        items.append({"name": name,
+                      "status": ch.status,
+                      "level": _CHANNEL_TO_LEVEL.get(ch.status, "degraded"),
+                      "active": ch.active})
+    live = [i for i in items if i["status"] == "ok"]
+    down = [i for i in items if i["status"] == "down"]
+
+    if down:
+        level = "down"
+        headline = f"{len(down)} channel(s) down"
+    elif not live:
+        level = "degraded"
+        headline = "no channel has a configured backend"
+    elif len(live) < len(items):
+        level = "degraded"
+        headline = f"{len(live)}/{len(items)} channels live"
+    else:
+        level = "ok"
+        headline = f"{len(live)}/{len(items)} channels live"
+
+    detail = ", ".join(f"{i['name']}={i['active'] or '-'}" for i in items)
+    return {"name": "channels", "level": level, "headline": headline,
+            "detail": detail, "items": items}
+
+
+def _immune_pillar() -> dict:
+    """Immune pillar: DB integrity, data freshness, risk system, calibration."""
+    try:
+        from brain.immune import run_health_check
+        report = run_health_check()
+    except Exception as exc:
+        return {"name": "immune", "level": "down", "headline": "immune check failed",
+                "detail": f"{type(exc).__name__}: {exc}", "items": []}
+
+    checks = report.get("checks") or []
+    items = [{"name": c.get("name", "?"),
+              "status": c.get("status", "OK"),
+              "level": _IMMUNE_TO_LEVEL.get(c.get("status", "OK"), "degraded"),
+              "detail": c.get("detail", "")}
+             for c in checks]
+    level = _IMMUNE_TO_LEVEL.get(report.get("status", "OK"), "degraded")
+    n_crit = int(report.get("critical_count") or 0)
+    n_warn = int(report.get("warn_count") or 0)
+    if n_crit:
+        headline = f"{n_crit} critical check(s)"
+    elif n_warn:
+        headline = f"{n_warn} warning(s)"
+    else:
+        headline = f"{len(items)} check(s) ok"
+    failing = [i["detail"] for i in items if i["level"] != "ok"]
+    return {"name": "immune", "level": level, "headline": headline,
+            "detail": "; ".join(failing) if failing else report.get("summary", ""),
+            "items": items, "status": report.get("status", "OK")}
+
+
+def _gate_pillar(status: dict) -> dict:
+    """Risk-gate pillar, read straight off an existing desk_status snapshot."""
+    gate = status.get("risk_gate") or {}
+    blocked = list(gate.get("blocked_by") or [])
+    flags = list(gate.get("trader_flags") or [])
+    allowed = bool(gate.get("allowed"))
+
+    if allowed and not flags:
+        level, headline = "ok", "gate OPEN"
+    elif allowed and flags:
+        level, headline = "degraded", f"gate OPEN with flags: {', '.join(flags)}"
+    else:
+        level, headline = "blocked", "gate CLOSED"
+
+    detail = "; ".join(blocked) if blocked else (
+        ", ".join(flags) if flags else "no blocks")
+    return {"name": "risk_gate", "level": level, "headline": headline,
+            "detail": detail, "open": allowed, "blocked_by": blocked,
+            "flags": flags}
+
+
+def readiness_strip(status: dict | None = None) -> dict:
+    """Combined channels + immune + risk-gate readiness verdict.
+
+    The single strip the dashboard shows above every tab, and the same
+    payload `python main.py doctor --strip` and MCP `readiness` return.
+    Pass an existing ``desk_status()`` snapshot to avoid re-computing it.
+
+    Read-only. Never mutates state, never places an order. Every pillar
+    is exception-isolated: one broken probe degrades that pillar instead
+    of failing the strip.
+    """
+    if status is None:
+        status = desk_status()
+
+    pillars = [_channels_pillar(), _immune_pillar(), _gate_pillar(status)]
+    level = _worst(p["level"] for p in pillars)
+
+    advice = status.get("advice") or {}
+    if level == "ok":
+        headline = "desk ready"
+    elif level == "degraded":
+        weak = [p["name"] for p in pillars if p["level"] == "degraded"]
+        headline = "desk degraded — " + ", ".join(weak)
+    elif level == "blocked":
+        headline = "desk blocked — risk gate closed"
+    else:
+        bad = [p["name"] for p in pillars if p["level"] == "down"]
+        headline = "desk not ready — " + ", ".join(bad)
+
+    return json_safe({
+        "time": status.get("time"),
+        "version": status.get("version", VERSION),
+        "level": level,
+        "ready": level == "ok",
+        "headline": headline,
+        "pillars": pillars,
+        "advice": {"action": advice.get("action"),
+                   "headline": advice.get("headline")},
+    })
+
+
+def format_readiness_strip(strip: dict) -> str:
+    """One-line-per-pillar text block for `python main.py doctor --strip`."""
+    mark = {"ok": "✓", "degraded": "○", "blocked": "!", "down": "✗"}
+    lines = [
+        "=" * 66,
+        f"READINESS — {strip.get('level', '?').upper()}: {strip.get('headline', '')}",
+        "-" * 66,
+    ]
+    for p in strip.get("pillars") or []:
+        lines.append(f"  {mark.get(p['level'], '?')} {p['name']:<10} "
+                     f"{p['level']:<9} {p.get('headline', '')}")
+        if p.get("detail"):
+            lines.append(f"      {p['detail']}")
+    advice = strip.get("advice") or {}
+    if advice.get("action"):
+        lines.append("-" * 66)
+        lines.append(f"  ADVICE       : {advice['action']} — {advice.get('headline', '')}")
+    return "\n".join(lines)

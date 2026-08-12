@@ -170,6 +170,88 @@ def test_desk_status_clear_state_when_angry(desk_env):
     assert status["advice"]["action"] == "CLEAR_STATE"
 
 
+# ── readiness strip (TODO-1.bis) ─────────────────────────────────────────
+
+def test_readiness_strip_shape_and_json(desk_env):
+    """readiness_strip() rolls three pillars into one verdict, JSON-safe."""
+    import json
+    from brain.agent import readiness_strip
+    strip = readiness_strip()
+    for key in ("time", "version", "level", "ready", "headline",
+                "pillars", "advice"):
+        assert key in strip, f"readiness_strip missing {key!r}"
+    assert strip["level"] in {"ok", "degraded", "blocked", "down"}
+    assert strip["ready"] == (strip["level"] == "ok")
+    assert {p["name"] for p in strip["pillars"]} == {
+        "channels", "immune", "risk_gate"}
+    for p in strip["pillars"]:
+        assert p["level"] in {"ok", "degraded", "blocked", "down"}
+        assert p["headline"]
+    json.dumps(strip)  # must not raise
+
+
+def test_readiness_strip_rolls_up_worst_pillar(desk_env, monkeypatch):
+    """The verdict is the WORST pillar, never an average."""
+    import brain.agent as agent
+    monkeypatch.setattr(agent, "_channels_pillar", lambda: {
+        "name": "channels", "level": "ok", "headline": "4/4 live", "detail": ""})
+    monkeypatch.setattr(agent, "_immune_pillar", lambda: {
+        "name": "immune", "level": "ok", "headline": "4 check(s) ok", "detail": ""})
+    assert agent.readiness_strip()["level"] == "ok"
+
+    monkeypatch.setattr(agent, "_immune_pillar", lambda: {
+        "name": "immune", "level": "degraded", "headline": "1 warning(s)",
+        "detail": "stale data"})
+    strip = agent.readiness_strip()
+    assert strip["level"] == "degraded"
+    assert "immune" in strip["headline"]
+
+    monkeypatch.setattr(agent, "_channels_pillar", lambda: {
+        "name": "channels", "level": "down", "headline": "1 channel(s) down",
+        "detail": ""})
+    strip = agent.readiness_strip()
+    assert strip["level"] == "down"
+    assert strip["ready"] is False
+
+
+def test_readiness_strip_reports_closed_gate_as_blocked(desk_env):
+    """A closed gate is 'blocked' — worse than degraded, better than down."""
+    import brain.agent as agent
+    from data.database import SignalDB
+    with SignalDB() as db:
+        db.set_trader_state(angry=True, note="tilted")
+    pillar = agent._gate_pillar(agent.desk_status())
+    assert pillar["level"] == "blocked"
+    assert pillar["open"] is False
+
+
+def test_readiness_strip_survives_broken_pillar(desk_env, monkeypatch):
+    """A crashing probe degrades its own pillar, never the whole strip."""
+    import brain.channels as channels
+    import brain.agent as agent
+
+    def boom():
+        raise RuntimeError("probe exploded")
+
+    monkeypatch.setattr(channels, "probe_all", boom)
+    strip = agent.readiness_strip()
+    assert strip["level"] == "down"
+    ch = next(p for p in strip["pillars"] if p["name"] == "channels")
+    assert ch["level"] == "down"
+    assert "RuntimeError" in ch["detail"]
+    # the other two pillars still reported
+    assert {p["name"] for p in strip["pillars"]} == {
+        "channels", "immune", "risk_gate"}
+
+
+def test_format_readiness_strip(desk_env):
+    from brain.agent import format_readiness_strip, readiness_strip
+    text = format_readiness_strip(readiness_strip())
+    assert "READINESS" in text
+    for pillar in ("channels", "immune", "risk_gate"):
+        assert pillar in text
+
+
 def test_ask_desk_intent(desk_env):
     from brain.agent import ask
     r = ask("what should I do right now?")

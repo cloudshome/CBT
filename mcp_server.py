@@ -27,7 +27,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.2.0"  # bumped: TODO-4 added desk_status advisory
+SERVER_VERSION = "1.3.0"  # bumped: TODO-1.bis added readiness strip
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -153,6 +153,14 @@ ALLOWED_TOOLS = {
             "properties": {},
         },
     },
+    # ── P9: combined readiness strip (TODO-1.bis) ────────────────────
+    "readiness": {
+        "description": "Combined readiness verdict across three pillars — source channels, immune system, and the risk gate — rolled up worst-first to ok/degraded/blocked/down. Read-only; the same as `python main.py doctor --strip --json` and GET /api/readiness. Ask this first to know whether the desk can be trusted right now.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
 }
 
 
@@ -249,6 +257,12 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
     elif name == "desk_status":
         from brain.agent import desk_status
         return desk_status()
+
+    elif name == "readiness":
+        # Combined channels + immune + risk-gate verdict. Read-only;
+        # every pillar is exception-isolated inside readiness_strip().
+        from brain.agent import readiness_strip
+        return readiness_strip()
 
     raise ValueError(f"Unhandled tool: {name}")
 

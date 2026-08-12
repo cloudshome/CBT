@@ -12,17 +12,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
+### Planned
+- TODO-7: human pastes the wheel-gate job into
+  `.github/workflows/ci.yml` (the spec currently sits inert at
+  `docs/.github/workflows/ci.yml` — nested under `docs/`, so GitHub
+  never runs it).
+- TODO-8: human protects `main` (require PR). Token gets 403.
+
+---
+
+## [2.2.0] — 2026-08-12 · branch `arena/019ff4c3-sky`
+
+MINOR bump: new readiness surface across CLI, HTTP, MCP, and dashboard.
+
+### Added — TODO-1.bis combined doctor strip
+
+One verdict answering "can I trust the desk right now?", rolled up
+**worst-first** across the three readiness pillars the desk already
+reported separately:
+
+| Pillar | Source of truth | Levels |
+|---|---|---|
+| `channels` | `brain.channels.probe_all()` | ok / degraded / down |
+| `immune` | `brain.immune.run_health_check()` | ok / degraded / down |
+| `risk_gate` | the gate inside `desk_status()` | ok / degraded / blocked |
+
+Rollup ladder: `ok < degraded < blocked < down`. The strip never
+invents a fourth source of truth — every pillar reads the same library
+function the CLI, MCP, and dashboard already read, so no surface can
+drift from another.
+
+- **`brain/agent.readiness_strip()`** + `format_readiness_strip()`.
+  Each pillar is exception-isolated: a crashing probe degrades that
+  pillar to `down` instead of failing the whole strip.
+- **`python main.py doctor --strip`** (`--json` for the machine blob).
+  Plain `doctor` now leads with the strip before the per-channel
+  detail; `doctor --json` gained a `readiness` key.
+- **`GET /api/readiness`** — never 500s; degrades to
+  `{ok: false, level: "down", error: …}`.
+- **MCP `readiness` tool** — `SERVER_VERSION` 1.2.0 → 1.3.0
+  (13 read-only tools). Deny list unchanged.
+- **Dashboard readiness strip** above every tab (`loadReadiness()`),
+  colour-coded by level with one chip per pillar and the current desk
+  advice. Lives outside `#app`, so it resolves before the first scan
+  does; refreshes on the 5-minute diagnostic cadence, not the 30s
+  scan tick.
+
+### Changed
+- `config.VERSION` 2.1.0 → **2.2.0**; `pyproject.toml` to match.
+
+### Test count
+- 324 → **337 pass / 1 skip** (+13). 0 regressions.
+
+New coverage: pillar rollup order, closed-gate → `blocked`, crashing
+probe isolation, `/api/readiness` shape + never-500, node-executed
+dashboard render of the strip (verdict, chips, error payload), and
+the three new CLI paths.
+
+### Prior unreleased entries folded in
 - `docs/INFRASTRUCTURE_LAYERS.md` — SKY-only map of OpenHands / Dify /
   LibreChat. Study patterns; never vendor. Dify after graduation;
   LibreChat last.
 - `tests/test_handoff_memory.py` — SESSION_STATE / TODO / layers-doc
   contract so a dead Arena session cannot ship a rotting handoff.
-
-### Planned
-- TODO-7: human pastes `docs/wheel-gate-job.yml` into
-  `.github/workflows/ci.yml`.
-- TODO-8: human protects `main` (require PR). Token gets 403.
 
 ---
 

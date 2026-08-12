@@ -179,7 +179,7 @@ route commands through CryptoBrain.
 |---|---|---|:---:|
 | **P7** | **Agent surface** | `SKILL.md` (≤ 250 lines) · `python main.py doctor` (alias of `health`) · `python main.py skill --install` · `docs/agent_install.md` | ✅ Complete |
 | **P8** | **Source channels** | `brain/channels.py` ordered-backend router (CryptoDada/Discord/news/LLM) · `python main.py channels` · dashboard "Channels" panel | ✅ Complete |
-| **P9** | **Capability endpoints** | MCP `tools/list` = 12 read-only tools (deny list visible) · `desk_status()` advisory · wheel-gate (`ci/wheel_gate.py` + `pyproject.toml`) | ✅ Complete (CI activation still TODO-7) |
+| **P9** | **Capability endpoints** | MCP `tools/list` = 13 read-only tools (deny list visible) · `desk_status()` advisory · `readiness_strip()` combined doctor verdict (`doctor --strip` / `/api/readiness` / MCP `readiness`) · wheel-gate (`ci/wheel_gate.py` + `pyproject.toml`) | ✅ Complete (CI activation still TODO-7) |
 
 **Out of scope (deliberate):** web scraping, social-platform logins,
 cookie extraction, audio transcription, third-party CLIs (`gh`,
