@@ -10,47 +10,48 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-12 (TODO-11 first grind shipped: 100/20 + sell-R bug fix + journal loop)
-**Branch:** `arena/019ff530-sky`
+**Last updated:** 2026-08-12 (P10.1 shipped: normalised Candle schema + Parquet store)
+**Branch:** `arena/019ff579-sky`
 **HEAD commit:** see "Last commit" below
-**Default branch:** `main` @ `f0eff12` (PR #6 merged 2026-08-12)
-**PR:** [#9](https://github.com/Azimshawon/SKY/pull/9) — this branch → `main`.
-Opened as the closing step of the session (the standing convention:
-work the session, open the PR before ending it).
+**Default branch:** `main` @ `d0ddb42` (PR #9 merged 2026-08-12)
+**PR:** [#10](https://github.com/Azimshawon/SKY/pull/10) — this branch → `main`.
+Opened as the closing step of the session (the standing convention: work
+the session, open the PR before ending it).
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session's decision:** the user asked "is this a new session?
-> let's do work" and, per the standing rhythm, the top unblocked item
-> on the list was **TODO-11 (P11 — prove the paper book)**, so that
-> is what this session did, end to end:
+> **This session's decision:** the user brought a ChatGPT-authored
+> "AI trading brain" build plan and said *"keep going to our sequel
+> road to build."* The reconciliation was done first (per SKY's own
+> rule: DO NOT BUILD MORE — FIRST UNDERSTAND WHAT ALREADY EXISTS):
+> the plan re-describes much of what P1–P9 already shipped, and its
+> own data-first ordering independently lands on where the repo
+> already was — **P10, data independence** (`TODO-12`). So this
+> session did not start an audit of what exists; it built the **first
+> shippable P10 milestone**:
 >
-> 1. **Ground truth first:** ran the grind, watched `desk` say
->    `PAPER_GRIND`, then dug into what the graduation report revealed.
-> 2. **Found + fixed a real engine bug:** sell-side wins were graded
->    with inverted R (`(tp-entry)/risk` is negative for a short), so
->    every sell FULL_WIN/PARTIAL_WIN counted as negative-R. This is
->    why the first report showed sell setups at −1.6…−1.9R. After the
->    fix the same data shows Sell Pullback **+0.540R**, FVG Retest
->    Sell **+0.636R**; Sweep Reversal Sell is honestly breakeven
->    (−0.033R). Regression tests added.
-> 3. **Journal loop:** every closed simulator paper trade now records
->    a journal entry (`followed_rules=1`, mechanical execution), so
->    graduation `compliance` reads **100%** instead of `None`.
-> 4. **Grind to a real 100/20:** all four primary setups now hold
->    thousands of unique backtest + 100+ unique paper samples
->    (**38,439 decided** primary samples). `learn` now produces a full
->    per-setup × regime calibration profile from the store.
-> 5. **Precise desk reporting:** `samples counts short` /
->    `samples expectancy short` instead of the blanket `samples
->    short`; PAPER_GRIND advice names the exact setup + missing item.
+> 1. **P10.1 — Schema + store shipped.** `data/store.py` adds the
+>    normalised `Candle` schema (§4 of the roadmap), a partitioned
+>    Parquet store under `data/store/**` (gitignored), and an upsert
+>    PK `(exchange, market, symbol, timeframe, ts)` that kills the
+>    duplicate-row bug class. `normalise_klines()` is the single
+>    adapter boundary P10.2's backfill will feed.
+> 2. **13 new offline tests** (`tests/test_store.py`): schema/dtypes,
+>    round-trip, upsert dedup (last-write-wins), out-of-order→sorted,
+>    duplicate-ts collapse, unclosed-candle drop, year/month partition
+>    boundary, range filter, empty read, series isolation.
+> 3. **Safety rule enforced in code:** an unclosed candle (`closed=False`)
+>    is never persisted into immutable history.
+> 4. **Deps:** added `pyarrow` (only the roadmap-permitted P10 additions;
+>    `websockets` waits for P10.10). Version **2.2.1 → 2.3.0**.
 >
-> The graduation gate is **honestly still closed** (family +0.263R /
-> 34.1% win / PF 1.40 — below the blueprint bar; Sweep Reversal Sell
-> expectancy −0.033R is the last sample-proof gap). That is the gate
-> doing its job, not a defect — the bar is the plan, not a knob.
+> **Result:** `DEMO_MODE=1` suite **342 → 355 pass / 1 skip** (+13),
+> fully offline. No strategy, risk-gate, or engine behaviour changed —
+> P10 changes inputs, not the brain.
 >
-> **Not done this session (deliberately):** no new agents, panels, or
-> endpoints; no P10 code; no change to the graduation criteria.
+> **Not done this session (deliberately):** no P10.2+ code, no new
+> agents/panels/endpoints, no change to the graduation criteria (P11
+> gate honestly still closed). The ChatGPT plan's RAG/agent/desk phases
+> remain re-descriptions of existing P1–P9 work — not new builds.
 
 ---
 
@@ -80,13 +81,11 @@ below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**P9 (Capability Endpoints) — complete.** Every planned P7/P8/P9 code
-item has landed. **P11 (paper-book proof) — first grind shipped** this
-session: 100/20 counts done, journal loop done, sell-R bug fixed; the
+**P10 (data infrastructure + market terminal) — started; P10.1 shipped.**
+P9 complete; P11 (paper-book proof) has shipped its first grind but the
 graduation *gate* is honestly still closed (family below the blueprint
 bar; Sweep Reversal Sell breakeven). Open items: two *human* GitHub
-actions (TODO-7, TODO-8), and the next *major milestone* (TODO-12 /
-P10, data infrastructure).
+actions (TODO-7, TODO-8); the rest of P10 (P10.2 → P10.12).
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -100,7 +99,7 @@ P10, data infrastructure).
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
-| **P10** | **Data infrastructure + market terminal** | 📋 Planned | 12 milestones in [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
+| **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1 shipped** (`data/store.py`); P10.2 (Binance backfill) next. 12 milestones in [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
 | **P12** | **Regime-conditional backtests** | ⏸ After P10 | Years of stored data, conditioned on OI / funding / CVD |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
@@ -110,7 +109,37 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-12 (this branch): TODO-1.bis readiness strip
+### Session 2026-08-12 (this branch): P10.1 — schema + Parquet store
+
+Branched from `main` @ `d0ddb42` (PR #9). 0 regressions.
+Tests **342 → 355 pass / 1 skip** (+13). Version **2.2.1 → 2.3.0**.
+
+**What landed:**
+- `data/store.py` — `CandleStore`: normalised `Candle` schema (§4 of the
+  roadmap), partitioned Parquet store under `data/store/**` (gitignored),
+  upsert PK `(exchange, market, symbol, timeframe, ts)`, `normalise_klines()`
+  adapter boundary, `coerce_candle_frame()` / `empty_frame()`.
+- Unclosed-candle rule enforced in code: `closed=False` rows never persist.
+- `tests/test_store.py` — 13 offline deterministic tests (round-trip, dedup
+  last-write-wins, ordering, partition boundary, range filter, etc.).
+- Deps: `pyarrow>=15.0` added (`requirements.txt`, `pyproject.toml`).
+- Docs: `CHANGELOG.md` (v2.3.0), `docs/DATA_INFRASTRUCTURE_ROADMAP.md`
+  (P10.1 shipped), `TODO.md`, this file.
+
+**Files changed:** `data/store.py` (new), `tests/test_store.py` (new),
+`requirements.txt`, `pyproject.toml`, `config.py`, `CHANGELOG.md`,
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `TODO.md`, `SESSION_STATE.md`.
+
+**Last successful test command:**
+`DEMO_MODE=1 python -m pytest tests/ -q` → **355 passed / 1 skipped**.
+
+**Known open issues (unchanged):** P11 graduation gate honestly closed;
+TODO-7 (human pastes wheel-gate job into real `.github/workflows/ci.yml`);
+TODO-8 (human protects `main`).
+
+---
+
+### Session 2026-08-12 (prior branch): TODO-1.bis readiness strip
 
 Branched from `main` @ `f0eff12`. 0 regressions.
 Tests **324 → 339 pass / 1 skip** (+15). Version **2.1.0 → 2.2.0**.
@@ -422,14 +451,14 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 1. [x] Finish or safely stop the current task.
 2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 339 pass.
+   ≥ 355 pass (339 previous bar).
 3. [x] Fix any obvious failures.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
 5. [x] Update `TODO.md` — mark finished items done, reprioritise.
 6. [x] Update `CHANGELOG.md`.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
-9. [x] Record the last commit reference.
+9. [x] Record the last commit reference — `ffa1bd8`.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` / `git push origin arena/019ff530-sky`.
-12. [x] Open the session PR as the closing step — PR #7.
+11. [x] `git add` / `git commit` / `git push origin arena/019ff579-sky`.
+12. [x] Open the session PR as the closing step — **PR #10**.

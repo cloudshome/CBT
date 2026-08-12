@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cryptobrain"
-version = "2.2.1"
+version = "2.3.0"
 description = "Multi-source, multi-indicator trading signal engine for BTC, ETH, and XAUUSD/GOLD. Read-only by design — never places an exchange order."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,6 +16,7 @@ dependencies = [
     "requests>=2.31",
     "flask>=3.0",
     "python-dotenv>=1.0",
+    "pyarrow>=15.0",   # P10 Parquet candle store (data/store.py)
 ]
 
 [project.optional-dependencies]

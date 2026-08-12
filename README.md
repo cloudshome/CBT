@@ -36,7 +36,7 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 | **Notifiers** | Telegram + Discord webhook push of signals |
 | **Backtester** | Walk-forward grading of every plan at +1h/+4h/+24h → win-rate, avg R, expectancy by plan type / confidence / action |
 | **Signal database** | SQLite learning store — every scan + every graded outcome, queried via `python main.py stats` |
-| **Human approval gate** | Every actionable signal enters `PENDING_REVIEW`; you approve/reject/execute/close it with one command (or the dashboard buttons). Full audit trail per signal. |
+| **Market-data store** (P10) | Normalised `Candle` schema + partitioned Parquet history under `data/store/**` (gitignored) — our own stored market history, so the edge is no longer re-derived from one amnesiac 500-candle fetch. `data/store.py`. |
 | **Paper-trading runner** | Watches **approved** signals against live public Binance candles, simulates a planned entry, and auto-closes at SL / TP1. It records the outcome and R result — **never places a real exchange order**. |
 | **Self-improvement** | `python main.py learn` recomputes a per-setup calibration profile from backtest outcomes **plus decided paper trades** — boosts positive-expectancy plans, dampens (or filters) negative ones. |
 | **Coach (teaching)** | `python main.py coach` explains *why* the engine said what it said, mentors you through the top setup step-by-step, gives personal feedback on your own approvals/rejections, and ships a full trading glossary. |

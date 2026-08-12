@@ -1,6 +1,8 @@
 # DATA_INFRASTRUCTURE_ROADMAP.md — P10 · SKY Market Terminal
 
-> **Status:** planned, not started.
+> **Status:** in progress — **P10.1 shipped** (2026-08-12): normalised
+> `Candle` schema + Parquet store (`data/store.py`, `tests/test_store.py`).
+> Next: P10.2 (Binance backfill).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -367,7 +369,7 @@ documented state. Ordered by value-per-session, same as `TODO.md`.
 
 | # | Milestone | Deliverable | Done when |
 |---|---|---|---|
-| **P10.1** | Schema + store | `data/store/` layer, normalised `Candle`, Parquet read/write, upsert PK | round-trips 1m candles; dedup + ordering tested offline |
+| **P10.1** | Schema + store | `data/store.py` + `data/store/**` (gitignored): normalised `Candle`, Parquet read/write, upsert PK | ✅ shipped — 1m round-trips; dedup + ordering tested offline |
 | **P10.2** | Binance backfill | paginated REST backfill reusing `binance_client`, resumable, rate-limit aware | 1m BTCUSDT perp history on disk; re-run adds zero rows |
 | **P10.3** | Gaps + aggregation | gap detector, repair, 1m→5m/15m/1h/4h/1d rollups | synthetic gaps detected+repaired; rollups match venue candles |
 | **P10.4** | Derivatives series | persist funding / OI / mark / index / basis over time | series queryable; `liquidations()` proxy renamed honestly |

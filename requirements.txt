@@ -3,6 +3,9 @@ numpy>=1.26
 pandas>=2.0
 requests>=2.31
 
+# P10 data store (Parquet candle history) — data/store.py
+pyarrow>=15.0
+
 # CLI + web dashboard
 flask>=3.0
 python-dotenv>=1.0

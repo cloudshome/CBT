@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-12 (TODO-11 shipped: first 100/20 grind + sell-R bug fix + journal loop)
+**Last updated:** 2026-08-12 (TODO-12/P10 started — **P10.1 shipped**: normalised Candle schema + Parquet store)
 
 ---
 
@@ -48,6 +48,22 @@ Anything that moves neither is out of scope.
 ---
 
 ## 🔥 Top priority — start here in the next session
+
+> **Order note (2026-08-12):** the active major milestone is now **P10**
+> and its first step shipped. The paper book (TODO-11) first-grind is
+> done; what remains there is ongoing data collection/grinding that can
+> run alongside P10. P10.2 is the concrete next build below.
+
+### TODO-12 / P10.2 · Binance backfill · the next P10 milestone
+
+**P10.1 (schema + store) is shipped.** Next milestone from the roadmap:
+**P10.2 — Binance paginated REST backfill** — reuse `data/binance_client.py`
+as the transport, page through 1m history (resumable, rate-limit aware),
+write via `CandleStore.write()`/`normalise_klines()`. Done when 1m
+BTCUSDT perp history is on disk under `data/store/**` and a re-run adds
+**zero** rows (idempotent upsert). Full plan: `docs/DATA_INFRASTRUCTURE_ROADMAP.md`.
+
+---
 
 ### TODO-11 · Prove the paper book · first grind shipped · P11
 
@@ -109,24 +125,23 @@ from scratch every run.
 exchange APIs, store it ourselves, and let the engine reason over
 stored evidence.
 
-Twelve independently shippable milestones (P10.1 → P10.12). Start at
-**P10.1 (schema + Parquet store)**; do not start milestone N+1 until N
-is green.
+Twelve independently shippable milestones (P10.1 → P10.12). **P10.1 is
+shipped** (this session). Do not start milestone N+1 until N is green.
 
-| # | Milestone |
-|---|---|
-| P10.1 | Normalised `Candle` schema + Parquet store + upsert PK |
-| P10.2 | Binance paginated REST backfill (resumable, rate-limit aware) |
-| P10.3 | Gap detection + repair + 1m→higher-TF aggregation |
-| P10.4 | Derivatives as time series (funding / OI / mark / index / basis) |
-| P10.5 | Data-quality pillar wired into `readiness_strip()` |
-| P10.6 | Bybit adapter behind the same schema |
-| P10.7 | Cross-exchange premium/discount + funding spread |
-| P10.8 | Lightweight Charts replaces `chartSVG()` |
-| P10.9 | OI / funding / CVD panes |
-| P10.10 | WebSocket tier (live klines + liquidations) |
-| P10.11 | Backtester reads the store, not a live fetch |
-| P10.12 | Feature store — one wide row per timestamp |
+| # | Milestone | Status |
+|---|---|---|
+| P10.1 | Normalised `Candle` schema + Parquet store + upsert PK | ✅ shipped (`data/store.py`) |
+| P10.2 | Binance paginated REST backfill (resumable, rate-limit aware) | ⏭ **next** |
+| P10.3 | Gap detection + repair + 1m→higher-TF aggregation | ⏳ |
+| P10.4 | Derivatives as time series (funding / OI / mark / index / basis) | ⏳ |
+| P10.5 | Data-quality pillar wired into `readiness_strip()` | ⏳ |
+| P10.6 | Bybit adapter behind the same schema | ⏳ |
+| P10.7 | Cross-exchange premium/discount + funding spread | ⏳ |
+| P10.8 | Lightweight Charts replaces `chartSVG()` | ⏳ |
+| P10.9 | OI / funding / CVD panes | ⏳ |
+| P10.10 | WebSocket tier (live klines + liquidations) | ⏳ |
+| P10.11 | Backtester reads the store, not a live fetch | ⏳ |
+| P10.12 | Feature store — one wide row per timestamp | ⏳ |
 
 **Phase done when** we can ask *"how did this setup perform when price
 rose, OI rose, funding was negative, and CVD was positive?"* and get a
@@ -206,9 +221,32 @@ multi-model chat panel is still wanted after Dify.
 
 ---
 
-## ✅ Done this session (2026-08-12 · `arena/019ff4c3-sky`)
+## ✅ Done this session (2026-08-12 · `arena/019ff579-sky`)
 
-### TODO-1.bis · combined dashboard doctor strip · ✅ DONE
+### TODO-12 / P10.1 · Schema + Parquet store · ✅ DONE
+
+The first shippable milestone of P10 (data independence): a normalised
+`Candle` schema and a partitioned Parquet store, fully offline.
+
+**What landed:**
+- `data/store.py` — `CandleStore`: normalised `Candle` schema (roadmap §4),
+  partitioned Parquet under `data/store/**` (gitignored), upsert PK
+  `(exchange, market, symbol, timeframe, ts)`, `normalise_klines()` adapter
+  boundary, `coerce_candle_frame()` / `empty_frame()`.
+- Unclosed-candle safety rule enforced in code.
+- `tests/test_store.py` — 13 offline tests (round-trip, dedup last-write-wins,
+  ordering, partition boundary, range filter, empty read, series isolation).
+- Deps: `pyarrow>=15.0`; version 2.2.1 → **2.3.0**.
+- Docs: CHANGELOG, DATA_INFRASTRUCTURE_ROADMAP (P10.1 shipped), SESSION_STATE.
+- Tests 342 → **355 pass / 1 skip** (+13).
+
+**Next (P10.2):** Binance paginated REST backfill reusing
+`data/binance_client.py`, resumable + rate-limit aware, writing via
+`CandleStore.write()`.
+
+---
+
+### TODO-1.bis · combined dashboard doctor strip · ✅ DONE (prior session)
 
 One readiness verdict across channels + immune system + risk gate,
 rolled up **worst-first** (`ok → degraded → blocked → down`).

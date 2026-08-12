@@ -51,6 +51,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.3.0] — 2026-08-12 · branch `arena/019ff579-sky`
+
+MINOR bump: **P10.1 — normalised Candle schema + Parquet store**, the
+first shippable milestone of P10 (data independence). No strategy,
+risk-gate, or engine behaviour changes — this adds the input-side storage
+layer the rest of P10 feeds.
+
+### Added
+- **`data/store.py`** — `CandleStore`: partitioned Parquet candle store.
+  - Normalised `Candle` schema (the roadmap §4 fields): `ts` (UTC epoch-ms
+    candle OPEN, inclusive), `exchange`, `market`, `symbol`, `timeframe`,
+    `open/high/low/close/volume/quote_volume`, `trades`, `closed`,
+    `source`, `ingested_at`.
+  - Upsert primary key `(exchange, market, symbol, timeframe, ts)` — the
+    duplicate-row class of bug is prevented by construction.
+  - `normalise_klines()` — the single adapter boundary; exchange-specific
+    shapes never reach the analytics layer.
+  - `coerce_candle_frame()` / `empty_frame()` — canonical schema + dtypes.
+  - Hive-style partitioning `data/store/parquet/candles/exchange=…/market=…
+    /symbol=…/timeframe=…/year=…/month=…/part-000.parquet` — one month, one
+    file; `data/store/**` stays gitignored.
+  - Safety rule enforced: an **unclosed** candle (`closed=False`) is never
+    persisted into immutable history.
+  - `read()` returns deduplicated rows ordered by `ts` ascending, with
+    optional `start_ts`/`end_ts` filtering; `count()` / `series()` helpers.
+- **`tests/test_store.py`** — 13 offline, deterministic tests: schema +
+  dtypes, upsert dedup (last write wins), out-of-order input returned
+  sorted, duplicate-ts collapse, unclosed-candle drop, year/month partition
+  boundary, range filtering, empty-read, series isolation, normalise/coerce.
+- `pyarrow` runtime dep (`requirements.txt` + `pyproject.toml`).
+
+### Changed
+- `docs/DATA_INFRASTRUCTURE_ROADMAP.md` — status header updated; P10.1
+  marked shipped.
+- `config.py` + `pyproject.toml` — version 2.2.1 → **2.3.0**.
+
+### Notes
+- Tests **342 → 355 pass / 1 skip** (+13). `DEMO_MODE=1` suite stays green;
+  the store is fully offline.
+- Next milestone: **P10.2** — Binance paginated REST backfill (resumable,
+  rate-limit aware) reusing `data/binance_client.py`, writing via
+  `CandleStore.write()`.
+
+---
+
 ## [2.2.1] — 2026-08-12 · branch `arena/019ff530-sky`
 
 PATCH bump: TODO-11 (P11) paper-book proof — first grind + a real
