@@ -30,8 +30,8 @@ python ci/wheel_gate.py --install  # also smoke-test a clean venv
 ### TODO-8 · Protect `main` · human / repo admin
 
 GitHub reports `main.protected = false`. Arena token gets HTTP 403
-on the branch-protection API. A human should enable: require a PR,
-disallow direct pushes, require status checks once TODO-7 is live.
+on the branch-protection API. Click-path is in
+[`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 A trading risk-calc change must never land on `main` unreviewed.
 
 ### TODO-1.bis · (deferred) dashboard "doctor" view

@@ -14,7 +14,7 @@
 **Branch:** `arena/019ff483-sky`
 **HEAD commit:** `c0b8a02` (desk_status + wheel-gate + handoff; 4 commits on this branch)
 **Default branch:** `main` @ `4216448` (PR #5 merged 2026-08-11)
-**PR:** none open at start of this session. PR #5 is MERGED.
+**PR:** [#6](https://github.com/Azimshawon/SKY/pull/6) OPEN / MERGEABLE — this branch → `main`.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
 > **This session's decision:** the user said "start a new day. work hard."
@@ -150,23 +150,20 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-1. Confirm this branch is pushed and (if the operator wants) open
-   one PR from `arena/019ff483-sky` → `main`.
-2. Next session: first check whether that PR merged. Then TODO-7
-   (CI activation) if a human can click Enable, or TODO-1.bis if
-   more dashboard work is wanted. There is no remaining P9 *code*
-   item.
+1. **Merge [PR #6](https://github.com/Azimshawon/SKY/pull/6)** (MERGEABLE).
+2. A human does TODO-8 + TODO-7 from
+   [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md)
+   (protect `main`, paste the wheel-gate job). Token gets 403.
+3. Next *code* session: branch from the new `main`. Do **not**
+   start Dify/LibreChat. Next engine work is proving the paper
+   book (`simulator` / journal / graduation), not more AI wrapping.
 
 **Suggested next-session prompt:**
 
-> Continue the SKY project from the state in SESSION_STATE.md.
-> First check whether the open PR from arena/019ff483-sky has
-> merged into main. If yes, branch from main. Then do TODO-7
-> (confirm GitHub Actions CI + wheel-gate job is actually
-> running). If the workflow file was dropped by the token,
-> re-apply the wheel-gate job from ci/wheel_gate.py's docstring
-> into .github/workflows/ci.yml via the GitHub UI. Update
-> SESSION_STATE.md + CHANGELOG.md and commit.
+> Continue SKY from SESSION_STATE.md. First check whether PR #6
+> merged. If yes, branch from main. Do not start Dify or LibreChat.
+> If TODO-7/8 are still open, remind the operator (docs/HUMAN_ACTIONS.md)
+> and pick the next *engine* item: paper-book proof, not new agents.
 
 ---
 

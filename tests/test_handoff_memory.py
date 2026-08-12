@@ -35,6 +35,14 @@ def test_todo_lists_human_and_parked_items():
     assert "OpenHands" in text or "INFRASTRUCTURE_LAYERS" in text
 
 
+def test_human_actions_doc_exists():
+    doc = ROOT / "docs" / "HUMAN_ACTIONS.md"
+    assert doc.exists()
+    text = doc.read_text(encoding="utf-8")
+    assert "TODO-7" in text and "TODO-8" in text
+    assert "settings/branches" in text
+
+
 def test_infrastructure_layers_doc_exists_and_forbids_vendoring():
     doc = ROOT / "docs" / "INFRASTRUCTURE_LAYERS.md"
     assert doc.exists()
