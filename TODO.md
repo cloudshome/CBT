@@ -6,19 +6,151 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-12 (OpenHands/Dify/LibreChat distilled for SKY)
+**Last updated:** 2026-08-12 (TODO-1.bis shipped; P10 data infrastructure planned)
+
+---
+
+## 🔁 Session rhythm (how we work)
+
+We go session by session. Each Arena session is one self-contained
+unit of work that ends in a reviewable PR:
+
+```text
+1. Read SESSION_STATE.md → TODO.md → the relevant docs
+2. Pick the top unblocked item
+3. Implement it; keep the suite green (≥ 339 pass / 1 skip)
+4. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
+5. Commit + push to the session branch
+6. Open ONE PR as the closing step  ← Arena allows one PR per session
+7. A human reviews and merges; the next session branches from main
+```
+
+The PR is the session boundary. Never merge your own PR, and never
+leave a session's work sitting on a branch with no PR — a future
+session then cannot tell what was finished from what was abandoned.
+
+---
+
+## 🎯 The aim (never changes)
+
+**Become a fully independent, consistently profitable trader.**
+
+Independence has two halves. SKY currently owns one of them:
+
+| Half | Meaning | Status |
+|---|---|---|
+| **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
+| **Data independence** | Our own stored market history | ❌ **P10** |
+
+Everything below is ordered by how directly it moves those two lines.
+Anything that moves neither is out of scope.
 
 ---
 
 ## 🔥 Top priority — start here in the next session
 
-### TODO-7 · Activate GitHub Actions CI · human action
+### TODO-11 · Prove the paper book · next *code* item · P11
 
-The job spec lives at `docs/wheel-gate-job.yml` (Arena's GitHub App
-token cannot update `.github/workflows/ci.yml` — the push of that
-path was rejected this session, same as `d40ff00`). A human with
-the `workflows` permission should paste the job into
-`.github/workflows/ci.yml` from the GitHub UI.
+The engine, the agent surface, and the readiness surface are all
+done. The thing that is **not** done is the only thing that unlocks
+real capital: `python main.py desk` still says `PAPER_GRIND` because
+graduation needs 100 unique backtest samples, 20 decided paper
+samples, positive expectancy, > 55% win rate, PF ≥ 1.5, and ≥ 90%
+rule compliance.
+
+Next session should grind and harden that path, not add more AI
+wrapping:
+
+```bash
+python main.py simulator          # unique-sample grind
+python main.py desk               # watch the graduation line move
+```
+
+Concretely: run the grind to a real 100/20, journal the closed
+trades so `compliance` stops being `None`, and fix whatever the
+graduation report reveals. Do **not** add new agents or panels.
+
+**Why this comes before P10:** P11 is days of grinding code that
+already exists; P10 is weeks of new infrastructure. Finishing P11
+keeps the graduation ladder moving and gives P10's backfill a working
+proof-loop to feed. Do not let the data project become a reason to
+stop proving the edge.
+
+### TODO-12 · P10 · Data infrastructure + market terminal · the next MAJOR milestone
+
+📄 **Full plan: [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md)** —
+read that before touching any of it. Summary only here.
+
+**The problem it solves:** every scan today is amnesiac. SKY fetches
+~500 candles, decides, and throws them away. That caps backtests at
+one API response, makes "how did this setup behave when OI rose and
+funding was negative?" unanswerable, and means the edge is re-derived
+from scratch every run.
+
+**The goal:** collect BTC market data ourselves from free/public
+exchange APIs, store it ourselves, and let the engine reason over
+stored evidence.
+
+Twelve independently shippable milestones (P10.1 → P10.12). Start at
+**P10.1 (schema + Parquet store)**; do not start milestone N+1 until N
+is green.
+
+| # | Milestone |
+|---|---|
+| P10.1 | Normalised `Candle` schema + Parquet store + upsert PK |
+| P10.2 | Binance paginated REST backfill (resumable, rate-limit aware) |
+| P10.3 | Gap detection + repair + 1m→higher-TF aggregation |
+| P10.4 | Derivatives as time series (funding / OI / mark / index / basis) |
+| P10.5 | Data-quality pillar wired into `readiness_strip()` |
+| P10.6 | Bybit adapter behind the same schema |
+| P10.7 | Cross-exchange premium/discount + funding spread |
+| P10.8 | Lightweight Charts replaces `chartSVG()` |
+| P10.9 | OI / funding / CVD panes |
+| P10.10 | WebSocket tier (live klines + liquidations) |
+| P10.11 | Backtester reads the store, not a live fetch |
+| P10.12 | Feature store — one wide row per timestamp |
+
+**Phase done when** we can ask *"how did this setup perform when price
+rose, OI rose, funding was negative, and CVD was positive?"* and get a
+number computed from our own data.
+
+**Corrections already applied to the incoming plan** (detail in §1 of
+the roadmap doc — these are the load-bearing ones):
+
+- **Analytics are ~80% built.** EMA/RSI/MACD/ATR/VWAP/Bollinger/CVD/
+  volume-profile all exist in `engine/`. P10 feeds them stored data;
+  it does not reimplement them.
+- **SQLite + Parquet, not PostgreSQL + Redis.** `ARCHITECTURE.md`
+  fixes SKY as single-process/single-user/single-machine. Redis solves
+  a cache-coherency problem we don't have.
+- **Lightweight Charts standalone, not React/Next.js.** ~45 KB from a
+  `<script>` tag keeps SKY one Flask process with five runtime deps.
+- **No FastAPI, no Docker.** Flask already serves `/api/*`;
+  `ops/systemd/` already deploys.
+- **Liquidations cannot be backfilled.** Real data comes from the
+  `!forceOrder@arr` WebSocket stream and only accumulates from the day
+  we start. The current `liquidations()` is a 24h-stats *proxy* and
+  must be renamed so nobody mistakes it for the real thing.
+- **Reuse `_cross_exchange_probe()`.** Cross-exchange comparison
+  already exists in `brain/agent.py`; generalise it, don't write a
+  second one.
+- **One PR per session** (Arena limit) overrides the incoming plan's
+  "always open a PR" step.
+
+**Hard constraints:** public endpoints only — no API keys, ever;
+`DEMO_MODE=1` must keep the suite green offline; bad data quarantines
+instead of producing a signal; `data/store/**` is gitignored.
+
+### TODO-7 · Activate GitHub Actions wheel-gate · human action
+
+The job spec sits at **`docs/.github/workflows/ci.yml`**, which is
+**inert** — nested under `docs/`, so GitHub Actions never reads it.
+Only the repository-root `.github/workflows/ci.yml` is executed, and
+Arena's GitHub App token cannot write that path (push rejected twice:
+`d40ff00`, and again this session's predecessor).
+
+A human with the `workflows` permission pastes the `wheel-gate` job
+from the GitHub UI. Click-path: [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 
 Until then, run the gate locally:
 
@@ -34,23 +166,19 @@ on the branch-protection API. Click-path is in
 [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 A trading risk-calc change must never land on `main` unreviewed.
 
-### TODO-1.bis · (deferred) dashboard "doctor" view
-
-A single readiness strip at the top of the dashboard combining
-channels + immune system + risk gate. Out of scope this session;
-`loadHealth()`, `loadRiskGate()`, `loadChannels()`, and the new
-`loadDesk()` cards already cover the content separately.
-
 ---
 
 ## ⏸ Parked — do not start until the gate says so
 
 Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md).
 
-### TODO-9 · Dify as a *separate* research layer · AFTER graduation
+**Both are now behind P10 as well as the graduation gate.** Owning our
+data moves the aim; wrapping the engine in another chat UI does not.
+
+### TODO-9 · Dify as a *separate* research layer · AFTER graduation + P10
 
 Not a SKY dependency. Deploy Dify elsewhere and point it at SKY's
-read-only surfaces (`desk`, `ask`, MCP). Start only when
+read-only surfaces (`desk`, `readiness`, `ask`, MCP). Start only when
 `python main.py agent ask "am i ready for micro?"` reports READY.
 
 ### TODO-10 · LibreChat-style chat UI · AFTER TODO-9
@@ -60,50 +188,39 @@ multi-model chat panel is still wanted after Dify.
 
 ---
 
-## ✅ Done this session (2026-08-12)
+## ✅ Done this session (2026-08-12 · `arena/019ff4c3-sky`)
 
-### TODO-4 · `brain/agent.desk_status()` advisory · ✅ DONE
+### TODO-1.bis · combined dashboard doctor strip · ✅ DONE
+
+One readiness verdict across channels + immune system + risk gate,
+rolled up **worst-first** (`ok → degraded → blocked → down`).
 
 **What landed:**
-- `desk_status()` + `format_desk_status()` in `brain/agent.py`
-- `next_scheduled_agent()` in `brain/agents.py`
-- CLI: `python main.py desk` / `desk --json`
-- MCP tool `desk_status` (`SERVER_VERSION` 1.1.0 → 1.2.0)
-- Dashboard: `GET /api/desk` + "DESK STATUS" card on the System tab
-- `ask("what should I do?")` routes to the same snapshot
-- Tests: agent / agents / mcp / web / CLI / dashboard-js
+- `brain/agent.readiness_strip()` + `format_readiness_strip()`, with
+  `_channels_pillar()` / `_immune_pillar()` / `_gate_pillar()` each
+  exception-isolated.
+- CLI: `python main.py doctor --strip` (+ `--json`); plain `doctor`
+  now leads with the strip; `doctor --json` gained a `readiness` key.
+- `GET /api/readiness` (never 500s — degrades to a JSON error).
+- MCP tool `readiness`; `SERVER_VERSION` 1.2.0 → 1.3.0 (13 tools).
+- Dashboard: colour-coded strip above **every** tab, one chip per
+  pillar, refreshed on the 5-minute diagnostic cadence.
+- Docs: SKILL.md, README, ARCHITECTURE (new invariant #10 "one
+  computation, many surfaces"), AI_ANATOMY_ROADMAP, CHANGELOG.
+- Version 2.1.0 → **2.2.0**.
+- Tests 324 → **337 pass / 1 skip** (+13).
 
-Advice is priority-ordered and capital-first:
-`CLEAR_STATE → STAND_ASIDE → REVIEW_QUEUE → JOURNAL → PAPER_GRIND → SCAN`.
+---
 
-### TODO-6 · Answer D1–D5 · ✅ DONE
+## ✅ Done in prior sessions
 
-Recorded in `ROADMAP_AGENT_REACH_UPGRADE.md` §4:
-
-| ID | Answer |
-|---|---|
-| D1 | full P7 (already shipped) |
-| D2 | keep `health`, add `doctor` alias (already shipped) |
-| D3 | 3 data sources + LLM only (already shipped) |
-| D4 | **YES** — wheel-gate |
-| D5 | **YES** — expose `docs/agent_install.md` raw URL |
-
-### TODO-3 · CI wheel-gate content · ✅ DONE (activation = TODO-7)
-
-- `pyproject.toml` (package `cryptobrain` v2.1.0, console script)
-- `cryptobrain/__init__.py` facade so `import cryptobrain` works
-- `ci/wheel_gate.py` — build, reject duplicate zip entries, optional
-  `--install` smoke test (`import cryptobrain` + `cryptobrain doctor`)
-- `wheel-gate` job added to `.github/workflows/ci.yml`
-- `tests/test_wheel_gate.py`
-
-### TODO-0 · PR #5 · ✅ MERGED
-
-Merged 2026-08-11 (`4216448`). This session branched from that HEAD.
-
-### TODO-1 · P8 dashboard Channels panel · ✅ DONE (prior session)
-### TODO-2 · MCP capability endpoints · ✅ DONE (prior session)
-### TODO-5 · CHANGELOG backfill · ✅ DONE (prior session; v2.1.0 added this session)
+- **TODO-4** `desk_status()` advisory (v2.1.0)
+- **TODO-6** D1–D5 answered — `ROADMAP_AGENT_REACH_UPGRADE.md` §4
+- **TODO-3** wheel-gate *content* (`ci/wheel_gate.py`, `pyproject.toml`)
+- **TODO-0** PR #5 merged; **PR #6** merged 2026-08-12
+- **TODO-1** P8 dashboard Channels panel
+- **TODO-2** MCP capability endpoints
+- **TODO-5** CHANGELOG backfill
 
 ---
 
@@ -111,7 +228,7 @@ Merged 2026-08-11 (`4216448`). This session branched from that HEAD.
 
 | ID | Decision | Default |
 |---|---|---|
-| TODO-7 | Paste `docs/wheel-gate-job.yml` into `.github/workflows/ci.yml` | human |
+| TODO-7 | Paste the wheel-gate job into the real `.github/workflows/ci.yml` | human |
 | TODO-8 | Protect `main` (require PR, no direct push) | human / recommend yes |
 
 D1–D5 are already recorded. Do **not** start TODO-9/TODO-10 this
@@ -136,4 +253,14 @@ session or the next.
   `docs/INFRASTRUCTURE_LAYERS.md`.
 - Splitting the desk into new "Market Analyst / Risk Manager /
   News Analyst / Code Maintenance" agents. The four existing desk
-  agents + `desk_status()` already cover that job.
+  agents + `desk_status()` + `readiness_strip()` already cover that job.
+- A *fourth* readiness surface. Channels, immune, gate, desk advice,
+  and the strip are enough; anything new reads `readiness_strip()`.
+- **Exchange trading credentials / signed endpoints / live order
+  placement** — forever, not just during P10. A collector that can
+  authenticate is a collector that can trade.
+- **Paid data vendors.** P10 is explicitly a free/public-API phase.
+- **Alt-coin expansion during P10.** BTC first, ETH second, nothing
+  else until the pipeline is proven.
+- **PostgreSQL, Redis, Docker, FastAPI, React/Next.js.** See the
+  corrections in TODO-12 / roadmap §1.

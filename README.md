@@ -116,6 +116,8 @@ python main.py journal <scan_id> --followed-rules 1 --emotion calm --mistake non
 python main.py journal        # discipline summary (violation rate)
 python main.py sourcetrust discord_group 5 0.3 --note "private signals: context only"
 python main.py health         # system health: data feeds, DB, risk gate, MCP, LLM
+python main.py doctor --strip # ONE readiness verdict: channels + immune + risk gate
+python main.py desk           # one-call advisory: what would a professional do now?
 python main.py brief          # daily desk briefing (alias for `agent morning`)
 python main.py agent morning  # desk morning briefing across BTC/ETH/GOLD
 python main.py agent ask "is the risk gate open?"   # natural-language question
@@ -152,6 +154,28 @@ the **graduation gate** passes (see `BLUEPRINT.md`).
   public APIs and flags deviations > 1%.
   The dashboard renders the same report (`/api/health`) and the morning
   briefing (`/api/agents`), and `/api/ask` exposes the question desk.
+
+#### Readiness strip (`doctor --strip`)
+
+`python main.py doctor --strip` answers one question — *can I trust the
+desk right now?* — by rolling three pillars up **worst-first**:
+
+| Pillar | Question it answers | Source |
+|---|---|---|
+| `channels` | Can the engine still see the world? | `brain/channels.probe_all()` |
+| `immune` | Is the machine itself sane? | `brain/immune.run_health_check()` |
+| `risk_gate` | Am I allowed to trade at all? | the gate inside `desk_status()` |
+
+Levels, worst wins: `ok` → `degraded` → `blocked` → `down`. Only `ok`
+sets `ready: true`; `blocked` means the engine is healthy but the risk
+gate is closed. Each pillar is exception-isolated, so a crashing probe
+degrades that pillar rather than the whole report.
+
+Plain `python main.py doctor` leads with the strip and then prints the
+full per-channel detail. The identical payload is available as
+`doctor --strip --json`, `GET /api/readiness`, the MCP `readiness`
+tool, and the colour-coded strip above every dashboard tab — one
+computation, four surfaces, no drift.
 
 #### Paper-sample grind (`simulator`)
 
@@ -191,8 +215,11 @@ risk gate, ask, pending, stats, paper, learn).  Add to your MCP client config:
 There is also a **zero-dependency** MCP server at the repo root
 (`python mcp_server.py`) for environments where the `mcp` SDK cannot be
 installed.  It speaks newline-delimited JSON-RPC 2.0 and exposes read-only
-desk tools (`ask`, `risk`, `health`, `brief`, `tradestate`, `postreview`)
-behind an explicit permission map — no order placement, no gate bypass.
+desk tools behind an explicit permission map — no order placement, no
+gate bypass. 13 tools: `ask`, `risk`, `health`, `brief`, `tradestate`,
+`postreview`, `channels`, `correlation`, `hidden_chart_read`,
+`hidden_analytics_mae`, `hidden_analytics_mc`, `desk_status`, and
+`readiness`.
 
 #### AI anatomy suite (RAG · briefs · agents · immune system)
 

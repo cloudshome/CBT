@@ -179,7 +179,7 @@ route commands through CryptoBrain.
 |---|---|---|:---:|
 | **P7** | **Agent surface** | `SKILL.md` (≤ 250 lines) · `python main.py doctor` (alias of `health`) · `python main.py skill --install` · `docs/agent_install.md` | ✅ Complete |
 | **P8** | **Source channels** | `brain/channels.py` ordered-backend router (CryptoDada/Discord/news/LLM) · `python main.py channels` · dashboard "Channels" panel | ✅ Complete |
-| **P9** | **Capability endpoints** | MCP `tools/list` = 12 read-only tools (deny list visible) · `desk_status()` advisory · wheel-gate (`ci/wheel_gate.py` + `pyproject.toml`) | ✅ Complete (CI activation still TODO-7) |
+| **P9** | **Capability endpoints** | MCP `tools/list` = 13 read-only tools (deny list visible) · `desk_status()` advisory · `readiness_strip()` combined doctor verdict (`doctor --strip` / `/api/readiness` / MCP `readiness`) · wheel-gate (`ci/wheel_gate.py` + `pyproject.toml`) | ✅ Complete (CI activation still TODO-7) |
 
 **Out of scope (deliberate):** web scraping, social-platform logins,
 cookie extraction, audio transcription, third-party CLIs (`gh`,
@@ -193,6 +193,37 @@ engine.
 real exchange order. Deny list enforced at the top of
 `mcp_server.handle_tool_call()`; the human-approval gate remains
 between the machine and any action.
+
+---
+
+## 🛰️ Next Phases — Data Independence (P10–P12)
+
+P1–P9 built **decision independence**: our own engine, our own risk
+gate, our own approval loop. What is still missing is **data
+independence** — SKY fetches ~500 candles per scan and throws them
+away, so the edge is re-derived from scratch every run and no backtest
+can reach past one API response.
+
+| Phase | Theme | Deliverables | Status |
+|---|---|---|:---:|
+| **P11** | **Paper-book proof** | Grind `simulator` to a real 100 backtest / 20 decided-paper samples · journal closed trades so `compliance` stops being `None` · move the graduation gate | 🔜 **Next** |
+| **P10** | **Data infrastructure + market terminal** | Normalised candle schema · Parquet store · Binance + Bybit backfill · derivatives as time series · data-quality pillar · Lightweight Charts terminal · WebSocket tier · feature store | 📋 Planned — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
+| **P12** | **Regime-conditional backtests** | Backtests over years of stored data, conditioned on OI / funding / CVD / regime | ⏸ After P10 |
+
+**P11 runs before P10 deliberately.** P11 is days of grinding code that
+already exists; P10 is weeks of new infrastructure. Finishing P11 first
+keeps the graduation ladder moving and gives P10's backfill a working
+proof-loop to feed.
+
+**P10's definition of done:** *"How did this setup perform when price
+rose, OI rose, funding was negative, and CVD was positive?"* answered
+with a number computed from our own stored data.
+
+**Out of scope for P10 (deliberate):** exchange trading credentials or
+signed endpoints (forever — a collector that can authenticate is a
+collector that can trade), paid data vendors, PostgreSQL/Redis/Docker/
+FastAPI/React (SKY stays single-process with five runtime deps —
+see roadmap §1), alt-coins beyond BTC then ETH.
 
 **Full planning document:** [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md)
 — includes honest alignment check, per-phase risk + rollback,

@@ -149,6 +149,33 @@ def test_doctor_endpoint_returns_text_report(client):
         assert ch in payload["report"]
 
 
+def test_readiness_endpoint_returns_strip(client):
+    """`/api/readiness` is the combined doctor strip (TODO-1.bis)."""
+    import json
+    resp = client.get("/api/readiness")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    payload = resp.get_json()
+    assert payload["level"] in {"ok", "degraded", "blocked", "down"}
+    assert payload["ready"] == (payload["level"] == "ok")
+    assert payload["headline"]
+    assert {p["name"] for p in payload["pillars"]} == {
+        "channels", "immune", "risk_gate"}
+    json.loads(resp.get_data(as_text=True))  # numpy-leak safety
+
+
+def test_readiness_endpoint_never_500s(client, monkeypatch):
+    """A crashing strip degrades to a JSON error, never an HTTP 500."""
+    import brain.agent as agent
+    monkeypatch.setattr(agent, "readiness_strip",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    resp = client.get("/api/readiness")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["ok"] is False
+    assert payload["level"] == "down"
+    assert "RuntimeError" in payload["error"]
+
+
 def test_desk_endpoint_returns_advisory(client):
     """`/api/desk` is the one-call advisory (same as `python main.py desk`)."""
     import json

@@ -15,6 +15,12 @@ data_samples/backtest_report.json
 # sqlite learning store
 *.db
 
+# P10 market-data store — collected data never enters Git.
+# The repo stays small; the dataset lives on disk. See
+# docs/DATA_INFRASTRUCTURE_ROADMAP.md
+data/store/
+*.parquet
+
 # local session-continuation notes (never pushed)
 SESSION.md
 

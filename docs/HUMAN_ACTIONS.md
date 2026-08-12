@@ -27,11 +27,18 @@ CI is already **active** (`.github/workflows/ci.yml` runs the offline
 suite). The wheel-gate *job* is not in that file because the token
 was refused when it tried to edit it.
 
+> **Heads-up:** the job spec currently lives at
+> [`docs/.github/workflows/ci.yml`](./.github/workflows/ci.yml). That
+> path is **inert** — it is nested under `docs/`, so GitHub Actions
+> never reads it. Only a file at the repository root's
+> `.github/workflows/` is executed. Copying it is still a human step.
+
 1. Open https://github.com/Azimshawon/SKY/edit/main/.github/workflows/ci.yml
    (or edit it in a tiny follow-up PR from the GitHub UI)
-2. Append the job from
-   [`docs/wheel-gate-job.yml`](./wheel-gate-job.yml)
+2. Append the `wheel-gate` job from
+   [`docs/.github/workflows/ci.yml`](./.github/workflows/ci.yml)
    under the existing `jobs:` map (same indent as `test:`).
+   Skip the leading comment block; start at the `wheel-gate:` key.
 3. Commit on `main` from the UI, or via a one-file PR.
 
 Local equivalent, no GitHub needed:

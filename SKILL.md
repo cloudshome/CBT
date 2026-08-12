@@ -27,6 +27,7 @@ plus a web dashboard. This file tells you what you can call, what you
 | "Give me the desk report" | `python main.py intelligence --symbol BTCUSDT --tf 15m` |
 | "Is the risk gate open? Am I cleared to trade?" | `python main.py risk` and `python main.py health` |
 | "What should I do right now?" | `python main.py desk` (or MCP `desk_status`) |
+| "Is the desk healthy? Can I trust it?" | `python main.py doctor --strip` (or MCP `readiness`) |
 | "Read the latest crypto news" | `python main.py sources` |
 | "Review this closed trade" | `python main.py postreview <scan_id>` |
 | "Am I ready for live micro-trading?" | `python main.py agent ask "am i ready for micro?"` |
@@ -52,10 +53,24 @@ For deeper setup (LLM, Discord, CryptoDada credentials) see
 Before doing anything else:
 
 ```bash
-python main.py doctor         # text report
-python main.py doctor --json  # machine-readable
-python main.py health         # legacy alias for doctor
+python main.py doctor --strip   # ONE combined verdict — start here
+python main.py doctor           # strip + full per-channel detail
+python main.py doctor --json    # machine-readable (includes `readiness`)
+python main.py health           # legacy alias for doctor
 ```
+
+`doctor --strip` rolls three pillars up **worst-first** into a single
+level:
+
+| Pillar | Question it answers |
+|---|---|
+| `channels` | Can the engine still see the world? (cryptodada / discord / news / llm) |
+| `immune` | Is the machine itself sane? (DB, data freshness, risk system, calibration) |
+| `risk_gate` | Am I allowed to trade at all? |
+
+Levels, worst wins: `ok` → `degraded` → `blocked` → `down`. Only `ok`
+sets `ready: true`. `blocked` specifically means the risk gate is
+closed — the engine is healthy but the operator must not trade.
 
 A healthy engine reports OK on: data feeds, database, risk gate, MCP
 ready, no behavioral flags, no calibration drift.
@@ -77,6 +92,7 @@ bypasses the risk gate. The deny list is enforced at the top of
 | Post-review | `python main.py postreview <scan_id>` | `postreview` | Closed-trade post-mortem: R, MAE/MFE, rule compliance |
 | Health | `python main.py health` / `python main.py doctor` | `health` | Immune-system diagnostic: stale data, DB integrity, risk limits, behavioral flags |
 | **Desk status** | `python main.py desk` | `desk_status` | One-call advisory: gate + today's P&L + graduation + next agent + "what would a professional do right now?" |
+| **Readiness** | `python main.py doctor --strip` | `readiness` | One combined verdict across channels + immune system + risk gate. Ask this first. |
 | Risk gate | `python main.py risk` | `risk` | Open/closed status, daily/weekly P&L, progression ladder |
 | Trader state | `python main.py tradestate` | `tradestate` | Behavioral flags: angry/tired/revenge/chasing — operator-controlled |
 | Paper watch | `python main.py paper --watch` | — | Live-market paper-trade monitor (does **not** touch any exchange) |

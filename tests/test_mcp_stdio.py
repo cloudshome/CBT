@@ -28,6 +28,8 @@ ROOT_TOOLS = {
     "hidden_analytics_mae", "hidden_analytics_mc",
     # P9 (TODO-4): desk advisory
     "desk_status",
+    # P9 (TODO-1.bis): combined readiness strip
+    "readiness",
 }
 
 
@@ -251,6 +253,23 @@ def test_root_mcp_desk_status_tool(env):
         assert "risk_gate" in data
         assert "graduation" in data
         assert "next_agent" in data
+    finally:
+        client.close()
+
+
+def test_root_mcp_readiness_tool(env):
+    """readiness rolls channels + immune + risk gate into one verdict."""
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        resp = client.send("tools/call", {"name": "readiness", "arguments": {}})
+        data = json.loads(resp["result"]["content"][0]["text"])
+        assert data["level"] in {"ok", "degraded", "blocked", "down"}
+        assert isinstance(data["ready"], bool)
+        assert data["ready"] == (data["level"] == "ok")
+        assert data["headline"]
+        names = {p["name"] for p in data["pillars"]}
+        assert names == {"channels", "immune", "risk_gate"}
     finally:
         client.close()
 

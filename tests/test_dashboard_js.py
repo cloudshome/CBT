@@ -137,6 +137,83 @@ def _run_harness(payload_json: str) -> None:
         Path(path).unlink(missing_ok=True)
 
 
+def _run_readiness_harness(strip: dict) -> str:
+    """Run loadReadiness() against a fixed /api/readiness payload.
+
+    Returns the innerHTML the strip element ends up with, so a field-name
+    drift between brain.agent.readiness_strip() and the dashboard is
+    caught here rather than in the browser.
+    """
+    js = _extract_js()
+    harness = f"""
+    const strip = {json.dumps(strip)};
+    const elements = {{}};
+    function el(id){{ if(!elements[id]) elements[id]={{ innerHTML:'', className:'',
+      value:'BTCUSDT', textContent:'', checked:true, disabled:false, style:{{}},
+      addEventListener:()=>{{}}, querySelector:()=>null }}; return elements[id]; }}
+    global.window = {{ addEventListener: ()=>{{}} }};
+    global.document = {{ getElementById: el, addEventListener: ()=>{{}} }};
+    global.fetch = async (url) => ({{ json: async () => {{
+      if(String(url).includes('/api/readiness')) return strip;
+      if(String(url).includes('/api/candles')) return {{ candles: [] }};
+      return {{}};
+    }} }});
+    global.AbortController = class {{ constructor(){{ this.signal={{}}; }} abort(){{}} }};
+    global.setInterval = () => 0; global.clearInterval = () => {{}};
+    global.setTimeout = () => 0; global.clearTimeout = () => {{}};
+    {js}
+    loadReadiness().then(() => {{
+      const e = elements['readiness'];
+      console.log(JSON.stringify({{ html: e.innerHTML, cls: e.className }}));
+    }}).catch(err => {{ console.error(err); process.exit(1); }});
+    """
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        f.write(harness)
+        path = f.name
+    try:
+        r = subprocess.run([NODE, path], capture_output=True, text=True)
+        assert r.returncode == 0, f"loadReadiness failed:\n{r.stdout}\n{r.stderr}"
+        return r.stdout.strip().splitlines()[-1]
+    finally:
+        Path(path).unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_readiness_strip_renders_every_pillar():
+    """The strip shows one chip per pillar and the rolled-up verdict."""
+    out = json.loads(_run_readiness_harness({
+        "level": "degraded",
+        "ready": False,
+        "headline": "desk degraded — channels",
+        "pillars": [
+            {"name": "channels", "level": "degraded",
+             "headline": "2/4 channels live", "detail": "news=rss_parallel"},
+            {"name": "immune", "level": "ok",
+             "headline": "4 check(s) ok", "detail": ""},
+            {"name": "risk_gate", "level": "ok",
+             "headline": "gate OPEN", "detail": "no blocks"},
+        ],
+        "advice": {"action": "PAPER_GRIND", "headline": "keep paper-trading"},
+    }))
+    html = out["html"]
+    for pillar in ("channels", "immune", "risk_gate"):
+        assert pillar in html, f"readiness strip missing the {pillar!r} chip"
+    assert "DESK DEGRADED" in html.upper()
+    assert "PAPER_GRIND" in html
+    assert out["cls"] == "strip lvl-degraded"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_readiness_strip_handles_error_payload():
+    """A degraded /api/readiness response must still render, not throw."""
+    out = json.loads(_run_readiness_harness({
+        "ok": False, "level": "down", "headline": "readiness unavailable",
+        "pillars": [], "error": "RuntimeError: boom",
+    }))
+    assert out["cls"] == "strip lvl-down"
+    assert "RuntimeError" in out["html"]
+
+
 @pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_dashboard_js_syntax():
     js = _extract_js()

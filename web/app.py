@@ -363,6 +363,22 @@ HTML = """<!doctype html>
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
   .sectionTitle{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:800;margin:14px 2px 8px;display:flex;align-items:center;gap:8px}
   .sectionTitle::after{content:'';flex:1;height:1px;background:var(--line);margin-left:8px}
+  /* readiness strip (TODO-1.bis) — one verdict above every tab */
+  .strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;
+    padding:10px 13px;border-radius:14px;border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(17,28,51,.9), rgba(22,36,71,.95));
+    box-shadow:0 8px 22px rgba(0,0,0,.28)}
+  .strip.lvl-ok{border-color:rgba(34,197,94,.42);box-shadow:0 8px 22px rgba(34,197,94,.10)}
+  .strip.lvl-degraded{border-color:rgba(245,158,11,.42);box-shadow:0 8px 22px rgba(245,158,11,.10)}
+  .strip.lvl-blocked{border-color:rgba(239,68,68,.42);box-shadow:0 8px 22px rgba(239,68,68,.10)}
+  .strip.lvl-down{border-color:rgba(239,68,68,.5);box-shadow:0 8px 22px rgba(239,68,68,.14)}
+  .strip .verdict{font-weight:800;letter-spacing:.02em;font-size:13px;display:inline-flex;align-items:center;gap:8px}
+  .strip .verdict .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .strip .pillars{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
+  .strip .pill-chip{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;
+    border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--mut);
+    display:inline-flex;align-items:center;gap:6px;cursor:help}
+  .strip .strip-detail{flex-basis:100%;font-size:11.5px;color:var(--mut);line-height:1.5}
   /* quick actions */
   .quickbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
   .quickbar .btn{padding:8px 13px;border-radius:999px}
@@ -418,6 +434,7 @@ HTML = """<!doctype html>
   <span id="updated" class="updated"></span>
 </nav>
 <div class="shell">
+  <div class="strip" id="readiness"><span class="muted">checking readiness…</span></div>
   <div class="quickbar" id="quickbar">
     <button class="btn" onclick="load(true)">↻ Scan now</button>
     <button class="btn" onclick="systemCheck(); switchTab('system')">🔍 System check</button>
@@ -822,6 +839,7 @@ function render(d){
   // load async sub-panels
   loadPending(); loadPaper(); loadHistory(); loadLearning(); loadSources();
   loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels(); loadDesk();
+  loadReadiness();
   const symE=document.getElementById('sym'); const tfE=document.getElementById('tf');
   loadChart((symE?symE.value:'BTCUSDT').toUpperCase(), tfE?tfE.value:'15m');
 }
@@ -1170,6 +1188,40 @@ async function loadDesk(){
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
 
+// TODO-1.bis readiness strip: ONE verdict above every tab, combining the
+// three pillars the desk already reports separately (channels + immune +
+// risk gate).  The verdict is computed server-side by
+// brain.agent.readiness_strip() so the dashboard, `python main.py doctor
+// --strip`, and the MCP `readiness` tool can never disagree.
+const READY_COLOR = {ok:'var(--green)', degraded:'var(--amber)',
+                     blocked:'var(--red)', down:'var(--red)'};
+const READY_MARK  = {ok:'✓', degraded:'○', blocked:'!', down:'✗'};
+async function loadReadiness(){
+  const el=document.getElementById('readiness'); if(!el) return;
+  try{
+    const d=await (await fetch('/api/readiness')).json();
+    const lvl=d.level||'down';
+    const col=READY_COLOR[lvl]||'var(--mut)';
+    el.className='strip lvl-'+lvl;
+    const chips=(d.pillars||[]).map(p=>{
+      const c=READY_COLOR[p.level]||'var(--mut)';
+      const title=esc(p.detail||p.headline||'');
+      return `<span class="pill-chip" style="border-color:${c}55;color:${c}" title="${title}">`
+           + `${READY_MARK[p.level]||'?'} ${esc(p.name)} · ${esc(p.headline||p.level)}</span>`;
+    }).join('');
+    const adv=d.advice||{};
+    el.innerHTML=`<span class="verdict" style="color:${col}"><i class="dot" style="background:${col}"></i>`
+      + `${esc((d.headline||lvl).toUpperCase())}</span>`
+      + (adv.action?`<span class="badge">next: ${esc(adv.action)}</span>`:'')
+      + `<span class="pillars">${chips}</span>`
+      + (adv.headline?`<span class="strip-detail">${esc(adv.headline)}</span>`:'')
+      + (d.error?`<span class="strip-detail err">${esc(d.error)}</span>`:'');
+  }catch(e){
+    el.className='strip lvl-down';
+    el.innerHTML='<span class="err">readiness check failed: '+esc(e)+'</span>';
+  }
+}
+
 async function askDesk(){
   const q=document.getElementById('askq'); const out=document.getElementById('askout');
   const question=(q?q.value:'').trim(); if(!question) { showToast('Type a question first','err'); return; }
@@ -1386,13 +1438,15 @@ async function coach(){
     if(h && ['overview','market','intelligence','trades','learn','system'].includes(h)) _activeTab=h;
   }catch(e){}
   try{ switchTab(_activeTab); }catch(e){}
+  // strip lives outside #app, so it can resolve before the first scan does
+  try{ loadReadiness(); }catch(e){}
 })();
 load(true);
 setInterval(()=>{ if(document.getElementById('auto').checked) load(false, true); }, 30000);
 // Channels panel is diagnostic-state (which backend is *serving*),
 // not signal-state, so refresh on a slower 5-minute cadence — not on
 // every 30s scan tick.  Cheap: probe_all() is config-driven.
-setInterval(()=>{ loadChannels(); loadMcp(); loadDesk(); }, 5 * 60 * 1000);
+setInterval(()=>{ loadChannels(); loadMcp(); loadDesk(); loadReadiness(); }, 5 * 60 * 1000);
 // keep seg active state in sync on load
 try{ if(document.querySelectorAll) document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===document.getElementById('sym').value)); }catch(e){}
 try{ if(document.querySelectorAll) document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===document.getElementById('tf').value)); }catch(e){}
@@ -1782,6 +1836,23 @@ def make_app() -> Flask:
             return jsonify(_sanitize_for_json(desk_status()))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.get("/api/readiness")
+    def api_readiness():
+        """Combined readiness strip: channels + immune system + risk gate.
+
+        The one verdict the dashboard shows above every tab (TODO-1.bis).
+        Same payload as `python main.py doctor --strip --json` and the MCP
+        ``readiness`` tool — no surface computes its own verdict.
+        """
+        try:
+            from brain.agent import readiness_strip
+            return jsonify(_sanitize_for_json(readiness_strip()))
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "level": "down",
+                            "headline": "readiness unavailable",
+                            "pillars": [],
+                            "error": f"{type(exc).__name__}: {exc}"})
 
     @app.get("/api/agents")
     def api_agents():
