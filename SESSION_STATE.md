@@ -12,7 +12,7 @@
 
 **Last updated:** 2026-08-12 (end of TODO-4 + D1–D5 + wheel-gate session)
 **Branch:** `arena/019ff483-sky`
-**HEAD commit:** *(this session's commit — see "Last commit" below)*
+**HEAD commit:** `c0b8a02` (desk_status + wheel-gate + handoff; 4 commits on this branch)
 **Default branch:** `main` @ `4216448` (PR #5 merged 2026-08-11)
 **PR:** none open at start of this session. PR #5 is MERGED.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
@@ -89,7 +89,9 @@ Tests **306 → 320 pass / 1 skip**.
 - `pyproject.toml` (package `cryptobrain` 2.1.0).
 - `cryptobrain/__init__.py` (`import cryptobrain` facade).
 - `ci/wheel_gate.py` + `tests/test_wheel_gate.py`.
-- `wheel-gate` job in `.github/workflows/ci.yml`.
+- `docs/wheel-gate-job.yml` — job spec for a human to paste into
+  `.github/workflows/ci.yml` (TODO-7). The token cannot push
+  under `.github/workflows/` (push rejected this session).
 - Local verification: `python ci/wheel_gate.py` built
   `cryptobrain-2.1.0-py3-none-any.whl`, no duplicate entries.
 
@@ -188,6 +190,8 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
+c0b8a02 chore: keep wheel-gate job spec out of .github/workflows
+8515897 docs: record session SHAs in SESSION_STATE.md
 03b9da8 feat(packaging): wheel-gate, pyproject, record D1–D5
 723bbff feat(desk): one-call desk_status advisory (TODO-4)
 ```
