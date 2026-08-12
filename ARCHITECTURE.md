@@ -31,7 +31,7 @@
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
 | `MERGE_NOTES.md` | Provenance of the Cloudslover + cloudshome merge |
-| `AI_ANATOMY_ROADMAP.md` | Live status of P1–P9 |
+| `AI_ANATOMY_ROADMAP.md` | Live status of P1–P12 |
 
 ### `brain/` — the desk brain
 | Module | Purpose | Used by |
@@ -101,7 +101,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 41 test modules, 337 pass / 1 skip
+### `tests/` — 41 test modules, 339 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
@@ -117,7 +117,13 @@
 - `agent_install.md` — **NEW (P7)** the one-pager an agent fetches when
   told "install CryptoBrain."
 - `INFRASTRUCTURE_LAYERS.md` — OpenHands / Dify / LibreChat vs SKY.
-  Study only; never vendor. Dify after graduation; LibreChat last.
+  Study only; never vendor. Dify after graduation *and* P10;
+  LibreChat last.
+- `DATA_INFRASTRUCTURE_ROADMAP.md` — **P10**, the next major
+  milestone: own the market data (normalised schema → Parquet store →
+  Binance/Bybit backfill → derivatives series → quality pillar →
+  Lightweight Charts terminal → WebSocket tier → feature store).
+  12 shippable milestones. Read it in full before writing any P10 code.
 - `wheel-gate-job.yml` — job spec a human pastes into
   `.github/workflows/ci.yml` (TODO-7).
 
@@ -158,7 +164,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 337 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 339 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial

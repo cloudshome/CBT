@@ -6,13 +6,29 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-12 (TODO-1.bis readiness strip shipped)
+**Last updated:** 2026-08-12 (TODO-1.bis shipped; P10 data infrastructure planned)
+
+---
+
+## 🎯 The aim (never changes)
+
+**Become a fully independent, consistently profitable trader.**
+
+Independence has two halves. SKY currently owns one of them:
+
+| Half | Meaning | Status |
+|---|---|---|
+| **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
+| **Data independence** | Our own stored market history | ❌ **P10** |
+
+Everything below is ordered by how directly it moves those two lines.
+Anything that moves neither is out of scope.
 
 ---
 
 ## 🔥 Top priority — start here in the next session
 
-### TODO-11 · Prove the paper book · next *code* item
+### TODO-11 · Prove the paper book · next *code* item · P11
 
 The engine, the agent surface, and the readiness surface are all
 done. The thing that is **not** done is the only thing that unlocks
@@ -32,6 +48,77 @@ python main.py desk               # watch the graduation line move
 Concretely: run the grind to a real 100/20, journal the closed
 trades so `compliance` stops being `None`, and fix whatever the
 graduation report reveals. Do **not** add new agents or panels.
+
+**Why this comes before P10:** P11 is days of grinding code that
+already exists; P10 is weeks of new infrastructure. Finishing P11
+keeps the graduation ladder moving and gives P10's backfill a working
+proof-loop to feed. Do not let the data project become a reason to
+stop proving the edge.
+
+### TODO-12 · P10 · Data infrastructure + market terminal · the next MAJOR milestone
+
+📄 **Full plan: [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md)** —
+read that before touching any of it. Summary only here.
+
+**The problem it solves:** every scan today is amnesiac. SKY fetches
+~500 candles, decides, and throws them away. That caps backtests at
+one API response, makes "how did this setup behave when OI rose and
+funding was negative?" unanswerable, and means the edge is re-derived
+from scratch every run.
+
+**The goal:** collect BTC market data ourselves from free/public
+exchange APIs, store it ourselves, and let the engine reason over
+stored evidence.
+
+Twelve independently shippable milestones (P10.1 → P10.12). Start at
+**P10.1 (schema + Parquet store)**; do not start milestone N+1 until N
+is green.
+
+| # | Milestone |
+|---|---|
+| P10.1 | Normalised `Candle` schema + Parquet store + upsert PK |
+| P10.2 | Binance paginated REST backfill (resumable, rate-limit aware) |
+| P10.3 | Gap detection + repair + 1m→higher-TF aggregation |
+| P10.4 | Derivatives as time series (funding / OI / mark / index / basis) |
+| P10.5 | Data-quality pillar wired into `readiness_strip()` |
+| P10.6 | Bybit adapter behind the same schema |
+| P10.7 | Cross-exchange premium/discount + funding spread |
+| P10.8 | Lightweight Charts replaces `chartSVG()` |
+| P10.9 | OI / funding / CVD panes |
+| P10.10 | WebSocket tier (live klines + liquidations) |
+| P10.11 | Backtester reads the store, not a live fetch |
+| P10.12 | Feature store — one wide row per timestamp |
+
+**Phase done when** we can ask *"how did this setup perform when price
+rose, OI rose, funding was negative, and CVD was positive?"* and get a
+number computed from our own data.
+
+**Corrections already applied to the incoming plan** (detail in §1 of
+the roadmap doc — these are the load-bearing ones):
+
+- **Analytics are ~80% built.** EMA/RSI/MACD/ATR/VWAP/Bollinger/CVD/
+  volume-profile all exist in `engine/`. P10 feeds them stored data;
+  it does not reimplement them.
+- **SQLite + Parquet, not PostgreSQL + Redis.** `ARCHITECTURE.md`
+  fixes SKY as single-process/single-user/single-machine. Redis solves
+  a cache-coherency problem we don't have.
+- **Lightweight Charts standalone, not React/Next.js.** ~45 KB from a
+  `<script>` tag keeps SKY one Flask process with five runtime deps.
+- **No FastAPI, no Docker.** Flask already serves `/api/*`;
+  `ops/systemd/` already deploys.
+- **Liquidations cannot be backfilled.** Real data comes from the
+  `!forceOrder@arr` WebSocket stream and only accumulates from the day
+  we start. The current `liquidations()` is a 24h-stats *proxy* and
+  must be renamed so nobody mistakes it for the real thing.
+- **Reuse `_cross_exchange_probe()`.** Cross-exchange comparison
+  already exists in `brain/agent.py`; generalise it, don't write a
+  second one.
+- **One PR per session** (Arena limit) overrides the incoming plan's
+  "always open a PR" step.
+
+**Hard constraints:** public endpoints only — no API keys, ever;
+`DEMO_MODE=1` must keep the suite green offline; bad data quarantines
+instead of producing a signal; `data/store/**` is gitignored.
 
 ### TODO-7 · Activate GitHub Actions wheel-gate · human action
 
@@ -64,7 +151,10 @@ A trading risk-calc change must never land on `main` unreviewed.
 
 Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md).
 
-### TODO-9 · Dify as a *separate* research layer · AFTER graduation
+**Both are now behind P10 as well as the graduation gate.** Owning our
+data moves the aim; wrapping the engine in another chat UI does not.
+
+### TODO-9 · Dify as a *separate* research layer · AFTER graduation + P10
 
 Not a SKY dependency. Deploy Dify elsewhere and point it at SKY's
 read-only surfaces (`desk`, `readiness`, `ask`, MCP). Start only when
@@ -145,3 +235,11 @@ session or the next.
   agents + `desk_status()` + `readiness_strip()` already cover that job.
 - A *fourth* readiness surface. Channels, immune, gate, desk advice,
   and the strip are enough; anything new reads `readiness_strip()`.
+- **Exchange trading credentials / signed endpoints / live order
+  placement** — forever, not just during P10. A collector that can
+  authenticate is a collector that can trade.
+- **Paid data vendors.** P10 is explicitly a free/public-API phase.
+- **Alt-coin expansion during P10.** BTC first, ETH second, nothing
+  else until the pipeline is proven.
+- **PostgreSQL, Redis, Docker, FastAPI, React/Next.js.** See the
+  corrections in TODO-12 / roadmap §1.

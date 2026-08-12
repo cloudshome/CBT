@@ -12,7 +12,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — planning only, no runtime change
+- **`docs/DATA_INFRASTRUCTURE_ROADMAP.md`** — P10, the market-data
+  independence phase: collect BTC data from free/public exchange APIs,
+  store it ourselves (normalised schema + Parquet), and let the engine
+  reason over stored evidence instead of a 500-candle amnesiac fetch.
+  12 independently shippable milestones (P10.1 → P10.12).
+
+  Reconciles a user-supplied plan against what SKY already has. Seven
+  corrections recorded so a future session doesn't re-litigate them:
+  analytics are ~80% already built in `engine/`; SQLite + Parquet
+  instead of PostgreSQL + Redis (SKY is single-process by invariant);
+  Lightweight Charts standalone instead of React/Next.js; no FastAPI
+  (Flask already serves `/api/*`); no Docker (`ops/systemd/` deploys);
+  liquidations cannot be backfilled (WS-only, accumulates from day one)
+  and today's `liquidations()` is a 24h-stats proxy; reuse the existing
+  `_cross_exchange_probe()` rather than writing a second one.
+- `tests/test_handoff_memory.py` — two tests guarding the P10 plan's
+  load-bearing constraints (milestone ladder, credential-free posture,
+  `DEMO_MODE`, and the rejected-dependency list).
+
+### Changed
+- `TODO.md` — records the project aim explicitly (decision
+  independence ✅ / data independence ❌), adds **TODO-12 (P10)**, and
+  moves Dify/LibreChat behind P10 as well as the graduation gate.
+- `AI_ANATOMY_ROADMAP.md` — new P10–P12 phase table.
+- `docs/INFRASTRUCTURE_LAYERS.md` — order of work now
+  `P11 → P10 → Dify → LibreChat`.
+- `.gitignore` — `data/store/**` excluded ahead of P10.1.
+
 ### Planned
+- TODO-11 (P11): prove the paper book — grind to a real 100/20,
+  journal closed trades, move the graduation gate. Next code item.
+- TODO-12 (P10): data infrastructure. Next major milestone.
 - TODO-7: human pastes the wheel-gate job into
   `.github/workflows/ci.yml` (the spec currently sits inert at
   `docs/.github/workflows/ci.yml` — nested under `docs/`, so GitHub

@@ -58,15 +58,22 @@ cover that job. A sixth agent that writes code is Arena itself.
 ## Order of work (do not skip ahead)
 
 ```
-NOW     Arena + GitHub + this repo's tests + desk_status
-NEXT    Prove the edge (simulator / paper / graduation gate)
-THEN    Dify as a *separate* research layer (never imported by the engine)
+NOW     Arena + GitHub + this repo's tests + desk_status + readiness
+NEXT    P11 · Prove the edge (simulator / paper / graduation gate)
+THEN    P10 · Own the data (collect, store, backtest over years)
+              docs/DATA_INFRASTRUCTURE_ROADMAP.md
+AFTER   Dify as a *separate* research layer (never imported by the engine)
 LAST    LibreChat-style chat UI, if the dashboard is not enough
 ```
 
 Promotion to Dify requires the existing graduation gate
 (`python main.py agent ask "am i ready for micro?"`) to pass.
 Not before.
+
+**P10 now sits ahead of Dify too.** Owning our market data moves the
+aim — a fully independent trader — because it turns a 500-candle
+amnesiac scan into years of queryable evidence. Another chat layer
+over the same thin data moves nothing. Data first, wrappers last.
 
 ---
 
@@ -76,7 +83,9 @@ Not before.
    token gets HTTP 403 on the protection API. A repo admin should
    enable: require PR, no direct push, require status checks once
    CI is active (TODO-7).
-2. **Activate CI / paste the wheel-gate job** into
-   `.github/workflows/ci.yml` from `docs/wheel-gate-job.yml` (TODO-7).
+2. **Activate CI / paste the wheel-gate job** into the real
+   `.github/workflows/ci.yml`. The spec sits at
+   `docs/.github/workflows/ci.yml`, which is **inert** — nested under
+   `docs/`, so GitHub Actions never reads it (TODO-7).
 
 Tracked as TODO-8 and TODO-7 in [`TODO.md`](../TODO.md).
