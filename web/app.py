@@ -30,6 +30,7 @@ Endpoints
   POST /api/ask     natural-language question to the desk
   GET /api/channels ordered-backend channel registry (P8; Panniantong/Agent-Reach pattern)
   GET /api/doctor   human-readable doctor report (same as `python main.py doctor`)
+  GET /api/desk     one-call desk advisory (gate + P&L + graduation + advice)
 """
 from __future__ import annotations
 
@@ -772,6 +773,7 @@ function render(d){
 
   // System tab
   let systemCards = '';
+  systemCards += card('DESK STATUS', '<div id="desk"><span class="muted">loading…</span></div>');
   systemCards += card('CONNECTIONS', `<div id="conn"><span class="muted">loading…</span></div>
     <div class="flex" style="margin-top:10px">
       <button class="btn" onclick="systemCheck()">🔍 System check</button>
@@ -819,7 +821,7 @@ function render(d){
   switchTab(_activeTab);
   // load async sub-panels
   loadPending(); loadPaper(); loadHistory(); loadLearning(); loadSources();
-  loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels();
+  loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels(); loadDesk();
   const symE=document.getElementById('sym'); const tfE=document.getElementById('tf');
   loadChart((symE?symE.value:'BTCUSDT').toUpperCase(), tfE?tfE.value:'15m');
 }
@@ -1138,6 +1140,36 @@ async function loadChannels(){
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
 
+// P9 desk_status advisory. Same snapshot as `python main.py desk` / MCP
+// desk_status: gate + P&L + graduation + next agent + one advice action.
+async function loadDesk(){
+  const el=document.getElementById('desk'); if(!el) return;
+  try{
+    const d=await (await fetch('/api/desk')).json();
+    if(d.error){ el.innerHTML='<span class="err">'+esc(d.error)+'</span>'; return; }
+    const gate=d.risk_gate||{}, advice=d.advice||{}, g=d.graduation||{},
+          score=d.scorecard||{}, nextA=d.next_agent||{}, prog=d.progression||{};
+    const open=!!gate.allowed;
+    const action=advice.action||'STAND_ASIDE';
+    const actionCls = action==='SCAN'?'BUY':(action==='CLEAR_STATE'||action==='STAND_ASIDE'?'NOTRADE':'SELL');
+    const wr=score.win_rate!=null?(score.win_rate*100).toFixed(1)+'%':'n/a';
+    const exp=score.expectancy_r!=null?(score.expectancy_r>=0?'+':'')+Number(score.expectancy_r).toFixed(3)+'R':'n/a';
+    el.innerHTML=`<div class="flex" style="margin-bottom:10px">
+        <span class="pill ${open?'BUY':'NOTRADE'}" style="${open?'background:rgba(34,197,94,.14);color:var(--green);border-color:rgba(34,197,94,.32)':''}">GATE ${open?'OPEN':'CLOSED'}</span>
+        <span class="pill ${actionCls}">${esc(action)}</span>
+        <span class="badge">progression: ${esc(prog.level||'?')}</span>
+        <span class="badge">graduation: ${g.ready?'READY':'NOT READY'}</span></div>
+      <div class="kv">
+        <b>Advice</b><span><b>${esc(advice.headline||'')}</b></span>
+        <b>Today P&amp;L</b><span class="mono">${gate.today_pnl_pct!=null?Number(gate.today_pnl_pct).toFixed(2)+'%':'n/a'} (${gate.today_n||0} trades)</span>
+        <b>Scorecard</b><span>n=${score.n||0} · win ${wr} · exp ${exp}</span>
+        <b>Pending</b><span>${d.pending_reviews||0} review(s) · open exposure ${d.open_exposure||0}</span>
+        <b>Next agent</b><span>${esc(nextA.name||'—')} — ${esc(nextA.reason||'')}</span></div>
+      <div class="note" style="margin-top:8px;background:rgba(255,255,255,.04);padding:8px;border-radius:10px;border:1px solid var(--line)">${esc(advice.detail||'')}</div>
+      <div class="note" style="margin-top:6px">Same snapshot as <code>python main.py desk</code> · MCP <code>desk_status</code>. Advisory only — never places an order.</div>`;
+  }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
+
 async function askDesk(){
   const q=document.getElementById('askq'); const out=document.getElementById('askout');
   const question=(q?q.value:'').trim(); if(!question) { showToast('Type a question first','err'); return; }
@@ -1360,7 +1392,7 @@ setInterval(()=>{ if(document.getElementById('auto').checked) load(false, true);
 // Channels panel is diagnostic-state (which backend is *serving*),
 // not signal-state, so refresh on a slower 5-minute cadence — not on
 // every 30s scan tick.  Cheap: probe_all() is config-driven.
-setInterval(()=>{ loadChannels(); loadMcp(); }, 5 * 60 * 1000);
+setInterval(()=>{ loadChannels(); loadMcp(); loadDesk(); }, 5 * 60 * 1000);
 // keep seg active state in sync on load
 try{ if(document.querySelectorAll) document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===document.getElementById('sym').value)); }catch(e){}
 try{ if(document.querySelectorAll) document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===document.getElementById('tf').value)); }catch(e){}
@@ -1739,6 +1771,15 @@ def make_app() -> Flask:
             from brain.channels import doctor_report
             # doctor_report returns a multi-line string in text mode
             return jsonify({"report": doctor_report(as_json=False)})
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.get("/api/desk")
+    def api_desk():
+        """One-call desk advisory — same snapshot as `python main.py desk`."""
+        try:
+            from brain.agent import desk_status
+            return jsonify(_sanitize_for_json(desk_status()))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
 

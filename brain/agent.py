@@ -460,6 +460,9 @@ _INTENT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("graduation", ("graduat", "am i ready", "ready for micro", "micro yet",
                     "real money", "promote me", "ready to trade real",
                     "step 3", "blueprint gate")),
+    # desk_status is the one-call advisory; match before generic "risk"/"health".
+    ("desk", ("desk status", "what should i do", "what would a professional",
+              "stand aside", "what now")),
     ("risk", ("risk", "gate", "limit", "drawdown", "daily", "weekly", "trader state",
               "stop trading", "allowed")),
     ("exposure", ("exposure", "portfolio", "position", "bucket", "correlation", "open trade")),
@@ -502,6 +505,11 @@ def ask(question: str, symbol: str | None = None,
             return {"intent": intent, "question": question,
                     "answer": format_graduation(g).splitlines(),
                     "data": {"graduation": g, "journal": j}}
+        if intent == "desk":
+            status = desk_status()
+            return {"intent": intent, "question": question,
+                    "answer": format_desk_status(status).splitlines(),
+                    "data": status}
         if intent == "risk":
             from brain.risk_gate import evaluate as gate_evaluate
             from brain.risk_gate import status_text
@@ -698,3 +706,287 @@ def json_safe(value):
         if isinstance(value, (list, tuple)):
             return [json_safe(v) for v in value]
         return str(value)
+
+
+# ── desk_status (P9 / TODO-4) ─────────────────────────────────────────────
+
+def desk_status() -> dict:
+    """Single advisory snapshot: gate + P&L + graduation + next agent + advice.
+
+    The one call an agent (or operator) makes to answer
+    "what would a professional do right now?"  Read-only — never
+    mutates state, never places an order.
+    """
+    from data.database import SignalDB
+
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    status: dict = {
+        "time": now,
+        "version": VERSION,
+        "progression": {"level": PROGRESSION},
+        "risk_gate": {"open": False, "allowed": False, "blocked_by": ["unavailable"]},
+        "pnl": {},
+        "scorecard": {"n": 0},
+        "graduation": {"ready": False},
+        "pending_reviews": 0,
+        "open_exposure": 0,
+        "next_agent": {"name": "morning_brief", "reason": "unavailable"},
+        "advice": {
+            "action": "STAND_ASIDE",
+            "headline": "desk status unavailable",
+            "detail": "could not assemble the snapshot",
+            "reasons": [],
+        },
+    }
+
+    try:
+        with SignalDB() as db:
+            try:
+                from brain.risk_gate import evaluate_risk_gate, progression as progression_info
+                gate = evaluate_risk_gate(db)
+                details = gate.get("details") or {}
+                dws = details.get("daily_weekly") or {}
+                dw = details.get("drawdown") or {}
+                ts = details.get("trader_state") or {}
+                prog = (gate.get("progression") or details.get("progression")
+                        or progression_info())
+                status["progression"] = {
+                    "level": prog.get("level", PROGRESSION),
+                    "label": prog.get("label", ""),
+                    "risk_pct": prog.get("risk_pct"),
+                    "approve_unproven": prog.get("approve_unproven"),
+                }
+                status["risk_gate"] = {
+                    "open": bool(gate.get("open", gate.get("allowed"))),
+                    "allowed": bool(gate.get("allowed")),
+                    "blocked_by": list(gate.get("blocked_by") or []),
+                    "today_pnl_pct": (dws.get("today") or {}).get("pct"),
+                    "today_n": (dws.get("today") or {}).get("n"),
+                    "week_pnl_pct": (dws.get("week") or {}).get("pct"),
+                    "week_n": (dws.get("week") or {}).get("n"),
+                    "drawdown_pct": dw.get("max_drawdown_pct"),
+                    "drawdown_level": dw.get("level"),
+                    "trader_flags": list(ts.get("flags") or []),
+                    "enforced": bool(details.get("enforced", True)),
+                }
+                status["pnl"] = {
+                    "today": dws.get("today") or {"n": 0, "pct": 0.0, "r_sum": 0.0},
+                    "week": dws.get("week") or {"n": 0, "pct": 0.0, "r_sum": 0.0},
+                    "drawdown": {
+                        "pct": dw.get("max_drawdown_pct", 0.0),
+                        "level": dw.get("level", "normal"),
+                        "equity": dw.get("equity"),
+                    },
+                }
+            except Exception as exc:
+                status["risk_gate"] = {
+                    "open": False, "allowed": False,
+                    "blocked_by": [f"unavailable: {type(exc).__name__}: {exc}"],
+                    "trader_flags": [],
+                }
+
+            try:
+                from brain.metrics import business_metrics
+                metrics = business_metrics(db)
+                overall = metrics.get("overall") or {}
+                execution = metrics.get("execution") or {}
+                status["scorecard"] = {
+                    "n": overall.get("n", 0),
+                    "wins": overall.get("wins", 0),
+                    "losses": overall.get("losses", 0),
+                    "win_rate": overall.get("win_rate"),
+                    "expectancy_r": overall.get("expectancy_r"),
+                    "profit_factor": overall.get("profit_factor"),
+                    "max_drawdown_pct": overall.get("max_drawdown_pct"),
+                    "final_equity": overall.get("final_equity"),
+                    "violation_rate": execution.get("violation_rate"),
+                    "journal_n": execution.get("n", 0),
+                }
+            except Exception as exc:
+                status["scorecard"] = {"n": 0, "error": f"{type(exc).__name__}: {exc}"}
+
+            try:
+                from data.simulator import graduation_status, paper_progress
+                from brain.journal import violation_rate
+                j = violation_rate(db)
+                compliance = (1.0 - j["violation_rate"]
+                              if j.get("violation_rate") is not None else None)
+                status["graduation"] = graduation_status(
+                    paper_progress(db), compliance=compliance)
+                status["journal"] = {
+                    "n": j.get("n", 0),
+                    "violations": j.get("violations", 0),
+                    "violation_rate": j.get("violation_rate"),
+                    "compliance": compliance,
+                }
+            except Exception as exc:
+                status["graduation"] = {
+                    "ready": False, "error": f"{type(exc).__name__}: {exc}"}
+
+            try:
+                status["pending_reviews"] = len(db.pending_reviews())
+            except Exception:
+                status["pending_reviews"] = 0
+            try:
+                status["open_exposure"] = len(db.open_exposure())
+            except Exception:
+                status["open_exposure"] = 0
+
+            try:
+                from brain.agents import next_scheduled_agent
+                status["next_agent"] = next_scheduled_agent(db)
+            except Exception as exc:
+                status["next_agent"] = {
+                    "name": "morning_brief",
+                    "reason": f"unavailable: {type(exc).__name__}: {exc}",
+                }
+    except Exception as exc:
+        status["advice"] = {
+            "action": "STAND_ASIDE",
+            "headline": "desk snapshot failed",
+            "detail": f"{type(exc).__name__}: {exc}",
+            "reasons": [str(exc)],
+        }
+        return json_safe(status)
+
+    status["advice"] = _desk_advice(status)
+    return json_safe(status)
+
+
+def _desk_advice(status: dict) -> dict:
+    """Priority-ordered 'what would a professional do right now?'."""
+    gate = status.get("risk_gate") or {}
+    flags = list(gate.get("trader_flags") or [])
+    blocked = list(gate.get("blocked_by") or [])
+    pending = int(status.get("pending_reviews") or 0)
+    graduation = status.get("graduation") or {}
+    scorecard = status.get("scorecard") or {}
+    journal = status.get("journal") or {}
+    next_agent = status.get("next_agent") or {}
+    level = (status.get("progression") or {}).get("level") or PROGRESSION
+
+    if flags:
+        return {
+            "action": "CLEAR_STATE",
+            "headline": "clear behavioral flags before anything else",
+            "detail": ("Trader-state flags are set (" + ", ".join(flags)
+                       + "). A professional stands aside until the flags "
+                       "are cleared with `python main.py tradestate --clear`."),
+            "reasons": [f"trader state: {', '.join(flags)}"],
+        }
+    if not gate.get("allowed", False):
+        why = "; ".join(blocked) if blocked else "risk gate closed"
+        return {
+            "action": "STAND_ASIDE",
+            "headline": "stand aside — the risk gate is closed",
+            "detail": (f"No new trades. {why}. Re-check with "
+                       "`python main.py risk` after the block lifts."),
+            "reasons": blocked or ["risk gate closed"],
+        }
+    if pending > 0:
+        return {
+            "action": "REVIEW_QUEUE",
+            "headline": f"{pending} signal(s) awaiting human review",
+            "detail": ("The machine proposed; you decide. "
+                       "`python main.py review` then approve/reject. "
+                       "Do not scan for more until the queue is empty."),
+            "reasons": [f"{pending} pending review(s)"],
+        }
+    closed_n = int(scorecard.get("n") or 0)
+    journal_n = int(journal.get("n") or scorecard.get("journal_n") or 0)
+    if closed_n > 0 and journal_n == 0:
+        return {
+            "action": "JOURNAL",
+            "headline": "journal the closed paper trades",
+            "detail": (f"{closed_n} decided paper trade(s) have no journal "
+                       "entry. A professional records 'did I follow my "
+                       "system?' before looking for the next setup. "
+                       "`python main.py journal <scan_id> --followed-rules 1`."),
+            "reasons": [f"{closed_n} decided trades, 0 journal entries"],
+        }
+    if not graduation.get("ready"):
+        missing = []
+        met = graduation.get("met") or {}
+        for name, ok in met.items():
+            if not ok:
+                missing.append(name)
+        if not graduation.get("samples_proven", False):
+            missing.append("100/20 sample proof")
+        why = ", ".join(missing) if missing else "graduation gate not met"
+        return {
+            "action": "PAPER_GRIND",
+            "headline": "keep paper-trading — not ready for micro",
+            "detail": (f"Progression is '{level}'. Graduation still needs: {why}. "
+                       "Grind unique samples with `python main.py simulator` "
+                       "and keep the paper runner on approved signals."),
+            "reasons": missing or ["not graduated"],
+        }
+    next_name = next_agent.get("name") or "morning_brief"
+    return {
+        "action": "SCAN",
+        "headline": "desk is open — scan the watchlist",
+        "detail": (f"Gate OPEN, graduation ready, queue empty. "
+                   f"Run `python main.py brief` (or agent '{next_name}') "
+                   "and act only on the desk decision, never the raw scan."),
+        "reasons": ["risk gate open", "graduation ready", "queue empty"],
+    }
+
+
+def format_desk_status(status: dict) -> str:
+    """Human-readable block for `python main.py desk` / MCP / dashboard."""
+    gate = status.get("risk_gate") or {}
+    pnl = status.get("pnl") or {}
+    today = pnl.get("today") or {}
+    week = pnl.get("week") or {}
+    dw = pnl.get("drawdown") or {}
+    score = status.get("scorecard") or {}
+    g = status.get("graduation") or {}
+    gstats = g.get("stats") or {}
+    next_a = status.get("next_agent") or {}
+    advice = status.get("advice") or {}
+    prog = status.get("progression") or {}
+    flags = gate.get("trader_flags") or []
+
+    gate_word = "OPEN" if gate.get("allowed") else "CLOSED"
+    wr = score.get("win_rate")
+    wr_s = f"{wr * 100:.1f}%" if wr is not None else "n/a"
+    exp = score.get("expectancy_r")
+    exp_s = f"{exp:+.3f}R" if exp is not None else "n/a"
+    pf = score.get("profit_factor")
+    pf_s = f"{pf:.2f}" if pf is not None else "n/a"
+    today_pct = today.get("pct")
+    today_s = f"{today_pct:+.2f}%" if today_pct is not None else "n/a"
+    week_pct = week.get("pct")
+    week_s = f"{week_pct:+.2f}%" if week_pct is not None else "n/a"
+    dd_pct = dw.get("pct")
+    dd_s = f"{dd_pct:.2f}%" if dd_pct is not None else "n/a"
+
+    lines = [
+        "=" * 66,
+        f"DESK STATUS — CryptoBrain v{status.get('version')}  {status.get('time')}",
+        "-" * 66,
+        f"  progression  : {prog.get('level', '?')} — {prog.get('label', '')}",
+        f"  risk gate    : {gate_word}"
+        + (f"  flags={', '.join(flags)}" if flags else "  flags=clear"),
+    ]
+    for b in gate.get("blocked_by") or []:
+        lines.append(f"    ✗ {b}")
+    lines.extend([
+        f"  today P&L    : {today_s}  ({today.get('n', 0)} trades)",
+        f"  week P&L     : {week_s}  ({week.get('n', 0)} trades)",
+        f"  drawdown     : {dd_s}  → {dw.get('level', 'normal')}",
+        f"  scorecard    : n={score.get('n', 0)}  win {wr_s}  "
+        f"exp {exp_s}  PF {pf_s}",
+        f"  graduation   : {'READY' if g.get('ready') else 'NOT READY'}  "
+        f"(samples {'proven' if g.get('samples_proven') else 'short'} · "
+        f"{gstats.get('n', 0)} decided)",
+        f"  pending      : {status.get('pending_reviews', 0)} review(s)  ·  "
+        f"open exposure {status.get('open_exposure', 0)}",
+        f"  next agent   : {next_a.get('name', '?')} — {next_a.get('reason', '')}",
+        "-" * 66,
+        f"  ADVICE       : {advice.get('action', '?')} — {advice.get('headline', '')}",
+    ])
+    detail = advice.get("detail")
+    if detail:
+        lines.append(f"               {detail}")
+    return "\n".join(lines)

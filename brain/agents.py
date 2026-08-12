@@ -200,6 +200,18 @@ AGENTS = {
     "weekly": WeeklyReviewAgent,
 }
 
+# Canonical autonomous-agent cadence. Used by desk_status() to answer
+# "which agent should run next?" without inventing a scheduler.
+CORE_AGENTS: tuple[str, ...] = (
+    "morning_brief", "watchdog", "paper_reviewer", "weekly_review",
+)
+AGENT_CADENCE_HOURS: dict[str, float] = {
+    "morning_brief": 24.0,     # once per UTC day
+    "watchdog": 4.0,           # a few times a day
+    "paper_reviewer": 24.0,    # after the session
+    "weekly_review": 168.0,    # once a week
+}
+
 
 def run_agent(name: str, db: Optional[SignalDB] = None) -> dict:
     """Run an agent by name."""
@@ -227,3 +239,74 @@ def run_all_agents(db: Optional[SignalDB] = None) -> dict:
         "agents": results,
         "ts": int(time.time()),
     }
+
+
+def next_scheduled_agent(db: Optional[SignalDB] = None) -> dict:
+    """Which autonomous desk agent is most overdue.
+
+    Looks at last-run timestamps in ``agent_runs`` and compares them
+    against :data:`AGENT_CADENCE_HOURS`. Returns a small advisory dict
+    — never starts an agent. Used by ``desk_status()``.
+
+    If nothing has ever run, recommend ``morning_brief`` (the cheapest
+    first desk action).
+    """
+    close_db = False
+    if db is None:
+        db = SignalDB()
+        close_db = True
+    try:
+        now = int(time.time())
+        last_by_name: dict[str, dict] = {}
+        for name in CORE_AGENTS:
+            rows = db.latest_agent_runs(limit=1, agent=name)
+            if rows:
+                last_by_name[name] = rows[0]
+
+        candidates: list[dict] = []
+        for name in CORE_AGENTS:
+            cadence = AGENT_CADENCE_HOURS[name]
+            last = last_by_name.get(name)
+            last_ts = int(last["ts"]) if last and last.get("ts") else None
+            age_hours = None if last_ts is None else max(0.0, (now - last_ts) / 3600.0)
+            overdue_hours = cadence if last_ts is None else max(0.0, age_hours - cadence)
+            never_run = last_ts is None
+            candidates.append({
+                "name": name,
+                "cadence_hours": cadence,
+                "last_run_ts": last_ts,
+                "age_hours": None if age_hours is None else round(age_hours, 2),
+                "overdue_hours": round(overdue_hours, 2),
+                "never_run": never_run,
+                "last_status": (last or {}).get("status"),
+            })
+
+        # If nothing has ever run, start with morning_brief (cheapest first
+        # desk action). Otherwise pick the most overdue agent.
+        if all(c["never_run"] for c in candidates):
+            pick = next(c for c in candidates if c["name"] == "morning_brief")
+        else:
+            candidates.sort(key=lambda c: (-c["overdue_hours"], c["name"]))
+            pick = candidates[0]
+        if pick["never_run"]:
+            reason = (f"{pick['name']} has never run — start the desk with "
+                      f"`python main.py agent {pick['name'].replace('_', '-')}`")
+        elif pick["overdue_hours"] > 0:
+            reason = (f"{pick['name']} is {pick['overdue_hours']:.1f}h overdue "
+                      f"(cadence {pick['cadence_hours']:.0f}h)")
+        else:
+            reason = (f"all agents are within cadence; next up is "
+                      f"{pick['name']} (last run {pick['age_hours']:.1f}h ago)")
+        return {
+            "name": pick["name"],
+            "overdue_hours": pick["overdue_hours"],
+            "age_hours": pick["age_hours"],
+            "cadence_hours": pick["cadence_hours"],
+            "last_run_ts": pick["last_run_ts"],
+            "never_run": pick["never_run"],
+            "reason": reason,
+            "candidates": candidates,
+        }
+    finally:
+        if close_db:
+            db.close()

@@ -27,7 +27,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.1.0"  # bumped: TODO-2 added 5 new tools (P9 capability endpoints)
+SERVER_VERSION = "1.2.0"  # bumped: TODO-4 added desk_status advisory
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -145,6 +145,14 @@ ALLOWED_TOOLS = {
             },
         },
     },
+    # ── P9: desk_status advisory (TODO-4) ────────────────────────────
+    "desk_status": {
+        "description": "One-call desk advisory: risk-gate open/closed, today's P&L, graduation verdict, next scheduled agent, and 'what would a professional do right now?'. Read-only; the same as `python main.py desk`. Never places an order.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
 }
 
 
@@ -237,6 +245,10 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         with SignalDB() as db:
             return monte_carlo_equity(db, samples=samples,
                                       seed=int(seed) if seed is not None else None)
+
+    elif name == "desk_status":
+        from brain.agent import desk_status
+        return desk_status()
 
     raise ValueError(f"Unhandled tool: {name}")
 
