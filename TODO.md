@@ -10,6 +10,27 @@
 
 ---
 
+## 🔁 Session rhythm (how we work)
+
+We go session by session. Each Arena session is one self-contained
+unit of work that ends in a reviewable PR:
+
+```text
+1. Read SESSION_STATE.md → TODO.md → the relevant docs
+2. Pick the top unblocked item
+3. Implement it; keep the suite green (≥ 339 pass / 1 skip)
+4. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
+5. Commit + push to the session branch
+6. Open ONE PR as the closing step  ← Arena allows one PR per session
+7. A human reviews and merges; the next session branches from main
+```
+
+The PR is the session boundary. Never merge your own PR, and never
+leave a session's work sitting on a branch with no PR — a future
+session then cannot tell what was finished from what was abandoned.
+
+---
+
 ## 🎯 The aim (never changes)
 
 **Become a fully independent, consistently profitable trader.**

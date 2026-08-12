@@ -14,7 +14,9 @@
 **Branch:** `arena/019ff4c3-sky`
 **HEAD commit:** see "Last commit" below
 **Default branch:** `main` @ `f0eff12` (PR #6 merged 2026-08-12)
-**PR:** none opened this session — the user asked for commit + push only.
+**PR:** [#7](https://github.com/Azimshawon/SKY/pull/7) — this branch → `main`.
+Opened as the closing step of the session (the standing convention:
+work the session, open the PR before ending it).
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
 > **This session's decision:** the user asked "can we work on?" and,
@@ -175,8 +177,9 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ## Known problems / caveats
 
 1. **D1–D5 are answered.** See `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
-2. **Arena's GitHub integration: one PR per chat session.** No PR was
-   opened this session (user chose commit + push only).
+2. **Arena's GitHub integration: one PR per chat session.** The
+   session convention is: do the work, then open **one** PR as the
+   closing step. PR #7 is this session's.
 3. **`mcp>=1.0` is listed in `requirements.txt` but not required**
    for the zero-dep `mcp_server.py`. It is only needed for the
    SDK-based `python main.py mcp` server.
@@ -305,6 +308,9 @@ Rules:
 If the task is too large for the remaining session, split it into a
 safe checkpoint rather than leaving the repository in an undocumented
 state.
+
+Before ending the session, open ONE pull request from this branch to
+main (Arena allows one PR per chat session). Do not merge it yourself.
 ```
 
 ## End-of-session checklist (run before closing this session)
@@ -321,4 +327,4 @@ state.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
 11. [x] `git add` / `git commit` / `git push origin arena/019ff4c3-sky`.
-12. [x] No PR opened — the user explicitly asked for commit + push only.
+12. [x] Open the session PR as the closing step — PR #7.
