@@ -10,48 +10,16 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-12 (P10.1 shipped: normalised Candle schema + Parquet store)
-**Branch:** `arena/019ff579-sky`
+**Last updated:** 2026-08-12 (P10.2 + P10.3 shipped: backfill + gaps/rollups)
+**Branch:** `arena/019ff5b1-sky`
 **HEAD commit:** see "Last commit" below
 **Default branch:** `main` @ `d0ddb42` (PR #9 merged 2026-08-12)
-**PR:** [#10](https://github.com/Azimshawon/SKY/pull/10) — this branch → `main`.
-Opened as the closing step of the session (the standing convention: work
-the session, open the PR before ending it).
+**PR:** this session opens one PR from `arena/019ff5b1-sky` → `main`.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session's decision:** the user brought a ChatGPT-authored
-> "AI trading brain" build plan and said *"keep going to our sequel
-> road to build."* The reconciliation was done first (per SKY's own
-> rule: DO NOT BUILD MORE — FIRST UNDERSTAND WHAT ALREADY EXISTS):
-> the plan re-describes much of what P1–P9 already shipped, and its
-> own data-first ordering independently lands on where the repo
-> already was — **P10, data independence** (`TODO-12`). So this
-> session did not start an audit of what exists; it built the **first
-> shippable P10 milestone**:
->
-> 1. **P10.1 — Schema + store shipped.** `data/store.py` adds the
->    normalised `Candle` schema (§4 of the roadmap), a partitioned
->    Parquet store under `data/store/**` (gitignored), and an upsert
->    PK `(exchange, market, symbol, timeframe, ts)` that kills the
->    duplicate-row bug class. `normalise_klines()` is the single
->    adapter boundary P10.2's backfill will feed.
-> 2. **13 new offline tests** (`tests/test_store.py`): schema/dtypes,
->    round-trip, upsert dedup (last-write-wins), out-of-order→sorted,
->    duplicate-ts collapse, unclosed-candle drop, year/month partition
->    boundary, range filter, empty read, series isolation.
-> 3. **Safety rule enforced in code:** an unclosed candle (`closed=False`)
->    is never persisted into immutable history.
-> 4. **Deps:** added `pyarrow` (only the roadmap-permitted P10 additions;
->    `websockets` waits for P10.10). Version **2.2.1 → 2.3.0**.
->
-> **Result:** `DEMO_MODE=1` suite **342 → 355 pass / 1 skip** (+13),
-> fully offline. No strategy, risk-gate, or engine behaviour changed —
-> P10 changes inputs, not the brain.
->
-> **Not done this session (deliberately):** no P10.2+ code, no new
-> agents/panels/endpoints, no change to the graduation criteria (P11
-> gate honestly still closed). The ChatGPT plan's RAG/agent/desk phases
-> remain re-descriptions of existing P1–P9 work — not new builds.
+> **This session's decision:** new session on `arena/019ff5b1-sky`.
+> Handoff said P10.2 next; operator asked for P10.3. Shipped **both
+> P10.2 and P10.3**. Suite **355 → 368**. Version **2.4.0**. Next: P10.4.
 
 ---
 
@@ -74,18 +42,16 @@ plan (18 phases, 15-item rulebook) is in
 **Become a fully independent, consistently profitable trader.**
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
-(our own stored market history — ❌ not started, P10). Every phase
+(our own stored market history — 🔄 P10.1–P10.3 shipped). Every phase
 below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P10 (data infrastructure + market terminal) — started; P10.1 shipped.**
-P9 complete; P11 (paper-book proof) has shipped its first grind but the
-graduation *gate* is honestly still closed (family below the blueprint
-bar; Sweep Reversal Sell breakeven). Open items: two *human* GitHub
-actions (TODO-7, TODO-8); the rest of P10 (P10.2 → P10.12).
+**P10 (data infrastructure + market terminal) — P10.1–P10.3 shipped.**
+P9 complete; P11 first grind shipped; graduation gate still closed.
+Open items: TODO-7, TODO-8; P10.4 → P10.12.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -99,7 +65,7 @@ actions (TODO-7, TODO-8); the rest of P10 (P10.2 → P10.12).
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
-| **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1 shipped** (`data/store.py`); P10.2 (Binance backfill) next. 12 milestones in [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
+| **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1–P10.3 shipped**; P10.4 (derivatives series) next. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
 | **P12** | **Regime-conditional backtests** | ⏸ After P10 | Years of stored data, conditioned on OI / funding / CVD |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
@@ -109,7 +75,21 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-12 (this branch): P10.1 — schema + Parquet store
+### Session 2026-08-12 (this branch): P10.2 + P10.3 — backfill + gaps/rollups
+
+Branched from `arena/019ff579-sky` @ `ee99486`. 0 regressions.
+Tests **355 → 368 pass / 1 skip** (+13). Version **2.3.0 → 2.4.0**.
+
+**What landed:**
+- `data/backfill.py` — `backfill()` / `iter_klines_pages()` / `BackfillResult`.
+- `data/gaps.py` — `detect_gaps` / `repair_gaps` / `aggregate_ohlcv` / `rollup`.
+- `python main.py backfill` with `--repair` / `--rollup`.
+- SampleClient pagination; 13 new tests.
+
+**Last successful test command:**
+`DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` → **368 passed / 1 skipped**.
+
+### Session 2026-08-12 (prior branch): P10.1 — schema + Parquet store
 
 Branched from `main` @ `d0ddb42` (PR #9). 0 regressions.
 Tests **342 → 355 pass / 1 skip** (+13). Version **2.2.1 → 2.3.0**.
@@ -235,8 +215,8 @@ See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ## Currently working on
 
-The TODO-11 grind is shipped and committed/pushed to
-`arena/019ff530-sky` (PR #9 open). Nothing in flight.
+P10.2 + P10.3 shipped on `arena/019ff5b1-sky`. Nothing in flight.
+Next code session: **P10.4** (derivatives time series).
 
 The paper book's **counts** are done (100/20 for every primary setup,
 38,439 decided samples) and the **journal loop** is done (compliance
@@ -266,10 +246,8 @@ reuse the existing cross-exchange probe; one-PR-per-session).
    0 paper samples because the simulator takes one paper sample per
    window — best plan only). Do **not** change the blueprint
    graduation criteria.
-2. **TODO-12 (P10)** — data infrastructure + market terminal. The next
-   *major* milestone; 12 shippable steps in
-   [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md).
-   Start at P10.1 (schema + Parquet store). **Read the roadmap first** —
+2. **TODO-12 (P10)** — P10.1–P10.3 done. Next: **P10.4** (funding / OI /
+   mark / index / basis + honest liquidations rename). Roadmap:
    it records which parts of the incoming plan were corrected and why.
 3. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
@@ -286,7 +264,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 1. **D1–D5 are answered.** See `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
 2. **Arena's GitHub integration: one PR per chat session.** The
    session convention is: do the work, then open **one** PR as the
-   closing step. PR #9 is this session's.
+   closing step.
 3. **`mcp>=1.0` is listed in `requirements.txt` but not required**
    for the zero-dep `mcp_server.py`. It is only needed for the
    SDK-based `python main.py mcp` server.
@@ -298,7 +276,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    job spec therefore lives at `docs/.github/workflows/ci.yml`, which
    GitHub Actions does **not** execute. Source of truth for running
    the gate is `ci/wheel_gate.py` locally (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.2.1.
+6. **`CHANGELOG.md` is current** through v2.4.0.
 7. **Sweep-reversal setups are breakeven on synthetic data.** The
    sandbox's deterministic series are smooth random walks with drift —
    they have no real stop-hunt structure, so sweep plans land near
@@ -313,10 +291,9 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 7. **The dashboard readiness strip lives outside `#app`.** `render()`
    replaces `#app.innerHTML` wholesale, so anything inside it would be
    destroyed on every scan. Keep the strip where it is.
-8. **SKY stores no market data.** Every scan fetches ~500 candles and
-   discards them; `data/database.py` has 10 tables and none hold
-   candles. This is the structural limit P10 exists to remove — it
-   caps every backtest at one API response.
+8. **Live scans are still amnesiac.** The Parquet store + backfill exist
+   (P10.1–P10.3) but the scanner/backtester still fetch ~500 live candles
+   (P10.11 wires them to the store).
 9. **`BinanceClient.liquidations()` is not liquidation data.** It is a
    24h-ticker proxy. Real forced-order data only comes from the
    `!forceOrder@arr` WebSocket stream and **cannot be backfilled** —
@@ -329,32 +306,18 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-1. Next *code* session: **continue TODO-11** — the counts (100/20),
-   journal loop, and sell-R fix are done; the graduation gate is
-   honestly still closed. Run `python main.py simulator --bars N
-   --step 1` on more/live data, watch Sweep Reversal Sell and the
-   family expectancy, and journal real (non-simulator) trades as they
-   happen. Do not add another AI surface.
+1. Next *code* session: **P10.4** — persist funding / OI / mark / index
+   / basis; rename `liquidations()` proxy. Read the roadmap first.
 2. A human does TODO-7 + TODO-8 from
    [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-3. Do **not** start Dify/LibreChat.
+3. Do **not** start Dify/LibreChat. Do not loosen the graduation bar.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md, branch arena/019ff530-sky.
-> TODO-11's first grind is shipped (PR #9): all four primary setups
-> have 100/20 unique samples, closed paper trades are journaled
-> (compliance 100%), and the sell-side R sign bug in the backtester
-> is fixed. Continue TODO-11: grind more (live if possible) data and
-> watch whether Sweep Reversal Sell's expectancy crosses above zero;
-> consider the one-paper-sample-per-window collection strategy (FVG
-> Retest types have 0 paper samples). Do not change the graduation
-> criteria and do not add new agents, panels, or endpoints. Do not
-> start Dify or LibreChat.
->
-> After P11's gate moves, the next major milestone is TODO-12 (P10,
-> data infrastructure) — read `docs/DATA_INFRASTRUCTURE_ROADMAP.md` in
-> full before writing any of it, and start at milestone P10.1.
+> Continue SKY from SESSION_STATE.md, branch arena/019ff5b1-sky.
+> P10.1–P10.3 are shipped. Implement P10.4 (derivatives time series)
+> from docs/DATA_INFRASTRUCTURE_ROADMAP.md. No new agents/panels.
+> Do not start Dify or LibreChat.
 
 ---
 
@@ -363,7 +326,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 342 passed, 1 skipped in 73.09s
+# 368 passed, 1 skipped
 ```
 
 Paper-book grind + graduation (offline sample/synthetic data):
@@ -378,7 +341,7 @@ Local wheel-gate (build + dup-check, no install):
 
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.2.1-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.4.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Readiness strip, all four surfaces:
@@ -396,8 +359,7 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-see `git log --oneline -3` on arena/019ff530-sky
-(this session: one commit — fix(backtester): sell-side R sign + TODO-11 grind/journal loop)
+580874a feat(p10): P10.2 paginated backfill + P10.3 gaps and 1m rollups
 ```
 
 ---
@@ -406,7 +368,7 @@ see `git log --oneline -3` on arena/019ff530-sky
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ff530-sky.
+github.com/Azimshawon/SKY, branch arena/019ff5b1-sky.
 
 First, inspect the GitHub repository before making changes.
 
@@ -433,7 +395,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 339 pass.
+- Maintain test count at ≥ 368 pass.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.

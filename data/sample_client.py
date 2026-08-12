@@ -66,13 +66,31 @@ class SampleClient:
 
     def klines(self, symbol: str = "BTCUSDT", timeframe: str = "15m",
                limit: int = 500, start_time=None, end_time=None):
-        if symbol == "BTCUSDT" and timeframe == "15m" and SAMPLE.exists():
+        """OHLCV. Honours start_time/end_time so P10.2 pagination works offline."""
+        step = TF_MS.get(timeframe, 900_000)
+        if symbol == "BTCUSDT" and timeframe == "15m" and SAMPLE.exists() and start_time is None:
             df = pd.read_csv(SAMPLE)
+            if end_time is not None:
+                df = df[df["ts"] <= int(end_time)]
             df = df.tail(int(limit)).reset_index(drop=True)
             df.attrs["symbol"] = symbol
             df.attrs["timeframe"] = timeframe
             return df
+        # When a cursor is provided, generate a contiguous page from that OPEN.
+        if start_time is not None:
+            n = max(1, int(limit))
+            if end_time is not None:
+                n = min(n, max(0, (int(end_time) - int(start_time)) // step + 1))
+            if n == 0:
+                return pd.DataFrame(columns=["ts", "open", "high", "low", "close", "volume"])
+            df = _synthetic(symbol, timeframe, n).iloc[:n].reset_index(drop=True)
+            df["ts"] = np.arange(n, dtype=np.int64) * step + int(start_time)
+            df.attrs["symbol"] = symbol
+            df.attrs["timeframe"] = timeframe
+            return df
         df = _synthetic(symbol, timeframe, int(limit))
+        if end_time is not None:
+            df = df[df["ts"] <= int(end_time)].reset_index(drop=True)
         df.attrs["symbol"] = symbol
         df.attrs["timeframe"] = timeframe
         return df

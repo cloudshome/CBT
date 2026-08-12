@@ -10,6 +10,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.4.0] — 2026-08-12 · branch `arena/019ff5b1-sky`
+
+MINOR bump: **P10.2** (Binance paginated REST backfill) + **P10.3**
+(gap detection, repair, 1m→higher-TF aggregation). Inputs only — no
+strategy, risk-gate, or engine behaviour change.
+
+### Added
+- **`data/backfill.py`** — resumable, rate-limit-aware REST backfill.
+  Pages through `klines` (Binance cap 1000), writes via
+  `CandleStore.write()` / `normalise_klines()`. Resume cursor is
+  `last_stored_ts + step`. A re-run of the same range adds **zero**
+  unique rows. `DEMO_MODE=1` uses `SampleClient` (offline).
+- **`data/gaps.py`** — `detect_gaps()`, `repair_gaps()`,
+  `aggregate_ohlcv()`, `rollup()`. Incomplete trailing buckets are
+  dropped (same rule as unclosed candles). Rollups tagged
+  `source=aggregated`.
+- **`python main.py backfill`** — `--repair` / `--rollup` / `--json`.
+- **`tests/test_backfill.py`** + **`tests/test_gaps.py`** — 13 offline
+  tests (paging, idempotent re-run, resume, sleep courtesy, CLI,
+  synthetic holes, 5m OHLC match, incomplete-bucket drop, 2-day rollup).
+
+### Changed
+- `data/sample_client.py` — `klines()` honours `start_time`/`end_time`
+  so DEMO pagination works.
+- `config.py` + `pyproject.toml` — version **2.3.0 → 2.4.0**.
+
+### Notes
+- Tests **355 → 368 pass / 1 skip** (+13).
+- Next milestone: **P10.4** — derivatives as time series.
+
+---
+
 ## [Unreleased]
 
 ### Added — planning only, no runtime change

@@ -1,8 +1,8 @@
 # DATA_INFRASTRUCTURE_ROADMAP.md — P10 · SKY Market Terminal
 
-> **Status:** in progress — **P10.1 shipped** (2026-08-12): normalised
-> `Candle` schema + Parquet store (`data/store.py`, `tests/test_store.py`).
-> Next: P10.2 (Binance backfill).
+> **Status:** in progress — **P10.1–P10.3 shipped** (2026-08-12): schema
+> + store, Binance paginated backfill, gap detect/repair + 1m rollups.
+> Next: P10.4 (derivatives series).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12

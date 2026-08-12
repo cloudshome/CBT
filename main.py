@@ -1244,6 +1244,69 @@ def cmd_simulator(args) -> int:
     return 0
 
 
+def cmd_backfill(args) -> int:
+    """P10.2/P10.3 — paginated REST backfill + optional gap repair / rollup.
+
+    Public market data only. ``DEMO_MODE=1`` uses SampleClient (offline).
+    """
+    from data.backfill import backfill
+    from data.gaps import detect_gaps, repair_gaps, rollup
+    from data.store import CandleStore
+
+    store = CandleStore(root=args.root) if args.root else CandleStore()
+    result = backfill(
+        store=store,
+        symbol=_sym(args.symbol),
+        timeframe=args.tf,
+        exchange=args.exchange,
+        market=args.market,
+        start_ts=args.start_ts,
+        end_ts=args.end_ts,
+        page_limit=args.page_limit,
+        sleep_s=0.0 if args.no_sleep else args.sleep,
+        resume=not args.no_resume,
+    )
+    payload = result.as_dict()
+    if args.repair:
+        from data.sample_client import maybe_client
+        client = maybe_client()
+
+        def fetch(start_time=None, end_time=None, limit=1000):
+            return client.klines(
+                _sym(args.symbol), args.tf, limit=limit,
+                start_time=start_time, end_time=end_time,
+            )
+
+        payload["repair"] = repair_gaps(
+            store, fetch, exchange=args.exchange, market=args.market,
+            symbol=_sym(args.symbol), timeframe=args.tf,
+        )
+    if args.rollup:
+        payload["rollup"] = rollup(
+            store, exchange=args.exchange, market=args.market,
+            symbol=_sym(args.symbol),
+        )
+    remaining = detect_gaps(
+        store.read(args.exchange, args.market, _sym(args.symbol), args.tf),
+        args.tf,
+    )
+    payload["gaps_remaining"] = len(remaining)
+    if args.json:
+        print(json.dumps(payload, indent=2, default=str))
+    else:
+        print(f"backfill {result.exchange}/{result.market}/{result.symbol}/{result.timeframe}")
+        print(f"  pages {result.pages}  before {result.rows_before}  "
+              f"after {result.rows_after}  added {result.rows_added}")
+        if result.resumed_from is not None:
+            print(f"  resumed from {result.resumed_from}")
+        if args.repair:
+            print(f"  repair: {payload['repair']}")
+        if args.rollup:
+            print(f"  rollup: {payload['rollup']}")
+        print(f"  gaps remaining: {payload['gaps_remaining']}")
+    return 0
+
+
 def cmd_mcp(args) -> int:
     """Run the Model Context Protocol server (stdio) for MCP clients."""
     from ai.mcp_server import run as mcp_run
@@ -1565,6 +1628,31 @@ def main(argv: list[str] | None = None) -> int:
                        help="compute what WOULD be added without storing anything")
     p_sim.add_argument("--json", action="store_true")
     p_sim.set_defaults(func=cmd_simulator)
+
+    p_bf = sub.add_parser(
+        "backfill",
+        help="P10: paginated REST candle backfill into the Parquet store",
+    )
+    p_bf.add_argument("--symbol", default=SYMBOL)
+    p_bf.add_argument("--tf", default="1m")
+    p_bf.add_argument("--exchange", default="binance")
+    p_bf.add_argument("--market", default="perp")
+    p_bf.add_argument("--start-ts", type=int, default=None,
+                      help="inclusive candle OPEN (UTC epoch ms)")
+    p_bf.add_argument("--end-ts", type=int, default=None)
+    p_bf.add_argument("--page-limit", type=int, default=1000)
+    p_bf.add_argument("--sleep", type=float, default=0.2,
+                      help="seconds between pages (rate-limit courtesy)")
+    p_bf.add_argument("--no-sleep", action="store_true")
+    p_bf.add_argument("--no-resume", action="store_true",
+                      help="ignore already-stored tail; re-walk the range")
+    p_bf.add_argument("--repair", action="store_true",
+                      help="P10.3: detect + fetch missing 1m holes")
+    p_bf.add_argument("--rollup", action="store_true",
+                      help="P10.3: aggregate stored 1m → 5m/15m/1h/4h/1d")
+    p_bf.add_argument("--root", default=None, help="CandleStore root (tests)")
+    p_bf.add_argument("--json", action="store_true")
+    p_bf.set_defaults(func=cmd_backfill)
 
     p_mcp = sub.add_parser("mcp", help="run the Model Context Protocol server (stdio)")
     p_mcp.set_defaults(func=cmd_mcp)
