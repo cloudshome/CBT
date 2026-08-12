@@ -5,44 +5,25 @@
 > every session** (see "End-of-session checklist" at the bottom).
 > **Read first** at the start of every new session (see "Start-of-session
 > recipe" at the bottom).
+>
+> **Contract:** do a **full-document reconciliation pass every time** —
+> re-read the entire file, fix pre-existing placeholders and stale
+> status lines, not just append new sections.
 
-**Last updated:** 2026-08-11 (end of conflict-resolution session; PR #5 now MERGEABLE)
-**Branch:** `arena/019ff045-sky`
-**HEAD commit:** `04ac6f9 merge: resolve PR #5 conflicts (main modern-dashboard + branch P7/P8/P9)`
-**Default branch:** `main` (last commit `99ace0d` + the modern-dashboard `0940452`)
-**PR:** [#5](https://github.com/Azimshawon/SKY/pull/5) — was `CONFLICTING`; now `MERGEABLE` after this session.
+**Last updated:** 2026-08-12 (end of TODO-4 + D1–D5 + wheel-gate session)
+**Branch:** `arena/019ff483-sky`
+**HEAD commit:** *(this session's commit — see "Last commit" below)*
+**Default branch:** `main` @ `4216448` (PR #5 merged 2026-08-11)
+**PR:** none open at start of this session. PR #5 is MERGED.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **End-of-session decision (this session):**
-> The user asked: "if this session cover todo3, than go for it, els
-> stop and end this session and make PR before end this."
->
-> **My read:** TODO-3 (CI wheel-gate) is NOT cleanly coverable in
-> this session because of three blockers:
-> 1. D4 decision in `ROADMAP_AGENT_REACH_UPGRADE.md` §4 is unanswered.
-> 2. Arena's GitHub integration cannot push under `.github/workflows/`
->    (per the `d40ff00` commit note; the existing `ci.yml` lives at
->    `docs/.github/workflows/ci.yml` for exactly this reason).
-> 3. There is no `pyproject.toml`; TODO-3's scope itself flags
->    "either add a minimal pyproject.toml or scope the smoke test
->    to `python -c 'import main'`" as a sub-decision.
->
-> Per the user's instruction, the **else** branch applies: stop, end
-> the session, make a PR. The branch has 9 commits of substantive
-> work (P7 agent surface + P8 channels + P9 MCP endpoints + handoff
-> memory) — that's a clean, reviewable PR. TODO-3 is now a TODO-3.bis
-> note in TODO.md: doable in a future session once D4 is answered.
-
-> **Self-reflection — refined update rule (re-confirmed this session):**
-> "update SESSION_STATE.md at the START, not just at the end" is
-> necessary but not sufficient. The actual contract is: **do a
-> full-document reconciliation pass every time** — re-read the
-> entire file, fix pre-existing placeholders and stale status lines,
-> not just append new sections. The previous session's end-of-session
-> update recorded the new SHAs (good) but left a `<new-sha>`
-> placeholder and a stale "P8 dashboard panel pending" line
-> un-fixed. The new pre-session reconciliation pass at the start
-> of this session fixed both.
+> **This session's decision:** the user said "start a new day. work hard."
+> The start-of-session recipe said: confirm PR #5 landed (it did),
+> answer D4, then do TODO-3 or TODO-4. D4's recommended default is
+> YES, so this session did **all three**: record D1–D5, ship TODO-4
+> (`desk_status`), and ship the TODO-3 wheel-gate *content*
+> (`ci/wheel_gate.py` + `pyproject.toml`). Activation of the GitHub
+> Actions workflow remains TODO-7 (human / `workflows` permission).
 
 ---
 
@@ -62,7 +43,8 @@ plan (18 phases, 15-item rulebook) is in
 
 ## Current phase
 
-**P8 (Source Channels) — fully complete; P9 in progress (TODO-2 done; TODO-3 next).**
+**P9 (Capability Endpoints) — code complete.** Remaining human action
+is TODO-7 (activate GitHub Actions from the UI).
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -72,9 +54,9 @@ plan (18 phases, 15-item rulebook) is in
 | P4 | MCP Nervous System | ✅ Complete | `mcp_server.py` (zero-dep stdio JSON-RPC 2.0) |
 | P5 | Immune System | ✅ Complete | `brain/immune.py` |
 | P6 | Hidden Alpha & Variance | ✅ Complete | `engine/hidden_alpha.py`, `engine/execution.py`, `engine/correlation.py`, `brain/analytics.py` |
-| **P7** | **Agent Surface (SKILL + CLI)** | **✅ Complete (this commit)** | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
+| **P7** | **Agent Surface (SKILL + CLI)** | **✅ Complete** | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
 | **P8** | **Source Channels (router)** | **✅ Complete** | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel + `/api/doctor` |
-| **P9** | **Capability Endpoints** | **🟡 TODO-2 done; TODO-3/4 remaining** | MCP `tools/list` extended to 11 tools (TODO-2 ✅); CI wheel-gate + `desk_status()` advisory pending (TODO-3, TODO-4) |
+| **P9** | **Capability Endpoints** | **✅ Code complete** | MCP 12 tools (incl. `desk_status`); wheel-gate content landed; CI activation = TODO-7 |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -83,258 +65,104 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-11 #1: P7 + P8 code layer — commit `b0fe82f`
+### Session 2026-08-12: TODO-4 + D1–D5 + wheel-gate — this branch
 
-7 files, +1624 / -1, **0 regressions**, tests **258 → 285 pass / 1 skip**.
+Branched from `main` @ `4216448` (PR #5 already merged). 0 regressions.
+Tests **306 → 320 pass / 1 skip**.
 
-**New files:**
-- `SKILL.md` (155 lines) — agent-facing skill file: full tool surface,
-  safety guarantee ("never place an exchange order"), citation contract,
-  behavioural examples. Mirrors the Agent-Reach pattern of "one URL
-  the agent reads."
-- `ROADMAP_AGENT_REACH_UPGRADE.md` (348 lines) — full P7/P8/P9 plan with
-  per-phase risk + rollback + definition-of-done + D1–D5 decision list.
-- `docs/agent_install.md` (74 lines) — the one-pager an agent fetches
-  when told "install CryptoBrain."
-- `brain/channels.py` (491 lines) — ordered-backend router. Four channels
-  (cryptodada / discord / news / llm), each with a primary → fallback
-  chain ending in an always-available tail (`none` or `rule_based`).
-  Probes are exception-isolated; a broken channel can't crash `doctor`.
-- `tests/test_channels.py` (339 lines, 27 tests) — registry shape, probe
-  isolation, fallback ordering, each source's "off" state, SKILL.md
-  content contract, every new CLI subcommand including `skill --install`
-  refusing without `--system`.
+**TODO-4 `desk_status()`:**
+- `brain/agent.py` — `desk_status()`, `_desk_advice()`, `format_desk_status()`;
+  `ask("what should I do?")` routes to the same snapshot.
+- `brain/agents.py` — `next_scheduled_agent()` + `CORE_AGENTS` /
+  `AGENT_CADENCE_HOURS`.
+- `main.py` — `cmd_desk` / `python main.py desk [--json]`. `main()` now
+  accepts an optional `argv` list.
+- `mcp_server.py` — `desk_status` tool; `SERVER_VERSION` 1.1.0 → 1.2.0.
+- `web/app.py` — `GET /api/desk` + "DESK STATUS" card + `loadDesk()`.
+- Tests in `test_agent.py`, `test_agents.py`, `test_mcp_stdio.py`,
+  `test_web_api.py`, `test_channels.py`, `test_dashboard_js.py`.
 
-**Modified files (additive only):**
-- `main.py` (+184 lines) — three new subcommands: `cmd_doctor`,
-  `cmd_channels`, `cmd_skill`. Default inspect-only; `--system` required
-  for any `$HOME` write.
-- `AI_ANATOMY_ROADMAP.md` (+34 lines) — short P7/P8/P9 summary table
-  linked to the new planning document.
+**TODO-6 D1–D5 answered** (recommended defaults) in
+`ROADMAP_AGENT_REACH_UPGRADE.md` §4. D4 = yes, D5 = yes.
 
-### Session 2026-08-11 #2: Handoff memory — commit `498d753`
+**TODO-3 wheel-gate content:**
+- `pyproject.toml` (package `cryptobrain` 2.1.0).
+- `cryptobrain/__init__.py` (`import cryptobrain` facade).
+- `ci/wheel_gate.py` + `tests/test_wheel_gate.py`.
+- `wheel-gate` job in `.github/workflows/ci.yml`.
+- Local verification: `python ci/wheel_gate.py` built
+  `cryptobrain-2.1.0-py3-none-any.whl`, no duplicate entries.
 
-4 files, +849 lines of documentation, **0 code changes**, **0 test impact**,
-tests stayed at **285 pass / 1 skip**.
+**Also:** `config.VERSION` 2.0.0 → 2.1.0.
 
-**New files:**
-- `SESSION_STATE.md` (256 lines) — handoff memory + start-of-session
-  recipe + end-of-session checklist.
-- `TODO.md` (156 lines) — prioritised TODO-1 ✅ + TODO-2 ✅ (done) + TODO-3..TODO-7.
-- `ARCHITECTURE.md` (266 lines) — module map + 10 invariants + data
-  flow + config + testing cheatsheets.
-- `CHANGELOG.md` (171 lines) — v2.0.0 + v2.0.1 + Unreleased.
+### Prior sessions (already on `main` via PR #5)
 
-### Session 2026-08-11 #3: TODO-1 P8 dashboard panel — commits `4ca00bb` + `d3a7e8c`
-
-2 commits, 5 files changed, **0 regressions**, tests **285 → 289 pass / 1 skip**.
-
-### Session 2026-08-11 #4: TODO-2 P9 MCP capability endpoints — commits `8120dcf` + `83cc1a4`
-
-2 commits, 4 files changed, **0 regressions**, tests **289 → 295 pass / 1 skip**.
-
-**Commit `8120dcf`:** pre-session reconciliation of stale
-`SESSION_STATE.md` (the previous session's end-of-session update
-left two pre-existing inconsistencies unrepaired). 0 code changes,
-0 test impact. Documents the refined "full-document reconciliation
-pass" rule.
-
-**Commit `83cc1a4`:** actual TODO-2 work.
-- `mcp_server.py` — 5 new tools in `ALLOWED_TOOLS` (`channels`,
-  `correlation`, `hidden_chart_read`, `hidden_analytics_mae`,
-  `hidden_analytics_mc`); handler branches added in
-  `handle_tool_call`; `SERVER_VERSION` bumped `1.0.0 → 1.1.0`;
-  deny list documented in the module docstring.
-- `tests/test_mcp_stdio.py` — `ROOT_TOOLS` extended to 11 names; 6
-  new tests covering each new tool + the deny-list invariant.
-- `SKILL.md` — 5 rows in the tool table updated from `—` to the new
-  MCP tool name.
-- `TODO.md`, `CHANGELOG.md`, `SESSION_STATE.md` — documentation
-  updates (this section).
-
-**Modified files (additive only):**
-- `web/app.py` — two new endpoints (`/api/channels`, `/api/doctor`),
-  new full-width dashboard "CHANNELS" card, new `loadChannels()` JS,
-  new 5-minute diagnostic auto-refresh. Docstring endpoint list updated.
-- `tests/test_web_api.py` — 4 new tests covering: registry shape,
-  numpy-leak safety, probe-isolation, doctor text output.
-
-**Also updated (docs):**
-- `TODO.md` — TODO-1 marked done; TODO-1.bis noted as deferred.
-- `CHANGELOG.md` — v2.0.2 entry added; Unreleased updated.
-- `SESSION_STATE.md` — current state, last commit, last test count
-  all updated.
-
-### Pushed
-
-- All four sessions' commits on `arena/019ff045-sky` pushed to `origin`.
-- **No PR opened** (user explicitly chose Option B: branch only).
-- `main` branch untouched at `99ace0d`.
-
-### Session 2026-08-11 #5: PR #5 conflict resolution — commits `04ac6f9`
-
-1 commit, 2 files manually resolved (main.py 4 hunks, web/app.py 3 hunks),
-**0 regressions**, tests **285 → 306 pass / 1 skip** (+21 tests came from
-main's modern-dashboard work including `tests/test_preflight.py`).
-
-**What happened:** PR #5 became `CONFLICTING` because `main` was
-independently updated (commit `0940452` "feat(dashboard): modern
-section-by-section website") with a new tabbed dashboard. The user
-asked me to resolve the conflicts.
-
-**Resolution strategy (documented in the merge commit):**
-- `main.py`: kept BOTH sides' additions — branch's `cmd_doctor/channels/skill`
-  AND main's `cmd_preflight` + the preflight gate in `cmd_paper --watch`.
-  Default banner updated to list all new commands.
-- `web/app.py`: took main's full modern tabbed dashboard wholesale
-  (the branch's old `html += card(...)` block was obsolete — main's
-  tabbed architecture IS the design). Re-applied the branch's
-  `loadChannels()` JS function and the `/api/channels` + `/api/doctor`
-  Flask endpoints (main did not have them). Added the CHANNELS card
-  to the system tab + a 5-minute diagnostic auto-refresh.
-
-**Self-reflection (this session):**
-- `git checkout --theirs` was the right call for the big HTML conflict
-  because main's tabbed architecture IS the design — the branch's
-  older `html += card(...)` block was dead code.
-- The risk was losing the branch's `loadChannels()` function; verified
-  via grep after checkout and added it back to the JS section.
-- Verified the conflict resolution by hitting every new endpoint via
-  curl. All 200. JSON shape correct.
+P7 SKILL + doctor/skill CLI · P8 channels router + dashboard panel ·
+P9 MCP 11-tool surface · handoff memory files · PR #5 conflict
+resolution with main's modern tabbed dashboard. See CHANGELOG
+v2.0.1–v2.0.4 and the previous `SESSION_STATE.md` history on
+`arena/019ff045-sky` if you need the file-level detail.
 
 ---
 
 ## Currently working on
 
-**Nothing — this session (TODO-2) is complete and the session is
-ending.** A PR is being opened from `arena/019ff045-sky` → `main`
-to consolidate the 9 commits of P7/P8/P9 work.
-
-**End-of-session decision (this session):**
-- TODO-3 (CI wheel-gate) is **NOT** cleanly coverable here because
-  of three blockers: D4 unanswered, can't push under
-  `.github/workflows/` from Arena, no `pyproject.toml`.
-- Per the user's "if/else" instruction, the **else** branch applied:
-  stop, end the session, make a PR.
-- TODO-3 is moved to a future session (after D4 is answered).
+**Nothing — this session is complete.** Next session should start
+from whatever lands on `main` after this branch is reviewed/merged,
+and pick up TODO-7 (activate CI) or TODO-1.bis (combined doctor
+strip) if the operator wants more dashboard work.
 
 ---
 
 ## Remaining work (prioritised)
 
-1. **TODO-3** — P9 CI wheel-gate job in `.github/workflows/`
-2. **TODO-4** — P9 `brain/agent.desk_status()` advisory + MCP exposure
-3. **TODO-5** — ✅ done (CHANGELOG.md no longer stale — v2.0.0, v2.0.1,
-   v2.0.2, v2.0.3 entries added)
-4. **TODO-6** — answer the D1–D5 decision list in
-   `ROADMAP_AGENT_REACH_UPGRADE.md` §4 (currently unanswered; D4 is
-   now a blocker for TODO-3)
-5. **TODO-7** — activate GitHub Actions CI from the UI
+1. **TODO-7** — Activate GitHub Actions CI from the UI (human).
+   The `wheel-gate` job is already in `.github/workflows/ci.yml`.
+2. **TODO-1.bis** — optional combined doctor/readiness strip at the
+   top of the dashboard. Not blocking.
 
 Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ---
 
-## Current files (added/modified across all sessions)
-
-### Session 2026-08-11 #1 (P7 + P8 code, commit `b0fe82f`)
-
-| File | Status | Lines | Purpose |
-|---|---|---|---|
-| `SKILL.md` | NEW | 155 | Agent-facing skill file |
-| `ROADMAP_AGENT_REACH_UPGRADE.md` | NEW | 348 | P7/P8/P9 plan + risk + rollback |
-| `docs/agent_install.md` | NEW | 74 | One-pager for the agent |
-| `brain/channels.py` | NEW | 491 | Ordered-backend router |
-| `tests/test_channels.py` | NEW | 339 | 27 new tests |
-| `main.py` | MODIFIED | +184 | `doctor`, `channels`, `skill` subcommands |
-| `AI_ANATOMY_ROADMAP.md` | MODIFIED | +34 | P7/P8/P9 summary |
-
-### Session 2026-08-11 #2 (handoff memory, commit `498d753`)
-
-| File | Status | Lines | Purpose |
-|---|---|---|---|
-| `SESSION_STATE.md` | NEW | 256 | This file (handoff memory) |
-| `TODO.md` | NEW | 156 | Prioritised remaining work |
-| `ARCHITECTURE.md` | NEW | 266 | Module map + invariants |
-| `CHANGELOG.md` | NEW | 171 | What shipped, when |
-
-### Session 2026-08-11 #3 (TODO-1 P8 dashboard, commits `4ca00bb` + `d3a7e8c`)
-
-| File | Status | Lines | Purpose |
-|---|---|---|---|
-| `web/app.py` | MODIFIED | +80 | `/api/channels`, `/api/doctor`, "CHANNELS" card, `loadChannels()`, 5-min diagnostic refresh |
-| `tests/test_web_api.py` | MODIFIED | +67 | 4 new tests for the new endpoints |
-| `TODO.md` | MODIFIED | – | TODO-1 marked done, TODO-1.bis noted as deferred |
-| `CHANGELOG.md` | MODIFIED | +44 | v2.0.2 entry with self-reflection note |
-| `SESSION_STATE.md` | MODIFIED | – | This file (updated at end-of-session) |
-
-### Session 2026-08-11 #4 (TODO-2 P9 MCP endpoints, commits `8120dcf` + `83cc1a4`)
-
-| File | Status | Lines | Purpose |
-|---|---|---|---|
-| `mcp_server.py` | MODIFIED | +~120 | 5 new tools in `ALLOWED_TOOLS`; 5 new handler branches in `handle_tool_call`; `SERVER_VERSION` 1.0.0→1.1.0; deny list documented in docstring |
-| `tests/test_mcp_stdio.py` | MODIFIED | +~115 | `ROOT_TOOLS` extended to 11; 6 new tests |
-| `SKILL.md` | MODIFIED | – | 5 rows in the tool table updated (was `—` in the MCP column) |
-| `TODO.md` | MODIFIED | – | TODO-2 marked done |
-| `CHANGELOG.md` | MODIFIED | +49 | v2.0.3 entry |
-| `SESSION_STATE.md` | MODIFIED | – | This file (reconciled + updated) |
-
----
-
 ## Known problems / caveats
 
-1. **`CHANGELOG.md` is no longer stale.** v2.0.0 + v2.0.1 + v2.0.2
-   entries added across the two prior sessions; pre-2.0.0 history
-   cross-referenced to MERGE_NOTES.md. Marked done in TODO.md.
-2. **D1–D5 decisions in `ROADMAP_AGENT_REACH_UPGRADE.md` §4 are
-   unanswered.** User chose full implementation for P7/P8, but the
-   sub-decisions (D2: keep `health` and add `doctor` alias vs rename;
-   D3: channels scope; D4: wheel-gate CI; D5: install URL exposure)
-   need explicit confirmation before P9 coding. **TODO-6.**
-3. **Arena's GitHub integration: one PR per chat session** (per Arena
-   docs). Don't open multiple PRs from one session. All three
-   sessions this far pushed without opening a PR (user choice).
-4. **`mcp>=1.0` is listed in `requirements.txt` but not installed in
-   the local `.venv`** — this is fine because `mcp_server.py` is
-   intentionally zero-dependency (uses stdlib JSON-RPC over stdio).
-   The `mcp` package is only needed if you want to use the
-   `mcp>=1.0` client-side SDK.
-5. **Immune system reports `CRITICAL` in `DEMO_MODE=1`** because the
-   sample data is stale by design. This is expected and not a bug.
-   The `python main.py doctor` command's text output shows the immune
-   status for transparency; the channels layer is independent of it.
-6. **Arena's GitHub integration cannot push under `.github/workflows/`**
-   (per the `d40ff00` commit note in the consolidated build's
-   history). The `ci.yml` workflow file lives at the right path
-   but the workflow itself must be activated from the GitHub UI
-   by a human with the `workflows` permission. **TODO-7.**
+1. **D1–D5 are answered.** See `ROADMAP_AGENT_REACH_UPGRADE.md` §4
+   "Recorded answers (session 2026-08-12)".
+2. **Arena's GitHub integration: one PR per chat session** (per Arena
+   docs). Don't open multiple PRs from one session.
+3. **`mcp>=1.0` is listed in `requirements.txt` but not required
+   for the zero-dep `mcp_server.py`.** The `mcp` package is only
+   needed for the SDK-based `python main.py mcp` server.
+4. **Immune system reports `CRITICAL` in `DEMO_MODE=1`** because the
+   sample data is stale by design. Expected, not a bug.
+5. **Arena may not be able to push under `.github/workflows/`.**
+   The `wheel-gate` job was added to the existing `ci.yml`. If the
+   push of that path is rejected, the source of truth is still
+   `ci/wheel_gate.py` (runs locally) — a human re-applies the job
+   spec from the GitHub UI (TODO-7).
+6. **`CHANGELOG.md` is current** through v2.1.0.
 
 ---
 
 ## Next recommended action
 
-**A PR is open from `arena/019ff045-sky` → `main` at the time of
-this writing. The next session should:**
-
-1. **First, confirm the PR landed and `main` is updated.** If the
-   PR was merged, the next session should branch from `main`, not
-   from this branch. If the PR is still open or was closed without
-   merging, the next session may need to address review feedback.
-
-2. **Answer the D1–D5 decision list** in
-   `ROADMAP_AGENT_REACH_UPGRADE.md` §4 — particularly **D4** (CI
-   wheel-gate yes/no), which is a blocker for TODO-3.
-
-3. **Start TODO-3 or TODO-4** depending on the D4 answer.
+1. Confirm this branch is pushed and (if the operator wants) open
+   one PR from `arena/019ff483-sky` → `main`.
+2. Next session: first check whether that PR merged. Then TODO-7
+   (CI activation) if a human can click Enable, or TODO-1.bis if
+   more dashboard work is wanted. There is no remaining P9 *code*
+   item.
 
 **Suggested next-session prompt:**
 
 > Continue the SKY project from the state in SESSION_STATE.md.
-> First check whether the open PR (or its successor branch) has
-> been merged into main. If yes, branch from main; if no, address
-> review feedback on the open PR. Then answer D4 (wheel-gate
-> yes/no). If D4 = yes, do TODO-3. If D4 = no, skip to TODO-4
-> (`brain/agent.desk_status()` advisory). In both cases, update
+> First check whether the open PR from arena/019ff483-sky has
+> merged into main. If yes, branch from main. Then do TODO-7
+> (confirm GitHub Actions CI + wheel-gate job is actually
+> running). If the workflow file was dropped by the token,
+> re-apply the wheel-gate job from ci/wheel_gate.py's docstring
+> into .github/workflows/ci.yml via the GitHub UI. Update
 > SESSION_STATE.md + CHANGELOG.md and commit.
 
 ---
@@ -343,8 +171,15 @@ this writing. The next session should:**
 
 ```bash
 cd /home/user/SKY
-DEMO_MODE=1 python -m pytest tests/ -q
-# 306 passed, 1 skipped in 61.82s
+DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
+# 320 passed, 1 skipped in 64.72s
+```
+
+Local wheel-gate (build + dup-check, no install):
+
+```bash
+DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
+# built cryptobrain-2.1.0-py3-none-any.whl ; no duplicate entries ; wheel-gate OK
 ```
 
 (The 1 skipped is the SDK-already-installed fallback test, present
@@ -352,12 +187,8 @@ since the consolidated build per `MERGE_NOTES.md`.)
 
 ## Last commit
 
-```
-04ac6f9 merge: resolve PR #5 conflicts (main modern-dashboard + branch P7/P8/P9)
-```
-
-Pushed to `origin/arena/019ff045-sky`. PR #5 now MERGEABLE — see
-"PR" line in the header.
+Recorded after `git commit` at end of session. Look at
+`git log -1 --oneline` on `arena/019ff483-sky`.
 
 ---
 
@@ -365,7 +196,7 @@ Pushed to `origin/arena/019ff045-sky`. PR #5 now MERGEABLE — see
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ff045-sky.
+github.com/Azimshawon/SKY, branch arena/019ff483-sky.
 
 First, inspect the GitHub repository before making changes.
 
@@ -392,9 +223,9 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 306 pass.
+- Maintain test count at ≥ 320 pass.
 - Update SESSION_STATE.md with completed/current/remaining/known/
-  next action.
+  next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
 - Commit and push.
 
@@ -405,18 +236,17 @@ state.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [ ] Finish or safely stop the current task.
-2. [ ] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 306 pass.
-3. [ ] Fix any obvious failures.
-4. [ ] Update `SESSION_STATE.md` with the exact current state.
-5. [ ] Update `TODO.md` — mark finished items done, reprioritise.
-6. [ ] Update `CHANGELOG.md`.
-7. [ ] Record all files changed in `SESSION_STATE.md`.
-8. [ ] Record the last successful test command.
-9. [ ] Record the last commit SHA.
-10. [ ] Record any known bugs or unresolved issues.
-11. [ ] `git add -A && git commit -m "..."` and
-    `git push origin arena/019ff045-sky`.
+1. [x] Finish or safely stop the current task.
+2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
+   ≥ 320 pass.
+3. [x] Fix any obvious failures.
+4. [x] Update `SESSION_STATE.md` with the exact current state.
+5. [x] Update `TODO.md` — mark finished items done, reprioritise.
+6. [x] Update `CHANGELOG.md`.
+7. [x] Record all files changed in `SESSION_STATE.md`.
+8. [x] Record the last successful test command.
+9. [ ] Record the last commit SHA (after commit).
+10. [x] Record any known bugs or unresolved issues.
+11. [ ] `git add` / `git commit` / `git push origin arena/019ff483-sky`.
 12. [ ] Only open a PR if the user explicitly says so
     (Arena GitHub limit: one PR per chat session).

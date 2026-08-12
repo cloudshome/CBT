@@ -13,10 +13,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Planned
-- TODO-3: CI wheel-gate job in `.github/workflows/ci.yml`.
-- TODO-4: `brain/agent.desk_status()` advisory.
-- TODO-6: Answer D1–D5 decision list in
-  `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
+- TODO-7: human activation of the GitHub Actions workflow (wheel-gate
+  job is already in `.github/workflows/ci.yml`).
+
+---
+
+## [2.1.0] — 2026-08-12 · branch `arena/019ff483-sky`
+
+MINOR bump: new CLI command, new MCP tool, installable package.
+
+### Added — TODO-4 desk_status advisory
+- **`brain/agent.desk_status()`** — one-call snapshot aggregating
+  the risk gate, today's/week's P&L, business scorecard, graduation
+  gate, next scheduled autonomous agent, and a single
+  "what would a professional do right now?" action.
+- **`brain/agents.next_scheduled_agent()`** — cadence-based pick
+  from `agent_runs` (morning_brief 24h / watchdog 4h /
+  paper_reviewer 24h / weekly_review 168h). Never starts an agent.
+- **`python main.py desk`** (`--json` for the machine blob).
+- **MCP `desk_status` tool** — `SERVER_VERSION` 1.1.0 → 1.2.0
+  (12 read-only tools). Deny list unchanged.
+- **`GET /api/desk`** + dashboard "DESK STATUS" card on the System
+  tab (`loadDesk()`, 5-minute diagnostic refresh).
+- **`ask("what should I do?")`** routes to the same snapshot.
+
+Advice is priority-ordered and capital-first:
+`CLEAR_STATE → STAND_ASIDE → REVIEW_QUEUE → JOURNAL → PAPER_GRIND → SCAN`.
+
+### Added — TODO-3 wheel-gate (D4 = yes)
+- **`pyproject.toml`** — package `cryptobrain` 2.1.0, console script
+  `cryptobrain = main:main`.
+- **`cryptobrain/__init__.py`** — `import cryptobrain` facade
+  (`__version__` from `config.VERSION`).
+- **`ci/wheel_gate.py`** — build the wheel, reject duplicate zip
+  entries, optional `--install` smoke test
+  (`import cryptobrain` + `cryptobrain doctor --json`).
+- **`wheel-gate` job** in `.github/workflows/ci.yml`.
+- **`tests/test_wheel_gate.py`**.
+
+### Changed
+- `config.VERSION` 2.0.0 → **2.1.0**.
+- `main.main()` now accepts an optional `argv` list (wheel-gate
+  smoke-test contract; `python main.py …` unchanged).
+- D1–D5 in `ROADMAP_AGENT_REACH_UPGRADE.md` §4 recorded as decided
+  (recommended defaults). D5 URL documented in `docs/agent_install.md`.
+
+### Test count
+- 306 → **320 pass / 1 skip** (+14). 0 regressions.
+
+### Pushed
+- Branch `arena/019ff483-sky` → `origin`.
 
 ---
 
