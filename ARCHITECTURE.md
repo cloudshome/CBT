@@ -101,7 +101,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 40 test modules, 320 pass / 1 skip
+### `tests/` — 41 test modules, 323 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
@@ -116,7 +116,10 @@
 ### `docs/`
 - `agent_install.md` — **NEW (P7)** the one-pager an agent fetches when
   told "install CryptoBrain."
-- `.github/workflows/ci.yml` — CI (activated manually per TODO-7).
+- `INFRASTRUCTURE_LAYERS.md` — OpenHands / Dify / LibreChat vs SKY.
+  Study only; never vendor. Dify after graduation; LibreChat last.
+- `wheel-gate-job.yml` — job spec a human pastes into
+  `.github/workflows/ci.yml` (TODO-7).
 
 ---
 
@@ -155,7 +158,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 320 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 323 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -265,5 +268,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **285 pass, 1 skip**. Any new feature must
+The expected baseline is **323 pass, 1 skip**. Any new feature must
 maintain or increase this count.

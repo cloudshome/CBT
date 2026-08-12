@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-12 (session `arena/019ff483-sky` — TODO-4 + D1–D5 + wheel-gate)
+**Last updated:** 2026-08-12 (OpenHands/Dify/LibreChat distilled for SKY)
 
 ---
 
@@ -27,12 +27,36 @@ python ci/wheel_gate.py            # build + duplicate-entry check
 python ci/wheel_gate.py --install  # also smoke-test a clean venv
 ```
 
+### TODO-8 · Protect `main` · human / repo admin
+
+GitHub reports `main.protected = false`. Arena token gets HTTP 403
+on the branch-protection API. A human should enable: require a PR,
+disallow direct pushes, require status checks once TODO-7 is live.
+A trading risk-calc change must never land on `main` unreviewed.
+
 ### TODO-1.bis · (deferred) dashboard "doctor" view
 
 A single readiness strip at the top of the dashboard combining
 channels + immune system + risk gate. Out of scope this session;
 `loadHealth()`, `loadRiskGate()`, `loadChannels()`, and the new
 `loadDesk()` cards already cover the content separately.
+
+---
+
+## ⏸ Parked — do not start until the gate says so
+
+Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md).
+
+### TODO-9 · Dify as a *separate* research layer · AFTER graduation
+
+Not a SKY dependency. Deploy Dify elsewhere and point it at SKY's
+read-only surfaces (`desk`, `ask`, MCP). Start only when
+`python main.py agent ask "am i ready for micro?"` reports READY.
+
+### TODO-10 · LibreChat-style chat UI · AFTER TODO-9
+
+Not a SKY dependency. The dashboard already exists. Only if a
+multi-model chat panel is still wanted after Dify.
 
 ---
 
@@ -85,9 +109,13 @@ Merged 2026-08-11 (`4216448`). This session branched from that HEAD.
 
 ## 📋 Decisions waiting on user
 
-None. D1–D5 are recorded. Remaining human action is TODO-7
-(enable the GitHub Actions workflow from the UI if the token
-cannot push under `.github/workflows/`).
+| ID | Decision | Default |
+|---|---|---|
+| TODO-7 | Paste `docs/wheel-gate-job.yml` into `.github/workflows/ci.yml` | human |
+| TODO-8 | Protect `main` (require PR, no direct push) | human / recommend yes |
+
+D1–D5 are already recorded. Do **not** start TODO-9/TODO-10 this
+session or the next.
 
 ---
 
@@ -103,3 +131,9 @@ cannot push under `.github/workflows/`).
 - Autonomous exchange order placement — explicitly forbidden by
   `MERGE_NOTES.md` safety statement.
 - Multi-language READMEs (CN/JP/KR) — single-language repo is fine.
+- Vendoring / forking / `pip install` of **OpenHands, Dify, or
+  LibreChat** into this repo. Study patterns only. See
+  `docs/INFRASTRUCTURE_LAYERS.md`.
+- Splitting the desk into new "Market Analyst / Risk Manager /
+  News Analyst / Code Maintenance" agents. The four existing desk
+  agents + `desk_status()` already cover that job.

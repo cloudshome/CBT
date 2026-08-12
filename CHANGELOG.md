@@ -12,9 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `docs/INFRASTRUCTURE_LAYERS.md` — SKY-only map of OpenHands / Dify /
+  LibreChat. Study patterns; never vendor. Dify after graduation;
+  LibreChat last.
+- `tests/test_handoff_memory.py` — SESSION_STATE / TODO / layers-doc
+  contract so a dead Arena session cannot ship a rotting handoff.
+
 ### Planned
-- TODO-7: human activation of the GitHub Actions workflow (wheel-gate
-  job is already in `.github/workflows/ci.yml`).
+- TODO-7: human pastes `docs/wheel-gate-job.yml` into
+  `.github/workflows/ci.yml`.
+- TODO-8: human protects `main` (require PR). Token gets 403.
 
 ---
 

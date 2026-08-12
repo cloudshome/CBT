@@ -109,19 +109,20 @@ v2.0.1–v2.0.4 and the previous `SESSION_STATE.md` history on
 
 ## Currently working on
 
-**Nothing — this session is complete.** Next session should start
-from whatever lands on `main` after this branch is reviewed/merged,
-and pick up TODO-7 (activate CI) or TODO-1.bis (combined doctor
-strip) if the operator wants more dashboard work.
+**This follow-up (same branch):** distilled the OpenHands / Dify /
+LibreChat strategy into SKY terms. No new trading code. No new
+dependencies. See `docs/INFRASTRUCTURE_LAYERS.md`.
 
 ---
 
 ## Remaining work (prioritised)
 
-1. **TODO-7** — Activate GitHub Actions CI from the UI (human).
-   The `wheel-gate` job is already in `.github/workflows/ci.yml`.
-2. **TODO-1.bis** — optional combined doctor/readiness strip at the
-   top of the dashboard. Not blocking.
+1. **TODO-7** — human pastes `docs/wheel-gate-job.yml` into
+   `.github/workflows/ci.yml`.
+2. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
+3. **TODO-1.bis** — optional combined doctor strip. Not blocking.
+4. **TODO-9 / TODO-10** — Dify then LibreChat. Parked until the
+   graduation gate is READY. Do not start next session.
 
 Full list and rationale: see [`TODO.md`](./TODO.md).
 
@@ -174,7 +175,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 320 passed, 1 skipped in 64.72s
+# 323 passed, 1 skipped in 62.82s
 ```
 
 Local wheel-gate (build + dup-check, no install):
@@ -229,7 +230,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 320 pass.
+- Maintain test count at ≥ 323 pass.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
