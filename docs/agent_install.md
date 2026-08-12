@@ -12,8 +12,12 @@ git clone https://github.com/Azimshawon/SKY.git
 cd SKY
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+# or, equivalently:  .venv/bin/pip install -e .
 cp .env.example .env
 ```
+
+The one-pager URL (D5 = yes):
+<https://raw.githubusercontent.com/Azimshawon/SKY/main/docs/agent_install.md>
 
 ## 2. Verify readiness (read-only, never mutates the system)
 

@@ -69,3 +69,35 @@ def test_run_all_agents(tmp_path):
         all_res = run_all_agents(db=db)
         assert all_res["status"] == "COMPLETED"
         assert len(all_res["agents"]) == 4
+
+
+def test_next_scheduled_agent_never_run(tmp_path):
+    """With an empty agent_runs table, morning_brief is the first recommendation."""
+    from brain.agents import next_scheduled_agent
+    db_path = tmp_path / "test.db"
+    with SignalDB(db_path) as db:
+        nxt = next_scheduled_agent(db)
+    assert nxt["name"] == "morning_brief"
+    assert nxt["never_run"] is True
+    assert nxt["overdue_hours"] == 24.0
+    assert len(nxt["candidates"]) == 4
+
+
+def test_next_scheduled_agent_picks_most_overdue(tmp_path):
+    """A stale weekly_review beats a fresh morning_brief."""
+    import time
+    from brain.agents import next_scheduled_agent
+    db_path = tmp_path / "test.db"
+    now = int(time.time())
+    with SignalDB(db_path) as db:
+        db.record_agent_run("morning_brief", "COMPLETED", summary="fresh")
+        # Backdate weekly_review far past its 168h cadence.
+        db.conn.execute(
+            "INSERT INTO agent_runs(agent, status, summary, payload_json, ts) "
+            "VALUES(?,?,?,?,?)",
+            ("weekly_review", "COMPLETED", "stale", "{}", now - 200 * 3600),
+        )
+        db.conn.commit()
+        nxt = next_scheduled_agent(db)
+    assert nxt["name"] == "weekly_review"
+    assert nxt["overdue_hours"] > 0

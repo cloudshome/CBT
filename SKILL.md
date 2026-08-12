@@ -26,6 +26,7 @@ plus a web dashboard. This file tells you what you can call, what you
 | "Run a 15-minute scan on ETH" | `python main.py scan --symbol ETHUSDT --tf 15m --json` |
 | "Give me the desk report" | `python main.py intelligence --symbol BTCUSDT --tf 15m` |
 | "Is the risk gate open? Am I cleared to trade?" | `python main.py risk` and `python main.py health` |
+| "What should I do right now?" | `python main.py desk` (or MCP `desk_status`) |
 | "Read the latest crypto news" | `python main.py sources` |
 | "Review this closed trade" | `python main.py postreview <scan_id>` |
 | "Am I ready for live micro-trading?" | `python main.py agent ask "am i ready for micro?"` |
@@ -75,6 +76,7 @@ bypasses the risk gate. The deny list is enforced at the top of
 | **Ask** | `python main.py ask "..."` | `ask` | Grounded RAG answer with **required citations** (you must keep `[cited: ...]` in any reply that paraphrases the engine) |
 | Post-review | `python main.py postreview <scan_id>` | `postreview` | Closed-trade post-mortem: R, MAE/MFE, rule compliance |
 | Health | `python main.py health` / `python main.py doctor` | `health` | Immune-system diagnostic: stale data, DB integrity, risk limits, behavioral flags |
+| **Desk status** | `python main.py desk` | `desk_status` | One-call advisory: gate + today's P&L + graduation + next agent + "what would a professional do right now?" |
 | Risk gate | `python main.py risk` | `risk` | Open/closed status, daily/weekly P&L, progression ladder |
 | Trader state | `python main.py tradestate` | `tradestate` | Behavioral flags: angry/tired/revenge/chasing — operator-controlled |
 | Paper watch | `python main.py paper --watch` | — | Live-market paper-trade monitor (does **not** touch any exchange) |

@@ -126,6 +126,58 @@ def test_graduation_report_shape(desk_env):
     assert rep["journal"]["violation_rate"] is None  # no journal entries yet
 
 
+def test_desk_status_shape_and_json(desk_env):
+    """desk_status() is the one-call advisory: required keys, JSON-safe."""
+    import json
+    from brain.agent import desk_status
+    status = desk_status()
+    for key in ("time", "version", "progression", "risk_gate", "pnl",
+                "scorecard", "graduation", "pending_reviews", "open_exposure",
+                "next_agent", "advice"):
+        assert key in status, f"desk_status missing {key!r}"
+    assert status["risk_gate"]["allowed"] is True
+    assert status["pending_reviews"] == 0
+    assert status["next_agent"]["name"] in {
+        "morning_brief", "watchdog", "paper_reviewer", "weekly_review"}
+    advice = status["advice"]
+    assert advice["action"] in {
+        "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
+        "JOURNAL", "PAPER_GRIND", "SCAN",
+    }
+    assert advice["headline"]
+    # empty book + student progression → grind samples, don't scan live
+    assert advice["action"] == "PAPER_GRIND"
+    json.dumps(status)  # must not raise
+
+
+def test_desk_status_format(desk_env):
+    from brain.agent import desk_status, format_desk_status
+    text = format_desk_status(desk_status())
+    assert "DESK STATUS" in text
+    assert "ADVICE" in text
+    assert "risk gate" in text.lower()
+
+
+def test_desk_status_clear_state_when_angry(desk_env):
+    """Behavioral flags outrank everything — a professional stands aside."""
+    from data.database import SignalDB
+    from brain.agent import desk_status
+    with SignalDB() as db:
+        db.set_trader_state(angry=True, note="tilted")
+    status = desk_status()
+    assert status["risk_gate"]["allowed"] is False
+    assert "angry" in status["risk_gate"]["trader_flags"]
+    assert status["advice"]["action"] == "CLEAR_STATE"
+
+
+def test_ask_desk_intent(desk_env):
+    from brain.agent import ask
+    r = ask("what should I do right now?")
+    assert r["intent"] == "desk"
+    assert r["data"]["advice"]["action"]
+    assert any("ADVICE" in line or "DESK STATUS" in line for line in r["answer"])
+
+
 def test_health_report_skips_cross_exchange_in_demo(desk_env):
     """Demo mode has no live Binance prices, so the multi-exchange
     cross-check must degrade to a note instead of running."""

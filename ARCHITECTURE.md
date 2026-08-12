@@ -7,9 +7,10 @@
 > **Read when:** starting work on a module you haven't touched in
 > ≥1 session.
 
-**Last updated:** 2026-08-11
+**Last updated:** 2026-08-12
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
+**Version:** `config.VERSION` = `2.1.0` (also `pyproject.toml`).
 
 ---
 
@@ -25,7 +26,7 @@
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
 | `TODO.md` | Prioritised remaining work |
 | `ARCHITECTURE.md` | This file |
-| `CHANGELOG.md` | What shipped, when (stale — see TODO-5) |
+| `CHANGELOG.md` | What shipped, when (current through v2.1.0) |
 | `BLUEPRINT.md` | The 4-step path from paper to real capital |
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
@@ -35,7 +36,7 @@
 ### `brain/` — the desk brain
 | Module | Purpose | Used by |
 |---|---|---|
-| `agent.py` | `health_report`, `format_health`, `desk_status` (TODO-4) | `cmd_health`, `cmd_doctor` |
+| `agent.py` | `health_report`, `format_health`, `desk_status`, `format_desk_status` | `cmd_health`, `cmd_desk`, MCP `desk_status`, `/api/desk` |
 | `agents.py` | Autonomous desk agents (morning, watchdog, paper-reviewer, weekly-review), audit-logged to `agent_runs` | `cmd_agent` |
 | `analytics.py` | MAE/MFE summary, Monte Carlo equity/drawdown | `hidden analytics mae/mc` |
 | `ask.py` | RAG query with grounded citations | `cmd_ask`, MCP `ask` |
@@ -100,20 +101,25 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 38 test modules, 285+ pass / 1 skip
+### `tests/` — 41 test modules, 323 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
   build per `MERGE_NOTES.md`).
 - `tests/test_mcp_stdio.py` — Root MCP server handshake, tool
   permission map, trader-state round-trip, health check.
-- `tests/test_channels.py` — **NEW (P8)** 27 tests for the channels
-  router + SKILL.md content contract + new CLI subcommands.
+- `tests/test_channels.py` — P8 channels router + SKILL.md content
+  contract + CLI subcommands (`doctor` / `channels` / `skill` / `desk`).
+- `tests/test_wheel_gate.py` — **NEW (P9)** pyproject + `import cryptobrain`
+  + duplicate-entry detection + `main(argv)` contract.
 
 ### `docs/`
 - `agent_install.md` — **NEW (P7)** the one-pager an agent fetches when
   told "install CryptoBrain."
-- `.github/workflows/ci.yml` — CI (activated manually per TODO-7).
+- `INFRASTRUCTURE_LAYERS.md` — OpenHands / Dify / LibreChat vs SKY.
+  Study only; never vendor. Dify after graduation; LibreChat last.
+- `wheel-gate-job.yml` — job spec a human pastes into
+  `.github/workflows/ci.yml` (TODO-7).
 
 ---
 
@@ -152,7 +158,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 285 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 323 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -262,5 +268,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **285 pass, 1 skip**. Any new feature must
+The expected baseline is **323 pass, 1 skip**. Any new feature must
 maintain or increase this count.

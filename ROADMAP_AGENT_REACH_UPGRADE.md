@@ -252,8 +252,22 @@ style, here are the choices:
 * **D4 — wheel-gate CI**: yes (matches Agent-Reach; catches duplicate-wheel bugs), or no (keep CI simple).
 * **D5 — `docs/agent_install.md` URL exposure**: the file is the "one URL the agent fetches" — confirm it's OK to point to `raw.githubusercontent.com/Azimshawon/SKY/main/docs/agent_install.md`.
 
-**No code has been changed.** Reply with D1=…D2=…D3=…D4=…D5=… (or
-"all ★" for the recommended default) and coding starts.
+### Recorded answers (session 2026-08-12)
+
+The recommended defaults are now **decided and implemented**. A new
+Arena session starting from a clean main after PR #5 applied the
+"work hard" instruction as "take the recommended default and ship":
+
+| ID | Answer | Landed as |
+|---|---|---|
+| **D1** | full P7 (recommended) | already shipped in v2.0.1 (`SKILL.md` + `doctor` + `skill` + `docs/agent_install.md`) |
+| **D2** | keep `health`, add `doctor` as alias | already shipped — both commands exist |
+| **D3** | 3 data sources + LLM only | already shipped in `brain/channels.py` |
+| **D4** | **YES** — add the wheel-gate | `ci/wheel_gate.py` + `pyproject.toml` + `cryptobrain/` facade + `wheel-gate` job in `.github/workflows/ci.yml`. Local: `python ci/wheel_gate.py` (build + dup-check) or `--install` (also smoke-tests a clean venv). |
+| **D5** | **YES** — expose the raw GitHub URL | documented in `docs/agent_install.md` and `SKILL.md` |
+
+If a later session wants to reverse D4 or D5, revert the files named
+above — nothing else depends on them.
 
 ---
 

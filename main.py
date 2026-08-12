@@ -15,6 +15,7 @@ Usage:
   python main.py agent ask "am i ready for micro?"           # graduation gate
   python main.py agent all                                   # health + briefing + graduation
   python main.py health                                      # system health (+ KuCoin/OKX cross-check)
+  python main.py desk                                        # one-call desk advisory (gate + P&L + graduation + advice)
   python main.py preflight                                   # strict live-paper operations gate
   python main.py simulator                                   # grind 100/20 sample proof
   python main.py mcp                                         # MCP server for Claude/Cursor
@@ -999,6 +1000,22 @@ def cmd_health(args) -> int:
     return 0 if report.get("ok") else 1
 
 
+def cmd_desk(args) -> int:
+    """One-call desk advisory: gate + today's P&L + graduation + next agent.
+
+    Read-only. Answers 'what would a professional do right now?' without
+    placing an order or mutating state. Same data as MCP ``desk_status``
+    and ``GET /api/desk``.
+    """
+    from brain.agent import desk_status, format_desk_status
+    status = desk_status()
+    if args.json:
+        print(json.dumps(status, indent=2, default=str))
+    else:
+        print(format_desk_status(status))
+    return 0
+
+
 # ── Agent-Reach-inspired CLI surface (P7/P8, additive) ─────────────────
 # These three commands are the install/doctor/SKILL trio borrowed from
 # Panniantong/Agent-Reach, scoped to CryptoBrain's read-only safety
@@ -1263,7 +1280,7 @@ def cmd_hidden(args) -> int:
     return 1
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="CryptoBrain — AI trading-brain signal engine")
     sub = ap.add_subparsers(dest="cmd")
 
@@ -1489,6 +1506,13 @@ def main() -> int:
     p_health.add_argument("--json", action="store_true")
     p_health.set_defaults(func=cmd_health)
 
+    p_desk = sub.add_parser(
+        "desk",
+        help="one-call desk advisory: risk gate + P&L + graduation + next agent + advice",
+    )
+    p_desk.add_argument("--json", action="store_true")
+    p_desk.set_defaults(func=cmd_desk)
+
     p_preflight = sub.add_parser(
         "preflight",
         help="strict safety/readiness gate before unattended live paper trading",
@@ -1600,7 +1624,7 @@ def main() -> int:
     p_an.add_argument("--seed", type=int, default=None,
                       help="Monte Carlo RNG seed")
 
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     if args.cmd == "scan" and args.symbols is None:
         args.symbols = args.symbol
     if args.cmd is None:
@@ -1613,7 +1637,7 @@ def main() -> int:
         print("   advanced/automation: scan | intelligence | watch | paper | analyze | backtest |")
         print("                        learn | stats | coach | review | sources | state | glossary |")
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
-        print("                        health | doctor | channels | skill | preflight | simulator |")
+        print("                        health | desk | doctor | channels | skill | preflight | simulator |")
         print("                        hidden | correlation | mcp")
         print("=" * 62)
         serve(make_app(), DASHBOARD_HOST, DASHBOARD_PORT)

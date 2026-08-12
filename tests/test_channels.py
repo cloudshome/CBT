@@ -208,7 +208,7 @@ def test_main_help_mentions_doctor_channels_skill():
     )
     assert res.returncode == 0, res.stderr
     out = res.stdout.lower()
-    for cmd in ("doctor", "channels", "skill"):
+    for cmd in ("doctor", "channels", "skill", "desk"):
         assert cmd in out, f"`main.py --help` should list the {cmd!r} subcommand"
 
 
@@ -232,6 +232,20 @@ def test_main_doctor_json_is_valid(capsys):
     assert res.returncode == 0, res.stderr
     parsed = json.loads(res.stdout)
     assert "channels" in parsed
+
+
+def test_main_desk_json_is_valid():
+    """`python main.py desk --json` is the one-call advisory."""
+    import subprocess
+    res = subprocess.run(
+        [sys.executable, str(ROOT / "main.py"), "desk", "--json"],
+        capture_output=True, text=True, timeout=40, cwd=str(ROOT),
+        env={**os.environ, "DEMO_MODE": "1"},
+    )
+    assert res.returncode == 0, res.stderr
+    parsed = json.loads(res.stdout)
+    assert "advice" in parsed
+    assert parsed["advice"]["action"]
 
 
 def test_main_channels_runs():

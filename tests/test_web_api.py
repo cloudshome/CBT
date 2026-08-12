@@ -147,3 +147,19 @@ def test_doctor_endpoint_returns_text_report(client):
     assert "CryptoBrain doctor report" in payload["report"]
     for ch in ("cryptodada", "discord", "news", "llm"):
         assert ch in payload["report"]
+
+
+def test_desk_endpoint_returns_advisory(client):
+    """`/api/desk` is the one-call advisory (same as `python main.py desk`)."""
+    import json
+    resp = client.get("/api/desk")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    payload = resp.get_json()
+    assert "advice" in payload
+    assert payload["advice"]["action"] in {
+        "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
+        "JOURNAL", "PAPER_GRIND", "SCAN",
+    }
+    assert "risk_gate" in payload
+    assert "graduation" in payload
+    json.loads(resp.get_data(as_text=True))  # numpy-leak safety

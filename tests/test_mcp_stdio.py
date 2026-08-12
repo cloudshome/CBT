@@ -26,6 +26,8 @@ ROOT_TOOLS = {
     # P9 (TODO-2): capability endpoints
     "channels", "correlation", "hidden_chart_read",
     "hidden_analytics_mae", "hidden_analytics_mc",
+    # P9 (TODO-4): desk advisory
+    "desk_status",
 }
 
 
@@ -230,6 +232,25 @@ def test_root_mcp_hidden_analytics_mc_tool(env):
             "arguments": {"samples": 50, "seed": 42}})
         data = json.loads(resp["result"]["content"][0]["text"])
         assert "available" in data or "note" in data or "samples" in data
+    finally:
+        client.close()
+
+
+def test_root_mcp_desk_status_tool(env):
+    """desk_status is the one-call advisory — same shape as the library."""
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        resp = client.send("tools/call", {"name": "desk_status", "arguments": {}})
+        data = json.loads(resp["result"]["content"][0]["text"])
+        assert "advice" in data
+        assert data["advice"]["action"] in {
+            "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
+            "JOURNAL", "PAPER_GRIND", "SCAN",
+        }
+        assert "risk_gate" in data
+        assert "graduation" in data
+        assert "next_agent" in data
     finally:
         client.close()
 
