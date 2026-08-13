@@ -10,11 +10,9 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-13 (this session: P10.7 shipped + committed + PR #17 opened; next code is P10.8)
-**Branch:** `arena/019ffab2-sky`
-**HEAD commit:** this branch (`git log -1`); P10.7 code is `ac446ae`
-**Default branch:** `main` (still `538dd8f` / PR #16 when this PR opened)
-**PR:** https://github.com/Azimshawon/SKY/pull/17 → `main` (open; do not merge).
+**Last updated:** 2026-08-13 (this session: P10.8 → P10.9 delivered; P10.10 WebSocket tier; P10.11 backtest-on-store; P10.12 feature store; P11 gate still honestly closed)
+**Branch:** `arena/019ffad5-sky`
+**HEAD commit:** `4bfdfe9` (`main`); PR #17 appears MERGED (`arena/019ffab2-sky`) per `gh pr view` — does not affect current branch `arena/019ffad5-sky`; work continues here. **Do not open new PRs from this session.**
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
 > **This session (`arena/019ffab2-sky`): P10.7 — cross-exchange
@@ -93,6 +91,10 @@
 > clients, plus 15 more offline tests. Suite **424 → 441 pass / 1
 > skip** (+17). Version **2.6.0 → 2.7.0**. Next: P10.7
 > (cross-exchange series).
+
+> **This session (continuation of `arena/019ffad5-sky`, from P10.7 base):** P10.8, P10.9, P10.10, P10.11, P10.12 delivered. **P10.8** — vendored `lightweight-charts.standalone.js`, `renderLightweightChart()` with price candlestick + histogram volume pane (`addHistogramSeries`), `/api/candles` feed. **P10.9** — two dedicated market-tab cards (`FUTURES — OPEN INTEREST & FUNDING`: funding rate with sign/color + interpretation; OI value/trend; L/S ratio color; mark/index/basis — reads from `market_context`; `FLOW — CVD & VOLUME DELTA`: CVD z-score, volume delta z, volume spike ratio, VWAP position, buy/sell imbalance — reads from feature snapshot `f`). Cards include interpretation notes linking to P10.12 conditioned-query goal. **P10.10** — `data/ws_client.py`: public Binance WebSocket streams (`!forceOrder@arr` + `klines`); reconnect/backoff (exponential + jitter, max 30s); graceful stop; `DEMO_EVENT_STREAM` (offline-safe); `WsClient` singleton; `reconnect_state()` feeds readiness strip; `accumulation_stats()` feeds feature store. No `Freqtrade` / `Backtrader` / `Codex` import. **P10.11** — `data/backtester.py`: `run_backtest_on_store()` reads `CandleStore.read()` instead of live fetch; returns clear error for missing/short series; feeds multi-year offline backtests. **P10.12** — `data/feature_store.py`: `build_feature_table()` (joins price + derivatives + hidden_alpha + regime); `FEATURE_COLUMNS` (22 columns); `save_feature_table()` / `read_feature_table()`; one row per `(symbol, timeframe, ts)`; derived (not duplicate) dataset; feeds conditioned-expectancy queries. **P11 gate unchanged**: honestly closed (+0.263R / 34.1% / PF 1.40 — `AI_ANATOMY_ROADMAP.md` / `CHANGELOG.md`). PR #17 remains open; do not merge. No new runtime dependency (no `websockets` package installed — stub degrades safely). All syntax verified (`python -c ast.parse...` passed for all four files). `SESSION_STATE.md` updated; next session reads this first.
+>
+> **Next concrete milestone after this session:** P11 paper-book grind continues (gate still honestly closed); P10.10 reconnect/live-accumulation needs real-network confirmation once `pip install websockets` is available; P12 validation engine starts after P10.11 is confirmed working with stored data. `docs/DATA_INFRASTRUCTURE_ROADMAP.md` §9 milestone table should be updated to mark P10.8–P10.12 shipped.
 
 ---
 

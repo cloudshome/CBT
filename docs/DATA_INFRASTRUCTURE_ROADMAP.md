@@ -1,9 +1,10 @@
 # DATA_INFRASTRUCTURE_ROADMAP.md — P10 · SKY Market Terminal
 
-> **Status:** in progress — **P10.1–P10.7 shipped** (P10.1–P10.3 on
-> 2026-08-12; P10.4 derivatives series + P10.2 hardening + P10.5
-> data-quality pillar + P10.6 Bybit adapter + P10.7 cross-exchange
-> series on 2026-08-13 — PR #13 / PR #14 / this session).
+> **Status:** in progress — **P10.1–P10.12 delivered** (P10.1–P10.3 on
+> 2026-08-12; P10.4 derivatives + P10.2 hardening + P10.5 data-quality
+> + P10.6 Bybit adapter + P10.7 cross-exchange series + P10.8 charts
+> + P10.9 futures/CVD panes + P10.10 WS tier + P10.11 store-backtest
+> + P10.12 feature store delivered 2026-08-13 — this session).
 > The P10.2 backfill pages the real perp endpoint and its rate-limit
 > handling is weight-header pacing + exponential backoff + geo-block
 > abort.
@@ -385,11 +386,11 @@ documented state. Ordered by value-per-session, same as `TODO.md`.
 | **P10.5** | Quality pillar | per-source checks wired into `readiness_strip()` | ✅ shipped (`data/quality.py`, fourth readiness pillar; corrupt data ⇒ quarantine ⇒ `ready: false`) |
 | **P10.6** | Bybit adapter | second exchange behind the same normalised schema | ✅ shipped (2026-08-13, PR #14) — `data/bybit_client.py` behind the same `PageResult` contract; identical assertions pass for both adapters (17 tests) |
 | **P10.7** | Cross-exchange | generalise `_cross_exchange_probe()` into a stored series | ✅ shipped — `data/cross_exchange.py`; `python main.py cross collect/status`; premium/discount + funding spread queryable; one probe |
-| **P10.8** | Lightweight Charts | vendored chart replaces `chartSVG()`; price+volume pane | dashboard renders stored data; no new runtime dep |
-| **P10.9** | Futures panes | OI + funding + CVD panes | the view a retail chart cannot give us |
-| **P10.10** | WebSocket tier | live klines + `!forceOrder@arr`, reconnect/backoff | survives forced disconnect; liquidations accumulate |
-| **P10.11** | Backtest on store | backtester reads Parquet instead of a live fetch | multi-year backtest runs offline |
-| **P10.12** | Feature store | one wide table per timestamp (price+deriv+flow+regime) | regime-conditional queries answerable |
+| **P10.8** | Lightweight Charts | vendored chart replaces `chartSVG()`; price+volume pane | ✅ delivered (2026-08-13 session) — `web/app.py` uses `/static/lightweight-charts.standalone.js`; `renderLightweightChart()` with `addHistogramSeries()`; `/api/candles` feeds chart |
+| **P10.9** | Futures panes | OI + funding + CVD panes | ✅ delivered (2026-08-13 session) — two new market-tab cards (`FUTURES — OPEN INTEREST & FUNDING`, `FLOW — CVD & VOLUME DELTA`) reading from `market_context` (`futuresCtx`) and feature snapshot (`f`) |
+| **P10.10** | WebSocket tier | live klines + `!forceOrder@arr`, reconnect/backoff | ✅ delivered (2026-08-13 session) — `data/ws_client.py` (public streams only, reconnect/backoff, `DEMO_EVENT_STREAM`, singleton); no `Freqtrade`/`Backtrader` import; graceful degradation without `websockets` package |
+| **P10.11** | Backtest on store | backtester reads Parquet instead of a live fetch | ✅ delivered (2026-08-13 session) — `run_backtest_on_store()` in `data/backtester.py` reads `CandleStore.read()`; returns honest error for missing/short series |
+| **P10.12** | Feature store | one wide table per timestamp (price+deriv+flow+regime) | ✅ delivered (2026-08-13 session) — `data/feature_store.py`: `build_feature_table()` (joins price + derivatives + hidden_alpha + regime); `FEATURE_COLUMNS` (22 cols); `save_feature_table()` / `read_feature_table()`; feeds P12 conditioned queries |
 
 **Definition of done for the phase:** we can ask *"how did this setup
 perform when price rose, OI rose, funding was negative, and CVD was

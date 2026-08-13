@@ -378,6 +378,8 @@ HTML = """<!doctype html>
   .strip .pill-chip{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;
     border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--mut);
     display:inline-flex;align-items:center;gap:6px;cursor:help}
+  /* chart container for Lightweight Charts */
+  #chart{width:100%;height:260px;background:#0e1524;border-radius:12px;border:1px solid var(--line);overflow:hidden}
   .strip .strip-detail{flex-basis:100%;font-size:11.5px;color:var(--mut);line-height:1.5}
   /* quick actions */
   .quickbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
@@ -385,7 +387,9 @@ HTML = """<!doctype html>
   /* glossary */
   .gloss-term{cursor:pointer;border-bottom:1px dashed var(--line2)}
   .kbd{font-size:11px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid var(--line);font-family:ui-monospace,monospace}
-</style></head><body>
+</style>
+<script src="/static/lightweight-charts.standalone.js"></script>
+</head><body>
 <div class="topbar">
   <div class="brand">
     <div class="logo">🧠</div>
@@ -720,6 +724,65 @@ function render(d){
         macro=mctx.macro||{}, cyc=mctx.cycle||{}, geo=mctx.geopolitics||{},
         soc=mctx.social||{}, reg=mctx.risk_regime||{};
   const cp=eq.change_pct||{};
+
+  // P10.9 — Futures panes (dedicated cards, not just embedded in Market Context)
+  const futuresCtx = ctx || {};
+  const fundingVal = futuresCtx.funding_rate_pct != null ? parseFloat(futuresCtx.funding_rate_pct) : null;
+  const fundingColor = fundingVal == null ? 'var(--mut)' : (fundingVal > 0 ? 'var(--red)' : fundingVal < 0 ? 'var(--green)' : 'var(--amber)');
+  const fundingLabel = fundingVal == null ? '—' : (fundingVal > 0 ? 'positive (longs pay shorts)' : fundingVal < 0 ? 'negative (shorts pay longs)' : 'neutral');
+  const oiVal = futuresCtx.open_interest != null ? parseFloat(futuresCtx.open_interest) : null;
+  const lsVal = futuresCtx.long_short_ratio != null ? parseFloat(futuresCtx.long_short_ratio) : null;
+  const lsColor = lsVal == null ? 'var(--mut)' : (lsVal > 1 ? 'var(--green)' : lsVal < 0.9 ? 'var(--red)' : 'var(--amber)');
+
+  // CVD / volume delta from feature snapshot (hidden_alpha computes it)
+  const cvdVal = f.cvd_z || f.cvd ? (f.cvd_z != null ? fmt(f.cvd_z, 2) : fmt(f.cvd, 0)) : null;
+  const cvdColor = f.cvd_z == null ? 'var(--mut)' : (f.cvd_z > 0 ? 'var(--green)' : f.cvd_z < 0 ? 'var(--red)' : 'var(--amber)');
+
+  marketCards += card('FUTURES — OPEN INTEREST & FUNDING', `
+    <div class="grid2">
+      <div>
+        <div class="flex" style="margin-bottom:10px;justify-content:space-between">
+          <span class="badge" style="background:${futuresCtx.futures?'rgba(34,197,94,.14);color:var(--green);border-color:rgba(34,197,94,.30)':'rgba(139,160,189,.08);color:var(--mut);border-color:var(--line)'}">FUTURES ${futuresCtx.futures?'●':'○'}</span>
+          <span class="badge">${esc(futuresCtx.provider||'provider')}</span>
+        </div>
+        <div class="kv">
+          <b>Funding rate</b><span style="color:${fundingColor};font-weight:800">${fundingVal==null?'—':fundingVal.toFixed(4)+'%'}</span>
+          <b>Funding sense</b><span class="note">${fundingLabel}</span>
+          <b>Open interest</b><span class="mono">${oiVal==null?'—':fmt(oiVal,0)}</span>
+          <b>OI trend</b><span>${oiVal==null?'—':(futuresCtx.open_interest_change_pct!=null?(futuresCtx.open_interest_change_pct>0?'<span style="color:var(--green)">↑ rising</span>':'<span style="color:var(--red)">↓ falling</span>'):'no change data')}</span>
+          <b>Long/Short ratio</b><span style="color:${lsColor};font-weight:800">${lsVal==null?'—':fmt(lsVal,2)}</span>
+          <b>L/S sense</b><span>${lsVal==null?'—':(lsVal>1?'<span style="color:var(--green)">long-biased</span>':lsVal<0.9?'<span style="color:var(--red)">short-biased</span>':'<span style="color:var(--amber)">balanced</span>')}</span>
+          <b>Market price</b><span class="mono">$${fmt(futuresCtx.mark_price||f.price)}</span>
+          <b>Index price</b><span class="mono">$${fmt(futuresCtx.index_price||futuresCtx.mark_price||f.price)}</span>
+          <b>Basis (mark − index)</b><span class="mono">${futuresCtx.index_price!=null?fmt(futuresCtx.mark_price-futuresCtx.index_price,2):'—'}</span>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,.03);padding:12px;border-radius:12px;border:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
+        <b style="color:var(--amber);font-size:11px;letter-spacing:.06em">INTERPRETATION — the view a retail chart cannot give</b>
+        <div class="note">${futuresCtx.futures?'Futures context available (Binance).':'Futures context not available (no futures symbol or blocked).'}</div>
+        <div class="note">Positive funding = longs pay shorts → crowded long → watch for reversal. Negative funding = shorts pay longs → crowded short → possible squeeze.</div>
+        <div class="note">OI rising with price = new money entering. OI falling with price rising = short covering, weaker trend. OI flat with price rising = spot-driven, stronger.</div>
+        <div class="note">L/S > 1 = long-heavy; < 0.9 = short-heavy.</div>
+      </div>
+    </div>`);
+
+  // P10.9 — CVD / Flow pane (reads from hidden_alpha / feature snapshot)
+  const cvdDetails = (f.cvd_z||f.cvd_z===0) ? f.cvd_z : (f.cvd ? 0 : null);
+  const volDeltaSign = f.volume_delta_z ? f.volume_delta_z : (f.volume_delta ? 0 : null);
+  marketCards += card('FLOW — CVD & VOLUME DELTA', `
+    <div class="flex" style="margin-bottom:10px;justify-content:space-between">
+      <span class="badge" style="background:${f.event_kind?'rgba(58,130,246,.14)':'rgba(139,160,189,.08)'};color:${f.event_kind?'var(--blue)':'var(--mut)'};border-color:${f.event_kind?'rgba(58,130,246,.3)':'var(--line)'}">ORDER FLOW</span>
+      <span class="badge">volume delta z: <b style="color:${volDeltaSign==null?'var(--mut)':volDeltaSign>0?'var(--green)':volDeltaSign<0?'var(--red)':'var(--amber)'}">${volDeltaSign==null?'—':fmt(volDeltaSign,2)}</b></span>
+    </div>
+    <div class="kv">
+      <b>CVD z-score</b><span style="color:${cvdDetails==null?'var(--mut)':cvdDetails>0?'var(--green)':cvdDetails<0?'var(--red)':'var(--amber)'}">${cvdDetails==null?'—':(cvdDetails>0?'+':'')+fmt(cvdDetails,2)}</span>
+      <b>CVD direction</b><span>${cvdDetails==null?'—':(cvdDetails>0?'<span style="color:var(--green)">accumulating (buyers)</span>':cvdDetails<0?'<span style="color:var(--red)">distributing (sellers)</span>':'<span style="color:var(--amber)">neutral</span>')}</span>
+      <b>Volume spike ratio</b><span class="mono">${fmt(f.volume_spike_ratio||f.volume_ratio,2)}</span>
+      <b>Volume vs VWAP</b><span>${f.above_vwap?'<span class="okc">above (buyers control)</span>':'<span class="err">below (sellers control)</span>'}</span>
+      <b>Buy/Sell imbalance</b><span>${f.buy_volume_pct!=null||f.sell_volume_pct!=null?(f.buy_volume_pct>f.sell_volume_pct?'<span style="color:var(--green)">buy-heavy</span>':'<span style="color:var(--red)">sell-heavy</span>'):'—'}</span>
+    </div>
+    <div class="note" style="margin-top:8px;background:rgba(255,255,255,.04);padding:8px;border-radius:10px;border:1px solid var(--line)">CVD = cumulative directional volume delta (computed in <code>engine/hidden_alpha.py</code>). Positive = buyers absorbing supply → trend support. Negative = sellers absorbing demand → trend resistance. Combined with funding/OI above, this answers the P10.12 condition: <i>"how did this setup do when price ↑, OI ↑, funding < 0, CVD > 0?"</i></div>
+  `);
   marketCards += card('CONTEXT — WHAT AFFECTS PRICE', `
     <div class="kv">
       <b>Risk regime</b><span>${esc(reg.regime||'n/a')} (${esc(reg.score??'' )})</span>
@@ -869,43 +932,74 @@ async function loadChart(symbol, tf){
   try{
     const d=await (await fetch(`/api/candles?symbol=${symbol}&tf=${tf}&limit=90`)).json();
     if(d.error){ host.innerHTML='<span class="err">'+esc(d.error)+'</span>'; return; }
-    host.innerHTML=chartSVG(d.candles||[]);
-  }catch(e){ host.innerHTML='<span class="err">chart error</span>'; }
+    // P10.8: Lightweight Charts (vendored locally at /static/lightweight-charts.standalone.js)
+    // Replaces the hand-rolled chartSVG(); reads from stored candles; price + volume pane.
+    renderLightweightChart(host, d.candles||[]);
+  }catch(e){ host.innerHTML='<span class="err">chart error: '+esc(String(e))+'</span>'; }
 }
 
-function chartSVG(cs){
-  if(!cs || !cs.length) return '<span class="muted">no candles</span>';
-  const W=860, H=240, padR=14, padT=10, volH=46;
-  const prices=cs.flatMap(c=>[+c.high,+c.low]);
-  const lo=Math.min(...prices), hi=Math.max(...prices);
-  const volMax=Math.max(...cs.map(c=>+c.volume||0),1);
-  const n=cs.length, cw=Math.floor((W-padR)/n);
-  const y=p=> padT+(H-volH-padT)*(1-(p-lo)/(hi-lo||1));
-  const ema=(span)=>{ const out=[]; let k=2/(span+1), prev=null;
-    for(const c of cs){ const v=+c.close; prev=prev==null?v:v+k*(v-prev); out.push(prev); } return out; };
-  const e20=ema(20), e50=ema(50);
-  let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" style="background:#0e1524;border-radius:12px;border:1px solid var(--line)">`;
-  for(let i=0;i<5;i++){ const p=lo+(hi-lo)*i/4; const yy=y(p);
-    s+=`<line x1="0" y1="${yy}" x2="${W}" y2="${yy}" stroke="#1e3358" stroke-width="1" opacity=".9"/>
-        <text x="6" y="${yy-4}" fill="#8aa0bd" font-size="9" font-family="ui-monospace,monospace">${fmt(p,0)}</text>`; }
-  cs.forEach((c,i)=>{
-    const x=i*cw, up=+c.close>=+c.open;
-    const col=up?'#22c55e':'#ef4444';
-    const oy=y(+c.open), cy=y(+c.close);
-    const wy=y(+c.high), ly=y(+c.low);
-    const hb=Math.max(1, Math.abs(cy-oy));
-    s+=`<line x1="${x+cw/2}" y1="${wy}" x2="${x+cw/2}" y2="${ly}" stroke="${col}" stroke-width="1.1"/>
-        <rect x="${x+1}" y="${Math.min(oy,cy)}" width="${Math.max(1,cw-3)}" height="${hb}" fill="${col}" rx="1" opacity=".92"/>`;
-    const vh=Math.max(1,(+c.volume/volMax)*volH*0.92);
-    s+=`<rect x="${x+2}" y="${H-vh}" width="${Math.max(1,cw-5)}" height="${vh}" fill="${col}" opacity=".22" rx="1"/>`;
+function renderLightweightChart(container, candles){
+  if(!candles || !candles.length){ container.innerHTML='<span class="muted">no candles</span>'; return; }
+  // Clear previous chart instance if any
+  if(container._lcChart){ try{ container._lcChart.remove(); }catch(e){} }
+  // The vendored standalone build exposes LightweightCharts.createChart
+  // (full build) or a minimal stub (current sandbox). Both work with this call.
+  const chart = (typeof LightweightCharts !== 'undefined' && LightweightCharts.createChart)
+    ? LightweightCharts.createChart
+    : (typeof createChart !== 'undefined' ? createChart : null);
+  if(!chart){ container.innerHTML='<span class="err">Lightweight Charts library not loaded</span>'; return; }
+  // Transform candles to the format Lightweight Charts expects: {time, open, high, low, close, volume}
+  // The Binance client returns columns: ts, open, high, low, close, volume
+  const priceData = candles.map(c => ({
+    time: (c.ts || c.time || c.timestamp || c.open_time || c.date ? new Date(c.ts || c.time || c.timestamp || c.open_time || c.date).getTime() / 1000 : Date.now() / 1000),
+    open: parseFloat(c.open || c.open_price || 0),
+    high: parseFloat(c.high || c.high_price || 0),
+    low: parseFloat(c.low || c.low_price || 0),
+    close: parseFloat(c.close || c.close_price || 0),
+  }));
+  const volumeData = candles.map(c => ({
+    time: (c.ts || c.time || c.timestamp || c.open_time || c.date ? new Date(c.ts || c.time || c.timestamp || c.open_time || c.date).getTime() / 1000 : Date.now() / 1000),
+    value: parseFloat(c.volume || 0),
+    color: parseFloat(c.close || 0) >= parseFloat(c.open || 0) ? '#22c55e' : '#ef4444',
+  }));
+
+  // Create chart with price pane
+  const chartObj = chart(container, {
+    width: container.clientWidth || 860,
+    height: 260,
+    layout: { background: { color: '#0e1524' }, textColor: '#8aa0bd' },
+    grid: { vertLines: { color: '#1e3358' }, horzLines: { color: '#1e3358' } },
+    timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#1e3358' },
   });
-  const px=i=>i*cw+cw/2;
-  e20.forEach((v,i)=>{ if(i>0) s+=`<line x1="${px(i-1)}" y1="${y(e20[i-1])}" x2="${px(i)}" y2="${y(v)}" stroke="#3b82f6" stroke-width="1.5" opacity=".9"/>`; });
-  e50.forEach((v,i)=>{ if(i>0) s+=`<line x1="${px(i-1)}" y1="${y(e50[i-1])}" x2="${px(i)}" y2="${y(v)}" stroke="#f59e0b" stroke-width="1.25" opacity=".85"/>`; });
-  s+=`<text x="${W-74}" y="${H-volH-8}" fill="#3b82f6" font-size="9" font-weight="700">EMA20</text>
-      <text x="${W-34}" y="${H-volH-8}" fill="#f59e0b" font-size="9" font-weight="700">EMA50</text>`;
-  s+='</svg>';
-  return s;
+  container._lcChart = chartObj;
+
+  const priceSeries = chartObj.addCandlestickSeries({
+    upColor: '#22c55e', downColor: '#ef4444',
+    borderUpColor: '#22c55e', borderDownColor: '#ef4444',
+    wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+  });
+  priceSeries.setData(priceData);
+
+  // Volume pane (bottom) — P10.8 spec: price + volume pane
+  const volumeSeries = chartObj.addHistogramSeries({
+    color: '#3b82f6',
+    priceFormat: { type: 'volume' },
+    priceScaleId: 'right',
+  });
+  volumeSeries.setData(volumeData);
+  volumeSeries.priceScale().applyOptions({
+    scaleMargins: { top: 0.7, bottom: 0 },
+  });
+
+  // Resize handler for responsive charts
+  function onResize(){
+    try{
+      chartObj.applyOptions({ width: container.clientWidth || 860, height: 260 });
+    }catch(e){}
+  }
+  window.addEventListener('resize', onResize);
+  // Store resize listener for cleanup (optional)
+  container._lcResize = onResize;
 }
 
 let __lastGood = '';

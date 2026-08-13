@@ -269,6 +269,43 @@ def save_report(report: dict, path: str = "data_samples/backtest_report.json") -
     Path(path).write_text(json.dumps(report, indent=2, default=str))
 
 
+def run_backtest_on_store(exchange: str = "binance", market: str = "perp",
+                           symbol: str = "BTCUSDT", timeframe: str = "15m",
+                           bars: int = 300,
+                           horizons: Optional[list[float]] = None,
+                           min_bars: int = BACKTEST_MIN_BARS,
+                           step: int = BACKTEST_STEP,
+                           min_confidence: int = 55) -> dict:
+    """P10.11 — backtest that reads from the stored Parquet series.
+
+    The engine no longer depends on a live ``client.klines()`` fetch; it reads
+    from ``CandleStore.read()`` (immutable, deduplicated, ordered) and can
+    therefore run multi-year backtests offline.  The result feeds ``P10.12``
+    feature-store queries.
+
+    If the series does not exist or has fewer bars than ``min_bars``, a clear
+    error is returned rather than a corrupt result.
+    """
+    from data.store import CandleStore
+    store = CandleStore()
+    df = store.read(exchange, market, symbol, timeframe)
+    if df.empty:
+        return {"ok": False, "error": f"No stored candles for {exchange}/{market}/{symbol}/{timeframe}",
+                "report": {}, "graded": []}
+    if len(df) < min_bars:
+        return {"ok": False, "error": f"Only {len(df)} bars stored (need >= {min_bars})",
+                "stored": len(df), "required": min_bars,
+                "report": {}, "graded": []}
+    # Respect the `bars` cap for quick backtests (same contract as REST).
+    df = df.tail(bars).reset_index(drop=True)
+    result = run_backtest(df, symbol=symbol, timeframe=timeframe,
+                          horizons=horizons, min_bars=min_bars,
+                          step=step, min_confidence=min_confidence)
+    return {"ok": True, **result, "store_source": True,
+            "store_path": store._series_dir(exchange, market, symbol, timeframe).as_posix(),
+            "bars_read": len(df)}
+
+
 def print_report(report: dict) -> None:
     meta, s = report["meta"], report["summary"]
     print("=" * 66)
