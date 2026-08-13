@@ -74,8 +74,11 @@
 | `bybit_client.py` | P10.6 — Bybit V5 klines transport behind the same `PageResult` contract; P10.7 also pages `/v5/market/funding/history`. Venue quirks stay at the boundary. |
 | `cross_exchange.py` | P10.7 — venue registry + one `snapshot_prices()` probe + stored premium/discount + funding spread; `python main.py cross collect\|status` |
 | `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB` context manager |
-| `backtester.py` | Walk-forward grading of plans at +1h/+4h/+24h |
+| `backtester.py` | Walk-forward grading of plans at +1h/+4h/+24h; P10.11 `run_backtest_on_store()` reads the Parquet store instead of a live fetch |
 | `paper_trading.py` | Approved-signal lifecycle: monitor + auto-close at SL/TP1 (no real orders) |
+| `ws_client.py` | P10.10 — public Binance WebSocket streams (`!forceOrder@arr` + klines) with reconnect/backoff; offline-safe demo stream; feeds readiness + feature store |
+| `feature_store.py` | P10.12 — one derived wide row per `(symbol, timeframe, ts)`: price + derivatives + hidden_alpha + regime (22 columns) |
+| `validation.py` | P12.1 — locked train/val/OOS/recent walk-forward protocol, graduation-bar checks, sealed OOS envelope; `python main.py validate` |
 | `simulator.py` | The paper-sample grind (100/20 sample proof); `graduation_status` |
 | `symbols.py` | Alias resolution (BTC → BTCUSDT, ETH → ETHUSDT, GOLD → XAUUSD) |
 | `sources/cryptodada_website.py` | Connector for the private CryptoDada site (api/browser modes) |
@@ -110,7 +113,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 48 test modules, 471 pass / 1 skip
+### `tests/` — 49 test modules, 488 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
@@ -182,7 +185,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 471 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 488 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -325,5 +328,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **471 pass, 1 skip**. Any new feature must
+The expected baseline is **488 pass, 1 skip**. Any new feature must
 maintain or increase this count.

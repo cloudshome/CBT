@@ -310,7 +310,7 @@ marks done-whens extended against the Freqtrade review's §8 table.
 
 | # | Milestone | Done when |
 |---|---|---|
-| **P12.1** | Locked walk-forward / dev-validate-OOS protocol | A setup cannot “pass” on the training window alone; the final OOS set is **sealed** (BT6) |
+| **P12.1** | Locked walk-forward / dev-validate-OOS protocol | ✅ **SHIPPED 2026-08-13** (`data/validation.py`, `python main.py validate`): a setup cannot “pass” on the training window alone; the final OOS set is **sealed** (BT6) — fingerprint-gated reuse, recorded reseals |
 | **P12.2** | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form |
 | **P12.3** | Single boxed R-report / **strategy scorecard** | One command, one block — long/short, regime, **session**, Sharpe/Sortino/Calmar, holding time (`+`) |
 | **P12.4** | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; **parameter-plateau test** — an isolated-peak parameter point caps the stability score (`+`) |

@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-13 (this session: P10.7 shipped — stored cross-exchange premium/discount + funding spread; next *code* is P10.8)
+**Last updated:** 2026-08-13 (this session: P12.1 shipped — locked train/val/OOS/recent walk-forward protocol + sealed OOS envelope + `python main.py validate`; next *code* is P12.2)
 
 ---
 
@@ -21,7 +21,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 471 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 488 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -43,7 +43,8 @@ Independence has two halves. SKY currently owns one of them:
 | Half | Meaning | Status |
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
-| **Data independence** | Our own stored market history | 🔄 **P10** (P10.1–P10.7 shipped; P10.8 next) |
+| **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
+| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1 shipped; P12.2 next) |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -57,21 +58,22 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-13, this session):** **P10.7 shipped.** The
-> live health probe is now `data/cross_exchange.snapshot_prices()`
-> (KuCoin + OKX + Bybit); premium/discount + funding spread are
-> queryable via `python main.py cross collect|status`. F1–F8 / BT1–BT8
-> stay decided. The paper book (TODO-11) first-grind is done; grind
-> continues alongside. **P10.8 is the concrete next *code* build
-> below.**
+> **Order note (2026-08-13, this session):** **P12.1 shipped.** The
+> SKY Quant Validation Engine's locked walk-forward protocol is live:
+> `data/validation.py` + `python main.py validate` — train/val pass
+> rule (train alone can never pass), sealed OOS/recent envelopes with
+> fingerprint-gated reuse and recorded reseals, the live graduation
+> bar as the criteria, and 17 new offline tests. **P10 is fully
+> shipped** (P10.1–P10.12, PR #18). F1–F8 / BT1–BT8 stay decided.
+> P11 grind continues alongside. **P12.2 is the concrete next *code*
+> build below.**
 
-### TODO-12 / P10.8 · Lightweight Charts · the next P10 milestone
+### TODO-13 / P12.2 · `python main.py validate lookahead` · the next P12 milestone
 
-**P10.1–P10.7 are shipped.** Next: **P10.8 — Lightweight Charts
-replaces `chartSVG()`** (price + volume pane over stored data; no
-new runtime dep; vendor the script locally). Full plan:
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md`. Do not start P10.9 until
-P10.8 is green.
+**P12.1 is shipped** (see the TODO-13 table below). Next: **P12.2 —
+lookahead analysis**: a `shift(-n)` (future-peeking) feature fails a
+test; CI runs the unit form. `data/validation.py` is the home for the
+scanner. Do not start P12.3 until P12.2 is green.
 
 ---
 
@@ -120,7 +122,7 @@ Next session options, in order:
 and gives P10's backfill a working proof-loop to feed. Do not let the
 data project become a reason to stop proving the edge.
 
-### TODO-12 · P10 · Data infrastructure + market terminal · the next MAJOR milestone
+### TODO-12 · P10 · Data infrastructure + market terminal · ✅ SHIPPED (PR #18)
 
 📄 **Full plan: [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md)** —
 read that before touching any of it. Summary only here.
@@ -135,8 +137,9 @@ from scratch every run.
 exchange APIs, store it ourselves, and let the engine reason over
 stored evidence.
 
-Twelve independently shippable milestones (P10.1 → P10.12). **P10.1–P10.7
-are shipped.** Do not start milestone N+1 until N is green.
+Twelve independently shippable milestones (P10.1 → P10.12). **All
+twelve are shipped** (PR #18, 2026-08-13). Do not start milestone N+1
+until N is green — held to the end.
 
 | # | Milestone | Status |
 |---|---|---|
@@ -147,11 +150,11 @@ are shipped.** Do not start milestone N+1 until N is green.
 | P10.5 | Data-quality pillar wired into `readiness_strip()` | ✅ shipped (`data/quality.py`, fourth pillar; corrupt data ⇒ quarantine ⇒ `ready: false`) |
 | P10.6 | Bybit adapter behind the same schema | ✅ shipped (`data/bybit_client.py`; `--exchange bybit`) |
 | P10.7 | Cross-exchange premium/discount + funding spread | ✅ shipped (`data/cross_exchange.py`; `python main.py cross`) |
-| P10.8 | Lightweight Charts replaces `chartSVG()` | ⏭ **next** |
-| P10.9 | OI / funding / CVD panes | ⏳ |
-| P10.10 | WebSocket tier (live klines + liquidations) | ⏳ |
-| P10.11 | Backtester reads the store, not a live fetch | ⏳ |
-| P10.12 | Feature store — one wide row per timestamp | ⏳ |
+| P10.8 | Lightweight Charts replaces `chartSVG()` | ✅ shipped (vendored standalone script + `/api/candles`) |
+| P10.9 | OI / funding / CVD panes | ✅ shipped (FUTURES + FLOW market-tab cards) |
+| P10.10 | WebSocket tier (live klines + liquidations) | ✅ shipped (`data/ws_client.py`; offline-safe stub) |
+| P10.11 | Backtester reads the store, not a live fetch | ✅ shipped (`run_backtest_on_store()`) |
+| P10.12 | Feature store — one wide row per timestamp | ✅ shipped (`data/feature_store.py`) |
 
 **Phase done when** we can ask *"how did this setup perform when price
 rose, OI rose, funding was negative, and CVD was positive?"* and get a
@@ -219,7 +222,7 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 **Both are now behind P10 as well as the graduation gate.** Owning our
 data moves the aim; wrapping the engine in another chat UI does not.
 
-### TODO-13 · P12 · SKY Quant Validation Engine · AFTER P10.11
+### TODO-13 · P12 · SKY Quant Validation Engine · P12.1 shipped
 
 📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8,
 extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.**
@@ -229,19 +232,19 @@ it **on our grader + our store**, not on a bot and not on Backtrader.
 The Backtrader audit (BT5) confirmed all seven milestones and extended
 four done-whens (marked `+`).
 
-Do **not** start until P10.11 is green (backtester reads Parquet).
-Years of locked train/val/OOS windows are impossible on a 500-candle
-fetch. Do **not** let this jump the queue ahead of P10.8.
+The gate condition is met: P10.11 is green (backtester reads Parquet)
+and the full P10 store stack (P10.1–P10.12) is shipped, so the locked
+train/val/OOS windows have real multi-window history to split.
 
-| # | Milestone | Done when |
-|---|---|---|
-| P12.1 | Locked walk-forward protocol (train / val / OOS / recent) | A setup cannot “pass” on the training window alone; the final OOS set is sealed (`+` BT6) |
-| P12.2 | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form |
-| P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) |
-| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) |
-| P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) |
-| P12.6 | Conditioned + net-of-costs expectancy | OI / funding / CVD / regime from our store **and** `E_net = E_gross − fees − slip − funding` with funding joined as-of-T (`+` BT5) |
-| P12.7 | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) |
+| # | Milestone | Done when | Status |
+|---|---|---|---|
+| P12.1 | Locked walk-forward protocol (train / val / OOS / recent) | A setup cannot “pass” on the training window alone; the final OOS set is sealed (`+` BT6) | ✅ **shipped** — `data/validation.py`, `python main.py validate`, 17 tests |
+| P12.2 | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form | ⏭ **next** |
+| P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) | ⏳ |
+| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ⏳ |
+| P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) | ⏳ |
+| P12.6 | Conditioned + net-of-costs expectancy | OI / funding / CVD / regime from our store **and** `E_net = E_gross − fees − slip − funding` with funding joined as-of-T (`+` BT5) | ⏳ |
+| P12.7 | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) | ⏳ |
 
 **Not in P12:** Hyperopt, FreqAI, Backtrader optimization or a second
 backtest engine (BT4/BT7), ML direction-prediction, a strategy-module

@@ -1,14 +1,16 @@
 # DATA_INFRASTRUCTURE_ROADMAP.md — P10 · SKY Market Terminal
 
-> **Status:** in progress — **P10.1–P10.12 delivered** (P10.1–P10.3 on
+> **Status:** ✅ **COMPLETE — P10.1–P10.12 delivered** (P10.1–P10.3 on
 > 2026-08-12; P10.4 derivatives + P10.2 hardening + P10.5 data-quality
 > + P10.6 Bybit adapter + P10.7 cross-exchange series + P10.8 charts
 > + P10.9 futures/CVD panes + P10.10 WS tier + P10.11 store-backtest
-> + P10.12 feature store delivered 2026-08-13 — this session).
+> + P10.12 feature store delivered 2026-08-13 — PR #18).
 > The P10.2 backfill pages the real perp endpoint and its rate-limit
 > handling is weight-header pacing + exponential backoff + geo-block
 > abort.
-> Next: P10.8 (Lightweight Charts replaces `chartSVG()`).
+> Next: P12 — the SKY Quant Validation Engine now runs on this stack
+> (**P12.1 locked walk-forward protocol shipped 2026-08-13**:
+> `data/validation.py`, `python main.py validate`).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -44,11 +46,11 @@ agents, no new AI wrapping. Store evidence, then reason over it.
 ### Where P10 sits in the order of work
 
 ```text
-NOW      P10.8 → P10.12 · data infrastructure + market terminal  ← THIS DOC
-           ↓  large, unlocks real backtesting
+DONE     P10.1 → P10.12 · data infrastructure + market terminal  ← THIS DOC
+           ↓  shipped (PR #18) — unlocks real backtesting on stored data
 ALONG    P11 · prove the paper book (counts done; gate still closed)
            ↓  do not loosen the bar
-THEN     P12 · SKY Quant Validation Engine
+NOW      P12 · SKY Quant Validation Engine  (P12.1 shipped; P12.2 next)
            (walk-forward / OOS / lookahead / quality score /
             funding-OI-CVD-conditioned + net-of-costs expectancy /
             risk-of-ruin table)

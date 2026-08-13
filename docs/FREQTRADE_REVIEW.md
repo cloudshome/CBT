@@ -327,7 +327,7 @@ Parquet). Each row is one session.
 
 | # | Milestone | Done when |
 |---|---|---|
-| **P12.1** | Locked walk-forward protocol (train / val / OOS / recent) | A strategy cannot be “passed” on the training window alone |
+| **P12.1** | Locked walk-forward protocol (train / val / OOS / recent) | ✅ **SHIPPED 2026-08-13** (`data/validation.py`, `python main.py validate`): train+val pass rule — train alone can never pass; sealed OOS envelope |
 | **P12.2** | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form |
 | **P12.3** | Single boxed R-report (long/short, regime, session) | One command, one block, no new math |
 | **P12.4** | Backtest Quality Score 0–100 | Fragile high-PnL curves score low |

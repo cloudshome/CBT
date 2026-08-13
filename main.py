@@ -36,7 +36,8 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import (SYMBOL, SYMBOLS, TIMEFRAME, BARS, MIN_CONFIDENCE, DEFAULT_RISK_REWARD,
-                    DASHBOARD_HOST, DASHBOARD_PORT, PAPER_POLL_SECONDS, VERSION)
+                    DASHBOARD_HOST, DASHBOARD_PORT, PAPER_POLL_SECONDS, VERSION,
+                    BACKTEST_MIN_BARS)
 
 from data.symbols import normalize_symbol, parse_symbol_list
 from data.binance_client import BinanceClient
@@ -311,6 +312,40 @@ def cmd_backtest(args) -> int:
         print(f"\nSaved {n} graded plans to the signal database (run {run_id}).")
         print("Run `python main.py stats` to see what the engine has learned.")
     return 0
+
+
+def cmd_validate(args) -> int:
+    """P12.1 — locked walk-forward train/val/OOS/recent validation.
+
+    Store-only by design: four locked windows need history only the Parquet
+    store can provide. The OOS/recent windows are sealed envelopes — an
+    identical run reuses the stored seal; `--reseal` re-opens it and the
+    re-opening is recorded. Verdicts never feed `learn`.
+    """
+    from data.validation import print_verdict, run_validation_on_store
+
+    horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
+    result = run_validation_on_store(
+        exchange=args.exchange, market=args.market,
+        symbol=_sym(args.symbol), timeframe=args.tf,
+        bars=args.bars, horizons=horizons,
+        min_bars=args.min_bars, step=args.step,
+        min_confidence=args.min_conf,
+        train_frac=args.train, val_frac=args.val,
+        oos_frac=args.oos, recent_frac=args.recent,
+        min_decided=args.min_decided,
+        seal_dir=args.seal_dir,
+        store_root=args.store_root,
+        reseal=args.reseal)
+    if args.json:
+        print(json.dumps(result, indent=2, default=str))
+    else:
+        print_verdict(result)
+    if args.reseal:
+        print("\n⚠ RESEAL — the sealed OOS envelope was re-opened on purpose.")
+        print("  This run is recorded in the seal history. Do not do this to")
+        print("  'improve' the OOS number — that is exactly what the seal forbids.")
+    return 0 if result.get("ok") else 1
 
 
 def _print_review_row(r: dict) -> None:
@@ -1664,6 +1699,42 @@ def main(argv: list[str] | None = None) -> int:
     p_bt.add_argument("--save", action="store_true", help="store graded outcomes in the signal database")
     p_bt.set_defaults(func=cmd_backtest)
 
+    p_val = sub.add_parser(
+        "validate",
+        help="P12.1 locked train/val/OOS/recent walk-forward validation (store-only)")
+    p_val.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH, XAU/GOLD)")
+    p_val.add_argument("--tf", default=TIMEFRAME)
+    p_val.add_argument("--exchange", default="binance", help="stored series venue (binance|bybit)")
+    p_val.add_argument("--market", default="perp", help="spot or perp series")
+    p_val.add_argument("--bars", type=int, default=2000,
+                       help="most-recent bars from the store to validate over")
+    p_val.add_argument("--step", type=int, default=3,
+                       help="bar step for the walk-forward scan (1 = every bar)")
+    p_val.add_argument("--min-bars", type=int, default=BACKTEST_MIN_BARS,
+                       help="engine warm-up bars (belong to no window)")
+    p_val.add_argument("--min-conf", type=int, default=MIN_CONFIDENCE)
+    p_val.add_argument("--min-decided", type=int, default=30,
+                       help="minimum decided trades per window for a bar check")
+    p_val.add_argument("--horizons", default="1,4,24",
+                       help="comma-separated hours; verdicts use the first (primary)")
+    p_val.add_argument("--train", type=float, default=0.60,
+                       help="train window fraction (earliest)")
+    p_val.add_argument("--val", type=float, default=0.15,
+                       help="validation window fraction")
+    p_val.add_argument("--oos", type=float, default=0.15,
+                       help="sealed OOS window fraction")
+    p_val.add_argument("--recent", type=float, default=0.10,
+                       help="sealed recent window fraction (newest)")
+    p_val.add_argument("--json", action="store_true",
+                       help="machine-readable result")
+    p_val.add_argument("--store-root", default=None,
+                       help="store root override (default data/store; mirrors backfill --root)")
+    p_val.add_argument("--seal-dir", default=None,
+                       help="sealed-OOS envelope directory override")
+    p_val.add_argument("--reseal", action="store_true",
+                       help="re-open the sealed OOS envelope (recorded in seal history)")
+    p_val.set_defaults(func=cmd_validate)
+
     p_stats = sub.add_parser("stats", help="what the engine has learned (DB + backtests)")
     p_stats.add_argument("--symbol", default=None, help="optional asset filter (BTC, ETH, XAU/GOLD)")
     p_stats.set_defaults(func=cmd_stats)
@@ -2077,7 +2148,7 @@ def main(argv: list[str] | None = None) -> int:
         print("                        learn | stats | coach | review | sources | state | glossary |")
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
         print("                        health | desk | doctor | channels | skill | preflight | simulator |")
-        print("                        hidden | correlation | backfill | store | derivatives | mcp")
+        print("                        validate | hidden | correlation | backfill | store | derivatives | mcp")
         print("=" * 62)
         serve(make_app(), DASHBOARD_HOST, DASHBOARD_PORT)
         return 0

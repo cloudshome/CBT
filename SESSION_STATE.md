@@ -10,10 +10,32 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-13 (this session: P10.8 → P10.9 delivered; P10.10 WebSocket tier; P10.11 backtest-on-store; P10.12 feature store; P11 gate still honestly closed)
-**Branch:** `arena/019ffad5-sky`
-**HEAD commit:** `4bfdfe9` (`main`); PR #17 appears MERGED (`arena/019ffab2-sky`) per `gh pr view` — does not affect current branch `arena/019ffad5-sky`; work continues here. **Do not open new PRs from this session.**
+**Last updated:** 2026-08-13 (this session: P12.1 shipped — locked train/val/OOS/recent walk-forward protocol + sealed OOS envelope + `python main.py validate`; P10 fully shipped; P11 gate still honestly closed)
+**Branch:** `arena/019ffafa-sky` (this session branches from `main` @ `bf31431` — PR #18 `feat(P10.8-P10.12)` is already MERGED there; P10.8–P10.12 are part of our base, not our deliverable)
+**HEAD commit:** `bf31431` (`main`); our work commits on top on `arena/019ffafa-sky`; one PR opened at session close (never self-merge).
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
+
+> **This session (`arena/019ffafa-sky`): P12.1 — the SKY Quant
+> Validation Engine's locked walk-forward protocol.** With P10 fully
+> shipped (P10.1–P10.12, PR #18) the P12 gate condition ("after
+> P10.11") is finally met, so the Freqtrade/Backtrader audit's first
+> build row is done: `data/validation.py` + `python main.py validate`
+> + `tests/test_validation.py` (17 tests). The protocol: four
+> chronological locked windows (train/val/OOS/recent) over the
+> analyzed range; plans bucket by their **signal bar**; each window
+> checked against the **live graduation bar**
+> (`GRADUATION_CRITERIA`); PASS requires train AND val — train alone
+> can never pass; OOS/recent are **sealed envelopes** (BT6):
+> identical runs reuse the stored seal (SHA-256 config fingerprint
+> gate), re-opening needs `--reseal` and is recorded in the seal
+> history. Full pipeline proven on sandbox demo store
+> (backfill → 11,520 stored 15m candles → verdict → seal reuse →
+> reseal). Version **2.8.0 → 2.9.0**. Suite **471 → 488 pass / 1
+> skip** (+17). Reconciliation gap fixed: PR #18 had shipped
+> P10.8–P10.12 with no changelog entry and stale TODO tables — a
+> retroactive `[2.8.0 — P10.8–P10.12 addendum]` changelog entry now
+> closes it. Next *code* is **P12.2** (lookahead scanner).
+
 
 > **This session (`arena/019ffab2-sky`): P10.7 — cross-exchange
 > series.** Premium/discount vs Binance and funding spread are now a
@@ -117,17 +139,19 @@ plan (18 phases, 15-item rulebook) is in
 **Become a fully independent, consistently profitable trader.**
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
-(our own stored market history — 🔄 P10.1–P10.7 shipped; P10.8 next). Every phase
+(our own stored market history — ✅ P10.1–P10.12 shipped; the research
+proof that makes the edge trustworthy — 🔄 P12.1 shipped, P12.2 next). Every phase
 below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P10 (data infrastructure + market terminal) — P10.1–P10.7 shipped.**
-P9 complete; P11 first grind shipped; graduation gate still closed.
-Freqtrade rejected (F1–F8); Backtrader rejected (BT1–BT8). Open items:
-TODO-7, TODO-8; P10.8 → P10.12; P12 parked until P10.11.
+**P12 (SKY Quant Validation Engine) — P12.1 shipped.** P10 (data
+infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 first
+grind shipped and the graduation gate is still honestly closed.
+Freqtrade rejected (F1–F8); Backtrader rejected (BT1–BT8). Open
+items: TODO-7, TODO-8; P12.2 → P12.7; P11 grind continues alongside.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -141,8 +165,8 @@ TODO-7, TODO-8; P10.8 → P10.12; P12 parked until P10.11.
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
-| **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1–P10.7 shipped**; next **P10.8** Lightweight Charts. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ⏸ After P10.11 | Walk-forward / lookahead / scorecard / quality score / conditioned + net-of-costs E / risk-of-ruin — `docs/FREQTRADE_REVIEW.md` extended by `docs/BACKTRADER_REVIEW.md` |
+| **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
+| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.1 shipped** (locked train/val/OOS/recent protocol + sealed OOS, `data/validation.py`, `python main.py validate`); next **P12.2** lookahead — `docs/FREQTRADE_REVIEW.md` extended by `docs/BACKTRADER_REVIEW.md` |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -693,7 +717,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 471 passed, 1 skipped
+# 488 passed, 1 skipped
 ```
 
 Readiness strip (four pillars since P10.5):
@@ -795,7 +819,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 471 pass / 1 skip.
+- Maintain test count at ≥ 488 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -811,16 +835,22 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task.
-2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 471 pass / 1 skip (449 previous bar).
-3. [x] Fix any obvious failures.
+1. [x] Finish or safely stop the current task. — **P12.1 shipped.**
+2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — **488 pass /
+   1 skip** (≥ 471 previous bar; +17 new validation tests).
+3. [x] Fix any obvious failures. — seal-payload ordering bug found
+   by the live demo (seal record was written before `report["seal"]`
+   existed) — fixed + regression-tested.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — mark finished items done, reprioritise.
-6. [x] Update `CHANGELOG.md`.
+5. [x] Update `TODO.md` — P12.1 marked shipped, P10.1–P10.12 marked
+   shipped, P12.2 reprioritised to top.
+6. [x] Update `CHANGELOG.md` — 2.9.0 entry + retroactive
+   `[2.8.0 — P10.8–P10.12 addendum]` (PR #18 shipped without one).
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
-10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` / `git push origin arena/019ffab2-sky`.
-12. [x] Open the session PR as the closing step — **PR #17**.
+10. [x] Record any known bugs or unresolved issues. — none blocking;
+    see "known limits" in the session block.
+11. [x] `git add` / `git commit` / `git push origin arena/019ffafa-sky`.
+12. [x] Open the session PR as the closing step — one PR from
+    `arena/019ffafa-sky` → `main` (P12.1).

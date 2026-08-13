@@ -10,6 +10,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.9.0] — 2026-08-13 · branch `arena/019ffafa-sky`
+
+MINOR bump: **P12.1 — the SKY Quant Validation Engine's locked
+walk-forward protocol (train / val / OOS / recent)** on our own
+backtester + store. Report-only: nothing here places orders or feeds
+`learn`.
+
+### Added
+- **`data/validation.py`** — the first P12 milestone
+  ([`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8 F5/F6,
+  [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8 BT5/BT6):
+  - `walk_forward_windows()` — chronologically locked, contiguous
+    four-way split of the analyzed range. The engine warm-up belongs
+    to no window; train absorbs the rounding remainder; bad fractions
+    or a too-short series raise `ValidationWindowError`.
+  - `bucket_by_window()` — a plan counts toward the window its
+    **signal bar** (timestamp) belongs to; exits never re-bucket it.
+  - `window_stats()` / `meets_bar()` — decided-trade statistics
+    including profit factor, checked against the **live graduation
+    bar** (`data.simulator.GRADUATION_CRITERIA` — E ≥ +0.50R,
+    WR > 55%, PF ≥ 1.5) plus a per-window decided floor.
+  - `protocol_verdict()` — the P12.1 done-when: a setup **cannot
+    pass on the training window alone** (`FAIL`); passing requires
+    train AND val; the sealed OOS/recent windows can only confirm
+    (`PASS`) or warn (`PASS_WITH_WARNINGS`); too few samples is
+    `INSUFFICIENT_DATA`, never a pass.
+  - Sealed envelope (BT6): identical runs **reuse the stored seal**
+    instead of silently re-deriving OOS; a config-fingerprint
+    mismatch never reuses an old seal; `--reseal` re-opens it and
+    the re-opening is appended to the seal history with a timestamp.
+  - `run_validation()` / `run_validation_on_store()` — one
+    walk-forward pass over the frame / stored Parquet series
+    (P10.11's path), then per-window and per-setup verdicts.
+  - `print_verdict()` — the boxed protocol report.
+- **CLI `python main.py validate`** — store-only by design (four
+  locked windows need history only the store can provide; a live
+  500-candle fetch cannot hold them). Flags: `--exchange/--market/
+  --bars/--step/--min-bars/--min-conf/--min-decided/--horizons/
+  --train/--val/--oos/--recent/--json/--store-root/--seal-dir/
+  --reseal`. Exit code 1 on error, 0 on a run.
+- **`tests/test_validation.py`** — 17 offline tests: split tiling /
+  fraction and length rejection, signal-bar bucketing, bar checks
+  (including "silence is not an edge"), train-only FAIL,
+  PASS_WITH_WARNINGS, INSUFFICIENT_DATA, seal round-trip +
+  fingerprint gate + reseal history, end-to-end protocol run with
+  seal reuse/reseal, and a guard test that `VALIDATION_CRITERIA`
+  stays identical to `GRADUATION_CRITERIA`.
+- **P11 gate unchanged** — still honestly closed (+0.263R / 34.1% /
+  PF 1.40, below the ≥ +0.50R / > 55% / ≥ 1.5 bar). P12.1 does not
+  loosen it; it adds the research-grade protocol around it.
+
+### Changed
+- Version **2.8.0 → 2.9.0** (`config.py`, `pyproject.toml`).
+- Dashboard banner lists `validate`.
+- Docs reconciliation: TODO-13 / SESSION_STATE / AI_ANATOMY_ROADMAP /
+  FREQTRADE_REVIEW §8 / BACKTRADER_REVIEW §8 / README / ARCHITECTURE.
+
+---
+
+## [2.8.0 — P10.8–P10.12 addendum] · PR #18 — 2026-08-13
+
+> Retroactive entry, added in the 2.9.0 session's reconciliation pass:
+> PR #18 shipped five more P10 milestones without a changelog entry or
+> version bump (`config.VERSION` stayed 2.8.0). Recorded here so the
+> gap is closed.
+
+### Added (PR #18)
+- **P10.8** — vendored `lightweight-charts.standalone.js`;
+  `renderLightweightChart()` (candlestick + histogram volume pane,
+  `addHistogramSeries`); `/api/candles` feed.
+- **P10.9** — market-tab cards `FUTURES — OPEN INTEREST & FUNDING`
+  and `FLOW — CVD & VOLUME DELTA`, reading from `market_context` and
+  the feature snapshot.
+- **P10.10** — `data/ws_client.py`: public Binance WebSocket streams
+  (`!forceOrder@arr` + klines), reconnect/backoff, graceful stop,
+  offline-safe `DEMO_EVENT_STREAM`, singleton `get_client()`;
+  `reconnect_state()` / `accumulation_stats()` feed the readiness
+  strip and feature store. No `websockets` runtime dependency.
+- **P10.11** — `data/backtester.py::run_backtest_on_store()` reads
+  `CandleStore.read()` instead of a live fetch; honest error for
+  missing/short series.
+- **P10.12** — `data/feature_store.py`: `build_feature_table()`
+  (price + derivatives + hidden_alpha + regime; 22 `FEATURE_COLUMNS`),
+  `save_feature_table()` / `read_feature_table()`; one derived row
+  per `(symbol, timeframe, ts)`.
+- **P11 gate unchanged** — honestly closed (+0.263R / 34.1% /
+  PF 1.40).
+
+---
+
 ## [2.8.0] — 2026-08-13 · branch `arena/019ffab2-sky`
 
 MINOR bump: **P10.7 — cross-exchange premium/discount + funding spread
