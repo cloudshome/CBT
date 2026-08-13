@@ -2,7 +2,10 @@
 
 The second exchange behind the same normalised schema
 (``docs/DATA_INFRASTRUCTURE_ROADMAP.md`` §4/§9): one ``Candle`` record,
-one meaning, regardless of venue. This module implements the exact
+one meaning, regardless of venue. P10.7 also pages
+``/v5/market/funding/history`` (``funding_history()``) so the
+cross-exchange collector can derive a Binance-vs-Bybit funding
+spread offline. This module implements the exact
 transport contract the hardened P10.2 backfill pages through —
 ``klines_page()`` returning a :class:`~data.binance_client.PageResult`
 with data, HTTP status, and headers — so ``data/backfill.py`` and the
@@ -207,3 +210,46 @@ class BybitClient:
                 f"[{market}] — status {page.status}; check network or a "
                 f"Bybit-accessible location.")
         return page.data
+
+    # ── Funding history (P10.7 — cross-exchange funding spread) ──────────
+    def funding_history(self, symbol: str = "BTCUSDT",
+                        start_time: Optional[int] = None,
+                        end_time: Optional[int] = None,
+                        limit: int = 200) -> Optional[pd.DataFrame]:
+        """Historical USDT-perp funding (``/v5/market/funding/history``).
+
+        Returns ``ts`` (fundingRateTimestamp, UTC epoch ms) and
+        ``funding_rate``, ascending. ``None`` when the transport failed;
+        an empty frame when the venue has no perp (XAUUSD) or the page
+        is empty. Public endpoint — no keys.
+        """
+        spec = resolve_symbol(symbol)
+        if not spec.futures_symbol:
+            return pd.DataFrame(columns=["ts", "funding_rate"])
+        params = {
+            "category": "linear",
+            "symbol": spec.futures_symbol,
+            "limit": min(max(1, int(limit)), 200),
+        }
+        if start_time is not None:
+            params["startTime"] = int(start_time)
+        if end_time is not None:
+            params["endTime"] = int(end_time)
+        payload, _headers, _status = self._get_page_with_headers(
+            BYBIT_HOSTS, "/v5/market/funding/history", params)
+        if payload is None:
+            return None
+        ret = int(payload.get("retCode", -1))
+        if ret != 0:
+            return None
+        rows = (payload.get("result") or {}).get("list") or []
+        if not rows:
+            return pd.DataFrame(columns=["ts", "funding_rate"])
+        df = pd.DataFrame(rows)
+        df = df.rename(columns={"fundingRateTimestamp": "ts",
+                                "fundingRate": "funding_rate"})
+        df["ts"] = df["ts"].astype("int64")
+        df["funding_rate"] = df["funding_rate"].astype(float)
+        return (df[["ts", "funding_rate"]]
+                .sort_values("ts")
+                .reset_index(drop=True))

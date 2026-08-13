@@ -1,12 +1,13 @@
 # DATA_INFRASTRUCTURE_ROADMAP.md — P10 · SKY Market Terminal
 
-> **Status:** in progress — **P10.1–P10.6 shipped** (P10.1–P10.3 on
+> **Status:** in progress — **P10.1–P10.7 shipped** (P10.1–P10.3 on
 > 2026-08-12; P10.4 derivatives series + P10.2 hardening + P10.5
-> data-quality pillar + P10.6 Bybit adapter on 2026-08-13 — PR #13 / PR #14).
+> data-quality pillar + P10.6 Bybit adapter + P10.7 cross-exchange
+> series on 2026-08-13 — PR #13 / PR #14 / this session).
 > The P10.2 backfill pages the real perp endpoint and its rate-limit
 > handling is weight-header pacing + exponential backoff + geo-block
 > abort.
-> Next: P10.7 (cross-exchange premium/discount + funding spread).
+> Next: P10.8 (Lightweight Charts replaces `chartSVG()`).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -42,7 +43,7 @@ agents, no new AI wrapping. Store evidence, then reason over it.
 ### Where P10 sits in the order of work
 
 ```text
-NOW      P10.7 → P10.12 · data infrastructure + market terminal  ← THIS DOC
+NOW      P10.8 → P10.12 · data infrastructure + market terminal  ← THIS DOC
            ↓  large, unlocks real backtesting
 ALONG    P11 · prove the paper book (counts done; gate still closed)
            ↓  do not loosen the bar
@@ -73,7 +74,7 @@ A repo inspection on 2026-08-12 found the following already shipped.
 | Binance REST klines, geo-fallback hosts, retries | `data/binance_client.py` | **Reuse as the Binance adapter's transport.** Already handles `limit` cap 1000 + `start_time`. |
 | Funding rate, open interest, long/short ratio | `data/binance_client.py` | Already fetched — but **never stored**. P10 persists them. |
 | Liquidations (proxy via 24h stats) | `data/binance_client.py:liquidations()` | Currently a *proxy*, not real forced-order data. P10 upgrades this honestly. |
-| Cross-exchange price check (KuCoin + OKX) | `brain/agent.py:_cross_exchange_probe()` | Cross-exchange logic **already exists**. P10 generalises it; don't write a second one. |
+| Cross-exchange price check (KuCoin + OKX + Bybit) | `data/cross_exchange.py:snapshot_prices()` (health wraps it) | ✅ P10.7 generalised the probe into a stored series. Do not write a second one. |
 | Symbol aliasing (BTC→BTCUSDT, GOLD→XAUUSD) | `data/symbols.py` | The normalisation layer already has a home. |
 | Offline determinism (`DEMO_MODE=1`) | `data/sample_client.py` | **Every P10 collector must have a DEMO_MODE path** or the test suite stops being offline. |
 | SQLite store + `SignalDB` context manager | `data/database.py` | 10 tables, none of them candles. See §5 on storage. |
@@ -383,7 +384,7 @@ documented state. Ordered by value-per-session, same as `TODO.md`.
 | **P10.4** | Derivatives series | persist funding / OI / mark / index / basis over time | ✅ shipped — `data/derivatives.py` (store + collector + fake transport), `python main.py derivatives collect/status`; series queryable; `liquidations()` renamed honestly to `liquidation_stats_proxy()` |
 | **P10.5** | Quality pillar | per-source checks wired into `readiness_strip()` | ✅ shipped (`data/quality.py`, fourth readiness pillar; corrupt data ⇒ quarantine ⇒ `ready: false`) |
 | **P10.6** | Bybit adapter | second exchange behind the same normalised schema | ✅ shipped (2026-08-13, PR #14) — `data/bybit_client.py` behind the same `PageResult` contract; identical assertions pass for both adapters (17 tests) |
-| **P10.7** | Cross-exchange | generalise `_cross_exchange_probe()` into a stored series | premium/discount + funding spread queryable |
+| **P10.7** | Cross-exchange | generalise `_cross_exchange_probe()` into a stored series | ✅ shipped — `data/cross_exchange.py`; `python main.py cross collect/status`; premium/discount + funding spread queryable; one probe |
 | **P10.8** | Lightweight Charts | vendored chart replaces `chartSVG()`; price+volume pane | dashboard renders stored data; no new runtime dep |
 | **P10.9** | Futures panes | OI + funding + CVD panes | the view a retail chart cannot give us |
 | **P10.10** | WebSocket tier | live klines + `!forceOrder@arr`, reconnect/backoff | survives forced disconnect; liquidations accumulate |

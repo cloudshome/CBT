@@ -108,6 +108,7 @@ bypasses the risk gate. The deny list is enforced at the top of
 | Hidden | `python main.py hidden chart_read BTCUSDT` | `hidden_chart_read` | HMM regime + CVD order flow + Kelly (advisory) |
 | Hidden | `python main.py hidden analytics mae` | `hidden_analytics_mae` | MAE/MFE summary per setup |
 | Hidden | `python main.py hidden analytics mc --samples 2000` | `hidden_analytics_mc` | Monte Carlo equity / drawdown distribution |
+| Cross | `python main.py cross collect --symbol BTCUSDT` | — | P10.7: persist KuCoin/OKX/Bybit premium + funding spread (`cross status` to inspect) |
 
 ## How to answer with CryptoBrain
 

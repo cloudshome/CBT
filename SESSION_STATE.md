@@ -10,14 +10,24 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-13 (this session: Backtrader audited — BT1–BT8 decided; P12 definitions extended; next code is P10.7)
-**Branch:** `arena/019ffa8d-sky`
-**HEAD commit:** see "Last commit" below
-**Default branch:** `main` @ `e462318` (PR #15 merged: Freqtrade F1–F8)
-**PR:** [#16](https://github.com/Azimshawon/SKY/pull/16) — this branch → `main`.
+**Last updated:** 2026-08-13 (this session: P10.7 shipped + committed + PR #17 opened; next code is P10.8)
+**Branch:** `arena/019ffab2-sky`
+**HEAD commit:** this branch (`git log -1`); P10.7 code is `ac446ae`
+**Default branch:** `main` (still `538dd8f` / PR #16 when this PR opened)
+**PR:** https://github.com/Azimshawon/SKY/pull/17 → `main` (open; do not merge).
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session (`arena/019ffa8d-sky`): Backtrader recommendation
+> **This session (`arena/019ffab2-sky`): P10.7 — cross-exchange
+> series.** Premium/discount vs Binance and funding spread are now a
+> stored, queryable series under `data/store/cross/**`. The live
+> health probe was **generalised** (`data/cross_exchange.snapshot_prices`,
+> KuCoin + OKX + Bybit) — health/preflight/collector share one
+> function. CLI: `python main.py cross collect|status`. DEMO_MODE
+> stays offline via `FakeVenueTransport`. Version **2.7.2 → 2.8.0**.
+> Suite **449 → 471 pass / 1 skip** (+22). Next *code* is **P10.8**
+> (Lightweight Charts). F1–F8 / BT1–BT8 stay decided.
+>
+> **Prior session (`arena/019ffa8d-sky`): Backtrader recommendation
 > reviewed and rejected.** A ChatGPT audit proposed mining Backtrader
 > for research architecture (Cerebro→feeds→strategy→broker→analyzers),
 > putting it behind a swappable adapter, and upgrading expectancy /
@@ -31,7 +41,7 @@
 > dependency / vendored engine / adapter (BT1), no Cerebro rewrite
 > (BT2), no second grader (BT3/BT7), no entry parameter-search (BT4),
 > P12 done-whens extended (BT5), sealed OOS confirmed (BT6), no reset
-> (BT8). Docs + contract tests only. Next *code* is still **P10.7**.
+> (BT8). Docs + contract tests only.
 >
 > **Prior session (`arena/019ffa5d-sky`, merged as PR #15): Freqtrade
 > recommendation reviewed and rejected.** A ChatGPT audit proposed
@@ -105,17 +115,17 @@ plan (18 phases, 15-item rulebook) is in
 **Become a fully independent, consistently profitable trader.**
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
-(our own stored market history — 🔄 P10.1–P10.6 shipped; P10.7 next). Every phase
+(our own stored market history — 🔄 P10.1–P10.7 shipped; P10.8 next). Every phase
 below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P10 (data infrastructure + market terminal) — P10.1–P10.6 shipped.**
+**P10 (data infrastructure + market terminal) — P10.1–P10.7 shipped.**
 P9 complete; P11 first grind shipped; graduation gate still closed.
 Freqtrade rejected (F1–F8); Backtrader rejected (BT1–BT8). Open items:
-TODO-7, TODO-8; P10.7 → P10.12; P12 parked until P10.11.
+TODO-7, TODO-8; P10.8 → P10.12; P12 parked until P10.11.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -129,7 +139,7 @@ TODO-7, TODO-8; P10.7 → P10.12; P12 parked until P10.11.
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
-| **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1–P10.6 shipped**; next **P10.7** cross-exchange. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
+| **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1–P10.7 shipped**; next **P10.8** Lightweight Charts. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
 | **P12** | **Quant Validation Engine** | ⏸ After P10.11 | Walk-forward / lookahead / scorecard / quality score / conditioned + net-of-costs E / risk-of-ruin — `docs/FREQTRADE_REVIEW.md` extended by `docs/BACKTRADER_REVIEW.md` |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
@@ -139,7 +149,41 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-13 (this branch `arena/019ffa8d-sky`): Backtrader review · BT1–BT8 · P12 extended
+### Session 2026-08-13 (this branch `arena/019ffab2-sky`): P10.7 — cross-exchange series
+
+Branched from `main` after the Backtrader review (PR #16). Inputs only
+— no strategy, risk-gate, or engine behaviour change. Version
+**2.7.2 → 2.8.0**. Suite **449 → 471 pass / 1 skip** (+22).
+
+**What landed:**
+- `data/cross_exchange.py` — venue registry (KuCoin/OKX/Bybit),
+  `snapshot_prices()` (the single probe), `snapshot_funding()`,
+  `CrossExchangeStore` (`data/store/cross/**`, same schema/PK as
+  P10.4), `derive_premium` / `derive_funding_spread`,
+  `FakeVenueTransport`, `CrossExchangeCollector` (candle-derived
+  premium, Bybit funding pages, live/fake snapshot). Snapshot ts
+  floors 15m (price) / 8h (funding).
+- `data/bybit_client.py` — `funding_history()` →
+  `GET /v5/market/funding/history` (`category=linear`); XAU → empty
+  frame; transport fail → `None`.
+- `brain/agent.py` — `_cross_exchange_probe` is a thin
+  `snapshot_prices` wrapper; `_CROSS_EXCHANGES` re-exports `VENUES`.
+- CLI — `python main.py cross collect|status`.
+- Tests — `tests/test_cross_exchange.py` (20) + 2 Bybit funding
+  tests; `test_cross_exchange_probe_uses_newest_candle` now mocks
+  Bybit V5 `result.list`.
+
+**Files changed:** `data/cross_exchange.py` (new),
+`data/bybit_client.py`, `brain/agent.py`, `main.py`,
+`tests/test_cross_exchange.py` (new), `tests/test_bybit.py`,
+`tests/test_agent.py`, `config.py`, `pyproject.toml`, `CHANGELOG.md`,
+`ARCHITECTURE.md`, `README.md`, `SKILL.md`, `TODO.md`,
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `docs/INFRASTRUCTURE_LAYERS.md`,
+`AI_ANATOMY_ROADMAP.md`, this file.
+
+---
+
+### Session 2026-08-13 (prior branch `arena/019ffa8d-sky`): Backtrader review · BT1–BT8 · P12 extended
 
 Branched from `main` @ `e462318` (PR #15 merged: Freqtrade F1–F8).
 0 regressions. Docs + contract tests only — **no runtime change**.
@@ -497,11 +541,11 @@ See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ## Currently working on
 
-PR #16 (from `arena/019ffa8d-sky`) carries the Backtrader
-keep/cut (BT1–BT8, `docs/BACKTRADER_REVIEW.md`) and the extended P12
-definitions, branched after PR #15 merged. Nothing else is in
-flight. Next *code* session: **P10.7** (cross-exchange series). Do
-not start P12, Dify, LibreChat, or a strategy-module catalog.
+This session (`arena/019ffab2-sky`) **shipped P10.7** — committed
+`ac446ae`, pushed, **PR #17** opened against `main`. Nothing else is
+in flight. Next *code* session: **P10.8** (Lightweight Charts
+replaces `chartSVG()`). Do not start P12, Dify, LibreChat, or a
+strategy-module catalog. Do not open a second PR from this session.
 
 The paper book's **counts** are done (100/20 for every primary setup,
 38,439 decided samples) and the **journal loop** is done (compliance
@@ -531,9 +575,9 @@ reuse the existing cross-exchange probe; one-PR-per-session).
    0 paper samples because the simulator takes one paper sample per
    window — best plan only). Do **not** change the blueprint
    graduation criteria.
-2. **TODO-12 (P10)** — P10.1–P10.6 done; P10.2 hardened. Next:
-   **P10.7** (cross-exchange premium/discount + funding spread as stored
-   series — generalise the existing `_cross_exchange_probe()`). Full plan:
+2. **TODO-12 (P10)** — P10.1–P10.7 done. Next: **P10.8** (Lightweight
+   Charts replaces `chartSVG()`; price+volume pane over stored data;
+   no new runtime dep). Full plan:
    [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md)
    — it records which parts of the incoming plan were corrected and why.
 3. **TODO-7** — human pastes the wheel-gate job into the **real**
@@ -567,7 +611,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    job spec therefore lives at `docs/.github/workflows/ci.yml`, which
    GitHub Actions does **not** execute. Source of truth for running
    the gate is `ci/wheel_gate.py` locally (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.7.1.
+6. **`CHANGELOG.md` is current** through v2.8.0.
 7. **Sweep-reversal setups are breakeven on synthetic data.** The
    sandbox's deterministic series are smooth random walks with drift —
    they have no real stop-hunt structure, so sweep plans land near
@@ -583,7 +627,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    replaces `#app.innerHTML` wholesale, so anything inside it would be
    destroyed on every scan. Keep the strip where it is.
 10. **Live scans are still amnesiac.** The Parquet store + backfill exist
-    (P10.1–P10.6) but the scanner/backtester still fetch ~500 live candles
+    (P10.1–P10.7) but the scanner/backtester still fetch ~500 live candles
     (P10.11 wires them to the store).
 11. **This sandbox has no network egress.** The real Binance backfill
     cannot run here (verified live: clean abort with a resumable message).
@@ -599,9 +643,10 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
     finishing any session, `git fetch` + compare with `origin/main`**;
     if newer P10 work landed, merge and reconcile instead of shipping a
     duplicate. PR #13 was that reconciliation (merged).
-14. **Cross-exchange logic already exists** in
-    `brain/agent.py:_cross_exchange_probe()` (KuCoin + OKX). P10.7
-    generalises it into a stored series — do not write a second one.
+14. **Cross-exchange probe is one function.**
+    `data/cross_exchange.snapshot_prices()` (KuCoin + OKX + Bybit);
+    `brain/agent.py:_cross_exchange_probe` is a thin wrapper. Do not
+    write a second probe. Stored series live under `data/store/cross/`.
 15. **Freqtrade was reviewed and rejected (F1–F8).** Do not reopen
     that as a “quick win.” The keep/cut is
     `docs/FREQTRADE_REVIEW.md`. Contract-tested in
@@ -616,9 +661,10 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-1. Next *code* session: **P10.7** — cross-exchange
-   premium/discount + funding spread as stored series. Read the roadmap
-   first. **First step of every future session:** `git fetch` and diff
+1. Next *code* session: **P10.8** — Lightweight Charts replaces
+   `chartSVG()` (price + volume pane over stored data; vendor the
+   script locally; no new runtime dep). Read the roadmap first.
+   **First step of every future session:** `git fetch` and diff
    against `origin/main` — parallel sessions merge while you work (see
    known problem 13); reconcile before building.
 2. A human does TODO-7 + TODO-8 from
@@ -629,16 +675,14 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md, branch arena/019ffa8d-sky.
-> PR #15 (Freqtrade review, F1–F8) is MERGED. This session's PR
-> records a Backtrader review and rejects a second backtest engine
-> (BT1–BT8, docs/BACKTRADER_REVIEW.md). Do not adopt Freqtrade /
-> Hyperopt / FreqAI / Backtrader. Implement P10.7
-> (cross-exchange premium/discount + funding spread as stored
-> series, generalising _cross_exchange_probe) from
-> docs/DATA_INFRASTRUCTURE_ROADMAP.md. Fetch and diff origin/main
-> first. No new agents/panels/strategies. Do not start Dify,
-> LibreChat, or P12.
+> Continue SKY from SESSION_STATE.md. P10.7 shipped as PR #17
+> (do not reopen or merge it from the session). Do not adopt
+> Freqtrade / Hyperopt / FreqAI / Backtrader (F1–F8 / BT1–BT8).
+> Implement P10.8 (Lightweight Charts replaces chartSVG;
+> price+volume pane over stored data; vendor locally; no new
+> runtime dep) from docs/DATA_INFRASTRUCTURE_ROADMAP.md. Fetch and
+> diff origin/main first. No new agents/panels/strategies. Do not
+> start Dify, LibreChat, or P12.
 
 ---
 
@@ -647,7 +691,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 449 passed, 1 skipped
+# 471 passed, 1 skipped
 ```
 
 Readiness strip (four pillars since P10.5):
@@ -666,6 +710,8 @@ DEMO_MODE=1 .venv/bin/python main.py backfill --symbol BTCUSDT --market perp \
 DEMO_MODE=1 .venv/bin/python main.py store --market perp --tf 1m
 DEMO_MODE=1 .venv/bin/python main.py derivatives collect --symbol BTCUSDT
 DEMO_MODE=1 .venv/bin/python main.py derivatives status --symbol BTCUSDT
+DEMO_MODE=1 .venv/bin/python main.py cross collect --symbol BTCUSDT
+DEMO_MODE=1 .venv/bin/python main.py cross status --symbol BTCUSDT
 # real data (operator's machine, Binance-reachable):
 python main.py backfill --symbol BTCUSDT --market perp --tf 1m --since 2019-09-08
 python main.py backfill --exchange bybit --symbol BTCUSDT --market perp --tf 1m
@@ -684,7 +730,7 @@ Local wheel-gate (build + dup-check, no install):
 
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.7.2-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.8.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Readiness strip, all four surfaces:
@@ -702,9 +748,13 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-see `git log --oneline -3` on arena/019ffa8d-sky
-(this session: Backtrader BT1–BT8 recorded; P12 definitions extended)
+ac446ae feat(p10.7): store cross-exchange premium and funding spread
+538dd8f docs: reject Backtrader as a SKY layer; P12 validated + extended (BT1–BT8) (#16)
 ```
+
+Plus a docs-only handoff commit on this branch recording PR #17.
+See `git log --oneline -3`. PR: https://github.com/Azimshawon/SKY/pull/17
+(open; do not merge).
 
 ---
 
@@ -712,7 +762,7 @@ see `git log --oneline -3` on arena/019ffa8d-sky
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ffa8d-sky.
+github.com/Azimshawon/SKY, branch arena/019ffab2-sky.
 
 First, inspect the GitHub repository before making changes:
 - git fetch origin, and diff your branch against origin/main —
@@ -743,7 +793,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 449 pass / 1 skip.
+- Maintain test count at ≥ 471 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -761,7 +811,7 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 1. [x] Finish or safely stop the current task.
 2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 449 pass / 1 skip (445 previous bar).
+   ≥ 471 pass / 1 skip (449 previous bar).
 3. [x] Fix any obvious failures.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
 5. [x] Update `TODO.md` — mark finished items done, reprioritise.
@@ -770,5 +820,5 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` / `git push origin arena/019ffa8d-sky`.
-12. [x] Open the session PR as the closing step (see "Currently working on").
+11. [x] `git add` / `git commit` / `git push origin arena/019ffab2-sky`.
+12. [x] Open the session PR as the closing step — **PR #17**.

@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-13 (this session: Backtrader recommendation reviewed — BT1–BT8 decided, no dependency, no reset; P12 definitions confirmed + extended; next *code* is still P10.7)
+**Last updated:** 2026-08-13 (this session: P10.7 shipped — stored cross-exchange premium/discount + funding spread; next *code* is P10.8)
 
 ---
 
@@ -21,7 +21,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 445 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 471 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -43,7 +43,7 @@ Independence has two halves. SKY currently owns one of them:
 | Half | Meaning | Status |
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
-| **Data independence** | Our own stored market history | 🔄 **P10** (P10.1–P10.6 shipped; P10.7 next) |
+| **Data independence** | Our own stored market history | 🔄 **P10** (P10.1–P10.7 shipped; P10.8 next) |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -57,26 +57,21 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-13, this session):** PR #15 (Freqtrade review,
-> F1–F8) is **merged**. This session reviewed the companion **Backtrader**
-> audit and recorded BT1–BT8: **do not adopt Backtrader** as dependency,
-> dev tool, vendored engine, or adapter; its good ideas were already
-> ours or already named **TODO-13 / P12** (definitions extended). A
-> reset was considered and refused a second time. The active major
-> milestone is still **P10**. **P10.1–P10.6 are shipped.** The paper
-> book (TODO-11) first-grind is done; grind continues alongside.
-> **P10.7 is the concrete next *code* build below.**
+> **Order note (2026-08-13, this session):** **P10.7 shipped.** The
+> live health probe is now `data/cross_exchange.snapshot_prices()`
+> (KuCoin + OKX + Bybit); premium/discount + funding spread are
+> queryable via `python main.py cross collect|status`. F1–F8 / BT1–BT8
+> stay decided. The paper book (TODO-11) first-grind is done; grind
+> continues alongside. **P10.8 is the concrete next *code* build
+> below.**
 
-### TODO-12 / P10.7 · Cross-exchange series · the next P10 milestone
+### TODO-12 / P10.8 · Lightweight Charts · the next P10 milestone
 
-**P10.1–P10.6 are shipped.** Next: **P10.7 — cross-exchange
-premium/discount + funding spread** as stored series: generalise the
-existing `brain/agent.py:_cross_exchange_probe()` (KuCoin + OKX live
-snapshot) into a stored per-timestamp series, and add the
-Binance-vs-Bybit premium/discount and funding spread now that both
-venues page through the same schema. Full plan:
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md`. Do not start P10.8 until P10.7
-is green.
+**P10.1–P10.7 are shipped.** Next: **P10.8 — Lightweight Charts
+replaces `chartSVG()`** (price + volume pane over stored data; no
+new runtime dep; vendor the script locally). Full plan:
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`. Do not start P10.9 until
+P10.8 is green.
 
 ---
 
@@ -140,7 +135,7 @@ from scratch every run.
 exchange APIs, store it ourselves, and let the engine reason over
 stored evidence.
 
-Twelve independently shippable milestones (P10.1 → P10.12). **P10.1–P10.4
+Twelve independently shippable milestones (P10.1 → P10.12). **P10.1–P10.7
 are shipped.** Do not start milestone N+1 until N is green.
 
 | # | Milestone | Status |
@@ -151,8 +146,8 @@ are shipped.** Do not start milestone N+1 until N is green.
 | P10.4 | Derivatives as time series (funding / OI / mark / index / basis) | ✅ shipped (`data/derivatives.py`) |
 | P10.5 | Data-quality pillar wired into `readiness_strip()` | ✅ shipped (`data/quality.py`, fourth pillar; corrupt data ⇒ quarantine ⇒ `ready: false`) |
 | P10.6 | Bybit adapter behind the same schema | ✅ shipped (`data/bybit_client.py`; `--exchange bybit`) |
-| P10.7 | Cross-exchange premium/discount + funding spread | ⏭ **next** |
-| P10.8 | Lightweight Charts replaces `chartSVG()` | ⏳ |
+| P10.7 | Cross-exchange premium/discount + funding spread | ✅ shipped (`data/cross_exchange.py`; `python main.py cross`) |
+| P10.8 | Lightweight Charts replaces `chartSVG()` | ⏭ **next** |
 | P10.9 | OI / funding / CVD panes | ⏳ |
 | P10.10 | WebSocket tier (live klines + liquidations) | ⏳ |
 | P10.11 | Backtester reads the store, not a live fetch | ⏳ |
@@ -180,9 +175,9 @@ the roadmap doc — these are the load-bearing ones):
   `!forceOrder@arr` WebSocket stream and only accumulates from the day
   we start. The current `liquidations()` is a 24h-stats *proxy* and
   must be renamed so nobody mistakes it for the real thing.
-- **Reuse `_cross_exchange_probe()`.** Cross-exchange comparison
-  already exists in `brain/agent.py`; generalise it, don't write a
-  second one.
+- **Reuse `_cross_exchange_probe()`.** ✅ P10.7: the probe now lives
+  in `data/cross_exchange.snapshot_prices()`; health is a thin
+  wrapper. Do not write a second one.
 - **One PR per session** (Arena limit) overrides the incoming plan's
   "always open a PR" step.
 
@@ -236,7 +231,7 @@ four done-whens (marked `+`).
 
 Do **not** start until P10.11 is green (backtester reads Parquet).
 Years of locked train/val/OOS windows are impossible on a 500-candle
-fetch. Do **not** let this jump the queue ahead of P10.7.
+fetch. Do **not** let this jump the queue ahead of P10.8.
 
 | # | Milestone | Done when |
 |---|---|---|
@@ -266,7 +261,30 @@ multi-model chat panel is still wanted after Dify.
 
 ---
 
-## ✅ Done this session (2026-08-13 · `arena/019ffa8d-sky`)
+## ✅ Done this session (2026-08-13 · `arena/019ffab2-sky`)
+
+### TODO-12 / P10.7 · Cross-exchange series · ✅ DONE
+
+Premium/discount vs Binance and funding spread are now a stored,
+queryable series. The live probe was **generalised, not rewritten**.
+
+**What landed:**
+- `data/cross_exchange.py` — venue registry (KuCoin/OKX/Bybit),
+  `snapshot_prices()` (the one probe), `snapshot_funding()`,
+  `CrossExchangeStore` (`data/store/cross/**`), `derive_premium` /
+  `derive_funding_spread`, `FakeVenueTransport`, collector.
+- `data/bybit_client.py` — `funding_history()` (`/v5/market/funding/history`).
+- `brain/agent.py:_cross_exchange_probe` → thin `snapshot_prices` wrapper.
+- CLI — `python main.py cross collect|status`.
+- Tests — `tests/test_cross_exchange.py` (20) + 2 Bybit funding tests;
+  agent probe now mocks Bybit V5.
+- Version **2.7.2 → 2.8.0**. Suite 449 → **471 pass / 1 skip** (+22).
+
+**Next (P10.8):** Lightweight Charts replaces `chartSVG()`.
+
+---
+
+## ✅ Done in a prior session (2026-08-13 · `arena/019ffa8d-sky`)
 
 ### Backtrader recommendation reviewed · BT1–BT8 decided · no reset
 

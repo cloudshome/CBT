@@ -2,7 +2,7 @@
 
 ```
 Progress: [████████████████████████████████████████] 100% (Phases P1–P6 Complete)
-Tests:    449 passed / 1 skip (offline, DEMO_MODE=1)
+Tests:    471 passed / 1 skip (offline, DEMO_MODE=1)
 Status:   Production-Ready Institutional Desk & Autonomous Architecture
 Note:     This repo consolidates Cloudslover/AI + cloudshome/AI (see MERGE_NOTES.md)
 ```
@@ -207,7 +207,7 @@ can reach past one API response.
 | Phase | Theme | Deliverables | Status |
 |---|---|---|:---:|
 | **P11** | **Paper-book proof** | First grind shipped (38,439 decided; 100/20 on all four primary setups; compliance 100%; sell-R bug fixed). Graduation gate **honestly CLOSED** (+0.263R / 34.1% / PF 1.40). Keep grinding live data; do not move the bar. | 🔄 In progress |
-| **P10** | **Data infrastructure + market terminal** | P10.1–P10.6 shipped (schema, Binance backfill, gaps/rollups, derivatives series, quality pillar, Bybit adapter). Next: **P10.7 cross-exchange**. Then charts / WS / store-backed backtest / feature store. | 🔄 In progress — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
+| **P10** | **Data infrastructure + market terminal** | P10.1–P10.7 shipped (schema, Binance backfill, gaps/rollups, derivatives series, quality pillar, Bybit adapter, cross-exchange series). Next: **P10.8 Lightweight Charts**. Then futures panes / WS / store-backed backtest / feature store. | 🔄 In progress — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
 | **P12** | **SKY Quant Validation Engine** | Walk-forward / OOS / lookahead / boxed scorecard / quality score / strategy score / conditioned + net-of-costs expectancy / MC ruin + risk-of-ruin table — on **our** backtester + **our** store. Starts after P10.11. | ⏸ After P10.11 — [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8 |
 
 **P11 runs alongside P10.** The first grind is done; the gate is still

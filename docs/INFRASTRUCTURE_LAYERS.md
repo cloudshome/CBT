@@ -62,7 +62,7 @@ cover that job. A sixth agent that writes code is Arena itself.
 ## Order of work (do not skip ahead)
 
 ```
-NOW     P10.7 → P10.12 · Own the data (cross-exchange, charts, WS, store-backed backtest)
+NOW     P10.8 → P10.12 · Own the data (charts, WS, store-backed backtest, feature store)
 ALONG   P11 · Prove the edge (simulator / paper / graduation gate) — do not move the bar
 THEN    P12 · SKY Quant Validation Engine on OUR backtester + OUR store
               (walk-forward / lookahead / quality score / conditioned + net-of-costs

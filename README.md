@@ -42,6 +42,7 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 | **Derivatives series** (P10.4) | `python main.py derivatives collect` — funding, open interest, mark, index and basis persisted as time series (resumable, idempotent); the old `liquidations()` 24h-stats proxy renamed honestly to `liquidation_stats_proxy()`. `data/derivatives.py`. |
 | **Data-quality pillar** (P10.5) | Fourth readiness pillar: per stored series, staleness (timeframe-scaled), gap fraction, price/volume sanity and ordering. A corrupt or unusably stale series is **quarantined** — `doctor --strip` / `/api/readiness` / MCP `readiness` all report the desk *not ready*, because the engine prefers silence to a signal built on corrupt data. `data/quality.py`. |
 | **Bybit adapter** (P10.6) | Second venue behind the same normalised schema: `python main.py backfill --exchange bybit` pages Bybit V5 klines (spot + linear perps) through the same resumable/idempotent/rate-limit-aware machinery; venue quirks (categories, intervals, newest-first rows, retCodes) never leak past the adapter. `data/bybit_client.py`. |
+| **Cross-exchange series** (P10.7) | `python main.py cross collect` — persist the live KuCoin/OKX/Bybit probe and derive Binance-vs-Bybit premium/discount + funding spread as queryable Parquet series. Same probe health/preflight already call; `DEMO_MODE=1` is offline. `data/cross_exchange.py`. |
 | **Paper-trading runner** | Watches **approved** signals against live public Binance candles, simulates a planned entry, and auto-closes at SL / TP1. It records the outcome and R result — **never places a real exchange order**. |
 | **Self-improvement** | `python main.py learn` recomputes a per-setup calibration profile from backtest outcomes **plus decided paper trades** — boosts positive-expectancy plans, dampens (or filters) negative ones. |
 | **Coach (teaching)** | `python main.py coach` explains *why* the engine said what it said, mentors you through the top setup step-by-step, gives personal feedback on your own approvals/rejections, and ships a full trading glossary. |
@@ -150,6 +151,8 @@ python main.py backfill --exchange bybit --market perp --tf 1m   # second venue,
 python main.py backfill --symbol BTCUSDT --market perp --tf 1m --repair --rollup  # gaps + 1m→higher TFs
 python main.py store --market perp --tf 1m                      # inspect the store
 python main.py derivatives collect --symbol BTCUSDT             # funding/OI/mark/index series
+python main.py cross collect --symbol BTCUSDT                   # premium/discount + funding spread
+python main.py cross status --symbol BTCUSDT
 ```
 
 Progression levels (`PROGRESSION=student|researcher|simulator|micro|consistent|scale`)
@@ -175,8 +178,9 @@ the **graduation gate** passes (see `BLUEPRINT.md`).
 * `python main.py brief` — the daily briefing (alias for `agent morning`).
 * `python main.py health` — probe every data feed per symbol, DB integrity,
   risk gate, learning store, MCP + LLM availability; exits non-zero on failure.
-  In live mode it also cross-checks Binance prices against **KuCoin + OKX**
-  public APIs and flags deviations > 1%.
+  In live mode it also cross-checks Binance prices against **KuCoin + OKX + Bybit**
+  public APIs and flags deviations > 1%. The same probe is stored as a
+  series by `python main.py cross collect`.
   The dashboard renders the same report (`/api/health`) and the morning
   briefing (`/api/agents`), and `/api/ask` exposes the question desk.
 
@@ -773,6 +777,8 @@ crypto-brain/
 │   └── full_pipeline.py     # combines MTF + context + engine + styles + memory + decision
 ├── data/
 │   ├── binance_client.py    # geo-aware Binance market data
+│   ├── bybit_client.py      # Bybit V5 klines + funding history (P10.6/P10.7)
+│   ├── cross_exchange.py    # P10.7 premium/discount + funding spread store
 │   ├── sample_client.py     # DEMO_MODE offline client (sample + deterministic synthetic)
 │   ├── database.py          # SQLite store (scans/plans/decisions/backtests/paper/journal/agent_runs)
 │   ├── backtester.py        # walk-forward plan grader (+1h/+4h/+24h, regime-tagged, slip-aware)

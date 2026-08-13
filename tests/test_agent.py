@@ -274,37 +274,51 @@ def test_health_report_skips_cross_exchange_in_demo(desk_env):
 
 
 def test_cross_exchange_probe_uses_newest_candle(monkeypatch):
-    """KuCoin and OKX return newest-first; never compare an old candle."""
+    """KuCoin, OKX and Bybit return newest-first; never compare an old candle.
+
+    P10.7 generalised the probe (Bybit added) but the contract is the
+    same function: brain.agent._cross_exchange_probe → snapshot_prices.
+    """
     from brain.agent import _cross_exchange_probe
 
     class Response:
-        def __init__(self, data):
-            self._data = data
+        def __init__(self, payload):
+            self._payload = payload
 
         def json(self):
-            return {"data": self._data}
+            return self._payload
 
     def fake_get(url, timeout):
         assert timeout == 6
         if "kucoin" in url:
             # KuCoin close is index 2.  The older row is intentionally far off.
-            return Response([
+            return Response({"data": [
                 ["200", "99", "100", "101", "98", "1", "100"],
                 ["100", "49", "50", "51", "48", "1", "50"],
-            ])
-        # OKX close is index 4 and is also newest-first.
-        return Response([
-            ["200", "99", "101", "98", "100", "1"],
-            ["100", "49", "51", "48", "50", "1"],
-        ])
+            ]})
+        if "okx" in url:
+            # OKX close is index 4 and is also newest-first.
+            return Response({"data": [
+                ["200", "99", "101", "98", "100", "1"],
+                ["100", "49", "51", "48", "50", "1"],
+            ]})
+        # Bybit V5: result.list, close index 4, newest-first.
+        return Response({"result": {"list": [
+            ["200", "99", "101", "98", "100", "1", "1"],
+            ["100", "49", "51", "48", "50", "1", "1"],
+        ]}})
 
     monkeypatch.setattr("requests.get", fake_get)
     cross = _cross_exchange_probe({"BTCUSDT": 100.0})
 
     assert cross["ok"] is True
+    assert set(cross["exchanges"]) >= {"kucoin", "okx", "bybit"}
     assert cross["exchanges"]["kucoin"]["symbols"]["BTCUSDT"] == {
         "price": 100.0, "deviation_pct": 0.0, "flag": False,
     }
     assert cross["exchanges"]["okx"]["symbols"]["BTCUSDT"] == {
+        "price": 100.0, "deviation_pct": 0.0, "flag": False,
+    }
+    assert cross["exchanges"]["bybit"]["symbols"]["BTCUSDT"] == {
         "price": 100.0, "deviation_pct": 0.0, "flag": False,
     }

@@ -285,6 +285,38 @@ def test_cli_backfill_bybit_demo_is_offline_and_idempotent(tmp_path, monkeypatch
     assert store.count("binance", "spot", "BTCUSDT", "1m") == 0
 
 
+def test_funding_history_parses_v5_and_sorts_ascending(monkeypatch):
+    """P10.7: /v5/market/funding/history → (ts, funding_rate), oldest first."""
+    t0 = 1_749_600_000_000
+    step = 8 * 3_600_000
+    rows = [
+        {"symbol": "BTCUSDT", "fundingRate": "0.0002",
+         "fundingRateTimestamp": str(t0 + step)},
+        {"symbol": "BTCUSDT", "fundingRate": "0.0001",
+         "fundingRateTimestamp": str(t0)},
+    ]
+    calls = _patch_bybit(
+        monkeypatch,
+        lambda p: ({"retCode": 0, "result": {"list": rows}}, {}, 200))
+    df = BybitClient().funding_history("BTCUSDT", t0, t0 + step, 200)
+    assert calls[0]["path"] == "/v5/market/funding/history"
+    assert calls[0]["params"]["category"] == "linear"
+    assert calls[0]["params"]["startTime"] == t0
+    assert calls[0]["params"]["endTime"] == t0 + step
+    assert list(df.columns) == ["ts", "funding_rate"]
+    assert df["ts"].tolist() == [t0, t0 + step]
+    assert df["funding_rate"].tolist() == [0.0001, 0.0002]
+
+
+def test_funding_history_skips_gold_and_returns_none_on_transport_fail(monkeypatch):
+    calls = _patch_bybit(monkeypatch, lambda p: (None, None, None))
+    empty = BybitClient().funding_history("XAUUSD")
+    assert calls == []
+    assert empty is not None and empty.empty
+    assert list(empty.columns) == ["ts", "funding_rate"]
+    assert BybitClient().funding_history("BTCUSDT") is None
+
+
 def test_cli_backfill_rejects_unknown_exchange():
     from main import main
     with pytest.raises(SystemExit) as exc:

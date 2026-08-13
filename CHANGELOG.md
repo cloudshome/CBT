@@ -10,6 +10,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.8.0] — 2026-08-13 · branch `arena/019ffab2-sky`
+
+MINOR bump: **P10.7 — cross-exchange premium/discount + funding spread
+as a stored series.** The live health probe is the same function
+(generalised, not rewritten). Inputs only — no strategy, risk-gate, or
+engine behaviour change.
+
+### Added
+- **`data/cross_exchange.py`** — Layer-4 series layer.
+  - Venue registry (KuCoin + OKX + Bybit) + `snapshot_prices()` — the
+    **single** probe health, preflight, and the collector all call.
+    Output contract unchanged (`price` / `deviation_pct` / `flag`).
+  - `snapshot_funding()` — public funding rates vs a Binance
+    reference; kept separate so a missing funding endpoint cannot
+    change the price-probe contract.
+  - `CrossExchangeStore` — partitioned Parquet under
+    `data/store/cross/**` (gitignored), same normalised row shape and
+    upsert PK as P10.4. Metrics: `price`, `premium_pct`,
+    `funding_rate`, `funding_spread`. Snapshot timestamps floor to
+    15m (price) / 8h (funding).
+  - `derive_premium()` = `(other / ref − 1) × 100` on common `ts`
+    (zero-ref dropped). `derive_funding_spread()` = `other − ref`.
+  - `FakeVenueTransport` + `DEMO_MODE=1` stay fully offline.
+  - `CrossExchangeCollector` — derive Binance-vs-Bybit premium from
+    the candle store, page Bybit funding history, persist one live/fake
+    probe snapshot. Resumable, idempotent (a completed re-run adds
+    zero rows).
+- **`BybitClient.funding_history()`** — `GET /v5/market/funding/history`
+  (`category=linear`). XAU / no perp → empty frame; transport fail →
+  `None`.
+- **CLI** — `python main.py cross collect|status` (`--since/--until/
+  --no-snapshot/--dry-run/--json/--root`).
+- **Tests** — `tests/test_cross_exchange.py` (20 offline) + 2 Bybit
+  funding-page tests. The agent probe test now mocks Bybit V5
+  `result.list` as well as KuCoin/OKX.
+
+### Changed
+- `brain/agent.py:_cross_exchange_probe` is a thin wrapper around
+  `snapshot_prices`. `_CROSS_EXCHANGES` re-exports `VENUES`.
+- Version 2.7.2 → **2.8.0** (`config.py`, `pyproject.toml`).
+- Suite **449 → 471 pass / 1 skip** (+22), fully offline.
+
+### Notes
+- Health still skips the live probe in `DEMO_MODE`; the collector
+  still writes offline via `FakeVenueTransport` / `SampleClient`.
+- Store first. Do not turn a premium or a funding spread into a
+  trading rule until the data proves it.
+
+---
+
 ## [2.7.2] — 2026-08-13 · branch `arena/019ffa8d-sky`
 
 PATCH bump: **Backtrader recommendation reviewed and rejected**.

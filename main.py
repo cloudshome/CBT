@@ -14,12 +14,13 @@ Usage:
   python main.py agent ask "is the risk gate open?"          # natural-language question
   python main.py agent ask "am i ready for micro?"           # graduation gate
   python main.py agent all                                   # health + briefing + graduation
-  python main.py health                                      # system health (+ KuCoin/OKX cross-check)
+  python main.py health                                      # system health (+ KuCoin/OKX/Bybit cross-check)
   python main.py desk                                        # one-call desk advisory (gate + P&L + graduation + advice)
   python main.py preflight                                   # strict live-paper operations gate
   python main.py simulator                                   # grind 100/20 sample proof
   python main.py backfill --symbol BTCUSDT --market perp     # P10.2: paginated Binance history → Parquet store
   python main.py derivatives collect --symbol BTCUSDT   # P10.4: funding/OI/mark/index/basis → Parquet store
+  python main.py cross collect --symbol BTCUSDT         # P10.7: premium/discount + funding spread
   python main.py store --market perp                         # inspect the stored candle history
   python main.py mcp                                         # MCP server for Claude/Cursor
 """
@@ -1461,6 +1462,92 @@ def cmd_derivatives(args) -> int:
     return 0
 
 
+def cmd_cross(args) -> int:
+    """P10.7: collect / inspect cross-exchange premium + funding spread.
+
+    Generalises the live health probe into a stored series. DEMO_MODE=1
+    uses FakeVenueTransport (offline). Historical Binance-vs-Bybit
+    premium is derived from the candle store when both venues exist.
+    """
+    from data.backfill import fmt_ts
+    from data.cross_exchange import (CrossExchangeCollector,
+                                     CrossExchangeError, CrossExchangeStore)
+    from data.store import CandleStore
+    from data.derivatives import DerivativesStore
+    from data.symbols import resolve_symbol
+
+    store = (CrossExchangeStore(root=args.root)
+             if getattr(args, "root", None) else CrossExchangeStore())
+    symbol = resolve_symbol(args.symbol).symbol
+
+    if args.subcmd == "collect":
+        candle_root = getattr(args, "candle_root", None)
+        deriv_root = getattr(args, "deriv_root", None)
+        candle_store = (CandleStore(root=candle_root) if candle_root
+                        else CandleStore())
+        deriv_store = (DerivativesStore(root=deriv_root) if deriv_root
+                       else DerivativesStore())
+        try:
+            collector = CrossExchangeCollector(
+                store, candle_store=candle_store, deriv_store=deriv_store,
+                sleep_s=getattr(args, "sleep", 0.0))
+            runs = collector.collect(
+                symbol, market=args.market, timeframe=args.tf,
+                since=args.since, until=args.until,
+                snapshot=not getattr(args, "no_snapshot", False),
+                dry_run=args.dry_run)
+        except CrossExchangeError as exc:
+            print(f"[!] cross collect aborted: {exc}", file=sys.stderr)
+            return 1
+        payload = {k: r.as_dict() for k, r in runs.items()}
+        if args.json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            dest = ("dry-run — nothing written" if args.dry_run
+                    else "written to " + str(store.root))
+            print(f"cross {symbol}/{args.market} ({dest})")
+            if not runs:
+                print("  (nothing collected — backfill both venues or rely on the snapshot)")
+            for key, r in runs.items():
+                print(f"  {key:<28} fetched {r.rows_fetched:>5}  "
+                      f"new {r.rows_new:>5}  "
+                      f"{fmt_ts(r.first_ts)} → {fmt_ts(r.last_ts)} UTC  "
+                      f"[{r.source}]")
+        return 0
+
+    rows = []
+    for series in store.list_series():
+        if series["symbol"] != symbol:
+            continue
+        df = store.read(series["exchange"], series["market"],
+                        series["symbol"], series["metric"])
+        if df.empty:
+            continue
+        rows.append({
+            "exchange": series["exchange"], "market": series["market"],
+            "metric": series["metric"], "count": len(df),
+            "first_ts": int(df["ts"].iloc[0]),
+            "last_ts": int(df["ts"].iloc[-1]),
+            "first": fmt_ts(int(df["ts"].iloc[0])),
+            "last": fmt_ts(int(df["ts"].iloc[-1])),
+            "last_value": float(df["value"].iloc[-1]),
+        })
+    if args.json:
+        print(json.dumps({"symbol": symbol, "root": str(store.root),
+                          "series": rows}, indent=2, default=str))
+    else:
+        if not rows:
+            print(f"cross: nothing stored for {symbol}")
+            print(f"  run:  python main.py cross collect --symbol {symbol}")
+            return 0
+        print(f"cross {symbol} — {len(rows)} series stored")
+        for r in rows:
+            print(f"  {r['exchange']:<8} {r['market']:<5} {r['metric']:<16} "
+                  f"{r['count']:>7,} rows  {r['first']} → {r['last']} UTC  "
+                  f"last={r['last_value']}")
+    return 0
+
+
 def cmd_mcp(args) -> int:
     """Run the Model Context Protocol server (stdio) for MCP clients."""
     from ai.mcp_server import run as mcp_run
@@ -1845,6 +1932,38 @@ def main(argv: list[str] | None = None) -> int:
     p_der_s.add_argument("--market", default="perp", choices=("perp",))
     p_der_s.add_argument("--json", action="store_true")
     p_der_s.set_defaults(func=cmd_derivatives)
+
+    p_cross = sub.add_parser(
+        "cross",
+        help="P10.7: collect/inspect cross-exchange premium/discount + funding spread")
+    cross_sub = p_cross.add_subparsers(dest="subcmd", required=True)
+    p_cross_c = cross_sub.add_parser(
+        "collect", help="persist the probe snapshot + derive Binance-vs-Bybit series")
+    p_cross_c.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH)")
+    p_cross_c.add_argument("--market", default="perp", choices=("spot", "perp"),
+                           help="candle-store market used for historical premium")
+    p_cross_c.add_argument("--tf", default="1m",
+                           help="candle timeframe used for historical premium")
+    p_cross_c.add_argument("--since", type=int, default=None,
+                           help="first record (UTC epoch ms)")
+    p_cross_c.add_argument("--until", type=int, default=None,
+                           help="last record (UTC epoch ms); default: now")
+    p_cross_c.add_argument("--sleep", type=float, default=0.2,
+                           help="seconds between Bybit funding pages")
+    p_cross_c.add_argument("--no-snapshot", action="store_true",
+                           help="skip the live/fake probe snapshot; derive only")
+    p_cross_c.add_argument("--dry-run", action="store_true",
+                           help="compute only; write nothing")
+    p_cross_c.add_argument("--root", default=None, help="CrossExchangeStore root (tests)")
+    p_cross_c.add_argument("--candle-root", default=None, help="CandleStore root override")
+    p_cross_c.add_argument("--deriv-root", default=None, help="DerivativesStore root override")
+    p_cross_c.add_argument("--json", action="store_true")
+    p_cross_c.set_defaults(func=cmd_cross)
+    p_cross_s = cross_sub.add_parser("status", help="what cross-exchange series are stored")
+    p_cross_s.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH)")
+    p_cross_s.add_argument("--root", default=None, help="CrossExchangeStore root (tests)")
+    p_cross_s.add_argument("--json", action="store_true")
+    p_cross_s.set_defaults(func=cmd_cross)
 
     p_st = sub.add_parser("store", help="inspect the P10 Parquet candle store (count/span/partitions)")
     p_st.add_argument("--exchange", default="binance")

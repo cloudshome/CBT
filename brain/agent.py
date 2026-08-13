@@ -75,62 +75,20 @@ def _probe_data(client) -> dict:
 
 # Public 15m-candle endpoints for the multi-exchange price cross-check
 # (BLUEPRINT: "multi-exchange price verification"). No keys required.
-_CROSS_EXCHANGES: dict[str, dict] = {
-    "kucoin": {
-        "url": "https://api.kucoin.com/api/v1/market/candles?type=15min&symbol={sym}",
-        "symbols": {"BTCUSDT": "BTC-USDT", "ETHUSDT": "ETH-USDT",
-                    "XAUUSD": "PAXG-USDT"},
-        # KuCoin returns candles newest-first:
-        # [time, open, close, high, low, volume, turnover].
-        "latest_idx": 0,
-        "close_idx": 2,
-    },
-    "okx": {
-        "url": "https://www.okx.com/api/v5/market/candles?instId={sym}&bar=15m&limit=1",
-        "symbols": {"BTCUSDT": "BTC-USDT", "ETHUSDT": "ETH-USDT",
-                    "XAUUSD": "PAXG-USDT"},
-        # OKX also returns newest-first: [ts, o, h, l, c, vol, ...].
-        "latest_idx": 0,
-        "close_idx": 4,
-    },
-}
+# The venue registry AND the probe live in data/cross_exchange.py (P10.7)
+# so health, preflight, and the stored series share one computation.
+from data.cross_exchange import VENUES as _CROSS_EXCHANGES  # noqa: F401
 
 
 def _cross_exchange_probe(binance_last: dict) -> dict:
-    """Best-effort price cross-check: Binance vs KuCoin + OKX (public APIs).
+    """Best-effort price cross-check: Binance vs KuCoin + OKX + Bybit.
 
-    Flags deviations > 1%. Every exchange call is wrapped — an unreachable
-    exchange degrades to a note instead of failing the health report.
+    Thin wrapper around ``data.cross_exchange.snapshot_prices`` — the
+    single probe. Health, preflight, and ``python main.py cross collect``
+    all call that function. Flags deviations > 1%.
     """
-    import requests
-    out = {"ok": True, "note": "multi-exchange cross-check (KuCoin + OKX public)",
-           "threshold_pct": 1.0, "exchanges": {}}
-    for name, cfg in _CROSS_EXCHANGES.items():
-        ex: dict = {"ok": False, "symbols": {}}
-        for our, theirs in cfg["symbols"].items():
-            last = binance_last.get(our)
-            if last is None:
-                continue
-            try:
-                resp = requests.get(cfg["url"].format(sym=theirs), timeout=6)
-                candles = (resp.json() or {}).get("data") or []
-                if not candles:
-                    ex["symbols"][our] = {"error": "no candles in response"}
-                    continue
-                price = float(candles[cfg["latest_idx"]][cfg["close_idx"]])
-                dev = round((price / last - 1.0) * 100.0, 3)
-                ex["symbols"][our] = {"price": round(price, 4),
-                                      "deviation_pct": dev,
-                                      "flag": abs(dev) > 1.0}
-                ex["ok"] = True
-            except Exception as exc:
-                ex["symbols"][our] = {"error": f"{type(exc).__name__}: {exc}"}
-        if not ex["symbols"]:
-            ex["note"] = "no symbols compared (no live Binance prices)"
-        out["exchanges"][name] = ex
-        if not ex["ok"]:
-            out["ok"] = False
-    return out
+    from data.cross_exchange import snapshot_prices
+    return snapshot_prices(binance_last)
 
 
 def health_report() -> dict:
