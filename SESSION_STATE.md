@@ -10,11 +10,13 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-13 (PR #13, part 2: P10.5 data-quality pillar shipped — fourth readiness pillar, corrupt data quarantines the desk)
+**Last updated:** 2026-08-13 (PR #13 merged — reconciliation + P10.5; P10.6 Bybit adapter goes out as PR #14)
 **Branch:** `arena/019ff9cf-sky`
 **HEAD commit:** see "Last commit" below
-**Default branch:** `main` @ `54fec5a` (PR #12 merged 2026-08-13: P10.2 hardening + P10.4)
-**PR:** [#13](https://github.com/Azimshawon/SKY/pull/13) — this branch → `main`.
+**Default branch:** `main` @ `21e22cd` (PR #13 merged 2026-08-13: reconciliation + P10.5)
+**PR:** [#14](https://github.com/Azimshawon/SKY/pull/14) — this branch → `main`.
+(PR #13 — reconciliation + P10.5 — was merged by the operator mid-session;
+P10.6 continues in its own PR, rebased onto the merge.)
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
 > **This session's decision — part 1: a parallel-session race, resolved
@@ -42,7 +44,21 @@
 > 1.4.0. 18 new offline tests, incl. the milestone's proof: corrupt
 > fixture written through the real store ⇒ quarantine ⇒ `ready: false`.
 > Suite **406 → 424 pass / 1 skip** (+18). Version **2.5.0 → 2.6.0**.
-> Next: P10.6 (Bybit adapter).
+> (Merged via PR #13.)
+>
+> **Part 3 (own PR #14): P10.6 — Bybit adapter.** Second venue behind
+> the same normalised schema: `data/bybit_client.py` implements the
+> exact `PageResult`/`klines_page` transport contract, so the hardened
+> backfill pages Bybit V5 identically to Binance — resumable,
+> idempotent, rate-limit aware. Venue quirks (V5 categories
+> `spot`/`linear`, V5 interval codes, newest-first rows, string
+> parsing, `retCode 10006 → 429`) stay inside the adapter. CLI:
+> `backfill --exchange bybit`. The milestone's proof — *identical
+> assertions pass for both adapters* — is
+> `tests/test_bybit.py::_assert_adapter_contract()` run against both
+> clients, plus 15 more offline tests. Suite **424 → 441 pass / 1
+> skip** (+17). Version **2.6.0 → 2.7.0**. Next: P10.7
+> (cross-exchange series).
 
 ---
 
@@ -65,16 +81,16 @@ plan (18 phases, 15-item rulebook) is in
 **Become a fully independent, consistently profitable trader.**
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
-(our own stored market history — 🔄 P10.1–P10.3 shipped). Every phase
+(our own stored market history — 🔄 P10.1–P10.6 shipped). Every phase
 below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P10 (data infrastructure + market terminal) — P10.1–P10.4 shipped;
+**P10 (data infrastructure + market terminal) — P10.1–P10.6 shipped;
 P10.2 hardened (2026-08-13).** P9 complete; P11 first grind shipped;
-graduation gate still closed. Open items: TODO-7, TODO-8; P10.5 → P10.12.
+graduation gate still closed. Open items: TODO-7, TODO-8; P10.7 → P10.12.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -98,7 +114,7 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-13 (this branch): PR #13 — reconciliation + P10.5 data-quality pillar
+### Session 2026-08-13 (this branch): PR #13 + PR #14 — reconciliation, P10.5 quality pillar, P10.6 Bybit adapter
 
 Branched from `main` @ `ee99486` (post-PR-#10, before PR #11/#12 landed).
 0 regressions. Tests **403 → 406 pass / 1 skip** (+3). Version unchanged
@@ -126,9 +142,12 @@ that parallel sessions had merged PR #11 (P10.2 + P10.3) and PR #12
 + 4-pillar strip), `mcp_server.py` (v1.4.0), `main.py` / `web/app.py`
 descriptions, `tests/test_quality.py` (new, 18 tests), pinned pillar-set
 assertions in `test_agent` / `test_web_api` / `test_mcp_stdio` /
-`test_channels` / `test_dashboard_js`; docs: `CHANGELOG.md` (v2.6.0),
-`config.py` + `pyproject.toml`, `docs/DATA_INFRASTRUCTURE_ROADMAP.md`,
-`TODO.md`, `README.md`, `SKILL.md`, `ARCHITECTURE.md`, this file.
+`test_channels` / `test_dashboard_js`; **P10.6:** `data/bybit_client.py`
+(new), `main.py` (`--exchange bybit`, repair routing, venue-neutral
+geo-block message in `data/backfill.py`), `tests/test_bybit.py` (new,
+17 tests); docs: `CHANGELOG.md` (v2.6.0 + v2.7.0), `config.py` +
+`pyproject.toml`, `docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `TODO.md`,
+`README.md`, `SKILL.md`, `ARCHITECTURE.md`, this file.
 
 ---
 
@@ -368,11 +387,12 @@ See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ## Currently working on
 
-PR #13 is open from `arena/019ff9cf-sky`: (1) reconciliation — main's
-P10.2-hardening/P10.3/P10.4 adopted, +3 edge-case tests; (2) **P10.5 —
-data-quality pillar** (`data/quality.py`, fourth readiness pillar,
-quarantine ⇒ `ready: false`). Nothing in flight after the PR. Next
-code session: **P10.6** (Bybit adapter).
+PR #14 is open from `arena/019ff9cf-sky` carrying **P10.6 — Bybit
+adapter** (`data/bybit_client.py`, `--exchange bybit`). PR #13
+(reconciliation + P10.5 data-quality pillar) was merged by the
+operator mid-session (squash, `main` @ `21e22cd`); this branch was
+reset onto that merge and re-applied P10.6 on top. Nothing in flight
+after PR #14. Next code session: **P10.7** (cross-exchange series).
 
 The paper book's **counts** are done (100/20 for every primary setup,
 38,439 decided samples) and the **journal loop** is done (compliance
@@ -402,8 +422,9 @@ reuse the existing cross-exchange probe; one-PR-per-session).
    0 paper samples because the simulator takes one paper sample per
    window — best plan only). Do **not** change the blueprint
    graduation criteria.
-2. **TODO-12 (P10)** — P10.1–P10.5 done; P10.2 hardened. Next:
-   **P10.6** (Bybit adapter behind the same normalised schema). Full plan:
+2. **TODO-12 (P10)** — P10.1–P10.6 done; P10.2 hardened. Next:
+   **P10.7** (cross-exchange premium/discount + funding spread as stored
+   series — generalise the existing `_cross_exchange_probe()`). Full plan:
    [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md)
    — it records which parts of the incoming plan were corrected and why.
 3. **TODO-7** — human pastes the wheel-gate job into the **real**
@@ -464,7 +485,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
     was being built on an older base. Lesson recorded here: **before
     finishing any session, `git fetch` + compare with `origin/main`**;
     if newer P10 work landed, merge and reconcile instead of shipping a
-    duplicate. PR #13 exists as that reconciliation.
+    duplicate. PR #13 was that reconciliation (merged).
 14. **Cross-exchange logic already exists** in
     `brain/agent.py:_cross_exchange_probe()` (KuCoin + OKX). P10.7
     generalises it into a stored series — do not write a second one.
@@ -473,11 +494,11 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-1. Next *code* session: **P10.6** — Bybit adapter behind the same
-   normalised schema (identical assertions for both adapters). Read the
-   roadmap first. **First step of every future session:** `git fetch`
-   and diff against `origin/main` — parallel sessions merge while you
-   work (see known problem 13); reconcile before building.
+1. Next *code* session: **P10.7** — cross-exchange
+   premium/discount + funding spread as stored series. Read the roadmap
+   first. **First step of every future session:** `git fetch` and diff
+   against `origin/main` — parallel sessions merge while you work (see
+   known problem 13); reconcile before building.
 2. A human does TODO-7 + TODO-8 from
    [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 3. Do **not** start Dify/LibreChat. Do not loosen the graduation bar.
@@ -485,14 +506,13 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md, branch arena/019ff9cf-sky.
-> PR #13 is open: parallel-session reconciliation (main's P10.2
-> hardening/P10.3/P10.4 adopted + 3 edge-case tests) AND P10.5 — the
-> fourth readiness pillar: per-series data quality (staleness, gaps,
-> price/volume sanity) from data/quality.py; corrupt data quarantines
-> the desk (ready: false). Implement P10.6 (Bybit adapter behind the
-> same schema) from docs/DATA_INFRASTRUCTURE_ROADMAP.md. Fetch and
-> diff origin/main first. No new agents/panels. Do not start Dify or
-> LibreChat.
+> PR #13 (reconciliation + P10.5 data-quality pillar) is MERGED.
+> PR #14 is open: P10.6 — Bybit V5 adapter behind the same schema
+> (backfill --exchange bybit). Implement P10.7 (cross-exchange
+> premium/discount + funding spread as stored series, generalising
+> _cross_exchange_probe) from docs/DATA_INFRASTRUCTURE_ROADMAP.md.
+> Fetch and diff origin/main first. No new agents/panels. Do not
+> start Dify or LibreChat.
 
 ---
 
@@ -501,7 +521,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 424 passed, 1 skipped
+# 441 passed, 1 skipped
 ```
 
 Readiness strip (four pillars since P10.5):
@@ -522,6 +542,7 @@ DEMO_MODE=1 .venv/bin/python main.py derivatives collect --symbol BTCUSDT
 DEMO_MODE=1 .venv/bin/python main.py derivatives status --symbol BTCUSDT
 # real data (operator's machine, Binance-reachable):
 python main.py backfill --symbol BTCUSDT --market perp --tf 1m --since 2019-09-08
+python main.py backfill --exchange bybit --symbol BTCUSDT --market perp --tf 1m
 python main.py derivatives collect --symbol BTCUSDT
 ```
 
@@ -557,7 +578,7 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ```
 see `git log --oneline -3` on arena/019ff9cf-sky
 (this session: merge origin/main (PR #11+#12) + reconciliation,
- then P10.5 data-quality pillar + docs)
+ then P10.5 data-quality pillar, then P10.6 Bybit adapter)
 ```
 
 ---
@@ -595,7 +616,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 424 pass / 1 skip.
+- Maintain test count at ≥ 441 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -613,7 +634,7 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 1. [x] Finish or safely stop the current task.
 2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 424 pass / 1 skip (406 previous bar).
+   ≥ 441 pass / 1 skip (424 previous bar).
 3. [x] Fix any obvious failures.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
 5. [x] Update `TODO.md` — mark finished items done, reprioritise.
@@ -623,4 +644,4 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
 11. [x] `git add` / `git commit` / `git push origin arena/019ff9cf-sky`.
-12. [x] Open the session PR as the closing step — **PR #13**.
+12. [x] Open the session PR as the closing step — **PR #14**.

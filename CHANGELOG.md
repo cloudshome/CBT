@@ -10,26 +10,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased] — PR #13 · branch `arena/019ff9cf-sky` (reconciliation, no version bump)
+## [Unreleased] — PR #14 · branch `arena/019ff9cf-sky`
 
-**Parallel-session reconciliation, not new features.** This session built
-its own P10.2 backfill on a base that predated PR #11 (P10.2 + P10.3)
-and PR #12 (P10.2 hardening + P10.4). On discovery, the repo rule won —
-never duplicate completed components — so this PR:
+**Two parts, two PRs.** (1) Parallel-session reconciliation: this
+session built its own P10.2 backfill on a base that predated PR #11
+(P10.2 + P10.3) and PR #12 (P10.2 hardening + P10.4); on discovery the
+repo rule won — never duplicate completed components — so PR #13
+(merged by the operator) adopts the reviewed implementation wholesale,
+keeping the session's genuinely new value as **3 edge-case tests** in
+`tests/test_backfill.py` (empty-first-page termination, start-past-end
+no-op, mid-history-hole termination without duplicates), and records
+the lesson for future sessions: **fetch and diff `origin/main` before
+finishing any session** — parallel Arena sessions merge while you work.
+(2) **P10.5** (v2.6.0) rode PR #13; **P10.6** (v2.7.0) goes out as
+PR #14 — see its entry below. Suite ends at **441 pass / 1 skip**.
 
-- merges `main` (PR #11 + #12) into the session branch and adopts the
-  reviewed implementation wholesale, discarding the parallel draft;
-- keeps the session's genuinely new value as **3 edge-case tests** in
-  `tests/test_backfill.py` (empty-first-page termination, start-past-end
-  no-op, mid-history-hole termination without duplicates — all pass
-  against the merged code);
-- reconciles `SESSION_STATE.md` / `TODO.md` / `ARCHITECTURE.md` and
-  records the lesson for future sessions: **fetch and diff `origin/main`
-  before finishing any session** — parallel Arena sessions merge while
-  you work.
+---
 
-Suite **403 → 406 pass / 1 skip** (+3). Version stays **2.5.0** — no
-runtime change.
+## [2.7.0] — 2026-08-13 · branch `arena/019ff9cf-sky`
+
+MINOR bump: **P10.6 — Bybit adapter behind the same normalised schema**.
+The second venue pages through the exact same backfill machinery: one
+`Candle` record, one meaning, regardless of exchange.
+
+### Added
+- **`data/bybit_client.py`** — read-only Bybit V5 public market-data
+  transport (no keys, ever):
+  - `klines_page()` implements the P10.2 `PageResult` contract
+    (data + HTTP status + headers), so the hardened backfill treats
+    Bybit pages identically to Binance pages — resumable, idempotent,
+    rate-limit aware, geo-block aware.
+  - Venue quirks stay at the boundary: V5 categories (`spot`/`linear`),
+    V5 interval codes (`1m→"1"` … `1d→"D"`), newest-first response rows
+    reversed to ascending `ts`, string rows parsed to float, `turnover`
+    carried as `quote_volume`, `retCode 10006` mapped to HTTP 429
+    (backoff engages), other non-zero retCodes to 400, HTTP 403/451
+    passed through for the backfill's immediate geo-block abort.
+  - XAUUSD has no Bybit perp → honest empty result (same rule as Binance).
+  - `klines()` convenience wrapper (with `market=`) so the `--repair`
+    path works unchanged.
+- **`main.py backfill`** — `--exchange binance|bybit`; live Bybit runs
+  route to `BybitClient`, DEMO_MODE stays on the offline demo fetcher
+  (synthetic series labelled with the requested exchange, same
+  convention the Binance demo already used).
+- **Tests** — `tests/test_bybit.py`: 17 offline tests. The milestone's
+  proof: `_assert_adapter_contract()` runs the **identical assertions**
+  against `BinanceClient` and `BybitClient` (page shape, ascending ts,
+  float OHLCV, perp/spot routing, status contract), plus V5-specific
+  parsing/routing tests, bybit series partition separation from
+  binance, idempotent re-run, and the offline CLI end-to-end.
+
+### Changed
+- `data/backfill.py` — geo-block message is venue-neutral ("the venue
+  blocked this request"); module history notes the transport is now an
+  interface (any `klines_page` client), not a class.
+- Suite: **424 → 441 pass / 1 skip** (+17), fully offline.
 
 ---
 

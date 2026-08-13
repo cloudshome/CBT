@@ -41,6 +41,7 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 | **Gap repair + rollups** (P10.3) | `python main.py backfill --repair --rollup` — detects holes in the stored 1m series, repairs them, and derives 5m/15m/1h/4h/1d from the 1m master so stored timeframes can never disagree. `data/gaps.py`. |
 | **Derivatives series** (P10.4) | `python main.py derivatives collect` — funding, open interest, mark, index and basis persisted as time series (resumable, idempotent); the old `liquidations()` 24h-stats proxy renamed honestly to `liquidation_stats_proxy()`. `data/derivatives.py`. |
 | **Data-quality pillar** (P10.5) | Fourth readiness pillar: per stored series, staleness (timeframe-scaled), gap fraction, price/volume sanity and ordering. A corrupt or unusably stale series is **quarantined** — `doctor --strip` / `/api/readiness` / MCP `readiness` all report the desk *not ready*, because the engine prefers silence to a signal built on corrupt data. `data/quality.py`. |
+| **Bybit adapter** (P10.6) | Second venue behind the same normalised schema: `python main.py backfill --exchange bybit` pages Bybit V5 klines (spot + linear perps) through the same resumable/idempotent/rate-limit-aware machinery; venue quirks (categories, intervals, newest-first rows, retCodes) never leak past the adapter. `data/bybit_client.py`. |
 | **Paper-trading runner** | Watches **approved** signals against live public Binance candles, simulates a planned entry, and auto-closes at SL / TP1. It records the outcome and R result — **never places a real exchange order**. |
 | **Self-improvement** | `python main.py learn` recomputes a per-setup calibration profile from backtest outcomes **plus decided paper trades** — boosts positive-expectancy plans, dampens (or filters) negative ones. |
 | **Coach (teaching)** | `python main.py coach` explains *why* the engine said what it said, mentors you through the top setup step-by-step, gives personal feedback on your own approvals/rejections, and ships a full trading glossary. |
@@ -133,6 +134,7 @@ python main.py mcp            # MCP server for Claude Desktop / Cursor (stdio)
 # P10 — own your market history (data/store/**, gitignored):
 python main.py backfill --symbol BTCUSDT --market perp --tf 1m   # full run, resumable
 python main.py backfill --symbol BTCUSDT --market perp --tf 1m   # re-run: adds 0 rows
+python main.py backfill --exchange bybit --market perp --tf 1m   # second venue, same store
 python main.py backfill --symbol BTCUSDT --market perp --tf 1m --repair --rollup  # gaps + 1m→higher TFs
 python main.py store --market perp --tf 1m                      # inspect the store
 python main.py derivatives collect --symbol BTCUSDT             # funding/OI/mark/index series

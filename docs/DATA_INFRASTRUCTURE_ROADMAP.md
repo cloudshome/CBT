@@ -1,11 +1,12 @@
 # DATA_INFRASTRUCTURE_ROADMAP.md — P10 · SKY Market Terminal
 
-> **Status:** in progress — **P10.1–P10.5 shipped** (P10.1–P10.3 on
-> 2026-08-12; P10.4 derivatives series + P10.2 hardening on 2026-08-13;
-> P10.5 data-quality pillar on 2026-08-13 — PR #13). The P10.2 backfill
-> pages the real perp endpoint and its rate-limit handling is
-> weight-header pacing + exponential backoff + geo-block abort.
-> Next: P10.6 (Bybit adapter).
+> **Status:** in progress — **P10.1–P10.6 shipped** (P10.1–P10.3 on
+> 2026-08-12; P10.4 derivatives series + P10.2 hardening + P10.5
+> data-quality pillar + P10.6 Bybit adapter on 2026-08-13 — PR #13 / PR #14).
+> The P10.2 backfill pages the real perp endpoint and its rate-limit
+> handling is weight-header pacing + exponential backoff + geo-block
+> abort.
+> Next: P10.7 (cross-exchange premium/discount + funding spread).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -377,7 +378,7 @@ documented state. Ordered by value-per-session, same as `TODO.md`.
 | **P10.3** | Gaps + aggregation | gap detector, repair, 1m→5m/15m/1h/4h/1d rollups | ✅ shipped — synthetic gaps detected+repaired; rollups match venue candles |
 | **P10.4** | Derivatives series | persist funding / OI / mark / index / basis over time | ✅ shipped — `data/derivatives.py` (store + collector + fake transport), `python main.py derivatives collect/status`; series queryable; `liquidations()` renamed honestly to `liquidation_stats_proxy()` |
 | **P10.5** | Quality pillar | per-source checks wired into `readiness_strip()` | ⏭ **next** — corrupt fixture ⇒ quarantine ⇒ no signal, proven by test |
-| **P10.6** | Bybit adapter | second exchange behind the same normalised schema | identical assertions pass for both adapters |
+| **P10.6** | Bybit adapter | second exchange behind the same normalised schema | ✅ shipped (2026-08-13, PR #14) — `data/bybit_client.py` behind the same `PageResult` contract; identical assertions pass for both adapters (17 tests) |
 | **P10.7** | Cross-exchange | generalise `_cross_exchange_probe()` into a stored series | premium/discount + funding spread queryable |
 | **P10.8** | Lightweight Charts | vendored chart replaces `chartSVG()`; price+volume pane | dashboard renders stored data; no new runtime dep |
 | **P10.9** | Futures panes | OI + funding + CVD panes | the view a retail chart cannot give us |

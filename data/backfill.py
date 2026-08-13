@@ -1,8 +1,8 @@
-"""data/backfill.py — P10.2: paginated, resumable, rate-limit-aware Binance backfill.
+"""data/backfill.py — P10.2: paginated, resumable, rate-limit-aware market-data backfill.
 
 The roadmap is ``docs/DATA_INFRASTRUCTURE_ROADMAP.md``; this is milestone
-**P10.2 (Binance backfill)**: page through exchange OHLCV history and upsert
-into the P10.1 Parquet store through ``CandleStore.write()`` /
+**P10.2 (market-data backfill)**: page through exchange OHLCV history and
+upsert into the P10.1 Parquet store through ``CandleStore.write()`` /
 ``normalise_klines()``.
 
 History: P10.2 first shipped on 2026-08-12 (PR #11) reusing
@@ -23,6 +23,11 @@ looks the way it does:
 3. **Forming candles never enter history.** A candle is closed only when
    ``ts + timeframe <= now``; the still-forming tail is skipped and picked
    up by the next run once closed (incremental top-up).
+4. **P10.6: the transport is an interface, not a class.** Any client with
+   a ``klines_page()`` returning ``PageResult(data, headers, status)``
+   pages through the same machinery — ``BybitClient`` (V5) ships behind
+   the identical contract; its pages simply carry no Binance weight
+   header, so header pacing no-ops and ``sleep_s`` pacing applies.
 
 Properties that are guaranteed by tests (all offline):
 
@@ -198,7 +203,7 @@ def _rate_limited_fetch(client: BinanceClient, symbol: str, timeframe: str,
             if status in (403, 451):
                 state.geo_blocked = True
                 raise BackfillError(
-                    f"Binance blocked this request (HTTP {status}) for "
+                    f"the venue blocked this request (HTTP {status}) for "
                     f"{symbol} {market} — geo-blocked network; nothing was written."
                 )
             if status in (429, 418):
@@ -235,7 +240,8 @@ def _fetch_for_client(client, symbol: str, timeframe: str, market: str, *,
                       page_limit: int, max_requests: int, backoff_attempts: int,
                       backoff_base: float, weight_min: int, weight_sleep: float,
                       low_weight_sleep: float) -> tuple[FetchFn, _RateLimitState]:
-    """Build the fetch for a transport: BinanceClient (hardened) or demo."""
+    """Build the fetch for a transport: any ``klines_page`` client
+    (BinanceClient, BybitClient, FakePagedTransport) or a demo transport."""
     if hasattr(client, "klines_page"):          # BinanceClient / FakePagedTransport
         return _rate_limited_fetch(
             client, symbol, timeframe, market, page_limit=page_limit,

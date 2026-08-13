@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-13 (TODO-12/P10 — **P10.1–P10.5 shipped**; P10.2 hardened; P10.5 quality pillar live in the readiness strip; next is P10.6)
+**Last updated:** 2026-08-13 (TODO-12/P10 — **P10.1–P10.6 shipped**; P10.2 hardened; P10.5 quality pillar live; P10.6 Bybit adapter live; next is P10.7)
 
 ---
 
@@ -21,7 +21,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 406 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 441 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -53,23 +53,23 @@ Anything that moves neither is out of scope.
 ## 🔥 Top priority — start here in the next session
 
 > **Order note (2026-08-13):** the active major milestone is **P10** and
-> P10.1–P10.5 are shipped. P10.2 was hardened (PR #12: real perp
+> P10.1–P10.6 are shipped. P10.2 was hardened (PR #12: real perp
 > endpoint, weight-header pacing, geo-block abort); P10.3 gaps/rollups
-> and P10.4 derivatives series shipped the same day. P10.5 (PR #13)
-> added the data-quality pillar to the readiness strip. The paper book
+> and P10.4 derivatives series shipped the same day; P10.5 (data-quality
+> pillar) shipped via PR #13 (merged); P10.6 (Bybit adapter) via PR #14. The paper book
 > (TODO-11) first-grind is done; what remains there is ongoing data
 > collection/grinding that can run alongside P10.
-> **P10.6 is the concrete next build below.**
+> **P10.7 is the concrete next build below.**
 
-### TODO-12 / P10.6 · Bybit adapter · the next P10 milestone
+### TODO-12 / P10.7 · Cross-exchange series · the next P10 milestone
 
-**P10.1–P10.5 are shipped.** Next: **P10.6 — Bybit adapter** behind the
-same normalised `Candle` schema: a Bybit klines transport (V5, spot +
-perps) with the same page/rate-limit/geo-block posture as the hardened
-Binance one, a deterministic offline fake, and identical assertions
-passing for both adapters (done when the same test battery runs against
-`exchange=bybit` series). Full plan:
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md`. Do not start P10.7 until P10.6
+**P10.1–P10.6 are shipped.** Next: **P10.7 — cross-exchange
+premium/discount + funding spread** as stored series: generalise the
+existing `brain/agent.py:_cross_exchange_probe()` (KuCoin + OKX live
+snapshot) into a stored per-timestamp series, and add the
+Binance-vs-Bybit premium/discount and funding spread now that both
+venues page through the same schema. Full plan:
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`. Do not start P10.8 until P10.7
 is green.
 
 ---
@@ -144,8 +144,8 @@ are shipped.** Do not start milestone N+1 until N is green.
 | P10.3 | Gap detection + repair + 1m→higher-TF aggregation | ✅ shipped (`data/gaps.py`) |
 | P10.4 | Derivatives as time series (funding / OI / mark / index / basis) | ✅ shipped (`data/derivatives.py`) |
 | P10.5 | Data-quality pillar wired into `readiness_strip()` | ✅ shipped (`data/quality.py`, fourth pillar; corrupt data ⇒ quarantine ⇒ `ready: false`) |
-| P10.6 | Bybit adapter behind the same schema | ⏭ **next** |
-| P10.7 | Cross-exchange premium/discount + funding spread | ⏳ |
+| P10.6 | Bybit adapter behind the same schema | ✅ shipped (`data/bybit_client.py`; `--exchange bybit`) |
+| P10.7 | Cross-exchange premium/discount + funding spread | ⏭ **next** |
 | P10.8 | Lightweight Charts replaces `chartSVG()` | ⏳ |
 | P10.9 | OI / funding / CVD panes | ⏳ |
 | P10.10 | WebSocket tier (live klines + liquidations) | ⏳ |

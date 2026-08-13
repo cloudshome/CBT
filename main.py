@@ -1025,14 +1025,15 @@ def cmd_desk(args) -> int:
 # posture.  They never place exchange orders; they only read.
 
 def cmd_backfill(args) -> int:
-    """P10.2/P10.3 — paginated REST backfill + optional gap repair / rollup.
+    """P10.2/P10.3/P10.6 — paginated REST backfill + optional gap repair / rollup.
 
     Resumable (re-runs continue at the last stored candle), idempotent
     (a completed re-run adds zero rows), rate-limit aware: paced pages
     (--sleep), exponential backoff on 429/network errors, weight-header
     pacing, geo-block abort, --max-requests cap. ``--market perp`` pages
-    the perp endpoint (``/fapi/v1/klines``) — spot candles are never
-    labelled ``market=perp``. ``DEMO_MODE=1`` uses SampleClient (offline).
+    the perp endpoint — spot candles are never labelled ``market=perp``.
+    ``--exchange bybit`` (P10.6) pages Bybit V5 klines behind the same
+    contract. ``DEMO_MODE=1`` uses the offline demo fetcher (offline).
     """
     from data.backfill import BackfillError, backfill, fmt_ts, parse_ts
     from data.gaps import detect_gaps, repair_gaps, rollup
@@ -1047,6 +1048,16 @@ def cmd_backfill(args) -> int:
         print(f"[!] {exc}", file=sys.stderr)
         return 2
 
+    # P10.6: --exchange bybit routes to the Bybit V5 transport behind the
+    # same klines_page contract. DEMO_MODE stays on the offline demo
+    # fetcher regardless of --exchange (synthetic data, labelled with the
+    # requested exchange — same convention the binance demo already uses).
+    client = None
+    demo = os.getenv("DEMO_MODE", "0") in ("1", "true", "yes")
+    if not demo and args.exchange == "bybit":
+        from data.bybit_client import BybitClient
+        client = BybitClient()
+
     try:
         result = backfill(
             store=store,
@@ -1054,6 +1065,7 @@ def cmd_backfill(args) -> int:
             timeframe=args.tf,
             exchange=args.exchange,
             market=args.market,
+            client=client,
             start_ts=start_ts,
             end_ts=end_ts,
             page_limit=args.page_limit,
@@ -1068,14 +1080,21 @@ def cmd_backfill(args) -> int:
 
     payload = result.as_dict()
     if args.repair:
-        from data.sample_client import maybe_client
-        client = maybe_client()
+        if client is not None:      # live BybitClient (its klines() has market)
+            def fetch(start_time=None, end_time=None, limit=1000):
+                return client.klines(
+                    _sym(args.symbol), args.tf, limit=limit,
+                    start_time=start_time, end_time=end_time,
+                    market=args.market)
+        else:                       # demo or live Binance
+            from data.sample_client import maybe_client
+            client = maybe_client()
 
-        def fetch(start_time=None, end_time=None, limit=1000):
-            return client.klines(
-                _sym(args.symbol), args.tf, limit=limit,
-                start_time=start_time, end_time=end_time,
-            )
+            def fetch(start_time=None, end_time=None, limit=1000):
+                return client.klines(
+                    _sym(args.symbol), args.tf, limit=limit,
+                    start_time=start_time, end_time=end_time,
+                )
 
         payload["repair"] = repair_gaps(
             store, fetch, exchange=args.exchange, market=args.market,
@@ -1770,9 +1789,10 @@ def main(argv: list[str] | None = None) -> int:
              "(resumable, rate-limit aware, idempotent)")
     p_bf.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH, XAU/GOLD)")
     p_bf.add_argument("--tf", default="1m")
-    p_bf.add_argument("--exchange", default="binance")
+    p_bf.add_argument("--exchange", default="binance", choices=("binance", "bybit"),
+                      help="venue to backfill (P10.6: bybit pages the V5 klines endpoint)")
     p_bf.add_argument("--market", default="perp", choices=("spot", "perp"),
-                      help="spot (/api/v3/klines) or perp (/fapi/v1/klines)")
+                      help="spot (/api/v3/klines or V5 spot) or perp (/fapi/v1/klines or V5 linear)")
     p_bf.add_argument("--start-ts", type=int, default=None,
                       help="inclusive candle OPEN (UTC epoch ms)")
     p_bf.add_argument("--end-ts", type=int, default=None,
