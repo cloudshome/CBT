@@ -10,23 +10,38 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-13 (PR #15 reconciles onto merged P10.6: F1–F8 decided; next code is P10.7)
-**Branch:** `arena/019ffa5d-sky`
+**Last updated:** 2026-08-13 (this session: Backtrader audited — BT1–BT8 decided; P12 definitions extended; next code is P10.7)
+**Branch:** `arena/019ffa8d-sky`
 **HEAD commit:** see "Last commit" below
-**Default branch:** `main` @ `e233580` (PR #14 merged: P10.6 Bybit adapter)
-**PR:** [#15](https://github.com/Azimshawon/SKY/pull/15) — this branch → `main`.
+**Default branch:** `main` @ `e462318` (PR #15 merged: Freqtrade F1–F8)
+**PR:** [#16](https://github.com/Azimshawon/SKY/pull/16) — this branch → `main`.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session (`arena/019ffa5d-sky`): Freqtrade recommendation
-> reviewed and rejected.** A ChatGPT audit proposed putting Freqtrade
-> under SKY as execution + backtest + strategy runtime, plus a Quant
-> Validation Engine. Compared to the live desk: SKY already *is* the
-> brain, the risk gate, and the R-expectancy loop. Adopting Freqtrade
-> would violate invariant #1 (never place an order) and A1 (one tested
-> edge). **The repo is not reset.** Decisions F1–F8 are in
-> `docs/FREQTRADE_REVIEW.md`. The useful ideas become **P12** on our
-> backtester after P10.11. P10.6 (Bybit) is now on `main` via PR #14.
-> Next *code* is **P10.7** (cross-exchange series).
+> **This session (`arena/019ffa8d-sky`): Backtrader recommendation
+> reviewed and rejected.** A ChatGPT audit proposed mining Backtrader
+> for research architecture (Cerebro→feeds→strategy→broker→analyzers),
+> putting it behind a swappable adapter, and upgrading expectancy /
+> walk-forward / Monte-Carlo / regime-matrix discipline. Compared to the
+> live desk: SKY already *is* the separated architecture, and the
+> honest validation ideas were already named **P12** by the Freqtrade
+> review. A reset was considered and refused a second time — adopting
+> Backtrader would contradict the note itself ("don't make it your
+> brain") and add a live-broker order surface invariant #1 forbids.
+> Decisions **BT1–BT8** are in `docs/BACKTRADER_REVIEW.md`: no
+> dependency / vendored engine / adapter (BT1), no Cerebro rewrite
+> (BT2), no second grader (BT3/BT7), no entry parameter-search (BT4),
+> P12 done-whens extended (BT5), sealed OOS confirmed (BT6), no reset
+> (BT8). Docs + contract tests only. Next *code* is still **P10.7**.
+>
+> **Prior session (`arena/019ffa5d-sky`, merged as PR #15): Freqtrade
+> recommendation reviewed and rejected.** A ChatGPT audit proposed
+> putting Freqtrade under SKY as execution + backtest + strategy
+> runtime, plus a Quant Validation Engine. Compared to the live desk:
+> SKY already *is* the brain, the risk gate, and the R-expectancy loop.
+> Adopting Freqtrade would violate invariant #1 (never place an order)
+> and A1 (one tested edge). **The repo is not reset.** Decisions F1–F8
+> are in `docs/FREQTRADE_REVIEW.md`. The useful ideas become **P12** on
+> our backtester after P10.11.
 >
 > **Prior session's decision — part 1: a parallel-session race, resolved
 > by reconciling instead of duplicating.** The session branched from
@@ -99,8 +114,8 @@ below is ordered by how directly it moves those two lines.
 
 **P10 (data infrastructure + market terminal) — P10.1–P10.6 shipped.**
 P9 complete; P11 first grind shipped; graduation gate still closed.
-Freqtrade rejected (F1–F8). Open items: TODO-7, TODO-8; P10.7 → P10.12;
-P12 parked until P10.11.
+Freqtrade rejected (F1–F8); Backtrader rejected (BT1–BT8). Open items:
+TODO-7, TODO-8; P10.7 → P10.12; P12 parked until P10.11.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -115,7 +130,7 @@ P12 parked until P10.11.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
 | **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1–P10.6 shipped**; next **P10.7** cross-exchange. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ⏸ After P10.11 | Walk-forward / lookahead / quality score / conditioned E — `docs/FREQTRADE_REVIEW.md` |
+| **P12** | **Quant Validation Engine** | ⏸ After P10.11 | Walk-forward / lookahead / scorecard / quality score / conditioned + net-of-costs E / risk-of-ruin — `docs/FREQTRADE_REVIEW.md` extended by `docs/BACKTRADER_REVIEW.md` |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -124,7 +139,54 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-13 (this branch `arena/019ffa5d-sky`): Freqtrade review · F1–F8 · reconciled onto P10.6
+### Session 2026-08-13 (this branch `arena/019ffa8d-sky`): Backtrader review · BT1–BT8 · P12 extended
+
+Branched from `main` @ `e462318` (PR #15 merged: Freqtrade F1–F8).
+0 regressions. Docs + contract tests only — **no runtime change**.
+Version **2.7.1 → 2.7.2**. Suite **445 → 449 pass / 1 skip** (+4).
+
+**What was reviewed:** a ChatGPT Backtrader audit (22 sections) —
+mine Backtrader as a research engine (Cerebro → feeds → strategy →
+broker → analyzers), put it behind a swappable adapter, standardise a
+`StrategyResult`, keep expectancy-in-R, net-of-costs, risk-veto,
+analyzers, MAE/MFE, regime matrices, walk-forward, sealed OOS,
+plateau-over-peak, Monte Carlo, risk-of-ruin, a strategy scorecard,
+and a P0–P4 priority list.
+
+**What was decided (see `docs/BACKTRADER_REVIEW.md`):**
+- **BT1/BT2/BT3 = No** — no `backtrader` dependency, adapter, vendored
+  engine; no Cerebro rewrite; no second grader (two fill semantics =
+  two truths).
+- **BT4 = No** — no entry parameter-search (consistent with F3).
+- **BT5/BT6 = Yes, into P12** — scorecard (P12.3), plateau test
+  (P12.4), net-of-costs funding-as-of-T (P12.6), risk-of-ruin table
+  (P12.7); sealed final OOS = P12.1.
+- **BT7 = Parked/never as a dependency** — second engine only as an
+  ad-hoc throwaway check, if our grader is ever doubted.
+- **BT8 = No** — the repo is not reset.
+
+**Why no reset (this time):** the note itself argues against embedding
+Backtrader ("don't make it your brain"), its §17 admits the missing
+crypto layer is data — which is exactly what P10 is building — and P10
+is mid-ladder with P11 grinding. A reset would contradict the
+recommendation *and* stall the aim. Two independent audits have now
+converged on the same plan: our grader, our store, P12 after P10.11.
+
+**Files changed:** `docs/BACKTRADER_REVIEW.md` (new); `TODO.md`
+(Backtrader out-of-scope; P12 definitions extended; next code still
+P10.7); `SESSION_STATE.md`; `ARCHITECTURE.md` (invariant #13 extended,
+version 2.7.2, baseline 449); `AI_ANATOMY_ROADMAP.md` (P12 names both
+reviews; out-of-scope + test count); `docs/DATA_INFRASTRUCTURE_ROADMAP.md`
+(P10.11 wording; out-of-scope); `docs/INFRASTRUCTURE_LAYERS.md`
+(Backtrader row; order-of-work); `PROFESSIONAL_PLAN_DECISIONS.md`
+(addendum 2); `BLUEPRINT.md` (backtester-ours line); `README.md`
+(both reviews in the quote block); `SKILL.md` (do-not list);
+`config.py` + `pyproject.toml` 2.7.2;
+`tests/test_handoff_memory.py` (+4 contract tests).
+
+---
+
+### Session 2026-08-13 (prior branch `arena/019ffa5d-sky`, merged as PR #15): Freqtrade review · F1–F8 · reconciled onto P10.6
 
 The operator merged PR #14 (P10.6 Bybit, `main` @ `e233580`) while
 PR #15 was open. This session merged `origin/main` and kept **both**
@@ -435,8 +497,9 @@ See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ## Currently working on
 
-PR #15 is open from `arena/019ffa5d-sky` carrying the Freqtrade
-keep/cut (F1–F8) reconciled onto merged P10.6. Nothing else is in
+PR #16 (from `arena/019ffa8d-sky`) carries the Backtrader
+keep/cut (BT1–BT8, `docs/BACKTRADER_REVIEW.md`) and the extended P12
+definitions, branched after PR #15 merged. Nothing else is in
 flight. Next *code* session: **P10.7** (cross-exchange series). Do
 not start P12, Dify, LibreChat, or a strategy-module catalog.
 
@@ -478,7 +541,8 @@ reuse the existing cross-exchange probe; one-PR-per-session).
 4. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
 5. **TODO-13 (P12)** — SKY Quant Validation Engine. Parked until
    P10.11. Do not start next session. Spec:
-   [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8.
+   [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended
+   by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.
 6. **TODO-9 / TODO-10** — Dify then LibreChat. Parked behind both the
    graduation gate *and* P10. Do not start next session.
 
@@ -542,6 +606,11 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
     that as a “quick win.” The keep/cut is
     `docs/FREQTRADE_REVIEW.md`. Contract-tested in
     `tests/test_handoff_memory.py`.
+16. **Backtrader was reviewed and rejected (BT1–BT8).** Same rule: no
+    dependency, dev tool, vendored engine, adapter, or second grader.
+    The keep/cut is `docs/BACKTRADER_REVIEW.md`, contract-tested in
+    `tests/test_handoff_memory.py`. P12's definitions were extended by
+    it (scorecard, plateau test, net-of-costs, risk-of-ruin table).
 
 ---
 
@@ -554,15 +623,17 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    known problem 13); reconcile before building.
 2. A human does TODO-7 + TODO-8 from
    [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-3. Do **not** start Dify/LibreChat/P12. Do not install Freqtrade.
-   Do not loosen the graduation bar. Do not add strategy modules.
+3. Do **not** start Dify/LibreChat/P12. Do not install Freqtrade or
+   Backtrader. Do not loosen the graduation bar. Do not add strategy
+   modules.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md, branch arena/019ffa5d-sky.
-> PR #14 (P10.6 Bybit) is MERGED. PR #15 recorded a Freqtrade
-> review and rejected the bot (F1–F8, docs/FREQTRADE_REVIEW.md).
-> Do not adopt Freqtrade / Hyperopt / FreqAI. Implement P10.7
+> Continue SKY from SESSION_STATE.md, branch arena/019ffa8d-sky.
+> PR #15 (Freqtrade review, F1–F8) is MERGED. This session's PR
+> records a Backtrader review and rejects a second backtest engine
+> (BT1–BT8, docs/BACKTRADER_REVIEW.md). Do not adopt Freqtrade /
+> Hyperopt / FreqAI / Backtrader. Implement P10.7
 > (cross-exchange premium/discount + funding spread as stored
 > series, generalising _cross_exchange_probe) from
 > docs/DATA_INFRASTRUCTURE_ROADMAP.md. Fetch and diff origin/main
@@ -576,7 +647,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 445 passed, 1 skipped
+# 449 passed, 1 skipped
 ```
 
 Readiness strip (four pillars since P10.5):
@@ -613,7 +684,7 @@ Local wheel-gate (build + dup-check, no install):
 
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.5.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.7.2-py3-none-any.whl ; no duplicate entries
 ```
 
 Readiness strip, all four surfaces:
@@ -631,8 +702,8 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-see `git log --oneline -3` on arena/019ffa5d-sky
-(this session: merge origin/main / PR #14 P10.6 + Freqtrade F1–F8)
+see `git log --oneline -3` on arena/019ffa8d-sky
+(this session: Backtrader BT1–BT8 recorded; P12 definitions extended)
 ```
 
 ---
@@ -641,7 +712,7 @@ see `git log --oneline -3` on arena/019ffa5d-sky
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ffa5d-sky.
+github.com/Azimshawon/SKY, branch arena/019ffa8d-sky.
 
 First, inspect the GitHub repository before making changes:
 - git fetch origin, and diff your branch against origin/main —
@@ -655,6 +726,7 @@ Read in this order:
 5. README.md                (user-facing overview)
 6. ROADMAP_AGENT_REACH_UPGRADE.md  (the P7/P8/P9 plan + D1–D5 decisions)
 7. docs/FREQTRADE_REVIEW.md        (F1–F8 — do not install a bot)
+8. docs/BACKTRADER_REVIEW.md       (BT1–BT8 — do not add a second grader)
 
 Then inspect the relevant source files and tests.
 
@@ -671,7 +743,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 445 pass / 1 skip.
+- Maintain test count at ≥ 449 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -689,7 +761,7 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 1. [x] Finish or safely stop the current task.
 2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 445 pass / 1 skip (441 previous bar).
+   ≥ 449 pass / 1 skip (445 previous bar).
 3. [x] Fix any obvious failures.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
 5. [x] Update `TODO.md` — mark finished items done, reprioritise.
@@ -698,5 +770,5 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` / `git push origin arena/019ffa5d-sky`.
-12. [x] Open the session PR as the closing step — **PR #15**.
+11. [x] `git add` / `git commit` / `git push origin arena/019ffa8d-sky`.
+12. [x] Open the session PR as the closing step (see "Currently working on").

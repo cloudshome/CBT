@@ -2,7 +2,7 @@
 
 ```
 Progress: [████████████████████████████████████████] 100% (Phases P1–P6 Complete)
-Tests:    428 passed / 1 skip (offline, DEMO_MODE=1)
+Tests:    449 passed / 1 skip (offline, DEMO_MODE=1)
 Status:   Production-Ready Institutional Desk & Autonomous Architecture
 Note:     This repo consolidates Cloudslover/AI + cloudshome/AI (see MERGE_NOTES.md)
 ```
@@ -208,7 +208,7 @@ can reach past one API response.
 |---|---|---|:---:|
 | **P11** | **Paper-book proof** | First grind shipped (38,439 decided; 100/20 on all four primary setups; compliance 100%; sell-R bug fixed). Graduation gate **honestly CLOSED** (+0.263R / 34.1% / PF 1.40). Keep grinding live data; do not move the bar. | 🔄 In progress |
 | **P10** | **Data infrastructure + market terminal** | P10.1–P10.6 shipped (schema, Binance backfill, gaps/rollups, derivatives series, quality pillar, Bybit adapter). Next: **P10.7 cross-exchange**. Then charts / WS / store-backed backtest / feature store. | 🔄 In progress — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **SKY Quant Validation Engine** | Walk-forward / OOS / lookahead / R-report / quality score / strategy score / funding-OI-CVD-conditioned expectancy / MC ruin — on **our** backtester + **our** store. Starts after P10.11. | ⏸ After P10.11 — [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8 |
+| **P12** | **SKY Quant Validation Engine** | Walk-forward / OOS / lookahead / boxed scorecard / quality score / strategy score / conditioned + net-of-costs expectancy / MC ruin + risk-of-ruin table — on **our** backtester + **our** store. Starts after P10.11. | ⏸ After P10.11 — [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8 |
 
 **P11 runs alongside P10.** The first grind is done; the gate is still
 closed on the blueprint bar. Do not let the data project become a
@@ -218,16 +218,19 @@ reason to stop proving the edge, and do not loosen the bar.
 rose, OI rose, funding was negative, and CVD was positive?"* answered
 with a number computed from our own stored data (P10.12 + P12.6).
 
-**P12 is not Freqtrade.** A 2026-08-13 review rejected Freqtrade /
-Hyperopt / FreqAI as a SKY dependency (F1–F3). The useful research-
-integrity ideas from that note *are* P12, built on `data/backtester.py`.
+**P12 is not Freqtrade, and it is not Backtrader.** A 2026-08-13
+review rejected Freqtrade / Hyperopt / FreqAI as a SKY dependency
+(F1–F3); a second same-day review rejected Backtrader as dependency,
+adapter, or second grader (BT1–BT4, BT7). The useful research-
+integrity ideas from both notes *are* P12, built on
+`data/backtester.py` and the P10 store.
 
 **Out of scope for P10 (deliberate):** exchange trading credentials or
 signed endpoints (forever — a collector that can authenticate is a
 collector that can trade), paid data vendors, PostgreSQL/Redis/Docker/
 FastAPI/React (SKY stays single-process with five runtime deps —
 see roadmap §1), alt-coins beyond BTC then ETH, **Freqtrade / any
-exchange-order bot**.
+exchange-order bot**, **Backtrader / any second backtest engine**.
 
 **Full planning document:** [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md)
 — includes honest alignment check, per-phase risk + rollback,

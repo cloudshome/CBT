@@ -1,15 +1,15 @@
 # Infrastructure layers — what matters for SKY
 
-> **Purpose:** distill the OpenHands / Dify / LibreChat / Freqtrade
-> discussion into *this* repository's terms. Read once. Do not
-> re-derive next session.
+> **Purpose:** distill the OpenHands / Dify / LibreChat / Freqtrade /
+> Backtrader discussion into *this* repository's terms. Read once. Do
+> not re-derive next session.
 > **Last updated:** 2026-08-13
 
 **One rule:** these projects are **not** dependencies of SKY and
 must never be vendored, forked-into, or `pip install`ed here.
 
-They are *layers around* SKY — or, in Freqtrade's case, a *different
-product* we are not becoming:
+They are *layers around* SKY — or, in Freqtrade's and Backtrader's
+case, a *different product* we are not becoming:
 
 | Layer | Project | Role for SKY | When |
 |---|---|---|---|
@@ -18,6 +18,7 @@ product* we are not becoming:
 | Knowledge / research | Dify | RAG + research workflows *around* the engine | After graduation *and* P10 |
 | Chat UI | LibreChat | Human control panel | After Dify |
 | Trading bot | **Freqtrade** | None. SKY is the brain; Freqtrade places orders | **Never** — see `docs/FREQTRADE_REVIEW.md` |
+| Research backtester | **Backtrader** | None as a dependency. Its discipline (expectancy, WF/OOS, MC, regime matrix) is already P12 on our grader | **Never** — see `docs/BACKTRADER_REVIEW.md` (BT1–BT8) |
 
 Persistent memory is **this GitHub repo** (commits + `SESSION_STATE.md`
 + `TODO.md` + tests). Nothing else "hacks" an Arena session limit.
@@ -64,10 +65,11 @@ cover that job. A sixth agent that writes code is Arena itself.
 NOW     P10.7 → P10.12 · Own the data (cross-exchange, charts, WS, store-backed backtest)
 ALONG   P11 · Prove the edge (simulator / paper / graduation gate) — do not move the bar
 THEN    P12 · SKY Quant Validation Engine on OUR backtester + OUR store
-              (walk-forward / lookahead / quality score / conditioned expectancy)
+              (walk-forward / lookahead / quality score / conditioned + net-of-costs
+               expectancy / risk-of-ruin — per both review docs)
 AFTER   Dify as a *separate* research layer (never imported by the engine)
 LAST    LibreChat-style chat UI, if the dashboard is not enough
-NEVER   Freqtrade / Hyperopt / FreqAI / signed order APIs
+NEVER   Freqtrade / Hyperopt / FreqAI / Backtrader / signed order APIs
 ```
 
 Promotion to Dify requires the existing graduation gate

@@ -48,10 +48,12 @@ ALONG    P11 · prove the paper book (counts done; gate still closed)
            ↓  do not loosen the bar
 THEN     P12 · SKY Quant Validation Engine
            (walk-forward / OOS / lookahead / quality score /
-            funding-OI-CVD-conditioned expectancy)
-           ↓  see docs/FREQTRADE_REVIEW.md §8
+            funding-OI-CVD-conditioned + net-of-costs expectancy /
+            risk-of-ruin table)
+           ↓  see docs/FREQTRADE_REVIEW.md §8 + docs/BACKTRADER_REVIEW.md §8
 PARKED   Dify (TODO-9) → LibreChat (TODO-10), after graduation
-NEVER    Freqtrade / Hyperopt / FreqAI — not our backtester, not our runtime
+NEVER    Freqtrade / Hyperopt / FreqAI / Backtrader — not our backtester,
+         not our runtime, not an adapter
 ```
 
 **P11 still runs alongside P10.** The first grind shipped (counts
@@ -393,9 +395,11 @@ perform when price rose, OI rose, funding was negative, and CVD was
 positive?"* and get a number computed from our own stored data.
 
 That question is answered by **P10.12 + P12**, on **our** grader
-(`data/backtester.py`), not by importing Freqtrade. A 2026-08-13
-review (`docs/FREQTRADE_REVIEW.md`, F1/F2) rejected Freqtrade as
-backtester, strategy runtime, and execution layer. P10.11 still
+(`data/backtester.py`), not by importing Freqtrade or Backtrader. Two
+2026-08-13 reviews rejected both: `docs/FREQTRADE_REVIEW.md` (F1/F2 —
+backtester, strategy runtime, execution layer) and
+`docs/BACKTRADER_REVIEW.md` (BT1–BT3, BT7 — dependency, dev tool,
+vendored engine, adapter, second grader). P10.11 still
 means: point *this* backtester at *this* Parquet store.
 
 ---
@@ -422,6 +426,9 @@ means: point *this* backtester at *this* Parquet store.
 - **Freqtrade, Hyperopt, FreqAI, or any exchange-order bot** — reviewed
   and rejected (F1–F3 in `docs/FREQTRADE_REVIEW.md`). P10.11 is our
   grader reading our store, not a Freqtrade strategy runtime.
+- **Backtrader — dependency, vendored engine, or adapter** — reviewed
+  and rejected (BT1–BT3, BT7 in `docs/BACKTRADER_REVIEW.md`). Two fill
+  semantics would be two truths; there is one grader and it is ours.
 - PostgreSQL, Redis, Docker, FastAPI, React/Next.js — see §1.
 - Changing the trading strategy or the risk gate. P10 changes *inputs*.
 - Alt-coin expansion. BTC first, ETH second, nothing else.

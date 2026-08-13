@@ -52,11 +52,16 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 ---
 
 > **SKY is the brain. SKY is not a trading bot.** We do not use
-> Freqtrade (or any exchange-order framework). The machine proposes,
-> the human approves, the paper-runner simulates. A 2026-08-13 review
-> of “put Freqtrade under SKY” is in
-> [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) — rejected.
-> Next code is still owning our market data (P10), not installing a bot.
+> Freqtrade (or any exchange-order framework), and we do not run our
+> backtests on Backtrader either — the grader is `data/backtester.py`.
+> The machine proposes, the human approves, the paper-runner simulates.
+> Two 2026-08-13 reviews — “put Freqtrade under SKY” and “mine
+> Backtrader as research architecture” — are in
+> [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) (F1–F8) and
+> [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) (BT1–BT8):
+> both external engines rejected, their research-integrity ideas kept
+> as **P12** on our own stack. Next code is still owning our market
+> data (P10), not installing a bot or a second backtest engine.
 
 ## 🏗 Architecture
 

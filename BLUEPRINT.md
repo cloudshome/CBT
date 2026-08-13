@@ -125,6 +125,9 @@ Sweep a fixed portion of profits (e.g. 50%) into long-term spot reserves:
 > exchange-order framework). Paper-only until the graduation gate.
 > If live micro ever happens, it is a SKY-owned thin adapter — never
 > a third-party strategy runtime. See `docs/FREQTRADE_REVIEW.md`.
+> **The backtester is ours too** — `data/backtester.py`, not Backtrader
+> (dependency/adapter/second-grader rejected; see
+> `docs/BACKTRADER_REVIEW.md`, BT1–BT8).
 
 ## 🛡️ The 5 Golden Rules of the Trading Brain
 

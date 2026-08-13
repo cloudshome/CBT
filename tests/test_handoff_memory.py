@@ -135,3 +135,44 @@ def test_data_roadmap_rejects_freqtrade_as_backtester():
     ).lower()
     assert "freqtrade" in text
     assert "p10.11" in text
+
+
+def test_backtrader_review_exists_and_records_bt_decisions():
+    """BT1–BT8 must survive session death. Do not install a second grader."""
+    doc = ROOT / "docs" / "BACKTRADER_REVIEW.md"
+    assert doc.exists(), "docs/BACKTRADER_REVIEW.md missing — see BT1–BT8"
+    text = doc.read_text(encoding="utf-8")
+    lower = text.lower()
+    for needle in ("BT1", "BT2", "BT3", "BT4", "BT5", "BT6", "BT7", "BT8"):
+        assert needle in text, f"Backtrader review must keep decision {needle}"
+    assert "backtrader" in lower
+    assert "cerebro" in lower, "the proposed object model must stay named"
+    assert "no." in lower or "rejected" in lower
+    assert "p12" in lower, "the kept ideas must stay named as P12"
+
+
+def test_todo_forbids_backtrader_and_names_p12():
+    text = (ROOT / "TODO.md").read_text(encoding="utf-8")
+    assert "BACKTRADER_REVIEW.md" in text
+    lower = text.lower()
+    assert "backtrader" in lower
+    # out-of-scope list must name it so it is not re-added
+    scope = text.split("Explicitly out of scope", 1)[-1]
+    assert "backtrader" in scope.lower()
+
+
+def test_architecture_and_layers_reject_backtrader():
+    arch = (ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").lower()
+    assert "backtrader" in arch
+    layers = (ROOT / "docs" / "INFRASTRUCTURE_LAYERS.md").read_text(
+        encoding="utf-8"
+    ).lower()
+    assert "backtrader" in layers
+
+
+def test_p12_roadmap_mentions_both_reviews():
+    """P12 is defined by the Freqtrade review AND extended by the
+    Backtrader review — the roadmap must keep naming both."""
+    anatomy = (ROOT / "AI_ANATOMY_ROADMAP.md").read_text(encoding="utf-8")
+    assert "FREQTRADE_REVIEW.md" in anatomy
+    assert "BACKTRADER_REVIEW.md" in anatomy

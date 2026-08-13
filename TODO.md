@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-13 (PR #15 reconciles onto merged P10.6: Freqtrade F1–F8 recorded, P12 named; **P10.1–P10.6 shipped**; next *code* is P10.7)
+**Last updated:** 2026-08-13 (this session: Backtrader recommendation reviewed — BT1–BT8 decided, no dependency, no reset; P12 definitions confirmed + extended; next *code* is still P10.7)
 
 ---
 
@@ -46,22 +46,25 @@ Independence has two halves. SKY currently owns one of them:
 | **Data independence** | Our own stored market history | 🔄 **P10** (P10.1–P10.6 shipped; P10.7 next) |
 
 Everything below is ordered by how directly it moves those two lines.
-Anything that moves neither is out of scope. A 2026-08-13 audit of a
-“put Freqtrade under SKY” recommendation is in
-[`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) — **F1–F8 are
-decided**. Do not reopen them to install a bot.
+Anything that moves neither is out of scope. Two 2026-08-13 audits are
+recorded and **decided**: the Freqtrade audit
+([`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md), **F1–F8**) and
+the Backtrader audit
+([`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md), **BT1–BT8**).
+Do not reopen them to install a bot or a second backtest engine.
 
 ---
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-13, this session):** the operator merged PR #14
-> (P10.6 Bybit) while PR #15 (Freqtrade review) was open. This file
-> now holds **both**. Verdict on the bot: **do not adopt Freqtrade,
-> Hyperopt, or FreqAI** (F1–F3). The useful ideas become **TODO-13 /
-> P12** on *our* backtester, after P10.11. The active major milestone
-> is still **P10**. **P10.1–P10.6 are shipped.** The paper book
-> (TODO-11) first-grind is done; grind continues alongside.
+> **Order note (2026-08-13, this session):** PR #15 (Freqtrade review,
+> F1–F8) is **merged**. This session reviewed the companion **Backtrader**
+> audit and recorded BT1–BT8: **do not adopt Backtrader** as dependency,
+> dev tool, vendored engine, or adapter; its good ideas were already
+> ours or already named **TODO-13 / P12** (definitions extended). A
+> reset was considered and refused a second time. The active major
+> milestone is still **P10**. **P10.1–P10.6 are shipped.** The paper
+> book (TODO-11) first-grind is done; grind continues alongside.
 > **P10.7 is the concrete next *code* build below.**
 
 ### TODO-12 / P10.7 · Cross-exchange series · the next P10 milestone
@@ -223,10 +226,13 @@ data moves the aim; wrapping the engine in another chat UI does not.
 
 ### TODO-13 · P12 · SKY Quant Validation Engine · AFTER P10.11
 
-📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8.**
+📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8,
+extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.**
 
-This is the only part of the Freqtrade note worth building — and we
-build it **on our grader + our store**, not on a bot.
+This is the part of both external audits worth building — and we build
+it **on our grader + our store**, not on a bot and not on Backtrader.
+The Backtrader audit (BT5) confirmed all seven milestones and extended
+four done-whens (marked `+`).
 
 Do **not** start until P10.11 is green (backtester reads Parquet).
 Years of locked train/val/OOS windows are impossible on a 500-candle
@@ -234,16 +240,18 @@ fetch. Do **not** let this jump the queue ahead of P10.7.
 
 | # | Milestone | Done when |
 |---|---|---|
-| P12.1 | Locked walk-forward protocol (train / val / OOS / recent) | A setup cannot “pass” on the training window alone |
+| P12.1 | Locked walk-forward protocol (train / val / OOS / recent) | A setup cannot “pass” on the training window alone; the final OOS set is sealed (`+` BT6) |
 | P12.2 | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form |
-| P12.3 | Single boxed R-report (long/short, regime, session) | One command, one block; most math already in `stats` |
-| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low |
-| P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` |
-| P12.6 | Conditioned expectancy (OI / funding / CVD / regime) | The original P10/P12 question, answered from our store |
-| P12.7 | MC ruin / worst streak / recovery | Graduation can see survivability, not just mean E |
+| P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) |
+| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) |
+| P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) |
+| P12.6 | Conditioned + net-of-costs expectancy | OI / funding / CVD / regime from our store **and** `E_net = E_gross − fees − slip − funding` with funding joined as-of-T (`+` BT5) |
+| P12.7 | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) |
 
-**Not in P12:** Hyperopt, FreqAI, a strategy-module catalog, auto
-capital allocation (F7 — parked until graduation + >1 proven edge).
+**Not in P12:** Hyperopt, FreqAI, Backtrader optimization or a second
+backtest engine (BT4/BT7), ML direction-prediction, a strategy-module
+catalog, auto capital allocation (F7 — parked until graduation + >1
+proven edge).
 
 ### TODO-9 · Dify as a *separate* research layer · AFTER graduation + P10
 
@@ -258,7 +266,33 @@ multi-model chat panel is still wanted after Dify.
 
 ---
 
-## ✅ Done this session (2026-08-13 · `arena/019ffa5d-sky`)
+## ✅ Done this session (2026-08-13 · `arena/019ffa8d-sky`)
+
+### Backtrader recommendation reviewed · BT1–BT8 decided · no reset
+
+A ChatGPT Backtrader audit (mine it as a research engine; separate
+data / signal / risk / execution / performance; expectancy + costs +
+regime matrices + walk-forward + Monte Carlo + risk of ruin; adapter,
+never fork) was compared to the live SKY desk. **The repo is not
+rebuilt.** SKY already implements the separation, the R-expectancy
+loop, the risk veto, MAE/MFE, Monte Carlo and regime-tagged grading;
+the remaining good ideas were already named **P12** by the Freqtrade
+review, and this audit's additions just extended them.
+
+**Kept (into P12, after P10.11):** boxed strategy scorecard with
+Sharpe/Sortino + session/L-S (P12.3), parameter-plateau test (P12.4),
+net-of-costs `E_net` with funding-as-of-T (P12.6), risk-of-ruin table
+on the MC resampler (P12.7). **Rejected:** the `backtrader` dependency
+(runtime/dev/adapter — BT1), a Cerebro rewrite (BT2), second grader
+(BT3/BT7), entry parameter-search (BT4), repo reset (BT8).
+
+Load-bearing doc: `docs/BACKTRADER_REVIEW.md`. Next *code* is still
+**P10.7**. Version **2.7.1 → 2.7.2**. Suite 445 → **449 pass / 1 skip**
+(+4 contract tests).
+
+---
+
+## ✅ Done in a prior session (2026-08-13 · `arena/019ffa5d-sky`)
 
 ### Freqtrade recommendation reviewed · F1–F8 decided · no reset
 
@@ -353,9 +387,9 @@ One readiness verdict across channels + immune system + risk gate
 | TODO-7 | Paste the wheel-gate job into the real `.github/workflows/ci.yml` | human |
 | TODO-8 | Protect `main` (require PR, no direct push) | human / recommend yes |
 
-D1–D5 and **F1–F8** are already recorded. Do **not** start
-TODO-9/TODO-10/TODO-13 this session. Do **not** reopen F1–F3 to
-install a trading bot.
+D1–D5, **F1–F8** and **BT1–BT8** are already recorded. Do **not**
+start TODO-9/TODO-10/TODO-13 this session. Do **not** reopen F1–F3 or
+BT1–BT4 to install a trading bot or a second backtest engine.
 
 ---
 
@@ -393,6 +427,13 @@ install a trading bot.
   vendor it, do not write `execution/freqtrade_adapter.py`. SKY is
   the brain; the strategy runtime is `engine/rules.py`; the
   backtester is `data/backtester.py`.
+- **Backtrader — as dependency, dev tool, vendored engine, or
+  adapter.** Reviewed 2026-08-13 and rejected (BT1–BT8 in
+  `docs/BACKTRADER_REVIEW.md`). Do not `pip install backtrader`; do
+  not re-express plans as Cerebro strategies; do not add a second
+  backtest engine "for cross-validation" (two fill semantics = two
+  truths). The audit's good ideas are already ours or named P12 on
+  *our* grader.
 - **A new catalog of strategy modules** (trend / mean-reversion /
   momentum / …) before the primary family clears the graduation bar
   (F4). A1 stands: `sweep_trend_continuation` only.

@@ -10,7 +10,7 @@
 **Last updated:** 2026-08-13
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.7.1` (also `pyproject.toml`).
+**Version:** `config.VERSION` = `2.7.2` (also `pyproject.toml`).
 
 ---
 
@@ -33,6 +33,7 @@
 | `MERGE_NOTES.md` | Provenance of the Cloudslover + cloudshome merge |
 | `AI_ANATOMY_ROADMAP.md` | Live status of P1–P12 |
 | `docs/FREQTRADE_REVIEW.md` | **F1–F8** — Freqtrade rejected; P12 is our validation engine |
+| `docs/BACKTRADER_REVIEW.md` | **BT1–BT8** — Backtrader rejected as dependency/grader; P12 definitions extended |
 
 ### `brain/` — the desk brain
 | Module | Purpose | Used by |
@@ -108,7 +109,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 47 test modules, 445 pass / 1 skip
+### `tests/` — 47 test modules, 449 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
@@ -124,8 +125,9 @@
 - `agent_install.md` — **NEW (P7)** the one-pager an agent fetches when
   told "install CryptoBrain."
 - `INFRASTRUCTURE_LAYERS.md` — OpenHands / Dify / LibreChat / **Freqtrade**
-  vs SKY. Study only; never vendor. Freqtrade never. Dify after
-  graduation *and* P10; LibreChat last.
+  / **Backtrader** vs SKY. Study only; never vendor. Freqtrade never;
+  Backtrader never (not even as an “optional research engine”). Dify
+  after graduation *and* P10; LibreChat last.
 - `DATA_INFRASTRUCTURE_ROADMAP.md` — **P10**, the next major
   milestone: own the market data (normalised schema → Parquet store →
   Binance/Bybit backfill (✅ P10.6) → derivatives series → quality pillar (✅ P10.5) →
@@ -134,6 +136,11 @@
 - `FREQTRADE_REVIEW.md` — 2026-08-13 audit of a “use Freqtrade as
   the execution + backtest layer” recommendation. Verdict: reject the
   bot, keep the research-integrity ideas as P12 on our stack.
+- `BACKTRADER_REVIEW.md` — 2026-08-13 audit of a “mine Backtrader as
+  research architecture / put it behind an adapter” recommendation.
+  Verdict: reject the dependency and the second grader; the good
+  ideas were already ours or already P12 — definitions extended
+  (BT1–BT8).
 - `wheel-gate-job.yml` — job spec a human pastes into
   `.github/workflows/ci.yml` (TODO-7).
 
@@ -174,7 +181,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 445 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 449 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -215,7 +222,11 @@
 
 13. **SKY is the brain. SKY is not a trading bot.** Do not add
     Freqtrade, Hyperopt, FreqAI, or any exchange-order framework
-    (`docs/FREQTRADE_REVIEW.md`, F1–F3). The strategy runtime is
+    (`docs/FREQTRADE_REVIEW.md`, F1–F3). **SKY is also not a
+    Backtrader host.** Do not add `backtrader` — dependency, dev
+    tool, vendored copy, or adapter — and do not add a second
+    backtest engine “for cross-validation”
+    (`docs/BACKTRADER_REVIEW.md`, BT1–BT4/BT7). The strategy runtime is
     `engine/rules.py` + `engine/signal_engine.py`. The backtester is
     `data/backtester.py`. Live execution, if it ever exists, is a
     SKY-owned thin adapter *after* the graduation gate — never a
@@ -313,5 +324,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **445 pass, 1 skip**. Any new feature must
+The expected baseline is **449 pass, 1 skip**. Any new feature must
 maintain or increase this count.

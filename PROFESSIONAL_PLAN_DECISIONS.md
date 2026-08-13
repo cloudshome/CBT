@@ -11,6 +11,16 @@ This file is the historical decision list — do not re-litigate it.
 > **F1–F8** live in [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md).
 > A1 (one primary family) and the “never place an exchange order”
 > invariant still win. Do not install a bot to “finish” this document.
+>
+> **2026-08-13 addendum 2.** A companion recommendation to mine
+> **Backtrader** as research architecture and dock it behind an adapter
+> was reviewed the same way. **Rejected as a dependency, vendored
+> engine, or adaptor.** Decisions **BT1–BT8** live in
+> [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md). The audit's
+> research discipline (expectancy, walk-forward/OOS, regime matrix,
+> Monte Carlo, risk of ruin) was already this document's own demand
+> (A6/B10 + the graduation bar) — its new details extended P12's
+> done-whens. Our grader stays `data/backtester.py`.
 
 ---
 

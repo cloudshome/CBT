@@ -10,6 +10,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.7.2] — 2026-08-13 · branch `arena/019ffa8d-sky`
+
+PATCH bump: **Backtrader recommendation reviewed and rejected**.
+Docs + contract tests only. No engine, risk-gate, or strategy
+behaviour change. The desk is not rebuilt around a third-party
+backtester, and the repo is not reset (considered, refused — second
+time in a day).
+
+### Added
+- **`docs/BACKTRADER_REVIEW.md`** — keep/cut of a 22-section ChatGPT
+  Backtrader audit against the live SKY desk. Decisions **BT1–BT8**:
+  no `backtrader` dependency / vendored engine / adapter (BT1);
+  no Cerebro rewrite (BT2); no second grader — “two fill semantics =
+  two truths” (BT3, BT7); no entry parameter search (BT4, consistent
+  with F3); the audit’s research discipline **confirms the F-named
+  P12** and extends four done-whens — boxed strategy scorecard with
+  Sharpe/Sortino/Calmar + session/L-S (P12.3), parameter-plateau test
+  (P12.4), net-of-costs `E_net = E_gross − fees − slip − funding` with
+  funding joined as-of-T (P12.6), risk-of-ruin table / worst-streak /
+  recovery on the MC resampler (P12.7); sealed final-OOS (BT6 = F6);
+  **no repo reset** (BT8).
+- Contract tests in `tests/test_handoff_memory.py` so a future session
+  cannot quietly add a second backtest engine or re-open BT1–BT8.
+
+### Changed
+- `TODO.md` — Backtrader added to out-of-scope; TODO-13 / P12
+  definitions extended per BT5; next *code* is still **P10.7**.
+- `SESSION_STATE.md`, `ARCHITECTURE.md` (invariant #13 extended),
+  `AI_ANATOMY_ROADMAP.md`, `docs/DATA_INFRASTRUCTURE_ROADMAP.md`,
+  `docs/INFRASTRUCTURE_LAYERS.md`, `PROFESSIONAL_PLAN_DECISIONS.md`,
+  `BLUEPRINT.md`, `SKILL.md`, `README.md` — BT1–BT8 recorded.
+- Version 2.7.1 → **2.7.2** (`config.py`, `pyproject.toml`).
+- Suite **445 → 449 pass / 1 skip** (+4), fully offline.
+
+---
+
 ## [2.7.1] — 2026-08-13 · branch `arena/019ffa5d-sky`
 
 PATCH bump: **Freqtrade recommendation reviewed and rejected**,
