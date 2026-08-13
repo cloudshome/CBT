@@ -1,8 +1,10 @@
-"""Tests for P12.1 — the locked train/val/OOS/recent validation protocol.
+"""Tests for P12.1 and P12.2 validation integrity.
 
 All offline: the protocol logic is tested on synthetic GradedPlan lists,
 plus one end-to-end run over deterministic synthetic candles (the same
 walk-forward grader the desk already uses — no look-ahead by construction).
+The P12.2 source guard is also tested against a deliberately future-peeking
+``shift(-n)`` feature so CI fails if the scanner ever stops catching it.
 """
 from __future__ import annotations
 
@@ -12,9 +14,10 @@ import pytest
 
 from data.backtester import GradedPlan
 from data.validation import (
-    DEFAULT_MIN_DECIDED, VALIDATION_CRITERIA, ValidationWindowError,
-    bucket_by_window, config_fingerprint, load_seal, meets_bar,
-    protocol_verdict, run_validation, walk_forward_windows, window_stats,
+    DEFAULT_MIN_DECIDED, VALIDATION_CRITERIA, LookaheadViolation,
+    ValidationWindowError, assert_no_lookahead, bucket_by_window,
+    config_fingerprint, load_seal, meets_bar, protocol_verdict,
+    run_validation, scan_lookahead, walk_forward_windows, window_stats,
     write_seal,
 )
 
@@ -271,3 +274,65 @@ def test_criteria_are_the_live_graduation_bar():
     assert VALIDATION_CRITERIA["expectancy"] == 0.50
     assert VALIDATION_CRITERIA["win_rate"] == 0.55
     assert VALIDATION_CRITERIA["pf"] == 1.5
+
+
+# ── P12.2 lookahead guard ─────────────────────────────────────────────────
+
+def test_lookahead_guard_passes_first_party_sources():
+    """CI's unit form scans the real feature/signal source tree."""
+    report = scan_lookahead()
+    assert report["ok"], report
+    assert report["status"] == "PASS"
+    assert report["files_scanned"] > 0
+    assert report["violations"] == []
+
+
+def test_lookahead_guard_rejects_shift_negative_n(tmp_path):
+    """The P12.2 done-when: a future-peeking ``shift(-n)`` fails."""
+    bad = tmp_path / "future_feature.py"
+    bad.write_text(
+        "def feature(frame, n):\n"
+        "    return frame['close'].shift(-n)\n"
+        "\n"
+        "def another_future_feature(frame, n):\n"
+        "    return frame['close'].shift(periods=-n)\n",
+        encoding="utf-8",
+    )
+    report = scan_lookahead([bad])
+    assert not report["ok"]
+    assert report["status"] == "FAIL"
+    assert len(report["violations"]) == 2
+    assert all(v["kind"] == "negative_shift" for v in report["violations"])
+    assert report["violations"][0]["line"] == 2
+    with pytest.raises(LookaheadViolation, match="lookahead guard failed"):
+        assert_no_lookahead([bad])
+
+
+def test_lookahead_guard_allows_past_shift_and_ignores_docstrings(tmp_path):
+    safe = tmp_path / "causal_feature.py"
+    safe.write_text(
+        '"""Documentation may mention shift(-n) without executing it."""\n'
+        "def feature(frame):\n"
+        "    return frame['close'].shift(1)\n",
+        encoding="utf-8",
+    )
+    report = scan_lookahead([safe])
+    assert report["ok"], report
+    assert report["violations"] == []
+
+
+def test_validate_lookahead_cli_json_and_exit_code(tmp_path, capsys):
+    """The reviewable CLI path uses the same unit scanner and fail code."""
+    from main import main
+
+    safe = tmp_path / "safe.py"
+    safe.write_text("def feature(frame):\n    return frame.close.shift(1)\n", encoding="utf-8")
+    assert main(["validate", "lookahead", "--path", str(safe), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "PASS"
+
+    bad = tmp_path / "bad.py"
+    bad.write_text("def feature(frame):\n    return frame.close.shift(-1)\n", encoding="utf-8")
+    assert main(["validate", "lookahead", "--path", str(bad), "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "FAIL"

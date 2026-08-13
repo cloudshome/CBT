@@ -9,8 +9,9 @@
 > handling is weight-header pacing + exponential backoff + geo-block
 > abort.
 > Next: P12 — the SKY Quant Validation Engine now runs on this stack
-> (**P12.1 locked walk-forward protocol shipped 2026-08-13**:
-> `data/validation.py`, `python main.py validate`).
+> (**P12.1 + P12.2 shipped 2026-08-13**: locked walk-forward protocol,
+> sealed OOS, and `python main.py validate lookahead` negative-shift guard
+> in `data/validation.py`).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -50,7 +51,7 @@ DONE     P10.1 → P10.12 · data infrastructure + market terminal  ← THIS DOC
            ↓  shipped (PR #18) — unlocks real backtesting on stored data
 ALONG    P11 · prove the paper book (counts done; gate still closed)
            ↓  do not loosen the bar
-NOW      P12 · SKY Quant Validation Engine  (P12.1 shipped; P12.2 next)
+NOW      P12 · SKY Quant Validation Engine  (P12.2 shipped; P12.3 next)
            (walk-forward / OOS / lookahead / quality score /
             funding-OI-CVD-conditioned + net-of-costs expectancy /
             risk-of-ruin table)

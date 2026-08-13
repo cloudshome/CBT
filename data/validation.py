@@ -1,4 +1,4 @@
-"""data/validation.py — P12.1: locked walk-forward validation protocol.
+"""data/validation.py — P12.1 protocol + P12.2 lookahead guard.
 
 The Quant Validation Engine (P12, per `docs/FREQTRADE_REVIEW.md` §8 F5/F6
 and `docs/BACKTRADER_REVIEW.md` §8 BT5/BT6) begins with the one protocol
@@ -29,15 +29,22 @@ window. Research and graduation therefore speak the same language.
 
 Everything in this module is a report. Nothing places orders, changes
 engine weights, or feeds the calibrator.
+
+P12.2 adds ``python main.py validate lookahead``: a deterministic AST guard
+for explicit negative pandas row shifts in first-party feature/signal code.
+It is intentionally narrower than recursive-state analysis, which remains a
+later extension; it does not claim that a source scan replaces the locked
+walk-forward protocol.
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 import pandas as pd
 
@@ -61,6 +68,211 @@ DEFAULT_SEAL_DIR = Path("data/store/validation")  # under gitignored data/store/
 
 class ValidationWindowError(ValueError):
     """The requested series cannot be split into the locked protocol."""
+
+
+class LookaheadViolation(ValueError):
+    """A feature source contains an explicitly future-looking row shift."""
+
+
+# P12.2 deliberately starts with the cheap, deterministic guard that catches
+# the most common future-peeking feature: ``series.shift(-n)``.  The default
+# roots cover the first-party feature/signal code, while callers and CI can
+# narrow the scan to a file or directory for a focused unit check.  Recursive
+# state-initialisation analysis remains a later P12.2 extension (as promised
+# by the Freqtrade/Backtrader review); this scanner does not pretend to do it.
+LOOKAHEAD_DEFAULT_PATHS = ("engine", "brain", "data")
+_LOOKAHEAD_SKIP_DIRS = {
+    ".git", ".venv", "__pycache__", "node_modules", "store", "store_demo",
+    ".pytest_cache", ".tox", ".nox", "build", "dist", "out", "target",
+}
+
+
+def _validation_repo_root() -> Path:
+    """Return the repository root without depending on the caller's cwd."""
+    return Path(__file__).resolve().parent.parent
+
+
+def _scan_python_files(paths: Iterable[str | Path], root: Path) -> tuple[list[Path], list[dict]]:
+    """Expand scan roots into deterministic Python files and input errors."""
+    files: list[Path] = []
+    errors: list[dict] = []
+    for raw in paths:
+        path = Path(raw)
+        if not path.is_absolute():
+            path = root / path
+        path = path.resolve()
+        if not path.exists():
+            errors.append({"path": path.as_posix(), "error": "path does not exist"})
+            continue
+        if path.is_file():
+            if path.suffix == ".py":
+                files.append(path)
+            else:
+                errors.append({"path": path.as_posix(),
+                               "error": "lookahead scan paths must be Python files or directories"})
+            continue
+        candidates = []
+        for candidate in path.rglob("*.py"):
+            if any(part in _LOOKAHEAD_SKIP_DIRS for part in candidate.parts):
+                continue
+            candidates.append(candidate.resolve())
+        files.extend(candidates)
+    # A path can be supplied twice (for example, a root plus a focused file).
+    # De-duplicate before parsing so the report and line counts are stable.
+    unique = sorted(set(files), key=lambda p: p.as_posix())
+    return unique, errors
+
+
+def _negative_shift_expression(node: ast.AST) -> bool:
+    """Whether an AST expression is syntactically a negative row offset.
+
+    ``shift(-n)`` is intentionally rejected even when ``n`` is a runtime
+    variable: a future-looking offset is unsafe unless it is made explicit in
+    a separate, reviewed target/labeling path.  Constant negative arithmetic
+    and the common ``0 - n`` spelling are rejected too.
+    """
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        return True
+    if (isinstance(node, ast.Constant)
+            and isinstance(node.value, (int, float))
+            and not isinstance(node.value, bool)):
+        return node.value < 0
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Sub):
+        return isinstance(node.left, ast.Constant) and node.left.value == 0
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mult, ast.Div)):
+        return _negative_shift_expression(node.left) or _negative_shift_expression(node.right)
+    return False
+
+
+def _shift_period_expression(call: ast.Call) -> Optional[ast.AST]:
+    """Return the row-offset argument of a pandas-like ``shift`` call."""
+    if call.args:
+        return call.args[0]
+    for keyword in call.keywords:
+        if keyword.arg in {"periods", "n"}:
+            return keyword.value
+    return None
+
+
+class _LookaheadVisitor(ast.NodeVisitor):
+    """Collect negative ``shift`` calls while ignoring comments/docstrings."""
+
+    def __init__(self, source: str, display_path: str):
+        self.source = source
+        self.display_path = display_path
+        self.violations: list[dict] = []
+
+    @staticmethod
+    def _is_shift_call(node: ast.Call) -> bool:
+        func = node.func
+        return ((isinstance(func, ast.Attribute) and func.attr == "shift")
+                or (isinstance(func, ast.Name) and func.id == "shift"))
+
+    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802 — ast visitor API
+        if self._is_shift_call(node):
+            offset = _shift_period_expression(node)
+            if offset is not None and _negative_shift_expression(offset):
+                expression = ast.get_source_segment(self.source, node) or "shift(...)"
+                self.violations.append({
+                    "path": self.display_path,
+                    "line": node.lineno,
+                    "column": node.col_offset,
+                    "expression": expression,
+                    "kind": "negative_shift",
+                    "message": "negative shift reads future rows; use only past/current data",
+                })
+        self.generic_visit(node)
+
+
+def scan_lookahead(paths: Optional[Iterable[str | Path]] = None,
+                   root: Optional[str | Path] = None) -> dict:
+    """Scan first-party feature code for explicit future-looking row shifts.
+
+    This is the P12.2 unit/CI form.  A negative pandas-style ``shift``
+    offset—``shift(-1)``, ``shift(-n)``, or ``shift(periods=-n)``—is a hard
+    failure.  The scanner is source-based and therefore deterministic,
+    offline, and independent of market data.  It intentionally reports
+    syntax/read errors as failures rather than silently skipping a file.
+
+    ``paths`` may contain files or directories. Relative paths resolve from
+    the repository root, not from whatever directory launched the command.
+    With no paths, ``engine/``, ``brain/``, and ``data/`` are scanned while
+    generated stores and caches are ignored.
+    """
+    repo_root = Path(root).resolve() if root else _validation_repo_root()
+    if isinstance(paths, (str, Path)):
+        requested = [paths]
+    else:
+        requested = list(paths) if paths is not None else list(LOOKAHEAD_DEFAULT_PATHS)
+    files, errors = _scan_python_files(requested, repo_root)
+    violations: list[dict] = []
+    scanned_files: list[str] = []
+
+    for path in files:
+        try:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=path.as_posix())
+        except (OSError, UnicodeError, SyntaxError) as exc:
+            errors.append({"path": path.as_posix(),
+                           "error": f"{type(exc).__name__}: {exc}"})
+            continue
+        try:
+            display = path.relative_to(repo_root).as_posix()
+        except ValueError:
+            display = path.as_posix()
+        scanned_files.append(display)
+        visitor = _LookaheadVisitor(source, display)
+        visitor.visit(tree)
+        violations.extend(visitor.violations)
+
+    ok = not errors and not violations
+    return {
+        "ok": ok,
+        "status": "PASS" if ok else "FAIL",
+        "scanner": "p12.2-negative-shift",
+        "paths": [str(p) for p in requested],
+        "files_scanned": len(scanned_files),
+        "scanned_files": scanned_files,
+        "violations": violations,
+        "errors": errors,
+    }
+
+
+def lookahead_report(paths: Optional[Iterable[str | Path]] = None,
+                     root: Optional[str | Path] = None) -> dict:
+    """Named report alias for callers that prefer the P12 report vocabulary."""
+    return scan_lookahead(paths=paths, root=root)
+
+
+def assert_no_lookahead(paths: Optional[Iterable[str | Path]] = None,
+                        root: Optional[str | Path] = None) -> dict:
+    """Raise ``LookaheadViolation`` unless the requested source scan passes."""
+    report = scan_lookahead(paths=paths, root=root)
+    if not report["ok"]:
+        details = [
+            f"{v['path']}:{v['line']} {v['expression']}"
+            for v in report["violations"]
+        ]
+        details.extend(f"{e['path']}: {e['error']}" for e in report["errors"])
+        raise LookaheadViolation("lookahead guard failed: " + "; ".join(details))
+    return report
+
+
+def print_lookahead(report: dict) -> None:
+    """Print the compact boxed output for ``validate lookahead``."""
+    print("=" * 74)
+    print("LOOKAHEAD VALIDATION  P12.2")
+    print(f"scanner {report.get('scanner', '?')}  files={report.get('files_scanned', 0)}")
+    for violation in report.get("violations", []):
+        print(f"  ❌ {violation['path']}:{violation['line']} "
+              f"{violation['expression']} — {violation['message']}")
+    for error in report.get("errors", []):
+        print(f"  ❌ {error['path']} — {error['error']}")
+    if report.get("ok"):
+        print("LOOKAHEAD VERDICT  🟢 PASS — no negative shift was found")
+    else:
+        print("LOOKAHEAD VERDICT  🔴 FAIL — future-looking source must be removed")
+    print("=" * 74)
 
 
 # ──────────────────────────────────────────────────────────────────────────

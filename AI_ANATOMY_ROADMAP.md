@@ -2,7 +2,7 @@
 
 ```
 Progress: [████████████████████████████████████████] 100% (Phases P1–P6 Complete)
-Tests:    488 passed / 1 skip (offline, DEMO_MODE=1)
+Tests:    492 passed / 1 skip (offline, DEMO_MODE=1)
 Status:   Production-Ready Institutional Desk & Autonomous Architecture
 Note:     This repo consolidates Cloudslover/AI + cloudshome/AI (see MERGE_NOTES.md)
 ```
@@ -209,7 +209,7 @@ store.
 |---|---|---|:---:|
 | **P11** | **Paper-book proof** | First grind shipped (38,439 decided; 100/20 on all four primary setups; compliance 100%; sell-R bug fixed). Graduation gate **honestly CLOSED** (+0.263R / 34.1% / PF 1.40). Keep grinding live data; do not move the bar. | 🔄 In progress |
 | **P10** | **Data infrastructure + market terminal** | **P10.1–P10.12 shipped** (PR #18): schema, Binance backfill, gaps/rollups, derivatives series, quality pillar, Bybit adapter, cross-exchange series, Lightweight Charts, futures/flow cards, WS tier, store-backed backtest, feature store. | ✅ Complete — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **SKY Quant Validation Engine** | Walk-forward / OOS / lookahead / boxed scorecard / quality score / strategy score / conditioned + net-of-costs expectancy / MC ruin + risk-of-ruin table — on **our** backtester + **our** store. Starts after P10.11. | 🔄 **P12.1 shipped** (locked train/val/OOS/recent protocol, sealed OOS — `data/validation.py`, `python main.py validate`); next **P12.2** lookahead — [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8 |
+| **P12** | **SKY Quant Validation Engine** | Walk-forward / OOS / lookahead / boxed scorecard / quality score / strategy score / conditioned + net-of-costs expectancy / MC ruin + risk-of-ruin table — on **our** backtester + **our** store. Starts after P10.11. | 🔄 **P12.2 shipped** (P12.1 locked train/val/OOS/recent protocol + sealed OOS; P12.2 `python main.py validate lookahead` AST guard + CI unit form); next **P12.3** scorecard — [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8 |
 
 **P11 runs alongside P10.** The first grind is done; the gate is still
 closed on the blueprint bar. Do not let the data project become a

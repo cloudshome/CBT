@@ -10,6 +10,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.10.0] — 2026-08-13 · branch `arena/019ffb14-sky`
+
+MINOR bump: **P12.2 — lookahead validation**. The validation engine
+now has a deterministic, offline source guard for explicit future-peeking
+row shifts, covered by the existing CI unit form. This is a research-integrity
+check only: it does not change signal logic, grading semantics, the sealed
+OOS protocol, or the graduation bar.
+
+### Added
+- **`data/validation.py`** — P12.2 AST scanner:
+  - `scan_lookahead()` scans first-party `engine/`, `brain/`, and `data/`
+    Python sources (or caller-supplied paths) and fails closed on
+    `shift(-n)`, `shift(-1)`, and `shift(periods=-n)` style row offsets.
+  - Source locations, offending expression, syntax/read errors, and a
+    stable `PASS`/`FAIL` JSON report are returned; comments/docstrings are
+    not executed or falsely reported.
+  - `assert_no_lookahead()` provides the unit/CI assertion form;
+    recursive-state analysis remains a later extension, as specified by
+    P12.2's `(+ recursive later)` scope.
+  - `print_lookahead()` renders the boxed `LOOKAHEAD VALIDATION — P12.2`
+    report.
+- **CLI** — `python main.py validate lookahead` (and `--json`; repeatable
+  `--path` for a focused file/directory scan). The existing store-backed
+  `python main.py validate` protocol is unchanged.
+- **Tests** — four offline guards in `tests/test_validation.py`: the
+  first-party source tree passes, a deliberately leaking `shift(-n)` /
+  `shift(periods=-n)` feature fails, a causal `shift(1)` plus a
+  docstring mention passes, and the CLI returns PASS/FAIL exit codes.
+- **CI** — the existing `.github/workflows/ci.yml` offline pytest job
+  runs the P12.2 unit form as part of the complete suite.
+
+### Changed
+- Version **2.9.0 → 2.10.0** (`config.py`, `pyproject.toml`).
+- P12 status docs now mark P12.2 shipped and P12.3 as next; no recursive
+  analysis is claimed early.
+
+---
+
 ## [2.9.0] — 2026-08-13 · branch `arena/019ffafa-sky`
 
 MINOR bump: **P12.1 — the SKY Quant Validation Engine's locked

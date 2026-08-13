@@ -10,34 +10,27 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-13 (this session: P12.1 shipped — locked train/val/OOS/recent walk-forward protocol + sealed OOS envelope + `python main.py validate`; P10 fully shipped; P11 gate still honestly closed)
-**Branch:** `arena/019ffafa-sky` (this session branches from `main` @ `bf31431` — PR #18 `feat(P10.8-P10.12)` is already MERGED there; P10.8–P10.12 are part of our base, not our deliverable)
-**HEAD commit:** `bf31431` (`main`); our work commits on top on `arena/019ffafa-sky`; one PR opened at session close (never self-merge).
+**Last updated:** 2026-08-13 (this session: P12.2 shipped — deterministic lookahead guard + CI unit form; P10 fully shipped; P11 gate still honestly closed)
+**Branch:** `arena/019ffb14-sky` (session branch fixed by Arena; reconciled with `origin/main` @ `abc6a37`, the P12.1 base)
+**HEAD commit:** `025da8d` (`feat(P12.2): add lookahead validation guard`), on top of `abc6a37` P12.1.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session (`arena/019ffafa-sky`): P12.1 — the SKY Quant
-> Validation Engine's locked walk-forward protocol.** With P10 fully
-> shipped (P10.1–P10.12, PR #18) the P12 gate condition ("after
-> P10.11") is finally met, so the Freqtrade/Backtrader audit's first
-> build row is done: `data/validation.py` + `python main.py validate`
-> + `tests/test_validation.py` (17 tests). The protocol: four
-> chronological locked windows (train/val/OOS/recent) over the
-> analyzed range; plans bucket by their **signal bar**; each window
-> checked against the **live graduation bar**
-> (`GRADUATION_CRITERIA`); PASS requires train AND val — train alone
-> can never pass; OOS/recent are **sealed envelopes** (BT6):
-> identical runs reuse the stored seal (SHA-256 config fingerprint
-> gate), re-opening needs `--reseal` and is recorded in the seal
-> history. Full pipeline proven on sandbox demo store
-> (backfill → 11,520 stored 15m candles → verdict → seal reuse →
-> reseal). Version **2.8.0 → 2.9.0**. Suite **471 → 488 pass / 1
-> skip** (+17). Reconciliation gap fixed: PR #18 had shipped
-> P10.8–P10.12 with no changelog entry and stale TODO tables — a
-> retroactive `[2.8.0 — P10.8–P10.12 addendum]` changelog entry now
-> closes it. Next *code* is **P12.2** (lookahead scanner).
+> **This session (`arena/019ffb14-sky`): P12.2 — lookahead validation.**
+> P12.1's locked train/val/OOS/recent protocol remains unchanged. This
+> milestone adds `data.validation.scan_lookahead()` and
+> `python main.py validate lookahead`: a deterministic stdlib-AST scan of
+> first-party `engine/`, `brain/`, and `data/` source that fails closed on
+> explicit future-peeking `shift(-n)` / `shift(periods=-n)` calls, reports
+> source locations, and treats syntax/read errors as failures. The unit
+> assertion `assert_no_lookahead()` is covered by a deliberately leaking
+> fixture; the active GitHub workflow's full offline pytest job runs those
+> lookahead tests as part of the suite. Recursive-state analysis is
+> explicitly still later.
+> Version **2.9.0 → 2.10.0**. Suite **488 → 492 pass / 1 skip**. No signal,
+> backtest, graduation-bar, OOS-seal, order, or dependency behavior changed.
+> Next *code* is **P12.3** (boxed strategy scorecard).
 
-
-> **This session (`arena/019ffab2-sky`): P10.7 — cross-exchange
+> **Prior session (`arena/019ffab2-sky`): P10.7 — cross-exchange
 > series.** Premium/discount vs Binance and funding spread are now a
 > stored, queryable series under `data/store/cross/**`. The live
 > health probe was **generalised** (`data/cross_exchange.snapshot_prices`,
@@ -140,18 +133,18 @@ plan (18 phases, 15-item rulebook) is in
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
 (our own stored market history — ✅ P10.1–P10.12 shipped; the research
-proof that makes the edge trustworthy — 🔄 P12.1 shipped, P12.2 next). Every phase
+proof that makes the edge trustworthy — 🔄 P12.1 + P12.2 shipped, P12.3 next). Every phase
 below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.1 shipped.** P10 (data
+**P12 (SKY Quant Validation Engine) — P12.2 shipped.** P10 (data
 infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 first
 grind shipped and the graduation gate is still honestly closed.
 Freqtrade rejected (F1–F8); Backtrader rejected (BT1–BT8). Open
-items: TODO-7, TODO-8; P12.2 → P12.7; P11 grind continues alongside.
+items: TODO-7, TODO-8; P12.3 → P12.7; P11 grind continues alongside.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -166,7 +159,7 @@ items: TODO-7, TODO-8; P12.2 → P12.7; P11 grind continues alongside.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.1 shipped** (locked train/val/OOS/recent protocol + sealed OOS, `data/validation.py`, `python main.py validate`); next **P12.2** lookahead — `docs/FREQTRADE_REVIEW.md` extended by `docs/BACKTRADER_REVIEW.md` |
+| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.2 shipped** (P12.1 locked train/val/OOS/recent protocol + sealed OOS; P12.2 `python main.py validate lookahead` AST guard + CI unit form); next **P12.3** scorecard — `docs/FREQTRADE_REVIEW.md` extended by `docs/BACKTRADER_REVIEW.md` |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -175,7 +168,7 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-13 (this branch `arena/019ffab2-sky`): P10.7 — cross-exchange series
+### Session 2026-08-13 (prior branch `arena/019ffab2-sky`): P10.7 — cross-exchange series
 
 Branched from `main` after the Backtrader review (PR #16). Inputs only
 — no strategy, risk-gate, or engine behaviour change. Version
@@ -567,27 +560,28 @@ See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ## Currently working on
 
-This session (`arena/019ffab2-sky`) **shipped P10.7** — committed
-`ac446ae`, pushed, **PR #17** opened against `main`. Nothing else is
-in flight. Next *code* session: **P10.8** (Lightweight Charts
-replaces `chartSVG()`). Do not start P12, Dify, LibreChat, or a
-strategy-module catalog. Do not open a second PR from this session.
+This session (`arena/019ffb14-sky`) **shipped P12.2** in the working tree:
+`data/validation.py` now owns the negative-shift AST guard,
+`python main.py validate lookahead` is the operator command, and the
+root GitHub workflow's full offline pytest job runs the focused unit form.
+The change is additive
+and report-only: no strategy, execution, risk, backtest, OOS seal, or
+graduation-bar behavior changed. Next *code* milestone is **P12.3**
+(the boxed strategy scorecard). Do not start recursive analysis early.
+Do not open a second PR from this session.
 
 The paper book's **counts** are done (100/20 for every primary setup,
 38,439 decided samples) and the **journal loop** is done (compliance
 100%). What is still open is the graduation gate itself: the primary
 family (+0.263R, 34.1% win, PF 1.40) is below the blueprint bar, and
 Sweep Reversal Sell (−0.033R) is the last sample-proof gap. That is
-the honest, intended state of the ladder — the next session's job is
-to grind more (ideally live) data, not to loosen the bar.
+the honest, intended state of the ladder — P11 continues alongside
+P12; never loosen the bar to make the gate pass.
 
-**P10 planning (no code):**
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md` — the market-data independence
-phase. It reconciles a user-supplied plan against what SKY already
-has, and records seven corrections (analytics ~80% already built;
-SQLite+Parquet not Postgres+Redis; Lightweight Charts standalone not
-React/Next; no FastAPI/Docker; liquidations can't be backfilled;
-reuse the existing cross-exchange probe; one-PR-per-session).
+**P10 is complete:** P10.1–P10.12 are already in the base (PR #18).
+The P10 planning corrections remain documented in
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`; do not reopen a completed
+milestone while building P12.
 
 ---
 
@@ -601,20 +595,20 @@ reuse the existing cross-exchange probe; one-PR-per-session).
    0 paper samples because the simulator takes one paper sample per
    window — best plan only). Do **not** change the blueprint
    graduation criteria.
-2. **TODO-12 (P10)** — P10.1–P10.7 done. Next: **P10.8** (Lightweight
-   Charts replaces `chartSVG()`; price+volume pane over stored data;
-   no new runtime dep). Full plan:
-   [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md)
-   — it records which parts of the incoming plan were corrected and why.
+2. **TODO-13 (P12)** — P12.1 and P12.2 are shipped. Next: **P12.3**
+   boxed R-report / strategy scorecard (long/short, regime, session,
+   Sharpe/Sortino/Calmar, holding time). The lookahead scanner is
+   intentionally only the explicit negative-shift guard; recursive-state
+   analysis remains later. Spec:
+   [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended
+   by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.
 3. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
 4. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
-5. **TODO-13 (P12)** — SKY Quant Validation Engine. Parked until
-   P10.11. Do not start next session. Spec:
-   [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended
-   by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.
+5. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
+   the graduation bar remains closed and unchanged.
 6. **TODO-9 / TODO-10** — Dify then LibreChat. Parked behind both the
-   graduation gate *and* P10. Do not start next session.
+   graduation gate and P10; do not start them.
 
 Full list and rationale: see [`TODO.md`](./TODO.md).
 
@@ -637,7 +631,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    job spec therefore lives at `docs/.github/workflows/ci.yml`, which
    GitHub Actions does **not** execute. Source of truth for running
    the gate is `ci/wheel_gate.py` locally (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.8.0.
+6. **`CHANGELOG.md` is current** through v2.10.0.
 7. **Sweep-reversal setups are breakeven on synthetic data.** The
    sandbox's deterministic series are smooth random walks with drift —
    they have no real stop-hunt structure, so sweep plans land near
@@ -652,9 +646,9 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 9. **The dashboard readiness strip lives outside `#app`.** `render()`
    replaces `#app.innerHTML` wholesale, so anything inside it would be
    destroyed on every scan. Keep the strip where it is.
-10. **Live scans are still amnesiac.** The Parquet store + backfill exist
-    (P10.1–P10.7) but the scanner/backtester still fetch ~500 live candles
-    (P10.11 wires them to the store).
+10. **Live scans are still amnesiac.** The Parquet store + backfill and
+    store-backed backtester exist (P10.1–P10.12), but the live scanner
+    still fetches ~500 candles; P10.11's store path is the research path.
 11. **This sandbox has no network egress.** The real Binance backfill
     cannot run here (verified live: clean abort with a resumable message).
     Run it on the operator's machine. All P10.2 behaviour is proven
@@ -687,28 +681,27 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-1. Next *code* session: **P10.8** — Lightweight Charts replaces
-   `chartSVG()` (price + volume pane over stored data; vendor the
-   script locally; no new runtime dep). Read the roadmap first.
+1. Next *code* session: **P12.3** — one boxed strategy scorecard over
+   the existing validation outputs (long/short, regime, session,
+   Sharpe/Sortino/Calmar, holding time). Read the P12 definitions first.
    **First step of every future session:** `git fetch` and diff
    against `origin/main` — parallel sessions merge while you work (see
    known problem 13); reconcile before building.
 2. A human does TODO-7 + TODO-8 from
    [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-3. Do **not** start Dify/LibreChat/P12. Do not install Freqtrade or
-   Backtrader. Do not loosen the graduation bar. Do not add strategy
-   modules.
+3. Do **not** start recursive analysis before its defined milestone.
+   Do not install Freqtrade or Backtrader. Do not loosen the graduation
+   bar. Do not add strategy modules or a second grader.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md. P10.7 shipped as PR #17
-> (do not reopen or merge it from the session). Do not adopt
-> Freqtrade / Hyperopt / FreqAI / Backtrader (F1–F8 / BT1–BT8).
-> Implement P10.8 (Lightweight Charts replaces chartSVG;
-> price+volume pane over stored data; vendor locally; no new
-> runtime dep) from docs/DATA_INFRASTRUCTURE_ROADMAP.md. Fetch and
-> diff origin/main first. No new agents/panels/strategies. Do not
-> start Dify, LibreChat, or P12.
+> Continue SKY from SESSION_STATE.md on `arena/019ffb14-sky`. Fetch and
+> diff origin/main first. P12.1 and P12.2 are shipped: do not redo the
+> locked protocol or the negative-shift guard. Implement P12.3, the boxed
+> strategy scorecard, from docs/FREQTRADE_REVIEW.md §8 and
+> docs/BACKTRADER_REVIEW.md §8. Keep the existing grader/store, do not
+> adopt Freqtrade / Hyperopt / FreqAI / Backtrader, do not add strategy
+> modules, and do not loosen the graduation bar.
 
 ---
 
@@ -717,7 +710,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 488 passed, 1 skipped
+# 492 passed, 1 skipped
 ```
 
 Readiness strip (four pillars since P10.5):
@@ -756,7 +749,7 @@ Local wheel-gate (build + dup-check, no install):
 
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.8.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.10.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Readiness strip, all four surfaces:
@@ -774,13 +767,12 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-ac446ae feat(p10.7): store cross-exchange premium and funding spread
-538dd8f docs: reject Backtrader as a SKY layer; P12 validated + extended (BT1–BT8) (#16)
+025da8d feat(P12.2): add lookahead validation guard
+abc6a37 feat(P12.1): locked train/val/OOS/recent validation protocol + sealed OOS envelope (#19)
 ```
 
-Plus a docs-only handoff commit on this branch recording PR #17.
-See `git log --oneline -3`. PR: https://github.com/Azimshawon/SKY/pull/17
-(open; do not merge).
+P12.2 is committed on `arena/019ffb14-sky`; the session PR is opened
+against `main` as the closing step. See `git log --oneline -3`.
 
 ---
 
@@ -788,7 +780,7 @@ See `git log --oneline -3`. PR: https://github.com/Azimshawon/SKY/pull/17
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ffab2-sky.
+github.com/Azimshawon/SKY, branch arena/019ffb14-sky.
 
 First, inspect the GitHub repository before making changes:
 - git fetch origin, and diff your branch against origin/main —
@@ -819,7 +811,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 488 pass / 1 skip.
+- Maintain test count at ≥ 492 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -835,22 +827,22 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.1 shipped.**
-2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — **488 pass /
-   1 skip** (≥ 471 previous bar; +17 new validation tests).
-3. [x] Fix any obvious failures. — seal-payload ordering bug found
-   by the live demo (seal record was written before `report["seal"]`
-   existed) — fixed + regression-tested.
+1. [x] Finish or safely stop the current task. — **P12.2 shipped.**
+2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` — **492 pass /
+   1 skip**; focused P12.2 form: 4 lookahead tests pass.
+3. [x] Fix any obvious failures. — scanner was corrected to accept a
+   string path as one path (rather than iterating its characters), and
+   compile/CLI negative-fixture checks pass.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.1 marked shipped, P10.1–P10.12 marked
-   shipped, P12.2 reprioritised to top.
-6. [x] Update `CHANGELOG.md` — 2.9.0 entry + retroactive
-   `[2.8.0 — P10.8–P10.12 addendum]` (PR #18 shipped without one).
+5. [x] Update `TODO.md` — P12.2 marked shipped; P12.3 is next; P10.1–P10.12
+   remain shipped; the graduation bar remains unchanged.
+6. [x] Update `CHANGELOG.md` — 2.10.0 P12.2 entry; prior 2.9.0 and
+   retroactive `[2.8.0 — P10.8–P10.12 addendum]` entries retained.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
-10. [x] Record any known bugs or unresolved issues. — none blocking;
-    see "known limits" in the session block.
-11. [x] `git add` / `git commit` / `git push origin arena/019ffafa-sky`.
+10. [x] Record any known bugs or unresolved issues. — recursive-state
+    analysis is intentionally later; no P12.2 blocking issue remains.
+11. [x] `git add` / `git commit` / `git push origin arena/019ffb14-sky`.
 12. [x] Open the session PR as the closing step — one PR from
-    `arena/019ffafa-sky` → `main` (P12.1).
+    `arena/019ffb14-sky` → `main` (P12.2).

@@ -22,6 +22,7 @@ Usage:
   python main.py derivatives collect --symbol BTCUSDT   # P10.4: funding/OI/mark/index/basis → Parquet store
   python main.py cross collect --symbol BTCUSDT         # P10.7: premium/discount + funding spread
   python main.py store --market perp                         # inspect the stored candle history
+  python main.py validate lookahead                          # P12.2 future-shift guard
   python main.py mcp                                         # MCP server for Claude/Cursor
 """
 from __future__ import annotations
@@ -315,13 +316,21 @@ def cmd_backtest(args) -> int:
 
 
 def cmd_validate(args) -> int:
-    """P12.1 — locked walk-forward train/val/OOS/recent validation.
+    """P12 validation commands: locked protocol and the P12.2 lookahead guard.
 
-    Store-only by design: four locked windows need history only the Parquet
-    store can provide. The OOS/recent windows are sealed envelopes — an
-    identical run reuses the stored seal; `--reseal` re-opens it and the
-    re-opening is recorded. Verdicts never feed `learn`.
+    ``validate`` remains the store-only P12.1 protocol.  ``validate
+    lookahead`` is a deterministic source scan that never reads market data;
+    it fails closed when feature code uses a negative row shift.
     """
+    if args.mode == "lookahead":
+        from data.validation import print_lookahead, scan_lookahead
+        result = scan_lookahead(paths=args.lookahead_paths)
+        if args.json:
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            print_lookahead(result)
+        return 0 if result.get("ok") else 1
+
     from data.validation import print_verdict, run_validation_on_store
 
     horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
@@ -1701,7 +1710,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p_val = sub.add_parser(
         "validate",
-        help="P12.1 locked train/val/OOS/recent walk-forward validation (store-only)")
+        help="P12 validation: locked protocol or `lookahead` source guard")
+    p_val.add_argument("mode", nargs="?", choices=("lookahead",), default=None,
+                       help="lookahead = P12.2 negative-shift guard; omit for P12.1 protocol")
+    p_val.add_argument("--path", dest="lookahead_paths", action="append", default=None,
+                       help="lookahead file/directory to scan (repeatable; default: engine, brain, data)")
     p_val.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH, XAU/GOLD)")
     p_val.add_argument("--tf", default=TIMEFRAME)
     p_val.add_argument("--exchange", default="binance", help="stored series venue (binance|bybit)")

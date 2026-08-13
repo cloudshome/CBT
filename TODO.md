@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-13 (this session: P12.1 shipped — locked train/val/OOS/recent walk-forward protocol + sealed OOS envelope + `python main.py validate`; next *code* is P12.2)
+**Last updated:** 2026-08-13 (this session: P12.2 shipped — `python main.py validate lookahead` negative-shift guard + CI unit form; next *code* is P12.3)
 
 ---
 
@@ -21,7 +21,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 488 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 492 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -44,7 +44,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1 shipped; P12.2 next) |
+| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1 + P12.2 shipped; P12.3 next) |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -58,22 +58,24 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-13, this session):** **P12.1 shipped.** The
-> SKY Quant Validation Engine's locked walk-forward protocol is live:
-> `data/validation.py` + `python main.py validate` — train/val pass
-> rule (train alone can never pass), sealed OOS/recent envelopes with
-> fingerprint-gated reuse and recorded reseals, the live graduation
-> bar as the criteria, and 17 new offline tests. **P10 is fully
-> shipped** (P10.1–P10.12, PR #18). F1–F8 / BT1–BT8 stay decided.
-> P11 grind continues alongside. **P12.2 is the concrete next *code*
-> build below.**
+> **Order note (2026-08-13, this session):** **P12.2 shipped.** The
+> SKY Quant Validation Engine now has both the locked P12.1 protocol
+> (`python main.py validate`) and the P12.2 deterministic lookahead guard
+> (`python main.py validate lookahead`). The guard scans first-party
+> feature/signal code with the stdlib AST, fails on `shift(-n)` /
+> `shift(periods=-n)`, reports source locations, and is covered by a
+> deliberately leaking unit fixture that the existing CI test job runs. **P10 is fully shipped**
+> (P10.1–P10.12, PR #18). F1–F8 / BT1–BT8 stay decided. P11 grind
+> continues alongside. **P12.3 is the concrete next *code* build below.**
 
-### TODO-13 / P12.2 · `python main.py validate lookahead` · the next P12 milestone
+### TODO-13 / P12.2 · `python main.py validate lookahead` · ✅ shipped
 
-**P12.1 is shipped** (see the TODO-13 table below). Next: **P12.2 —
-lookahead analysis**: a `shift(-n)` (future-peeking) feature fails a
-test; CI runs the unit form. `data/validation.py` is the home for the
-scanner. Do not start P12.3 until P12.2 is green.
+**P12.2 is shipped** (see the TODO-13 table below): `data/validation.py`
+now owns a deterministic AST scanner for negative pandas row shifts,
+`python main.py validate lookahead` exposes the boxed report, and CI runs
+the existing full-suite unit-form guard. A deliberately leaking `shift(-n)` fixture
+fails the scanner. Recursive-state analysis remains a later extension;
+P12.3 is the next milestone.
 
 ---
 
@@ -222,7 +224,7 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 **Both are now behind P10 as well as the graduation gate.** Owning our
 data moves the aim; wrapping the engine in another chat UI does not.
 
-### TODO-13 · P12 · SKY Quant Validation Engine · P12.1 shipped
+### TODO-13 · P12 · SKY Quant Validation Engine · P12.2 shipped
 
 📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8,
 extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.**
@@ -239,8 +241,8 @@ train/val/OOS windows have real multi-window history to split.
 | # | Milestone | Done when | Status |
 |---|---|---|---|
 | P12.1 | Locked walk-forward protocol (train / val / OOS / recent) | A setup cannot “pass” on the training window alone; the final OOS set is sealed (`+` BT6) | ✅ **shipped** — `data/validation.py`, `python main.py validate`, 17 tests |
-| P12.2 | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form | ⏭ **next** |
-| P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) | ⏳ |
+| P12.2 | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form | ✅ **shipped** — AST guard, source locations, 4 tests; existing CI full-suite job runs the lookahead unit form; recursive analysis remains later |
+| P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) | ⏭ **next** |
 | P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ⏳ |
 | P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) | ⏳ |
 | P12.6 | Conditioned + net-of-costs expectancy | OI / funding / CVD / regime from our store **and** `E_net = E_gross − fees − slip − funding` with funding joined as-of-T (`+` BT5) | ⏳ |

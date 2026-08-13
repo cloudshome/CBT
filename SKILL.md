@@ -99,6 +99,7 @@ bypasses the risk gate. The deny list is enforced at the top of
 | Paper watch | `python main.py paper --watch` | — | Live-market paper-trade monitor (does **not** touch any exchange) |
 | Sources | `python main.py sources` | — | CryptoDada + Discord + RSS news snapshot |
 | Stats | `python main.py stats` | — | What the engine has learned from graded backtests + paper trades |
+| **Validation** | `python main.py validate` / `python main.py validate lookahead` | — | P12.1 locked train/val/OOS/recent protocol; P12.2 offline guard fails on future-peeking `shift(-n)` feature code |
 | Learn | `python main.py learn` | — | Recompute self-improvement calibration (advisory) |
 | Coach | `python main.py coach <scan_id>` | — | Why the engine said what it said; teaching mode |
 | Agent ask | `python main.py agent ask "am i ready for micro?"` | — | Natural-language desk query (graduation gate) |

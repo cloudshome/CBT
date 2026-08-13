@@ -48,7 +48,7 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 | **WebSocket tier** (P10.10) | `data/ws_client.py` — public Binance streams (`!forceOrder@arr` + klines) with reconnect/backoff, graceful stop, offline-safe demo stream; `reconnect_state()`/`accumulation_stats()` feed the readiness strip and feature store. No `websockets` runtime dependency. |
 | **Store-backed backtester** (P10.11) | `data/backtester.py::run_backtest_on_store()` reads `CandleStore.read()` instead of a live fetch — multi-year offline backtests, honest error for missing/short series. |
 | **Feature store** (P10.12) | `data/feature_store.py` — one derived wide row per `(symbol, timeframe, ts)`: price + derivatives + hidden_alpha + regime (22 columns); feeds conditioned-expectancy queries. |
-| **Quant Validation Engine** (P12.1) | `python main.py validate` — locked train/val/OOS/recent walk-forward protocol over the stored series: a setup **cannot pass on the training window alone**; the OOS/recent windows are **sealed envelopes** (identical runs reuse the stored seal; `--reseal` re-opens with a recorded paper trail); every window is checked against the live graduation bar. `data/validation.py`. |
+| **Quant Validation Engine** (P12.1/P12.2) | `python main.py validate` — locked train/val/OOS/recent walk-forward protocol over the stored series: a setup **cannot pass on the training window alone**; the OOS/recent windows are **sealed envelopes** (identical runs reuse the stored seal; `--reseal` re-opens with a recorded paper trail); every window is checked against the live graduation bar. `python main.py validate lookahead` — deterministic CI/source guard that fails on `shift(-n)` future-peeking feature code. `data/validation.py`. |
 | **Paper-trading runner** | Watches **approved** signals against live public Binance candles, simulates a planned entry, and auto-closes at SL / TP1. It records the outcome and R result — **never places a real exchange order**. |
 | **Self-improvement** | `python main.py learn` recomputes a per-setup calibration profile from backtest outcomes **plus decided paper trades** — boosts positive-expectancy plans, dampens (or filters) negative ones. |
 | **Coach (teaching)** | `python main.py coach` explains *why* the engine said what it said, mentors you through the top setup step-by-step, gives personal feedback on your own approvals/rejections, and ships a full trading glossary. |
@@ -532,7 +532,7 @@ the output is never empty.
 ## 🧪 Tests
 
 ```bash
-python -m pytest tests/ -q      # 250+ tests, fully offline (synthetic data)
+python -m pytest tests/ -q      # 492 pass / 1 skip, fully offline (synthetic data)
 ```
 
 Covers: indicator math & no-look-ahead, structure detection (BOS/CHOCH, FVG,
@@ -847,3 +847,4 @@ This software is for **research and education**. Outputs are risk-advice only,
 not financial advice. Crypto derivatives are high-risk; always use stop-losses
 and never risk money you cannot afford to lose. Always respect the ToS and rate
 limits of any service you connect to (Binance, Discord, CryptoDada, LLM APIs).
+s).
