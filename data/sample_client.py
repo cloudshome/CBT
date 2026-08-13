@@ -106,6 +106,58 @@ class SampleClient:
             "long_short_ratio": None,
         }
 
+    # ── Derivatives history (P10.4 — DEMO_MODE must stay fully offline) ────
+    def _synthetic_page(self, symbol: str, kind: str, step_ms: int,
+                        start_time, end_time, limit: int) -> pd.DataFrame:
+        """Deterministic seeded page for a derivatives history kind."""
+        start = int(start_time) if start_time is not None else 1_700_000_000_000
+        end = int(end_time) if end_time is not None else start + 400 * step_ms
+        first = ((start + step_ms - 1) // step_ms) * step_ms
+        n = max(0, (end - first) // step_ms)
+        if n == 0:
+            return pd.DataFrame()
+        rng = np.random.default_rng(_seed(f"{symbol}:{kind}"))
+        ts = first + np.arange(n, dtype=np.int64) * step_ms
+        base = BASE_PRICES.get(symbol, 100.0)
+        if kind == "funding":
+            value = rng.normal(0.0001, 0.0002, n)
+            mark = base + np.cumsum(rng.normal(0, base * 0.002, n))
+            return pd.DataFrame({"ts": ts, "funding_rate": value,
+                                 "mark_price": np.round(mark, 2)})
+        if kind == "oi":
+            oi = base * 100_000 + np.cumsum(rng.normal(0, base * 50, n))
+            oi = np.maximum(base * 10_000, oi)
+            return pd.DataFrame({"ts": ts,
+                                 "open_interest": np.round(oi, 2),
+                                 "open_interest_value": np.round(oi * base, 2)})
+        # mark / index price klines (1h candle shape)
+        price = base + np.cumsum(rng.normal(0, base * 0.001, n))
+        return pd.DataFrame({"ts": ts, f"{kind}_price": np.round(price, 2)})
+
+    def funding_rate_history(self, symbol="BTCUSDT", start_time=None,
+                             end_time=None, limit=1000):
+        df = self._synthetic_page(symbol, "funding", 8 * 3_600_000,
+                                  start_time, end_time, limit)
+        return df.head(int(limit)).reset_index(drop=True) if not df.empty else df
+
+    def open_interest_history(self, symbol="BTCUSDT", period="1h",
+                              start_time=None, end_time=None, limit=500):
+        df = self._synthetic_page(symbol, "oi", 3_600_000,
+                                  start_time, end_time, limit)
+        return df.head(int(limit)).reset_index(drop=True) if not df.empty else df
+
+    def mark_price_klines(self, symbol="BTCUSDT", timeframe="1h",
+                          start_time=None, end_time=None, limit=1000):
+        df = self._synthetic_page(symbol, "mark", 3_600_000,
+                                  start_time, end_time, limit)
+        return df.head(int(limit)).reset_index(drop=True) if not df.empty else df
+
+    def index_price_klines(self, symbol="BTCUSDT", timeframe="1h",
+                           start_time=None, end_time=None, limit=1000):
+        df = self._synthetic_page(symbol, "index", 3_600_000,
+                                  start_time, end_time, limit)
+        return df.head(int(limit)).reset_index(drop=True) if not df.empty else df
+
 
 def maybe_client():
     """Return the demo client when DEMO_MODE=1, else the real one."""

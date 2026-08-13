@@ -19,6 +19,7 @@ data_samples/backtest_report.json
 # The repo stays small; the dataset lives on disk. See
 # docs/DATA_INFRASTRUCTURE_ROADMAP.md
 data/store/
+data/store_demo/          # DEMO_MODE backfill sandbox (offline fake transport)
 *.parquet
 
 # local session-continuation notes (never pushed)

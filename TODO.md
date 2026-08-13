@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-12 (TODO-12/P10 — **P10.1–P10.3 shipped**; next is P10.4)
+**Last updated:** 2026-08-13 (TODO-12/P10 — **P10.1–P10.4 shipped**; P10.2 hardened: perp endpoint + real rate-limit handling; next is P10.5)
 
 ---
 
@@ -49,17 +49,25 @@ Anything that moves neither is out of scope.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-12):** the active major milestone is now **P10**
-> and P10.1–P10.3 shipped. The paper book (TODO-11) first-grind is
-> done; what remains there is ongoing data collection/grinding that can
-> run alongside P10. P10.4 is the concrete next build below.
+> **Order note (2026-08-13):** the active major milestone is **P10** and
+> P10.1–P10.4 are shipped. On 2026-08-13 the shipped P10.2 was hardened
+> (PR #12): the first cut labelled *spot* candles as ``market=perp`` — it
+> now pages the real perp endpoint — and rate-limit handling went from a
+> between-pages nap to real weight-header pacing + exponential backoff +
+> geo-block abort. P10.4 shipped the same day (PR #12): funding / OI /
+> mark / index / basis now persist as time series. The paper book
+> (TODO-11) first-grind is done; what remains there is ongoing data
+> collection/grinding that can run alongside P10.
+> **P10.5 is the concrete next build below.**
 
-### TODO-12 / P10.4 · Derivatives time series · the next P10 milestone
+### TODO-12 / P10.5 · Data-quality pillar · the next P10 milestone
 
-**P10.1–P10.3 are shipped** (schema + store, paginated backfill, gaps +
-1m rollups). Next: **P10.4 — persist funding / OI / mark / index / basis**
-as time series and rename the `liquidations()` 24h-stats proxy honestly.
-Full plan: `docs/DATA_INFRASTRUCTURE_ROADMAP.md`.
+**P10.1–P10.4 are shipped** (schema + store, paginated backfill, gaps +
+1m rollups, derivatives series). Next: **P10.5 — per-source data-quality
+checks wired into `readiness_strip()`** (gap detection per window,
+price sanity, volume sanity, staleness per source, rate-limit budget) so
+a corrupt/stale feed quarantines and produces NO signal — proven by a
+test. Full plan: `docs/DATA_INFRASTRUCTURE_ROADMAP.md`.
 
 ---
 
@@ -123,16 +131,16 @@ from scratch every run.
 exchange APIs, store it ourselves, and let the engine reason over
 stored evidence.
 
-Twelve independently shippable milestones (P10.1 → P10.12). **P10.1 is
-shipped** (this session). Do not start milestone N+1 until N is green.
+Twelve independently shippable milestones (P10.1 → P10.12). **P10.1–P10.4
+are shipped.** Do not start milestone N+1 until N is green.
 
 | # | Milestone | Status |
 |---|---|---|
 | P10.1 | Normalised `Candle` schema + Parquet store + upsert PK | ✅ shipped (`data/store.py`) |
-| P10.2 | Binance paginated REST backfill (resumable, rate-limit aware) | ✅ shipped (`data/backfill.py`) |
+| P10.2 | Binance paginated REST backfill (resumable, rate-limit aware) | ✅ shipped (`data/backfill.py`; hardened 2026-08-13: real perp endpoint + weight-header/backoff handling) |
 | P10.3 | Gap detection + repair + 1m→higher-TF aggregation | ✅ shipped (`data/gaps.py`) |
-| P10.4 | Derivatives as time series (funding / OI / mark / index / basis) | ⏭ **next** |
-| P10.5 | Data-quality pillar wired into `readiness_strip()` | ⏳ |
+| P10.4 | Derivatives as time series (funding / OI / mark / index / basis) | ✅ shipped (`data/derivatives.py`) |
+| P10.5 | Data-quality pillar wired into `readiness_strip()` | ⏭ **next** |
 | P10.6 | Bybit adapter behind the same schema | ⏳ |
 | P10.7 | Cross-exchange premium/discount + funding spread | ⏳ |
 | P10.8 | Lightweight Charts replaces `chartSVG()` | ⏳ |
@@ -238,9 +246,14 @@ The first shippable milestone of P10 (data independence): a normalised
 - Docs: CHANGELOG, DATA_INFRASTRUCTURE_ROADMAP (P10.1 shipped), SESSION_STATE.
 - Tests 342 → **355 pass / 1 skip** (+13).
 
-**Next (P10.2):** Binance paginated REST backfill reusing
-`data/binance_client.py`, resumable + rate-limit aware, writing via
-`CandleStore.write()`.
+**P10.2 shipped (2026-08-13, this session):** `data/backfill.py`
+(`BinanceBackfiller`, `FakePagedTransport`) + `klines_page()` on the
+Binance client + `backfill`/`store` CLI commands; resumable, rate-limit
+aware, idempotent re-run (zero rows); 21 offline tests;
+suite 355 → **377 pass / 1 skip**; version **2.4.0**.
+
+**Next (P10.3):** gap detection + repair + 1m→5m/15m/1h/4h/1d aggregation
+(the master-timeframe rule — derive, don't store duplicates).
 
 ---
 

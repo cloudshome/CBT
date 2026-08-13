@@ -18,6 +18,9 @@ Usage:
   python main.py desk                                        # one-call desk advisory (gate + P&L + graduation + advice)
   python main.py preflight                                   # strict live-paper operations gate
   python main.py simulator                                   # grind 100/20 sample proof
+  python main.py backfill --symbol BTCUSDT --market perp     # P10.2: paginated Binance history → Parquet store
+  python main.py derivatives collect --symbol BTCUSDT   # P10.4: funding/OI/mark/index/basis → Parquet store
+  python main.py store --market perp                         # inspect the stored candle history
   python main.py mcp                                         # MCP server for Claude/Cursor
 """
 from __future__ import annotations
@@ -1021,6 +1024,136 @@ def cmd_desk(args) -> int:
 # Panniantong/Agent-Reach, scoped to CryptoBrain's read-only safety
 # posture.  They never place exchange orders; they only read.
 
+def cmd_backfill(args) -> int:
+    """P10.2/P10.3 — paginated REST backfill + optional gap repair / rollup.
+
+    Resumable (re-runs continue at the last stored candle), idempotent
+    (a completed re-run adds zero rows), rate-limit aware: paced pages
+    (--sleep), exponential backoff on 429/network errors, weight-header
+    pacing, geo-block abort, --max-requests cap. ``--market perp`` pages
+    the perp endpoint (``/fapi/v1/klines``) — spot candles are never
+    labelled ``market=perp``. ``DEMO_MODE=1`` uses SampleClient (offline).
+    """
+    from data.backfill import BackfillError, backfill, fmt_ts, parse_ts
+    from data.gaps import detect_gaps, repair_gaps, rollup
+    from data.store import CandleStore
+
+    store = CandleStore(root=args.root) if args.root else CandleStore()
+    now_ms = int(time.time() * 1000)
+    try:
+        start_ts = parse_ts(args.since, now_ms=now_ms) if args.since else args.start_ts
+        end_ts = parse_ts(args.until, now_ms=now_ms) if args.until else args.end_ts
+    except BackfillError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        result = backfill(
+            store=store,
+            symbol=_sym(args.symbol),
+            timeframe=args.tf,
+            exchange=args.exchange,
+            market=args.market,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            page_limit=args.page_limit,
+            sleep_s=0.0 if args.no_sleep else args.sleep,
+            resume=not args.no_resume,
+            max_requests=args.max_requests,
+            dry_run=args.dry_run,
+        )
+    except BackfillError as exc:
+        print(f"[!] backfill aborted: {exc}", file=sys.stderr)
+        return 1
+
+    payload = result.as_dict()
+    if args.repair:
+        from data.sample_client import maybe_client
+        client = maybe_client()
+
+        def fetch(start_time=None, end_time=None, limit=1000):
+            return client.klines(
+                _sym(args.symbol), args.tf, limit=limit,
+                start_time=start_time, end_time=end_time,
+            )
+
+        payload["repair"] = repair_gaps(
+            store, fetch, exchange=args.exchange, market=args.market,
+            symbol=_sym(args.symbol), timeframe=args.tf,
+        )
+    if args.rollup:
+        payload["rollup"] = rollup(
+            store, exchange=args.exchange, market=args.market,
+            symbol=_sym(args.symbol),
+        )
+    remaining = detect_gaps(
+        store.read(args.exchange, args.market, _sym(args.symbol), args.tf),
+        args.tf,
+    )
+    payload["gaps_remaining"] = len(remaining)
+    if args.json:
+        print(json.dumps(payload, indent=2, default=str))
+    else:
+        print(f"backfill {result.exchange}/{result.market}/{result.symbol}/{result.timeframe}")
+        print(f"  pages {result.pages}  before {result.rows_before}  "
+              f"after {result.rows_after}  added {result.rows_added}")
+        if result.resumed_from is not None:
+            print(f"  resumed from {fmt_ts(result.resumed_from)} UTC")
+        if result.forming_skipped:
+            print(f"  forming skipped {result.forming_skipped} (picked up next run)")
+        if result.rate_limit_stalls or result.retries:
+            print(f"  transport  {result.rate_limit_stalls} rate-limit stalls · "
+                  f"{result.retries} retries · {result.requests} requests")
+        if args.repair:
+            print(f"  repair: {payload['repair']}")
+        if args.rollup:
+            print(f"  rollup: {payload['rollup']}")
+        print(f"  gaps remaining: {payload['gaps_remaining']}")
+        if result.rows_added == 0 and result.resumed_from is not None:
+            print("  ✓ idempotent re-run — zero rows added")
+        if args.dry_run:
+            print("  (dry-run — nothing written)")
+    return 0
+
+
+def cmd_store(args) -> int:
+    """Inspect the P10 Parquet candle store (count, span, partitions)."""
+    from data.backfill import DEMO_STORE_ROOT, fmt_ts
+    from data.store import CandleStore
+    from data.symbols import resolve_symbol
+
+    demo = os.getenv("DEMO_MODE", "0") in ("1", "true", "yes") or args.demo
+    symbol = resolve_symbol(args.symbol).symbol
+    root = args.root if args.root else (DEMO_STORE_ROOT if demo else None)
+    store = CandleStore(root=root)
+    df = store.read(args.exchange, args.market, symbol, args.tf)
+    parts = store.series(args.exchange, args.market, symbol, args.tf)
+
+    if df.empty:
+        print(f"store: no candles for {args.exchange}/{args.market}/{symbol}/{args.tf}")
+        print(f"  root: {store.parquet_dir}")
+        print("  run:  python main.py backfill --symbol BTCUSDT --market perp --tf 1m")
+        return 0
+
+    payload = {
+        "exchange": args.exchange, "market": args.market, "symbol": symbol,
+        "timeframe": args.tf, "count": len(df),
+        "first_ts": int(df["ts"].iloc[0]), "last_ts": int(df["ts"].iloc[-1]),
+        "first": fmt_ts(int(df["ts"].iloc[0])), "last": fmt_ts(int(df["ts"].iloc[-1])),
+        "span_days": round((df["ts"].iloc[-1] - df["ts"].iloc[0]) / 86_400_000, 1),
+        "partitions": parts, "root": str(store.parquet_dir),
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, default=str))
+    else:
+        print(f"store: {payload['count']:,} candles · {payload['first']} → "
+              f"{payload['last']} UTC · {payload['span_days']} days")
+        print(f"  series: {payload['exchange']}/{payload['market']}/{payload['symbol']} "
+              f"{payload['timeframe']}  ·  {len(parts)} year/month partitions")
+        print(f"  root:   {payload['root']}")
+    return 0
+
+
 def cmd_doctor(args) -> int:
     """Non-mutating readiness report.
 
@@ -1244,66 +1377,68 @@ def cmd_simulator(args) -> int:
     return 0
 
 
-def cmd_backfill(args) -> int:
-    """P10.2/P10.3 — paginated REST backfill + optional gap repair / rollup.
+def cmd_derivatives(args) -> int:
+    """P10.4: collect / inspect derivatives time series (funding, OI,
+    mark, index, basis). Resumable, idempotent, rate-limit aware.
+    DEMO_MODE=1 uses SampleClient (offline)."""
+    from data.backfill import fmt_ts
+    from data.derivatives import (ALL_METRICS, DerivativesCollector,
+                                  DerivativesStore, DerivativesTransportError,
+                                  default_derivatives_transport)
+    from data.symbols import resolve_symbol
 
-    Public market data only. ``DEMO_MODE=1`` uses SampleClient (offline).
-    """
-    from data.backfill import backfill
-    from data.gaps import detect_gaps, repair_gaps, rollup
-    from data.store import CandleStore
+    store = DerivativesStore()
+    symbol = resolve_symbol(args.symbol).symbol
 
-    store = CandleStore(root=args.root) if args.root else CandleStore()
-    result = backfill(
-        store=store,
-        symbol=_sym(args.symbol),
-        timeframe=args.tf,
-        exchange=args.exchange,
-        market=args.market,
-        start_ts=args.start_ts,
-        end_ts=args.end_ts,
-        page_limit=args.page_limit,
-        sleep_s=0.0 if args.no_sleep else args.sleep,
-        resume=not args.no_resume,
-    )
-    payload = result.as_dict()
-    if args.repair:
-        from data.sample_client import maybe_client
-        client = maybe_client()
+    if args.subcmd == "collect":
+        metrics = None
+        if getattr(args, "metrics", None):
+            metrics = [m.strip() for m in args.metrics.split(",") if m.strip()]
+        try:
+            collector = DerivativesCollector(store, sleep_s=args.sleep)
+            runs = collector.collect(symbol, market=args.market, since=args.since,
+                                     until=args.until, metrics=metrics,
+                                     dry_run=args.dry_run)
+        except DerivativesTransportError as exc:
+            print(f"[!] derivatives collect aborted: {exc}", file=sys.stderr)
+            return 1
+        payload = {m: r.as_dict() for m, r in runs.items()}
+        if args.json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(f"derivatives {symbol}/{args.market} "
+                  f"({'dry-run — nothing written' if args.dry_run else 'written to ' + str(store.root)})")
+            for metric, r in runs.items():
+                print(f"  {metric:<22} pages {r.pages:>3}  fetched {r.rows_fetched:>7}  "
+                      f"new {r.rows_new:>7}  {fmt_ts(r.first_ts)} → {fmt_ts(r.last_ts)} UTC")
+        return 0
 
-        def fetch(start_time=None, end_time=None, limit=1000):
-            return client.klines(
-                _sym(args.symbol), args.tf, limit=limit,
-                start_time=start_time, end_time=end_time,
-            )
-
-        payload["repair"] = repair_gaps(
-            store, fetch, exchange=args.exchange, market=args.market,
-            symbol=_sym(args.symbol), timeframe=args.tf,
-        )
-    if args.rollup:
-        payload["rollup"] = rollup(
-            store, exchange=args.exchange, market=args.market,
-            symbol=_sym(args.symbol),
-        )
-    remaining = detect_gaps(
-        store.read(args.exchange, args.market, _sym(args.symbol), args.tf),
-        args.tf,
-    )
-    payload["gaps_remaining"] = len(remaining)
+    # status
+    rows = []
+    for metric in ALL_METRICS:
+        df = store.read("binance", args.market, symbol, metric)
+        if df.empty:
+            continue
+        rows.append({
+            "metric": metric,
+            "count": len(df),
+            "first_ts": int(df["ts"].iloc[0]),
+            "last_ts": int(df["ts"].iloc[-1]),
+            "first": fmt_ts(int(df["ts"].iloc[0])),
+            "last": fmt_ts(int(df["ts"].iloc[-1])),
+        })
     if args.json:
-        print(json.dumps(payload, indent=2, default=str))
+        print(json.dumps({"symbol": symbol, "market": args.market,
+                          "root": str(store.root), "series": rows},
+                         indent=2, default=str))
     else:
-        print(f"backfill {result.exchange}/{result.market}/{result.symbol}/{result.timeframe}")
-        print(f"  pages {result.pages}  before {result.rows_before}  "
-              f"after {result.rows_after}  added {result.rows_added}")
-        if result.resumed_from is not None:
-            print(f"  resumed from {result.resumed_from}")
-        if args.repair:
-            print(f"  repair: {payload['repair']}")
-        if args.rollup:
-            print(f"  rollup: {payload['rollup']}")
-        print(f"  gaps remaining: {payload['gaps_remaining']}")
+        if not rows:
+            print(f"derivatives: nothing stored for {symbol}/{args.market}")
+            print(f"  run:  python main.py derivatives collect --symbol {symbol}")
+            return 0
+        print(f"derivatives {symbol}/{args.market} — {len(rows)} metrics stored")
+        for r in rows:
+            print(f"  {r['metric']:<22} {r['count']:>9,} rows  {r['first']} → {r['last']} UTC")
     return 0
 
 
@@ -1631,21 +1766,32 @@ def main(argv: list[str] | None = None) -> int:
 
     p_bf = sub.add_parser(
         "backfill",
-        help="P10: paginated REST candle backfill into the Parquet store",
-    )
-    p_bf.add_argument("--symbol", default=SYMBOL)
+        help="P10: paginated REST candle backfill into the Parquet store "
+             "(resumable, rate-limit aware, idempotent)")
+    p_bf.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH, XAU/GOLD)")
     p_bf.add_argument("--tf", default="1m")
     p_bf.add_argument("--exchange", default="binance")
-    p_bf.add_argument("--market", default="perp")
+    p_bf.add_argument("--market", default="perp", choices=("spot", "perp"),
+                      help="spot (/api/v3/klines) or perp (/fapi/v1/klines)")
     p_bf.add_argument("--start-ts", type=int, default=None,
                       help="inclusive candle OPEN (UTC epoch ms)")
-    p_bf.add_argument("--end-ts", type=int, default=None)
+    p_bf.add_argument("--end-ts", type=int, default=None,
+                      help="stop at this candle OPEN (UTC epoch ms)")
+    p_bf.add_argument("--since", default=None,
+                      help="alternative to --start-ts: epoch ms, YYYY-MM-DD, or Nd (e.g. 90d)")
+    p_bf.add_argument("--until", default=None,
+                      help="alternative to --end-ts: epoch ms, YYYY-MM-DD, or Nd")
     p_bf.add_argument("--page-limit", type=int, default=1000)
     p_bf.add_argument("--sleep", type=float, default=0.2,
                       help="seconds between pages (rate-limit courtesy)")
     p_bf.add_argument("--no-sleep", action="store_true")
     p_bf.add_argument("--no-resume", action="store_true",
                       help="ignore already-stored tail; re-walk the range")
+    p_bf.add_argument("--max-requests", type=int, default=5000,
+                      help="safety cap on requests per run; 0 = unlimited. "
+                           "An interrupted run resumes on re-run")
+    p_bf.add_argument("--dry-run", action="store_true",
+                      help="fetch + count only; write nothing")
     p_bf.add_argument("--repair", action="store_true",
                       help="P10.3: detect + fetch missing 1m holes")
     p_bf.add_argument("--rollup", action="store_true",
@@ -1653,6 +1799,43 @@ def main(argv: list[str] | None = None) -> int:
     p_bf.add_argument("--root", default=None, help="CandleStore root (tests)")
     p_bf.add_argument("--json", action="store_true")
     p_bf.set_defaults(func=cmd_backfill)
+
+    p_der = sub.add_parser(
+        "derivatives",
+        help="P10.4: collect/inspect derivatives time series (funding / OI / mark / index / basis)")
+    der_sub = p_der.add_subparsers(dest="subcmd", required=True)
+    p_der_c = der_sub.add_parser("collect", help="paginated derivatives history into the Parquet store")
+    p_der_c.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH)")
+    p_der_c.add_argument("--market", default="perp", choices=("perp",),
+                         help="derivatives exist for perp markets only")
+    p_der_c.add_argument("--since", type=int, default=None,
+                         help="first record (UTC epoch ms); default: resume after the last stored one")
+    p_der_c.add_argument("--until", type=int, default=None,
+                         help="last record (UTC epoch ms); default: now")
+    p_der_c.add_argument("--metrics", default=None,
+                         help="comma-separated: funding_rate,open_interest,open_interest_value,"
+                              "mark_price,index_price,basis (default: all)")
+    p_der_c.add_argument("--sleep", type=float, default=0.2,
+                         help="seconds between pages (rate-limit courtesy)")
+    p_der_c.add_argument("--dry-run", action="store_true", help="fetch + count only")
+    p_der_c.add_argument("--json", action="store_true")
+    p_der_c.set_defaults(func=cmd_derivatives)
+    p_der_s = der_sub.add_parser("status", help="what derivatives series are stored")
+    p_der_s.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH)")
+    p_der_s.add_argument("--market", default="perp", choices=("perp",))
+    p_der_s.add_argument("--json", action="store_true")
+    p_der_s.set_defaults(func=cmd_derivatives)
+
+    p_st = sub.add_parser("store", help="inspect the P10 Parquet candle store (count/span/partitions)")
+    p_st.add_argument("--exchange", default="binance")
+    p_st.add_argument("--market", default="perp", choices=("spot", "perp"))
+    p_st.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH, XAU/GOLD)")
+    p_st.add_argument("--tf", default="1m", help="timeframe")
+    p_st.add_argument("--demo", action="store_true",
+                      help="inspect the demo store (data/store_demo) instead of the real one")
+    p_st.add_argument("--root", default=None, help="CandleStore root override")
+    p_st.add_argument("--json", action="store_true")
+    p_st.set_defaults(func=cmd_store)
 
     p_mcp = sub.add_parser("mcp", help="run the Model Context Protocol server (stdio)")
     p_mcp.set_defaults(func=cmd_mcp)
@@ -1755,7 +1938,7 @@ def main(argv: list[str] | None = None) -> int:
         print("                        learn | stats | coach | review | sources | state | glossary |")
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
         print("                        health | desk | doctor | channels | skill | preflight | simulator |")
-        print("                        hidden | correlation | mcp")
+        print("                        hidden | correlation | backfill | store | derivatives | mcp")
         print("=" * 62)
         serve(make_app(), DASHBOARD_HOST, DASHBOARD_PORT)
         return 0

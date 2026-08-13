@@ -127,6 +127,10 @@ def normalise_klines(
     single normalisation point P10.2's backfill (and any future adapter) feeds,
     so exchange-specific quirks never leak past this function.
 
+    A ``closed`` column in the input is honoured — a forming candle
+    (``closed=False``) is marked so the store can drop it before it ever
+    reaches immutable history. When absent, candles are treated as closed.
+
     ``ts`` is expected to already be UTC epoch-ms candle OPEN time. If the
     venue reports the candle close time or seconds, normalise it *here* by
     passing ``ts`` already converted.
@@ -142,7 +146,10 @@ def normalise_klines(
     frame["market"] = market
     frame["symbol"] = symbol
     frame["timeframe"] = timeframe
-    frame["closed"] = True            # persisted history only ever holds closed candles
+    if "closed" in ohlcv.columns:
+        frame["closed"] = ohlcv["closed"]   # coerce_candle_frame cleans it
+    else:
+        frame["closed"] = True              # history is closed unless told otherwise
     frame["source"] = source
     frame["ingested_at"] = ingest
     return coerce_candle_frame(frame)

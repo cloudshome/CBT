@@ -73,6 +73,18 @@ def test_normalise_klines_attaches_context_and_closed_true():
     assert df["close"].tolist() == raw["close"].round(2).tolist()
 
 
+def test_normalise_klines_honours_input_closed_column(store):
+    raw = ohlcv(4)
+    raw["closed"] = [True, True, False, True]      # P10.2 backfill marks the tail
+    df = normalise_klines(raw, exchange=EXCH, market=MARKET,
+                          symbol=SYMBOL, timeframe=TF)
+    assert list(df["closed"]) == [True, True, False, True]
+    store.write(df)                                # forming row never persists
+    back = store.read(EXCH, MARKET, SYMBOL, TF)
+    assert len(back) == 3
+    assert (back["closed"] == True).all()           # noqa: E712
+
+
 def test_coerce_fills_missing_optional_fields():
     df = coerce_candle_frame([{
         "ts": 1_750_000_000_000, "open": 1.0, "high": 2.0,

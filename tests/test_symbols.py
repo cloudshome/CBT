@@ -43,13 +43,15 @@ def test_binance_klines_routes_xau_alias_to_paxg(monkeypatch):
 
     def fake_get_first_host(self, hosts, path, params, timeout=None, retries=None):
         calls.append({"hosts": hosts, "path": path, "params": dict(params)})
-        return [[
+        return ([[
             1_780_000_000_000,
             "2000.0", "2010.0", "1990.0", "2005.0", "12.5",
             1_780_000_900_000, "0", 1, "0", "0", "0",
-        ]]
+        ]], {}, 200)
 
-    monkeypatch.setattr(BinanceClient, "_get_first_host", fake_get_first_host)
+    # klines() routes through the P10.2 header-aware seam (klines_page).
+    monkeypatch.setattr(BinanceClient, "_get_first_host_with_headers",
+                        fake_get_first_host)
     df = BinanceClient().klines("XAU", "15m", 1)
 
     assert calls[0]["path"] == "/api/v3/klines"

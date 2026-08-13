@@ -10,6 +10,122 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.5.0] — 2026-08-13 · branch `arena/019ff948-sky`
+
+MINOR bump: **P10.4 — derivatives as time series**. Funding, open
+interest, mark, index and basis are now persisted into the Parquet store
+(the roadmap's Layer 2) instead of existing only as one live snapshot;
+the `liquidations()` 24h-stats proxy is renamed honestly. Inputs only —
+no strategy, risk-gate, or engine behaviour change.
+
+### Added
+- **`data/derivatives.py`** — the Layer-2 series layer.
+  - `DerivativesStore` — partitioned Parquet store under
+    `data/store/derivatives/**` (gitignored) with the normalised row shape
+    `(ts, exchange, market, symbol, metric, value, ingested_at)` and upsert
+    PK `(exchange, market, symbol, metric, ts)`.
+  - `derive_basis()` — basis = mark − index at timestamps where both are
+    known (accepts raw fetch frames or canonical store frames).
+  - `BinanceDerivativesTransport` — adapter over the new client endpoints
+    with retry/backoff and geo-block awareness; `FakeDerivativesTransport`
+    — deterministic offline stand-in with fault injection.
+  - `DerivativesCollector` — resumable per metric (re-runs continue at the
+    last stored timestamp), idempotent (upsert PK → a completed re-run
+    adds zero rows), pages with rate-limit courtesy, derives basis from
+    the stored mark/index after each run.
+- **`data/binance_client.py`** — derivatives history endpoints:
+  `funding_rate_history()` (`/fapi/v1/fundingRate`), `open_interest_history()`
+  (`/futures/data/openInterestHist`), `mark_price_klines()` and
+  `index_price_klines()` (`/fapi/v1/markPriceKlines` + `/fapi/v1/indexPriceKlines`),
+  `premium_index()` (current mark/index/basis snapshot).
+- **`liquidations()` renamed honestly** → `liquidation_stats_proxy()`: the
+  roadmap's P10.4 done-when ("proxy renamed honestly"). Real forced-order
+  data cannot be backfilled (WS `!forceOrder@arr` only); the method's
+  docstring now says so and no misleading alias remains.
+- **CLI** — `python main.py derivatives collect --symbol BTCUSDT`
+  (paginated history into the store; `--since/--until/--metrics/--dry-run/
+  --json`) and `python main.py derivatives status` (per-metric counts +
+  UTC span).
+- **Tests** — `tests/test_derivatives.py`: 20 offline tests (schema/store,
+  upsert, metric isolation, basis derivation + join semantics, fake
+  transport shape, collect-all, idempotent re-run, resume, metric
+  selection, basis ⇒ mark+index, dry-run, XAU rejection, unknown metric,
+  transient-fault retry, honest-rename assertion). `SampleClient` gained
+  the four demo history methods so `DEMO_MODE=1` stays fully offline.
+
+### Changed
+- Version 2.4.1 → 2.5.0 (`config.py`, `pyproject.toml`).
+- `docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `TODO.md`, `SESSION_STATE.md` —
+  P10.4 marked shipped; next milestone P10.5 (quality pillar).
+
+### Notes
+- Tests **383 → 403 pass / 1 skip** (+20), fully offline.
+- The sandbox has no network egress; the real derivatives fetch runs on a
+  Binance-reachable machine:
+  `python main.py derivatives collect --symbol BTCUSDT` (resumes on re-run;
+  inspect with `python main.py derivatives status`).
+
+---
+
+## [2.4.1] — 2026-08-13 · branch `arena/019ff948-sky`
+
+PATCH bump: **P10.2 hardening** — fixes two real defects in the P10.2
+first cut (2.4.0) so the data-independence layer cannot silently corrupt
+itself. Inputs only; no strategy, risk-gate, or engine behaviour change.
+
+### Fixed
+- **Perp backfill was storing spot candles labelled `market=perp`.**
+  The first cut paged `/api/v3/klines` (spot) for every market. The
+  default transport now routes `market="perp"` through `/fapi/v1/klines`
+  (`BinanceClient.klines_page()`, geo-friendly mirror first) so the
+  roadmap's primary series is actually perp. Spot candles are never
+  labelled perp; XAUUSD (no perp market) fails with an honest message
+  instead of writing mislabelled data.
+
+### Added
+- `data/binance_client.py` — `klines_page()`: one raw 1000-candle page
+  for `spot` or `perp`, returning a `PageResult` with rate-limit headers
+  and HTTP status. Header-aware `_get_with_headers` /
+  `_get_first_host_with_headers`; existing `klines()` behaviour unchanged
+  (routes through the same seam).
+- `data/store.py` — `normalise_klines()` honours an input `closed`
+  column (forming candles stay out of history; default remains closed).
+- **Real rate-limit handling** in `data/backfill.py` (the 2.4.0 cut only
+  slept `sleep_s` between pages):
+  - exponential backoff on 429/network errors (`backoff_attempts` /
+    `backoff_base`),
+  - pacing on Binance's `x-mbx-remaining-weight` header (low budget →
+    extra sleep; exhausted → longer),
+  - immediate abort on geo-blocks (403/451) instead of hammering a wall,
+  - `max_requests` cap (default 5000 on the CLI; 0 = unlimited) — an
+    interrupted run resumes where it stopped,
+  - forming-tail-candle rule: `ts + timeframe ≤ now` is the definition of
+    closed; the still-forming candle is skipped and picked up next run.
+- CLI — `backfill` gains `--since`/`--until` (epoch ms, ISO date, or `90d`
+  style), `--max-requests`, `--dry-run`; output shows hardening stats
+  (rate-limit stalls, retries, forming skipped) and a
+  "✓ idempotent re-run — zero rows added" line. New `python main.py store`
+  command inspects the store (count, UTC span, year/month partitions).
+- `tests/test_backfill.py` — 2.4.0's 7 tests retained; +13 hardening tests
+  (perp routing, forming-candle drop + top-up, 429 backoff + exhaustion,
+  network-error retry, geo-block abort, weight-header pacing,
+  max-requests cap + resume, dry-run, ts parsing).
+
+### Changed
+- Version 2.4.0 → 2.4.1 (`config.py`, `pyproject.toml`).
+- `.gitignore` — `data/store_demo/` (explicit demo sandbox for `store --demo`).
+- `docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `TODO.md`, `SESSION_STATE.md` —
+  P10.2 marked hardened; P10.3 marked shipped; next milestone P10.4.
+
+### Notes
+- Tests **368 → 383 pass / 1 skip** (+15: 13 hardening + 1 store closed-column
+  + 1 unbounded-backfill regression), fully offline.
+- The sandbox has no network egress; the real perp fetch runs on a
+  Binance-reachable machine:
+  `python main.py backfill --symbol BTCUSDT --market perp --tf 1m`.
+
+---
+
 ## [2.4.0] — 2026-08-12 · branch `arena/019ff5b1-sky`
 
 MINOR bump: **P10.2** (Binance paginated REST backfill) + **P10.3**
@@ -80,6 +196,60 @@ strategy, risk-gate, or engine behaviour change.
   `docs/.github/workflows/ci.yml` — nested under `docs/`, so GitHub
   never runs it).
 - TODO-8: human protects `main` (require PR). Token gets 403.
+
+---
+
+## [2.4.0] — 2026-08-13 · branch `arena/019ff948-sky`
+
+MINOR bump: **P10.2 — Binance paginated REST backfill**, the second
+shippable milestone of P10 (data independence). Reuses the existing
+`BinanceClient` transport, pages 1m history into the P10.1 store, and is
+resumable + rate-limit aware; a completed re-run adds **zero rows**
+(the milestone's done-when, proven offline). No strategy, risk-gate, or
+engine behaviour changed — this fills the input-side storage layer.
+
+### Added
+- **`data/backfill.py`** — `BinanceBackfiller`: paginated, resumable,
+  rate-limit-aware OHLCV backfill.
+  - Resumes at the last stored candle + 1 timeframe; an interrupted run
+    (`--max-requests` cap, network drop, Ctrl+C) continues where it stopped.
+  - Idempotent: the store's upsert PK makes re-runs and `--since` repairs
+    add zero rows by construction.
+  - Rate-limit aware: paced `--interval` between pages, exponential backoff
+    on 429/network errors, extra sleep when Binance's
+    `x-mbx-remaining-weight` header reports a low budget, immediate abort on
+    geo-blocks (403/451) — nothing is hammered and nothing is half-written.
+  - Forming-candle safety: a candle is only closed when
+    `ts + timeframe ≤ now`; the still-forming tail is skipped and picked up
+    by the next run once closed (incremental top-up).
+  - `FakePagedTransport` — deterministic offline stand-in (fault/weight
+    injection) so the milestone is fully testable with zero network, and
+    `DEMO_MODE=1` runs into the gitignored `data/store_demo/` root.
+- **`data/binance_client.py`** — `klines_page()`: one raw 1000-candle page
+  for `spot` (`/api/v3/klines`, geo-friendly mirror first) or `perp`
+  (`/fapi/v1/klines`), returning a `PageResult` with rate-limit headers and
+  HTTP status. Existing `klines()` behaviour unchanged (routes through the
+  same seam). Header-aware `_get_with_headers` /
+  `_get_first_host_with_headers` helpers added; `_get` semantics preserved.
+- **`data/store.py`** — `normalise_klines()` honours an input `closed`
+  column (forming candles marked by the backfill stay out of history;
+  default remains closed).
+- **CLI** — `python main.py backfill` (paged fetch into the Parquet store;
+  `--symbol/--market/--tf/--since/--until/--page-size/--interval/--max-requests/
+  --dry-run/--demo/--json`) and `python main.py store` (count, UTC span,
+  year/month partitions, `--json`).
+- **Tests** — `tests/test_backfill.py`: 21 offline tests (fresh backfill,
+  re-run zero-rows, resume, `--since` repair, dry-run, forming-candle skip
+  + top-up, 429 backoff, geo-block abort, weight-header pacing,
+  max-requests cap + resume, input validation, ts parsing). Plus a
+  `closed`-column test in `tests/test_store.py` and the XAU routing test
+  updated to the new transport seam.
+
+### Changed
+- Version 2.3.0 → 2.4.0 (`config.py`, `pyproject.toml`).
+- `.gitignore` — `data/store_demo/` (DEMO_MODE backfill sandbox).
+- `docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `TODO.md`, `SESSION_STATE.md` —
+  P10.2 marked shipped; next milestone P10.3 (gaps + aggregation).
 
 ---
 

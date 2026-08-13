@@ -1,8 +1,12 @@
 # DATA_INFRASTRUCTURE_ROADMAP.md — P10 · SKY Market Terminal
 
-> **Status:** in progress — **P10.1–P10.3 shipped** (2026-08-12): schema
-> + store, Binance paginated backfill, gap detect/repair + 1m rollups.
-> Next: P10.4 (derivatives series).
+> **Status:** in progress — **P10.1–P10.4 shipped** (P10.1–P10.3 on
+> 2026-08-12; P10.4 derivatives series on 2026-08-13). On 2026-08-13 the
+> P10.2 backfill was also **hardened** (PR #12): it now pages the real
+> perp endpoint (`/fapi/v1/klines`) instead of labelling spot candles
+> `market=perp`, and rate-limit handling went from a between-pages nap to
+> weight-header pacing + exponential backoff + geo-block abort.
+> Next: P10.5 (data-quality pillar).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -370,10 +374,10 @@ documented state. Ordered by value-per-session, same as `TODO.md`.
 | # | Milestone | Deliverable | Done when |
 |---|---|---|---|
 | **P10.1** | Schema + store | `data/store.py` + `data/store/**` (gitignored): normalised `Candle`, Parquet read/write, upsert PK | ✅ shipped — 1m round-trips; dedup + ordering tested offline |
-| **P10.2** | Binance backfill | paginated REST backfill reusing `binance_client`, resumable, rate-limit aware | 1m BTCUSDT perp history on disk; re-run adds zero rows |
-| **P10.3** | Gaps + aggregation | gap detector, repair, 1m→5m/15m/1h/4h/1d rollups | synthetic gaps detected+repaired; rollups match venue candles |
-| **P10.4** | Derivatives series | persist funding / OI / mark / index / basis over time | series queryable; `liquidations()` proxy renamed honestly |
-| **P10.5** | Quality pillar | per-source checks wired into `readiness_strip()` | corrupt fixture ⇒ quarantine ⇒ no signal, proven by test |
+| **P10.2** | Binance backfill | paginated REST backfill reusing `binance_client`, resumable, rate-limit aware | ✅ shipped (`data/backfill.py`; re-run adds zero rows). **Hardened 2026-08-13:** real perp endpoint (`/fapi/v1/klines`), weight-header pacing, exponential backoff, geo-block abort, forming-candle rule, `--max-requests` cap |
+| **P10.3** | Gaps + aggregation | gap detector, repair, 1m→5m/15m/1h/4h/1d rollups | ✅ shipped — synthetic gaps detected+repaired; rollups match venue candles |
+| **P10.4** | Derivatives series | persist funding / OI / mark / index / basis over time | ✅ shipped — `data/derivatives.py` (store + collector + fake transport), `python main.py derivatives collect/status`; series queryable; `liquidations()` renamed honestly to `liquidation_stats_proxy()` |
+| **P10.5** | Quality pillar | per-source checks wired into `readiness_strip()` | ⏭ **next** — corrupt fixture ⇒ quarantine ⇒ no signal, proven by test |
 | **P10.6** | Bybit adapter | second exchange behind the same normalised schema | identical assertions pass for both adapters |
 | **P10.7** | Cross-exchange | generalise `_cross_exchange_probe()` into a stored series | premium/discount + funding spread queryable |
 | **P10.8** | Lightweight Charts | vendored chart replaces `chartSVG()`; price+volume pane | dashboard renders stored data; no new runtime dep |
