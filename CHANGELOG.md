@@ -10,7 +10,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased] — PR #14 · branch `arena/019ff9cf-sky`
+## [2.7.1] — 2026-08-13 · branch `arena/019ffa5d-sky`
+
+PATCH bump: **Freqtrade recommendation reviewed and rejected**,
+reconciled onto merged P10.6 (PR #14). Docs + contract tests only.
+No engine, risk-gate, or strategy behaviour change. The desk is not
+rebuilt around a bot.
+
+### Added
+- **`docs/FREQTRADE_REVIEW.md`** — keep/cut of a 31-section ChatGPT
+  Freqtrade audit against the live SKY desk. Decisions **F1–F8**:
+  Freqtrade / Hyperopt / FreqAI out; strategy-catalog expansion out;
+  repo reset out; the useful research-integrity ideas become **P12**
+  (walk-forward / OOS / lookahead / quality score / strategy score /
+  conditioned expectancy / MC ruin) on *our* backtester after P10.11.
+- **TODO-13 / P12** — SKY Quant Validation Engine, parked until
+  P10.11. Next *code* is **P10.7** (P10.6 Bybit already on `main`).
+- **Invariant #13** in `ARCHITECTURE.md`: SKY is the brain, not a
+  trading bot.
+- Contract tests in `tests/test_handoff_memory.py` so a future
+  session cannot quietly re-adopt Freqtrade.
+
+### Changed
+- Reconciled onto `origin/main` @ `e233580` (PR #14 / P10.6) so PR #15
+  can merge: both the Bybit adapter and the F1–F8 decisions are kept.
+- `TODO.md`, `SESSION_STATE.md`, `AI_ANATOMY_ROADMAP.md`,
+  `docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `docs/INFRASTRUCTURE_LAYERS.md`,
+  `PROFESSIONAL_PLAN_DECISIONS.md`, `BLUEPRINT.md`, `SKILL.md`,
+  `README.md` — F1–F8 recorded; next code pointed at P10.7.
+- Version 2.7.0 → **2.7.1** (`config.py`, `pyproject.toml`).
+- Suite **441 → 445 pass / 1 skip** (+4), fully offline.
+
+---
+
+## [Unreleased] — PR #14 · branch `arena/019ff9cf-sky` (merged as 2.7.0)
 
 **Two parts, two PRs.** (1) Parallel-session reconciliation: this
 session built its own P10.2 backfill on a base that predated PR #11

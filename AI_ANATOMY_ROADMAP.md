@@ -2,7 +2,7 @@
 
 ```
 Progress: [████████████████████████████████████████] 100% (Phases P1–P6 Complete)
-Tests:    259 Items (258 Passed, 1 Conditional Skip — 100% Pass Rate)
+Tests:    428 passed / 1 skip (offline, DEMO_MODE=1)
 Status:   Production-Ready Institutional Desk & Autonomous Architecture
 Note:     This repo consolidates Cloudslover/AI + cloudshome/AI (see MERGE_NOTES.md)
 ```
@@ -154,7 +154,7 @@ When continuing in a new session or machine:
    ```
 
 2. **Remaining Progression Ladder**:
-   - **Step 1: Live Market Feed**: Connect Binance live API keys or run against live BTC/ETH/GOLD WebSocket/REST feed.
+   - **Step 1: Live Market Feed**: Public Binance REST (no keys). Never add trading credentials.
    - **Step 2: Collect 100–200 Paper Samples**: Run `python main.py paper --watch` in `PROGRESSION=simulator` mode to accumulate statistical sample size.
    - **Step 3: Self-Calibration**: Run `python main.py learn` to update proven setups from real paper-trade outcomes.
    - **Step 4: Transition to Micro**: Set `PROGRESSION=micro` in `.env` once setup expectancy is mathematically proven.
@@ -206,24 +206,28 @@ can reach past one API response.
 
 | Phase | Theme | Deliverables | Status |
 |---|---|---|:---:|
-| **P11** | **Paper-book proof** | Grind `simulator` to a real 100 backtest / 20 decided-paper samples · journal closed trades so `compliance` stops being `None` · move the graduation gate | 🔜 **Next** |
-| **P10** | **Data infrastructure + market terminal** | Normalised candle schema · Parquet store · Binance + Bybit backfill · derivatives as time series · data-quality pillar · Lightweight Charts terminal · WebSocket tier · feature store | 📋 Planned — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Regime-conditional backtests** | Backtests over years of stored data, conditioned on OI / funding / CVD / regime | ⏸ After P10 |
+| **P11** | **Paper-book proof** | First grind shipped (38,439 decided; 100/20 on all four primary setups; compliance 100%; sell-R bug fixed). Graduation gate **honestly CLOSED** (+0.263R / 34.1% / PF 1.40). Keep grinding live data; do not move the bar. | 🔄 In progress |
+| **P10** | **Data infrastructure + market terminal** | P10.1–P10.6 shipped (schema, Binance backfill, gaps/rollups, derivatives series, quality pillar, Bybit adapter). Next: **P10.7 cross-exchange**. Then charts / WS / store-backed backtest / feature store. | 🔄 In progress — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
+| **P12** | **SKY Quant Validation Engine** | Walk-forward / OOS / lookahead / R-report / quality score / strategy score / funding-OI-CVD-conditioned expectancy / MC ruin — on **our** backtester + **our** store. Starts after P10.11. | ⏸ After P10.11 — [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8 |
 
-**P11 runs before P10 deliberately.** P11 is days of grinding code that
-already exists; P10 is weeks of new infrastructure. Finishing P11 first
-keeps the graduation ladder moving and gives P10's backfill a working
-proof-loop to feed.
+**P11 runs alongside P10.** The first grind is done; the gate is still
+closed on the blueprint bar. Do not let the data project become a
+reason to stop proving the edge, and do not loosen the bar.
 
 **P10's definition of done:** *"How did this setup perform when price
 rose, OI rose, funding was negative, and CVD was positive?"* answered
-with a number computed from our own stored data.
+with a number computed from our own stored data (P10.12 + P12.6).
+
+**P12 is not Freqtrade.** A 2026-08-13 review rejected Freqtrade /
+Hyperopt / FreqAI as a SKY dependency (F1–F3). The useful research-
+integrity ideas from that note *are* P12, built on `data/backtester.py`.
 
 **Out of scope for P10 (deliberate):** exchange trading credentials or
 signed endpoints (forever — a collector that can authenticate is a
 collector that can trade), paid data vendors, PostgreSQL/Redis/Docker/
 FastAPI/React (SKY stays single-process with five runtime deps —
-see roadmap §1), alt-coins beyond BTC then ETH.
+see roadmap §1), alt-coins beyond BTC then ETH, **Freqtrade / any
+exchange-order bot**.
 
 **Full planning document:** [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md)
 — includes honest alignment check, per-phase risk + rollback,

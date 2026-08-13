@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-13 (TODO-12/P10 — **P10.1–P10.6 shipped**; P10.2 hardened; P10.5 quality pillar live; P10.6 Bybit adapter live; next is P10.7)
+**Last updated:** 2026-08-13 (PR #15 reconciles onto merged P10.6: Freqtrade F1–F8 recorded, P12 named; **P10.1–P10.6 shipped**; next *code* is P10.7)
 
 ---
 
@@ -21,7 +21,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 441 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 445 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -43,23 +43,26 @@ Independence has two halves. SKY currently owns one of them:
 | Half | Meaning | Status |
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
-| **Data independence** | Our own stored market history | ❌ **P10** |
+| **Data independence** | Our own stored market history | 🔄 **P10** (P10.1–P10.6 shipped; P10.7 next) |
 
 Everything below is ordered by how directly it moves those two lines.
-Anything that moves neither is out of scope.
+Anything that moves neither is out of scope. A 2026-08-13 audit of a
+“put Freqtrade under SKY” recommendation is in
+[`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) — **F1–F8 are
+decided**. Do not reopen them to install a bot.
 
 ---
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-13):** the active major milestone is **P10** and
-> P10.1–P10.6 are shipped. P10.2 was hardened (PR #12: real perp
-> endpoint, weight-header pacing, geo-block abort); P10.3 gaps/rollups
-> and P10.4 derivatives series shipped the same day; P10.5 (data-quality
-> pillar) shipped via PR #13 (merged); P10.6 (Bybit adapter) via PR #14. The paper book
-> (TODO-11) first-grind is done; what remains there is ongoing data
-> collection/grinding that can run alongside P10.
-> **P10.7 is the concrete next build below.**
+> **Order note (2026-08-13, this session):** the operator merged PR #14
+> (P10.6 Bybit) while PR #15 (Freqtrade review) was open. This file
+> now holds **both**. Verdict on the bot: **do not adopt Freqtrade,
+> Hyperopt, or FreqAI** (F1–F3). The useful ideas become **TODO-13 /
+> P12** on *our* backtester, after P10.11. The active major milestone
+> is still **P10**. **P10.1–P10.6 are shipped.** The paper book
+> (TODO-11) first-grind is done; grind continues alongside.
+> **P10.7 is the concrete next *code* build below.**
 
 ### TODO-12 / P10.7 · Cross-exchange series · the next P10 milestone
 
@@ -154,7 +157,8 @@ are shipped.** Do not start milestone N+1 until N is green.
 
 **Phase done when** we can ask *"how did this setup perform when price
 rose, OI rose, funding was negative, and CVD was positive?"* and get a
-number computed from our own data.
+number computed from our own data. That number is produced by
+**P10.11/P10.12 + P12 on `data/backtester.py`**, not by Freqtrade.
 
 **Corrections already applied to the incoming plan** (detail in §1 of
 the roadmap doc — these are the load-bearing ones):
@@ -217,6 +221,30 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 **Both are now behind P10 as well as the graduation gate.** Owning our
 data moves the aim; wrapping the engine in another chat UI does not.
 
+### TODO-13 · P12 · SKY Quant Validation Engine · AFTER P10.11
+
+📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8.**
+
+This is the only part of the Freqtrade note worth building — and we
+build it **on our grader + our store**, not on a bot.
+
+Do **not** start until P10.11 is green (backtester reads Parquet).
+Years of locked train/val/OOS windows are impossible on a 500-candle
+fetch. Do **not** let this jump the queue ahead of P10.7.
+
+| # | Milestone | Done when |
+|---|---|---|
+| P12.1 | Locked walk-forward protocol (train / val / OOS / recent) | A setup cannot “pass” on the training window alone |
+| P12.2 | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form |
+| P12.3 | Single boxed R-report (long/short, regime, session) | One command, one block; most math already in `stats` |
+| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low |
+| P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` |
+| P12.6 | Conditioned expectancy (OI / funding / CVD / regime) | The original P10/P12 question, answered from our store |
+| P12.7 | MC ruin / worst streak / recovery | Graduation can see survivability, not just mean E |
+
+**Not in P12:** Hyperopt, FreqAI, a strategy-module catalog, auto
+capital allocation (F7 — parked until graduation + >1 proven edge).
+
 ### TODO-9 · Dify as a *separate* research layer · AFTER graduation + P10
 
 Not a SKY dependency. Deploy Dify elsewhere and point it at SKY's
@@ -230,7 +258,30 @@ multi-model chat panel is still wanted after Dify.
 
 ---
 
-## ✅ Done this session (2026-08-12 · `arena/019ff579-sky`)
+## ✅ Done this session (2026-08-13 · `arena/019ffa5d-sky`)
+
+### Freqtrade recommendation reviewed · F1–F8 decided · no reset
+
+A full ChatGPT Freqtrade audit (use it as execution + backtest +
+strategy runtime; build a Quant Validation Engine) was compared to
+the live SKY desk. **The repo is not rebuilt.** SKY already *is*
+the brain + risk gate + R-expectancy loop. Freqtrade would violate
+invariant #1 (never place an order) and A1 (one tested edge).
+
+**Kept (as P12, after P10.11):** walk-forward / OOS protocol,
+lookahead command, boxed R-report polish, Backtest Quality Score,
+strategy score on the calibrator, funding-as-of-T, MC ruin/streaks.
+
+**Rejected:** Freqtrade itself, Hyperopt, FreqAI, a strategy-module
+catalog, auto capital allocation, resetting the repo.
+
+Load-bearing doc: `docs/FREQTRADE_REVIEW.md`. Reconciled onto
+merged P10.6 (PR #14). Next *code* is **P10.7**. Version **2.7.0 →
+2.7.1**. Suite 441 → **445 pass / 1 skip** (+4 contract tests).
+
+---
+
+## ✅ Done in a prior session (2026-08-12 · `arena/019ff579-sky`)
 
 ### TODO-12 / P10.1 · Schema + Parquet store · ✅ DONE
 
@@ -302,8 +353,9 @@ One readiness verdict across channels + immune system + risk gate
 | TODO-7 | Paste the wheel-gate job into the real `.github/workflows/ci.yml` | human |
 | TODO-8 | Protect `main` (require PR, no direct push) | human / recommend yes |
 
-D1–D5 are already recorded. Do **not** start TODO-9/TODO-10 this
-session or the next.
+D1–D5 and **F1–F8** are already recorded. Do **not** start
+TODO-9/TODO-10/TODO-13 this session. Do **not** reopen F1–F3 to
+install a trading bot.
 
 ---
 
@@ -335,3 +387,16 @@ session or the next.
   else until the pipeline is proven.
 - **PostgreSQL, Redis, Docker, FastAPI, React/Next.js.** See the
   corrections in TODO-12 / roadmap §1.
+- **Freqtrade, Hyperopt, FreqAI, or any exchange-order bot.**
+  Reviewed 2026-08-13 and rejected (F1–F3 in
+  `docs/FREQTRADE_REVIEW.md`). Do not `pip install freqtrade`, do not
+  vendor it, do not write `execution/freqtrade_adapter.py`. SKY is
+  the brain; the strategy runtime is `engine/rules.py`; the
+  backtester is `data/backtester.py`.
+- **A new catalog of strategy modules** (trend / mean-reversion /
+  momentum / …) before the primary family clears the graduation bar
+  (F4). A1 stands: `sweep_trend_continuation` only.
+- **Auto strategy-allocation / capital routing across strategies**
+  (F7). Parked until graduation *and* more than one proven edge.
+- **Resetting the repository around a third-party bot** (F8). The
+  desk, the gate, the paper loop, and P10 stay.

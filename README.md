@@ -51,6 +51,13 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 
 ---
 
+> **SKY is the brain. SKY is not a trading bot.** We do not use
+> Freqtrade (or any exchange-order framework). The machine proposes,
+> the human approves, the paper-runner simulates. A 2026-08-13 review
+> of “put Freqtrade under SKY” is in
+> [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) — rejected.
+> Next code is still owning our market data (P10), not installing a bot.
+
 ## 🏗 Architecture
 
 ```

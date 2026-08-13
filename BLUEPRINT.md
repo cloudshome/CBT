@@ -121,6 +121,11 @@ Sweep a fixed portion of profits (e.g. 50%) into long-term spot reserves:
 - **ETH** — the decentralized compute layer
 - **GOLD / PAXG** — macro hedge against fiat inflation and volatility
 
+> **SKY is the brain, not a bot.** We do not run Freqtrade (or any
+> exchange-order framework). Paper-only until the graduation gate.
+> If live micro ever happens, it is a SKY-owned thin adapter — never
+> a third-party strategy runtime. See `docs/FREQTRADE_REVIEW.md`.
+
 ## 🛡️ The 5 Golden Rules of the Trading Brain
 
 1. **Protect capital above all** — a stopped-out trade with rules followed is

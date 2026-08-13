@@ -7,10 +7,10 @@
 > **Read when:** starting work on a module you haven't touched in
 > ≥1 session.
 
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-13
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.2.0` (also `pyproject.toml`).
+**Version:** `config.VERSION` = `2.7.1` (also `pyproject.toml`).
 
 ---
 
@@ -20,18 +20,19 @@
 | File | Purpose |
 |---|---|
 | `main.py` | argparse CLI dispatcher (~30 `cmd_*` subcommands) |
-| `config.py` | Env-driven config; `VERSION = "2.2.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
+| `config.py` | Env-driven config; `VERSION = "2.7.1"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
 | `mcp_server.py` | Zero-dep stdio JSON-RPC 2.0 MCP server (read-only tool permission map) |
 | `SKILL.md` | Agent-facing skill file (the one AI agents read first) |
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
 | `TODO.md` | Prioritised remaining work |
 | `ARCHITECTURE.md` | This file |
-| `CHANGELOG.md` | What shipped, when (current through v2.2.0) |
+| `CHANGELOG.md` | What shipped, when (current through v2.7.1) |
 | `BLUEPRINT.md` | The 4-step path from paper to real capital |
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
 | `MERGE_NOTES.md` | Provenance of the Cloudslover + cloudshome merge |
 | `AI_ANATOMY_ROADMAP.md` | Live status of P1–P12 |
+| `docs/FREQTRADE_REVIEW.md` | **F1–F8** — Freqtrade rejected; P12 is our validation engine |
 
 ### `brain/` — the desk brain
 | Module | Purpose | Used by |
@@ -107,7 +108,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 47 test modules, 441 pass / 1 skip
+### `tests/` — 47 test modules, 445 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
@@ -122,14 +123,17 @@
 ### `docs/`
 - `agent_install.md` — **NEW (P7)** the one-pager an agent fetches when
   told "install CryptoBrain."
-- `INFRASTRUCTURE_LAYERS.md` — OpenHands / Dify / LibreChat vs SKY.
-  Study only; never vendor. Dify after graduation *and* P10;
-  LibreChat last.
+- `INFRASTRUCTURE_LAYERS.md` — OpenHands / Dify / LibreChat / **Freqtrade**
+  vs SKY. Study only; never vendor. Freqtrade never. Dify after
+  graduation *and* P10; LibreChat last.
 - `DATA_INFRASTRUCTURE_ROADMAP.md` — **P10**, the next major
   milestone: own the market data (normalised schema → Parquet store →
-  Binance/Bybit backfill → derivatives series → quality pillar (✅ P10.5) →
+  Binance/Bybit backfill (✅ P10.6) → derivatives series → quality pillar (✅ P10.5) →
   Lightweight Charts terminal → WebSocket tier → feature store).
   12 shippable milestones. Read it in full before writing any P10 code.
+- `FREQTRADE_REVIEW.md` — 2026-08-13 audit of a “use Freqtrade as
+  the execution + backtest layer” recommendation. Verdict: reject the
+  bot, keep the research-integrity ideas as P12 on our stack.
 - `wheel-gate-job.yml` — job spec a human pastes into
   `.github/workflows/ci.yml` (TODO-7).
 
@@ -170,7 +174,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 441 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 445 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -208,6 +212,16 @@
     it, and the store itself refuses `closed=False`. Market data
     collectors are read-only public endpoints: no keys, no signed
     requests, ever.
+
+13. **SKY is the brain. SKY is not a trading bot.** Do not add
+    Freqtrade, Hyperopt, FreqAI, or any exchange-order framework
+    (`docs/FREQTRADE_REVIEW.md`, F1–F3). The strategy runtime is
+    `engine/rules.py` + `engine/signal_engine.py`. The backtester is
+    `data/backtester.py`. Live execution, if it ever exists, is a
+    SKY-owned thin adapter *after* the graduation gate — never a
+    third-party strategy runtime. Do not expand the strategy catalog
+    until the primary family (`sweep_trend_continuation`) clears the
+    graduation bar (F4).
 
 ---
 
@@ -299,5 +313,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **323 pass, 1 skip**. Any new feature must
+The expected baseline is **445 pass, 1 skip**. Any new feature must
 maintain or increase this count.

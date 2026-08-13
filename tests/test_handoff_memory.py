@@ -88,3 +88,50 @@ def test_infrastructure_layers_doc_exists_and_forbids_vendoring():
     assert "not" in text and "dependenc" in text
     assert "dify" in text and "librechat" in text and "openhands" in text
     assert "graduation" in text
+    assert "freqtrade" in text, (
+        "Freqtrade was reviewed and rejected — the layers doc must "
+        "keep saying so or a future session re-adopts the bot"
+    )
+
+
+def test_freqtrade_review_exists_and_records_f_decisions():
+    """F1–F8 must survive session death. Do not install the bot."""
+    doc = ROOT / "docs" / "FREQTRADE_REVIEW.md"
+    assert doc.exists(), "docs/FREQTRADE_REVIEW.md missing — see F1–F8"
+    text = doc.read_text(encoding="utf-8")
+    lower = text.lower()
+    for needle in ("F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"):
+        assert needle in text, f"Freqtrade review must keep decision {needle}"
+    assert "freqtrade" in lower
+    assert "hyperopt" in lower
+    assert "freqai" in lower
+    # the binding refusals
+    assert "do not add" in lower or "rejected" in lower or "no." in lower
+    assert "p12" in lower, "the kept ideas must stay named as P12"
+
+
+def test_todo_forbids_freqtrade_and_names_p12():
+    text = (ROOT / "TODO.md").read_text(encoding="utf-8")
+    assert "TODO-13" in text, "P12 must be a real TODO, not a comment"
+    assert "FREQTRADE_REVIEW.md" in text
+    lower = text.lower()
+    assert "freqtrade" in lower
+    assert "hyperopt" in lower
+    # out-of-scope list must name the bot so it is not re-added
+    scope = text.split("Explicitly out of scope", 1)[-1]
+    assert "freqtrade" in scope.lower()
+
+
+def test_architecture_invariant_thirteen_rejects_trading_bots():
+    text = (ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").lower()
+    assert "invariant" in text
+    assert "freqtrade" in text
+    assert "not a trading bot" in text or "sky is not a trading bot" in text
+
+
+def test_data_roadmap_rejects_freqtrade_as_backtester():
+    text = (ROOT / "docs" / "DATA_INFRASTRUCTURE_ROADMAP.md").read_text(
+        encoding="utf-8"
+    ).lower()
+    assert "freqtrade" in text
+    assert "p10.11" in text

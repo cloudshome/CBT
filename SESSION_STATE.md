@@ -10,16 +10,25 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-13 (PR #13 merged — reconciliation + P10.5; P10.6 Bybit adapter goes out as PR #14)
-**Branch:** `arena/019ff9cf-sky`
+**Last updated:** 2026-08-13 (PR #15 reconciles onto merged P10.6: F1–F8 decided; next code is P10.7)
+**Branch:** `arena/019ffa5d-sky`
 **HEAD commit:** see "Last commit" below
-**Default branch:** `main` @ `21e22cd` (PR #13 merged 2026-08-13: reconciliation + P10.5)
-**PR:** [#14](https://github.com/Azimshawon/SKY/pull/14) — this branch → `main`.
-(PR #13 — reconciliation + P10.5 — was merged by the operator mid-session;
-P10.6 continues in its own PR, rebased onto the merge.)
+**Default branch:** `main` @ `e233580` (PR #14 merged: P10.6 Bybit adapter)
+**PR:** [#15](https://github.com/Azimshawon/SKY/pull/15) — this branch → `main`.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session's decision — part 1: a parallel-session race, resolved
+> **This session (`arena/019ffa5d-sky`): Freqtrade recommendation
+> reviewed and rejected.** A ChatGPT audit proposed putting Freqtrade
+> under SKY as execution + backtest + strategy runtime, plus a Quant
+> Validation Engine. Compared to the live desk: SKY already *is* the
+> brain, the risk gate, and the R-expectancy loop. Adopting Freqtrade
+> would violate invariant #1 (never place an order) and A1 (one tested
+> edge). **The repo is not reset.** Decisions F1–F8 are in
+> `docs/FREQTRADE_REVIEW.md`. The useful ideas become **P12** on our
+> backtester after P10.11. P10.6 (Bybit) is now on `main` via PR #14.
+> Next *code* is **P10.7** (cross-exchange series).
+>
+> **Prior session's decision — part 1: a parallel-session race, resolved
 > by reconciling instead of duplicating.** The session branched from
 > `main` @ `ee99486` (post-PR-#10) and built its own P10.2 backfill.
 > Mid-session it discovered two *other* Arena sessions had already
@@ -81,16 +90,17 @@ plan (18 phases, 15-item rulebook) is in
 **Become a fully independent, consistently profitable trader.**
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
-(our own stored market history — 🔄 P10.1–P10.6 shipped). Every phase
+(our own stored market history — 🔄 P10.1–P10.6 shipped; P10.7 next). Every phase
 below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P10 (data infrastructure + market terminal) — P10.1–P10.6 shipped;
-P10.2 hardened (2026-08-13).** P9 complete; P11 first grind shipped;
-graduation gate still closed. Open items: TODO-7, TODO-8; P10.7 → P10.12.
+**P10 (data infrastructure + market terminal) — P10.1–P10.6 shipped.**
+P9 complete; P11 first grind shipped; graduation gate still closed.
+Freqtrade rejected (F1–F8). Open items: TODO-7, TODO-8; P10.7 → P10.12;
+P12 parked until P10.11.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -104,8 +114,8 @@ graduation gate still closed. Open items: TODO-7, TODO-8; P10.7 → P10.12.
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
-| **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1–P10.4 shipped**; P10.2 hardened 2026-08-13 (real perp endpoint + rate-limit machinery); P10.5 (quality pillar) next. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Regime-conditional backtests** | ⏸ After P10 | Years of stored data, conditioned on OI / funding / CVD |
+| **P10** | **Data infrastructure + market terminal** | 🔄 In progress | **P10.1–P10.6 shipped**; next **P10.7** cross-exchange. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
+| **P12** | **Quant Validation Engine** | ⏸ After P10.11 | Walk-forward / lookahead / quality score / conditioned E — `docs/FREQTRADE_REVIEW.md` |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -114,7 +124,45 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-13 (this branch): PR #13 + PR #14 — reconciliation, P10.5 quality pillar, P10.6 Bybit adapter
+### Session 2026-08-13 (this branch `arena/019ffa5d-sky`): Freqtrade review · F1–F8 · reconciled onto P10.6
+
+The operator merged PR #14 (P10.6 Bybit, `main` @ `e233580`) while
+PR #15 was open. This session merged `origin/main` and kept **both**
+the Bybit adapter and the F1–F8 decisions. **No runtime engine
+change beyond what #14 already shipped.** Docs + contract tests.
+Version **2.7.0 → 2.7.1**. Suite **441 → 445 pass / 1 skip** (+4).
+
+**What was reviewed:** a ChatGPT Freqtrade audit (use Freqtrade as
+execution + backtest + strategy runtime; modular strategy catalog;
+Hyperopt-with-caution; FreqAI later; Quant Validation Engine).
+
+**What was decided (see `docs/FREQTRADE_REVIEW.md`):**
+- **F1/F2/F3 = No** — do not adopt Freqtrade, Hyperopt, or FreqAI.
+- **F4 = No** — do not expand the strategy catalog before graduation.
+- **F5/F6 = Yes** — the validation ideas become **P12** on *our*
+  backtester, after P10.11.
+- **F7 = Park** — auto capital allocation after graduation + >1 edge.
+- **F8 = No** — do not reset the repository.
+
+**Why no reset:** SKY already *is* the brain (`engine/` + `brain/`),
+already has the risk gate, already reports R-expectancy, already
+walks forward without look-ahead, already has Monte Carlo / MAE/MFE.
+Freqtrade's remaining value is placing orders — forbidden by
+invariant #1. ICT/SMC conditional plans do not fit
+`populate_entry_trend`.
+
+**Files changed:** merge of `origin/main` @ `e233580` (PR #14);
+`docs/FREQTRADE_REVIEW.md` (new); `TODO.md` (TODO-13 / P12 +
+out-of-scope; next code P10.7); `SESSION_STATE.md`;
+`ARCHITECTURE.md` (invariant #13); `AI_ANATOMY_ROADMAP.md`;
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`; `docs/INFRASTRUCTURE_LAYERS.md`;
+`PROFESSIONAL_PLAN_DECISIONS.md`; `BLUEPRINT.md`; `SKILL.md`;
+`README.md`; `CHANGELOG.md`; `config.py` + `pyproject.toml` 2.7.1;
+`tests/test_handoff_memory.py` (+4 contract tests).
+
+---
+
+### Session 2026-08-13 (prior branches): PR #13 + PR #14 — reconciliation, P10.5, P10.6 Bybit
 
 Branched from `main` @ `ee99486` (post-PR-#10, before PR #11/#12 landed).
 0 regressions. Tests **403 → 406 pass / 1 skip** (+3). Version unchanged
@@ -387,12 +435,10 @@ See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ## Currently working on
 
-PR #14 is open from `arena/019ff9cf-sky` carrying **P10.6 — Bybit
-adapter** (`data/bybit_client.py`, `--exchange bybit`). PR #13
-(reconciliation + P10.5 data-quality pillar) was merged by the
-operator mid-session (squash, `main` @ `21e22cd`); this branch was
-reset onto that merge and re-applied P10.6 on top. Nothing in flight
-after PR #14. Next code session: **P10.7** (cross-exchange series).
+PR #15 is open from `arena/019ffa5d-sky` carrying the Freqtrade
+keep/cut (F1–F8) reconciled onto merged P10.6. Nothing else is in
+flight. Next *code* session: **P10.7** (cross-exchange series). Do
+not start P12, Dify, LibreChat, or a strategy-module catalog.
 
 The paper book's **counts** are done (100/20 for every primary setup,
 38,439 decided samples) and the **journal loop** is done (compliance
@@ -430,7 +476,10 @@ reuse the existing cross-exchange probe; one-PR-per-session).
 3. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
 4. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
-5. **TODO-9 / TODO-10** — Dify then LibreChat. Parked behind both the
+5. **TODO-13 (P12)** — SKY Quant Validation Engine. Parked until
+   P10.11. Do not start next session. Spec:
+   [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8.
+6. **TODO-9 / TODO-10** — Dify then LibreChat. Parked behind both the
    graduation gate *and* P10. Do not start next session.
 
 Full list and rationale: see [`TODO.md`](./TODO.md).
@@ -454,7 +503,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    job spec therefore lives at `docs/.github/workflows/ci.yml`, which
    GitHub Actions does **not** execute. Source of truth for running
    the gate is `ci/wheel_gate.py` locally (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.5.0.
+6. **`CHANGELOG.md` is current** through v2.7.1.
 7. **Sweep-reversal setups are breakeven on synthetic data.** The
    sandbox's deterministic series are smooth random walks with drift —
    they have no real stop-hunt structure, so sweep plans land near
@@ -470,7 +519,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    replaces `#app.innerHTML` wholesale, so anything inside it would be
    destroyed on every scan. Keep the strip where it is.
 10. **Live scans are still amnesiac.** The Parquet store + backfill exist
-    (P10.1–P10.4) but the scanner/backtester still fetch ~500 live candles
+    (P10.1–P10.6) but the scanner/backtester still fetch ~500 live candles
     (P10.11 wires them to the store).
 11. **This sandbox has no network egress.** The real Binance backfill
     cannot run here (verified live: clean abort with a resumable message).
@@ -489,6 +538,10 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 14. **Cross-exchange logic already exists** in
     `brain/agent.py:_cross_exchange_probe()` (KuCoin + OKX). P10.7
     generalises it into a stored series — do not write a second one.
+15. **Freqtrade was reviewed and rejected (F1–F8).** Do not reopen
+    that as a “quick win.” The keep/cut is
+    `docs/FREQTRADE_REVIEW.md`. Contract-tested in
+    `tests/test_handoff_memory.py`.
 
 ---
 
@@ -501,18 +554,20 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    known problem 13); reconcile before building.
 2. A human does TODO-7 + TODO-8 from
    [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-3. Do **not** start Dify/LibreChat. Do not loosen the graduation bar.
+3. Do **not** start Dify/LibreChat/P12. Do not install Freqtrade.
+   Do not loosen the graduation bar. Do not add strategy modules.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md, branch arena/019ff9cf-sky.
-> PR #13 (reconciliation + P10.5 data-quality pillar) is MERGED.
-> PR #14 is open: P10.6 — Bybit V5 adapter behind the same schema
-> (backfill --exchange bybit). Implement P10.7 (cross-exchange
-> premium/discount + funding spread as stored series, generalising
-> _cross_exchange_probe) from docs/DATA_INFRASTRUCTURE_ROADMAP.md.
-> Fetch and diff origin/main first. No new agents/panels. Do not
-> start Dify or LibreChat.
+> Continue SKY from SESSION_STATE.md, branch arena/019ffa5d-sky.
+> PR #14 (P10.6 Bybit) is MERGED. PR #15 recorded a Freqtrade
+> review and rejected the bot (F1–F8, docs/FREQTRADE_REVIEW.md).
+> Do not adopt Freqtrade / Hyperopt / FreqAI. Implement P10.7
+> (cross-exchange premium/discount + funding spread as stored
+> series, generalising _cross_exchange_probe) from
+> docs/DATA_INFRASTRUCTURE_ROADMAP.md. Fetch and diff origin/main
+> first. No new agents/panels/strategies. Do not start Dify,
+> LibreChat, or P12.
 
 ---
 
@@ -521,7 +576,7 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 441 passed, 1 skipped
+# 445 passed, 1 skipped
 ```
 
 Readiness strip (four pillars since P10.5):
@@ -576,9 +631,8 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-see `git log --oneline -3` on arena/019ff9cf-sky
-(this session: merge origin/main (PR #11+#12) + reconciliation,
- then P10.5 data-quality pillar, then P10.6 Bybit adapter)
+see `git log --oneline -3` on arena/019ffa5d-sky
+(this session: merge origin/main / PR #14 P10.6 + Freqtrade F1–F8)
 ```
 
 ---
@@ -587,7 +641,7 @@ see `git log --oneline -3` on arena/019ff9cf-sky
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ff9cf-sky.
+github.com/Azimshawon/SKY, branch arena/019ffa5d-sky.
 
 First, inspect the GitHub repository before making changes:
 - git fetch origin, and diff your branch against origin/main —
@@ -600,6 +654,7 @@ Read in this order:
 4. CHANGELOG.md             (what shipped, when)
 5. README.md                (user-facing overview)
 6. ROADMAP_AGENT_REACH_UPGRADE.md  (the P7/P8/P9 plan + D1–D5 decisions)
+7. docs/FREQTRADE_REVIEW.md        (F1–F8 — do not install a bot)
 
 Then inspect the relevant source files and tests.
 
@@ -616,7 +671,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 441 pass / 1 skip.
+- Maintain test count at ≥ 445 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -634,7 +689,7 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 1. [x] Finish or safely stop the current task.
 2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 441 pass / 1 skip (424 previous bar).
+   ≥ 445 pass / 1 skip (441 previous bar).
 3. [x] Fix any obvious failures.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
 5. [x] Update `TODO.md` — mark finished items done, reprioritise.
@@ -643,5 +698,5 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` / `git push origin arena/019ff9cf-sky`.
-12. [x] Open the session PR as the closing step — **PR #14**.
+11. [x] `git add` / `git commit` / `git push origin arena/019ffa5d-sky`.
+12. [x] Open the session PR as the closing step — **PR #15**.

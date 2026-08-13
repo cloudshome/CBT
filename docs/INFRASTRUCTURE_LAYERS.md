@@ -1,20 +1,23 @@
 # Infrastructure layers — what matters for SKY
 
-> **Purpose:** distill the OpenHands / Dify / LibreChat discussion into
-> *this* repository's terms. Read once. Do not re-derive next session.
-> **Last updated:** 2026-08-12
+> **Purpose:** distill the OpenHands / Dify / LibreChat / Freqtrade
+> discussion into *this* repository's terms. Read once. Do not
+> re-derive next session.
+> **Last updated:** 2026-08-13
 
-**One rule:** these three projects are **not** dependencies of SKY and
+**One rule:** these projects are **not** dependencies of SKY and
 must never be vendored, forked-into, or `pip install`ed here.
 
-They are *layers around* SKY, in this order:
+They are *layers around* SKY — or, in Freqtrade's case, a *different
+product* we are not becoming:
 
 | Layer | Project | Role for SKY | When |
 |---|---|---|---|
 | Development agent | Arena.ai (already) | Writes code on `arena/*` branches | Now |
 | Engineering patterns | OpenHands (study only) | Plan → tool → test → commit → PR | Extract ideas, never copy |
-| Knowledge / research | Dify | RAG + research workflows *around* the engine | After graduation (Phase 7) |
-| Chat UI | LibreChat | Human control panel | After Dify (Phase 8) |
+| Knowledge / research | Dify | RAG + research workflows *around* the engine | After graduation *and* P10 |
+| Chat UI | LibreChat | Human control panel | After Dify |
+| Trading bot | **Freqtrade** | None. SKY is the brain; Freqtrade places orders | **Never** — see `docs/FREQTRADE_REVIEW.md` |
 
 Persistent memory is **this GitHub repo** (commits + `SESSION_STATE.md`
 + `TODO.md` + tests). Nothing else "hacks" an Arena session limit.
@@ -58,22 +61,24 @@ cover that job. A sixth agent that writes code is Arena itself.
 ## Order of work (do not skip ahead)
 
 ```
-NOW     Arena + GitHub + this repo's tests + desk_status + readiness
-NEXT    P11 · Prove the edge (simulator / paper / graduation gate)
-THEN    P10 · Own the data (collect, store, backtest over years)
-              docs/DATA_INFRASTRUCTURE_ROADMAP.md
+NOW     P10.7 → P10.12 · Own the data (cross-exchange, charts, WS, store-backed backtest)
+ALONG   P11 · Prove the edge (simulator / paper / graduation gate) — do not move the bar
+THEN    P12 · SKY Quant Validation Engine on OUR backtester + OUR store
+              (walk-forward / lookahead / quality score / conditioned expectancy)
 AFTER   Dify as a *separate* research layer (never imported by the engine)
 LAST    LibreChat-style chat UI, if the dashboard is not enough
+NEVER   Freqtrade / Hyperopt / FreqAI / signed order APIs
 ```
 
 Promotion to Dify requires the existing graduation gate
 (`python main.py agent ask "am i ready for micro?"`) to pass.
 Not before.
 
-**P10 now sits ahead of Dify too.** Owning our market data moves the
-aim — a fully independent trader — because it turns a 500-candle
-amnesiac scan into years of queryable evidence. Another chat layer
-over the same thin data moves nothing. Data first, wrappers last.
+**P10 still sits ahead of Dify and of P12's heavy items.** Owning our
+market data moves the aim — a fully independent trader — because it
+turns a 500-candle amnesiac scan into years of queryable evidence.
+Another chat layer, or another bot framework, over the same thin data
+moves nothing. Data first, validation second, wrappers last, bots never.
 
 ---
 

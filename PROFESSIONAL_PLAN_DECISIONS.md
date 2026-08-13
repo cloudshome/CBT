@@ -1,8 +1,16 @@
 # CryptoBrain × Your Professional-Trader Goal — Review & Decision List
 
-**Status:** Review only. **No code has been changed.** You confirm decisions below; coding starts only after you say so.
+**Status:** A1–B10 implemented 2026-08-09 (see the log at the bottom).
+This file is the historical decision list — do not re-litigate it.
 
 **Date:** 2026-08-09 · **Reviewed against:** your 18-phase professional roadmap + 15-item rulebook for BTC + ETH + GOLD.
+
+> **2026-08-13 addendum.** A later recommendation to put **Freqtrade**
+> under SKY as the execution + backtest + strategy-runtime layer was
+> reviewed against this plan and the live repo. **Rejected.** Decisions
+> **F1–F8** live in [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md).
+> A1 (one primary family) and the “never place an exchange order”
+> invariant still win. Do not install a bot to “finish” this document.
 
 ---
 

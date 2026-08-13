@@ -42,20 +42,22 @@ agents, no new AI wrapping. Store evidence, then reason over it.
 ### Where P10 sits in the order of work
 
 ```text
-NOW      P11 · prove the paper book (100/20 + journal + graduation)
-           ↓  small, finishes the existing ladder
-THEN     P10 · data infrastructure + market terminal  ← THIS DOC
+NOW      P10.7 → P10.12 · data infrastructure + market terminal  ← THIS DOC
            ↓  large, unlocks real backtesting
-LATER    P12 · feature store + regime-conditional backtests
-           ↓
+ALONG    P11 · prove the paper book (counts done; gate still closed)
+           ↓  do not loosen the bar
+THEN     P12 · SKY Quant Validation Engine
+           (walk-forward / OOS / lookahead / quality score /
+            funding-OI-CVD-conditioned expectancy)
+           ↓  see docs/FREQTRADE_REVIEW.md §8
 PARKED   Dify (TODO-9) → LibreChat (TODO-10), after graduation
+NEVER    Freqtrade / Hyperopt / FreqAI — not our backtester, not our runtime
 ```
 
-**P11 before P10 — deliberately.** P11 is days of grinding on code
-that already exists; P10 is weeks of new infrastructure. Finishing
-P11 first keeps the graduation ladder moving and means P10's backfill
-has a working proof-loop to feed. Do not let P10 become a reason to
-stop proving the edge.
+**P11 still runs alongside P10.** The first grind shipped (counts
+cleared; graduation gate honestly closed). P10.1–P10.6 are also
+shipped. Do not let the data project become a reason to stop proving
+the edge, and do not loosen the graduation bar to make the gate pass.
 
 ---
 
@@ -377,7 +379,7 @@ documented state. Ordered by value-per-session, same as `TODO.md`.
 | **P10.2** | Binance backfill | paginated REST backfill reusing `binance_client`, resumable, rate-limit aware | ✅ shipped (`data/backfill.py`; re-run adds zero rows). **Hardened 2026-08-13:** real perp endpoint (`/fapi/v1/klines`), weight-header pacing, exponential backoff, geo-block abort, forming-candle rule, `--max-requests` cap |
 | **P10.3** | Gaps + aggregation | gap detector, repair, 1m→5m/15m/1h/4h/1d rollups | ✅ shipped — synthetic gaps detected+repaired; rollups match venue candles |
 | **P10.4** | Derivatives series | persist funding / OI / mark / index / basis over time | ✅ shipped — `data/derivatives.py` (store + collector + fake transport), `python main.py derivatives collect/status`; series queryable; `liquidations()` renamed honestly to `liquidation_stats_proxy()` |
-| **P10.5** | Quality pillar | per-source checks wired into `readiness_strip()` | ⏭ **next** — corrupt fixture ⇒ quarantine ⇒ no signal, proven by test |
+| **P10.5** | Quality pillar | per-source checks wired into `readiness_strip()` | ✅ shipped (`data/quality.py`, fourth readiness pillar; corrupt data ⇒ quarantine ⇒ `ready: false`) |
 | **P10.6** | Bybit adapter | second exchange behind the same normalised schema | ✅ shipped (2026-08-13, PR #14) — `data/bybit_client.py` behind the same `PageResult` contract; identical assertions pass for both adapters (17 tests) |
 | **P10.7** | Cross-exchange | generalise `_cross_exchange_probe()` into a stored series | premium/discount + funding spread queryable |
 | **P10.8** | Lightweight Charts | vendored chart replaces `chartSVG()`; price+volume pane | dashboard renders stored data; no new runtime dep |
@@ -389,6 +391,12 @@ documented state. Ordered by value-per-session, same as `TODO.md`.
 **Definition of done for the phase:** we can ask *"how did this setup
 perform when price rose, OI rose, funding was negative, and CVD was
 positive?"* and get a number computed from our own stored data.
+
+That question is answered by **P10.12 + P12**, on **our** grader
+(`data/backtester.py`), not by importing Freqtrade. A 2026-08-13
+review (`docs/FREQTRADE_REVIEW.md`, F1/F2) rejected Freqtrade as
+backtester, strategy runtime, and execution layer. P10.11 still
+means: point *this* backtester at *this* Parquet store.
 
 ---
 
@@ -411,6 +419,9 @@ positive?"* and get a number computed from our own stored data.
 - Trading credentials, signed endpoints, order placement — **forever**.
 - Paid data vendors.
 - OpenHands / Dify / LibreChat (TODO-9/10, still parked).
+- **Freqtrade, Hyperopt, FreqAI, or any exchange-order bot** — reviewed
+  and rejected (F1–F3 in `docs/FREQTRADE_REVIEW.md`). P10.11 is our
+  grader reading our store, not a Freqtrade strategy runtime.
 - PostgreSQL, Redis, Docker, FastAPI, React/Next.js — see §1.
 - Changing the trading strategy or the risk gate. P10 changes *inputs*.
 - Alt-coin expansion. BTC first, ETH second, nothing else.

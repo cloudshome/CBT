@@ -138,6 +138,8 @@ bypasses the risk gate. The deny list is enforced at the top of
   they are not exposed via MCP by design. The human owns those.
 - ❌ Do not invent a "place_order" tool. There is none, and there
   never will be one in this engine.
+- ❌ Do not add Freqtrade, Hyperopt, FreqAI, or any exchange-order
+  bot. SKY is the brain; the human-approval gate is the runtime.
 - ❌ Do not bypass the risk gate by reading the DB and writing to it
   directly. The gate is not in the DB; it is in `brain/risk_gate.py`
   and is consulted on every approval.
