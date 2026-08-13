@@ -1188,9 +1188,9 @@ async function loadDesk(){
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
 
-// TODO-1.bis readiness strip: ONE verdict above every tab, combining the
-// three pillars the desk already reports separately (channels + immune +
-// risk gate).  The verdict is computed server-side by
+// TODO-1.bis + P10.5 readiness strip: ONE verdict above every tab,
+// combining the four pillars the desk already reports separately
+// (channels + immune + risk gate + stored-data quality).  The verdict is computed server-side by
 // brain.agent.readiness_strip() so the dashboard, `python main.py doctor
 // --strip`, and the MCP `readiness` tool can never disagree.
 const READY_COLOR = {ok:'var(--green)', degraded:'var(--amber)',
@@ -1839,9 +1839,10 @@ def make_app() -> Flask:
 
     @app.get("/api/readiness")
     def api_readiness():
-        """Combined readiness strip: channels + immune system + risk gate.
+        """Combined readiness strip: channels + immune + risk gate + data quality.
 
-        The one verdict the dashboard shows above every tab (TODO-1.bis).
+        The one verdict the dashboard shows above every tab (TODO-1.bis +
+        P10.5).
         Same payload as `python main.py doctor --strip --json` and the MCP
         ``readiness`` tool — no surface computes its own verdict.
         """

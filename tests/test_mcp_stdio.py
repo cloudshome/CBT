@@ -258,7 +258,7 @@ def test_root_mcp_desk_status_tool(env):
 
 
 def test_root_mcp_readiness_tool(env):
-    """readiness rolls channels + immune + risk gate into one verdict."""
+    """readiness rolls channels + immune + risk gate + data into one verdict."""
     client = StdioClient(env)
     try:
         client.send("initialize")
@@ -269,7 +269,7 @@ def test_root_mcp_readiness_tool(env):
         assert data["ready"] == (data["level"] == "ok")
         assert data["headline"]
         names = {p["name"] for p in data["pillars"]}
-        assert names == {"channels", "immune", "risk_gate"}
+        assert names == {"channels", "immune", "risk_gate", "data"}
     finally:
         client.close()
 

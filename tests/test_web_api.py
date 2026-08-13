@@ -159,7 +159,7 @@ def test_readiness_endpoint_returns_strip(client):
     assert payload["ready"] == (payload["level"] == "ok")
     assert payload["headline"]
     assert {p["name"] for p in payload["pillars"]} == {
-        "channels", "immune", "risk_gate"}
+        "channels", "immune", "risk_gate", "data"}
     json.loads(resp.get_data(as_text=True))  # numpy-leak safety
 
 

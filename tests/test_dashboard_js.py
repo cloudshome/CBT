@@ -192,11 +192,14 @@ def test_readiness_strip_renders_every_pillar():
              "headline": "4 check(s) ok", "detail": ""},
             {"name": "risk_gate", "level": "ok",
              "headline": "gate OPEN", "detail": "no blocks"},
+            {"name": "data", "level": "degraded",
+             "headline": "no stored market history yet",
+             "detail": "run `python main.py backfill`"},
         ],
         "advice": {"action": "PAPER_GRIND", "headline": "keep paper-trading"},
     }))
     html = out["html"]
-    for pillar in ("channels", "immune", "risk_gate"):
+    for pillar in ("channels", "immune", "risk_gate", "data"):
         assert pillar in html, f"readiness strip missing the {pillar!r} chip"
     assert "DESK DEGRADED" in html.upper()
     assert "PAPER_GRIND" in html

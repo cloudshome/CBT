@@ -59,7 +59,7 @@ python main.py doctor --json    # machine-readable (includes `readiness`)
 python main.py health           # legacy alias for doctor
 ```
 
-`doctor --strip` rolls three pillars up **worst-first** into a single
+`doctor --strip` rolls four pillars up **worst-first** into a single
 level:
 
 | Pillar | Question it answers |
@@ -67,6 +67,7 @@ level:
 | `channels` | Can the engine still see the world? (cryptodada / discord / news / llm) |
 | `immune` | Is the machine itself sane? (DB, data freshness, risk system, calibration) |
 | `risk_gate` | Am I allowed to trade at all? |
+| `data` | Can I trust my own stored market history? (P10.5: staleness, gaps, price/volume sanity — corrupt data quarantines the desk) |
 
 Levels, worst wins: `ok` → `degraded` → `blocked` → `down`. Only `ok`
 sets `ready: true`. `blocked` specifically means the risk gate is
@@ -92,7 +93,7 @@ bypasses the risk gate. The deny list is enforced at the top of
 | Post-review | `python main.py postreview <scan_id>` | `postreview` | Closed-trade post-mortem: R, MAE/MFE, rule compliance |
 | Health | `python main.py health` / `python main.py doctor` | `health` | Immune-system diagnostic: stale data, DB integrity, risk limits, behavioral flags |
 | **Desk status** | `python main.py desk` | `desk_status` | One-call advisory: gate + today's P&L + graduation + next agent + "what would a professional do right now?" |
-| **Readiness** | `python main.py doctor --strip` | `readiness` | One combined verdict across channels + immune system + risk gate. Ask this first. |
+| **Readiness** | `python main.py doctor --strip` | `readiness` | One combined verdict across channels + immune system + risk gate + stored-data quality. Ask this first. |
 | Risk gate | `python main.py risk` | `risk` | Open/closed status, daily/weekly P&L, progression ladder |
 | Trader state | `python main.py tradestate` | `tradestate` | Behavioral flags: angry/tired/revenge/chasing — operator-controlled |
 | Paper watch | `python main.py paper --watch` | — | Live-market paper-trade monitor (does **not** touch any exchange) |

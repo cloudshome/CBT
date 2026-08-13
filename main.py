@@ -1859,7 +1859,7 @@ def main(argv: list[str] | None = None) -> int:
     # opt-in prescription execution (currently a no-op).
     p_doc = sub.add_parser(
         "doctor",
-        help="non-mutating readiness report (channels + immune system + risk gate)")
+        help="non-mutating readiness report (channels + immune + risk gate + data quality)")
     p_doc.add_argument("--json", action="store_true")
     p_doc.add_argument("--strip", action="store_true",
                        help="print only the combined readiness strip "

@@ -10,33 +10,39 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-13 (P10.4 shipped: derivatives as time series; P10.2 hardened)
-**Branch:** `arena/019ff948-sky`
+**Last updated:** 2026-08-13 (PR #13, part 2: P10.5 data-quality pillar shipped — fourth readiness pillar, corrupt data quarantines the desk)
+**Branch:** `arena/019ff9cf-sky`
 **HEAD commit:** see "Last commit" below
-**Default branch:** `main` @ `5736ee8` (PR #11 merged 2026-08-12: P10.2 + P10.3)
-**PR:** [#13](https://github.com/Azimshawon/SKY/pull/12) — this branch → `main`.
+**Default branch:** `main` @ `54fec5a` (PR #12 merged 2026-08-13: P10.2 hardening + P10.4)
+**PR:** [#13](https://github.com/Azimshawon/SKY/pull/13) — this branch → `main`.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
 
-> **This session's decision:** the operator picked "P10.2 — Binance
-> backfill" for the day. A remote check showed P10.2 *and* P10.3 had
-> already shipped on `main` (PR #11) — the local checkout predated the
-> merge — and the freshly drafted backfill turned out to fix two real
-> defects in the shipped one:
-> 1. **The shipped backfill labelled spot candles as `market=perp`** —
->    `client.klines()` always pages `/api/v3/klines` (spot) even for
->    `--market perp`, silently mislabelling the roadmap's primary series.
-> 2. **"Rate-limit aware" was only a nap** — no weight-header pacing, no
->    exponential backoff, no geo-block abort, no request cap, and no
->    forming-candle rule (the still-forming tail candle could be stored).
+> **This session's decision — part 1: a parallel-session race, resolved
+> by reconciling instead of duplicating.** The session branched from
+> `main` @ `ee99486` (post-PR-#10) and built its own P10.2 backfill.
+> Mid-session it discovered two *other* Arena sessions had already
+> merged **PR #11** (P10.2 backfill + P10.3 gaps/rollups) and **PR #12**
+> (P10.2 hardening: real perp endpoint, header-aware rate limiting;
+> P10.4 derivatives series) into `main`. Per the repo's own rule —
+> *never duplicate completed components* — this session **merged `main`
+> and adopted the reviewed implementation wholesale**, discarding its
+> own parallel draft. Its genuinely new value was kept as 3 edge-case
+> tests in `tests/test_backfill.py` (empty-first-page termination,
+> start-past-end no-op, mid-history-hole termination).
 >
-> The operator chose: **merge main, harden P10.2** (keep the shipped
-> `backfill()` API/CLI so P10.3's `--repair`/`--rollup` keep working).
-> With time left in the session (and the operator asking for more), the
-> natural next milestone **P10.4 (derivatives as time series)** was then
-> built too — funding / OI / mark / index / basis now persist, and the
-> `liquidations()` 24h-stats proxy is renamed honestly. Suite
-> **368 → 383 → 403**. Version **2.4.0 → 2.4.1 → 2.5.0**.
-> Next: P10.5.
+> **Part 2 (same PR, same session): P10.5 — data-quality pillar.** With
+> the ladder clear (re-checked `origin/main`: no new merges), the
+> session built the next milestone: `data/quality.py` + a **fourth
+> readiness pillar** (`data`) in `readiness_strip()`. Per-series checks
+> (staleness, gaps, price/volume sanity, ordering) over the stored
+> Parquet history; a corrupt or unusably stale series is **quarantined**
+> (`level=down` → `ready: false`). Empty store = honest `degraded` with
+> the backfill hint. CLI/HTTP/MCP/dashboard all inherit the pillar via
+> the one `readiness_strip()` (invariant #10). MCP `SERVER_VERSION`
+> 1.4.0. 18 new offline tests, incl. the milestone's proof: corrupt
+> fixture written through the real store ⇒ quarantine ⇒ `ready: false`.
+> Suite **406 → 424 pass / 1 skip** (+18). Version **2.5.0 → 2.6.0**.
+> Next: P10.6 (Bybit adapter).
 
 ---
 
@@ -92,7 +98,41 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-13 (this branch): P10.2 hardening — perp endpoint + rate-limit machinery
+### Session 2026-08-13 (this branch): PR #13 — reconciliation + P10.5 data-quality pillar
+
+Branched from `main` @ `ee99486` (post-PR-#10, before PR #11/#12 landed).
+0 regressions. Tests **403 → 406 pass / 1 skip** (+3). Version unchanged
+**2.5.0** (no runtime change).
+
+**What happened:** this session independently built its own P10.2
+backfill (`data/backfill.py`, `main.py backfill`, 19 tests) unaware
+that parallel sessions had merged PR #11 (P10.2 + P10.3) and PR #12
+(P10.2 hardening + P10.4) into `main`. On discovery, the rule won:
+*never duplicate completed components*. This session:
+
+- **Merged `main` into the session branch** and adopted the reviewed
+  implementation wholesale (hardened backfill, gaps/rollups,
+  derivatives store) — its own parallel draft was discarded.
+- **Kept its genuinely new value as three edge-case tests** appended
+  to `tests/test_backfill.py`, all passing against the merged code:
+  empty-first-page termination, start-past-end no-op, mid-history-hole
+  termination (no duplicates, repair is P10.3's job).
+- **Reconciled the docs** (`SESSION_STATE.md`, `TODO.md`, `CHANGELOG.md`,
+  `ARCHITECTURE.md`) so the next session reads one true story.
+
+**Files changed:** merge of `main` @ `54fec5a` (PR #11 + #12);
+`tests/test_backfill.py` (+3 edge-case tests); **P10.5:** `data/quality.py`
+(new), `data/store.py` (`list_series()`), `brain/agent.py` (`_data_pillar`
++ 4-pillar strip), `mcp_server.py` (v1.4.0), `main.py` / `web/app.py`
+descriptions, `tests/test_quality.py` (new, 18 tests), pinned pillar-set
+assertions in `test_agent` / `test_web_api` / `test_mcp_stdio` /
+`test_channels` / `test_dashboard_js`; docs: `CHANGELOG.md` (v2.6.0),
+`config.py` + `pyproject.toml`, `docs/DATA_INFRASTRUCTURE_ROADMAP.md`,
+`TODO.md`, `README.md`, `SKILL.md`, `ARCHITECTURE.md`, this file.
+
+---
+
+### Session 2026-08-13 (prior branch): P10.2 hardening — perp endpoint + rate-limit machinery
 
 Rebased the session branch onto `main` @ `5736ee8` (PR #11: P10.2 + P10.3).
 0 regressions. Tests **368 → 383 pass / 1 skip** (+15). Version **2.4.0 → 2.4.1**.
@@ -328,8 +368,11 @@ See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
 
 ## Currently working on
 
-P10.2 hardening shipped on `arena/019ff948-sky` (PR #12 open). Nothing
-in flight. Next code session: **P10.4** (derivatives time series).
+PR #13 is open from `arena/019ff9cf-sky`: (1) reconciliation — main's
+P10.2-hardening/P10.3/P10.4 adopted, +3 edge-case tests; (2) **P10.5 —
+data-quality pillar** (`data/quality.py`, fourth readiness pillar,
+quarantine ⇒ `ready: false`). Nothing in flight after the PR. Next
+code session: **P10.6** (Bybit adapter).
 
 The paper book's **counts** are done (100/20 for every primary setup,
 38,439 decided samples) and the **journal loop** is done (compliance
@@ -359,11 +402,10 @@ reuse the existing cross-exchange probe; one-PR-per-session).
    0 paper samples because the simulator takes one paper sample per
    window — best plan only). Do **not** change the blueprint
    graduation criteria.
-2. **TODO-12 (P10)** — P10.1–P10.4 done; P10.2 hardened 2026-08-13.
-   Next: **P10.5** (per-source data-quality checks wired into
-   `readiness_strip()` — corrupt/stale feed ⇒ quarantine ⇒ no signal,
-   proven by test). Roadmap:
-   it records which parts of the incoming plan were corrected and why.
+2. **TODO-12 (P10)** — P10.1–P10.5 done; P10.2 hardened. Next:
+   **P10.6** (Bybit adapter behind the same normalised schema). Full plan:
+   [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md)
+   — it records which parts of the incoming plan were corrected and why.
 3. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
 4. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
@@ -403,22 +445,27 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    setups that rarely win the confidence contest never earn paper
    proof (FVG Retest Buy 7,480 bt / 0 pp). Outside the primary family
    today; noted for a future collection-strategy decision.
-7. **The dashboard readiness strip lives outside `#app`.** `render()`
+9. **The dashboard readiness strip lives outside `#app`.** `render()`
    replaces `#app.innerHTML` wholesale, so anything inside it would be
    destroyed on every scan. Keep the strip where it is.
-8. **Live scans are still amnesiac.** The Parquet store + backfill exist
-   (P10.1–P10.3) but the scanner/backtester still fetch ~500 live candles
-   (P10.11 wires them to the store).
-8b. **This sandbox has no network egress.** The real Binance backfill
-   cannot run here (verified live: clean abort with a resumable message).
-   Run it on the operator's machine. All P10.2 behaviour is proven
-   offline via `FakePagedTransport` / `SampleClient`.
-9. **`BinanceClient.liquidations()` was not liquidation data** — a
-   24h-ticker proxy. Renamed honestly in P10.4 to
-   `liquidation_stats_proxy()`. Real forced-order data only comes from
-   the `!forceOrder@arr` WebSocket stream and **cannot be backfilled** —
-   it accumulates from the day collection starts (P10.10).
-10. **Cross-exchange logic already exists** in
+10. **Live scans are still amnesiac.** The Parquet store + backfill exist
+    (P10.1–P10.4) but the scanner/backtester still fetch ~500 live candles
+    (P10.11 wires them to the store).
+11. **This sandbox has no network egress.** The real Binance backfill
+    cannot run here (verified live: clean abort with a resumable message).
+    Run it on the operator's machine. All P10.2 behaviour is proven
+    offline via `FakePagedTransport` / `SampleClient`.
+12. **`BinanceClient.liquidations()` was not liquidation data** — a
+    24h-ticker proxy. Renamed honestly in P10.4 to
+    `liquidation_stats_proxy()`. Real forced-order data only comes from
+    the `!forceOrder@arr` WebSocket stream and **cannot be backfilled** —
+    it accumulates from the day collection starts (P10.10).
+13. **Parallel sessions race on `main`.** PR #11/#12 merged while PR #13
+    was being built on an older base. Lesson recorded here: **before
+    finishing any session, `git fetch` + compare with `origin/main`**;
+    if newer P10 work landed, merge and reconcile instead of shipping a
+    duplicate. PR #13 exists as that reconciliation.
+14. **Cross-exchange logic already exists** in
     `brain/agent.py:_cross_exchange_probe()` (KuCoin + OKX). P10.7
     generalises it into a stored series — do not write a second one.
 
@@ -426,24 +473,26 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-1. Next *code* session: **P10.5** — per-source data-quality checks
-   wired into `readiness_strip()` (gap detection per window, price/volume
-   sanity, staleness, rate-limit budget). Read the roadmap first.
+1. Next *code* session: **P10.6** — Bybit adapter behind the same
+   normalised schema (identical assertions for both adapters). Read the
+   roadmap first. **First step of every future session:** `git fetch`
+   and diff against `origin/main` — parallel sessions merge while you
+   work (see known problem 13); reconcile before building.
 2. A human does TODO-7 + TODO-8 from
    [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 3. Do **not** start Dify/LibreChat. Do not loosen the graduation bar.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md, branch arena/019ff948-sky.
-> P10.1–P10.3 are shipped and P10.2 was hardened (PR #12 merged):
-> perp pages the real perp endpoint, rate-limit handling is real
-> (weight headers, backoff, geo-block abort, request cap), forming
-> candles never enter history, and the unbounded-demo hang is fixed.
-> Implement P10.4 (derivatives time series: funding / OI / mark /
-> index / basis + honest liquidations rename) from
-> docs/DATA_INFRASTRUCTURE_ROADMAP.md. No new agents/panels.
-> Do not start Dify or LibreChat.
+> Continue SKY from SESSION_STATE.md, branch arena/019ff9cf-sky.
+> PR #13 is open: parallel-session reconciliation (main's P10.2
+> hardening/P10.3/P10.4 adopted + 3 edge-case tests) AND P10.5 — the
+> fourth readiness pillar: per-series data quality (staleness, gaps,
+> price/volume sanity) from data/quality.py; corrupt data quarantines
+> the desk (ready: false). Implement P10.6 (Bybit adapter behind the
+> same schema) from docs/DATA_INFRASTRUCTURE_ROADMAP.md. Fetch and
+> diff origin/main first. No new agents/panels. Do not start Dify or
+> LibreChat.
 
 ---
 
@@ -452,7 +501,15 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 403 passed, 1 skipped
+# 424 passed, 1 skipped
+```
+
+Readiness strip (four pillars since P10.5):
+```bash
+DEMO_MODE=1 python main.py doctor --strip          # CLI text — channels/immune/risk_gate/data
+DEMO_MODE=1 python main.py doctor --strip --json   # CLI JSON
+curl -s localhost:8080/api/readiness               # HTTP
+# MCP: tools/call {"name": "readiness", "arguments": {}}
 ```
 
 P10 backfill + store (DEMO_MODE is fully offline):
@@ -498,8 +555,9 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-see `git log --oneline -3` on arena/019ff948-sky
-(this session: P10.2 hardening — perp endpoint + rate-limit machinery)
+see `git log --oneline -3` on arena/019ff9cf-sky
+(this session: merge origin/main (PR #11+#12) + reconciliation,
+ then P10.5 data-quality pillar + docs)
 ```
 
 ---
@@ -508,9 +566,11 @@ see `git log --oneline -3` on arena/019ff948-sky
 
 ```
 You are continuing development of the existing SKY project at
-github.com/Azimshawon/SKY, branch arena/019ff948-sky.
+github.com/Azimshawon/SKY, branch arena/019ff9cf-sky.
 
-First, inspect the GitHub repository before making changes.
+First, inspect the GitHub repository before making changes:
+- git fetch origin, and diff your branch against origin/main —
+  parallel sessions merge while you work; reconcile before building.
 
 Read in this order:
 1. SESSION_STATE.md         (current state, current TODO, last commit)
@@ -535,7 +595,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 403 pass.
+- Maintain test count at ≥ 424 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -553,7 +613,7 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 1. [x] Finish or safely stop the current task.
 2. [x] Run `DEMO_MODE=1 python -m pytest tests/ -q` — must stay
-   ≥ 403 pass (383 previous bar).
+   ≥ 424 pass / 1 skip (406 previous bar).
 3. [x] Fix any obvious failures.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
 5. [x] Update `TODO.md` — mark finished items done, reprioritise.
@@ -562,5 +622,5 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` / `git push origin arena/019ff948-sky`.
-12. [x] Open the session PR as the closing step — **PR #12**.
+11. [x] `git add` / `git commit` / `git push origin arena/019ff9cf-sky`.
+12. [x] Open the session PR as the closing step — **PR #13**.

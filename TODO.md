@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-13 (TODO-12/P10 — **P10.1–P10.4 shipped**; P10.2 hardened: perp endpoint + real rate-limit handling; next is P10.5)
+**Last updated:** 2026-08-13 (TODO-12/P10 — **P10.1–P10.5 shipped**; P10.2 hardened; P10.5 quality pillar live in the readiness strip; next is P10.6)
 
 ---
 
@@ -17,12 +17,15 @@ unit of work that ends in a reviewable PR:
 
 ```text
 1. Read SESSION_STATE.md → TODO.md → the relevant docs
-2. Pick the top unblocked item
-3. Implement it; keep the suite green (≥ 339 pass / 1 skip)
-4. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
-5. Commit + push to the session branch
-6. Open ONE PR as the closing step  ← Arena allows one PR per session
-7. A human reviews and merges; the next session branches from main
+2. git fetch origin; diff your branch vs origin/main — parallel
+   sessions merge while you work (PR #13 learned this the hard way);
+   reconcile BEFORE building
+3. Pick the top unblocked item
+4. Implement it; keep the suite green (≥ 406 pass / 1 skip)
+5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
+6. Commit + push to the session branch
+7. Open ONE PR as the closing step  ← Arena allows one PR per session
+8. A human reviews and merges; the next session branches from main
 ```
 
 The PR is the session boundary. Never merge your own PR, and never
@@ -50,24 +53,24 @@ Anything that moves neither is out of scope.
 ## 🔥 Top priority — start here in the next session
 
 > **Order note (2026-08-13):** the active major milestone is **P10** and
-> P10.1–P10.4 are shipped. On 2026-08-13 the shipped P10.2 was hardened
-> (PR #12): the first cut labelled *spot* candles as ``market=perp`` — it
-> now pages the real perp endpoint — and rate-limit handling went from a
-> between-pages nap to real weight-header pacing + exponential backoff +
-> geo-block abort. P10.4 shipped the same day (PR #12): funding / OI /
-> mark / index / basis now persist as time series. The paper book
+> P10.1–P10.5 are shipped. P10.2 was hardened (PR #12: real perp
+> endpoint, weight-header pacing, geo-block abort); P10.3 gaps/rollups
+> and P10.4 derivatives series shipped the same day. P10.5 (PR #13)
+> added the data-quality pillar to the readiness strip. The paper book
 > (TODO-11) first-grind is done; what remains there is ongoing data
 > collection/grinding that can run alongside P10.
-> **P10.5 is the concrete next build below.**
+> **P10.6 is the concrete next build below.**
 
-### TODO-12 / P10.5 · Data-quality pillar · the next P10 milestone
+### TODO-12 / P10.6 · Bybit adapter · the next P10 milestone
 
-**P10.1–P10.4 are shipped** (schema + store, paginated backfill, gaps +
-1m rollups, derivatives series). Next: **P10.5 — per-source data-quality
-checks wired into `readiness_strip()`** (gap detection per window,
-price sanity, volume sanity, staleness per source, rate-limit budget) so
-a corrupt/stale feed quarantines and produces NO signal — proven by a
-test. Full plan: `docs/DATA_INFRASTRUCTURE_ROADMAP.md`.
+**P10.1–P10.5 are shipped.** Next: **P10.6 — Bybit adapter** behind the
+same normalised `Candle` schema: a Bybit klines transport (V5, spot +
+perps) with the same page/rate-limit/geo-block posture as the hardened
+Binance one, a deterministic offline fake, and identical assertions
+passing for both adapters (done when the same test battery runs against
+`exchange=bybit` series). Full plan:
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`. Do not start P10.7 until P10.6
+is green.
 
 ---
 
@@ -140,8 +143,8 @@ are shipped.** Do not start milestone N+1 until N is green.
 | P10.2 | Binance paginated REST backfill (resumable, rate-limit aware) | ✅ shipped (`data/backfill.py`; hardened 2026-08-13: real perp endpoint + weight-header/backoff handling) |
 | P10.3 | Gap detection + repair + 1m→higher-TF aggregation | ✅ shipped (`data/gaps.py`) |
 | P10.4 | Derivatives as time series (funding / OI / mark / index / basis) | ✅ shipped (`data/derivatives.py`) |
-| P10.5 | Data-quality pillar wired into `readiness_strip()` | ⏭ **next** |
-| P10.6 | Bybit adapter behind the same schema | ⏳ |
+| P10.5 | Data-quality pillar wired into `readiness_strip()` | ✅ shipped (`data/quality.py`, fourth pillar; corrupt data ⇒ quarantine ⇒ `ready: false`) |
+| P10.6 | Bybit adapter behind the same schema | ⏭ **next** |
 | P10.7 | Cross-exchange premium/discount + funding spread | ⏳ |
 | P10.8 | Lightweight Charts replaces `chartSVG()` | ⏳ |
 | P10.9 | OI / funding / CVD panes | ⏳ |
@@ -259,8 +262,9 @@ suite 355 → **377 pass / 1 skip**; version **2.4.0**.
 
 ### TODO-1.bis · combined dashboard doctor strip · ✅ DONE (prior session)
 
-One readiness verdict across channels + immune system + risk gate,
-rolled up **worst-first** (`ok → degraded → blocked → down`).
+One readiness verdict across channels + immune system + risk gate
+(+ stored-data quality since P10.5), rolled up **worst-first**
+(`ok → degraded → blocked → down`).
 
 **What landed:**
 - `brain/agent.readiness_strip()` + `format_readiness_strip()`, with

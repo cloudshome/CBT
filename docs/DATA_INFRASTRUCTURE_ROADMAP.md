@@ -1,12 +1,11 @@
 # DATA_INFRASTRUCTURE_ROADMAP.md — P10 · SKY Market Terminal
 
-> **Status:** in progress — **P10.1–P10.4 shipped** (P10.1–P10.3 on
-> 2026-08-12; P10.4 derivatives series on 2026-08-13). On 2026-08-13 the
-> P10.2 backfill was also **hardened** (PR #12): it now pages the real
-> perp endpoint (`/fapi/v1/klines`) instead of labelling spot candles
-> `market=perp`, and rate-limit handling went from a between-pages nap to
+> **Status:** in progress — **P10.1–P10.5 shipped** (P10.1–P10.3 on
+> 2026-08-12; P10.4 derivatives series + P10.2 hardening on 2026-08-13;
+> P10.5 data-quality pillar on 2026-08-13 — PR #13). The P10.2 backfill
+> pages the real perp endpoint and its rate-limit handling is
 > weight-header pacing + exponential backoff + geo-block abort.
-> Next: P10.5 (data-quality pillar).
+> Next: P10.6 (Bybit adapter).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12

@@ -282,3 +282,25 @@ class CandleStore:
             f"{p.parent.name}/{p.name}"
             for p in series_dir.glob("year=*/month=*")
         )
+
+    def list_series(self) -> list[dict]:
+        """List every stored candle series as {exchange, market, symbol, timeframe}.
+
+        P10.5: lets the data-quality pillar inspect each stored series
+        without knowing the keys up front. Empty store → ``[]``.
+        """
+        if not self.parquet_dir.exists():
+            return []
+        found: dict[tuple[str, str, str, str], dict] = {}
+        for tdir in sorted(self.parquet_dir.glob(
+                "exchange=*/market=*/symbol=*/timeframe=*")):
+            meta: dict[str, str] = {}
+            for seg in tdir.parts:
+                key, _, value = seg.partition("=")
+                if key in ("exchange", "market", "symbol", "timeframe"):
+                    meta[key] = value
+            if len(meta) == 4:
+                key = (meta["exchange"], meta["market"],
+                       meta["symbol"], meta["timeframe"])
+                found[key] = meta
+        return [found[k] for k in sorted(found)]

@@ -10,6 +10,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased] — PR #13 · branch `arena/019ff9cf-sky` (reconciliation, no version bump)
+
+**Parallel-session reconciliation, not new features.** This session built
+its own P10.2 backfill on a base that predated PR #11 (P10.2 + P10.3)
+and PR #12 (P10.2 hardening + P10.4). On discovery, the repo rule won —
+never duplicate completed components — so this PR:
+
+- merges `main` (PR #11 + #12) into the session branch and adopts the
+  reviewed implementation wholesale, discarding the parallel draft;
+- keeps the session's genuinely new value as **3 edge-case tests** in
+  `tests/test_backfill.py` (empty-first-page termination, start-past-end
+  no-op, mid-history-hole termination without duplicates — all pass
+  against the merged code);
+- reconciles `SESSION_STATE.md` / `TODO.md` / `ARCHITECTURE.md` and
+  records the lesson for future sessions: **fetch and diff `origin/main`
+  before finishing any session** — parallel Arena sessions merge while
+  you work.
+
+Suite **403 → 406 pass / 1 skip** (+3). Version stays **2.5.0** — no
+runtime change.
+
+---
+
+## [2.6.0] — 2026-08-13 · branch `arena/019ff9cf-sky`
+
+MINOR bump: **P10.5 — data-quality pillar wired into the readiness
+strip**. SKY now answers *"can I trust my own stored market history?"*
+with the same one-line verdict it already gives for channels, immune
+system, and risk gate. Corrupt or unusably stale data **quarantines**
+the desk — `ready` goes False — because the engine prefers silence to a
+signal built on corrupt data.
+
+### Added
+- **`data/quality.py`** — per-series market-data checks:
+  - `checks_on_frame()` — staleness (timeframe-scaled: ≤3×step fresh,
+    ≤30×step lagging, older = unusable), gaps in the recent window
+    (reuses P10.3 `detect_gaps`), price sanity (non-positive OHLC,
+    high below body, low above body), volume sanity (negative = corrupt,
+    zero-volume-with-range = suspicious), ts ordering (defensive).
+  - `verdict_for()` — maps health onto the readiness ladder with an
+    explicit `quarantined` flag.
+  - `series_health()` / `series_item()` — read a stored series through
+    the real store boundary and produce a pillar item.
+- **`CandleStore.list_series()`** — enumerate stored series so the
+  pillar inspects every series without knowing keys up front.
+- **`brain/agent.py`** — fourth pillar `_data_pillar()` in
+  `readiness_strip()`; exception-isolated like the other three; an
+  empty store is honest `degraded` with the backfill hint, a
+  quarantined series rolls the strip to `down` (`ready: false`).
+- **`mcp_server.py`** — `readiness` tool description updated to four
+  pillars; `SERVER_VERSION` 1.3.0 → 1.4.0.
+- **Tests** — `tests/test_quality.py`: 18 offline tests (fresh/lagging/
+  stale ladder, gap bands, negative-close / inverted-high / inverted-low
+  / negative-volume / non-monotonic-ts quarantine, zero-volume suspicion,
+  corrupt fixture written through the real store ⇒ quarantine, healthy
+  series, `list_series`, empty-store degraded, quarantine ⇒
+  `ready: false` integration, pillar exception isolation). Pinned
+  pillar-set assertions updated across `test_agent`, `test_web_api`,
+  `test_mcp_stdio`, `test_channels`, `test_dashboard_js`.
+
+### Changed
+- `main.py` doctor help, `web/app.py` strip comments, `SKILL.md` /
+  `README.md` / `TODO.md` pillar descriptions — all say **four** pillars.
+- Suite: **406 → 424 pass / 1 skip** (+18), fully offline.
+
+---
+
 ## [2.5.0] — 2026-08-13 · branch `arena/019ff948-sky`
 
 MINOR bump: **P10.4 — derivatives as time series**. Funding, open

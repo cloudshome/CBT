@@ -27,7 +27,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.3.0"  # bumped: TODO-1.bis added readiness strip
+SERVER_VERSION = "1.4.0"  # bumped: P10.5 added the data-quality pillar
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -155,7 +155,7 @@ ALLOWED_TOOLS = {
     },
     # ── P9: combined readiness strip (TODO-1.bis) ────────────────────
     "readiness": {
-        "description": "Combined readiness verdict across three pillars — source channels, immune system, and the risk gate — rolled up worst-first to ok/degraded/blocked/down. Read-only; the same as `python main.py doctor --strip --json` and GET /api/readiness. Ask this first to know whether the desk can be trusted right now.",
+        "description": "Combined readiness verdict across four pillars — source channels, immune system, the risk gate, and stored market-data quality — rolled up worst-first to ok/degraded/blocked/down. Read-only; the same as `python main.py doctor --strip --json` and GET /api/readiness. Ask this first to know whether the desk can be trusted right now.",
         "inputSchema": {
             "type": "object",
             "properties": {},
@@ -259,7 +259,7 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         return desk_status()
 
     elif name == "readiness":
-        # Combined channels + immune + risk-gate verdict. Read-only;
+        # Combined channels + immune + risk-gate + data-quality verdict. Read-only;
         # every pillar is exception-isolated inside readiness_strip().
         from brain.agent import readiness_strip
         return readiness_strip()

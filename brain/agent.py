@@ -1022,15 +1022,17 @@ def format_desk_status(status: dict) -> str:
     return "\n".join(lines)
 
 
-# ── readiness strip (TODO-1.bis) ─────────────────────────────────────────
-# One combined "doctor" verdict across the three independent readiness
+# ── readiness strip (TODO-1.bis + P10.5) ─────────────────────────────────
+# One combined "doctor" verdict across the independent readiness
 # surfaces the desk already reports separately:
 #
 #   channels  (brain/channels.probe_all)  — can I still see the world?
 #   immune    (brain/immune.run_health_check) — is the machine itself sane?
 #   risk gate (inside desk_status)        — am I allowed to trade?
+#   data      (data/quality)              — can I trust my own stored market
+#                                            history? (P10.5)
 #
-# The strip does not invent a fourth source of truth: every pillar reads
+# The strip does not invent a new source of truth: every pillar reads
 # the same library function the CLI / MCP / dashboard already read, so no
 # surface can drift from another.  Read-only; never places an order.
 
@@ -1120,6 +1122,51 @@ def _immune_pillar() -> dict:
             "items": items, "status": report.get("status", "OK")}
 
 
+def _data_pillar(store=None, now_ms=None) -> dict:
+    """Data pillar (P10.5): is our own stored market history trustworthy?
+
+    Every stored candle series gets a per-series health check from
+    ``data/quality.py`` (staleness, gaps, price/volume sanity). A corrupt
+    or unusably stale series is **quarantined** (`level="down"`), which
+    rolls the whole desk to *not ready* — the engine prefers silence to a
+    signal built on corrupt data. No stored history is honest `degraded`
+    (the desk still runs on live fetches today; P10.11 wires it to the
+    store). Exception-isolated like every other pillar.
+    """
+    try:
+        from data.quality import MAX_SERIES, series_item
+        from data.store import CandleStore
+
+        st = store if store is not None else CandleStore()
+        series = st.list_series()
+        if not series:
+            return {
+                "name": "data", "level": "degraded",
+                "headline": "no stored market history yet",
+                "detail": "run `python main.py backfill` to populate data/store (P10)",
+                "items": [],
+            }
+        items = [series_item(st, s, now_ms=now_ms)
+                 for s in series[:MAX_SERIES]]
+        level = _worst(i["level"] for i in items)
+        quarantined = [i for i in items if i["quarantined"]]
+        if quarantined:
+            headline = f"{len(quarantined)} series quarantined"
+        elif level == "degraded":
+            headline = (f"{sum(1 for i in items if i['level'] != 'ok')}"
+                        f"/{len(items)} series lagging")
+        else:
+            headline = f"{len(items)} series fresh"
+        detail = ", ".join(f"{i['name']}={i['level']}" for i in items)
+        return {"name": "data", "level": level, "headline": headline,
+                "detail": detail, "items": items,
+                "quarantined": [i["name"] for i in quarantined]}
+    except Exception as exc:
+        return {"name": "data", "level": "down",
+                "headline": "data-quality check failed",
+                "detail": f"{type(exc).__name__}: {exc}", "items": []}
+
+
 def _gate_pillar(status: dict) -> dict:
     """Risk-gate pillar, read straight off an existing desk_status snapshot."""
     gate = status.get("risk_gate") or {}
@@ -1142,7 +1189,7 @@ def _gate_pillar(status: dict) -> dict:
 
 
 def readiness_strip(status: dict | None = None) -> dict:
-    """Combined channels + immune + risk-gate readiness verdict.
+    """Combined channels + immune + risk-gate + data-quality verdict.
 
     The single strip the dashboard shows above every tab, and the same
     payload `python main.py doctor --strip` and MCP `readiness` return.
@@ -1155,7 +1202,8 @@ def readiness_strip(status: dict | None = None) -> dict:
     if status is None:
         status = desk_status()
 
-    pillars = [_channels_pillar(), _immune_pillar(), _gate_pillar(status)]
+    pillars = [_channels_pillar(), _immune_pillar(),
+               _gate_pillar(status), _data_pillar()]
     level = _worst(p["level"] for p in pillars)
 
     advice = status.get("advice") or {}

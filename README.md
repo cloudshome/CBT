@@ -37,6 +37,10 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 | **Backtester** | Walk-forward grading of every plan at +1h/+4h/+24h → win-rate, avg R, expectancy by plan type / confidence / action |
 | **Signal database** | SQLite learning store — every scan + every graded outcome, queried via `python main.py stats` |
 | **Market-data store** (P10) | Normalised `Candle` schema + partitioned Parquet history under `data/store/**` (gitignored) — our own stored market history, so the edge is no longer re-derived from one amnesiac 500-candle fetch. `data/store.py`. |
+| **Market-data backfill** (P10.2) | `python main.py backfill` — paginated, resumable, idempotent Binance klines collector (spot + USD-M perp with the real perp endpoint), header-aware rate limiting + exponential backoff + geo-block abort; a re-run adds **zero** rows and a still-forming candle never enters history. `data/backfill.py`. |
+| **Gap repair + rollups** (P10.3) | `python main.py backfill --repair --rollup` — detects holes in the stored 1m series, repairs them, and derives 5m/15m/1h/4h/1d from the 1m master so stored timeframes can never disagree. `data/gaps.py`. |
+| **Derivatives series** (P10.4) | `python main.py derivatives collect` — funding, open interest, mark, index and basis persisted as time series (resumable, idempotent); the old `liquidations()` 24h-stats proxy renamed honestly to `liquidation_stats_proxy()`. `data/derivatives.py`. |
+| **Data-quality pillar** (P10.5) | Fourth readiness pillar: per stored series, staleness (timeframe-scaled), gap fraction, price/volume sanity and ordering. A corrupt or unusably stale series is **quarantined** — `doctor --strip` / `/api/readiness` / MCP `readiness` all report the desk *not ready*, because the engine prefers silence to a signal built on corrupt data. `data/quality.py`. |
 | **Paper-trading runner** | Watches **approved** signals against live public Binance candles, simulates a planned entry, and auto-closes at SL / TP1. It records the outcome and R result — **never places a real exchange order**. |
 | **Self-improvement** | `python main.py learn` recomputes a per-setup calibration profile from backtest outcomes **plus decided paper trades** — boosts positive-expectancy plans, dampens (or filters) negative ones. |
 | **Coach (teaching)** | `python main.py coach` explains *why* the engine said what it said, mentors you through the top setup step-by-step, gives personal feedback on your own approvals/rejections, and ships a full trading glossary. |
@@ -116,7 +120,7 @@ python main.py journal <scan_id> --followed-rules 1 --emotion calm --mistake non
 python main.py journal        # discipline summary (violation rate)
 python main.py sourcetrust discord_group 5 0.3 --note "private signals: context only"
 python main.py health         # system health: data feeds, DB, risk gate, MCP, LLM
-python main.py doctor --strip # ONE readiness verdict: channels + immune + risk gate
+python main.py doctor --strip # ONE readiness verdict: channels + immune + risk gate + data quality
 python main.py desk           # one-call advisory: what would a professional do now?
 python main.py brief          # daily desk briefing (alias for `agent morning`)
 python main.py agent morning  # desk morning briefing across BTC/ETH/GOLD
@@ -125,6 +129,13 @@ python main.py agent ask "am i ready for micro?"    # the graduation gate
 python main.py agent all      # one desk run: health + briefing + graduation
 python main.py simulator      # grind unique 100-backtest / 20-paper samples per setup
 python main.py mcp            # MCP server for Claude Desktop / Cursor (stdio)
+
+# P10 — own your market history (data/store/**, gitignored):
+python main.py backfill --symbol BTCUSDT --market perp --tf 1m   # full run, resumable
+python main.py backfill --symbol BTCUSDT --market perp --tf 1m   # re-run: adds 0 rows
+python main.py backfill --symbol BTCUSDT --market perp --tf 1m --repair --rollup  # gaps + 1m→higher TFs
+python main.py store --market perp --tf 1m                      # inspect the store
+python main.py derivatives collect --symbol BTCUSDT             # funding/OI/mark/index series
 ```
 
 Progression levels (`PROGRESSION=student|researcher|simulator|micro|consistent|scale`)
@@ -158,13 +169,14 @@ the **graduation gate** passes (see `BLUEPRINT.md`).
 #### Readiness strip (`doctor --strip`)
 
 `python main.py doctor --strip` answers one question — *can I trust the
-desk right now?* — by rolling three pillars up **worst-first**:
+desk right now?* — by rolling four pillars up **worst-first**:
 
 | Pillar | Question it answers | Source |
 |---|---|---|
 | `channels` | Can the engine still see the world? | `brain/channels.probe_all()` |
 | `immune` | Is the machine itself sane? | `brain/immune.run_health_check()` |
 | `risk_gate` | Am I allowed to trade at all? | the gate inside `desk_status()` |
+| `data` | Can I trust my own stored market history? (P10.5) | `data/quality.py` — staleness, gaps, price/volume sanity per stored series; corrupt data is **quarantined** → desk not ready |
 
 Levels, worst wins: `ok` → `degraded` → `blocked` → `down`. Only `ok`
 sets `ready: true`; `blocked` means the engine is healthy but the risk

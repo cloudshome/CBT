@@ -360,7 +360,7 @@ def test_main_doctor_strip_json_is_valid():
     parsed = json.loads(res.stdout)
     assert parsed["level"] in {"ok", "degraded", "blocked", "down"}
     assert {p["name"] for p in parsed["pillars"]} == {
-        "channels", "immune", "risk_gate"}
+        "channels", "immune", "risk_gate", "data"}
 
 
 def test_main_doctor_json_includes_readiness():

@@ -370,3 +370,55 @@ def test_parse_ts_forms():
 def test_fmt_ts_utc():
     assert fmt_ts(1_704_067_200_000) == "2024-01-01 00:00"
     assert fmt_ts(None) == "-"
+
+
+# --------------------------------------------------------------------------- #
+# Edge cases from the parallel P10.2 session (PR #13 reconciliation)
+# --------------------------------------------------------------------------- #
+
+def test_empty_first_page_terminates_cleanly(store):
+    """Window starts before the venue's oldest data: the empty first page
+    ends the run with zero rows instead of looping or guessing."""
+    fake = FakeBook(book(0))
+    result = backfill(
+        store=store, symbol=SYMBOL, timeframe=TF,
+        fetch=fake, page_limit=1000, sleep_s=0.0, resume=False,
+        start_ts=START,
+    )
+    assert result.pages == 0
+    assert result.rows_added == 0
+    assert result.rows_after == 0
+    assert store.count(EXCH, MARKET, SYMBOL, TF) == 0
+
+
+def test_start_past_end_is_a_clean_noop(store):
+    """start > end must fetch one empty page and stop — no rows, no error."""
+    src = book(20)
+    fake = FakeBook(src)
+    result = backfill(
+        store=store, symbol=SYMBOL, timeframe=TF,
+        fetch=fake, page_limit=10, sleep_s=0.0, resume=False,
+        start_ts=START + 100 * STEP, end_ts=START,
+    )
+    assert result.pages == 0
+    assert result.rows_added == 0
+    assert store.count(EXCH, MARKET, SYMBOL, TF) == 0
+
+
+def test_mid_history_hole_stops_run_without_duplicates(store):
+    """A venue outage hole (empty page mid-window) terminates the iterator:
+    everything fetched before the hole is stored exactly once. Repairing
+    the hole is P10.3's job (`repair_gaps`)."""
+    full = book(30)
+    # The venue answers exactly one full page, then the hole begins.
+    holey = FakeBook(full.iloc[:10])
+    result = backfill(
+        store=store, symbol=SYMBOL, timeframe=TF,
+        fetch=holey, page_limit=10, sleep_s=0.0, resume=False,
+        start_ts=START,
+    )
+    assert result.rows_added == 10
+    df = store.read(EXCH, MARKET, SYMBOL, TF)
+    assert len(df) == 10
+    assert df["ts"].is_unique
+    assert int(df["ts"].max()) == int(full["ts"].iloc[9])

@@ -173,7 +173,7 @@ def test_desk_status_clear_state_when_angry(desk_env):
 # ── readiness strip (TODO-1.bis) ─────────────────────────────────────────
 
 def test_readiness_strip_shape_and_json(desk_env):
-    """readiness_strip() rolls three pillars into one verdict, JSON-safe."""
+    """readiness_strip() rolls four pillars into one verdict, JSON-safe."""
     import json
     from brain.agent import readiness_strip
     strip = readiness_strip()
@@ -183,7 +183,7 @@ def test_readiness_strip_shape_and_json(desk_env):
     assert strip["level"] in {"ok", "degraded", "blocked", "down"}
     assert strip["ready"] == (strip["level"] == "ok")
     assert {p["name"] for p in strip["pillars"]} == {
-        "channels", "immune", "risk_gate"}
+        "channels", "immune", "risk_gate", "data"}
     for p in strip["pillars"]:
         assert p["level"] in {"ok", "degraded", "blocked", "down"}
         assert p["headline"]
@@ -197,6 +197,8 @@ def test_readiness_strip_rolls_up_worst_pillar(desk_env, monkeypatch):
         "name": "channels", "level": "ok", "headline": "4/4 live", "detail": ""})
     monkeypatch.setattr(agent, "_immune_pillar", lambda: {
         "name": "immune", "level": "ok", "headline": "4 check(s) ok", "detail": ""})
+    monkeypatch.setattr(agent, "_data_pillar", lambda: {
+        "name": "data", "level": "ok", "headline": "1 series fresh", "detail": ""})
     assert agent.readiness_strip()["level"] == "ok"
 
     monkeypatch.setattr(agent, "_immune_pillar", lambda: {
@@ -239,16 +241,16 @@ def test_readiness_strip_survives_broken_pillar(desk_env, monkeypatch):
     ch = next(p for p in strip["pillars"] if p["name"] == "channels")
     assert ch["level"] == "down"
     assert "RuntimeError" in ch["detail"]
-    # the other two pillars still reported
+    # the other pillars still reported
     assert {p["name"] for p in strip["pillars"]} == {
-        "channels", "immune", "risk_gate"}
+        "channels", "immune", "risk_gate", "data"}
 
 
 def test_format_readiness_strip(desk_env):
     from brain.agent import format_readiness_strip, readiness_strip
     text = format_readiness_strip(readiness_strip())
     assert "READINESS" in text
-    for pillar in ("channels", "immune", "risk_gate"):
+    for pillar in ("channels", "immune", "risk_gate", "data"):
         assert pillar in text
 
 

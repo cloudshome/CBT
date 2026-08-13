@@ -62,8 +62,13 @@
 ### `data/` — sources + persistence
 | Module | Purpose |
 |---|---|
-| `binance_client.py` | Public market data (OHLCV, funding, OI, L/S, liq) with geo-friendly fallbacks |
+| `binance_client.py` | Public market data (OHLCV spot + perp, funding, OI, L/S, liq) with geo-friendly fallbacks |
 | `sample_client.py` | Offline deterministic synthetic data (DEMO_MODE=1) |
+| `store.py` | P10.1 — normalised `Candle` schema + partitioned Parquet store (upsert PK, unclosed-candle rule) |
+| `backfill.py` | P10.2 — paginated, resumable, rate-limit-aware backfill into the store (hardened: real perp endpoint, weight-header pacing, geo-block abort); `python main.py backfill` |
+| `gaps.py` | P10.3 — gap detection + repair + 1m→5m/15m/1h/4h/1d rollups (`--repair` / `--rollup`) |
+| `derivatives.py` | P10.4 — funding / OI / mark / index / basis as stored time series; `python main.py derivatives` |
+| `quality.py` | P10.5 — per-series data-quality pillar (staleness, gaps, price/volume sanity); corrupt data quarantines the desk via `readiness_strip` |
 | `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB` context manager |
 | `backtester.py` | Walk-forward grading of plans at +1h/+4h/+24h |
 | `paper_trading.py` | Approved-signal lifecycle: monitor + auto-close at SL/TP1 (no real orders) |
@@ -101,7 +106,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 41 test modules, 339 pass / 1 skip
+### `tests/` — 46 test modules, 424 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
@@ -121,7 +126,7 @@
   LibreChat last.
 - `DATA_INFRASTRUCTURE_ROADMAP.md` — **P10**, the next major
   milestone: own the market data (normalised schema → Parquet store →
-  Binance/Bybit backfill → derivatives series → quality pillar →
+  Binance/Bybit backfill → derivatives series → quality pillar (✅ P10.5) →
   Lightweight Charts terminal → WebSocket tier → feature store).
   12 shippable milestones. Read it in full before writing any P10 code.
 - `wheel-gate-job.yml` — job spec a human pastes into
@@ -164,7 +169,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 339 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 424 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -192,6 +197,16 @@
     connector, which already exists), `yt-dlp`, `ffmpeg`, or any
     Twitter/Reddit/Bilibili/Xiaohongshu/Facebook/Instagram/LinkedIn
     API/CLI.
+
+12. **Stored history is immutable, closed-candle-only, and
+    normalised at one boundary.** Every persisted candle passes
+    through `data/store.py::normalise_klines()` (UTC epoch-ms OPEN
+    times, upsert PK `(exchange, market, symbol, timeframe, ts)`);
+    a still-forming candle (`ts + step > end boundary`) is never
+    persisted — the P10.2 backfill drops it before the store sees
+    it, and the store itself refuses `closed=False`. Market data
+    collectors are read-only public endpoints: no keys, no signed
+    requests, ever.
 
 ---
 
