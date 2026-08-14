@@ -10,7 +10,7 @@
 **Last updated:** 2026-08-13
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.11.1` (also `pyproject.toml`).
+**Version:** `config.VERSION` = `2.12.0` (also `pyproject.toml`).
 
 ---
 
@@ -20,13 +20,13 @@
 | File | Purpose |
 |---|---|
 | `main.py` | argparse CLI dispatcher (~30 `cmd_*` subcommands) |
-| `config.py` | Env-driven config; `VERSION = "2.11.1"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
+| `config.py` | Env-driven config; `VERSION = "2.12.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
 | `mcp_server.py` | Zero-dep stdio JSON-RPC 2.0 MCP server (read-only tool permission map) |
 | `SKILL.md` | Agent-facing skill file (the one AI agents read first) |
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
 | `TODO.md` | Prioritised remaining work |
 | `ARCHITECTURE.md` | This file |
-| `CHANGELOG.md` | What shipped, when (current through v2.11.1) |
+| `CHANGELOG.md` | What shipped, when (current through v2.12.0) |
 | `BLUEPRINT.md` | The 4-step path from paper to real capital |
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
@@ -66,8 +66,8 @@
 |---|---|
 | `binance_client.py` | Public market data (OHLCV spot + perp, funding, OI, L/S, liq) with geo-friendly fallbacks |
 | `sample_client.py` | Offline deterministic synthetic data (DEMO_MODE=1) |
-| `store.py` | P10.1 — normalised `Candle` schema + partitioned Parquet store (upsert PK, unclosed-candle rule) |
-| `backfill.py` | P10.2 — paginated, resumable, rate-limit-aware backfill into the store (hardened: real perp endpoint, weight-header pacing, geo-block abort); `python main.py backfill` |
+| `store.py` | P10.1 — normalised `Candle` schema + partitioned Parquet store (upsert PK, unclosed-candle rule); P12.3.2 — `StoreClient` klines-shaped reader so offline walkers run on stored real candles |
+| `backfill.py` | P10.2 — paginated, resumable, rate-limit-aware backfill into the store (hardened: real perp endpoint, weight-header pacing, geo-block abort); P12.3.2 — `backfill_from_csv` offline CSV import (same adapter boundary, sha256 provenance pin); `python main.py backfill [--from-csv PATH]` |
 | `gaps.py` | P10.3 — gap detection + repair + 1m→5m/15m/1h/4h/1d rollups (`--repair` / `--rollup`) |
 | `derivatives.py` | P10.4 — funding / OI / mark / index / basis as stored time series; `python main.py derivatives` |
 | `quality.py` | P10.5 — per-series data-quality pillar (staleness, gaps, price/volume sanity); corrupt data quarantines the desk via `readiness_strip` |

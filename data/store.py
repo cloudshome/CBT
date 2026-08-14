@@ -304,3 +304,43 @@ class CandleStore:
                        meta["symbol"], meta["timeframe"])
                 found[key] = meta
         return [found[k] for k in sorted(found)]
+
+
+# --------------------------------------------------------------------------- #
+# klines-style read client (P12.3.2 — real market data)
+# --------------------------------------------------------------------------- #
+
+class StoreClient:
+    """Drop-in ``klines()`` reader over the Parquet store.
+
+    P12.3.2 gives the desk its first real market history. The offline
+    walkers (``backtest``, ``simulator``) take a client with
+    ``klines(symbol, timeframe, limit, start_time, end_time)``; this one
+    serves **stored** candles — immutable, deduplicated, ordered — with
+    the same ``ts/open/high/low/close/volume`` shape and the same
+    ``attrs["symbol"]`` / ``attrs["timeframe"]`` contract, so no walker
+    knows whether the series came from a live socket or the store.
+
+    It never fetches anything: a missing series returns an empty frame,
+    exactly like the demo client outside its synthetic range.
+    """
+
+    def __init__(self, store: CandleStore | None = None, *,
+                 exchange: str = "binance", market: str = "spot"):
+        self.store = store or CandleStore()
+        self.exchange = exchange
+        self.market = market
+
+    def klines(self, symbol: str = "BTCUSDT", timeframe: str = "15m",
+               limit: int = 500, start_time=None, end_time=None):
+        """OHLCV tail from the store, honouring cursors like the REST client."""
+        df = self.store.read(self.exchange, self.market, symbol, timeframe)
+        if not df.empty:
+            if start_time is not None:
+                df = df[df["ts"] >= int(start_time)]
+            if end_time is not None:
+                df = df[df["ts"] <= int(end_time)]
+            df = df.tail(int(limit)).reset_index(drop=True)
+        df.attrs["symbol"] = symbol
+        df.attrs["timeframe"] = timeframe
+        return df

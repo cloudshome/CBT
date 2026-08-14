@@ -10,10 +10,10 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-14 (this session: P12.3 scorecard + P12.3.1 tie-break shipped; a measured audit reordered the P12 ladder; P11 gate still honestly closed)
-**Branch:** `arena/019fffe5-sky` (session branch fixed by Arena; branched from `origin/main` @ `7154825`, the P12.2 base)
-**HEAD commit:** `342c66b` (P12.3 scorecard) → `aa6645a` (audit doc) → the P12.3.1 tie-break commit, all on top of `7154825`. PR **#21** is open and **unmerged** — the human merges it.
-**Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI)
+**Last updated:** 2026-08-14 (this session: **P12.3.2 real market data shipped** — SKY's first real market data ever; P11 / P12.1 / P12.3 re-run on it; the gate stays honestly closed and now has a real-data reason)
+**Branch:** `arena/01a00034-sky` (session branch fixed by Arena; branched from `origin/main` @ `f403ed4`, the merged P12.3 PR #21)
+**HEAD commit:** `2b25720` (P12.3.2 real market data) on top of `f403ed4`. PR **#22** is open, `MERGEABLE`, CI running — the human merges it.
+**Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI); this session's sandbox ran 3.11 with pandas 3.0.5 / pyarrow 25 — suite green
 
 > **This session (`arena/019fffe5-sky`): P12.3 — the boxed strategy
 > scorecard.** `data/scorecard.py` turns outcomes the grader already
@@ -180,21 +180,24 @@ plan (18 phases, 15-item rulebook) is in
 **Become a fully independent, consistently profitable trader.**
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
-(our own stored market history — ✅ P10.1–P10.12 shipped; the research
-proof that makes the edge trustworthy — 🔄 P12.1–P12.3 + P12.3.1 shipped;
-next is **P12.3.2, real market data**, because none has ever been used). Every phase
-below is ordered by how directly it moves those two lines.
+(our own stored market history — ✅ P10.1–P10.12 shipped, and now with
+**real market data in it**: P12.3.2 imported real Binance spot BTCUSDT
+1m, 2025-01-01 → 2026-04-30, sha256-pinned; the research proof that
+makes the edge trustworthy — 🔄 P12.1–P12.3.1 shipped and **re-run on
+real data**; next is **P12.6, fees-first `E_net`**, then P12.3.3). Every
+phase below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.3 + P12.3.1 shipped.** P10 (data
-infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 first
-grind shipped and the graduation gate is still honestly closed.
-Freqtrade rejected (F1–F8); Backtrader rejected (BT1–BT8). Open
-items: TODO-7, TODO-8; **P12.3.2 (real data)** → P12.6 → P12.3.3 → P12.4
-→ P12.7; P11 grind continues alongside.
+**P12 (SKY Quant Validation Engine) — P12.3.2 real data shipped.** P10
+(data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
+re-run on real data and the graduation gate is still honestly closed
+(now +0.348R / 36.8% WR / PF 1.55 on real samples). Freqtrade rejected
+(F1–F8); Backtrader rejected (BT1–BT8). Open items: TODO-7, TODO-8;
+**P12.6 (fees-first `E_net`)** → P12.3.3 → P12.4 → P12.7; P11 grind
+continues alongside. Numbers + repro: `docs/REAL_DATA_RUN_2026-08-14.md`.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -207,9 +210,9 @@ items: TODO-7, TODO-8; **P12.3.2 (real data)** → P12.6 → P12.3.3 → P12.4
 | P7 | Agent Surface (SKILL + CLI) | ✅ Complete | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
-| **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided, all four primary setups ≥100/20, compliance 100%, sell-R bug fixed); gate still closed on the blueprint bar |
+| **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%; sell-R bug fixed); **first real-data grind shipped** (+8,300 backtest / +494 paper real samples). Gate still closed — on real data now too (+0.348R / 36.8% / PF 1.55) |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.3 + P12.3.1 shipped** (P12.1 locked protocol + sealed OOS; P12.2 lookahead AST guard; P12.3 `data/scorecard.py` boxed scorecard on CLI + `/api/scorecard` + MCP; P12.3.1 same-bar tie-break unified with the paper trader); **ladder reordered** — next **P12.3.2 real market data**, then fees-first P12.6; P12.4 deferred. `docs/PATH_TO_REAL_MONEY.md` |
+| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.3.2 shipped — real market data** (P12.1 locked protocol + sealed OOS; P12.2 lookahead guard; P12.3 boxed scorecard; P12.3.1 tie-break unified; **real Binance spot BTCUSDT 1m imported and P11/P12.1/P12.3 re-run on it** — protocol fails every window at 1h; only 24h is gross-positive and it's below the net bar). Next: **fees-first P12.6** (`E_net`), then P12.3.3; P12.4 deferred. `docs/REAL_DATA_RUN_2026-08-14.md` |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -218,7 +221,74 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-14 (this branch `arena/019fffe5-sky`): P12.3 — boxed strategy scorecard
+### Session 2026-08-14 (this branch `arena/01a00034-sky`): P12.3.2 — real market data
+
+Branched from `main` @ `f403ed4` (PR #21 merged by the human — thank
+you). 0 regressions. Tests **539 → 552 pass / 1 skip** (+13). Version
+**2.11.1 → 2.12.0**.
+
+**The milestone.** The sandbox has no exchange egress (all Binance /
+Bybit / OKX / Kraken / Coinbase / Coingecko / Yahoo hosts reset the TLS
+handshake; PyPI and GitHub are the only reachable hosts — verified, not
+assumed). So the transport was substituted honestly and everything
+downstream is the code the project already trusts:
+
+- `data/backfill.py::backfill_from_csv` — local Binance-style OHLCV CSV
+  (Vision 6-col or 12-col klines, plain or gzipped) through the same
+  adapter boundary as the REST backfill (validate → sort →
+  `normalise_klines` → `CandleStore.write`). Idempotent; reports
+  duplicates / sanity-drops / misalignment / gaps; `--csv-sha256` pins
+  provenance and **refuses mismatches**.
+- `data/store.py::StoreClient` — `klines()`-shaped reader over the
+  Parquet store; `backtest --source store`, `simulator --source store`
+  (with `--market`), `backtest --step`.
+- `scorecard --since/--until` (epoch-ms or YYYY-MM-DD) so one book can
+  hold several data eras without mixing.
+
+**The data.** Real Binance **spot** BTCUSDT 1m, 2025-01-01 →
+2026-04-30 (696,960 bars, 484 days), from Binance's official public
+archive (`data.binance.vision`), transported via
+`github.com/j-greig/insomnia-hype-data` @ `9791d85`; sha256
+`c4ad6029…b934b7` verified against the dataset's own manifest. 0 gaps,
+0 duplicates, 0 sanity drops. P10.3 rollups produced 15m (46,464 bars).
+The P10.5 quality pillar reads it `down` — *history too stale* — which
+is correct for a frozen archive and irrelevant to walk-forward research
+over a closed window.
+
+**The runs (all in `docs/REAL_DATA_RUN_2026-08-14.md` with repro):**
+
+- **P12.1 sealed protocol, first real run** — 12,000 real 15m bars,
+  primary 1h, seal `data/store/validation/binance_spot_BTCUSDT_15m.json`
+  (fingerprint `1223819609d75213`, never resealed): **FAIL on every
+  window** — train −0.452R, val −0.251R, oos −0.101R, recent −0.429R.
+- **P12.3 scorecard, first real run** — 24,215 decided: +0.180R / 32.2%
+  WR / PF 1.266 all-horizon. Per horizon: 1h **−0.326R**, 4h −0.032R,
+  24h **+0.400R gross** (≈ +0.28R net at measured taker costs — below
+  the restated bar). **Breakout Buy −0.630R** over 6,062 decided,
+  negative at every horizon — the prune case from
+  `docs/PATH_TO_REAL_MONEY.md` §6.2 is now real-data fact.
+- **P11 grind, first real run** — +8,300 backtest + 494 paper samples
+  (era 2026-02 → 2026-04). Gate: +0.348R / 36.8% WR / PF 1.55 /
+  compliance 100% — **still closed**. Sweep Reversal Buy is the only
+  sample-proven setup at **+0.048R** — proof of nothing.
+
+**The honest reading.** The fall was predicted; it arrived. The engine
+is negative at its locked primary horizon on real data, in every
+window, including the sealed OOS. Nothing was re-tuned in response: no
+horizon change, no bar change, no strategy change. The 24h horizon is
+the one real lead for a future session (still below the net bar).
+The sandbox's DB was empty at session start (the synthetic book lived
+on the developer's machine), so this session's DB holds only real rows;
+`scorecard --since/--until` exists for machines where both eras coexist.
+
+**Files changed:** `data/backfill.py`, `data/store.py`, `data/scorecard.py`,
+`main.py`, `tests/test_backfill_csv.py` (new, 11), `tests/test_scorecard.py`
+(+2), `docs/REAL_DATA_RUN_2026-08-14.md` (new), `CHANGELOG.md`,
+`ARCHITECTURE.md`, `TODO.md`, `AI_ANATOMY_ROADMAP.md`,
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `config.py`, `pyproject.toml`,
+this file.
+
+### Session 2026-08-14 (prior branch `arena/019fffe5-sky`, merged as PR #21): P12.3 — boxed strategy scorecard
 
 Branched from `main` @ `7154825` (the P12.2 merge). 0 regressions.
 Tests **492 → 534 pass / 1 skip** (+42). Version **2.10.0 → 2.11.0**.
@@ -853,15 +923,17 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
 
 ## Next recommended action
 
-1. Next *code* session: **P12.3.2 — real market data.** Read
-   `docs/PATH_TO_REAL_MONEY.md` first, then point the P10 backfill at a
-   real exchange, re-run P11 / P12.1 / P12.3, and publish the new
-   numbers next to the old ones. This is worth more than P12.4–P12.7
-   combined: every current figure is measured on a synthetic random walk,
-   and expectancy already swings +0.387R…+0.730R on seed alone.
-   Requires network + a Binance-reachable machine (DEMO_MODE is offline,
-   so this likely cannot run in the Arena sandbox — if blocked, say so
-   plainly rather than grinding more synthetic data).
+1. Next *code* session: **P12.6 — costs, fees first.** Real-data
+   `E_gross` now exists (this session). Add `E_net = E_gross − fees −
+   slip − funding` to the grader's report and make `E_net` the number
+   the gate reads; the bar is already restated as **+0.50R net** in
+   `docs/PATH_TO_REAL_MONEY.md`. Fees (≈ −0.121R/round trip at measured
+   stop distances) are ~40× funding at the observed hold times. Then
+   **P12.3.3** (effective sample size — real counts are still
+   overlap-inflated ~30×). Optionally give the **24h horizon** one
+   honest look (`docs/REAL_DATA_RUN_2026-08-14.md` §4: the only
+   gross-positive cell, ≈ +0.28R net) — without touching the locked
+   primary or the seal.
    **First step of every future session:** `git fetch` and diff
    against `origin/main` — parallel sessions merge while you work (see
    known problem 16); reconcile before building.
@@ -871,25 +943,30 @@ Full list and rationale: see [`TODO.md`](./TODO.md).
    Do not install Freqtrade or Backtrader. Do not loosen the graduation
    bar. Do not add strategy modules or a second grader.
 
-A narrative handover for this session (what shipped, the four audit
-findings, the reordered ladder, and what the human must do) is at
+A narrative handover for this session (what shipped, what the human
+must do, the next-session order, sandbox notes) is at
+[`docs/HANDOVER_2026-08-14_P12_3_2.md`](docs/HANDOVER_2026-08-14_P12_3_2.md);
+the full run record with every number and repro command is
+[`docs/REAL_DATA_RUN_2026-08-14.md`](docs/REAL_DATA_RUN_2026-08-14.md).
+The previous session's handover (PR #21) is
 [`docs/HANDOVER_2026-08-14.md`](docs/HANDOVER_2026-08-14.md).
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm PR #21 merged. Read docs/PATH_TO_REAL_MONEY.md before
-> writing code — it reorders the P12 ladder and explains why.
-> P12.1, P12.2, P12.3 and P12.3.1 are shipped: do not redo the locked
-> protocol, the negative-shift guard, the boxed scorecard, or the
-> tie-break. **P12.4 is deferred.** Implement P12.3.2: point the existing
-> P10 backfill at real BTCUSDT 1m, then re-run P11 / P12.1 / P12.3 on it
-> and publish the new numbers beside the synthetic ones. If the sandbox
-> has no exchange access, say so plainly and do the largest honest
-> subset (e.g. P12.3.3 effective sample size) instead of grinding more
-> synthetic data. Keep the existing grader/store, do not adopt Freqtrade
-> / Hyperopt / FreqAI / Backtrader, do not add strategy modules or a
-> second grader, and do not loosen the graduation bar.
+> and confirm the P12.3.2 PR merged. P12.1, P12.2, P12.3, P12.3.1 and
+> P12.3.2 are shipped: do not redo the locked protocol, the
+> negative-shift guard, the boxed scorecard, the tie-break, or the real
+> data import. **P12.4/P12.5 are deferred.** Implement **P12.6 —
+> fees-first**: `E_net = E_gross − fees − slip − funding` becomes the
+> number the gate reads (bar already restated +0.50R net). The real
+> BTCUSDT series is already in the store (`binance/spot/BTCUSDT/1m`,
+> sha256-pinned) — use `--source store` everywhere; if the sandbox lacks
+> the store, re-import with the pinned `backfill --from-csv` command in
+> docs/REAL_DATA_RUN_2026-08-14.md §7. Keep the existing grader/store,
+> do not adopt Freqtrade / Hyperopt / FreqAI / Backtrader, do not add
+> strategy modules or a second grader, and do not loosen the graduation
+> bar.
 
 ---
 
@@ -898,7 +975,7 @@ findings, the reordered ladder, and what the human must do) is at
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 539 passed, 1 skipped
+# 552 passed, 1 skipped
 ```
 
 Readiness strip (four pillars since P10.5):
@@ -925,6 +1002,23 @@ python main.py backfill --exchange bybit --symbol BTCUSDT --market perp --tf 1m
 python main.py derivatives collect --symbol BTCUSDT
 ```
 
+P12.3.2 — real BTCUSDT 1m, offline (sandbox has no exchange egress; the
+store is gitignored, re-import if absent):
+
+```bash
+git clone https://github.com/j-greig/insomnia-hype-data /tmp/insomnia-hype-data
+python main.py backfill --from-csv \
+    /tmp/insomnia-hype-data/data/market/btc_1m_binance_spot_bulk_2025-01-01_2026-04-30.csv.gz \
+    --symbol BTCUSDT --tf 1m --market spot \
+    --csv-sha256 c4ad60296d9c13b77886fd916795ff38e7f605b387c64c82bcda9f0464b934b7 \
+    --rollup
+python main.py store --market spot --symbol BTCUSDT --tf 15m
+python main.py validate --exchange binance --market spot --symbol BTCUSDT --tf 15m --bars 12000
+python main.py backtest --source store --market spot --symbol BTCUSDT --tf 15m --bars 12000 --step 3 --save
+python main.py simulator --source store --market spot --symbols BTCUSDT --tf 15m --bars 6000 --step 3
+python main.py scorecard --source db --symbol BTCUSDT --since 2025-01-01 --until 2026-04-30
+```
+
 Paper-book grind + graduation (offline sample/synthetic data):
 
 ```bash
@@ -937,7 +1031,7 @@ Local wheel-gate (build + dup-check, no install):
 
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.11.1-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.12.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Readiness strip, all four surfaces:
@@ -955,13 +1049,14 @@ since the consolidated build per `MERGE_NOTES.md`.)
 ## Last commit
 
 ```
-feat(P12.3): boxed strategy scorecard on CLI, dashboard and MCP
+2b25720 feat(P12.3.2): real market data — first real BTCUSDT 1m, P11/P12.1/P12.3 re-run
+f403ed4 feat(P12.3): boxed strategy scorecard on CLI, dashboard and MCP (#21)
 7154825 feat(P12.2): add lookahead validation guard (#20)
-abc6a37 feat(P12.1): locked train/val/OOS/recent validation protocol + sealed OOS envelope (#19)
 ```
 
-P12.3 is committed on `arena/019fffe5-sky`; the session PR is opened
-against `main` as the closing step. See `git log --oneline -3`.
+P12.3.2 is committed on `arena/01a00034-sky`, pushed to origin, and the
+session PR **#22** is open against `main` — the human merges it. See
+`git log --oneline -3`.
 
 ---
 
@@ -1016,25 +1111,29 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.3 shipped.**
-2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` — **534 pass /
-   1 skip** (+42: 37 scorecard, 4 web API, 1 backtester holding-time).
-3. [x] Fix any obvious failures. — a nested f-string illegal on Python
-   3.11 was replaced with a helper; `cmd_scorecard` referenced a
-   nonexistent `args.symbol_given`; and `tests/test_web_api.py`'s
-   `client` fixture was reaching the real database (`setenv("DB_PATH")`
-   is too late once `config` is imported) — it now patches
-   `config.DB_PATH`, which also fixed a suite-order-dependent failure.
+1. [x] Finish or safely stop the current task. — **P12.3.2 shipped**
+   (real market data; P11 / P12.1 / P12.3 re-run and re-reported).
+2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` — **552 pass /
+   1 skip** (+13: 11 `test_backfill_csv`, 2 scorecard era filters).
+3. [x] Fix any obvious failures. — none left open; test-expectation
+   fixes only (era-cutoff arithmetic, store-upsert semantics in the
+   gap test).
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.3 marked shipped; P12.4 is next; P10.1–P10.12
-   remain shipped; the graduation bar remains unchanged.
-6. [x] Update `CHANGELOG.md` — 2.11.0 P12.3 entry; prior entries retained.
+5. [x] Update `TODO.md` — P12.3.2 marked shipped; P12.6 (fees-first)
+   is next; the graduation bar remains unchanged (restated net).
+6. [x] Update `CHANGELOG.md` — 2.12.0 P12.3.2 entry; prior entries retained.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
-10. [x] Record any known bugs or unresolved issues. — recursive-state
-    analysis is intentionally later; the P12.3 scorecard deliberately
-    reports per-trade (not annualised) ratios; no blocking issue remains.
-11. [x] `git add` / `git commit` / `git push origin arena/019fffe5-sky`.
-12. [x] Open the session PR as the closing step — one PR from
-    `arena/019fffe5-sky` → `main` (P12.3).
+10. [x] Record any known bugs or unresolved issues. — walk-forward is
+    O(n²) in slice recomputation: full-series (46k bar) protocol runs
+    take ~hours; the sealed run used the 12,000-bar tail (documented).
+    The P10.5 pillar calls the frozen archive "stale" — correct by
+    design, documented in `docs/REAL_DATA_RUN_2026-08-14.md` §2.
+11. [x] `git add` / `git commit` — committed as `2b25720` and
+    **pushed** to `origin/arena/01a00034-sky` (with the operator's PAT;
+    not stored in any repo file or credential helper).
+12. [x] Open the session PR as the closing step — **PR #22** from
+    `arena/01a00034-sky` → `main` (P12.3.2), body in
+    `docs/PR_BODY_P12_3_2.md`. Open, `MERGEABLE`; CI jobs
+    (offline test suite + wheel gate) run on the active workflow.

@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import (SYMBOL, SYMBOLS, TIMEFRAME, BARS, MIN_CONFIDENCE, DEFAULT_RISK_REWARD,
                     DASHBOARD_HOST, DASHBOARD_PORT, PAPER_POLL_SECONDS, VERSION,
-                    BACKTEST_MIN_BARS)
+                    BACKTEST_MIN_BARS, BACKTEST_STEP)
 
 from data.symbols import normalize_symbol, parse_symbol_list
 from data.binance_client import BinanceClient
@@ -290,12 +290,17 @@ def cmd_backtest(args) -> int:
     from data.backtester import run_backtest, save_report, print_report
     from data.database import SignalDB
 
-    client = _client()
+    if args.source == "store":
+        from data.store import StoreClient
+        client = StoreClient(market=args.market)
+    else:
+        client = _client()
     symbol = _sym(args.symbol)
     df = client.klines(symbol, args.tf, args.bars)
     horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
     result = run_backtest(df, symbol=symbol, timeframe=args.tf,
-                          horizons=horizons, min_confidence=args.min_conf)
+                          horizons=horizons, min_confidence=args.min_conf,
+                          step=args.step)
     report = result["report"]
     save_report(report)
     print_report(report)
@@ -377,11 +382,20 @@ def cmd_scorecard(args) -> int:
             horizons=horizons, min_bars=args.min_bars, step=args.step,
             min_confidence=args.min_conf, min_decided=args.min_decided)
     else:
+        from data.backfill import BackfillError, parse_ts
+        now_ms = int(time.time() * 1000)
+        try:
+            since_ts = parse_ts(args.since, now_ms=now_ms) if args.since else None
+            until_ts = parse_ts(args.until, now_ms=now_ms) if args.until else None
+        except BackfillError as exc:
+            print(f"[!] {exc}", file=sys.stderr)
+            return 2
         source = "all" if args.source == "db" else args.source
         report = scorecard_from_db(
             symbol=_sym(args.symbol) if args.symbol else None,
             source=source, min_decided=args.min_decided,
-            include_sim=not args.exclude_sim)
+            include_sim=not args.exclude_sim,
+            since_ts=since_ts, until_ts=until_ts)
 
     if args.json:
         print(json.dumps(report, indent=2, default=str))
@@ -1103,7 +1117,7 @@ def cmd_desk(args) -> int:
 # posture.  They never place exchange orders; they only read.
 
 def cmd_backfill(args) -> int:
-    """P10.2/P10.3/P10.6 — paginated REST backfill + optional gap repair / rollup.
+    """P10.2/P10.3/P10.6/P12.3.2 — market-data backfill + gap repair / rollup.
 
     Resumable (re-runs continue at the last stored candle), idempotent
     (a completed re-run adds zero rows), rate-limit aware: paced pages
@@ -1112,12 +1126,69 @@ def cmd_backfill(args) -> int:
     the perp endpoint — spot candles are never labelled ``market=perp``.
     ``--exchange bybit`` (P10.6) pages Bybit V5 klines behind the same
     contract. ``DEMO_MODE=1`` uses the offline demo fetcher (offline).
+
+    ``--from-csv PATH`` (P12.3.2) skips the REST transport entirely and
+    imports a local Binance-style OHLCV CSV through the same adapter
+    boundary (``normalise_klines`` → ``CandleStore.write``), so real
+    market data can enter the store on a machine with no exchange
+    egress. ``--csv-sha256`` pins the provenance before anything is
+    written; ``--rollup`` still composes on top of the imported 1m.
     """
     from data.backfill import BackfillError, backfill, fmt_ts, parse_ts
     from data.gaps import detect_gaps, repair_gaps, rollup
     from data.store import CandleStore
 
     store = CandleStore(root=args.root) if args.root else CandleStore()
+
+    # P12.3.2 — offline CSV import (never touches a network socket).
+    if args.from_csv:
+        from data.backfill import backfill_from_csv
+        try:
+            payload = backfill_from_csv(
+                store=store,
+                csv_path=args.from_csv,
+                symbol=_sym(args.symbol),
+                timeframe=args.tf,
+                exchange=args.exchange,
+                market=args.market,
+                expected_sha256=args.csv_sha256,
+            )
+            if args.rollup:
+                payload["rollup"] = rollup(
+                    store, exchange=args.exchange, market=args.market,
+                    symbol=_sym(args.symbol),
+                )
+            payload["gaps_remaining"] = len(detect_gaps(
+                store.read(args.exchange, args.market,
+                           _sym(args.symbol), args.tf), args.tf))
+        except BackfillError as exc:
+            print(f"[!] {exc}", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(f"csv import  {payload['exchange']}/{payload['market']}/"
+                  f"{payload['symbol']}/{payload['timeframe']}")
+            print(f"  sha256 {payload['sha256']}"
+                  f"{'  ✓ pin verified' if payload['sha256_verified'] else ''}")
+            print(f"  rows read {payload['rows_read']:,}  added "
+                  f"{payload['rows_added']:,}  (store now "
+                  f"{payload['rows_after']:,})")
+            if payload["duplicates_dropped"]:
+                print(f"  duplicates dropped {payload['duplicates_dropped']:,}")
+            if payload["sanity_dropped"]:
+                print(f"  sanity dropped {payload['sanity_dropped']:,}")
+            if payload["misaligned_ts"]:
+                print(f"  misaligned ts {payload['misaligned_ts']:,}")
+            print(f"  span {payload['span_days']} days  gaps "
+                  f"{payload['gaps_found']}  gaps_remaining "
+                  f"{payload['gaps_remaining']}")
+            if payload["rows_added"] == 0:
+                print("  ✓ idempotent re-run — zero rows added")
+            if args.rollup:
+                print(f"  rollup: {payload['rollup']}")
+        return 0
+
     now_ms = int(time.time() * 1000)
     try:
         start_ts = parse_ts(args.since, now_ms=now_ms) if args.since else args.start_ts
@@ -1425,11 +1496,20 @@ def cmd_preflight(args) -> int:
 
 
 def cmd_simulator(args) -> int:
-    """The paper-sample grind: unique backtest + paper samples per setup."""
+    """The paper-sample grind: unique backtest + paper samples per setup.
+
+    ``--source store`` walks the stored Parquet series (P12.3.2 real
+    data) instead of a live/demo client — same grind, same dedupe keys.
+    """
     from data.database import SignalDB
     from data.simulator import (format_graduation, format_progress,
                                 graduation_status, grind_verdict,
                                 paper_progress, simulate_round)
+
+    client = None
+    if args.source == "store":
+        from data.store import StoreClient
+        client = StoreClient(market=args.market)
 
     symbols = _symbols(args.symbols) if args.symbols else None
     total_bt = total_pp = 0
@@ -1438,7 +1518,7 @@ def cmd_simulator(args) -> int:
         res = simulate_round(symbols=symbols, timeframe=args.tf, bars=args.bars,
                              step=args.step, min_confidence=args.min_conf,
                              horizons=[float(h) for h in args.horizons.split(",") if h],
-                             save=not args.dry_run)
+                             save=not args.dry_run, client=client)
         rounds.append(res)
         total_bt += res["backtest_added"]
         total_pp += res["paper_added"]
@@ -1738,7 +1818,14 @@ def main(argv: list[str] | None = None) -> int:
     p_bt.add_argument("--bars", type=int, default=BARS)
     p_bt.add_argument("--horizons", default="1,4,24", help="comma-separated hours, e.g. 1,4,24")
     p_bt.add_argument("--min-conf", type=int, default=MIN_CONFIDENCE)
+    p_bt.add_argument("--step", type=int, default=BACKTEST_STEP,
+                      help="walk-forward bar step (1 = every bar)")
     p_bt.add_argument("--save", action="store_true", help="store graded outcomes in the signal database")
+    p_bt.add_argument("--source", default="auto", choices=("auto", "store"),
+                      help="auto = live (or demo) client; store = the P10 Parquet "
+                           "series (offline, P12.3.2 real data)")
+    p_bt.add_argument("--market", default="spot", choices=("spot", "perp"),
+                      help="store series market label (used with --source store)")
     p_bt.set_defaults(func=cmd_backtest)
 
     p_val = sub.add_parser(
@@ -1810,6 +1897,12 @@ def main(argv: list[str] | None = None) -> int:
                          help="minimum decided trades before a verdict is given")
     p_score.add_argument("--exclude-sim", action="store_true",
                          help="drop simulator walk-forward samples (real book only)")
+    p_score.add_argument("--since", default=None,
+                         help="db sources: score rows at/after this signal bar "
+                              "(epoch ms or YYYY-MM-DD) — separates data eras")
+    p_score.add_argument("--until", default=None,
+                         help="db backtest rows: score rows at/before this "
+                              "signal bar (epoch ms or YYYY-MM-DD)")
     p_score.add_argument("--json", action="store_true",
                          help="machine-readable result")
     p_score.set_defaults(func=cmd_scorecard)
@@ -2015,6 +2108,11 @@ def main(argv: list[str] | None = None) -> int:
     p_sim.add_argument("--min-conf", type=int, default=MIN_CONFIDENCE)
     p_sim.add_argument("--horizons", default="1,4,24",
                        help="comma-separated forward horizons in hours")
+    p_sim.add_argument("--source", default="auto", choices=("auto", "store"),
+                       help="auto = live (or demo) client; store = the P10 Parquet "
+                            "series (offline, P12.3.2 real data)")
+    p_sim.add_argument("--market", default="spot", choices=("spot", "perp"),
+                       help="store series market label (used with --source store)")
     p_sim.add_argument("--dry-run", action="store_true",
                        help="compute what WOULD be added without storing anything")
     p_sim.add_argument("--json", action="store_true")
@@ -2053,6 +2151,12 @@ def main(argv: list[str] | None = None) -> int:
                       help="P10.3: detect + fetch missing 1m holes")
     p_bf.add_argument("--rollup", action="store_true",
                       help="P10.3: aggregate stored 1m → 5m/15m/1h/4h/1d")
+    p_bf.add_argument("--from-csv", default=None, metavar="PATH",
+                      help="P12.3.2: import a local Binance-style OHLCV CSV(.gz) "
+                           "(offline; no REST page) — Vision 6-col or 12-col klines format")
+    p_bf.add_argument("--csv-sha256", default=None, metavar="HEX",
+                      help="provenance pin: refuse to import unless the "
+                           "decompressed CSV matches this sha256")
     p_bf.add_argument("--root", default=None, help="CandleStore root (tests)")
     p_bf.add_argument("--json", action="store_true")
     p_bf.set_defaults(func=cmd_backfill)

@@ -143,8 +143,15 @@ def rows_from_graded(graded: Iterable, symbol: str = "", timeframe: str = "",
 
 
 def rows_from_backtest_db(db, symbol: Optional[str] = None,
-                          include_sim: bool = True) -> list[dict]:
-    """Decided rows from the stored `backtest_results` table."""
+                          include_sim: bool = True,
+                          since_ts: Optional[int] = None,
+                          until_ts: Optional[int] = None) -> list[dict]:
+    """Decided rows from the stored `backtest_results` table.
+
+    ``since_ts`` / ``until_ts`` bound the signal bar (inclusive) so one
+    book can hold several data eras (e.g. the old synthetic samples vs.
+    the P12.3.2 real-market rows) without mixing them.
+    """
     q = ("SELECT ts, symbol, timeframe, plan_type, action, outcome, "
          "rr_achieved, regime, holding_hours, horizon_hours "
          "FROM backtest_results WHERE outcome IN "
@@ -153,6 +160,12 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
     if symbol:
         q += " AND symbol=?"
         args.append(symbol)
+    if since_ts is not None:
+        q += " AND ts>=?"
+        args.append(int(since_ts))
+    if until_ts is not None:
+        q += " AND ts<=?"
+        args.append(int(until_ts))
     if not include_sim:
         q += " AND sim_key IS NULL"
     q += " ORDER BY ts ASC"
@@ -167,12 +180,16 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
 
 
 def rows_from_paper_db(db, symbol: Optional[str] = None,
-                       include_sim: bool = False) -> list[dict]:
+                       include_sim: bool = False,
+                       since_ts: Optional[int] = None) -> list[dict]:
     """Decided rows from the real paper book (TP_HIT / STOP_LOSS).
 
     Holding time here is measured, not assumed: ``closed_ts - opened_ts``.
+    ``since_ts`` bounds ``closed_ts`` (the same era-separation the
+    backtest book uses, on the column paper trades actually close on).
     """
-    rows = db.decided_paper_rows(symbol=symbol, exclude_sim=not include_sim)
+    rows = db.decided_paper_rows(symbol=symbol, exclude_sim=not include_sim,
+                                 since_ts=since_ts)
     out = []
     for d in rows:
         opened = d.get("opened_ts")
@@ -370,12 +387,15 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
 
 def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
                       min_decided: int = DEFAULT_MIN_DECIDED,
-                      include_sim: bool = True, db=None) -> dict:
+                      include_sim: bool = True, db=None,
+                      since_ts: Optional[int] = None,
+                      until_ts: Optional[int] = None) -> dict:
     """Scorecard over what the desk has already graded and stored.
 
     ``source``: ``backtest`` | ``paper`` | ``all`` (both books combined).
     Paper trades exclude simulator samples unless ``include_sim`` — the live
     book and the walk-forward evidence are not the same thing.
+    ``since_ts`` / ``until_ts`` bound the signal bar for era-separated runs.
     """
     if source not in ("backtest", "paper", "all"):
         return {"ok": False,
@@ -388,10 +408,12 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
         rows: list[dict] = []
         if source in ("backtest", "all"):
             rows += rows_from_backtest_db(db, symbol=symbol,
-                                          include_sim=include_sim)
+                                          include_sim=include_sim,
+                                          since_ts=since_ts, until_ts=until_ts)
         if source in ("paper", "all"):
             rows += rows_from_paper_db(db, symbol=symbol,
-                                       include_sim=include_sim)
+                                       include_sim=include_sim,
+                                       since_ts=since_ts)
     finally:
         if owned:
             db.close()

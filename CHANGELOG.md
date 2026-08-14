@@ -10,6 +10,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.12.0] — 2026-08-14 · branch `arena/01a00034-sky`
+
+MINOR bump: **P12.3.2 — real market data.** The first real market data
+ever entered the project: Binance spot BTCUSDT 1m, 2025-01-01 →
+2026-04-30, 696,960 bars, from Binance's official public archive
+(`data.binance.vision`), sha256-pinned and verified on import. P11,
+P12.1 and P12.3 were re-run on it and the published numbers moved —
+down, as `docs/PATH_TO_REAL_MONEY.md` predicted. The graduation bar was
+not touched; the sealed protocol now fails every window on real data.
+
+### Added
+- **`data/backfill.py::backfill_from_csv`** — offline CSV import through
+  the same adapter boundary as the REST backfill (validate → sort →
+  `normalise_klines` → `CandleStore.write`). Idempotent by the store's
+  upsert PK; reports duplicates, sanity-dropped rows, misalignment and
+  gaps; `--csv-sha256` pins provenance and refuses mismatches.
+- **`data/store.py::StoreClient`** — `klines()`-shaped reader over the
+  Parquet store, so the offline walkers run on stored real candles.
+- **CLI** — `backfill --from-csv PATH [--csv-sha256 HEX] [--rollup]`;
+  `backtest --source store --market spot [--step N]`;
+  `simulator --source store --market spot`; `scorecard --since/--until`
+  (epoch-ms or YYYY-MM-DD) so one book can hold several data eras.
+- **`docs/REAL_DATA_RUN_2026-08-14.md`** — provenance, repro commands,
+  and the side-by-side synthetic-vs-real numbers.
+- Tests: `tests/test_backfill_csv.py` (11) + scorecard era-filter tests
+  (2). Suite **539 → 552 pass / 1 skip** (+13).
+
+### Measured (the milestone's deliverable)
+- **P12.1 sealed protocol, first real run** (12,000 real 15m bars, 1h
+  primary): train −0.452R, val −0.251R, **oos −0.101R**, recent −0.429R
+  — FAIL on every window (seal `1223819609d75213`).
+- **P12.3 scorecard, first real run** (24,215 decided): +0.180R / 32.2%
+  WR / PF 1.266 all-horizon; per horizon 1h −0.326R, 4h −0.032R,
+  **24h +0.400R gross** (≈ +0.28R net at measured taker costs — below
+  the restated +0.50R net bar). **Breakout Buy −0.630R** (6,062
+  decided, negative at every horizon) — real-data confirmation of the
+  prune case.
+- **P11 grind, first real run**: +8,300 backtest + 494 paper samples;
+  gate still closed (+0.348R / 36.8% WR / PF 1.55 / compliance 100%).
+
+No strategy, risk-gate, graduation-bar, OOS-seal, order, or dependency
+behavior changed. P12.6 (costs) is next on the ladder.
+
+---
+
 ## [2.11.1] — 2026-08-14 · branch `arena/019fffe5-sky`
 
 PATCH bump: **the two graders now agree on an ambiguous candle**, plus

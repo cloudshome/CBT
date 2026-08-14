@@ -39,6 +39,9 @@ Properties that are guaranteed by tests (all offline):
 """
 from __future__ import annotations
 
+import gzip
+import hashlib
+import io
 import os
 import re
 import time
@@ -529,3 +532,150 @@ class FakePagedTransport:
         if self.weight_budget is None:
             return {}
         return {"x-mbx-remaining-weight": str(self.weight_budget)}
+
+
+# --------------------------------------------------------------------------- #
+# P12.3.2 — offline CSV import (real market data without a live socket)
+# --------------------------------------------------------------------------- #
+
+_KLINES_12_COLS = [
+    "open_time", "open", "high", "low", "close", "volume", "close_time",
+    "quote_volume", "trades", "taker_buy_volume", "taker_buy_quote_volume",
+    "ignore",
+]
+
+_VISION_6_COLS = ["open_time_ms", "open", "high", "low", "close", "volume"]
+
+
+def _read_ohlcv_csv(csv_path: str | Path) -> tuple[pd.DataFrame, bytes, str]:
+    """Read a Binance-style OHLCV CSV (optionally gzipped) into a raw frame.
+
+    Accepted layouts (Binance public-archive exports and raw klines rows):
+
+    - header ``open_time_ms,open,high,low,close,volume`` (Vision 6-col)
+    - header ``open_time,open,high,low,close,volume,...`` (12-col klines)
+    - headerless 12-col klines rows
+    - headerless 6-col rows
+
+    Returns ``(frame with ts/open/high/low/close/volume, raw_bytes, sha256)``
+    where the digest is of the **decompressed** bytes, so a published pin
+    of the uncompressed file can be verified regardless of transport.
+    """
+    path = Path(csv_path)
+    raw = path.read_bytes()
+    if path.suffix == ".gz":
+        raw = gzip.decompress(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    buf = io.BytesIO(raw)
+    first = raw.split(b"\n", 1)[0]
+    headerless = not any(ch.isalpha() for ch in first.decode("utf-8", "ignore"))
+    if headerless:
+        df = pd.read_csv(buf, header=None)
+        if df.shape[1] >= 12:
+            df.columns = _KLINES_12_COLS[: df.shape[1]]
+        elif df.shape[1] == 6:
+            df.columns = _VISION_6_COLS
+        else:
+            raise BackfillError(
+                f"headerless CSV has {df.shape[1]} columns; expected 6 or 12")
+    else:
+        df = pd.read_csv(buf)
+    if "ts" not in df.columns:
+        for cand in ("open_time", "open_time_ms"):
+            if cand in df.columns:
+                df = df.rename(columns={cand: "ts"})
+    missing = {"ts", "open", "high", "low", "close", "volume"} - set(df.columns)
+    if missing:
+        raise BackfillError(
+            f"CSV is missing required columns: {sorted(missing)}")
+    df["ts"] = pd.to_numeric(df["ts"], errors="coerce")
+    if df["ts"].isna().any():
+        raise BackfillError("CSV contains non-numeric timestamps")
+    df["ts"] = df["ts"].astype(np.int64)
+    for col in ("open", "high", "low", "close", "volume"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df, raw, digest
+
+
+def backfill_from_csv(
+    *,
+    store: CandleStore,
+    csv_path: str | Path,
+    symbol: str = "BTCUSDT",
+    timeframe: str = "1m",
+    exchange: str = "binance",
+    market: str = "spot",
+    expected_sha256: Optional[str] = None,
+) -> dict:
+    """P12.3.2 — import a local Binance-style OHLCV CSV into the store.
+
+    Same adapter boundary as the REST backfill: rows are validated,
+    sorted, normalised through ``normalise_klines()`` and upserted by
+    ``CandleStore.write()``, so a re-run of the same file adds zero rows
+    (idempotent by the primary key). Nothing is fetched from a network:
+    this is the offline transport for real market data.
+
+    ``expected_sha256`` is the provenance pin: the digest of the
+    **decompressed** file must match it or the import refuses to write
+    anything. Rows that fail sanity (non-positive prices, inverted
+    high/low) are dropped and counted, never fixed silently. Duplicate
+    timestamps and step misalignment are counted and reported; gaps are
+    measured with the same detector the P10.3 repair path uses.
+
+    Returns a report dict (``ok`` is False only for hard parse failures,
+    which are raised as ``BackfillError`` instead).
+    """
+    from data.gaps import detect_gaps, step_ms
+
+    frame, _raw, digest = _read_ohlcv_csv(csv_path)
+    if expected_sha256 and digest.lower() != expected_sha256.strip().lower():
+        raise BackfillError(
+            f"sha256 mismatch: file {digest} != pin {expected_sha256.strip()} "
+            f"(nothing was written)")
+    step = step_ms(timeframe)
+    frame = frame.sort_values("ts").reset_index(drop=True)
+    n_read = len(frame)
+    duplicates = int(frame["ts"].duplicated().sum())
+    frame = frame.drop_duplicates(subset=["ts"], keep="last").reset_index(drop=True)
+
+    pos = (frame["open"] > 0) & (frame["high"] > 0) & (frame["low"] > 0) \
+        & (frame["close"] > 0) & (frame["volume"] >= 0)
+    sane = pos & (frame["high"] >= frame[["open", "close"]].max(axis=1)) \
+        & (frame["low"] <= frame[["open", "close"]].min(axis=1))
+    sanity_dropped = int((~sane).sum())
+    frame = frame[sane].reset_index(drop=True)
+
+    misaligned = int((frame["ts"] % step != 0).sum())
+
+    before = store.count(exchange, market, symbol, timeframe)
+    if not frame.empty:
+        canon = normalise_klines(
+            frame, exchange=exchange, market=market, symbol=symbol,
+            timeframe=timeframe, source="csv",
+        )
+        store.write(canon)
+    after = store.count(exchange, market, symbol, timeframe)
+
+    gaps = detect_gaps(store.read(exchange, market, symbol, timeframe),
+                       timeframe) if after else []
+    first_ts = int(frame["ts"].iloc[0]) if not frame.empty else None
+    last_ts = int(frame["ts"].iloc[-1]) if not frame.empty else None
+    return {
+        "ok": True,
+        "exchange": exchange, "market": market, "symbol": symbol,
+        "timeframe": timeframe,
+        "csv_path": str(csv_path),
+        "sha256": digest,
+        "sha256_verified": bool(expected_sha256),
+        "rows_read": n_read,
+        "rows_added": after - before,
+        "rows_after": after,
+        "duplicates_dropped": duplicates,
+        "sanity_dropped": sanity_dropped,
+        "misaligned_ts": misaligned,
+        "gaps_found": len(gaps),
+        "first_ts": first_ts,
+        "last_ts": last_ts,
+        "span_days": round((last_ts - first_ts) / 86_400_000, 2)
+        if first_ts is not None else 0.0,
+    }

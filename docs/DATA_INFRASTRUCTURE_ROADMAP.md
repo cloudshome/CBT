@@ -14,10 +14,13 @@
 > in `data/validation.py`; **P12.3 shipped 2026-08-14**: the boxed
 > strategy scorecard in `data/scorecard.py`, on CLI + `/api/scorecard`
 > + MCP; **P12.3.1 shipped**: the backtester's same-bar SL/TP tie-break now
-> matches the paper trader's conservative stop-first rule. Next
-> **P12.3.2 — real market data**: this doc's backfill machinery has never
-> been pointed at a real exchange, so every number so far is measured on a
-> synthetic random walk. See `docs/PATH_TO_REAL_MONEY.md`).
+> matches the paper trader's conservative stop-first rule; **P12.3.2
+> shipped 2026-08-14 — real market data**: real Binance spot BTCUSDT 1m
+> (2025-01-01 → 2026-04-30, 696,960 bars, sha256-pinned from Binance's
+> official public archive) imported offline via `backfill --from-csv`
+> through the same adapter boundary this doc specifies, rolled up with
+> the P10.3 rollups, and P11/P12.1/P12.3 re-run on it — every number is
+> in `docs/REAL_DATA_RUN_2026-08-14.md`. Next: fees-first P12.6.
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -57,9 +60,10 @@ DONE     P10.1 → P10.12 · data infrastructure + market terminal  ← THIS DOC
            ↓  shipped (PR #18) — unlocks real backtesting on stored data
 ALONG    P11 · prove the paper book (counts done; gate still closed)
            ↓  do not loosen the bar
-NOW      P12 · SKY Quant Validation Engine  (P12.3 + P12.3.1 shipped;
-           P12.3.2 REAL DATA next — ladder reordered, see
-           docs/PATH_TO_REAL_MONEY.md)
+NOW      P12 · SKY Quant Validation Engine  (P12.3 + P12.3.1 +
+           P12.3.2 REAL DATA shipped 2026-08-14 — see
+           docs/REAL_DATA_RUN_2026-08-14.md; P12.6 fees-first next,
+           ladder in docs/PATH_TO_REAL_MONEY.md)
            (walk-forward / OOS / lookahead / quality score /
             funding-OI-CVD-conditioned + net-of-costs expectancy /
             risk-of-ruin table)

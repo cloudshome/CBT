@@ -437,3 +437,57 @@ def test_cli_scorecard_prints_the_block(tmp_path, monkeypatch, capsys):
     assert "by session (UTC):" in out
     assert "VERDICT" in out
     assert rc == 0
+
+
+def test_rows_from_backtest_db_honours_since_until_eras(tmp_path, monkeypatch):
+    """P12.3.2: synthetic and real rows live in one book; era filters
+    must separate them by signal bar without mixing."""
+    import config
+    monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "era.db"))
+    from data.database import SignalDB
+    from data.scorecard import rows_from_backtest_db
+
+    with SignalDB() as db:
+        db.save_backtest_rows([
+            bt_row(1_700_000_000_000, "BUY", "FULL_WIN", 2.0),
+            bt_row(1_700_000_000_001, "BUY", "LOSS", -1.0),
+            bt_row(1_800_000_000_000, "BUY", "FULL_WIN", 2.0),
+            bt_row(1_800_000_000_001, "SELL", "FULL_WIN", 1.5),
+        ], run_id="era_test")
+        rows = rows_from_backtest_db(db, symbol="BTCUSDT")
+        assert len(rows) == 4
+        old = rows_from_backtest_db(db, symbol="BTCUSDT",
+                                    until_ts=1_750_000_000_000)
+        assert [r["ts"] for r in old] == [1_700_000_000_000, 1_700_000_000_001]
+        new = rows_from_backtest_db(db, symbol="BTCUSDT",
+                                    since_ts=1_750_000_000_000)
+        assert [r["ts"] for r in new] == [1_800_000_000_000, 1_800_000_000_001]
+        # Date strings route through the same CLI parser.
+        assert rows_from_backtest_db(db, symbol="BTCUSDT",
+                                     since_ts=0, until_ts=1_750_000_000_000) \
+            == old
+
+
+def test_cli_scorecard_era_flags_pass_through(tmp_path, monkeypatch, capsys):
+    """`scorecard --since/--until` parse dates/epoch-ms into ts bounds."""
+    import json
+    import config
+    monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "era_cli.db"))
+    from main import main
+
+    seen = {}
+
+    def fake_from_db(**kw):
+        seen.update(kw)
+        return {"ok": True, "rows": 0, "meta": {}, "overall": {},
+                "by_side": {}, "by_regime": {}, "by_session": {},
+                "by_setup": {}, "criteria": {}, "bar": {}, "verdict": {}}
+
+    monkeypatch.setattr("data.scorecard.scorecard_from_db", fake_from_db)
+    assert main(["scorecard", "--source", "backtest", "--symbol", "BTCUSDT",
+                 "--since", "2025-01-01", "--until", "2026-04-30",
+                 "--json"]) == 0
+    capsys.readouterr()
+    assert seen["since_ts"] == 1_735_689_600_000   # 2025-01-01T00:00:00Z
+    assert seen["until_ts"] == 1_777_507_200_000   # 2026-04-30T00:00:00Z
+    assert seen["source"] == "backtest"
