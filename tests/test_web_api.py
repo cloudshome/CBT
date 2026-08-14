@@ -14,6 +14,12 @@ import pytest
 def client(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "web.db"))
+    # config.DB_PATH is resolved from the environment at *import* time, so the
+    # setenv above is too late whenever another test already imported config.
+    # Patch the attribute too — SignalDB reads it at construction, so this is
+    # what actually keeps these endpoints off the developer's real database.
+    import config
+    monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "web.db"))
     from web.app import make_app
     app = make_app()
     app.testing = True
@@ -190,3 +196,58 @@ def test_desk_endpoint_returns_advisory(client):
     assert "risk_gate" in payload
     assert "graduation" in payload
     json.loads(resp.get_data(as_text=True))  # numpy-leak safety
+
+
+def test_scorecard_endpoint_empty_db_refuses_cleanly(client):
+    """`/api/scorecard` on a fresh DB reports the truth, not an error page."""
+    resp = client.get("/api/scorecard")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    payload = resp.get_json()
+    assert payload["ok"] is False
+    assert payload["rows"] == 0
+    assert "No decided outcomes stored yet" in payload["error"]
+
+
+def test_scorecard_endpoint_rejects_unknown_source(client):
+    payload = client.get("/api/scorecard?source=bogus").get_json()
+    assert payload["ok"] is False
+    assert "unknown source" in payload["error"]
+
+
+def test_scorecard_endpoint_returns_the_full_block(client, tmp_path, monkeypatch):
+    """With stored outcomes the endpoint serves every scorecard dimension."""
+    import json
+
+    import data.scorecard as sc
+    from data.scorecard import build_scorecard
+
+    rows = [{"ts": (i + 1) * 3_600_000,
+             "side": "BUY" if i % 2 else "SELL",
+             "setup": "Buy Pullback", "regime": "RANGING",
+             "r": 2.0 if i % 3 else -1.0, "outcome": "FULL_WIN",
+             "holding_hours": 1.5, "symbol": "BTCUSDT", "timeframe": "15m",
+             "source": "backtest", "session": "london"} for i in range(40)]
+    monkeypatch.setattr(sc, "scorecard_from_db",
+                        lambda **kw: build_scorecard(rows, min_decided=30))
+
+    resp = client.get("/api/scorecard?symbol=BTCUSDT")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["ok"] is True
+    for key in ("overall", "by_side", "by_regime", "by_session", "by_setup",
+                "verdict", "criteria", "bar"):
+        assert key in payload
+    assert payload["overall"]["n"] == 40
+    assert payload["verdict"]["status"] in {"PASS", "FAIL", "INSUFFICIENT_DATA"}
+    json.loads(resp.get_data(as_text=True))  # numpy-leak safety
+
+
+def test_scorecard_endpoint_never_500s(client, monkeypatch):
+    import data.scorecard as sc
+    monkeypatch.setattr(sc, "scorecard_from_db",
+                        lambda **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    resp = client.get("/api/scorecard")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["ok"] is False
+    assert "RuntimeError" in payload["error"]

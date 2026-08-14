@@ -53,6 +53,17 @@ class GradedPlan:
     max_favorable: float = 0.0
     max_adverse: float = 0.0
     regime: str = ""   # market regime at signal time (decision B3)
+    # Bars from entry to the deciding touch (SL or TP), and the same span in
+    # hours. Recorded, not decided: P12.3's scorecard needs to know how long
+    # the money was exposed. None while the trade never reached a decision.
+    holding_bars: Optional[int] = None
+    holding_hours: Optional[float] = None
+    #: True when the deciding candle touched BOTH the stop and the target, so
+    #: the outcome was resolved by the conservative stop-first rule rather than
+    #: observed ordering. In-memory diagnostic only (not persisted): on real
+    #: data its rate tells you how much of the book rests on that assumption.
+    #: Near-zero on synthetic series; expected to be non-trivial on real wicks.
+    ambiguous_bar: bool = False
 
     def as_row(self) -> dict:
         return {
@@ -61,7 +72,8 @@ class GradedPlan:
             "trigger_level": self.trigger_level, "horizon_hours": self.horizon_hours,
             "outcome": self.outcome, "rr_achieved": self.rr_achieved,
             "max_favorable": self.max_favorable, "max_adverse": self.max_adverse,
-            "regime": self.regime,
+            "regime": self.regime, "holding_bars": self.holding_bars,
+            "holding_hours": self.holding_hours,
         }
 
 
@@ -131,24 +143,53 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
         return round((exit_price - entry) / risk, 3) if is_buy \
             else round((entry - exit_price) / risk, 3)
 
-    if first_sl is not None and (first_tp1 is None or first_sl < first_tp1):
+    # Bars held until the deciding touch. Measured off the same first-touch
+    # indices the outcome uses, so holding time can never disagree with the
+    # grade it belongs to.
+    bar_ms = TIMEFRAME_TO_MS.get(df.attrs.get("timeframe", "15m"), 900_000)
+
+    def set_holding(bars_held: Optional[int]) -> None:
+        if bars_held is None:
+            return
+        gp.holding_bars = int(bars_held) + 1   # entry bar → deciding bar
+        gp.holding_hours = round(gp.holding_bars * bar_ms / 3_600_000, 3)
+
+    # Conservative same-bar rule (<=, not <): when the stop and the target are
+    # both touched inside ONE candle, bar data cannot tell us which came first,
+    # so we grade the STOP. This is the rule `data/paper_trading.py::exit_event`
+    # already applies ("ambiguous ... conservative stop-first") and the rule
+    # docs/BACKTRADER_REVIEW.md §7.1 cites as written-down-and-tested.
+    #
+    # Fix (2026-08-14): this comparison used a strict `<`, so on a tie
+    # (first_sl == first_tp1) control fell through to the TP branch and the
+    # ambiguous candle was graded +2R instead of -1R — a 3R optimism, and a
+    # silent disagreement with the paper trader on identical input. It stayed
+    # invisible because synthetic random-walk candles are too small to span a
+    # 1R stop and a 2R target in one bar (0 ties measured over 876 decided
+    # trades); real wick/liquidation candles hit it routinely.
+    if first_sl is not None and (first_tp1 is None or first_sl <= first_tp1):
         gp.outcome = "LOSS"
         gp.rr_achieved = -1.0
+        gp.ambiguous_bar = first_tp1 is not None and first_sl == first_tp1
+        set_holding(first_sl)
     elif first_tp1 is not None:
         if tp2 is not None:
             if is_buy:
-                tp2_hit = bool((highs[first_tp1:] >= tp2).any())
+                tp2_idx = np.flatnonzero(highs[first_tp1:] >= tp2)
             else:
-                tp2_hit = bool((lows[first_tp1:] <= tp2).any())
-            if tp2_hit:
+                tp2_idx = np.flatnonzero(lows[first_tp1:] <= tp2)
+            if tp2_idx.size:
                 gp.outcome = "FULL_WIN"
                 gp.rr_achieved = realized_r(tp2)
+                set_holding(first_tp1 + int(tp2_idx[0]))
             else:
                 gp.outcome = "PARTIAL_WIN"
                 gp.rr_achieved = realized_r(tp1)
+                set_holding(first_tp1)
         else:
             gp.outcome = "PARTIAL_WIN"
             gp.rr_achieved = realized_r(tp1)
+            set_holding(first_tp1)
     else:
         gp.outcome = "OPEN"
 

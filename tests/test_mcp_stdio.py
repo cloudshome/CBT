@@ -30,6 +30,8 @@ ROOT_TOOLS = {
     "desk_status",
     # P9 (TODO-1.bis): combined readiness strip
     "readiness",
+    # P12.3: boxed strategy scorecard (read-only report over graded outcomes)
+    "scorecard",
 }
 
 

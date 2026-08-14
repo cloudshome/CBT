@@ -357,6 +357,39 @@ def cmd_validate(args) -> int:
     return 0 if result.get("ok") else 1
 
 
+def cmd_scorecard(args) -> int:
+    """P12.3 — the single boxed strategy scorecard. One command, one block.
+
+    Reads outcomes that already exist. ``--source db|backtest|paper`` reads
+    what has been graded and stored; ``--source store`` runs one fresh
+    walk-forward grade over the stored series and scores that. Either way the
+    grading is done by data/backtester.py — this command only reports.
+    """
+    from data.scorecard import (print_scorecard, scorecard_from_db,
+                                scorecard_from_store)
+
+    if args.source == "store":
+        horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
+        report = scorecard_from_store(
+            exchange=args.exchange, market=args.market,
+            symbol=_sym(args.symbol or SYMBOL), timeframe=args.tf,
+            bars=args.bars,
+            horizons=horizons, min_bars=args.min_bars, step=args.step,
+            min_confidence=args.min_conf, min_decided=args.min_decided)
+    else:
+        source = "all" if args.source == "db" else args.source
+        report = scorecard_from_db(
+            symbol=_sym(args.symbol) if args.symbol else None,
+            source=source, min_decided=args.min_decided,
+            include_sim=not args.exclude_sim)
+
+    if args.json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print_scorecard(report)
+    return 0 if report.get("ok") else 1
+
+
 def _print_review_row(r: dict) -> None:
     print(f"  #{r['id']:<5} {r['symbol']:<10} {r['timeframe']:<4} {r['action']:<5} "
           f"conf={r['confidence_label']:<7} entry={r['entry']}  "
@@ -1748,6 +1781,39 @@ def main(argv: list[str] | None = None) -> int:
                        help="re-open the sealed OOS envelope (recorded in seal history)")
     p_val.set_defaults(func=cmd_validate)
 
+    p_score = sub.add_parser(
+        "scorecard",
+        help="P12.3 strategy scorecard — one boxed block (side/regime/session, "
+             "Sharpe/Sortino/Calmar, holding time)")
+    p_score.add_argument("--source", default="db",
+                         choices=("db", "backtest", "paper", "store"),
+                         help="db = stored backtest+paper outcomes (default); "
+                              "backtest/paper = one book; store = fresh "
+                              "walk-forward grade of the stored series")
+    p_score.add_argument("--symbol", default=None,
+                         help="asset filter / store symbol (BTC, ETH, XAU/GOLD)")
+    p_score.add_argument("--tf", default=TIMEFRAME, help="store timeframe")
+    p_score.add_argument("--exchange", default="binance",
+                         help="stored series venue (binance|bybit)")
+    p_score.add_argument("--market", default="perp", help="spot or perp series")
+    p_score.add_argument("--bars", type=int, default=1000,
+                         help="--source store: most-recent bars to grade")
+    p_score.add_argument("--horizons", default="4",
+                         help="--source store: comma-separated hours; the "
+                              "first is scored")
+    p_score.add_argument("--min-bars", type=int, default=BACKTEST_MIN_BARS,
+                         help="--source store: engine warm-up bars")
+    p_score.add_argument("--step", type=int, default=3,
+                         help="--source store: walk-forward bar step")
+    p_score.add_argument("--min-conf", type=int, default=MIN_CONFIDENCE)
+    p_score.add_argument("--min-decided", type=int, default=30,
+                         help="minimum decided trades before a verdict is given")
+    p_score.add_argument("--exclude-sim", action="store_true",
+                         help="drop simulator walk-forward samples (real book only)")
+    p_score.add_argument("--json", action="store_true",
+                         help="machine-readable result")
+    p_score.set_defaults(func=cmd_scorecard)
+
     p_stats = sub.add_parser("stats", help="what the engine has learned (DB + backtests)")
     p_stats.add_argument("--symbol", default=None, help="optional asset filter (BTC, ETH, XAU/GOLD)")
     p_stats.set_defaults(func=cmd_stats)
@@ -2161,7 +2227,8 @@ def main(argv: list[str] | None = None) -> int:
         print("                        learn | stats | coach | review | sources | state | glossary |")
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
         print("                        health | desk | doctor | channels | skill | preflight | simulator |")
-        print("                        validate | hidden | correlation | backfill | store | derivatives | mcp")
+        print("                        validate | scorecard | hidden | correlation | backfill | store |")
+        print("                        derivatives | mcp")
         print("=" * 62)
         serve(make_app(), DASHBOARD_HOST, DASHBOARD_PORT)
         return 0

@@ -11,7 +11,13 @@
 > Next: P12 — the SKY Quant Validation Engine now runs on this stack
 > (**P12.1 + P12.2 shipped 2026-08-13**: locked walk-forward protocol,
 > sealed OOS, and `python main.py validate lookahead` negative-shift guard
-> in `data/validation.py`).
+> in `data/validation.py`; **P12.3 shipped 2026-08-14**: the boxed
+> strategy scorecard in `data/scorecard.py`, on CLI + `/api/scorecard`
+> + MCP; **P12.3.1 shipped**: the backtester's same-bar SL/TP tie-break now
+> matches the paper trader's conservative stop-first rule. Next
+> **P12.3.2 — real market data**: this doc's backfill machinery has never
+> been pointed at a real exchange, so every number so far is measured on a
+> synthetic random walk. See `docs/PATH_TO_REAL_MONEY.md`).
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -51,7 +57,9 @@ DONE     P10.1 → P10.12 · data infrastructure + market terminal  ← THIS DOC
            ↓  shipped (PR #18) — unlocks real backtesting on stored data
 ALONG    P11 · prove the paper book (counts done; gate still closed)
            ↓  do not loosen the bar
-NOW      P12 · SKY Quant Validation Engine  (P12.2 shipped; P12.3 next)
+NOW      P12 · SKY Quant Validation Engine  (P12.3 + P12.3.1 shipped;
+           P12.3.2 REAL DATA next — ladder reordered, see
+           docs/PATH_TO_REAL_MONEY.md)
            (walk-forward / OOS / lookahead / quality score /
             funding-OI-CVD-conditioned + net-of-costs expectancy /
             risk-of-ruin table)

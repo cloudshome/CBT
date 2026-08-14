@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS backtest_results(
   plan_type TEXT, action TEXT, confidence_pct INTEGER,
   horizon_hours REAL, outcome TEXT,
   rr_achieved REAL, max_favorable REAL, max_adverse REAL,
-  entry REAL, trigger_level REAL, regime TEXT
+  entry REAL, trigger_level REAL, regime TEXT,
+  holding_bars INTEGER, holding_hours REAL
 );
 CREATE TABLE IF NOT EXISTS decisions(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -198,6 +199,10 @@ class SignalDB:
         # so the 100-backtest / 20-paper grind counts UNIQUE samples even when the
         # same history window is re-simulated in a later run (decision A6/B10).
         _add("backtest_results", "sim_key", "TEXT")
+        # holding time of a graded plan (P12.3 scorecard): bars and hours from
+        # entry to the deciding touch. NULL on rows graded before P12.3.
+        _add("backtest_results", "holding_bars", "INTEGER")
+        _add("backtest_results", "holding_hours", "REAL")
         _add("paper_trades", "sim_key", "TEXT")
         _add("paper_trades", "regime", "TEXT")
         _add("paper_trades", "mae", "REAL")
@@ -722,13 +727,14 @@ class SignalDB:
                        (run_id, ts, symbol, timeframe, plan_type, action,
                         confidence_pct, horizon_hours, outcome, rr_achieved,
                         max_favorable, max_adverse, entry, trigger_level, regime,
-                        sim_key)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        sim_key, holding_bars, holding_hours)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (run_id, r.get("ts"), r.get("symbol"), r.get("timeframe"),
                      r.get("plan_type"), r.get("action"), r.get("confidence_pct"),
                      r.get("horizon_hours"), r.get("outcome"), r.get("rr_achieved"),
                      r.get("max_favorable"), r.get("max_adverse"), r.get("entry"),
-                     r.get("trigger_level"), r.get("regime"), r.get("sim_key")),
+                     r.get("trigger_level"), r.get("regime"), r.get("sim_key"),
+                     r.get("holding_bars"), r.get("holding_hours")),
                 )
                 n += 1
             self.conn.commit()

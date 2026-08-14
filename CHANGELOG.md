@@ -10,6 +10,140 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.11.1] — 2026-08-14 · branch `arena/019fffe5-sky`
+
+PATCH bump: **the two graders now agree on an ambiguous candle**, plus
+`docs/PATH_TO_REAL_MONEY.md` — a measured audit against the project's
+actual aim, and a proposed reordering of the P12 ladder.
+
+### Fixed
+- **`data/backtester.py::_evaluate()` — same-bar SL/TP ties graded 3R too
+  generously.** When one candle touches both the stop and the target the
+  ordering is undecidable from bar data. `data/paper_trading.py::exit_event`
+  has always resolved this conservatively (stop wins, `ambiguous: True`),
+  and `docs/BACKTRADER_REVIEW.md` §7.1 cites that written-down rule as a
+  reason SKY needs no second engine. The backtester did **not** implement
+  it: the first-touch comparison used a strict `<`, so on a tie
+  (`first_sl == first_tp1`) control fell through to the take-profit branch
+  and the candle was graded `PARTIAL_WIN +2.0R` where the paper trader
+  graded `STOP_LOSS -1.0R`. Now `<=`, so the stop wins the tie on both
+  sides of the book and the two graders can never disagree again.
+  - Measured no-op on current data: **0 ties across 3,263 decided
+    synthetic trades** (5 seeds). Random-walk candles are too small to
+    span a 1R stop and a 2R target in one bar, which is exactly why this
+    survived undetected. Real wick/liquidation candles hit it routinely,
+    so the fix lands *before* real data rather than after.
+  - **Expect measured expectancy to fall once real data arrives.** That
+    fall is the correction, not a regression.
+
+### Added
+- **`GradedPlan.ambiguous_bar`** — in-memory diagnostic flag, `True` when
+  the outcome was resolved by the conservative rule rather than observed
+  ordering. Not persisted; on real data its rate tells you how much of a
+  book rests on that assumption.
+- **`docs/PATH_TO_REAL_MONEY.md`** — audit of the repo against the aim,
+  with every figure measured at commit `342c66b`, not estimated:
+  1. **No real market data has ever entered the project** — 0 `.parquet`
+     files, 0 `paper_trades` rows; all 1,049 graded rows come from a
+     seeded Gaussian random walk with no autocorrelation, fat tails,
+     regime persistence or stop-hunt structure.
+  2. **Costs are absent** (`EXECUTION_MODEL` defaults to `"none"`).
+     Median stop distance is **0.823% of entry**, so a taker round trip
+     costs **0.121R**: P12.3's +0.341R gross is ≈ **+0.22R net**. At the
+     measured 1.8h median hold, **fees are ~40× funding** — which
+     reverses P12.6's current emphasis.
+  3. The same-bar disagreement fixed above.
+  4. **Sample counts are inflated ~30×** — `step=3` against a 96-bar
+     horizon overlaps ~32 neighbours, so 384 decided ≈ 12 independent.
+- **5 regression tests** (`tests/test_backtester.py`) pinning the tie-break
+  on both sides, asserting the backtester and paper trader return the
+  identical verdict on identical input, and proving unambiguous candles
+  are untouched.
+
+### Changed
+- **P12 ladder reordered** (`TODO.md`, `AI_ANATOMY_ROADMAP.md`,
+  `docs/DATA_INFRASTRUCTURE_ROADMAP.md`). P12.4 would have scored a
+  fiction — a robustness grade over a gross, cost-free number measured on
+  a random walk. New order: **P12.3.1** tie-break (this release) →
+  **P12.3.2 real data** → **P12.6 pulled forward, fees-first** →
+  **P12.3.3 effective sample size** → P12.4 / P12.5 → micro-live last.
+- **Graduation bar restated as net, not loosened.** The intent was always
+  a real, tradeable +0.50R; measuring it gross quietly made it ~40%
+  easier. The thresholds themselves (≥ +0.50R, > 55% WR, PF ≥ 1.5) are
+  unchanged and remain enforced gross until P12.6 lands `E_net`.
+
+### Unchanged
+No signal, risk, execution, OOS-seal, order or dependency behavior. No
+new dependency. F1–F8 and BT1–BT8 stay decided; still one grader.
+Suite **534 → 539 pass / 1 skip**.
+
+---
+
+## [2.11.0] — 2026-08-14 · branch `arena/019fffe5-sky`
+
+MINOR bump: **P12.3 — the boxed strategy scorecard**. One command, one
+block: long/short, regime, session, Sharpe/Sortino/Calmar and holding
+time over outcomes the grader already decided. This is a **report layer**
+— it re-reads stored results and never re-grades, never re-optimises, and
+never loosens the graduation bar.
+
+### Added
+- **`data/scorecard.py`** (new) — the P12.3 report engine:
+  - `build_scorecard()` assembles one block from decided rows: overall
+    stats plus `by_side`, `by_regime`, `by_session`, `by_setup` splits.
+  - `trade_stats()` — expectancy, win rate, PF, avg win/loss, total R,
+    max drawdown, win/loss streaks, best/worst, Sharpe, Sortino, Calmar,
+    average/median holding time and how many trades were actually timed.
+  - Row adapters, one honest shape per source: `rows_from_graded()`
+    (in-memory `GradedPlan`s, single horizon), `rows_from_backtest_db()`
+    (stored `backtest_results`), `rows_from_paper_db()` (the live paper
+    book; holding time measured as `closed_ts - opened_ts`).
+  - `scorecard_from_db()` (`backtest` | `paper` | `all`) and
+    `scorecard_from_store()`; `print_scorecard()` renders the boxed block.
+  - `session_of_hour()` / `session_of_ts()` bucket trades into
+    asia / london / newyork from the existing `config` session windows.
+- **CLI** — `python main.py scorecard` with `--source db|backtest|paper|store`,
+  `--symbol`, `--tf`, `--min-decided`, `--exclude-sim`, `--json` and the
+  backtest knobs. An empty book prints an actionable refusal and exits 1.
+- **Web** — `GET /api/scorecard` and a `STRATEGY SCORECARD` dashboard card
+  rendering the same block; the endpoint never 500s.
+- **MCP** — read-only `scorecard` tool (`SERVER_VERSION` 1.4.0 → 1.5.0),
+  so an agent reads the identical report the CLI prints.
+- **Holding time is now recorded at grading time**: `GradedPlan` carries
+  `holding_bars` / `holding_hours` (`None` while `OPEN`), both persisted by
+  `save_backtest_rows()` into new `backtest_results` columns.
+
+### Changed
+- `data/database.py` — `backtest_results` gains `holding_bars` and
+  `holding_hours`, added by the existing additive `_migrate()` path; rows
+  written before this release read back as `NULL` and are reported as
+  "not recorded" rather than silently counted as zero.
+- `tests/test_web_api.py` — the `client` fixture now patches
+  `config.DB_PATH` as well as the environment variable. `setenv` alone is
+  read too late once `config` is imported, so these endpoint tests could
+  reach the developer's real database; they are now genuinely isolated.
+
+### Deliberately not done
+- **No annualised Sharpe.** Scaling by `sqrt(trades_per_year)` on
+  overlapping walk-forward samples inflated Sharpe from 0.27 to 36.7 in
+  testing. The report states `span_days` and `trades_per_day` and labels
+  every ratio per-trade.
+- **No second grader, no new engine, no new dependency.**
+  `data/backtester.py` remains the only grader (BT3/BT7).
+- **The graduation bar is unchanged** (≥ +0.50R, > 55% WR, PF ≥ 1.5). The
+  scorecard prints a verdict; it does not grant permission.
+
+### Tests
+- `tests/test_scorecard.py` (new, 37) — metric arithmetic, drawdown,
+  streaks, session bucketing, split partitioning, DB adapters, sim-sample
+  exclusion, PASS/FAIL/INSUFFICIENT_DATA verdicts, purity, and both CLI
+  paths. `tests/test_web_api.py` +4, `tests/test_backtester.py` +1
+  (holding-time contract), `tests/test_mcp_stdio.py` / `test_dashboard_js.py`
+  inventories updated.
+- Suite **492 → 534 pass / 1 skip**.
+
+---
+
 ## [2.10.0] — 2026-08-13 · branch `arena/019ffb14-sky`
 
 MINOR bump: **P12.2 — lookahead validation**. The validation engine

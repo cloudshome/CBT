@@ -27,7 +27,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.4.0"  # bumped: P10.5 added the data-quality pillar
+SERVER_VERSION = "1.5.0"  # bumped: P12.3 added the strategy scorecard tool
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -112,6 +112,18 @@ ALLOWED_TOOLS = {
                 "timeframe": {"type": "string", "default": "1h", "description": "Candle timeframe"},
                 "bars": {"type": "integer", "default": 300, "description": "History length (max 1000)"},
                 "window": {"type": "integer", "default": 60, "description": "Rolling window of aligned returns"},
+            },
+        },
+    },
+    "scorecard": {
+        "description": "P12.3 strategy scorecard: one block of expectancy R, win rate, profit factor, Sharpe/Sortino/Calmar, max drawdown and holding time, split by side (long/short), regime, session and setup — over outcomes the grader already produced. Read-only; the same as `python main.py scorecard --json`. Reports performance, never grants permission to trade.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {"type": "string", "enum": ["db", "backtest", "paper"], "default": "db", "description": "db = stored backtest + paper outcomes combined; or one book alone"},
+                "symbol": {"type": "string", "description": "Optional asset filter (BTCUSDT, ETHUSDT, XAUUSD)"},
+                "min_decided": {"type": "integer", "default": 30, "description": "Minimum decided trades before a verdict is given"},
+                "exclude_sim": {"type": "boolean", "default": False, "description": "Drop simulator walk-forward samples (real paper book only)"},
             },
         },
     },
@@ -226,6 +238,17 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
             bars=min(int(args.get("bars", 300)), 1000),
             window=int(args.get("window", 60)),
         )
+
+    elif name == "scorecard":
+        # P12.3 boxed scorecard over ALREADY-graded outcomes. Read-only: it
+        # re-reads the store, never re-grades and never places anything.
+        from data.scorecard import scorecard_from_db
+        src = args.get("source", "db")
+        return scorecard_from_db(
+            symbol=normalize_symbol(args["symbol"]) if args.get("symbol") else None,
+            source="all" if src == "db" else src,
+            min_decided=int(args.get("min_decided", 30)),
+            include_sim=not bool(args.get("exclude_sim", False)))
 
     elif name == "hidden_chart_read":
         # HMM regime + CVD + Kelly advisory for one symbol. Read-only.

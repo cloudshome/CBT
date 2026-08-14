@@ -146,6 +146,29 @@ def test_run_backtest_shape(df):
     assert report["summary"]["win_rate"] is None or 0 <= report["summary"]["win_rate"] <= 1
 
 
+def test_graded_plans_carry_holding_time():
+    """P12.3: every decided plan records how long it took to resolve."""
+    from tests.conftest import make_ohlcv
+    df = make_ohlcv(n=300, seed=11)
+    out = run_backtest(df, symbol="BTCUSDT", timeframe="15m", horizons=[4.0],
+                       min_bars=150, step=5)
+    graded = out["graded"]
+    decided = [g for g in graded if g.outcome in WIN_SET or g.outcome == "LOSS"]
+    assert decided, "expected some decided plans"
+    for g in decided:
+        assert g.holding_bars is not None and g.holding_bars >= 1
+        assert g.holding_hours is not None and g.holding_hours > 0
+        # 15m bars: holding_hours == holding_bars * 0.25, and a decided plan
+        # can never take longer than its own horizon.
+        assert g.holding_hours == round(g.holding_bars * 0.25, 3)
+        assert g.holding_hours <= g.horizon_hours
+    for g in graded:
+        if g.outcome == "OPEN":
+            assert g.holding_bars is None and g.holding_hours is None
+    row = decided[0].as_row()
+    assert "holding_bars" in row and "holding_hours" in row
+
+
 def test_backtest_tags_regime(tmp_path):
     """Decision B3: backtest rows carry the regime at signal time."""
     from tests.conftest import make_ohlcv
@@ -158,3 +181,89 @@ def test_backtest_tags_regime(tmp_path):
     assert "by_regime" in out["report"]
     rows = [g.as_row() for g in graded]
     assert all("regime" in r for r in rows)
+
+
+# ── same-bar SL/TP ambiguity: the two graders must agree ────────────────────
+# A candle that touches both the stop and the target is undecidable from bar
+# data. `data/paper_trading.py::exit_event` resolves it conservatively (stop
+# wins) and docs/BACKTRADER_REVIEW.md §7.1 cites that rule as the reason SKY
+# does not need another engine's implicit fill model. These tests pin the
+# backtester to the same rule, so the two graders can never drift apart again.
+
+def _one_bar_df(high: float, low: float):
+    """Two bars: a flat signal bar, then one bar spanning `low`..`high`."""
+    import pandas as pd
+    df = pd.DataFrame([
+        {"ts": 0, "open": 100.0, "high": 100.0, "low": 100.0, "close": 100.0},
+        {"ts": 900_000, "open": 100.0, "high": high, "low": low, "close": 100.0},
+    ])
+    df.attrs["timeframe"] = "15m"
+    return df
+
+
+def _plan(action="BUY", entry=100.0, sl=95.0, tps=(110.0,)):
+    return {"entry": entry, "stop_loss": sl, "take_profits": list(tps),
+            "action": action, "type": "Immediate " + action.title(),
+            "confidence": 80}
+
+
+def test_same_bar_stop_and_target_grades_as_loss_buy():
+    """BUY: one candle spanning both levels is a LOSS, not a win."""
+    gp = _evaluate(_plan(), _one_bar_df(high=112.0, low=88.0), 0, horizon_bars=1)
+    assert gp.outcome == "LOSS"
+    assert gp.rr_achieved == -1.0
+    assert gp.ambiguous_bar is True
+
+
+def test_same_bar_stop_and_target_grades_as_loss_sell():
+    """SELL: mirror image — the stop above still wins the tie."""
+    plan = _plan(action="SELL", entry=100.0, sl=105.0, tps=(90.0,))
+    gp = _evaluate(plan, _one_bar_df(high=112.0, low=88.0), 0, horizon_bars=1)
+    assert gp.outcome == "LOSS"
+    assert gp.rr_achieved == -1.0
+    assert gp.ambiguous_bar is True
+
+
+def test_backtester_and_paper_trader_agree_on_ambiguous_candle():
+    """The regression itself: identical input, identical verdict.
+
+    Before 2026-08-14 the backtester used a strict `<` on the first-touch
+    indices, so a tie fell through to the take-profit branch and graded +2R
+    while the paper trader graded -1R — a 3R disagreement on one candle.
+    """
+    from data.paper_trading import exit_event
+    candle = {"high": 112.0, "low": 88.0}
+    gp = _evaluate(_plan(), _one_bar_df(**candle), 0, horizon_bars=1)
+    ev = exit_event({"action": "BUY", "entry": 100.0, "stop_loss": 95.0,
+                     "take_profit": 110.0}, candle)
+    assert ev["ambiguous"] is True
+    assert gp.rr_achieved == ev["rr_achieved"] == -1.0
+    assert gp.ambiguous_bar is True
+
+
+def test_unambiguous_candles_are_unaffected():
+    """The conservative rule must only fire on a genuine tie."""
+    # Target only (high reaches 110, low never reaches the 95 stop).
+    gp = _evaluate(_plan(), _one_bar_df(high=112.0, low=99.0), 0, horizon_bars=1)
+    assert gp.outcome == "PARTIAL_WIN"
+    assert gp.rr_achieved > 0
+    assert gp.ambiguous_bar is False
+    # Stop only (low reaches 95, high never reaches the 110 target).
+    gp = _evaluate(_plan(), _one_bar_df(high=101.0, low=88.0), 0, horizon_bars=1)
+    assert gp.outcome == "LOSS"
+    assert gp.ambiguous_bar is False
+
+
+def test_target_before_stop_on_later_bar_still_wins():
+    """A TP touched on an earlier bar than the SL is still a win."""
+    import pandas as pd
+    df = pd.DataFrame([
+        {"ts": 0, "open": 100.0, "high": 100.0, "low": 100.0, "close": 100.0},
+        {"ts": 900_000, "open": 100.0, "high": 111.0, "low": 99.0, "close": 110.0},
+        {"ts": 1_800_000, "open": 110.0, "high": 110.0, "low": 88.0, "close": 90.0},
+    ])
+    df.attrs["timeframe"] = "15m"
+    gp = _evaluate(_plan(), df, 0, horizon_bars=2)
+    assert gp.outcome == "PARTIAL_WIN"
+    assert gp.rr_achieved > 0
+    assert gp.ambiguous_bar is False

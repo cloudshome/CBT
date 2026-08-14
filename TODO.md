@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-13 (this session: P12.2 shipped — `python main.py validate lookahead` negative-shift guard + CI unit form; next *code* is P12.3)
+**Last updated:** 2026-08-14 (this session: P12.3 shipped — the boxed strategy scorecard on CLI + dashboard + MCP; then P12.3.1 unified the same-bar tie-break and the ladder was reordered; next *code* is **P12.3.2 — real market data**)
 
 ---
 
@@ -44,7 +44,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1 + P12.2 shipped; P12.3 next) |
+| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1 + P12.2 + P12.3 + P12.3.1 shipped; **P12.3.2 real data** next) |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -66,16 +66,63 @@ Do not reopen them to install a bot or a second backtest engine.
 > `shift(periods=-n)`, reports source locations, and is covered by a
 > deliberately leaking unit fixture that the existing CI test job runs. **P10 is fully shipped**
 > (P10.1–P10.12, PR #18). F1–F8 / BT1–BT8 stay decided. P11 grind
-> continues alongside. **P12.3 is the concrete next *code* build below.**
+> continues alongside. **P12.3.2 — real market data — is the concrete next
+> *code* build below** (the ladder was reordered; see TODO-14).
 
-### TODO-13 / P12.2 · `python main.py validate lookahead` · ✅ shipped
+### TODO-13 / P12.3 · the boxed strategy scorecard · ✅ shipped
 
-**P12.2 is shipped** (see the TODO-13 table below): `data/validation.py`
-now owns a deterministic AST scanner for negative pandas row shifts,
-`python main.py validate lookahead` exposes the boxed report, and CI runs
-the existing full-suite unit-form guard. A deliberately leaking `shift(-n)` fixture
-fails the scanner. Recursive-state analysis remains a later extension;
-P12.3 is the next milestone.
+**P12.3 is shipped** (see the TODO-13 table below): `data/scorecard.py`
+turns already-graded outcomes into one block — expectancy, WR, PF, total
+R, drawdown, streaks, Sharpe/Sortino/Calmar and holding time, split by
+long/short, regime, session and setup. Three surfaces read the same
+report: `python main.py scorecard` (`--json`), `GET /api/scorecard` + the
+`STRATEGY SCORECARD` dashboard card, and the read-only MCP `scorecard`
+tool. Holding time is now recorded at grading time (`GradedPlan`
+`holding_bars` / `holding_hours`, persisted to `backtest_results`).
+
+It is a **report layer**: no re-grading, no second engine, no new
+dependency, and the graduation bar is untouched — the block prints a
+verdict, it does not grant permission. Ratios are per-trade and labelled
+as such; annualising Sharpe over overlapping walk-forward samples was
+tried and rejected as dishonest (0.27 → 36.7).
+
+### TODO-14 / P12.3.1 · the two graders now agree · ✅ shipped
+
+A candle touching both stop and target is undecidable from bar data.
+`data/paper_trading.py` has always resolved it conservatively (stop
+wins), and `docs/BACKTRADER_REVIEW.md` §7.1 cites that written-down rule
+as why SKY needs no second engine. **The backtester did not implement
+it** — a strict `<` on the first-touch indices let the take-profit branch
+win the tie, grading `+2.0R` where the paper trader graded `-1.0R`. Now
+`<=`, plus `GradedPlan.ambiguous_bar` as a diagnostic and 5 regression
+tests that assert both graders return the identical verdict.
+
+Measured no-op today: **0 ties across 3,263 decided synthetic trades**
+(5 seeds) — random-walk candles are too small to span a 1R stop and a 2R
+target in one bar, which is precisely why it survived. Real wicks hit it
+routinely, so the fix lands *before* the data does. Expect measured
+expectancy to fall on real data; that fall is the correction.
+
+### The ladder was reordered — P12.4 is no longer next
+
+`docs/PATH_TO_REAL_MONEY.md` (2026-08-14) measured four things and the
+order changed as a result. **P12.4 would score a fiction:** a robustness
+grade over a gross, cost-free expectancy measured on a random walk is a
+precise measurement of the wrong object.
+
+| # | step | why here | size |
+|---|---|---|---|
+| **P12.3.1** | unify the same-bar tie-break | ✅ shipped above; honest *before* real data | XS |
+| **P12.3.2** | **real market data** — backfill real BTCUSDT 1m with the P10 machinery, re-run P11 / P12.1 / P12.3 | **next.** Worth more than P12.4–P12.7 combined; everything downstream is uninterpretable without it | M |
+| **P12.6** | pulled forward, **fees-first** — `E_net` becomes the number the gate reads | costs are −0.121R ≈ 35% of current gross E. At 1.8h hold, fees ≈ 40× funding, reversing P12.6's original emphasis | M |
+| **P12.3.3** | effective sample size in the scorecard | overlap inflates counts ~30× (384 decided ≈ 12 independent) | S |
+| P12.4 / P12.5 | as originally specced | now scoring something real | M |
+| micro-live | trivial size | slippage / partial fills / latency can only be measured | L |
+
+**The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
+real and tradeable; measuring it *gross* quietly made it ~40% easier.
+Thresholds are unchanged (≥ +0.50R, > 55% WR, PF ≥ 1.5) and stay enforced
+gross until P12.6 lands `E_net`.
 
 ---
 
@@ -242,10 +289,13 @@ train/val/OOS windows have real multi-window history to split.
 |---|---|---|---|
 | P12.1 | Locked walk-forward protocol (train / val / OOS / recent) | A setup cannot “pass” on the training window alone; the final OOS set is sealed (`+` BT6) | ✅ **shipped** — `data/validation.py`, `python main.py validate`, 17 tests |
 | P12.2 | `python main.py validate lookahead` (+ recursive later) | A `shift(-n)` feature fails a test; CI runs the unit form | ✅ **shipped** — AST guard, source locations, 4 tests; existing CI full-suite job runs the lookahead unit form; recursive analysis remains later |
-| P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) | ⏭ **next** |
-| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ⏳ |
+| P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) | ✅ **shipped** — `data/scorecard.py`, `python main.py scorecard`, `/api/scorecard`, MCP `scorecard`, 42 tests |
+| **P12.3.1** | Same-bar SL/TP tie-break unified with the paper trader | One ambiguous candle grades identically in both graders; conservative stop-first (`+` BT7 §7.1) | ✅ **shipped** — `data/backtester.py` `<` → `<=`, `ambiguous_bar`, 5 tests |
+| **P12.3.2** | **Real market data** | Real BTCUSDT 1m backfilled with the P10 machinery; P11 / P12.1 / P12.3 re-run and re-reported on it | ⏭ **next** — see `docs/PATH_TO_REAL_MONEY.md` §1 |
+| **P12.3.3** | Effective sample size | Overlapping walk-forward windows divided down; confidence intervals widened honestly | ⏳ (after P12.3.2) |
+| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ⏳ **deferred** — scores a fiction until P12.3.2 + P12.6 land |
 | P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) | ⏳ |
-| P12.6 | Conditioned + net-of-costs expectancy | OI / funding / CVD / regime from our store **and** `E_net = E_gross − fees − slip − funding` with funding joined as-of-T (`+` BT5) | ⏳ |
+| P12.6 | Conditioned + net-of-costs expectancy | **Fees/spread first** (≈ 40× funding at a 1.8h hold), then OI / funding / CVD / regime from our store: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T (`+` BT5) | 🔼 **pulled forward** — runs right after P12.3.2 |
 | P12.7 | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) | ⏳ |
 
 **Not in P12:** Hyperopt, FreqAI, Backtrader optimization or a second
@@ -303,7 +353,7 @@ the remaining good ideas were already named **P12** by the Freqtrade
 review, and this audit's additions just extended them.
 
 **Kept (into P12, after P10.11):** boxed strategy scorecard with
-Sharpe/Sortino + session/L-S (P12.3), parameter-plateau test (P12.4),
+Sharpe/Sortino + session/L-S (P12.3 — ✅ shipped), parameter-plateau test (P12.4),
 net-of-costs `E_net` with funding-as-of-T (P12.6), risk-of-ruin table
 on the MC resampler (P12.7). **Rejected:** the `backtrader` dependency
 (runtime/dev/adapter — BT1), a Cerebro rewrite (BT2), second grader

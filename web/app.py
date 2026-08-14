@@ -821,6 +821,7 @@ function render(d){
   // Learn tab
   let learnCards = '';
   learnCards += card('LEARNING — backtest & calibration', '<div id="learn"><span class="muted">loading…</span></div>', true);
+  learnCards += card('STRATEGY SCORECARD — one block (P12.3)', '<div id="scorecard"><span class="muted">loading…</span></div>', true);
   learnCards += card('🧑‍🏫 COACH', `<div class="flex" style="margin-bottom:8px"><button class="btn primary" onclick="coach()">Explain & mentor me</button><span class="note">Get plain-English reasoning for this signal</span></div>
     <div id="coach" class="muted" style="white-space:pre-wrap;min-height:22px"></div>
     <div class="sep"></div>
@@ -900,7 +901,7 @@ function render(d){
   // re-apply active tab
   switchTab(_activeTab);
   // load async sub-panels
-  loadPending(); loadPaper(); loadHistory(); loadLearning(); loadSources();
+  loadPending(); loadPaper(); loadHistory(); loadLearning(); loadScorecard(); loadSources();
   loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels(); loadDesk();
   loadReadiness();
   const symE=document.getElementById('sym'); const tfE=document.getElementById('tf');
@@ -1156,7 +1157,7 @@ async function runPaper(){
     if(d.ok) showToast(`Paper checked — ${d.run.checked} scanned, ${d.run.opened} entries, ${d.run.closed} closed`, 'ok');
     else showToast(d.error||'paper run failed','err');
   }catch(e){ if(m) m.textContent='error: '+e; showToast(String(e),'err'); }
-  loadPaper(); loadHistory(); loadPending(); loadLearning();
+  loadPaper(); loadHistory(); loadPending(); loadLearning(); loadScorecard();
 }
 
 async function loadHealth(){
@@ -1405,6 +1406,68 @@ async function loadLearning(){
   }catch(e){ const el=document.getElementById('learn'); if(el) el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
 
+// P12.3 — the boxed strategy scorecard, same payload as the CLI and MCP.
+function scNum(v, dp, suffix){
+  if(v===null||v===undefined||v==='') return '—';
+  const n=Number(v); if(!isFinite(n)) return '—';
+  return n.toFixed(dp===undefined?2:dp)+(suffix||'');
+}
+function scPct(v){ return (v===null||v===undefined)?'—':(Number(v)*100).toFixed(1)+'%'; }
+function scSigned(v){
+  if(v===null||v===undefined) return '—';
+  const n=Number(v); if(!isFinite(n)) return '—';
+  return (n>=0?'+':'')+n.toFixed(3)+'R';
+}
+function scSplit(title, obj, keepOrder){
+  const rows=Object.entries(obj||{}).filter(([k,s])=>s&&s.n);
+  // JSON transport alphabetises keys; biggest sample first reads better.
+  if(!keepOrder) rows.sort((a,b)=>b[1].n-a[1].n);
+  if(!rows.length) return '';
+  return `<div style="margin-top:12px"><b>${esc(title)}</b><div style="overflow:auto;margin-top:6px">`+
+    `<table><tr><th>bucket</th><th>n</th><th>WR</th><th>Expectancy</th><th>PF</th><th>total R</th><th>hold</th></tr>`+
+    rows.map(([k,s])=>`<tr><td>${esc(k)}</td><td>${s.n}</td><td>${scPct(s.win_rate)}</td>`+
+      `<td class="${(s.expectancy||0)>=0?'okc':'err'}">${scSigned(s.expectancy)}</td>`+
+      `<td>${s.pf===null||s.pf===undefined?'—':s.pf}</td><td>${scNum(s.total_r,1,'R')}</td>`+
+      `<td>${s.avg_holding_hours===null||s.avg_holding_hours===undefined?'—':scNum(s.avg_holding_hours,1,'h')}</td></tr>`).join('')+
+    `</table></div></div>`;
+}
+async function loadScorecard(){
+  const el=document.getElementById('scorecard'); if(!el) return;
+  try{
+    const d=await (await fetch('/api/scorecard')).json();
+    if(!d.ok){
+      el.innerHTML=`<div class="muted" style="background:rgba(255,255,255,.03);padding:10px;border-radius:12px;border:1px dashed var(--line)">`+
+        esc(d.error||'scorecard unavailable')+`</div>`;
+      return;
+    }
+    const o=d.overall||{}, v=d.verdict||{}, c=d.criteria||{}, m=d.meta||{};
+    const icon={PASS:'🟢',FAIL:'🔴',INSUFFICIENT_DATA:'⚪'}[v.status]||'❓';
+    let html=`<div class="note" style="margin-bottom:8px">${o.n||0} decided trades — source <b>${esc(m.source||'db')}</b>`+
+      `${m.span_days?` over ${scNum(o.span_days,1)} days`:''} · same block as <code>python main.py scorecard</code></div>`;
+    html+=`<div class="statrow" style="margin-bottom:10px">
+      <div class="stat"><div class="v">${scSigned(o.expectancy)}</div><div class="k">Expectancy</div></div>
+      <div class="stat"><div class="v">${scPct(o.win_rate)}</div><div class="k">Win rate (${o.wins||0}W/${o.losses||0}L)</div></div>
+      <div class="stat"><div class="v">${o.pf===null||o.pf===undefined?'—':o.pf}</div><div class="k">Profit factor</div></div>
+      <div class="stat"><div class="v">${scNum(o.total_r,1,'R')}</div><div class="k">Total R</div></div>
+    </div>`;
+    html+=`<div class="kv">
+      <b>Sharpe / Sortino / Calmar</b><span>${scNum(o.sharpe,3)} / ${scNum(o.sortino,3)} / ${scNum(o.calmar,3)} <span class="note">per-trade, not annualised</span></span>
+      <b>Max drawdown</b><span>${scNum(o.max_drawdown_r,2,'R')}</span>
+      <b>Avg win / loss</b><span>${scSigned(o.avg_win_r)} / ${scSigned(o.avg_loss_r)}</span>
+      <b>Streaks</b><span>${o.max_win_streak||0}W / ${o.max_loss_streak||0}L</span>
+      <b>Holding time</b><span>${o.avg_holding_hours===null||o.avg_holding_hours===undefined?'not recorded for these outcomes':scNum(o.avg_holding_hours,1,'h')+' avg · '+scNum(o.median_holding_hours,1,'h')+' median'}</span>
+    </div>`;
+    html+=scSplit('By side — long vs short', d.by_side, true);
+    html+=scSplit('By regime', d.by_regime);
+    html+=scSplit('By session (UTC)', d.by_session, true);
+    html+=scSplit('By setup', d.by_setup);
+    html+=`<div class="sep"></div><div class="note">Bar: expectancy ≥ ${scNum(c.expectancy,2,'R')} · win rate &gt; ${scPct(c.win_rate)} · PF ≥ ${c.pf} · decided ≥ ${(d.bar||{}).min_decided}</div>`;
+    html+=`<div style="margin-top:6px"><b>VERDICT ${icon} ${esc(v.status||'—')}</b> — ${esc(v.reason||'')}</div>`;
+    if(v.status!=='PASS') html+=`<div class="note" style="margin-top:6px">A scorecard reports performance; it does not grant permission. The graduation bar is unchanged.</div>`;
+    el.innerHTML=html;
+  }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
+
 async function learnNow(){
   const m=document.getElementById('learnmsg'); if(m) m.textContent='learning…';
   try{
@@ -1430,7 +1493,7 @@ async function backtestNow(){
     else showToast(d.error||'backtest failed','err');
   }catch(e){ if(m) m.textContent='error: '+e; showToast(String(e),'err'); }
   if(b){ b.disabled=false; b.textContent='▶ Quick backtest + learn'; }
-  loadLearning(); load(true);
+  loadLearning(); loadScorecard(); load(true);
 }
 
 async function loadSources(){
@@ -1467,7 +1530,7 @@ async function decide(id, decision, note){
   }catch(e){ showToast(String(e),'err'); }
   closeModal();
   await load(true, true);
-  loadPending(); loadPaper(); loadHistory(); loadLearning(); loadWatchlist();
+  loadPending(); loadPaper(); loadHistory(); loadLearning(); loadScorecard(); loadWatchlist();
 }
 
 async function openModal(id){
@@ -1947,6 +2010,27 @@ def make_app() -> Flask:
             return jsonify({"ok": False, "level": "down",
                             "headline": "readiness unavailable",
                             "pillars": [],
+                            "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.get("/api/scorecard")
+    def api_scorecard():
+        """P12.3 strategy scorecard — the same block as `python main.py
+        scorecard --json` and the MCP ``scorecard`` tool.
+
+        Read-only report over outcomes the grader already produced; no
+        surface re-grades anything or computes its own verdict.
+        """
+        try:
+            from data.scorecard import scorecard_from_db
+            src = request.args.get("source", "db")
+            sym = request.args.get("symbol") or None
+            return jsonify(_sanitize_for_json(scorecard_from_db(
+                symbol=_sym(sym) if sym else None,
+                source="all" if src == "db" else src,
+                min_decided=int(request.args.get("min_decided", 30)),
+                include_sim=request.args.get("include_sim", "1") != "0")))
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False,
                             "error": f"{type(exc).__name__}: {exc}"})
 
     @app.get("/api/agents")
