@@ -244,10 +244,16 @@ def paper_progress(db) -> list[dict]:
                   SUM(CASE WHEN outcome IN ('FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
                   SUM(CASE WHEN outcome='LOSS' THEN 1 ELSE 0 END) losses,
                   ROUND(AVG(rr_achieved), 3) expectancy,
+                  ROUND(AVG(COALESCE(rr_net, rr_achieved)), 3) expectancy_net,
                   ROUND(SUM(CASE WHEN outcome IN ('FULL_WIN','PARTIAL_WIN')
                                  THEN COALESCE(rr_achieved,0) ELSE 0 END), 3) win_r,
                   ROUND(SUM(CASE WHEN outcome='LOSS'
-                                 THEN ABS(COALESCE(rr_achieved,0)) ELSE 0 END), 3) loss_r
+                                 THEN ABS(COALESCE(rr_achieved,0)) ELSE 0 END), 3) loss_r,
+                  ROUND(SUM(CASE WHEN COALESCE(rr_net, rr_achieved) > 0
+                                 THEN COALESCE(rr_net, rr_achieved) ELSE 0 END), 3) win_r_net,
+                  ROUND(SUM(CASE WHEN COALESCE(rr_net, rr_achieved) <= 0
+                                 THEN ABS(COALESCE(rr_net, rr_achieved)) ELSE 0 END), 3) loss_r_net,
+                  SUM(CASE WHEN COALESCE(rr_net, rr_achieved) > 0 THEN 1 ELSE 0 END) wins_net
            FROM backtest_results
            WHERE outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')
            GROUP BY plan_type ORDER BY n DESC""").fetchall()
@@ -257,10 +263,16 @@ def paper_progress(db) -> list[dict]:
                   SUM(CASE WHEN outcome='TP_HIT' THEN 1 ELSE 0 END) wins,
                   SUM(CASE WHEN outcome='STOP_LOSS' THEN 1 ELSE 0 END) losses,
                   ROUND(AVG(rr_achieved), 3) expectancy,
+                  ROUND(AVG(COALESCE(rr_net, rr_achieved)), 3) expectancy_net,
                   ROUND(SUM(CASE WHEN outcome='TP_HIT'
                                  THEN COALESCE(rr_achieved,0) ELSE 0 END), 3) win_r,
                   ROUND(SUM(CASE WHEN outcome='STOP_LOSS'
-                                 THEN ABS(COALESCE(rr_achieved,0)) ELSE 0 END), 3) loss_r
+                                 THEN ABS(COALESCE(rr_achieved,0)) ELSE 0 END), 3) loss_r,
+                  ROUND(SUM(CASE WHEN COALESCE(rr_net, rr_achieved) > 0
+                                 THEN COALESCE(rr_net, rr_achieved) ELSE 0 END), 3) win_r_net,
+                  ROUND(SUM(CASE WHEN COALESCE(rr_net, rr_achieved) <= 0
+                                 THEN ABS(COALESCE(rr_net, rr_achieved)) ELSE 0 END), 3) loss_r_net,
+                  SUM(CASE WHEN COALESCE(rr_net, rr_achieved) > 0 THEN 1 ELSE 0 END) wins_net
            FROM paper_trades
            WHERE outcome IN ('TP_HIT','STOP_LOSS')
            GROUP BY plan_type ORDER BY n DESC""").fetchall()
@@ -274,10 +286,16 @@ def paper_progress(db) -> list[dict]:
         b_n, p_n = b.get("n") or 0, p.get("n") or 0
         expectancy = ((b.get("expectancy") or 0.0) * b_n + (p.get("expectancy") or 0.0) * p_n) \
             / (b_n + p_n) if (b_n + p_n) else 0.0
+        exp_net = ((b.get("expectancy_net") or b.get("expectancy") or 0.0) * b_n
+                   + (p.get("expectancy_net") or p.get("expectancy") or 0.0) * p_n) \
+            / (b_n + p_n) if (b_n + p_n) else 0.0
         wins = (b.get("wins") or 0) + (p.get("wins") or 0)
         losses = (b.get("losses") or 0) + (p.get("losses") or 0)
+        wins_net = (b.get("wins_net") or b.get("wins") or 0) + (p.get("wins_net") or p.get("wins") or 0)
         win_r = (b.get("win_r") or 0.0) + (p.get("win_r") or 0.0)
         loss_r = (b.get("loss_r") or 0.0) + (p.get("loss_r") or 0.0)
+        win_r_net = (b.get("win_r_net") or b.get("win_r") or 0.0) + (p.get("win_r_net") or p.get("win_r") or 0.0)
+        loss_r_net = (b.get("loss_r_net") or b.get("loss_r") or 0.0) + (p.get("loss_r_net") or p.get("loss_r") or 0.0)
         decided = wins + losses
         progress.append({
             "plan_type": pt,
@@ -288,13 +306,19 @@ def paper_progress(db) -> list[dict]:
             "n": b_n + p_n,
             "wins": wins,
             "losses": losses,
+            "wins_net": wins_net,
             "win_rate": round(wins / decided, 3) if decided else None,
+            "win_rate_net": round(wins_net / decided, 3) if decided else None,
             "pf": round(win_r / loss_r, 3) if loss_r > 0 else None,
+            "pf_net": round(win_r_net / loss_r_net, 3) if loss_r_net > 0 else None,
             "win_r": round(win_r, 3),
             "loss_r": round(loss_r, 3),
+            "win_r_net": round(win_r_net, 3),
+            "loss_r_net": round(loss_r_net, 3),
             "expectancy": round(expectancy, 3),
+            "expectancy_net": round(exp_net, 3),
             "proven": b_n >= CALIBRATE_MIN_N and p_n >= CALIBRATE_MIN_PAPER_N
-                      and expectancy > 0,
+                      and exp_net > 0,
         })
     return progress
 
@@ -358,27 +382,36 @@ def graduation_status(progress: list[dict], compliance: float | None = None) -> 
     Aggregates every decided sample (backtest + paper, deduped) across the
     primary setup family and checks the four blueprint criteria. `compliance`
     is 1 - journal violation_rate (None until real journal entries exist —
-    an unproven criterion, never a pass).
+    an unproven criterion, never a pass). Evaluated NET of costs (P12.6).
     """
     primary = primary_plan_types()
     rows = [p for p in progress if p["plan_type"] in primary]
     n = sum(p["n"] for p in rows)
     wins = sum(p["wins"] for p in rows)
     losses = sum(p["losses"] for p in rows)
+    wins_net = sum(p.get("wins_net", p["wins"]) for p in rows)
     win_r = sum(p.get("win_r") or 0.0 for p in rows)
     loss_r = sum(p.get("loss_r") or 0.0 for p in rows)
+    win_r_net = sum(p.get("win_r_net", p.get("win_r") or 0.0) for p in rows)
+    loss_r_net = sum(p.get("loss_r_net", p.get("loss_r") or 0.0) for p in rows)
     decided = wins + losses
     expectancy = round((win_r - loss_r) / n, 3) if n else 0.0
+    expectancy_net = round((win_r_net - loss_r_net) / n, 3) if n else 0.0
     win_rate = round(wins / decided, 3) if decided else None
+    win_rate_net = round(wins_net / decided, 3) if decided else None
     pf = round(win_r / loss_r, 3) if loss_r > 0 else None
+    pf_net = round(win_r_net / loss_r_net, 3) if loss_r_net > 0 else None
     stats = {"plan_types": primary, "n": n, "decided": decided,
-             "expectancy": expectancy, "win_rate": win_rate, "pf": pf,
+             "expectancy": expectancy, "expectancy_net": expectancy_net,
+             "win_rate": win_rate, "win_rate_net": win_rate_net,
+             "pf": pf, "pf_net": pf_net,
              "compliance": compliance}
     met = {
-        "expectancy": expectancy >= GRADUATION_CRITERIA["expectancy"],
-        "win_rate": win_rate is not None and win_rate > GRADUATION_CRITERIA["win_rate"],
-        "pf": (pf is not None and pf >= GRADUATION_CRITERIA["pf"])
-              or (pf is None and loss_r == 0 and win_r > 0),
+        "expectancy": expectancy_net >= GRADUATION_CRITERIA["expectancy"],
+        "win_rate": (win_rate_net is not None and win_rate_net > GRADUATION_CRITERIA["win_rate"])
+                    if win_rate_net is not None else (win_rate is not None and win_rate > GRADUATION_CRITERIA["win_rate"]),
+        "pf": (pf_net is not None and pf_net >= GRADUATION_CRITERIA["pf"])
+              or (pf_net is None and loss_r_net == 0 and win_r_net > 0),
         "compliance": compliance is not None
                       and compliance >= GRADUATION_CRITERIA["compliance"],
     }
@@ -399,12 +432,16 @@ def format_graduation(g: dict) -> str:
                        "(BLUEPRINT Step 2 → 3)", "-" * 70]
     lines.append(f"  primary family : {', '.join(s['plan_types']) or 'none'} "
                  f"({s['n']} decided samples)")
+    exp_str = (f"{s.get('expectancy_net', s['expectancy']):+.3f}R (net)"
+               if "expectancy_net" in s else f"{s['expectancy']:+.3f}R")
+    wr = s.get("win_rate_net", s.get("win_rate"))
+    wr_str = f"{wr * 100:.1f}% (net)" if wr is not None else "n/a"
+    pf = s.get("pf_net", s.get("pf"))
+    pf_str = f"{pf:.2f} (net)" if pf is not None else "n/a"
     rows = [
-        ("expectancy", f"{s['expectancy']:+.3f}R", "≥ +0.50R", g["met"]["expectancy"]),
-        ("win rate", f"{s['win_rate'] * 100:.1f}%" if s["win_rate"] is not None
-         else "n/a", "> 55%", g["met"]["win_rate"]),
-        ("profit factor", f"{s['pf']:.2f}" if s["pf"] is not None else "n/a",
-         "≥ 1.50", g["met"]["pf"]),
+        ("expectancy", exp_str, "≥ +0.50R", g["met"]["expectancy"]),
+        ("win rate", wr_str, "> 55%", g["met"]["win_rate"]),
+        ("profit factor", pf_str, "≥ 1.50", g["met"]["pf"]),
         ("rule compliance", f"{s['compliance'] * 100:.1f}%" if s["compliance"] is not None
          else "no journal entries yet", "≥ 90%", g["met"]["compliance"]),
     ]

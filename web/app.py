@@ -1424,10 +1424,12 @@ function scSplit(title, obj, keepOrder){
   if(!keepOrder) rows.sort((a,b)=>b[1].n-a[1].n);
   if(!rows.length) return '';
   return `<div style="margin-top:12px"><b>${esc(title)}</b><div style="overflow:auto;margin-top:6px">`+
-    `<table><tr><th>bucket</th><th>n</th><th>WR</th><th>Expectancy</th><th>PF</th><th>total R</th><th>hold</th></tr>`+
-    rows.map(([k,s])=>`<tr><td>${esc(k)}</td><td>${s.n}</td><td>${scPct(s.win_rate)}</td>`+
+    `<table><tr><th>bucket</th><th>n</th><th>WR (net)</th><th>E (gross)</th><th>E (net)</th><th>PF (net)</th><th>totR (net)</th><th>hold</th></tr>`+
+    rows.map(([k,s])=>`<tr><td>${esc(k)}</td><td>${s.n}</td><td>${scPct(s.win_rate_net!==undefined&&s.win_rate_net!==null?s.win_rate_net:s.win_rate)}</td>`+
       `<td class="${(s.expectancy||0)>=0?'okc':'err'}">${scSigned(s.expectancy)}</td>`+
-      `<td>${s.pf===null||s.pf===undefined?'—':s.pf}</td><td>${scNum(s.total_r,1,'R')}</td>`+
+      `<td class="${(s.expectancy_net!==undefined?s.expectancy_net:(s.expectancy||0))>=0?'okc':'err'}"><b>${scSigned(s.expectancy_net!==undefined?s.expectancy_net:s.expectancy)}</b></td>`+
+      `<td>${(s.pf_net!==undefined&&s.pf_net!==null)?s.pf_net:(s.pf===null||s.pf===undefined?'—':s.pf)}</td>`+
+      `<td>${scNum(s.total_r_net!==undefined?s.total_r_net:s.total_r,1,'R')}</td>`+
       `<td>${s.avg_holding_hours===null||s.avg_holding_hours===undefined?'—':scNum(s.avg_holding_hours,1,'h')}</td></tr>`).join('')+
     `</table></div></div>`;
 }
@@ -1443,27 +1445,28 @@ async function loadScorecard(){
     const o=d.overall||{}, v=d.verdict||{}, c=d.criteria||{}, m=d.meta||{};
     const icon={PASS:'🟢',FAIL:'🔴',INSUFFICIENT_DATA:'⚪'}[v.status]||'❓';
     let html=`<div class="note" style="margin-bottom:8px">${o.n||0} decided trades — source <b>${esc(m.source||'db')}</b>`+
-      `${m.span_days?` over ${scNum(o.span_days,1)} days`:''} · same block as <code>python main.py scorecard</code></div>`;
+      `${m.span_days?` over ${scNum(o.span_days,1)} days`:''} · evaluated NET of costs (P12.6) · same block as <code>python main.py scorecard</code></div>`;
     html+=`<div class="statrow" style="margin-bottom:10px">
-      <div class="stat"><div class="v">${scSigned(o.expectancy)}</div><div class="k">Expectancy</div></div>
-      <div class="stat"><div class="v">${scPct(o.win_rate)}</div><div class="k">Win rate (${o.wins||0}W/${o.losses||0}L)</div></div>
-      <div class="stat"><div class="v">${o.pf===null||o.pf===undefined?'—':o.pf}</div><div class="k">Profit factor</div></div>
-      <div class="stat"><div class="v">${scNum(o.total_r,1,'R')}</div><div class="k">Total R</div></div>
+      <div class="stat"><div class="v">${scSigned(o.expectancy_net!==undefined?o.expectancy_net:o.expectancy)}</div><div class="k">Expectancy (net) <span class="note">gross ${scSigned(o.expectancy)}</span></div></div>
+      <div class="stat"><div class="v">${scPct(o.win_rate_net!==undefined?o.win_rate_net:o.win_rate)}</div><div class="k">Win rate (net) (${o.wins_net||o.wins||0}W/${o.losses_net||o.losses||0}L)</div></div>
+      <div class="stat"><div class="v">${o.pf_net!==undefined&&o.pf_net!==null?o.pf_net:(o.pf===null||o.pf===undefined?'—':o.pf)}</div><div class="k">Profit factor (net)</div></div>
+      <div class="stat"><div class="v">${scNum(o.total_r_net!==undefined?o.total_r_net:o.total_r,1,'R')}</div><div class="k">Total R (net)</div></div>
     </div>`;
     html+=`<div class="kv">
-      <b>Sharpe / Sortino / Calmar</b><span>${scNum(o.sharpe,3)} / ${scNum(o.sortino,3)} / ${scNum(o.calmar,3)} <span class="note">per-trade, not annualised</span></span>
-      <b>Max drawdown</b><span>${scNum(o.max_drawdown_r,2,'R')}</span>
-      <b>Avg win / loss</b><span>${scSigned(o.avg_win_r)} / ${scSigned(o.avg_loss_r)}</span>
-      <b>Streaks</b><span>${o.max_win_streak||0}W / ${o.max_loss_streak||0}L</span>
+      <b>Cost drag (fees/slip/funding)</b><span>${scSigned(-o.cost_r)} <span class="note">(fees ${scSigned(-o.fee_r)}, slip ${scSigned(-o.slip_r)}, funding ${scSigned(-o.funding_r)})</span></span>
+      <b>Sharpe / Sortino / Calmar (net)</b><span>${scNum(o.sharpe_net!==undefined?o.sharpe_net:o.sharpe,3)} / ${scNum(o.sortino_net!==undefined?o.sortino_net:o.sortino,3)} / ${scNum(o.calmar_net!==undefined?o.calmar_net:o.calmar,3)} <span class="note">per-trade, not annualised</span></span>
+      <b>Max drawdown (net)</b><span>${scNum(o.max_drawdown_r_net!==undefined?o.max_drawdown_r_net:o.max_drawdown_r,2,'R')} <span class="note">gross ${scNum(o.max_drawdown_r,2,'R')}</span></span>
+      <b>Avg win / loss (net)</b><span>${scSigned(o.avg_win_r_net!==undefined?o.avg_win_r_net:o.avg_win_r)} / ${scSigned(o.avg_loss_r_net!==undefined?o.avg_loss_r_net:o.avg_loss_r)}</span>
+      <b>Streaks (net)</b><span>${o.max_win_streak_net||o.max_win_streak||0}W / ${o.max_loss_streak_net||o.max_loss_streak||0}L</span>
       <b>Holding time</b><span>${o.avg_holding_hours===null||o.avg_holding_hours===undefined?'not recorded for these outcomes':scNum(o.avg_holding_hours,1,'h')+' avg · '+scNum(o.median_holding_hours,1,'h')+' median'}</span>
     </div>`;
     html+=scSplit('By side — long vs short', d.by_side, true);
     html+=scSplit('By regime', d.by_regime);
     html+=scSplit('By session (UTC)', d.by_session, true);
     html+=scSplit('By setup', d.by_setup);
-    html+=`<div class="sep"></div><div class="note">Bar: expectancy ≥ ${scNum(c.expectancy,2,'R')} · win rate &gt; ${scPct(c.win_rate)} · PF ≥ ${c.pf} · decided ≥ ${(d.bar||{}).min_decided}</div>`;
+    html+=`<div class="sep"></div><div class="note">Bar (NET): expectancy ≥ ${scNum(c.expectancy,2,'R')} · win rate &gt; ${scPct(c.win_rate)} · PF ≥ ${c.pf} · decided ≥ ${(d.bar||{}).min_decided}</div>`;
     html+=`<div style="margin-top:6px"><b>VERDICT ${icon} ${esc(v.status||'—')}</b> — ${esc(v.reason||'')}</div>`;
-    if(v.status!=='PASS') html+=`<div class="note" style="margin-top:6px">A scorecard reports performance; it does not grant permission. The graduation bar is unchanged.</div>`;
+    if(v.status!=='PASS') html+=`<div class="note" style="margin-top:6px">A scorecard reports performance; it does not grant permission. The graduation bar is enforced NET of costs.</div>`;
     el.innerHTML=html;
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
@@ -2014,21 +2017,33 @@ def make_app() -> Flask:
 
     @app.get("/api/scorecard")
     def api_scorecard():
-        """P12.3 strategy scorecard — the same block as `python main.py
+        """P12.3 & P12.6 strategy scorecard — the same block as `python main.py
         scorecard --json` and the MCP ``scorecard`` tool.
 
         Read-only report over outcomes the grader already produced; no
-        surface re-grades anything or computes its own verdict.
+        surface re-grades anything or computes its own verdict. Evaluated
+        NET of costs (P12.6).
         """
         try:
+            from data.costs import CostModel
             from data.scorecard import scorecard_from_db
             src = request.args.get("source", "db")
             sym = request.args.get("symbol") or None
+            no_costs = request.args.get("no_costs", "").lower() in ("1", "true", "yes")
+            conditioned = request.args.get("conditioned", "").lower() in ("1", "true", "yes")
+            since = request.args.get("since")
+            until = request.args.get("until")
+            since_ts = int(since) if since and since.isdigit() else None
+            until_ts = int(until) if until and until.isdigit() else None
+            cost_model = CostModel(enabled=not no_costs)
             return jsonify(_sanitize_for_json(scorecard_from_db(
                 symbol=_sym(sym) if sym else None,
                 source="all" if src == "db" else src,
                 min_decided=int(request.args.get("min_decided", 30)),
-                include_sim=request.args.get("include_sim", "1") != "0")))
+                include_sim=request.args.get("include_sim", "1") != "0",
+                since_ts=since_ts, until_ts=until_ts,
+                cost_model=cost_model,
+                conditioned=conditioned)))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False,
                             "error": f"{type(exc).__name__}: {exc}"})

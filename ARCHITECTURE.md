@@ -10,7 +10,7 @@
 **Last updated:** 2026-08-13
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.12.0` (also `pyproject.toml`).
+**Version:** `config.VERSION` = `2.13.0` (also `pyproject.toml`).
 
 ---
 
@@ -20,13 +20,13 @@
 | File | Purpose |
 |---|---|
 | `main.py` | argparse CLI dispatcher (~30 `cmd_*` subcommands) |
-| `config.py` | Env-driven config; `VERSION = "2.12.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
+| `config.py` | Env-driven config; `VERSION = "2.13.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
 | `mcp_server.py` | Zero-dep stdio JSON-RPC 2.0 MCP server (read-only tool permission map) |
 | `SKILL.md` | Agent-facing skill file (the one AI agents read first) |
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
 | `TODO.md` | Prioritised remaining work |
 | `ARCHITECTURE.md` | This file |
-| `CHANGELOG.md` | What shipped, when (current through v2.12.0) |
+| `CHANGELOG.md` | What shipped, when (current through v2.13.0) |
 | `BLUEPRINT.md` | The 4-step path from paper to real capital |
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
@@ -73,6 +73,8 @@
 | `quality.py` | P10.5 — per-series data-quality pillar (staleness, gaps, price/volume sanity); corrupt data quarantines the desk via `readiness_strip` |
 | `bybit_client.py` | P10.6 — Bybit V5 klines transport behind the same `PageResult` contract; P10.7 also pages `/v5/market/funding/history`. Venue quirks stay at the boundary. |
 | `cross_exchange.py` | P10.7 — venue registry + one `snapshot_prices()` probe + stored premium/discount + funding spread; `python main.py cross collect\|status` |
+| `costs.py` | P12.6 — fees-first trade cost modeling (`E_net = E_gross − fees − slip − funding`, funding joined as-of-T) |
+| `scorecard.py` | P12.3/P12.6 — boxed strategy scorecard reporting gross + net metrics, Sharpe/Sortino/Calmar, holding time, split by side/regime/session/setup/conditions |
 | `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB` context manager |
 | `backtester.py` | Walk-forward grading of plans at +1h/+4h/+24h; P10.11 `run_backtest_on_store()` reads the Parquet store instead of a live fetch |
 | `paper_trading.py` | Approved-signal lifecycle: monitor + auto-close at SL/TP1 (no real orders) |
@@ -113,8 +115,10 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 49 test modules, 492 pass / 1 skip
+### `tests/` — 50 test modules, 567 pass / 1 skip
 - Most modules have a matching `test_*.py`.
+- `tests/test_costs.py` — **NEW (P12.6)** fee scaling, spread, funding direction, net R conversion.
+- `tests/test_scorecard.py` — P12.3 scorecard + P12.6 net-of-costs & conditioned splits.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the
   `_sanitize_for_json` numpy-bool-500 bug fixed in the consolidated
   build per `MERGE_NOTES.md`).
@@ -145,6 +149,8 @@
   Verdict: reject the dependency and the second grader; the good
   ideas were already ours or already P12 — definitions extended
   (BT1–BT8).
+- `PATH_TO_REAL_MONEY.md` — 2026-08-14 audit: real market data before P12.4, fees-first P12.6, net bar.
+- `REAL_DATA_RUN_2026-08-14.md` — first real BTCUSDT 1m imported and re-run.
 - `wheel-gate-job.yml` — job spec a human pastes into
   `.github/workflows/ci.yml` (TODO-7).
 
@@ -185,7 +191,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 492 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 567 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -328,5 +334,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **492 pass, 1 skip**. Any new feature must
+The expected baseline is **567 pass, 1 skip**. Any new feature must
 maintain or increase this count.

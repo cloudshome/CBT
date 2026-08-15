@@ -363,15 +363,22 @@ def cmd_validate(args) -> int:
 
 
 def cmd_scorecard(args) -> int:
-    """P12.3 — the single boxed strategy scorecard. One command, one block.
+    """P12.3 & P12.6 — the single boxed strategy scorecard & net expectancy.
 
     Reads outcomes that already exist. ``--source db|backtest|paper`` reads
     what has been graded and stored; ``--source store`` runs one fresh
-    walk-forward grade over the stored series and scores that. Either way the
-    grading is done by data/backtester.py — this command only reports.
+    walk-forward grade over the stored series and scores that. Evaluated
+    NET of costs (fees, slip, funding) per P12.6.
     """
+    from data.costs import CostModel
     from data.scorecard import (print_scorecard, scorecard_from_db,
                                 scorecard_from_store)
+
+    cost_model = CostModel(
+        execution_type="maker" if getattr(args, "maker", False) else "taker",
+        enabled=not getattr(args, "no_costs", False),
+    )
+    conditioned = getattr(args, "conditioned", False)
 
     if args.source == "store":
         horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
@@ -380,7 +387,8 @@ def cmd_scorecard(args) -> int:
             symbol=_sym(args.symbol or SYMBOL), timeframe=args.tf,
             bars=args.bars,
             horizons=horizons, min_bars=args.min_bars, step=args.step,
-            min_confidence=args.min_conf, min_decided=args.min_decided)
+            min_confidence=args.min_conf, min_decided=args.min_decided,
+            cost_model=cost_model, conditioned=conditioned)
     else:
         from data.backfill import BackfillError, parse_ts
         now_ms = int(time.time() * 1000)
@@ -395,7 +403,8 @@ def cmd_scorecard(args) -> int:
             symbol=_sym(args.symbol) if args.symbol else None,
             source=source, min_decided=args.min_decided,
             include_sim=not args.exclude_sim,
-            since_ts=since_ts, until_ts=until_ts)
+            since_ts=since_ts, until_ts=until_ts,
+            cost_model=cost_model, conditioned=conditioned)
 
     if args.json:
         print(json.dumps(report, indent=2, default=str))
@@ -1903,6 +1912,12 @@ def main(argv: list[str] | None = None) -> int:
     p_score.add_argument("--until", default=None,
                          help="db backtest rows: score rows at/before this "
                               "signal bar (epoch ms or YYYY-MM-DD)")
+    p_score.add_argument("--no-costs", action="store_true",
+                         help="disable cost modeling (score gross outcomes only)")
+    p_score.add_argument("--maker", action="store_true",
+                         help="model maker fees instead of default taker fees")
+    p_score.add_argument("--conditioned", action="store_true",
+                         help="include conditioned splits by funding and CVD order flow")
     p_score.add_argument("--json", action="store_true",
                          help="machine-readable result")
     p_score.set_defaults(func=cmd_scorecard)

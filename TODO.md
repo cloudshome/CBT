@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-14 (this session: **P12.3.2 shipped — real market data**: real Binance spot BTCUSDT 1m imported through the P10 machinery and P11 / P12.1 / P12.3 re-run on it — all numbers in `docs/REAL_DATA_RUN_2026-08-14.md`; next *code* is **P12.6 — fees-first `E_net`**)
+**Last updated:** 2026-08-15 (this session: **P12.6 shipped — fees-first `E_net` & conditioned expectancy**: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T, net graduation bar enforced; next *code* is **P12.3.3 — effective sample size in the scorecard**)
 
 ---
 
@@ -21,7 +21,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 492 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 567 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -44,7 +44,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1–P12.3.1 shipped; **P12.3.2 real data shipped 2026-08-14** — first real market data ever; P12.6 fees-first next) |
+| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1–P12.3.2 shipped; **P12.6 shipped 2026-08-15** — fees-first `E_net` & net bar; next P12.3.3) |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -58,70 +58,38 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-14, this session):** **P12.3.2 shipped — the
-> project's first real market data.** Real Binance spot BTCUSDT 1m
-> (2025-01-01 → 2026-04-30, 696,960 bars, sha256-pinned from Binance's
-> official public archive) imported offline through the P10 machinery
-> (`backfill --from-csv`, same adapter boundary; `StoreClient`;
-> `backtest/simulator --source store`; `scorecard --since/--until`), and
-> P11 / P12.1 / P12.3 re-run on it. Result: the sealed P12.1 protocol
-> **fails every window at the 1h horizon** (train −0.452R … oos
-> −0.101R); only the 24h horizon is gross-positive (+0.400R ≈ +0.28R
-> net — still below the restated bar); **Breakout Buy −0.630R** (6,062
-> decided) confirms the prune case; the graduation gate stays honestly
-> closed (+0.348R / 36.8% / PF 1.55). All numbers + repro:
-> `docs/REAL_DATA_RUN_2026-08-14.md`. **The concrete next *code* build
-> below is P12.6 — fees-first `E_net`** (ladder reordered per TODO-14).
-> P10 is fully shipped (P10.1–P10.12, PR #18). F1–F8 / BT1–BT8 stay
-> decided. P11 grind continues alongside.
+> **Order note (2026-08-15, this session):** **P12.6 shipped — fees-first
+> `E_net` & conditioned expectancy.** `data/costs.py` integrates realistic
+> taker/maker fees, spread/slippage, and direction-aware funding into the
+> grader, backtest DB, paper book, and scorecard (`E_net = E_gross − fees − slip − funding`).
+> The graduation bar is enforced **NET of costs** (+0.50R net, >55% WR net,
+> PF >= 1.5 net). Next *code* build is **P12.3.3 — effective sample size in the
+> scorecard** (divide walk-forward trade counts by window overlap factor ~30×
+> to report honest independent sample size and widen confidence intervals).
 
-### TODO-13 / P12.3 · the boxed strategy scorecard · ✅ shipped
+### TODO-15 / P12.6 · Fees-first `E_net` & conditioned expectancy · ✅ shipped
 
-**P12.3 is shipped** (see the TODO-13 table below): `data/scorecard.py`
-turns already-graded outcomes into one block — expectancy, WR, PF, total
-R, drawdown, streaks, Sharpe/Sortino/Calmar and holding time, split by
-long/short, regime, session and setup. Three surfaces read the same
-report: `python main.py scorecard` (`--json`), `GET /api/scorecard` + the
-`STRATEGY SCORECARD` dashboard card, and the read-only MCP `scorecard`
-tool. Holding time is now recorded at grading time (`GradedPlan`
-`holding_bars` / `holding_hours`, persisted to `backtest_results`).
-
-It is a **report layer**: no re-grading, no second engine, no new
-dependency, and the graduation bar is untouched — the block prints a
-verdict, it does not grant permission. Ratios are per-trade and labelled
-as such; annualising Sharpe over overlapping walk-forward samples was
-tried and rejected as dishonest (0.27 → 36.7).
-
-### TODO-14 / P12.3.1 · the two graders now agree · ✅ shipped
-
-A candle touching both stop and target is undecidable from bar data.
-`data/paper_trading.py` has always resolved it conservatively (stop
-wins), and `docs/BACKTRADER_REVIEW.md` §7.1 cites that written-down rule
-as why SKY needs no second engine. **The backtester did not implement
-it** — a strict `<` on the first-touch indices let the take-profit branch
-win the tie, grading `+2.0R` where the paper trader graded `-1.0R`. Now
-`<=`, plus `GradedPlan.ambiguous_bar` as a diagnostic and 5 regression
-tests that assert both graders return the identical verdict.
-
-Measured no-op today: **0 ties across 3,263 decided synthetic trades**
-(5 seeds) — random-walk candles are too small to span a 1R stop and a 2R
-target in one bar, which is precisely why it survived. Real wicks hit it
-routinely, so the fix lands *before* the data does. Expect measured
-expectancy to fall on real data; that fall is the correction.
+**P12.6 is shipped**: `data/costs.py` provides `CostModel` and
+`calculate_trade_cost()`. Real trade cost drag is now computed in R units
+per trade. At measured BTC median stop distance (0.823%), taker round-trip
+costs −0.1215R (~35% of gross expectancy), and fees are ~40× funding at a
+1.8h hold. `GradedPlan` and `backtest_results`/`paper_trades` DB tables
+persist `rr_net`, `fee_r`, `slip_r`, `funding_r`, `cost_r`.
+`data/scorecard.py` displays gross and net expectancy, cost drag, and
+conditioned splits (`--conditioned`). The graduation bar evaluates NET
+metrics on all surfaces (CLI, HTTP `/api/scorecard`, MCP `scorecard` v1.6.0).
 
 ### The ladder was reordered — P12.4 is no longer next
 
 `docs/PATH_TO_REAL_MONEY.md` (2026-08-14) measured four things and the
-order changed as a result. **P12.4 would score a fiction:** a robustness
-grade over a gross, cost-free expectancy measured on a random walk is a
-precise measurement of the wrong object.
+order changed as a result.
 
 | # | step | why here | size |
 |---|---|---|---|
-| **P12.3.1** | unify the same-bar tie-break | ✅ shipped above; honest *before* real data | XS |
-| **P12.3.2** | **real market data** — backfill real BTCUSDT 1m with the P10 machinery, re-run P11 / P12.1 / P12.3 | ✅ **shipped** — see `docs/REAL_DATA_RUN_2026-08-14.md`; every downstream number is now interpretable | M |
-| **P12.6** | pulled forward, **fees-first** — `E_net` becomes the number the gate reads | **next.** costs are −0.121R ≈ 35% of gross E (and 40× funding at a 1.8h hold); real-data numbers are still gross | M |
-| **P12.3.3** | effective sample size in the scorecard | overlap inflates counts ~30× (384 decided ≈ 12 independent) | S |
+| **P12.3.1** | unify the same-bar tie-break | ✅ shipped; honest *before* real data | XS |
+| **P12.3.2** | **real market data** — backfill real BTCUSDT 1m with the P10 machinery, re-run P11 / P12.1 / P12.3 | ✅ **shipped** — see `docs/REAL_DATA_RUN_2026-08-14.md` | M |
+| **P12.6** | pulled forward, **fees-first** — `E_net` becomes the number the gate reads | ✅ **shipped** — `data/costs.py`, `E_net`, net bar | M |
+| **P12.3.3** | effective sample size in the scorecard | **next.** overlap inflates counts ~30× (384 decided ≈ 12 independent) | S |
 | P12.4 / P12.5 | as originally specced | now scoring something real | M |
 | micro-live | trivial size | slippage / partial fills / latency can only be measured | L |
 
@@ -298,10 +266,10 @@ train/val/OOS windows have real multi-window history to split.
 | P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) | ✅ **shipped** — `data/scorecard.py`, `python main.py scorecard`, `/api/scorecard`, MCP `scorecard`, 42 tests |
 | **P12.3.1** | Same-bar SL/TP tie-break unified with the paper trader | One ambiguous candle grades identically in both graders; conservative stop-first (`+` BT7 §7.1) | ✅ **shipped** — `data/backtester.py` `<` → `<=`, `ambiguous_bar`, 5 tests |
 | **P12.3.2** | **Real market data** | Real BTCUSDT 1m backfilled with the P10 machinery; P11 / P12.1 / P12.3 re-run and re-reported on it | ✅ **shipped** — `backfill --from-csv`, `StoreClient`, `docs/REAL_DATA_RUN_2026-08-14.md` |
-| **P12.3.3** | Effective sample size | Overlapping walk-forward windows divided down; confidence intervals widened honestly | ⏳ (after P12.6 — overlap still inflates every real count ~30×) |
-| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ⏳ **deferred** — scores a fiction until P12.3.2 + P12.6 land |
+| **P12.3.3** | Effective sample size | Overlapping walk-forward windows divided down; confidence intervals widened honestly | ▶ **next** — overlap inflates counts ~30× |
+| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ⏳ **deferred** — after P12.3.3 |
 | P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) | ⏳ |
-| P12.6 | Conditioned + net-of-costs expectancy | **Fees/spread first** (≈ 40× funding at a 1.8h hold), then OI / funding / CVD / regime from our store: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T (`+` BT5) | ▶ **next** — real-data `E_gross` exists now; make `E_net` the number the gate reads |
+| **P12.6** | Conditioned + net-of-costs expectancy | **Fees/spread first** (≈ 40× funding at a 1.8h hold), then OI / funding / CVD / regime from our store: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T (`+` BT5) | ✅ **shipped** — `data/costs.py`, `E_net` on all surfaces, net bar |
 | P12.7 | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) | ⏳ |
 
 **Not in P12:** Hyperopt, FreqAI, Backtrader optimization or a second

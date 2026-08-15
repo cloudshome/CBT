@@ -10,6 +10,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.13.0] — 2026-08-15 · branch `arena/01a003f9-sky`
+
+MINOR bump: **P12.6 — fees-first `E_net` & conditioned expectancy.**
+Costs are now integrated into every performance measurement in SKY:
+`E_net = E_gross − fees − slip − funding`, where every term is scaled
+into R units per trade. Fees + spread lead the cost calculation (at
+measured median stop distances of 0.823%, a 0.10% round-trip taker fee
+costs **0.1215R**, ~40× funding at typical 1.8h holds). Funding is joined
+as-of-T from stored derivatives series (or default 0.01%/8h). The
+graduation bar is enforced **NET of costs** ($E_{\text{net}} \ge +0.50\text{R}$,
+$WR_{\text{net}} > 55\%$, $PF_{\text{net}} \ge 1.5$), turning previously
+cosmetic gross numbers into actionable trading evidence.
+
+### Added
+- **`data/costs.py`** — `CostModel` and `calculate_trade_cost()`,
+  `get_funding_rate_as_of_t()`, supporting taker/maker/spot fee
+  schedules, spread & slippage, and direction-aware funding (long pays
+  positive funding, short receives positive funding credit).
+- **Grader & Database Net R** — `GradedPlan` and `backtest_results` /
+  `paper_trades` tables gained `rr_net`, `fee_r`, `slip_r`, `funding_r`,
+  and `cost_r` columns through additive migrations.
+- **Scorecard Net Metrics & Conditioned Splits** — `trade_stats()` and
+  `build_scorecard()` report both gross and net metrics (`expectancy_net`,
+  `win_rate_net`, `pf_net`, `total_r_net`, `max_drawdown_r_net`,
+  `sharpe_net`, `sortino_net`, `calmar_net`, `cost_r`, `fee_r`,
+  `slip_r`, `funding_r`), and conditioned splits by funding regime
+  and CVD order flow (`--conditioned`).
+- **Surfaces** — CLI `python main.py scorecard [--no-costs] [--maker] [--conditioned]`,
+  HTTP `GET /api/scorecard`, MCP `scorecard` tool (v1.6.0), and the
+  dashboard learning card showing cost drag and net expectancy.
+- Tests: `tests/test_costs.py` (12 new tests) + scorecard net metric &
+  conditioned split tests (3 new tests). Suite **552 → 567 pass / 1 skip** (+15).
+
+No trading orders or private credentials added (invariant #1 strictly preserved).
+Next on the ladder: **P12.3.3 effective sample size**.
+
+---
+
 ## [2.12.0] — 2026-08-14 · branch `arena/01a00034-sky`
 
 MINOR bump: **P12.3.2 — real market data.** The first real market data

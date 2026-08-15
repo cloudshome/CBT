@@ -491,3 +491,65 @@ def test_cli_scorecard_era_flags_pass_through(tmp_path, monkeypatch, capsys):
     assert seen["since_ts"] == 1_735_689_600_000   # 2025-01-01T00:00:00Z
     assert seen["until_ts"] == 1_777_507_200_000   # 2026-04-30T00:00:00Z
     assert seen["source"] == "backtest"
+
+
+# ── P12.6 Net-of-costs (E_net) & Conditioned Expectancy tests ─────────────
+
+def test_scorecard_net_metrics_computation():
+    """Verify scorecard computes both gross and net metrics with cost drag."""
+    from data.costs import CostModel
+    # 40 trades: 24 wins at +2.0R, 16 losses at -1.0R (gross WR 60%, gross E +0.80R)
+    # Entry 100,000, SL 99,177 (stop dist 0.823% -> fee_r = 0.1215R, slip_r = 0.0486R, fund_r = 0.0027R, total = 0.1728R)
+    rows = []
+    for i in range(24):
+        rows.append(row(2.0, ts=(i + 1) * MS_PER_HOUR, symbol="BTCUSDT"))
+    for i in range(16):
+        rows.append(row(-1.0, ts=(25 + i) * MS_PER_HOUR, symbol="BTCUSDT"))
+
+    rep = build_scorecard(rows, min_decided=30)
+    o = rep["overall"]
+    assert o["expectancy"] == 0.80
+    assert o["expectancy_net"] < 0.80
+    assert o["expectancy_net"] == pytest.approx(0.80 - o["cost_r"], abs=0.01)
+    assert o["cost_r"] > 0.15
+    assert o["fee_r"] > 0.10
+    assert o["total_r_net"] < o["total_r"]
+    assert o["win_rate_net"] == 0.60
+    assert o["pf_net"] < o["pf"]
+
+
+def test_scorecard_verdict_fails_when_gross_passes_but_net_fails():
+    """P12.6 core honesty proof: gross +0.55R passes gross bar, but net +0.38R FAILS net bar."""
+    # Build a book with gross E = +0.55R, gross WR = 58%
+    # E.g., 29 wins of +1.5R and 21 losses of -0.76R -> sum = 43.5 - 15.96 = 27.54 / 50 = +0.5508R
+    rows = [row(1.5, ts=(i + 1) * MS_PER_HOUR) for i in range(29)] + \
+           [row(-0.76, ts=(30 + i) * MS_PER_HOUR) for i in range(21)]
+    rep = build_scorecard(rows, min_decided=30)
+    o = rep["overall"]
+    assert o["expectancy"] > 0.50
+    # Net expectancy after costs (approx -0.17R) drops below +0.50R
+    assert o["expectancy_net"] < 0.50
+    assert rep["verdict"]["status"] == "FAIL"
+    assert "expectancy net" in rep["verdict"]["reason"]
+
+
+def test_scorecard_conditioned_splits():
+    """P12.6: conditioned scorecard splits by funding sign and CVD order flow."""
+    rows = [
+        row(2.0, ts=1 * MS_PER_HOUR),
+        row(-1.0, ts=2 * MS_PER_HOUR),
+    ]
+    rows[0]["funding_rate"] = 0.0002
+    rows[0]["cvd_z"] = 1.5
+    rows[1]["funding_rate"] = -0.0002
+    rows[1]["cvd_z"] = -1.5
+
+    rep = build_scorecard(rows, min_decided=1, conditioned=True)
+    assert "conditioned" in rep
+    cond = rep["conditioned"]
+    assert "by_funding" in cond
+    assert "by_cvd" in cond
+    assert "POSITIVE" in cond["by_funding"]
+    assert "NEGATIVE" in cond["by_funding"]
+    assert "BULLISH_FLOW" in cond["by_cvd"]
+    assert "BEARISH_FLOW" in cond["by_cvd"]

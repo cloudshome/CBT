@@ -10,154 +10,70 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-14 (this session: **P12.3.2 real market data shipped** — SKY's first real market data ever; P11 / P12.1 / P12.3 re-run on it; the gate stays honestly closed and now has a real-data reason)
-**Branch:** `arena/01a00034-sky` (session branch fixed by Arena; branched from `origin/main` @ `f403ed4`, the merged P12.3 PR #21)
-**HEAD commit:** `2b25720` (P12.3.2 real market data) on top of `f403ed4`. PR **#22** is open, `MERGEABLE`, CI running — the human merges it.
+**Last updated:** 2026-08-15 (this session: **P12.6 fees-first `E_net` & conditioned expectancy shipped** — trade cost modeling in R units, funding as-of-T, net graduation bar enforced on all surfaces)
+**Branch:** `arena/01a003f9-sky` (session branch fixed by Arena; branched from `origin/main` @ `58ed864`, the merged P12.3.2 PR #22)
+**HEAD commit:** `c91ac9e` (P12.6 fees-first `E_net` & conditioned expectancy) on top of `58ed864`. PR **#23** is open, `MERGEABLE`, CI running — the human merges it.
 **Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI); this session's sandbox ran 3.11 with pandas 3.0.5 / pyarrow 25 — suite green
 
-> **This session (`arena/019fffe5-sky`): P12.3 — the boxed strategy
-> scorecard.** `data/scorecard.py` turns outcomes the grader already
-> decided into **one block**: expectancy, win rate, PF, total R, max
-> drawdown, streaks, Sharpe/Sortino/Calmar and holding time, split by
-> **long/short**, **regime**, **session** and **setup**. Three surfaces
-> read the identical report (invariant #10): `python main.py scorecard`
-> (`--source db|backtest|paper|store`, `--json`), `GET /api/scorecard`
-> plus the `STRATEGY SCORECARD` dashboard card, and the read-only MCP
-> `scorecard` tool (`SERVER_VERSION` 1.4.0 → 1.5.0). Holding time is now
-> captured at grading time: `GradedPlan.holding_bars` / `holding_hours`
-> (`None` while `OPEN`), persisted into two new additive
-> `backtest_results` columns; pre-P12.3 rows read back `NULL` and are
-> reported as "not recorded", never as zero.
+> **This session (`arena/01a003f9-sky`): P12.6 — fees-first `E_net` & conditioned expectancy.**
+> Costs are now integrated into every performance measurement across the desk:
+> `E_net = E_gross − fees − slip − funding`, where every term is expressed
+> in **R units per trade**.
 >
-> It is a **report layer** — no re-grading, no second engine, no new
-> dependency, and the graduation bar (≥ +0.50R, > 55% WR, PF ≥ 1.5) is
-> untouched; the block prints a verdict, it does not grant permission.
-> Annualising Sharpe was tried and **rejected as dishonest**: on
-> overlapping walk-forward samples (step=3) `sqrt(trades_per_year)`
-> inflated 0.269 → 36.74, so every ratio is per-trade and labelled, with
-> `span_days` / `trades_per_day` given as context. Sortino uses downside
-> deviation about a 0R target, because `stdev(losses)` is exactly 0 under
-> a fixed −1R stop and would silently report `n/a`.
-> While testing, the `tests/test_web_api.py` `client` fixture was found to
-> leak onto the developer's **real** database (`setenv("DB_PATH")` is read
-> too late once `config` is imported); it now patches `config.DB_PATH`.
+> `data/costs.py` implements `CostModel` and `calculate_trade_cost()`:
+> - **Fees + spread lead the cost calculation**: at the measured BTC median
+>   stop distance (0.823% of entry), standard taker round-trip fee (0.05%/side =
+>   0.10% total) costs **0.1215R** per trade (~35% of gross expectancy), and
+>   at typical 1.8h holds **fees are ~45× funding**.
+> - **Funding as-of-T**: direction-aware funding looked up from stored
+>   derivatives series (`data/derivatives.py`) as of signal timestamp $T$
+>   (long pays positive funding, short receives positive funding credit;
+>   spot has 0 funding).
+> - **Grader & Database Net R**: `GradedPlan` and `backtest_results` /
+>   `paper_trades` DB tables gained `rr_net`, `fee_r`, `slip_r`, `funding_r`,
+>   `cost_r` via additive migrations in `data/database.py`.
+> - **Scorecard Net Metrics & Conditioned Splits**: `data/scorecard.py`
+>   computes both gross and net metrics (`expectancy_net`, `win_rate_net`,
+>   `pf_net`, `total_r_net`, `max_drawdown_r_net`, `sharpe_net`, `sortino_net`,
+>   `calmar_net`, `cost_r`, `fee_r`, `slip_r`, `funding_r`), and conditioned
+>   splits by funding regime and CVD order flow (`--conditioned`).
+> - **Net Bar Enforcement**: `meets_bar()` in `data/validation.py` and
+>   `build_scorecard()` evaluate performance against the restated **NET**
+>   bar: $E_{\text{net}} \ge +0.50\text{R}$, $WR_{\text{net}} > 55\%$, $PF_{\text{net}} \ge 1.5$.
+> - **Surfaces**: CLI `python main.py scorecard [--no-costs] [--maker] [--conditioned]`,
+>   HTTP `GET /api/scorecard`, MCP `scorecard` tool (v1.6.0), and dashboard
+>   learning card displaying net expectancy and cost drag breakdown.
+> Version **2.12.0 → 2.13.0**. Suite **552 → 567 pass / 1 skip** (+15).
+
+> **Prior session (`arena/01a00034-sky`, merged as PR #22): P12.3.2 — real market data.**
+> The first real market data entered the project: Binance spot BTCUSDT 1m,
+> 2025-01-01 → 2026-04-30, 696,960 bars, from Binance's official public archive
+> (`data.binance.vision`), sha256-pinned and verified on import (`c4ad6029…b934b7`).
+> Transported offline via `backfill --from-csv`, rolled up to 15m/1h/4h/1d by P10.3
+> rollups. P11, P12.1, and P12.3 re-run on real data: primary 1h horizon loses
+> money in every window (train −0.452R, oos −0.101R); 24h horizon is +0.400R gross
+> (≈ +0.28R net, below the net bar); Breakout Buy confirmed as prune candidate (−0.630R);
+> graduation gate stays honestly closed (+0.348R / 36.8% WR / PF 1.55).
+> Version **2.11.1 → 2.12.0**. Suite **539 → 552 pass / 1 skip** (+13).
+
+> **Prior session (`arena/019fffe5-sky`, merged as PR #21): P12.3 — the boxed strategy scorecard.**
+> `data/scorecard.py` turns outcomes the grader already decided into **one block**:
+> expectancy, win rate, PF, total R, max drawdown, streaks, Sharpe/Sortino/Calmar
+> and holding time, split by **long/short**, **regime**, **session** and **setup**.
+> Three surfaces read the identical report (invariant #10): CLI, HTTP, and read-only MCP.
+> Holding time is captured at grading time: `GradedPlan.holding_bars` / `holding_hours`.
+> P12.3.1 unified same-bar tie-break (conservative stop-first).
 > Version **2.10.0 → 2.11.1**. Suite **492 → 539 pass / 1 skip** (+47).
->
-> **Then P12.3.1 + an audit that reordered the ladder.** Reviewing the
-> repo against the real-money aim produced four *measured* findings
-> (`docs/PATH_TO_REAL_MONEY.md`, every figure reproducible):
-> (1) **no real market data has ever entered the project** — 0 parquet
-> files, 0 `paper_trades` rows, all 1,049 graded rows from a seeded
-> Gaussian random walk; (2) **costs are absent** — median stop distance
-> 0.823% of entry ⇒ a taker round trip costs **0.121R**, so +0.341R gross
-> is ≈ **+0.22R net**, and at a 1.8h hold **fees are ~40× funding**,
-> reversing P12.6's emphasis; (3) **the two graders disagreed by 3R** on
-> an ambiguous candle — **fixed in P12.3.1**; (4) **sample counts are
-> inflated ~30×** by overlapping windows (384 decided ≈ 12 independent).
-> Also measured: expectancy swings **+0.387R … +0.730R** across 5 random
-> seeds, straddling the graduation bar in both directions. The current
-> number is noise, not an edge.
->
-> **Ladder reordered:** P12.4 would score a fiction. New order is
-> **P12.3.2 real data** → **fees-first P12.6** → **P12.3.3 effective
-> sample size** → P12.4/P12.5 → micro-live. The bar is **restated as net,
-> not loosened**: thresholds unchanged, still enforced gross until P12.6.
-> No signal, risk, OOS-seal, order, or dependency behavior changed.
->
-> **Prior session (`arena/019ffb14-sky`): P12.2 — lookahead validation.**
-> P12.1's locked train/val/OOS/recent protocol remains unchanged. This
-> milestone adds `data.validation.scan_lookahead()` and
-> `python main.py validate lookahead`: a deterministic stdlib-AST scan of
-> first-party `engine/`, `brain/`, and `data/` source that fails closed on
-> explicit future-peeking `shift(-n)` / `shift(periods=-n)` calls, reports
-> source locations, and treats syntax/read errors as failures. The unit
-> assertion `assert_no_lookahead()` is covered by a deliberately leaking
-> fixture; the active GitHub workflow's full offline pytest job runs those
-> lookahead tests as part of the suite. Recursive-state analysis is
-> explicitly still later.
-> Version **2.9.0 → 2.10.0**. Suite **488 → 492 pass / 1 skip**. No signal,
-> backtest, graduation-bar, OOS-seal, order, or dependency behavior changed.
 
-> **Prior session (`arena/019ffab2-sky`): P10.7 — cross-exchange
-> series.** Premium/discount vs Binance and funding spread are now a
-> stored, queryable series under `data/store/cross/**`. The live
-> health probe was **generalised** (`data/cross_exchange.snapshot_prices`,
-> KuCoin + OKX + Bybit) — health/preflight/collector share one
-> function. CLI: `python main.py cross collect|status`. DEMO_MODE
-> stays offline via `FakeVenueTransport`. Version **2.7.2 → 2.8.0**.
-> Suite **449 → 471 pass / 1 skip** (+22). Next *code* is **P10.8**
-> (Lightweight Charts). F1–F8 / BT1–BT8 stay decided.
->
-> **Prior session (`arena/019ffa8d-sky`): Backtrader recommendation
-> reviewed and rejected.** A ChatGPT audit proposed mining Backtrader
-> for research architecture (Cerebro→feeds→strategy→broker→analyzers),
-> putting it behind a swappable adapter, and upgrading expectancy /
-> walk-forward / Monte-Carlo / regime-matrix discipline. Compared to the
-> live desk: SKY already *is* the separated architecture, and the
-> honest validation ideas were already named **P12** by the Freqtrade
-> review. A reset was considered and refused a second time — adopting
-> Backtrader would contradict the note itself ("don't make it your
-> brain") and add a live-broker order surface invariant #1 forbids.
-> Decisions **BT1–BT8** are in `docs/BACKTRADER_REVIEW.md`: no
-> dependency / vendored engine / adapter (BT1), no Cerebro rewrite
-> (BT2), no second grader (BT3/BT7), no entry parameter-search (BT4),
-> P12 done-whens extended (BT5), sealed OOS confirmed (BT6), no reset
-> (BT8). Docs + contract tests only.
->
-> **Prior session (`arena/019ffa5d-sky`, merged as PR #15): Freqtrade
-> recommendation reviewed and rejected.** A ChatGPT audit proposed
-> putting Freqtrade under SKY as execution + backtest + strategy
-> runtime, plus a Quant Validation Engine. Compared to the live desk:
-> SKY already *is* the brain, the risk gate, and the R-expectancy loop.
-> Adopting Freqtrade would violate invariant #1 (never place an order)
-> and A1 (one tested edge). **The repo is not reset.** Decisions F1–F8
-> are in `docs/FREQTRADE_REVIEW.md`. The useful ideas become **P12** on
-> our backtester after P10.11.
->
-> **Prior session's decision — part 1: a parallel-session race, resolved
-> by reconciling instead of duplicating.** The session branched from
-> `main` @ `ee99486` (post-PR-#10) and built its own P10.2 backfill.
-> Mid-session it discovered two *other* Arena sessions had already
-> merged **PR #11** (P10.2 backfill + P10.3 gaps/rollups) and **PR #12**
-> (P10.2 hardening: real perp endpoint, header-aware rate limiting;
-> P10.4 derivatives series) into `main`. Per the repo's own rule —
-> *never duplicate completed components* — this session **merged `main`
-> and adopted the reviewed implementation wholesale**, discarding its
-> own parallel draft. Its genuinely new value was kept as 3 edge-case
-> tests in `tests/test_backfill.py` (empty-first-page termination,
-> start-past-end no-op, mid-history-hole termination).
->
-> **Part 2 (same PR, same session): P10.5 — data-quality pillar.** With
-> the ladder clear (re-checked `origin/main`: no new merges), the
-> session built the next milestone: `data/quality.py` + a **fourth
-> readiness pillar** (`data`) in `readiness_strip()`. Per-series checks
-> (staleness, gaps, price/volume sanity, ordering) over the stored
-> Parquet history; a corrupt or unusably stale series is **quarantined**
-> (`level=down` → `ready: false`). Empty store = honest `degraded` with
-> the backfill hint. CLI/HTTP/MCP/dashboard all inherit the pillar via
-> the one `readiness_strip()` (invariant #10). MCP `SERVER_VERSION`
-> 1.4.0. 18 new offline tests, incl. the milestone's proof: corrupt
-> fixture written through the real store ⇒ quarantine ⇒ `ready: false`.
-> Suite **406 → 424 pass / 1 skip** (+18). Version **2.5.0 → 2.6.0**.
-> (Merged via PR #13.)
->
-> **Part 3 (own PR #14): P10.6 — Bybit adapter.** Second venue behind
-> the same normalised schema: `data/bybit_client.py` implements the
-> exact `PageResult`/`klines_page` transport contract, so the hardened
-> backfill pages Bybit V5 identically to Binance — resumable,
-> idempotent, rate-limit aware. Venue quirks (V5 categories
-> `spot`/`linear`, V5 interval codes, newest-first rows, string
-> parsing, `retCode 10006 → 429`) stay inside the adapter. CLI:
-> `backfill --exchange bybit`. The milestone's proof — *identical
-> assertions pass for both adapters* — is
-> `tests/test_bybit.py::_assert_adapter_contract()` run against both
-> clients, plus 15 more offline tests. Suite **424 → 441 pass / 1
-> skip** (+17). Version **2.6.0 → 2.7.0**. Next: P10.7
-> (cross-exchange series).
+> **Prior session (`arena/019ffb14-sky`, merged as PR #20): P12.2 — lookahead validation.**
+> Added `data.validation.scan_lookahead()` and `python main.py validate lookahead`:
+> deterministic stdlib-AST scan that fails closed on explicit future-peeking `shift(-n)`
+> calls. Version **2.9.0 → 2.10.0**. Suite **488 → 492 pass / 1 skip**.
 
-> **This session (continuation of `arena/019ffad5-sky`, from P10.7 base):** P10.8, P10.9, P10.10, P10.11, P10.12 delivered. **P10.8** — vendored `lightweight-charts.standalone.js`, `renderLightweightChart()` with price candlestick + histogram volume pane (`addHistogramSeries`), `/api/candles` feed. **P10.9** — two dedicated market-tab cards (`FUTURES — OPEN INTEREST & FUNDING`: funding rate with sign/color + interpretation; OI value/trend; L/S ratio color; mark/index/basis — reads from `market_context`; `FLOW — CVD & VOLUME DELTA`: CVD z-score, volume delta z, volume spike ratio, VWAP position, buy/sell imbalance — reads from feature snapshot `f`). Cards include interpretation notes linking to P10.12 conditioned-query goal. **P10.10** — `data/ws_client.py`: public Binance WebSocket streams (`!forceOrder@arr` + `klines`); reconnect/backoff (exponential + jitter, max 30s); graceful stop; `DEMO_EVENT_STREAM` (offline-safe); `WsClient` singleton; `reconnect_state()` feeds readiness strip; `accumulation_stats()` feeds feature store. No `Freqtrade` / `Backtrader` / `Codex` import. **P10.11** — `data/backtester.py`: `run_backtest_on_store()` reads `CandleStore.read()` instead of live fetch; returns clear error for missing/short series; feeds multi-year offline backtests. **P10.12** — `data/feature_store.py`: `build_feature_table()` (joins price + derivatives + hidden_alpha + regime); `FEATURE_COLUMNS` (22 columns); `save_feature_table()` / `read_feature_table()`; one row per `(symbol, timeframe, ts)`; derived (not duplicate) dataset; feeds conditioned-expectancy queries. **P11 gate unchanged**: honestly closed (+0.263R / 34.1% / PF 1.40 — `AI_ANATOMY_ROADMAP.md` / `CHANGELOG.md`). PR #17 remains open; do not merge. No new runtime dependency (no `websockets` package installed — stub degrades safely). All syntax verified (`python -c ast.parse...` passed for all four files). `SESSION_STATE.md` updated; next session reads this first.
->
-> **Next concrete milestone after this session:** P11 paper-book grind continues (gate still honestly closed); P10.10 reconnect/live-accumulation needs real-network confirmation once `pip install websockets` is available; P12 validation engine starts after P10.11 is confirmed working with stored data. `docs/DATA_INFRASTRUCTURE_ROADMAP.md` §9 milestone table should be updated to mark P10.8–P10.12 shipped.
+> **Prior session (`arena/019ffad5-sky`, merged as PR #18): P10.8–P10.12.**
+> P10 data infrastructure fully delivered: Lightweight Charts candlestick/volume pane,
+> FUTURES/FLOW market-tab cards, WebSocket tier with reconnect/backoff, store-backed
+> backtester (`run_backtest_on_store`), feature store (`data/feature_store.py`).
 
 ---
 
@@ -180,24 +96,21 @@ plan (18 phases, 15-item rulebook) is in
 **Become a fully independent, consistently profitable trader.**
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
-(our own stored market history — ✅ P10.1–P10.12 shipped, and now with
-**real market data in it**: P12.3.2 imported real Binance spot BTCUSDT
-1m, 2025-01-01 → 2026-04-30, sha256-pinned; the research proof that
-makes the edge trustworthy — 🔄 P12.1–P12.3.1 shipped and **re-run on
-real data**; next is **P12.6, fees-first `E_net`**, then P12.3.3). Every
-phase below is ordered by how directly it moves those two lines.
+(our own stored market history — ✅ P10.1–P10.12 shipped, with real market
+data imported and verified; research validation proof — 🔄 P12.1–P12.6 shipped;
+next is **P12.3.3 effective sample size**, then P12.4/P12.5). Every phase
+below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.3.2 real data shipped.** P10
+**P12 (SKY Quant Validation Engine) — P12.6 fees-first `E_net` shipped.** P10
 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
-re-run on real data and the graduation gate is still honestly closed
-(now +0.348R / 36.8% WR / PF 1.55 on real samples). Freqtrade rejected
-(F1–F8); Backtrader rejected (BT1–BT8). Open items: TODO-7, TODO-8;
-**P12.6 (fees-first `E_net`)** → P12.3.3 → P12.4 → P12.7; P11 grind
-continues alongside. Numbers + repro: `docs/REAL_DATA_RUN_2026-08-14.md`.
+re-run on real data and the graduation gate is honestly closed (+0.348R gross,
+negative net on 1h/4h primary). Freqtrade rejected (F1–F8); Backtrader
+rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.3.3 (effective sample size)**
+→ P12.4 → P12.5 → P12.7.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -210,9 +123,9 @@ continues alongside. Numbers + repro: `docs/REAL_DATA_RUN_2026-08-14.md`.
 | P7 | Agent Surface (SKILL + CLI) | ✅ Complete | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
-| **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%; sell-R bug fixed); **first real-data grind shipped** (+8,300 backtest / +494 paper real samples). Gate still closed — on real data now too (+0.348R / 36.8% / PF 1.55) |
+| **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.3.2 shipped — real market data** (P12.1 locked protocol + sealed OOS; P12.2 lookahead guard; P12.3 boxed scorecard; P12.3.1 tie-break unified; **real Binance spot BTCUSDT 1m imported and P11/P12.1/P12.3 re-run on it** — protocol fails every window at 1h; only 24h is gross-positive and it's below the net bar). Next: **fees-first P12.6** (`E_net`), then P12.3.3; P12.4 deferred. `docs/REAL_DATA_RUN_2026-08-14.md` |
+| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.6 shipped — fees-first `E_net` & conditioned expectancy** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; **P12.6: `data/costs.py`, `E_net = E_gross − fees − slip − funding`, funding joined as-of-T, net graduation bar enforced**). Next: **P12.3.3 effective sample size**. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -221,752 +134,106 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-14 (this branch `arena/01a00034-sky`): P12.3.2 — real market data
-
-Branched from `main` @ `f403ed4` (PR #21 merged by the human — thank
-you). 0 regressions. Tests **539 → 552 pass / 1 skip** (+13). Version
-**2.11.1 → 2.12.0**.
-
-**The milestone.** The sandbox has no exchange egress (all Binance /
-Bybit / OKX / Kraken / Coinbase / Coingecko / Yahoo hosts reset the TLS
-handshake; PyPI and GitHub are the only reachable hosts — verified, not
-assumed). So the transport was substituted honestly and everything
-downstream is the code the project already trusts:
-
-- `data/backfill.py::backfill_from_csv` — local Binance-style OHLCV CSV
-  (Vision 6-col or 12-col klines, plain or gzipped) through the same
-  adapter boundary as the REST backfill (validate → sort →
-  `normalise_klines` → `CandleStore.write`). Idempotent; reports
-  duplicates / sanity-drops / misalignment / gaps; `--csv-sha256` pins
-  provenance and **refuses mismatches**.
-- `data/store.py::StoreClient` — `klines()`-shaped reader over the
-  Parquet store; `backtest --source store`, `simulator --source store`
-  (with `--market`), `backtest --step`.
-- `scorecard --since/--until` (epoch-ms or YYYY-MM-DD) so one book can
-  hold several data eras without mixing.
-
-**The data.** Real Binance **spot** BTCUSDT 1m, 2025-01-01 →
-2026-04-30 (696,960 bars, 484 days), from Binance's official public
-archive (`data.binance.vision`), transported via
-`github.com/j-greig/insomnia-hype-data` @ `9791d85`; sha256
-`c4ad6029…b934b7` verified against the dataset's own manifest. 0 gaps,
-0 duplicates, 0 sanity drops. P10.3 rollups produced 15m (46,464 bars).
-The P10.5 quality pillar reads it `down` — *history too stale* — which
-is correct for a frozen archive and irrelevant to walk-forward research
-over a closed window.
-
-**The runs (all in `docs/REAL_DATA_RUN_2026-08-14.md` with repro):**
-
-- **P12.1 sealed protocol, first real run** — 12,000 real 15m bars,
-  primary 1h, seal `data/store/validation/binance_spot_BTCUSDT_15m.json`
-  (fingerprint `1223819609d75213`, never resealed): **FAIL on every
-  window** — train −0.452R, val −0.251R, oos −0.101R, recent −0.429R.
-- **P12.3 scorecard, first real run** — 24,215 decided: +0.180R / 32.2%
-  WR / PF 1.266 all-horizon. Per horizon: 1h **−0.326R**, 4h −0.032R,
-  24h **+0.400R gross** (≈ +0.28R net at measured taker costs — below
-  the restated bar). **Breakout Buy −0.630R** over 6,062 decided,
-  negative at every horizon — the prune case from
-  `docs/PATH_TO_REAL_MONEY.md` §6.2 is now real-data fact.
-- **P11 grind, first real run** — +8,300 backtest + 494 paper samples
-  (era 2026-02 → 2026-04). Gate: +0.348R / 36.8% WR / PF 1.55 /
-  compliance 100% — **still closed**. Sweep Reversal Buy is the only
-  sample-proven setup at **+0.048R** — proof of nothing.
-
-**The honest reading.** The fall was predicted; it arrived. The engine
-is negative at its locked primary horizon on real data, in every
-window, including the sealed OOS. Nothing was re-tuned in response: no
-horizon change, no bar change, no strategy change. The 24h horizon is
-the one real lead for a future session (still below the net bar).
-The sandbox's DB was empty at session start (the synthetic book lived
-on the developer's machine), so this session's DB holds only real rows;
-`scorecard --since/--until` exists for machines where both eras coexist.
-
-**Files changed:** `data/backfill.py`, `data/store.py`, `data/scorecard.py`,
-`main.py`, `tests/test_backfill_csv.py` (new, 11), `tests/test_scorecard.py`
-(+2), `docs/REAL_DATA_RUN_2026-08-14.md` (new), `CHANGELOG.md`,
-`ARCHITECTURE.md`, `TODO.md`, `AI_ANATOMY_ROADMAP.md`,
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `config.py`, `pyproject.toml`,
-this file.
-
-### Session 2026-08-14 (prior branch `arena/019fffe5-sky`, merged as PR #21): P12.3 — boxed strategy scorecard
-
-Branched from `main` @ `7154825` (the P12.2 merge). 0 regressions.
-Tests **492 → 534 pass / 1 skip** (+42). Version **2.10.0 → 2.11.0**.
-MCP `SERVER_VERSION` **1.4.0 → 1.5.0** (14 tools).
-
-**What shipped.** `data/scorecard.py` is a pure report layer over
-outcomes the existing grader already decided — it never re-grades, adds
-no engine and no dependency. `build_scorecard()` returns one report:
-`meta`, `overall`, `by_side`, `by_regime`, `by_session`, `by_setup`,
-`criteria`, `bar` and `verdict`. Each block reports n / win rate /
-expectancy / profit factor / total R / average hold. `overall` adds max
-drawdown in R, win and loss streaks, average win and average loss, and
-Sharpe / Sortino / Calmar. Sources: `rows_from_graded()` (in-memory
-`GradedPlan`s), `rows_from_backtest_db()`, `rows_from_paper_db()`, with
-`scorecard_from_db()` and `scorecard_from_store()` as the entry points.
-Only decided rows count (`TP_HIT` / `STOP_LOSS`, plus the backtest
-win/loss statuses); `OPEN` and `TIMEOUT` are excluded, and `--exclude-sim`
-drops simulator paper rows.
-
-**Holding time is now measured, not guessed.** `data/backtester.py`
-records `holding_bars` and `holding_hours` on each `GradedPlan` at
-grading time (`None` while `OPEN`), converting bars via `TIMEFRAME_TO_MS`
-and `df.attrs["timeframe"]` (15m default). `data/database.py` gained the
-two additive `backtest_results` columns through `_migrate()`;
-pre-P12.3 rows read back `NULL` and are reported as "not recorded",
-never as zero.
-
-**Three surfaces, one report (invariant #10).**
-- CLI: `python main.py scorecard [--source db|backtest|paper|store]
-  [--symbol] [--tf] [--min-decided 30] [--exclude-sim] [--json]`;
-  exit 0 when `ok`, 1 otherwise.
-- HTTP: `GET /api/scorecard?source=&symbol=&min_decided=&include_sim=`
-  (never 500s), plus the `STRATEGY SCORECARD` card on the Learning tab.
-- MCP: read-only `scorecard` tool (`source`, `symbol`, `min_decided`,
-  `exclude_sim`), verified live over stdio.
-
-**Two honesty decisions worth keeping.** (1) Annualised Sharpe was built
-and then **removed**: walk-forward grading steps every few bars, so the
-samples overlap heavily and `sqrt(trades_per_year)` inflated a real
-0.269 into 36.74 at an implied 18,656 trades/yr. Every ratio is now
-per-trade and labelled as such, with `span_days` / `trades_per_day` for
-context. Do not reintroduce it. (2) Sortino uses downside deviation
-about a 0R target, `sqrt(mean(min(R,0)^2))`, not `stdev(losses)` — with
-a fixed −1R stop the losses have zero variance and the old form
-reported `n/a` on a perfectly valid book.
-
-**The bug this milestone caught in the test suite:** `tests/test_web_api.py`'s
-`client` fixture set `DB_PATH` with `monkeypatch.setenv`, but
-`config.DB_PATH` is bound at import time, so once anything had imported
-`config` the fixture silently pointed the web tests at the developer's
-**real** `data/cryptobrain.db`. Invisible in isolation, order-dependent
-in the full suite. It now patches `config.DB_PATH` directly. Rule:
-never configure the database in tests with `setenv`.
-
-**First real run** (1049 graded rows, run `20260814_110407`; 384 decided
-BTCUSDT, span 3.9d): expectancy **+0.341R**, WR 40.4%, PF 1.572, total
-+131.0R, max DD 51.00R, Sharpe 0.202 / Sortino 0.442 / Calmar 2.569,
-hold avg 1.8h. SELL (+0.547R, PF 2.04) is carrying BUY (+0.248R).
-RANGING is the best regime (+1.431R), VOL_EXPANSION the worst
-(−0.115R); New York is the best session (+0.554R), London the only
-negative one (−0.108R); **Breakout Buy is the bleeding setup**
-(−0.473R over 74 trades, PF 0.426). **VERDICT 🔴 FAIL** — expectancy
-below +0.50R and win rate below 55%. The bar was not touched; the
-scorecard prints "This is a scorecard, not permission."
-
-**Files changed:**
-- `data/scorecard.py` (new) — the whole report layer.
-- `data/backtester.py` — `holding_bars` / `holding_hours` on
-  `GradedPlan` and `as_row()`; bar-duration resolution.
-- `data/database.py` — two additive `backtest_results` columns in
-  `_migrate()`; widened `save_backtest_rows()` INSERT.
-- `main.py` — `cmd_scorecard()` + the `scorecard` subparser + command list.
-- `mcp_server.py` — `scorecard` tool schema and dispatch; version 1.5.0.
-- `web/app.py` — `GET /api/scorecard`, the `STRATEGY SCORECARD` card,
-  `loadScorecard()`, `scSplit()` (client-side ordering, because Flask's
-  `jsonify` sorts JSON keys), and the four refresh wirings.
-- `config.py` + `pyproject.toml` + `ARCHITECTURE.md` — version 2.11.0.
-- Tests: `tests/test_scorecard.py` (new, 37), `test_web_api.py` (+4 and
-  the fixture fix), `test_backtester.py` (+1), `test_dashboard_js.py`
-  and `test_mcp_stdio.py` (surface contracts).
-- Docs: `README.md`, `CHANGELOG.md` (2.11.0), `TODO.md`,
-  `AI_ANATOMY_ROADMAP.md`, `docs/DATA_INFRASTRUCTURE_ROADMAP.md`,
-  `SESSION_STATE.md`.
-
-### Session 2026-08-13 (prior branch `arena/019ffab2-sky`): P10.7 — cross-exchange series
-
-Branched from `main` after the Backtrader review (PR #16). Inputs only
-— no strategy, risk-gate, or engine behaviour change. Version
-**2.7.2 → 2.8.0**. Suite **449 → 471 pass / 1 skip** (+22).
-
-**What landed:**
-- `data/cross_exchange.py` — venue registry (KuCoin/OKX/Bybit),
-  `snapshot_prices()` (the single probe), `snapshot_funding()`,
-  `CrossExchangeStore` (`data/store/cross/**`, same schema/PK as
-  P10.4), `derive_premium` / `derive_funding_spread`,
-  `FakeVenueTransport`, `CrossExchangeCollector` (candle-derived
-  premium, Bybit funding pages, live/fake snapshot). Snapshot ts
-  floors 15m (price) / 8h (funding).
-- `data/bybit_client.py` — `funding_history()` →
-  `GET /v5/market/funding/history` (`category=linear`); XAU → empty
-  frame; transport fail → `None`.
-- `brain/agent.py` — `_cross_exchange_probe` is a thin
-  `snapshot_prices` wrapper; `_CROSS_EXCHANGES` re-exports `VENUES`.
-- CLI — `python main.py cross collect|status`.
-- Tests — `tests/test_cross_exchange.py` (20) + 2 Bybit funding
-  tests; `test_cross_exchange_probe_uses_newest_candle` now mocks
-  Bybit V5 `result.list`.
-
-**Files changed:** `data/cross_exchange.py` (new),
-`data/bybit_client.py`, `brain/agent.py`, `main.py`,
-`tests/test_cross_exchange.py` (new), `tests/test_bybit.py`,
-`tests/test_agent.py`, `config.py`, `pyproject.toml`, `CHANGELOG.md`,
-`ARCHITECTURE.md`, `README.md`, `SKILL.md`, `TODO.md`,
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `docs/INFRASTRUCTURE_LAYERS.md`,
-`AI_ANATOMY_ROADMAP.md`, this file.
-
----
-
-### Session 2026-08-13 (prior branch `arena/019ffa8d-sky`): Backtrader review · BT1–BT8 · P12 extended
-
-Branched from `main` @ `e462318` (PR #15 merged: Freqtrade F1–F8).
-0 regressions. Docs + contract tests only — **no runtime change**.
-Version **2.7.1 → 2.7.2**. Suite **445 → 449 pass / 1 skip** (+4).
-
-**What was reviewed:** a ChatGPT Backtrader audit (22 sections) —
-mine Backtrader as a research engine (Cerebro → feeds → strategy →
-broker → analyzers), put it behind a swappable adapter, standardise a
-`StrategyResult`, keep expectancy-in-R, net-of-costs, risk-veto,
-analyzers, MAE/MFE, regime matrices, walk-forward, sealed OOS,
-plateau-over-peak, Monte Carlo, risk-of-ruin, a strategy scorecard,
-and a P0–P4 priority list.
-
-**What was decided (see `docs/BACKTRADER_REVIEW.md`):**
-- **BT1/BT2/BT3 = No** — no `backtrader` dependency, adapter, vendored
-  engine; no Cerebro rewrite; no second grader (two fill semantics =
-  two truths).
-- **BT4 = No** — no entry parameter-search (consistent with F3).
-- **BT5/BT6 = Yes, into P12** — scorecard (P12.3), plateau test
-  (P12.4), net-of-costs funding-as-of-T (P12.6), risk-of-ruin table
-  (P12.7); sealed final OOS = P12.1.
-- **BT7 = Parked/never as a dependency** — second engine only as an
-  ad-hoc throwaway check, if our grader is ever doubted.
-- **BT8 = No** — the repo is not reset.
-
-**Why no reset (this time):** the note itself argues against embedding
-Backtrader ("don't make it your brain"), its §17 admits the missing
-crypto layer is data — which is exactly what P10 is building — and P10
-is mid-ladder with P11 grinding. A reset would contradict the
-recommendation *and* stall the aim. Two independent audits have now
-converged on the same plan: our grader, our store, P12 after P10.11.
-
-**Files changed:** `docs/BACKTRADER_REVIEW.md` (new); `TODO.md`
-(Backtrader out-of-scope; P12 definitions extended; next code still
-P10.7); `SESSION_STATE.md`; `ARCHITECTURE.md` (invariant #13 extended,
-version 2.7.2, baseline 449); `AI_ANATOMY_ROADMAP.md` (P12 names both
-reviews; out-of-scope + test count); `docs/DATA_INFRASTRUCTURE_ROADMAP.md`
-(P10.11 wording; out-of-scope); `docs/INFRASTRUCTURE_LAYERS.md`
-(Backtrader row; order-of-work); `PROFESSIONAL_PLAN_DECISIONS.md`
-(addendum 2); `BLUEPRINT.md` (backtester-ours line); `README.md`
-(both reviews in the quote block); `SKILL.md` (do-not list);
-`config.py` + `pyproject.toml` 2.7.2;
-`tests/test_handoff_memory.py` (+4 contract tests).
-
----
-
-### Session 2026-08-13 (prior branch `arena/019ffa5d-sky`, merged as PR #15): Freqtrade review · F1–F8 · reconciled onto P10.6
-
-The operator merged PR #14 (P10.6 Bybit, `main` @ `e233580`) while
-PR #15 was open. This session merged `origin/main` and kept **both**
-the Bybit adapter and the F1–F8 decisions. **No runtime engine
-change beyond what #14 already shipped.** Docs + contract tests.
-Version **2.7.0 → 2.7.1**. Suite **441 → 445 pass / 1 skip** (+4).
-
-**What was reviewed:** a ChatGPT Freqtrade audit (use Freqtrade as
-execution + backtest + strategy runtime; modular strategy catalog;
-Hyperopt-with-caution; FreqAI later; Quant Validation Engine).
-
-**What was decided (see `docs/FREQTRADE_REVIEW.md`):**
-- **F1/F2/F3 = No** — do not adopt Freqtrade, Hyperopt, or FreqAI.
-- **F4 = No** — do not expand the strategy catalog before graduation.
-- **F5/F6 = Yes** — the validation ideas become **P12** on *our*
-  backtester, after P10.11.
-- **F7 = Park** — auto capital allocation after graduation + >1 edge.
-- **F8 = No** — do not reset the repository.
-
-**Why no reset:** SKY already *is* the brain (`engine/` + `brain/`),
-already has the risk gate, already reports R-expectancy, already
-walks forward without look-ahead, already has Monte Carlo / MAE/MFE.
-Freqtrade's remaining value is placing orders — forbidden by
-invariant #1. ICT/SMC conditional plans do not fit
-`populate_entry_trend`.
-
-**Files changed:** merge of `origin/main` @ `e233580` (PR #14);
-`docs/FREQTRADE_REVIEW.md` (new); `TODO.md` (TODO-13 / P12 +
-out-of-scope; next code P10.7); `SESSION_STATE.md`;
-`ARCHITECTURE.md` (invariant #13); `AI_ANATOMY_ROADMAP.md`;
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md`; `docs/INFRASTRUCTURE_LAYERS.md`;
-`PROFESSIONAL_PLAN_DECISIONS.md`; `BLUEPRINT.md`; `SKILL.md`;
-`README.md`; `CHANGELOG.md`; `config.py` + `pyproject.toml` 2.7.1;
-`tests/test_handoff_memory.py` (+4 contract tests).
-
----
-
-### Session 2026-08-13 (prior branches): PR #13 + PR #14 — reconciliation, P10.5, P10.6 Bybit
-
-Branched from `main` @ `ee99486` (post-PR-#10, before PR #11/#12 landed).
-0 regressions. Tests **403 → 406 pass / 1 skip** (+3). Version unchanged
-**2.5.0** (no runtime change).
-
-**What happened:** this session independently built its own P10.2
-backfill (`data/backfill.py`, `main.py backfill`, 19 tests) unaware
-that parallel sessions had merged PR #11 (P10.2 + P10.3) and PR #12
-(P10.2 hardening + P10.4) into `main`. On discovery, the rule won:
-*never duplicate completed components*. This session:
-
-- **Merged `main` into the session branch** and adopted the reviewed
-  implementation wholesale (hardened backfill, gaps/rollups,
-  derivatives store) — its own parallel draft was discarded.
-- **Kept its genuinely new value as three edge-case tests** appended
-  to `tests/test_backfill.py`, all passing against the merged code:
-  empty-first-page termination, start-past-end no-op, mid-history-hole
-  termination (no duplicates, repair is P10.3's job).
-- **Reconciled the docs** (`SESSION_STATE.md`, `TODO.md`, `CHANGELOG.md`,
-  `ARCHITECTURE.md`) so the next session reads one true story.
-
-**Files changed:** merge of `main` @ `54fec5a` (PR #11 + #12);
-`tests/test_backfill.py` (+3 edge-case tests); **P10.5:** `data/quality.py`
-(new), `data/store.py` (`list_series()`), `brain/agent.py` (`_data_pillar`
-+ 4-pillar strip), `mcp_server.py` (v1.4.0), `main.py` / `web/app.py`
-descriptions, `tests/test_quality.py` (new, 18 tests), pinned pillar-set
-assertions in `test_agent` / `test_web_api` / `test_mcp_stdio` /
-`test_channels` / `test_dashboard_js`; **P10.6:** `data/bybit_client.py`
-(new), `main.py` (`--exchange bybit`, repair routing, venue-neutral
-geo-block message in `data/backfill.py`), `tests/test_bybit.py` (new,
-17 tests); docs: `CHANGELOG.md` (v2.6.0 + v2.7.0), `config.py` +
-`pyproject.toml`, `docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `TODO.md`,
-`README.md`, `SKILL.md`, `ARCHITECTURE.md`, this file.
-
----
-
-### Session 2026-08-13 (prior branch): P10.2 hardening — perp endpoint + rate-limit machinery
-
-Rebased the session branch onto `main` @ `5736ee8` (PR #11: P10.2 + P10.3).
-0 regressions. Tests **368 → 383 pass / 1 skip** (+15). Version **2.4.0 → 2.4.1**.
-
-**What landed (fixes to the shipped P10.2):**
-- **Perp is actually perp.** `data/binance_client.py` gains `klines_page()`
-  (raw 1000-candle page for `spot` `/api/v3/klines` or `perp`
-  `/fapi/v1/klines`, `PageResult` with rate-limit headers + HTTP status;
-  header-aware `_get_with_headers` / `_get_first_host_with_headers`).
-  The default backfill transport routes `market="perp"` through the perp
-  endpoint — previously `client.klines()` stored **spot candles labelled
-  `market=perp`**. XAUUSD (no perp market) now fails with an honest
-  message instead of writing mislabelled data. Existing `klines()`
-  behaviour unchanged (routes through the same seam).
-- **Real rate-limit handling** in `data/backfill.py` (the first cut only
-  slept `sleep_s` between pages): exponential backoff on 429/network
-  errors (`backoff_attempts`/`backoff_base`), pacing on Binance's
-  `x-mbx-remaining-weight` header (low budget → extra sleep; exhausted →
-  longer), immediate abort on geo-blocks (403/451), `max_requests` cap
-  (CLI default 5000; 0 = unlimited) that bounds *pages* not retries, and
-  a forming-tail-candle rule (`ts + timeframe ≤ now`; the forming candle
-  is skipped and picked up by the next run). `normalise_klines()` now
-  honours an input `closed` column (store drops forming rows).
-- **Write-as-you-fetch.** `backfill()` now consumes a generator
-  (`_iter_klines_pages`) so every page is persisted the moment it
-  arrives — an interrupted run keeps everything fetched so far, and the
-  next run resumes from the last stored candle. (The first cut collected
-  all pages first and would lose hours of fetching on a mid-run error.)
-- **Unbounded-backfill hang fixed.** `end_ts` now defaults to `now`: the
-  offline `SampleClient`'s synthetic venue never runs out of history, so
-  an unbounded demo backfill used to page forever.
-- **CLI:** `backfill` gains `--since`/`--until` (epoch ms, ISO date, or
-  `90d` style), `--max-requests`, `--dry-run`; text output shows
-  hardening stats (rate-limit stalls, retries, forming skipped) and a
-  "✓ idempotent re-run — zero rows added" line. New `python main.py
-  store` command (count, UTC span, year/month partitions; `--root`/
-  `--demo`/`--json`).
-- **Tests:** `tests/test_backfill.py` retains the first cut's 7 tests
-  and adds 14 (perp routing, XAU perp rejection, forming-candle drop +
-  top-up, 429 backoff + exhaustion, network-error retry, geo-block
-  abort, weight-header pacing, max-requests cap + resume, dry-run,
-  unbounded-backfill regression, ts parsing). `tests/test_store.py` +1
-  (closed-column), `tests/test_symbols.py` updated to the new seam.
-
-**Sandbox note:** this sandbox has **no network egress** (verified:
-example.com, Binance, KuCoin, OKX all fail). The real perp fetch runs on
-the operator's machine (Dhaka, BD — Binance spot mirror should work;
-fapi may geo-block; the client degrades honestly either way):
-`python main.py backfill --symbol BTCUSDT --market perp --tf 1m`.
-A live attempt here aborts cleanly: "transport failed after 4 attempts
-(last status None) — re-run resumes where it stopped."
-
-**Last successful test command:**
-`DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` → **383 passed / 1 skipped**.
-
-### Session 2026-08-13 (this branch, second half): P10.4 — derivatives as time series
-
-Same branch (`arena/019ff948-sky`, PR #12). 0 regressions.
-Tests **383 → 403 pass / 1 skip** (+20). Version **2.4.1 → 2.5.0**.
-
-**What landed (roadmap Layer 2 — store first, prove later):**
-- `data/derivatives.py` — `DerivativesStore` (partitioned Parquet under
-  `data/store/derivatives/**`, gitignored; normalised row shape
-  `(ts, exchange, market, symbol, metric, value, ingested_at)`; upsert PK
-  `(exchange, market, symbol, metric, ts)`), `derive_basis()`
-  (basis = mark − index on common timestamps; accepts raw or canonical
-  frames), `BinanceDerivativesTransport` (retry/backoff, geo-block
-  awareness), `FakeDerivativesTransport` (deterministic offline fake with
-  fault injection), `DerivativesCollector` (resumable per metric,
-  idempotent, pages with rate-limit courtesy, derives basis from stored
-  mark/index after each run).
-- `data/binance_client.py` — `funding_rate_history()`
-  (`/fapi/v1/fundingRate`), `open_interest_history()`
-  (`/futures/data/openInterestHist`), `mark_price_klines()` /
-  `index_price_klines()` (`/fapi/v1/markPriceKlines` +
-  `/fapi/v1/indexPriceKlines`), `premium_index()` snapshot; and the
-  P10.4 done-when: **`liquidations()` renamed honestly to
-  `liquidation_stats_proxy()`** — no misleading alias remains.
-- CLI — `python main.py derivatives collect` (`--since/--until/--metrics/
-  --dry-run/--json`) + `python main.py derivatives status`.
-- `SampleClient` — four demo history methods (deterministic synthetic
-  funding/OI/mark/index) so `DEMO_MODE=1` stays fully offline.
-- `tests/test_derivatives.py` — 20 offline tests (schema/store, upsert,
-  metric isolation, basis derivation + join semantics, fake transport,
-  collect-all, idempotent re-run, resume, metric selection, basis ⇒
-  mark+index, dry-run, XAU rejection, unknown metric, transient-fault
-  retry, honest-rename assertion).
-
-**Verified end-to-end offline:** a DEMO collect stored 3,006 funding +
-24,055 each of OI/OI-value/mark/index + 24,055 derived basis rows; a
-re-run added **zero** rows; `derivatives status` lists all six series.
-
-**Last successful test command:**
-`DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` → **403 passed / 1 skipped**.
-
-### Session 2026-08-12 (this branch): P10.2 + P10.3 — backfill + gaps/rollups
-
-Branched from `arena/019ff579-sky` @ `ee99486`. 0 regressions.
-Tests **355 → 368 pass / 1 skip** (+13). Version **2.3.0 → 2.4.0**.
-
-**What landed:**
-- `data/backfill.py` — `backfill()` / `iter_klines_pages()` / `BackfillResult`.
-- `data/gaps.py` — `detect_gaps` / `repair_gaps` / `aggregate_ohlcv` / `rollup`.
-- `python main.py backfill` with `--repair` / `--rollup`.
-- SampleClient pagination; 13 new tests.
-
-**Last successful test command:**
-`DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` → **368 passed / 1 skipped**.
-
-### Session 2026-08-12 (prior branch): P10.1 — schema + Parquet store
-
-Branched from `main` @ `d0ddb42` (PR #9). 0 regressions.
-Tests **342 → 355 pass / 1 skip** (+13). Version **2.2.1 → 2.3.0**.
-
-**What landed:**
-- `data/store.py` — `CandleStore`: normalised `Candle` schema (§4 of the
-  roadmap), partitioned Parquet store under `data/store/**` (gitignored),
-  upsert PK `(exchange, market, symbol, timeframe, ts)`, `normalise_klines()`
-  adapter boundary, `coerce_candle_frame()` / `empty_frame()`.
-- Unclosed-candle rule enforced in code: `closed=False` rows never persist.
-- `tests/test_store.py` — 13 offline deterministic tests (round-trip, dedup
-  last-write-wins, ordering, partition boundary, range filter, etc.).
-- Deps: `pyarrow>=15.0` added (`requirements.txt`, `pyproject.toml`).
-- Docs: `CHANGELOG.md` (v2.3.0), `docs/DATA_INFRASTRUCTURE_ROADMAP.md`
-  (P10.1 shipped), `TODO.md`, this file.
-
-**Files changed:** `data/store.py` (new), `tests/test_store.py` (new),
-`requirements.txt`, `pyproject.toml`, `config.py`, `CHANGELOG.md`,
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `TODO.md`, `SESSION_STATE.md`.
-
-**Last successful test command:**
-`DEMO_MODE=1 python -m pytest tests/ -q` → **355 passed / 1 skipped**.
-
-**Known open issues (unchanged):** P11 graduation gate honestly closed;
-TODO-7 (human pastes wheel-gate job into real `.github/workflows/ci.yml`);
-TODO-8 (human protects `main`).
-
----
-
-### Session 2026-08-12 (prior branch): TODO-1.bis readiness strip
-
-Branched from `main` @ `f0eff12`. 0 regressions.
-Tests **324 → 339 pass / 1 skip** (+15). Version **2.1.0 → 2.2.0**.
-
-One verdict answering "can I trust the desk right now?", rolled up
-**worst-first** across three pillars that already existed separately:
-
-| Pillar | Source of truth | Levels |
-|---|---|---|
-| `channels` | `brain.channels.probe_all()` | ok / degraded / down |
-| `immune` | `brain.immune.run_health_check()` | ok / degraded / down |
-| `risk_gate` | the gate inside `desk_status()` | ok / degraded / blocked |
-
-Ladder: `ok < degraded < blocked < down`; only `ok` sets `ready: true`.
-
-**Files changed:**
-- `brain/agent.py` — `readiness_strip()`, `format_readiness_strip()`,
-  `_channels_pillar()`, `_immune_pillar()`, `_gate_pillar()`,
-  `_worst()`, plus the `_READINESS_ORDER` / `_IMMUNE_TO_LEVEL` /
-  `_CHANNEL_TO_LEVEL` maps. Every pillar is exception-isolated.
-- `main.py` — `doctor --strip` flag; `cmd_doctor` leads with the strip
-  in text mode and adds a `readiness` key in `--json` mode.
-- `web/app.py` — `GET /api/readiness` (never 500s), `.strip` CSS,
-  the `#readiness` element above every tab, `loadReadiness()`, wired
-  into `render()`, the init IIFE, and the 5-minute diagnostic timer.
-- `mcp_server.py` — `readiness` tool; `SERVER_VERSION` 1.2.0 → 1.3.0.
-- `config.py` + `pyproject.toml` — version 2.2.0.
-- Tests: `test_agent.py` (+5), `test_web_api.py` (+2),
-  `test_dashboard_js.py` (+2, node-executed), `test_channels.py` (+3),
-  `test_mcp_stdio.py` (+1 and `ROOT_TOOLS` updated).
-- Docs: `SKILL.md`, `README.md`, `ARCHITECTURE.md` (new invariant #10),
-  `AI_ANATOMY_ROADMAP.md`, `CHANGELOG.md` (v2.2.0), `TODO.md`,
-  `docs/HUMAN_ACTIONS.md` (corrected the dead `wheel-gate-job.yml` link).
-
-**Also found and documented:** `main`'s last commit renamed the
-wheel-gate spec to `docs/.github/workflows/ci.yml`. That path is
-**inert** — nested under `docs/`, GitHub Actions never reads it. TODO-7
-is still open and `docs/HUMAN_ACTIONS.md` now says so explicitly.
-
-### Session 2026-08-12 (this branch): TODO-11 paper-book proof — first grind
-
-Branched from `main` @ `f0eff12`. 0 regressions.
-Tests **339 → 342 pass / 1 skip** (+3). Version **2.2.0 → 2.2.1**.
-
-**The one bug the graduation report revealed (this is why we grind):**
-`data/backtester.py::_evaluate()` graded a SELL win's realized R as
-`(tp - entry) / risk` — negative for a short, so every sell
-FULL_WIN/PARTIAL_WIN was stored as a negative-R trade. Sell-side
-expectancy, win-R and PF were systematically destroyed (first report:
-Sell Pullback −1.855R, Sweep Reversal Sell −1.596R). After the fix,
-the same data shows Sell Pullback **+0.540R**, Sweep Reversal Sell
-**−0.033R** (honestly breakeven), FVG Retest Sell **+0.636R**. The
-paper runner already used `abs()`; only the backtester was wrong.
-
-**Files changed:**
-- `data/backtester.py` — `realized_r()`: side-aware R for
-  FULL_WIN/PARTIAL_WIN (BUY `(exit-entry)/risk`, SELL
-  `(entry-exit)/risk`); LOSS stays −1.0.
-- `data/simulator.py` — `_persist_paper_samples()` journals every
-  closed paper sample (`followed_rules=1`, note "simulator paper
-  sample — mechanical rule-following execution"); `graduation_status()`
-  exposes `sample_gaps`.
-- `brain/agent.py` — `_sample_proof_word()` (precise `counts short` /
-  `expectancy short` / `counts+expectancy short` label) and PAPER_GRIND
-  advice that names the exact primary setup + missing item.
-- `tests/test_backtester.py` — `test_evaluate_sell_win_full` (+2.0R),
-  `test_evaluate_sell_win_partial` (+1.0R).
-- `tests/test_simulator.py` — `test_simulate_round_journals_closed_paper_samples`.
-- `config.py` + `pyproject.toml` — version 2.2.1.
-- Docs: `TODO.md`, `CHANGELOG.md` (v2.2.1), this file.
-
-**First grind numbers (sandbox offline sample/synthetic data):**
-all four primary setups ≥ 100 backtest / ≥ 20 paper unique samples —
-Buy Pullback 9936/367, Sell Pullback 4276/184, Sweep Reversal Buy
-18711/1600, Sweep Reversal Sell 3085/280; **38,439 decided**
-primary-family samples. Graduation gate: expectancy +0.263R,
-win rate 34.1%, PF 1.40, compliance 100% — honestly below the
-blueprint bar, so the gate stays closed. `learn` now calibrates
-every setup × regime (proven pullbacks ×1.12–1.19, Breakout Buy
-dampened ×0.83).
-
-### Prior sessions (already on `main`)
-
-- **v2.1.0 / PR #6** — `desk_status()` advisory, `next_scheduled_agent()`,
-  `python main.py desk`, MCP `desk_status`, `/api/desk`, wheel-gate
-  content (`ci/wheel_gate.py` + `pyproject.toml`), D1–D5 recorded.
-- **v2.0.x / PR #5** — P7 SKILL + doctor/skill CLI, P8 channels router
-  + dashboard panel, P9 MCP 11-tool surface, handoff memory files.
-
-See CHANGELOG v2.0.1–v2.2.0 for file-level detail.
-
----
-
-## Currently working on
-
-This session (`arena/019fffe5-sky`) **shipped P12.3**: `data/scorecard.py`
-is the boxed strategy scorecard, exposed identically on the CLI
-(`python main.py scorecard`), HTTP (`GET /api/scorecard` + the
-`STRATEGY SCORECARD` dashboard card) and MCP (`scorecard`). Holding time
-is now recorded at grading time and persisted with the backtest rows.
-The change is additive and report-only: no strategy, execution, risk,
-backtest grading, OOS seal, or graduation-bar behavior changed — the
-scorecard re-reads decided outcomes and never re-grades. Next *code*
-milestone is **P12.3.2 — real market data.** The ladder was reordered
-after the audit below; **P12.4 is deferred** because a robustness score
-over a gross, cost-free number measured on a random walk grades the wrong
-object. Do not start recursive analysis early. Do not open a second PR
-from this session.
-
-**The audit (`docs/PATH_TO_REAL_MONEY.md`) is the most important thing
-this session produced.** Read it before writing any P12 code. Its four
-findings are measured, not argued, and finding 1 recontextualises every
-performance number in this file: *SKY has never seen a real market.*
-
-The paper book's **counts** are done (100/20 for every primary setup,
-38,439 decided samples) and the **journal loop** is done (compliance
-100%). What is still open is the graduation gate itself: the primary
-family (+0.263R, 34.1% win, PF 1.40) is below the blueprint bar, and
-Sweep Reversal Sell (−0.033R) is the last sample-proof gap. That is
-the honest, intended state of the ladder — P11 continues alongside
-P12; never loosen the bar to make the gate pass.
-
-**P10 is complete:** P10.1–P10.12 are already in the base (PR #18).
-The P10 planning corrections remain documented in
-`docs/DATA_INFRASTRUCTURE_ROADMAP.md`; do not reopen a completed
-milestone while building P12.
+### Session 2026-08-15 (this branch `arena/01a003f9-sky`): P12.6 — fees-first `E_net` & conditioned expectancy
+
+Branched from `main` @ `58ed864` (PR #22 merged). 0 regressions.
+Tests **552 → 567 pass / 1 skip** (+15). Version **2.12.0 → 2.13.0**.
+MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
+
+**What shipped:**
+- `data/costs.py` (new module) — `CostModel` and `calculate_trade_cost()`,
+  `get_funding_rate_as_of_t()`. Models taker/maker/spot fees, spreads,
+  slippage, and direction-aware funding in R units scaled to stop distance.
+- `data/backtester.py` — `GradedPlan` and `_evaluate()` attach `rr_net`,
+  `fee_r`, `slip_r`, `funding_r`, `cost_r`. `_aggregate()` computes gross
+  and net metrics.
+- `data/database.py` — `_migrate()` adds `rr_net`, `fee_r`, `slip_r`,
+  `funding_r`, `cost_r` to `backtest_results` and `paper_trades`.
+  `save_backtest_rows()` persists all net metrics.
+- `data/scorecard.py` — `trade_stats()` and `build_scorecard()` calculate
+  gross and net performance (`expectancy_net`, `win_rate_net`, `pf_net`,
+  `total_r_net`, `max_drawdown_r_net`, `sharpe_net`, `sortino_net`,
+  `calmar_net`, `cost_r`, `fee_r`, `slip_r`, `funding_r`).
+  `conditioned_splits()` supports funding regime and CVD order-flow splits.
+  `print_scorecard()` prints the boxed gross-vs-net comparison and cost drag.
+- `data/validation.py` & `data/simulator.py` — `meets_bar()` and
+  `graduation_status()` evaluate against the restated **NET** bar.
+- `main.py` — `python main.py scorecard [--no-costs] [--maker] [--conditioned] [--json]`.
+- `web/app.py` & `mcp_server.py` — `/api/scorecard` and MCP `scorecard` tool
+  exposing net metrics, cost drag, and conditioned splits.
+
+**Measured cost impact on real BTCUSDT 15m data:**
+- Expectancy: **+0.001R gross → −0.369R net** (cost drag −0.370R: fee 0.262R, slip 0.105R, funding 0.004R).
+- `Sell Pullback` (+0.974R net, PF 3.99 net) and `FVG Retest Sell` (+1.161R net, PF 6.43 net) survive net.
+- `Breakout Buy` (−0.904R net, PF 0.225 net) confirmed as heavy drag.
 
 ---
 
 ## Remaining work (prioritised)
 
-1. **TODO-11 (P11) — continue, not start.** Counts (100/20), the
-   journal loop, and the sell-R bug fix are DONE. What remains:
-   grind more (ideally live) data and watch whether Sweep Reversal
-   Sell crosses above zero and the family expectancy climbs; decide
-   on the paper-sample collection strategy (FVG Retest types have
-   0 paper samples because the simulator takes one paper sample per
-   window — best plan only). Do **not** change the blueprint
-   graduation criteria.
-2. **TODO-13 / TODO-14 (P12)** — P12.1, P12.2, P12.3 and P12.3.1 are
-   shipped. Next: **P12.3.2 — real market data.** Point the existing P10
-   backfill at real BTCUSDT 1m (the machinery is built, tested and has
-   never been used against a real exchange), then re-run P11, P12.1 and
-   P12.3 and re-report. Expect every number to move, most likely down;
-   that is the correction, not a regression. Then **P12.6 pulled forward,
-   fees-first**, then **P12.3.3** effective sample size, then P12.4/P12.5.
-   The lookahead scanner is intentionally only the explicit
-   negative-shift guard; recursive-state analysis remains later. Spec:
-   [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended
-   by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.
-3. **TODO-7** — human pastes the wheel-gate job into the **real**
+1. **TODO-13 (P12.3.3) — Effective sample size in the scorecard.**
+   Walk-forward grading with multi-bar horizons causes overlapping trades (~30× overlap).
+   Divide trade counts by overlap factor to report honest independent sample count $N_{\text{eff}}$
+   and widen standard errors / confidence intervals honestly.
+2. **TODO-13 (P12.4 / P12.5) — Backtest Quality Score & Strategy Score on the calibrator.**
+   Score parameter plateaus and robustness over real, net-of-costs data.
+3. **TODO-13 (P12.7) — Monte Carlo ruin & risk-of-ruin table.**
+4. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
-4. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
-5. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
+5. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
+6. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
    the graduation bar remains closed and unchanged.
-6. **TODO-9 / TODO-10** — Dify then LibreChat. Parked behind both the
-   graduation gate and P10; do not start them.
-
-Full list and rationale: see [`TODO.md`](./TODO.md).
+7. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
 
 ---
 
 ## Known problems / caveats
 
 1. **D1–D5 are answered.** See `ROADMAP_AGENT_REACH_UPGRADE.md` §4.
-2. **Arena's GitHub integration: one PR per chat session.** The
-   session convention is: do the work, then open **one** PR as the
-   closing step.
+2. **Arena's GitHub integration: one PR per chat session.** Do the work,
+   then open **one** PR as the closing step.
 3. **`mcp>=1.0` is listed in `requirements.txt` but not required**
-   for the zero-dep `mcp_server.py`. It is only needed for the
-   SDK-based `python main.py mcp` server.
+   for the zero-dep `mcp_server.py`.
 4. **Immune system reports `CRITICAL` in `DEMO_MODE=1`** because the
-   committed sample data is stale by design. Expected, not a bug —
-   and it is why `doctor --strip` reports `down` offline. On live
-   data the same pillar goes green.
+   committed sample data is stale by design. Expected offline.
 5. **Arena cannot push under `.github/workflows/`.** The wheel-gate
-   job spec therefore lives at `docs/.github/workflows/ci.yml`, which
-   GitHub Actions does **not** execute. Source of truth for running
-   the gate is `ci/wheel_gate.py` locally (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.11.1.
-7. **⚠ NO REAL MARKET DATA HAS EVER ENTERED THIS PROJECT.** 0 `.parquet`
-   files under `data/store/`, 0 rows in `paper_trades`. Every number the
-   repo has ever reported — P11's +0.263R, P12.3's +0.341R, every
-   per-regime and per-setup split — is measured on `make_ohlcv()`, a
-   seeded Gaussian random walk with no autocorrelation, no fat tails, no
-   regime persistence and no stop-hunt structure. Those are the only
-   things a technical edge can feed on. **Treat every performance figure
-   in this file as a grader-geometry measurement, not an edge.**
-   Corroboration: expectancy swings **+0.387R … +0.730R** across 5 seeds,
-   straddling the graduation bar in both directions. Fixing this is
-   P12.3.2 and it is the next build. See `docs/PATH_TO_REAL_MONEY.md` §1.
-8. **Costs are not in any reported number.** `EXECUTION_MODEL` defaults
-   to `"none"` (`config.py:130`). Measured median stop distance is
-   **0.823% of entry**, so a taker round trip costs **0.121R**: +0.341R
-   gross ≈ **+0.22R net**. The graduation bar is therefore a *gross*
-   threshold, ~40% easier than intended. At the measured 1.8h median
-   hold, **fees ≈ 40× funding** — P12.6 must lead with fees/spread, not
-   funding-as-of-T. See `docs/PATH_TO_REAL_MONEY.md` §2.
-9. **Reported sample counts are inflated ~30×.** `step=3` against a
-   96-bar horizon overlaps ~32 neighbours, so "384 decided" ≈ 12
-   independent observations and "38,439" ≈ ~1,200. This is the same
-   overlap that made annualised Sharpe dishonest; it also silently
-   narrows every confidence interval and inflates `min_decided` /
-   `CALIBRATE_MIN_N`. Nothing divides by it yet — that is P12.3.3.
-10. **Sweep-reversal setups are breakeven on synthetic data.** The
-   sandbox's deterministic series are smooth random walks with drift —
-   they have no real stop-hunt structure, so sweep plans land near
-   zero expectancy (Sweep Reversal Buy +0.028R, Sell −0.033R) while
-   pullbacks carry the edge (+0.54…+0.70R). Data character, not a bug;
-   the sweep detector was audited and is symmetric/correct.
-11. **FVG Retest types have 0 paper samples.** `_persist_paper_samples`
-   takes one paper sample per window (the highest-confidence plan), so
-   setups that rarely win the confidence contest never earn paper
-   proof (FVG Retest Buy 7,480 bt / 0 pp). Outside the primary family
-   today; noted for a future collection-strategy decision.
-12. **The dashboard readiness strip lives outside `#app`.** `render()`
-   replaces `#app.innerHTML` wholesale, so anything inside it would be
-   destroyed on every scan. Keep the strip where it is.
-13. **Live scans are still amnesiac.** The Parquet store + backfill and
-    store-backed backtester exist (P10.1–P10.12), but the live scanner
-    still fetches ~500 candles; P10.11's store path is the research path.
-14. **This sandbox has no network egress.** The real Binance backfill
-    cannot run here (verified live: clean abort with a resumable message).
-    Run it on the operator's machine. All P10.2 behaviour is proven
-    offline via `FakePagedTransport` / `SampleClient`.
-15. **`BinanceClient.liquidations()` was not liquidation data** — a
-    24h-ticker proxy. Renamed honestly in P10.4 to
-    `liquidation_stats_proxy()`. Real forced-order data only comes from
-    the `!forceOrder@arr` WebSocket stream and **cannot be backfilled** —
-    it accumulates from the day collection starts (P10.10).
-16. **Parallel sessions race on `main`.** PR #11/#12 merged while PR #13
-    was being built on an older base. Lesson recorded here: **before
-    finishing any session, `git fetch` + compare with `origin/main`**;
-    if newer P10 work landed, merge and reconcile instead of shipping a
-    duplicate. PR #13 was that reconciliation (merged).
-17. **Cross-exchange probe is one function.**
-    `data/cross_exchange.snapshot_prices()` (KuCoin + OKX + Bybit);
-    `brain/agent.py:_cross_exchange_probe` is a thin wrapper. Do not
-    write a second probe. Stored series live under `data/store/cross/`.
-18. **Freqtrade was reviewed and rejected (F1–F8).** Do not reopen
-    that as a “quick win.” The keep/cut is
-    `docs/FREQTRADE_REVIEW.md`. Contract-tested in
-    `tests/test_handoff_memory.py`.
-19. **Backtrader was reviewed and rejected (BT1–BT8).** Same rule: no
-    dependency, dev tool, vendored engine, adapter, or second grader.
-    The keep/cut is `docs/BACKTRADER_REVIEW.md`, contract-tested in
-    `tests/test_handoff_memory.py`. P12's definitions were extended by
-    it (scorecard, plateau test, net-of-costs, risk-of-ruin table).
+   job spec lives at `docs/.github/workflows/ci.yml` (TODO-7).
+6. **`CHANGELOG.md` is current** through v2.13.0.
+7. **Real market data is imported offline**: Binance spot BTCUSDT 1m
+   (696,960 bars, sha256-pinned `c4ad6029…b934b7`). The store is
+   gitignored; re-import with `backfill --from-csv` if starting in a clean sandbox.
+8. **Costs are now integrated via P12.6**: `E_net = E_gross − fees − slip − funding`.
+   The graduation bar is enforced NET of costs.
+9. **Reported sample counts are still inflated ~30×** by overlapping
+   walk-forward windows. That is P12.3.3 (next milestone).
+10. **Freqtrade was reviewed and rejected (F1–F8)** (`docs/FREQTRADE_REVIEW.md`).
+11. **Backtrader was reviewed and rejected (BT1–BT8)** (`docs/BACKTRADER_REVIEW.md`).
 
 ---
 
 ## Next recommended action
 
-1. Next *code* session: **P12.6 — costs, fees first.** Real-data
-   `E_gross` now exists (this session). Add `E_net = E_gross − fees −
-   slip − funding` to the grader's report and make `E_net` the number
-   the gate reads; the bar is already restated as **+0.50R net** in
-   `docs/PATH_TO_REAL_MONEY.md`. Fees (≈ −0.121R/round trip at measured
-   stop distances) are ~40× funding at the observed hold times. Then
-   **P12.3.3** (effective sample size — real counts are still
-   overlap-inflated ~30×). Optionally give the **24h horizon** one
-   honest look (`docs/REAL_DATA_RUN_2026-08-14.md` §4: the only
-   gross-positive cell, ≈ +0.28R net) — without touching the locked
-   primary or the seal.
-   **First step of every future session:** `git fetch` and diff
-   against `origin/main` — parallel sessions merge while you work (see
-   known problem 16); reconcile before building.
-2. A human does TODO-7 + TODO-8 from
-   [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-3. Do **not** start recursive analysis before its defined milestone.
-   Do not install Freqtrade or Backtrader. Do not loosen the graduation
-   bar. Do not add strategy modules or a second grader.
+1. Next *code* session: **P12.3.3 — effective sample size in the scorecard.**
+   Divide walk-forward sample counts by the window overlap factor (~30× on 15m/24h or ~5.3× on 15m/4h)
+   to report honest independent sample size ($N_{\text{eff}}$) alongside raw count $N$,
+   and widen standard errors honestly in the scorecard.
+2. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
+3. Do **not** install Freqtrade or Backtrader. Do not loosen the graduation bar.
 
-A narrative handover for this session (what shipped, what the human
-must do, the next-session order, sandbox notes) is at
-[`docs/HANDOVER_2026-08-14_P12_3_2.md`](docs/HANDOVER_2026-08-14_P12_3_2.md);
-the full run record with every number and repro command is
-[`docs/REAL_DATA_RUN_2026-08-14.md`](docs/REAL_DATA_RUN_2026-08-14.md).
-The previous session's handover (PR #21) is
-[`docs/HANDOVER_2026-08-14.md`](docs/HANDOVER_2026-08-14.md).
+Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_6.md`](docs/HANDOVER_2026-08-15_P12_6.md).
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm the P12.3.2 PR merged. P12.1, P12.2, P12.3, P12.3.1 and
-> P12.3.2 are shipped: do not redo the locked protocol, the
-> negative-shift guard, the boxed scorecard, the tie-break, or the real
-> data import. **P12.4/P12.5 are deferred.** Implement **P12.6 —
-> fees-first**: `E_net = E_gross − fees − slip − funding` becomes the
-> number the gate reads (bar already restated +0.50R net). The real
-> BTCUSDT series is already in the store (`binance/spot/BTCUSDT/1m`,
-> sha256-pinned) — use `--source store` everywhere; if the sandbox lacks
-> the store, re-import with the pinned `backfill --from-csv` command in
-> docs/REAL_DATA_RUN_2026-08-14.md §7. Keep the existing grader/store,
-> do not adopt Freqtrade / Hyperopt / FreqAI / Backtrader, do not add
-> strategy modules or a second grader, and do not loosen the graduation
-> bar.
+> and confirm the P12.6 PR merged. P12.1, P12.2, P12.3, P12.3.1, P12.3.2,
+> and P12.6 are shipped: do not redo the locked protocol, the
+> negative-shift guard, the boxed scorecard, the tie-break, the real data
+> import, or trade cost modeling. Implement **P12.3.3 — effective sample size
+> in the scorecard**: divide walk-forward trade counts by the window overlap
+> factor so the scorecard reports honest independent sample sizes ($N_{\text{eff}}$)
+> alongside raw trade counts and widens confidence intervals honestly. Keep
+> the existing grader/store, do not adopt Freqtrade or Backtrader, and do not
+> loosen the graduation bar.
 
 ---
 
@@ -975,87 +242,39 @@ The previous session's handover (PR #21) is
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 552 passed, 1 skipped
+# 567 passed, 1 skipped
 ```
 
-Readiness strip (four pillars since P10.5):
+Wheel gate:
 ```bash
-DEMO_MODE=1 python main.py doctor --strip          # CLI text — channels/immune/risk_gate/data
+DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
+# builds cryptobrain-2.13.0-py3-none-any.whl ; no duplicate entries
+```
+
+Readiness strip:
+```bash
+DEMO_MODE=1 python main.py doctor --strip          # CLI text
 DEMO_MODE=1 python main.py doctor --strip --json   # CLI JSON
 curl -s localhost:8080/api/readiness               # HTTP
 # MCP: tools/call {"name": "readiness", "arguments": {}}
 ```
 
-P10 backfill + store (DEMO_MODE is fully offline):
-
+Scorecard with costs (P12.6):
 ```bash
-DEMO_MODE=1 .venv/bin/python main.py backfill --symbol BTCUSDT --market perp \
-    --tf 1m --start-ts 1785960000000 --end-ts 1786017600000 --repair --rollup
-DEMO_MODE=1 .venv/bin/python main.py store --market perp --tf 1m
-DEMO_MODE=1 .venv/bin/python main.py derivatives collect --symbol BTCUSDT
-DEMO_MODE=1 .venv/bin/python main.py derivatives status --symbol BTCUSDT
-DEMO_MODE=1 .venv/bin/python main.py cross collect --symbol BTCUSDT
-DEMO_MODE=1 .venv/bin/python main.py cross status --symbol BTCUSDT
-# real data (operator's machine, Binance-reachable):
-python main.py backfill --symbol BTCUSDT --market perp --tf 1m --since 2019-09-08
-python main.py backfill --exchange bybit --symbol BTCUSDT --market perp --tf 1m
-python main.py derivatives collect --symbol BTCUSDT
+python main.py scorecard --source store --market spot --symbol BTCUSDT --tf 15m --bars 1000
+python main.py scorecard --source store --market spot --symbol BTCUSDT --tf 15m --bars 500 --conditioned
 ```
-
-P12.3.2 — real BTCUSDT 1m, offline (sandbox has no exchange egress; the
-store is gitignored, re-import if absent):
-
-```bash
-git clone https://github.com/j-greig/insomnia-hype-data /tmp/insomnia-hype-data
-python main.py backfill --from-csv \
-    /tmp/insomnia-hype-data/data/market/btc_1m_binance_spot_bulk_2025-01-01_2026-04-30.csv.gz \
-    --symbol BTCUSDT --tf 1m --market spot \
-    --csv-sha256 c4ad60296d9c13b77886fd916795ff38e7f605b387c64c82bcda9f0464b934b7 \
-    --rollup
-python main.py store --market spot --symbol BTCUSDT --tf 15m
-python main.py validate --exchange binance --market spot --symbol BTCUSDT --tf 15m --bars 12000
-python main.py backtest --source store --market spot --symbol BTCUSDT --tf 15m --bars 12000 --step 3 --save
-python main.py simulator --source store --market spot --symbols BTCUSDT --tf 15m --bars 6000 --step 3
-python main.py scorecard --source db --symbol BTCUSDT --since 2025-01-01 --until 2026-04-30
-```
-
-Paper-book grind + graduation (offline sample/synthetic data):
-
-```bash
-DEMO_MODE=1 .venv/bin/python main.py simulator --bars 3000 --step 1   # grind
-DEMO_MODE=1 .venv/bin/python main.py desk                             # watch the line
-DEMO_MODE=1 .venv/bin/python main.py learn                            # calibrate from the store
-```
-
-Local wheel-gate (build + dup-check, no install):
-
-```bash
-DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.12.0-py3-none-any.whl ; no duplicate entries
-```
-
-Readiness strip, all four surfaces:
-
-```bash
-DEMO_MODE=1 python main.py doctor --strip          # CLI text
-DEMO_MODE=1 python main.py doctor --strip --json   # CLI JSON
-curl -s localhost:8080/api/readiness                # HTTP
-# MCP: tools/call {"name": "readiness", "arguments": {}}
-```
-
-(The 1 skipped test is the SDK-already-installed fallback, present
-since the consolidated build per `MERGE_NOTES.md`.)
 
 ## Last commit
 
 ```
-2b25720 feat(P12.3.2): real market data — first real BTCUSDT 1m, P11/P12.1/P12.3 re-run
+c91ac9e feat(P12.6): fees-first E_net, trade costs engine & conditioned expectancy
+58ed864 feat(P12.3.2): real market data — first real BTCUSDT 1m, P11/P12.1/P12.3 re-run (#22)
 f403ed4 feat(P12.3): boxed strategy scorecard on CLI, dashboard and MCP (#21)
-7154825 feat(P12.2): add lookahead validation guard (#20)
 ```
 
-P12.3.2 is committed on `arena/01a00034-sky`, pushed to origin, and the
-session PR **#22** is open against `main` — the human merges it. See
+P12.6 is committed on `arena/01a003f9-sky`, pushed to origin, and the
+session PR **#23** is open against `main` — the human merges it. See
 `git log --oneline -3`.
 
 ---
@@ -1095,7 +314,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 539 pass / 1 skip.
+- Maintain test count at ≥ 567 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -1111,29 +330,18 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.3.2 shipped**
-   (real market data; P11 / P12.1 / P12.3 re-run and re-reported).
-2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` — **552 pass /
-   1 skip** (+13: 11 `test_backfill_csv`, 2 scorecard era filters).
-3. [x] Fix any obvious failures. — none left open; test-expectation
-   fixes only (era-cutoff arithmetic, store-upsert semantics in the
-   gap test).
+1. [x] Finish or safely stop the current task. — **P12.6 shipped**
+   (fees-first `E_net`, trade costs engine, net graduation bar, conditioned splits).
+2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` — **567 pass /
+   1 skip** (+15: 12 `test_costs.py`, 3 scorecard net & conditioned tests).
+3. [x] Fix any obvious failures. — none left open.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.3.2 marked shipped; P12.6 (fees-first)
-   is next; the graduation bar remains unchanged (restated net).
-6. [x] Update `CHANGELOG.md` — 2.12.0 P12.3.2 entry; prior entries retained.
+5. [x] Update `TODO.md` — P12.6 marked shipped; P12.3.3 is next.
+6. [x] Update `CHANGELOG.md` — 2.13.0 P12.6 entry.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
-10. [x] Record any known bugs or unresolved issues. — walk-forward is
-    O(n²) in slice recomputation: full-series (46k bar) protocol runs
-    take ~hours; the sealed run used the 12,000-bar tail (documented).
-    The P10.5 pillar calls the frozen archive "stale" — correct by
-    design, documented in `docs/REAL_DATA_RUN_2026-08-14.md` §2.
-11. [x] `git add` / `git commit` — committed as `2b25720` and
-    **pushed** to `origin/arena/01a00034-sky` (with the operator's PAT;
-    not stored in any repo file or credential helper).
-12. [x] Open the session PR as the closing step — **PR #22** from
-    `arena/01a00034-sky` → `main` (P12.3.2), body in
-    `docs/PR_BODY_P12_3_2.md`. Open, `MERGEABLE`; CI jobs
-    (offline test suite + wheel gate) run on the active workflow.
+10. [x] Record any known bugs or unresolved issues.
+11. [x] `git add` / `git commit` — commit and push to `origin/arena/01a003f9-sky`.
+12. [x] Open the session PR as the closing step — PR from
+    `arena/01a003f9-sky` → `main` (P12.6).

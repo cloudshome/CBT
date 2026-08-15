@@ -363,13 +363,21 @@ def window_stats(plans: list) -> dict:
     loss_r = abs(sum(g.rr_achieved for g in decided if g.rr_achieved < 0))
     pf = round(wins_r / loss_r, 3) if loss_r > 0 else (99.0 if wins_r > 0
                                                        else None)
-    return {**agg, "decided": len(decided), "pf": pf}
+    # Net profit factor (P12.6)
+    wins_net_r = sum(getattr(g, "rr_net", g.rr_achieved) for g in decided
+                     if getattr(g, "rr_net", g.rr_achieved) > 0)
+    loss_net_r = abs(sum(getattr(g, "rr_net", g.rr_achieved) for g in decided
+                         if getattr(g, "rr_net", g.rr_achieved) <= 0))
+    pf_net = round(wins_net_r / loss_net_r, 3) if loss_net_r > 0 else (99.0 if wins_net_r > 0
+                                                                       else None)
+    return {**agg, "decided": len(decided), "pf": pf, "pf_net": pf_net}
 
 
 def meets_bar(stats: dict, min_decided: int = DEFAULT_MIN_DECIDED,
               criteria: Optional[dict[str, float]] = None) -> tuple[bool, list[str]]:
     """Apply the graduation bar to one window's statistics.
 
+    Evaluates NET of costs (P12.6): E_net >= +0.50R, WR_net > 55%, PF_net >= 1.5.
     Returns ``(met, unmet_reasons)``. A window with fewer decided trades
     than ``min_decided`` can never pass — silence is not an edge.
     """
@@ -379,16 +387,20 @@ def meets_bar(stats: dict, min_decided: int = DEFAULT_MIN_DECIDED,
     if n < min_decided:
         unmet.append(f"decided {n} < min {min_decided}")
         return False, unmet
-    e = stats.get("expectancy", 0.0)
-    wr = stats.get("win_rate")
-    pf = stats.get("pf")
+
+    use_net = "expectancy_net" in stats or "win_rate_net" in stats
+    e = stats.get("expectancy_net", stats.get("expectancy", 0.0)) if use_net else stats.get("expectancy", 0.0)
+    wr = stats.get("win_rate_net", stats.get("win_rate")) if use_net else stats.get("win_rate")
+    pf = stats.get("pf_net", stats.get("pf")) if use_net else stats.get("pf")
+
+    label_prefix = "net " if use_net else ""
     if e < criteria["expectancy"]:
-        unmet.append(f"expectancy {e:+.3f}R < {criteria['expectancy']:+.2f}R")
+        unmet.append(f"expectancy {label_prefix}{e:+.3f}R < {criteria['expectancy']:+.2f}R")
     if wr is None or wr <= criteria["win_rate"]:
-        unmet.append(f"win_rate {wr if wr is not None else 'n/a'} "
-                     f"<= {criteria['win_rate']}")
+        unmet.append(f"win_rate {label_prefix}{f'{wr*100:.1f}%' if wr is not None else 'n/a'} "
+                     f"<= {criteria['win_rate']:.0%}")
     if pf is None or pf < criteria["pf"]:
-        unmet.append(f"pf {pf if pf is not None else 'n/a'} "
+        unmet.append(f"pf {label_prefix}{pf if pf is not None else 'n/a'} "
                      f"< {criteria['pf']}")
     return (not unmet), unmet
 
@@ -694,18 +706,20 @@ def print_verdict(report: dict) -> None:
           f"bars={meta['bars_total']} plans={meta['plans_generated']} "
           f"({meta['runtime_seconds']}s)")
     print("-" * 74)
-    print(f"{'window':<8} {'bars':<22} {'sig':>5} {'dec':>5} {'WR':>6} "
-          f"{'E':>7} {'PF':>6}  bar")
+    print(f"{'window':<8} {'bars':<22} {'sig':>5} {'dec':>5} {'WR_net':>7} "
+          f"{'E_net':>7} {'PF_net':>7}  bar")
     for name in WINDOW_NAMES:
         w = report["windows"][name]
         s = w["stats"]
-        wr = s["win_rate"]
+        wr = s.get("win_rate_net", s.get("win_rate"))
         wr_s = f"{wr*100:.0f}%" if wr is not None else "n/a"
-        pf_s = f"{s['pf']}" if s["pf"] is not None else "n/a"
+        pf = s.get("pf_net", s.get("pf"))
+        pf_s = f"{pf}" if pf is not None else "n/a"
+        exp_net = s.get("expectancy_net", s.get("expectancy", 0.0))
         mark = "met ✅" if w["bar_met"] else "missed ❌"
         print(f"{name:<8} [{w['bars'][0]:>6},{w['bars'][1]:>6})  "
-              f"{w['signals']:>5} {s['decided']:>5} {wr_s:>6} "
-              f"{s['expectancy']:>+7.2f} {pf_s:>6}  {mark}")
+              f"{w['signals']:>5} {s['decided']:>5} {wr_s:>7} "
+              f"{exp_net:>+7.2f} {pf_s:>7}  {mark}")
     print("-" * 74)
     verdict = report["verdicts"].get("ALL", {})
     icon = {"PASS": "🟢", "PASS_WITH_WARNINGS": "🟡",

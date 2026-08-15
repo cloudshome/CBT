@@ -32,6 +32,7 @@ from config import (BACKTEST_HORIZONS, BACKTEST_MIN_BARS, BACKTEST_STEP,
                     EXECUTION_MODEL)
 from data.symbols import normalize_symbol
 from data.binance_client import TIMEFRAME_TO_MS
+from data.costs import calculate_trade_cost, CostModel
 from engine.signal_engine import analyze_frame
 from engine.execution import adjust_for_slip
 
@@ -50,6 +51,12 @@ class GradedPlan:
     horizon_hours: float
     outcome: str = "OPEN"
     rr_achieved: float = 0.0
+    # Net R and cost breakdown (P12.6): E_net = E_gross − fees − slip − funding
+    rr_net: Optional[float] = None
+    fee_r: float = 0.0
+    slip_r: float = 0.0
+    funding_r: float = 0.0
+    cost_r: float = 0.0
     max_favorable: float = 0.0
     max_adverse: float = 0.0
     regime: str = ""   # market regime at signal time (decision B3)
@@ -65,12 +72,22 @@ class GradedPlan:
     #: Near-zero on synthetic series; expected to be non-trivial on real wicks.
     ambiguous_bar: bool = False
 
+    def __post_init__(self):
+        if self.rr_net is None:
+            if self.rr_achieved is not None:
+                self.rr_net = round(float(self.rr_achieved) - float(self.cost_r or 0.0), 3)
+            else:
+                self.rr_net = None
+
     def as_row(self) -> dict:
         return {
             "ts": self.ts, "plan_type": self.plan_type, "action": self.action,
             "confidence_pct": self.confidence_pct, "entry": self.entry,
             "trigger_level": self.trigger_level, "horizon_hours": self.horizon_hours,
             "outcome": self.outcome, "rr_achieved": self.rr_achieved,
+            "rr_net": self.rr_net if self.rr_net is not None else (self.rr_achieved if self.rr_achieved is not None else 0.0),
+            "fee_r": self.fee_r, "slip_r": self.slip_r,
+            "funding_r": self.funding_r, "cost_r": self.cost_r,
             "max_favorable": self.max_favorable, "max_adverse": self.max_adverse,
             "regime": self.regime, "holding_bars": self.holding_bars,
             "holding_hours": self.holding_hours,
@@ -208,9 +225,29 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
         try:
             row = df.iloc[i]
             adjust_for_slip(gp, plan, row, window,
-                            df.attrs.get("symbol", symbol), EXECUTION_MODEL)
+                            df.attrs.get("symbol", "BTCUSDT"), EXECUTION_MODEL)
         except Exception:
             pass  # execution model failure must not break the backtest
+
+    # ── P12.6 trade costs & net R (E_net = E_gross − fees − slip − funding) ─
+    if gp.outcome in ("LOSS", "FULL_WIN", "PARTIAL_WIN"):
+        try:
+            cost = calculate_trade_cost(
+                entry=entry,
+                stop_loss=sl,
+                action=side or "BUY",
+                gross_r=gp.rr_achieved,
+                holding_hours=gp.holding_hours,
+                symbol=df.attrs.get("symbol", "BTCUSDT"),
+                ts=gp.ts,
+            )
+            gp.fee_r = cost.fee_r
+            gp.slip_r = cost.slip_r
+            gp.funding_r = cost.funding_r
+            gp.cost_r = cost.total_cost_r
+            gp.rr_net = cost.net_r
+        except Exception:
+            gp.rr_net = gp.rr_achieved
 
     return gp
 
@@ -219,7 +256,9 @@ def _aggregate(graded: list[GradedPlan]) -> dict:
     if not graded:
         return {"executed": 0, "wins": 0, "losses": 0, "opens": 0,
                 "not_triggered": 0, "win_rate": None, "avg_rr": 0.0,
-                "expectancy": 0.0}
+                "expectancy": 0.0, "expectancy_net": 0.0,
+                "win_rate_net": None, "avg_rr_net": 0.0,
+                "cost_r": 0.0, "fee_r": 0.0, "slip_r": 0.0, "funding_r": 0.0}
     executed = [g for g in graded if g.outcome != "NOT_TRIGGERED"]
     wins = [g for g in executed if g.outcome in WIN_SET]
     losses = [g for g in executed if g.outcome == "LOSS"]
@@ -230,10 +269,29 @@ def _aggregate(graded: list[GradedPlan]) -> dict:
     avg_rr = round(sum(rr_vals) / len(rr_vals), 3) if rr_vals else 0.0
     # expectancy: average R per decided trade (wins positive, losses -1R)
     exp = round(sum(g.rr_achieved for g in decided) / len(decided), 3) if decided else 0.0
+
+    # Net metrics (P12.6)
+    rr_net_vals = [getattr(g, "rr_net", g.rr_achieved) for g in decided]
+    cost_vals = [getattr(g, "cost_r", 0.0) for g in decided]
+    fee_vals = [getattr(g, "fee_r", 0.0) for g in decided]
+    slip_vals = [getattr(g, "slip_r", 0.0) for g in decided]
+    fund_vals = [getattr(g, "funding_r", 0.0) for g in decided]
+    net_wins = [r for r in rr_net_vals if r > 0]
+    win_rate_net = round(len(net_wins) / len(decided), 3) if decided else None
+    avg_rr_net = round(sum(rr_net_vals) / len(rr_net_vals), 3) if rr_net_vals else 0.0
+    exp_net = round(sum(rr_net_vals) / len(decided), 3) if decided else 0.0
+    avg_cost = round(sum(cost_vals) / len(cost_vals), 4) if cost_vals else 0.0
+    avg_fee = round(sum(fee_vals) / len(fee_vals), 4) if fee_vals else 0.0
+    avg_slip = round(sum(slip_vals) / len(slip_vals), 4) if slip_vals else 0.0
+    avg_funding = round(sum(fund_vals) / len(fund_vals), 4) if fund_vals else 0.0
+
     return {
         "executed": len(executed), "wins": len(wins), "losses": len(losses),
         "opens": len(opens), "not_triggered": len(graded) - len(executed),
         "win_rate": win_rate, "avg_rr": avg_rr, "expectancy": exp,
+        "expectancy_net": exp_net, "win_rate_net": win_rate_net,
+        "avg_rr_net": avg_rr_net, "cost_r": avg_cost, "fee_r": avg_fee,
+        "slip_r": avg_slip, "funding_r": avg_funding,
     }
 
 

@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS backtest_results(
   horizon_hours REAL, outcome TEXT,
   rr_achieved REAL, max_favorable REAL, max_adverse REAL,
   entry REAL, trigger_level REAL, regime TEXT,
-  holding_bars INTEGER, holding_hours REAL
+  sim_key TEXT, holding_bars INTEGER, holding_hours REAL,
+  rr_net REAL, fee_r REAL, slip_r REAL, funding_r REAL, cost_r REAL
 );
 CREATE TABLE IF NOT EXISTS decisions(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +87,7 @@ CREATE TABLE IF NOT EXISTS paper_trades(
   outcome TEXT, rr_achieved REAL, close_reason TEXT,
   last_candle_ts INTEGER, last_price REAL, checks INTEGER DEFAULT 0,
   error TEXT, regime TEXT, mae REAL, mfe REAL,
+  sim_key TEXT, rr_net REAL, fee_r REAL, slip_r REAL, funding_r REAL, cost_r REAL,
   FOREIGN KEY(scan_id) REFERENCES scans(id)
 );
 CREATE TABLE IF NOT EXISTS journal_entries(
@@ -203,10 +205,21 @@ class SignalDB:
         # entry to the deciding touch. NULL on rows graded before P12.3.
         _add("backtest_results", "holding_bars", "INTEGER")
         _add("backtest_results", "holding_hours", "REAL")
+        # P12.6 costs and net R (E_net = E_gross − fees − slip − funding)
+        _add("backtest_results", "rr_net", "REAL")
+        _add("backtest_results", "fee_r", "REAL")
+        _add("backtest_results", "slip_r", "REAL")
+        _add("backtest_results", "funding_r", "REAL")
+        _add("backtest_results", "cost_r", "REAL")
         _add("paper_trades", "sim_key", "TEXT")
         _add("paper_trades", "regime", "TEXT")
         _add("paper_trades", "mae", "REAL")
         _add("paper_trades", "mfe", "REAL")
+        _add("paper_trades", "rr_net", "REAL")
+        _add("paper_trades", "fee_r", "REAL")
+        _add("paper_trades", "slip_r", "REAL")
+        _add("paper_trades", "funding_r", "REAL")
+        _add("paper_trades", "cost_r", "REAL")
         _add("calibration", "regime", "TEXT DEFAULT ''")
         _add("calibration", "proven", "INTEGER DEFAULT 0")
         _add("calibration", "tp_rr", "REAL")
@@ -727,14 +740,17 @@ class SignalDB:
                        (run_id, ts, symbol, timeframe, plan_type, action,
                         confidence_pct, horizon_hours, outcome, rr_achieved,
                         max_favorable, max_adverse, entry, trigger_level, regime,
-                        sim_key, holding_bars, holding_hours)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        sim_key, holding_bars, holding_hours,
+                        rr_net, fee_r, slip_r, funding_r, cost_r)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (run_id, r.get("ts"), r.get("symbol"), r.get("timeframe"),
                      r.get("plan_type"), r.get("action"), r.get("confidence_pct"),
                      r.get("horizon_hours"), r.get("outcome"), r.get("rr_achieved"),
                      r.get("max_favorable"), r.get("max_adverse"), r.get("entry"),
                      r.get("trigger_level"), r.get("regime"), r.get("sim_key"),
-                     r.get("holding_bars"), r.get("holding_hours")),
+                     r.get("holding_bars"), r.get("holding_hours"),
+                     r.get("rr_net"), r.get("fee_r"), r.get("slip_r"),
+                     r.get("funding_r"), r.get("cost_r")),
                 )
                 n += 1
             self.conn.commit()
