@@ -58,6 +58,9 @@ from typing import Iterable, Optional
 
 from config import BACKTEST_STEP, GOLD_LONDON_WINDOW, GOLD_NY_WINDOW
 from data.backtester import WIN_SET
+from data.provenance import normalize as _provenance_normalize
+from data.provenance import parse_source_key as _provenance_parse
+from data.provenance import source_key as _provenance_key
 from data.binance_client import TIMEFRAME_TO_MS
 from data.costs import (
     CostModel, TradeCost, calculate_trade_cost, DEFAULT_STOP_DISTANCE_PCT,
@@ -122,7 +125,8 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
          r_net=None, fee_r=None, slip_r=None, funding_r=None, cost_r=None,
          funding_rate=None, cvd_z=None, oi_trend=None,
          horizon_hours: Optional[float] = None, step: Optional[int] = None,
-         cost_model: Optional[CostModel] = None) -> dict:
+         cost_model: Optional[CostModel] = None,
+         exchange=None, market=None, price_type=None) -> dict:
     gross_r = float(r) if r is not None else 0.0
     hold = (round(float(holding_hours), 3)
             if holding_hours is not None else None)
@@ -147,6 +151,13 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
         if funding_rate is None:
             funding_rate = cost.funding_rate_8h
 
+    # P12.11 — provenance travels with the row so every downstream reader
+    # (scorecard splits, calibrator keys, quality score) can tell which price
+    # series produced it. Missing fields normalise to the canonical live
+    # series, which is what all pre-provenance history actually is.
+    prov_exchange, prov_market, prov_price_type = _provenance_normalize(
+        exchange, market, price_type)
+
     return {
         "ts": int(ts) if ts is not None else None,
         "side": (side or "?").upper(),
@@ -169,12 +180,19 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
         "funding_rate": funding_rate,
         "cvd_z": cvd_z,
         "oi_trend": oi_trend,
+        "exchange": prov_exchange,
+        "market": prov_market,
+        "price_type": prov_price_type,
+        "source_key": _provenance_key(prov_exchange, prov_market, prov_price_type),
     }
 
 
 def rows_from_graded(graded: Iterable, symbol: str = "", timeframe: str = "",
                      horizon_hours: Optional[float] = None,
-                     cost_model: Optional[CostModel] = None) -> list[dict]:
+                     cost_model: Optional[CostModel] = None,
+                     exchange: Optional[str] = None,
+                     market: Optional[str] = None,
+                     price_type: Optional[str] = None) -> list[dict]:
     """Decided rows from in-memory `GradedPlan` objects (the grader's output).
 
     ``horizon_hours`` filters to one horizon so a multi-horizon backtest is
@@ -203,16 +221,34 @@ def rows_from_graded(graded: Iterable, symbol: str = "", timeframe: str = "",
             cost_r=getattr(g, "cost_r", None),
             horizon_hours=getattr(g, "horizon_hours", None),
             cost_model=cost_model,
+            exchange=exchange, market=market, price_type=price_type,
         ))
     rows.sort(key=lambda r: (r["ts"] is None, r["ts"]))
     return rows
+
+
+def _source_sql(cols: set, source_key: Optional[str], args: list) -> str:
+    """P12.11 source filter for the `backtest_results` reader.
+
+    The canonical key ``""`` also matches legacy NULL rows: history written
+    before provenance existed *is* the canonical Binance spot series.
+    """
+    if source_key is None or "source_key" not in cols:
+        return ""
+    key = _provenance_key(*_provenance_parse(source_key))
+    if key == "":
+        args.append("")
+        return " AND COALESCE(source_key,'')=?"
+    args.append(key)
+    return " AND source_key=?"
 
 
 def rows_from_backtest_db(db, symbol: Optional[str] = None,
                           include_sim: bool = True,
                           since_ts: Optional[int] = None,
                           until_ts: Optional[int] = None,
-                          cost_model: Optional[CostModel] = None) -> list[dict]:
+                          cost_model: Optional[CostModel] = None,
+                          source_key: Optional[str] = None) -> list[dict]:
     """Decided rows from the stored `backtest_results` table.
 
     ``since_ts`` / ``until_ts`` bound the signal bar (inclusive) so one
@@ -223,7 +259,8 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
     cols = {r["name"] for r in db.conn.execute("PRAGMA table_info(backtest_results)")}
     sel_cols = ["ts", "symbol", "timeframe", "plan_type", "action", "outcome",
                 "rr_achieved", "regime", "holding_hours", "horizon_hours"]
-    for extra in ("entry", "trigger_level", "rr_net", "fee_r", "slip_r", "funding_r", "cost_r", "step"):
+    for extra in ("entry", "trigger_level", "rr_net", "fee_r", "slip_r", "funding_r",
+                  "cost_r", "step", "exchange", "market", "price_type"):
         if extra in cols:
             sel_cols.append(extra)
 
@@ -242,6 +279,8 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
         args.append(int(until_ts))
     if not include_sim and "sim_key" in cols:
         q += " AND sim_key IS NULL"
+    # P12.11 — restrict to one price series when asked. `None` = every source.
+    q += _source_sql(cols, source_key, args)
     q += " ORDER BY ts ASC"
     out = []
     for r in db.conn.execute(q, args).fetchall():
@@ -256,6 +295,8 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
             slip_r=d.get("slip_r"), funding_r=d.get("funding_r"),
             cost_r=d.get("cost_r"), cost_model=cost_model,
             horizon_hours=d.get("horizon_hours"), step=d.get("step"),
+            exchange=d.get("exchange"), market=d.get("market"),
+            price_type=d.get("price_type"),
         ))
     return out
 
@@ -263,7 +304,8 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
 def rows_from_paper_db(db, symbol: Optional[str] = None,
                        include_sim: bool = False,
                        since_ts: Optional[int] = None,
-                       cost_model: Optional[CostModel] = None) -> list[dict]:
+                       cost_model: Optional[CostModel] = None,
+                       source_key: Optional[str] = None) -> list[dict]:
     """Decided rows from the real paper book (TP_HIT / STOP_LOSS).
 
     Holding time here is measured, not assumed: ``closed_ts - opened_ts``.
@@ -271,7 +313,7 @@ def rows_from_paper_db(db, symbol: Optional[str] = None,
     backtest book uses, on the column paper trades actually close on).
     """
     rows = db.decided_paper_rows(symbol=symbol, exclude_sim=not include_sim,
-                                 since_ts=since_ts)
+                                 since_ts=since_ts, source_key=source_key)
     out = []
     for d in rows:
         opened = d.get("opened_ts")
@@ -289,6 +331,8 @@ def rows_from_paper_db(db, symbol: Optional[str] = None,
             r_net=d.get("rr_net"), fee_r=d.get("fee_r"),
             slip_r=d.get("slip_r"), funding_r=d.get("funding_r"),
             cost_r=d.get("cost_r"), cost_model=cost_model,
+            exchange=d.get("exchange"), market=d.get("market"),
+            price_type=d.get("price_type"),
         ))
     return out
 
@@ -548,11 +592,22 @@ def _span(rows: list[dict]) -> dict:
 
 
 def _split(rows: list[dict], key: str, order: Optional[tuple] = None,
-           step: int = BACKTEST_STEP) -> dict:
+           step: int = BACKTEST_STEP, empty_label: Optional[str] = "UNKNOWN") -> dict:
+    """Group rows by a field and score each bucket.
+
+    ``empty_label=None`` keeps an empty value as its own real bucket instead
+    of relabelling it ``UNKNOWN`` — required for the P12.11 source split,
+    where ``""`` is not missing data but the *name* of the canonical live
+    series.
+    """
     buckets: dict[str, list[dict]] = {}
     for r in rows:
-        k = r.get(key) or "UNKNOWN"
-        buckets.setdefault(str(k), []).append(r)
+        raw = r.get(key)
+        if empty_label is None:
+            k = "" if raw is None else str(raw)
+        else:
+            k = str(raw or empty_label)
+        buckets.setdefault(k, []).append(r)
     keys = list(order) if order else sorted(buckets,
                                             key=lambda k: -len(buckets[k]))
     return {k: trade_stats(buckets.get(k, []), step=step) for k in keys
@@ -608,6 +663,32 @@ def conditioned_splits(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
 # ──────────────────────────────────────────────────────────────────────────
 # The scorecard
 # ──────────────────────────────────────────────────────────────────────────
+def _source_inventory(rows: list[dict]) -> dict:
+    """P12.11 — which price series this book was built from.
+
+    A scorecard that silently pools a live Binance book with a bid-only
+    Dukascopy research import is not one number, it is two. The report says
+    so: ``mixed`` is true whenever more than one source contributed, and
+    ``one_sided`` names any series that cannot be round-tripped at the
+    printed price.
+    """
+    from data.provenance import describe_source, is_canonical, is_one_sided
+
+    counts: dict[str, int] = {}
+    for r in rows:
+        key = r.get("source_key") or ""
+        counts[key] = counts.get(key, 0) + 1
+    keys = sorted(counts, key=lambda k: (-counts[k], k))
+    return {
+        "keys": keys,
+        "counts": counts,
+        "mixed": len(keys) > 1,
+        "canonical_only": bool(keys) and all(is_canonical(k) for k in keys),
+        "one_sided": [k for k in keys if is_one_sided(k)],
+        "labels": {k: describe_source(k) for k in keys},
+    }
+
+
 def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
                     source: str = "", min_decided: int = DEFAULT_MIN_DECIDED,
                     criteria: Optional[dict] = None,
@@ -675,6 +756,10 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
         "by_regime": _split(rows, "regime", step=step),
         "by_session": _split(rows, "session", order=SESSION_NAMES, step=step),
         "by_setup": _split(rows, "setup", step=step),
+        # P12.11 — the same block per price series, so a pooled book can
+        # always be taken apart into the series that produced it.
+        "by_source": _split(rows, "source_key", step=step, empty_label=None),
+        "sources": _source_inventory(rows),
         "criteria": dict(criteria),
         "bar": {"met": bool(bar_met), "unmet": bar_unmet,
                 "min_decided": min_decided, "evaluated_on": "net",
@@ -701,7 +786,8 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
                       cost_model: Optional[CostModel] = None,
                       conditioned: bool = False,
                       quality: bool = False,
-                      step: int = BACKTEST_STEP) -> dict:
+                      step: int = BACKTEST_STEP,
+                      source_key: Optional[str] = None) -> dict:
     """Scorecard over what the desk has already graded and stored.
 
     ``source``: ``backtest`` | ``paper`` | ``all`` (both books combined).
@@ -709,6 +795,10 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
     book and the walk-forward evidence are not the same thing.
     ``since_ts`` / ``until_ts`` bound the signal bar for era-separated runs.
     ``quality`` (P12.4) embeds the Backtest Quality Score block.
+    ``source_key`` (P12.11) restricts the book to one price series, e.g.
+    ``""`` for the canonical live Binance spot series or
+    ``"dukascopy:spot:bid"`` for the XAU research import. ``None`` reads
+    every source, and the report always names the sources it mixed.
     """
     if source not in ("backtest", "paper", "all"):
         return {"ok": False,
@@ -723,22 +813,30 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
             rows += rows_from_backtest_db(db, symbol=symbol,
                                           include_sim=include_sim,
                                           since_ts=since_ts, until_ts=until_ts,
-                                          cost_model=cost_model)
+                                          cost_model=cost_model,
+                                          source_key=source_key)
         if source in ("paper", "all"):
             rows += rows_from_paper_db(db, symbol=symbol,
                                        include_sim=include_sim,
                                        since_ts=since_ts,
-                                       cost_model=cost_model)
+                                       cost_model=cost_model,
+                                       source_key=source_key)
     finally:
         if owned:
             db.close()
 
     if not rows:
+        hint = ""
+        if source_key is not None:
+            from data.provenance import describe_source
+            hint = (f" No decided rows carry source "
+                    f"{describe_source(source_key)!r}.")
         return {"ok": False,
                 "error": ("No decided outcomes stored yet — run "
                           "`python main.py backtest --save` (or the paper "
-                          "runner) first, then re-run the scorecard."),
-                "source": source, "rows": 0}
+                          "runner) first, then re-run the scorecard." + hint),
+                "source": source, "rows": 0,
+                "source_key": source_key}
     return build_scorecard(rows, symbol=symbol or "", source=source,
                            min_decided=min_decided,
                            note="stored outcomes (no re-grading)",
@@ -776,7 +874,9 @@ def scorecard_from_store(exchange: str = "binance", market: str = "perp",
     primary = (result.get("report", {}).get("meta", {})
                .get("horizons_hours") or [None])[0]
     rows = rows_from_graded(result.get("graded", []), symbol=symbol,
-                            timeframe=timeframe, cost_model=cost_model)
+                            timeframe=timeframe, cost_model=cost_model,
+                            exchange=exchange, market=market,
+                            price_type=result.get("price_type"))
     if not rows:
         return {"ok": False,
                 "error": (f"Graded {len(result.get('graded', []))} plans but "
@@ -917,6 +1017,21 @@ def print_scorecard(report: dict) -> None:
     print(_split_header("by setup:"))
     for name, s in report["by_setup"].items():
         print(_split_line(name[:18], s))
+    # P12.11 — say which price series this book was built from, and split it.
+    srcs = report.get("sources") or {}
+    if srcs.get("keys"):
+        from data.provenance import describe_source
+        if srcs.get("mixed") or not srcs.get("canonical_only"):
+            print(_split_header("by source series (P12.11):"))
+            for name, s in report.get("by_source", {}).items():
+                label = describe_source(name)
+                print(_split_line(label[:18], s))
+            if srcs.get("mixed"):
+                print("  ⚠ this book POOLS several price series — the headline "
+                      "number is a blend, not one market")
+            for k in srcs.get("one_sided", []):
+                print(f"  ⚠ {describe_source(k)} is one-sided: the printed "
+                      f"price is not an executable round trip (research only)")
     if "conditioned" in report:
         print("-" * W)
         print(_split_header("by funding regime:"))

@@ -10,18 +10,64 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-15 (this session: **v2.21.0 — P12.10 XAU bid/ask
-cost model**: `data/costs.py` auto-detects gold instruments and applies a
-spot-market model with spread-based costs, no funding, and a small ECN
-commission. Closes Dukascopy blocker #2. Two of three blockers closed.)
+**Last updated:** 2026-08-16 (this session: **v2.22.0 — P12.11 source
+provenance in saved keys**: the price series a graded row came from is now
+part of its calibration key, so a research backtest can no longer recalibrate
+the live book. Closes Dukascopy blocker #3 — **all three blockers closed**.)
 
-**Previous:** 2026-08-15 (**v2.20.0 P12.9 — market calendars**: scheduled
-closure is no longer a gap.)
-**Branch:** `arena/01a0069a-sky` (this session's branch)
-**HEAD commit:** `d9410b9` feat(P12.9): market calendars — a scheduled closure is not a gap (#32)
-**Python:** 3.11 (venv `.venv`) — suite green (**681 pass / 1 skip**)
+**Previous:** 2026-08-15 (**v2.21.0 P12.10 — XAU bid/ask cost model**: gold
+auto-detection in `data/costs.py`; Dukascopy blocker #2 closed.)
+**Branch:** `arena/01a006ca-sky` (this session's branch)
+**HEAD commit:** `85bcfd7` feat(P12.10): XAU bid/ask cost model — gold auto-detection in data/costs.py (#33)
+**Python:** 3.11 (venv `.venv`) — suite green (**704 pass / 1 skip**)
 
-> **This session (`arena/01a0069a-sky`): v2.21.0 — P12.10 XAU bid/ask cost model.**
+> **This session (`arena/01a006ca-sky`): v2.22.0 — P12.11 source provenance.**
+> **Verified first:** rebuilt `.venv`, ran the inherited suite → **681 pass /
+> 1 skip** (the P12.10 baseline). Then built the next item.
+>
+> **The problem.** Every decided row was filed under `plan_type` or
+> `plan_type::regime` and nothing else — the price series that produced it was
+> invisible to the learning loop. A row graded on Binance BTCUSDT spot and a
+> row graded on a bid-only Dukascopy XAUUSD import landed in the **same**
+> calibration entry, so a research backtest on a venue we do not trade could
+> move the multiplier applied to live signals. The only protection was a human
+> remembering not to type `--save`. Measured: the live entry alone is
+> `E +0.46R → net +0.29R` at `×1.07`; pooling a `+3.58R` bid-only gold book
+> into that key inflated it.
+>
+> - **`data/provenance.py`** — the source-key algebra.
+>   `exchange:market[:price_type]`, with the canonical live series (Binance
+>   spot, two-sided) deliberately the **empty string**. That single choice is
+>   what makes P12.11 additive: every pre-existing key is byte-identical, and
+>   every legacy NULL-provenance row reads as the canonical series — which is
+>   what all pre-P12.11 history actually is, not a guess.
+> - **Persistence** — `exchange`/`market`/`price_type`/`source_key` on
+>   `backtest_results` + `paper_trades`, `source_key` on `calibration`, all by
+>   idempotent migration. `StoreClient` stamps the frame; the simulator and
+>   `backtest --save` propagate it.
+> - **`profile_key(plan_type, regime, source_key)`** appends `@source` for
+>   non-canonical series only → `Buy Pullback::TREND_UP@dukascopy:spot:bid`.
+> - **Live isolation** — `engine/calibration_hook.apply_calibration()`
+>   resolves canonical keys only and never falls back across sources, so a
+>   research entry's **boost and its filter** are both unreachable live.
+> - **`setup_proven()`** counts evidence on one series (default live); a
+>   one-sided (bid/ask-only) series is `research_only` and never `proven` —
+>   its printed price is not an executable round trip.
+> - **Reporting** — scorecard `by_source` split + `sources` inventory (warns
+>   when a book pools series), `--source-key` / `?source_key=` / MCP
+>   `source_key` (server **1.10.0**), and `learn` lists the stored series.
+> - **Safety direction — strictly additive, strictly tighter.** It can only
+>   withdraw trust from a research series, never grant it. Crypto output,
+>   legacy keys and the graduation bar are unchanged; no existing test was
+>   modified.
+> - **Unblocked:** `--save` on a Dukascopy XAU backtest is now permitted.
+> - **Docs:** `docs/SOURCE_PROVENANCE.md`; blocker #3 closed in
+>   `docs/DUKASCOPY_XAU_ADAPTER.md`.
+> - **Versions:** `config.py` / `pyproject.toml` **2.21.0 → 2.22.0**;
+>   wheel gate green.
+> - **Tests:** +23 in `tests/test_provenance.py` → **704 pass / 1 skip**.
+
+> **Prior session (`arena/01a0069a-sky`): v2.21.0 — P12.10 XAU bid/ask cost model.**
 > **Verified first:** rebuilt `.venv`, ran the inherited suite → **671 pass /
 > 1 skip** (the P12.9 baseline). Then built the next item.
 >
@@ -52,7 +98,7 @@ closure is no longer a gap.)
 >   wheel gate green.
 > - **Tests:** +10 in `tests/test_costs.py` → **681 pass / 1 skip**.
 
-> **This session (`arena/01a004b0-sky`): v2.19.0 — optional Dukascopy XAU adapter.**
+> **Prior session (`arena/01a004b0-sky`): v2.19.0 — optional Dukascopy XAU adapter.**
 > - `dukascopy-node` remains an external, version-pinned CSV producer. SKY
 >   does not install, vendor, or execute it at runtime.
 > - `backfill --from-csv --csv-source dukascopy --price-type bid|ask` accepts
@@ -229,10 +275,10 @@ phase below is ordered by how directly it moves those two lines.
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real data and the graduation gate is honestly closed (+0.348R gross,
 negative net on 1h/4h primary). Freqtrade rejected (F1–F8); Backtrader
-rejected (BT1–BT8). The Dukascopy XAU research book (v2.21.0) has calendar-aware
-gap detection (P12.9) and a gold-specific cost model (P12.10); one of its three
-blockers remains (calibration-key source provenance). Open items: TODO-7,
-TODO-8; next phase after the XAU blockers: **micro-live**.
+rejected (BT1–BT8). The Dukascopy XAU research book (v2.22.0) has calendar-aware
+gap detection (P12.9), a gold-specific cost model (P12.10) and source-keyed
+calibration (P12.11); **all three of its blockers are closed**. Open items:
+TODO-7, TODO-8; next phase: **micro-live**.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -247,7 +293,7 @@ TODO-8; next phase after the XAU blockers: **micro-live**.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.10 shipped — XAU bid/ask cost model** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score + plateau sweep; P12.5 strategy score on the calibrator; P12.7 Monte Carlo ruin/streak/TTR table; P12.8 the net anchor — the calibrator multiplier and the setup-proven gate judge `E_net`, not `E_gross`; P12.9 market calendars — `data/calendar.py` gives each venue a trading calendar, so scheduled OTC-gold closures stop being read as missing data; **P12.10 XAU bid/ask cost model — `data/costs.py` auto-detects gold instruments and applies a spot-market model with spread-based costs, no funding, ECN commission; Dukascopy blocker #2 closed**). Next: **calibration-key source provenance**, then micro-live. |
+| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.11 shipped — source provenance in saved keys** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score + plateau sweep; P12.5 strategy score on the calibrator; P12.7 Monte Carlo ruin/streak/TTR table; P12.8 the net anchor — the calibrator multiplier and the setup-proven gate judge `E_net`, not `E_gross`; P12.9 market calendars — `data/calendar.py` gives each venue a trading calendar, so scheduled OTC-gold closures stop being read as missing data; P12.10 XAU bid/ask cost model — `data/costs.py` auto-detects gold instruments and applies a spot-market model with spread-based costs, no funding, ECN commission, Dukascopy blocker #2 closed; **P12.11 source provenance — `data/provenance.py` makes the price series part of the calibration key, so a research backtest can never recalibrate the live book; Dukascopy blocker #3 closed, all three closed**). Next: **micro-live**. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -256,7 +302,50 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-15 (this branch `arena/01a0069a-sky`): P12.10 — XAU bid/ask cost model
+### Session 2026-08-16 (this branch `arena/01a006ca-sky`): P12.11 — source provenance in saved keys
+
+Branched from `main` @ `85bcfd7d` (P12.10 merged). Inherited suite re-verified at
+**681 pass / 1 skip** before any change. 0 regressions.
+Tests **681 → 704 pass / 1 skip** (+23). Version **2.21.0 → 2.22.0**.
+(`config.py` and `pyproject.toml` bumped in step; wheel gate green.)
+
+**Why:** a graded row's calibration key carried `plan_type` and `regime` but
+not the price series that produced it, so a bid-only Dukascopy XAUUSD research
+backtest pooled into the same entry as the live Binance book and could raise
+the confidence multiplier applied to live signals. `--save` was prohibited for
+that adapter purely because a human might forget.
+
+**What shipped:** `data/provenance.py` (source-key algebra, canonical live
+series = `""`); provenance columns on `backtest_results` / `paper_trades` /
+`calibration` by idempotent migration; `profile_key()` gains a source
+dimension appended only for non-canonical series; the live calibration hook
+resolves canonical keys only (boost *and* filter isolated); `setup_proven()`
+counts one series and never proves a one-sided one; scorecard `by_source`
+split + `sources` inventory + `--source-key` / `?source_key=` / MCP
+`source_key` (server 1.10.0); `learn` lists stored series.
+
+**Result:** measured on a seeded book, the live entry stays `E +0.46R → net
++0.29R` / `×1.07` whether or not a `+3.58R` research book is present — it is
+now a separate key. Dukascopy `--save` is unblocked.
+Docs: [`docs/SOURCE_PROVENANCE.md`](docs/SOURCE_PROVENANCE.md).
+
+**Files changed:** `data/provenance.py` (new), `tests/test_provenance.py`
+(new), `docs/SOURCE_PROVENANCE.md` (new), `data/database.py`,
+`data/scorecard.py`, `data/backtester.py`, `data/simulator.py`,
+`data/store.py`, `brain/calibrator.py`, `brain/risk_gate.py`,
+`engine/calibration_hook.py`, `main.py`, `web/app.py`, `mcp_server.py`,
+`docs/DUKASCOPY_XAU_ADAPTER.md`, `config.py`, `pyproject.toml`,
+`CHANGELOG.md`, `SESSION_STATE.md`, `TODO.md`.
+
+**Known issues / not done:** this checkout still has neither `data/store/**`
+nor `data/cryptobrain.db`, so the P12.11 behaviour was verified against a
+seeded temporary database rather than the real book — the calibration profile
+on the host holding real data must be recomputed with `learn` to pick up
+source keys (existing rows migrate as canonical, so the live profile does not
+change). Parallel bid/ask storage and an as-of spread model remain a later
+schema milestone.
+
+### Session 2026-08-15 (branch `arena/01a0069a-sky`): P12.10 — XAU bid/ask cost model
 
 Branched from `main` @ `d9410b90` (P12.9 merged). Inherited suite re-verified at
 **671 pass / 1 skip** before any change. 0 regressions.
@@ -492,9 +581,9 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
-1. **Calibration-key source provenance** (Dukascopy blocker #3) — saved
-   calibration keys do not carry candle-source provenance. A Dukascopy XAU
-   backtest must not silently recalibrate the live PAXG proxy.
+1. **Micro-live at trivial size** — the only remaining unknowns (slippage,
+   partial fills, latency) cannot be measured offline. Gated on the
+   graduation bar opening and explicit human approval.
 2. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
 3. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
@@ -555,11 +644,14 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
     reads the decided paper book NET of costs and surfaces survivability
     estimates. It does not approve trades, loosen the graduation bar, or
     replace the risk gate.
-17. **Dukascopy XAU is still research-only — but for one reason now, not
-    three.** P12.9 closed the market-calendar blocker; P12.10 closed the XAU
-    bid/ask cost model blocker. Open: saved calibration keys do not carry
-    candle-source provenance (blocker #3). Do not use `backtest --save` on this
-    book yet.
+17. **Dukascopy XAU: all three blockers are closed, and it is still not
+    tradeable evidence.** P12.9 closed the market calendar, P12.10 the XAU
+    bid/ask cost model, P12.11 the calibration-key provenance. `backtest
+    --save` is now permitted — its rows land in `…@dukascopy:spot:bid` keys
+    and cannot recalibrate the live proxy. What remains is *not* code:
+    PAXG-vs-XAU basis measurement, sealed-OOS results clearing the unchanged
+    bar, and explicit human approval. Separable evidence is the precondition
+    for judging it, not the judgement.
 18. **A calendar can only remove false alarms, never hide a hole.** It is
     opt-in by venue: anything not explicitly `dukascopy` + an XAU symbol keeps
     the 24/7 crypto calendar, including Binance `PAXGUSDT`, which really does
@@ -568,24 +660,33 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 19. **Early/partial closes are deliberately unmodelled.** Only 1 Jan and
     25 Dec are holidays. An unmodelled early close shows up as a real gap
     (visible, safe); an over-broad holiday list would silently swallow one.
+20. **The canonical source key is the empty string — do not "tidy" this.**
+    `binance/spot/two-sided` → `""` is what keeps P12.11 additive: every
+    pre-existing calibration key stays byte-identical and every legacy
+    NULL-provenance row reads as the live series (which is what it is).
+    Writing it as `"binance:spot"` would silently re-key the entire stored
+    profile and orphan the desk's history.
+21. **P12.11 isolates the filter as well as the boost.** A research entry
+    marked `filtered` must not block a live signal either — a series we do
+    not trade gets no vote in both directions. Both are covered by tests.
 
 ---
 
 ## Next recommended action
 
-1. **Next code build — calibration-key source provenance** (Dukascopy blocker
-   #3): saved calibration keys do not carry candle-source provenance, so a
-   Dukascopy XAU backtest `--save` could silently recalibrate the live PAXG
-   proxy. Add a `source` dimension to the calibration table and gate the
-   calibrator on source match.
+1. **Next code build — micro-live at trivial size.** All three Dukascopy
+   blockers and every P12 milestone are shipped; slippage, partial fills and
+   latency are the only remaining unknowns that *cannot* be measured offline.
+   This starts only after the graduation bar opens and a human approves.
 2. **On the host holding the real BTC store/DB**, re-run `backtest --save` +
    `learn`; the calibration profile remains stale in this clean checkout. Do
    not substitute demo data.
 3. Optionally acquire version-pinned Dukascopy XAU m1 **bid** or **ask** CSV
    and import it with a SHA pin using `docs/DUKASCOPY_XAU_ADAPTER.md`; the
-   import, quality checks and now cost model are all gold-aware
-   (`python main.py calendar --symbol XAUUSD --tf 1h --series`). Run
-   validate/backtest/quality **without `--save`**.
+   import, quality checks, cost model and calibration keys are all gold- and
+   source-aware. `--save` is now permitted (rows land under
+   `…@dukascopy:spot:bid`); inspect with
+   `python main.py scorecard --source backtest --source-key dukascopy:spot:bid`.
 4. **Micro-live** only after the existing graduation bar opens and a human
    explicitly approves progression. This work does not move that bar.
 5. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
@@ -594,12 +695,13 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm the P12.10 PR merged. P12.1–P12.9, the Dukascopy XAU adapter,
-> market calendars and **P12.10 XAU bid/ask cost model** are shipped — do not
-> rewrite `data/calendar.py`, re-derive the gold week, make the calendar apply
-> to Binance, or rework the gold cost model. The next build is
-> **calibration-key source provenance** (Dukascopy blocker #3). All earlier
-> P12 milestones are shipped: do not redo the locked protocol, the
+> and confirm the P12.11 PR merged. P12.1–P12.10, the Dukascopy XAU adapter,
+> market calendars, the gold cost model and **P12.11 source provenance** are
+> shipped — do not rewrite `data/provenance.py`, re-key the calibration table,
+> change the canonical source key away from the empty string, rewrite
+> `data/calendar.py`, or rework the gold cost model. **All three Dukascopy
+> blockers are closed**; what remains for XAU is measurement and human
+> approval, not code. All earlier P12 milestones are shipped: do not redo the locked protocol, the
 > negative-shift guard, the boxed scorecard, the tie-break, the real data
 > import, trade cost modeling, the overlap-corrected effective sample size,
 > the Backtest Quality Score, the strategy score on the calibrator, the Monte
@@ -614,7 +716,13 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 681 passed, 1 skipped
+# 704 passed, 1 skipped
+```
+
+Source provenance (P12.11):
+```bash
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_provenance.py -q
+# 23 passed
 ```
 
 XAU cost model (P12.10):
@@ -626,7 +734,7 @@ DEMO_MODE=1 .venv/bin/python -m pytest tests/test_costs.py -q
 Wheel gate:
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.21.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.22.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Market calendar (P12.9):
@@ -736,17 +844,17 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
    (XAU bid/ask cost model in `data/costs.py`, gold auto-detection,
    Dukascopy blocker #2 closed).
 2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` —
-   **681 pass / 1 skip** (+10: `tests/test_costs.py`). Inherited baseline
-   re-verified at 671/1 before any change.
+   **704 pass / 1 skip** (+23: `tests/test_provenance.py`). Inherited baseline
+   re-verified at 681/1 before any change.
 3. [x] Fix any obvious failures. — none left open.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.10 marked shipped; next is calibration-key
-   source provenance (Dukascopy blocker #3).
-6. [x] Update `CHANGELOG.md` — 2.21.0 P12.10 entry.
+5. [x] Update `TODO.md` — P12.11 marked shipped; all three Dukascopy blockers
+   closed; next is micro-live.
+6. [x] Update `CHANGELOG.md` — 2.22.0 P12.11 entry.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [ ] `git add` / `git commit` — commit and push to `origin/arena/01a0069a-sky`.
+11. [ ] `git add` / `git commit` — commit and push to `origin/arena/01a006ca-sky`.
 12. [ ] Open the session PR as the closing step — PR from
-    `arena/01a0069a-sky` (P12.10).
+    `arena/01a006ca-sky` (P12.11).

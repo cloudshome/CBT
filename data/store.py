@@ -353,4 +353,8 @@ class StoreClient:
             df = df.tail(int(limit)).reset_index(drop=True)
         df.attrs["symbol"] = symbol
         df.attrs["timeframe"] = timeframe
+        # P12.11 — stamp provenance so every downstream grader/writer knows
+        # which price series it is reading without being told separately.
+        df.attrs["exchange"] = self.exchange
+        df.attrs["market"] = self.market
         return df

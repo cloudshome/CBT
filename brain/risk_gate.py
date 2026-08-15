@@ -29,6 +29,7 @@ from config import (PROGRESSION, PROGRESSION_LEVELS, ENFORCE_RISK_LIMITS,
                     DRAWDOWN_REVIEW_PCT, RISK_PCT, MAX_DAILY_LOSS_PCT,
                     MAX_WEEKLY_LOSS_PCT, ACCOUNT_BALANCE, KELLY_MAX_RISK_PCT)
 from data.database import SignalDB
+from data.provenance import LIVE_SOURCE_KEY
 
 
 def progression() -> dict:
@@ -147,7 +148,8 @@ def trader_state_blocked(db: SignalDB) -> dict:
     return {"blocked": bool(flags), "state": st, "flags": flags}
 
 
-def setup_proven(db: SignalDB, plan_type: str) -> dict:
+def setup_proven(db: SignalDB, plan_type: str,
+                 source_key: str | None = LIVE_SOURCE_KEY) -> dict:
     """Setup-proven gate (decisions A6/B10): >=100 backtest samples AND >=20
     decided paper samples AND positive expectancy.
 
@@ -155,15 +157,23 @@ def setup_proven(db: SignalDB, plan_type: str) -> dict:
     wherever the net column is populated (P12.6), falling back to gross only
     when it is not. A setup that only makes money before fees was never
     proven; it was mismeasured. The sample floors are unchanged.
+
+    **P12.11** — the evidence is counted on **one price series**, defaulting
+    to the canonical live series the desk actually trades. A Dukascopy XAU
+    bid-only research book can no longer contribute samples toward proving a
+    setup for live trading. Pass ``source_key=None`` to count every source
+    (reporting only), or an explicit key to audit one research series.
+    Strictly tighter, never looser: the floors and the bar are unchanged.
     """
-    st = db.setup_stats(plan_type or "")
+    st = db.setup_stats(plan_type or "", source_key=source_key)
     bt_e = (st["backtest_expectancy"] if st.get("backtest_expectancy_net") is None
             else st["backtest_expectancy_net"])
     pp_e = (st["paper_expectancy"] if st.get("paper_expectancy_net") is None
             else st["paper_expectancy_net"])
     proven = bool(st["backtest_n"] >= 100 and st["paper_n"] >= 20 and
                   pp_e > 0 and bt_e > 0)
-    return {"proven": proven, "proven_on": "net" if (
+    return {"proven": proven, "source_key": source_key,
+            "proven_on": "net" if (
         st.get("backtest_expectancy_net") is not None
         or st.get("paper_expectancy_net") is not None) else "gross", **st}
 

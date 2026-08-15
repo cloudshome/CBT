@@ -62,6 +62,10 @@ def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
     Returns counts added to the learning store (backtest + paper samples).
     """
     from data.database import SignalDB
+    from data.provenance import provenance_of_frame
+    # P12.11 — every sample this walk stores is stamped with the price series
+    # it came from, read off the frame the store handed us.
+    prov_exchange, prov_market, prov_price_type = provenance_of_frame(df)
     tf_ms = df.attrs.get("timeframe", timeframe)
     from data.binance_client import TIMEFRAME_TO_MS
     ms = TIMEFRAME_TO_MS.get(tf_ms, 900_000)
@@ -93,6 +97,9 @@ def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
                 row["symbol"] = symbol
                 row["timeframe"] = timeframe
                 row["sim_key"] = _bt_key(symbol, timeframe, plan, graded.ts, h)
+                row["exchange"] = prov_exchange
+                row["market"] = prov_market
+                row["price_type"] = prov_price_type
                 if row["sim_key"] in seen_bt:
                     continue
                 seen_bt.add(row["sim_key"])
@@ -115,6 +122,8 @@ def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
                 paper_samples.append({
                     "plan": plan, "graded": graded, "outcome": outcome,
                     "sim_key": key, "regime": regime,
+                    "exchange": prov_exchange, "market": prov_market,
+                    "price_type": prov_price_type,
                 })
                 pp_added += 1
 
@@ -180,6 +189,9 @@ def _persist_paper_samples(symbol: str, timeframe: str, samples: list[dict],
                 "status": "OPEN", "created_ts": graded.ts,
                 "opened_ts": graded.ts, "entry_price": entry,
                 "regime": s["regime"], "sim_key": s["sim_key"],
+                # P12.11 — provenance travels with the simulated paper sample.
+                "exchange": s.get("exchange"), "market": s.get("market"),
+                "price_type": s.get("price_type"),
             }
             trade, created = sdb.create_paper_trade(fields)
             if not created:

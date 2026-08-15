@@ -26,6 +26,49 @@ from pathlib import Path
 from typing import Optional
 
 import config as _config
+from data.provenance import normalize as _normalize_provenance
+from data.provenance import source_key as _source_key
+
+
+def _provenance_values(row: dict) -> tuple[str, str, str, str]:
+    """P12.11 — the (exchange, market, price_type, source_key) a row is filed under.
+
+    Derived in one place so the backtest book and the paper book can never
+    disagree, and so a caller that supplies nothing gets the canonical live
+    series rather than a NULL that later reads as "unknown".
+    """
+    ex, mk, pt = _normalize_provenance(row.get("exchange"), row.get("market"),
+                                       row.get("price_type"))
+    return ex, mk, pt, _source_key(ex, mk, pt)
+
+
+def _source_clause(conn, table: str, source_key: Optional[str],
+                   args: list) -> str:
+    """SQL fragment restricting a query to one source series (P12.11).
+
+    ``None`` means "every source" and appends nothing, so untouched callers
+    keep their exact previous behaviour. The canonical key ``""`` also matches
+    legacy rows whose provenance columns are NULL — those rows *are* the
+    canonical Binance series, and pretending otherwise would hide the desk's
+    real history from its own gate.
+    """
+    if source_key is None:
+        return ""
+    cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+    if "source_key" not in cols:  # pragma: no cover - pre-migration DB only
+        return ""
+    key = _source_key(*_normalize_provenance(*_split_key(source_key)))
+    if key == "":
+        args.append("")
+        return " AND COALESCE(source_key,'')=?"
+    args.append(key)
+    return " AND source_key=?"
+
+
+def _split_key(key: str):
+    from data.provenance import parse_source_key
+    return parse_source_key(key)
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans(
@@ -55,7 +98,8 @@ CREATE TABLE IF NOT EXISTS backtest_results(
   rr_achieved REAL, max_favorable REAL, max_adverse REAL,
   entry REAL, trigger_level REAL, regime TEXT,
   sim_key TEXT, holding_bars INTEGER, holding_hours REAL,
-  rr_net REAL, fee_r REAL, slip_r REAL, funding_r REAL, cost_r REAL
+  rr_net REAL, fee_r REAL, slip_r REAL, funding_r REAL, cost_r REAL,
+  exchange TEXT, market TEXT, price_type TEXT, source_key TEXT
 );
 CREATE TABLE IF NOT EXISTS decisions(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,6 +114,7 @@ CREATE TABLE IF NOT EXISTS calibration(
   plan_type TEXT PRIMARY KEY,
   multiplier REAL, expectancy REAL, samples INTEGER,
   regime TEXT DEFAULT '', proven INTEGER DEFAULT 0, tp_rr REAL,
+  source_key TEXT DEFAULT '',
   backtest_samples INTEGER DEFAULT 0, paper_samples INTEGER DEFAULT 0,
   win_rate REAL,
   updated_at INTEGER
@@ -88,6 +133,7 @@ CREATE TABLE IF NOT EXISTS paper_trades(
   last_candle_ts INTEGER, last_price REAL, checks INTEGER DEFAULT 0,
   error TEXT, regime TEXT, mae REAL, mfe REAL,
   sim_key TEXT, rr_net REAL, fee_r REAL, slip_r REAL, funding_r REAL, cost_r REAL,
+  exchange TEXT, market TEXT, price_type TEXT, source_key TEXT,
   FOREIGN KEY(scan_id) REFERENCES scans(id)
 );
 CREATE TABLE IF NOT EXISTS journal_entries(
@@ -215,6 +261,15 @@ class SignalDB:
         _add("backtest_results", "slip_r", "REAL")
         _add("backtest_results", "funding_r", "REAL")
         _add("backtest_results", "cost_r", "REAL")
+        # P12.11 — source provenance: which price series produced this row.
+        # NULL means the row predates provenance tracking, which is exactly
+        # the canonical Binance spot series (see data/provenance.py), so the
+        # derived source key of legacy rows is "" and their calibration keys
+        # are unchanged.
+        _add("backtest_results", "exchange", "TEXT")
+        _add("backtest_results", "market", "TEXT")
+        _add("backtest_results", "price_type", "TEXT")
+        _add("backtest_results", "source_key", "TEXT")
         _add("paper_trades", "sim_key", "TEXT")
         _add("paper_trades", "regime", "TEXT")
         _add("paper_trades", "mae", "REAL")
@@ -224,6 +279,10 @@ class SignalDB:
         _add("paper_trades", "slip_r", "REAL")
         _add("paper_trades", "funding_r", "REAL")
         _add("paper_trades", "cost_r", "REAL")
+        _add("paper_trades", "exchange", "TEXT")
+        _add("paper_trades", "market", "TEXT")
+        _add("paper_trades", "price_type", "TEXT")
+        _add("paper_trades", "source_key", "TEXT")
         _add("calibration", "regime", "TEXT DEFAULT ''")
         _add("calibration", "proven", "INTEGER DEFAULT 0")
         _add("calibration", "tp_rr", "REAL")
@@ -236,6 +295,8 @@ class SignalDB:
         # same stored computation (invariant #10).
         _add("calibration", "strategy_score", "REAL")
         _add("calibration", "strategy_band", "TEXT")
+        # P12.11 — the source series a calibration entry was learned from.
+        _add("calibration", "source_key", "TEXT DEFAULT ''")
 
     # ── lifecycle ────────────────────────────────────────────────────────
     def update_status(self, scan_id: int, to_state: str, note: str = "",
@@ -315,8 +376,12 @@ class SignalDB:
             "scan_id", "signal_id", "plan_id", "plan_type", "symbol", "timeframe", "action",
             "entry", "stop_loss", "take_profit", "risk_reward", "confidence_pct", "status",
             "created_ts", "opened_ts", "entry_price", "regime", "sim_key",
+            # P12.11 — the price series this simulated trade was taken on.
+            "exchange", "market", "price_type", "source_key",
         )
-        values = tuple(fields.get(c) for c in cols)
+        prov = dict(zip(("exchange", "market", "price_type", "source_key"),
+                        _provenance_values(fields)))
+        values = tuple(prov.get(c, fields.get(c)) for c in cols)
         cur = self.conn.execute(
             f"INSERT OR IGNORE INTO paper_trades ({','.join(cols)}) VALUES ({','.join('?' for _ in cols)})",
             values,
@@ -522,7 +587,8 @@ class SignalDB:
 
     def decided_paper_rows(self, since_ts: int | None = None,
                            symbol: str | None = None,
-                           exclude_sim: bool = False) -> list[dict]:
+                           exclude_sim: bool = False,
+                           source_key: str | None = None) -> list[dict]:
         """Closed, decided paper trades (TP_HIT / STOP_LOSS), oldest first.
 
         exclude_sim=True drops simulator walk-forward samples (sim_key NOT
@@ -541,10 +607,11 @@ class SignalDB:
         if symbol:
             q += " AND symbol=?"
             args.append(symbol)
+        q += _source_clause(self.conn, "paper_trades", source_key, args)
         q += " ORDER BY COALESCE(closed_ts, opened_ts, created_ts) ASC"
         return [dict(r) for r in self.conn.execute(q, args).fetchall()]
 
-    def setup_stats(self, plan_type: str) -> dict:
+    def setup_stats(self, plan_type: str, source_key: str | None = None) -> dict:
         """Decided-sample counts for the setup-proven gate (decision B10).
 
         **P12.8** also returns ``*_expectancy_net`` — the average of the
@@ -554,22 +621,24 @@ class SignalDB:
         ``None`` means the column holds no net values for this setup, and
         the caller falls back to gross rather than guessing.
         """
-        bt = self.conn.execute(
-            """SELECT COUNT(*) n,
+        bt_args: list = [plan_type]
+        bt_q = ("""SELECT COUNT(*) n,
                       SUM(CASE WHEN outcome IN ('FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
                       ROUND(AVG(rr_achieved),3) avg_rr,
                       ROUND(AVG(rr_net),3) avg_rr_net
                FROM backtest_results WHERE plan_type=?
-                 AND outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')""",
-            (plan_type,)).fetchone()
-        pp = self.conn.execute(
-            """SELECT COUNT(*) n,
+                 AND outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')"""
+                + _source_clause(self.conn, "backtest_results", source_key, bt_args))
+        bt = self.conn.execute(bt_q, bt_args).fetchone()
+        pp_args: list = [plan_type]
+        pp_q = ("""SELECT COUNT(*) n,
                       SUM(CASE WHEN outcome='TP_HIT' THEN 1 ELSE 0 END) wins,
                       ROUND(AVG(rr_achieved),3) avg_rr,
                       ROUND(AVG(rr_net),3) avg_rr_net
                FROM paper_trades WHERE plan_type=?
-                 AND outcome IN ('TP_HIT','STOP_LOSS')""",
-            (plan_type,)).fetchone()
+                 AND outcome IN ('TP_HIT','STOP_LOSS')"""
+                + _source_clause(self.conn, "paper_trades", source_key, pp_args))
+        pp = self.conn.execute(pp_q, pp_args).fetchone()
         bt_n, bt_wins, bt_avg = (bt["n"] or 0, bt["wins"] or 0, bt["avg_rr"] or 0.0)
         pp_n, pp_wins, pp_avg = (pp["n"] or 0, pp["wins"] or 0, pp["avg_rr"] or 0.0)
         bt_net = bt["avg_rr_net"]
@@ -627,6 +696,42 @@ class SignalDB:
             args + (max(1, min(int(limit), 50)),)).fetchall()]
         return {"overall": overall, "by_type": by_type, "recent": recent}
 
+    def source_inventory(self) -> dict:
+        """P12.11 — which price series the learning store actually holds.
+
+        Reports decided-row counts per source key across both books, so a
+        reviewer can see at a glance whether the learning database is pure
+        live-series evidence or contains research imports.
+        """
+        from data.provenance import describe_source, is_canonical, is_one_sided
+
+        counts: dict[str, dict] = {}
+        for table, col, decided in (
+                ("backtest_results", "backtest",
+                 ("FULL_WIN", "PARTIAL_WIN", "LOSS")),
+                ("paper_trades", "paper", ("TP_HIT", "STOP_LOSS"))):
+            cols = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+            if "source_key" not in cols:  # pragma: no cover - pre-migration DB
+                continue
+            rows = self.conn.execute(
+                f"""SELECT COALESCE(source_key,'') AS k, COUNT(*) n
+                    FROM {table}
+                    WHERE outcome IN ({','.join('?' * len(decided))})
+                    GROUP BY k""", decided).fetchall()
+            for r in rows:
+                entry = counts.setdefault(r["k"], {"backtest": 0, "paper": 0})
+                entry[col] += r["n"] or 0
+        keys = sorted(counts, key=lambda k: (-(counts[k]["backtest"]
+                                               + counts[k]["paper"]), k))
+        return {
+            "keys": keys,
+            "counts": counts,
+            "mixed": len(keys) > 1,
+            "canonical_only": bool(keys) and all(is_canonical(k) for k in keys),
+            "one_sided": [k for k in keys if is_one_sided(k)],
+            "labels": {k: describe_source(k) for k in keys},
+        }
+
     # ── calibration (self-improvement profile) ───────────────────────────
     def save_calibration(self, profile: dict) -> None:
         def _do_save():
@@ -636,8 +741,8 @@ class SignalDB:
                     """INSERT INTO calibration(plan_type, multiplier, expectancy, samples,
                                                regime, proven, tp_rr, backtest_samples,
                                                paper_samples, win_rate, updated_at,
-                                               strategy_score, strategy_band)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                               strategy_score, strategy_band, source_key)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                        ON CONFLICT(plan_type) DO UPDATE SET
                          multiplier=excluded.multiplier, expectancy=excluded.expectancy,
                          samples=excluded.samples, regime=excluded.regime,
@@ -646,13 +751,15 @@ class SignalDB:
                          paper_samples=excluded.paper_samples,
                          win_rate=excluded.win_rate, updated_at=excluded.updated_at,
                          strategy_score=excluded.strategy_score,
-                         strategy_band=excluded.strategy_band""",
+                         strategy_band=excluded.strategy_band,
+                         source_key=excluded.source_key""",
                     (plan_type, entry.get("multiplier", 1.0),
                      entry.get("expectancy"), entry.get("samples", 0),
                      entry.get("regime", ""), 1 if entry.get("proven") else 0,
                      entry.get("tp_rr"), entry.get("backtest_samples", 0),
                      entry.get("paper_samples", 0), entry.get("win_rate"), now,
-                     entry.get("strategy_score"), entry.get("strategy_band")))
+                     entry.get("strategy_score"), entry.get("strategy_band"),
+                     entry.get("source_key", "") or ""))
             self.conn.commit()
         return self._retry_write(_do_save)
 
@@ -670,6 +777,9 @@ class SignalDB:
             "win_rate": r["win_rate"],
             "strategy_score": r["strategy_score"],
             "strategy_band": r["strategy_band"],
+            # P12.11 — the price series this entry was learned from ("" = the
+            # canonical live Binance spot series).
+            "source_key": (r["source_key"] if "source_key" in r.keys() else "") or "",
         } for r in rows}
 
     # ── scans ────────────────────────────────────────────────────────────
@@ -771,8 +881,9 @@ class SignalDB:
                         confidence_pct, horizon_hours, step, outcome, rr_achieved,
                         max_favorable, max_adverse, entry, trigger_level, regime,
                         sim_key, holding_bars, holding_hours,
-                        rr_net, fee_r, slip_r, funding_r, cost_r)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        rr_net, fee_r, slip_r, funding_r, cost_r,
+                        exchange, market, price_type, source_key)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (run_id, r.get("ts"), r.get("symbol"), r.get("timeframe"),
                      r.get("plan_type"), r.get("action"), r.get("confidence_pct"),
                      r.get("horizon_hours"), r.get("step"), r.get("outcome"), r.get("rr_achieved"),
@@ -780,7 +891,8 @@ class SignalDB:
                      r.get("trigger_level"), r.get("regime"), r.get("sim_key"),
                      r.get("holding_bars"), r.get("holding_hours"),
                      r.get("rr_net"), r.get("fee_r"), r.get("slip_r"),
-                     r.get("funding_r"), r.get("cost_r")),
+                     r.get("funding_r"), r.get("cost_r"),
+                     *_provenance_values(r)),
                 )
                 n += 1
             self.conn.commit()

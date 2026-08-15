@@ -10,6 +10,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.22.0] — 2026-08-16 · P12.11: source provenance in saved keys (Dukascopy blocker #3)
+
+MINOR: make the price series a graded row came from part of its identity, so
+two different markets can never pool into one calibration entry. Closes the
+**last** of the three blockers recorded against the Dukascopy XAU research
+book — all three are now closed.
+
+### The problem
+Every decided row was filed under `plan_type` or `plan_type::regime` and
+nothing else. A row graded on Binance BTCUSDT spot candles and a row graded on
+a bid-only Dukascopy XAUUSD import landed in the **same** calibration entry,
+so a research backtest on a venue the desk does not trade could move the
+confidence multiplier applied to live signals. The only protection was a
+human remembering not to type `--save`.
+
+Measured on a seeded book (300 rows per series): the live entry alone scores
+`E +0.46R → net +0.29R`, multiplier `×1.07`; pooling a `+3.58R` bid-only gold
+research book into the same key inflated that number. They are now two
+entries, and the live one is byte-identical to a live-only run.
+
+### Added
+- **`data/provenance.py`** — the source-key algebra. `source_key()`,
+  `parse_source_key()`, `normalize()`, `is_canonical()`, `is_one_sided()`,
+  `describe_source()`, `split_profile_key()`, `provenance_of_frame()`.
+  A source key is `exchange:market[:price_type]`, and the canonical live
+  series (Binance spot, two-sided) is deliberately the **empty string**.
+- **Provenance columns** — `exchange`, `market`, `price_type`, `source_key` on
+  `backtest_results` and `paper_trades`; `source_key` on `calibration`. All
+  added by idempotent migration.
+- **`SignalDB.source_inventory()`** — decided-row counts per source series
+  across both books, with `mixed` / `canonical_only` / `one_sided` flags.
+- **Scorecard `by_source` split + `sources` inventory** — a pooled book is
+  reported as pooled, and one-sided series are flagged research-only.
+- **`--source-key` / `?source_key=` / MCP `source_key`** — score one series:
+  `live`, `exchange:market[:bid|ask]`, or `all` (default).
+- **`docs/SOURCE_PROVENANCE.md`** — the full design note.
+
+### Changed
+- **`brain/calibrator.profile_key()`** takes a source key and appends
+  `@source` for non-canonical series only, so **every pre-existing key is
+  byte-identical**. `build_profile()` groups by source and marks one-sided
+  entries `research_only`.
+- **`engine/calibration_hook.apply_calibration()`** — the live path resolves
+  **canonical keys only**, narrowing `plan_type::regime` → `plan_type` within
+  one source and never falling back across sources. A research entry's boost
+  *and* its filter are both unreachable from a live scan.
+- **`brain/risk_gate.setup_proven()`** counts evidence on one series
+  (default: live) and can never call a one-sided series proven.
+- **`data/store.StoreClient`** stamps provenance on the frame; the simulator
+  and `backtest --save` propagate it to every stored row.
+- **`python main.py learn`** lists the source series in the learning store.
+- MCP server `1.9.0 → 1.10.0`.
+
+### Unblocked
+- `--save` on a Dukascopy XAU backtest is now **permitted**: its rows land in
+  their own calibration keys and cannot recalibrate the live PAXG proxy.
+  Promotion of that series remains a separate, human-approved decision.
+
+### Safety direction
+Strictly additive and strictly tighter. Canonical keys, legacy NULL-provenance
+rows (which *are* the canonical series), crypto output and the graduation bar
+are all unchanged; the change can only *withdraw* trust from a research series,
+never grant it. No existing test was modified.
+
+### Tests
++23 in `tests/test_provenance.py` — key algebra, persistence, the
+pooling-regression proof, live-isolation of both boost and filter, legacy
+compatibility, the proven gate, and scorecard reporting/filtering.
+Suite: **681 → 704 pass / 1 skip**.
+
+---
+
 ## [2.21.0] — 2026-08-15 · P12.10: XAU bid/ask cost model (Dukascopy blocker #2)
 
 MINOR: teach `data/costs.py` that gold instruments trade on spot markets with

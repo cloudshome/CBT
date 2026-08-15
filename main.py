@@ -62,6 +62,25 @@ def _symbols(value: str | None) -> list[str]:
     return parse_symbol_list(value, default=SYMBOLS)
 
 
+def _source_key_arg(value: str | None) -> str | None:
+    """Resolve a ``--source-key`` CLI value into a P12.11 source key.
+
+    ``None``/``all``  → every source (pooled, and the report says so)
+    ``live``/``canonical`` → the canonical live Binance spot series (``""``)
+    anything else     → parsed as ``exchange:market[:price_type]``
+    """
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in ("", "all", "any", "*"):
+        return None
+    if text in ("live", "canonical", "binance", "default"):
+        from data.provenance import LIVE_SOURCE_KEY
+        return LIVE_SOURCE_KEY
+    from data.provenance import parse_source_key, source_key
+    return source_key(*parse_source_key(text))
+
+
 def _load_calibration() -> dict:
     """Load the self-improvement profile from the DB (empty dict when unused)."""
     try:
@@ -290,6 +309,9 @@ def cmd_backtest(args) -> int:
     from data.backtester import run_backtest, save_report, print_report
     from data.database import SignalDB
 
+    from data.provenance import (describe_source, is_canonical, is_one_sided,
+                                 provenance_of_frame, source_key)
+
     if args.source == "store":
         from data.store import StoreClient
         client = StoreClient(exchange=args.exchange, market=args.market)
@@ -305,17 +327,37 @@ def cmd_backtest(args) -> int:
     save_report(report)
     print_report(report)
 
+    # P12.11 — which price series produced these grades. A live/demo REST
+    # fetch is the canonical series; a store read carries the store's own
+    # stamped provenance (venue, market, and bid/ask side for CSV imports).
+    if args.source == "store":
+        prov = provenance_of_frame(df, exchange=args.exchange,
+                                   market=args.market)
+    else:
+        prov = provenance_of_frame(df)
+    src_key = source_key(*prov)
+    if not is_canonical(src_key):
+        print(f"\nsource: {describe_source(src_key)}  [key {src_key}]")
+
     if args.save:
         run_id = time.strftime("%Y%m%d_%H%M%S")
         rows = []
         for g in result["graded"]:
             r = g.as_row()
             r.update({"run_id": run_id, "symbol": symbol,
-                      "timeframe": args.tf, "step": args.step})
+                      "timeframe": args.tf, "step": args.step,
+                      "exchange": prov[0], "market": prov[1],
+                      "price_type": prov[2]})
             rows.append(r)
         with SignalDB() as db:
             n = db.save_backtest_rows(rows, run_id)
         print(f"\nSaved {n} graded plans to the signal database (run {run_id}).")
+        if src_key:
+            print(f"Filed under source '{src_key}' ({describe_source(src_key)}) — "
+                  "a separate calibration key from the live series.")
+            if is_one_sided(src_key):
+                print("This series is one-sided (not an executable round trip): "
+                      "research evidence only, never 'proven'.")
         print("Run `python main.py stats` to see what the engine has learned.")
     return 0
 
@@ -402,6 +444,7 @@ def cmd_scorecard(args) -> int:
             return 2
         source = "all" if args.source == "db" else args.source
         report = scorecard_from_db(
+            source_key=_source_key_arg(getattr(args, "source_key", None)),
             symbol=_sym(args.symbol) if args.symbol else None,
             source=source, min_decided=args.min_decided,
             include_sim=not args.exclude_sim,
@@ -710,9 +753,29 @@ def cmd_learn(args) -> int:
     from brain.calibrator import learn, describe
     result = learn()
     print(describe(result["profile"]))
+
+    # P12.11 — name the price series the learning store holds, so a reviewer
+    # can see whether research imports are present before trusting a profile.
+    from data.database import SignalDB
+    from data.provenance import describe_source
+    try:
+        with SignalDB() as db:
+            inv = db.source_inventory()
+    except Exception:
+        inv = {}
+    if inv.get("keys") and not inv.get("canonical_only", True):
+        print("\nsource series in the learning store (P12.11):")
+        for k in inv["keys"]:
+            c = inv["counts"][k]
+            flag = "  ← research only (one-sided)" if k in inv.get("one_sided", []) else ""
+            print(f"  {describe_source(k):<44} bt={c['backtest']} pp={c['paper']}{flag}")
+        print("  calibration keys are per source — a research series cannot "
+              "move live confidence.")
+
     if args.json:
         import json as _json
-        print(_json.dumps(result["profile"], indent=2))
+        print(_json.dumps({"profile": result["profile"], "sources": inv},
+                          indent=2, default=str))
     return 0
 
 
@@ -2115,6 +2178,12 @@ def main(argv: list[str] | None = None) -> int:
     p_score.add_argument("--quality", action="store_true",
                          help="P12.4: embed the Backtest Quality Score 0–100 "
                               "for the same book")
+    p_score.add_argument("--source-key", default=None,
+                         help="P12.11: score ONE price series only — "
+                              "'live' (canonical Binance spot), "
+                              "'exchange:market[:bid|ask]' e.g. "
+                              "dukascopy:spot:bid, or 'all' (default) to pool "
+                              "every source and report the mix")
     p_score.add_argument("--json", action="store_true",
                          help="machine-readable result")
     p_score.set_defaults(func=cmd_scorecard)

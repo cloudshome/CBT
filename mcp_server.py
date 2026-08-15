@@ -28,7 +28,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.9.0"  # bumped: P12.7 Monte Carlo risk-of-ruin table embedded in risk tool
+SERVER_VERSION = "1.10.0"  # bumped: P12.11 source provenance — scorecard source_key filter + source inventory
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -127,6 +127,7 @@ ALLOWED_TOOLS = {
                 "exclude_sim": {"type": "boolean", "default": False, "description": "Drop simulator walk-forward samples (real paper book only)"},
                 "no_costs": {"type": "boolean", "default": False, "description": "Disable cost modeling (evaluate gross only)"},
                 "conditioned": {"type": "boolean", "default": False, "description": "Include conditioned splits by funding and CVD order flow"},
+                "source_key": {"type": "string", "description": "P12.11 price-series filter: 'live' (canonical Binance spot), 'exchange:market[:bid|ask]' e.g. 'dukascopy:spot:bid', or 'all' (default) to pool every source. The report always names the sources it mixed and flags one-sided (bid/ask-only) series as research-only."},
             },
         },
     },
@@ -251,6 +252,17 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         from data.scorecard import scorecard_from_db
         src = args.get("source", "db")
         cost_model = CostModel(enabled=not bool(args.get("no_costs", False)))
+        # P12.11 — an explicit price-series filter; default pools and reports.
+        raw_key = args.get("source_key")
+        source_key = None
+        if raw_key is not None:
+            text = str(raw_key).strip().lower()
+            if text not in ("", "all", "any", "*"):
+                from data.provenance import (LIVE_SOURCE_KEY, parse_source_key,
+                                             source_key as _mk_source_key)
+                source_key = (LIVE_SOURCE_KEY
+                              if text in ("live", "canonical", "binance", "default")
+                              else _mk_source_key(*parse_source_key(text)))
         return scorecard_from_db(
             symbol=normalize_symbol(args["symbol"]) if args.get("symbol") else None,
             source="all" if src == "db" else src,
@@ -258,7 +270,8 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
             include_sim=not bool(args.get("exclude_sim", False)),
             cost_model=cost_model,
             conditioned=bool(args.get("conditioned", False)),
-            quality=bool(args.get("quality", False)))
+            quality=bool(args.get("quality", False)),
+            source_key=source_key)
 
     elif name == "hidden_chart_read":
         # HMM regime + CVD + Kelly advisory for one symbol. Read-only.

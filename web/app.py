@@ -54,6 +54,24 @@ _CACHE: dict = {"payload": None, "ts": 0, "ttl": 40}
 _LAST_GOOD: dict[tuple[str, str], dict] = {}   # last successful payload by (symbol, timeframe)
 
 
+def _source_key_param(value):
+    """Resolve a ``source_key`` query parameter into a P12.11 source key.
+
+    Missing / ``all`` → every source; ``live`` → the canonical Binance spot
+    series; otherwise parsed as ``exchange:market[:price_type]``.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in ("", "all", "any", "*"):
+        return None
+    if text in ("live", "canonical", "binance", "default"):
+        from data.provenance import LIVE_SOURCE_KEY
+        return LIVE_SOURCE_KEY
+    from data.provenance import parse_source_key, source_key
+    return source_key(*parse_source_key(text))
+
+
 def _sanitize_for_json(obj):
     """Recursively convert NumPy scalars/arrays to native Python types.
 
@@ -1863,6 +1881,8 @@ def make_app() -> Flask:
                 return jsonify({
                     "backtest": db.backtest_stats(),
                     "calibration": db.load_calibration(),
+                    # P12.11 — which price series the learning store holds.
+                    "sources": db.source_inventory(),
                     "plan_stats": db.plan_stats(),
                     "metrics": business_metrics(db),
                     "journal": violation_rate(db),
@@ -2110,6 +2130,8 @@ def make_app() -> Flask:
             since_ts = int(since) if since and since.isdigit() else None
             until_ts = int(until) if until and until.isdigit() else None
             cost_model = CostModel(enabled=not no_costs)
+            # P12.11 — ?source_key=live | exchange:market[:bid|ask] | all
+            source_key = _source_key_param(request.args.get("source_key"))
             return jsonify(_sanitize_for_json(scorecard_from_db(
                 symbol=_sym(sym) if sym else None,
                 source="all" if src == "db" else src,
@@ -2118,7 +2140,8 @@ def make_app() -> Flask:
                 since_ts=since_ts, until_ts=until_ts,
                 cost_model=cost_model,
                 conditioned=conditioned,
-                quality=quality)))
+                quality=quality,
+                source_key=source_key)))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False,
                             "error": f"{type(exc).__name__}: {exc}"})

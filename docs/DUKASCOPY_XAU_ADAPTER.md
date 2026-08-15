@@ -116,10 +116,21 @@ python main.py quality \
   --symbol XAUUSD --tf 15m --bars 12000
 ```
 
-Do **not** add `--save` until the book is reviewed. Saving mixes graded rows
-into the learning database by symbol; source-series provenance is not yet a
-calibration dimension. A Dukascopy XAU backtest must not silently recalibrate
-the live PAXG proxy.
+`--save` is **permitted since P12.11** (v2.22.0). Source-series provenance is
+now a calibration dimension: saved rows are stamped with
+`exchange`/`market`/`price_type` and filed under a separate calibration key
+(`…@dukascopy:spot:bid`), so a Dukascopy XAU backtest **cannot** recalibrate
+the live PAXG proxy — neither its multiplier nor its filter reaches a live
+scan, and a one-sided series can never be marked `proven`. See
+[`SOURCE_PROVENANCE.md`](SOURCE_PROVENANCE.md).
+
+Inspect what the learning store holds at any time:
+
+```bash
+python main.py learn                                        # lists source series
+python main.py scorecard --source backtest --source-key dukascopy:spot:bid
+python main.py scorecard --source backtest --source-key live
+```
 
 ## Important limitations before calibration or micro-live
 
@@ -163,7 +174,7 @@ after:
 - a market-calendar-aware quality check is green (✅ available since P12.9 —
   run it on the imported book and record the result);
 - bid/ask spread and XAU-specific costs are modeled net of costs ✅ **Closed by P12.10** (v2.21.0);
-- source provenance reaches saved backtest/calibration keys;
+- source provenance reaches saved backtest/calibration keys ✅ **Closed by P12.11** (v2.22.0);
 - PAXG-vs-XAU basis/deviation is measured, not assumed;
 - walk-forward train/validation/sealed-OOS results clear the unchanged bar;
 - a human explicitly approves the progression decision.

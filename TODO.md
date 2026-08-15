@@ -6,14 +6,19 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-15 (this session: **P12.10 shipped — XAU bid/ask
-cost model** (Dukascopy blocker #2). `data/costs.py` auto-detects gold
-instruments and applies a spot-market model with spread-based costs, no
-funding, and a small ECN commission. Crypto costs and explicit CostModel
-overrides are unchanged. Two of three Dukascopy blockers closed. Suite green:
+**Last updated:** 2026-08-16 (this session: **P12.11 shipped — source
+provenance in saved keys** (Dukascopy blocker #3). `data/provenance.py` makes
+the price series part of the calibration key, so a research backtest can never
+recalibrate the live book; the live path resolves canonical keys only and a
+one-sided series can never be proven. **All three Dukascopy blockers are now
+closed** and `--save` on that adapter is unblocked. Suite green:
+**704 pass / 1 skip**.)
+
+**Previous:** 2026-08-15 (**P12.10 shipped — XAU bid/ask cost model**
+(Dukascopy blocker #2): gold auto-detection in `data/costs.py`. Suite green:
 **681 pass / 1 skip**.)
 
-**Previous:** 2026-08-15 (**P12.9 shipped — market calendars**: `data/calendar.py` gives each venue a trading calendar, so scheduled OTC-gold closure is no longer read as missing data. Suite green: **671 pass / 1 skip**.)
+**Earlier:** 2026-08-15 (**P12.9 shipped — market calendars**: `data/calendar.py` gives each venue a trading calendar, so scheduled OTC-gold closure is no longer read as missing data. Suite green: **671 pass / 1 skip**.)
 
 **Earlier:** 2026-08-15 (**P12.8 shipped — the net anchor**: the calibrator multiplier and the setup-proven gate now judge `E_net` instead of `E_gross`, so a setup that only profits before costs is dampened and never called proven. Suite green: **631 pass / 1 skip**.)
 
@@ -32,7 +37,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 567 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 704 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -89,10 +94,26 @@ Do not reopen them to install a bot or a second backtest engine.
 > (0.005%/side), spread as the primary cost. An explicit `CostModel` still
 > overrides auto-detection. Crypto costs are unchanged.
 >
-> **Next code build:** **source provenance in saved calibration keys**
-> (Dukascopy blocker #3), so a Dukascopy backtest can never recalibrate the
-> live PAXG proxy. Only then is any XAU expectancy quotable as graduation
-> evidence.
+> **P12.11 shipped — source provenance in saved keys** (Dukascopy blocker #3,
+> **the last one**). A graded row's calibration key carried `plan_type` and
+> `regime` but not the price series that produced it, so a bid-only Dukascopy
+> XAUUSD backtest pooled into the same entry as the live Binance book and
+> could raise the multiplier applied to live signals. `data/provenance.py`
+> adds a source key (`exchange:market[:price_type]`) with the canonical live
+> series as the **empty string** — so every pre-existing key is byte-identical
+> and legacy NULL-provenance rows read as the live series. Non-canonical
+> series get `…@dukascopy:spot:bid` keys; the live calibration hook resolves
+> canonical keys only (boost **and** filter isolated); `setup_proven()` counts
+> one series and never proves a one-sided one; the scorecard splits
+> `by_source` and warns when a book pools series. `--save` on the XAU adapter
+> is unblocked. Docs: `docs/SOURCE_PROVENANCE.md`. Suite: **704 pass / 1 skip**
+> (+23).
+>
+> **Next code build:** **micro-live at trivial size**. Every P12 milestone and
+> all three Dukascopy blockers are shipped; slippage, partial fills and
+> latency are the only remaining unknowns that cannot be measured offline.
+> That step is gated on the graduation bar opening and explicit human
+> approval — it is not a code decision to make unilaterally.
 >
 > **Prior order note (2026-08-15):** **P12.8 shipped — the net
 > anchor.** P12.6 made every *measurement* net of costs; P12.8 fixes the two
@@ -145,7 +166,7 @@ order changed as a result.
 | **P12.7** | **MC ruin / worst streak / risk-of-ruin table** | ✅ **shipped** — `brain/analytics.monte_carlo_ruin_table()` (NET outcomes); CLI `monte`; HTTP `/api/monte`; MCP `cryptobrain_monte` + `ruin_table`; dashboard Risk card | M |
 | **P12.9** | **market calendars** | ✅ **shipped** — `data/calendar.py` (`crypto-24x7` / `xau-otc`); calendar-aware gaps, quality pillar, readiness, CSV import; CLI `calendar`; `docs/MARKET_CALENDAR.md` | S |
 | **P12.10** | **XAU bid/ask cost model** | ✅ **shipped** — gold auto-detection in `data/costs.py`; spot market model with spread-based costs, no funding, ECN commission; Dukascopy blocker #2 closed | M |
-| key provenance | candle-source in saved calibration keys | Dukascopy blocker #3 — stops an XAU backtest recalibrating live PAXG | S |
+| **P12.11** | **source provenance in saved keys** | ✅ **shipped** — `data/provenance.py`; source-keyed calibration, live-path isolation, `by_source` scorecard split, `--source-key`; Dukascopy blocker #3 closed; `docs/SOURCE_PROVENANCE.md` | S |
 | micro-live | trivial size | slippage / partial fills / latency can only be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be

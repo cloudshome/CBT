@@ -38,14 +38,44 @@ from config import (CALIBRATE_MIN_N, CALIBRATE_MIN_PAPER_N, CALIBRATE_GAIN,
                     CALIBRATE_FILTER_THRESHOLD, TP_RR_MIN, TP_RR_MAX,
                     BACKTEST_STEP)
 from data.database import SignalDB
+from data.provenance import KEY_SEP, describe_source, is_one_sided
+from data.provenance import parse_source_key as _parse_source_key
+from data.provenance import source_key as _source_key
 from data.validation import DEFAULT_MIN_DECIDED
 
 WIN_SET = {"FULL_WIN", "PARTIAL_WIN"}
 
 
-def profile_key(plan_type: str, regime: str = "") -> str:
-    """Composite calibration key: ``plan_type`` or ``plan_type::regime``."""
-    return f"{plan_type}::{regime}" if regime else plan_type
+def profile_key(plan_type: str, regime: str = "", source_key: str = "") -> str:
+    """Composite calibration key.
+
+    ``plan_type`` | ``plan_type::regime`` | ``plan_type::regime@source``
+
+    **P12.11 — source provenance is part of the key.** Before this, a graded
+    row from a Dukascopy bid-only XAU research import and a graded row from
+    the live Binance series landed in the *same* calibration entry, so a
+    research backtest could move the multiplier applied to live trades. The
+    source key is now a key dimension.
+
+    The canonical live series (Binance spot, two-sided) normalises to the
+    empty source key and appends nothing, so every key SKY has ever written
+    is byte-identical to before — P12.11 is strictly additive.
+    """
+    base = f"{plan_type}::{regime}" if regime else plan_type
+    src = _source_key(*_parse_source_key(source_key))
+    return f"{base}{KEY_SEP}{src}" if src else base
+
+
+def _key_source(key: str, entry: Optional[dict] = None) -> str:
+    """The source key a profile entry belongs to (P12.11).
+
+    Prefers the stored ``source_key`` field and falls back to parsing the
+    calibration key, so profiles written before P12.11 (no field, no suffix)
+    read as the canonical live series.
+    """
+    if entry is not None and entry.get("source_key") is not None:
+        return _source_key(*_parse_source_key(entry.get("source_key")))
+    return _source_key(*_parse_source_key(key.partition(KEY_SEP)[2]))
 
 
 def compute_expectancy_by_type(db: SignalDB, horizons: Optional[list[float]] = None) -> dict:
@@ -97,21 +127,29 @@ def compute_expectancy_by_type(db: SignalDB, horizons: Optional[list[float]] = N
 
 
 def _decided_by_key(db: SignalDB) -> dict:
-    """Expectancy per (plan_type, regime) from backtests + paper outcomes."""
+    """Expectancy per (plan_type, regime, **source**) from backtests + paper.
+
+    **P12.11** groups by the stored source key as well, so two price series
+    never pool into one calibration entry. Legacy rows carry NULL provenance
+    and collapse to the canonical key ``''`` — which is what they are.
+    """
     rows = db.conn.execute(
         """WITH decided AS (
-                 SELECT plan_type, regime, outcome, rr_achieved, 'backtest' AS source
+                 SELECT plan_type, regime, outcome, rr_achieved, 'backtest' AS source,
+                        COALESCE(source_key,'') AS source_key
                  FROM backtest_results
                  WHERE outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')
                  UNION ALL
                  SELECT plan_type, regime,
                         CASE outcome WHEN 'TP_HIT' THEN 'FULL_WIN'
                                      WHEN 'STOP_LOSS' THEN 'LOSS' END AS outcome,
-                        rr_achieved, 'paper' AS source
+                        rr_achieved, 'paper' AS source,
+                        COALESCE(source_key,'') AS source_key
                  FROM paper_trades
                  WHERE outcome IN ('TP_HIT','STOP_LOSS')
              )
              SELECT plan_type, COALESCE(NULLIF(regime,''),'') AS regime,
+                    source_key,
                     COUNT(*) n,
                     SUM(CASE WHEN outcome IN ('FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
                     SUM(CASE WHEN outcome='LOSS' THEN 1 ELSE 0 END) losses,
@@ -120,7 +158,7 @@ def _decided_by_key(db: SignalDB) -> dict:
                     AVG(rr_achieved) avg_rr,
                     AVG(CASE WHEN outcome IN ('FULL_WIN','PARTIAL_WIN') THEN rr_achieved END) avg_win_rr
              FROM decided
-             GROUP BY plan_type, regime"""
+             GROUP BY plan_type, regime, source_key"""
     ).fetchall()
     out = {}
     for r in rows:
@@ -128,8 +166,10 @@ def _decided_by_key(db: SignalDB) -> dict:
         wins = r["wins"] or 0
         losses = r["losses"] or 0
         decided = wins + losses
-        key = profile_key(r["plan_type"], r["regime"])
+        src = r["source_key"] or ""
+        key = profile_key(r["plan_type"], r["regime"], src)
         out[key] = {
+            "source_key": src,
             "n": n,
             "wins": wins,
             "losses": losses,
@@ -162,9 +202,14 @@ def _decided_rows_by_key(db: SignalDB) -> tuple[dict, dict]:
     rows_by_key: dict[str, list[dict]] = {}
     setup_rows_by_type: dict[str, list[dict]] = {}
     for r in backtest_rows + paper_rows:
-        key = profile_key(r.get("setup") or "?", r.get("regime") or "")
+        # P12.11 — the row's own provenance decides its key, and the
+        # per-setup pool is kept per source too: a research series must not
+        # lend sample quality to the live series' score.
+        src = r.get("source_key") or ""
+        key = profile_key(r.get("setup") or "?", r.get("regime") or "", src)
         rows_by_key.setdefault(key, []).append(r)
-        setup_rows_by_type.setdefault(r.get("setup") or "?", []).append(r)
+        type_key = profile_key(r.get("setup") or "?", "", src)
+        setup_rows_by_type.setdefault(type_key, []).append(r)
     return rows_by_key, setup_rows_by_type
 
 
@@ -199,7 +244,9 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
         if n < min_n:
             continue  # not enough samples to trust — keep neutral
         exp = st["expectancy"]
-        plan_type, _, regime = key.partition("::")
+        src = st.get("source_key", "") or ""
+        base, _, _ = key.partition(KEY_SEP)
+        plan_type, _, regime = base.partition("::")
 
         # P12.5 — the strategy score for this key's own decided rows.
         rows = rows_by_key.get(key, [])
@@ -207,7 +254,8 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
         if rows:
             score_block = strategy_score(
                 rows, plan_type=plan_type, regime=(regime or None),
-                setup_rows=setup_rows_by_type.get(plan_type, rows),
+                setup_rows=setup_rows_by_type.get(
+                    profile_key(plan_type, "", src), rows),
                 min_decided=min_decided, criteria=criteria, step=step)
         score_val = score_block.get("score") if score_block else None
         exp_net = (score_block.get("expectancy_net") if score_block else None)
@@ -228,8 +276,18 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
         tp_rr = None
         if st["avg_win_rr"] is not None:
             tp_rr = round(max(TP_RR_MIN, min(TP_RR_MAX, st["avg_win_rr"])), 2)
+        # P12.11 — a one-sided (bid-only / ask-only) research series can never
+        # be "proven": its printed price is not a round trip the desk could
+        # have executed. Strictly tighter, never looser.
+        research_only = is_one_sided(src)
+        if research_only:
+            proven = False
+
         profile[key] = {
             "multiplier": round(mult, 3),
+            # P12.11 — which price series produced this entry.
+            "source_key": src,
+            "research_only": research_only,
             "expectancy": exp,
             "expectancy_net": (score_block.get("expectancy_net")
                                if score_block else None),
@@ -250,22 +308,31 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
     return profile
 
 
-def suggest_tp_rr_by_type(profile: dict, regime: str = "") -> dict:
+def suggest_tp_rr_by_type(profile: dict, regime: str = "",
+                          source_key: str = "") -> dict:
     """Map plan_type -> suggested TP distance in R from the profile (A2).
 
     When a regime is given, regime-specific entries win; otherwise the best-
     sampled entry per plan type is used.
+
+    **P12.11** — only entries learned from ``source_key`` (default: the
+    canonical live series) are consulted, so a research book cannot retarget
+    live take-profits.
     """
+    want_src = _source_key(*_parse_source_key(source_key))
+    profile = {k: e for k, e in profile.items()
+               if _key_source(k, e) == want_src}
     out: dict[str, dict] = {}
     for key, e in profile.items():
         if not e.get("tp_rr"):
             continue
-        plan_type = key.split("::")[0]
-        if regime and key.endswith(f"::{regime}"):
+        base = key.partition(KEY_SEP)[0]
+        plan_type = base.split("::")[0]
+        if regime and base.endswith(f"::{regime}"):
             cur = out.get(plan_type)
             if cur is None or e["samples"] > cur["samples"]:
                 out[plan_type] = e
-        elif not regime and "::" not in key:
+        elif not regime and "::" not in base:
             out[plan_type] = e
     if not regime:
         # Fall back to the best-sampled entry per plan type across regimes.
@@ -273,7 +340,7 @@ def suggest_tp_rr_by_type(profile: dict, regime: str = "") -> dict:
         for key, e in profile.items():
             if not e.get("tp_rr"):
                 continue
-            pt = key.split("::")[0]
+            pt = key.partition(KEY_SEP)[0].split("::")[0]
             cur = by_type.get(pt)
             if cur is None or e["samples"] > cur["samples"]:
                 by_type[pt] = e
@@ -291,14 +358,24 @@ def learn(profile_path: Optional[str] = None) -> dict:
 
 
 def apply_calibration(conf: int, plan_type: str, calibration: dict,
-                      regime: str = "") -> tuple[int, bool]:
+                      regime: str = "", source_key: str = "") -> tuple[int, bool]:
     """Apply the calibration profile to one plan's confidence.
-    Returns (adjusted_confidence, filtered_out)."""
+
+    Returns ``(adjusted_confidence, filtered_out)``.
+
+    **P12.11** — a live scan reads the **canonical** source key (``""``) by
+    default and therefore only ever matches entries learned from the series
+    the desk actually trades. A Dukascopy XAU research entry is filed under
+    ``…@dukascopy:spot:bid`` and simply is not found here, so it cannot move
+    live confidence. Lookup falls back from the most specific key to the
+    least specific one **within the same source** — never across sources.
+    """
     if not calibration:
         return conf, False
-    entry = calibration.get(profile_key(plan_type, regime))
+    src = _source_key(*_parse_source_key(source_key))
+    entry = calibration.get(profile_key(plan_type, regime, src))
     if entry is None:
-        entry = calibration.get(plan_type)
+        entry = calibration.get(profile_key(plan_type, "", src))
     if not entry:
         return conf, False
     if entry.get("filtered"):
@@ -313,19 +390,26 @@ def describe(profile: dict) -> str:
     lines = ["Calibration profile (applied to future signals; ✓ = proven setup):"]
     for pt, e in sorted(profile.items(), key=lambda kv: kv[1]["samples"], reverse=True):
         proven = "✓" if e.get("proven") else " "
+        src = _key_source(pt, e)
+        if src:
+            # P12.11 — a non-canonical series is research evidence; say so on
+            # the same line rather than letting it look like live calibration.
+            tag = " [research: " + describe_source(src) + "]"
+        else:
+            tag = ""
         score = e.get("strategy_score")
         band = e.get("strategy_band")
         score_bits = (f"score {score:.0f}/100 {band}" if score is not None
                       else "score n/a")
         if e["filtered"]:
             lines.append(f"  {proven} {pt:<24} FILTERED (E {e['expectancy']:+.2f}R, "
-                         f"{score_bits}, n={e['samples']})")
+                         f"{score_bits}, n={e['samples']}){tag}")
         else:
             lines.append(f"  {proven} {pt:<24} x{e['multiplier']:.2f}  "
                          f"({score_bits}, E {e['expectancy']:+.2f}R "
                          f"→ net {e['expectancy_net'] if e.get('expectancy_net') is not None else e['expectancy']:+.2f}R, "
                          f"win {e['win_rate']*100:.0f}%, bt={e['backtest_samples']} pp={e['paper_samples']}, "
-                         f"tp_rr={e['tp_rr']})")
+                         f"tp_rr={e['tp_rr']}){tag}")
     lines.append("  strategy score = E_R × sample-quality × regime-fit × "
                  "execution (P12.5, evaluated NET of costs)")
     lines.append("  multiplier anchors on NET expectancy (P12.8) — a setup that "

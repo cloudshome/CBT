@@ -400,9 +400,17 @@ def run_backtest_on_store(exchange: str = "binance", market: str = "perp",
     result = run_backtest(df, symbol=symbol, timeframe=timeframe,
                           horizons=horizons, min_bars=min_bars,
                           step=step, min_confidence=min_confidence)
+    # P12.11 — report the provenance of the series that was actually graded,
+    # read off the stored frame itself rather than assumed from arguments.
+    from data.provenance import provenance_of_frame, source_key
+    prov_exchange, prov_market, prov_price_type = provenance_of_frame(
+        df, exchange=exchange, market=market)
     return {"ok": True, **result, "store_source": True,
             "store_path": store._series_dir(exchange, market, symbol, timeframe).as_posix(),
-            "bars_read": len(df)}
+            "bars_read": len(df),
+            "exchange": prov_exchange, "market": prov_market,
+            "price_type": prov_price_type,
+            "source_key": source_key(prov_exchange, prov_market, prov_price_type)}
 
 
 def print_report(report: dict) -> None:
