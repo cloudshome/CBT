@@ -6,7 +6,9 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-15 (this session: **P12.7 shipped — Monte Carlo risk-of-ruin table**: `brain/analytics.monte_carlo_ruin_table()` resamples NET realised paper outcomes to produce a `risk% × expected DD × ruin probability` sweep plus longest losing streak and time-to-recovery, surfaced through CLI `monte`, HTTP `/api/monte` + embedded in `/api/risk`, MCP `cryptobrain_monte` + `cryptobrain_risk.ruin_table`, and the dashboard Risk card. Suite green: **620 pass / 1 skip**.)
+**Last updated:** 2026-08-15 (this session: **P12.8 shipped — the net anchor**: the calibrator multiplier and the setup-proven gate now judge `E_net` instead of `E_gross`, so a setup that only profits before costs is dampened and never called proven. Suite green: **631 pass / 1 skip**.)
+
+**Previous:** 2026-08-15 (**P12.7 shipped — Monte Carlo risk-of-ruin table**: `brain/analytics.monte_carlo_ruin_table()` resamples NET realised paper outcomes to produce a `risk% × expected DD × ruin probability` sweep plus longest losing streak and time-to-recovery, surfaced through CLI `monte`, HTTP `/api/monte` + embedded in `/api/risk`, MCP `cryptobrain_monte` + `cryptobrain_risk.ruin_table`, and the dashboard Risk card. Suite green: **620 pass / 1 skip**.)
 
 ---
 
@@ -58,7 +60,19 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-15, this session):** **P12.7 shipped — Monte
+> **Order note (2026-08-15, this session):** **P12.8 shipped — the net
+> anchor.** P12.6 made every *measurement* net of costs; P12.8 fixes the two
+> places that *act* on one and were still reading **gross**.
+> `data.strategy_score.multiplier_from_score()` anchored on `E_gross`, so a
+> setup at `E_gross +0.055R` / `E_net −0.118R` was boosted **×1.008** — the
+> engine raised confidence on a setup that loses money (now **×0.982**).
+> `brain.risk_gate.setup_proven()` likewise called setups proven on gross
+> expectancy and now requires positive **net** expectancy where available
+> (`proven_on` reports which anchor was used; sample floors unchanged).
+> Strictly tighter, never looser — the graduation bar is untouched.
+> Suite green: **631 pass / 1 skip** (+11).
+>
+> **Prior order note (2026-08-15):** **P12.7 shipped — Monte
 > Carlo risk-of-ruin table.** `brain/analytics.monte_carlo_ruin_table()`
 > resamples the NET realised paper book (costs included) and sweeps
 > position size so the desk can read off expected max drawdown, ruin

@@ -210,11 +210,19 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
                 setup_rows=setup_rows_by_type.get(plan_type, rows),
                 min_decided=min_decided, criteria=criteria, step=step)
         score_val = score_block.get("score") if score_block else None
+        exp_net = (score_block.get("expectancy_net") if score_block else None)
 
-        mult = multiplier_from_score(exp, score_val)
-        filtered = bool(filter_neg and exp < CALIBRATE_FILTER_THRESHOLD)
+        # P12.8 — the multiplier and the negative filter both judge the NET
+        # number (what the money actually does), falling back to gross only
+        # when costs could not be computed for this key.
+        mult = multiplier_from_score(exp, score_val, expectancy_net=exp_net)
+        exp_for_filter = exp if exp_net is None else exp_net
+        filtered = bool(filter_neg and exp_for_filter < CALIBRATE_FILTER_THRESHOLD)
+        # P12.8 — "proven" judges the net number too, matching
+        # `brain.risk_gate.setup_proven()`; gross is the fallback only when
+        # costs could not be computed for this key.
         proven = bool(st["backtest_samples"] >= min_n and
-                      st["paper_samples"] >= min_paper_n and exp > 0)
+                      st["paper_samples"] >= min_paper_n and exp_for_filter > 0)
         # Data-driven TP target (decision A2): measured average winner, clamped
         # to a sane range; None keeps the engine default until there is evidence.
         tp_rr = None
@@ -320,6 +328,8 @@ def describe(profile: dict) -> str:
                          f"tp_rr={e['tp_rr']})")
     lines.append("  strategy score = E_R × sample-quality × regime-fit × "
                  "execution (P12.5, evaluated NET of costs)")
+    lines.append("  multiplier anchors on NET expectancy (P12.8) — a setup that "
+                 "only profits before costs is dampened, never boosted")
     return "\n".join(lines)
 
 

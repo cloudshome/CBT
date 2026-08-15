@@ -10,12 +10,42 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-15 (this session: **P12.7 Monte Carlo risk-of-ruin table shipped** — `brain/analytics.monte_carlo_ruin_table()` resamples NET realised paper outcomes to produce a `risk% × expected DD × ruin probability` sweep plus longest losing streak and time-to-recovery; surfaces: CLI `monte`, HTTP `/api/monte` + embedded in `/api/risk`, MCP `cryptobrain_monte` + `ruin_table` inside `cryptobrain_risk`, dashboard Risk card)
-**Branch:** `arena/01a0046d-sky` (session branch fixed by Arena; branched from `origin/main` @ `5384a84`)
-**HEAD commit:** `44832c1` feat(P12.7): Monte Carlo risk-of-ruin table
-**Python:** 3.11 (venv `.venv` — system Python is PEP 668 externally managed) — suite green (620 pass / 1 skip)
+**Last updated:** 2026-08-15 (this session: **P12.8 the net anchor shipped** — the
+two places that *act* on a measurement, the calibrator multiplier and the
+setup-proven gate, were still reading **gross** expectancy after P12.6 made every
+*report* net. A setup at `E_gross +0.055R` / `E_net −0.118R` was boosted ×1.008;
+it is now dampened ×0.982. Surfaces: `learn` CLI, risk-gate block message,
+`setup_stats` net columns, `proven_on` flag)
 
-> **This session (`arena/01a0046d-sky`): P12.7 — Monte Carlo risk-of-ruin table.**
+**Previous:** 2026-08-15 (**P12.7 Monte Carlo risk-of-ruin table shipped** — `brain/analytics.monte_carlo_ruin_table()` resamples NET realised paper outcomes to produce a `risk% × expected DD × ruin probability` sweep plus longest losing streak and time-to-recovery; surfaces: CLI `monte`, HTTP `/api/monte` + embedded in `/api/risk`, MCP `cryptobrain_monte` + `ruin_table` inside `cryptobrain_risk`, dashboard Risk card)
+**Branch:** `arena/01a00490-sky` (session branch fixed by Arena; branched from `main` @ `2dd49a6`)
+**HEAD commit:** `2dd49a6` feat(P12.7): Monte Carlo risk-of-ruin table (this session's work sits on top)
+**Python:** 3.11 (venv `.venv` — system Python is PEP 668 externally managed) — suite green (**631 pass / 1 skip**)
+
+> **This session (`arena/01a00490-sky`): P12.8 — the net anchor.**
+> P12.6 made every *measurement* net of costs. P12.8 closes the gap it left:
+> the two places that **act** on a measurement still read the **gross**
+> number, so the desk measured honestly and then decided on the wrong figure.
+> - **`data/strategy_score.multiplier_from_score()`** anchored its sign on
+>   `E_gross`. Measured: a setup at `E_gross = +0.055R` / `E_net = −0.118R`
+>   got multiplier **×1.008** — the engine *raised* confidence on a setup that
+>   loses money. Now anchored on `expectancy_net` (gross only as fallback when
+>   costs are unknown) → **×0.982**, dampened.
+> - **`brain/calibrator.build_profile()`** passes the net anchor; the
+>   `CALIBRATE_FILTER` negative filter judges net too.
+> - **`brain/risk_gate.setup_proven()`** (A6/B10) now requires positive
+>   expectancy **net of costs**; sample floors unchanged. The block message
+>   names the failing condition instead of only reprinting sample counts.
+> - **`data/database.setup_stats()`** returns `backtest_expectancy_net` /
+>   `paper_expectancy_net` (`None` → caller falls back to gross, never guesses);
+>   `setup_proven` reports `proven_on: "net" | "gross"`.
+> - **Strictly tighter, never looser** — it can only dampen a multiplier or
+>   withdraw a "proven". The graduation bar is untouched.
+> - **Tests:** +11 in `tests/test_net_anchor.py` (incl. a monotonicity property:
+>   the net anchor can never raise a multiplier). Suite **620 → 631 / 1 skip**.
+> - **Versions:** `config.py` / `pyproject.toml` **2.17.0 → 2.18.0**.
+
+> **Prior session (`arena/01a0046d-sky`): P12.7 — Monte Carlo risk-of-ruin table.**
 > The scorecard says whether the live book is profitable net of costs;
 > P12.7 answers *how much size it can survive*. It resamples the decided
 > paper-trade outcomes **NET of costs** (filling missing `rr_net` via
@@ -134,7 +164,7 @@ phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.7 Monte Carlo risk-of-ruin table shipped.**
+**P12 (SKY Quant Validation Engine) — P12.8 the net anchor shipped.**
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real data and the graduation gate is honestly closed (+0.348R gross,
 negative net on 1h/4h primary). Freqtrade rejected (F1–F8); Backtrader
@@ -153,7 +183,7 @@ rejected (BT1–BT8). Open items: TODO-7, TODO-8; next phase: **micro-live**.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.7 shipped — Monte Carlo risk-of-ruin table** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score + plateau sweep; P12.5 strategy score on the calibrator; **P12.7: `brain/analytics.monte_carlo_ruin_table()` sweeps risk %/trade over NET realised outcomes to expose expected DD, ruin probability, longest losing streak and time-to-recovery**). Next: **micro-live**. |
+| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.7 shipped — Monte Carlo risk-of-ruin table** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score + plateau sweep; P12.5 strategy score on the calibrator; P12.7 Monte Carlo ruin/streak/TTR table; **P12.8: the net anchor — the calibrator multiplier and the setup-proven gate now judge `E_net`, not `E_gross`; a setup that only profits before costs is dampened and never called proven**). Next: **micro-live**. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -162,7 +192,44 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-15 (this branch `arena/01a0046d-sky`): P12.7 — Monte Carlo risk-of-ruin table
+### Session 2026-08-15 (this branch `arena/01a00490-sky`): P12.8 — the net anchor
+
+Branched from `main` @ `2dd49a6`. 0 regressions.
+Tests **620 → 631 pass / 1 skip** (+11). Version **2.17.0 → 2.18.0**.
+
+**The gap this closed.** P12.6 made every measurement net of costs, and the
+desk has been reporting `E_net` honestly ever since. But the two places that
+*act* on a measurement were never migrated, so the project measured with one
+number and decided with another:
+
+| site | read | consequence |
+|---|---|---|
+| `multiplier_from_score()` | `E_gross` | `+0.055R` gross / `−0.118R` net → **×1.008 boost** on a losing setup |
+| `setup_proven()` (A6/B10) | `backtest_expectancy`, `paper_expectancy` (gross) | a cost-flipped setup could be called **proven** |
+
+**What shipped:**
+- `data/strategy_score.py` — `multiplier_from_score(..., expectancy_net=None)`;
+  the sign anchor is the net number when known, gross only as fallback.
+  The cost-flipped case now yields **×0.982** instead of ×1.008.
+- `brain/calibrator.py` — `build_profile()` passes `expectancy_net`; the
+  `CALIBRATE_FILTER` negative-expectancy filter judges net too; `describe()`
+  states which anchor is in use.
+- `brain/risk_gate.py` — `setup_proven()` requires positive **net** expectancy
+  where available, returns `proven_on: "net" | "gross"`, and the gate's block
+  message names the failing condition (expectancy vs. sample floors).
+- `data/database.py` — `setup_stats()` returns `backtest_expectancy_net` /
+  `paper_expectancy_net` from the stored `rr_net` column; `None` when absent.
+- `tests/test_net_anchor.py` (new) — 11 tests, including a monotonicity
+  property: the net anchor can only lower a multiplier, never raise one.
+
+**Invariant kept:** strictly tighter, never looser. No change to the
+graduation bar, the sample floors, or any read-only guarantee.
+
+**Files changed:** `data/strategy_score.py`, `brain/calibrator.py`,
+`brain/risk_gate.py`, `data/database.py`, `tests/test_net_anchor.py` (new),
+`config.py`, `pyproject.toml`, `CHANGELOG.md`, `SESSION_STATE.md`, `TODO.md`.
+
+### Session 2026-08-15 (branch `arena/01a0046d-sky`): P12.7 — Monte Carlo risk-of-ruin table
 
 Branched from `main` @ `5384a84`. 0 regressions.
 Tests **613 → 620 pass / 1 skip** (+7). Version **2.16.0 → 2.17.0**.
@@ -334,6 +401,14 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 14. **`config.VERSION` was stale after P12.4** (2.14.0 instead of 2.15.0) —
     fixed to **2.17.0** in this session; `config.py` and `pyproject.toml` are
     now in step.
+16. **P12.8 changed decisions, not measurements.** The scorecard, quality
+    score and strategy score were already net-correct; only the calibrator
+    multiplier and the proven gate were reading gross. If a setup's
+    multiplier or `proven` flag looks *worse* than in a pre-2.18.0 run, that
+    is the fix working — the earlier value was measuring the wrong number.
+    Where `rr_net` is absent (old rows, costs disabled) behaviour falls back
+    to gross exactly as before, so historical books do not silently change
+    meaning; `proven_on` says which anchor was used.
 15. **P12.7 is a report, not a gate-bypass**: the Monte Carlo ruin table
     reads the decided paper book NET of costs and surfaces survivability
     estimates. It does not approve trades, loosen the graduation bar, or
@@ -343,27 +418,34 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Next recommended action
 
-1. Next *code* session: **micro-live** — begin very-small real-capital
-   execution only after the graduation bar opens and a human explicitly
-   approves the progression step. P12 is complete; no further quant-engine
-   features are queued.
-2. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-3. Do **not** install Freqtrade or Backtrader. Do not loosen the graduation bar.
-
-Narrative handover for this session: `docs/HANDOVER_2026-08-15_P12_7.md`
-(to be written if needed).
+1. **Re-run the grind on real data now that decisions read `E_net`.**
+   P12.8 changed what the calibrator and the proven gate *do*, so the
+   stored calibration profile was built on the old gross anchor. Re-run
+   `backtest --save` + `learn` on the real BTCUSDT store and re-read the
+   graduation report: some setups will lose their boost, and that is the
+   point. This is cheap and it is the first honest read of the desk.
+2. **Audit for any remaining gross-anchored decision.** P12.8 fixed the two
+   found by inspection (`multiplier_from_score`, `setup_proven`). A short
+   sweep for other places that compare an expectancy against zero or a
+   threshold would confirm the class of bug is closed, not just its
+   instances.
+3. Then *code*: **micro-live** — very-small real-capital execution only
+   after the graduation bar opens and a human explicitly approves the
+   progression step.
+4. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
+5. Do **not** install Freqtrade or Backtrader. Do not loosen the graduation bar.
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm the P12.7 PR merged. P12.1, P12.2, P12.3, P12.3.1, P12.3.2,
-> P12.6, P12.3.3, P12.4, P12.5, and **P12.7** are shipped: do not redo
-> the locked protocol, the negative-shift guard, the boxed scorecard, the
-> tie-break, the real data import, trade cost modeling, the
+> and confirm the P12.8 PR merged. P12.1–P12.7 and **P12.8** are shipped:
+> do not redo the locked protocol, the negative-shift guard, the boxed
+> scorecard, the tie-break, the real data import, trade cost modeling, the
 > overlap-corrected effective sample size, the Backtest Quality Score, the
-> strategy score on the calibrator, or the Monte Carlo ruin/streak/TTR
-> table. Keep the existing grader/store, do not adopt Freqtrade or
-> Backtrader, and do not loosen the graduation bar.
+> strategy score on the calibrator, the Monte Carlo ruin/streak/TTR table,
+> or the net anchor on the calibrator/proven gate. Keep the existing
+> grader/store, do not adopt Freqtrade or Backtrader, and do not loosen the
+> graduation bar.
 
 ---
 
@@ -372,7 +454,7 @@ Narrative handover for this session: `docs/HANDOVER_2026-08-15_P12_7.md`
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 620 passed, 1 skipped
+# 631 passed, 1 skipped
 ```
 
 Wheel gate:
@@ -481,8 +563,8 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
    (Monte Carlo risk-of-ruin table: `brain/analytics.monte_carlo_ruin_table()`,
    CLI `monte`, HTTP `/api/monte` + `/api/risk`, MCP `cryptobrain_monte` +
    `ruin_table`, dashboard Risk card).
-2. [x] Run `.venv/bin/python -m pytest tests/ -q` — **620 pass / 1 skip**
-   (+7: `tests/test_monte_carlo.py`).
+2. [x] Run `.venv/bin/python -m pytest tests/ -q` — **631 pass / 1 skip**
+   (+11: `tests/test_net_anchor.py`).
 3. [x] Fix any obvious failures. — none left open.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
 5. [x] Update `TODO.md` — P12.7 marked shipped; next is micro-live / human actions.

@@ -285,17 +285,30 @@ def multiplier_from_score(expectancy: float,
                           strategy_score_value: Optional[float],
                           gain: float = CALIBRATE_GAIN,
                           mult_min: float = CALIBRATE_MIN_MULT,
-                          mult_max: float = CALIBRATE_MAX_MULT) -> float:
-    """Gross expectancy → calibration multiplier, gated by the strategy score.
+                          mult_max: float = CALIBRATE_MAX_MULT,
+                          expectancy_net: Optional[float] = None) -> float:
+    """Expectancy → calibration multiplier, gated by the strategy score.
 
-    ``mult = clamp(1 + E_gross × gain × trust, mult_min, mult_max)`` where
+    ``mult = clamp(1 + E_anchor × gain × trust, mult_min, mult_max)`` where
     ``trust = clamp(score / 50, 0.6, 1.5)``. A score of 50 is the neutral
     pre-P12.5 formula; a robust, well-sampled, regime-fit, cost-surviving
     setup is trusted up to 1.5×; a fragile or net-negative book is trusted
     at the 0.6 floor — its boost/dampening is shrunk, not celebrated. An
-    unknown score (None) is neutral. The sign anchor stays the observed
-    gross expectancy, so a losing setup is always dampened or filtered.
+    unknown score (None) is neutral.
+
+    **P12.8 — the sign anchor is NET of costs.** ``E_anchor`` is
+    ``expectancy_net`` when it is known, falling back to ``expectancy``
+    (gross) only when costs could not be computed for the key. Anchoring on
+    gross was a real defect, not a cosmetic one: a setup measured at
+    ``E_gross = +0.055R`` / ``E_net = −0.118R`` — positive before costs,
+    losing money after them — received multiplier **×1.008**, i.e. the
+    engine *raised* confidence on a setup that loses money. Because the
+    anchor is now the number the money actually does, any book that does
+    not survive its own costs is dampened (``1 + negative × … < 1``) and
+    can never be boosted. This is strictly tighter than the previous
+    behaviour: it can only lower a multiplier, never raise one.
     """
     trust = 1.0 if strategy_score_value is None \
         else _clamp(float(strategy_score_value) / 50.0, 0.6, 1.5)
-    return round(max(mult_min, min(mult_max, 1.0 + expectancy * gain * trust)), 3)
+    anchor = float(expectancy if expectancy_net is None else expectancy_net)
+    return round(max(mult_min, min(mult_max, 1.0 + anchor * gain * trust)), 3)

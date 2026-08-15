@@ -10,6 +10,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.18.0] — 2026-08-15 · branch `arena/01a00490-sky`
+
+MINOR bump: **P12.8 — the net anchor: decisions judge costs, not just reports.**
+
+P12.6 made every *measurement* net of costs. P12.8 closes the gap it left
+behind: the two places that **act** on a measurement were still reading the
+**gross** number, so the desk could measure honestly and then decide on the
+wrong figure.
+
+### Fixed
+- **`data/strategy_score.py` → `multiplier_from_score()`** anchored its sign
+  on `E_gross`. Measured consequence: a setup at **`E_gross = +0.055R` /
+  `E_net = −0.118R`** — profitable before fees, losing money after them —
+  received multiplier **×1.008**, i.e. the engine *raised* confidence on a
+  setup that loses money. The anchor is now `expectancy_net` when known
+  (gross only as a fallback when costs cannot be computed), so the same
+  setup now scores **×0.982** — dampened, never boosted.
+- **`brain/calibrator.py`** — `build_profile()` passes the net expectancy to
+  the multiplier, and the `CALIBRATE_FILTER` negative-expectancy filter now
+  judges the net number too.
+- **`brain/risk_gate.py` → `setup_proven()`** — the A6/B10 proven gate called
+  a setup "proven" on gross expectancy. It now requires positive expectancy
+  **net of costs** wherever the net column is populated. Sample floors
+  (100 backtest / 20 paper) are unchanged. The block message now names the
+  failing condition instead of only reprinting sample counts, so a
+  net-expectancy rejection no longer reads as a bug.
+
+### Added
+- **`data/database.py` → `setup_stats()`** also returns
+  `backtest_expectancy_net` / `paper_expectancy_net` (average of the stored
+  `rr_net` column), or `None` when no net values exist for that setup — the
+  caller falls back to gross rather than guessing.
+- `setup_proven()` reports `proven_on: "net" | "gross"` so every surface can
+  state which number the verdict used.
+- `tests/test_net_anchor.py` — 11 tests: the cost-flipped regression case,
+  the monotonicity property (the net anchor can only lower a multiplier,
+  never raise one), gross fallback when costs are unknown, clamps, and the
+  proven gate refusing a setup that is positive gross and negative net.
+
+### Notes
+- This is **strictly tighter**, never looser: it can only dampen a
+  multiplier or withdraw a "proven". The graduation bar is untouched.
+- Suite **620 → 631 pass / 1 skip** (+11). Versions `config.py` /
+  `pyproject.toml` **2.17.0 → 2.18.0**.
+
+---
+
 ## [2.17.0] — 2026-08-15 · branch `arena/01a0046d-sky`
 
 MINOR bump: **P12.7 — Monte Carlo risk-of-ruin table.**

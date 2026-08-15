@@ -149,11 +149,23 @@ def trader_state_blocked(db: SignalDB) -> dict:
 
 def setup_proven(db: SignalDB, plan_type: str) -> dict:
     """Setup-proven gate (decisions A6/B10): >=100 backtest samples AND >=20
-    decided paper samples AND positive expectancy."""
+    decided paper samples AND positive expectancy.
+
+    **P12.8** — "positive expectancy" now means positive **net of costs**
+    wherever the net column is populated (P12.6), falling back to gross only
+    when it is not. A setup that only makes money before fees was never
+    proven; it was mismeasured. The sample floors are unchanged.
+    """
     st = db.setup_stats(plan_type or "")
+    bt_e = (st["backtest_expectancy"] if st.get("backtest_expectancy_net") is None
+            else st["backtest_expectancy_net"])
+    pp_e = (st["paper_expectancy"] if st.get("paper_expectancy_net") is None
+            else st["paper_expectancy_net"])
     proven = bool(st["backtest_n"] >= 100 and st["paper_n"] >= 20 and
-                  st["paper_expectancy"] > 0 and st["backtest_expectancy"] > 0)
-    return {"proven": proven, **st}
+                  pp_e > 0 and bt_e > 0)
+    return {"proven": proven, "proven_on": "net" if (
+        st.get("backtest_expectancy_net") is not None
+        or st.get("paper_expectancy_net") is not None) else "gross", **st}
 
 
 def evaluate(db: SignalDB, symbol: str | None = None, plan_type: str | None = None,
@@ -188,9 +200,26 @@ def evaluate(db: SignalDB, symbol: str | None = None, plan_type: str | None = No
         proven_check = setup_proven(db, plan_type)
         details["setup_proven"] = proven_check
         if not proven_check["proven"] and not prog["approve_unproven"]:
+            # P12.8 — say *which* condition failed. When the sample floors are
+            # met, the setup is unproven because it does not make money net of
+            # costs, and reporting only the counts would read as a bug.
+            floors_met = (proven_check["backtest_n"] >= 100
+                          and proven_check["paper_n"] >= 20)
+            if floors_met:
+                bt_e = (proven_check["backtest_expectancy"]
+                        if proven_check.get("backtest_expectancy_net") is None
+                        else proven_check["backtest_expectancy_net"])
+                pp_e = (proven_check["paper_expectancy"]
+                        if proven_check.get("paper_expectancy_net") is None
+                        else proven_check["paper_expectancy_net"])
+                reason = (f"expectancy {proven_check['proven_on']} "
+                          f"(backtest {bt_e:+.3f}R / paper {pp_e:+.3f}R) "
+                          f"is not positive")
+            else:
+                reason = (f"{proven_check['backtest_n']} backtest / "
+                          f"{proven_check['paper_n']} paper samples")
             blocked_by.append(
-                f"setup unproven ({plan_type}): {proven_check['backtest_n']} backtest / "
-                f"{proven_check['paper_n']} paper samples — research only at "
+                f"setup unproven ({plan_type}): {reason} — research only at "
                 f"'{prog['level']}' level")
 
     details.update({

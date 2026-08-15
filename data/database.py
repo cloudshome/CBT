@@ -545,26 +545,40 @@ class SignalDB:
         return [dict(r) for r in self.conn.execute(q, args).fetchall()]
 
     def setup_stats(self, plan_type: str) -> dict:
-        """Decided-sample counts for the setup-proven gate (decision B10)."""
+        """Decided-sample counts for the setup-proven gate (decision B10).
+
+        **P12.8** also returns ``*_expectancy_net`` — the average of the
+        stored ``rr_net`` column (P12.6) over the same decided rows. The
+        proven gate reads the net number where it exists, so a setup that
+        is only profitable before costs cannot be called "proven".
+        ``None`` means the column holds no net values for this setup, and
+        the caller falls back to gross rather than guessing.
+        """
         bt = self.conn.execute(
             """SELECT COUNT(*) n,
                       SUM(CASE WHEN outcome IN ('FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
-                      ROUND(AVG(rr_achieved),3) avg_rr
+                      ROUND(AVG(rr_achieved),3) avg_rr,
+                      ROUND(AVG(rr_net),3) avg_rr_net
                FROM backtest_results WHERE plan_type=?
                  AND outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')""",
             (plan_type,)).fetchone()
         pp = self.conn.execute(
             """SELECT COUNT(*) n,
                       SUM(CASE WHEN outcome='TP_HIT' THEN 1 ELSE 0 END) wins,
-                      ROUND(AVG(rr_achieved),3) avg_rr
+                      ROUND(AVG(rr_achieved),3) avg_rr,
+                      ROUND(AVG(rr_net),3) avg_rr_net
                FROM paper_trades WHERE plan_type=?
                  AND outcome IN ('TP_HIT','STOP_LOSS')""",
             (plan_type,)).fetchone()
         bt_n, bt_wins, bt_avg = (bt["n"] or 0, bt["wins"] or 0, bt["avg_rr"] or 0.0)
         pp_n, pp_wins, pp_avg = (pp["n"] or 0, pp["wins"] or 0, pp["avg_rr"] or 0.0)
+        bt_net = bt["avg_rr_net"]
+        pp_net = pp["avg_rr_net"]
         return {
             "backtest_n": bt_n, "backtest_wins": bt_wins, "backtest_expectancy": round(bt_avg, 3),
             "paper_n": pp_n, "paper_wins": pp_wins, "paper_expectancy": round(pp_avg, 3),
+            "backtest_expectancy_net": (round(bt_net, 3) if bt_net is not None else None),
+            "paper_expectancy_net": (round(pp_net, 3) if pp_net is not None else None),
         }
 
     @staticmethod
