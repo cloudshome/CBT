@@ -123,12 +123,17 @@ the live PAXG proxy.
 
 ## Important limitations before calibration or micro-live
 
-1. **Bid is not an executable round trip.** A bid-only OHLC backtest lacks the
-   ask-side entry/exit spread. The existing generic cost model is not evidence
-   of Dukascopy/XAU execution costs. The importer refuses to mix bid and ask in
-   one store series; parallel bid/ask storage and an as-of spread model are a
-   later schema milestone. Until then, configure and validate a conservative
-   gold-specific cost assumption outside any graduation claim.
+1. **Bid is not an executable round trip.** ✅ **Closed by P12.10** (v2.21.0) —
+   [`data/costs.py`](../data/costs.py) now auto-detects gold instruments
+   (symbols starting with `XAU`/`GOLD`) and applies a spot-market cost model:
+   no funding, a small ECN broker commission (`DEFAULT_GOLD_COMMISSION_PCT =
+   0.005%` per side), and the bid-ask spread as the primary cost via the
+   existing `SPREADS["XAUUSD"] = 0.00060` (6 bps half-spread). The generic
+   crypto-perp default (taker fees, funding) is no longer applied to gold.
+   An explicit `CostModel` argument still overrides auto-detection. The
+   importer's bid/ask separation is unchanged; parallel bid/ask storage and
+   an as-of spread model remain a later schema milestone, but the default
+   cost engine now produces an honest gold-specific cost estimate.
 2. **Market calendar.** ✅ **Closed by P12.9** (v2.20.0) —
    [`docs/MARKET_CALENDAR.md`](MARKET_CALENDAR.md). `data/calendar.py` models the
    DST-aware OTC gold week (Sun 18:00 ET → Fri 17:00 ET, daily 17:00–18:00 ET
@@ -157,7 +162,7 @@ after:
 
 - a market-calendar-aware quality check is green (✅ available since P12.9 —
   run it on the imported book and record the result);
-- bid/ask spread and XAU-specific costs are modeled net of costs;
+- bid/ask spread and XAU-specific costs are modeled net of costs ✅ **Closed by P12.10** (v2.21.0);
 - source provenance reaches saved backtest/calibration keys;
 - PAXG-vs-XAU basis/deviation is measured, not assumed;
 - walk-forward train/validation/sealed-OOS results clear the unchanged bar;

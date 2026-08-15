@@ -1,19 +1,25 @@
-"""data/costs.py — P12.6: Fees-first trade cost modeling and net expectancy (E_net).
+"""data/costs.py — P12.6+: Trade cost modeling and net expectancy (E_net).
 
-    E_net = E_gross − fees − slip − funding
+    E_net = E_gross - fees - slip - funding
 
-As measured in docs/PATH_TO_REAL_MONEY.md (§2):
-  * Median stop distance = 0.823% of entry price (≈ 0.00823).
-  * Standard taker fee (e.g. Binance USDT-perp) = 0.05% (5 bps) per side → 0.10% round trip.
+As measured in docs/PATH_TO_REAL_MONEY.md (S2):
+  * Median stop distance = 0.823% of entry price (~ 0.00823).
+  * Standard taker fee (e.g. Binance USDT-perp) = 0.05% (5 bps) per side -> 0.10% round trip.
   * In R units:
-      fee_R = (2 × fee_rate) / (stop_distance / entry) = 0.0010 / 0.00823 ≈ 0.1215R
+      fee_R = (2 * fee_rate) / (stop_distance / entry) = 0.0010 / 0.00823 ~ 0.1215R
   * At a 1.8h median hold:
-      funding ≈ (1.8h / 8h) × 0.01% = 0.00225% of notional ≈ 0.0027R
-      fees ≈ 0.1215R (≈ 40× funding at this holding horizon).
+      funding ~ (1.8h / 8h) * 0.01% = 0.00225% of notional ~ 0.0027R
+      fees ~ 0.1215R (~ 40x funding at this holding horizon).
 
 Therefore, fees + spread lead the cost calculation, with funding joined as-of-T
 from stored derivatives series (or defaulting to 0.01%/8h when stored series is absent),
 and slippage modeled per execution model.
+
+P12.10+: XAU bid/ask cost model.
+  * Gold instruments (XAU*) trade on spot markets -- no funding, no taker/maker fees.
+  * The primary cost is the bid-ask spread, modelled as half-spread per side.
+  * A small broker commission (~0.005% per side) is included for ECN-style execution.
+  * Auto-detected by symbol prefix when no explicit CostModel is provided.
 """
 from __future__ import annotations
 
@@ -21,17 +27,20 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-# ──────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 # Default fee schedules and market parameters
-# ──────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 
 # Standard exchange rates (Binance USDT-M Futures / Bybit Linear perps)
-DEFAULT_TAKER_FEE_PCT: float = 0.0005    # 0.05% (5 bps) per side → 0.10% round-trip
-DEFAULT_MAKER_FEE_PCT: float = 0.0002    # 0.02% (2 bps) per side → 0.04% round-trip
-DEFAULT_SPOT_FEE_PCT: float = 0.0010     # 0.10% (10 bps) per side → 0.20% round-trip
+DEFAULT_TAKER_FEE_PCT: float = 0.0005    # 0.05% (5 bps) per side -> 0.10% round-trip
+DEFAULT_MAKER_FEE_PCT: float = 0.0002    # 0.02% (2 bps) per side -> 0.04% round-trip
+DEFAULT_SPOT_FEE_PCT: float = 0.0010     # 0.10% (10 bps) per side -> 0.20% round-trip
 DEFAULT_FUNDING_RATE_8H: float = 0.0001  # 0.01% per 8h baseline
 DEFAULT_HOLDING_HOURS: float = 1.8       # empirical median hold from P12.3 scorecard
 DEFAULT_STOP_DISTANCE_PCT: float = 0.00823 # 0.823% median stop distance
+
+# Gold-specific commission (ECN broker, ~$5 per $100k notional = 0.005% per side)
+DEFAULT_GOLD_COMMISSION_PCT: float = 0.00005  # 0.005% per side
 
 # Half-spread per side as fraction of price (aligned with engine/execution.py)
 SPREADS: dict[str, float] = {
@@ -41,6 +50,49 @@ SPREADS: dict[str, float] = {
 }
 DEFAULT_HALF_SPREAD: float = 0.00020
 DEFAULT_SLIPPAGE_PCT: float = 0.0000     # 0.0% base slippage (expanded when modeled)
+
+# Symbols whose prefix identifies them as gold instruments (spot, no funding)
+GOLD_SYMBOL_PREFIXES: tuple[str, ...] = ("XAU", "GOLD")
+
+
+# ---------------------------------------------------------------------------
+# Symbol-based model resolver
+# ---------------------------------------------------------------------------
+
+def is_gold_symbol(symbol: str) -> bool:
+    """Return True if *symbol* starts with a known gold prefix."""
+    sym = (symbol or "").upper().strip()
+    return any(sym.startswith(p) for p in GOLD_SYMBOL_PREFIXES)
+
+
+def cost_model_for_symbol(symbol: str = "BTCUSDT",
+                          base_model: Optional[CostModel] = None) -> "CostModel":
+    """Return the appropriate cost model for *symbol*.
+
+    When *base_model* is passed it is returned unchanged (the caller
+    overrides auto-detection).  Otherwise gold instruments get a spot
+    market model with no funding and a gold-specific commission; all
+    other symbols get the default crypto-perp model.
+    """
+    if base_model is not None:
+        return base_model
+
+    if is_gold_symbol(symbol):
+        return CostModel(
+            market="spot",
+            execution_type="taker",          # commission treated as "taker" fee
+            taker_fee_pct=DEFAULT_GOLD_COMMISSION_PCT,
+            maker_fee_pct=DEFAULT_GOLD_COMMISSION_PCT,
+            spot_fee_pct=DEFAULT_GOLD_COMMISSION_PCT,
+            default_funding_rate_8h=0.0,     # no funding on spot
+        )
+
+    return CostModel()   # default crypto-perp
+
+
+# ---------------------------------------------------------------------------
+# TradeCost result
+# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -83,16 +135,16 @@ class CostModel:
                    execution_type=exec_type, market=market, enabled=enabled)
 
 
-# ──────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 # Funding as-of-T lookup
-# ──────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 
 def get_funding_rate_as_of_t(symbol: str = "BTCUSDT", ts: Optional[int] = None,
                              default: float = DEFAULT_FUNDING_RATE_8H,
                              store=None) -> float:
-    """Look up the stored funding rate as of timestamp `ts`.
+    """Look up the stored funding rate as of timestamp *ts*.
 
-    If the stored series is unavailable or ts is None, returns `default`.
+    If the stored series is unavailable or ts is None, returns *default*.
     """
     if ts is None:
         return default
@@ -108,9 +160,9 @@ def get_funding_rate_as_of_t(symbol: str = "BTCUSDT", ts: Optional[int] = None,
     return default
 
 
-# ──────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 # Cost Calculation Engine
-# ──────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 
 def calculate_trade_cost(
     entry: Optional[float] = None,
@@ -125,9 +177,15 @@ def calculate_trade_cost(
 ) -> TradeCost:
     """Compute fees, spread/slippage, funding, and net R for one trade.
 
-    All cost components are scaled to the trade's planned risk (1R = |entry - sl|).
+    All cost components are scaled to the trade's planned risk
+    (1R = |entry - sl|).
+
+    When *cost_model* is None the appropriate model is auto-selected via
+    *cost_model_for_symbol()* -- gold instruments get a spot model with
+    spread-based costs and no funding; everything else keeps the default
+    crypto-perp model.
     """
-    model = cost_model or CostModel()
+    model = cost_model if cost_model is not None else cost_model_for_symbol(symbol)
     if not model.enabled or model.execution_type == "none":
         return TradeCost(
             fee_r=0.0, slip_r=0.0, funding_r=0.0, total_cost_r=0.0,

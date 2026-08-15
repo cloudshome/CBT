@@ -10,54 +10,47 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-15 (this session: **v2.20.0 — P12.9 market
-calendars**: the data layer now knows that some venues close. Scheduled OTC
-gold closures stop being read as missing data, which unblocks the v2.19.0
-Dukascopy XAU research book without touching crypto behaviour or the gate.)
+**Last updated:** 2026-08-15 (this session: **v2.21.0 — P12.10 XAU bid/ask
+cost model**: `data/costs.py` auto-detects gold instruments and applies a
+spot-market model with spread-based costs, no funding, and a small ECN
+commission. Closes Dukascopy blocker #2. Two of three blockers closed.)
 
-**Previous:** 2026-08-15 (**v2.19.0 optional Dukascopy XAU research adapter** — external acquisition boundary only; no Node runtime dependency, second data architecture, live-feed switch, or gate loosening)
-**Branch:** `arena/01a00521-sky` (session branch fixed by Arena; branched from `arena/01a004b0-sky` @ `94a6de0`)
-**HEAD commit:** `94a6de0` feat(data): add guarded Dukascopy XAU adapter (this session's work sits on top)
-**Python:** 3.11 (venv `.venv`) — suite green (**671 pass / 1 skip**)
+**Previous:** 2026-08-15 (**v2.20.0 P12.9 — market calendars**: scheduled
+closure is no longer a gap.)
+**Branch:** `arena/01a0069a-sky` (this session's branch)
+**HEAD commit:** `d9410b9` feat(P12.9): market calendars — a scheduled closure is not a gap (#32)
+**Python:** 3.11 (venv `.venv`) — suite green (**681 pass / 1 skip**)
 
-> **This session (`arena/01a00521-sky`): v2.20.0 — P12.9 market calendars.**
-> **Verified first:** rebuilt `.venv`, ran the inherited suite → **636 pass /
-> 1 skip**, matching the v2.19.0 CHANGELOG claim. Then built the next item.
+> **This session (`arena/01a0069a-sky`): v2.21.0 — P12.10 XAU bid/ask cost model.**
+> **Verified first:** rebuilt `.venv`, ran the inherited suite → **671 pass /
+> 1 skip** (the P12.9 baseline). Then built the next item.
 >
-> **The problem.** Every quality check in SKY assumed a 24/7 market, so "the
-> venue was shut" and "our collection broke" were indistinguishable. A correct,
-> complete week of spot gold holds ~53h of scheduled closure — read as a 30%+
-> gap fraction and an unusably stale feed, which **quarantined a healthy
-> series** and rolled the desk to *not ready*. This was blocker #1 of the three
-> recorded against the Dukascopy XAU book.
+> **The problem.** `calculate_trade_cost()` used a default `CostModel()` with
+> `market="perp"`, taker fees (0.05%/side) and funding — appropriate for crypto
+> perps but not for spot gold. A bid-only XAUUSD backtest was costed with
+> crypto assumptions. The existing `SPREADS["XAUUSD"]` entry existed but was
+> never auto-selected. This was blocker #2 of the three recorded against the
+> Dukascopy XAU research book.
 >
-> - **`data/calendar.py` (new)** — a `MarketCalendar` protocol plus
->   `crypto-24x7` (always open) and `xau-otc`: the DST-aware OTC gold week
->   (Sun 18:00 ET open, Fri 17:00 ET close, 17:00–18:00 ET daily break, 1 Jan
->   and 25 Dec closed) resolved through stdlib `zoneinfo`. Trading-time
->   helpers: `expected_bars`, `open_bars_between`, `closed_bar_count`,
->   `split_by_session`.
-> - **Gaps:** `detect_gaps(frame, tf, calendar)` — a span that is entirely a
->   scheduled closure is not a gap; a partial one counts only the OPENs owed.
-> - **Quality pillar:** `checks_on_frame(..., calendar)` measures `expected`
->   and `age_mult` in **trading bars** and adds `calendar` / `market_open` /
->   `closed_bars`. `series_health` / `series_item` resolve the calendar from
->   the series identity, so readiness inherits it. `verdict_for` reports
->   `market closed — clean` rather than a false alarm.
-> - **Import:** `backfill_from_csv` reports `calendar` + `closed_session_bars`
->   and no longer counts the gold weekend in `gaps_found`.
-> - **CLI:** `python main.py calendar [--symbol --tf --exchange --market
->   --calendar --at --series --root --json]`.
-> - **Safety direction — it can only remove false alarms.** Opt-in by venue
->   (only `dukascopy` + XAU); unknown venues, unknown symbols and Binance
->   `PAXGUSDT` all keep 24/7 rules, so a wrong calendar can never hide a real
->   gap. Crypto numbers are byte-identical. A hole inside a session, a series
->   stale during open hours, and corrupt OHLC all still quarantine.
-> - **Docs:** `docs/MARKET_CALENDAR.md`; blocker #1 marked closed in
->   `docs/DUKASCOPY_XAU_ADAPTER.md`.
-> - **Versions:** `config.py` / `pyproject.toml` **2.19.0 → 2.20.0**;
+> - **`cost_model_for_symbol()`** — symbol-based cost model resolver. When no
+>   explicit `CostModel` is passed, gold instruments (XAU*/GOLD*) get a
+>   spot-market model with zero funding, `DEFAULT_GOLD_COMMISSION_PCT = 0.005%`
+>   per side ECN commission, and spread as the primary cost.
+> - **`is_gold_symbol()`** / **`GOLD_SYMBOL_PREFIXES`** — prefix-based gold
+>   detection.
+> - **`DEFAULT_GOLD_COMMISSION_PCT`** — 0.005% per side (~$5 per $100k notional).
+> - **Auto-detection** — `calculate_trade_cost()` now calls
+>   `cost_model_for_symbol(symbol)` when `cost_model` is None, so every XAUUSD
+>   call automatically uses gold-specific costs. An explicit `CostModel`
+>   argument still overrides auto-detection.
+> - **Safety direction — it can only make costs more accurate for gold.**
+>   Opt-in by symbol prefix (XAU/GOLD); BTCUSDT, ETHUSDT, PAXGUSDT keep the
+>   crypto-perp default unchanged. An explicit `CostModel` always wins over
+>   auto-detection. Crypto numbers are byte-identical.
+> - **Docs:** `docs/DUKASCOPY_XAU_ADAPTER.md` blocker #2 closed.
+> - **Versions:** `config.py` / `pyproject.toml` **2.20.0 → 2.21.0**;
 >   wheel gate green.
-> - **Tests:** +35 in `tests/test_calendar.py` → **671 pass / 1 skip**.
+> - **Tests:** +10 in `tests/test_costs.py` → **681 pass / 1 skip**.
 
 > **This session (`arena/01a004b0-sky`): v2.19.0 — optional Dukascopy XAU adapter.**
 > - `dukascopy-node` remains an external, version-pinned CSV producer. SKY
@@ -232,14 +225,14 @@ phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.9 market calendars shipped.**
+**P12 (SKY Quant Validation Engine) — P12.10 XAU bid/ask cost model shipped.**
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real data and the graduation gate is honestly closed (+0.348R gross,
 negative net on 1h/4h primary). Freqtrade rejected (F1–F8); Backtrader
-rejected (BT1–BT8). The Dukascopy XAU research book (v2.19.0) is calendar-aware
-as of P12.9; two of its three blockers remain (XAU bid/ask cost model, then
-calibration-key source provenance). Open items: TODO-7, TODO-8; next phase
-after the XAU blockers: **micro-live**.
+rejected (BT1–BT8). The Dukascopy XAU research book (v2.21.0) has calendar-aware
+gap detection (P12.9) and a gold-specific cost model (P12.10); one of its three
+blockers remains (calibration-key source provenance). Open items: TODO-7,
+TODO-8; next phase after the XAU blockers: **micro-live**.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -254,7 +247,7 @@ after the XAU blockers: **micro-live**.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.9 shipped — market calendars** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score + plateau sweep; P12.5 strategy score on the calibrator; P12.7 Monte Carlo ruin/streak/TTR table; P12.8 the net anchor — the calibrator multiplier and the setup-proven gate judge `E_net`, not `E_gross`; **P12.9 market calendars — `data/calendar.py` gives each venue a trading calendar, so scheduled OTC-gold closures stop being read as missing data; crypto stays 24/7 and unchanged**). Next: **XAU bid/ask cost model**, then micro-live. |
+| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.10 shipped — XAU bid/ask cost model** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score + plateau sweep; P12.5 strategy score on the calibrator; P12.7 Monte Carlo ruin/streak/TTR table; P12.8 the net anchor — the calibrator multiplier and the setup-proven gate judge `E_net`, not `E_gross`; P12.9 market calendars — `data/calendar.py` gives each venue a trading calendar, so scheduled OTC-gold closures stop being read as missing data; **P12.10 XAU bid/ask cost model — `data/costs.py` auto-detects gold instruments and applies a spot-market model with spread-based costs, no funding, ECN commission; Dukascopy blocker #2 closed**). Next: **calibration-key source provenance**, then micro-live. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -262,6 +255,38 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 ---
 
 ## Completed work
+
+### Session 2026-08-15 (this branch `arena/01a0069a-sky`): P12.10 — XAU bid/ask cost model
+
+Branched from `main` @ `d9410b90` (P12.9 merged). Inherited suite re-verified at
+**671 pass / 1 skip** before any change. 0 regressions.
+Tests **671 → 681 pass / 1 skip** (+10). Version **2.20.0 → 2.21.0**.
+(`config.py` and `pyproject.toml` bumped in step; wheel gate green.)
+
+**Why:** `calculate_trade_cost()` used a default `CostModel()` with
+`market="perp"`, taker fees (0.05%/side) and funding — appropriate for crypto
+perps but not for spot gold. A bid-only XAUUSD backtest was costed with crypto
+assumptions, giving a misleading cost picture. This was blocker #2 of three
+against the v2.19.0 Dukascopy XAU research book.
+
+**What shipped:**
+- `data/costs.py` — new `cost_model_for_symbol()` resolver auto-selects a
+  spot-market model for gold instruments (symbols starting with `XAU` or `GOLD`):
+  no funding, `DEFAULT_GOLD_COMMISSION_PCT = 0.005%` per side ECN commission,
+  spread as the primary cost via the existing `SPREADS["XAUUSD"]` entry.
+- `is_gold_symbol()` / `GOLD_SYMBOL_PREFIXES` — prefix-based detection.
+- `calculate_trade_cost()` — when `cost_model` is None, calls
+  `cost_model_for_symbol(symbol)` so every XAUUSD call auto-uses gold costs.
+  An explicit `CostModel` argument still overrides auto-detection.
+- `docs/DUKASCOPY_XAU_ADAPTER.md` — blocker #2 marked closed.
+
+**Invariant kept:** Opt-in by symbol prefix, never by guess. BTCUSDT, ETHUSDT,
+PAXGUSDT keep the crypto-perp default unchanged. An explicit `CostModel` always
+wins over auto-detection. Crypto numbers are byte-identical.
+
+**Files changed:** `data/costs.py`, `tests/test_costs.py`, `config.py`,
+`pyproject.toml`, `CHANGELOG.md`, `TODO.md`, `SESSION_STATE.md`,
+`docs/DUKASCOPY_XAU_ADAPTER.md`.
 
 ### Session 2026-08-15 (this branch `arena/01a00521-sky`): P12.9 — market calendars
 
@@ -467,9 +492,9 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
-1. **XAU bid/ask cost model** (Dukascopy blocker #2) — `data/costs.py` models
-   crypto taker/maker fees and funding; that is not evidence of spot-gold
-   execution cost. Then **calibration-key source provenance** (blocker #3).
+1. **Calibration-key source provenance** (Dukascopy blocker #3) — saved
+   calibration keys do not carry candle-source provenance. A Dukascopy XAU
+   backtest must not silently recalibrate the live PAXG proxy.
 2. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
 3. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
@@ -530,13 +555,11 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
     reads the decided paper book NET of costs and surfaces survivability
     estimates. It does not approve trades, loosen the graduation bar, or
     replace the risk gate.
-17. **Dukascopy XAU is still research-only — but for two reasons now, not
-    three.** P12.9 closed the market-calendar blocker: gap detection, the
-    quality pillar, readiness and the CSV import report all judge a
-    `dukascopy/**/XAUUSD` series in trading time. Still open: (a) the generic
-    cost model is not a measured XAU bid/ask spread model, and (b) saved
-    calibration keys do not carry candle-source provenance. Do not use
-    `backtest --save` on this book yet.
+17. **Dukascopy XAU is still research-only — but for one reason now, not
+    three.** P12.9 closed the market-calendar blocker; P12.10 closed the XAU
+    bid/ask cost model blocker. Open: saved calibration keys do not carry
+    candle-source provenance (blocker #3). Do not use `backtest --save` on this
+    book yet.
 18. **A calendar can only remove false alarms, never hide a hole.** It is
     opt-in by venue: anything not explicitly `dukascopy` + an XAU symbol keeps
     the 24/7 crypto calendar, including Binance `PAXGUSDT`, which really does
@@ -550,39 +573,39 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Next recommended action
 
-1. **Next code build — XAU/bid-ask cost model** (blocker #2 of the Dukascopy
-   set): `data/costs.py` models crypto taker/maker fees and funding, which is
-   not evidence of spot-gold execution cost. Needs a measured bid/ask spread
-   term and gold-specific assumptions before any XAU expectancy is quotable.
-   Blocker #3 after it: **source provenance in saved calibration keys**, so a
-   Dukascopy backtest can never recalibrate the live PAXG proxy.
+1. **Next code build — calibration-key source provenance** (Dukascopy blocker
+   #3): saved calibration keys do not carry candle-source provenance, so a
+   Dukascopy XAU backtest `--save` could silently recalibrate the live PAXG
+   proxy. Add a `source` dimension to the calibration table and gate the
+   calibrator on source match.
 2. **On the host holding the real BTC store/DB**, re-run `backtest --save` +
-   `learn`; the calibration profile remains stale under the pre-P12.8 gross
-   anchor in this clean checkout. Do not substitute demo data.
-3. Optionally acquire version-pinned Dukascopy XAU m1 **bid** CSV and import it
-   with a SHA pin using `docs/DUKASCOPY_XAU_ADAPTER.md`; the import and quality
-   checks are now calendar-aware (`python main.py calendar --symbol XAUUSD
-   --tf 1h --series`). Run validate/backtest/quality **without `--save`**.
+   `learn`; the calibration profile remains stale in this clean checkout. Do
+   not substitute demo data.
+3. Optionally acquire version-pinned Dukascopy XAU m1 **bid** or **ask** CSV
+   and import it with a SHA pin using `docs/DUKASCOPY_XAU_ADAPTER.md`; the
+   import, quality checks and now cost model are all gold-aware
+   (`python main.py calendar --symbol XAUUSD --tf 1h --series`). Run
+   validate/backtest/quality **without `--save`**.
 4. **Micro-live** only after the existing graduation bar opens and a human
-   explicitly approves progression. This adapter does not move that bar.
+   explicitly approves progression. This work does not move that bar.
 5. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 6. Do not install Freqtrade or Backtrader and do not loosen the graduation bar.
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm the P12.9 PR merged. P12.1–P12.8, the Dukascopy XAU adapter and
-> **P12.9 market calendars** are shipped — do not rewrite `data/calendar.py`,
-> re-derive the gold week, or make the calendar apply to Binance. The next
-> build is the XAU bid/ask cost model, then calibration-key source provenance.
-> P12.1–P12.7 and **P12.8** are shipped:
-> do not redo the locked protocol, the negative-shift guard, the boxed
-> scorecard, the tie-break, the real data import, trade cost modeling, the
-> overlap-corrected effective sample size, the Backtest Quality Score, the
-> strategy score on the calibrator, the Monte Carlo ruin/streak/TTR table,
-> or the net anchor on the calibrator/proven gate. Keep the existing
-> grader/store, do not adopt Freqtrade or Backtrader, and do not loosen the
-> graduation bar.
+> and confirm the P12.10 PR merged. P12.1–P12.9, the Dukascopy XAU adapter,
+> market calendars and **P12.10 XAU bid/ask cost model** are shipped — do not
+> rewrite `data/calendar.py`, re-derive the gold week, make the calendar apply
+> to Binance, or rework the gold cost model. The next build is
+> **calibration-key source provenance** (Dukascopy blocker #3). All earlier
+> P12 milestones are shipped: do not redo the locked protocol, the
+> negative-shift guard, the boxed scorecard, the tie-break, the real data
+> import, trade cost modeling, the overlap-corrected effective sample size,
+> the Backtest Quality Score, the strategy score on the calibrator, the Monte
+> Carlo ruin/streak/TTR table, or the net anchor on the calibrator/proven gate.
+> Keep the existing grader/store, do not adopt Freqtrade or Backtrader, and do
+> not loosen the graduation bar.
 
 ---
 
@@ -591,13 +614,19 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 671 passed, 1 skipped
+# 681 passed, 1 skipped
+```
+
+XAU cost model (P12.10):
+```bash
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_costs.py -q
+# 22 passed  (12 original P12.6 + 10 new P12.10 gold tests)
 ```
 
 Wheel gate:
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.20.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.21.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Market calendar (P12.9):
@@ -643,12 +672,12 @@ python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau swe
 ## Last commit
 
 ```
-(THIS SESSION) feat(P12.9): market calendars — scheduled closure is not a gap
-94a6de0  feat(data): add guarded Dukascopy XAU adapter   # parent commit
+(THIS SESSION) feat(P12.10): XAU bid/ask cost model — gold auto-detection in data/costs.py
+d9410b9  feat(P12.9): market calendars — a scheduled closure is not a gap (#32)   # parent
 ```
 
-P12.9 is committed on `arena/01a00521-sky` and pushed to origin; the session PR
-is open — the human reviews and merges it. See `git log --oneline -3`.
+P12.10 work sits on `arena/01a0069a-sky` and will be pushed to origin as a
+session branch. See `git log --oneline -3`.
 
 ---
 
@@ -703,21 +732,21 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.9 shipped**
-   (`data/calendar.py`, calendar-aware gaps/quality/readiness/import,
-   CLI `calendar`, `docs/MARKET_CALENDAR.md`).
+1. [x] Finish or safely stop the current task. — **P12.10 shipped**
+   (XAU bid/ask cost model in `data/costs.py`, gold auto-detection,
+   Dukascopy blocker #2 closed).
 2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` —
-   **671 pass / 1 skip** (+35: `tests/test_calendar.py`). Inherited baseline
-   re-verified at 636/1 before any change.
+   **681 pass / 1 skip** (+10: `tests/test_costs.py`). Inherited baseline
+   re-verified at 671/1 before any change.
 3. [x] Fix any obvious failures. — none left open.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.9 marked shipped; next is the XAU bid/ask cost
-   model, then calibration-key source provenance.
-6. [x] Update `CHANGELOG.md` — 2.20.0 P12.9 entry.
+5. [x] Update `TODO.md` — P12.10 marked shipped; next is calibration-key
+   source provenance (Dukascopy blocker #3).
+6. [x] Update `CHANGELOG.md` — 2.21.0 P12.10 entry.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` — commit and push to `origin/arena/01a00521-sky`.
-12. [x] Open the session PR as the closing step — PR from
-    `arena/01a00521-sky` (P12.9).
+11. [ ] `git add` / `git commit` — commit and push to `origin/arena/01a0069a-sky`.
+12. [ ] Open the session PR as the closing step — PR from
+    `arena/01a0069a-sky` (P12.10).

@@ -148,3 +148,118 @@ def test_maker_execution_cheaper_than_taker():
 def test_get_funding_rate_as_of_t_fallback():
     assert get_funding_rate_as_of_t("BTCUSDT", ts=None) == DEFAULT_FUNDING_RATE_8H
     assert get_funding_rate_as_of_t("BTCUSDT", ts=123456789) == DEFAULT_FUNDING_RATE_8H
+
+
+# ---------------------------------------------------------------------------
+# P12.10: XAU bid/ask cost model (Dukascopy blocker #2)
+# ---------------------------------------------------------------------------
+
+def test_is_gold_symbol():
+    from data.costs import is_gold_symbol, GOLD_SYMBOL_PREFIXES
+    assert is_gold_symbol("XAUUSD")
+    assert is_gold_symbol("xauusd")
+    assert is_gold_symbol("XAU/USD")
+    assert is_gold_symbol("GOLD")
+    assert is_gold_symbol("gold")
+    assert not is_gold_symbol("BTCUSDT")
+    assert not is_gold_symbol("ETHUSDT")
+    assert not is_gold_symbol("")
+    assert not is_gold_symbol(None)
+
+
+def test_cost_model_for_symbol_selects_gold_model():
+    from data.costs import cost_model_for_symbol, DEFAULT_GOLD_COMMISSION_PCT
+    m = cost_model_for_symbol("XAUUSD")
+    assert m.market == "spot"
+    assert m.default_funding_rate_8h == 0.0
+    assert m.spot_fee_pct == DEFAULT_GOLD_COMMISSION_PCT
+    assert m.execution_type == "taker"
+
+    # BTC stays on the default perp model
+    m_btc = cost_model_for_symbol("BTCUSDT")
+    assert m_btc.market == "perp"
+    assert m_btc.default_funding_rate_8h > 0
+
+
+def test_cost_model_for_symbol_returns_base_model_unchanged():
+    from data.costs import cost_model_for_symbol
+    explicit = CostModel(market="perp", execution_type="maker")
+    result = cost_model_for_symbol("XAUUSD", base_model=explicit)
+    assert result is explicit
+    assert result.market == "perp"
+
+
+def test_xau_auto_detection_no_cost_model():
+    """XAUUSD automatically uses spot gold assumptions when no cost_model given."""
+    cost = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, action="BUY",
+                                gross_r=2.0, holding_hours=1.8, symbol="XAUUSD")
+    # No funding on spot gold
+    assert cost.funding_r == 0.0
+    assert cost.funding_rate_8h == 0.0
+    # Fee is gold commission: 2 * 0.005% / (20/2000 = 0.01) = 0.0001 / 0.01 = 0.01R
+    assert cost.fee_r == pytest.approx(0.01, abs=1e-4)
+    # Spread: XAUUSD half-spread = 0.06% -> 0.12% round-trip = 0.0012 / 0.01 = 0.12R
+    assert cost.slip_r == pytest.approx(0.12, abs=1e-4)
+
+
+def test_xau_has_no_funding_short_or_long():
+    """Both long and short XAU have zero funding cost."""
+    cost_buy = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, action="BUY",
+                                    holding_hours=24.0, symbol="XAUUSD")
+    cost_sell = calculate_trade_cost(entry=2000.0, stop_loss=2020.0, action="SELL",
+                                     holding_hours=24.0, symbol="XAUUSD")
+    assert cost_buy.funding_r == 0.0
+    assert cost_sell.funding_r == 0.0
+    # Total costs are identical (no direction asymmetry on spot)
+    assert cost_buy.total_cost_r == cost_sell.total_cost_r
+
+
+def test_xau_gold_commission_scales_with_stop():
+    """Gold commission is tiny at typical gold stop distances (~0.5-1.0%)."""
+    # 0.5% stop on $2000 gold: entry=2000, sl=1990 -> stop_pct=0.005
+    # fee = 2 * 0.005% / 0.005 = 0.0001 / 0.005 = 0.02R
+    cost = calculate_trade_cost(entry=2000.0, stop_loss=1990.0, symbol="XAUUSD")
+    assert cost.fee_r == pytest.approx(0.02, abs=1e-4)
+    # Total cost is mostly spread
+    assert cost.slip_r > cost.fee_r
+
+
+def test_xau_explicit_model_overrides_auto_detect():
+    """Passing an explicit CostModel prevents auto-detection."""
+    crypto_model = CostModel(market="perp", taker_fee_pct=0.0005)
+    cost = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, symbol="XAUUSD",
+                                cost_model=crypto_model)
+    # If auto-detect was active, funding_r would be 0 and fee_r would be 0.01.
+    # With explicit perp model, fee uses taker rate and funding is computed.
+    assert cost.funding_r != 0.0  # perp model applies funding
+
+
+def test_xau_net_r_small_winner():
+    """A small gross win on XAU is reduced by spread + commission."""
+    # Gross win +0.50R on $2000 gold with 1% stop
+    cost = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, action="BUY",
+                                gross_r=0.50, symbol="XAUUSD")
+    # Total cost = fee_r + slip_r = 0.01 + 0.12 = 0.13R
+    assert cost.gross_r == 0.50
+    assert cost.total_cost_r == pytest.approx(0.13, abs=1e-4)
+    assert cost.net_r == pytest.approx(0.37, abs=1e-4)
+
+
+def test_xau_spread_is_primary_cost():
+    """For XAU, the spread component dominates over commission."""
+    cost = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, symbol="XAUUSD")
+    assert cost.slip_r > 0
+    assert cost.fee_r > 0
+    assert cost.slip_r > cost.fee_r  # spread is the main cost
+    assert cost.funding_r == 0.0     # no funding on spot
+
+
+def test_gold_symbol_prefixes_match_common_variants():
+    from data.costs import is_gold_symbol
+    assert is_gold_symbol("XAUEUR")
+    assert is_gold_symbol("XAUGBP")
+    assert is_gold_symbol("XAU/GBP")
+    assert is_gold_symbol("GOLD100")
+    assert is_gold_symbol("gold-futures")
+    assert not is_gold_symbol("BTCXAU")    # suffix, not prefix
+    assert not is_gold_symbol("PAXGUSDT")   # tokenized gold, not spot gold

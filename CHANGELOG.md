@@ -10,6 +10,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.21.0] — 2026-08-15 · P12.10: XAU bid/ask cost model (Dukascopy blocker #2)
+
+MINOR: teach `data/costs.py` that gold instruments trade on spot markets with
+spread-based costs, not crypto-perp taker fees and funding. Closes blocker #2
+of the three recorded against the Dukascopy XAU research book.
+
+### The problem
+`calculate_trade_cost()` used a default `CostModel()` with `market="perp"`,
+taker fees (0.05%/side) and funding — appropriate for crypto perps but not
+for spot gold. A bid-only XAUUSD backtest was costed with crypto assumptions,
+giving a misleading cost picture. The existing `SPREADS["XAUUSD"]` entry
+existed but was never auto-selected.
+
+### Added
+- **`cost_model_for_symbol()`** — symbol-based cost model resolver. When no
+  explicit `CostModel` is passed, gold instruments (symbols starting with
+  `XAU` or `GOLD`) get a spot-market model with zero funding, a small ECN
+  broker commission (`DEFAULT_GOLD_COMMISSION_PCT = 0.005%` per side), and
+  spread as the primary cost via the existing `SPREADS` dict. Everything
+  else stays on the crypto-perp default.
+- **`is_gold_symbol()`** — prefix-based gold detection.
+- **`GOLD_SYMBOL_PREFIXES`** — `("XAU", "GOLD")`.
+- **`DEFAULT_GOLD_COMMISSION_PCT`** — 0.005% per side, aligned with common
+  ECN spot-gold brokers (~$5 per $100k notional).
+- **Auto-detection** in `calculate_trade_cost()` — when `cost_model` is
+  `None`, the function now calls `cost_model_for_symbol(symbol)` so every
+  XAUUSD call automatically uses gold-specific costs. An explicit
+  `cost_model` argument still overrides auto-detection.
+
+### Safety
+- **Opt-in by symbol, never by guess.** Only symbols with an XAU or GOLD
+  prefix get the gold model. BTCUSDT, ETHUSDT, PAXGUSDT (tokenized gold)
+  keep the crypto-perp default unchanged.
+- **Explicit model always wins.** Passing a `CostModel` argument disables
+  auto-detection, preserving the existing test contracts and any caller
+  that wants to override.
+- **Numbers are unchanged for crypto.** BTC/ETH costs are byte-identical to
+  the pre-2.21.0 behaviour.
+- **No new dependency, no surface change.** The model is internal to
+  `data/costs.py`; the cost-calculation pipeline (`_evaluate()` in the
+  backtester, `trade_stats()` in the scorecard) receives the corrected costs
+  without any import or signature changes.
+- Full suite: **681 passed, 1 skipped** (+10 in `tests/test_costs.py`).
+
+### Documentation
+- `docs/DUKASCOPY_XAU_ADAPTER.md`: blocker #2 (bid/ask cost model) marked
+  **closed**. Two of three blockers now closed; one remains (calibration-key
+  source provenance).
+- Module docstring updated to describe the P12.10 gold cost model.
+
+---
+
 ## [2.20.0] — 2026-08-15 · P12.9 market calendars: scheduled closure is not a gap
 
 MINOR: teach the data layer that some venues close. Closes blocker #1 of the
