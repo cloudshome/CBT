@@ -292,7 +292,7 @@ def cmd_backtest(args) -> int:
 
     if args.source == "store":
         from data.store import StoreClient
-        client = StoreClient(market=args.market)
+        client = StoreClient(exchange=args.exchange, market=args.market)
     else:
         client = _client()
     symbol = _sym(args.symbol)
@@ -1252,23 +1252,33 @@ def cmd_backfill(args) -> int:
     # P12.3.2 — offline CSV import (never touches a network socket).
     if args.from_csv:
         from data.backfill import backfill_from_csv
+        # dukascopy-node is an optional external acquisition tool, not a SKY
+        # runtime dependency. Its CSV enters through our existing validation
+        # boundary and receives its own series/provenance identity.
+        csv_source = getattr(args, "csv_source", "binance")
+        csv_exchange = "dukascopy" if csv_source == "dukascopy" else args.exchange
+        csv_market = "spot" if csv_source == "dukascopy" else args.market
+        price_type = getattr(args, "price_type", "") if csv_source == "dukascopy" else ""
+        source_tag = "dukascopy_csv" if csv_source == "dukascopy" else "csv"
         try:
             payload = backfill_from_csv(
                 store=store,
                 csv_path=args.from_csv,
                 symbol=_sym(args.symbol),
                 timeframe=args.tf,
-                exchange=args.exchange,
-                market=args.market,
+                exchange=csv_exchange,
+                market=csv_market,
                 expected_sha256=args.csv_sha256,
+                source=source_tag,
+                price_type=price_type,
             )
             if args.rollup:
                 payload["rollup"] = rollup(
-                    store, exchange=args.exchange, market=args.market,
+                    store, exchange=csv_exchange, market=csv_market,
                     symbol=_sym(args.symbol),
                 )
             payload["gaps_remaining"] = len(detect_gaps(
-                store.read(args.exchange, args.market,
+                store.read(csv_exchange, csv_market,
                            _sym(args.symbol), args.tf), args.tf))
         except BackfillError as exc:
             print(f"[!] {exc}", file=sys.stderr)
@@ -1618,7 +1628,7 @@ def cmd_simulator(args) -> int:
     client = None
     if args.source == "store":
         from data.store import StoreClient
-        client = StoreClient(market=args.market)
+        client = StoreClient(exchange=args.exchange, market=args.market)
 
     symbols = _symbols(args.symbols) if args.symbols else None
     total_bt = total_pp = 0
@@ -1933,6 +1943,8 @@ def main(argv: list[str] | None = None) -> int:
     p_bt.add_argument("--source", default="auto", choices=("auto", "store"),
                       help="auto = live (or demo) client; store = the P10 Parquet "
                            "series (offline, P12.3.2 real data)")
+    p_bt.add_argument("--exchange", default="binance",
+                      help="store venue (binance|bybit|dukascopy)")
     p_bt.add_argument("--market", default="spot", choices=("spot", "perp"),
                       help="store series market label (used with --source store)")
     p_bt.set_defaults(func=cmd_backtest)
@@ -2273,6 +2285,8 @@ def main(argv: list[str] | None = None) -> int:
     p_sim.add_argument("--source", default="auto", choices=("auto", "store"),
                        help="auto = live (or demo) client; store = the P10 Parquet "
                             "series (offline, P12.3.2 real data)")
+    p_sim.add_argument("--exchange", default="binance",
+                       help="store venue (binance|bybit|dukascopy)")
     p_sim.add_argument("--market", default="spot", choices=("spot", "perp"),
                        help="store series market label (used with --source store)")
     p_sim.add_argument("--dry-run", action="store_true",
@@ -2314,8 +2328,15 @@ def main(argv: list[str] | None = None) -> int:
     p_bf.add_argument("--rollup", action="store_true",
                       help="P10.3: aggregate stored 1m → 5m/15m/1h/4h/1d")
     p_bf.add_argument("--from-csv", default=None, metavar="PATH",
-                      help="P12.3.2: import a local Binance-style OHLCV CSV(.gz) "
-                           "(offline; no REST page) — Vision 6-col or 12-col klines format")
+                      help="import local OHLCV CSV(.gz) through validation — "
+                           "Binance Vision/klines or dukascopy-node format")
+    p_bf.add_argument("--csv-source", default="binance",
+                      choices=("binance", "dukascopy"),
+                      help="CSV provenance; dukascopy stores a separate "
+                           "dukascopy/spot series (never relabelled Binance)")
+    p_bf.add_argument("--price-type", default="bid", choices=("bid", "ask"),
+                      help="dukascopy-node candle side (default bid; ignored "
+                           "for Binance CSV)")
     p_bf.add_argument("--csv-sha256", default=None, metavar="HEX",
                       help="provenance pin: refuse to import unless the "
                            "decompressed CSV matches this sha256")

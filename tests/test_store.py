@@ -68,6 +68,7 @@ def test_normalise_klines_attaches_context_and_closed_true():
     assert list(df.columns) == CANDLE_COLUMNS
     assert (df["closed"] == True).all()          # noqa: E712  persisted history is closed
     assert (df["source"] == "rest").all()
+    assert (df["price_type"] == "").all()
     assert (df["ingested_at"] == 1_760_000_000_000).all()
     # prices survive the normalisation untouched
     assert df["close"].tolist() == raw["close"].round(2).tolist()

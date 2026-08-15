@@ -144,6 +144,14 @@ def rollup(
 ) -> dict:
     """Aggregate stored 1m into higher TFs and upsert (source='aggregated')."""
     master = store.read(exchange, market, symbol, MASTER_TF)
+    # Preserve side provenance on derived Dukascopy candles. A rollup of bid
+    # candles is still bid; dropping that field would make the higher-TF book
+    # look like an unspecified/last-trade series.
+    price_types = ({str(v) for v in master.get("price_type", []) if str(v)}
+                   if not master.empty else set())
+    if len(price_types) > 1:
+        raise ValueError(f"cannot roll a mixed price_type series: {sorted(price_types)}")
+    price_type = next(iter(price_types), "")
     written: dict[str, int] = {}
     for tf in targets:
         raw = aggregate_ohlcv(master, tf)
@@ -153,6 +161,7 @@ def rollup(
         frame = normalise_klines(
             raw, exchange=exchange, market=market,
             symbol=symbol, timeframe=tf, source="aggregated",
+            price_type=price_type,
         )
         before = store.count(exchange, market, symbol, tf)
         store.write(frame)

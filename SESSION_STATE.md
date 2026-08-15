@@ -10,19 +10,48 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-15 (this session: **P12.8 the net anchor shipped** — the
-two places that *act* on a measurement, the calibrator multiplier and the
-setup-proven gate, were still reading **gross** expectancy after P12.6 made every
-*report* net. A setup at `E_gross +0.055R` / `E_net −0.118R` was boosted ×1.008;
-it is now dampened ×0.982. Surfaces: `learn` CLI, risk-gate block message,
-`setup_stats` net columns, `proven_on` flag)
+**Last updated:** 2026-08-15 (this session: **v2.19.0 optional Dukascopy
+XAU research adapter** on top of the P12.8.1 expectancy-anchor class audit —
+adapts only the useful external acquisition boundary; no Node runtime
+ dependency, second data architecture, live-feed switch, or gate loosening)
 
-**Previous:** 2026-08-15 (**P12.7 Monte Carlo risk-of-ruin table shipped** — `brain/analytics.monte_carlo_ruin_table()` resamples NET realised paper outcomes to produce a `risk% × expected DD × ruin probability` sweep plus longest losing streak and time-to-recovery; surfaces: CLI `monte`, HTTP `/api/monte` + embedded in `/api/risk`, MCP `cryptobrain_monte` + `ruin_table` inside `cryptobrain_risk`, dashboard Risk card)
-**Branch:** `arena/01a00490-sky` (session branch fixed by Arena; branched from `main` @ `2dd49a6`)
-**HEAD commit:** `2dd49a6` feat(P12.7): Monte Carlo risk-of-ruin table (this session's work sits on top)
-**Python:** 3.11 (venv `.venv` — system Python is PEP 668 externally managed) — suite green (**631 pass / 1 skip**)
+**Previous:** 2026-08-15 (**P12.8.1 expectancy-anchor class audit** — remaining simulator net-proof path fixed; real-store recalibration pending because runtime artifacts are absent)
+**Branch:** `arena/01a004b0-sky` (session branch fixed by Arena; branched from `main` @ `0344625`)
+**HEAD commit:** `0344625` fix(P12.8): the net anchor (this session's patch work sits on top)
+**Python:** 3.11 (venv `.venv`) — suite green (**636 pass / 1 skip** expected after final test)
 
-> **This session (`arena/01a00490-sky`): P12.8 — the net anchor.**
+> **This session (`arena/01a004b0-sky`): v2.19.0 — optional Dukascopy XAU adapter.**
+> - `dukascopy-node` remains an external, version-pinned CSV producer. SKY
+>   does not install, vendor, or execute it at runtime.
+> - `backfill --from-csv --csv-source dukascopy --price-type bid|ask` accepts
+>   its documented epoch-ms OHLC CSV through the existing SHA/sanity/dedupe/gap
+>   boundary and stores a separate `dukascopy/spot/XAUUSD` series.
+> - Canonical candles now carry `price_type`; old Parquet partitions are
+>   additively coerced, rollups preserve the side, and mixed bid/ask imports
+>   into one series fail closed.
+> - `backtest` / `simulator` store mode now accept `--exchange`, matching
+>   validate/scorecard/quality.
+> - Existing Binance BTC/ETH and live XAU→PAXG behavior is unchanged. Saving
+>   Dukascopy grades into calibration remains prohibited until market-calendar,
+>   gold spread/cost, and learning-key provenance work is complete.
+> - Guide: `docs/DUKASCOPY_XAU_ADAPTER.md`.
+>
+> **Earlier this session: P12.8.1 — expectancy-anchor class audit.**
+> - **Sweep:** all executable expectancy comparisons against zero or a bar are
+>   inventoried in `docs/EXPECTANCY_ANCHOR_AUDIT_2026-08-15.md`.
+> - **Remaining path fixed:** `data.simulator.grind_verdict()` now recomputes
+>   the micro-live sample proof from counts + `E_net`; a stale `proven=True`
+>   cannot override a cost-flipped book, and the gap says `positive net
+>   expectancy` rather than the contradictory `all targets met`.
+> - **Zero is data:** `paper_progress()` uses `None`-only net→gross fallback;
+>   exact-zero net expectancy/wins/R no longer inherit positive gross values.
+> - **Surface aligned:** simulator grind output displays labelled `E_NET`.
+> - **Operational blocker:** this checkout has neither `data/store/**` nor
+>   `data/cryptobrain.db`, so the requested real `backtest --save` + `learn`
+>   was not faked with demo data. Commands are recorded in the audit.
+> - **Version/tests:** 2.18.0 → **2.18.1**; **633 pass / 1 skip**.
+
+> **Prior session (`arena/01a00490-sky`): P12.8 — the net anchor.**
 > P12.6 made every *measurement* net of costs. P12.8 closes the gap it left:
 > the two places that **act** on a measurement still read the **gross**
 > number, so the desk measured honestly and then decided on the wrong figure.
@@ -413,27 +442,30 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
     reads the decided paper book NET of costs and surfaces survivability
     estimates. It does not approve trades, loosen the graduation bar, or
     replace the risk gate.
+17. **Dukascopy XAU is research-only.** The adapter preserves venue and
+    bid/ask provenance and refuses mixed sides, but crypto-first gap checks do
+    not yet understand XAU session closures, the generic cost model is not a
+    measured XAU bid/ask spread model, and saved calibration keys do not carry
+    candle-source provenance. Do not use `backtest --save` on this book yet.
 
 ---
 
 ## Next recommended action
 
-1. **Re-run the grind on real data now that decisions read `E_net`.**
-   P12.8 changed what the calibrator and the proven gate *do*, so the
-   stored calibration profile was built on the old gross anchor. Re-run
-   `backtest --save` + `learn` on the real BTCUSDT store and re-read the
-   graduation report: some setups will lose their boost, and that is the
-   point. This is cheap and it is the first honest read of the desk.
-2. **Audit for any remaining gross-anchored decision.** P12.8 fixed the two
-   found by inspection (`multiplier_from_score`, `setup_proven`). A short
-   sweep for other places that compare an expectancy against zero or a
-   threshold would confirm the class of bug is closed, not just its
-   instances.
-3. Then *code*: **micro-live** — very-small real-capital execution only
-   after the graduation bar opens and a human explicitly approves the
-   progression step.
-4. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-5. Do **not** install Freqtrade or Backtrader. Do not loosen the graduation bar.
+1. **On the host holding the real BTC store/DB**, re-run `backtest --save` +
+   `learn`; the calibration profile remains stale under the pre-P12.8 gross
+   anchor in this clean checkout. Do not substitute demo data.
+2. Optionally acquire version-pinned Dukascopy XAU m1 **bid** CSV and import it
+   with a SHA pin using `docs/DUKASCOPY_XAU_ADAPTER.md`; run validate/backtest/
+   quality **without `--save`** as a separate research book.
+3. Before any Dukascopy-derived calibration, add an XAU market calendar,
+   bid/ask spread + gold-specific net costs, and source-series provenance in
+   saved learning keys. Until all three are closed, PAXG live behavior stays
+   unchanged and Dukascopy remains research-only.
+4. **Micro-live** only after the existing graduation bar opens and a human
+   explicitly approves progression. This adapter does not move that bar.
+5. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
+6. Do not install Freqtrade or Backtrader and do not loosen the graduation bar.
 
 **Suggested next-session prompt:**
 
@@ -454,13 +486,13 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 631 passed, 1 skipped
+# 636 passed, 1 skipped
 ```
 
 Wheel gate:
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.17.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.19.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Monte Carlo risk-of-ruin table (P12.7):

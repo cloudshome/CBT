@@ -46,6 +46,16 @@ def klines12_csv(n: int = 30, start: int = T0) -> str:
     return "\n".join(lines) + "\n"
 
 
+def dukascopy_csv(n: int = 30, start: int = T0) -> str:
+    """dukascopy-node OHLC CSV layout (UTC epoch-ms timestamp)."""
+    lines = ["timestamp,open,high,low,close,volume"]
+    for i in range(n):
+        t = start + i * STEP
+        p = 2_650.0 + i * 0.1
+        lines.append(f"{t},{p},{p + 0.8},{p - 0.6},{p + 0.2},12.5")
+    return "\n".join(lines) + "\n"
+
+
 @pytest.fixture
 def store(tmp_path):
     return CandleStore(root=tmp_path / "store")
@@ -97,6 +107,33 @@ def test_headerless_12_col_klines_imports(store, tmp_path):
     assert res["rows_added"] == 30
     df = store.read(EXCH, MARKET, SYMBOL, TF)
     assert float(df["close"].iloc[-1]) == 93_500.0 + 29 * 2.5 + 3
+
+
+def test_dukascopy_node_csv_keeps_venue_and_price_side(store, tmp_path):
+    path = tmp_path / "xauusd.csv"
+    path.write_text(dukascopy_csv())
+    res = backfill_from_csv(
+        store=store, csv_path=path, symbol="XAUUSD", timeframe=TF,
+        exchange="dukascopy", market="spot", source="dukascopy_csv",
+        price_type="bid")
+
+    assert res["rows_added"] == 30
+    assert res["source"] == "dukascopy_csv"
+    assert res["price_type"] == "bid"
+    df = store.read("dukascopy", "spot", "XAUUSD", TF)
+    assert set(df["source"]) == {"dukascopy_csv"}
+    assert set(df["price_type"]) == {"bid"}
+    assert float(df["open"].iloc[0]) == 2_650.0
+    # It must never masquerade as the Binance PAXG proxy series.
+    assert store.count("binance", "spot", "XAUUSD", TF) == 0
+
+    with pytest.raises(BackfillError, match="price_type mismatch"):
+        backfill_from_csv(
+            store=store, csv_path=path, symbol="XAUUSD", timeframe=TF,
+            exchange="dukascopy", market="spot", source="dukascopy_csv",
+            price_type="ask")
+    # The refused opposite side did not overwrite the bid book.
+    assert set(store.read("dukascopy", "spot", "XAUUSD", TF)["price_type"]) == {"bid"}
 
 
 def test_sha256_pin_verified_and_enforced(store, tmp_path):
@@ -193,6 +230,23 @@ def test_cli_backfill_from_csv_roundtrip(tmp_path, monkeypatch):
     assert main(argv) == 0
     df = CandleStore(root=root).read(EXCH, MARKET, SYMBOL, TF)
     assert len(df) == 25 and df["source"].iloc[0] == "csv"
+
+
+def test_cli_imports_dukascopy_xau_as_separate_store_series(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEMO_MODE", "0")
+    from main import main
+
+    csv = tmp_path / "xauusd.csv"
+    csv.write_text(dukascopy_csv(25))
+    root = tmp_path / "store"
+    argv = ["backfill", "--from-csv", str(csv), "--csv-source", "dukascopy",
+            "--price-type", "ask", "--symbol", "XAUUSD", "--tf", "1m",
+            "--root", str(root), "--json"]
+    assert main(argv) == 0
+    df = CandleStore(root=root).read("dukascopy", "spot", "XAUUSD", "1m")
+    assert len(df) == 25
+    assert set(df["source"]) == {"dukascopy_csv"}
+    assert set(df["price_type"]) == {"ask"}
 
 
 def test_cli_from_csv_sha256_pin_refuses_and_exits_1(tmp_path, monkeypatch,

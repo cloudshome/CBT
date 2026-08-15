@@ -10,6 +10,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.19.0] — 2026-08-15 · optional Dukascopy XAU research adapter
+
+MINOR: adapt the useful acquisition boundary from `dukascopy-node` without
+adding a Node runtime dependency or a second data/strategy architecture.
+
+### Added
+- `backfill --from-csv ... --csv-source dukascopy --price-type bid|ask`
+  accepts the documented dukascopy-node OHLC CSV shape
+  (`timestamp,open,high,low,close,volume`) through SKY's existing SHA pin,
+  sanity, dedupe, gap, normalization, and Parquet boundaries.
+- Canonical candles carry `price_type`; old partitions are additively coerced
+  on read and upgraded on their next write.
+- Dukascopy imports are isolated as `dukascopy/spot/XAUUSD` with
+  `source=dukascopy_csv`; they cannot overwrite or masquerade as Binance/PAXG.
+- Store-backed `backtest` and `simulator` accept `--exchange`, matching the
+  existing validate/scorecard/quality venue selection.
+- `docs/DUKASCOPY_XAU_ADAPTER.md` records the pinned acquisition/import flow
+  and the gates still required before saved calibration: XAU market calendar,
+  bid/ask spread costs, and source provenance in learning keys.
+
+### Safety
+- Binance remains canonical for BTC/ETH. Existing live XAU/PAXG behavior is
+  unchanged. Dukascopy is acquisition-only and research-only.
+- Tick ingestion, ML prediction, new strategy families, and automatic source
+  pooling were deliberately not added.
+- Full suite: **636 passed, 1 skipped**.
+
+---
+
+## [2.18.1] — 2026-08-15 · expectancy-anchor class audit
+
+PATCH: close the remaining simulator path after P12.8's net-anchor fix.
+
+### Fixed
+- **`data/simulator.py` → `grind_verdict()`** now recomputes the micro-live
+  sample proof from counts and **net expectancy** instead of trusting a
+  caller-supplied/stale `proven` flag. Its gap explanation also compares
+  `E_net`, so a gross-positive/net-negative setup no longer reports the
+  contradictory `all targets met` while remaining blocked.
+- **`paper_progress()`** now falls back from net to gross only on `None`.
+  Exact-zero net expectancy, net wins, and net win/loss R are valid measured
+  values; truthiness fallback previously replaced zero with gross and could
+  flip the sign of the proof.
+- The simulator grind table now labels and displays `E_NET` beside its
+  net-derived `PROVEN` marker.
+
+### Audit and verification
+- `docs/EXPECTANCY_ANCHOR_AUDIT_2026-08-15.md` inventories every executable
+  expectancy comparison against zero or a threshold and records its anchor.
+- Added regressions for a stale `proven=True` on a cost-flipped setup and for
+  exact-zero net values. Suite: **633 passed, 1 skipped**.
+- The real-store `backtest --save` + `learn` rerun remains operationally
+  pending because this checkout contains neither gitignored `data/store/**`
+  nor `data/cryptobrain.db`; no demo data was substituted.
+
+---
+
 ## [2.18.0] — 2026-08-15 · branch `arena/01a00490-sky`
 
 MINOR bump: **P12.8 — the net anchor: decisions judge costs, not just reports.**

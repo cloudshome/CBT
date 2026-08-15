@@ -97,6 +97,19 @@ def test_incomplete_trailing_bucket_is_dropped():
     assert len(agg) == 2
 
 
+def test_rollup_preserves_bid_ask_provenance(store):
+    raw = minutes(60)
+    store.write(normalise_klines(
+        raw, exchange="dukascopy", market="spot", symbol="XAUUSD",
+        timeframe="1m", source="dukascopy_csv", price_type="bid"))
+    rollup(store, exchange="dukascopy", market="spot", symbol="XAUUSD",
+           targets=("5m", "15m"))
+    for tf in ("5m", "15m"):
+        derived = store.read("dukascopy", "spot", "XAUUSD", tf)
+        assert set(derived["source"]) == {"aggregated"}
+        assert set(derived["price_type"]) == {"bid"}
+
+
 def test_rollup_writes_all_higher_tfs(store):
     # 2 days of 1m = 2880 bars → complete 5m/15m/1h/4h/1d buckets
     raw = minutes(2 * 24 * 60)

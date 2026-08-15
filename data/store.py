@@ -43,12 +43,12 @@ import pandas as pd
 CANDLE_COLUMNS: list[str] = [
     "ts", "exchange", "market", "symbol", "timeframe",
     "open", "high", "low", "close", "volume", "quote_volume", "trades",
-    "closed", "source", "ingested_at",
+    "closed", "source", "price_type", "ingested_at",
 ]
 
 PRIMARY_KEY: list[str] = ["exchange", "market", "symbol", "timeframe", "ts"]
 
-_STR_COLS = {"exchange", "market", "symbol", "timeframe", "source"}
+_STR_COLS = {"exchange", "market", "symbol", "timeframe", "source", "price_type"}
 _INT_COLS = {"ts", "trades", "ingested_at"}
 _FLOAT_COLS = {"open", "high", "low", "close", "volume", "quote_volume"}
 _BOOL_COLS = {"closed"}
@@ -118,6 +118,7 @@ def normalise_klines(
     symbol: str,
     timeframe: str,
     source: str = "rest",
+    price_type: str = "",
     ingested_at: int | None = None,
 ) -> pd.DataFrame:
     """Normalise a raw OHLCV frame (the adapter boundary).
@@ -151,6 +152,10 @@ def normalise_klines(
     else:
         frame["closed"] = True              # history is closed unless told otherwise
     frame["source"] = source
+    # Exchange candles are usually last-trade prices; Dukascopy OHLC is
+    # explicitly bid or ask. Keep that distinction in the canonical row so a
+    # later backtest cannot silently mix unlike price series.
+    frame["price_type"] = price_type
     frame["ingested_at"] = ingest
     return coerce_candle_frame(frame)
 
@@ -223,7 +228,10 @@ class CandleStore:
             path = part_dir / "part-000.parquet"
             sub = sub.reset_index(drop=True)
             if path.exists():
-                old = pd.read_parquet(path)
+                # Additive schema migration: old partitions predate fields
+                # such as ``price_type``. Coerce before concatenation so a
+                # rewrite upgrades them without NaN/object drift.
+                old = coerce_candle_frame(pd.read_parquet(path))
                 merged = pd.concat([old, sub], ignore_index=True)
             else:
                 merged = sub
@@ -265,7 +273,9 @@ class CandleStore:
             df = df[df["ts"] >= start_ts].reset_index(drop=True)
         if end_ts is not None:
             df = df[df["ts"] <= end_ts].reset_index(drop=True)
-        return df
+        # Readers see the current canonical schema even when a partition was
+        # written by an older release. The next write upgrades it on disk.
+        return coerce_candle_frame(df)
 
     # -- introspection ------------------------------------------------------ #
     def count(self, exchange: str, market: str,

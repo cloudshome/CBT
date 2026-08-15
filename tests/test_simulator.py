@@ -163,6 +163,44 @@ def test_grind_verdict_lists_missing(sim_env):
     assert types_missing == {"Sweep Reversal Sell", "Buy Pullback", "Sell Pullback"}
 
 
+def test_grind_verdict_explains_cost_flipped_setup_on_net_expectancy(sim_env):
+    """The micro-live proof and its explanation must judge the same E_net."""
+    from data.simulator import grind_verdict
+
+    # Even a stale/caller-supplied proven=True cannot override the net book.
+    fake = [{"plan_type": "Buy Pullback", "backtest_n": 120, "paper_n": 25,
+             "expectancy": 0.10, "expectancy_net": -0.05, "proven": True}]
+    gap = next(m for m in grind_verdict(fake)["missing"]
+               if m["plan_type"] == "Buy Pullback")
+    assert gap["expectancy"] > 0
+    assert gap["expectancy_net"] < 0
+    assert "positive net expectancy" in gap["missing"]
+    assert gap["missing"] != "all targets met"
+
+
+def test_paper_progress_preserves_exact_zero_net_values(sim_env):
+    """Zero E_net/wins_net is data, not a signal to fall back to gross."""
+    from data.database import SignalDB
+    from data.simulator import paper_progress
+
+    with SignalDB() as db:
+        db.save_backtest_rows([{
+            "ts": 1_700_000_000_000, "symbol": "BTCUSDT", "timeframe": "15m",
+            "plan_type": "Zero Net", "action": "BUY", "confidence_pct": 70,
+            "horizon_hours": 4.0, "outcome": "FULL_WIN", "rr_achieved": 1.0,
+            "rr_net": 0.0, "max_favorable": 1.0, "max_adverse": -1.0,
+            "entry": 60_000.0, "stop_loss": 59_500.0,
+            "trigger_level": None,
+        }], run_id="zero-net")
+        row = next(p for p in paper_progress(db) if p["plan_type"] == "Zero Net")
+
+    assert row["expectancy"] == 1.0
+    assert row["expectancy_net"] == 0.0
+    assert row["wins"] == 1
+    assert row["wins_net"] == 0
+    assert row["proven"] is False
+
+
 # ── graduation gate (BLUEPRINT Step 2 → Step 3) ───────────────────────────
 
 def _full_row(pt: str, n: int = 120, wins: int = 72, win_r: float = 108.0,

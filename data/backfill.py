@@ -554,6 +554,7 @@ def _read_ohlcv_csv(csv_path: str | Path) -> tuple[pd.DataFrame, bytes, str]:
 
     - header ``open_time_ms,open,high,low,close,volume`` (Vision 6-col)
     - header ``open_time,open,high,low,close,volume,...`` (12-col klines)
+    - header ``timestamp,open,high,low,close,volume`` (dukascopy-node)
     - headerless 12-col klines rows
     - headerless 6-col rows
 
@@ -581,9 +582,12 @@ def _read_ohlcv_csv(csv_path: str | Path) -> tuple[pd.DataFrame, bytes, str]:
     else:
         df = pd.read_csv(buf)
     if "ts" not in df.columns:
-        for cand in ("open_time", "open_time_ms"):
+        # Binance archives use open_time[_ms]; dukascopy-node's canonical CSV
+        # output uses timestamp (UTC epoch ms).
+        for cand in ("open_time", "open_time_ms", "timestamp"):
             if cand in df.columns:
                 df = df.rename(columns={cand: "ts"})
+                break
     missing = {"ts", "open", "high", "low", "close", "volume"} - set(df.columns)
     if missing:
         raise BackfillError(
@@ -606,6 +610,8 @@ def backfill_from_csv(
     exchange: str = "binance",
     market: str = "spot",
     expected_sha256: Optional[str] = None,
+    source: str = "csv",
+    price_type: str = "",
 ) -> dict:
     """P12.3.2 — import a local Binance-style OHLCV CSV into the store.
 
@@ -627,6 +633,8 @@ def backfill_from_csv(
     """
     from data.gaps import detect_gaps, step_ms
 
+    if price_type not in ("", "bid", "ask"):
+        raise BackfillError("price_type must be empty, 'bid', or 'ask'")
     frame, _raw, digest = _read_ohlcv_csv(csv_path)
     if expected_sha256 and digest.lower() != expected_sha256.strip().lower():
         raise BackfillError(
@@ -647,11 +655,20 @@ def backfill_from_csv(
 
     misaligned = int((frame["ts"] % step != 0).sum())
 
-    before = store.count(exchange, market, symbol, timeframe)
+    existing = store.read(exchange, market, symbol, timeframe)
+    existing_price_types = ({str(v) for v in existing.get("price_type", [])
+                             if str(v)} if not existing.empty else set())
+    if price_type and existing_price_types and existing_price_types != {price_type}:
+        raise BackfillError(
+            f"price_type mismatch: existing series is "
+            f"{sorted(existing_price_types)}, import is {price_type}; "
+            f"bid/ask candles must not share one store series")
+
+    before = len(existing)
     if not frame.empty:
         canon = normalise_klines(
             frame, exchange=exchange, market=market, symbol=symbol,
-            timeframe=timeframe, source="csv",
+            timeframe=timeframe, source=source, price_type=price_type,
         )
         store.write(canon)
     after = store.count(exchange, market, symbol, timeframe)
@@ -663,7 +680,8 @@ def backfill_from_csv(
     return {
         "ok": True,
         "exchange": exchange, "market": market, "symbol": symbol,
-        "timeframe": timeframe,
+        "timeframe": timeframe, "source": source,
+        "price_type": price_type,
         "csv_path": str(csv_path),
         "sha256": digest,
         "sha256_verified": bool(expected_sha256),

@@ -280,22 +280,32 @@ def paper_progress(db) -> list[dict]:
     pp_map = {r["plan_type"]: dict(r) for r in pp}
     plan_types = sorted(set(bt_map) | set(pp_map))
     progress = []
+    # Net values legitimately can be exactly zero.  Truthiness fallback (``net
+    # or gross``) would replace that zero with the gross value and can flip the
+    # sign of the proof shown to the micro-live gate.  Fall back only when the
+    # net measurement is genuinely absent.
+    def net_or(value, gross, default=0.0):
+        return gross if value is None and gross is not None else (default if value is None else value)
+
     for pt in plan_types:
         b = bt_map.get(pt, {})
         p = pp_map.get(pt, {})
         b_n, p_n = b.get("n") or 0, p.get("n") or 0
         expectancy = ((b.get("expectancy") or 0.0) * b_n + (p.get("expectancy") or 0.0) * p_n) \
             / (b_n + p_n) if (b_n + p_n) else 0.0
-        exp_net = ((b.get("expectancy_net") or b.get("expectancy") or 0.0) * b_n
-                   + (p.get("expectancy_net") or p.get("expectancy") or 0.0) * p_n) \
+        exp_net = (net_or(b.get("expectancy_net"), b.get("expectancy")) * b_n
+                   + net_or(p.get("expectancy_net"), p.get("expectancy")) * p_n) \
             / (b_n + p_n) if (b_n + p_n) else 0.0
         wins = (b.get("wins") or 0) + (p.get("wins") or 0)
         losses = (b.get("losses") or 0) + (p.get("losses") or 0)
-        wins_net = (b.get("wins_net") or b.get("wins") or 0) + (p.get("wins_net") or p.get("wins") or 0)
+        wins_net = (net_or(b.get("wins_net"), b.get("wins"), 0)
+                    + net_or(p.get("wins_net"), p.get("wins"), 0))
         win_r = (b.get("win_r") or 0.0) + (p.get("win_r") or 0.0)
         loss_r = (b.get("loss_r") or 0.0) + (p.get("loss_r") or 0.0)
-        win_r_net = (b.get("win_r_net") or b.get("win_r") or 0.0) + (p.get("win_r_net") or p.get("win_r") or 0.0)
-        loss_r_net = (b.get("loss_r_net") or b.get("loss_r") or 0.0) + (p.get("loss_r_net") or p.get("loss_r") or 0.0)
+        win_r_net = (net_or(b.get("win_r_net"), b.get("win_r"))
+                     + net_or(p.get("win_r_net"), p.get("win_r")))
+        loss_r_net = (net_or(b.get("loss_r_net"), b.get("loss_r"))
+                      + net_or(p.get("loss_r_net"), p.get("loss_r")))
         decided = wins + losses
         progress.append({
             "plan_type": pt,
@@ -337,24 +347,36 @@ def grind_verdict(progress: list[dict]) -> dict:
     ready = True
     for pt in primary:
         p = by_type.get(pt)
-        if p is None or not p["proven"]:
+        if p is None:
             ready = False
-            if p is None:
-                needed.append({"plan_type": pt, "backtest_n": 0, "paper_n": 0,
-                               "missing": "no samples yet"})
-            else:
-                parts = []
-                if p["backtest_n"] < CALIBRATE_MIN_N:
-                    parts.append("backtest")
-                if p["paper_n"] < CALIBRATE_MIN_PAPER_N:
-                    parts.append("paper")
-                if p["expectancy"] <= 0:
-                    parts.append("positive expectancy")
-                needed.append({
-                    "plan_type": pt, "backtest_n": p["backtest_n"],
-                    "paper_n": p["paper_n"], "expectancy": p["expectancy"],
-                    "missing": ", ".join(parts) or "all targets met",
-                })
+            needed.append({"plan_type": pt, "backtest_n": 0, "paper_n": 0,
+                           "missing": "no samples yet"})
+            continue
+
+        # Recompute this safety decision from its evidence instead of trusting
+        # a caller-supplied/stale ``proven`` boolean.  Net is authoritative;
+        # gross remains a compatibility fallback only when costs are absent.
+        exp_net = p.get("expectancy_net")
+        if exp_net is None:
+            exp_net = p.get("expectancy", 0.0)
+        proven = (p["backtest_n"] >= CALIBRATE_MIN_N
+                  and p["paper_n"] >= CALIBRATE_MIN_PAPER_N
+                  and exp_net > 0)
+        if not proven:
+            ready = False
+            parts = []
+            if p["backtest_n"] < CALIBRATE_MIN_N:
+                parts.append("backtest")
+            if p["paper_n"] < CALIBRATE_MIN_PAPER_N:
+                parts.append("paper")
+            if exp_net <= 0:
+                parts.append("positive net expectancy")
+            needed.append({
+                "plan_type": pt, "backtest_n": p["backtest_n"],
+                "paper_n": p["paper_n"], "expectancy": p["expectancy"],
+                "expectancy_net": exp_net,
+                "missing": ", ".join(parts),
+            })
     return {"ready": ready, "primary_setup_family": PRIMARY_SETUP_FAMILY,
             "primary_plan_types": primary, "missing": needed,
             "targets": {"backtest": CALIBRATE_MIN_N, "paper": CALIBRATE_MIN_PAPER_N}}
@@ -465,11 +487,14 @@ def format_graduation(g: dict) -> str:
 def format_progress(progress: list[dict], verdict: dict) -> str:
     lines = ["=" * 70, "SIMULATOR GRIND — unique learning samples per setup",
              "-" * 70,
-             f"  {'PLAN TYPE':<26}{'BACKTEST':>10}{'PAPER':>8}{'EXPECT':>10}  PROVEN"]
+             f"  {'PLAN TYPE':<26}{'BACKTEST':>10}{'PAPER':>8}{'E_NET':>10}  PROVEN"]
     for p in progress:
         mark = "✓" if p["proven"] else "·"
+        exp_net = p.get("expectancy_net")
+        if exp_net is None:  # legacy callers without cost measurements
+            exp_net = p["expectancy"]
         lines.append(f"  {p['plan_type']:<26}{p['backtest_n']:>6}/{p['backtest_target']}"
-                     f"{p['paper_n']:>5}/{p['paper_target']}{p['expectancy']:>+9.3f}R  {mark}")
+                     f"{p['paper_n']:>5}/{p['paper_target']}{exp_net:>+9.3f}R  {mark}")
     lines.append("-" * 70)
     lines.append(f"  primary setup family: {verdict['primary_setup_family']} "
                  f"({', '.join(verdict['primary_plan_types']) or 'none'})")
