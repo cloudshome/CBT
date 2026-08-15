@@ -10,40 +10,52 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-15 (this session: **P12.4 Backtest Quality Score 0–100 shipped** — `data/quality_score.py`: edge / curve-robustness / sample-confidence / BT5 parameter-plateau composite; `python main.py quality` store sweep; `scorecard --quality` on CLI / HTTP / MCP / dashboard)
-**Branch:** `arena/01a00431-sky` (session branch fixed by Arena; branched from `origin/main` @ `e07fa43`, the merged P12.3.3 PR #24)
-**HEAD commit:** `e07fa43` (P12.3.3 effective sample size) — this session's P12.4 work commits on top of it.
-**Python:** 3.11 (venv `.venv` created this session — system Python is PEP 668 externally managed) — suite green (598 pass / 1 skip)
+**Last updated:** 2026-08-15 (this session: **P12.5 Strategy Score on the calibrator shipped** — `data/strategy_score.py`: `E_R × sample-quality × regime-fit × execution` per calibration key (weighted geometric mean, NET of costs; sample-quality = P12.4's `backtest_quality_score()` in full); calibrator multiplier is now a trust dial `mult = clamp(1 + E_gross × gain × trust, …)`, `trust = clamp(score/50, 0.6, 1.5)`; surfaces: `learn` CLI / `/api/learning` / dashboard Calibration card)
+**Branch:** `arena/01a00446-sky` (session branch fixed by Arena; branched from `origin/main` @ `fd4aa51`, the merged P12.4 PR #25)
+**HEAD commit:** `fd4aa51` (P12.4 Backtest Quality Score) — this session's P12.5 work commits on top of it.
+**Python:** 3.11 (venv `.venv` — system Python is PEP 668 externally managed) — suite green (613 pass / 1 skip)
 
-> **This session (`arena/01a00431-sky`): P12.4 — Backtest Quality Score 0–100.**
-> The scorecard answers *"is this book profitable net of costs, with honest
-> overlap-corrected uncertainty?"* — P12.4 answers *"is it robust, or did it
-> win by luck?"* A composite 0–100 so a fragile high-PnL curve cannot look
-> like a pass (F5 / BT5), scoring the now-real net-of-costs (P12.6),
-> overlap-corrected (P12.3.3) data:
-> - **`data/quality_score.py`** — pure `backtest_quality_score(rows, …)`;
->   four weighted components, each 0–100, degraded to `None` rather than a
->   guess when the sample cannot support them:
->   - **edge** (35%) — E_net vs the bar (+0.50R → 50, 2× bar → 100), ×0.85
->     per miss when WR_net ≤ 55% or PF_net < 1.5 (the bar is all three);
->   - **robustness** (35%) — top-5 wins' share of gross wins (a 5-trade
->     streak must not BE the edge), max-DD ÷ |total R| (giving back half
->     the profit is fragile), chronological segment consistency (profits
->     must persist, not arrive in one burst);
->   - **sample** (20%) — N_eff vs min_decided + where the 95% CI of E_net
->     sits relative to break-even;
->   - **plateau** (10%) — the BT5 parameter-plateau test: re-grade the
->     stored series at `min_confidence ± 5`; a setup that only wins at one
->     isolated parameter point **caps the total at 50** (`plateau_cap`).
-> - **`python main.py quality`** — store-only plateau sweep (like the locked
->   P12.1 protocol): base point guaranteed even when offsets clamp onto it,
->   points deduplicated; `grade_fn` injectable so CI stays offline.
-> - **Surfaces (invariant #10):** `scorecard --quality` embeds the block
->   (edge/robustness/sample; plateau n/a without the re-grade sweep),
->   `GET /api/scorecard?quality=1`, the `STRATEGY SCORECARD` dashboard card,
->   and MCP `scorecard` gained a `quality` argument.
-> Version **2.14.0 → 2.15.0**; MCP `SERVER_VERSION` **1.7.0 → 1.8.0**.
-> Suite **573 → 598 pass / 1 skip** (+25: `tests/test_quality_score.py`).
+> **This session (`arena/01a00446-sky`): P12.5 — Strategy Score on the calibrator.**
+> The scorecard (P12.3/P12.6) reports the numbers, P12.4 judges the curve's
+> robustness, and the calibrator turns a setup's observed expectancy into
+> the confidence multiplier the engine applies. Before P12.5 the calibrator
+> trusted **gross expectancy alone** — a fragile, weakly-sampled, or
+> cost-doomed curve earned the same boost as a robust one. P12.5 closes
+> that with the audits' formula (`docs/FREQTRADE_REVIEW.md` F25 /
+> `docs/BACKTRADER_REVIEW.md` BT12): **`E_R × Stability × SampleConfidence`**
+> — landed on the calibrator as a 0–100 **strategy score** per key:
+> - **`data/strategy_score.py`** — pure `strategy_score(rows, …)`, four
+>   multiplicative components composited as a **weighted geometric mean**
+>   (the "×" is literal — zero on any axis zeroes the score):
+>   - **e_r** (35%) — P12.4's `edge_score` verbatim (E_net vs bar,
+>     shape-discounted on WR/PF misses);
+>   - **sample_quality** (35%) — **P12.4's `backtest_quality_score()` in
+>     full** (curve robustness + sample confidence + plateau) — read,
+>     never reimplemented;
+>   - **regime_fit** (15%) — base `plan_type` key: sample-weighted fraction
+>     of regimes with positive E_net (a one-regime edge is real, but the
+>     base key cannot know which regime is next); `plan_type::regime` key:
+>     the regime's E_net vs the setup's all-regime E_net (100 = ≥1.5×
+>     stronger, 66.7 = average, 0 = no edge in this regime);
+>   - **execution** (15%) — share of the gross edge surviving the P12.6
+>     cost model (`1 − avg_cost_r / avg_gross_r`).
+> - **`multiplier_from_score()`** — the trust dial:
+>   `mult = clamp(1 + E_gross × gain × trust, min, max)` with
+>   `trust = clamp(score/50, 0.6, 1.5)`: score 50 = pre-P12.5 formula;
+>   robust edge trusted up to 1.5×; fragile/net-negative shrunk to the
+>   0.6 floor. Sign anchor stays gross expectancy → losing setups are
+>   always dampened or filtered.
+> - **`brain/calibrator.py`** — `build_profile` pulls the key's decided
+>   rows (`_decided_rows_by_key`, reusing the scorecard's row adapters),
+>   computes + persists the score; entries gain `strategy_score`,
+>   `strategy_band`, `strategy_components`, `expectancy_net`.
+> - **Surfaces (invariant #10):** `learn` CLI (`describe` + `--json`),
+>   `GET /api/learning`, dashboard Calibration card (`Score` column).
+> - **DB:** additive migration `calibration.strategy_score REAL` +
+>   `strategy_band TEXT`; `save/load_calibration` round-trip them.
+> Version **2.15.0 → 2.16.0** (also fixed: `config.VERSION` was still
+> 2.14.0 after P12.4 — both `config.py` and `pyproject.toml` now 2.16.0).
+> Suite **598 → 613 pass / 1 skip** (+15: `tests/test_strategy_score.py`).
 
 > **Prior session (`arena/01a003f9-sky`, merged as PR #23): P12.6 — fees-first `E_net` & conditioned expectancy.**
 > Costs are now integrated into every performance measurement across the desk:
@@ -128,20 +140,20 @@ Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
 (our own stored market history — ✅ P10.1–P10.12 shipped, with real market
 data imported and verified; research validation proof — 🔄 P12.1–P12.6 &
-P12.3.3 & P12.4 shipped;
-next is **P12.5 strategy score on the calibrator**, then P12.7). Every
+P12.3.3 & P12.4 & P12.5 shipped;
+next is **P12.7 Monte Carlo ruin / risk-of-ruin**, then micro-live). Every
 phase below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.4 backtest quality score shipped.**
+**P12 (SKY Quant Validation Engine) — P12.5 strategy score on the calibrator shipped.**
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real data and the graduation gate is honestly closed (+0.348R gross,
 negative net on 1h/4h primary). Freqtrade rejected (F1–F8); Backtrader
-rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.5 (strategy score on
-the calibrator)** → P12.7.
+rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.7 (MC ruin / worst
+streak / risk-of-ruin table)** → micro-live.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -156,7 +168,7 @@ the calibrator)** → P12.7.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.4 shipped — Backtest Quality Score 0–100** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; **P12.4: `data/quality_score.py` edge/robustness/sample/plateau composite + `python main.py quality` plateau sweep + `scorecard --quality` on all surfaces**). Next: **P12.5 strategy score on the calibrator**. |
+| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.5 shipped — Strategy Score on the calibrator** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score + plateau sweep; **P12.5: `data/strategy_score.py` `E_R × sample-quality × regime-fit × execution` on the calibrator — sample-quality reads P12.4 in full; multiplier is now a trust dial**). Next: **P12.7 MC ruin / worst streak / risk-of-ruin**. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -164,6 +176,53 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 ---
 
 ## Completed work
+
+### Session 2026-08-15 (this branch `arena/01a00446-sky`): P12.5 — Strategy Score on the calibrator
+
+Branched from `main` @ `fd4aa51` (PR #25 merged). 0 regressions.
+Tests **598 → 613 pass / 1 skip** (+15). Version **2.15.0 → 2.16.0**.
+(`config.VERSION` was still 2.14.0 after P12.4 — fixed; `config.py` and
+`pyproject.toml` are now in step.)
+
+**What shipped:**
+- `data/strategy_score.py` (new module) — pure `strategy_score(rows, …)`:
+  `E_R × sample-quality × regime-fit × execution` per calibration key,
+  each component 0–100, composited as a **weighted geometric mean** (the
+  audits' "×" is literal — zero on any axis zeroes the score), evaluated
+  NET of costs (P12.6) with overlap-corrected samples (P12.3.3):
+  - e_r (35%) = P12.4's `edge_score`; sample_quality (35%) = **P12.4's
+    `backtest_quality_score()` in full**; regime_fit (15%) = positive-
+    regime fraction (base key) or regime-vs-setup-average ratio (regime
+    key); execution (15%) = share of gross edge surviving the P12.6 cost
+    model.
+  - Empty books degrade to `score: None`; bands ≥80 robust / ≥60
+    acceptable / ≥40 borderline / else fragile.
+  - `multiplier_from_score()` — the calibrator's trust dial:
+    `mult = clamp(1 + E_gross × gain × trust, min, max)`,
+    `trust = clamp(score/50, 0.6, 1.5)`.
+- `brain/calibrator.py` — `_decided_rows_by_key()` (reuses the scorecard's
+  row adapters, invariant #10), `build_profile` computes + persists the
+  score per key; entries gain `strategy_score`, `strategy_band`,
+  `strategy_components`, `expectancy_net`; `describe()` prints the score.
+- `data/database.py` — additive migration `calibration.strategy_score
+  REAL` + `strategy_band TEXT`; `save/load_calibration` round-trip them.
+- `web/app.py` — dashboard `LEARNING` card: band-coloured `Score` column
+  + P12.5 legend line.
+- `main.py` — `learn` CLI prints the score via `describe()` (no signature
+  change); `--json` dumps components.
+- Tests: 15 new (`tests/test_strategy_score.py`).
+
+**Measured on a demo book (120 Buy Pullback / 60 Breakout Buy rows):**
+- `Buy Pullback::TRENDING_BULL` → **65.9/100 acceptable** (E +0.667R →
+  net +0.547R, win 67%) → multiplier **1.22** (trust dial, capped).
+- `Breakout Buy::TRENDING_BULL` (net-negative) → **0.0/100 fragile** →
+  multiplier 0.85 (dampened, never boosted).
+
+**Files changed:** `data/strategy_score.py` (new), `brain/calibrator.py`,
+`data/database.py`, `web/app.py`, `config.py`, `pyproject.toml`,
+`tests/test_strategy_score.py` (new), `CHANGELOG.md`, `TODO.md`,
+`README.md`, `ARCHITECTURE.md`, `AI_ANATOMY_ROADMAP.md`,
+`docs/HANDOVER_2026-08-15_P12_5.md` (new), `SESSION_STATE.md`.
 
 ### Session 2026-08-15 (this branch `arena/01a00431-sky`): P12.4 — Backtest Quality Score 0–100
 
@@ -240,16 +299,16 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
-1. **TODO-13 (P12.5) — Strategy Score on the calibrator.**
-   `E_R × sample-quality × regime-fit × execution` (P12.4's quality score
-   becomes the "sample-quality" input the audits' formula demands).
-2. **TODO-13 (P12.7) — Monte Carlo ruin & risk-of-ruin table.**
-3. **TODO-7** — human pastes the wheel-gate job into the **real**
+1. **TODO-13 (P12.7) — Monte Carlo ruin / worst streak / risk-of-ruin
+   table.** `risk% × expected DD × ruin probability`, longest losing
+   streak, time-to-recovery on the existing resampler (`+` BT5/BT16) —
+   graduation can then see survivability, not just mean E.
+2. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
-4. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
-5. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
+3. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
+4. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
    the graduation bar remains closed and unchanged.
-6. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
+5. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
 
 ---
 
@@ -264,7 +323,7 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    committed sample data is stale by design. Expected offline.
 5. **Arena cannot push under `.github/workflows/`.** The wheel-gate
    job spec lives at `docs/.github/workflows/ci.yml` (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.15.0.
+6. **`CHANGELOG.md` is current** through v2.16.0.
 7. **Real market data is imported offline**: Binance spot BTCUSDT 1m
    (696,960 bars, sha256-pinned `c4ad6029…b934b7`). The store is
    gitignored; re-import with `backfill --from-csv` if starting in a clean sandbox.
@@ -279,32 +338,48 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
     `min_confidence ± 5` — on a clean sandbox with no store it returns a
     clear error, never a score. The `scorecard --quality` block shows
     "plateau n/a" without that re-grade sweep.
-11. **Freqtrade was reviewed and rejected (F1–F8)** (`docs/FREQTRADE_REVIEW.md`).
-12. **Backtrader was reviewed and rejected (BT1–BT8)** (`docs/BACKTRADER_REVIEW.md`).
+11. **P12.5 scores what the calibrator already gates**: only keys with
+    `n >= min_n` (default 100) get a strategy score — below the gate there
+    is no entry at all, exactly as before. The score is a report on what
+    passed the gate, never a gate-bypass. It is computed from the key's
+    decided rows via the scorecard's row adapters; the multiplier keeps
+    the gross-expectancy sign anchor and is only *modulated* by the score
+    (trust floor 0.6) — a deliberate middle ground between the old formula
+    and a hard score-only gate.
+12. **Freqtrade was reviewed and rejected (F1–F8)** (`docs/FREQTRADE_REVIEW.md`).
+13. **Backtrader was reviewed and rejected (BT1–BT8)** (`docs/BACKTRADER_REVIEW.md`).
+14. **`config.VERSION` was stale after P12.4** (2.14.0 instead of 2.15.0) —
+    fixed to 2.16.0 in this session; `config.py` and `pyproject.toml` are
+    now in step.
 
 ---
 
 ## Next recommended action
 
-1. Next *code* session: **P12.5 — Strategy Score on the calibrator.**
-   `E_R × sample-quality × regime-fit × execution` — P12.4's quality score
-   is the "sample-quality" input; the calibrator (`brain/calibrator.py`)
-   turns a setup's calibration profile + P12.4 quality into one score.
+1. Next *code* session: **P12.7 — Monte Carlo ruin / worst streak /
+   risk-of-ruin table.** Extend the existing resampler
+   (`brain/analytics.monte_carlo_equity`) into
+   `risk% × expected DD × ruin probability` + longest losing streak +
+   time-to-recovery (`+` BT5/BT16) so graduation can see survivability,
+   not just mean E. One command, one boxed block (CLI / HTTP / MCP /
+   dashboard — invariant #10).
 2. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 3. Do **not** install Freqtrade or Backtrader. Do not loosen the graduation bar.
 
-Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_4.md`](docs/HANDOVER_2026-08-15_P12_4.md).
+Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_5.md`](docs/HANDOVER_2026-08-15_P12_5.md).
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm the P12.4 PR merged. P12.1, P12.2, P12.3, P12.3.1, P12.3.2,
-> P12.6, P12.3.3, and P12.4 are shipped: do not redo the locked protocol,
-> the negative-shift guard, the boxed scorecard, the tie-break, the real
-> data import, trade cost modeling, the overlap-corrected effective sample
-> size, or the Backtest Quality Score. Implement **P12.5 — strategy score
-> on the calibrator**: `E_R × sample-quality × regime-fit × execution`,
-> where sample-quality reads P12.4's `backtest_quality_score()`. Keep the
+> and confirm the P12.5 PR merged. P12.1, P12.2, P12.3, P12.3.1, P12.3.2,
+> P12.6, P12.3.3, P12.4, and P12.5 are shipped: do not redo the locked
+> protocol, the negative-shift guard, the boxed scorecard, the tie-break,
+> the real data import, trade cost modeling, the overlap-corrected
+> effective sample size, the Backtest Quality Score, or the strategy score
+> on the calibrator. Implement **P12.7 — Monte Carlo ruin / worst streak /
+> risk-of-ruin table**: on the existing resampler
+> (`brain/analytics.monte_carlo_equity`), add `risk% × expected DD × ruin
+> probability`, longest losing streak and time-to-recovery. Keep the
 > existing grader/store, do not adopt Freqtrade or Backtrader, and do not
 > loosen the graduation bar.
 
@@ -315,13 +390,20 @@ Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_4.md`](docs/
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 598 passed, 1 skipped
+# 613 passed, 1 skipped
 ```
 
 Wheel gate:
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.15.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.16.0-py3-none-any.whl ; no duplicate entries
+```
+
+Calibration with the P12.5 strategy score:
+```bash
+python main.py learn                          # profile + strategy score per key
+python main.py learn --json                   # full profile incl. strategy_components
+curl -s localhost:8080/api/learning           # HTTP (dashboard Calibration card reads it)
 ```
 
 Readiness strip:
@@ -343,12 +425,12 @@ python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau swe
 ## Last commit
 
 ```
-(THIS SESSION) feat(P12.4): backtest quality score 0-100, plateau sweep & scorecard surfaces
+(THIS SESSION) feat(P12.5): strategy score on the calibrator — E_R × sample-quality × regime-fit × execution
+fd4aa51 feat(P12.4): backtest quality score 0-100, plateau sweep & scorecard surfaces (#25)
 e07fa43 feat(P12.3.3): effective sample size in the scorecard (#24)
-c91ac9e feat(P12.6): fees-first E_net, trade costs engine & conditioned expectancy
 ```
 
-P12.4 is committed on `arena/01a00431-sky`, pushed to origin, and the
+P12.5 is committed on `arena/01a00446-sky`, pushed to origin, and the
 session PR is open against `main` — the human merges it. See
 `git log --oneline -3`.
 
@@ -405,19 +487,20 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.4 shipped**
-   (Backtest Quality Score 0–100: edge / robustness / sample / plateau,
-   `python main.py quality` sweep, `scorecard --quality` everywhere).
-2. [x] Run `.venv/bin/python -m pytest tests/ -q` — **598 pass / 1 skip**
-   (+25: `tests/test_quality_score.py`).
+1. [x] Finish or safely stop the current task. — **P12.5 shipped**
+   (Strategy Score on the calibrator: `E_R × sample-quality × regime-fit ×
+   execution`, `data/strategy_score.py`, trust-dial multiplier,
+   `learn` / `/api/learning` / dashboard surfaces).
+2. [x] Run `.venv/bin/python -m pytest tests/ -q` — **613 pass / 1 skip**
+   (+15: `tests/test_strategy_score.py`).
 3. [x] Fix any obvious failures. — none left open.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.4 marked shipped; P12.5 is next.
-6. [x] Update `CHANGELOG.md` — 2.15.0 P12.4 entry.
+5. [x] Update `TODO.md` — P12.5 marked shipped; P12.7 is next.
+6. [x] Update `CHANGELOG.md` — 2.16.0 P12.5 entry.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` — commit and push to `origin/arena/01a00431-sky`.
+11. [x] `git add` / `git commit` — commit and push to `origin/arena/01a00446-sky`.
 12. [x] Open the session PR as the closing step — PR from
-    `arena/01a00431-sky` → `main` (P12.4).
+    `arena/01a00446-sky` → `main` (P12.5).

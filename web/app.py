@@ -1385,8 +1385,13 @@ async function loadLearning(){
       html+=`<div class="muted" style="background:rgba(255,255,255,.03);padding:10px;border-radius:12px;border:1px dashed var(--line)">No backtest data yet. Click <b>▶ Quick backtest + learn</b> to grade the engine on recent 300 bars (~25s) and auto-apply calibration. This proves which setups actually have edge before you trade them.</div>`;
     }
     if(entries.length){
-      html+=`<div style="margin-top:12px"><b>Calibration — applied to future signals</b><div style="overflow:auto;margin-top:6px"><table><tr><th>Plan</th><th>Mult</th><th>Exp R</th><th>Bt/Pp</th><th>Proven</th><th>TP R</th></tr>`+
-        entries.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.filtered?'<span class="err">FILTERED</span>':'×'+v.multiplier}</td><td>${v.expectancy!=null?v.expectancy.toFixed(2):'—'}</td><td>${v.backtest_samples||0}/${v.paper_samples||0}</td><td>${v.proven?'<span class="okc">✓ proven</span>':'<span class="note">unproven</span>'}</td><td>${v.tp_rr!=null?v.tp_rr:'—'}</td></tr>`).join('')+`</table></div></div>`;
+      html+=`<div style="margin-top:12px"><b>Calibration — applied to future signals</b><div style="overflow:auto;margin-top:6px"><table><tr><th>Plan</th><th>Mult</th><th>Score</th><th>Exp R</th><th>Bt/Pp</th><th>Proven</th><th>TP R</th></tr>`+
+        entries.map(([k,v])=>{
+          const bandCls = v.strategy_band==='robust'?'var(--green)':(v.strategy_band==='acceptable'?'var(--green)':(v.strategy_band==='borderline'?'var(--amber)':'var(--red)'));
+          const sc = v.strategy_score!=null ? `<span style="color:${bandCls}">${Number(v.strategy_score).toFixed(0)}<span style="opacity:.55">/100 ${v.strategy_band||''}</span></span>` : '—';
+          return `<tr><td>${esc(k)}</td><td>${v.filtered?'<span class="err">FILTERED</span>':'×'+v.multiplier}</td><td>${sc}</td><td>${v.expectancy!=null?v.expectancy.toFixed(2):'—'}</td><td>${v.backtest_samples||0}/${v.paper_samples||0}</td><td>${v.proven?'<span class="okc">✓ proven</span>':'<span class="note">unproven</span>'}</td><td>${v.tp_rr!=null?v.tp_rr:'—'}</td></tr>`;
+        }).join('')+`</table></div>
+        <div class="note" style="margin-top:6px">P12.5 strategy score = E_R × sample-quality × regime-fit × execution (NET of costs). It reports trust, never permission — the graduation bar is unchanged.</div></div>`;
     }
     const bm=d.metrics||{}, bo=bm.overall||{};
     if(bo.n){

@@ -314,7 +314,7 @@ marks done-whens extended against the Freqtrade review's §8 table.
 | **P12.2** | `python main.py validate lookahead` (+ recursive later) | ✅ **SHIPPED 2026-08-13** — deterministic AST guard fails on `shift(-n)` / `shift(periods=-n)` in first-party feature code; unit form runs in CI. Recursive-state analysis remains later. |
 | **P12.3** | Single boxed R-report / **strategy scorecard** | One command, one block — long/short, regime, **session**, Sharpe/Sortino/Calmar, holding time (`+`) |
 | **P12.4** | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; **parameter-plateau test** — an isolated-peak parameter point caps the stability score (`+`) |
-| **P12.5** | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (the note's `Score = E × Stability × SampleConfidence − penalties` lands here) |
+| **P12.5** | Strategy score on the calibrator | ✅ **SHIPPED 2026-08-15** (`data/strategy_score.py` + trust-dial multiplier on `brain/calibrator.py`): `E_R × sample-quality × regime-fit × execution` (the note's `Score = E × Stability × SampleConfidence − penalties` landed here) |
 | **P12.6** | Conditioned + **net-of-costs** expectancy | OI / funding / CVD / regime matrix **and** `E_net = E_gross − fees − slip − funding` with funding joined **as of T** from P10.4 (`+`) |
 | **P12.7** | MC ruin / worst streak / **risk-of-ruin table** | Survivability, not just mean E: risk% × expected DD × ruin probability, longest losing streak, time-to-recovery (`+`) |
 

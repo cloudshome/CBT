@@ -230,6 +230,12 @@ class SignalDB:
         _add("calibration", "backtest_samples", "INTEGER DEFAULT 0")
         _add("calibration", "paper_samples", "INTEGER DEFAULT 0")
         _add("calibration", "win_rate", "REAL")
+        # P12.5 — the strategy score 0–100 on the calibrator
+        # (E_R × sample-quality × regime-fit × execution, NET of costs) and
+        # its band, persisted with the profile so every surface reads the
+        # same stored computation (invariant #10).
+        _add("calibration", "strategy_score", "REAL")
+        _add("calibration", "strategy_band", "TEXT")
 
     # ── lifecycle ────────────────────────────────────────────────────────
     def update_status(self, scan_id: int, to_state: str, note: str = "",
@@ -615,20 +621,24 @@ class SignalDB:
                 self.conn.execute(
                     """INSERT INTO calibration(plan_type, multiplier, expectancy, samples,
                                                regime, proven, tp_rr, backtest_samples,
-                                               paper_samples, win_rate, updated_at)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                                               paper_samples, win_rate, updated_at,
+                                               strategy_score, strategy_band)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                        ON CONFLICT(plan_type) DO UPDATE SET
                          multiplier=excluded.multiplier, expectancy=excluded.expectancy,
                          samples=excluded.samples, regime=excluded.regime,
                          proven=excluded.proven, tp_rr=excluded.tp_rr,
                          backtest_samples=excluded.backtest_samples,
                          paper_samples=excluded.paper_samples,
-                         win_rate=excluded.win_rate, updated_at=excluded.updated_at""",
+                         win_rate=excluded.win_rate, updated_at=excluded.updated_at,
+                         strategy_score=excluded.strategy_score,
+                         strategy_band=excluded.strategy_band""",
                     (plan_type, entry.get("multiplier", 1.0),
                      entry.get("expectancy"), entry.get("samples", 0),
                      entry.get("regime", ""), 1 if entry.get("proven") else 0,
                      entry.get("tp_rr"), entry.get("backtest_samples", 0),
-                     entry.get("paper_samples", 0), entry.get("win_rate"), now))
+                     entry.get("paper_samples", 0), entry.get("win_rate"), now,
+                     entry.get("strategy_score"), entry.get("strategy_band")))
             self.conn.commit()
         return self._retry_write(_do_save)
 
@@ -644,6 +654,8 @@ class SignalDB:
             "backtest_samples": r["backtest_samples"],
             "paper_samples": r["paper_samples"],
             "win_rate": r["win_rate"],
+            "strategy_score": r["strategy_score"],
+            "strategy_band": r["strategy_band"],
         } for r in rows}
 
     # ── scans ────────────────────────────────────────────────────────────

@@ -16,6 +16,17 @@ The profile is stored in the DB and loaded by `analyze_frame` → `build_plans`,
 so the engine literally improves with every backtest you run. With zero data
 the profile is empty and every multiplier is 1.0 (neutral — no behaviour
 change), so calibration is strictly additive.
+
+**P12.5 — strategy score on the calibrator.** Since 2.16.0 every profile
+entry also carries the strategy score (`E_R × sample-quality × regime-fit ×
+execution`, `data/strategy_score.py`): sample-quality reads P12.4's
+`backtest_quality_score()` in full, so a fragile, weakly-sampled, or
+cost-doomed curve can no longer earn a boost on gross expectancy alone. The
+multiplier formula keeps its sign anchor (positive-gross setups are boosted,
+negative ones dampened or filtered) but the P12.5 score is now the *trust
+dial*: `mult = clamp(1 + E_gross × gain × trust, min, max)` with
+`trust = clamp(score/50, 0.6, 1.5)` — a robust edge is trusted up to 1.5×,
+a fragile one is shrunk to the 0.6 floor.
 """
 from __future__ import annotations
 
@@ -24,8 +35,10 @@ from typing import Optional
 
 from config import (CALIBRATE_MIN_N, CALIBRATE_MIN_PAPER_N, CALIBRATE_GAIN,
                     CALIBRATE_MAX_MULT, CALIBRATE_MIN_MULT, CALIBRATE_FILTER,
-                    CALIBRATE_FILTER_THRESHOLD, TP_RR_MIN, TP_RR_MAX)
+                    CALIBRATE_FILTER_THRESHOLD, TP_RR_MIN, TP_RR_MAX,
+                    BACKTEST_STEP)
 from data.database import SignalDB
+from data.validation import DEFAULT_MIN_DECIDED
 
 WIN_SET = {"FULL_WIN", "PARTIAL_WIN"}
 
@@ -129,9 +142,38 @@ def _decided_by_key(db: SignalDB) -> dict:
     return out
 
 
+def _decided_rows_by_key(db: SignalDB) -> tuple[dict, dict]:
+    """Decided rows per calibration key, plus per plan_type across regimes.
+
+    Reuses the scorecard's row adapters (`data/scorecard.py`) so the rows
+    feeding P12.5 are the exact same row shape the scorecard and P12.4 read
+    (ts / side / setup / regime / r / r_net / cost_r / …) — one computation,
+    many surfaces (invariant #10). Paper samples are included, matching the
+    calibrator's aggregate SQL (the paper book is real evidence too).
+
+    Returns ``(rows_by_key, setup_rows_by_type)`` where keys are
+    ``plan_type`` or ``plan_type::regime`` (see `profile_key`).
+    """
+    from data.scorecard import rows_from_backtest_db, rows_from_paper_db
+
+    backtest_rows = rows_from_backtest_db(db, include_sim=True)
+    paper_rows = rows_from_paper_db(db, include_sim=True)
+
+    rows_by_key: dict[str, list[dict]] = {}
+    setup_rows_by_type: dict[str, list[dict]] = {}
+    for r in backtest_rows + paper_rows:
+        key = profile_key(r.get("setup") or "?", r.get("regime") or "")
+        rows_by_key.setdefault(key, []).append(r)
+        setup_rows_by_type.setdefault(r.get("setup") or "?", []).append(r)
+    return rows_by_key, setup_rows_by_type
+
+
 def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
                   min_n: int = CALIBRATE_MIN_N,
-                  min_paper_n: int = CALIBRATE_MIN_PAPER_N) -> dict:
+                  min_paper_n: int = CALIBRATE_MIN_PAPER_N,
+                  min_decided: int = DEFAULT_MIN_DECIDED,
+                  criteria: Optional[dict] = None,
+                  step: int = BACKTEST_STEP) -> dict:
     """Turn decided backtest/paper stats into a calibration profile.
 
     Trust thresholds follow the roadmap (decisions A6/B10): a setup is only
@@ -139,15 +181,37 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
     paper samples with positive expectancy.  Below that it is kept neutral
     (no boost) and flagged ``proven=False`` so the risk gate can refuse it in
     the lower progression levels.
+
+    **P12.5**: every entry that passes the sample gate also carries the
+    strategy score 0–100 (`E_R × sample-quality × regime-fit × execution`,
+    `data/strategy_score.py`) and a quality-gated multiplier. The score is a
+    report field; it never loosens the graduation bar and never grants a
+    trade — it only decides how much of the observed expectancy the engine
+    is allowed to trust when scaling confidence.
     """
+    from data.strategy_score import multiplier_from_score, strategy_score
+
     stats = _decided_by_key(db)
+    rows_by_key, setup_rows_by_type = _decided_rows_by_key(db)
     profile: dict = {}
     for key, st in stats.items():
         n = st["n"]
         if n < min_n:
             continue  # not enough samples to trust — keep neutral
         exp = st["expectancy"]
-        mult = max(CALIBRATE_MIN_MULT, min(CALIBRATE_MAX_MULT, 1 + exp * CALIBRATE_GAIN))
+        plan_type, _, regime = key.partition("::")
+
+        # P12.5 — the strategy score for this key's own decided rows.
+        rows = rows_by_key.get(key, [])
+        score_block = None
+        if rows:
+            score_block = strategy_score(
+                rows, plan_type=plan_type, regime=(regime or None),
+                setup_rows=setup_rows_by_type.get(plan_type, rows),
+                min_decided=min_decided, criteria=criteria, step=step)
+        score_val = score_block.get("score") if score_block else None
+
+        mult = multiplier_from_score(exp, score_val)
         filtered = bool(filter_neg and exp < CALIBRATE_FILTER_THRESHOLD)
         proven = bool(st["backtest_samples"] >= min_n and
                       st["paper_samples"] >= min_paper_n and exp > 0)
@@ -159,6 +223,8 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
         profile[key] = {
             "multiplier": round(mult, 3),
             "expectancy": exp,
+            "expectancy_net": (score_block.get("expectancy_net")
+                               if score_block else None),
             "samples": n,
             "backtest_samples": st["backtest_samples"],
             "paper_samples": st["paper_samples"],
@@ -166,6 +232,12 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
             "filtered": filtered,
             "proven": proven,
             "tp_rr": tp_rr,
+            # P12.5 — strategy score 0–100 (E_R × sample-quality ×
+            # regime-fit × execution) + its band and per-component block.
+            "strategy_score": score_val,
+            "strategy_band": (score_block.get("band") if score_block else None),
+            "strategy_components": (score_block.get("components")
+                                    if score_block else None),
         }
     return profile
 
@@ -233,12 +305,21 @@ def describe(profile: dict) -> str:
     lines = ["Calibration profile (applied to future signals; ✓ = proven setup):"]
     for pt, e in sorted(profile.items(), key=lambda kv: kv[1]["samples"], reverse=True):
         proven = "✓" if e.get("proven") else " "
+        score = e.get("strategy_score")
+        band = e.get("strategy_band")
+        score_bits = (f"score {score:.0f}/100 {band}" if score is not None
+                      else "score n/a")
         if e["filtered"]:
-            lines.append(f"  {proven} {pt:<26} FILTERED (expectancy {e['expectancy']:+.2f}R, n={e['samples']})")
+            lines.append(f"  {proven} {pt:<24} FILTERED (E {e['expectancy']:+.2f}R, "
+                         f"{score_bits}, n={e['samples']})")
         else:
-            lines.append(f"  {proven} {pt:<26} x{e['multiplier']:.2f}  (expectancy {e['expectancy']:+.2f}R, "
+            lines.append(f"  {proven} {pt:<24} x{e['multiplier']:.2f}  "
+                         f"({score_bits}, E {e['expectancy']:+.2f}R "
+                         f"→ net {e['expectancy_net'] if e.get('expectancy_net') is not None else e['expectancy']:+.2f}R, "
                          f"win {e['win_rate']*100:.0f}%, bt={e['backtest_samples']} pp={e['paper_samples']}, "
                          f"tp_rr={e['tp_rr']})")
+    lines.append("  strategy score = E_R × sample-quality × regime-fit × "
+                 "execution (P12.5, evaluated NET of costs)")
     return "\n".join(lines)
 
 

@@ -331,7 +331,7 @@ Parquet). Each row is one session.
 | **P12.2** | `python main.py validate lookahead` (+ recursive later) | ✅ **SHIPPED 2026-08-13** — deterministic AST guard fails on `shift(-n)` / `shift(periods=-n)` in first-party feature code; unit form runs in CI. Recursive-state analysis remains later. |
 | **P12.3** | Single boxed R-report (long/short, regime, session) | One command, one block, no new math |
 | **P12.4** | Backtest Quality Score 0–100 | Fragile high-PnL curves score low |
-| **P12.5** | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` |
+| **P12.5** | Strategy score on the calibrator | ✅ **SHIPPED 2026-08-15** (`data/strategy_score.py` + trust-dial multiplier on `brain/calibrator.py`): `E_R × sample-quality × regime-fit × execution` |
 | **P12.6** | Conditioned expectancy (OI / funding / CVD / regime) | *“how did this setup do when price ↑, OI ↑, funding < 0?”* — the original P10/P12 done-when |
 | **P12.7** | MC ruin / worst streak / recovery on the existing resampler | Graduation can see survivability, not just mean E |
 

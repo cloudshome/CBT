@@ -75,6 +75,8 @@
 | `cross_exchange.py` | P10.7 — venue registry + one `snapshot_prices()` probe + stored premium/discount + funding spread; `python main.py cross collect\|status` |
 | `costs.py` | P12.6 — fees-first trade cost modeling (`E_net = E_gross − fees − slip − funding`, funding joined as-of-T) |
 | `scorecard.py` | P12.3/P12.6 — boxed strategy scorecard reporting gross + net metrics, Sharpe/Sortino/Calmar, holding time, split by side/regime/session/setup/conditions |
+| `quality_score.py` | P12.4 — Backtest Quality Score 0–100 (edge / curve robustness / sample confidence / BT5 parameter-plateau with isolated-peak cap at 50); `python main.py quality` store sweep |
+| `strategy_score.py` | P12.5 — strategy score on the calibrator: `E_R × sample-quality × regime-fit × execution` (weighted geometric mean, NET of costs), `multiplier_from_score()` trust dial |
 | `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB` context manager |
 | `backtester.py` | Walk-forward grading of plans at +1h/+4h/+24h; P10.11 `run_backtest_on_store()` reads the Parquet store instead of a live fetch |
 | `paper_trading.py` | Approved-signal lifecycle: monitor + auto-close at SL/TP1 (no real orders) |

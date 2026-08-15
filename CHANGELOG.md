@@ -10,6 +10,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.16.0] — 2026-08-15 · branch `arena/01a00446-sky`
+
+MINOR bump: **P12.5 — Strategy Score on the calibrator.**
+
+The scorecard (P12.3/P12.6) reports the numbers, P12.4 judges the curve's
+robustness, and the calibrator (`brain/calibrator.py`) turns a setup's
+observed expectancy into a confidence multiplier. Before P12.5 the
+calibrator trusted gross expectancy alone — a fragile, weakly-sampled or
+cost-doomed curve could earn a full boost. P12.5 closes that: the audits'
+formula (`docs/FREQTRADE_REVIEW.md` F25, `docs/BACKTRADER_REVIEW.md` BT12)
+
+    Score = E_R × Stability × SampleConfidence − DD/complexity penalties
+
+lands on the calibrator as a 0–100 **strategy score** per calibration key,
+computed NET of costs (P12.6) over the same decided rows the scorecard and
+P12.4 read (invariant #10 — one computation, many surfaces).
+
+### Added
+- **`data/strategy_score.py`** — pure `strategy_score(rows, …)` with four
+  multiplicative components, composited as a **weighted geometric mean**
+  (the "×" is literal — zero on any axis zeroes the score):
+  - **e_r** (35%) — P12.4's `edge_score` verbatim: net expectancy vs the
+    bar, shape-discounted on WR/PF misses;
+  - **sample_quality** (35%) — **P12.4's `backtest_quality_score()` in
+    full** (curve robustness + sample confidence + plateau when a sweep
+    exists) — the audits' "Stability × SampleConfidence", read, never
+    reimplemented;
+  - **regime_fit** (15%) — base `plan_type` key: sample-weighted fraction
+    of regimes with positive E_net (a one-regime edge is real, but the
+    base key cannot know which regime is next); `plan_type::regime` key:
+    the regime's E_net vs the setup's all-regime E_net (100 = ≥1.5×
+    stronger here, 66.7 = average, 0 = no edge in this regime);
+  - **execution** (15%) — share of the gross edge that survives the P12.6
+    cost model: `1 − avg_cost_r / avg_gross_r` (modelled fees+spread+
+    funding until micro-live records real fills).
+  - Bands: ≥80 robust, ≥60 acceptable, ≥40 borderline, else fragile.
+  - Empty books degrade to `score: None` with a reason.
+- **`multiplier_from_score()`** — the calibrator's new trust dial:
+  `mult = clamp(1 + E_gross × gain × trust, min, max)` with
+  `trust = clamp(score/50, 0.6, 1.5)`. Score 50 = the pre-P12.5 formula;
+  a robust edge is trusted up to 1.5×; a fragile or net-negative book is
+  shrunk to the 0.6 floor. The sign anchor stays the observed gross
+  expectancy, so a losing setup is always dampened or filtered.
+- **`brain/calibrator.py`** — `build_profile` now pulls the key's decided
+  rows (`_decided_rows_by_key`, reusing the scorecard's row adapters),
+  computes the strategy score per key, and persists it. Profile entries
+  gain `strategy_score`, `strategy_band`, `strategy_components`, and
+  `expectancy_net`; `describe()` prints the score.
+- **Surfaces (invariant #10):**
+  - CLI `python main.py learn` — `describe()` shows `score N/100 band`
+    per entry; `--json` dumps the full profile incl. components.
+  - `GET /api/learning` — calibration entries carry the stored
+    `strategy_score` / `strategy_band` (same block as the CLI).
+  - Dashboard `LEARNING` card — new `Score` column, band-coloured, with a
+    P12.5 legend line.
+- **DB** — additive migration: `calibration.strategy_score REAL` +
+  `calibration.strategy_band TEXT` (idempotent `_add`, no data loss);
+  `save_calibration` / `load_calibration` round-trip the new fields.
+- Tests: 15 new (`tests/test_strategy_score.py`) — empty-book degradation,
+  strong vs zero-edge books, determinism, the literal-zero multiplication,
+  regime-fit (base/regime keys), cost-survival, the multiplier trust dial,
+  `build_profile` integration (score > 0 → boosted; net-negative → 0 /
+  fragile / dampened), the min_n gate, DB round-trip, row grouping.
+  Suite **598 → 613 pass / 1 skip** (+15).
+
+Also fixed: `config.VERSION` was still 2.14.0 after P12.4's 2.15.0 bump —
+both `config.py` and `pyproject.toml` are now **2.16.0** in step.
+
+No trading orders or private credentials added (invariant #1 preserved).
+Next on the ladder: **P12.7 — Monte Carlo ruin / worst streak /
+risk-of-ruin table** (`risk% × expected DD × ruin probability` on the
+existing resampler), then micro-live.
+
+---
+
 ## [2.15.0] — 2026-08-15 · branch `arena/01a00431-sky`
 
 MINOR bump: **P12.4 — Backtest Quality Score 0–100.**
