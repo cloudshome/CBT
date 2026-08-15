@@ -23,6 +23,7 @@ Usage:
   python main.py cross collect --symbol BTCUSDT         # P10.7: premium/discount + funding spread
   python main.py store --market perp                         # inspect the stored candle history
   python main.py validate lookahead                          # P12.2 future-shift guard
+  python main.py xau-evidence --tf 15m                       # P12.12 PAXG/XAU basis dossier
   python main.py mcp                                         # MCP server for Claude/Cursor
 """
 from __future__ import annotations
@@ -38,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import (SYMBOL, SYMBOLS, TIMEFRAME, BARS, MIN_CONFIDENCE, DEFAULT_RISK_REWARD,
                     DASHBOARD_HOST, DASHBOARD_PORT, PAPER_POLL_SECONDS, VERSION,
-                    BACKTEST_MIN_BARS, BACKTEST_STEP)
+                    BACKTEST_MIN_BARS, BACKTEST_STEP, ROOT)
 
 from data.symbols import normalize_symbol, parse_symbol_list
 from data.binance_client import BinanceClient
@@ -401,6 +402,68 @@ def cmd_validate(args) -> int:
         print("\n⚠ RESEAL — the sealed OOS envelope was re-opened on purpose.")
         print("  This run is recorded in the seal history. Do not do this to")
         print("  'improve' the OOS number — that is exactly what the seal forbids.")
+    return 0 if result.get("ok") else 1
+
+
+def cmd_xau_evidence(args) -> int:
+    """P12.12 — measure PAXG/XAU basis and inspect sealed promotion evidence.
+
+    This is deliberately read-only. It cannot record approval, alter source
+    calibration, unlock micro-live, or place an order.
+    """
+    from pathlib import Path
+    from data.gold_basis import build_xau_evidence_dossier
+
+    try:
+        result = build_xau_evidence_dossier(
+            store_root=Path(args.store_root),
+            seal_dir=Path(args.seal_dir),
+            timeframe=args.tf,
+            bars=args.bars,
+            min_overlap=args.min_overlap,
+        )
+    except (OSError, ValueError) as exc:
+        print(f"[!] XAU evidence audit failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(result, indent=2, default=str))
+        return 0 if result.get("ok") else 1
+
+    basis = result["basis_measurement"]
+    sealed = result["sealed_oos"]
+    decision = result["decision"]
+    print("=" * 76)
+    print("XAU PROMOTION EVIDENCE — RESEARCH ONLY")
+    print("=" * 76)
+    print("  sources    binance:spot:PAXGUSDT  vs  dukascopy:spot:XAUUSD")
+    print(f"  alignment  exact timestamp only · no fill/resample · {result['timeframe']}")
+    print(f"  basis      {basis['status']} · matched {basis['matched_rows']:,} "
+          f"(minimum {basis['minimum_overlap']:,})")
+    if basis.get("basis"):
+        metrics = basis["basis"]
+        print(f"             median {metrics['median_bps']} bps · mean {metrics['mean_bps']} bps · "
+              f"p05/p95 {metrics['p05_bps']}/{metrics['p95_bps']} bps")
+        print(f"             MAD {metrics['mad_bps']} bps · max |basis| {metrics['max_abs_bps']} bps")
+        print(f"  period     {basis['start']} → {basis['end']}")
+        print(f"  XAU side   {basis['xau']['price_type']} (one-sided research provenance)")
+    for error in basis.get("errors", []):
+        print(f"  basis gap  {error}")
+    print(f"  seal       {sealed['status']} · {sealed['seal_key']}")
+    print(f"  history    {sealed['history_entries']} entr{'y' if sealed['history_entries'] == 1 else 'ies'} · "
+          f"{sealed['reseal_count']} reseal{'s' if sealed['reseal_count'] != 1 else ''} · "
+          f"latest {'RESEALED' if sealed['latest_resealed'] else 'original/absent'}")
+    for reason in sealed.get("reasons", []):
+        print(f"  seal gap   {reason}")
+    print("-" * 76)
+    req = result["requirements"]
+    print(f"  basis measured                 {'YES' if req['basis_measured_not_assumed'] else 'OPEN'}")
+    print(f"  sealed OOS clears current bar  {'YES' if req['sealed_oos_clears_unchanged_bar'] else 'OPEN'}")
+    print("  explicit human approval        OPEN")
+    print(f"  eligible for human review      {'YES' if decision['eligible_for_human_review'] else 'NO'}")
+    print("  XAU tradeable                  NO")
+    print("  micro-live unlocked            NO")
+    print("=" * 76)
     return 0 if result.get("ok") else 1
 
 
@@ -2132,6 +2195,23 @@ def main(argv: list[str] | None = None) -> int:
     p_val.add_argument("--reseal", action="store_true",
                        help="re-open the sealed OOS envelope (recorded in seal history)")
     p_val.set_defaults(func=cmd_validate)
+
+    p_xau = sub.add_parser(
+        "xau-evidence",
+        help="P12.12: read-only PAXG-vs-XAU basis + sealed-OOS promotion dossier")
+    p_xau.add_argument("--tf", default="15m",
+                       help="timeframe stored for both series (default 15m)")
+    p_xau.add_argument("--bars", type=int, default=12000,
+                       help="most-recent rows read independently from each series")
+    p_xau.add_argument("--min-overlap", type=int, default=100,
+                       help="minimum exact-time matched bars for a measured basis")
+    p_xau.add_argument("--store-root", default=str(ROOT / "data" / "store"),
+                       help="CandleStore root containing separately keyed series")
+    p_xau.add_argument("--seal-dir", default=str(ROOT / "data" / "store" / "validation"),
+                       help="directory holding the Dukascopy XAU validation seal")
+    p_xau.add_argument("--json", action="store_true",
+                       help="machine-readable research dossier")
+    p_xau.set_defaults(func=cmd_xau_evidence)
 
     p_score = sub.add_parser(
         "scorecard",

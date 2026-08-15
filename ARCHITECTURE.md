@@ -7,10 +7,10 @@
 > **Read when:** starting work on a module you haven't touched in
 > ≥1 session.
 
-**Last updated:** 2026-08-13
+**Last updated:** 2026-08-16
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.13.0` (also `pyproject.toml`).
+**Version:** `config.VERSION` = `2.23.0` (also `pyproject.toml`).
 
 ---
 
@@ -20,13 +20,13 @@
 | File | Purpose |
 |---|---|
 | `main.py` | argparse CLI dispatcher (~30 `cmd_*` subcommands) |
-| `config.py` | Env-driven config; `VERSION = "2.13.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
+| `config.py` | Env-driven config; `VERSION = "2.23.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
 | `mcp_server.py` | Zero-dep stdio JSON-RPC 2.0 MCP server (read-only tool permission map) |
 | `SKILL.md` | Agent-facing skill file (the one AI agents read first) |
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
 | `TODO.md` | Prioritised remaining work |
 | `ARCHITECTURE.md` | This file |
-| `CHANGELOG.md` | What shipped, when (current through v2.13.0) |
+| `CHANGELOG.md` | What shipped, when (current through v2.23.0) |
 | `BLUEPRINT.md` | The 4-step path from paper to real capital |
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
@@ -84,6 +84,8 @@
 | `ws_client.py` | P10.10 — public Binance WebSocket streams (`!forceOrder@arr` + klines) with reconnect/backoff; offline-safe demo stream; feeds readiness + feature store |
 | `feature_store.py` | P10.12 — one derived wide row per `(symbol, timeframe, ts)`: price + derivatives + hidden_alpha + regime (22 columns) |
 | `validation.py` | P12.1 locked train/val/OOS/recent protocol + sealed OOS envelope; P12.2 AST guard rejects negative `shift(-n)` feature code; `python main.py validate [lookahead]` |
+| `provenance.py` | P12.11 source-series identity for graded rows and calibration keys; canonical live rows remain backward-compatible while one-sided imports stay unreachable from live calibration |
+| `gold_basis.py` | P12.12 read-only exact-time PAXGUSDT/XAUUSD basis measurement + current sealed-OOS inspection; always reports XAU research-only and leaves human approval open; `python main.py xau-evidence` |
 | `simulator.py` | The paper-sample grind (100/20 sample proof); `graduation_status` |
 | `symbols.py` | Alias resolution (BTC → BTCUSDT, ETH → ETHUSDT, GOLD → XAUUSD) |
 | `sources/cryptodada_website.py` | Connector for the private CryptoDada site (api/browser modes) |
@@ -118,7 +120,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 50 test modules, 567 pass / 1 skip
+### `tests/` — 59 test modules, 723 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_calendar.py` — **NEW (P12.9)** gold-week boundaries + DST, holidays, trading-time counting,
   calendar-aware gaps/quality, Dukascopy import gap report, `calendar` CLI.
@@ -156,6 +158,8 @@
   (BT1–BT8).
 - `PATH_TO_REAL_MONEY.md` — 2026-08-14 audit: real market data before P12.4, fees-first P12.6, net bar.
 - `REAL_DATA_RUN_2026-08-14.md` — first real BTCUSDT 1m imported and re-run.
+- `DUKASCOPY_XAU_ADAPTER.md` / `SOURCE_PROVENANCE.md` — external XAU import and source-separated learning contract.
+- `XAU_PROMOTION_EVIDENCE.md` — P12.12 real-host procedure, exact-time basis contract, and still-open promotion gates.
 - `wheel-gate-job.yml` — job spec a human pastes into
   `.github/workflows/ci.yml` (TODO-7).
 
@@ -196,7 +200,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 567 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 723 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -248,6 +252,13 @@
     third-party strategy runtime. Do not expand the strategy catalog
     until the primary family (`sweep_trend_continuation`) clears the
     graduation bar (F4).
+
+14. **XAU evidence is source-separated and cannot self-promote.** Dukascopy
+    XAU and Binance PAXG histories are never concatenated; P12.12 joins exact
+    timestamps only for a read-only basis report. A measured basis and a
+    passing sealed-OOS envelope make a dossier eligible for human review, not
+    tradeable. Explicit human approval and the repository-wide graduation gate
+    remain mandatory; no evidence command can unlock micro-live.
 
 ---
 
@@ -339,5 +350,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **567 pass, 1 skip**. Any new feature must
+The expected baseline is **723 pass, 1 skip**. Any new feature must
 maintain or increase this count.

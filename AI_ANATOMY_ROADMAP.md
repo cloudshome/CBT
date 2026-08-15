@@ -2,8 +2,8 @@
 
 ```
 Progress: [████████████████████████████████████████] 100% (Phases P1–P6 Complete)
-Tests:    492 passed / 1 skip (offline, DEMO_MODE=1)
-Status:   Production-Ready Institutional Desk & Autonomous Architecture
+Tests:    723 passed / 1 skip (offline, DEMO_MODE=1)
+Status:   P12.12 evidence tooling shipped; micro-live remains graduation-gated
 Note:     This repo consolidates Cloudslover/AI + cloudshome/AI (see MERGE_NOTES.md)
 ```
 
@@ -203,13 +203,16 @@ gate, our own approval loop. P10 built **data independence**: our own
 stored, gap-repaired, quality-quarantined market history — shipped in
 full (P10.1–P10.12). P12 now builds **validation independence**: the
 research-grade proof that the edge is real, on our backtester + our
-store.
+store. Its integrity definitions come from
+[`FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) and
+[`BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md); neither framework is a
+runtime dependency or alternate grader.
 
 | Phase | Theme | Deliverables | Status |
 |---|---|---|:---:|
 | **P11** | **Paper-book proof** | First grind shipped (38,439 decided; 100/20 on all four primary setups; compliance 100%; sell-R bug fixed). **First real-data grind shipped 2026-08-14** (+8,300 backtest / +494 paper real samples). Graduation gate **honestly CLOSED** (real data: +0.348R / 36.8% WR / PF 1.55). Keep grinding live data; do not move the bar. | 🔄 In progress |
 | **P10** | **Data infrastructure + market terminal** | **P10.1–P10.12 shipped** (PR #18): schema, Binance backfill, gaps/rollups, derivatives series, quality pillar, Bybit adapter, cross-exchange series, Lightweight Charts, futures/flow cards, WS tier, store-backed backtest, feature store. | ✅ Complete — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **SKY Quant Validation Engine** | Walk-forward / OOS / lookahead / boxed scorecard / quality score / strategy score / conditioned + net-of-costs expectancy / MC ruin + risk-of-ruin table — on **our** backtester + **our** store. Starts after P10.11. | 🔄 **P12.5 shipped 2026-08-15 — strategy score on the calibrator** (P12.1 locked protocol + sealed OOS; P12.2 lookahead guard; P12.3 boxed scorecard; P12.3.1 tie-break unified; P12.3.2 real market data imported; P12.6 fees-first `E_net` + net bar; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score 0–100 + plateau sweep; **P12.5: `data/strategy_score.py` `E_R × sample-quality × regime-fit × execution` on `brain/calibrator.py` — sample-quality reads P12.4 in full; multiplier is now a trust dial**). Next: P12.7 MC ruin / worst streak / risk-of-ruin table — [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8, extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8 |
+| **P12** | **SKY Quant Validation Engine** | Walk-forward / sealed OOS / lookahead / boxed scorecard / quality and strategy scores / conditioned net expectancy / MC risk / venue calendars / gold costs / source provenance / XAU promotion evidence — on **our** backtester + **our** store. | ✅ **P12.1–P12.12 shipped through 2026-08-16.** P12.7 added MC ruin/streak/TTR; P12.8 made `E_net` the decision anchor; P12.9 added venue calendars; P12.10 added the XAU-specific cost model; P12.11 isolated calibration by source; **P12.12 adds `data/gold_basis.py` and `xau-evidence`, an exact-time PAXG/XAU basis + sealed-OOS dossier that remains research-only and cannot record approval.** Next executable work is the documented real-host evidence run plus continued P11 paper proof. Micro-live remains blocked until the unchanged repository graduation bar opens **and** the user explicitly approves it. |
 
 **P11 runs alongside P10.** The first grind is done; the gate is still
 closed on the blueprint bar. Do not let the data project become a

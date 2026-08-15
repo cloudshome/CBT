@@ -6,15 +6,19 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-16 (this session: **P12.11 shipped — source
-provenance in saved keys** (Dukascopy blocker #3). `data/provenance.py` makes
-the price series part of the calibration key, so a research backtest can never
-recalibrate the live book; the live path resolves canonical keys only and a
-one-sided series can never be proven. **All three Dukascopy blockers are now
-closed** and `--save` on that adapter is unblocked. Suite green:
-**704 pass / 1 skip**.)
+**Last updated:** 2026-08-16 (this session: **P12.12 shipped — read-only
+PAXG-vs-XAU promotion-evidence dossier**. `data/gold_basis.py` exact-time
+aligns the separately stored series, measures basis/deviation, fingerprints
+the observations, and verifies the current XAU sealed-OOS envelope without
+pooling, calibrating, approving, or trading. The clean checkout correctly
+finds no real evidence. Suite green: **723 pass / 1 skip**.)
 
-**Previous:** 2026-08-15 (**P12.10 shipped — XAU bid/ask cost model**
+**Previous:** 2026-08-16 (**P12.11 shipped — source provenance in saved
+keys** (Dukascopy blocker #3). `--save` is unblocked but XAU remains
+research-only pending measured real-host basis, passing sealed OOS, and human
+approval. Suite green: **704 pass / 1 skip**.)
+
+**Earlier:** 2026-08-15 (**P12.10 shipped — XAU bid/ask cost model**
 (Dukascopy blocker #2): gold auto-detection in `data/costs.py`. Suite green:
 **681 pass / 1 skip**.)
 
@@ -37,7 +41,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 704 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 723 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -60,7 +64,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1–P12.3.2, P12.6, P12.3.3, **P12.4**, **P12.5**, **P12.7** shipped — fees-first `E_net` & net bar, overlap-corrected `N_eff` & widened CIs, Backtest Quality Score 0–100, strategy score on the calibrator, MC ruin/streak/TTR table) |
+| **Validation independence** | Research-grade proof on our own data | ✅ **P12.1–P12.12 shipped** — locked/sealed validation, fees-first `E_net`, effective sample size, quality/strategy scores, MC risk, calendars, gold costs, source isolation, and the read-only XAU promotion-evidence dossier |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -74,8 +78,8 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-15, this session):** **P12.10 shipped — XAU bid/ask
-> calendars.** Every data-quality check in SKY assumed a 24/7 market, so
+> **Prior order note (2026-08-15):** **P12.9 shipped — market calendars.**
+> Every data-quality check in SKY assumed a 24/7 market, so
 > "the venue was shut" and "our collection broke" were indistinguishable. A
 > complete week of spot gold holds ~53h of scheduled closure — read as a 30%+
 > gap fraction and a dead feed, which **quarantined a healthy series** and
@@ -109,11 +113,24 @@ Do not reopen them to install a bot or a second backtest engine.
 > is unblocked. Docs: `docs/SOURCE_PROVENANCE.md`. Suite: **704 pass / 1 skip**
 > (+23).
 >
-> **Next code build:** **micro-live at trivial size**. Every P12 milestone and
-> all three Dukascopy blockers are shipped; slippage, partial fills and
-> latency are the only remaining unknowns that cannot be measured offline.
-> That step is gated on the graduation bar opening and explicit human
-> approval — it is not a code decision to make unilaterally.
+> **P12.12 shipped — PAXG-vs-XAU promotion-evidence dossier.**
+> `python main.py xau-evidence` reads only the separately keyed Binance PAXG
+> and Dukascopy XAU books, aligns exact timestamps without filling, measures
+> basis/tracking deviation, and inspects the current XAU seal against the
+> unchanged bar. It has no approve/promote option and hard-reports approval
+> open, XAU non-tradeable, and micro-live locked. Synthetic tests establish
+> mechanics only; the actual measurement remains to be run on the real-data
+> host. Docs: `docs/XAU_PROMOTION_EVIDENCE.md`. Suite: **723 pass / 1 skip**.
+>
+> **Next executable work:** run the real-host evidence procedure: rerun
+> `learn` so saved rows adopt source keys, run the locked Dukascopy XAU
+> validation, then archive `xau-evidence --json`. Continue the live paper
+> proof until the unchanged repository graduation report says READY.
+>
+> **Next code build, still BLOCKED:** **micro-live at trivial size**. It may
+> begin only after the graduation bar opens **and** the user explicitly
+> approves it. `xau-evidence` is neither condition. Do not build order
+> placement while either gate is open.
 >
 > **Prior order note (2026-08-15):** **P12.8 shipped — the net
 > anchor.** P12.6 made every *measurement* net of costs; P12.8 fixes the two
@@ -164,15 +181,17 @@ order changed as a result.
 | **P12.4** | backtest quality score 0–100 | ✅ **shipped** — `data/quality_score.py` + `python main.py quality` (plateau sweep) + `scorecard --quality` on all surfaces | M |
 | P12.5 | strategy score on the calibrator | ✅ **shipped** — `data/strategy_score.py` + trust-dial multiplier on the calibrator; `learn` / `/api/learning` / dashboard | M |
 | **P12.7** | **MC ruin / worst streak / risk-of-ruin table** | ✅ **shipped** — `brain/analytics.monte_carlo_ruin_table()` (NET outcomes); CLI `monte`; HTTP `/api/monte`; MCP `cryptobrain_monte` + `ruin_table`; dashboard Risk card | M |
+| **P12.8** | **net decision anchor** | ✅ **shipped** — calibrator multiplier and setup-proven gate judge `E_net`, never a gross-only edge | S |
 | **P12.9** | **market calendars** | ✅ **shipped** — `data/calendar.py` (`crypto-24x7` / `xau-otc`); calendar-aware gaps, quality pillar, readiness, CSV import; CLI `calendar`; `docs/MARKET_CALENDAR.md` | S |
 | **P12.10** | **XAU bid/ask cost model** | ✅ **shipped** — gold auto-detection in `data/costs.py`; spot market model with spread-based costs, no funding, ECN commission; Dukascopy blocker #2 closed | M |
 | **P12.11** | **source provenance in saved keys** | ✅ **shipped** — `data/provenance.py`; source-keyed calibration, live-path isolation, `by_source` scorecard split, `--source-key`; Dukascopy blocker #3 closed; `docs/SOURCE_PROVENANCE.md` | S |
-| micro-live | trivial size | slippage / partial fills / latency can only be measured | L |
+| **P12.12** | **PAXG-vs-XAU promotion evidence** | ✅ **tooling shipped** — `data/gold_basis.py`, CLI `xau-evidence`, exact-time basis/tracking report + current sealed-OOS inspection; real-host evidence remains open; never approves or trades | S |
+| micro-live | trivial size | ⛔ **blocked** — only after unchanged graduation bar says READY and explicit user approval; slippage / partial fills / latency can then be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
 real and tradeable; measuring it *gross* quietly made it ~40% easier.
-Thresholds are unchanged (≥ +0.50R, > 55% WR, PF ≥ 1.5) and stay enforced
-gross until P12.6 lands `E_net`.
+Thresholds are unchanged (≥ +0.50R, > 55% WR, PF ≥ 1.5) and are enforced
+on `E_net` wherever costs are available (P12.6/P12.8).
 
 ---
 
@@ -321,7 +340,7 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 **Both are now behind P10 as well as the graduation gate.** Owning our
 data moves the aim; wrapping the engine in another chat UI does not.
 
-### TODO-13 · P12 · SKY Quant Validation Engine · P12.2 shipped
+### TODO-13 · P12 · SKY Quant Validation Engine · ✅ P12.1–P12.12 shipped
 
 📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8,
 extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.**
@@ -347,6 +366,11 @@ train/val/OOS windows have real multi-window history to split.
 | P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) | ✅ **shipped** — `data/strategy_score.py` (weighted geometric mean, NET of costs; sample-quality = P12.4 in full) + `multiplier_from_score()` trust dial on `brain/calibrator.py`; `learn` CLI / `/api/learning` / dashboard Calibration card; 15 tests |
 | **P12.6** | Conditioned + net-of-costs expectancy | **Fees/spread first** (≈ 40× funding at a 1.8h hold), then OI / funding / CVD / regime from our store: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T (`+` BT5) | ✅ **shipped** — `data/costs.py`, `E_net` on all surfaces, net bar |
 | **P12.7** | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) | ✅ **shipped** — `brain/analytics.monte_carlo_ruin_table()` (NET outcomes); CLI `monte`; HTTP `/api/monte` + embedded in `/api/risk`; MCP `cryptobrain_monte` + `ruin_table` in `cryptobrain_risk`; dashboard Risk card; 7 tests |
+| **P12.8** | Net decision anchor | Setup proof and confidence calibration cannot promote on gross-only expectancy | ✅ **shipped** — setup-proven and calibrator gates judge `E_net`; missing costs fail closed |
+| **P12.9** | Market calendars | Gap/coverage semantics distinguish continuous crypto from XAU FX sessions | ✅ **shipped** — calendar-aware quality, gaps, validation, and CLI surfaces |
+| **P12.10** | Gold transaction costs | XAU evidence uses the correct point size and one-sided quote limitations | ✅ **shipped** — bid/ask-aware gold cost model and evidence surfaces |
+| **P12.11** | Source-separated saved keys | Research histories cannot pool into or recalibrate the canonical live profile | ✅ **shipped** — canonical provenance keys throughout save/learn/scorecard paths |
+| **P12.12** | PAXG-vs-XAU promotion-evidence dossier | Exact-time basis and sealed-OOS evidence are inspectable without self-promotion | ✅ **tooling shipped** — `data/gold_basis.py`, `xau-evidence`, operator guide; real-host run and approval remain open |
 
 **Not in P12:** Hyperopt, FreqAI, Backtrader optimization or a second
 backtest engine (BT4/BT7), ML direction-prediction, a strategy-module

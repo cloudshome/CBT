@@ -114,7 +114,15 @@ python main.py scorecard \
 python main.py quality \
   --exchange dukascopy --market spot \
   --symbol XAUUSD --tf 15m --bars 12000
+
+# P12.12: exact-time PAXG/XAU basis + sealed-OOS dossier (read-only)
+python main.py xau-evidence --tf 15m --bars 12000 --json
 ```
+
+The evidence command is documented in
+[`XAU_PROMOTION_EVIDENCE.md`](XAU_PROMOTION_EVIDENCE.md). It measures the basis
+without pooling or gap filling, inspects the existing seal, and always leaves
+human approval open.
 
 `--save` is **permitted since P12.11** (v2.22.0). Source-series provenance is
 now a calibration dimension: saved rows are stamped with
@@ -175,8 +183,11 @@ after:
   run it on the imported book and record the result);
 - bid/ask spread and XAU-specific costs are modeled net of costs ✅ **Closed by P12.10** (v2.21.0);
 - source provenance reaches saved backtest/calibration keys ✅ **Closed by P12.11** (v2.22.0);
-- PAXG-vs-XAU basis/deviation is measured, not assumed;
+- PAXG-vs-XAU basis/deviation is measured, not assumed (P12.12 provides the
+  audit command; the real-data-host result remains open);
 - walk-forward train/validation/sealed-OOS results clear the unchanged bar;
 - a human explicitly approves the progression decision.
 
 Until then this adapter expands research data; it does not open the risk gate.
+A successful `xau-evidence` run is evidence for review, not an approval or a
+micro-live unlock.

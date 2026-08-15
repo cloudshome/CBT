@@ -10,20 +10,58 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-16 (this session: **v2.22.0 — P12.11 source
-provenance in saved keys**: the price series a graded row came from is now
-part of its calibration key, so a research backtest can no longer recalibrate
-the live book. Closes Dukascopy blocker #3 — **all three blockers closed**.)
+**Last updated:** 2026-08-16 (this session: **v2.23.0 — P12.12 read-only
+PAXG-vs-XAU promotion-evidence dossier**: exact-time basis measurement,
+strict one-sided XAU provenance, and read-only sealed-envelope inspection.
+Synthetic mechanics are green; real-host evidence and approval remain open.)
 
-**Previous:** 2026-08-15 (**v2.21.0 P12.10 — XAU bid/ask cost model**: gold
-auto-detection in `data/costs.py`; Dukascopy blocker #2 closed.)
-**Branch:** `arena/01a006ca-sky` (this session's branch)
-**HEAD commit:** `85bcfd7` feat(P12.10): XAU bid/ask cost model — gold auto-detection in data/costs.py (#33)
-**Python:** 3.11 (venv `.venv`) — suite green (**704 pass / 1 skip**)
+**Previous:** 2026-08-16 (**v2.22.0 P12.11 — source provenance in saved
+keys**: research histories can no longer recalibrate the live book; all three
+Dukascopy adapter blockers closed, but XAU promotion did not.)
+**Branch:** `arena/01a006ec-sky` (this session's branch)
+**HEAD commit:** `ee4ed1d` feat: add read-only XAU evidence dossier
+**Python:** 3.11 (venv `.venv`) — suite green (**723 pass / 1 skip**)
 
-> **This session (`arena/01a006ca-sky`): v2.22.0 — P12.11 source provenance.**
-> **Verified first:** rebuilt `.venv`, ran the inherited suite → **681 pass /
-> 1 skip** (the P12.10 baseline). Then built the next item.
+> **This session (`arena/01a006ec-sky`): v2.23.0 — P12.12 PAXG-vs-XAU
+> promotion-evidence dossier.**
+>
+> **What shipped.** `data/gold_basis.py` reads
+> `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD` as independent canonical
+> series and exact-inner-joins candle-open timestamps. It does not resample,
+> interpolate, forward-fill, synthesize calendar observations, or pool either
+> history into calibration. The basis is
+> `(PAXGUSDT_close - XAUUSD_close) / XAUUSD_close`, so it explicitly includes
+> USDT-vs-USD quote basis. It reports overlap coverage, basis distributions,
+> median/MAD, price/return correlations, tracking error, and a reproducibility
+> fingerprint.
+>
+> **Provenance and seals.** XAU rows must unambiguously declare one one-sided
+> `bid` or `ask` price type; absent or mixed provenance fails closed. Seal
+> inspection is read-only: it verifies the expected XAU symbol/timeframe,
+> envelope fingerprint, exact unchanged criteria, all train/validation/
+> sealed-OOS/recent windows, and surfaces history/reseal counts. It never
+> creates or reseals evidence.
+>
+> **Operator surface.** `python main.py xau-evidence --tf 15m` produces the
+> dossier; `docs/XAU_PROMOTION_EVIDENCE.md` defines the real-host procedure.
+> Repository-root-relative defaults make invocation location-independent.
+> There is no approve/promote option. Every output hard-reports
+> `RESEARCH_ONLY`, `human_approval=OPEN`, `xau_tradeable=false`, and
+> `micro_live_unlocked=false`; passing evidence can only set
+> `eligible_for_human_review=true`.
+>
+> **Verification.** Focused P12.12/validation/handoff: **54 passed** in 8.32s.
+> Full suite after installing the optional MCP extra: **723 passed, 1 skipped**
+> in 111.96s. Compileall and `pip check` pass; the v2.23.0 wheel gate reports
+> no duplicate entries.
+> The clean checkout CLI exits 1 with zero matched rows, seal `MISSING`, and all
+> decision gates closed. All basis fixtures are synthetic and prove mechanics
+> only; this checkout has no real store/database and cannot claim real basis,
+> sealed-OOS, promotion, or trading evidence.
+>
+> **Previous session (`arena/01a006ca-sky`): v2.22.0 — P12.11 source
+> provenance.** Rebuilt `.venv`, ran the inherited suite → **681 pass / 1 skip**
+> (the P12.10 baseline), then built source-separated saved keys.
 >
 > **The problem.** Every decided row was filed under `plan_type` or
 > `plan_type::regime` and nothing else — the price series that produced it was
@@ -262,23 +300,28 @@ plan (18 phases, 15-item rulebook) is in
 **Become a fully independent, consistently profitable trader.**
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
-(our own stored market history — ✅ P10.1–P10.12 shipped, with real market
-data imported and verified; research validation proof — 🔄 P12.1–P12.7
-shipped; next is **micro-live**, then scale). Every
-phase below is ordered by how directly it moves those two lines.
+(our own stored market history — ✅ P10.1–P10.12 shipped, with real BTC
+market data imported and verified; research-validation tooling — ✅
+P12.1–P12.12 shipped). The next executable work is the real-host XAU evidence
+run plus continued paper proof. **Micro-live remains blocked** until the
+unchanged graduation report says READY and the user explicitly approves it.
+Every phase below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.10 XAU bid/ask cost model shipped.**
+**P12 (SKY Quant Validation Engine) — P12.12 evidence tooling shipped.**
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
-re-run on real data and the graduation gate is honestly closed (+0.348R gross,
-negative net on 1h/4h primary). Freqtrade rejected (F1–F8); Backtrader
-rejected (BT1–BT8). The Dukascopy XAU research book (v2.22.0) has calendar-aware
-gap detection (P12.9), a gold-specific cost model (P12.10) and source-keyed
-calibration (P12.11); **all three of its blockers are closed**. Open items:
-TODO-7, TODO-8; next phase: **micro-live**.
+re-run on real BTC data and the graduation gate is honestly closed (+0.348R
+gross, negative net on 1h/4h primary). Freqtrade rejected (F1–F8);
+Backtrader rejected (BT1–BT8). The Dukascopy XAU research book now has
+calendar-aware gap detection (P12.9), a gold-specific cost model (P12.10),
+source-keyed calibration (P12.11), and a read-only PAXG-vs-XAU basis/seal
+dossier (P12.12). Adapter blockers are closed, but **promotion evidence is
+not**: this checkout has no real basis measurement or XAU seal, approval is
+open, and XAU remains non-tradeable. Open items: real-host evidence, the P11
+paper gate, TODO-7, TODO-8; micro-live is blocked.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -293,7 +336,7 @@ TODO-7, TODO-8; next phase: **micro-live**.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.11 shipped — source provenance in saved keys** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; P12.4 Backtest Quality Score + plateau sweep; P12.5 strategy score on the calibrator; P12.7 Monte Carlo ruin/streak/TTR table; P12.8 the net anchor — the calibrator multiplier and the setup-proven gate judge `E_net`, not `E_gross`; P12.9 market calendars — `data/calendar.py` gives each venue a trading calendar, so scheduled OTC-gold closures stop being read as missing data; P12.10 XAU bid/ask cost model — `data/costs.py` auto-detects gold instruments and applies a spot-market model with spread-based costs, no funding, ECN commission, Dukascopy blocker #2 closed; **P12.11 source provenance — `data/provenance.py` makes the price series part of the calibration key, so a research backtest can never recalibrate the live book; Dukascopy blocker #3 closed, all three closed**). Next: **micro-live**. |
+| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.1–P12.12 shipped** — locked/sealed validation, lookahead guard, scorecard, real-data path, fees-first `E_net`, effective sample size, quality/strategy scores, Monte Carlo survivability, net decision anchor, market calendars, XAU costs, source-separated saved keys, and the read-only PAXG-vs-XAU promotion-evidence dossier. Tooling completion does not promote XAU: run P12.12 on the real-data host, retain human review, and keep micro-live locked until the global bar says READY plus explicit approval. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -302,7 +345,39 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-16 (this branch `arena/01a006ca-sky`): P12.11 — source provenance in saved keys
+### Session 2026-08-16 (this branch `arena/01a006ec-sky`): P12.12 — read-only PAXG-vs-XAU promotion evidence
+
+Inherited baseline: P12.11 at `f34540e`. Built the next permissible evidence
+step without order placement, calibration pooling, seal mutation, or promotion.
+Tests **704 → 723 pass / 1 skip** (+19 net). Version **2.22.0 → 2.23.0**.
+
+- Added `data/gold_basis.py`: separate canonical reads, exact-timestamp inner
+  alignment, basis/coverage/tracking statistics, and SHA-256 reproducibility
+  fingerprint. No resampling, interpolation, forward fill, or calendar
+  synthesis.
+- Enforced one-sided Dukascopy provenance: exactly one of `bid`/`ask`; missing,
+  two-sided, or mixed price types fail closed.
+- Added read-only inspection of `dukascopy_spot_XAUUSD_<tf>` envelopes:
+  expected source metadata, payload fingerprint, exact unchanged criteria, all
+  four validation windows, and reseal history are exposed. Nothing can create
+  or reseal evidence.
+- Added `python main.py xau-evidence` with repository-root-relative defaults,
+  human and JSON reports, minimum-overlap controls, and no approval switch.
+- Added `docs/XAU_PROMOTION_EVIDENCE.md`; updated operator, architecture,
+  roadmap, README, changelog, TODO, and this handoff.
+- Safety output is invariant: `RESEARCH_ONLY`, approval `OPEN`, XAU not
+  tradeable, micro-live locked. Passing evidence means human-review eligibility
+  only.
+- Focused verification: 54 pass. Full suite: 723 pass / 1 skip. Clean-checkout
+  CLI exits 1 because no real store/seal exists; no evidence was manufactured.
+
+**Files changed:** `data/gold_basis.py` (new), `tests/test_gold_basis.py` (new),
+`docs/XAU_PROMOTION_EVIDENCE.md` (new), `main.py`, `config.py`,
+`pyproject.toml`, `README.md`, `docs/DUKASCOPY_XAU_ADAPTER.md`,
+`ARCHITECTURE.md`, `AI_ANATOMY_ROADMAP.md`, `TODO.md`, `CHANGELOG.md`, and
+`SESSION_STATE.md`.
+
+### Session 2026-08-16 (branch `arena/01a006ca-sky`): P12.11 — source provenance in saved keys
 
 Branched from `main` @ `85bcfd7d` (P12.10 merged). Inherited suite re-verified at
 **681 pass / 1 skip** before any change. 0 regressions.
@@ -581,15 +656,18 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
-1. **Micro-live at trivial size** — the only remaining unknowns (slippage,
-   partial fills, latency) cannot be measured offline. Gated on the
-   graduation bar opening and explicit human approval.
-2. **TODO-7** — human pastes the wheel-gate job into the **real**
+1. **Run P12.12 on the real-data host** — rerun `learn` to adopt source keys,
+   build/retain the locked Dukascopy XAU validation evidence, then archive
+   `python main.py xau-evidence --json`. Do not reseal from the audit command.
+2. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
+   the unchanged graduation bar remains closed.
+3. **Micro-live at trivial size — BLOCKED** until the graduation report says
+   READY and the user explicitly approves it. Slippage, partial fills, and
+   latency become measurable only after both gates open.
+4. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
-3. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
-4. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
-   the graduation bar remains closed and unchanged.
-5. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
+5. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
+6. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
 
 ---
 
@@ -604,7 +682,7 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    committed sample data is stale by design. Expected offline.
 5. **Arena cannot push under `.github/workflows/`.** The wheel-gate
    job spec lives at `docs/.github/workflows/ci.yml` (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.16.0.
+6. **`CHANGELOG.md` is current** through v2.23.0.
 7. **Real market data is imported offline**: Binance spot BTCUSDT 1m
    (696,960 bars, sha256-pinned `c4ad6029…b934b7`). The store is
    gitignored; re-import with `backfill --from-csv` if starting in a clean sandbox.
@@ -644,14 +722,14 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
     reads the decided paper book NET of costs and surfaces survivability
     estimates. It does not approve trades, loosen the graduation bar, or
     replace the risk gate.
-17. **Dukascopy XAU: all three blockers are closed, and it is still not
-    tradeable evidence.** P12.9 closed the market calendar, P12.10 the XAU
-    bid/ask cost model, P12.11 the calibration-key provenance. `backtest
-    --save` is now permitted — its rows land in `…@dukascopy:spot:bid` keys
-    and cannot recalibrate the live proxy. What remains is *not* code:
-    PAXG-vs-XAU basis measurement, sealed-OOS results clearing the unchanged
-    bar, and explicit human approval. Separable evidence is the precondition
-    for judging it, not the judgement.
+17. **Dukascopy XAU: adapter blockers and audit tooling are closed; promotion
+    is not.** P12.9 closed the market calendar, P12.10 the XAU bid/ask cost
+    model, P12.11 calibration-key provenance, and P12.12 the read-only basis /
+    seal dossier. `backtest --save` is permitted because its rows land in
+    `…@dukascopy:spot:bid` keys and cannot recalibrate the live proxy. The
+    real-data host must still produce the PAXG-vs-XAU measurement and passing
+    sealed-OOS evidence, followed by explicit human approval. Separable,
+    inspectable evidence is the precondition for judgement, not the judgement.
 18. **A calendar can only remove false alarms, never hide a hole.** It is
     opt-in by venue: anything not explicitly `dukascopy` + an XAU symbol keeps
     the 24/7 crypto calendar, including Binance `PAXGUSDT`, which really does
@@ -669,45 +747,55 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 21. **P12.11 isolates the filter as well as the boost.** A research entry
     marked `filtered` must not block a live signal either — a series we do
     not trade gets no vote in both directions. Both are covered by tests.
+22. **P12.12 exact-time alignment is intentionally sparse.** Never resample,
+    interpolate, forward-fill, or calendar-synthesize PAXG/XAU observations to
+    improve overlap. Low overlap is evidence quality information and fails
+    closed below `--min-overlap`.
+23. **PAXG-vs-XAU basis is not pure gold dislocation.** PAXGUSDT versus XAUUSD
+    includes the USDT/USD quote basis. Keep that caveat on every interpretation
+    and never pool either series into calibration.
+24. **Seal inspection is not seal creation.** P12.12 validates source metadata,
+    exact locked criteria, envelope integrity, four windows, and reseal history
+    without writing any seal. A resealed history remains visible for human
+    scrutiny even when the latest payload passes.
+25. **This checkout has no real basis evidence.** Synthetic fixtures prove
+    mechanics only. The clean-checkout failure is the correct fail-closed
+    result and must not be reported as real-host validation.
 
 ---
 
 ## Next recommended action
 
-1. **Next code build — micro-live at trivial size.** All three Dukascopy
-   blockers and every P12 milestone are shipped; slippage, partial fills and
-   latency are the only remaining unknowns that *cannot* be measured offline.
-   This starts only after the graduation bar opens and a human approves.
-2. **On the host holding the real BTC store/DB**, re-run `backtest --save` +
-   `learn`; the calibration profile remains stale in this clean checkout. Do
-   not substitute demo data.
-3. Optionally acquire version-pinned Dukascopy XAU m1 **bid** or **ask** CSV
-   and import it with a SHA pin using `docs/DUKASCOPY_XAU_ADAPTER.md`; the
-   import, quality checks, cost model and calibration keys are all gold- and
-   source-aware. `--save` is now permitted (rows land under
-   `…@dukascopy:spot:bid`); inspect with
-   `python main.py scorecard --source backtest --source-key dukascopy:spot:bid`.
-4. **Micro-live** only after the existing graduation bar opens and a human
-   explicitly approves progression. This work does not move that bar.
+1. **On the real-data host**, rerun `learn` so existing canonical rows pick up
+   source keys; the live profile should remain unchanged. Do not substitute
+   demo or synthetic rows.
+2. Acquire/version-pin Dukascopy XAU m1 **bid** or **ask** data if not already
+   present, import it per `docs/DUKASCOPY_XAU_ADAPTER.md`, and run the locked
+   train/validation/OOS/recent protocol under the expected XAU seal key.
+3. Run and archive `python main.py xau-evidence --tf 15m --json` per
+   `docs/XAU_PROMOTION_EVIDENCE.md`. Review overlap, provenance, fingerprint,
+   all four seal windows, envelope integrity, and reseal history. Do not
+   create/reseal evidence from the audit.
+4. Continue P11 live-data paper proof until the unchanged graduation report
+   says READY. **Micro-live remains blocked** until that result and separate
+   explicit user approval both exist.
 5. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-6. Do not install Freqtrade or Backtrader and do not loosen the graduation bar.
+6. Do not install Freqtrade or Backtrader, pool PAXG/XAU calibration histories,
+   loosen the graduation bar, or build order placement while gates are open.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm the P12.11 PR merged. P12.1–P12.10, the Dukascopy XAU adapter,
-> market calendars, the gold cost model and **P12.11 source provenance** are
-> shipped — do not rewrite `data/provenance.py`, re-key the calibration table,
-> change the canonical source key away from the empty string, rewrite
-> `data/calendar.py`, or rework the gold cost model. **All three Dukascopy
-> blockers are closed**; what remains for XAU is measurement and human
-> approval, not code. All earlier P12 milestones are shipped: do not redo the locked protocol, the
-> negative-shift guard, the boxed scorecard, the tie-break, the real data
-> import, trade cost modeling, the overlap-corrected effective sample size,
-> the Backtest Quality Score, the strategy score on the calibrator, the Monte
-> Carlo ruin/streak/TTR table, or the net anchor on the calibrator/proven gate.
-> Keep the existing grader/store, do not adopt Freqtrade or Backtrader, and do
-> not loosen the graduation bar.
+> Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first and
+> confirm P12.12 merged. P12.1–P12.12 are shipped; do not rewrite the locked
+> protocol, source-key algebra, calendars, gold costs, or `data/gold_basis.py`.
+> Preserve separate `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD`
+> histories and exact-time-only alignment. Run the documented P12.12 procedure
+> on the real-data host; never substitute synthetic fixtures, pool calibration,
+> or create/reseal evidence from `xau-evidence`. Treat a passing dossier as
+> eligible for human review only. Continue paper proof, keep XAU non-tradeable,
+> and keep micro-live blocked until the unchanged graduation bar says READY
+> and the user separately gives explicit approval. Do not adopt Freqtrade or
+> Backtrader and do not loosen any gate.
 
 ---
 
@@ -716,7 +804,15 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 704 passed, 1 skipped
+# 723 passed, 1 skipped
+```
+
+PAXG-vs-XAU evidence (P12.12):
+```bash
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_gold_basis.py tests/test_validation.py tests/test_handoff_guard.py -q
+# 54 passed
+python main.py xau-evidence --tf 15m --json
+# RESEARCH_ONLY; 0 rows; seal MISSING; approval OPEN; exit 1
 ```
 
 Source provenance (P12.11):
@@ -734,7 +830,7 @@ DEMO_MODE=1 .venv/bin/python -m pytest tests/test_costs.py -q
 Wheel gate:
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.22.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.23.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Market calendar (P12.9):
@@ -777,15 +873,15 @@ python main.py scorecard --source db --quality        # embed the quality block 
 python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau sweep (store-only)
 ```
 
-## Last commit
+## Last implementation commit
 
 ```
-(THIS SESSION) feat(P12.10): XAU bid/ask cost model — gold auto-detection in data/costs.py
-d9410b9  feat(P12.9): market calendars — a scheduled closure is not a gap (#32)   # parent
+ee4ed1d  feat: add read-only XAU evidence dossier
 ```
 
-P12.10 work sits on `arena/01a0069a-sky` and will be pushed to origin as a
-session branch. See `git log --oneline -3`.
+P12.12 is committed and pushed on `arena/01a006ec-sky`. Pull request **#35**
+is open from that branch to `main`. The inherited branch base remains `f34540e`
+(P12.11 / PR #34).
 
 ---
 
@@ -824,7 +920,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 567 pass / 1 skip.
+- Maintain test count at ≥ 723 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -840,21 +936,22 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.10 shipped**
-   (XAU bid/ask cost model in `data/costs.py`, gold auto-detection,
-   Dukascopy blocker #2 closed).
+1. [x] Finish or safely stop the current task. — **P12.12 shipped**
+   (read-only exact-time PAXG/XAU basis and sealed-evidence dossier).
 2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` —
-   **704 pass / 1 skip** (+23: `tests/test_provenance.py`). Inherited baseline
-   re-verified at 681/1 before any change.
+   **723 pass / 1 skip** with the optional MCP extra installed; focused P12.12
+   run **54 pass**.
 3. [x] Fix any obvious failures. — none left open.
-4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.11 marked shipped; all three Dukascopy blockers
-   closed; next is micro-live.
-6. [x] Update `CHANGELOG.md` — 2.22.0 P12.11 entry.
+4. [x] Update `SESSION_STATE.md` with the exact current state and preserve the
+   exact `HEAD commit:` handoff header.
+5. [x] Update `TODO.md` — P12.12 tooling marked shipped; real-host evidence is
+   next; micro-live remains blocked.
+6. [x] Update `CHANGELOG.md` — v2.23.0 P12.12 entry.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
-9. [x] Record the last commit reference.
-10. [x] Record any known bugs or unresolved issues.
-11. [ ] `git add` / `git commit` — commit and push to `origin/arena/01a006ca-sky`.
-12. [ ] Open the session PR as the closing step — PR from
-    `arena/01a006ca-sky` (P12.11).
+9. [x] Record the P12.12 implementation commit reference — `ee4ed1d`.
+10. [x] Record known limitations — synthetic-only mechanics here, no real
+    basis/seal/promotion evidence.
+11. [x] `git add` / `git commit` and push only to
+    `origin/arena/01a006ec-sky`.
+12. [x] Open the session PR from `arena/01a006ec-sky` — **PR #35**.

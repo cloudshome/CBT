@@ -10,6 +10,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.23.0] — 2026-08-16 · P12.12: PAXG-vs-XAU promotion-evidence dossier
+
+MINOR: add the missing read-only measurement between separately stored Binance
+PAXG and Dukascopy XAU histories. This is an evidence build, not micro-live:
+the repository graduation gate is still closed and no explicit approval has
+been given.
+
+### Added
+
+- `data/gold_basis.py`:
+  - reads `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD` independently;
+  - rejects ambiguous/missing Dukascopy bid-or-ask provenance;
+  - aligns exact UTC candle-open timestamps only, with no resampling,
+    interpolation, forward fill, calendar synthesis, or history pooling;
+  - reports overlap coverage, USD/percent/bps basis distribution, median/MAD,
+    price/return correlation, tracking error, and a SHA-256 fingerprint of the
+    aligned observations;
+  - fails closed when overlap is below the declared minimum.
+- Sealed-envelope inspection verifies that the latest payload:
+  - matches the expected XAU symbol and timeframe;
+  - matches its envelope fingerprint;
+  - uses the current unchanged graduation criteria;
+  - clears train, validation, sealed-OOS, and recent windows;
+  - exposes history and reseal counts for human review.
+- `python main.py xau-evidence [--tf 15m] [--bars 12000]
+  [--min-overlap 100] [--json]` builds one promotion dossier from the two
+  evidence records. There is deliberately no approve/promote option.
+- `docs/XAU_PROMOTION_EVIDENCE.md` records the real-data-host procedure,
+  exact-alignment contract, quote-currency caveat, and promotion gates.
+- `tests/test_gold_basis.py` covers alignment, metrics, coverage, provenance,
+  seals, source/criteria mismatch, separate store keys, CLI failure on an
+  empty checkout, and the non-promotion contract.
+
+### Safety contract
+
+Every dossier remains `RESEARCH_ONLY`. Even when basis measurement and sealed
+OOS pass, the command reports `human_approval=OPEN`, `xau_tradeable=false`, and
+`micro_live_unlocked=false`. Synthetic fixtures verify mechanics only; they are
+not real basis or OOS evidence. Micro-live still requires the unchanged global
+graduation bar and a separate explicit user approval.
+
+### Verification
+
+- P12.12 + validation + handoff focus: **54 passed**.
+- Full suite: **723 passed, 1 skipped** (MCP extra installed).
+- Compileall and dependency checks pass; v2.23.0 wheel builds with no duplicate
+  entries.
+- Clean-checkout CLI: no matched rows, seal `MISSING`, approval `OPEN`,
+  tradeable/micro-live false, exit 1 — no evidence manufactured.
+
+---
+
 ## [2.22.0] — 2026-08-16 · P12.11: source provenance in saved keys (Dukascopy blocker #3)
 
 MINOR: make the price series a graded row came from part of its identity, so
