@@ -379,6 +379,7 @@ def cmd_scorecard(args) -> int:
         enabled=not getattr(args, "no_costs", False),
     )
     conditioned = getattr(args, "conditioned", False)
+    quality = getattr(args, "quality", False)
 
     if args.source == "store":
         horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
@@ -388,7 +389,8 @@ def cmd_scorecard(args) -> int:
             bars=args.bars,
             horizons=horizons, min_bars=args.min_bars, step=args.step,
             min_confidence=args.min_conf, min_decided=args.min_decided,
-            cost_model=cost_model, conditioned=conditioned)
+            cost_model=cost_model, conditioned=conditioned,
+            quality=quality)
     else:
         from data.backfill import BackfillError, parse_ts
         now_ms = int(time.time() * 1000)
@@ -405,12 +407,45 @@ def cmd_scorecard(args) -> int:
             include_sim=not args.exclude_sim,
             since_ts=since_ts, until_ts=until_ts,
             cost_model=cost_model, conditioned=conditioned,
-            step=args.step)
+            quality=quality, step=args.step)
 
     if args.json:
         print(json.dumps(report, indent=2, default=str))
     else:
         print_scorecard(report)
+    return 0 if report.get("ok") else 1
+
+
+def cmd_quality(args) -> int:
+    """P12.4 — Backtest Quality Score 0–100 with the parameter-plateau sweep.
+
+    Re-grades the stored series at every point of a strategy-parameter
+    neighbourhood (min_confidence ± 5 by default — the engine gate that
+    decides which plans exist) and scores the base book against that
+    evidence. A setup that only wins at one isolated parameter point is
+    capped at 50/100: an isolated peak is a fit, not an edge (BT5).
+    Store-only, exactly like the locked P12.1 protocol.
+    """
+    from data.costs import CostModel
+    from data.quality_score import print_quality, run_quality_sweep
+
+    cost_model = CostModel(
+        execution_type="maker" if getattr(args, "maker", False) else "taker",
+        enabled=not getattr(args, "no_costs", False),
+    )
+    horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
+    report = run_quality_sweep(
+        exchange=args.exchange, market=args.market,
+        symbol=_sym(args.symbol or SYMBOL), timeframe=args.tf,
+        bars=args.bars, horizons=horizons,
+        min_bars=args.min_bars, step=args.step,
+        min_confidence=args.min_conf, min_decided=args.min_decided,
+        cost_model=cost_model)
+
+    if args.json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print_quality(report)
     return 0 if report.get("ok") else 1
 
 
@@ -1920,9 +1955,43 @@ def main(argv: list[str] | None = None) -> int:
                          help="model maker fees instead of default taker fees")
     p_score.add_argument("--conditioned", action="store_true",
                          help="include conditioned splits by funding and CVD order flow")
+    p_score.add_argument("--quality", action="store_true",
+                         help="P12.4: embed the Backtest Quality Score 0–100 "
+                              "for the same book")
     p_score.add_argument("--json", action="store_true",
                          help="machine-readable result")
     p_score.set_defaults(func=cmd_scorecard)
+
+    p_quality = sub.add_parser(
+        "quality",
+        help="P12.4 Backtest Quality Score 0–100 with the parameter-plateau "
+             "sweep (store-only): re-grades min_confidence ±5 and caps an "
+             "isolated-peak edge at 50")
+    p_quality.add_argument("--symbol", default=None,
+                           help="asset symbol (BTC, ETH, XAU/GOLD)")
+    p_quality.add_argument("--tf", default=TIMEFRAME, help="store timeframe")
+    p_quality.add_argument("--exchange", default="binance",
+                           help="stored series venue (binance|bybit)")
+    p_quality.add_argument("--market", default="perp", help="spot or perp series")
+    p_quality.add_argument("--bars", type=int, default=1000,
+                           help="most-recent bars to grade")
+    p_quality.add_argument("--horizons", default="4",
+                           help="comma-separated hours; the first is scored")
+    p_quality.add_argument("--min-bars", type=int, default=BACKTEST_MIN_BARS,
+                           help="engine warm-up bars")
+    p_quality.add_argument("--step", type=int, default=3,
+                           help="walk-forward bar step (overlap correction, P12.3.3)")
+    p_quality.add_argument("--min-conf", type=int, default=MIN_CONFIDENCE,
+                           help="base strategy parameter; swept at ±5")
+    p_quality.add_argument("--min-decided", type=int, default=30,
+                           help="minimum decided trades before a verdict is given")
+    p_quality.add_argument("--no-costs", action="store_true",
+                           help="disable cost modeling (score gross outcomes only)")
+    p_quality.add_argument("--maker", action="store_true",
+                           help="model maker fees instead of default taker fees")
+    p_quality.add_argument("--json", action="store_true",
+                           help="machine-readable result")
+    p_quality.set_defaults(func=cmd_quality)
 
     p_stats = sub.add_parser("stats", help="what the engine has learned (DB + backtests)")
     p_stats.add_argument("--symbol", default=None, help="optional asset filter (BTC, ETH, XAU/GOLD)")
@@ -2348,7 +2417,7 @@ def main(argv: list[str] | None = None) -> int:
         print("                        learn | stats | coach | review | sources | state | glossary |")
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
         print("                        health | desk | doctor | channels | skill | preflight | simulator |")
-        print("                        validate | scorecard | hidden | correlation | backfill | store |")
+        print("                        validate | quality | scorecard | hidden | correlation | backfill | store |")
         print("                        derivatives | mcp")
         print("=" * 62)
         serve(make_app(), DASHBOARD_HOST, DASHBOARD_PORT)

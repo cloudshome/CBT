@@ -20,7 +20,12 @@
 > official public archive) imported offline via `backfill --from-csv`
 > through the same adapter boundary this doc specifies, rolled up with
 > the P10.3 rollups, and P11/P12.1/P12.3 re-run on it — every number is
-> in `docs/REAL_DATA_RUN_2026-08-14.md`. Next: fees-first P12.6.
+> in `docs/REAL_DATA_RUN_2026-08-14.md`. Then P12.6 fees-first `E_net`
+> and P12.3.3 effective sample size shipped; **P12.4 shipped 2026-08-15 —
+> Backtest Quality Score 0–100** (`data/quality_score.py`: edge / curve
+> robustness / sample confidence / BT5 parameter-plateau; `python main.py
+> quality` store sweep; `scorecard --quality` on CLI / HTTP / MCP /
+> dashboard). Next: P12.5 strategy score on the calibrator.
 > **Phase:** P10 — the next *major* milestone after the paper-book proof.
 > **Owner doc:** this file. `TODO.md` links here; don't duplicate detail there.
 > **Created:** 2026-08-12
@@ -62,7 +67,8 @@ ALONG    P11 · prove the paper book (counts done; gate still closed)
            ↓  do not loosen the bar
 NOW      P12 · SKY Quant Validation Engine  (P12.3 + P12.3.1 +
            P12.3.2 REAL DATA shipped 2026-08-14 — see
-           docs/REAL_DATA_RUN_2026-08-14.md; P12.6 fees-first next,
+           docs/REAL_DATA_RUN_2026-08-14.md; P12.6, P12.3.3 and
+           P12.4 quality score shipped 2026-08-15; P12.5 next,
            ladder in docs/PATH_TO_REAL_MONEY.md)
            (walk-forward / OOS / lookahead / quality score /
             funding-OI-CVD-conditioned + net-of-costs expectancy /

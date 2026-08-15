@@ -27,7 +27,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.7.0"  # bumped: P12.3.3 effective sample size (N_eff, widened CI)
+SERVER_VERSION = "1.8.0"  # bumped: P12.4 Backtest Quality Score (quality arg on scorecard tool)
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -116,7 +116,7 @@ ALLOWED_TOOLS = {
         },
     },
     "scorecard": {
-        "description": "P12.3 & P12.6 & P12.3.3 strategy scorecard: boxed block of gross and NET expectancy R (E_net = E_gross − fees − slip − funding), win rate, profit factor, Sharpe/Sortino/Calmar, max drawdown, cost breakdown, holding time, and effective sample size (N_eff, overlap-corrected with widened 95% confidence intervals), split by side (long/short), regime, session, setup, and market conditions — over outcomes the grader already produced. Read-only; the same as `python main.py scorecard --json`. Evaluates performance NET of costs; never grants permission to trade.",
+        "description": "P12.3 & P12.6 & P12.3.3 & P12.4 strategy scorecard: boxed block of gross and NET expectancy R (E_net = E_gross − fees − slip − funding), win rate, profit factor, Sharpe/Sortino/Calmar, max drawdown, cost breakdown, holding time, effective sample size (N_eff, overlap-corrected with widened 95% confidence intervals), split by side (long/short), regime, session, setup, and market conditions — over outcomes the grader already produced. Pass quality=true to embed the P12.4 Backtest Quality Score 0–100 (edge, curve robustness, sample confidence; plateau n/a without the store re-grade sweep). Read-only; the same as `python main.py scorecard --json`. Evaluates performance NET of costs; never grants permission to trade.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -254,7 +254,8 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
             min_decided=int(args.get("min_decided", 30)),
             include_sim=not bool(args.get("exclude_sim", False)),
             cost_model=cost_model,
-            conditioned=bool(args.get("conditioned", False)))
+            conditioned=bool(args.get("conditioned", False)),
+            quality=bool(args.get("quality", False)))
 
     elif name == "hidden_chart_read":
         # HMM regime + CVD + Kelly advisory for one symbol. Read-only.

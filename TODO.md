@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-15 (this session: **P12.3.3 shipped — effective sample size in the scorecard**: walk-forward counts divided by window overlap (`N_eff = N / overlap`, `overlap = horizon_bars / step`), standard errors & 95% CIs widened with `√N_eff`; `step` now stored on `backtest_results`. Next *code* is **P12.4 — backtest quality score**)
+**Last updated:** 2026-08-15 (this session: **P12.4 shipped — Backtest Quality Score 0–100**: `data/quality_score.py` scores edge (net expectancy vs bar, shape-discounted), curve robustness (top-5 concentration / drawdown / chronological segments), sample confidence (N_eff + CI significance), and the BT5 parameter-plateau test that caps an isolated-peak edge at 50. `python main.py quality` runs the min_confidence ±5 store sweep; `scorecard --quality` embeds the block on CLI / HTTP / MCP / dashboard. Next *code* is **P12.5 — strategy score on the calibrator**)
 
 ---
 
@@ -58,15 +58,19 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-15, this session):** **P12.3.3 shipped — effective
-> sample size in the scorecard.** Walk-forward samples overlap ~30×
-> (24h/15m graded at step 3 → 96/3 = 32 windows per observation); the
-> scorecard now divides raw counts by the overlap factor
-> (`N_eff = N / overlap`), reports `N_eff` alongside `N`, and widens
-> standard errors / 95% CIs with `SE = σ / √N_eff`. `step` is stored on
-> `backtest_results`. The `min_decided` floor still reads raw N (flagged,
-> not changed — floor revisit is the next decision). Next *code* build is
-> **P12.4 — backtest quality score**, now scoring something real.
+> **Order note (2026-08-15, this session):** **P12.4 shipped — Backtest
+> Quality Score 0–100.** The scorecard now answers *"is this book
+> profitable net of costs, with honest overlap-corrected uncertainty?"*
+> *and* *"is it robust, or did it win by luck?"*:
+> `data/quality_score.py` composites edge (net expectancy vs bar,
+> shape-discounted), curve robustness (top-5 concentration / drawdown /
+> chronological segments), sample confidence (N_eff + CI significance),
+> and the BT5 parameter-plateau test (`python main.py quality` re-grades
+> min_confidence ± 5 and **caps an isolated-peak edge at 50** — a fit,
+> not an edge). `scorecard --quality` embeds the same block on CLI /
+> HTTP / MCP / dashboard (invariant #10). Next *code* build is
+> **P12.5 — strategy score on the calibrator**
+> (`E_R × sample-quality × regime-fit × execution`).
 
 ### TODO-15 / P12.6 · Fees-first `E_net` & conditioned expectancy · ✅ shipped
 
@@ -91,8 +95,8 @@ order changed as a result.
 | **P12.3.2** | **real market data** — backfill real BTCUSDT 1m with the P10 machinery, re-run P11 / P12.1 / P12.3 | ✅ **shipped** — see `docs/REAL_DATA_RUN_2026-08-14.md` | M |
 | **P12.6** | pulled forward, **fees-first** — `E_net` becomes the number the gate reads | ✅ **shipped** — `data/costs.py`, `E_net`, net bar | M |
 | **P12.3.3** | effective sample size in the scorecard | ✅ **shipped** — `N_eff = N / overlap`, widened CI/SE, `step` stored | S |
-| **P12.4** | backtest quality score 0–100 | **next.** now scoring something real | M |
-| P12.5 | strategy score on the calibrator | after P12.4 | M |
+| **P12.4** | backtest quality score 0–100 | ✅ **shipped** — `data/quality_score.py` + `python main.py quality` (plateau sweep) + `scorecard --quality` on all surfaces | M |
+| P12.5 | strategy score on the calibrator | **next.** `E_R × sample-quality × regime-fit × execution` | M |
 | micro-live | trivial size | slippage / partial fills / latency can only be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
@@ -269,7 +273,7 @@ train/val/OOS windows have real multi-window history to split.
 | **P12.3.1** | Same-bar SL/TP tie-break unified with the paper trader | One ambiguous candle grades identically in both graders; conservative stop-first (`+` BT7 §7.1) | ✅ **shipped** — `data/backtester.py` `<` → `<=`, `ambiguous_bar`, 5 tests |
 | **P12.3.2** | **Real market data** | Real BTCUSDT 1m backfilled with the P10 machinery; P11 / P12.1 / P12.3 re-run and re-reported on it | ✅ **shipped** — `backfill --from-csv`, `StoreClient`, `docs/REAL_DATA_RUN_2026-08-14.md` |
 | **P12.3.3** | Effective sample size | Overlapping walk-forward windows divided down; confidence intervals widened honestly | ✅ **shipped** — `N_eff = N / overlap` (≈30×), `SE = σ / √N_eff`, `step` column on `backtest_results`; `min_decided` floor flagged but unchanged (revisit next) |
-| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ▶ **next** — after P12.3.3 |
+| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ✅ **shipped** — `data/quality_score.py`, `python main.py quality`, `scorecard --quality`, MCP `scorecard quality` (v1.8.0), 25 tests |
 | P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) | ⏳ |
 | **P12.6** | Conditioned + net-of-costs expectancy | **Fees/spread first** (≈ 40× funding at a 1.8h hold), then OI / funding / CVD / regime from our store: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T (`+` BT5) | ✅ **shipped** — `data/costs.py`, `E_net` on all surfaces, net bar |
 | P12.7 | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) | ⏳ |

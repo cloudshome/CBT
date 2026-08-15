@@ -10,6 +10,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.15.0] — 2026-08-15 · branch `arena/01a00431-sky`
+
+MINOR bump: **P12.4 — Backtest Quality Score 0–100.**
+
+The scorecard answers *"is this book profitable net of costs, with honest
+overlap-corrected uncertainty?"* — P12.4 answers the second question a
+desk must ask before trusting a curve: **"is this book robust, or did it
+win by luck?"** A composite 0–100 so a fragile high-PnL curve cannot look
+like a pass, scoring the now-real net-of-costs, overlap-corrected data
+(per `docs/FREQTRADE_REVIEW.md` F5 and `docs/BACKTRADER_REVIEW.md` BT5):
+
+    Score = E_net × stability × sample-confidence − DD/concentration
+            penalties, with the parameter-plateau test as a cap
+
+### Added
+- **`data/quality_score.py`** — pure `backtest_quality_score(rows, …)`
+  with four weighted components (edge 35%, robustness 35%, sample 20%,
+  plateau 10%; renormalised when plateau evidence is absent):
+  - **edge** — net expectancy vs the bar (+0.50R → 50, 2× bar → 100),
+    discounted ×0.85 per miss when win rate ≤ 55% or PF < 1.5 (the bar
+    requires all three conditions, so the score cannot pass on E alone);
+  - **robustness** — fragility of the cumulative net-R curve:
+    top-5 wins' share of gross wins (one lucky 5-trade streak must not
+    BE the edge), max-drawdown ÷ |total R| (giving back half the profit
+    is fragile), and chronological segment consistency (profits must
+    persist across time, not arrive in one burst);
+  - **sample** — N_eff vs min_decided (overlap-corrected) and where the
+    95% CI of E_net sits relative to break-even (significance, not mean);
+  - **plateau** — the BT5 parameter-plateau test: re-grade the stored
+    series over `min_confidence ± 5`; a setup that only wins at one
+    isolated parameter point **caps the total at 50** (a fit, not an
+    edge). Plateaus < 50 also flag `plateau_cap`.
+  - Bands: ≥80 robust, ≥60 acceptable, ≥40 borderline, else fragile.
+  - Empty books degrade to `quality: None` with a reason — silence is
+    not an edge.
+- **`run_quality_sweep()`** — store-only plateau sweep (like the locked
+  P12.1 protocol): `python main.py quality` re-grades the stored series
+  at min_confidence ± 5 (clamped [40, 90], deduplicated, base point
+  guaranteed), scores the base book against that evidence, and prints the
+  boxed block. `grade_fn` is injectable so CI stays offline.
+- **Surfaces (invariant #10, one computation everywhere):**
+  - CLI `python main.py scorecard --quality` embeds the block (edge /
+    robustness / sample; plateau n/a without the re-grade sweep);
+    new `python main.py quality` runs the full plateau sweep.
+  - `GET /api/scorecard?quality=1` and the `STRATEGY SCORECARD`
+    dashboard card show the quality block.
+  - MCP `scorecard` tool gained a `quality` argument; `SERVER_VERSION`
+    1.7.0 → **1.8.0**.
+- Tests: 25 new (`tests/test_quality_score.py`) — edge mapping & shape
+  discount, concentration / drawdown / segment arithmetic, sample
+  sufficiency & CI significance, the BT5 isolated-peak cap (= 50.0),
+  plateau not-testable degradation, sweep dedupe / error propagation,
+  scorecard embedding determinism, printer paths.
+  Suite **573 → 598 pass / 1 skip** (+25).
+
+No trading orders or private credentials added (invariant #1 preserved).
+Next on the ladder: **P12.5 strategy score on the calibrator**
+(`E_R × sample-quality × regime-fit × execution`), then P12.7 Monte Carlo
+ruin.
+
+---
+
 ## [2.14.0] — 2026-08-15 · branch `arena/01a00417-sky`
 
 MINOR bump: **P12.3.3 — effective sample size in the scorecard.**

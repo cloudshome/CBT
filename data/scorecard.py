@@ -613,6 +613,7 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
                     criteria: Optional[dict] = None,
                     note: str = "",
                     conditioned: bool = False,
+                    quality: bool = False,
                     step: int = BACKTEST_STEP) -> dict:
     """Assemble the boxed report from already-graded rows.
 
@@ -623,6 +624,10 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
     ``step`` is the walk-forward bar step used to grade backtest rows, used
     to correct sample counts for window overlap (P12.3.3).  Rows that carry
     their own recorded ``step`` (from the store) override it.
+
+    ``quality`` (P12.4) embeds the Backtest Quality Score 0–100 for the
+    same book — same rows, same computation as `python main.py quality`
+    (minus the plateau sweep, which needs re-graded neighbourhoods).
     """
     criteria = criteria or VALIDATION_CRITERIA
     rows = [r for r in rows if r.get("r") is not None]
@@ -681,6 +686,10 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
     }
     if conditioned:
         report["conditioned"] = conditioned_splits(rows, step=step)
+    if quality:
+        from data.quality_score import backtest_quality_score
+        report["quality"] = backtest_quality_score(
+            rows, min_decided=min_decided, criteria=criteria, step=step)
     return report
 
 
@@ -691,6 +700,7 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
                       until_ts: Optional[int] = None,
                       cost_model: Optional[CostModel] = None,
                       conditioned: bool = False,
+                      quality: bool = False,
                       step: int = BACKTEST_STEP) -> dict:
     """Scorecard over what the desk has already graded and stored.
 
@@ -698,6 +708,7 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
     Paper trades exclude simulator samples unless ``include_sim`` — the live
     book and the walk-forward evidence are not the same thing.
     ``since_ts`` / ``until_ts`` bound the signal bar for era-separated runs.
+    ``quality`` (P12.4) embeds the Backtest Quality Score block.
     """
     if source not in ("backtest", "paper", "all"):
         return {"ok": False,
@@ -731,7 +742,8 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
     return build_scorecard(rows, symbol=symbol or "", source=source,
                            min_decided=min_decided,
                            note="stored outcomes (no re-grading)",
-                           conditioned=conditioned, step=step)
+                           conditioned=conditioned, quality=quality,
+                           step=step)
 
 
 def scorecard_from_store(exchange: str = "binance", market: str = "perp",
@@ -741,7 +753,8 @@ def scorecard_from_store(exchange: str = "binance", market: str = "perp",
                          step: int = 3, min_confidence: Optional[int] = None,
                          min_decided: int = DEFAULT_MIN_DECIDED,
                          cost_model: Optional[CostModel] = None,
-                         conditioned: bool = False) -> dict:
+                         conditioned: bool = False,
+                         quality: bool = False) -> dict:
     """Scorecard over a fresh walk-forward grade of the stored series.
 
     Delegates every grading decision to `data.backtester.run_backtest_on_store`
@@ -774,7 +787,8 @@ def scorecard_from_store(exchange: str = "binance", market: str = "perp",
                            source="store", min_decided=min_decided,
                            note=f"fresh walk-forward grade, primary horizon "
                                 f"{primary}h",
-                           conditioned=conditioned, step=step)
+                           conditioned=conditioned, quality=quality,
+                           step=step)
     card["meta"]["bars_read"] = result.get("bars_read")
     card["meta"]["store_path"] = result.get("store_path")
     card["meta"]["primary_horizon_hours"] = primary
@@ -927,4 +941,28 @@ def print_scorecard(report: dict) -> None:
     if v["status"] != "PASS":
         print("  This is a scorecard, not permission. The graduation bar is "
               "unchanged.")
+    # P12.4 — Backtest Quality Score 0–100 (embedded by --quality).
+    q = report.get("quality")
+    if q and q.get("ok") and q.get("quality") is not None:
+        comp = q.get("components") or {}
+        bits = []
+        for key in ("edge", "robustness", "sample"):
+            b = comp.get(key)
+            if b and b.get("score") is not None:
+                bits.append(f"{key} {_fmt(b['score'], '.0f')}")
+        plat = comp.get("plateau")
+        if plat and plat.get("score") is not None:
+            bits.append(f"plateau {_fmt(plat['score'], '.0f')}")
+        else:
+            bits.append("plateau n/a (re-grade sweep via `python main.py quality`)")
+        cap_note = ("  🛑 isolated parameter peak — total CAPPED at 50 "
+                    "(a fit, not an edge)") if q.get("plateau_cap") else ""
+        print("=" * W)
+        print(f"BACKTEST QUALITY  {_fmt(q['quality'], '.1f')}/100  "
+              f"band: {q['band']}   "
+              f"{' · '.join(bits)}")
+        if cap_note:
+            print(cap_note)
+        print("  A quality score reports robustness; it does not grant "
+              "permission. The graduation bar is unchanged.")
     print("=" * W)

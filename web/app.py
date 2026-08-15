@@ -1467,6 +1467,16 @@ async function loadScorecard(){
     html+=`<div class="sep"></div><div class="note">Bar (NET): expectancy ≥ ${scNum(c.expectancy,2,'R')} · win rate &gt; ${scPct(c.win_rate)} · PF ≥ ${c.pf} · decided ≥ ${(d.bar||{}).min_decided}</div>`;
     html+=`<div style="margin-top:6px"><b>VERDICT ${icon} ${esc(v.status||'—')}</b> — ${esc(v.reason||'')}</div>`;
     if(v.status!=='PASS') html+=`<div class="note" style="margin-top:6px">A scorecard reports performance; it does not grant permission. The graduation bar is enforced NET of costs.</div>`;
+    // P12.4 — Backtest Quality Score 0–100 (embedded via /api/scorecard?quality=1)
+    if(d.quality&&d.quality.ok&&d.quality.quality!==null&&d.quality.quality!==undefined){
+      const q=d.quality, cq=q.components||{};
+      const sc=k=>(cq[k]&&cq[k].score!==null&&cq[k].score!==undefined)?scNum(cq[k].score,0):'—';
+      html+=`<div class="sep"></div><div style="margin-top:8px"><b>BACKTEST QUALITY (P12.4) ${scNum(q.quality,1,'/100')} — ${esc(q.band||'')}</b>`+
+        `<div class="note">edge ${sc('edge')} · robustness ${sc('robustness')} · sample ${sc('sample')}`+
+        (cq.plateau&&cq.plateau.score!==null&&cq.plateau.score!==undefined?` · plateau ${sc('plateau')}`:' · plateau n/a')+
+        (q.plateau_cap?` · <span class="err">capped — isolated parameter peak</span>`:'')+
+        `</div></div>`;
+    }
     el.innerHTML=html;
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
@@ -2031,6 +2041,7 @@ def make_app() -> Flask:
             sym = request.args.get("symbol") or None
             no_costs = request.args.get("no_costs", "").lower() in ("1", "true", "yes")
             conditioned = request.args.get("conditioned", "").lower() in ("1", "true", "yes")
+            quality = request.args.get("quality", "").lower() in ("1", "true", "yes")
             since = request.args.get("since")
             until = request.args.get("until")
             since_ts = int(since) if since and since.isdigit() else None
@@ -2043,7 +2054,8 @@ def make_app() -> Flask:
                 include_sim=request.args.get("include_sim", "1") != "0",
                 since_ts=since_ts, until_ts=until_ts,
                 cost_model=cost_model,
-                conditioned=conditioned)))
+                conditioned=conditioned,
+                quality=quality)))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False,
                             "error": f"{type(exc).__name__}: {exc}"})

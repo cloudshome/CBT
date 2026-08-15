@@ -10,30 +10,40 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-15 (this session: **P12.3.3 effective sample size shipped** — walk-forward counts divided by window overlap, honest `N_eff` & widened CI/SE, `step` stored on `backtest_results`)
-**Branch:** `arena/01a00417-sky` (session branch fixed by Arena; branched from `origin/main` @ `abed6cc`, the merged P12.6 PR #23)
-**HEAD commit:** `abed6cc` (P12.6 fees-first `E_net` & conditioned expectancy) — this session's P12.3.3 work commits on top of it.
-**Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI); this session's sandbox ran 3.11 (venv `.venv`) — suite green (573 pass / 1 skip)
+**Last updated:** 2026-08-15 (this session: **P12.4 Backtest Quality Score 0–100 shipped** — `data/quality_score.py`: edge / curve-robustness / sample-confidence / BT5 parameter-plateau composite; `python main.py quality` store sweep; `scorecard --quality` on CLI / HTTP / MCP / dashboard)
+**Branch:** `arena/01a00431-sky` (session branch fixed by Arena; branched from `origin/main` @ `e07fa43`, the merged P12.3.3 PR #24)
+**HEAD commit:** `e07fa43` (P12.3.3 effective sample size) — this session's P12.4 work commits on top of it.
+**Python:** 3.11 (venv `.venv` created this session — system Python is PEP 668 externally managed) — suite green (598 pass / 1 skip)
 
-> **This session (`arena/01a00417-sky`): P12.3.3 — effective sample size in the scorecard.**
-> Walk-forward grading steps `step` bars and follows each plan over
-> `horizon_bars` future bars, so consecutive samples overlap heavily — a 24h
-> horizon on 15m bars graded at step 3 shares 96/3 ≈ 32 windows, so "384
-> decided" was really ~12 independent observations. The scorecard now:
-> - **Divides counts by overlap** — `overlap_factor()` / `effective_sample_size()`
->   in `data/scorecard.py` compute `overlap = horizon_bars / step` per row
->   (paper trades = 1.0; unrecorded horizon/timeframe/step = 1.0, never guessed)
->   and `N_eff = Σ 1/overlap_i`, reported as `n_eff` and `overlap`.
-> - **Widens uncertainty honestly** — `SE = σ / √N_eff` and a 95% CI
->   (`expectancy_se`, `expectancy_ci95`, `expectancy_net_se`,
->   `expectancy_net_ci95`) on every stats block, overall and per split.
-> - **Stores the step** — `backtest_results` gained a `step` column (additive
->   migration + save path) so the factor is exact, not assumed.
-> - **Flags, does not change, the floor** — `min_decided` still reads raw N;
->   `n_eff_below_min_decided` surfaces when the honest sample is thin. The
->   floor revisit is the next decision, not this one.
-> Version **2.13.0 → 2.14.0**; MCP `scorecard` **1.6.0 → 1.7.0**.
-> Suite **567 → 573 pass / 1 skip** (+6).
+> **This session (`arena/01a00431-sky`): P12.4 — Backtest Quality Score 0–100.**
+> The scorecard answers *"is this book profitable net of costs, with honest
+> overlap-corrected uncertainty?"* — P12.4 answers *"is it robust, or did it
+> win by luck?"* A composite 0–100 so a fragile high-PnL curve cannot look
+> like a pass (F5 / BT5), scoring the now-real net-of-costs (P12.6),
+> overlap-corrected (P12.3.3) data:
+> - **`data/quality_score.py`** — pure `backtest_quality_score(rows, …)`;
+>   four weighted components, each 0–100, degraded to `None` rather than a
+>   guess when the sample cannot support them:
+>   - **edge** (35%) — E_net vs the bar (+0.50R → 50, 2× bar → 100), ×0.85
+>     per miss when WR_net ≤ 55% or PF_net < 1.5 (the bar is all three);
+>   - **robustness** (35%) — top-5 wins' share of gross wins (a 5-trade
+>     streak must not BE the edge), max-DD ÷ |total R| (giving back half
+>     the profit is fragile), chronological segment consistency (profits
+>     must persist, not arrive in one burst);
+>   - **sample** (20%) — N_eff vs min_decided + where the 95% CI of E_net
+>     sits relative to break-even;
+>   - **plateau** (10%) — the BT5 parameter-plateau test: re-grade the
+>     stored series at `min_confidence ± 5`; a setup that only wins at one
+>     isolated parameter point **caps the total at 50** (`plateau_cap`).
+> - **`python main.py quality`** — store-only plateau sweep (like the locked
+>   P12.1 protocol): base point guaranteed even when offsets clamp onto it,
+>   points deduplicated; `grade_fn` injectable so CI stays offline.
+> - **Surfaces (invariant #10):** `scorecard --quality` embeds the block
+>   (edge/robustness/sample; plateau n/a without the re-grade sweep),
+>   `GET /api/scorecard?quality=1`, the `STRATEGY SCORECARD` dashboard card,
+>   and MCP `scorecard` gained a `quality` argument.
+> Version **2.14.0 → 2.15.0**; MCP `SERVER_VERSION` **1.7.0 → 1.8.0**.
+> Suite **573 → 598 pass / 1 skip** (+25: `tests/test_quality_score.py`).
 
 > **Prior session (`arena/01a003f9-sky`, merged as PR #23): P12.6 — fees-first `E_net` & conditioned expectancy.**
 > Costs are now integrated into every performance measurement across the desk:
@@ -118,20 +128,20 @@ Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
 (our own stored market history — ✅ P10.1–P10.12 shipped, with real market
 data imported and verified; research validation proof — 🔄 P12.1–P12.6 &
-P12.3.3 shipped;
-next is **P12.4 backtest quality score**, then P12.5/P12.7). Every phase
-below is ordered by how directly it moves those two lines.
+P12.3.3 & P12.4 shipped;
+next is **P12.5 strategy score on the calibrator**, then P12.7). Every
+phase below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.3.3 effective sample size shipped.**
+**P12 (SKY Quant Validation Engine) — P12.4 backtest quality score shipped.**
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real data and the graduation gate is honestly closed (+0.348R gross,
 negative net on 1h/4h primary). Freqtrade rejected (F1–F8); Backtrader
-rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.4 (backtest quality score)**
-→ P12.5 → P12.7.
+rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.5 (strategy score on
+the calibrator)** → P12.7.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -146,7 +156,7 @@ rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.4 (backtest quality scor
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.3.3 shipped — effective sample size** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; **P12.3.3: `N_eff = N / overlap`, widened CI/SE, `step` stored on `backtest_results`**). Next: **P12.4 backtest quality score**. |
+| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.4 shipped — Backtest Quality Score 0–100** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; P12.3.3 `N_eff`/CI; **P12.4: `data/quality_score.py` edge/robustness/sample/plateau composite + `python main.py quality` plateau sweep + `scorecard --quality` on all surfaces**). Next: **P12.5 strategy score on the calibrator**. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -154,6 +164,44 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 ---
 
 ## Completed work
+
+### Session 2026-08-15 (this branch `arena/01a00431-sky`): P12.4 — Backtest Quality Score 0–100
+
+Branched from `main` @ `e07fa43` (PR #24 merged). 0 regressions.
+Tests **573 → 598 pass / 1 skip** (+25). Version **2.14.0 → 2.15.0**.
+MCP `SERVER_VERSION` **1.7.0 → 1.8.0**.
+
+**What shipped:**
+- `data/quality_score.py` (new module) — pure `backtest_quality_score(rows, …)`:
+  edge (E_net vs bar, shape-discounted), curve robustness (top-5
+  concentration / max-DD ÷ |total R| / chronological segments), sample
+  confidence (N_eff vs min_decided + CI95 significance), and the BT5
+  parameter-plateau test that caps an isolated-peak edge at 50. Empty
+  books degrade to `quality: None` with a reason.
+- `run_quality_sweep()` + `python main.py quality` — store-only plateau
+  sweep re-grading `min_confidence ± 5` (clamped [40, 90], deduplicated,
+  base point guaranteed; `grade_fn` injectable for offline tests).
+- `data/scorecard.py` — `build_scorecard(..., quality=True)` embeds the
+  block; `scorecard_from_db` / `scorecard_from_store` forward the flag;
+  `print_scorecard` prints it.
+- `main.py` — `scorecard --quality`; new `quality` subcommand.
+- `web/app.py` — `/api/scorecard?quality=1`; dashboard `STRATEGY SCORECARD`
+  card renders the quality block.
+- `mcp_server.py` — `scorecard` tool `quality` argument; v1.8.0.
+- Tests: 25 new (`tests/test_quality_score.py`).
+
+**Measured on the demo store (sample CSV, 500 × 15m bars, spot):**
+- `scorecard --source store --quality` → **25.9/100 fragile** (edge 0,
+  robustness 38, sample 50, plateau n/a) — a losing book scores like a
+  losing book.
+- `quality` → **23.3/100 fragile**, plateau 0.0 (0/3 conf points
+  positive), `plateau_cap: True` — the isolated-peak guard is live.
+
+**Files changed:** `data/quality_score.py` (new), `data/scorecard.py`,
+`main.py`, `web/app.py`, `mcp_server.py`, `tests/test_quality_score.py`
+(new), `pyproject.toml`, `CHANGELOG.md`, `TODO.md`, `README.md`,
+`docs/DATA_INFRASTRUCTURE_ROADMAP.md`, `docs/HANDOVER_2026-08-15_P12_4.md`
+(new), `SESSION_STATE.md`.
 
 ### Session 2026-08-15 (this branch `arena/01a003f9-sky`): P12.6 — fees-first `E_net` & conditioned expectancy
 
@@ -192,19 +240,16 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
-1. **TODO-13 (P12.4) — Backtest Quality Score 0–100.**
-   Fragile high-PnL curves score low; parameter-plateau test caps
-   isolated-peak parameters (`+` BT5). Now scores something real
-   (net-of-costs, overlap-corrected).
-2. **TODO-13 (P12.5) — Strategy Score on the calibrator.**
-   `E_R × sample-quality × regime-fit × execution`.
-3. **TODO-13 (P12.7) — Monte Carlo ruin & risk-of-ruin table.**
-4. **TODO-7** — human pastes the wheel-gate job into the **real**
+1. **TODO-13 (P12.5) — Strategy Score on the calibrator.**
+   `E_R × sample-quality × regime-fit × execution` (P12.4's quality score
+   becomes the "sample-quality" input the audits' formula demands).
+2. **TODO-13 (P12.7) — Monte Carlo ruin & risk-of-ruin table.**
+3. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
-5. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
-6. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
+4. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
+5. **TODO-11 (P11)** — continue the paper-book grind/live-data proof;
    the graduation bar remains closed and unchanged.
-7. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
+6. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
 
 ---
 
@@ -219,7 +264,7 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    committed sample data is stale by design. Expected offline.
 5. **Arena cannot push under `.github/workflows/`.** The wheel-gate
    job spec lives at `docs/.github/workflows/ci.yml` (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.14.0.
+6. **`CHANGELOG.md` is current** through v2.15.0.
 7. **Real market data is imported offline**: Binance spot BTCUSDT 1m
    (696,960 bars, sha256-pinned `c4ad6029…b934b7`). The store is
    gitignored; re-import with `backfill --from-csv` if starting in a clean sandbox.
@@ -229,34 +274,39 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    reports `N_eff = N / overlap` and widened CI/SE. The `min_decided`
    floor still reads raw N (flagged via `n_eff_below_min_decided`) — the
    floor revisit is the next decision, not this one.
-10. **Freqtrade was reviewed and rejected (F1–F8)** (`docs/FREQTRADE_REVIEW.md`).
-11. **Backtrader was reviewed and rejected (BT1–BT8)** (`docs/BACKTRADER_REVIEW.md`).
+10. **P12.4 quality scores what P12.6/P12.3.3 made real**: the plateau
+    sweep (`python main.py quality`) re-grades the stored series at
+    `min_confidence ± 5` — on a clean sandbox with no store it returns a
+    clear error, never a score. The `scorecard --quality` block shows
+    "plateau n/a" without that re-grade sweep.
+11. **Freqtrade was reviewed and rejected (F1–F8)** (`docs/FREQTRADE_REVIEW.md`).
+12. **Backtrader was reviewed and rejected (BT1–BT8)** (`docs/BACKTRADER_REVIEW.md`).
 
 ---
 
 ## Next recommended action
 
-1. Next *code* session: **P12.4 — backtest quality score 0–100.**
-   Fragile high-PnL curves score low; parameter-plateau test caps
-   isolated-peak parameters (`+` BT5). Now scores real, net-of-costs,
-   overlap-corrected data.
+1. Next *code* session: **P12.5 — Strategy Score on the calibrator.**
+   `E_R × sample-quality × regime-fit × execution` — P12.4's quality score
+   is the "sample-quality" input; the calibrator (`brain/calibrator.py`)
+   turns a setup's calibration profile + P12.4 quality into one score.
 2. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 3. Do **not** install Freqtrade or Backtrader. Do not loosen the graduation bar.
 
-Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_3_3.md`](docs/HANDOVER_2026-08-15_P12_3_3.md).
+Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_4.md`](docs/HANDOVER_2026-08-15_P12_4.md).
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm the P12.3.3 PR merged. P12.1, P12.2, P12.3, P12.3.1, P12.3.2,
-> P12.6, and P12.3.3 are shipped: do not redo the locked protocol, the
-> negative-shift guard, the boxed scorecard, the tie-break, the real data
-> import, trade cost modeling, or the overlap-corrected effective sample
-> size. Implement **P12.4 — backtest quality score**: score the robustness of
-> the curve (fragile high-PnL curves score low) and run the parameter-plateau
-> test that caps isolated-peak parameters, over the now-real net-of-costs,
-> overlap-corrected data. Keep the existing grader/store, do not adopt
-> Freqtrade or Backtrader, and do not loosen the graduation bar.
+> and confirm the P12.4 PR merged. P12.1, P12.2, P12.3, P12.3.1, P12.3.2,
+> P12.6, P12.3.3, and P12.4 are shipped: do not redo the locked protocol,
+> the negative-shift guard, the boxed scorecard, the tie-break, the real
+> data import, trade cost modeling, the overlap-corrected effective sample
+> size, or the Backtest Quality Score. Implement **P12.5 — strategy score
+> on the calibrator**: `E_R × sample-quality × regime-fit × execution`,
+> where sample-quality reads P12.4's `backtest_quality_score()`. Keep the
+> existing grader/store, do not adopt Freqtrade or Backtrader, and do not
+> loosen the graduation bar.
 
 ---
 
@@ -265,13 +315,13 @@ Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_3_3.md`](doc
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 567 passed, 1 skipped
+# 598 passed, 1 skipped
 ```
 
 Wheel gate:
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.13.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.15.0-py3-none-any.whl ; no duplicate entries
 ```
 
 Readiness strip:
@@ -282,22 +332,24 @@ curl -s localhost:8080/api/readiness               # HTTP
 # MCP: tools/call {"name": "readiness", "arguments": {}}
 ```
 
-Scorecard with costs (P12.6):
+Scorecard with costs (P12.6) + quality (P12.4):
 ```bash
 python main.py scorecard --source store --market spot --symbol BTCUSDT --tf 15m --bars 1000
 python main.py scorecard --source store --market spot --symbol BTCUSDT --tf 15m --bars 500 --conditioned
+python main.py scorecard --source db --quality        # embed the quality block (no plateau)
+python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau sweep (store-only)
 ```
 
 ## Last commit
 
 ```
+(THIS SESSION) feat(P12.4): backtest quality score 0-100, plateau sweep & scorecard surfaces
+e07fa43 feat(P12.3.3): effective sample size in the scorecard (#24)
 c91ac9e feat(P12.6): fees-first E_net, trade costs engine & conditioned expectancy
-58ed864 feat(P12.3.2): real market data — first real BTCUSDT 1m, P11/P12.1/P12.3 re-run (#22)
-f403ed4 feat(P12.3): boxed strategy scorecard on CLI, dashboard and MCP (#21)
 ```
 
-P12.6 is committed on `arena/01a003f9-sky`, pushed to origin, and the
-session PR **#23** is open against `main` — the human merges it. See
+P12.4 is committed on `arena/01a00431-sky`, pushed to origin, and the
+session PR is open against `main` — the human merges it. See
 `git log --oneline -3`.
 
 ---
@@ -353,18 +405,19 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.3.3 shipped**
-   (effective sample size: `N_eff = N / overlap`, widened CI/SE, `step` stored).
-2. [x] Run `.venv/bin/python -m pytest tests/ -q` — **573 pass / 1 skip**
-   (+6: `test_scorecard.py` P12.3.3 tests).
+1. [x] Finish or safely stop the current task. — **P12.4 shipped**
+   (Backtest Quality Score 0–100: edge / robustness / sample / plateau,
+   `python main.py quality` sweep, `scorecard --quality` everywhere).
+2. [x] Run `.venv/bin/python -m pytest tests/ -q` — **598 pass / 1 skip**
+   (+25: `tests/test_quality_score.py`).
 3. [x] Fix any obvious failures. — none left open.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.3.3 marked shipped; P12.4 is next.
-6. [x] Update `CHANGELOG.md` — 2.14.0 P12.3.3 entry.
+5. [x] Update `TODO.md` — P12.4 marked shipped; P12.5 is next.
+6. [x] Update `CHANGELOG.md` — 2.15.0 P12.4 entry.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` — commit and push to `origin/arena/01a00417-sky`.
+11. [x] `git add` / `git commit` — commit and push to `origin/arena/01a00431-sky`.
 12. [x] Open the session PR as the closing step — PR from
-    `arena/01a00417-sky` → `main` (P12.3.3).
+    `arena/01a00431-sky` → `main` (P12.4).
