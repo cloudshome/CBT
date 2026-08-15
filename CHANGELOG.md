@@ -10,6 +10,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.17.0] — 2026-08-15 · branch `arena/01a0046d-sky`
+
+MINOR bump: **P12.7 — Monte Carlo risk-of-ruin table.**
+
+The scorecard says whether the book is profitable net of costs; P12.7 adds
+*how much size the live book can survive*. It resamples the decided
+paper-trade outcomes (NET of costs) and sweeps position size to expose
+expected maximum drawdown, ruin probability, longest losing streak and
+median time-to-recovery — all from one computation in
+`brain/analytics.py` and surfaced everywhere the desk already looks
+(invariant #10).
+
+### Added
+- **`brain/analytics.py` → `monte_carlo_ruin_table()`** — resamples net
+  realised R outcomes (costs included; `data.costs.calculate_trade_cost`
+  fills missing `rr_net` values) and returns:
+  - per risk-% row: expected DD %, ruin probability, prob final equity
+    below start, terminal median/p5/p95, median longest loss streak,
+    median/mean time-to-recovery (trades);
+  - historical block: actual longest losing streak, median/max TTR, and
+    max drawdown from the observed net sequence.
+- **CLI** — `python main.py monte [--risk-pcts ...] [--ruin-threshold 50]
+  [--samples N] [--seed N] [--json]` prints the boxed table; `python
+  main.py risk` now points the user to it.
+- **HTTP** — `GET /api/monte` and the `monte` key embedded in `GET
+  /api/risk`.
+- **MCP** — root `mcp_server.py` risk tool embeds `ruin_table`;
+  `ai/mcp_server.py` adds `cryptobrain_monte` tool alongside
+  `cryptobrain_risk` (also augmented with `ruin_table`).
+- **Dashboard** — Risk gate card renders the Monte Carlo sweep table plus
+  historical streak / TTR / drawdown when data is available.
+- Tests: `tests/test_monte_carlo.py` — empty book, structure, drawdown
+  scaling with size, seed determinism, historical streak, sim-sample
+  exclusion, direct `rows=` input. Suite **613 → 620 pass / 1 skip** (+7).
+
+### Changed
+- `config.py` and `pyproject.toml`: `VERSION` **2.16.0 → 2.17.0**.
+- Root MCP server version: **1.8.0 → 1.9.0**.
+- `tests/test_mcp_server.py`: `cryptobrain_monte` added to `TOOL_NAMES`.
+
+---
+
 ## [2.16.0] — 2026-08-15 · branch `arena/01a00446-sky`
 
 MINOR bump: **P12.5 — Strategy Score on the calibrator.**

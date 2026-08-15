@@ -1,6 +1,6 @@
 """Risk / execution analytics built on the decided-paper book.
 
-Two tools for the "what is my real risk / edge" question that the single
+Tools for the "what is my real risk / edge" question that the single
 profit-factor number cannot answer:
 
   * mae_mfe_summary — how far against / for did each trade go, in R?  Tells
@@ -11,6 +11,11 @@ profit-factor number cannot answer:
     times to get a *distribution* of terminal equity and drawdown, not a single
     hopeful backtest line.  This is the honest picture of variance before you
     trust PROGRESSION=micro.
+
+  * monte_carlo_ruin_table — sweep position size (risk %/trade) and read off
+    the expected maximum drawdown, risk-of-ruin, longest losing streak and
+    median time-to-recovery.  Uses NET realised R so costs are inside the
+    estimate (P12.7).
 """
 
 from __future__ import annotations
@@ -169,4 +174,204 @@ def monte_carlo_equity(db, start: float = 10_000.0, risk_pct: float = None,
             "median_pct": round(float(np.median(max_dds)) * 100, 2),
             "p95_pct": round(float(np.percentile(max_dds, 95)) * 100, 2),
         },
+    }
+
+
+def _net_outcome(row: dict) -> float:
+    """Return the net R for a decided paper row, computing costs if needed."""
+    rr = float(row.get("rr_achieved") or 0.0)
+    rr_net = row.get("rr_net")
+    if rr_net is not None:
+        return float(rr_net)
+
+    from data.costs import calculate_trade_cost
+
+    opened = row.get("opened_ts")
+    closed = row.get("closed_ts")
+    hold_hours = None
+    if opened and closed and closed >= opened:
+        hold_hours = (closed - opened) / 3_600_000.0
+
+    cost = calculate_trade_cost(
+        entry=row.get("entry"),
+        stop_loss=row.get("stop_loss"),
+        action=row.get("action", "BUY"),
+        gross_r=rr,
+        holding_hours=hold_hours,
+        symbol=row.get("symbol", "BTCUSDT"),
+        ts=closed or opened,
+    )
+    return cost.net_r
+
+
+def _historical_metrics(rows: list[dict]) -> dict:
+    """Longest loss streak and time-to-recovery from the actual net equity curve."""
+    outcomes = [_net_outcome(r) for r in rows]
+
+    # longest losing streak
+    cur = max_l = 0
+    for rr in outcomes:
+        if rr <= 0:
+            cur += 1
+            max_l = max(max_l, cur)
+        else:
+            cur = 0
+
+    # time-to-recovery in trades from a peak to the next new high
+    peak = 1.0
+    equity = 1.0
+    in_dd = False
+    rec_count = 0
+    recoveries = []
+    for rr in outcomes:
+        equity *= (1.0 + rr * 0.01)  # use 1% as a normalised unit; we only want trades
+        if equity > peak:
+            if in_dd:
+                recoveries.append(rec_count)
+            peak = equity
+            in_dd = False
+            rec_count = 0
+        elif equity < peak:
+            in_dd = True
+            rec_count += 1
+
+    # max drawdown from the same normalised curve
+    peak = 1.0
+    max_dd = 0.0
+    equity = 1.0
+    for rr in outcomes:
+        equity *= (1.0 + rr * 0.01)
+        peak = max(peak, equity)
+        if peak:
+            max_dd = max(max_dd, 1.0 - equity / peak)
+
+    return {
+        "longest_loss_streak": max_l,
+        "median_time_to_recovery_trades": (round(float(np.median(recoveries)), 1)
+                                           if recoveries else 0.0),
+        "max_time_to_recovery_trades": (max(recoveries) if recoveries else 0),
+        "max_drawdown_pct": round(max_dd * 100, 2),
+    }
+
+
+def monte_carlo_ruin_table(
+    db=None,
+    rows: Optional[list[dict]] = None,
+    start: float = 10_000.0,
+    risk_percents: tuple[float, ...] = (0.25, 0.5, 1.0, 1.5, 2.0),
+    ruin_threshold_pct: float = 50.0,
+    samples: int = 2_000,
+    seed: Optional[int] = None,
+) -> dict:
+    """Risk-of-ruin sweep across position sizes using NET realised outcomes.
+
+    For each ``risk_pct`` the function simulates ``samples`` equity curves by
+    resampling the decided paper-trade net outcomes with replacement.  It
+    reports:
+
+      * expected maximum drawdown
+      * ruin probability (max drawdown >= ``ruin_threshold_pct``)
+      * probability the curve is below its starting equity at the end
+      * median / p5 / p95 terminal equity
+      * median longest losing streak (trades)
+      * median time-to-recovery (trades)
+
+    It also returns the same metrics computed on the actual historical net
+    sequence (longest losing streak and time-to-recovery), because the live
+    book already experienced one path and that path matters to the desk.
+
+    Simulator walk-forward samples are excluded — this is a live-book risk
+    read, not a backtest variance read.
+    """
+    if rows is None:
+        if db is None:
+            return {"available": False, "note": "no database or rows provided"}
+        rows = db.decided_paper_rows(exclude_sim=True)
+
+    rows = [r for r in rows if r.get("rr_achieved") is not None]
+    if not rows:
+        return {"available": False, "note": "no decided paper trades yet"}
+
+    outcomes = [_net_outcome(r) for r in rows]
+    n = len(outcomes)
+    rng = np.random.default_rng(seed)
+    ruin_frac = ruin_threshold_pct / 100.0
+    historical = _historical_metrics(rows)
+
+    table = []
+    for risk_pct in risk_percents:
+        growth = risk_pct / 100.0
+        max_dds = np.zeros(samples)
+        terminals = np.zeros(samples)
+        max_loss_streaks = np.zeros(samples, dtype=int)
+        time_to_recovery = np.zeros(samples, dtype=int)
+
+        for s in range(samples):
+            perm = rng.choice(outcomes, size=n, replace=True)
+            equity = start
+            peak = start
+            dd = 0.0
+
+            # longest losing streak
+            cur_l = max_l = 0
+            # time-to-recovery
+            in_dd = False
+            rec_count = 0
+            ttr_peak = start
+
+            for rr in perm:
+                equity *= (1.0 + rr * growth)
+                if equity > peak:
+                    peak = equity
+                dd = max(dd, 1.0 - equity / peak)
+
+                # streaks (net outcome <= 0 is a loss)
+                if rr <= 0:
+                    cur_l += 1
+                    max_l = max(max_l, cur_l)
+                else:
+                    cur_l = 0
+
+                # time-to-recovery from a previous peak
+                if equity > ttr_peak:
+                    if in_dd:
+                        time_to_recovery[s] = max(time_to_recovery[s], rec_count)
+                    ttr_peak = equity
+                    in_dd = False
+                    rec_count = 0
+                elif equity < ttr_peak:
+                    in_dd = True
+                    rec_count += 1
+
+            terminals[s] = equity
+            max_dds[s] = dd
+            max_loss_streaks[s] = max_l
+
+        ruin_prob = round(float(np.mean(max_dds >= ruin_frac)), 3)
+        below_start_prob = round(float(np.mean(terminals < start)), 3)
+        median_ttr = round(float(np.median(time_to_recovery)), 1)
+        mean_ttr = round(float(np.mean(time_to_recovery)), 1)
+
+        table.append({
+            "risk_pct": risk_pct,
+            "expected_dd_pct": round(float(np.mean(max_dds)) * 100, 2),
+            "ruin_prob": ruin_prob,
+            "prob_below_start": below_start_prob,
+            "terminal_median": round(float(np.median(terminals)), 2),
+            "terminal_p5": round(float(np.percentile(terminals, 5)), 2),
+            "terminal_p95": round(float(np.percentile(terminals, 95)), 2),
+            "max_loss_streak_median": int(np.median(max_loss_streaks)),
+            "max_loss_streak_p95": int(np.percentile(max_loss_streaks, 95)),
+            "time_to_recovery_median_trades": median_ttr,
+            "time_to_recovery_mean_trades": mean_ttr,
+        })
+
+    return {
+        "available": True,
+        "start": start,
+        "ruin_threshold_pct": ruin_threshold_pct,
+        "n_trades": n,
+        "samples": samples,
+        "historical": historical,
+        "table": table,
     }

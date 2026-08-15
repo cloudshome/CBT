@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-15 (this session: **P12.5 shipped — Strategy Score on the calibrator**: `data/strategy_score.py` scores every calibration key 0–100 as `E_R × sample-quality × regime-fit × execution` (weighted geometric mean, NET of costs) where sample-quality is P12.4's `backtest_quality_score()` in full; the calibrator multiplier is now a trust dial `mult = clamp(1 + E_gross × gain × trust, …)` with `trust = clamp(score/50, 0.6, 1.5)` — a fragile curve can no longer earn a boost on gross expectancy alone. Surfaces: `learn` CLI, `/api/learning`, dashboard Calibration card. Next *code* is **P12.7 — MC ruin / worst streak / risk-of-ruin table**)
+**Last updated:** 2026-08-15 (this session: **P12.7 shipped — Monte Carlo risk-of-ruin table**: `brain/analytics.monte_carlo_ruin_table()` resamples NET realised paper outcomes to produce a `risk% × expected DD × ruin probability` sweep plus longest losing streak and time-to-recovery, surfaced through CLI `monte`, HTTP `/api/monte` + embedded in `/api/risk`, MCP `cryptobrain_monte` + `cryptobrain_risk.ruin_table`, and the dashboard Risk card. Suite green: **620 pass / 1 skip**.)
 
 ---
 
@@ -44,7 +44,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1–P12.3.2, P12.6, P12.3.3, **P12.4**, **P12.5** shipped — fees-first `E_net` & net bar, overlap-corrected `N_eff` & widened CIs, Backtest Quality Score 0–100, strategy score on the calibrator; next P12.7) |
+| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1–P12.3.2, P12.6, P12.3.3, **P12.4**, **P12.5**, **P12.7** shipped — fees-first `E_net` & net bar, overlap-corrected `N_eff` & widened CIs, Backtest Quality Score 0–100, strategy score on the calibrator, MC ruin/streak/TTR table) |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -58,23 +58,16 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-15, this session):** **P12.5 shipped — Strategy
-> Score on the calibrator.** The scorecard answers *"is this book
-> profitable net of costs, with honest overlap-corrected uncertainty?"*,
-> P12.4 answers *"is it robust, or did it win by luck?"*, and P12.5
-> answers *"how much of this setup's observed edge should the engine
-> trust to repeat — in this regime, at these costs?"*:
-> `data/strategy_score.py` scores each calibration key 0–100 as
-> `E_R × sample-quality × regime-fit × execution` (weighted geometric
-> mean — a zero on any axis zeroes the score) where sample-quality is
-> **P12.4's `backtest_quality_score()` in full**; the calibrator
-> multiplier is now a trust dial
-> (`mult = clamp(1 + E_gross × gain × trust, …)`,
-> `trust = clamp(score/50, 0.6, 1.5)`). Surfaces: `learn` CLI (describe +
-> `--json`), `/api/learning`, dashboard Calibration card. Next *code*
-> build is **P12.7 — Monte Carlo ruin / worst streak / risk-of-ruin
-> table** (`risk% × expected DD × ruin probability` on the existing
-> resampler).
+> **Order note (2026-08-15, this session):** **P12.7 shipped — Monte
+> Carlo risk-of-ruin table.** `brain/analytics.monte_carlo_ruin_table()`
+> resamples the NET realised paper book (costs included) and sweeps
+> position size so the desk can read off expected max drawdown, ruin
+> probability, longest losing streak and time-to-recovery for any risk
+> %/trade. Surfaces: CLI `python main.py monte`, HTTP `GET /api/monte`
+> (also embedded in `/api/risk`), MCP `cryptobrain_monte` plus
+> `ruin_table` inside `cryptobrain_risk`, and the dashboard Risk card.
+> One computation (`brain/analytics.py`), many surfaces (invariant #10).
+> Suite green: **620 pass / 1 skip**. Next *code* build TBD from backlog.
 
 ### TODO-15 / P12.6 · Fees-first `E_net` & conditioned expectancy · ✅ shipped
 
@@ -101,6 +94,7 @@ order changed as a result.
 | **P12.3.3** | effective sample size in the scorecard | ✅ **shipped** — `N_eff = N / overlap`, widened CI/SE, `step` stored | S |
 | **P12.4** | backtest quality score 0–100 | ✅ **shipped** — `data/quality_score.py` + `python main.py quality` (plateau sweep) + `scorecard --quality` on all surfaces | M |
 | P12.5 | strategy score on the calibrator | ✅ **shipped** — `data/strategy_score.py` + trust-dial multiplier on the calibrator; `learn` / `/api/learning` / dashboard | M |
+| **P12.7** | **MC ruin / worst streak / risk-of-ruin table** | ✅ **shipped** — `brain/analytics.monte_carlo_ruin_table()` (NET outcomes); CLI `monte`; HTTP `/api/monte`; MCP `cryptobrain_monte` + `ruin_table`; dashboard Risk card | M |
 | micro-live | trivial size | slippage / partial fills / latency can only be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
@@ -280,7 +274,7 @@ train/val/OOS windows have real multi-window history to split.
 | P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ✅ **shipped** — `data/quality_score.py`, `python main.py quality`, `scorecard --quality`, MCP `scorecard quality` (v1.8.0), 25 tests |
 | P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) | ✅ **shipped** — `data/strategy_score.py` (weighted geometric mean, NET of costs; sample-quality = P12.4 in full) + `multiplier_from_score()` trust dial on `brain/calibrator.py`; `learn` CLI / `/api/learning` / dashboard Calibration card; 15 tests |
 | **P12.6** | Conditioned + net-of-costs expectancy | **Fees/spread first** (≈ 40× funding at a 1.8h hold), then OI / funding / CVD / regime from our store: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T (`+` BT5) | ✅ **shipped** — `data/costs.py`, `E_net` on all surfaces, net bar |
-| P12.7 | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) | ⏳ |
+| **P12.7** | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) | ✅ **shipped** — `brain/analytics.monte_carlo_ruin_table()` (NET outcomes); CLI `monte`; HTTP `/api/monte` + embedded in `/api/risk`; MCP `cryptobrain_monte` + `ruin_table` in `cryptobrain_risk`; dashboard Risk card; 7 tests |
 
 **Not in P12:** Hyperopt, FreqAI, Backtrader optimization or a second
 backtest engine (BT4/BT7), ML direction-prediction, a strategy-module
@@ -444,8 +438,8 @@ One readiness verdict across channels + immune system + risk gate
 | TODO-7 | Paste the wheel-gate job into the real `.github/workflows/ci.yml` | human |
 | TODO-8 | Protect `main` (require PR, no direct push) | human / recommend yes |
 
-D1–D5, **F1–F8** and **BT1–BT8** are already recorded. Do **not**
-start TODO-9/TODO-10/TODO-13 this session. Do **not** reopen F1–F3 or
+D1–D5, **F1–F8** and **BT1–BT8** are already recorded. P12 is complete;
+no further quant-engine TODOs are active. Do **not** reopen F1–F3 or
 BT1–BT4 to install a trading bot or a second backtest engine.
 
 ---

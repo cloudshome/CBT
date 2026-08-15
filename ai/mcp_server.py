@@ -71,10 +71,20 @@ def _morning(symbols: list[str] | None, timeframe: str, bars: int) -> dict:
 def _risk() -> dict:
     from data.database import SignalDB
     from brain.risk_gate import evaluate
+    from brain.analytics import monte_carlo_ruin_table
     with SignalDB() as db:
         gate = evaluate(db)
+        gate["ruin_table"] = monte_carlo_ruin_table(db)
         return {"allowed": gate["allowed"], "blocked_by": gate.get("blocked_by", []),
-                "details": gate.get("details", {})}
+                "details": gate.get("details", {}),
+                "ruin_table": gate["ruin_table"]}
+
+
+def _monte(samples: int = 2000, seed: int | None = None) -> dict:
+    from data.database import SignalDB
+    from brain.analytics import monte_carlo_ruin_table
+    with SignalDB() as db:
+        return monte_carlo_ruin_table(db, samples=samples, seed=seed)
 
 
 def _ask(question: str, symbol: str | None, timeframe: str) -> dict:
@@ -152,8 +162,19 @@ TOOLS = [
     {
         "name": "cryptobrain_risk",
         "description": "Risk & discipline gate: daily/weekly limits, drawdown ladder, "
-                       "trader-state flags, progression level.",
+                       "trader-state flags, progression level. Includes a Monte Carlo "
+                       "risk-of-ruin table (expected DD / ruin prob / streak / TTR).",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "cryptobrain_monte",
+        "description": "Monte Carlo risk-of-ruin sweep across risk %/trade. Returns "
+                       "expected max drawdown, ruin probability, longest losing streak "
+                       "and time-to-recovery using NET realised paper outcomes.",
+        "inputSchema": {"type": "object", "properties": {
+            "samples": {"type": "integer", "default": 2000},
+            "seed": {"type": "integer"},
+        }, "additionalProperties": False},
     },
     {
         "name": "cryptobrain_ask",
@@ -201,6 +222,11 @@ def _call_tool(name: str, arguments: dict | None) -> dict:
         return _desk(args.get("symbol", "BTCUSDT"), args.get("timeframe", "15m"), 500)
     if name == "cryptobrain_risk":
         return _risk()
+    if name == "cryptobrain_monte":
+        return _monte(
+            samples=int(args.get("samples", 2000)),
+            seed=int(args["seed"]) if args.get("seed") is not None else None,
+        )
     if name == "cryptobrain_ask":
         return _ask(args.get("question", ""), args.get("symbol"), "15m")
     if name == "cryptobrain_pending":

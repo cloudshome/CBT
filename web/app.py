@@ -1135,7 +1135,37 @@ async function loadRiskGate(){
           <b>Samples</b><span>${kelly.n_trades||0} trades</span>
           <b>Cap</b><span>${kelly.max_risk_pct}%</span></div></div>`;
     }
-    html+=`<div class="note" style="margin-top:8px">Enforced at approval + paper runner. CLI: <code>python main.py risk</code> · <code>python main.py tradestate</code> · <code>python main.py journal</code></div>`;
+    const monte=d.monte;
+    if(monte && monte.available){
+      html+=`<div style="margin-top:12px;background:rgba(255,255,255,.04);padding:10px;border-radius:12px;border:1px solid var(--line)">
+        <b style="color:var(--amber)">Monte Carlo Risk Sweep (NET of costs)</b>
+        <div style="overflow-x:auto;margin-top:6px">
+          <table style="width:100%;font-size:12px;border-collapse:collapse">
+            <thead><tr style="border-bottom:1px solid var(--line)">
+              <th style="text-align:left;padding:4px">risk%</th>
+              <th style="text-align:right;padding:4px">exp DD%</th>
+              <th style="text-align:right;padding:4px">ruin%</th>
+              <th style="text-align:right;padding:4px">below0%</th>
+              <th style="text-align:right;padding:4px">term median</th>
+              <th style="text-align:right;padding:4px">loss streak</th>
+              <th style="text-align:right;padding:4px">TTR</th>
+            </tr></thead><tbody>`;
+      for(const r of monte.table){
+        html+=`<tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+          <td style="padding:4px">${r.risk_pct.toFixed(2)}</td>
+          <td style="text-align:right;padding:4px">${r.expected_dd_pct.toFixed(2)}%</td>
+          <td style="text-align:right;padding:4px">${(r.ruin_prob*100).toFixed(1)}%</td>
+          <td style="text-align:right;padding:4px">${(r.prob_below_start*100).toFixed(1)}%</td>
+          <td style="text-align:right;padding:4px">${r.terminal_median.toLocaleString()}</td>
+          <td style="text-align:right;padding:4px">${r.max_loss_streak_median}</td>
+          <td style="text-align:right;padding:4px">${r.time_to_recovery_median_trades.toFixed(1)}</td>
+        </tr>`;
+      }
+      html+=`</tbody></table></div>
+        <div class="note" style="margin-top:6px">historical longest loss streak: <b>${monte.historical.longest_loss_streak}</b> · median TTR: <b>${monte.historical.median_time_to_recovery_trades}</b> · historical DD: <b>${monte.historical.max_drawdown_pct}%</b></div>
+      </div>`;
+    }
+    html+=`<div class="note" style="margin-top:8px">Enforced at approval + paper runner. CLI: <code>python main.py risk</code> · <code>python main.py monte</code> · <code>python main.py tradestate</code> · <code>python main.py journal</code></div>`;
     el.innerHTML=html;
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
@@ -1746,19 +1776,47 @@ def make_app() -> Flask:
         from brain.risk_gate import evaluate as gate_evaluate, status_text
         from brain.metrics import business_metrics
         from brain.journal import violation_rate
+        from brain.analytics import monte_carlo_ruin_table
         try:
             with SignalDB() as db:
                 gate = gate_evaluate(db)
                 metrics = business_metrics(db)
                 journal = violation_rate(db)
                 state = db.get_trader_state()
+                monte = monte_carlo_ruin_table(db)
             return jsonify({
                 "gate": gate,
                 "trader_state": state,
                 "metrics": metrics,
                 "journal": journal,
+                "monte": monte,
                 "status_text": status_text.__doc__ or "",
             })
+        except Exception as exc:
+            return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/monte")
+    def api_monte():
+        """Monte Carlo risk-of-ruin table (expected DD / ruin prob / streak / TTR)."""
+        from data.database import SignalDB
+        from brain.analytics import monte_carlo_ruin_table
+        try:
+            samples = request.args.get("samples", type=int) or 2000
+            seed = request.args.get("seed", type=int)
+            ruin = request.args.get("ruin_threshold", type=float) or 50.0
+            rp_raw = request.args.get("risk_pcts", type=str)
+            risk_pcts = None
+            if rp_raw:
+                try:
+                    risk_pcts = tuple(float(x.strip()) for x in rp_raw.split(",") if x.strip())
+                except ValueError:
+                    return jsonify({"error": "risk_pcts must be comma-separated floats"}), 400
+            with SignalDB() as db:
+                result = monte_carlo_ruin_table(
+                    db, risk_percents=risk_pcts or (0.25, 0.5, 1.0, 1.5, 2.0),
+                    ruin_threshold_pct=ruin, samples=min(samples, 20000),
+                    seed=seed)
+            return jsonify(result)
         except Exception as exc:
             return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
 

@@ -948,6 +948,70 @@ def cmd_risk(args) -> int:
     from data.database import SignalDB
     with SignalDB() as db:
         print(status_text(db))
+        print()
+        print("Run `python main.py monte` for the risk-of-ruin table.")
+    return 0
+
+
+def _parse_risk_pcts(s: str | None) -> tuple[float, ...] | None:
+    if not s:
+        return None
+    try:
+        return tuple(round(float(x.strip()), 4) for x in s.split(",") if x.strip())
+    except ValueError:
+        return None
+
+
+def cmd_monte(args) -> int:
+    """Monte Carlo risk-of-ruin table: sweep risk %/trade and read off expected
+    drawdown, ruin probability, longest losing streak and time-to-recovery.
+    Uses NET realised paper outcomes (costs included)."""
+    import json
+    from data.database import SignalDB
+    from brain.analytics import monte_carlo_ruin_table
+
+    risk_pcts = _parse_risk_pcts(args.risk_pcts)
+    with SignalDB() as db:
+        result = monte_carlo_ruin_table(
+            db,
+            risk_percents=risk_pcts or (0.25, 0.5, 1.0, 1.5, 2.0),
+            ruin_threshold_pct=args.ruin_threshold,
+            samples=args.samples,
+            seed=args.seed,
+        )
+
+    if args.json:
+        print(json.dumps(result, indent=2, default=str))
+        return 0 if result.get("available") else 1
+
+    if not result.get("available"):
+        print("MONTE CARLO RISK TABLE — cannot run")
+        print(f"  {result.get('note', 'unknown error')}")
+        return 1
+
+    hist = result["historical"]
+    print("=" * 96)
+    print(f"MONTE CARLO RISK TABLE   start={result['start']:,.0f}   "
+          f"ruin threshold={result['ruin_threshold_pct']}%   "
+          f"samples={result['samples']}   n_trades={result['n_trades']}")
+    print("-" * 96)
+    print(f"  historical longest losing streak: {hist['longest_loss_streak']} trade(s)")
+    print(f"  historical median time-to-recovery: {hist['median_time_to_recovery_trades']} trade(s)")
+    print(f"  historical max drawdown: {hist['max_drawdown_pct']}%")
+    print("-" * 96)
+    header = (f"  {'risk%':>6} {'exp DD%':>9} {'ruin%':>8} {'below0%':>9} "
+              f"{'term median':>12} {'term p5':>11} {'term p95':>11} "
+              f"{'loss streak':>11} {'TTR median':>11}")
+    print(header)
+    for row in result["table"]:
+        print(f"  {row['risk_pct']:>6.2f} {row['expected_dd_pct']:>9.2f} "
+              f"{row['ruin_prob']*100:>7.1f}% {row['prob_below_start']*100:>7.1f}% "
+              f"{row['terminal_median']:>12,.0f} {row['terminal_p5']:>11,.0f} "
+              f"{row['terminal_p95']:>11,.0f} {row['max_loss_streak_median']:>11} "
+              f"{row['time_to_recovery_median_trades']:>11.1f}")
+    print("=" * 96)
+    print("exp DD% = expected maximum drawdown; ruin% = prob drawdown >= ruin threshold;")
+    print("below0% = prob final equity below start; TTR = trades to recover to prior peak.")
     return 0
 
 
@@ -2071,6 +2135,18 @@ def main(argv: list[str] | None = None) -> int:
     p_risk = sub.add_parser("risk", help="risk & discipline gate status (daily/weekly/drawdown/progression)")
     p_risk.set_defaults(func=cmd_risk)
 
+    p_monte = sub.add_parser("monte", help="Monte Carlo risk-of-ruin table (expected DD / ruin prob / streak / TTR)")
+    p_monte.add_argument("--risk-pcts", default="0.25,0.5,1.0,1.5,2.0",
+                         help="comma-separated risk percentages per trade to sweep")
+    p_monte.add_argument("--ruin-threshold", type=float, default=50.0,
+                         help="drawdown % that counts as ruin (default 50)")
+    p_monte.add_argument("--samples", type=int, default=2000,
+                         help="Monte Carlo samples (default 2000)")
+    p_monte.add_argument("--seed", type=int, default=None,
+                         help="RNG seed for reproducible output")
+    p_monte.add_argument("--json", action="store_true", help="raw JSON output")
+    p_monte.set_defaults(func=cmd_monte)
+
     p_st2 = sub.add_parser("sourcetrust", help="record a source's information tier (1-5) + trust (0-1)")
     p_st2.add_argument("source")
     p_st2.add_argument("tier", type=int, choices=(1, 2, 3, 4, 5))
@@ -2418,7 +2494,7 @@ def main(argv: list[str] | None = None) -> int:
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
         print("                        health | desk | doctor | channels | skill | preflight | simulator |")
         print("                        validate | quality | scorecard | hidden | correlation | backfill | store |")
-        print("                        derivatives | mcp")
+        print("                        derivatives | mcp | monte")
         print("=" * 62)
         serve(make_app(), DASHBOARD_HOST, DASHBOARD_PORT)
         return 0

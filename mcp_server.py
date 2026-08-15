@@ -20,6 +20,7 @@ from typing import Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from brain.analytics import monte_carlo_ruin_table
 from brain.ask import ask
 from brain.brief import generate_morning_brief, post_trade_review
 from brain.risk_gate import evaluate_risk_gate
@@ -27,7 +28,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.8.0"  # bumped: P12.4 Backtest Quality Score (quality arg on scorecard tool)
+SERVER_VERSION = "1.9.0"  # bumped: P12.7 Monte Carlo risk-of-ruin table embedded in risk tool
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -204,7 +205,9 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
 
     elif name == "risk":
         with SignalDB() as db:
-            return evaluate_risk_gate(db)
+            gate = evaluate_risk_gate(db)
+            gate["ruin_table"] = monte_carlo_ruin_table(db)
+            return gate
 
     elif name == "health":
         from brain.immune import run_health_check
