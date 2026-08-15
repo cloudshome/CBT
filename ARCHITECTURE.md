@@ -68,9 +68,10 @@
 | `sample_client.py` | Offline deterministic synthetic data (DEMO_MODE=1) |
 | `store.py` | P10.1 — normalised `Candle` schema + partitioned Parquet store (upsert PK, unclosed-candle rule); P12.3.2 — `StoreClient` klines-shaped reader so offline walkers run on stored real candles |
 | `backfill.py` | P10.2 — paginated, resumable, rate-limit-aware backfill into the store (hardened: real perp endpoint, weight-header pacing, geo-block abort); P12.3.2 — `backfill_from_csv` offline CSV import (same adapter boundary, sha256 provenance pin); `python main.py backfill [--from-csv PATH]` |
-| `gaps.py` | P10.3 — gap detection + repair + 1m→5m/15m/1h/4h/1d rollups (`--repair` / `--rollup`) |
+| `gaps.py` | P10.3 — gap detection + repair + 1m→5m/15m/1h/4h/1d rollups (`--repair` / `--rollup`); `detect_gaps(..., calendar)` skips scheduled closures (P12.9) |
 | `derivatives.py` | P10.4 — funding / OI / mark / index / basis as stored time series; `python main.py derivatives` |
-| `quality.py` | P10.5 — per-series data-quality pillar (staleness, gaps, price/volume sanity); corrupt data quarantines the desk via `readiness_strip` |
+| `quality.py` | P10.5 — per-series data-quality pillar (staleness, gaps, price/volume sanity); corrupt data quarantines the desk via `readiness_strip`. P12.9: calendar-aware — a session venue is judged in trading time |
+| `calendar.py` | **P12.9** — venue trading calendars (`crypto-24x7` always open; `xau-otc` the DST-aware OTC gold week). `calendar_for()` opts in by venue only; scheduled closure stops counting as missing data |
 | `bybit_client.py` | P10.6 — Bybit V5 klines transport behind the same `PageResult` contract; P10.7 also pages `/v5/market/funding/history`. Venue quirks stay at the boundary. |
 | `cross_exchange.py` | P10.7 — venue registry + one `snapshot_prices()` probe + stored premium/discount + funding spread; `python main.py cross collect\|status` |
 | `costs.py` | P12.6 — fees-first trade cost modeling (`E_net = E_gross − fees − slip − funding`, funding joined as-of-T) |
@@ -119,6 +120,8 @@
 
 ### `tests/` — 50 test modules, 567 pass / 1 skip
 - Most modules have a matching `test_*.py`.
+- `tests/test_calendar.py` — **NEW (P12.9)** gold-week boundaries + DST, holidays, trading-time counting,
+  calendar-aware gaps/quality, Dukascopy import gap report, `calendar` CLI.
 - `tests/test_costs.py` — **NEW (P12.6)** fee scaling, spread, funding direction, net R conversion.
 - `tests/test_scorecard.py` — P12.3 scorecard + P12.6 net-of-costs & conditioned splits.
 - `tests/test_web_api.py` — Flask endpoint regression tests (catches the

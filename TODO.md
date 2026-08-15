@@ -6,7 +6,17 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-15 (this session: **P12.8 shipped — the net anchor**: the calibrator multiplier and the setup-proven gate now judge `E_net` instead of `E_gross`, so a setup that only profits before costs is dampened and never called proven. Suite green: **631 pass / 1 skip**.)
+**Last updated:** 2026-08-15 (this session: **P12.9 shipped — market
+calendars**: `data/calendar.py` gives each venue a trading calendar, so a
+scheduled OTC-gold closure is no longer read as missing data. Gap detection,
+the quality pillar, readiness and the CSV import all judge a `dukascopy/**/
+XAUUSD` series in trading time; crypto stays 24/7 and byte-identical. Closes
+blocker #1 of three against the Dukascopy XAU research book. Suite green:
+**671 pass / 1 skip**.)
+
+**Previous:** 2026-08-15 (**v2.19.0 optional Dukascopy XAU research adapter** — external acquisition boundary only, research-only book.)
+
+**Earlier:** 2026-08-15 (**P12.8 shipped — the net anchor**: the calibrator multiplier and the setup-proven gate now judge `E_net` instead of `E_gross`, so a setup that only profits before costs is dampened and never called proven. Suite green: **631 pass / 1 skip**.)
 
 **Previous:** 2026-08-15 (**P12.7 shipped — Monte Carlo risk-of-ruin table**: `brain/analytics.monte_carlo_ruin_table()` resamples NET realised paper outcomes to produce a `risk% × expected DD × ruin probability` sweep plus longest losing streak and time-to-recovery, surfaced through CLI `monte`, HTTP `/api/monte` + embedded in `/api/risk`, MCP `cryptobrain_monte` + `cryptobrain_risk.ruin_table`, and the dashboard Risk card. Suite green: **620 pass / 1 skip**.)
 
@@ -60,7 +70,28 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-15, this session):** **P12.8 shipped — the net
+> **Order note (2026-08-15, this session):** **P12.9 shipped — market
+> calendars.** Every data-quality check in SKY assumed a 24/7 market, so
+> "the venue was shut" and "our collection broke" were indistinguishable. A
+> complete week of spot gold holds ~53h of scheduled closure — read as a 30%+
+> gap fraction and a dead feed, which **quarantined a healthy series** and
+> rolled the desk to *not ready*. `data/calendar.py` adds a `MarketCalendar`
+> protocol with `crypto-24x7` and the DST-aware `xau-otc` gold week; gaps, the
+> quality pillar, readiness, the CSV import report and a new
+> `python main.py calendar` command all judge a session venue in **trading
+> time**. It is opt-in by venue and can only remove false alarms — unknown
+> venues and Binance `PAXGUSDT` keep 24/7 rules, crypto output is unchanged,
+> and in-session holes / stale-during-session / corrupt OHLC still quarantine.
+> Docs: `docs/MARKET_CALENDAR.md`. Suite green: **671 pass / 1 skip** (+35).
+>
+> **Next code build:** the **XAU bid/ask cost model** — Dukascopy blocker #2.
+> `data/costs.py` models crypto taker/maker fees and funding, which is not
+> evidence of spot-gold execution cost; a bid-only OHLC book has no ask-side
+> spread. After that, **source provenance in saved calibration keys**
+> (blocker #3), so a Dukascopy backtest can never recalibrate the live PAXG
+> proxy. Only then is any XAU expectancy quotable.
+>
+> **Prior order note (2026-08-15):** **P12.8 shipped — the net
 > anchor.** P12.6 made every *measurement* net of costs; P12.8 fixes the two
 > places that *act* on one and were still reading **gross**.
 > `data.strategy_score.multiplier_from_score()` anchored on `E_gross`, so a
@@ -109,6 +140,9 @@ order changed as a result.
 | **P12.4** | backtest quality score 0–100 | ✅ **shipped** — `data/quality_score.py` + `python main.py quality` (plateau sweep) + `scorecard --quality` on all surfaces | M |
 | P12.5 | strategy score on the calibrator | ✅ **shipped** — `data/strategy_score.py` + trust-dial multiplier on the calibrator; `learn` / `/api/learning` / dashboard | M |
 | **P12.7** | **MC ruin / worst streak / risk-of-ruin table** | ✅ **shipped** — `brain/analytics.monte_carlo_ruin_table()` (NET outcomes); CLI `monte`; HTTP `/api/monte`; MCP `cryptobrain_monte` + `ruin_table`; dashboard Risk card | M |
+| **P12.9** | **market calendars** | ✅ **shipped** — `data/calendar.py` (`crypto-24x7` / `xau-otc`); calendar-aware gaps, quality pillar, readiness, CSV import; CLI `calendar`; `docs/MARKET_CALENDAR.md` | S |
+| XAU costs | bid/ask spread + gold-specific net costs | Dukascopy blocker #2 — a bid-only book has no executable round trip | M |
+| key provenance | candle-source in saved calibration keys | Dukascopy blocker #3 — stops an XAU backtest recalibrating live PAXG | S |
 | micro-live | trivial size | slippage / partial fills / latency can only be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be

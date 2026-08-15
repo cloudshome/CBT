@@ -129,10 +129,14 @@ the live PAXG proxy.
    one store series; parallel bid/ask storage and an as-of spread model are a
    later schema milestone. Until then, configure and validate a conservative
    gold-specific cost assumption outside any graduation claim.
-2. **Market calendar.** The current crypto-first gap/readiness logic assumes a
-   continuous market. XAU's scheduled weekend/session closures can appear as
-   gaps. Acquisition with `--flats` reduces false gaps, but a proper XAU market
-   calendar is still required before treating readiness as authoritative.
+2. **Market calendar.** ✅ **Closed by P12.9** (v2.20.0) —
+   [`docs/MARKET_CALENDAR.md`](MARKET_CALENDAR.md). `data/calendar.py` models the
+   DST-aware OTC gold week (Sun 18:00 ET → Fri 17:00 ET, daily 17:00–18:00 ET
+   break, 1 Jan / 25 Dec), and gap detection, the quality pillar, readiness and
+   the CSV import report all judge a `dukascopy/**/XAUUSD` series in **trading
+   time**. A weekend is no longer a gap and no longer ages the series; a hole
+   inside a session still is. Binance/PAXG behaviour is unchanged. Inspect with
+   `python main.py calendar --symbol XAUUSD --tf 1h --series`.
 3. **Volume semantics.** Dukascopy volume is feed/tick volume in configurable
    units, not Binance base-asset volume. Never compare the raw magnitude across
    those venues without normalization.
@@ -151,7 +155,8 @@ the live PAXG proxy.
 Dukascopy history may replace PAXG as the canonical **research** series only
 after:
 
-- a market-calendar-aware quality check is green;
+- a market-calendar-aware quality check is green (✅ available since P12.9 —
+  run it on the imported book and record the result);
 - bid/ask spread and XAU-specific costs are modeled net of costs;
 - source provenance reaches saved backtest/calibration keys;
 - PAXG-vs-XAU basis/deviation is measured, not assumed;

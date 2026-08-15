@@ -69,13 +69,24 @@ def checks_on_frame(
     now_ms: Optional[int] = None,
     step_ms: Optional[int] = None,
     window_bars: int = WINDOW_BARS,
+    calendar=None,
 ) -> dict:
     """Run every quality check over ``frame`` and return a health dict.
 
     ``frame`` needs at least ``ts/open/high/low/close``; ``volume`` is
     checked when present. All timestamps are candle OPEN times in UTC
     epoch ms. Fully offline: pass ``now_ms`` for determinism.
+
+    ``calendar`` (P12.9) is an optional :class:`data.calendar.MarketCalendar`.
+    The default is 24/7 crypto, which reproduces the previous numbers
+    exactly. With a session calendar (spot gold), *expected bars*, *missing*
+    and *age* are all measured in **trading** time: a weekend is not a gap
+    and does not age the series.
     """
+    from data.calendar import CRYPTO, expected_bars, open_bars_between
+
+    cal = calendar or CRYPTO
+    session = not getattr(cal, "always_open", True)
     if step_ms is None:
         step_ms = TIMEFRAME_TO_MS.get(timeframe, 60_000)
     now = now_ms if now_ms is not None else int(time.time() * 1000)
@@ -84,6 +95,9 @@ def checks_on_frame(
         "timeframe": timeframe,
         "step_ms": step_ms,
         "now_ms": now,
+        "calendar": getattr(cal, "name", "crypto-24x7"),
+        "market_open": bool(cal.is_open(now)) if session else True,
+        "closed_bars": 0,
         "candles": 0,
         "first_ts": None,
         "last_ts": None,
@@ -129,8 +143,18 @@ def checks_on_frame(
     win = f.tail(max(1, int(window_bars)))
     first = int(win["ts"].iloc[0])
     last = int(win["ts"].iloc[-1])
-    expected = (last - first) // step_ms + 1
-    missing = sum(g.missing for g in detect_gaps(win, timeframe))
+    if session:
+        expected = expected_bars(first, last, step_ms, cal)
+        missing = sum(g.missing for g in detect_gaps(win, timeframe, cal))
+        # Staleness in trading bars: a closed market cannot be stale.
+        age_bars = open_bars_between(last, now, step_ms, cal)
+        age_mult = round(float(age_bars), 2)
+        health["closed_bars"] = max(
+            0, ((last - first) // step_ms + 1) - expected)
+    else:
+        expected = (last - first) // step_ms + 1
+        missing = sum(g.missing for g in detect_gaps(win, timeframe))
+        age_mult = None
     age_ms = max(0, now - last)
 
     health.update({
@@ -138,7 +162,8 @@ def checks_on_frame(
         "first_ts": first,
         "last_ts": last,
         "age_ms": age_ms,
-        "age_mult": round(age_ms / step_ms, 2) if step_ms else None,
+        "age_mult": (age_mult if session
+                     else (round(age_ms / step_ms, 2) if step_ms else None)),
         "expected": expected,
         "missing": missing,
         "gap_fraction": round(missing / expected, 6) if expected else 0.0,
@@ -169,11 +194,17 @@ def verdict_for(health: dict) -> dict:
         return {"level": "down", "quarantined": True,
                 "headline": "corrupt data — quarantined",
                 "detail": "; ".join(health["violations"]), "name": name}
+    # P12.9: on a session venue `age_mult` counts *trading* bars, so a closed
+    # market cannot age the series. Say so, or the operator reads a Sunday as
+    # a broken feed.
+    stale_unit = ("trading bars" if health.get("calendar", "crypto-24x7")
+                  != "crypto-24x7" else "× the timeframe")
+    shut = (health.get("market_open") is False)
     if (health["age_mult"] or 0) > LAG_MULT:
         return {"level": "down", "quarantined": True,
                 "headline": "history too stale — quarantined",
-                "detail": (f"newest candle is {health['age_mult']:.0f}× the "
-                           f"timeframe old"),
+                "detail": (f"newest candle is {health['age_mult']:.0f} "
+                           f"{stale_unit} old"),
                 "name": name}
     if health["gap_fraction"] > GAP_DOWN:
         return {"level": "down", "quarantined": True,
@@ -194,9 +225,14 @@ def verdict_for(health: dict) -> dict:
     if (health["age_mult"] or 0) > FRESH_MULT:
         return {"level": "degraded", "quarantined": False,
                 "headline": "lagging",
-                "detail": (f"newest candle is {health['age_mult']:.0f}× the "
-                           f"timeframe old"),
+                "detail": (f"newest candle is {health['age_mult']:.0f} "
+                           f"{stale_unit} old"),
                 "name": name}
+    if shut:
+        return {"level": "ok", "quarantined": False,
+                "headline": "market closed — clean",
+                "detail": (f"{health['candles']} candles; venue shut "
+                           f"({health['calendar']})"), "name": name}
     return {"level": "ok", "quarantined": False,
             "headline": "fresh and clean",
             "detail": f"{health['candles']} candles", "name": name}
@@ -211,11 +247,19 @@ def series_health(
     *,
     now_ms: Optional[int] = None,
     window_bars: int = WINDOW_BARS,
+    calendar=None,
 ) -> dict:
-    """Health dict for one stored series (reads the store; offline)."""
+    """Health dict for one stored series (reads the store; offline).
+
+    P12.9: the venue's calendar is resolved from the series identity when
+    not supplied, so a non-24/7 book (spot gold) is judged on trading time.
+    """
+    from data.calendar import calendar_for
+
+    cal = calendar or calendar_for(exchange, market, symbol)
     frame = store.read(exchange, market, symbol, timeframe)
     health = checks_on_frame(frame, timeframe, now_ms=now_ms,
-                             window_bars=window_bars)
+                             window_bars=window_bars, calendar=cal)
     health.update({"exchange": exchange, "market": market,
                    "symbol": symbol, "timeframe": timeframe})
     return health
@@ -243,4 +287,6 @@ def series_item(
         "candles": health["candles"],
         "last_ts": health["last_ts"],
         "age_mult": health["age_mult"],
+        "calendar": health.get("calendar", "crypto-24x7"),
+        "market_open": health.get("market_open", True),
     }

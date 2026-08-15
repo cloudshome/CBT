@@ -416,6 +416,81 @@ def cmd_scorecard(args) -> int:
     return 0 if report.get("ok") else 1
 
 
+def cmd_calendar(args) -> int:
+    """P12.9 — inspect a venue's trading calendar and its stored series.
+
+    Crypto is 24/7 and unchanged; spot gold (Dukascopy XAUUSD) follows the
+    OTC week, so scheduled closures stop being read as missing data. This
+    command answers two operator questions offline: *is the venue open right
+    now?* and *how much of a stored series' span was scheduled closure?*
+    """
+    from data.calendar import (calendar_for, closed_bar_count, describe,
+                               expected_bars, get_calendar)
+    from data.backfill import fmt_ts
+    from data.gaps import step_ms
+
+    symbol = _sym(args.symbol) if args.symbol else "XAUUSD"
+    cal = (get_calendar(args.calendar) if args.calendar
+           else calendar_for(args.exchange, args.market, symbol))
+    now_ms = args.at if args.at is not None else int(time.time() * 1000)
+
+    payload = {
+        "ok": True,
+        "exchange": args.exchange, "market": args.market,
+        "symbol": symbol, "timeframe": args.tf,
+        "calendar": describe(cal),
+        "at_ms": now_ms,
+        "open_now": bool(cal.is_open(now_ms)),
+    }
+
+    if args.series:
+        from data.quality import series_health, verdict_for
+        from data.store import CandleStore
+
+        store = CandleStore(root=args.root) if args.root else CandleStore()
+        health = series_health(store, args.exchange, args.market, symbol,
+                               args.tf, now_ms=now_ms, calendar=cal)
+        verdict = verdict_for(health)
+        step = step_ms(args.tf)
+        first, last = health.get("first_ts"), health.get("last_ts")
+        payload["series"] = {
+            "candles": health["candles"],
+            "first_ts": first, "last_ts": last,
+            "expected_open_bars": (expected_bars(first, last, step, cal)
+                                   if first is not None else 0),
+            "closed_session_bars": (closed_bar_count(first, last, step, cal)
+                                    if first is not None else 0),
+            "missing": health["missing"],
+            "gap_fraction": health["gap_fraction"],
+            "age_bars": health["age_mult"],
+            "level": verdict["level"],
+            "headline": verdict["headline"],
+            "detail": verdict["detail"],
+        }
+
+    if args.json:
+        print(json.dumps(payload, indent=2, default=str))
+        return 0
+
+    name = payload["calendar"]["name"]
+    print(f"calendar    {name}"
+          f"{'  (always open)' if payload['calendar']['always_open'] else ''}")
+    print(f"  series    {args.exchange}/{args.market}/{symbol}/{args.tf}")
+    print(f"  at        {fmt_ts(now_ms)} UTC")
+    print(f"  open now  {'YES' if payload['open_now'] else 'no — venue shut'}")
+    ser = payload.get("series")
+    if ser:
+        print(f"  stored    {ser['candles']:,} candles  "
+              f"expected-open {ser['expected_open_bars']:,}  "
+              f"closed-session {ser['closed_session_bars']:,}")
+        print(f"  missing   {ser['missing']:,} "
+              f"({ser['gap_fraction']:.2%})  age {ser['age_bars']} bars")
+        print(f"  verdict   {ser['level']} — {ser['headline']}")
+        if ser["detail"]:
+            print(f"            {ser['detail']}")
+    return 0
+
+
 def cmd_quality(args) -> int:
     """P12.4 — Backtest Quality Score 0–100 with the parameter-plateau sweep.
 
@@ -1277,9 +1352,11 @@ def cmd_backfill(args) -> int:
                     store, exchange=csv_exchange, market=csv_market,
                     symbol=_sym(args.symbol),
                 )
+            from data.calendar import calendar_for
+            csv_cal = calendar_for(csv_exchange, csv_market, _sym(args.symbol))
             payload["gaps_remaining"] = len(detect_gaps(
                 store.read(csv_exchange, csv_market,
-                           _sym(args.symbol), args.tf), args.tf))
+                           _sym(args.symbol), args.tf), args.tf, csv_cal))
         except BackfillError as exc:
             print(f"[!] {exc}", file=sys.stderr)
             return 1
@@ -1302,6 +1379,10 @@ def cmd_backfill(args) -> int:
             print(f"  span {payload['span_days']} days  gaps "
                   f"{payload['gaps_found']}  gaps_remaining "
                   f"{payload['gaps_remaining']}")
+            print(f"  calendar {payload['calendar']}"
+                  + (f"  closed-session bars skipped "
+                     f"{payload['closed_session_bars']:,}"
+                     if payload.get("closed_session_bars") else ""))
             if payload["rows_added"] == 0:
                 print("  ✓ idempotent re-run — zero rows added")
             if args.rollup:
@@ -2068,6 +2149,28 @@ def main(argv: list[str] | None = None) -> int:
     p_quality.add_argument("--json", action="store_true",
                            help="machine-readable result")
     p_quality.set_defaults(func=cmd_quality)
+
+    p_cal = sub.add_parser(
+        "calendar",
+        help="P12.9: venue trading calendar — is the market open, and how "
+             "much of a stored series' span was scheduled closure?")
+    p_cal.add_argument("--symbol", default=None,
+                       help="asset symbol (default XAUUSD)")
+    p_cal.add_argument("--tf", default="1m", help="store timeframe")
+    p_cal.add_argument("--exchange", default="dukascopy",
+                       help="stored series venue (binance|bybit|dukascopy)")
+    p_cal.add_argument("--market", default="spot", help="spot or perp series")
+    p_cal.add_argument("--calendar", default=None,
+                       help="force a calendar by name (crypto-24x7|xau-otc)")
+    p_cal.add_argument("--at", type=int, default=None,
+                       help="UTC epoch ms to evaluate (default: now)")
+    p_cal.add_argument("--series", action="store_true",
+                       help="also read the stored series and report its "
+                            "calendar-aware health")
+    p_cal.add_argument("--root", default=None, help="store root override")
+    p_cal.add_argument("--json", action="store_true",
+                       help="machine-readable result")
+    p_cal.set_defaults(func=cmd_calendar)
 
     p_stats = sub.add_parser("stats", help="what the engine has learned (DB + backtests)")
     p_stats.add_argument("--symbol", default=None, help="optional asset filter (BTC, ETH, XAU/GOLD)")

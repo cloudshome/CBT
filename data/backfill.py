@@ -673,8 +673,17 @@ def backfill_from_csv(
         store.write(canon)
     after = store.count(exchange, market, symbol, timeframe)
 
+    # P12.9: judge gaps against the venue's calendar. Crypto stays 24/7;
+    # a Dukascopy XAU import no longer reports the gold weekend as missing data.
+    from data.calendar import calendar_for
+    cal = calendar_for(exchange, market, symbol)
     gaps = detect_gaps(store.read(exchange, market, symbol, timeframe),
-                       timeframe) if after else []
+                       timeframe, cal) if after else []
+    closed_bars = 0
+    if not frame.empty and not getattr(cal, "always_open", True):
+        from data.calendar import closed_bar_count
+        closed_bars = closed_bar_count(
+            int(frame["ts"].iloc[0]), int(frame["ts"].iloc[-1]), step, cal)
     first_ts = int(frame["ts"].iloc[0]) if not frame.empty else None
     last_ts = int(frame["ts"].iloc[-1]) if not frame.empty else None
     return {
@@ -691,6 +700,8 @@ def backfill_from_csv(
         "duplicates_dropped": duplicates,
         "sanity_dropped": sanity_dropped,
         "misaligned_ts": misaligned,
+        "calendar": getattr(cal, "name", "crypto-24x7"),
+        "closed_session_bars": closed_bars,
         "gaps_found": len(gaps),
         "first_ts": first_ts,
         "last_ts": last_ts,

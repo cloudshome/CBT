@@ -10,6 +10,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.20.0] — 2026-08-15 · P12.9 market calendars: scheduled closure is not a gap
+
+MINOR: teach the data layer that some venues close. Closes blocker #1 of the
+three recorded against the v2.19.0 Dukascopy XAU research book.
+
+### The problem
+Every quality check in SKY assumed a 24/7 market, so "the venue was shut" and
+"our collection broke" were the same event. A correct, complete week of spot
+gold contains ~53 hours of scheduled closure — read as a 30%+ gap fraction and
+an unusably stale feed, which **quarantined a healthy series** and rolled the
+whole desk to *not ready*.
+
+### Added
+- **`data/calendar.py`** — a `MarketCalendar` protocol with two implementations:
+  `crypto-24x7` (always open) and `xau-otc`, the DST-aware OTC gold week
+  (Sun 18:00 ET open, Fri 17:00 ET close, 17:00–18:00 ET daily break, 1 Jan and
+  25 Dec closed), resolved through stdlib `zoneinfo`.
+- Trading-time counting helpers: `expected_bars()`, `open_bars_between()`,
+  `closed_bar_count()`, `split_by_session()`, `calendar_for()`, `get_calendar()`.
+- **CLI `python main.py calendar`** — is the venue open at an instant, and how
+  much of a stored series' span was scheduled closure (`--series`), with
+  `--calendar`, `--at`, `--root` and `--json`.
+- `docs/MARKET_CALENDAR.md`.
+
+### Changed
+- `data/gaps.detect_gaps()` takes an optional `calendar`: a span that is
+  entirely a scheduled closure is not a gap, and a partial one counts only the
+  OPENs the venue owed.
+- `data/quality.checks_on_frame()` takes an optional `calendar`; on a session
+  venue `expected` and `age_mult` are measured in **trading bars** (a shut
+  market cannot age a series) and the health dict carries `calendar`,
+  `market_open` and `closed_bars`.
+- `series_health()` / `series_item()` resolve the calendar from the series
+  identity, so the readiness pillar inherits it; `verdict_for()` reports
+  `market closed — clean` instead of a false alarm and says `trading bars`.
+- `backfill_from_csv()` reports `calendar` and `closed_session_bars`, and its
+  `gaps_found` no longer counts the gold weekend; `backfill --from-csv` prints
+  the calendar and a calendar-aware `gaps_remaining`.
+
+### Safety
+- **Opt-in by venue, never by guess.** Only `dukascopy` + an XAU symbol gets the
+  gold week. Unknown venues, unknown symbols and Binance `PAXGUSDT` (a genuine
+  24/7 token proxy) all keep the crypto calendar, so a wrong calendar can never
+  hide a real gap.
+- **Crypto numbers are unchanged** — `detect_gaps(f, tf)` equals
+  `detect_gaps(f, tf, CRYPTO)`, and the pre-P12.9 branch runs whenever
+  `always_open` is true.
+- **Real failures still fail**: a hole inside a session, a series stale during
+  open hours, and corrupt OHLC all still quarantine.
+- This does not open the risk gate. Dukascopy XAU stays research-only until
+  bid/ask spread + XAU net costs and calibration-key source provenance land.
+- Full suite: **671 passed, 1 skipped** (+35 in `tests/test_calendar.py`);
+  wheel gate builds `cryptobrain-2.20.0-py3-none-any.whl` with no duplicates.
+
+---
+
 ## [2.19.0] — 2026-08-15 · optional Dukascopy XAU research adapter
 
 MINOR: adapt the useful acquisition boundary from `dukascopy-node` without

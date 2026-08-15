@@ -34,22 +34,41 @@ def step_ms(timeframe: str) -> int:
     return TIMEFRAME_TO_MS[timeframe]
 
 
-def detect_gaps(frame: pd.DataFrame, timeframe: str = MASTER_TF) -> list[Gap]:
-    """Return missing OPEN-time ranges inside ``frame``'s [min, max] span."""
+def detect_gaps(frame: pd.DataFrame, timeframe: str = MASTER_TF,
+                calendar=None) -> list[Gap]:
+    """Return missing OPEN-time ranges inside ``frame``'s [min, max] span.
+
+    ``calendar`` (P12.9) is an optional :class:`data.calendar.MarketCalendar`.
+    With the default 24/7 crypto calendar — or ``None`` — every missing step
+    counts, exactly as before. With a session calendar (spot gold), bars the
+    venue was *shut* for are not missing data: ``missing`` counts only the
+    OPENs the market should have produced, and a span that is entirely a
+    scheduled closure is not reported as a gap at all.
+    """
     if frame is None or frame.empty:
         return []
     step = step_ms(timeframe)
     ts = np.sort(frame["ts"].astype(np.int64).unique())
+    session = calendar is not None and not getattr(calendar, "always_open", True)
+    if session:
+        from data.calendar import expected_bars
     gaps: list[Gap] = []
     for a, b in zip(ts[:-1], ts[1:]):
         delta = int(b) - int(a)
-        if delta > step:
+        if delta <= step:
+            continue
+        start_ts, end_ts = int(a) + step, int(b) - step
+        if session:
+            missing = expected_bars(start_ts, end_ts, step, calendar)
+            if missing <= 0:
+                continue        # the whole span was a scheduled closure
+        else:
             missing = delta // step - 1
-            gaps.append(Gap(
-                start_ts=int(a) + step,
-                end_ts=int(b) - step,
-                missing=int(missing),
-            ))
+        gaps.append(Gap(
+            start_ts=start_ts,
+            end_ts=end_ts,
+            missing=int(missing),
+        ))
     return gaps
 
 
