@@ -10,6 +10,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.14.0] — 2026-08-15 · branch `arena/01a00417-sky`
+
+MINOR bump: **P12.3.3 — effective sample size in the scorecard.**
+A walk-forward grade steps `step` bars and follows each plan over
+`horizon_bars` future bars, so consecutive samples overlap heavily — a
+24h horizon on 15m bars graded at step 3 shares 96/3 ≈ 32 windows, so
+"384 decided" was really ~12 independent observations. The scorecard now
+reports the honest independent sample size `N_eff = N / overlap`
+(`overlap = horizon_bars / step`) alongside the raw trade count, and
+widens every standard error and 95% confidence interval with
+`SE = σ / √N_eff` instead of `σ / √N`. The graduation-bar *floor* is
+unchanged for now (`min_decided` still reads raw N); the report flags
+`n_eff_below_min_decided` so the desk can see when the overlap-corrected
+sample is thin — the floor revisit is the next decision, not this one.
+
+### Added
+- **`overlap_factor()` / `effective_sample_size()`** in `data/scorecard.py`
+  — per-row window-overlap factor (`horizon_bars / step` for walk-forward
+  backtest rows; 1.0 for paper trades, which are real non-overlapping
+  positions; 1.0 when horizon/timeframe/step are unrecorded, rather than
+  inventing a divisor).
+- **`step` column** on `backtest_results` (additive migration + save path)
+  so the scorecard computes the overlap factor exactly instead of assuming
+  the default; `python main.py backtest --save` records it.
+- **`n_eff`, `overlap`, `expectancy_se`, `expectancy_ci95`,
+  `expectancy_net_se`, `expectancy_net_ci95`** on every scorecard stats
+  block (overall and each split), threaded through `trade_stats()`,
+  `_split()`, `conditioned_splits()`, `build_scorecard()`,
+  `scorecard_from_db()`, and `scorecard_from_store()`.
+- **CLI** `python main.py scorecard --step` now applies to the stored-book
+  path too (overlap correction); the printed block shows
+  `(~N_eff independent, overlap ×K)` and the net 95% CI, plus a warning
+  when `N_eff < min_decided`.
+- Tests: 6 new (`test_overlap_factor_*`, `test_effective_sample_size_*`,
+  `test_trade_stats_reports_honest_n_eff_and_widens_ci`,
+  `test_build_scorecard_flags_n_eff_below_min_decided`,
+  `test_backtest_rows_roundtrip_step_and_horizon`).
+  Suite **567 → 573 pass / 1 skip** (+6).
+
+No trading orders or private credentials added (invariant #1 preserved).
+Next on the ladder: **P12.4 backtest quality score** (now scoring something
+real), then P12.5, then P12.7 Monte Carlo ruin.
+
+---
+
 ## [2.13.0] — 2026-08-15 · branch `arena/01a003f9-sky`
 
 MINOR bump: **P12.6 — fees-first `E_net` & conditioned expectancy.**

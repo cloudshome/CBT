@@ -9,7 +9,7 @@ from data.symbols import DEFAULT_WATCHLIST, normalize_symbol, parse_symbol_list
 
 load_dotenv()
 
-VERSION = "2.13.0"
+VERSION = "2.14.0"
 
 ROOT = Path(__file__).parent
 

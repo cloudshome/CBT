@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS backtest_results(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id TEXT, ts INTEGER, symbol TEXT, timeframe TEXT,
   plan_type TEXT, action TEXT, confidence_pct INTEGER,
-  horizon_hours REAL, outcome TEXT,
+  horizon_hours REAL, step INTEGER, outcome TEXT,
   rr_achieved REAL, max_favorable REAL, max_adverse REAL,
   entry REAL, trigger_level REAL, regime TEXT,
   sim_key TEXT, holding_bars INTEGER, holding_hours REAL,
@@ -197,6 +197,10 @@ class SignalDB:
         _add("scans", "approve_note", "TEXT")
         _add("scans", "regime", "TEXT")
         _add("backtest_results", "regime", "TEXT")
+        # P12.3.3 — the walk-forward bar step that produced this row, so the
+        # scorecard can compute the window-overlap factor exactly
+        # (overlap = horizon_bars / step) instead of assuming the default.
+        _add("backtest_results", "step", "INTEGER")
         # sim_key: identity of a simulator-generated sample (symbol:tf:ts:plan:action)
         # so the 100-backtest / 20-paper grind counts UNIQUE samples even when the
         # same history window is re-simulated in a later run (decision A6/B10).
@@ -738,14 +742,14 @@ class SignalDB:
                 self.conn.execute(
                     """INSERT INTO backtest_results
                        (run_id, ts, symbol, timeframe, plan_type, action,
-                        confidence_pct, horizon_hours, outcome, rr_achieved,
+                        confidence_pct, horizon_hours, step, outcome, rr_achieved,
                         max_favorable, max_adverse, entry, trigger_level, regime,
                         sim_key, holding_bars, holding_hours,
                         rr_net, fee_r, slip_r, funding_r, cost_r)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (run_id, r.get("ts"), r.get("symbol"), r.get("timeframe"),
                      r.get("plan_type"), r.get("action"), r.get("confidence_pct"),
-                     r.get("horizon_hours"), r.get("outcome"), r.get("rr_achieved"),
+                     r.get("horizon_hours"), r.get("step"), r.get("outcome"), r.get("rr_achieved"),
                      r.get("max_favorable"), r.get("max_adverse"), r.get("entry"),
                      r.get("trigger_level"), r.get("regime"), r.get("sim_key"),
                      r.get("holding_bars"), r.get("holding_hours"),

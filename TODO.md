@@ -6,7 +6,7 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-15 (this session: **P12.6 shipped — fees-first `E_net` & conditioned expectancy**: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T, net graduation bar enforced; next *code* is **P12.3.3 — effective sample size in the scorecard**)
+**Last updated:** 2026-08-15 (this session: **P12.3.3 shipped — effective sample size in the scorecard**: walk-forward counts divided by window overlap (`N_eff = N / overlap`, `overlap = horizon_bars / step`), standard errors & 95% CIs widened with `√N_eff`; `step` now stored on `backtest_results`. Next *code* is **P12.4 — backtest quality score**)
 
 ---
 
@@ -44,7 +44,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1–P12.3.2 shipped; **P12.6 shipped 2026-08-15** — fees-first `E_net` & net bar; next P12.3.3) |
+| **Validation independence** | Research-grade proof on our own data | 🔄 **P12** (P12.1–P12.3.2, P12.6, **P12.3.3** shipped — fees-first `E_net` & net bar, overlap-corrected `N_eff` & widened CIs; next P12.4) |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -58,14 +58,15 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Top priority — start here in the next session
 
-> **Order note (2026-08-15, this session):** **P12.6 shipped — fees-first
-> `E_net` & conditioned expectancy.** `data/costs.py` integrates realistic
-> taker/maker fees, spread/slippage, and direction-aware funding into the
-> grader, backtest DB, paper book, and scorecard (`E_net = E_gross − fees − slip − funding`).
-> The graduation bar is enforced **NET of costs** (+0.50R net, >55% WR net,
-> PF >= 1.5 net). Next *code* build is **P12.3.3 — effective sample size in the
-> scorecard** (divide walk-forward trade counts by window overlap factor ~30×
-> to report honest independent sample size and widen confidence intervals).
+> **Order note (2026-08-15, this session):** **P12.3.3 shipped — effective
+> sample size in the scorecard.** Walk-forward samples overlap ~30×
+> (24h/15m graded at step 3 → 96/3 = 32 windows per observation); the
+> scorecard now divides raw counts by the overlap factor
+> (`N_eff = N / overlap`), reports `N_eff` alongside `N`, and widens
+> standard errors / 95% CIs with `SE = σ / √N_eff`. `step` is stored on
+> `backtest_results`. The `min_decided` floor still reads raw N (flagged,
+> not changed — floor revisit is the next decision). Next *code* build is
+> **P12.4 — backtest quality score**, now scoring something real.
 
 ### TODO-15 / P12.6 · Fees-first `E_net` & conditioned expectancy · ✅ shipped
 
@@ -89,8 +90,9 @@ order changed as a result.
 | **P12.3.1** | unify the same-bar tie-break | ✅ shipped; honest *before* real data | XS |
 | **P12.3.2** | **real market data** — backfill real BTCUSDT 1m with the P10 machinery, re-run P11 / P12.1 / P12.3 | ✅ **shipped** — see `docs/REAL_DATA_RUN_2026-08-14.md` | M |
 | **P12.6** | pulled forward, **fees-first** — `E_net` becomes the number the gate reads | ✅ **shipped** — `data/costs.py`, `E_net`, net bar | M |
-| **P12.3.3** | effective sample size in the scorecard | **next.** overlap inflates counts ~30× (384 decided ≈ 12 independent) | S |
-| P12.4 / P12.5 | as originally specced | now scoring something real | M |
+| **P12.3.3** | effective sample size in the scorecard | ✅ **shipped** — `N_eff = N / overlap`, widened CI/SE, `step` stored | S |
+| **P12.4** | backtest quality score 0–100 | **next.** now scoring something real | M |
+| P12.5 | strategy score on the calibrator | after P12.4 | M |
 | micro-live | trivial size | slippage / partial fills / latency can only be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
@@ -266,8 +268,8 @@ train/val/OOS windows have real multi-window history to split.
 | P12.3 | Single boxed R-report / strategy scorecard | One command, one block — long/short, regime, session, Sharpe/Sortino/Calmar, holding time (`+` BT5) | ✅ **shipped** — `data/scorecard.py`, `python main.py scorecard`, `/api/scorecard`, MCP `scorecard`, 42 tests |
 | **P12.3.1** | Same-bar SL/TP tie-break unified with the paper trader | One ambiguous candle grades identically in both graders; conservative stop-first (`+` BT7 §7.1) | ✅ **shipped** — `data/backtester.py` `<` → `<=`, `ambiguous_bar`, 5 tests |
 | **P12.3.2** | **Real market data** | Real BTCUSDT 1m backfilled with the P10 machinery; P11 / P12.1 / P12.3 re-run and re-reported on it | ✅ **shipped** — `backfill --from-csv`, `StoreClient`, `docs/REAL_DATA_RUN_2026-08-14.md` |
-| **P12.3.3** | Effective sample size | Overlapping walk-forward windows divided down; confidence intervals widened honestly | ▶ **next** — overlap inflates counts ~30× |
-| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ⏳ **deferred** — after P12.3.3 |
+| **P12.3.3** | Effective sample size | Overlapping walk-forward windows divided down; confidence intervals widened honestly | ✅ **shipped** — `N_eff = N / overlap` (≈30×), `SE = σ / √N_eff`, `step` column on `backtest_results`; `min_decided` floor flagged but unchanged (revisit next) |
+| P12.4 | Backtest Quality Score 0–100 | Fragile high-PnL curves score low; parameter-plateau test caps isolated-peak parameters (`+` BT5) | ▶ **next** — after P12.3.3 |
 | P12.5 | Strategy score on the calibrator | `E_R × sample-quality × regime-fit × execution` (≡ the audits' `E × Stability × SampleConfidence − penalties`) | ⏳ |
 | **P12.6** | Conditioned + net-of-costs expectancy | **Fees/spread first** (≈ 40× funding at a 1.8h hold), then OI / funding / CVD / regime from our store: `E_net = E_gross − fees − slip − funding`, funding joined as-of-T (`+` BT5) | ✅ **shipped** — `data/costs.py`, `E_net` on all surfaces, net bar |
 | P12.7 | MC ruin / worst streak / recovery / risk-of-ruin table | Graduation can see survivability, not just mean E: risk% × expected DD × ruin probability (`+` BT5) | ⏳ |

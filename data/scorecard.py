@@ -13,6 +13,9 @@ prints the numbers a discretionary desk actually needs before it risks money:
   * max drawdown in R (gross and net), longest win/loss streak
   * holding time (hours) — how long the money is exposed
   * cost breakdown: fees in R, spread/slippage in R, funding in R
+  * effective sample size N_eff (P12.3.3) — raw walk-forward counts divided
+    by the window-overlap factor (horizon_bars / step), with standard errors
+    and 95% confidence intervals widened honestly (SE = σ / √N_eff)
   * the same block split by **side** (long/short), **regime**, **session**,
     **setup**, and **market condition** (funding sign, CVD flow, OI trend)
 
@@ -40,6 +43,11 @@ history every few bars, so its "trades" overlap heavily; multiplying by
 sqrt(trades per year) would turn a Sharpe of 0.27 into a Sharpe of 36 and that
 number would be a lie.  The sample span and trades-per-day are reported as
 plain context instead, so the reader can judge frequency themselves.
+
+P12.3.3 closes the same overlap gap for sample *counts*: ``N_eff = N / overlap``
+(``overlap = horizon_bars / step``) is reported alongside raw ``N``, and every
+standard error / 95% confidence interval uses ``√N_eff`` rather than ``√N`` so
+the reported uncertainty does not silently shrink ~30×.
 """
 from __future__ import annotations
 
@@ -48,8 +56,9 @@ import statistics
 import time
 from typing import Iterable, Optional
 
-from config import GOLD_LONDON_WINDOW, GOLD_NY_WINDOW
+from config import BACKTEST_STEP, GOLD_LONDON_WINDOW, GOLD_NY_WINDOW
 from data.backtester import WIN_SET
+from data.binance_client import TIMEFRAME_TO_MS
 from data.costs import (
     CostModel, TradeCost, calculate_trade_cost, DEFAULT_STOP_DISTANCE_PCT,
     DEFAULT_HOLDING_HOURS,
@@ -112,6 +121,7 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
          symbol="", timeframe="", source="", entry=None, stop_loss=None,
          r_net=None, fee_r=None, slip_r=None, funding_r=None, cost_r=None,
          funding_rate=None, cvd_z=None, oi_trend=None,
+         horizon_hours: Optional[float] = None, step: Optional[int] = None,
          cost_model: Optional[CostModel] = None) -> dict:
     gross_r = float(r) if r is not None else 0.0
     hold = (round(float(holding_hours), 3)
@@ -153,6 +163,8 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
         "symbol": symbol or "",
         "timeframe": timeframe or "",
         "source": source,
+        "horizon_hours": horizon_hours,
+        "step": step,
         "session": session_of_ts(ts),
         "funding_rate": funding_rate,
         "cvd_z": cvd_z,
@@ -189,6 +201,7 @@ def rows_from_graded(graded: Iterable, symbol: str = "", timeframe: str = "",
             slip_r=getattr(g, "slip_r", None),
             funding_r=getattr(g, "funding_r", None),
             cost_r=getattr(g, "cost_r", None),
+            horizon_hours=getattr(g, "horizon_hours", None),
             cost_model=cost_model,
         ))
     rows.sort(key=lambda r: (r["ts"] is None, r["ts"]))
@@ -210,7 +223,7 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
     cols = {r["name"] for r in db.conn.execute("PRAGMA table_info(backtest_results)")}
     sel_cols = ["ts", "symbol", "timeframe", "plan_type", "action", "outcome",
                 "rr_achieved", "regime", "holding_hours", "horizon_hours"]
-    for extra in ("entry", "trigger_level", "rr_net", "fee_r", "slip_r", "funding_r", "cost_r"):
+    for extra in ("entry", "trigger_level", "rr_net", "fee_r", "slip_r", "funding_r", "cost_r", "step"):
         if extra in cols:
             sel_cols.append(extra)
 
@@ -242,6 +255,7 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
             r_net=d.get("rr_net"), fee_r=d.get("fee_r"),
             slip_r=d.get("slip_r"), funding_r=d.get("funding_r"),
             cost_r=d.get("cost_r"), cost_model=cost_model,
+            horizon_hours=d.get("horizon_hours"), step=d.get("step"),
         ))
     return out
 
@@ -301,6 +315,10 @@ def _empty_stats() -> dict:
         "fee_r": 0.0, "slip_r": 0.0, "funding_r": 0.0, "cost_r": 0.0,
         "avg_holding_hours": None, "median_holding_hours": None,
         "holding_samples": 0,
+        # Effective sample size (P12.3.3) — overlap-corrected, honest counts
+        "n_eff": 0.0, "overlap": None,
+        "expectancy_se": None, "expectancy_ci95": None,
+        "expectancy_net_se": None, "expectancy_net_ci95": None,
     }
 
 
@@ -330,7 +348,53 @@ def _streaks(r_values: list[float]) -> tuple[int, int]:
     return max_w, max_l
 
 
-def trade_stats(rows: list[dict]) -> dict:
+# ──────────────────────────────────────────────────────────────────────────
+# Effective sample size (P12.3.3)
+# ──────────────────────────────────────────────────────────────────────────
+def overlap_factor(row: dict, default_step: int = BACKTEST_STEP) -> float:
+    """How many walk-forward samples this row's evaluation window overlaps.
+
+    A walk-forward grade steps ``step`` bars and follows each plan over
+    ``horizon_bars`` future bars, so consecutive samples share
+    ``horizon_bars - step`` bars.  The overlap factor is
+    ``horizon_bars / step`` — one independent observation per full window.
+
+    Paper trades are real, non-overlapping positions → factor 1.0.  A
+    backtest row with no recorded horizon / timeframe / step is treated as
+    independent (1.0) rather than guessed: silence is not an edge, but
+    neither is inventing a divisor.
+    """
+    if (row.get("source") or "") != "backtest":
+        return 1.0
+    horizon_hours = row.get("horizon_hours")
+    timeframe = row.get("timeframe")
+    tf_ms = TIMEFRAME_TO_MS.get(timeframe) if timeframe else None
+    if not horizon_hours or not tf_ms:
+        return 1.0
+    step = row.get("step") or default_step
+    if step <= 0:
+        step = default_step
+    horizon_bars = max(1, int(float(horizon_hours) * 3_600_000 / tf_ms))
+    return max(1.0, horizon_bars / step)
+
+
+def effective_sample_size(rows: list[dict],
+                          default_step: int = BACKTEST_STEP) -> tuple[float, Optional[float]]:
+    """``(n_eff, overlap)`` — honest independent sample size.
+
+    ``n_eff = Σ 1/overlap_i``: each row contributes one independent unit
+    divided by its own window-overlap factor.  ``overlap`` is the aggregate
+    ``n / n_eff`` (the effective divisor, ≈ horizon_bars/step for a
+    homogeneous walk-forward book).
+    """
+    if not rows:
+        return 0.0, None
+    n_eff = sum(1.0 / overlap_factor(r, default_step) for r in rows)
+    overlap = (len(rows) / n_eff) if n_eff > 0 else None
+    return n_eff, (round(overlap, 2) if overlap is not None else None)
+
+
+def trade_stats(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
     """The scorecard block for one set of decided trades (gross and net)."""
     if not rows:
         return _empty_stats()
@@ -357,6 +421,7 @@ def trade_stats(rows: list[dict]) -> dict:
     r_values = [float(r["r"]) for r in rows]
     r_net_values = [float(r["r_net"]) for r in rows]
     n = len(r_values)
+    n_eff, overlap = effective_sample_size(rows, default_step=step)
 
     # ── Gross metrics ──────────────────────────────────────────────────────
     wins = [r for r in r_values if r > 0]
@@ -400,9 +465,28 @@ def trade_stats(rows: list[dict]) -> dict:
 
     holds = [r["holding_hours"] for r in rows if r.get("holding_hours") is not None]
 
+    # ── Effective sample size: honest standard error & 95% CI (P12.3.3) ────
+    # SE = σ / √N_eff.  The raw N would silently narrow every interval by the
+    # overlap factor (~30× on a 24h/15m walk-forward); N_eff does not.
+    def _ci(mean: float, sd: Optional[float]) -> tuple:
+        if not sd or n_eff <= 0:
+            return None, None
+        se = sd / math.sqrt(n_eff)
+        z = 1.96  # 95% two-sided
+        return round(se, 4), [round(mean - z * se, 4), round(mean + z * se, 4)]
+
+    expectancy_se, expectancy_ci95 = _ci(mean_r, stdev)
+    expectancy_net_se, expectancy_net_ci95 = _ci(mean_r_net, stdev_net)
+
     return {
         "n": n,
         "decided": n,
+        "n_eff": round(n_eff, 2),
+        "overlap": overlap,
+        "expectancy_se": expectancy_se,
+        "expectancy_ci95": expectancy_ci95,
+        "expectancy_net_se": expectancy_net_se,
+        "expectancy_net_ci95": expectancy_net_ci95,
         "wins": len(wins),
         "losses": len(losses),
         "win_rate": round(len(wins) / n, 3),
@@ -463,14 +547,15 @@ def _span(rows: list[dict]) -> dict:
             "trades_per_day": round(len(ts) / days, 2) if days else None}
 
 
-def _split(rows: list[dict], key: str, order: Optional[tuple] = None) -> dict:
+def _split(rows: list[dict], key: str, order: Optional[tuple] = None,
+           step: int = BACKTEST_STEP) -> dict:
     buckets: dict[str, list[dict]] = {}
     for r in rows:
         k = r.get(key) or "UNKNOWN"
         buckets.setdefault(str(k), []).append(r)
     keys = list(order) if order else sorted(buckets,
                                             key=lambda k: -len(buckets[k]))
-    return {k: trade_stats(buckets.get(k, [])) for k in keys
+    return {k: trade_stats(buckets.get(k, []), step=step) for k in keys
             if order or buckets.get(k)}
 
 
@@ -500,7 +585,7 @@ def _cvd_regime_label(r: dict) -> str:
     return "NEUTRAL_FLOW"
 
 
-def conditioned_splits(rows: list[dict]) -> dict:
+def conditioned_splits(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
     """Conditioned splits over derivatives & order-flow features (P12.6)."""
     # Funding regime
     by_funding: dict[str, list[dict]] = {}
@@ -515,8 +600,8 @@ def conditioned_splits(rows: list[dict]) -> dict:
         by_cvd.setdefault(lbl, []).append(r)
 
     return {
-        "by_funding": {k: trade_stats(v) for k, v in sorted(by_funding.items())},
-        "by_cvd": {k: trade_stats(v) for k, v in sorted(by_cvd.items())},
+        "by_funding": {k: trade_stats(v, step=step) for k, v in sorted(by_funding.items())},
+        "by_cvd": {k: trade_stats(v, step=step) for k, v in sorted(by_cvd.items())},
     }
 
 
@@ -527,16 +612,21 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
                     source: str = "", min_decided: int = DEFAULT_MIN_DECIDED,
                     criteria: Optional[dict] = None,
                     note: str = "",
-                    conditioned: bool = False) -> dict:
+                    conditioned: bool = False,
+                    step: int = BACKTEST_STEP) -> dict:
     """Assemble the boxed report from already-graded rows.
 
     Pure: same rows in → same report out.  Never raises on an empty sample;
     an empty book is reported as INSUFFICIENT_DATA, which is the truth.
     The verdict is evaluated NET of costs (P12.6).
+
+    ``step`` is the walk-forward bar step used to grade backtest rows, used
+    to correct sample counts for window overlap (P12.3.3).  Rows that carry
+    their own recorded ``step`` (from the store) override it.
     """
     criteria = criteria or VALIDATION_CRITERIA
     rows = [r for r in rows if r.get("r") is not None]
-    overall = trade_stats(rows)
+    overall = trade_stats(rows, step=step)
     overall.update(_span(rows))
 
     # Bar is evaluated NET of costs (P12.6)
@@ -573,19 +663,24 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
             "first_ts": min((r["ts"] for r in rows if r.get("ts")), default=None),
             "last_ts": max((r["ts"] for r in rows if r.get("ts")), default=None),
             "net_evaluation": True,
+            "step": step,
         },
         "overall": overall,
-        "by_side": _split(rows, "side", order=SIDES),
-        "by_regime": _split(rows, "regime"),
-        "by_session": _split(rows, "session", order=SESSION_NAMES),
-        "by_setup": _split(rows, "setup"),
+        "by_side": _split(rows, "side", order=SIDES, step=step),
+        "by_regime": _split(rows, "regime", step=step),
+        "by_session": _split(rows, "session", order=SESSION_NAMES, step=step),
+        "by_setup": _split(rows, "setup", step=step),
         "criteria": dict(criteria),
         "bar": {"met": bool(bar_met), "unmet": bar_unmet,
-                "min_decided": min_decided, "evaluated_on": "net"},
+                "min_decided": min_decided, "evaluated_on": "net",
+                # P12.3.3: the gate still reads raw N (min_decided revisit is a
+                # later decision) — this flag is the honest signal that the
+                # overlap-corrected sample is below the floor.
+                "n_eff_below_min_decided": overall["n_eff"] < min_decided},
         "verdict": {"status": status, "reason": reason},
     }
     if conditioned:
-        report["conditioned"] = conditioned_splits(rows)
+        report["conditioned"] = conditioned_splits(rows, step=step)
     return report
 
 
@@ -595,7 +690,8 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
                       since_ts: Optional[int] = None,
                       until_ts: Optional[int] = None,
                       cost_model: Optional[CostModel] = None,
-                      conditioned: bool = False) -> dict:
+                      conditioned: bool = False,
+                      step: int = BACKTEST_STEP) -> dict:
     """Scorecard over what the desk has already graded and stored.
 
     ``source``: ``backtest`` | ``paper`` | ``all`` (both books combined).
@@ -635,7 +731,7 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
     return build_scorecard(rows, symbol=symbol or "", source=source,
                            min_decided=min_decided,
                            note="stored outcomes (no re-grading)",
-                           conditioned=conditioned)
+                           conditioned=conditioned, step=step)
 
 
 def scorecard_from_store(exchange: str = "binance", market: str = "perp",
@@ -678,7 +774,7 @@ def scorecard_from_store(exchange: str = "binance", market: str = "perp",
                            source="store", min_decided=min_decided,
                            note=f"fresh walk-forward grade, primary horizon "
                                 f"{primary}h",
-                           conditioned=conditioned)
+                           conditioned=conditioned, step=step)
     card["meta"]["bars_read"] = result.get("bars_read")
     card["meta"]["store_path"] = result.get("store_path")
     card["meta"]["primary_horizon_hours"] = primary
@@ -736,11 +832,21 @@ def print_scorecard(report: dict) -> None:
     span = ""
     if m.get("span_days") or o.get("span_days"):
         span = f"   span {o.get('span_days')}d"
-    print(f"decided trades {o['n']}   min_decided {m['min_decided']}{span}"
+    n_eff_bits = ""
+    if o.get("n_eff"):
+        ov = f", overlap ×{o['overlap']}" if o.get("overlap") else ""
+        n_eff_bits = f"   (~{o['n_eff']} independent{ov})"
+    print(f"decided trades {o['n']}{n_eff_bits}   min_decided {m['min_decided']}{span}"
           f"{'   ' + m['note'] if m.get('note') else ''}")
     print("-" * W)
+    ci = ""
+    if o.get("expectancy_net_ci95"):
+        lo, hi = o["expectancy_net_ci95"]
+        ci = f"   95% CI net [{lo:+.3f}, {hi:+.3f}]R (N_eff={o['n_eff']})"
     print(f"  expectancy   {_fmt(o['expectancy'])}R gross → {_fmt(o['expectancy_net'])}R net  "
           f"(cost {_fmt(-o['cost_r'])}R: fee {_fmt(o['fee_r'])}R, slip {_fmt(o['slip_r'])}R, fund {_fmt(o['funding_r'])}R)")
+    if ci:
+        print(f"  expectancy CI{ci}")
     print(f"  win rate     {_fmt_pct(o['win_rate'])} gross → {_fmt_pct(o['win_rate_net'])} net "
           f"({o.get('wins_net', o['wins'])}W/{o.get('losses_net', o['losses'])}L net)")
     pf_g = str(o['pf']) if o['pf'] is not None else 'n/a'
@@ -814,6 +920,10 @@ def print_scorecard(report: dict) -> None:
           f"win rate > {c['win_rate']:.0%}   PF >= {c['pf']}   "
           f"decided >= {report['bar']['min_decided']}")
     print(f"VERDICT  {icon} {v['status']}  —  {v['reason']}")
+    if report["bar"].get("n_eff_below_min_decided"):
+        print(f"  ⚠ overlap-corrected sample {o['n_eff']} < min_decided "
+              f"{report['bar']['min_decided']} — the raw count overstates the "
+              f"evidence ~×{o['overlap']}")
     if v["status"] != "PASS":
         print("  This is a scorecard, not permission. The graduation bar is "
               "unchanged.")

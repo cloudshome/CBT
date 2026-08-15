@@ -311,7 +311,7 @@ def cmd_backtest(args) -> int:
         for g in result["graded"]:
             r = g.as_row()
             r.update({"run_id": run_id, "symbol": symbol,
-                      "timeframe": args.tf})
+                      "timeframe": args.tf, "step": args.step})
             rows.append(r)
         with SignalDB() as db:
             n = db.save_backtest_rows(rows, run_id)
@@ -404,7 +404,8 @@ def cmd_scorecard(args) -> int:
             source=source, min_decided=args.min_decided,
             include_sim=not args.exclude_sim,
             since_ts=since_ts, until_ts=until_ts,
-            cost_model=cost_model, conditioned=conditioned)
+            cost_model=cost_model, conditioned=conditioned,
+            step=args.step)
 
     if args.json:
         print(json.dumps(report, indent=2, default=str))
@@ -1900,7 +1901,8 @@ def main(argv: list[str] | None = None) -> int:
     p_score.add_argument("--min-bars", type=int, default=BACKTEST_MIN_BARS,
                          help="--source store: engine warm-up bars")
     p_score.add_argument("--step", type=int, default=3,
-                         help="--source store: walk-forward bar step")
+                         help="walk-forward bar step used to grade backtest "
+                              "rows (overlap correction, P12.3.3)")
     p_score.add_argument("--min-conf", type=int, default=MIN_CONFIDENCE)
     p_score.add_argument("--min-decided", type=int, default=30,
                          help="minimum decided trades before a verdict is given")

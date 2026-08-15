@@ -14,9 +14,9 @@ import pytest
 from data.database import SignalDB
 from data.scorecard import (
     DECIDED_BACKTEST, DECIDED_PAPER, SESSION_NAMES, build_scorecard,
-    max_drawdown_r, print_scorecard, rows_from_backtest_db, rows_from_graded,
-    rows_from_paper_db, scorecard_from_db, session_of_hour, session_of_ts,
-    trade_stats,
+    effective_sample_size, max_drawdown_r, overlap_factor, print_scorecard,
+    rows_from_backtest_db, rows_from_graded, rows_from_paper_db,
+    scorecard_from_db, session_of_hour, session_of_ts, trade_stats,
 )
 
 MS_PER_HOUR = 3_600_000
@@ -553,3 +553,98 @@ def test_scorecard_conditioned_splits():
     assert "NEGATIVE" in cond["by_funding"]
     assert "BULLISH_FLOW" in cond["by_cvd"]
     assert "BEARISH_FLOW" in cond["by_cvd"]
+
+
+# ── P12.3.3 — effective sample size (overlap-corrected, honest counts) ────
+
+def bt_row_overlap(r, ts, *, horizon_hours=24.0, step=3, timeframe="15m"):
+    """A decided backtest row carrying its own horizon + step (walk-forward)."""
+    d = row(r, ts=ts, source="backtest")
+    d["horizon_hours"] = horizon_hours
+    d["step"] = step
+    d["timeframe"] = timeframe
+    return d
+
+
+def test_overlap_factor_is_window_bars_over_step():
+    # 15m bars → 4 bars/hour. 24h horizon = 96 bars; step 3 → 96/3 = 32×.
+    r = bt_row_overlap(1.0, ts=1, horizon_hours=24.0, step=3)
+    assert overlap_factor(r) == 32.0
+    # 4h horizon = 16 bars; step 3 → 5.33×.
+    r4 = bt_row_overlap(1.0, ts=1, horizon_hours=4.0, step=3)
+    assert abs(overlap_factor(r4) - 16 / 3) < 1e-9
+    # step 1 (every bar) → overlap == horizon_bars.
+    assert overlap_factor(bt_row_overlap(1.0, ts=1, horizon_hours=4.0, step=1)) == 16.0
+
+
+def test_overlap_factor_paper_and_unknown_are_independent():
+    # Paper trades are real, non-overlapping positions.
+    paper = row(1.0, ts=1, source="paper")
+    paper["horizon_hours"] = 24.0
+    paper["step"] = 3
+    assert overlap_factor(paper) == 1.0
+    # A backtest row with no recorded horizon cannot be divided honestly:
+    # treat it as independent rather than inventing a divisor.
+    assert overlap_factor(row(1.0, ts=1, source="backtest")) == 1.0
+    # Step <= 0 falls back to the passed default rather than dividing by zero.
+    bad = bt_row_overlap(1.0, ts=1, horizon_hours=4.0, step=0)
+    assert overlap_factor(bad, default_step=3) == 16 / 3
+
+
+def test_effective_sample_size_divides_by_overlap():
+    rows = [bt_row_overlap(1.0, ts=i + 1, horizon_hours=24.0, step=3)
+            for i in range(96)]
+    n_eff, overlap = effective_sample_size(rows)
+    assert n_eff == 3.0        # 96 decided / 32× overlap
+    assert overlap == 32.0
+    # Independent rows (paper) contribute one full unit each.
+    assert effective_sample_size([row(1.0, ts=1, source="paper"),
+                                  row(-1.0, ts=2, source="paper")]) == (2.0, 1.0)
+    assert effective_sample_size([]) == (0.0, None)
+
+
+def test_trade_stats_reports_honest_n_eff_and_widens_ci():
+    """SE = σ/√N_eff, not σ/√N — the raw N would understate uncertainty ~32×."""
+    rs = [1.0 if i % 2 == 0 else -1.0 for i in range(96)]
+    rows = [bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3)
+            for i, r in enumerate(rs)]
+    s = trade_stats(rows, step=3)
+    assert s["n"] == 96
+    assert s["n_eff"] == 3.0
+    assert s["overlap"] == 32.0
+    # mean ≈ 0, stdev ≈ 1.005 → SE_eff ≈ 0.58, CI half-width ≈ 1.14.
+    assert s["expectancy_se"] is not None
+    assert s["expectancy_se"] > 0.5
+    lo, hi = s["expectancy_ci95"]
+    assert hi - lo > 2.0, "interval must be widened by the overlap factor"
+    # Net CI present and sane too.
+    assert s["expectancy_net_ci95"][1] - s["expectancy_net_ci95"][0] > 2.0
+
+
+def test_build_scorecard_flags_n_eff_below_min_decided():
+    # 96 overlapping rows = only 3 independent, yet raw n clears min 30.
+    rs = [1.0 if i % 2 == 0 else -1.0 for i in range(96)]
+    rows = [bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3)
+            for i, r in enumerate(rs)]
+    rep = build_scorecard(rows, min_decided=30, step=3)
+    assert rep["overall"]["n_eff"] == 3.0
+    assert rep["overall"]["overlap"] == 32.0
+    assert rep["bar"]["n_eff_below_min_decided"] is True
+    assert rep["meta"]["step"] == 3
+    # Splits inherit the same correction.
+    assert rep["by_side"]["BUY"]["n_eff"] == rep["overall"]["n_eff"]
+
+
+def test_backtest_rows_roundtrip_step_and_horizon(db):
+    """Stored backtest rows must carry horizon + step so the scorecard can
+    compute the overlap factor exactly (P12.3.3)."""
+    rows = [bt_row(ts=1, action="BUY", outcome="FULL_WIN", rr=2.0)]
+    rows[0]["step"] = 3
+    db.save_backtest_rows(rows, "run-1")
+    out = rows_from_backtest_db(db)
+    assert len(out) == 1
+    assert out[0]["horizon_hours"] == 4.0
+    assert out[0]["step"] == 3
+    assert out[0]["source"] == "backtest"
+    # 4h horizon on 15m bars = 16 bars; step 3 → 5.33× overlap.
+    assert abs(overlap_factor(out[0]) - 16 / 3) < 1e-9

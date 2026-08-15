@@ -27,7 +27,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.6.0"  # bumped: P12.6 net-of-costs expectancy and cost drag
+SERVER_VERSION = "1.7.0"  # bumped: P12.3.3 effective sample size (N_eff, widened CI)
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -116,7 +116,7 @@ ALLOWED_TOOLS = {
         },
     },
     "scorecard": {
-        "description": "P12.3 & P12.6 strategy scorecard: boxed block of gross and NET expectancy R (E_net = E_gross − fees − slip − funding), win rate, profit factor, Sharpe/Sortino/Calmar, max drawdown, cost breakdown, and holding time, split by side (long/short), regime, session, setup, and market conditions — over outcomes the grader already produced. Read-only; the same as `python main.py scorecard --json`. Evaluates performance NET of costs; never grants permission to trade.",
+        "description": "P12.3 & P12.6 & P12.3.3 strategy scorecard: boxed block of gross and NET expectancy R (E_net = E_gross − fees − slip − funding), win rate, profit factor, Sharpe/Sortino/Calmar, max drawdown, cost breakdown, holding time, and effective sample size (N_eff, overlap-corrected with widened 95% confidence intervals), split by side (long/short), regime, session, setup, and market conditions — over outcomes the grader already produced. Read-only; the same as `python main.py scorecard --json`. Evaluates performance NET of costs; never grants permission to trade.",
         "inputSchema": {
             "type": "object",
             "properties": {

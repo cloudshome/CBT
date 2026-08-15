@@ -10,12 +10,32 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-15 (this session: **P12.6 fees-first `E_net` & conditioned expectancy shipped** — trade cost modeling in R units, funding as-of-T, net graduation bar enforced on all surfaces)
-**Branch:** `arena/01a003f9-sky` (session branch fixed by Arena; branched from `origin/main` @ `58ed864`, the merged P12.3.2 PR #22)
-**HEAD commit:** `c91ac9e` (P12.6 fees-first `E_net` & conditioned expectancy) on top of `58ed864`. PR **#23** is open, `MERGEABLE`, CI running — the human merges it.
-**Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI); this session's sandbox ran 3.11 with pandas 3.0.5 / pyarrow 25 — suite green
+**Last updated:** 2026-08-15 (this session: **P12.3.3 effective sample size shipped** — walk-forward counts divided by window overlap, honest `N_eff` & widened CI/SE, `step` stored on `backtest_results`)
+**Branch:** `arena/01a00417-sky` (session branch fixed by Arena; branched from `origin/main` @ `abed6cc`, the merged P12.6 PR #23)
+**HEAD commit:** `abed6cc` (P12.6 fees-first `E_net` & conditioned expectancy) — this session's P12.3.3 work commits on top of it.
+**Python:** 3.10+ tested on 3.10–3.13 + Windows (per existing CI); this session's sandbox ran 3.11 (venv `.venv`) — suite green (573 pass / 1 skip)
 
-> **This session (`arena/01a003f9-sky`): P12.6 — fees-first `E_net` & conditioned expectancy.**
+> **This session (`arena/01a00417-sky`): P12.3.3 — effective sample size in the scorecard.**
+> Walk-forward grading steps `step` bars and follows each plan over
+> `horizon_bars` future bars, so consecutive samples overlap heavily — a 24h
+> horizon on 15m bars graded at step 3 shares 96/3 ≈ 32 windows, so "384
+> decided" was really ~12 independent observations. The scorecard now:
+> - **Divides counts by overlap** — `overlap_factor()` / `effective_sample_size()`
+>   in `data/scorecard.py` compute `overlap = horizon_bars / step` per row
+>   (paper trades = 1.0; unrecorded horizon/timeframe/step = 1.0, never guessed)
+>   and `N_eff = Σ 1/overlap_i`, reported as `n_eff` and `overlap`.
+> - **Widens uncertainty honestly** — `SE = σ / √N_eff` and a 95% CI
+>   (`expectancy_se`, `expectancy_ci95`, `expectancy_net_se`,
+>   `expectancy_net_ci95`) on every stats block, overall and per split.
+> - **Stores the step** — `backtest_results` gained a `step` column (additive
+>   migration + save path) so the factor is exact, not assumed.
+> - **Flags, does not change, the floor** — `min_decided` still reads raw N;
+>   `n_eff_below_min_decided` surfaces when the honest sample is thin. The
+>   floor revisit is the next decision, not this one.
+> Version **2.13.0 → 2.14.0**; MCP `scorecard` **1.6.0 → 1.7.0**.
+> Suite **567 → 573 pass / 1 skip** (+6).
+
+> **Prior session (`arena/01a003f9-sky`, merged as PR #23): P12.6 — fees-first `E_net` & conditioned expectancy.**
 > Costs are now integrated into every performance measurement across the desk:
 > `E_net = E_gross − fees − slip − funding`, where every term is expressed
 > in **R units per trade**.
@@ -97,20 +117,21 @@ plan (18 phases, 15-item rulebook) is in
 Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
 (our own stored market history — ✅ P10.1–P10.12 shipped, with real market
-data imported and verified; research validation proof — 🔄 P12.1–P12.6 shipped;
-next is **P12.3.3 effective sample size**, then P12.4/P12.5). Every phase
+data imported and verified; research validation proof — 🔄 P12.1–P12.6 &
+P12.3.3 shipped;
+next is **P12.4 backtest quality score**, then P12.5/P12.7). Every phase
 below is ordered by how directly it moves those two lines.
 
 ---
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.6 fees-first `E_net` shipped.** P10
-(data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
+**P12 (SKY Quant Validation Engine) — P12.3.3 effective sample size shipped.**
+P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real data and the graduation gate is honestly closed (+0.348R gross,
 negative net on 1h/4h primary). Freqtrade rejected (F1–F8); Backtrader
-rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.3.3 (effective sample size)**
-→ P12.4 → P12.5 → P12.7.
+rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.4 (backtest quality score)**
+→ P12.5 → P12.7.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -125,7 +146,7 @@ rejected (BT1–BT8). Open items: TODO-7, TODO-8; **P12.3.3 (effective sample si
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.6 shipped — fees-first `E_net` & conditioned expectancy** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; **P12.6: `data/costs.py`, `E_net = E_gross − fees − slip − funding`, funding joined as-of-T, net graduation bar enforced**). Next: **P12.3.3 effective sample size**. |
+| **P12** | **Quant Validation Engine** | 🔄 In progress | **P12.3.3 shipped — effective sample size** (P12.1 locked protocol; P12.2 lookahead guard; P12.3 scorecard; P12.3.1 tie-break unified; P12.3.2 real market data; P12.6 fees-first `E_net`; **P12.3.3: `N_eff = N / overlap`, widened CI/SE, `step` stored on `backtest_results`**). Next: **P12.4 backtest quality score**. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -171,12 +192,12 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
-1. **TODO-13 (P12.3.3) — Effective sample size in the scorecard.**
-   Walk-forward grading with multi-bar horizons causes overlapping trades (~30× overlap).
-   Divide trade counts by overlap factor to report honest independent sample count $N_{\text{eff}}$
-   and widen standard errors / confidence intervals honestly.
-2. **TODO-13 (P12.4 / P12.5) — Backtest Quality Score & Strategy Score on the calibrator.**
-   Score parameter plateaus and robustness over real, net-of-costs data.
+1. **TODO-13 (P12.4) — Backtest Quality Score 0–100.**
+   Fragile high-PnL curves score low; parameter-plateau test caps
+   isolated-peak parameters (`+` BT5). Now scores something real
+   (net-of-costs, overlap-corrected).
+2. **TODO-13 (P12.5) — Strategy Score on the calibrator.**
+   `E_R × sample-quality × regime-fit × execution`.
 3. **TODO-13 (P12.7) — Monte Carlo ruin & risk-of-ruin table.**
 4. **TODO-7** — human pastes the wheel-gate job into the **real**
    `.github/workflows/ci.yml` (the `docs/` copy is inert).
@@ -198,14 +219,16 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    committed sample data is stale by design. Expected offline.
 5. **Arena cannot push under `.github/workflows/`.** The wheel-gate
    job spec lives at `docs/.github/workflows/ci.yml` (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.13.0.
+6. **`CHANGELOG.md` is current** through v2.14.0.
 7. **Real market data is imported offline**: Binance spot BTCUSDT 1m
    (696,960 bars, sha256-pinned `c4ad6029…b934b7`). The store is
    gitignored; re-import with `backfill --from-csv` if starting in a clean sandbox.
 8. **Costs are now integrated via P12.6**: `E_net = E_gross − fees − slip − funding`.
    The graduation bar is enforced NET of costs.
-9. **Reported sample counts are still inflated ~30×** by overlapping
-   walk-forward windows. That is P12.3.3 (next milestone).
+9. **Sample counts are now overlap-corrected (P12.3.3)**: the scorecard
+   reports `N_eff = N / overlap` and widened CI/SE. The `min_decided`
+   floor still reads raw N (flagged via `n_eff_below_min_decided`) — the
+   floor revisit is the next decision, not this one.
 10. **Freqtrade was reviewed and rejected (F1–F8)** (`docs/FREQTRADE_REVIEW.md`).
 11. **Backtrader was reviewed and rejected (BT1–BT8)** (`docs/BACKTRADER_REVIEW.md`).
 
@@ -213,27 +236,27 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Next recommended action
 
-1. Next *code* session: **P12.3.3 — effective sample size in the scorecard.**
-   Divide walk-forward sample counts by the window overlap factor (~30× on 15m/24h or ~5.3× on 15m/4h)
-   to report honest independent sample size ($N_{\text{eff}}$) alongside raw count $N$,
-   and widen standard errors honestly in the scorecard.
+1. Next *code* session: **P12.4 — backtest quality score 0–100.**
+   Fragile high-PnL curves score low; parameter-plateau test caps
+   isolated-peak parameters (`+` BT5). Now scores real, net-of-costs,
+   overlap-corrected data.
 2. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 3. Do **not** install Freqtrade or Backtrader. Do not loosen the graduation bar.
 
-Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_6.md`](docs/HANDOVER_2026-08-15_P12_6.md).
+Narrative handover for this session: [`docs/HANDOVER_2026-08-15_P12_3_3.md`](docs/HANDOVER_2026-08-15_P12_3_3.md).
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first,
-> and confirm the P12.6 PR merged. P12.1, P12.2, P12.3, P12.3.1, P12.3.2,
-> and P12.6 are shipped: do not redo the locked protocol, the
+> and confirm the P12.3.3 PR merged. P12.1, P12.2, P12.3, P12.3.1, P12.3.2,
+> P12.6, and P12.3.3 are shipped: do not redo the locked protocol, the
 > negative-shift guard, the boxed scorecard, the tie-break, the real data
-> import, or trade cost modeling. Implement **P12.3.3 — effective sample size
-> in the scorecard**: divide walk-forward trade counts by the window overlap
-> factor so the scorecard reports honest independent sample sizes ($N_{\text{eff}}$)
-> alongside raw trade counts and widens confidence intervals honestly. Keep
-> the existing grader/store, do not adopt Freqtrade or Backtrader, and do not
-> loosen the graduation bar.
+> import, trade cost modeling, or the overlap-corrected effective sample
+> size. Implement **P12.4 — backtest quality score**: score the robustness of
+> the curve (fragile high-PnL curves score low) and run the parameter-plateau
+> test that caps isolated-peak parameters, over the now-real net-of-costs,
+> overlap-corrected data. Keep the existing grader/store, do not adopt
+> Freqtrade or Backtrader, and do not loosen the graduation bar.
 
 ---
 
@@ -330,18 +353,18 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.6 shipped**
-   (fees-first `E_net`, trade costs engine, net graduation bar, conditioned splits).
-2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` — **567 pass /
-   1 skip** (+15: 12 `test_costs.py`, 3 scorecard net & conditioned tests).
+1. [x] Finish or safely stop the current task. — **P12.3.3 shipped**
+   (effective sample size: `N_eff = N / overlap`, widened CI/SE, `step` stored).
+2. [x] Run `.venv/bin/python -m pytest tests/ -q` — **573 pass / 1 skip**
+   (+6: `test_scorecard.py` P12.3.3 tests).
 3. [x] Fix any obvious failures. — none left open.
 4. [x] Update `SESSION_STATE.md` with the exact current state.
-5. [x] Update `TODO.md` — P12.6 marked shipped; P12.3.3 is next.
-6. [x] Update `CHANGELOG.md` — 2.13.0 P12.6 entry.
+5. [x] Update `TODO.md` — P12.3.3 marked shipped; P12.4 is next.
+6. [x] Update `CHANGELOG.md` — 2.14.0 P12.3.3 entry.
 7. [x] Record all files changed in `SESSION_STATE.md`.
 8. [x] Record the last successful test command.
 9. [x] Record the last commit reference.
 10. [x] Record any known bugs or unresolved issues.
-11. [x] `git add` / `git commit` — commit and push to `origin/arena/01a003f9-sky`.
+11. [x] `git add` / `git commit` — commit and push to `origin/arena/01a00417-sky`.
 12. [x] Open the session PR as the closing step — PR from
-    `arena/01a003f9-sky` → `main` (P12.6).
+    `arena/01a00417-sky` → `main` (P12.3.3).
