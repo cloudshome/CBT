@@ -611,6 +611,36 @@ class SignalDB:
         q += " ORDER BY COALESCE(closed_ts, opened_ts, created_ts) ASC"
         return [dict(r) for r in self.conn.execute(q, args).fetchall()]
 
+    def live_book_rows(self, since_ts: int | None = None,
+                       symbol: str | None = None) -> list[dict]:
+        """THE live paper book (P12.15): decided, non-simulator, canonical-live.
+
+        One definition, many surfaces (invariant #10). Every live *risk
+        control* — the daily/weekly loss limits, the drawdown ladder, the
+        Kelly advisory, MC ruin/equity, MAE/MFE review and the business
+        scorecard — must read this population and nothing wider:
+
+        * decided only (``TP_HIT`` / ``STOP_LOSS``);
+        * ``sim_key IS NULL`` — simulator walk-forward samples are
+          calibration evidence with backdated timestamps, not today's
+          trading;
+        * canonical live source only (``COALESCE(source_key,'') = ''``,
+          which by P12.11 convention also matches legacy NULL-provenance
+          rows — those rows *are* the canonical Binance series).
+
+        Before P12.15 these controls read ``decided_paper_rows(exclude_sim=True)``
+        with no provenance filter, so a research book (e.g.
+        ``dukascopy:spot:bid``) pooled into the live risk read: research wins
+        could mask real losses past the daily loss limit and flatten a real
+        drawdown (fail **open**), and research losses could block a live desk
+        that had not traded (research must neither unlock nor block —
+        P12.13). Research books remain fully inspectable through the
+        source-filtered scorecard surfaces.
+        """
+        return self.decided_paper_rows(since_ts=since_ts, symbol=symbol,
+                                       exclude_sim=True,
+                                       source_key="")
+
     def discipline_rows(self, source_key: str | None = "") -> list[dict]:
         """Decided REAL paper trades joined to their journal answer (P12.14).
 

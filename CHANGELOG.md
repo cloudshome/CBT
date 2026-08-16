@@ -10,6 +10,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.23.3] — 2026-08-16 · P12.15 live-book source isolation
+
+PATCH: the live *risk controls* are now isolated to the canonical live book
+the way P12.13/P12.14 isolated the graduation gate. Every one of them read
+`decided_paper_rows(exclude_sim=True)` with no provenance filter — the
+P12.11 source boundary never reached them — so a research book (e.g.
+`dukascopy:spot:bid`) pooled straight into the daily/weekly loss limits, the
+drawdown ladder, the Kelly advisory, the Monte Carlo ruin/equity reads,
+MAE/MFE review and the business scorecard. Measured on `fdfc9f4`: 5 real
+canonical losses today (−1.25%, past the student 1.0% daily limit) plus 6
+research wins read `+7R / not blocked` — the loss limit failed **open**; a
+24-loss canonical streak (6.0% drawdown, `reduce_risk`) interleaved with
+research wins read `0.25% / normal`; and 8 research-only losses **blocked** a
+live desk that had not traded at all. No threshold changed; every control is
+strictly truer to the book it protects.
+
+### Added
+
+- `SignalDB.live_book_rows()` — the single definition of the live paper
+  book: decided (`TP_HIT`/`STOP_LOSS`), non-simulator (`sim_key IS NULL`),
+  canonical-live (`COALESCE(source_key,'')=''`, legacy NULL rows included).
+  One computation, many surfaces (invariant #10).
+- `engine.hidden_alpha.kelly_from_rows()` — Kelly advisory computed from the
+  live book's actual trade rows, judged **net of costs** where `rr_net` is
+  recorded (P12.8, gross fallback). A decided book with no net winners
+  stands aside at 0.0% instead of pleading "insufficient evidence"; an empty
+  book suggests nothing. Advisory only — nothing auto-executes on it.
+- Probe harness `ops/probes/p12_15_livebook_probe.py` — six executable
+  cases (A–F) proving each failure mode closed and the control book
+  unchanged; exits non-zero on any regression.
+- `tests/test_livebook_isolation.py` — 12 regressions pinning every live
+  control to `live_book_rows()` and the honest canonical book to its exact
+  pre-P12.15 numbers.
+
+### Fixed
+
+- Daily/weekly loss limits (`brain.risk_gate.closed_pnl`) fail closed:
+  research wins can no longer offset real canonical losses past the limit,
+  and research losses can no longer trip a limit the live book never hit.
+- Drawdown ladder (`brain.risk_gate.drawdown`): research wins can no longer
+  refill a real losing streak before it reaches `reduce_risk` /
+  `stop_and_review`, and research losses cannot deepen a drawdown the desk
+  never took.
+- The Kelly advisory was silently dead on any populated book:
+  `risk_gate.evaluate()` and `trading_intelligence` fed raw `paper_trades`
+  rows into `kelly_from_progress()`, which expects `paper_progress()`
+  aggregates — `KeyError('wins')` was swallowed by a blanket `except` into a
+  permanent `{"note": "unavailable"}`, so the dashboard Kelly card never
+  rendered with data. Both call sites now use `kelly_from_rows()` over
+  `live_book_rows()`.
+- `brain.analytics.monte_carlo_ruin_table` / `monte_carlo_equity` /
+  `mae_mfe_summary` and `brain.metrics.business_metrics` / `_equity_curve`
+  read the live book only: a research series can neither flatter nor spoil
+  the desk's survivability, review or business numbers.
+
+### Unchanged
+
+- Every threshold and cap: the loss limits, the drawdown ladder rungs, the
+  Kelly clamp (`KELLY_MAX_RISK_PCT`), the graduation bar.
+- `decided_paper_rows()` keeps its exact signature and behaviour for
+  explicit callers; the scorecard's research surfaces
+  (`rows_from_paper_db(..., source_key=…)`, `by_source`) still inspect any
+  series on demand.
+- P12.11 source-key algebra, P12.13/P12.14 graduation isolation, XAU
+  research-only status, and the no-order-placement contract.
+
+### Verification
+
+- Full suite **748 passed / 1 skipped** (+12); probe harness exits 0 with
+  all six cases behaving as specified; `compileall`, `pip check` and the
+  v2.23.3 wheel gate pass.
+
+---
+
 ## [2.23.2] — 2026-08-16 · P12.14 graduation discipline isolation
 
 PATCH: the discipline half of the graduation gate is now isolated the way

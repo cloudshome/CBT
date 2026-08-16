@@ -6,13 +6,22 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-16 (**v2.23.2 / P12.14 shipped — graduation
+**Last updated:** 2026-08-16 (**v2.23.3 / P12.15 shipped — live-book source
+isolation**. Every live risk control — daily/weekly loss limits, drawdown
+ladder, Kelly advisory, MC ruin/equity, MAE/MFE, business scorecard — now
+reads `SignalDB.live_book_rows()`: decided, non-simulator, canonical-live
+only. Research books can neither mask real losses (fail-open) nor trip live
+limits. The silently-dead Kelly advisory (KeyError swallowed into
+"unavailable" since wiring) was repaired: net-anchored, clamped,
+advisory-only. Thresholds unchanged. Suite green: **748 pass / 1 skip**
+(+12). To be delivered as this session's PR.)
+
+**Previous:** 2026-08-16 (**v2.23.2 / P12.14 shipped — graduation
 discipline isolation**. Compliance is now computed once, over decided,
 non-simulator, canonical-live paper trades only, and missing or blank journals
 fail closed. Simulator grinds and research books can no longer prove human
 discipline. Threshold, performance criteria and source-key algebra unchanged.
-Suite green: **736 pass / 1 skip** (+10). Pushed to `arena/01a008d1-sky` and
-opened as **PR #37**; both root CI jobs pass. Awaiting human review.)
+Suite green: **736 pass / 1 skip** (+10). Merged as **PR #37**.)
 
 **Previous:** 2026-08-16 (**v2.23.1 / P12.13 shipped — global
 graduation source isolation**). Review found that P12.11 isolated calibration
@@ -52,7 +61,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 736 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 748 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -75,7 +84,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | ✅ **P12.1–P12.14 shipped** — locked/sealed validation, fees-first `E_net`, effective sample size, quality/strategy scores, MC risk, calendars, gold costs, source isolation, and the read-only XAU promotion-evidence dossier |
+| **Validation independence** | Research-grade proof on our own data | ✅ **P12.1–P12.15 shipped** — locked/sealed validation, fees-first `E_net`, effective sample size, quality/strategy scores, MC risk, calendars, gold costs, source isolation (graduation **and** live risk controls), and the read-only XAU promotion-evidence dossier |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -88,6 +97,35 @@ Do not reopen them to install a bot or a second backtest engine.
 ---
 
 ## 🔥 Top priority — start here in the next session
+
+### TODO-17 / P12.15 · Live-book source isolation · ✅ SHIPPED (v2.23.3)
+
+**Report:** [`docs/HANDOVER_2026-08-16_P12_15.md`](docs/HANDOVER_2026-08-16_P12_15.md)
+**Harness:** `.venv/bin/python ops/probes/p12_15_livebook_probe.py`
+
+P12.13/P12.14 isolated the graduation gate to the canonical live book, but
+every live *risk control* still read `decided_paper_rows(exclude_sim=True)`
+with no provenance filter. On `fdfc9f4` that meant 5 real canonical losses
+today (−1.25%, past the 1.0% daily limit) plus 6 research wins read
+`+7R / not blocked` — the loss limit failed **open**; a 24-loss canonical
+streak (6.0% dd) interleaved with research wins read `0.25% / normal`; 8
+research-only losses **blocked** a desk that had not traded; and the Kelly
+advisory was silently dead on any populated book (`KeyError('wins')`
+swallowed into "unavailable" — it was fed raw rows but expects
+`paper_progress()` aggregates).
+
+Now `SignalDB.live_book_rows()` is the single definition of the live book
+(decided, `sim_key IS NULL`, canonical-live, legacy NULL rows kept) and every
+live control reads it: `closed_pnl()` (daily/weekly limits), `drawdown()`
+(ladder), both Kelly call sites (via the new
+`engine.hidden_alpha.kelly_from_rows()`, net-anchored per P12.8),
+`monte_carlo_ruin_table()` / `monte_carlo_equity()` / `mae_mfe_summary()`,
+and `business_metrics()`. The scorecard keeps its explicit `source_key` /
+`by_source` research surfaces. No threshold moved in either direction.
+
+**Next executable work is unchanged by this build:** run the real-host XAU
+evidence procedure, and keep grinding the canonical paper book — journaling
+every decided real trade.
 
 ### TODO-16 / P12.14 · Graduation discipline isolation · ✅ SHIPPED (v2.23.2)
 
@@ -233,6 +271,7 @@ order changed as a result.
 | **P12.12** | **PAXG-vs-XAU promotion evidence** | ✅ **tooling shipped** — `data/gold_basis.py`, CLI `xau-evidence`, exact-time basis/tracking report + current sealed-OOS inspection; real-host evidence remains open; never approves or trades | S |
 | **P12.13** | **graduation source isolation** | ✅ **shipped** — global progress is canonical-live-only; direct research progress fails closed; scorecards retain research visibility | XS |
 | **P12.14** | **graduation discipline isolation** | ✅ **shipped** — one canonical-live, non-simulator, decided-paper `graduation_discipline(db)`; missing/blank journals fail closed; all four graduation surfaces share it (`docs/HANDOVER_2026-08-16_P12_14.md`) | S |
+| **P12.15** | **live-book source isolation** | ✅ **shipped** — `SignalDB.live_book_rows()` behind every live risk control (loss limits, drawdown ladder, Kelly, MC ruin/equity, MAE/MFE, business scorecard); Kelly advisory repaired, net-anchored (`docs/HANDOVER_2026-08-16_P12_15.md`) | S |
 | micro-live | trivial size | ⛔ **blocked** — only after unchanged graduation bar says READY and explicit user approval; slippage / partial fills / latency can then be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
@@ -385,7 +424,7 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 **Both are now behind P10 as well as the graduation gate.** Owning our
 data moves the aim; wrapping the engine in another chat UI does not.
 
-### TODO-13 · P12 · SKY Quant Validation Engine · ✅ P12.1–P12.14 shipped
+### TODO-13 · P12 · SKY Quant Validation Engine · ✅ P12.1–P12.15 shipped
 
 📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8,
 extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.**

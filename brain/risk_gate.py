@@ -75,11 +75,14 @@ def _week_start_utc(now: datetime | None = None) -> int:
 def closed_pnl(db: SignalDB, since_ts: int, risk_pct: float) -> dict:
     """Sum of decided paper results since a timestamp, in R and in % equity.
 
-    The live risk book excludes simulator walk-forward samples (exclude_sim):
-    they are historical calibration evidence with backdated timestamps, not
-    today's trading, so they must not trip daily/weekly loss limits.
+    The live risk book is :func:`SignalDB.live_book_rows` (P12.15): decided,
+    non-simulator, canonical-live only. Simulator walk-forward samples are
+    historical calibration evidence with backdated timestamps, and research
+    books (non-canonical ``source_key``) are not this desk's trading — a
+    research win must not offset a real loss past the daily limit, and a
+    research loss must not trip a limit the live book never hit.
     """
-    rows = db.decided_paper_rows(since_ts=since_ts, exclude_sim=True)
+    rows = db.live_book_rows(since_ts=since_ts)
     r_sum = round(sum(float(r["rr_achieved"] or 0.0) for r in rows), 3)
     return {"n": len(rows), "r_sum": r_sum,
             "pct": round(r_sum * risk_pct, 3)}
@@ -108,10 +111,14 @@ def drawdown(db: SignalDB) -> dict:
 
     Equity starts at the configured account balance (or $10,000) and applies
     each decided trade's ``rr_achieved * risk_pct`` in chronological order.
-    Simulator samples (sim_key NOT NULL) are excluded: they are historical
-    walk-forward rows, not the live book, and must not close the live gate.
+    The population is :func:`SignalDB.live_book_rows` (P12.15): simulator
+    samples are historical walk-forward rows, and research-book trades are
+    another price series entirely — a research win interleaved into the
+    sequence would refill equity and hide a real losing streak from the
+    ladder, and research losses would deepen a drawdown the live desk never
+    took. Neither may move a live risk control.
     """
-    rows = db.decided_paper_rows(exclude_sim=True)
+    rows = db.live_book_rows()
     balance = ACCOUNT_BALANCE or 10_000.0
     risk = effective_risk()
     equity = balance
@@ -242,10 +249,15 @@ def evaluate(db: SignalDB, symbol: str | None = None, plan_type: str | None = No
     })
 
     # ── kelly advisory (hidden_alpha; advisory-only, never auto-executes) ──
+    # P12.15: this used to call kelly_from_progress() on raw paper_trades
+    # rows — a shape mismatch (KeyError 'wins') that the blanket except
+    # silently turned into a permanent "unavailable" whenever the book held
+    # data. kelly_from_rows() accepts the live book's actual rows, judges NET
+    # of costs where recorded (P12.8), and reads canonical-live trades only.
     try:
-        from engine.hidden_alpha import kelly_from_progress
+        from engine.hidden_alpha import kelly_from_rows
 
-        kelly = kelly_from_progress(db.decided_paper_rows(exclude_sim=True))
+        kelly = kelly_from_rows(db.live_book_rows())
         ks = kelly.get("kelly_size")
         clamped = round(min(ks, KELLY_MAX_RISK_PCT), 4) if ks is not None else None
         details["kelly"] = {

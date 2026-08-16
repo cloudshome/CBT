@@ -30,11 +30,12 @@ from config import RISK_PCT
 def mae_mfe_summary(db, plan_type: Optional[str] = None) -> dict:
     """MAE / MFE statistics per setup, in R (price excursion / planned risk).
 
-    Returns per-setup aggregates plus an overall insight.  Runs on the real
-    paper book (decided_paper_rows with exclude_sim=True): simulator samples
-    are calibration evidence, not the live book the desk should review.
+    Returns per-setup aggregates plus an overall insight.  Runs on the live
+    paper book (:func:`SignalDB.live_book_rows`, P12.15): simulator samples
+    are calibration evidence and research books are another price series —
+    neither is the live book the desk should review.
     """
-    rows = db.decided_paper_rows(exclude_sim=True)
+    rows = db.live_book_rows()
     if not rows:
         return {"available": False, "note": "no decided paper trades yet"}
 
@@ -131,9 +132,10 @@ def monte_carlo_equity(db, start: float = 10_000.0, risk_pct: float = None,
     times, grows an equity curve at ``risk_pct`` % of equity per trade, and
     reports the median / percentile terminal equity and the drawdown
     distribution.  This is the honest variance picture behind a single
-    profit-factor number.
+    profit-factor number.  Reads the live book only
+    (:func:`SignalDB.live_book_rows`, P12.15).
     """
-    rows = db.decided_paper_rows(exclude_sim=True)
+    rows = db.live_book_rows()
     outcomes = [float(r["rr_achieved"]) for r in rows
                 if r.get("rr_achieved") is not None]
     if not outcomes:
@@ -280,13 +282,15 @@ def monte_carlo_ruin_table(
     sequence (longest losing streak and time-to-recovery), because the live
     book already experienced one path and that path matters to the desk.
 
-    Simulator walk-forward samples are excluded — this is a live-book risk
-    read, not a backtest variance read.
+    Simulator walk-forward samples and research-book trades are excluded
+    (:func:`SignalDB.live_book_rows`, P12.15) — this is a live-book risk
+    read, not a backtest variance read: a research series must neither
+    flatter nor spoil the desk's survivability numbers.
     """
     if rows is None:
         if db is None:
             return {"available": False, "note": "no database or rows provided"}
-        rows = db.decided_paper_rows(exclude_sim=True)
+        rows = db.live_book_rows()
 
     rows = [r for r in rows if r.get("rr_achieved") is not None]
     if not rows:

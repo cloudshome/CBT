@@ -1,4 +1,11 @@
-**Last updated:** 2026-08-16 (this session `arena/01a008d1-sky`: **v2.23.2 /
+**Last updated:** 2026-08-16 (this session `arena/01a0096b-sky`: **v2.23.3 /
+P12.15 — live-book source isolation**. Every live risk control — daily/weekly
+loss limits, drawdown ladder, Kelly advisory, MC ruin/equity, MAE/MFE,
+business scorecard — now reads the canonical live book only
+(`SignalDB.live_book_rows()`); the silently-dead Kelly advisory was repaired.
+Session began as a review after PR #37 merged; the finding was then built.)
+
+**Previous:** 2026-08-16 (**v2.23.2 /
 P12.14 — graduation discipline isolation**. The 90% compliance criterion no
 longer counts simulator journals, research-book journals, or blank
 `followed_rules` answers, and missing journals now fail closed. Session began
@@ -8,17 +15,63 @@ as a review after PR #36 closed; the finding was then built.)
 graduation source isolation**. The global permission path now admits canonical
 live evidence only; research books can neither unlock nor block micro-live.
 Also reconciled merged PR/CI state and closed stale TODO-7 instructions.)
+**Branch:** `arena/01a0096b-sky` (this session; PR to be opened against `main` as the closing step)
+**HEAD commit:** the P12.15 commit on `arena/01a0096b-sky` (`git rev-parse HEAD`), on top of merged base `fdfc9f4` — `P12.14: isolate graduation discipline (v2.23.2) (#37)`
+**Previous branch:** `arena/01a008d1-sky` (P12.14 implementation, merged as PR #37)
+**Version:** 2.23.3
+**Python:** 3.11 (venv `.venv`) — suite green (**748 pass / 1 skip**)
 
-**Previous:** 2026-08-16 (**v2.23.0 P12.12 — read-only PAXG-vs-XAU
-promotion-evidence dossier**. Synthetic mechanics are green; real-host
-evidence and approval remain open.)
-**Branch:** `arena/01a008d1-sky` (pushed; **PR #37** open against `main`, CI green)
-**HEAD commit:** the P12.14 commit on `arena/01a008d1-sky` (`git rev-parse HEAD`), on top of merged base `60b61e5` — `P12.13: isolate global graduation evidence by source (#36)`
-**Previous branch:** `arena/01a008b9-sky` (P12.13 implementation, merged as PR #36)
-**Version:** 2.23.2
-**Python:** 3.11 (venv `.venv`) — suite green (**736 pass / 1 skip**)
-
-> **This session (`arena/01a008d1-sky`): v2.23.2 / P12.14 graduation
+> **This session (`arena/01a0096b-sky`): v2.23.3 / P12.15 live-book source
+> isolation.** PR #37 (P12.14) merged, so the session opened as a safety
+> review and produced `docs/HANDOVER_2026-08-16_P12_15.md` plus the
+> reproduction `ops/probes/p12_15_livebook_probe.py`; the fix was then built
+> against that contract.
+>
+> **The gap.** P12.13/P12.14 isolated the graduation gate to the canonical
+> live book, but every live *risk control* still read
+> `decided_paper_rows(exclude_sim=True)` with **no provenance filter** — the
+> P12.11 source boundary never reached the daily/weekly loss limits
+> (`closed_pnl`), the drawdown ladder (`drawdown`), the Kelly advisory, the
+> MC ruin/equity reads, MAE/MFE review, or the business scorecard. Measured
+> on `fdfc9f4`: 5 real canonical losses today (−1.25%, past the student 1.0%
+> daily limit) plus 6 research wins read `+7R / not blocked` — the loss
+> limit failed **open**; a 24-loss canonical streak (6.0% dd, `reduce_risk`)
+> interleaved with research wins read `0.25% / normal`; 8 research-only
+> losses **blocked** a live desk that had not traded at all; and the Kelly
+> advisory turned out to be silently dead on any populated book —
+> `kelly_from_progress()` expects `paper_progress()` aggregates but was fed
+> raw trade rows, so `KeyError('wins')` fell into a blanket `except` and the
+> dashboard Kelly card has never rendered with data.
+>
+> **Fix.** `SignalDB.live_book_rows()` is now the single definition of the
+> live paper book — decided (`TP_HIT`/`STOP_LOSS`), non-simulator
+> (`sim_key IS NULL`), canonical-live (`COALESCE(source_key,'')=''`, legacy
+> NULL rows kept) — delegating to `decided_paper_rows(...)` so the P12.11
+> `_source_clause` algebra is reused. All eight live-control call sites read
+> it. `engine.hidden_alpha.kelly_from_rows()` replaces the broken Kelly
+> calls: it accepts trade rows, judges NET of costs where `rr_net` exists
+> (P12.8), classifies win/loss by net sign, stands aside at 0.0% on a book
+> with no net winners, and emits the keys the surfaces read.
+>
+> **Demonstration.** The probe's six cases (A–F) all behave as specified:
+> the masked daily limit now blocks, the masked drawdown reads
+> `6.0% / reduce_risk`, the research-only book moves nothing, Kelly reads
+> `n_trades=20, kelly_size=1.0` (clamped 0.5) on a 12W/8L canonical book
+> while ignoring 30 research wins, legacy NULL rows still count, and the
+> canonical-only control book is byte-identical.
+>
+> **Unchanged.** Every threshold and cap (loss limits, ladder rungs,
+> `KELLY_MAX_RISK_PCT`, the graduation bar), `decided_paper_rows()` for
+> explicit callers, the scorecard research surfaces (`source_key`,
+> `by_source`), `kelly_from_progress()` for genuine aggregates, P12.11–14
+> behaviour, XAU research-only status, and the no-order-placement contract.
+>
+> **Verification.** `tests/test_livebook_isolation.py` (12 new regressions);
+> full suite **748 passed, 1 skipped** (108s); compileall, `pip check`, and
+> the v2.23.3 wheel gate pass; the probe harness exits 0 with all six cases
+> behaving as specified.
+>
+> **Previous session (`arena/01a008d1-sky`): v2.23.2 / P12.14 graduation
 > discipline isolation.** PR #36 (P12.13) closed, so the session opened as a
 > safety review and produced `docs/HANDOVER_2026-08-16_P12_14.md` plus the
 > reproduction `ops/probes/p12_14_discipline_probe.py`; the fix was then built
@@ -63,9 +116,9 @@ evidence and approval remain open.)
 > exits 0 with all five cases behaving as specified.
 >
 > **Shipped.** Pushed to `origin/arena/01a008d1-sky` and opened as **PR #37**
-> (`P12.14: isolate graduation discipline (v2.23.2)`, base `main`, MERGEABLE).
-> Both root CI jobs pass on the pushed head — *Offline test suite* (2m34s) and
-> *Wheel gate* (31s). Awaiting human review; do not self-merge.
+> (`P12.14: isolate graduation discipline (v2.23.2)`, base `main`). Both root
+> CI jobs passed on the pushed head — *Offline test suite* and *Wheel gate* —
+> and the PR was **merged into `main` as `fdfc9f4`** on 2026-08-16.
 >
 > **Previous session (`arena/01a008b9-sky`): v2.23.1 / P12.13 graduation
 > source isolation.** Review found a safety gap left after P12.11:
@@ -409,7 +462,7 @@ paper gate, and TODO-8; micro-live is blocked. TODO-7 is complete.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; root CI runs offline suite + wheel gate (TODO-7 complete) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.1–P12.14 shipped** — locked/sealed validation, lookahead guard, scorecard, real-data path, fees-first `E_net`, effective sample size, quality/strategy scores, Monte Carlo survivability, net decision anchor, calendars, XAU costs, source-separated saved keys, read-only XAU promotion evidence, canonical-only global graduation, and simulator-free graduation discipline. Tooling completion does not promote XAU: run P12.12 on the real-data host, retain human review, and keep micro-live locked until the unchanged global bar says READY plus explicit approval. |
+| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.1–P12.15 shipped** — locked/sealed validation, lookahead guard, scorecard, real-data path, fees-first `E_net`, effective sample size, quality/strategy scores, Monte Carlo survivability, net decision anchor, calendars, XAU costs, source-separated saved keys, read-only XAU promotion evidence, canonical-only global graduation, simulator-free graduation discipline, and canonical-only live risk controls (loss limits, drawdown ladder, Kelly, MC, business metrics). Tooling completion does not promote XAU: run P12.12 on the real-data host, retain human review, and keep micro-live locked until the unchanged global bar says READY plus explicit approval. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).

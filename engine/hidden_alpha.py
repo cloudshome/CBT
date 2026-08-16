@@ -362,6 +362,62 @@ def kelly_from_progress(progress: list[dict], plan_types=None,
     out["avg_loss_r"] = round(avg_loss_r, 3) if avg_loss_r is not None else None
     return out
 
+
+def kelly_from_rows(rows: list[dict], fraction: float = 0.25,
+                    max_risk: float = 1.0) -> dict:
+    """Kelly advisory from decided paper-trade *rows* (the live book).
+
+    **P12.15.** The risk gate and the chart-read advisory used to feed raw
+    ``paper_trades`` rows into :func:`kelly_from_progress`, which expects
+    ``paper_progress()`` aggregates (``wins`` / ``win_r`` columns). The shape
+    mismatch raised ``KeyError('wins')`` on any non-empty book, and the call
+    sites' blanket ``except`` rendered the advisory permanently
+    "unavailable". This function accepts the rows the live book actually
+    produces.
+
+    Outcomes are judged **net of costs** where the ``rr_net`` column is
+    populated (P12.8), falling back to gross only when it is not: a book
+    that only wins before fees must not size up. A win is a positive net
+    outcome; a non-positive one is a loss (the same rule the Monte Carlo
+    resampler uses). Negative edge stands aside at 0.0% risk; an empty book
+    suggests nothing. Advisory only — nothing auto-executes on this number.
+
+    Returns the :func:`kelly_from_stats` payload plus the keys the desk
+    surfaces read: ``kelly_size`` (== ``suggested_risk_pct``),
+    ``expectancy`` (mean net R) and ``n_trades``.
+    """
+    outcomes = []
+    for r in rows or []:
+        rr = r.get("rr_net")
+        if rr is None:
+            rr = r.get("rr_achieved")
+        if rr is None:
+            continue
+        outcomes.append(float(rr))
+    if not outcomes:
+        out = kelly_size(None, None, fraction, max_risk)
+        out.update({"kelly_size": None, "expectancy": None, "n_trades": 0})
+        return out
+    wins = [o for o in outcomes if o > 0]
+    losses = [o for o in outcomes if o <= 0]
+    avg_win_r = sum(wins) / len(wins) if wins else None
+    avg_loss_r = sum(losses) / len(losses) if losses else None
+    if not wins:
+        # A decided book with no net winners has an unambiguous negative
+        # edge: stand aside, don't plead "insufficient evidence".
+        out = kelly_size(0.0, 1.0, fraction, max_risk)
+        out.update({"wins": 0, "losses": len(losses), "n": len(outcomes),
+                    "win_rate": 0.0, "payoff": None})
+    else:
+        out = kelly_from_stats(len(wins), len(losses), avg_win_r, avg_loss_r,
+                               fraction=fraction, max_risk=max_risk)
+    out["kelly_size"] = out.get("suggested_risk_pct")
+    out["expectancy"] = round(sum(outcomes) / len(outcomes), 4)
+    out["n_trades"] = len(outcomes)
+    out["avg_win_r"] = round(avg_win_r, 3) if avg_win_r is not None else None
+    out["avg_loss_r"] = round(avg_loss_r, 3) if avg_loss_r is not None else None
+    return out
+
 # ── 4. 8D state vector + similarity search ────────────────────────────────
 STATE_DIM_NAMES = ("return_z", "vol_z", "volume_z", "skew_z", "bandwidth_z",
                    "trend_slope_z", "cvd_z", "mean_reverting_p")

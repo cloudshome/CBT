@@ -1,4 +1,4 @@
-# Source provenance in saved keys and graduation (P12.11 / P12.13)
+# Source provenance in saved keys, graduation and live risk (P12.11 / P12.13 / P12.15)
 
 > **Status:** shipped in v2.22.0.
 > **Closes:** Dukascopy blocker #3 — *"source provenance reaches saved
@@ -171,3 +171,35 @@ can neither grant nor withdraw live-trading permission.
 `--save` on a Dukascopy XAU backtest is now **permitted** — its rows land in
 their own keys and cannot recalibrate the live proxy. Promotion of that series
 to canonical research status remains a separate, human-approved decision.
+
+## P12.15 closure: the live risk controls
+
+P12.13/P12.14 isolated the *graduation* gate, but every live *risk control*
+still read `decided_paper_rows(exclude_sim=True)` with no provenance filter:
+the daily/weekly loss limits, the drawdown ladder, the Kelly advisory, the
+Monte Carlo ruin/equity reads, MAE/MFE review and the business scorecard.
+Research wins could mask real canonical losses past the daily limit and
+flatten a real drawdown (fail **open**), and research losses could block a
+live desk that had not traded.
+
+P12.15 closes that gap:
+
+- `SignalDB.live_book_rows()` is the single definition of the live paper
+  book — decided (`TP_HIT`/`STOP_LOSS`), non-simulator (`sim_key IS NULL`),
+  canonical-live (`COALESCE(source_key, '') = ''`, legacy NULL rows kept).
+- `closed_pnl()`, `drawdown()`, both Kelly advisory call sites,
+  `monte_carlo_ruin_table()`, `monte_carlo_equity()`, `mae_mfe_summary()`
+  and `business_metrics()` all read it.
+- The Kelly advisory was also repaired (it fed raw rows into
+  `kelly_from_progress()`, which expects `paper_progress()` aggregates, and
+  had been silently "unavailable" on any populated book);
+  `engine.hidden_alpha.kelly_from_rows()` judges NET of costs (P12.8) and
+  stands aside on a book with no net winners.
+- The scorecard keeps its explicit `source_key` / `by_source` research
+  surfaces; `decided_paper_rows()` is unchanged for explicit callers.
+
+No threshold moved in either direction. A research series can neither
+flatter nor spoil any number the live desk acts on.
+
+Report: `docs/HANDOVER_2026-08-16_P12_15.md` · harness:
+`ops/probes/p12_15_livebook_probe.py`.

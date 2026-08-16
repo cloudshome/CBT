@@ -618,10 +618,14 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
         if db is not None:
             try:
                 from config import KELLY_MAX_RISK_PCT
-                from engine.hidden_alpha import kelly_from_progress
+                from engine.hidden_alpha import kelly_from_rows
                 from brain import analytics as analytics_mod
 
-                kelly = kelly_from_progress(db.decided_paper_rows(exclude_sim=True))
+                # P12.15: the live book only (canonical-live, non-simulator);
+                # kelly_from_rows accepts trade rows — the old
+                # kelly_from_progress call expected aggregates and always
+                # failed into "unavailable" on a populated book.
+                kelly = kelly_from_rows(db.live_book_rows())
                 ks = kelly.get("kelly_size")
                 clamped = round(min(ks, KELLY_MAX_RISK_PCT), 4) if ks is not None else None
                 chart_read["kelly"] = {
