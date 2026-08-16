@@ -27,7 +27,7 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 | **Structure engine (ICT/SMC)** | Fractal swings, **BOS / CHOCH**, **order blocks**, **fair value gaps** (filled/unfilled), **liquidity sweeps**, equal highs/lows, premium/discount zone |
 | **Scoring brain** | Weighted condition scoring (Trend +15, Structure +15, OB/FVG +20, Liquidity +15, Volume +10, Divergence +10, Momentum +10, Location +5 = 100) → `HIGH / MEDIUM / LOW / NO TRADE` |
 | **Multi-condition plans** | Immediate entry, pullback at OB/FVG, breakout, sweep-reversal, FVG retest — each with entry/SL/TP ladder, R:R, confidence, and a human-readable IF condition |
-| **AI Trading Intelligence System** | Institutional desk report for BTC / ETH / XAUUSD: strict `NO TRADE` filter when confidence <80%, RR <1:2, HTF conflict, volatile/sideways conditions, or news risk; includes scenarios, risk management, IF/THEN logic, trade management and self-review. |
+| **AI Trading Intelligence System** | Institutional desk report for BTC / ETH / XAUUSD: strict `NO TRADE` filter when confidence <80%, RR below the 1:1.5 safety floor, HTF conflict, volatile/sideways conditions, or news risk; includes scenarios, risk management, IF/THEN logic, trade management and self-review. |
 | **JSON signals** | Exact schema requested — `signal_id`, `timestamp`, `asset`, `action`, `entry`, `stop_loss`, `take_profit`, `risk_reward`, `confidence`, `timeframe`, `reason` — plus validation |
 | **CryptoDada website** | Connector for the private membership site (volume-spike screener, market radar, analyst notes, historical signals) via hidden-API probe or Playwright login |
 | **Discord group** | Channel reader (bot/self token) that parses analyst "market update" posts into structured bias notes + sentiment; webhook push for outbound alerts |
@@ -50,7 +50,7 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 | **Optional Dukascopy XAU adapter** | `dukascopy-node` stays an external, version-pinned acquisition worker; its m1 XAUUSD CSV enters the existing validated store via `backfill --from-csv ... --csv-source dukascopy --price-type bid`. It is stored separately as `dukascopy/spot/XAUUSD`, never relabelled Binance/PAXG. All three of its original blockers are now closed — market calendar (P12.9), gold bid/ask cost model (P12.10) and calibration-key source provenance (P12.11) — so `--save` is permitted and its rows land under a separate `…@dukascopy:spot:bid` calibration key that cannot recalibrate the live PAXG proxy. Still research-only as *evidence*: PAXG-vs-XAU basis, sealed-OOS results and human approval remain open. See `docs/DUKASCOPY_XAU_ADAPTER.md` and `docs/SOURCE_PROVENANCE.md`. |
 | **XAU promotion evidence** (P12.12) | `python main.py xau-evidence --tf 15m` reads separately stored `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD`, exact-time aligns them without fill/resampling, measures the USD/bps basis distribution and tracking deviation, fingerprints the aligned observations, and inspects the existing Dukascopy sealed-OOS envelope against the unchanged bar. It is deliberately read-only: even with basis and OOS evidence present, `human_approval=OPEN`, `xau_tradeable=false`, and `micro_live_unlocked=false`. Real results must be produced on the data host; this clean checkout manufactures none. See `docs/XAU_PROMOTION_EVIDENCE.md`. |
 | **Market calendars** (P12.9) | `data/calendar.py` — some venues close, and a scheduled closure is not missing data. `crypto-24x7` keeps every crypto series byte-identical; `xau-otc` models the DST-aware OTC gold week (Sun 18:00 ET open, Fri 17:00 ET close, 17:00–18:00 ET daily break, 1 Jan / 25 Dec). Gap detection, the data-quality pillar, readiness and the CSV import report judge a `dukascopy/**/XAUUSD` series in **trading time**, so a weekend neither counts as a gap nor ages the feed. Opt-in by venue only — it can remove a false alarm, never hide a real hole: in-session holes, stale-during-session and corrupt OHLC all still quarantine. Inspect with `python main.py calendar --symbol XAUUSD --tf 1h --series`. See `docs/MARKET_CALENDAR.md`. |
-| **Source provenance** (P12.11/P12.13) | `data/provenance.py` makes the price series part of every calibration key. A source key is `exchange:market[:price_type]`; canonical Binance spot is deliberately `""`, preserving legacy keys. A research import keys to `…@dukascopy:spot:bid`; its boost/filter cannot reach live signals and a one-sided series is never `proven`. **P12.13 closes the remaining permission-path gap:** `paper_progress()` and every global graduation surface now count canonical live rows only, while the evaluator fails closed on explicitly non-canonical progress. Research can neither unlock nor block micro-live; it remains visible through `scorecard --source-key live|dukascopy:spot:bid|all`, HTTP, and MCP. See `docs/SOURCE_PROVENANCE.md`. |
+| **Source provenance and live-book isolation** (P12.11/P12.13/P12.15) | `data/provenance.py` makes the price series part of every calibration key. A source key is `exchange:market[:price_type]`; canonical Binance spot is deliberately `""`, preserving legacy keys. A research import keys to `…@dukascopy:spot:bid`; its boost/filter cannot reach live signals and a one-sided series is never `proven`. **P12.13 closes the remaining graduation permission-path gap:** `paper_progress()` and every global graduation surface count canonical live rows only, while the evaluator fails closed on explicitly non-canonical progress. **P12.15 extends the same boundary to live risk controls:** `SignalDB.live_book_rows()` feeds loss limits, drawdown, Kelly, MC, MAE/MFE and business metrics. Research can neither unlock/block graduation nor move live risk; it remains visible through `scorecard --source-key live|dukascopy:spot:bid|all`, HTTP, and MCP. See `docs/SOURCE_PROVENANCE.md`. |
 | **Feature store** (P10.12) | `data/feature_store.py` — one derived wide row per `(symbol, timeframe, ts)`: price + derivatives + hidden_alpha + regime (22 columns); feeds conditioned-expectancy queries. |
 | **Strategy scorecard** (P12.3/P12.6/P12.3.3) | `python main.py scorecard` — one command, one block over outcomes the grader already decided: gross and **NET** expectancy ($E_{\text{net}} = E_{\text{gross}} − \text{fees} − \text{slip} − \text{funding}$), WR, PF, total R, max drawdown, streaks, Sharpe/Sortino/Calmar (per-trade, **not** annualised), cost drag breakdown, holding time, and **effective sample size** ($N_{\text{eff}} = N / \text{overlap}$, with overlap-corrected standard errors and 95% CIs), split by **long/short**, **regime**, **session**, **setup**, and **conditions**. Same report on `GET /api/scorecard`, the `STRATEGY SCORECARD` dashboard card and the read-only MCP `scorecard` tool (v1.8.0). Evaluates performance against the **net** graduation bar. `data/scorecard.py` & `data/costs.py`. |
 | **Backtest Quality Score** (P12.4) | `python main.py scorecard --quality` / `python main.py quality` — a 0–100 robustness verdict so a fragile high-PnL curve cannot look like a pass: **edge** (net expectancy vs the bar, shape-discounted), **curve robustness** (top-5 wins' concentration, max-drawdown ÷ total R, chronological segment consistency), **sample confidence** (N_eff + 95% CI significance), and the **parameter-plateau test** (BT5): `python main.py quality` re-grades the stored series at `min_confidence ± 5` and **caps an isolated-peak edge at 50** — a fit, not an edge. Same block on `/api/scorecard?quality=1`, the dashboard card and MCP `scorecard quality`. `data/quality_score.py`. |
@@ -134,7 +134,7 @@ configurable via `.env`; defaults are conservative.
 | **Behavioral no-trade gate** | Angry / tired / revenge / chasing flags close the gate until cleared. | `python main.py tradestate --angry --note "..."` |
 | **Setup-proven gate** | A setup is PROVEN only after ≥100 backtest + ≥20 decided paper samples with positive expectancy; unproven = research-only at student/researcher levels. | `CALIBRATE_MIN_N=100` |
 | **Regime-tagged learning** | Every backtest/paper trade records its market regime; calibration works per `setup × regime`, stats report per regime. | `python main.py stats` |
-| **Business scorecard** | Win rate, avg win/loss, expectancy, profit factor, max drawdown, streaks, rolling 50/100 windows, execution-violation rate. | `python main.py stats` |
+| **Business scorecard** | Win rate, avg win/loss, expectancy, profit factor, max drawdown, streaks, rolling 50/100 windows, canonical-live execution discipline (missing journals visible). | `python main.py stats` |
 | **Professional journal** | Post-trade fields with "did I follow my system?" as the headline; MAE/MFE recorded per paper trade. | `python main.py journal <scan_id> --followed-rules 1 ...` |
 
 New CLI:
@@ -245,7 +245,7 @@ Offline it runs on the committed sample + deterministic synthetic data
 > Note: simulator walk-forward samples count as **calibration evidence**
 > (setup-proof, graduation gate) but are excluded from the **live risk book**
 > — daily/weekly loss limits, the drawdown ladder and the business scorecard
-> only see real paper trades (`decided_paper_rows(exclude_sim=True)`).
+> only see real paper trades (`SignalDB.live_book_rows()`).
 
 #### MCP server (`mcp`)
 
@@ -547,7 +547,7 @@ the output is never empty.
 ## 🧪 Tests
 
 ```bash
-python -m pytest tests/ -q      # 492 pass / 1 skip, fully offline (synthetic data)
+python -m pytest tests/ -q      # 750 pass / 1 skip, fully offline (synthetic data)
 ```
 
 Covers: indicator math & no-look-ahead, structure detection (BOS/CHOCH, FVG,
@@ -563,8 +563,7 @@ immune diagnostics, the RAG library Q&A, both MCP servers (SDK + zero-dep
 stdio), and the dashboard JS.
 
 On every push, GitHub Actions runs this suite automatically plus an offline
-smoke test on the sample data. The workflow ships as `docs/CI-workflow.yml` —
-rename it to `.github/workflows/ci.yml` to activate (see the note there).
+smoke test on the sample data. The active workflow is `.github/workflows/ci.yml`; it runs the offline suite and wheel gate on every PR and push to `main`.
 
 ---
 
@@ -659,13 +658,10 @@ visibly separate in the dashboard.
 
 ## 🔄 CI
 
-The workflow ships as **`docs/CI-workflow.yml`** — rename it to
-`.github/workflows/ci.yml` (GitHub web UI: upload the file into `.github/workflows/`)
-to activate it, since automation tokens may not create workflow files.  Once
-active it runs on every push / PR to `main`: Python 3.12 → install deps →
-`compileall` → `pytest` → offline smoke test on
-`data_samples/btcusdt_15m_sample.csv`. All tests are network-free, so CI is
-fast and deterministic.
+The active workflow is **`.github/workflows/ci.yml`**. It runs on every push /
+PR to `main`: install dependencies, run `compileall`, execute the offline
+suite, and run the wheel gate. All tests are network-free, so CI is fast and
+deterministic.
 
 ---
 
@@ -817,8 +813,8 @@ crypto-brain/
 │   ├── signal_card.py       # institutional signal card (terminal rendering)
 │   └── notifiers.py         # Telegram + Discord push
 ├── web/app.py               # Flask dashboard (decision, risk gate, agents, ask, paper, learning)
-├── tests/                   # offline test-suite (258+ tests, 100% offline-capable)
-├── docs/CI-workflow.yml     # GitHub Actions CI (rename to .github/workflows/ci.yml)
+├── tests/                   # offline test-suite (750 pass / 1 skip)
+├── .github/workflows/ci.yml # active GitHub Actions offline suite + wheel gate
 ├── examples/example_signal.json
 └── data_samples/btcusdt_15m_sample.csv
 ```

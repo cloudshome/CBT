@@ -6,15 +6,12 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-16 (**v2.23.3 / P12.15 shipped — live-book source
-isolation**. Every live risk control — daily/weekly loss limits, drawdown
-ladder, Kelly advisory, MC ruin/equity, MAE/MFE, business scorecard — now
-reads `SignalDB.live_book_rows()`: decided, non-simulator, canonical-live
-only. Research books can neither mask real losses (fail-open) nor trip live
-limits. The silently-dead Kelly advisory (KeyError swallowed into
-"unavailable" since wiring) was repaired: net-anchored, clamped,
-advisory-only. Thresholds unchanged. Suite green: **748 pass / 1 skip**
-(+12). To be delivered as this session's PR.)
+**Last updated:** 2026-08-16 (**v2.23.4 / P12.15 execution-metric follow-up**.
+P12.15's canonical live population now covers the business scorecard's
+execution metric as well as its P&L/equity/risk reads. `live_execution_stats()`
+keeps the broad journal report unchanged while exposing missing live journals.
+Thresholds unchanged. Suite green: **750 pass / 1 skip** (+2). PR #39 carries
+this follow-up and the post-merge handoff reconciliation.)
 
 **Previous:** 2026-08-16 (**v2.23.2 / P12.14 shipped — graduation
 discipline isolation**. Compliance is now computed once, over decided,
@@ -96,11 +93,12 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ---
 
-## 🔥 Top priority — start here in the next session
+## 🔥 Current sequence — next executable work (operational, not a new code milestone)
 
-### TODO-17 / P12.15 · Live-book source isolation · ✅ SHIPPED (v2.23.3)
+### TODO-17 / P12.15 · Live-book source isolation + execution metric · ✅ SHIPPED (v2.23.4)
 
 **Report:** [`docs/HANDOVER_2026-08-16_P12_15.md`](docs/HANDOVER_2026-08-16_P12_15.md)
+**Follow-up:** [`docs/HANDOVER_2026-08-16_P12_15_1.md`](docs/HANDOVER_2026-08-16_P12_15_1.md)
 **Harness:** `.venv/bin/python ops/probes/p12_15_livebook_probe.py`
 
 P12.13/P12.14 isolated the graduation gate to the canonical live book, but
@@ -121,11 +119,33 @@ live control reads it: `closed_pnl()` (daily/weekly limits), `drawdown()`
 `engine.hidden_alpha.kelly_from_rows()`, net-anchored per P12.8),
 `monte_carlo_ruin_table()` / `monte_carlo_equity()` / `mae_mfe_summary()`,
 and `business_metrics()`. The scorecard keeps its explicit `source_key` /
-`by_source` research surfaces. No threshold moved in either direction.
+`by_source` research surfaces. P12.15's execution metric now uses the same
+canonical-live population and exposes missing journals; the broad journal
+report remains unchanged. No threshold moved in either direction.
 
 **Next executable work is unchanged by this build:** run the real-host XAU
 evidence procedure, and keep grinding the canonical paper book — journaling
 every decided real trade.
+
+### Ordered next actions
+
+1. **Real-data host / source reconciliation:** rerun `learn` so existing
+   canonical rows adopt the P12.11 source key; do not use demo or synthetic
+   rows.
+2. **XAU evidence:** import/version-pin the separate Dukascopy XAU bid or ask
+   history, run the locked train/validation/OOS/recent protocol, then archive
+   `python main.py xau-evidence --tf 15m --json`. Inspect overlap, provenance,
+   fingerprint, seal integrity and reseal history; never create/reseal from the
+   audit command.
+3. **Canonical P11 paper proof:** keep the live paper monitor running, review
+   every candidate manually, and journal every decided real trade. Re-run
+   `stats`, `learn`, and `agent ask "am I ready for micro?"` on the real host.
+4. **Human control:** a repo admin verifies TODO-8 branch protection.
+5. **Blocked future build:** micro-live and any order-placement adapter wait for
+   the unchanged graduation bar plus separate explicit user approval.
+
+This checkout has no real store/database; it can test mechanics only and must
+not claim the real-host evidence gates.
 
 ### TODO-16 / P12.14 · Graduation discipline isolation · ✅ SHIPPED (v2.23.2)
 
@@ -271,7 +291,7 @@ order changed as a result.
 | **P12.12** | **PAXG-vs-XAU promotion evidence** | ✅ **tooling shipped** — `data/gold_basis.py`, CLI `xau-evidence`, exact-time basis/tracking report + current sealed-OOS inspection; real-host evidence remains open; never approves or trades | S |
 | **P12.13** | **graduation source isolation** | ✅ **shipped** — global progress is canonical-live-only; direct research progress fails closed; scorecards retain research visibility | XS |
 | **P12.14** | **graduation discipline isolation** | ✅ **shipped** — one canonical-live, non-simulator, decided-paper `graduation_discipline(db)`; missing/blank journals fail closed; all four graduation surfaces share it (`docs/HANDOVER_2026-08-16_P12_14.md`) | S |
-| **P12.15** | **live-book source isolation** | ✅ **shipped** — `SignalDB.live_book_rows()` behind every live risk control (loss limits, drawdown ladder, Kelly, MC ruin/equity, MAE/MFE, business scorecard); Kelly advisory repaired, net-anchored (`docs/HANDOVER_2026-08-16_P12_15.md`) | S |
+| **P12.15** | **live-book source isolation** | ✅ **shipped** — `SignalDB.live_book_rows()` behind live loss limits, drawdown, Kelly, MC ruin/equity, MAE/MFE and business metrics; the follow-up also isolates `business_metrics()["execution"]` and exposes missing journals (`docs/HANDOVER_2026-08-16_P12_15_1.md`) | S |
 | micro-live | trivial size | ⛔ **blocked** — only after unchanged graduation bar says READY and explicit user approval; slippage / partial fills / latency can then be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
@@ -456,6 +476,8 @@ train/val/OOS windows have real multi-window history to split.
 | **P12.11** | Source-separated saved keys | Research histories cannot pool into or recalibrate the canonical live profile | ✅ **shipped** — canonical provenance keys throughout save/learn/scorecard paths |
 | **P12.12** | PAXG-vs-XAU promotion-evidence dossier | Exact-time basis and sealed-OOS evidence are inspectable without self-promotion | ✅ **tooling shipped** — `data/gold_basis.py`, `xau-evidence`, operator guide; real-host run and approval remain open |
 | **P12.13** | Graduation source isolation | Research histories can neither unlock nor block canonical live graduation | ✅ **shipped** — canonical-only `paper_progress`; evaluator provenance veto; 3 regression tests |
+| **P12.14** | Graduation discipline isolation | Simulator/research journals and missing answers cannot prove the 90% criterion | ✅ **shipped** — canonical-live, non-simulator, decided-paper discipline payload; all graduation surfaces share it |
+| **P12.15** | Live-book source isolation | Research outcomes cannot move live loss limits, drawdown, Kelly, MC, MAE/MFE or business reads | ✅ **shipped** — `SignalDB.live_book_rows()` behind every live risk control; `live_execution_stats()` also isolates business-scorecard discipline and shows missing journals |
 
 **Not in P12:** Hyperopt, FreqAI, Backtrader optimization or a second
 backtest engine (BT4/BT7), ML direction-prediction, a strategy-module

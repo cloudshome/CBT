@@ -1,9 +1,24 @@
-**Last updated:** 2026-08-16 (this session `arena/01a0096b-sky`: **v2.23.3 /
-P12.15 — live-book source isolation**. Every live risk control — daily/weekly
-loss limits, drawdown ladder, Kelly advisory, MC ruin/equity, MAE/MFE,
-business scorecard — now reads the canonical live book only
-(`SignalDB.live_book_rows()`); the silently-dead Kelly advisory was repaired.
-Session began as a review after PR #37 merged; the finding was then built.)
+**Last updated:** 2026-08-16 (P12.15 follow-up on the fixed Arena session
+branch `arena/01a0099b-sky`). The repository is at **v2.23.4**: the business
+scorecard's execution metric now uses the same canonical live population as
+its P&L/equity/risk reads, while the broad journal report remains unchanged.
+
+**Branch:** `arena/01a0099b-sky` (fixed session branch)
+**HEAD commit:** verify with `git rev-parse HEAD` (the current tip is the P12.15 follow-up checkpoint)
+**Upstream:** PR #38 is merged; PR #39 carries this follow-up and remains open for review.
+**Previous implementation branch:** `arena/01a0096b-sky` (P12.15 implementation, merged as PR #38)
+**Version:** 2.23.4
+**Python:** 3.11 (venv `.venv`) — suite green (**750 pass / 1 skip**)
+
+> **Current state.** P12.1–P12.15 and the P12.15 execution-metric follow-up
+> are shipped. The next work in sequence is operational, not a speculative
+> trading feature: on the real-data host, rerun canonical learning, import and
+> validate the separate Dukascopy XAU history, archive the read-only
+> `xau-evidence --json` dossier, and continue the canonical live paper book.
+> This clean checkout has no real store/database, so it must not manufacture
+> either result. The graduation bar remains closed; XAU remains research-only;
+> micro-live remains blocked until the unchanged graduation gate is READY and
+> the user separately approves it.
 
 **Previous:** 2026-08-16 (**v2.23.2 /
 P12.14 — graduation discipline isolation**. The 90% compliance criterion no
@@ -15,17 +30,11 @@ as a review after PR #36 closed; the finding was then built.)
 graduation source isolation**. The global permission path now admits canonical
 live evidence only; research books can neither unlock nor block micro-live.
 Also reconciled merged PR/CI state and closed stale TODO-7 instructions.)
-**Branch:** `arena/01a0096b-sky` (this session; PR to be opened against `main` as the closing step)
-**HEAD commit:** the P12.15 commit on `arena/01a0096b-sky` (`git rev-parse HEAD`), on top of merged base `fdfc9f4` — `P12.14: isolate graduation discipline (v2.23.2) (#37)`
-**Previous branch:** `arena/01a008d1-sky` (P12.14 implementation, merged as PR #37)
-**Version:** 2.23.3
-**Python:** 3.11 (venv `.venv`) — suite green (**748 pass / 1 skip**)
-
-> **This session (`arena/01a0096b-sky`): v2.23.3 / P12.15 live-book source
-> isolation.** PR #37 (P12.14) merged, so the session opened as a safety
+> **Implementation session (`arena/01a0096b-sky`): v2.23.3 / P12.15 live-book
+> source isolation.** PR #37 (P12.14) had merged, so that session opened as a safety
 > review and produced `docs/HANDOVER_2026-08-16_P12_15.md` plus the
 > reproduction `ops/probes/p12_15_livebook_probe.py`; the fix was then built
-> against that contract.
+> against that contract and merged as PR #38.
 >
 > **The gap.** P12.13/P12.14 isolated the graduation gate to the canonical
 > live book, but every live *risk control* still read
@@ -70,6 +79,17 @@ Also reconciled merged PR/CI state and closed stale TODO-7 instructions.)
 > full suite **748 passed, 1 skipped** (108s); compileall, `pip check`, and
 > the v2.23.3 wheel gate pass; the probe harness exits 0 with all six cases
 > behaving as specified.
+
+> **This follow-up (v2.23.4 / P12.15 execution-metric isolation).** Review
+> found that `business_metrics()["execution"]` still called the broad
+> `violation_rate()` journal report even though the scorecard's trade/equity
+> rows were canonical-live-only. `brain.journal.live_execution_stats()` now
+> reads decided, non-simulator, canonical-live paper trades; it preserves the
+> old journaled-entry keys, exposes eligible/journaled/missing/compliant/source,
+> and `format_metrics()` prints missing live journals. The broad journal report
+> and graduation discipline remain unchanged. Two regressions cover research/
+> simulator isolation and missing-journal visibility; full suite is **750
+> passed / 1 skipped**. Contract: `docs/HANDOVER_2026-08-16_P12_15_1.md`.
 >
 > **Previous session (`arena/01a008d1-sky`): v2.23.2 / P12.14 graduation
 > discipline isolation.** PR #36 (P12.13) closed, so the session opened as a
@@ -428,8 +448,8 @@ Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
 (our own stored market history — ✅ P10.1–P10.12 shipped, with real BTC
 market data imported and verified; research-validation tooling — ✅
-P12.1–P12.13 shipped). The next executable work is the real-host XAU evidence
-run plus continued paper proof. **Micro-live remains blocked** until the
+P12.1–P12.15 shipped, plus the P12.15 execution-metric follow-up). The next executable work is the real-host XAU evidence
+run plus continued canonical paper proof. **Micro-live remains blocked** until the
 unchanged graduation report says READY and the user explicitly approves it.
 Every phase below is ordered by how directly it moves those two lines.
 
@@ -437,15 +457,16 @@ Every phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.1–P12.13 shipped.**
+**P12 (SKY Quant Validation Engine) — P12.1–P12.15 shipped, including the P12.15 execution-metric follow-up.**
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real BTC data and the graduation gate is honestly closed (+0.348R
 gross, negative net on 1h/4h primary). Freqtrade rejected (F1–F8);
 Backtrader rejected (BT1–BT8). The Dukascopy XAU research book now has
 calendar-aware gap detection (P12.9), a gold-specific cost model (P12.10),
-source-keyed calibration (P12.11), and a read-only PAXG-vs-XAU basis/seal
-dossier (P12.12). Adapter blockers are closed, but **promotion evidence is
-not**: this checkout has no real basis measurement or XAU seal, approval is
+source-keyed calibration (P12.11), a read-only PAXG-vs-XAU basis/seal dossier
+(P12.12), canonical-only graduation (P12.13/P12.14), and canonical-only live
+risk controls (P12.15). Tooling blockers are closed, but **promotion evidence
+is not**: this checkout has no real basis measurement or XAU seal, approval is
 open, and XAU remains non-tradeable. Open items: real-host evidence, the P11
 paper gate, and TODO-8; micro-live is blocked. TODO-7 is complete.
 
@@ -869,10 +890,11 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 4. **Immune system reports `CRITICAL` in `DEMO_MODE=1`** because the
    committed sample data is stale by design. Expected offline.
 5. **TODO-7 is complete.** Root `.github/workflows/ci.yml` runs the offline
-   suite and wheel gate; both passed on merged P12.12 (`main`, run
-   `31907327643`). The obsolete nested workflow copy was removed.
-6. **`CHANGELOG.md` is current** through v2.23.0 plus an Unreleased maintenance
-   correction.
+   suite and wheel gate; the active jobs have passed on `main` (run
+   `31907327643` was the recorded P12.12 verification). The obsolete nested
+   workflow copy was removed.
+6. **`CHANGELOG.md` is current** through v2.23.4, including the P12.15
+   execution-metric follow-up.
 7. **Real market data is imported offline**: Binance spot BTCUSDT 1m
    (696,960 bars, sha256-pinned `c4ad6029…b934b7`). The store is
    gitignored; re-import with `backfill --from-csv` if starting in a clean sandbox.
@@ -981,16 +1003,18 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first and
-> confirm P12.13 merged. P12.1–P12.13 are shipped; do not rewrite the locked
-> protocol, source-key algebra, canonical-only graduation filters, calendars,
-> gold costs, or `data/gold_basis.py`. Preserve separate `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD`
-> histories and exact-time-only alignment. Run the documented P12.12 procedure
-> on the real-data host; never substitute synthetic fixtures, pool calibration,
-> or create/reseal evidence from `xau-evidence`. Treat a passing dossier as
-> eligible for human review only. Continue paper proof, keep XAU non-tradeable,
-> and keep micro-live blocked until the unchanged graduation bar says READY
-> and the user separately gives explicit approval. Do not adopt Freqtrade or
-> Backtrader and do not loosen any gate.
+> confirm P12.15 / PR #38 is merged. P12.1–P12.15 are shipped; do not rewrite
+> the locked protocol, source-key algebra, canonical-only graduation and live
+> risk filters, calendars, gold costs, or `data/gold_basis.py`. Preserve
+> separate `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD` histories and
+> exact-time-only alignment. On the real-data host, rerun `learn`, run the
+> documented P12.12 validation/evidence procedure, and archive
+> `xau-evidence --json`; never substitute synthetic fixtures, pool calibration,
+> or create/reseal evidence from the audit command. Treat a passing dossier as
+> eligible for human review only. Continue canonical paper proof, keep XAU
+> non-tradeable, and keep micro-live blocked until the unchanged graduation bar
+> says READY and the user separately gives explicit approval. Do not adopt
+> Freqtrade or Backtrader, loosen any gate, or build order placement.
 
 ---
 
@@ -999,15 +1023,21 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 736 passed, 1 skipped
+# 750 passed, 1 skipped
 
 # P12.14 discipline harness (exits non-zero if any case fails open)
 .venv/bin/python ops/probes/p12_14_discipline_probe.py
+
+# P12.15 live-book harness (exits non-zero if any control pools research)
+.venv/bin/python ops/probes/p12_15_livebook_probe.py
+
+# P12.15 execution-metric follow-up
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_livebook_isolation.py tests/test_journal_metrics.py -q
 ```
 
 PAXG-vs-XAU evidence (P12.12):
 ```bash
-DEMO_MODE=1 .venv/bin/python -m pytest tests/test_gold_basis.py tests/test_validation.py tests/test_handoff_guard.py -q
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_gold_basis.py tests/test_validation.py tests/test_handoff_memory.py -q
 # 54 passed
 python main.py xau-evidence --tf 15m --json
 # RESEARCH_ONLY; 0 rows; seal MISSING; approval OPEN; exit 1
@@ -1028,7 +1058,7 @@ DEMO_MODE=1 .venv/bin/python -m pytest tests/test_costs.py -q
 Wheel gate:
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.23.1-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.23.4-py3-none-any.whl ; no duplicate entries
 ```
 
 Market calendar (P12.9):
@@ -1074,13 +1104,14 @@ python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau swe
 ## Last implementation commit
 
 ```
-015366f  P12.14: isolate graduation discipline (v2.23.2)   — PR #37, open, CI green
-60b61e5  P12.13: isolate global graduation evidence by source (#36)   — merged base
+P12.15 follow-up: live execution-metric source isolation (v2.23.4) — PR #39
+00eedff  P12.15: isolate the live risk controls by source (v2.23.3) (#38) — merged
+015366f  P12.14: isolate graduation discipline (v2.23.2) (#37) — merged
 ```
 
-PR #37: https://github.com/Azimshawon/SKY/pull/37 — open, MERGEABLE, both root
-CI jobs passing. A later handoff commit on this branch may sit on top of
-`015366f`; use `git rev-parse HEAD` for the tip.
+PR #38: https://github.com/Azimshawon/SKY/pull/38 — merged into `main`.
+This reconciliation branch is intentionally at the same commit as
+`origin/main`; use `git rev-parse HEAD` for the tip.
 
 ---
 
@@ -1119,7 +1150,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 736 pass / 1 skip.
+- Maintain test count at ≥ 748 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -1134,6 +1165,18 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 ```
 
 ## End-of-session checklist (run before closing this session)
+
+**Current reconciliation session `arena/01a0099b-sky` (2026-08-16):**
+
+1. [x] Fetch `origin` and confirm PR #38 is merged; keep work on the fixed session branch.
+2. [x] Review P12.1–P12.15 and find the remaining pooled business execution metric.
+3. [x] Build `live_execution_stats()` and wire only `business_metrics()` to it; preserve broad journal/graduation contracts.
+4. [x] Add two source-isolation/missing-journal regressions and bump v2.23.3 → v2.23.4.
+5. [x] Reconcile the durable docs and run the full suite: **750 passed / 1 skipped**.
+6. [x] Verify clean-checkout XAU evidence still fails closed with zero rows and no seal.
+7. [ ] Real-data host: rerun `learn`, run the locked XAU validation, and archive `xau-evidence --json` without synthetic substitutions.
+8. [ ] Continue canonical live paper proof and journal every decided real trade.
+9. [ ] Repo admin verifies TODO-8; do not unlock micro-live or build order placement.
 
 **Session `arena/01a008d1-sky` (2026-08-16) — review + P12.14 build:**
 

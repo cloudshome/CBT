@@ -1,10 +1,9 @@
 """P12.15 — live-book source isolation for the live risk controls.
 
 P12.13/P12.14 isolated the *graduation* gate (performance, then discipline)
-to the canonical live book, but every live *risk* control still read
-``decided_paper_rows(exclude_sim=True)`` with no provenance filter: the
-daily/weekly loss limits, the drawdown ladder, the Kelly advisory, the
-Monte Carlo ruin/equity reads, MAE/MFE review and the business scorecard.
+to the canonical live book, and P12.15 isolated live *risk* rows. The
+remaining P12.15 follow-up isolates the business scorecard's nested execution
+metric, which still used a broad journal query with no provenance filter.
 A research book (e.g. ``dukascopy:spot:bid``) pooled straight into them —
 research wins masked real losses past the daily limit and flattened a real
 drawdown (fail OPEN), and research losses tripped limits the live desk never
@@ -22,7 +21,8 @@ from __future__ import annotations
 import time
 
 from brain.analytics import mae_mfe_summary, monte_carlo_equity, monte_carlo_ruin_table
-from brain.metrics import business_metrics
+from brain.journal import save_journal
+from brain.metrics import business_metrics, format_metrics
 from brain.risk_gate import daily_weekly, drawdown, evaluate
 from data.database import SignalDB
 from data.provenance import LIVE_SOURCE_KEY
@@ -181,6 +181,56 @@ def test_mc_and_business_reads_ignore_research_books(tmp_path):
     assert monte_carlo_equity(db, samples=20, seed=1)["available"] is False
     assert mae_mfe_summary(db)["available"] is False
     assert business_metrics(db)["overall"]["n"] == 0
+    db.close()
+
+
+def test_business_execution_metric_uses_live_book_journals_only(tmp_path):
+    """P12.15 follow-up: the business scorecard's execution block must not
+    pool simulator/research journal rows behind a live P&L number."""
+    db = SignalDB(tmp_path / "d.db")
+    _paper(db, 1150, rr=2.0, ts=_NOW)
+    save_journal(db, 1150, followed_rules=True)
+    _paper(db, 1151, rr=-1.0, ts=_NOW + 1)
+    save_journal(db, 1151, followed_rules=False)
+    for i in range(10):
+        scan_id = 1160 + i
+        _paper(db, scan_id, rr=-1.0, source_key=RESEARCH_KEY, ts=_NOW + 2 + i)
+        save_journal(db, scan_id, followed_rules=False)
+    _paper(db, 1175, rr=2.0, sim_key="sim:1175", ts=_NOW + 20)
+    save_journal(db, 1175, followed_rules=True)
+
+    execution = business_metrics(db)["execution"]
+    assert execution["eligible"] == 2
+    assert execution["journaled"] == 2
+    assert execution["n"] == 2
+    assert execution["violations"] == 1
+    assert execution["violation_rate"] == 0.5
+    assert execution["missing_journals"] == 0
+    db.close()
+
+
+def test_business_execution_metric_exposes_missing_live_journals(tmp_path):
+    """Missing answers remain visible in the live business report; the broad
+    journal report's old denominator is not silently reused."""
+    db = SignalDB(tmp_path / "d.db")
+    _paper(db, 1180, rr=2.0, ts=_NOW)
+    save_journal(db, 1180, followed_rules=True)
+    _paper(db, 1181, rr=-1.0, ts=_NOW + 1)  # no journal answer
+    for i in range(5):
+        scan_id = 1190 + i
+        _paper(db, scan_id, rr=-1.0, source_key=RESEARCH_KEY, ts=_NOW + 2 + i)
+        save_journal(db, scan_id, followed_rules=False)
+
+    metrics = business_metrics(db)
+    execution = metrics["execution"]
+    assert execution["eligible"] == 2
+    assert execution["journaled"] == 1
+    assert execution["n"] == 1
+    assert execution["violations"] == 0
+    assert execution["violation_rate"] == 0.0
+    assert execution["missing_journals"] == 1
+    assert execution["compliance"] == 0.5
+    assert "1 missing journal" in format_metrics(metrics)
     db.close()
 
 

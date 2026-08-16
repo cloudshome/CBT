@@ -212,6 +212,13 @@ python main.py journal <scan_id> --followed-rules 1 --emotion calm
 python main.py desk        # the "discipline" line shows eligible/missing/violations
 ```
 
+The live risk read is deliberately narrower than a research report: P12.15
+makes `SignalDB.live_book_rows()` the source for loss limits, drawdown, Kelly,
+Monte Carlo, MAE/MFE and the business scorecard. The scorecard's execution
+metric follows the same boundary and exposes missing live journals. Simulator rows and
+non-canonical research trades cannot move those controls; use the scorecard's
+explicit source filters to inspect research separately.
+
 ## 7. Logs, stop controls and recovery
 
 Useful commands:

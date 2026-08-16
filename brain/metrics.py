@@ -1,7 +1,9 @@
 """brain/metrics.py — professional trading business metrics (decision B4).
 
 Calculates equity curves, profit factors, win rates, expectancies, drawdowns,
-and rolling performance windows from the decided paper-trade log.
+and rolling performance windows from the canonical live decided paper-trade
+log. Its execution block is canonical-live-only; the broad journal report
+remains a separate general view.
 
 Expectancy formula:
   E = (win_rate * avg_win_R) - (loss_rate * abs(avg_loss_R))
@@ -111,8 +113,11 @@ def business_metrics(db: SignalDB, windows: tuple[int, ...] = (50, 100)) -> dict
                                      dw.get("current_equity",
                                             dw.get("equity", 10_000.0)))
 
-    from brain.journal import violation_rate
-    v = violation_rate(db)
+    # P12.15 follow-up: execution discipline must use the same canonical live
+    # business population as the scorecard's P&L/equity rows. The broad
+    # `violation_rate()` report remains available for general journal views.
+    from brain.journal import live_execution_stats
+    v = live_execution_stats(db)
     return {
         "overall": overall,
         "rolling": rolling,
@@ -142,9 +147,14 @@ def format_metrics(metrics: dict) -> str:
             lines.append(f"  last {w:<4} trades: win {r['win_rate']*100:.0f}%  "
                          f"exp {r['expectancy_r']:+.3f}R  pf {r['profit_factor']}")
     e = metrics["execution"]
-    if e.get("n"):
-        lines.append(f"  execution       {e['violation_rate']*100:.0f}% rule violations "
-                     f"({e['violations']}/{e['n']} journaled trades)")
+    if e.get("eligible") or e.get("n"):
+        rate = (f"{e['violation_rate'] * 100:.0f}%"
+                if e.get("violation_rate") is not None else "n/a")
+        line = (f"  execution       {rate} rule violations "
+                f"({e.get('violations', 0)}/{e.get('n', 0)} journaled trades)")
+        if e.get("missing_journals"):
+            line += f"; {e['missing_journals']} missing journal(s)"
+        lines.append(line)
     return "\n".join(lines)
 
 

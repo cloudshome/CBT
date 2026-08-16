@@ -7,7 +7,7 @@ Your roadmap's most important journal field: **"Did I follow my system?"**
 
 This module stores the post-trade fields per scan, derives the pre-trade
 checklist automatically from the payload, scores execution quality, and feeds
-the violation rate into the business metrics (decision B4).
+source-correct execution discipline into the business metrics (decision B4).
 
 Pre-trade (auto-derived, nothing to type): regime, HTF bias, setup, entry/SL/TP,
 planned R:R, risk %, news environment.
@@ -111,6 +111,39 @@ def violation_rate(db: SignalDB) -> dict:
         "n": stats["n"],
         "violations": stats["violations"],
         "violation_rate": stats["violation_rate"],
+    }
+
+
+def live_execution_stats(db: SignalDB) -> dict:
+    """Execution discipline for the canonical live business scorecard.
+
+    ``violation_rate()`` intentionally remains the broad journal report used
+    by the journal CLI, weekly/general reports and historical surfaces. The
+    business scorecard is different: its P&L/equity population is the
+    canonical live book, so its execution metric must use the same population
+    and cannot be moved by simulator or research journals.
+
+    The ``n`` / ``violations`` / ``violation_rate`` keys retain the old
+    journaled-entry semantics for backwards-compatible consumers. The
+    additional population fields make missing live journals visible instead
+    of allowing a small clean subset to look like complete discipline.
+    """
+    rows = db.discipline_rows(source_key=LIVE_SOURCE_KEY)
+    eligible = len(rows)
+    violations = sum(1 for r in rows if r.get("followed_rules") == 0)
+    compliant = sum(1 for r in rows if r.get("followed_rules") == 1)
+    journaled = violations + compliant
+    return {
+        "n": journaled,
+        "violations": violations,
+        "violation_rate": round(violations / journaled, 3) if journaled else None,
+        "eligible": eligible,
+        "journaled": journaled,
+        "missing_journals": eligible - journaled,
+        "compliant": compliant,
+        "compliance": round(compliant / eligible, 4) if eligible else None,
+        "source_key": LIVE_SOURCE_KEY,
+        "source": describe_source(LIVE_SOURCE_KEY),
     }
 
 

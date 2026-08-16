@@ -1,9 +1,9 @@
 # 🧠 AI Trading Brain Anatomy Roadmap & Status Tracker
 
 ```
-Progress: [████████████████████████████████████████] 100% (Phases P1–P6 Complete)
-Tests:    726 passed / 1 skip (offline, DEMO_MODE=1)
-Status:   P12.13 graduation source isolation shipped; micro-live remains gated
+Progress: [████████████████████████████████████████] P1–P10 + P12 tooling shipped; P11 proof in progress
+Tests:    750 passed / 1 skip (offline, DEMO_MODE=1)
+Status:   P12.15 live-book isolation plus execution-metric follow-up shipped; real-host evidence + P11 paper proof next; micro-live remains gated
 Note:     This repo consolidates Cloudslover/AI + cloudshome/AI (see MERGE_NOTES.md)
 ```
 
@@ -179,7 +179,7 @@ route commands through CryptoBrain.
 |---|---|---|:---:|
 | **P7** | **Agent surface** | `SKILL.md` (≤ 250 lines) · `python main.py doctor` (alias of `health`) · `python main.py skill --install` · `docs/agent_install.md` | ✅ Complete |
 | **P8** | **Source channels** | `brain/channels.py` ordered-backend router (CryptoDada/Discord/news/LLM) · `python main.py channels` · dashboard "Channels" panel | ✅ Complete |
-| **P9** | **Capability endpoints** | MCP `tools/list` = 13 read-only tools (deny list visible) · `desk_status()` advisory · `readiness_strip()` combined doctor verdict (`doctor --strip` / `/api/readiness` / MCP `readiness`) · active root CI wheel-gate (`ci/wheel_gate.py` + `pyproject.toml`) | ✅ Complete (TODO-7 closed; merged-P12.12 CI passed both jobs) |
+| **P9** | **Capability endpoints** | MCP `tools/list` = 13 read-only tools (deny list visible) · `desk_status()` advisory · `readiness_strip()` combined doctor verdict (`doctor --strip` / `/api/readiness` / MCP `readiness`) · active root CI wheel-gate (`ci/wheel_gate.py` + `pyproject.toml`) | ✅ Complete (TODO-7 closed; merged P12.15 CI passed both jobs) |
 
 **Out of scope (deliberate):** web scraping, social-platform logins,
 cookie extraction, audio transcription, third-party CLIs (`gh`,
@@ -212,7 +212,7 @@ runtime dependency or alternate grader.
 |---|---|---|:---:|
 | **P11** | **Paper-book proof** | First grind shipped (38,439 decided; 100/20 on all four primary setups; compliance 100%; sell-R bug fixed). **First real-data grind shipped 2026-08-14** (+8,300 backtest / +494 paper real samples). Graduation gate **honestly CLOSED** (real data: +0.348R / 36.8% WR / PF 1.55). Keep grinding live data; do not move the bar. | 🔄 In progress |
 | **P10** | **Data infrastructure + market terminal** | **P10.1–P10.12 shipped** (PR #18): schema, Binance backfill, gaps/rollups, derivatives series, quality pillar, Bybit adapter, cross-exchange series, Lightweight Charts, futures/flow cards, WS tier, store-backed backtest, feature store. | ✅ Complete — [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **SKY Quant Validation Engine** | Walk-forward / sealed OOS / lookahead / boxed scorecard / quality and strategy scores / conditioned net expectancy / MC risk / venue calendars / gold costs / source provenance / XAU promotion evidence — on **our** backtester + **our** store. | ✅ **P12.1–P12.14 shipped through 2026-08-16.** P12.11 isolated calibration/setup proof by source; P12.12 added the read-only PAXG/XAU basis + seal dossier; P12.13 makes the global graduation path canonical-live-only and fails closed on research progress; **P12.14 isolates the graduation discipline criterion too — compliance counts only decided, non-simulator, canonical-live paper trades, and a missing or blank journal fails closed exactly like a violation.** Next executable work is the documented real-host evidence run plus continued P11 paper proof. Micro-live remains blocked until the unchanged repository graduation bar opens **and** the user explicitly approves it. |
+| **P12** | **SKY Quant Validation Engine** | Walk-forward / sealed OOS / lookahead / boxed scorecard / quality and strategy scores / conditioned net expectancy / MC risk / venue calendars / gold costs / source provenance / XAU promotion evidence / canonical-live risk isolation — on **our** backtester + **our** store. | ✅ **P12.1–P12.15 shipped through 2026-08-16.** P12.11 isolated calibration/setup proof by source; P12.12 added the read-only PAXG/XAU basis + seal dossier; P12.13 makes global graduation canonical-live-only; P12.14 isolates graduation discipline; **P12.15 makes `SignalDB.live_book_rows()` the population for every live risk control, repairs the Kelly advisory, and the follow-up isolates the business execution metric with missing-journal visibility.** Next executable work is the documented real-host evidence run plus continued canonical P11 paper proof. Micro-live remains blocked until the unchanged repository graduation bar opens **and** the user explicitly approves it. |
 
 **P11 runs alongside P10.** The first grind is done; the gate is still
 closed on the blueprint bar. Do not let the data project become a

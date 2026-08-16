@@ -10,6 +10,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.23.4] — 2026-08-16 · P12.15 execution-metric follow-up
+
+PATCH: finish the P12.15 live-book boundary inside the business scorecard.
+P12.15 already isolated its P&L, equity, risk, MC and MAE/MFE populations, but
+its nested `execution` field still read the broad `violation_rate()` journal
+report. Simulator and research journals could therefore move a discipline
+number shown beside an otherwise canonical-live scorecard.
+
+### Added / Fixed
+
+- `brain.journal.live_execution_stats()` computes the scorecard execution
+  block over decided, non-simulator, canonical-live paper trades only,
+  including legacy NULL provenance rows.
+- `business_metrics()` now reads that source-correct block. Its existing
+  `n`/`violations`/`violation_rate` journaled-entry keys remain compatible;
+  eligible, journaled, missing-journal, compliant and source fields expose the
+  population behind the number.
+- `format_metrics()` reports missing live journals instead of hiding them.
+- Two regressions prove research/simulator journals cannot move the live
+  execution metric and missing canonical journals remain visible.
+- The broad `violation_rate()` report, `graduation_discipline()`, all
+  thresholds, source-key algebra, XAU status and no-order-placement contract
+  are unchanged.
+
+### Reconciled
+
+- Updated the durable session, TODO, architecture, roadmap, README and
+  operations documentation with the merged PR #38 state and the ordered next
+  work: real-host XAU evidence, canonical P11 paper proof, then TODO-8 admin
+  verification. This checkout still cannot claim real-host evidence.
+
+### Verification
+
+- Full suite: **750 passed, 1 skipped** (+2).
+- Compileall, `pip check`, wheel gate and P12.14/P12.15 probes pass.
+
+---
+
 ## [2.23.3] — 2026-08-16 · P12.15 live-book source isolation
 
 PATCH: the live *risk controls* are now isolated to the canonical live book

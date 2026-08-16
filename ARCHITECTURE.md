@@ -10,7 +10,7 @@
 **Last updated:** 2026-08-16
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.23.0` (also `pyproject.toml`).
+**Version:** `config.VERSION` = `2.23.4` (also `pyproject.toml`).
 
 ---
 
@@ -20,13 +20,13 @@
 | File | Purpose |
 |---|---|
 | `main.py` | argparse CLI dispatcher (~30 `cmd_*` subcommands) |
-| `config.py` | Env-driven config; `VERSION = "2.23.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
+| `config.py` | Env-driven config; `VERSION = "2.23.4"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
 | `mcp_server.py` | Zero-dep stdio JSON-RPC 2.0 MCP server (read-only tool permission map) |
 | `SKILL.md` | Agent-facing skill file (the one AI agents read first) |
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
 | `TODO.md` | Prioritised remaining work |
 | `ARCHITECTURE.md` | This file |
-| `CHANGELOG.md` | What shipped, when (current through v2.23.0) |
+| `CHANGELOG.md` | What shipped, when (current through v2.23.4) |
 | `BLUEPRINT.md` | The 4-step path from paper to real capital |
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
@@ -40,7 +40,7 @@
 |---|---|---|
 | `agent.py` | `health_report`, `format_health`, `desk_status`, `format_desk_status`, `readiness_strip`, `format_readiness_strip` | `cmd_health`, `cmd_desk`, `cmd_doctor`, MCP `desk_status` / `readiness`, `/api/desk`, `/api/readiness` |
 | `agents.py` | Autonomous desk agents (morning, watchdog, paper-reviewer, weekly-review), audit-logged to `agent_runs` | `cmd_agent` |
-| `analytics.py` | MAE/MFE summary, Monte Carlo equity/drawdown | `hidden analytics mae/mc` |
+| `analytics.py` | MAE/MFE summary, Monte Carlo equity/drawdown over the canonical live book (P12.15) | `hidden analytics mae/mc` |
 | `ask.py` | RAG query with grounded citations | `cmd_ask`, MCP `ask` |
 | `brief.py` | Cross-asset morning brief + post-trade reviews | `cmd_brief`, `cmd_postreview`, `cmd_agent morning` |
 | `calibrator.py` | Self-improvement profile from graded backtests | `cmd_learn` |
@@ -51,12 +51,12 @@
 | `full_pipeline.py` | The end-to-end analysis pipeline | `cmd_scan`, `cmd_intelligence` |
 | `immune.py` | Staleness, DB integrity, risk gates, behavioral flags, calibration drift | `cmd_health`, `cmd_doctor`, `readiness_strip` |
 | `institutional_score.py` | Institutional desk-style scoring | `intelligence` |
-| `journal.py` | Professional trading journal + `graduation_discipline()` (P12.14 gate input) | `cmd_journal` |
+| `journal.py` | Professional trading journal + `graduation_discipline()` + `live_execution_stats()` (P12.14/P12.15) | `cmd_journal`, business scorecard |
 | `library.py` | RAG knowledge index | `ask` |
-| `metrics.py` | Win-rate, expectancy, profit factor, drawdown, streaks | `agents`, `metrics` |
+| `metrics.py` | Win-rate, expectancy, profit factor, drawdown, streaks and source-correct execution discipline over the canonical live book (P12.15) | `agents`, `metrics` |
 | `playbooks.py` | Per-asset playbooks (BTC / ETH / GOLD) | `library`, `ask` |
 | `portfolio.py` | Portfolio-level risk (BTC+ETH = one bucket) | `intelligence` |
-| `risk_gate.py` | **The gate.** Kelly-advisory, daily/weekly stop, progression ladder | `cmd_approve`, `cmd_risk` |
+| `risk_gate.py` | **The gate.** Canonical-live Kelly advisory, daily/weekly stop, drawdown ladder, progression | `cmd_approve`, `cmd_risk` |
 | `state_memory.py` | 8D state fingerprint + historical similarity | `cmd_state` |
 | `styles.py` | Scalp/Day/Swing/Momentum/Position style routing | `analyze_full` |
 | `trading_intelligence.py` | The institutional desk report | `cmd_intelligence`, `cmd_card` |
@@ -78,7 +78,7 @@
 | `scorecard.py` | P12.3/P12.6 — boxed strategy scorecard reporting gross + net metrics, Sharpe/Sortino/Calmar, holding time, split by side/regime/session/setup/conditions |
 | `quality_score.py` | P12.4 — Backtest Quality Score 0–100 (edge / curve robustness / sample confidence / BT5 parameter-plateau with isolated-peak cap at 50); `python main.py quality` store sweep |
 | `strategy_score.py` | P12.5 — strategy score on the calibrator: `E_R × sample-quality × regime-fit × execution` (weighted geometric mean, NET of costs), `multiplier_from_score()` trust dial |
-| `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB` context manager |
+| `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB.live_book_rows()` defines the P12.15 live book |
 | `backtester.py` | Walk-forward grading of plans at +1h/+4h/+24h; P10.11 `run_backtest_on_store()` reads the Parquet store instead of a live fetch |
 | `paper_trading.py` | Approved-signal lifecycle: monitor + auto-close at SL/TP1 (no real orders) |
 | `ws_client.py` | P10.10 — public Binance WebSocket streams (`!forceOrder@arr` + klines) with reconnect/backoff; offline-safe demo stream; feeds readiness + feature store |
@@ -105,7 +105,7 @@
 | `mtf.py` | Multi-timeframe (Monthly → 1M) alignment |
 | `lifecycle.py` | Signal status transitions (CREATED → PENDING_REVIEW → APPROVED → EXECUTED → CLOSED) |
 | `execution.py` | Realistic spread/slippage execution model (`EXECUTION_MODEL=simple`) |
-| `hidden_alpha.py` | Markov-smoothed HMM regimes, CVD order flow, Bayesian Kelly, 8D fingerprint + similarity search |
+| `hidden_alpha.py` | Markov-smoothed HMM regimes, CVD order flow, Bayesian Kelly, 8D fingerprint + similarity search; `kelly_from_rows()` for P12.15 |
 | `correlation.py` | Measured BTC/ETH/GOLD rolling correlation + ETH/BTC beta |
 | `calibration_hook.py` | Plugs the `brain/calibrator` into the engine output |
 
@@ -120,7 +120,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 59 test modules, 726 pass / 1 skip
+### `tests/` — 61 test modules, 750 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_calendar.py` — **NEW (P12.9)** gold-week boundaries + DST, holidays, trading-time counting,
   calendar-aware gaps/quality, Dukascopy import gap report, `calendar` CLI.
@@ -160,8 +160,9 @@
 - `REAL_DATA_RUN_2026-08-14.md` — first real BTCUSDT 1m imported and re-run.
 - `DUKASCOPY_XAU_ADAPTER.md` / `SOURCE_PROVENANCE.md` — external XAU import and source-separated learning contract.
 - `XAU_PROMOTION_EVIDENCE.md` — P12.12 real-host procedure, exact-time basis contract, and still-open promotion gates.
+- `HANDOVER_2026-08-16_P12_15_1.md` — P12.15 follow-up: live execution-metric source isolation.
 - `.github/workflows/ci.yml` — active offline-suite and wheel-gate jobs;
-  both passed on merged P12.12 (`main`, run `31907327643`).
+  both passed on merged P12.15 (`main`; later runs may use the same two-job contract).
 
 ---
 
@@ -200,7 +201,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 726 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 750 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -277,6 +278,13 @@
     cannot contribute. The general journal report (`violation_rate()`) is a
     separate, deliberately broader number for the scorecard and risk card, and
     must never be substituted back into the gate.
+
+17. **Live risk controls are canonical-live-only.** `SignalDB.live_book_rows()`
+    is the one population for daily/weekly loss limits, drawdown, Kelly,
+    Monte-Carlo risk, MAE/MFE and business metrics: decided, non-simulator,
+    canonical-live rows, with legacy NULL provenance retained. Research rows
+    remain inspectable through explicit scorecard/source queries but cannot
+    mask, deepen or otherwise move a live risk reading.
 
 ---
 
@@ -368,5 +376,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **726 pass, 1 skip**. Any new feature must
+The expected baseline is **750 pass, 1 skip**. Any new feature must
 maintain or increase this count.

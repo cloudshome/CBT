@@ -1,6 +1,7 @@
 # Source provenance in saved keys, graduation and live risk (P12.11 / P12.13 / P12.15)
 
-> **Status:** shipped in v2.22.0.
+> **Status:** shipped in v2.23.4 (P12.11/P12.13/P12.15 plus the live
+> execution-metric follow-up).
 > **Closes:** Dukascopy blocker #3 — *"source provenance reaches saved
 > backtest/calibration keys"* ([`DUKASCOPY_XAU_ADAPTER.md`](DUKASCOPY_XAU_ADAPTER.md)).
 > **Module:** [`data/provenance.py`](../data/provenance.py).
@@ -197,9 +198,15 @@ P12.15 closes that gap:
   stands aside on a book with no net winners.
 - The scorecard keeps its explicit `source_key` / `by_source` research
   surfaces; `decided_paper_rows()` is unchanged for explicit callers.
+- The business scorecard's `execution` block now uses
+  `brain.journal.live_execution_stats()` over the same canonical live book.
+  The broad `violation_rate()` report remains unchanged for the journal CLI,
+  weekly/general reports and historical surfaces; missing live journals are
+  exposed in the business block rather than silently hidden.
 
 No threshold moved in either direction. A research series can neither
 flatter nor spoil any number the live desk acts on.
 
-Report: `docs/HANDOVER_2026-08-16_P12_15.md` · harness:
+Report: `docs/HANDOVER_2026-08-16_P12_15.md` · follow-up:
+`docs/HANDOVER_2026-08-16_P12_15_1.md` · harness:
 `ops/probes/p12_15_livebook_probe.py`.
