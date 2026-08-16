@@ -34,7 +34,8 @@ CARDS = ["LIVE SIGNAL", "CANDLESTICK", "MULTI-TIMEFRAME", "WHAT THE MARKET OFFER
          "CONTEXT — WHAT AFFECTS PRICE", "STATE MEMORY", "HUMAN APPROVAL QUEUE",
          "PAPER TRADING", "RECENT SIGNALS", "LEARNING", "COACH", "CONNECTIONS",
          "SYSTEM HEALTH", "AGENTS — MORNING BRIEFING", "MCP SERVER", "ASK THE DESK",
-         "DESK STATUS", "STRATEGY SCORECARD", "LOOP HEALTH", "KEY LEVELS"]
+         "DESK STATUS", "STRATEGY SCORECARD", "LOOP HEALTH", "KEY LEVELS",
+         "MARKET SENTIMENT — THE COLOUR IS THE MARKET"]
 
 
 def _extract_js() -> str:
@@ -243,3 +244,141 @@ def test_render_with_real_sample_payload():
     assert SAMPLE.exists(), "example_payload.json missing"
     payload = json.loads(SAMPLE.read_text())
     _run_harness(json.dumps(payload))
+
+
+def _run_sentiment_harness(payload_json: str) -> str:
+    """Run render() with an attached ``sentiment`` block and return the state
+    of the sentiment strip + mood bar, so colour wiring is guarded here."""
+    js = _extract_js()
+    harness = f"""
+    const payload = {payload_json};
+    const elements = {{}};
+    function el(id){{ if(!elements[id]) elements[id]={{ innerHTML:'', className:'',
+      value:'BTCUSDT', textContent:'', checked:true, disabled:false, style:{{}},
+      addEventListener:()=>{{}}, querySelector:()=>null }}; return elements[id]; }}
+    global.window = {{ addEventListener: ()=>{{}} }};
+    global.document = {{ getElementById: el, addEventListener: ()=>{{}} }};
+    global.fetch = async (url) => ({{ json: async () => {{
+      if(String(url).includes('/api/candles')) return {{ candles: [] }};
+      return {{}};
+    }} }});
+    global.AbortController = class {{ constructor(){{ this.signal={{}}; }} abort(){{}} }};
+    global.setInterval = () => 0; global.clearInterval = () => {{}};
+    global.setTimeout = () => 0; global.clearTimeout = () => {{}};
+    {js}
+    render(payload);
+    const app = elements['app'].innerHTML;
+    console.log(JSON.stringify({{
+      card: app.includes('MARKET SENTIMENT — THE COLOUR IS THE MARKET'),
+      labelInCard: app.includes('STRONG BULLISH'),
+      legend: app.includes('strong bull = deep green'),
+      parts: app.includes('engine bull'),
+      needle: elements['sentiNeedle'].style.left,
+      border: elements['senti'].style.borderColor,
+      bar: elements['moodbar'].style.background,
+      depth: elements['sentiDepth'].textContent,
+      dur: elements['sentiDur'].textContent
+    }}));
+    """
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        f.write(harness)
+        path = f.name
+    try:
+        r = subprocess.run([NODE, path], capture_output=True, text=True)
+        assert r.returncode == 0, f"sentiment render failed:\n{r.stdout}\n{r.stderr}"
+        return r.stdout.strip().splitlines()[-1]
+    finally:
+        Path(path).unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_sentiment_strip_colours_bullish_deep_green():
+    payload = _synthetic_payload()
+    payload["sentiment"] = {
+        "available": True, "score": 71.0, "direction": "bullish",
+        "label": "STRONG BULLISH", "strength": 0.71, "duration_min": 150,
+        "duration_text": "2h 30m", "persistence": 0.83, "intensity": 0.66,
+        "color": "hsl(142,74%,37%)",
+        "parts": [{"name": "engine bull − bear scores", "weight": 0.5,
+                   "raw": 40.0, "contrib": 20.0, "detail": "bull 60 vs bear 20 / 100"},
+                  {"name": "MTF alignment", "weight": 0.2, "raw": 40.0,
+                   "contrib": 8.0, "detail": "aligned"}],
+        "history": [{"ts": 1, "score": 30.0}, {"ts": 2, "score": 45.0},
+                    {"ts": 3, "score": 71.0}],
+    }
+    out = json.loads(_run_sentiment_harness(json.dumps(payload)))
+    assert out["card"] and out["labelInCard"] and out["legend"] and out["parts"]
+    assert out["bar"] == "hsl(142,74%,37%)", out
+    assert out["border"] == "hsl(142,74%,37%)", out
+    assert out["needle"] == "85.5%", out
+    assert out["depth"] == "66%", out
+    assert out["dur"] == "2h 30m", out
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_sentiment_strip_colours_bearish_red_and_neutral_slate():
+    payload = _synthetic_payload()
+    payload["sentiment"] = {
+        "available": True, "score": -42.0, "direction": "bearish",
+        "label": "BEARISH", "strength": 0.42, "duration_min": 20,
+        "duration_text": "20m", "persistence": 0.11, "intensity": 0.27,
+        "color": "hsl(0,67%,47%)", "parts": [], "history": [],
+    }
+    out = json.loads(_run_sentiment_harness(json.dumps(payload)))
+    assert out["bar"].startswith("hsl(0,67%,47%)"), out
+    assert out["needle"] == "29%", out
+
+    payload["sentiment"] = {
+        "available": True, "score": 3.0, "direction": "neutral",
+        "label": "NEUTRAL", "strength": 0.03, "duration_min": 0,
+        "duration_text": "—", "persistence": 0.0, "intensity": 0.0,
+        "color": "#5f6d84", "parts": [], "history": [],
+    }
+    out = json.loads(_run_sentiment_harness(json.dumps(payload)))
+    assert out["bar"] == "#5f6d84", out
+    assert out["depth"] == "—", out
+    assert out["dur"] == "—", out
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_sentiment_fallback_renders_without_backend_block():
+    """A payload WITHOUT a sentiment block (old cached scan) must still render:
+    the client-side estimate keeps the colour signal alive."""
+    payload = _synthetic_payload()
+    payload.pop("sentiment", None)
+    js = _extract_js()
+    harness = f"""
+    const payload = {json.dumps(payload)};
+    const elements = {{}};
+    function el(id){{ if(!elements[id]) elements[id]={{ innerHTML:'', className:'',
+      value:'BTCUSDT', textContent:'', checked:true, disabled:false, style:{{}},
+      addEventListener:()=>{{}}, querySelector:()=>null }}; return elements[id]; }}
+    global.window = {{ addEventListener: ()=>{{}} }};
+    global.document = {{ getElementById: el, addEventListener: ()=>{{}} }};
+    global.fetch = async () => ({{ json: async () => ({{}}) }});
+    global.AbortController = class {{ constructor(){{ this.signal={{}}; }} abort(){{}} }};
+    global.setInterval = () => 0; global.clearInterval = () => {{}};
+    global.setTimeout = () => 0; global.clearTimeout = () => {{}};
+    {js}
+    render(payload);
+    const app = elements['app'].innerHTML;
+    console.log(JSON.stringify({{
+      card: app.includes('MARKET SENTIMENT — THE COLOUR IS THE MARKET'),
+      estimate: app.includes('estimate — backend will confirm'),
+      bar: elements['moodbar'].style.background,
+      label: elements['sentiLabel'].textContent
+    }}));
+    """
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        f.write(harness)
+        path = f.name
+    try:
+        r = subprocess.run([NODE, path], capture_output=True, text=True)
+        assert r.returncode == 0, f"fallback sentiment render failed:\n{r.stdout}\n{r.stderr}"
+        out = json.loads(r.stdout.strip().splitlines()[-1])
+    finally:
+        Path(path).unlink(missing_ok=True)
+    assert out["card"], out
+    assert out["estimate"], out
+    assert out["bar"].startswith("hsl("), out
+    assert out["label"], out

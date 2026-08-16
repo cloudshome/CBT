@@ -71,6 +71,12 @@ class GradedPlan:
     #: data its rate tells you how much of the book rests on that assumption.
     #: Near-zero on synthetic series; expected to be non-trivial on real wicks.
     ambiguous_bar: bool = False
+    # P16 — the sentiment colour reading at signal time (offline mirror of
+    # the live strip: engine scores + trend×ADX + signal, renormalised).
+    sentiment_bucket: str = ""
+    sentiment_score: float = 0.0
+    sentiment_intensity: float = 0.0
+    sentiment_persistence_min: float = 0.0
 
     def __post_init__(self):
         if self.rr_net is None:
@@ -91,11 +97,15 @@ class GradedPlan:
             "max_favorable": self.max_favorable, "max_adverse": self.max_adverse,
             "regime": self.regime, "holding_bars": self.holding_bars,
             "holding_hours": self.holding_hours,
+            "sentiment_bucket": self.sentiment_bucket,
+            "sentiment_score": self.sentiment_score,
+            "sentiment_intensity": self.sentiment_intensity,
+            "sentiment_persistence_min": self.sentiment_persistence_min,
         }
 
 
 def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
-              regime: str = "") -> GradedPlan:
+              regime: str = "", sentiment: Optional[dict] = None) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
     sl = plan.get("stop_loss")
@@ -105,6 +115,7 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
     side = plan.get("action")
     is_buy = side == "BUY"
 
+    sentiment = sentiment or {}
     gp = GradedPlan(
         ts=int(df.iloc[i]["ts"]), plan_type=plan.get("type", "?"),
         action=side or "?", confidence_pct=plan.get("confidence", 0),
@@ -112,6 +123,10 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
         horizon_hours=round(horizon_bars * TIMEFRAME_TO_MS.get(
             df.attrs.get("timeframe", "15m"), 900_000) / 3_600_000, 2),
         regime=regime,
+        sentiment_bucket=sentiment.get("bucket", ""),
+        sentiment_score=float(sentiment.get("score", 0.0) or 0.0),
+        sentiment_intensity=float(sentiment.get("intensity", 0.0) or 0.0),
+        sentiment_persistence_min=float(sentiment.get("persistence_min", 0.0) or 0.0),
     )
     if entry is None or sl is None or tp1 is None:
         gp.outcome = "NOT_TRIGGERED"
@@ -321,10 +336,27 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
     plans_total = 0
     start = time.time()
 
+    # P16 — the sentiment colour clock walks the same chronological path the
+    # grader does: one reading per analyzed bar, persistence accrues while the
+    # direction holds, neutral/flips reset. Plans are tagged with the colour
+    # the desk would have seen at that exact bar.
+    from engine.sentiment import SentimentClock, compute_historical
+    clock = SentimentClock()
+
     for i in range(min_bars, len(df), step):
         slice_df = df.iloc[: i + 1]
         out = analyze_frame(slice_df, symbol=symbol, timeframe=timeframe,
                             min_confidence=min_confidence)
+        bar_ts = int(df.iloc[i]["ts"])
+        sig = out.best_signal or {}
+        hist_score = compute_historical(
+            bull_score=out.bull_score.score if out.bull_score else 0.0,
+            bear_score=out.bear_score.score if out.bear_score else 0.0,
+            features=out.features,
+            signal_action=sig.get("action", "NO TRADE"),
+            signal_confidence=sig.get("confidence", ""),
+        )
+        sentiment = clock.reading(hist_score, bar_ts)
         plans = out.plans
         if not plans:
             continue
@@ -334,7 +366,8 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
         for h in horizons:
             horizon_bars = max(1, int(h * 3_600_000 / tf_ms))
             for plan in plans:
-                all_graded.append(_evaluate(plan, df, i, horizon_bars, regime=regime))
+                all_graded.append(_evaluate(plan, df, i, horizon_bars,
+                                            regime=regime, sentiment=sentiment))
 
     report = {
         "meta": {
@@ -345,6 +378,10 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
             "min_bars": min_bars, "step": step,
             "runtime_seconds": round(time.time() - start, 2),
             "engine_min_confidence": min_confidence,
+            # P16 — the colour proof runs on the offline mirror of the live
+            # composite (engine scores + trend×ADX + signal), never on data
+            # the walk couldn't see (funding/news/fear&greed/MTF excluded).
+            "sentiment_mode": "historical",
         },
         "summary": _aggregate([g for g in all_graded if g.horizon_hours == horizons[0]]),
         "per_horizon": {
@@ -359,6 +396,9 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
                       else "MEDIUM" if g.confidence_pct >= 60 else "LOW",
         ),
         "by_regime": group_by(all_graded, lambda g: g.regime or "UNKNOWN"),
+        # P16 — does the colour pay? The same buckets the strip paints.
+        "by_sentiment": group_by(
+            all_graded, lambda g: g.sentiment_bucket or "UNKNOWN"),
     }
     return {"report": report, "graded": all_graded}
 
@@ -449,5 +489,13 @@ def print_report(report: dict) -> None:
                          key=lambda kv: -(kv[1]["executed"] or 0)):
         wr = agg["win_rate"]
         print(f"  {r:<22} exec {agg['executed']:>4}  win "
+              f"{f'{wr*100:.1f}%' if wr is not None else 'n/a'}  "
+              f"avgR {agg['avg_rr']}  exp {agg['expectancy']}")
+    print("by sentiment colour (P16 — does deep green actually pay?):")
+    from engine.sentiment import bucket_label
+    for r, agg in sorted(report.get("by_sentiment", {}).items(),
+                         key=lambda kv: -(kv[1]["executed"] or 0)):
+        wr = agg["win_rate"]
+        print(f"  {bucket_label(r):<12} exec {agg['executed']:>4}  win "
               f"{f'{wr*100:.1f}%' if wr is not None else 'n/a'}  "
               f"avgR {agg['avg_rr']}  exp {agg['expectancy']}")

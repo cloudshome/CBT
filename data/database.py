@@ -182,6 +182,12 @@ CREATE TABLE IF NOT EXISTS agent_runs(
   ts INTEGER,
   created_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS sentiment_history(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol TEXT, timeframe TEXT, ts INTEGER,
+  score REAL, direction TEXT, label TEXT, parts_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_sentiment_sym_tf_ts ON sentiment_history(symbol, timeframe, ts);
 CREATE INDEX IF NOT EXISTS idx_plans_scan ON plans(scan_id);
 CREATE INDEX IF NOT EXISTS idx_bt_type ON backtest_results(plan_type);
 CREATE INDEX IF NOT EXISTS idx_bt_outcome ON backtest_results(outcome);
@@ -304,6 +310,20 @@ class SignalDB:
         _add("paper_trades", "market", "TEXT")
         _add("paper_trades", "price_type", "TEXT")
         _add("paper_trades", "source_key", "TEXT")
+        # P16 — the sentiment colour reading at signal/entry time, so the
+        # scorecard can split outcomes by what the strip painted. Rows graded
+        # before P16 carry NULL = UNKNOWN (never silently re-labelled).
+        _add("scans", "sentiment_bucket", "TEXT")
+        _add("scans", "sentiment_score", "REAL")
+        _add("scans", "sentiment_intensity", "REAL")
+        _add("backtest_results", "sentiment_bucket", "TEXT")
+        _add("backtest_results", "sentiment_score", "REAL")
+        _add("backtest_results", "sentiment_intensity", "REAL")
+        _add("backtest_results", "sentiment_persistence_min", "REAL")
+        _add("paper_trades", "sentiment_bucket", "TEXT")
+        _add("paper_trades", "sentiment_score", "REAL")
+        _add("paper_trades", "sentiment_intensity", "REAL")
+        _add("paper_trades", "sentiment_persistence_min", "REAL")
         _add("calibration", "regime", "TEXT DEFAULT ''")
         _add("calibration", "proven", "INTEGER DEFAULT 0")
         _add("calibration", "tp_rr", "REAL")
@@ -399,6 +419,10 @@ class SignalDB:
             "created_ts", "opened_ts", "entry_price", "regime", "sim_key",
             # P12.11 — the price series this simulated trade was taken on.
             "exchange", "market", "price_type", "source_key",
+            # P16 — the sentiment colour the strip painted when the trade was
+            # enrolled, so decided paper outcomes split by colour too.
+            "sentiment_bucket", "sentiment_score", "sentiment_intensity",
+            "sentiment_persistence_min",
         )
         prov = dict(zip(("exchange", "market", "price_type", "source_key"),
                         _provenance_values(fields)))
@@ -599,6 +623,37 @@ class SignalDB:
     def load_source_scores(self) -> list[dict]:
         rows = self.conn.execute(
             "SELECT * FROM source_scores ORDER BY tier ASC, trust DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    # ── market sentiment colour engine (engine/sentiment.py) ─────────────
+    def save_sentiment(self, symbol: str, timeframe: str, ts: int,
+                       score: float, direction: str, label: str,
+                       parts_json: str) -> None:
+        """Store one sentiment reading, deduped to one row per minute bucket
+        so a 30s auto-refresh can never double-count persistence time."""
+        def _do_save():
+            minute = (int(ts) // 60000) * 60000
+            existing = self.conn.execute(
+                "SELECT id FROM sentiment_history WHERE symbol=? AND timeframe=? AND ts=?",
+                (symbol, timeframe, minute)).fetchone()
+            if existing:
+                return
+            self.conn.execute(
+                """INSERT INTO sentiment_history
+                   (symbol, timeframe, ts, score, direction, label, parts_json)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (symbol, timeframe, minute, float(score), direction, label, parts_json))
+            self.conn.commit()
+        return self._retry_write(_do_save)
+
+    def sentiment_history(self, symbol: str, timeframe: str,
+                          minutes: int = 720) -> list[dict]:
+        """Recent sentiment readings, oldest first."""
+        since = int(time.time() * 1000) - int(minutes) * 60000
+        rows = self.conn.execute(
+            """SELECT ts, score, direction, label FROM sentiment_history
+               WHERE symbol=? AND timeframe=? AND ts>=? ORDER BY ts ASC""",
+            (symbol, timeframe, since)).fetchall()
         return [dict(r) for r in rows]
 
     # ── exposure + decided outcomes for risk/portfolio engines ───────────
@@ -960,12 +1015,15 @@ class SignalDB:
                 status = status_override
             else:
                 status = "PENDING_REVIEW" if reviewable(sig) else "CREATED"
+            # P16 — persist the sentiment colour reading at signal time.
+            sentiment = payload.get("sentiment") or {}
             cur = self.conn.execute(
                 """INSERT INTO scans
                    (signal_id, ts, symbol, timeframe, price, action, entry, stop_loss, take_profit,
                     risk_reward, confidence_label, confidence_pct, reason, signal_type,
-                    features_json, plans_json, context_json, status, lifecycle_ts, regime)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    features_json, plans_json, context_json, status, lifecycle_ts, regime,
+                    sentiment_bucket, sentiment_score, sentiment_intensity)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     sig.get("signal_id"),
                     sig.get("timestamp") or int(time.time() * 1000),
@@ -987,6 +1045,9 @@ class SignalDB:
                     status,
                     int(time.time() * 1000),
                     features.get("regime_name"),
+                    sentiment.get("bucket") or None,
+                    sentiment.get("score"),
+                    sentiment.get("intensity"),
                 ),
             )
             scan_id = cur.lastrowid
@@ -1042,8 +1103,10 @@ class SignalDB:
                         max_favorable, max_adverse, entry, trigger_level, regime,
                         sim_key, holding_bars, holding_hours,
                         rr_net, fee_r, slip_r, funding_r, cost_r,
-                        exchange, market, price_type, source_key)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        exchange, market, price_type, source_key,
+                        sentiment_bucket, sentiment_score, sentiment_intensity,
+                        sentiment_persistence_min)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (run_id, r.get("ts"), r.get("symbol"), r.get("timeframe"),
                      r.get("plan_type"), r.get("action"), r.get("confidence_pct"),
                      r.get("horizon_hours"), r.get("step"), r.get("outcome"), r.get("rr_achieved"),
@@ -1052,7 +1115,11 @@ class SignalDB:
                      r.get("holding_bars"), r.get("holding_hours"),
                      r.get("rr_net"), r.get("fee_r"), r.get("slip_r"),
                      r.get("funding_r"), r.get("cost_r"),
-                     *_provenance_values(r)),
+                     *_provenance_values(r),
+                     r.get("sentiment_bucket") or None,
+                     r.get("sentiment_score"),
+                     r.get("sentiment_intensity"),
+                     r.get("sentiment_persistence_min")),
                 )
                 n += 1
             self.conn.commit()

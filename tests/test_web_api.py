@@ -75,6 +75,26 @@ def test_pending_paper_learning_endpoints(client):
     assert "history" in hist and isinstance(hist["history"], list)
 
 
+def test_sentiment_endpoint(client):
+    """GET /api/sentiment — the colour reading that paints the dashboard."""
+    resp = client.get("/api/sentiment?symbol=BTCUSDT&tf=15m")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    data = resp.get_json()
+    assert data["symbol"] == "BTCUSDT"
+    sent = data["sentiment"]
+    for key in ("score", "direction", "label", "strength", "duration_min",
+                "duration_text", "persistence", "intensity", "color", "parts",
+                "history"):
+        assert key in sent, f"sentiment missing {key!r}: {sent}"
+    assert -100 <= sent["score"] <= 100
+    assert sent["direction"] in ("bullish", "bearish", "neutral")
+    assert sent["color"].startswith(("hsl(", "#"))
+    # the scan payload carries the same block
+    scan = client.get("/api/scan?symbol=BTCUSDT&tf=15m").get_json()
+    assert "sentiment" in scan
+    assert scan["sentiment"]["score"] == sent["score"]
+
+
 def test_sanitize_for_json_helper():
     import numpy as np
     from web.app import _sanitize_for_json

@@ -107,6 +107,14 @@ def run_scan(symbol: str, timeframe: str, bars: int, with_context: bool = True,
 
     payload["validation"] = validate_output(payload)
 
+    # P15/P16 — the sentiment colour reading rides on every scan path (CLI,
+    # web, MCP) so the learning store always holds the signal-time colour.
+    try:
+        from engine.sentiment import current_sentiment_safe
+        payload["sentiment"] = current_sentiment_safe(symbol, timeframe, payload)
+    except Exception:  # pragma: no cover — sentiment is a display/learning aid
+        pass
+
     if save_db:
         from data.database import SignalDB
         from engine.lifecycle import reviewable

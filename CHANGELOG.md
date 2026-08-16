@@ -10,6 +10,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.29.0] — 2026-08-16 · P16 prove the colour: sentiment-conditioned expectancy
+
+MINOR: the colour is no longer a belief — it is measured. Every graded plan
+and every paper trade now carries the sentiment colour the strip painted at
+signal time, and the scorecard splits outcomes by it.
+
+- **P16.1 colour buckets** (`engine/sentiment.py`) — `bucket(score)` maps the
+  composite score to the exact bins the strip paints: DEEP GREEN / GREEN /
+  SLATE / RED / DEEP RED (±65 deep, ±10 coloured, else slate), same
+  thresholds as the labels so the legend and the measurement can never
+  disagree.
+- **P16.2 offline mirror** — `compute_historical()` scores sentiment from
+  bar-slice inputs only (engine bull−bear scores, trend × ADX, signal action;
+  renormalised over the 0.65 available weight). Funding/news/fear&greed/MTF
+  are live-time inputs and are deliberately excluded — the walk can only use
+  what it could see at that bar.
+- **P16.3 walk clock** — `SentimentClock` walks the backtest chronologically
+  and tags every plan with the colour reading at its exact bar: bucket,
+  score, persistence, and the same depth formula the dashboard paints.
+  Persistence accrues bar-time; flips and neutral readings reset it, exactly
+  like the live strip.
+- **P16.4 persisted colour** — `backtest_results`, `paper_trades` and `scans`
+  gain `sentiment_bucket/sentiment_score/sentiment_intensity` (plus
+  persistence on graded rows) via idempotent migration; `save_scan` stores
+  the payload's sentiment block on every scan path (CLI, web, MCP), and the
+  paper runner carries the signal-time colour onto the book.
+- **P16.5 scorecard splits** — `by_sentiment` (the five colour buckets +
+  UNKNOWN for pre-P16 rows, which are never silently re-labelled) and
+  `by_sentiment_depth` (DEEP vs FRESH vs SLATE — the deepening hypothesis in
+  its own split: does time-in-condition add edge?). Same block on the CLI,
+  the dashboard STRATEGY SCORECARD card, and MCP. The backtest report also
+  prints `by sentiment colour`.
+- **P16.6 tests** — bucketing boundaries, historical-score renormalisation,
+  clock accrual/reset semantics, backtester tagging on a deterministic walk,
+  DB persistence + scorecard splits, legacy-row UNKNOWN handling
+  (`tests/test_sentiment_validation.py`).
+
+---
+
+## [2.28.0] — 2026-08-16 · P15 market-sentiment colour engine: one colour is the market
+
+MINOR: the desk reads the market's condition from ONE colour. Bullish paints
+green — and the longer the same bullish sentiment holds, the deeper the green
+gets; bearish paints red and deepens to strong red the longer it holds;
+neutral is slate (no colour = no trade). A neutral reading resets the clock,
+and the clock survives dashboard restarts because history is persisted.
+
+- **P15.1 sentiment engine** (`engine/sentiment.py`) — composite score in
+  [-100, +100] blending what the brain already computes: engine bull−bear
+  scores (50%), MTF alignment (20%), trend × ADX strength (10%), funding
+  crowding (5%), news sentiment tally (5%), fear & greed (5%), signal action
+  × confidence (5%). Every input is weighted and exposed as `parts` so the
+  colour is always explainable.
+- **P15.2 time duration = colour depth** — `depth = strength × (0.6 +
+  0.4 × persistence)`; persistence reaches 1.0 after 180 minutes of the same
+  direction. Fresh strong readings paint bright; only time in the same
+  condition paints deep (green → deep green, red → strong red). Gaps longer
+  than 15 min don't count as persistence.
+- **P15.3 persisted history** (`data/database.py::sentiment_history`) — one
+  row per symbol/timeframe/minute, deduped so a 30s auto-refresh can never
+  double-count the clock; `engine/sentiment.py::current_sentiment` computes →
+  records → measures duration in one call, never raising into the scan path.
+- **P15.4 dashboard colour surfaces** — fixed left-edge mood bar (the colour
+  on every tab), a sticky SENTIMENT strip above the dashboard (label, score,
+  held-for duration, colour depth, needle on the red→slate→green scale), and
+  a full-width MARKET SENTIMENT card on Overview with the weighted-input
+  table, sparkline of recent readings, and the colour legend. `GET
+  /api/sentiment?symbol=&tf=` exposes the same block as JSON; the scan
+  payload now carries `sentiment` for every symbol/timeframe. A payload
+  without the block still renders via a client-side estimate.
+- **P15.5 tests** — `tests/test_sentiment.py` (scoring, duration caps,
+  direction-break resets, colour deepening, DB persistence) and new
+  dashboard-JS harnesses that pin the strip/mood-bar colour wiring for
+  bullish, bearish, neutral, and fallback payloads.
+
+---
+
 ## [2.27.0] — 2026-08-16 · P14 operate the loop: daily ritual + one loop-health number
 
 MINOR: the project-review answer. Success is operating the paper→graduation

@@ -58,6 +58,7 @@ from typing import Iterable, Optional
 
 from config import BACKTEST_STEP, GOLD_LONDON_WINDOW, GOLD_NY_WINDOW
 from data.backtester import WIN_SET
+from engine.sentiment import BUCKETS
 from data.provenance import normalize as _provenance_normalize
 from data.provenance import parse_source_key as _provenance_parse
 from data.provenance import source_key as _provenance_key
@@ -126,7 +127,9 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
          funding_rate=None, cvd_z=None, oi_trend=None,
          horizon_hours: Optional[float] = None, step: Optional[int] = None,
          cost_model: Optional[CostModel] = None,
-         exchange=None, market=None, price_type=None) -> dict:
+         exchange=None, market=None, price_type=None,
+         sentiment_bucket=None, sentiment_score=None,
+         sentiment_intensity=None) -> dict:
     gross_r = float(r) if r is not None else 0.0
     hold = (round(float(holding_hours), 3)
             if holding_hours is not None else None)
@@ -158,6 +161,17 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
     prov_exchange, prov_market, prov_price_type = _provenance_normalize(
         exchange, market, price_type)
 
+    # P16 — the sentiment colour at signal time. Pre-P16 rows carry NULL and
+    # must stay UNKNOWN (never silently re-labelled slate).
+    s_bucket = sentiment_bucket or "UNKNOWN"
+    s_intensity = float(sentiment_intensity) if sentiment_intensity is not None else None
+    if s_bucket in ("bull", "bear", "deep_bull", "deep_bear"):
+        s_depth = "DEEP" if (s_intensity is not None and s_intensity >= 0.5) else "FRESH"
+    elif s_bucket == "slate":
+        s_depth = "SLATE"
+    else:
+        s_depth = "UNKNOWN"
+
     return {
         "ts": int(ts) if ts is not None else None,
         "side": (side or "?").upper(),
@@ -184,6 +198,10 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
         "market": prov_market,
         "price_type": prov_price_type,
         "source_key": _provenance_key(prov_exchange, prov_market, prov_price_type),
+        "sentiment_bucket": s_bucket,
+        "sentiment_score": float(sentiment_score) if sentiment_score is not None else None,
+        "sentiment_intensity": s_intensity,
+        "sentiment_depth": s_depth,
     }
 
 
@@ -260,7 +278,8 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
     sel_cols = ["ts", "symbol", "timeframe", "plan_type", "action", "outcome",
                 "rr_achieved", "regime", "holding_hours", "horizon_hours"]
     for extra in ("entry", "trigger_level", "rr_net", "fee_r", "slip_r", "funding_r",
-                  "cost_r", "step", "exchange", "market", "price_type"):
+                  "cost_r", "step", "exchange", "market", "price_type",
+                  "sentiment_bucket", "sentiment_score", "sentiment_intensity"):
         if extra in cols:
             sel_cols.append(extra)
 
@@ -297,6 +316,9 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
             horizon_hours=d.get("horizon_hours"), step=d.get("step"),
             exchange=d.get("exchange"), market=d.get("market"),
             price_type=d.get("price_type"),
+            sentiment_bucket=d.get("sentiment_bucket"),
+            sentiment_score=d.get("sentiment_score"),
+            sentiment_intensity=d.get("sentiment_intensity"),
         ))
     return out
 
@@ -333,6 +355,9 @@ def rows_from_paper_db(db, symbol: Optional[str] = None,
             cost_r=d.get("cost_r"), cost_model=cost_model,
             exchange=d.get("exchange"), market=d.get("market"),
             price_type=d.get("price_type"),
+            sentiment_bucket=d.get("sentiment_bucket"),
+            sentiment_score=d.get("sentiment_score"),
+            sentiment_intensity=d.get("sentiment_intensity"),
         ))
     return out
 
@@ -756,6 +781,15 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
         "by_regime": _split(rows, "regime", step=step),
         "by_session": _split(rows, "session", order=SESSION_NAMES, step=step),
         "by_setup": _split(rows, "setup", step=step),
+        # P16 — the sentiment colour proof: does what the strip painted
+        # actually correlate with what the trades earned? UNKNOWN keeps
+        # pre-P16 rows visible instead of silently disappearing.
+        "by_sentiment": _split(rows, "sentiment_bucket",
+                               order=BUCKETS + ("UNKNOWN",), step=step),
+        # The deepening hypothesis in its own split: within a coloured
+        # condition, does more time-in-condition (DEEP) beat a fresh reading?
+        "by_sentiment_depth": _split(rows, "sentiment_depth",
+                                     order=("DEEP", "FRESH", "SLATE"), step=step),
         # P12.11 — the same block per price series, so a pooled book can
         # always be taken apart into the series that produced it.
         "by_source": _split(rows, "source_key", step=step, empty_label=None),
@@ -1017,6 +1051,17 @@ def print_scorecard(report: dict) -> None:
     print(_split_header("by setup:"))
     for name, s in report["by_setup"].items():
         print(_split_line(name[:18], s))
+    # P16 — the sentiment colour proof, in the same boxed block as the CLI.
+    if "by_sentiment" in report:
+        from engine.sentiment import bucket_label
+        print(_split_header("by sentiment colour (P16 — does the colour pay?):"))
+        for name, s in report["by_sentiment"].items():
+            if s.get("n"):
+                print(_split_line(bucket_label(name), s))
+        print(_split_header("by colour depth (fresh vs deep — time in condition):"))
+        for name, s in report["by_sentiment_depth"].items():
+            if s.get("n"):
+                print(_split_line(name, s))
     # P12.11 — say which price series this book was built from, and split it.
     srcs = report.get("sources") or {}
     if srcs.get("keys"):

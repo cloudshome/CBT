@@ -16,6 +16,7 @@ One page shows:
 Endpoints
   GET /             dashboard HTML
   GET /api/scan     live brain output (persisted, deduped by signal_id)
+  GET /api/sentiment market-sentiment colour reading (score/duration/depth/colour)
   GET /api/pending  signals awaiting human approval
   POST /api/review  approve/reject/execute/close a signal
   GET /api/history  recent scans with lifecycle status
@@ -181,6 +182,7 @@ def _basic_scan(symbol: str, tf: str, save: bool) -> dict:
     t.join(timeout=_SCAN_TIMEOUT)
     if "payload" in result:
         payload = result["payload"]
+        _attach_sentiment(payload, symbol, tf)
         if save:
             try:
                 _persist(payload)
@@ -189,6 +191,19 @@ def _basic_scan(symbol: str, tf: str, save: bool) -> dict:
         _LAST_GOOD[(symbol, tf)] = payload
         return payload
     raise ConnectionError(result.get("error", "scan timed out"))
+
+
+def _attach_sentiment(payload: dict, symbol: str, tf: str) -> dict:
+    """Attach the market-sentiment colour reading (engine/sentiment.py) to a
+    scan payload. Never raises — sentiment is a display aid, not a gate."""
+    try:
+        from engine.sentiment import current_sentiment_safe
+        payload["sentiment"] = current_sentiment_safe(symbol, tf, payload)
+    except Exception:  # pragma: no cover — defensive only
+        payload.setdefault("sentiment", {"available": False, "score": 0.0,
+                                         "direction": "neutral", "label": "NO DATA",
+                                         "color": "#5f6d84", "intensity": 0.0})
+    return payload
 
 
 def compute_payload(symbol: str, tf: str, save: bool = True, use_cache: bool = True) -> dict:
@@ -246,11 +261,13 @@ def compute_payload(symbol: str, tf: str, save: bool = True, use_cache: bool = T
                                    "futures": False, "note": spec.note or "not checked"},
                 "error": str(exc), "lifecycle": {"status": "ERROR", "note": str(exc)},
             }
+            _attach_sentiment(payload, symbol, tf)
         _CACHE.update(payload=payload, ts=time.time())
         return payload
 
     payload = result["payload"]
     _attach_management(payload)
+    _attach_sentiment(payload, symbol, tf)
     if save:
         try:
             _persist(payload)
@@ -410,6 +427,36 @@ HTML = """<!doctype html>
   .strip .pill-chip{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;
     border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--mut);
     display:inline-flex;align-items:center;gap:6px;cursor:help}
+  /* market-sentiment colour signal (the "mood ring") */
+  #moodbar{position:fixed;left:0;top:0;bottom:0;width:5px;z-index:80;background:#5f6d84;transition:background 1.4s ease, box-shadow 1.4s ease}
+  .sentistrip{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;
+    position:sticky;top:61px;z-index:15;
+    padding:12px 15px;border-radius:14px;border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(17,28,51,.92), rgba(22,36,71,.96));
+    backdrop-filter:blur(10px);
+    box-shadow:0 8px 22px rgba(0,0,0,.28);
+    transition:border-color 1.2s ease, box-shadow 1.2s ease}
+  @media(max-width:980px){.sentistrip{position:static}}
+  .sentistrip .slabel{font-size:16px;font-weight:900;letter-spacing:.01em;display:flex;align-items:center;gap:9px;min-width:196px}
+  .sentistrip .slabel .sdot{width:14px;height:14px;border-radius:50%;flex-shrink:0;box-shadow:0 0 14px currentColor;transition:background 1.2s ease}
+  .sentistrip .scale{position:relative;flex:1;min-width:280px;height:14px;border-radius:999px;border:1px solid rgba(255,255,255,.09);
+    background:linear-gradient(90deg, hsl(0,82%,26%) 0%, hsl(0,70%,46%) 22%, #5f6d84 50%, hsl(142,68%,46%) 78%, hsl(142,82%,26%) 100%)}
+  .sentistrip .scale .tick{position:absolute;top:50%;width:1px;height:18px;background:rgba(255,255,255,.22);transform:translateY(-50%)}
+  .sentistrip .needle{position:absolute;top:50%;width:3px;height:24px;transform:translate(-50%,-50%);background:#fff;border-radius:999px;box-shadow:0 0 10px rgba(255,255,255,.85);transition:left 1.1s cubic-bezier(.22,1,.36,1)}
+  .sentistrip .smeta{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--mut)}
+  .sentistrip .smeta .k{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--mut2)}
+  .sentistrip .smeta .v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--txt)}
+  .sentistrip .deepen{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;padding:4px 9px;border-radius:999px;border:1px solid var(--line);transition:color 1.2s ease}
+  .senti-legend{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .senti-chip{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);display:inline-flex;align-items:center;gap:6px}
+  .senti-chip i{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+  .senti-parts{width:100%;border-collapse:collapse;font-size:12px}
+  .senti-parts th,.senti-parts td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .senti-part{height:8px;border-radius:999px;background:#0e1524;overflow:hidden;border:1px solid var(--line);display:flex}
+  .senti-part i{display:block;height:100%;border-radius:999px}
+  .senti-scale-lg{position:relative;height:18px;border-radius:999px;border:1px solid rgba(255,255,255,.09);margin:10px 0 4px;
+    background:linear-gradient(90deg, hsl(0,82%,26%) 0%, hsl(0,70%,46%) 22%, #5f6d84 50%, hsl(142,68%,46%) 78%, hsl(142,82%,26%) 100%)}
+  .senti-scale-lg .needle{position:absolute;top:50%;width:3px;height:30px;transform:translate(-50%,-50%);background:#fff;border-radius:999px;box-shadow:0 0 12px rgba(255,255,255,.9)}
   /* chart container for Lightweight Charts */
   #chart{width:100%;height:260px;background:#0e1524;border-radius:12px;border:1px solid var(--line);overflow:hidden}
   .strip .strip-detail{flex-basis:100%;font-size:11.5px;color:var(--mut);line-height:1.5}
@@ -422,6 +469,7 @@ HTML = """<!doctype html>
 </style>
 <script src="/static/lightweight-charts.standalone.js"></script>
 </head><body>
+<div id="moodbar" title="market sentiment — green = bullish, red = bearish, deeper = longer"></div>
 <div class="topbar">
   <div class="brand">
     <div class="logo">🧠</div>
@@ -471,6 +519,19 @@ HTML = """<!doctype html>
 </nav>
 <div class="shell">
   <div class="strip" id="readiness"><span class="muted">checking readiness…</span></div>
+  <div class="sentistrip" id="senti">
+    <span class="slabel"><span class="sdot" id="sentiDot" style="background:#5f6d84;color:#5f6d84"></span><span id="sentiLabel" style="color:var(--mut)">reading sentiment…</span></span>
+    <div class="scale" id="sentiScale">
+      <span class="tick" style="left:25%"></span><span class="tick" style="left:50%"></span><span class="tick" style="left:75%"></span>
+      <span class="needle" id="sentiNeedle" style="left:50%"></span>
+    </div>
+    <div class="smeta">
+      <div><div class="k">sentiment</div><div class="v" id="sentiScore">—</div></div>
+      <div><div class="k">held for</div><div class="v" id="sentiDur">—</div></div>
+      <div><div class="k">colour depth</div><div class="v" id="sentiDepth">—</div></div>
+      <span class="deepen" id="sentiDeepen">—</span>
+    </div>
+  </div>
   <div class="quickbar" id="quickbar">
     <button class="btn" onclick="load(true)">↻ Scan now</button>
     <button class="btn" onclick="systemCheck(); switchTab('system')">🔍 System check</button>
@@ -533,6 +594,156 @@ function switchTab(tab){
   try{ if(typeof history !== 'undefined' && history.replaceState) history.replaceState(null,'','#'+tab); }catch(e){}
 }
 function card(title, inner, span){ return `<div class="card" ${span?'style="grid-column:1/-1"':''}><h2>${title}</h2>${inner}</div>`; }
+/* ── Market-sentiment colour signal ───────────────────────────────────────
+   One colour tells the market's condition:
+     bullish → green, deepening to DEEP green the longer it holds
+     bearish → red, deepening to STRONG red the longer it holds
+     neutral → slate (no colour = no trade)
+   depth = strength × (0.6 + 0.4 × persistence) — same formula as the
+   backend (engine/sentiment.py). */
+const SENTI_BAND = 10;
+function sentiClamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function sentiLabel(score){
+  if(score>=65) return 'STRONG BULLISH';
+  if(score>=30) return 'BULLISH';
+  if(score>=SENTI_BAND) return 'LEANING BULLISH';
+  if(score<=-65) return 'STRONG BEARISH';
+  if(score<=-30) return 'BEARISH';
+  if(score<=-SENTI_BAND) return 'LEANING BEARISH';
+  return 'NEUTRAL';
+}
+function sentiColor(score, intensity){
+  if(Math.abs(score) < SENTI_BAND || !intensity) return '#5f6d84';
+  const hue = score>0 ? 142 : 0;
+  const sat = 62 + 18*sentiClamp(intensity,0,1);
+  const light = 55 - 28*sentiClamp(intensity,0,1);
+  return `hsl(${hue},${Math.round(sat)}%,${Math.round(light)}%)`;
+}
+function sentiTextColor(score){
+  if(Math.abs(score) < SENTI_BAND) return 'var(--mut)';
+  return score>0 ? 'var(--green)' : 'var(--red)';
+}
+function sentiDurTxt(min){
+  min = Math.max(0, Number(min)||0);
+  if(min<1) return 'just now';
+  if(min<60) return Math.round(min)+'m';
+  const h=Math.floor(min/60), m=Math.round(min%60);
+  return m ? `${h}h ${String(m).padStart(2,'0')}m` : `${h}h`;
+}
+function fallbackSentiment(d){
+  // Client-side estimate when the backend hasn't attached sentiment yet
+  // (old cached payload / synthetic test payload). Duration is unknown
+  // client-side, so the colour stays bright until the backend confirms.
+  const snap=d.snapshot||{}, sc=snap.scores||{}, f=snap.features||{};
+  const bull=(sc.bull&&sc.bull.score)||0, bear=(sc.bear&&sc.bear.score)||0;
+  const align=(d.mtf&&d.mtf.alignment&&d.mtf.alignment.score)||0;
+  const trend=String(f.trend||'').toLowerCase();
+  const t= trend==='bullish'?1 : trend==='bearish'?-1 : 0;
+  const adx=Number(f.adx)||20;
+  let score = (bull-bear)*0.6 + sentiClamp(align,-100,100)*0.2 + t*sentiClamp(adx/25,0,1)*100*0.1;
+  if(d.signal&&d.signal.action==='BUY') score += ({HIGH:90,MEDIUM:70,LOW:45}[d.signal.confidence]||0)*0.05;
+  if(d.signal&&d.signal.action==='SELL') score -= ({HIGH:90,MEDIUM:70,LOW:45}[d.signal.confidence]||0)*0.05;
+  score = sentiClamp(score,-100,100);
+  const strength=Math.min(Math.abs(score)/100,1);
+  return {available:true, score:Math.round(score*10)/10,
+    direction: score>=SENTI_BAND?'bullish':score<=-SENTI_BAND?'bearish':'neutral',
+    label:sentiLabel(score), strength, duration_min:0, persistence:0,
+    intensity:strength*0.6, color:sentiColor(score,strength*0.6),
+    parts:[], history:[], fallback:true};
+}
+function sentiSpark(sent){
+  const pts=(sent&&sent.history)||[];
+  if(pts.length<2) return '';
+  const w=340, h=46;
+  const xs=pts.map((p,i)=> (i/(pts.length-1))*w);
+  const ys=pts.map(p=> h/2 - sentiClamp(Number(p.score)||0,-100,100)/100*(h/2-2));
+  const line=xs.map((x,i)=>`${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const col=sentiColor(sent.score||0, sent.intensity||0);
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:46px;margin-top:6px" preserveAspectRatio="none">
+    <line x1="0" y1="${h/2}" x2="${w}" y2="${h/2}" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+    <polyline points="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+function sentiCard(sent){
+  const score=Number(sent&&sent.score)||0;
+  const depth=Math.round((Number(sent&&sent.intensity)||0)*100);
+  const col=sentiColor(score, Number(sent&&sent.intensity)||0);
+  const parts=(sent&&sent.parts)||[];
+  const dur=(sent&&sent.duration_min)||0;
+  const rows=parts.length?parts.map(p=>{
+    const c=Number(p.contrib)||0;
+    const w=Math.min(Math.abs(c)*2,100);
+    return `<tr><td>${esc(p.name)} <span class="note">(${Math.round((Number(p.weight)||0)*100)}%)</span></td>
+      <td style="width:110px"><div class="senti-part"><i style="width:${w}%;background:${c>=0?'var(--green)':'var(--red)'};${c<0?'margin-left:auto':''}"></i></div></td>
+      <td class="mono" style="color:${c>0?'var(--green)':c<0?'var(--red)':'var(--mut)'}">${c>0?'+':''}${Math.round(c*10)/10}</td>
+      <td class="note">${esc(p.detail||'')}</td></tr>`;
+  }).join('') : '<div class="muted">no sentiment inputs yet — the first scan fills this in</div>';
+  return `
+  <div class="flex" style="justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <div>
+      <div class="slabel" style="font-size:20px;min-width:0">
+        <span class="sdot" style="background:${col};color:${col};width:16px;height:16px"></span>
+        <span style="color:${sentiTextColor(score)}">${esc((sent&&sent.label)||sentiLabel(score))}</span>
+      </div>
+      <div class="note" style="margin-top:4px">
+        score <b class="mono">${score>0?'+':''}${Math.round(score*10)/10}</b> ·
+        depth <b>${depth}%</b>${dur?` · same condition <b>${sentiDurTxt(dur)}</b>`:''}${sent&&sent.fallback?' · <span style="color:var(--amber)">estimate — backend will confirm</span>':''}
+      </div>
+    </div>
+    <div class="senti-legend">
+      <span class="senti-chip"><i style="background:hsl(142,82%,26%)"></i>strong bull = deep green</span>
+      <span class="senti-chip"><i style="background:hsl(142,62%,55%)"></i>bull = green</span>
+      <span class="senti-chip"><i style="background:#5f6d84"></i>neutral = slate</span>
+      <span class="senti-chip"><i style="background:hsl(0,62%,55%)"></i>bear = red</span>
+      <span class="senti-chip"><i style="background:hsl(0,82%,26%)"></i>strong bear = deep red</span>
+    </div>
+  </div>
+  <div class="senti-scale-lg"><span class="needle" style="left:${sentiClamp((score+100)/2,0,100)}%"></span></div>
+  ${sentiSpark(sent)}
+  <table class="senti-parts" style="margin-top:6px"><tr><th>Input</th><th></th><th>pts</th><th>reading</th></tr>${rows}</table>
+  <div class="note" style="margin-top:8px">The colour deepens with <b>time in the same sentiment</b>: green gets greener the longer the market holds bullish, red gets stronger the longer it holds bearish. Full depth after 3 hours of the same condition. Watch the left edge bar — that colour is the market's mood, on every tab.<br>The colour is <b>measured</b>, not just painted (P16): every graded plan carries its signal-time colour, and the <b>STRATEGY SCORECARD</b> splits outcomes by colour and by depth — see <b>By sentiment colour</b> and <b>By colour depth</b> on the Learn tab.</div>`;
+}
+function renderSentiment(sent){
+  const score=Number(sent&&sent.score)||0;
+  const intensity=sentiClamp(Number(sent&&sent.intensity)||0,0,1);
+  const col=sentiColor(score,intensity);
+  const lab=(sent&&sent.label)||sentiLabel(score);
+  const dir=(sent&&sent.direction)||(score>=SENTI_BAND?'bullish':score<=-SENTI_BAND?'bearish':'neutral');
+  const durMin=Number(sent&&sent.duration_min)||0;
+  const persist=Number(sent&&sent.persistence)||0;
+  try{
+    const bar=document.getElementById('moodbar');
+    if(bar){ bar.style.background=col; bar.style.boxShadow=`0 0 20px ${col}`; }
+  }catch(e){}
+  try{
+    const el=document.getElementById('senti');
+    if(el){
+      el.style.borderColor=col;
+      el.style.boxShadow=`0 10px 30px ${col}33, inset 0 1px 0 rgba(255,255,255,.05)`;
+      const dot=document.getElementById('sentiDot');
+      if(dot){ dot.style.background=col; dot.style.color=col; }
+      const lbl=document.getElementById('sentiLabel');
+      if(lbl){ lbl.textContent=lab; lbl.style.color=sentiTextColor(score); }
+      const needle=document.getElementById('sentiNeedle');
+      if(needle) needle.style.left=sentiClamp((score+100)/2,0,100)+'%';
+      const sc=document.getElementById('sentiScore');
+      if(sc) sc.textContent= score>0?'+'+score:''+score;
+      const du=document.getElementById('sentiDur');
+      if(du) du.textContent= dir==='neutral'?'—':sentiDurTxt(durMin);
+      const dep=document.getElementById('sentiDepth');
+      if(dep) dep.textContent= dir==='neutral'?'—':Math.round(intensity*100)+'%';
+      const deep=document.getElementById('sentiDeepen');
+      if(deep){
+        deep.textContent = dir==='neutral'
+          ? 'NO COLOUR — WAIT'
+          : persist>=0.95 ? ('DEEP '+(dir==='bullish'?'GREEN':'RED')+' — LONG HOLD')
+          : persist>=0.5 ? 'DEEPENING'
+          : 'FRESH '+(dir==='bullish'?'GREEN':'RED');
+        deep.style.color=col;
+        deep.style.borderColor=col;
+      }
+    }
+  }catch(e){}
+}
 function renderKeyLevels(levels){
   if(!levels || !levels.length) return '<div class="muted">no ranked levels — the desk has nothing to map yet</div>';
   const col = {A:'var(--red)', B:'var(--amber)', C:'var(--mut)'};
@@ -550,6 +761,7 @@ function renderKeyLevels(levels){
 
 function render(d){
   const s=d.signal||{}, plans=d.plans||[], snap=d.snapshot||{}, f=snap.features||{}, sc=snap.scores||{}, ctx=d.market_context||{}, lc=d.lifecycle||{};
+  const sent=d.sentiment||fallbackSentiment(d);
   const cf=sc.bull?.score??0, cs=sc.bear?.score??0;
   const sid=d.scan_id, st=lc.status||'';
   const decideBtns = st==='PENDING_REVIEW'
@@ -570,6 +782,7 @@ function render(d){
 
   // Build grouped tab panels
   let overview = '';
+  overview += card('MARKET SENTIMENT — THE COLOUR IS THE MARKET', sentiCard(sent), true);
   overview += card('LIVE SIGNAL', `
     <div class="flex" style="margin-bottom:8px">
       <span class="pill ${cls(s.action)}">${s.action}</span>
@@ -956,6 +1169,8 @@ function render(d){
   `;
 
   document.getElementById('app').innerHTML = html;
+  // colour the mood bar + sentiment strip from this scan's reading
+  try{ renderSentiment(sent); }catch(e){}
   // re-apply active tab
   switchTab(_activeTab);
   // load async sub-panels
@@ -1567,6 +1782,11 @@ async function loadScorecard(){
     html+=scSplit('By regime', d.by_regime);
     html+=scSplit('By session (UTC)', d.by_session, true);
     html+=scSplit('By setup', d.by_setup);
+    // P16 — the colour proof: did what the strip painted correlate with what trades earned?
+    const SENTI_LABELS={deep_bull:'DEEP GREEN',bull:'GREEN',slate:'SLATE',bear:'RED',deep_bear:'DEEP RED',UNKNOWN:'UNKNOWN'};
+    const bySenti=Object.fromEntries(Object.entries(d.by_sentiment||{}).map(([k,v])=>[SENTI_LABELS[k]||k,v]));
+    html+=scSplit('By sentiment colour — does deep green pay?', bySenti, true);
+    html+=scSplit('By colour depth — fresh vs deep (time in condition)', d.by_sentiment_depth, true);
     html+=`<div class="sep"></div><div class="note">Bar (NET): expectancy ≥ ${scNum(c.expectancy,2,'R')} · win rate &gt; ${scPct(c.win_rate)} · PF ≥ ${c.pf} · decided ≥ ${(d.bar||{}).min_decided}</div>`;
     html+=`<div style="margin-top:6px"><b>VERDICT ${icon} ${esc(v.status||'—')}</b> — ${esc(v.reason||'')}</div>`;
     if(v.status!=='PASS') html+=`<div class="note" style="margin-top:6px">A scorecard reports performance; it does not grant permission. The graduation bar is enforced NET of costs.</div>`;
@@ -1806,6 +2026,31 @@ def make_app() -> Flask:
             return jsonify({"error": str(exc)}), 502
         except Exception as exc:  # pragma: no cover
             return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/sentiment")
+    def api_sentiment():
+        """Market-sentiment colour reading for one asset/timeframe.
+
+        Returns the composite score, direction, how long the same sentiment
+        has held (duration_min), colour depth (intensity) and the CSS colour.
+        Reuses the cached scan; ``force=1`` triggers a fresh scan."""
+        symbol = _sym(request.args.get("symbol", SYMBOL))
+        tf = request.args.get("tf", TIMEFRAME)
+        force = request.args.get("force") == "1"
+        try:
+            payload = compute_payload(symbol, tf, save=False, use_cache=not force)
+            sent = payload.get("sentiment") or {
+                "available": False, "score": 0.0, "direction": "neutral",
+                "label": "NO DATA", "color": "#5f6d84", "intensity": 0.0,
+                "duration_min": 0.0, "duration_text": "—", "history": []}
+            return jsonify(_sanitize_for_json({
+                "symbol": symbol, "timeframe": tf, "sentiment": sent}))
+        except Exception as exc:
+            return jsonify({"symbol": symbol, "timeframe": tf,
+                            "sentiment": {"available": False, "score": 0.0,
+                                          "direction": "neutral", "label": "NO DATA",
+                                          "color": "#5f6d84", "intensity": 0.0,
+                                          "error": f"{type(exc).__name__}: {exc}"}}), 200
 
     @app.get("/api/intelligence")
     def api_intelligence():

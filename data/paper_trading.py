@@ -208,6 +208,11 @@ def paper_fields_from_scan(scan: dict, created_ts: Optional[int] = None) -> dict
         "opened_ts": None if is_waiting else int(created_ts or scan.get("lifecycle_ts") or time.time() * 1000),
         "entry_price": None if is_waiting else entry,
         "regime": _scan_regime(scan),
+        # P16 — carry the signal-time colour onto the paper book.
+        "sentiment_bucket": scan.get("sentiment_bucket"),
+        "sentiment_score": scan.get("sentiment_score"),
+        "sentiment_intensity": scan.get("sentiment_intensity"),
+        "sentiment_persistence_min": None,
     }
 
 
