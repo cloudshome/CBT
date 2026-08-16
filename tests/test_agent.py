@@ -121,9 +121,15 @@ def test_ask_graduation_intent(desk_env):
 def test_graduation_report_shape(desk_env):
     from brain.agent import graduation_report
     rep = graduation_report()
-    assert set(rep) == {"progress", "graduation", "journal"}
+    assert set(rep) == {"progress", "graduation", "journal", "discipline"}
     assert "ready" in rep["graduation"] and "stats" in rep["graduation"]
     assert rep["journal"]["violation_rate"] is None  # no journal entries yet
+    # P12.14 — the graduation criterion is the isolated discipline payload,
+    # unproven (never a pass) until real canonical paper trades exist.
+    assert rep["discipline"]["eligible"] == 0
+    assert rep["discipline"]["compliance"] is None
+    assert rep["graduation"]["stats"]["compliance"] is None
+    assert rep["graduation"]["met"]["compliance"] is False
 
 
 def test_desk_status_shape_and_json(desk_env):

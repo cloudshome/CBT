@@ -185,7 +185,10 @@ the **graduation gate** passes (see `BLUEPRINT.md`).
   calibration, stats, paper book, market scan, sources, progression, and the
   **graduation gate** (`"am i ready for micro?"`) — the BLUEPRINT Step 2→3
   checklist: expectancy ≥ +0.50R, win rate > 55%, profit factor ≥ 1.5,
-  rule compliance ≥ 90%, plus the 100/20 sample proof.
+  rule compliance ≥ 90%, plus the 100/20 sample proof. Compliance (P12.14) is
+  measured **only** over decided, non-simulator, canonical-live paper trades,
+  and a trade with no journal answer counts against you exactly like a
+  violation — a machine grind or a research book cannot prove your discipline.
 * `python main.py agent all` — one desk run: health report + morning
   briefing + graduation gate (`--json` for the full machine-readable blob).
 * `python main.py brief` — the daily briefing (alias for `agent morning`).

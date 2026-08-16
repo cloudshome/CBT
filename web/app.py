@@ -1310,6 +1310,13 @@ async function loadDesk(){
     if(d.error){ el.innerHTML='<span class="err">'+esc(d.error)+'</span>'; return; }
     const gate=d.risk_gate||{}, advice=d.advice||{}, g=d.graduation||{},
           score=d.scorecard||{}, nextA=d.next_agent||{}, prog=d.progression||{};
+    // P12.14 — graduation discipline: canonical live, non-simulator, decided
+    // paper trades only; missing journals count against compliance.
+    const dis=d.discipline||g.discipline||{};
+    const disTxt = dis.eligible ? `${(dis.compliance*100).toFixed(1)}% (${dis.compliant}/${dis.eligible} real canonical trades`
+        + (dis.missing_journals?`, ${dis.missing_journals} missing journal${dis.missing_journals>1?'s':''}`:'')
+        + (dis.violations?`, ${dis.violations} violation${dis.violations>1?'s':''}`:'') + ')'
+      : 'unproven — no decided real trades on the canonical live book';
     const open=!!gate.allowed;
     const action=advice.action||'STAND_ASIDE';
     const actionCls = action==='SCAN'?'BUY':(action==='CLEAR_STATE'||action==='STAND_ASIDE'?'NOTRADE':'SELL');
@@ -1324,6 +1331,7 @@ async function loadDesk(){
         <b>Advice</b><span><b>${esc(advice.headline||'')}</b></span>
         <b>Today P&amp;L</b><span class="mono">${gate.today_pnl_pct!=null?Number(gate.today_pnl_pct).toFixed(2)+'%':'n/a'} (${gate.today_n||0} trades)</span>
         <b>Scorecard</b><span>n=${score.n||0} · win ${wr} · exp ${exp}</span>
+        <b>Discipline</b><span>${esc(disTxt)}</span>
         <b>Pending</b><span>${d.pending_reviews||0} review(s) · open exposure ${d.open_exposure||0}</span>
         <b>Next agent</b><span>${esc(nextA.name||'—')} — ${esc(nextA.reason||'')}</span></div>
       <div class="note" style="margin-top:8px;background:rgba(255,255,255,.04);padding:8px;border-radius:10px;border:1px solid var(--line)">${esc(advice.detail||'')}</div>

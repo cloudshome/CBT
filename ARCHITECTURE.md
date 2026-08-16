@@ -51,7 +51,7 @@
 | `full_pipeline.py` | The end-to-end analysis pipeline | `cmd_scan`, `cmd_intelligence` |
 | `immune.py` | Staleness, DB integrity, risk gates, behavioral flags, calibration drift | `cmd_health`, `cmd_doctor`, `readiness_strip` |
 | `institutional_score.py` | Institutional desk-style scoring | `intelligence` |
-| `journal.py` | Professional trading journal | `cmd_journal` |
+| `journal.py` | Professional trading journal + `graduation_discipline()` (P12.14 gate input) | `cmd_journal` |
 | `library.py` | RAG knowledge index | `ask` |
 | `metrics.py` | Win-rate, expectancy, profit factor, drawdown, streaks | `agents`, `metrics` |
 | `playbooks.py` | Per-asset playbooks (BTC / ETH / GOLD) | `library`, `ask` |
@@ -86,7 +86,7 @@
 | `validation.py` | P12.1 locked train/val/OOS/recent protocol + sealed OOS envelope; P12.2 AST guard rejects negative `shift(-n)` feature code; `python main.py validate [lookahead]` |
 | `provenance.py` | P12.11 source-series identity for graded rows and calibration keys; canonical live rows remain backward-compatible while one-sided imports stay unreachable from live calibration |
 | `gold_basis.py` | P12.12 read-only exact-time PAXGUSDT/XAUUSD basis measurement + current sealed-OOS inspection; always reports XAU research-only and leaves human approval open; `python main.py xau-evidence` |
-| `simulator.py` | The paper-sample grind (100/20 sample proof); canonical-live-only `paper_progress` and fail-closed `graduation_status` |
+| `simulator.py` | The paper-sample grind (100/20 sample proof); canonical-live-only `paper_progress`, fail-closed `graduation_status` (discipline payload from `brain.journal`) |
 | `symbols.py` | Alias resolution (BTC → BTCUSDT, ETH → ETHUSDT, GOLD → XAUUSD) |
 | `sources/cryptodada_website.py` | Connector for the private CryptoDada site (api/browser modes) |
 | `sources/discord_reader.py` | Connector for the private Discord group (read + webhook push) |
@@ -266,6 +266,17 @@
     remain visible through source-filtered scorecards but can neither unlock
     nor block micro-live. `grind_verdict()` / `graduation_status()` fail closed
     when a caller explicitly supplies research-source progress.
+
+16. **Graduation discipline is earned, never inherited.** The 90% compliance
+    criterion reads one computation — `brain.journal.graduation_discipline()` —
+    over decided, non-simulator (`sim_key IS NULL`), canonical-live paper
+    trades only. A trade counts as journaled only when `followed_rules` is 0 or
+    1, and compliance is `compliant / eligible`, so every missing or blank
+    journal counts against the desk exactly like a violation and an empty book
+    reads `None` (unproven, never a pass). Simulator grinds and research books
+    cannot contribute. The general journal report (`violation_rate()`) is a
+    separate, deliberately broader number for the scorecard and risk card, and
+    must never be substituted back into the gate.
 
 ---
 

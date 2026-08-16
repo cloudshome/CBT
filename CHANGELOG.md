@@ -10,6 +10,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.23.2] — 2026-08-16 · P12.14 graduation discipline isolation
+
+PATCH: the discipline half of the graduation gate is now isolated the way
+P12.13 isolated the performance half. Compliance was computed from
+`violation_rate(db)`, which reads every `journal_entries` row with no join to
+`paper_trades` and no provenance filter, so the 90% criterion could pass
+without a real, fully journaled canonical paper book. The threshold, the
+performance criteria, the source-key algebra and the no-order-placement
+contract are unchanged; the gate is strictly narrower.
+
+### Added
+
+- `brain.journal.graduation_discipline(db)` — the single discipline
+  computation. Reads decided (`TP_HIT`/`STOP_LOSS`), non-simulator
+  (`sim_key IS NULL`), canonical-live (`COALESCE(source_key,'')=''`, legacy
+  NULL rows included) paper trades LEFT JOINed to their journal answer, and
+  reports `eligible`, `journaled`, `missing_journals`, `violations`,
+  `compliant`, `compliance`, `source_key`, `source`.
+- `SignalDB.discipline_rows()` — the eligible-population query behind it.
+- `brain.journal.describe_discipline()` and a `discipline` line on
+  `desk` / `format_graduation()` / the dashboard desk card, so a passing or
+  failing criterion can be audited without a second query.
+
+### Fixed
+
+- Simulator journals can no longer satisfy graduation compliance: a machine
+  grind that auto-writes `followed_rules=1` now yields `eligible=0`,
+  `compliance=None` (unproven) instead of a 100% pass.
+- Non-canonical research journals can no longer move canonical compliance
+  (previously 19 clean `dukascopy:spot:bid` entries outvoted the one real
+  canonical trade that broke the rules: 0.95 PASS instead of 0.0).
+- `followed_rules=None` counts as a missing journal, not as compliance.
+- Missing journals fail **closed**: `compliance = compliant / eligible`, so
+  30 decided real trades with 1 journaled reads 0.033, not 1.0.
+- `graduation_status(..., discipline=...)` treats the payload as
+  authoritative and echoes it under `graduation["discipline"]`; the CLI
+  simulator gate, `agent ask`, `graduation_report()` and `desk_status()`
+  (desk, `/api/desk`, dashboard, MCP) all read that one computation.
+
+### Unchanged
+
+- `GRADUATION_CRITERIA["compliance"] = 0.90` and every performance criterion.
+- The general journal report (`violation_rate()` / `journal_stats()`) keeps
+  feeding `/api/risk`, `/api/learning`, `business_metrics()` and the journal
+  CLI over every recorded entry.
+- XAU stays research-only; nothing places an order.
+
+Reproduction: `ops/probes/p12_14_discipline_probe.py`; contract:
+`docs/HANDOVER_2026-08-16_P12_14.md`. Suite: **736 pass / 1 skip** (+10).
+
+---
+
 ## [2.23.1] — 2026-08-16 · P12.13 graduation source isolation
 
 PATCH: close the last source-provenance leak in the permission path. P12.11

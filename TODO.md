@@ -6,7 +6,15 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-16 (**v2.23.1 / P12.13 shipped — global
+**Last updated:** 2026-08-16 (**v2.23.2 / P12.14 shipped — graduation
+discipline isolation**. Compliance is now computed once, over decided,
+non-simulator, canonical-live paper trades only, and missing or blank journals
+fail closed. Simulator grinds and research books can no longer prove human
+discipline. Threshold, performance criteria and source-key algebra unchanged.
+Suite green: **736 pass / 1 skip** (+10). Pushed to `arena/01a008d1-sky` and
+opened as **PR #37**; both root CI jobs pass. Awaiting human review.)
+
+**Previous:** 2026-08-16 (**v2.23.1 / P12.13 shipped — global
 graduation source isolation**). Review found that P12.11 isolated calibration
 and per-setup proof, but `paper_progress()` still pooled all sources into the
 global micro-live gate. Graduation now counts canonical Binance spot evidence
@@ -44,7 +52,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 726 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 736 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -67,7 +75,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | ✅ **P12.1–P12.13 shipped** — locked/sealed validation, fees-first `E_net`, effective sample size, quality/strategy scores, MC risk, calendars, gold costs, source isolation, and the read-only XAU promotion-evidence dossier |
+| **Validation independence** | Research-grade proof on our own data | ✅ **P12.1–P12.14 shipped** — locked/sealed validation, fees-first `E_net`, effective sample size, quality/strategy scores, MC risk, calendars, gold costs, source isolation, and the read-only XAU promotion-evidence dossier |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -80,6 +88,32 @@ Do not reopen them to install a bot or a second backtest engine.
 ---
 
 ## 🔥 Top priority — start here in the next session
+
+### TODO-16 / P12.14 · Graduation discipline isolation · ✅ SHIPPED (v2.23.2)
+
+**Report:** [`docs/HANDOVER_2026-08-16_P12_14.md`](docs/HANDOVER_2026-08-16_P12_14.md)
+**Harness:** `.venv/bin/python ops/probes/p12_14_discipline_probe.py`
+
+P12.13 isolated graduation *performance* evidence by source and left the
+*discipline* criterion pooled: compliance came from `violation_rate(db)`, which
+reads every `journal_entries` row with no join and no provenance filter. On
+`60b61e5` that meant 20 simulator journals with zero real trades read `1.0`
+PASS; 19 clean research journals outvoted the one real canonical trade that
+broke the rules; `followed_rules=None` read as 100%; and 30 real trades with
+one journaled read `1.0` — missing journals failed **open**.
+
+Now `brain.journal.graduation_discipline()` (over `SignalDB.discipline_rows()`)
+is the single computation: decided, `sim_key IS NULL`, canonical-live (legacy
+NULL rows kept), journaled only when `followed_rules` is 0 or 1,
+`compliance = compliant / eligible`, `None` on an empty book. The CLI simulator
+gate, `agent ask`, `graduation_report()` and `desk_status()` (desk, `/api/desk`,
+dashboard, MCP) all read it, and the desk/gate text shows the population behind
+the number. `violation_rate()` still serves the general journal report.
+
+**Next executable work is unchanged by this build:** run the real-host XAU
+evidence procedure, and keep grinding the canonical paper book — *journaling
+every decided real trade*, which now genuinely matters, since an unjournaled
+trade lowers graduation compliance exactly like a violation.
 
 > **Prior order note (2026-08-15):** **P12.9 shipped — market calendars.**
 > Every data-quality check in SKY assumed a 24/7 market, so
@@ -198,6 +232,7 @@ order changed as a result.
 | **P12.11** | **source provenance in saved keys** | ✅ **shipped** — `data/provenance.py`; source-keyed calibration, live-path isolation, `by_source` scorecard split, `--source-key`; Dukascopy blocker #3 closed; `docs/SOURCE_PROVENANCE.md` | S |
 | **P12.12** | **PAXG-vs-XAU promotion evidence** | ✅ **tooling shipped** — `data/gold_basis.py`, CLI `xau-evidence`, exact-time basis/tracking report + current sealed-OOS inspection; real-host evidence remains open; never approves or trades | S |
 | **P12.13** | **graduation source isolation** | ✅ **shipped** — global progress is canonical-live-only; direct research progress fails closed; scorecards retain research visibility | XS |
+| **P12.14** | **graduation discipline isolation** | ✅ **shipped** — one canonical-live, non-simulator, decided-paper `graduation_discipline(db)`; missing/blank journals fail closed; all four graduation surfaces share it (`docs/HANDOVER_2026-08-16_P12_14.md`) | S |
 | micro-live | trivial size | ⛔ **blocked** — only after unchanged graduation bar says READY and explicit user approval; slippage / partial fills / latency can then be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
@@ -350,7 +385,7 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 **Both are now behind P10 as well as the graduation gate.** Owning our
 data moves the aim; wrapping the engine in another chat UI does not.
 
-### TODO-13 · P12 · SKY Quant Validation Engine · ✅ P12.1–P12.13 shipped
+### TODO-13 · P12 · SKY Quant Validation Engine · ✅ P12.1–P12.14 shipped
 
 📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8,
 extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.**

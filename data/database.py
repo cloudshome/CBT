@@ -611,6 +611,45 @@ class SignalDB:
         q += " ORDER BY COALESCE(closed_ts, opened_ts, created_ts) ASC"
         return [dict(r) for r in self.conn.execute(q, args).fetchall()]
 
+    def discipline_rows(self, source_key: str | None = "") -> list[dict]:
+        """Decided REAL paper trades joined to their journal answer (P12.14).
+
+        The population the graduation discipline criterion is allowed to see:
+
+        * decided only (``TP_HIT`` / ``STOP_LOSS``) — an open trade cannot yet
+          be journaled, so it is neither compliant nor a violation;
+        * ``sim_key IS NULL`` — simulator walk-forward samples auto-record
+          ``followed_rules=1`` and would otherwise manufacture perfect
+          discipline out of machine behaviour;
+        * one source series (default: the canonical live key ``""``, which by
+          P12.11 convention also matches legacy NULL-provenance rows).
+
+        Returns one row per eligible trade with ``followed_rules`` LEFT JOINed
+        from ``journal_entries``: ``None`` means *no journal answer exists*,
+        which the caller must treat as unproven rather than as compliance.
+        """
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(paper_trades)")}
+        q = ("SELECT p.id AS trade_id, p.scan_id AS scan_id, p.plan_type AS plan_type, "
+             "p.symbol AS symbol, p.outcome AS outcome, "
+             "COALESCE(p.closed_ts, p.opened_ts, p.created_ts) AS ts, "
+             "j.followed_rules AS followed_rules "
+             "FROM paper_trades p "
+             "LEFT JOIN journal_entries j ON j.scan_id = p.scan_id "
+             "WHERE p.outcome IN ('TP_HIT','STOP_LOSS')")
+        args: list = []
+        if "sim_key" in cols:  # pragma: no branch - post-migration DBs always have it
+            q += " AND p.sim_key IS NULL"
+        if source_key is not None and "source_key" in cols:
+            key = _source_key(*_normalize_provenance(*_split_key(source_key)))
+            if key == "":
+                q += " AND COALESCE(p.source_key,'')=?"
+                args.append("")
+            else:
+                q += " AND p.source_key=?"
+                args.append(key)
+        q += " ORDER BY ts ASC, p.id ASC"
+        return [dict(r) for r in self.conn.execute(q, args).fetchall()]
+
     def setup_stats(self, plan_type: str, source_key: str | None = None) -> dict:
         """Decided-sample counts for the setup-proven gate (decision B10).
 

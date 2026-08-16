@@ -205,9 +205,10 @@ def _persist_paper_samples(symbol: str, timeframe: str, samples: list[dict],
             # trade is a mechanical execution — the engine filled its own plan
             # at the planned levels and closed at SL/TP, so it followed the
             # system's rules by construction. Recording followed_rules=1 with
-            # a transparent note lets the graduation gate's compliance
-            # criterion (1 - violation_rate) be computed from real journal
-            # entries instead of staying None forever.
+            # a transparent note keeps the general journal report honest.
+            # P12.14: these rows carry a sim_key and are therefore EXCLUDED
+            # from the graduation discipline criterion — machine execution
+            # cannot prove human discipline.
             sdb.save_journal(scan_id, followed_rules=1, emotion="calm",
                              mistake="none", notes="simulator paper sample — "
                              "mechanical rule-following execution")
@@ -449,18 +450,29 @@ GRADUATION_CRITERIA: dict[str, float] = {
     "expectancy": 0.50,   # average R per decided trade (backtest + paper)
     "win_rate": 0.55,     # fraction of decided trades that won
     "pf": 1.5,            # gross win R / gross loss R
-    "compliance": 0.90,   # journal: 1 - violation_rate
+    "compliance": 0.90,   # P12.14: journaled-compliant / eligible real trades
 }
 
 
-def graduation_status(progress: list[dict], compliance: float | None = None) -> dict:
+def graduation_status(progress: list[dict], compliance: float | None = None,
+                      discipline: dict | None = None) -> dict:
     """Blueprint graduation gate: is the desk ready for PROGRESSION=micro?
 
     Aggregates every decided sample (backtest + paper, deduped) across the
-    primary setup family and checks the four blueprint criteria. `compliance`
-    is 1 - journal violation_rate (None until real journal entries exist —
-    an unproven criterion, never a pass). Evaluated NET of costs (P12.6).
+    primary setup family and checks the four blueprint criteria. Evaluated
+    NET of costs (P12.6).
+
+    `compliance` is the P12.14 discipline ratio — journaled-compliant real
+    canonical paper trades over *eligible* real canonical paper trades — which
+    is ``None`` until such trades exist. ``None`` is an unproven criterion,
+    never a pass. `discipline` is the full
+    :func:`brain.journal.graduation_discipline` payload; when supplied it is
+    echoed under ``"discipline"`` so every surface can show *why* the
+    criterion reads the way it does (missing journals, violations, source),
+    and its ``compliance`` is authoritative.
     """
+    if discipline is not None:
+        compliance = discipline.get("compliance")
     primary = primary_plan_types()
     rows = [p for p in progress if p["plan_type"] in primary]
     n = sum(p["n"] for p in rows)
@@ -495,6 +507,7 @@ def graduation_status(progress: list[dict], compliance: float | None = None) -> 
     verdict = grind_verdict(progress)
     samples_ok = verdict["ready"]
     return {"ready": bool(samples_ok and all(met.values())),
+            "discipline": dict(discipline) if discipline else None,
             "samples_proven": bool(samples_ok),
             "sample_gaps": verdict["missing"],
             "source_is_canonical": verdict["source_is_canonical"],
@@ -528,11 +541,26 @@ def format_graduation(g: dict) -> str:
         ("win rate", wr_str, "> 55%", g["met"]["win_rate"]),
         ("profit factor", pf_str, "≥ 1.50", g["met"]["pf"]),
         ("rule compliance", f"{s['compliance'] * 100:.1f}%" if s["compliance"] is not None
-         else "no journal entries yet", "≥ 90%", g["met"]["compliance"]),
+         else "no real journaled trades", "≥ 90%", g["met"]["compliance"]),
     ]
     for name, value, target, ok in rows:
         mark = "✓" if ok else "✗"
         lines.append(f"  {mark} {name:<16}{value:<22}{target}")
+    # P12.14 — show the population compliance was measured over, so a passing
+    # or failing discipline line can be audited without a second query.
+    d = g.get("discipline")
+    if d:
+        if d.get("eligible"):
+            detail = (f"{d['compliant']}/{d['eligible']} decided real trades on "
+                      f"{d.get('source') or describe_source(LIVE_SOURCE_KEY)}")
+            if d.get("missing_journals"):
+                detail += f", {d['missing_journals']} MISSING journal(s)"
+            if d.get("violations"):
+                detail += f", {d['violations']} violation(s)"
+        else:
+            detail = ("no decided real trades on the canonical live book — "
+                      "simulator samples do not count")
+        lines.append(f"    discipline    : {detail}")
     lines.append("-" * 70)
     proof = ("✓ 100 backtest + 20 paper per primary setup" if g["samples_proven"]
              else "✗ grind more history first")

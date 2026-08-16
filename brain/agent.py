@@ -453,16 +453,17 @@ def ask(question: str, symbol: str | None = None,
     from data.database import SignalDB
     with SignalDB() as db:
         if intent == "graduation":
-            from brain.journal import violation_rate
+            from brain.journal import graduation_discipline, violation_rate
             from data.simulator import (format_graduation, graduation_status,
                                         paper_progress)
-            j = violation_rate(db)
-            compliance = 1.0 - j["violation_rate"] if j["violation_rate"] is not None \
-                else None
-            g = graduation_status(paper_progress(db), compliance=compliance)
+            j = violation_rate(db)                    # general journal report
+            discipline = graduation_discipline(db)    # P12.14 criterion
+            g = graduation_status(paper_progress(db),
+                                  discipline=discipline)
             return {"intent": intent, "question": question,
                     "answer": format_graduation(g).splitlines(),
-                    "data": {"graduation": g, "journal": j}}
+                    "data": {"graduation": g, "journal": j,
+                             "discipline": discipline}}
         if intent == "desk":
             status = desk_status()
             return {"intent": intent, "question": question,
@@ -639,13 +640,13 @@ def graduation_report() -> dict:
     from data.simulator import graduation_status, paper_progress
     with SignalDB() as db:
         progress = paper_progress(db)
-        from brain.journal import violation_rate
-        j = violation_rate(db)
-        compliance = 1.0 - j["violation_rate"] if j["violation_rate"] is not None \
-            else None
+        from brain.journal import graduation_discipline, violation_rate
+        j = violation_rate(db)                    # general journal report
+        discipline = graduation_discipline(db)    # P12.14 criterion
     return {"progress": progress,
-            "graduation": graduation_status(progress, compliance=compliance),
-            "journal": j}
+            "graduation": graduation_status(progress, discipline=discipline),
+            "journal": j,
+            "discipline": discipline}
 
 
 def format_answer(result: dict) -> str:
@@ -765,17 +766,20 @@ def desk_status() -> dict:
 
             try:
                 from data.simulator import graduation_status, paper_progress
-                from brain.journal import violation_rate
-                j = violation_rate(db)
-                compliance = (1.0 - j["violation_rate"]
-                              if j.get("violation_rate") is not None else None)
+                from brain.journal import graduation_discipline, violation_rate
+                j = violation_rate(db)                    # general journal report
+                discipline = graduation_discipline(db)    # P12.14 criterion
                 status["graduation"] = graduation_status(
-                    paper_progress(db), compliance=compliance)
+                    paper_progress(db), discipline=discipline)
+                status["discipline"] = discipline
                 status["journal"] = {
                     "n": j.get("n", 0),
                     "violations": j.get("violations", 0),
                     "violation_rate": j.get("violation_rate"),
-                    "compliance": compliance,
+                    # graduation compliance is the isolated P12.14 number, not
+                    # 1 - violation_rate over every journal row (which counts
+                    # simulator and research entries).
+                    "compliance": discipline["compliance"],
                 }
             except Exception as exc:
                 status["graduation"] = {
@@ -920,6 +924,21 @@ def _sample_proof_word(g: dict) -> str:
     return "unproven"
 
 
+def _discipline_word(status: dict) -> str:
+    """P12.14 one-liner: the graduation discipline criterion and its base."""
+    d = status.get("discipline") or (status.get("graduation") or {}).get("discipline")
+    if not d or not d.get("eligible"):
+        return ("unproven — no decided real trades on the canonical live book "
+                "(simulator samples excluded)")
+    out = (f"{d['compliance'] * 100:.1f}% compliance  "
+           f"({d['compliant']}/{d['eligible']} real canonical trades)")
+    if d.get("missing_journals"):
+        out += f"  ✗ {d['missing_journals']} missing journal(s)"
+    if d.get("violations"):
+        out += f"  ✗ {d['violations']} violation(s)"
+    return out
+
+
 def format_desk_status(status: dict) -> str:
     """Human-readable block for `python main.py desk` / MCP / dashboard."""
     gate = status.get("risk_gate") or {}
@@ -968,6 +987,7 @@ def format_desk_status(status: dict) -> str:
         f"exp {exp_s}  PF {pf_s}",
         f"  graduation   : {'READY' if g.get('ready') else 'NOT READY'}  "
         f"(samples {proof_word} · {gstats.get('n', 0)} decided)",
+        f"  discipline   : {_discipline_word(status)}",
         f"  pending      : {status.get('pending_reviews', 0)} review(s)  ·  "
         f"open exposure {status.get('open_exposure', 0)}",
         f"  next agent   : {next_a.get('name', '?')} — {next_a.get('reason', '')}",

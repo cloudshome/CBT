@@ -1860,16 +1860,19 @@ def cmd_simulator(args) -> int:
     with SignalDB() as db:
         progress = paper_progress(db)
         verdict = grind_verdict(progress)
-        from brain.journal import violation_rate
-        j = violation_rate(db)
-        compliance = 1.0 - j["violation_rate"] if j["violation_rate"] is not None \
-            else None
-        gate = graduation_status(progress, compliance=compliance)
+        # P12.14 — discipline is read from the canonical live, non-simulator,
+        # decided paper book only; missing journals fail closed.
+        from brain.journal import graduation_discipline, violation_rate
+        j = violation_rate(db)                       # general journal report
+        discipline = graduation_discipline(db)       # graduation criterion
+        gate = graduation_status(progress, compliance=discipline["compliance"],
+                                 discipline=discipline)
     if args.json:
         print(json.dumps({"rounds": rounds, "totals": {"backtest_added": total_bt,
                                                        "paper_added": total_pp},
                           "progress": progress, "verdict": verdict,
-                          "graduation": gate, "journal": j},
+                          "graduation": gate, "journal": j,
+                          "discipline": discipline},
                          indent=2, default=str))
     else:
         print()

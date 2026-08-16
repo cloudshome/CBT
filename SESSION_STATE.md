@@ -1,16 +1,10 @@
-# SESSION_STATE.md — CryptoBrain / SKY
+**Last updated:** 2026-08-16 (this session `arena/01a008d1-sky`: **v2.23.2 /
+P12.14 — graduation discipline isolation**. The 90% compliance criterion no
+longer counts simulator journals, research-book journals, or blank
+`followed_rules` answers, and missing journals now fail closed. Session began
+as a review after PR #36 closed; the finding was then built.)
 
-> **Purpose:** the *single* handoff file a new Arena session reads first
-> to resume work without re-deriving context. **Update at the end of
-> every session** (see "End-of-session checklist" at the bottom).
-> **Read first** at the start of every new session (see "Start-of-session
-> recipe" at the bottom).
->
-> **Contract:** do a **full-document reconciliation pass every time** —
-> re-read the entire file, fix pre-existing placeholders and stale
-> status lines, not just append new sections.
-
-**Last updated:** 2026-08-16 (this session: **v2.23.1 / P12.13 —
+**Previous:** 2026-08-16 (**v2.23.1 / P12.13 —
 graduation source isolation**. The global permission path now admits canonical
 live evidence only; research books can neither unlock nor block micro-live.
 Also reconciled merged PR/CI state and closed stale TODO-7 instructions.)
@@ -18,11 +12,62 @@ Also reconciled merged PR/CI state and closed stale TODO-7 instructions.)
 **Previous:** 2026-08-16 (**v2.23.0 P12.12 — read-only PAXG-vs-XAU
 promotion-evidence dossier**. Synthetic mechanics are green; real-host
 evidence and approval remain open.)
-**Branch:** `arena/01a008b9-sky` (this session's fixed branch)
-**HEAD commit:** handoff-only commit on top of `5320281` (the exact implementation commit below; use `git rev-parse HEAD` for the self-referential handoff tip)
-**Python:** 3.11 (venv `.venv`) — suite green (**726 pass / 1 skip**)
+**Branch:** `arena/01a008d1-sky` (pushed; **PR #37** open against `main`, CI green)
+**HEAD commit:** the P12.14 commit on `arena/01a008d1-sky` (`git rev-parse HEAD`), on top of merged base `60b61e5` — `P12.13: isolate global graduation evidence by source (#36)`
+**Previous branch:** `arena/01a008b9-sky` (P12.13 implementation, merged as PR #36)
+**Version:** 2.23.2
+**Python:** 3.11 (venv `.venv`) — suite green (**736 pass / 1 skip**)
 
-> **This session (`arena/01a008b9-sky`): v2.23.1 / P12.13 graduation
+> **This session (`arena/01a008d1-sky`): v2.23.2 / P12.14 graduation
+> discipline isolation.** PR #36 (P12.13) closed, so the session opened as a
+> safety review and produced `docs/HANDOVER_2026-08-16_P12_14.md` plus the
+> reproduction `ops/probes/p12_14_discipline_probe.py`; the fix was then built
+> against that contract.
+>
+> **The gap.** P12.13 isolated graduation *performance* evidence by source, but
+> every graduation surface still computed compliance as
+> `1 - violation_rate(db)`, and `journal_stats()` reads every `journal_entries`
+> row with no join to `paper_trades` and no provenance filter. Measured on
+> `60b61e5`: 20 simulator journals with **zero** real canonical trades read
+> `1.0` PASS; 19 clean `dukascopy:spot:bid` journals outvoted the one real
+> canonical trade that broke the rules (`0.95` PASS instead of `0.0`);
+> `followed_rules=None` read as 100% compliance; and 30 decided real trades
+> with one journaled read `1.0` — missing journals failed **open**.
+>
+> **Fix.** `brain.journal.graduation_discipline(db)` (over
+> `SignalDB.discipline_rows()`) is now the single discipline computation:
+> decided (`TP_HIT`/`STOP_LOSS`), `sim_key IS NULL`, canonical-live
+> (`COALESCE(source_key,'')=''`, legacy NULL rows included); journaled only
+> when `followed_rules` is 0 or 1; `compliance = compliant / eligible` with
+> `None` on an empty book. It reports eligible / journaled / missing_journals /
+> violations / compliant / compliance / source. `graduation_status()` takes it
+> as authoritative and echoes it as `graduation["discipline"]`; the CLI
+> simulator gate, `agent ask`, `graduation_report()` and `desk_status()`
+> (CLI desk, `/api/desk`, dashboard desk card, MCP) all read that one payload,
+> and the desk/gate text shows the population behind the number.
+>
+> **Demonstration.** On a seeded mixed book the pooled report says 99.1%
+> compliance (108 entries, 1 violation) while graduation now says **80.0%**
+> (8/10 eligible, 1 missing journal, 1 violation) — a book that previously
+> passed the 90% criterion correctly fails it.
+>
+> **Unchanged.** The 90% threshold, all performance criteria, P12.11 source-key
+> algebra, the general journal report (`violation_rate()` still feeds
+> `/api/risk`, `/api/learning`, `business_metrics()` and the journal CLI), XAU
+> research-only status, and the no-order-placement contract.
+>
+> **Verification.** `tests/test_graduation_discipline.py` (10 new regressions,
+> incl. surface parity across all four graduation paths) plus an updated
+> `test_graduation_report_shape`; full suite **736 passed, 1 skipped** (126s);
+> compileall, `pip check`, and the v2.23.2 wheel gate pass; the probe harness
+> exits 0 with all five cases behaving as specified.
+>
+> **Shipped.** Pushed to `origin/arena/01a008d1-sky` and opened as **PR #37**
+> (`P12.14: isolate graduation discipline (v2.23.2)`, base `main`, MERGEABLE).
+> Both root CI jobs pass on the pushed head — *Offline test suite* (2m34s) and
+> *Wheel gate* (31s). Awaiting human review; do not self-merge.
+>
+> **Previous session (`arena/01a008b9-sky`): v2.23.1 / P12.13 graduation
 > source isolation.** Review found a safety gap left after P12.11:
 > calibration, the live confidence hook, and `setup_proven()` were isolated by
 > source, but `data.simulator.paper_progress()` still pooled every source into
@@ -364,7 +409,7 @@ paper gate, and TODO-8; micro-live is blocked. TODO-7 is complete.
 | **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; root CI runs offline suite + wheel gate (TODO-7 complete) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.1–P12.13 shipped** — locked/sealed validation, lookahead guard, scorecard, real-data path, fees-first `E_net`, effective sample size, quality/strategy scores, Monte Carlo survivability, net decision anchor, calendars, XAU costs, source-separated saved keys, read-only XAU promotion evidence, and canonical-only global graduation. Tooling completion does not promote XAU: run P12.12 on the real-data host, retain human review, and keep micro-live locked until the unchanged global bar says READY plus explicit approval. |
+| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.1–P12.14 shipped** — locked/sealed validation, lookahead guard, scorecard, real-data path, fees-first `E_net`, effective sample size, quality/strategy scores, Monte Carlo survivability, net decision anchor, calendars, XAU costs, source-separated saved keys, read-only XAU promotion evidence, canonical-only global graduation, and simulator-free graduation discipline. Tooling completion does not promote XAU: run P12.12 on the real-data host, retain human review, and keep micro-live locked until the unchanged global bar says READY plus explicit approval. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -373,7 +418,42 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-16 (this branch `arena/01a008b9-sky`): v2.23.1 / P12.13 — graduation source isolation
+### Session 2026-08-16 (this branch `arena/01a008d1-sky`): v2.23.2 / P12.14 — graduation discipline isolation
+
+Started as a post-PR-#36 safety review, then built the fix it found.
+
+- `data/database.py`: `SignalDB.discipline_rows()` — decided, `sim_key IS NULL`,
+  single-source paper trades LEFT JOINed to `journal_entries` (canonical `""`
+  by default, legacy NULL provenance included).
+- `brain/journal.py`: `graduation_discipline()` — eligible / journaled /
+  missing_journals / violations / compliant / compliance / source, with
+  `compliance = compliant / eligible` and `None` on an empty book;
+  `describe_discipline()` for human surfaces. `violation_rate()` unchanged.
+- `data/simulator.py`: `graduation_status(..., discipline=...)` treats the
+  payload as authoritative, echoes it as `graduation["discipline"]`, and
+  `format_graduation()` prints the population behind the criterion.
+- Surfaces rewired to that one computation: `main.py` simulator gate
+  (+`discipline` in `--json`), `brain/agent.py` `ask` / `graduation_report()` /
+  `desk_status()`, `format_desk_status()` discipline line, dashboard desk card
+  **Discipline** row (`/api/desk`, MCP inherit it).
+- `tests/test_graduation_discipline.py`: 10 regressions — simulator journals,
+  research journals, `followed_rules=None`, missing journals, undecided trades,
+  legacy NULL rows, honest-book control, no primary-family restriction,
+  four-surface parity, and stale-`compliance` override.
+- `ops/probes/p12_14_discipline_probe.py`: pooled-vs-isolated harness, exit
+  non-zero if any case fails open. Contract/report:
+  `docs/HANDOVER_2026-08-16_P12_14.md`.
+- Version `2.23.1 → 2.23.2`. Verification: **736 pass / 1 skip**; compileall,
+  `pip check`, v2.23.2 wheel gate pass. Pushed; **PR #37** open with green CI.
+
+**Files changed:** `data/database.py`, `brain/journal.py`, `data/simulator.py`,
+`brain/agent.py`, `main.py`, `web/app.py`, `config.py`, `pyproject.toml`,
+`tests/test_graduation_discipline.py`, `tests/test_agent.py`,
+`ops/probes/p12_14_discipline_probe.py`,
+`docs/HANDOVER_2026-08-16_P12_14.md`, `ARCHITECTURE.md`, `CHANGELOG.md`,
+`TODO.md`, `SESSION_STATE.md`.
+
+### Session 2026-08-16 (branch `arena/01a008b9-sky`): v2.23.1 / P12.13 — graduation source isolation
 
 Inherited merged P12.12 at `5345e9e`; branch and `origin/main` were identical.
 Review found one remaining P12.11 source leak in the permission path and fixed
@@ -866,7 +946,10 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 726 passed, 1 skipped
+# 736 passed, 1 skipped
+
+# P12.14 discipline harness (exits non-zero if any case fails open)
+.venv/bin/python ops/probes/p12_14_discipline_probe.py
 ```
 
 PAXG-vs-XAU evidence (P12.12):
@@ -938,11 +1021,13 @@ python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau swe
 ## Last implementation commit
 
 ```
-5320281  fix: isolate graduation evidence by source
+015366f  P12.14: isolate graduation discipline (v2.23.2)   — PR #37, open, CI green
+60b61e5  P12.13: isolate global graduation evidence by source (#36)   — merged base
 ```
 
-Session base: `5345e9e` (merged P12.12 / PR #35). P12.13 is committed at
-`5320281`; the final branch-tip commit only reconciles this handoff file.
+PR #37: https://github.com/Azimshawon/SKY/pull/37 — open, MERGEABLE, both root
+CI jobs passing. A later handoff commit on this branch may sit on top of
+`015366f`; use `git rev-parse HEAD` for the tip.
 
 ---
 
@@ -981,7 +1066,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 726 pass / 1 skip.
+- Maintain test count at ≥ 736 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -996,6 +1081,19 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 ```
 
 ## End-of-session checklist (run before closing this session)
+
+**Session `arena/01a008d1-sky` (2026-08-16) — review + P12.14 build:**
+
+1. [x] Review P12.13's remaining surface; find and reproduce the discipline gap.
+2. [x] Write the contract (`docs/HANDOVER_2026-08-16_P12_14.md`) + probe harness.
+3. [x] Build `graduation_discipline()` / `SignalDB.discipline_rows()`.
+4. [x] Wire all four graduation surfaces to the one computation.
+5. [x] Add 10 regressions; full suite **736 passed, 1 skipped**.
+6. [x] compileall, `pip check`, v2.23.2 wheel gate.
+7. [x] Bump version 2.23.1 → 2.23.2; reconcile CHANGELOG/ARCHITECTURE/TODO/SESSION_STATE.
+8. [x] Push `origin/arena/01a008d1-sky`; open **PR #37**; both CI jobs green; not merged.
+
+**Previous session `arena/01a008b9-sky` (P12.13):**
 
 1. [x] Fix the reviewed safety gap — canonical-only global graduation.
 2. [x] Rebuild `.venv`; run focused tests — **41 passed**.

@@ -201,6 +201,17 @@ positive expectancy, win rate above 55%, profit factor at least 1.5, rule
 compliance at least 90%, and at least 100 backtest plus 20 paper samples for
 each primary setup.
 
+Rule compliance (P12.14) is measured over **decided real paper trades on the
+canonical live book only** — simulator samples (`sim_key`) and research-source
+books are excluded — and it is `journaled-compliant / eligible`. A decided
+trade you never journal, or one journaled without a `followed_rules` answer,
+lowers compliance exactly like a violation, so journal every closed trade:
+
+```bash
+python main.py journal <scan_id> --followed-rules 1 --emotion calm
+python main.py desk        # the "discipline" line shows eligible/missing/violations
+```
+
 ## 7. Logs, stop controls and recovery
 
 Useful commands:

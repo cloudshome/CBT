@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import Optional
 
 from data.database import SignalDB
+from data.provenance import LIVE_SOURCE_KEY, describe_source
 
 POST_TRADE_FIELDS = ("followed_rules", "emotion", "mistake", "screenshot_path",
                      "would_change", "notes")
@@ -97,13 +98,86 @@ def execution_quality(db: SignalDB, scan_id: int) -> dict:
 
 
 def violation_rate(db: SignalDB) -> dict:
-    """Execution discipline across all recorded trades (feeds B4 metrics)."""
+    """Execution discipline across all recorded trades (feeds B4 metrics).
+
+    This is the **general journal report**: every journal row the human ever
+    wrote, whatever produced the trade. It is the right number for the
+    scorecard, the risk card and the weekly review — and the *wrong* number
+    for a permission decision. The graduation gate must use
+    :func:`graduation_discipline` instead (P12.14).
+    """
     stats = db.journal_stats()
     return {
         "n": stats["n"],
         "violations": stats["violations"],
         "violation_rate": stats["violation_rate"],
     }
+
+
+def graduation_discipline(db: SignalDB, source_key: str = LIVE_SOURCE_KEY) -> dict:
+    """P12.14 — the discipline criterion of the graduation gate.
+
+    P12.13 isolated graduation *performance* evidence by source. Discipline
+    was still derived from ``violation_rate(db)``, i.e. from every row of
+    ``journal_entries`` with no join and no provenance filter. Four ways that
+    let the 90% criterion pass without a real, fully journaled book:
+
+    * simulator samples auto-write ``followed_rules=1``, so a machine grind
+      alone read as 100% compliance;
+    * research-book journals (e.g. ``dukascopy:spot:bid``) outvoted the
+      canonical live trades they have no authority over;
+    * ``followed_rules IS NULL`` — a journal saved with no answer — counted as
+      a non-violation;
+    * unjournaled trades were invisible, because the denominator was journal
+      rows rather than trades that *should* have been journaled. Missing
+      journals therefore failed **open**.
+
+    This computation fails closed on all four. The eligible population is
+    decided, non-simulator paper trades on the canonical live series
+    (:func:`SignalDB.discipline_rows`); a trade counts as journaled only when
+    ``followed_rules`` is exactly 0 or 1; and compliance is measured against
+    **eligible**, not against journaled::
+
+        compliance = compliant / eligible          # None when eligible == 0
+
+    so every missing journal lowers compliance exactly like a violation. An
+    empty book yields ``None``, which :func:`data.simulator.graduation_status`
+    already treats as unproven — never a pass.
+
+    Deliberately *not* filtered by plan family: discipline is a property of
+    the trader across the whole canonical real paper book, and restricting it
+    to the primary family would let an undisciplined book hide outside it.
+    """
+    rows = db.discipline_rows(source_key=source_key)
+    eligible = len(rows)
+    violations = sum(1 for r in rows if r.get("followed_rules") == 0)
+    compliant = sum(1 for r in rows if r.get("followed_rules") == 1)
+    journaled = violations + compliant
+    return {
+        "eligible": eligible,
+        "journaled": journaled,
+        "missing_journals": eligible - journaled,
+        "violations": violations,
+        "compliant": compliant,
+        "compliance": round(compliant / eligible, 4) if eligible else None,
+        "source_key": source_key,
+        "source": describe_source(source_key),
+    }
+
+
+def describe_discipline(d: dict) -> str:
+    """One-line human summary of a :func:`graduation_discipline` payload."""
+    if not d or not d.get("eligible"):
+        return ("discipline: unproven — no decided real paper trades on the "
+                "canonical live book yet")
+    pct = f"{d['compliance'] * 100:.1f}%"
+    line = (f"discipline: {pct} compliance "
+            f"({d['compliant']}/{d['eligible']} real canonical trades)")
+    if d.get("missing_journals"):
+        line += f" — {d['missing_journals']} missing journal(s) count against you"
+    if d.get("violations"):
+        line += f", {d['violations']} violation(s)"
+    return line
 
 
 def describe_entry(entry: dict) -> str:
