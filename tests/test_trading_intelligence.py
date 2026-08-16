@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from brain.trading_intelligence import build_intelligence
+from brain.trading_intelligence import build_intelligence, rank_key_levels
 
 
 def _payload(confidence=88, rr=2.5, action="BUY"):
@@ -71,3 +71,39 @@ def test_intelligence_rejects_missing_data():
     assert out["signal"] == "NO TRADE"
     assert out["confidence"] == 0
     assert out["reason"] == ["Insufficient market data."]
+
+
+def test_key_levels_ranked_in_tiers_sorted_by_distance():
+    feats = _payload()["snapshot"]["features"]
+    plan = _payload()["plans"][0]
+    levels = rank_key_levels(feats, plan)
+    assert levels, "expected at least some levels from the fixture"
+    # tiers appear in A → B → C order
+    assert [l["tier"] for l in levels] == sorted(l["tier"] for l in levels)
+    # within each tier, sorted by distance from price
+    for tier in ("A", "B", "C"):
+        sub = [l for l in levels if l["tier"] == tier]
+        dists = [l["distance_pct"] for l in sub]
+        assert dists == sorted(dists), f"tier {tier} not sorted by distance"
+        assert all(d >= 0 for d in dists)
+    # no invented levels: every level came from the fixture
+    assert any(l["name"] == "Sweep level" for l in levels) or \
+           any(l["name"].startswith("Liquidity pool") for l in levels)
+    assert any(l["name"] == "Plan entry" for l in levels)
+
+
+def test_key_levels_capped_and_no_price_returns_empty():
+    feats = _payload()["snapshot"]["features"]
+    plan = _payload()["plans"][0]
+    levels = rank_key_levels(feats, plan)
+    for tier in ("A", "B", "C"):
+        assert sum(1 for l in levels if l["tier"] == tier) <= 6
+    assert rank_key_levels({}) == []
+
+
+def test_intelligence_report_includes_key_levels():
+    out = build_intelligence(_payload())
+    assert "key_levels" in out
+    assert isinstance(out["key_levels"], list)
+    assert all({"tier", "name", "level", "note", "distance_pct"} <= set(l)
+               for l in out["key_levels"])

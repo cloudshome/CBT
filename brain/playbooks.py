@@ -13,6 +13,12 @@ they must not run one generic pipeline.
 This module only *derives* gates and playbook metadata.  Enforcing them is
 done by brain/decision.py so the raw engine output always stays visible as
 research.
+
+P13 invariant (see BLUEPRINT.md Golden Rule 6): the per-trade risk budget is
+immutable. There is no averaging-down, no trading-DCA, no martingale anywhere
+in the codebase; an "add" may only ever be a pre-defined scale-in whose total
+risk was fixed before entry, and no add may ever grow because a trade is
+losing.
 """
 from __future__ import annotations
 

@@ -672,13 +672,15 @@ def cmd_approve(args) -> int:
     (decisions B6/B7/B9/B10).  `--force` is the explicit escape hatch."""
     from data.database import SignalDB
     from brain.risk_gate import evaluate as gate_evaluate, gate_message
+    from brain.coach import management_checklist
     from data.paper_trading import _primary_plan
     with SignalDB() as db:
         scan = db.get_scan(args.scan_id)
         if scan is None:
             print(f"[!] scan #{args.scan_id} not found", file=sys.stderr)
             return 1
-        plan_type = _primary_plan(scan).get("type")
+        plan = _primary_plan(scan)
+        plan_type = plan.get("type")
         gate = gate_evaluate(db, symbol=scan.get("symbol"), plan_type=plan_type,
                              action=scan.get("action"))
     if not gate["allowed"] and not args.force:
@@ -687,6 +689,11 @@ def cmd_approve(args) -> int:
             print(f"    ✗ {b}", file=sys.stderr)
         print("    (re-run with --force to override consciously)", file=sys.stderr)
         return 2
+    # P13: position-manager card — see how the trade will be managed
+    # (HOLD / REDUCE / TRAIL / EXIT) BEFORE you commit to it.
+    print("   📋 POSITION MANAGER — how this trade will be managed:")
+    for c in management_checklist(plan):
+        print(f"      {c}")
     rc = _decide(args, "APPROVED")
     if rc == 0 and not gate["allowed"]:
         print(f"    ⚠️ overridden with --force: {gate_message(gate)}")
@@ -850,7 +857,8 @@ def cmd_learn(args) -> int:
 
 def cmd_coach(args) -> int:
     from data.database import SignalDB
-    from brain.coach import explain_signal, mentor, personal_feedback, GLOSSARY
+    from brain.coach import (explain_signal, mentor, personal_feedback,
+                             five_levels, GLOSSARY)
 
     # 1) teach from the current market (fresh scan, no DB save)
     payload = run_scan(args.symbol, args.tf, args.bars, save_db=False)
@@ -862,8 +870,15 @@ def cmd_coach(args) -> int:
     print()
     print(mentor(payload))
 
-    # 2) personal feedback from decision history
+    # 2) the five-question ladder — observation → interpretation →
+    #    opportunity → decision → action (P13)
     with SignalDB() as db:
+        print()
+        print("🎯 THE FIVE QUESTIONS — the professional decision ladder")
+        for line in five_levels(payload, db=db):
+            print(" ", line)
+
+        # 3) personal feedback from decision history
         fb = personal_feedback(db)
     print()
     print("📈 YOUR TRADING FEEDBACK")

@@ -10,6 +10,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.26.0] — 2026-08-16 · P13 the desk teaches: five-question coach, A/B/C key levels, position-manager card
+
+MINOR: the first build of **P13**, the decision-support phase. It adopts the
+four ideas that survived the external ChatGPT desk-review
+(`docs/TRADING_DESK_CHATGPT_REVIEW.md`) without leaving the main road — no new
+data sources, no new indicators, no new risk surface. Three code additions +
+one documented invariant:
+
+- **P13.1 five-question coach** (`brain/coach.py::five_levels`) — the coach now
+  answers the professional ladder *Observation → Interpretation → Opportunity
+  → Decision → Action* in plain English, with the per-setup measured
+  expectancy from the learning loop (`_setup_evidence`) when the DB has
+  samples, and an honest "no graded samples yet" otherwise. Wired into
+  `python main.py coach`.
+- **P13.2 A/B/C key-level ranking** (`brain/trading_intelligence.py::rank_key_levels`) —
+  the desk report now ships `key_levels`: A = liquidity & major structure
+  (sweeps, pools, equal highs/lows, swings), B = decision zones (order blocks,
+  plan trigger/entry), C = reference levels (FVGs, VWAP, POC, stop, TPs),
+  sorted by distance from price and capped per tier — no invented levels.
+- **P13.3 approval-time position-manager card** (`main.py cmd_approve`) — before
+  you click approve, the CLI prints HOLD / REDUCE / TRAIL / EXIT guidance for
+  that exact plan, built by `brain/coach.py::management_checklist`.
+- **P13.4 no-martingale invariant** — BLUEPRINT.md Golden Rule 6 and the
+  playbooks module docstring: risk budget immutable, trading-DCA/martingale
+  forbidden, only Step-4 *investment* accumulation allowed. Already true in
+  code; now a stated invariant.
+
+No thresholds moved. Suite green: **807 pass / 1 skip** (+10).
+
 ## [2.25.0] — 2026-08-16 · P12.18 the net anchor at the hard limits
 
 MINOR: finish what P12.8 started. P12.6 restated the desk's numbers net of

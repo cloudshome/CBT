@@ -203,6 +203,78 @@ def _supply_demand(features: dict) -> dict:
     }
 
 
+def rank_key_levels(features: dict, plan: Optional[dict] = None) -> list[dict]:
+    """Rank the levels the desk can see into A/B/C importance tiers.
+
+    P13: the ChatGPT desk-review asked for ranked levels instead of "hundreds
+    of meaningless lines".  The rule is deliberately simple and derived only
+    from data that already exists in the feature snapshot:
+
+      A — liquidity & major structure  (where sweeps happen: pools, equal
+          highs/lows, swing high/low, the sweep level itself)
+      B — decision zones               (order blocks + the plan's trigger/entry)
+      C — reference levels             (FVGs, VWAP, POC, stop, take-profits)
+
+    Within a tier, levels are sorted by distance from price; each tier is
+    capped so the map stays readable.  Nothing here invents a level.
+    """
+    price = features.get("price")
+    if price is None:
+        return []
+    tiers: dict[str, list[dict]] = {"A": [], "B": [], "C": []}
+
+    def add(tier: str, name: str, level: Any, note: str = "") -> None:
+        if level is None:
+            return
+        try:
+            level = float(level)
+        except (TypeError, ValueError):
+            return
+        tiers[tier].append({
+            "name": name,
+            "level": _round(level),
+            "note": note,
+            "distance_pct": round(abs(level - price) / price * 100.0, 3),
+        })
+
+    # A — liquidity & major structure
+    sweep = features.get("sweep") or {}
+    _side = str(sweep.get("side") or "").lower()
+    _side_txt = _side if _side.endswith("side") else f"{_side}-side"
+    add("A", "Sweep level", sweep.get("level"),
+        f"{_side_txt} liquidity sweep" if _side_txt else "liquidity sweep")
+    for lvl in (features.get("liquidity_above") or [])[:3]:
+        add("A", "Liquidity pool (above)", lvl, "buy-side liquidity")
+    for lvl in (features.get("liquidity_below") or [])[:3]:
+        add("A", "Liquidity pool (below)", lvl, "sell-side liquidity")
+    for lvl in (features.get("equal_highs") or [])[:2]:
+        add("A", "Equal highs", lvl, "liquidity magnet")
+    for lvl in (features.get("equal_lows") or [])[:2]:
+        add("A", "Equal lows", lvl, "liquidity magnet")
+    add("A", "Swing high", features.get("swing_high"), "major structure")
+    add("A", "Swing low", features.get("swing_low"), "major structure")
+
+    # B — decision zones
+    add("B", "Bullish order block", features.get("nearest_bull_ob"))
+    add("B", "Bearish order block", features.get("nearest_bear_ob"))
+    add("B", "Plan trigger", (plan or {}).get("trigger_level"), "setup condition")
+    add("B", "Plan entry", (plan or {}).get("entry"), "planned entry")
+
+    # C — reference levels
+    add("C", "Bullish FVG", features.get("nearest_bull_fvg"))
+    add("C", "Bearish FVG", features.get("nearest_bear_fvg"))
+    add("C", "VWAP", features.get("vwap"), "session mean")
+    add("C", "POC", features.get("poc"), "volume point of control")
+    add("C", "Stop loss", (plan or {}).get("stop_loss"), "where the idea is wrong")
+    for i, tp in enumerate((plan or {}).get("take_profits") or [], start=1):
+        add("C", f"Take profit {i}", tp, "target")
+
+    for tier in tiers:
+        tiers[tier].sort(key=lambda d: d["distance_pct"])
+        tiers[tier] = tiers[tier][:6]
+    return [dict(d, tier=tier) for tier in ("A", "B", "C") for d in tiers[tier]]
+
+
 def _price_action(df: Optional[pd.DataFrame]) -> dict:
     if df is None or len(df) < 2:
         return {"pattern": "Unknown", "confirmation": False}
@@ -547,6 +619,7 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
         "trend_analysis": trend,
         "smart_money_concept": smc,
         "supply_demand": _supply_demand(features),
+        "key_levels": rank_key_levels(features, plan),
         "price_action": pa,
         "indicators": _indicators(features),
         "fundamental_analysis": _fundamentals(ctx),

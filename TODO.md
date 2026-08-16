@@ -6,7 +6,24 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-16 (**v2.25.0 / P12.18 shipped — the net anchor at
+**Last updated:** 2026-08-16 (**v2.26.0 / P13 shipped — the desk teaches**.
+Fourth build of the session, the first of the P13 decision-support phase and
+the only code shipped after the user's project review. It adopts the **four
+ideas that survived the ChatGPT desk-review** (`docs/TRADING_DESK_CHATGPT_REVIEW.md`)
+without leaving the main road: **P13.1** `brain/coach.py::five_levels` — the
+coach now answers Observation → Interpretation → Opportunity → Decision →
+Action, including the measured per-setup expectancy from the learning loop
+(`_setup_evidence`) and a ⚠️ "desk says NO TRADE — watch-item only" line;
+**P13.2** `brain/trading_intelligence.py::rank_key_levels` — the desk report
+ships `key_levels` ranked A (liquidity/structure) / B (decision zones) / C
+(reference), sorted by distance from price, capped per tier, nothing invented;
+**P13.3** `main.py cmd_approve` — a HOLD/REDUCE/TRAIL/EXIT position-manager
+card prints before you commit (`management_checklist`, shared with the coach);
+**P13.4** no-martingale invariant stated as BLUEPRINT.md Golden Rule 6 + a
+playbooks docstring note. No threshold moved; the risk gate and graduation bar
+are untouched. Suite green: **807 pass / 1 skip** (+10).)
+
+**Previous:** 2026-08-16 (**v2.25.0 / P12.18 shipped — the net anchor at
 the hard limits**. Third build of the session. P12.8 set the rule that "a
 measurement only matters where something acts on it" and fixed the two
 expectancy sites; it missed the **P&L** sites. The daily/weekly loss limits,
@@ -132,6 +149,29 @@ Do not reopen them to install a bot or a second backtest engine.
 ---
 
 ## 🔥 Current sequence — next executable work (operational, not a new code milestone)
+
+### TODO-21 / P13 · The desk teaches: five-question coach, A/B/C key levels, position-manager card · ✅ SHIPPED (v2.26.0)
+
+**Report:** [`docs/HANDOVER_2026-08-16_P13.md`](docs/HANDOVER_2026-08-16_P13.md)
+**Source:** the four ideas that survived the ChatGPT desk-review
+([`docs/TRADING_DESK_CHATGPT_REVIEW.md`](docs/TRADING_DESK_CHATGPT_REVIEW.md)) —
+a review, not a roadmap change; the main road (real-data operation) is
+unchanged.
+
+- **P13.1** `brain/coach.py::five_levels` — the five-question ladder
+  (Observation → Interpretation → Opportunity → Decision → Action) with
+  measured per-setup expectancy (`_setup_evidence`) and a ⚠️ watch-item
+  warning when the desk says NO TRADE but a plan exists.
+- **P13.2** `brain/trading_intelligence.py::rank_key_levels` — `key_levels`
+  A/B/C in the desk report, sorted by distance from price, capped per tier.
+- **P13.3** `main.py cmd_approve` — position-manager card
+  (HOLD/REDUCE/TRAIL/EXIT) before you commit.
+- **P13.4** BLUEPRINT.md Golden Rule 6 + playbooks docstring — no-martingale /
+  immutable risk-budget invariant.
+
+**Web follow-up (not done, front-end only):** render `key_levels` on the
+dashboard chart page and the position-manager card on the approval queue; the
+JSON is already emitted by `/api/scan` and MCP.
 
 ### TODO-20 / P12.18 · The net anchor at the hard limits · ✅ SHIPPED (v2.25.0)
 

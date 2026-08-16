@@ -143,6 +143,12 @@ Sweep a fixed portion of profits (e.g. 50%) into long-term spot reserves:
    - **GOLD:** trade London/NY sessions; stand aside around high-impact US data
 5. **Let the math compound** — trading is managing risk and letting positive
    statistical expectancy build wealth over time.
+6. **Never average down — the risk budget is immutable** — position size and
+   total risk are fixed **before** entry. Adding to a losing trade (trading-DCA
+   / martingale) is forbidden; the only allowed accumulation is Step-4
+   *investment* DCA — sweeping profits into spot BTC/ETH/GOLD on a fixed
+   schedule, which is portfolio allocation, not position management.
+   (P13 invariant; enforced in the coach and at approval time.)
 
 ## 🎯 Ready to Run
 

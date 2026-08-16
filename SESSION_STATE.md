@@ -65,21 +65,25 @@ now judges P&L **net of costs** (P12.18).
 > regressions); harness `ops/probes/p12_17_weekstart_probe.py`; contract
 > `docs/HANDOVER_2026-08-16_P12_17.md`.
 
-**Branch:** `arena/01a009c0-sky` (fixed session branch)
-**HEAD commit:** verify with `git rev-parse HEAD` (the current tip is the P12.18 checkpoint)
-**Upstream:** PR #39 is merged; PR #40 carries this session's P12.16 + P12.17 + P12.18 work.
-**Previous implementation branch:** `arena/01a0099b-sky` (P12.15 follow-up, merged as PR #39)
-**Version:** 2.25.0
-**Python:** 3.11 (venv `.venv`) — suite green (**797 pass / 1 skip**)
+**Branch:** `arena/01a00a3d-sky` (fixed session branch)
+**HEAD commit:** verify with `git rev-parse HEAD` (the current tip is the P13 checkpoint)
+**Upstream:** PR #40 merged P12.16 + P12.17 + P12.18; P13 is the current session's work.
+**Previous implementation branch:** `arena/01a009c0-sky` (P12.18 checkpoint, merged as PR #40)
+**Version:** 2.26.0
+**Python:** 3.11 (venv `.venv`) — suite green (**807 pass / 1 skip**)
 
-> **Current state.** P12.1–P12.18 are shipped. The next work in sequence is
-> operational, not a speculative trading feature: on the real-data host, rerun
-> canonical learning, import and validate the separate Dukascopy XAU history,
-> archive the read-only `xau-evidence --json` dossier, and continue the
-> canonical live paper book. This clean checkout has no real store/database,
-> so it must not manufacture either result. The graduation bar remains closed;
-> XAU remains research-only; micro-live remains blocked until the unchanged
-> graduation gate is READY and the user separately approves it.
+> **Current state.** P12.1–P12.18 and P13 are shipped. The next work in sequence
+> remains operational, not a speculative trading feature: on the real-data
+> host, rerun canonical learning, import and validate the separate Dukascopy
+> XAU history, archive the read-only `xau-evidence --json` dossier, and
+> continue the canonical live paper book. This clean checkout has no real
+> store/database, so it must not manufacture either result. The graduation bar
+> remains closed; XAU remains research-only; micro-live remains blocked until
+> the unchanged graduation gate is READY and the user separately approves it.
+> **P13 (v2.26.0, this session)** shipped the four adopted ideas from the
+> ChatGPT desk-review — five-question coach, A/B/C key-level ranking,
+> approval-time position-manager card, no-martingale invariant — as
+> `docs/HANDOVER_2026-08-16_P13.md`; no threshold moved.
 
 > **This session (`arena/01a009c0-sky`): v2.24.0 / P12.16 open-book source
 > isolation.** PR #39 had merged and every ordered next action is real-host

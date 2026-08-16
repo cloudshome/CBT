@@ -64,6 +64,15 @@ GLOSSARY = {
 
 _TERM_KEYS = sorted(GLOSSARY, key=len, reverse=True)  # longest first for matching
 
+# P13: structure events translated into what they *imply* (the interpretation
+# rung of the five-question ladder — observation already reports the event).
+_EVENT_MEANING = {
+    "bos_up": "price broke above a recent swing high — the prior down-move is being rejected",
+    "bos_down": "price broke below a recent swing low — the prior up-move is being rejected",
+    "choch_up": "a change of character — the downtrend is being questioned",
+    "choch_down": "a change of character — the uptrend is being questioned",
+}
+
 
 def _expand(text: str) -> str:
     """Bold+explain glossary terms found in a string."""
@@ -166,6 +175,169 @@ def mentor(payload: dict, db=None) -> str:
     out.append("\nHomework: write down your plan BEFORE price moves. If the trigger "
                "doesn't happen, the plan is cancelled — no revenge trades.")
     return "\n".join(out)
+
+
+def management_checklist(plan: Optional[dict] = None) -> list[str]:
+    """Position-manager guidance for one plan — HOLD / REDUCE / TRAIL / EXIT.
+
+    P13: the desk report already ships a management plan; this turns it into a
+    reusable card shown at approval time and inside the five-question coach so
+    the human sees *how the trade will be managed* before they click approve.
+
+    The risk budget is immutable (BLUEPRINT.md Golden Rule 6): adding to a
+    losing trade (martingale / trading-DCA) is forbidden.
+    """
+    if not plan:
+        return ["HOLD — no active plan right now; the best trade is no trade."]
+    tps = [t for t in (plan.get("take_profits") or []) if t is not None]
+    out = ["HOLD — the original thesis is intact; monitor the trigger/entry."]
+    if tps:
+        out.append(f"REDUCE — close ~50% at TP1 {tps[0]:,.2f} and move the stop to break-even.")
+        out.append("TRAIL — trail the remaining position behind structure or ATR.")
+    out.append("EXIT — if HTF structure flips against the trade or high-impact "
+               "news invalidates the setup, exit early — never wait for hope.")
+    out.append("Risk budget is immutable: never ADD to a losing trade (no martingale).")
+    return out
+
+
+def five_levels(payload: dict, db=None) -> list[str]:
+    """The five-question decision ladder — the professional desk framing.
+
+    The engine is not asked to predict price. It answers five increasingly
+    difficult questions: OBSERVATION → INTERPRETATION → OPPORTUNITY →
+    DECISION → ACTION. Each answer is built from the same payload the signal
+    was built from, so the human can check the reasoning at every rung.
+
+    ``db`` (optional) adds the measured per-setup expectancy from the
+    calibrator (setup × historical expectancy, the P12 learning loop).
+    """
+    sig = payload.get("signal", {})
+    feats = (payload.get("snapshot") or {}).get("features") or {}
+    plans = payload.get("plans") or []
+    intel = payload.get("intelligence") or {}
+    decision = payload.get("decision") or {}
+    price = feats.get("price")
+    out: list[str] = []
+
+    # LEVEL 1 — Observation: what is happening?
+    out.append("LEVEL 1 — OBSERVATION: what is happening right now?")
+    obs = _feature_plain(feats)
+    if not obs:
+        obs = ([f"Price {price:,.2f} — no feature detail available."] if price
+               else ["No market data yet — the desk cannot see the market."])
+    out += [f"   • {line}" for line in obs[:6]]
+
+    # LEVEL 2 — Interpretation: what does the structure imply?
+    out.append("LEVEL 2 — INTERPRETATION: what does the structure imply?")
+    bias = feats.get("trend_bias")
+    if bias:
+        seq = {"bullish": "higher highs and higher lows",
+               "bearish": "lower highs and lower lows"}.get(bias, "no clean sequence")
+        out.append(f"   • Structural bias is {bias} — price is printing {seq}.")
+    ev = str(feats.get("event_kind") or "").lower()
+    if ev:
+        label = str(feats["event_kind"]).upper().replace("_", " ")
+        meaning = _EVENT_MEANING.get(ev)
+        out.append(f"   • Structure event: {label} — {meaning}." if meaning
+                   else f"   • Structure event: {label} — {_expand(label)}.")
+    regime_label = (intel.get("regime") or {}).get("label") or feats.get("regime_name")
+    if regime_label:
+        hint = ("a range favours fading extremes, not chasing breakouts" if "RANG" in str(regime_label).upper()
+                else "a trending regime favours pullbacks with the trend" if "TREND" in str(regime_label).upper()
+                else "a volatile regime demands smaller size and wider stops")
+        out.append(f"   • Regime: {regime_label} — {hint}.")
+    if feats.get("premium_discount"):
+        zone = feats["premium_discount"]
+        out.append(f"   • Price sits in the {zone} zone of the dealing range — "
+                   f"{'expensive, smart money tends to sell' if zone == 'premium' else 'cheap, smart money tends to buy'}.")
+
+    # LEVEL 3 — Opportunity: is there a statistically validated setup?
+    out.append("LEVEL 3 — OPPORTUNITY: is there a statistically validated setup?")
+    plan = plans[0] if plans else None
+    if plan:
+        conf = plan.get("confidence")
+        out.append(f"   • Top setup: {plan.get('type')} "
+                   f"({conf}% confidence) — {_expand(plan.get('condition') or '')}.")
+        measured = _setup_evidence(plan.get("type"), db)
+        out.append(f"   • {measured}")
+        if len(plans) > 1:
+            out.append(f"   • Also watching: {', '.join(p.get('type') for p in plans[1:4])}.")
+    else:
+        out.append("   • No plan above the confidence threshold — the opportunity "
+                   "is to wait. Patience is a position.")
+
+    # LEVEL 4 — Decision: is the expected return worth the risk?
+    out.append("LEVEL 4 — DECISION: is the expected return worth the risk?")
+    desk_action = decision.get("action") or intel.get("signal") or sig.get("action") or "NO TRADE"
+    out.append(f"   • Desk decision: {desk_action}.")
+    for b in decision.get("blocked_by") or []:
+        out.append(f"      blocked by: {b}")
+    conf = intel.get("confidence", (plan or {}).get("confidence"))
+    rr = intel.get("risk_reward")
+    risk = intel.get("risk")
+    bits = []
+    if conf is not None:
+        bits.append(f"confidence {conf}% (desk floor ≥ 80%)")
+    if rr:
+        bits.append(f"R:R {rr} (safety floor ≥ 1:1.5)")
+    if risk:
+        bits.append(f"risk {risk} per trade (hard cap 1.0%)")
+    if bits:
+        out.append(f"   • Score ≠ permission — {', '.join(bits)}.")
+    if intel.get("self_review", {}).get("would_professional_take_trade") is False:
+        out.append("   • Self-review: a professional desk would NOT take this trade right now.")
+
+    # LEVEL 5 — Action: exactly where do I enter, stop, target, size, manage, exit?
+    out.append("LEVEL 5 — ACTION: exactly where do I enter, stop, target, size, manage and exit?")
+    if desk_action == "NO TRADE" and plan:
+        out.append("   • ⚠️ The desk says NO TRADE — this plan is a watch-item "
+                   "only; do not execute it until the desk approves.")
+    if plan:
+        entry, sl = plan.get("entry"), plan.get("stop_loss")
+        tps = [t for t in (plan.get("take_profits") or []) if t is not None]
+        out.append(f"   • Entry {entry:,.2f} · Stop {sl:,.2f} · Targets "
+                   f"{', '.join(f'{t:,.2f}' for t in tps) or '—'} · R:R {plan.get('risk_reward')}.")
+        ps = intel.get("position_size") or {}
+        if ps.get("risk_percent") is not None:
+            line = f"   • Position: risk {ps.get('risk_percent')}%"
+            if ps.get("risk_amount") is not None:
+                line += f" (≈${ps['risk_amount']:,.2f})"
+            if ps.get("units") is not None:
+                line += f" · {ps['units']:g} units"
+            out.append(line + ".")
+        out += [f"   • {c}" for c in management_checklist(plan)]
+    else:
+        out.append("   • No entry, stop or target — there is nothing to size. Stand aside.")
+    out.append("   • Homework: write the plan BEFORE price moves. If the trigger "
+               "doesn't happen, the plan is cancelled — no revenge trades.")
+
+    return out
+
+
+def _setup_evidence(plan_type: Optional[str], db) -> str:
+    """Measured expectancy for a setup family from the learning loop, or an
+    honest 'not enough samples yet' when absent."""
+    if not plan_type or db is None:
+        return ("Measured evidence: none yet — paper-trade this setup and let "
+                "the calibrator learn (python main.py learn).")
+    try:
+        stats = db.backtest_stats().get("by_type", [])
+    except Exception:
+        return ("Measured evidence: unavailable right now — check the database "
+                "with python main.py stats.")
+    for r in stats:
+        if r.get("plan_type") == plan_type and r.get("n"):
+            n = r["n"]
+            if n < 10:
+                return (f"Measured evidence: only {n} sample(s) so far — too few "
+                        "to trust yet; keep paper-trading.")
+            wr = r.get("win_rate")
+            wr_txt = f"{wr*100:.0f}% win rate" if wr is not None else "win rate n/a"
+            return (f"Measured evidence: {wr_txt} over {n} samples, "
+                    f"avg {r.get('avg_rr') or 0.0:+.2f}R — the learning loop is "
+                    f"watching this setup family.")
+    return ("Measured evidence: this setup family has no graded samples yet — "
+            "paper-trade it and let the calibrator learn.")
 
 
 def personal_feedback(db, limit: int = 25) -> list[str]:
