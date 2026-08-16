@@ -34,9 +34,66 @@ import json
 import os
 import sys
 import time
+import importlib.util
+import subprocess
 from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
+def _ensure_runtime():
+    """Make ``python main.py`` a genuine one-command launcher.
+
+    Normal installations already have the dependencies and this is a cheap
+    import check. On a fresh checkout, install the pinned project requirements
+    once, then continue into the same dashboard process. Set
+    ``SKY_NO_AUTO_INSTALL=1`` for locked-down/CI environments.
+    """
+    required = {"flask": "flask", "dotenv": "python-dotenv", "numpy": "numpy",
+                "pandas": "pandas", "requests": "requests"}
+    missing = [package for module, package in required.items()
+               if importlib.util.find_spec(module) is None]
+    if not missing or os.getenv("SKY_NO_AUTO_INSTALL") == "1":
+        if missing:
+            raise RuntimeError("Missing dependencies: " + ", ".join(missing)
+                               + ". Run: python -m pip install -r requirements.txt")
+        return
+    print("SKY: first run detected — preparing an isolated environment…", flush=True)
+    # Ubuntu/Debian enforce PEP 668 and reject system-wide pip installs.
+    # Create a project-local virtualenv and transparently re-launch the same
+    # command inside it, so the user still only runs `python3 main.py`.
+    venv_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv")
+    if sys.prefix == getattr(sys, "base_prefix", sys.prefix) and os.getenv("SKY_IN_VENV") != "1":
+        try:
+            subprocess.check_call([sys.executable, "-m", "venv", venv_dir])
+            vpy = os.path.join(venv_dir, "bin", "python")
+            env = os.environ.copy()
+            env["SKY_IN_VENV"] = "1"
+            os.execve(vpy, [vpy, os.path.abspath(__file__), *sys.argv[1:]], env)
+        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+            raise RuntimeError(
+                "Could not create .venv. Run: sudo apt install -y python3-venv "
+                "then retry python3 main.py") from exc
+    print("SKY: installing dashboard dependencies in .venv…", flush=True)
+    # Minimal Ubuntu images often ship python3 without pip. Try the standard
+    # library bootstrap first; if the distro disables it, report the exact
+    # one-time package command instead of exposing a cryptic pip traceback.
+    if importlib.util.find_spec("pip") is None:
+        try:
+            subprocess.check_call([sys.executable, "-m", "ensurepip", "--upgrade"])
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            raise RuntimeError(
+                "pip is not installed. Run: sudo apt update && "
+                "sudo apt install -y python3-pip python3-venv, then rerun: "
+                "python3 main.py")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+
+
+try:
+    _ensure_runtime()
+except (RuntimeError, subprocess.CalledProcessError) as exc:
+    print(f"SKY cannot start: {exc}", file=sys.stderr)
+    sys.exit(1)
 
 from config import (SYMBOL, SYMBOLS, TIMEFRAME, BARS, MIN_CONFIDENCE, DEFAULT_RISK_REWARD,
                     DASHBOARD_HOST, DASHBOARD_PORT, PAPER_POLL_SECONDS, VERSION,

@@ -536,6 +536,7 @@ HTML = """<!doctype html>
     <button class="btn" onclick="load(true)">↻ Scan now</button>
     <button class="btn" onclick="systemCheck(); switchTab('system')">🔍 System check</button>
     <button class="btn" onclick="runPaper(); switchTab('trades')">▶ Check paper trades</button>
+    <button class="btn" onclick="dailyRitual()">⏱ Daily ritual</button>
     <button class="btn" onclick="switchTab('learn'); setTimeout(()=>{ const el=document.getElementById('learn'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },120)">⚡ Learn now</button>
     <button class="btn primary" onclick="backtestNow()">▶ Quick backtest + learn</button>
   </div>
@@ -780,8 +781,25 @@ function render(d){
       ${mgmt.map(c=>`<div class="note">• ${esc(c)}</div>`).join('')}
     </div>` : '';
 
-  // Build grouped tab panels
-  let overview = '';
+  // Build grouped tab panels. The workflow card is intentionally visible on
+  // the first screen: it turns the large command surface into a repeatable
+  // trader ritual, so the user does not have to memorize the CLI.
+  const workflowCard = card('DESK WORKFLOW — WHAT TO DO NEXT', `
+    <div class="statrow" style="margin-bottom:10px">
+      <div class="stat"><div class="v" style="color:var(--blue)">1</div><div class="k">Check readiness</div><div class="note">Gate, data, channels</div></div>
+      <div class="stat"><div class="v" style="color:var(--violet)">2</div><div class="k">Read the desk</div><div class="note">Signal is research</div></div>
+      <div class="stat"><div class="v" style="color:var(--amber)">3</div><div class="k">Approve or reject</div><div class="note">You stay in control</div></div>
+      <div class="stat"><div class="v" style="color:var(--green)">4</div><div class="k">Review outcome</div><div class="note">Paper only · journal</div></div>
+    </div>
+    <div class="flex" style="justify-content:space-between;align-items:flex-start">
+      <div class="note" style="max-width:760px">Use this dashboard as your memory: <b>Overview</b> answers “should I act?”, <b>Market</b> explains price and structure, <b>Trades</b> protects execution, <b>Learn</b> measures your edge, and <b>System</b> checks the plumbing. If the gate is closed or readiness is not green, the professional action is to stand aside.</div>
+      <div class="flex">
+        <button class="btn" onclick="switchTab('trades');setTimeout(()=>document.getElementById('riskgate')?.scrollIntoView({behavior:'smooth'}),120)">🛡 Risk gate</button>
+        <button class="btn" onclick="switchTab('learn');setTimeout(()=>document.getElementById('coach')?.scrollIntoView({behavior:'smooth'}),120)">🧑‍🏫 Coach me</button>
+      </div>
+    </div>
+  `, true);
+  let overview = workflowCard;
   overview += card('MARKET SENTIMENT — THE COLOUR IS THE MARKET', sentiCard(sent), true);
   overview += card('LIVE SIGNAL', `
     <div class="flex" style="margin-bottom:8px">
@@ -1443,6 +1461,21 @@ async function loadRiskGate(){
     html+=`<div class="note" style="margin-top:8px">Enforced at approval + paper runner. CLI: <code>python main.py risk</code> · <code>python main.py monte</code> · <code>python main.py tradestate</code> · <code>python main.py journal</code></div>`;
     el.innerHTML=html;
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
+
+async function dailyRitual(){
+  // A single, calm pre-trade routine. It deliberately does not approve,
+  // execute, or place anything: the ritual only refreshes evidence and
+  // leaves the final decision with the human.
+  showToast('Daily ritual started — checking readiness, gate, desk and paper book', 'ok');
+  await Promise.allSettled([
+    loadReadiness(), loadLoop(), loadRiskGate(), loadDesk(), loadHealth(),
+    loadPaper(), loadPending(), loadHistory()
+  ]);
+  switchTab('overview');
+  const el=document.getElementById('readiness');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+  showToast('Ritual complete — read the verdict before considering any trade', 'ok');
 }
 
 async function setTraderState(key, val){
