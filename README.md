@@ -43,7 +43,8 @@ with connectors for your **private CryptoDada website** and **Discord group**.
 | **Data-quality pillar** (P10.5) | Fourth readiness pillar: per stored series, staleness (timeframe-scaled), gap fraction, price/volume sanity and ordering. A corrupt or unusably stale series is **quarantined** — `doctor --strip` / `/api/readiness` / MCP `readiness` all report the desk *not ready*, because the engine prefers silence to a signal built on corrupt data. `data/quality.py`. |
 | **Bybit adapter** (P10.6) | Second venue behind the same normalised schema: `python main.py backfill --exchange bybit` pages Bybit V5 klines (spot + linear perps) through the same resumable/idempotent/rate-limit-aware machinery; venue quirks (categories, intervals, newest-first rows, retCodes) never leak past the adapter. `data/bybit_client.py`. |
 | **Cross-exchange series** (P10.7) | `python main.py cross collect` — persist the live KuCoin/OKX/Bybit probe and derive Binance-vs-Bybit premium/discount + funding spread as queryable Parquet series. Same probe health/preflight already call; `DEMO_MODE=1` is offline. `data/cross_exchange.py`. |
-| **Lightweight Charts** (P10.8) | Vendored `lightweight-charts.standalone.js` replaces the SVG chart: candlestick + histogram volume pane over stored data via `/api/candles` — no new runtime dependency. |
+| **Lightweight Charts** (P10.8) | Vendored `lightweight-charts.standalone.js` — the **full TradingView v4.2.3 production build** (Apache-2.0), not a stub. Candlestick + volume + RSI + MACD panes with linked time scales, EMA/VWAP/Bollinger overlays and entry/stop/target price lines. No new runtime dependency and no outbound internet. |
+| **Trading Workstation** (P17) | The browser *is* the product: `Chart`, `Signal desk`, `Trades`, `Trade manager`, `Risk center`, `Journal`, `Learning`, `Command center`, `Modules` and `System` tabs. Every CLI command is a documented button (`web/command_center.py`), every open position shows live R / MAE / MFE / management steps, the position-size calculator is bounded by the risk gate (`web/position_sizer.py`), and the journal is a real form instead of a command to memorize. |
 | **Futures & flow cards** (P10.9) | Market-tab cards `FUTURES — OPEN INTEREST & FUNDING` (funding sign/color, OI trend, L/S ratio, mark/index/basis) and `FLOW — CVD & VOLUME DELTA` (CVD z-score, volume-delta z, volume spike, VWAP position) reading from `market_context` / the feature snapshot. |
 | **WebSocket tier** (P10.10) | `data/ws_client.py` — public Binance streams (`!forceOrder@arr` + klines) with reconnect/backoff, graceful stop, offline-safe demo stream; `reconnect_state()`/`accumulation_stats()` feed the readiness strip and feature store. No `websockets` runtime dependency. |
 | **Store-backed backtester** (P10.11) | `data/backtester.py::run_backtest_on_store()` reads `CandleStore.read()` instead of a live fetch — multi-year offline backtests, honest error for missing/short series. `backtest --source store --exchange ...` keeps venue identity explicit. |
@@ -312,17 +313,44 @@ gate bypass. 15 tools: `ask`, `risk`, `health`, `brief`, `tradestate`,
 
 ## 🚀 Quickstart
 
+**The normal way to use SKY is two lines. Everything else is optional.**
 
 ```bash
-# 1. install
+cd ~/SKY
+python3 main.py     # then open http://localhost:8050
+```
+
+That is the whole workflow. `main.py` creates its own virtualenv, installs its
+dependencies and opens the **Trading Workstation** — a browser control centre
+where every function is a button. You never need to memorize a command.
+
+| Tab | What you click |
+|---|---|
+| 📊 **Chart** | Candles, volume, EMA 20/50/200, VWAP, Bollinger, RSI, MACD, support/resistance and your entry / stop / take-profit — TradingView Lightweight Charts with linked time scales. Asset and timeframe are one click. |
+| 🎯 **Signal desk** | BUY / SELL / NO TRADE with entry, stop, target, R:R, confidence, setup, regime, invalidation, why it exists and why it may fail. |
+| ⚡ **Trades** | Approve · Reject · Execute · Close. The risk gate is enforced; overriding it is a separate, conscious click. |
+| 🎛 **Trade manager** | Open positions with live price, current R, stop/target distance, MAE, MFE, time in trade and the management instruction. Close or journal from the row. |
+| 🛡 **Risk center** | Gate status with the exact reason it is closed, daily/weekly loss budgets, drawdown ladder, Kelly advisory, Monte Carlo risk-of-ruin, trader-state flags (angry / tired / revenge / chasing) and the **position-size calculator**. |
+| 🔓 **Evidence** | *Why* you cannot trade right now, in plain language, with a progress bar per criterion and a 4-step one-click pipeline (Backfill → Backtest → Simulator → Scorecard) that actually earns the unlock. |
+| 🔌 **Connections** | Every real-world link — market data, funding/OI, news, Fear & Greed, macro, Telegram/Discord alerts, LLM, and your **read-only** exchange account — with a live badge, a Test button and setup steps. See `CONNECT_REAL_WORLD.md`. |
+| 📓 **Journal** | A real form: followed rules, emotion, mistake, what happened, what you would change — plus the auto-derived pre-trade checklist and your execution grade. |
+| 🧑‍🏫 **Learning** | Backtest, calibrate, scorecard by setup/regime/side/session, simulator and graduation progress. |
+| ⌘ **Command center** | **Every CLI command as a documented button** with its inputs, a Run button and its output in the page. Colour-coded: 🟢 read-only · 🟡 writes locally · 🟠 slow · 🔒 terminal only. |
+| 🧩 **Modules** | Every module in the engine and what it does, searchable. |
+| ⚙️ **System** | Data health, channel registry, doctor verdict, MCP status. |
+
+The desk is **advisory**: you approve every trade, and it is paper-only —
+no exchange key exists in this app, so no real order can be sent.
+
+<details>
+<summary>Advanced / automation — the CLI behind those buttons</summary>
+
+```bash
+# 1. install (only if you are not using the one-command launcher above)
 pip install -r requirements.txt
 
-# 2. ALL-IN-ONE DASHBOARD — watch everything + click to decide (no commands needed)
-python main.py              # opens http://localhost:8050
-#    everything runs from the dashboard: BTC/ETH/XAU quick buttons, live
-#    signal, chart, MTF, styles, context, approval queue, history, coach, and one-click
-#    "⚡ Learn now" / "▶ Quick backtest + learn" buttons.
-#    CLI is only for automation/advanced use.
+# 2. the dashboard, explicitly
+python main.py web          # same as `python main.py`
 
 # 3. one-shot scan (live Binance data, no keys needed)
 python main.py scan --symbol BTCUSDT --tf 15m --json
@@ -388,6 +416,12 @@ python main.py glossary FVG          # quick term lookup
 # 15. run tests
 python -m pytest tests/ -q
 ```
+
+Every one of these commands is also a button in the dashboard's
+**Command center** tab, with its inputs, an explanation and its output shown
+in the page — the CLI is for automation, not for daily use.
+
+</details>
 
 ### 24/7 paper operations
 

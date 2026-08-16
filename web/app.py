@@ -102,6 +102,52 @@ def _sym(value: str | None) -> str:
     return normalize_symbol(value or SYMBOL)
 
 
+def _scan_row_to_payload(row: dict | None) -> dict:
+    """Re-nest a flat ``scans`` DB row into the scan-payload shape.
+
+    ``SignalDB.get_scan()`` returns one flat SQL row, while the analysis
+    helpers (``brain.journal.pre_trade_checklist`` and friends) read the
+    nested ``{"signal": …, "plans": …, "snapshot": …}`` payload. Without this
+    bridge the journal's pre-trade checklist rendered "—" for every field.
+    """
+    if not row:
+        return {}
+    features, plans, context = {}, [], {}
+    for key, target in (("features_json", "features"), ("plans_json", "plans"),
+                        ("context_json", "context")):
+        raw = row.get(key)
+        if not raw:
+            continue
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if target == "features":
+            features = parsed if isinstance(parsed, dict) else {}
+        elif target == "plans":
+            plans = parsed if isinstance(parsed, list) else []
+        else:
+            context = parsed if isinstance(parsed, dict) else {}
+    return {
+        "scan_id": row.get("id"),
+        "signal": {
+            "signal_id": row.get("signal_id"), "timestamp": row.get("ts"),
+            "asset": row.get("symbol"), "timeframe": row.get("timeframe"),
+            "action": row.get("action"), "entry": row.get("entry"),
+            "stop_loss": row.get("stop_loss"), "take_profit": row.get("take_profit"),
+            "risk_reward": row.get("risk_reward"),
+            "confidence": row.get("confidence_label"),
+            "reason": row.get("reason"), "signal_type": row.get("signal_type"),
+        },
+        "plans": plans,
+        "snapshot": {"features": {**features, "regime_label": row.get("regime")},
+                     "scores": {}},
+        "context": context,
+        "intelligence": {"regime_label": row.get("regime")},
+        "lifecycle": {"status": row.get("status"), "note": row.get("approve_note") or ""},
+    }
+
+
 def _attach_management(payload: dict) -> dict:
     """P13/P14: attach the HOLD/REDUCE/TRAIL/EXIT card to a scan payload."""
     try:
@@ -459,6 +505,70 @@ HTML = """<!doctype html>
   .senti-scale-lg .needle{position:absolute;top:50%;width:3px;height:30px;transform:translate(-50%,-50%);background:#fff;border-radius:999px;box-shadow:0 0 12px rgba(255,255,255,.9)}
   /* chart container for Lightweight Charts */
   #chart{width:100%;height:260px;background:#0e1524;border-radius:12px;border:1px solid var(--line);overflow:hidden}
+  /* ── chart workspace (TradingView-style) ── */
+  .chart-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .chart-toggles{display:flex;gap:10px;flex-wrap:wrap}
+  .chart-head{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .chart-head .px{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+  .chart-head .ind{font-size:11.5px;color:var(--mut)}
+  .chart-head .ind b{color:var(--txt);font-variant-numeric:tabular-nums}
+  .chart-pane{width:100%;background:#0b1120}
+  .chart-pane + .chart-pane{border-top:1px solid var(--line)}
+  /* ── forms (journal, sizer, command inputs) ── */
+  .formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .formgrid label,.fullfield{display:flex;flex-direction:column;gap:5px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  .formgrid input,.formgrid select,.fullfield textarea,.fullfield input{text-transform:none;letter-spacing:normal;font-weight:400;color:var(--txt);font-size:13px}
+  .fullfield{margin-top:10px}
+  /* ── command center ── */
+  .cmdcat{margin:14px 0 8px}
+  .cmdgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px}
+  .cmdcard{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:rgba(255,255,255,.02);transition:.13s}
+  .cmdcard:hover{border-color:var(--line2);background:rgba(255,255,255,.04)}
+  .cmdcard h3{margin:0 0 4px;font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:7px}
+  .cmdcard .cli{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--mut2);background:rgba(0,0,0,.28);padding:3px 7px;border-radius:6px;display:inline-block;margin-top:6px}
+  .cmdcard .inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;margin-top:8px}
+  .cmdcard .inputs label{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:700;display:flex;flex-direction:column;gap:4px}
+  .cmdcard .inputs input,.cmdcard .inputs select{font-size:12.5px;text-transform:none;letter-spacing:normal;color:var(--txt);padding:5px 8px}
+  .safety{font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;border:1px solid var(--line);letter-spacing:.04em}
+  .safety.read{color:var(--green);border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.10)}
+  .safety.write{color:var(--amber);border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.10)}
+  .safety.long{color:#fb923c;border-color:rgba(251,146,60,.35);background:rgba(251,146,60,.10)}
+  .safety.blocked{color:var(--mut);border-color:var(--line);background:rgba(255,255,255,.04)}
+  .termout{background:#05080f;border:1px solid var(--line);border-radius:12px;padding:12px;max-height:460px;overflow:auto;white-space:pre-wrap;font-size:12px;line-height:1.5;color:#cfe0f5;margin:0}
+  .catchip{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--mut);cursor:pointer}
+  .catchip.active{background:#fff;color:#0b1220;border-color:#fff}
+  /* ── trade manager ── */
+  .tmtable{width:100%;border-collapse:collapse;font-size:12.5px}
+  .tmtable td,.tmtable th{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}
+  .rpos{color:var(--green);font-weight:800} .rneg{color:var(--red);font-weight:800}
+  .modrow{display:grid;grid-template-columns:230px 1fr 62px;gap:10px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;align-items:baseline}
+  .modrow code{color:var(--cyan);font-size:12px}
+  @media(max-width:760px){.modrow{grid-template-columns:1fr}}
+  /* ── connections ── */
+  .conncard{border:1px solid var(--line);border-radius:12px;padding:12px;background:rgba(255,255,255,.02);margin-bottom:10px}
+  .conncard.live{border-color:rgba(34,197,94,.35)}
+  .conncard.off{border-color:var(--line)}
+  .conncard.fail{border-color:rgba(239,68,68,.35)}
+  .conncard h3{margin:0 0 4px;font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .connstate{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:.04em}
+  .connstate.live{background:rgba(34,197,94,.14);color:var(--green);border:1px solid rgba(34,197,94,.35)}
+  .connstate.off{background:rgba(255,255,255,.05);color:var(--mut);border:1px solid var(--line)}
+  .connstate.fail{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.35)}
+  .connhow{margin:8px 0 0;padding-left:18px;font-size:12px;color:var(--mut);line-height:1.7}
+  .connhow li{margin-bottom:2px}
+  .connhow code{color:var(--cyan);background:rgba(0,0,0,.3);padding:1px 5px;border-radius:5px}
+  /* ── evidence / unlock ── */
+  .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+  .pipestep{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:11px;background:rgba(255,255,255,.02)}
+  .pipestep .n{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--violet));display:grid;place-items:center;font-weight:800;font-size:13px}
+  .pipestep .btn{margin-top:8px;margin-right:6px}
+  .critrow{margin-bottom:9px}
+  .critrow .top{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;align-items:baseline}
+  .critrow .bar{margin-top:5px}
+  .setupcard{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+  .setupcard.proven{border-color:rgba(34,197,94,.4)}
+  .blockcard{border-radius:12px;padding:12px;margin-bottom:10px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
+  .blockcard.earn{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08)}
   .strip .strip-detail{flex-basis:100%;font-size:11.5px;color:var(--mut);line-height:1.5}
   /* quick actions */
   .quickbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
@@ -509,10 +619,18 @@ HTML = """<!doctype html>
 </div>
 <nav class="tabbar" id="tabbar">
   <button class="tabbtn active" data-tab="overview" onclick="switchTab('overview')">◎ Overview</button>
+  <button class="tabbtn" data-tab="chart" onclick="switchTab('chart')">📊 Chart</button>
   <button class="tabbtn" data-tab="market" onclick="switchTab('market')">📈 Market</button>
-  <button class="tabbtn" data-tab="intelligence" onclick="switchTab('intelligence')">🎯 Intelligence</button>
+  <button class="tabbtn" data-tab="intelligence" onclick="switchTab('intelligence')">🎯 Signal desk</button>
   <button class="tabbtn" data-tab="trades" onclick="switchTab('trades')">⚡ Trades</button>
-  <button class="tabbtn" data-tab="learn" onclick="switchTab('learn')">🧑‍🏫 Learn</button>
+  <button class="tabbtn" data-tab="manage" onclick="switchTab('manage')">🎛 Trade manager</button>
+  <button class="tabbtn" data-tab="risk" onclick="switchTab('risk')">🛡 Risk center</button>
+  <button class="tabbtn" data-tab="evidence" onclick="switchTab('evidence')">🔓 Evidence</button>
+  <button class="tabbtn" data-tab="journal" onclick="switchTab('journal')">📓 Journal</button>
+  <button class="tabbtn" data-tab="learn" onclick="switchTab('learn')">🧑‍🏫 Learning</button>
+  <button class="tabbtn" data-tab="connections" onclick="switchTab('connections')">🔌 Connections</button>
+  <button class="tabbtn" data-tab="commands" onclick="switchTab('commands')">⌘ Command center</button>
+  <button class="tabbtn" data-tab="modules" onclick="switchTab('modules')">🧩 Modules</button>
   <button class="tabbtn" data-tab="system" onclick="switchTab('system')">⚙️ System</button>
   <span class="spacer"></span>
   <span id="updated" class="updated"></span>
@@ -541,6 +659,202 @@ HTML = """<!doctype html>
     <button class="btn primary" onclick="backtestNow()">▶ Quick backtest + learn</button>
   </div>
   <div id="app">Loading…</div>
+
+  <!-- ── Chart workspace (TradingView-style, vendored Lightweight Charts) ── -->
+  <div class="tabpanel" data-tab="chart">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="chart-toolbar">
+        <div class="seg" id="chartSymSeg">
+          {% for s in symbols %}<button data-sym="{{s.symbol}}" onclick="chartSetSymbol('{{s.symbol}}')" class="{{'active' if s.symbol==symbol}}">{{s.symbol}}</button>{% endfor %}
+        </div>
+        <div class="seg" id="chartTfSeg">
+          {% for t in ['1m','5m','15m','30m','1h','4h','1d','1w'] %}<button data-tf="{{t}}" onclick="chartSetTF('{{t}}')" class="{{'active' if t==tf}}">{{t}}</button>{% endfor %}
+        </div>
+        <div class="chart-toggles">
+          <label class="check"><input type="checkbox" id="ovEma" checked onchange="drawChart()"> EMA 20/50/200</label>
+          <label class="check"><input type="checkbox" id="ovVwap" checked onchange="drawChart()"> VWAP</label>
+          <label class="check"><input type="checkbox" id="ovBb" onchange="drawChart()"> Bollinger</label>
+          <label class="check"><input type="checkbox" id="ovLevels" checked onchange="drawChart()"> S/R levels</label>
+          <label class="check"><input type="checkbox" id="ovPlan" checked onchange="drawChart()"> Entry / SL / TP</label>
+          <label class="check"><input type="checkbox" id="ovRsi" checked onchange="drawChart()"> RSI</label>
+          <label class="check"><input type="checkbox" id="ovMacd" onchange="drawChart()"> MACD</label>
+        </div>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn" onclick="loadChartWorkspace(true)">↻ Reload chart</button>
+      </div>
+      <div class="chart-head" id="chartHead"><span class="muted">loading chart…</span></div>
+      <div id="chartMain" class="chart-pane" style="height:420px"></div>
+      <div id="chartVol" class="chart-pane" style="height:110px"></div>
+      <div id="chartRsi" class="chart-pane" style="height:120px"></div>
+      <div id="chartMacd" class="chart-pane" style="height:120px;display:none"></div>
+      <div class="note" style="padding:10px 14px">Candles, volume, EMA, VWAP, Bollinger, RSI, MACD, support/resistance and your entry / stop / take-profit — all from the same scan the desk decided on. Chart engine: TradingView Lightweight Charts, vendored locally (no internet needed).</div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="card"><h2>CHART READINGS</h2><div id="chartStats"><span class="muted">—</span></div></div>
+      <div class="card"><h2>LEVELS ON THIS CHART</h2><div id="chartLevels"><span class="muted">—</span></div></div>
+    </div>
+  </div>
+
+  <!-- ── Trade manager ── -->
+  <div class="tabpanel" data-tab="manage">
+    <div class="card" style="grid-column:1/-1">
+      <h2>OPEN POSITIONS — LIVE PAPER BOOK <span class="count" id="tmCount">0</span></h2>
+      <div class="flex" style="margin-bottom:10px">
+        <button class="btn primary" onclick="loadTradeManager()">↻ Refresh</button>
+        <button class="btn" onclick="runPaper()">▶ Run paper check</button>
+        <span class="note">Positions are simulated. No exchange key exists in this app.</span>
+      </div>
+      <div id="tradeManager"><span class="muted">loading positions…</span></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>RECENTLY CLOSED</h2><div id="tmRecent"><span class="muted">—</span></div></div>
+  </div>
+
+  <!-- ── Risk center ── -->
+  <div class="tabpanel" data-tab="risk">
+    <div class="grid">
+      <div class="card" style="grid-column:1/-1"><h2>RISK GATE</h2><div id="riskCenterGate"><span class="muted">loading…</span></div></div>
+      <div class="card">
+        <h2>POSITION SIZE CALCULATOR</h2>
+        <div class="formgrid">
+          <label>Account balance<input id="psBalance" type="number" step="any" placeholder="10000"></label>
+          <label>Risk % per trade<input id="psRisk" type="number" step="any" placeholder="0.25"></label>
+          <label>Entry<input id="psEntry" type="number" step="any"></label>
+          <label>Stop-loss<input id="psStop" type="number" step="any"></label>
+          <label>Take-profit<input id="psTp" type="number" step="any"></label>
+          <label>Leverage<input id="psLev" type="number" step="any" value="1"></label>
+        </div>
+        <div class="flex" style="margin-top:10px">
+          <button class="btn primary" onclick="calcPositionSize()">Calculate size</button>
+          <button class="btn" onclick="fillSizerFromSignal()">Use the live signal</button>
+        </div>
+        <div id="psResult" class="note" style="margin-top:10px">Enter a balance, entry and stop. The calculator caps risk at your progression level and returns ZERO size when the gate is closed.</div>
+      </div>
+      <div class="card">
+        <h2>TRADER STATE — BEHAVIORAL FLAGS</h2>
+        <div class="note" style="margin-bottom:8px">Any flag below closes the gate until you clear it. Honesty here is the whole point.</div>
+        <div class="flex" id="traderStateBtns">
+          <button class="btn no" onclick="setTraderState('angry',true)">😠 Angry</button>
+          <button class="btn no" onclick="setTraderState('tired',true)">😴 Tired</button>
+          <button class="btn no" onclick="setTraderState('revenge',true)">🔥 Revenge</button>
+          <button class="btn no" onclick="setTraderState('chasing',true)">🏃 Chasing</button>
+          <button class="btn ok" onclick="clearTraderState()">✓ Clear all — I am calm</button>
+        </div>
+        <div id="traderStateNow" class="note" style="margin-top:10px">—</div>
+      </div>
+      <div class="card" style="grid-column:1/-1"><h2>MONTE CARLO — RISK OF RUIN</h2><div id="riskMonte"><span class="muted">—</span></div></div>
+    </div>
+  </div>
+
+  <!-- ── Evidence: why blocked, and how to unlock ── -->
+  <div class="tabpanel" data-tab="evidence">
+    <div class="card" style="grid-column:1/-1">
+      <h2>WHY YOU CANNOT TRADE RIGHT NOW</h2>
+      <div id="unlockWhy"><span class="muted">checking the gate…</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>EVIDENCE PIPELINE — EARN THE UNLOCK</h2>
+      <div class="note" style="margin-bottom:10px">The gate opens when a setup is
+        <b>measured</b>, not when you feel ready. Run these in order. Each one is
+        the same command the pros run — it just takes time, not luck.</div>
+      <div class="pipeline">
+        <div class="pipestep"><span class="n">1</span>
+          <div><b>Get real history</b><div class="note">Download real candles into local storage.</div>
+          <button class="btn" onclick="runCommand('backfill')">▶ Backfill</button></div></div>
+        <div class="pipestep"><span class="n">2</span>
+          <div><b>Grade it</b><div class="note">Walk the history and score every setup.</div>
+          <button class="btn" onclick="runCommand('backtest')">▶ Backtest</button></div></div>
+        <div class="pipestep"><span class="n">3</span>
+          <div><b>Forward-test</b><div class="note">Grind paper samples on unseen candles.</div>
+          <button class="btn" onclick="runCommand('simulator')">▶ Simulator</button></div></div>
+        <div class="pipestep"><span class="n">4</span>
+          <div><b>Check it is real</b><div class="note">Net of costs, not curve-fitted.</div>
+          <button class="btn" onclick="runCommand('scorecard')">▶ Scorecard</button>
+          <button class="btn" onclick="runCommand('validate')">▶ Look-ahead guard</button></div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>SETUP EVIDENCE SCOREBOARD <span class="count" id="evCount">—</span></h2>
+      <div id="evidenceBoard"><span class="muted">loading…</span></div>
+    </div>
+  </div>
+
+  <!-- ── Connections: what SKY is really plugged into ── -->
+  <div class="tabpanel" data-tab="connections">
+    <div class="strip" id="connStrip"><span class="muted">checking connections…</span></div>
+    <div class="card" style="grid-column:1/-1">
+      <h2>REAL-WORLD CONNECTIONS <span class="count" id="connCount">—</span></h2>
+      <div class="flex" style="margin-bottom:10px">
+        <button class="btn primary" onclick="loadConnections(true)">↻ Re-test all</button>
+        <span class="note">Every probe is read-only. SKY has no trading key and cannot place an order.</span>
+      </div>
+      <div id="connectionList"><span class="muted">loading…</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>YOUR EXCHANGE ACCOUNT (READ-ONLY)</h2>
+      <div id="accountPanel"><span class="muted">—</span></div>
+    </div>
+  </div>
+
+  <!-- ── Journal ── -->
+  <div class="tabpanel" data-tab="journal">
+    <div class="grid">
+      <div class="card">
+        <h2>NEW JOURNAL ENTRY</h2>
+        <div class="formgrid">
+          <label>Trade (scan)
+            <select id="jScan" onchange="loadJournalEntry()"><option value="">— pick a trade —</option></select>
+          </label>
+          <label>Did you follow your system?
+            <select id="jFollowed"><option value="1">Yes — I followed every rule</option><option value="0">No — I broke a rule</option></select>
+          </label>
+          <label>Emotion<select id="jEmotion"></select></label>
+          <label>Mistake<select id="jMistake">
+            <option value="none">none</option><option value="entered early">entered early</option>
+            <option value="entered late">entered late</option><option value="moved stop">moved stop</option>
+            <option value="oversized">oversized</option><option value="no plan">no plan</option>
+            <option value="revenge trade">revenge trade</option><option value="ignored gate">ignored the risk gate</option>
+            <option value="exited early">exited early</option><option value="held too long">held too long</option>
+          </select></label>
+        </div>
+        <label class="fullfield">What happened?<textarea id="jNotes" rows="3" placeholder="describe the trade honestly"></textarea></label>
+        <label class="fullfield">What would you change?<textarea id="jChange" rows="2" placeholder="one specific improvement"></textarea></label>
+        <div class="flex" style="margin-top:10px">
+          <button class="btn primary" onclick="saveJournal()">💾 Save journal</button>
+          <span id="jStatus" class="note"></span>
+        </div>
+      </div>
+      <div class="card"><h2>PRE-TRADE CHECKLIST (AUTO)</h2><div id="jChecklist" class="note">Pick a trade to see the plan you actually took.</div></div>
+      <div class="card" style="grid-column:1/-1"><h2>DISCIPLINE SUMMARY</h2><div id="jSummary"><span class="muted">—</span></div></div>
+    </div>
+  </div>
+
+  <!-- ── Command center ── -->
+  <div class="tabpanel" data-tab="commands">
+    <div class="card" style="grid-column:1/-1">
+      <h2>COMMAND CENTER — EVERY COMMAND IS A BUTTON <span class="count" id="cmdCount">—</span></h2>
+      <div class="flex" style="margin-bottom:10px">
+        <input id="cmdSearch" placeholder="search actions…" oninput="renderCommands()" style="flex:1;min-width:200px">
+        <span class="note">🟢 read-only · 🟡 writes locally · 🟠 slow · 🔒 terminal only</span>
+      </div>
+      <div id="cmdCats" class="flex" style="margin-bottom:10px"></div>
+      <div id="commandList"><span class="muted">loading commands…</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>RESULT</h2>
+      <div id="cmdRunning" class="note"></div>
+      <pre id="cmdOut" class="mono termout">Click any action above. Its output appears here — you never need a terminal.</pre>
+    </div>
+  </div>
+
+  <!-- ── Module catalog ── -->
+  <div class="tabpanel" data-tab="modules">
+    <div class="card" style="grid-column:1/-1">
+      <h2>MODULE CATALOG — WHAT IS INSIDE SKY <span class="count" id="modCount">—</span></h2>
+      <input id="modSearch" placeholder="search modules…" oninput="renderModules()" style="width:100%;margin-bottom:10px">
+      <div id="moduleList"><span class="muted">loading modules…</span></div>
+    </div>
+  </div>
+
   <div class="note" style="margin-top:14px;text-align:center;opacity:.7">Paper trading only — public Binance candles, no API key, no real orders. The desk decision is the only output you act on.</div>
 </div>
 <div id="toasts"></div>
@@ -593,6 +907,8 @@ function switchTab(tab){
   // keep header updated visible
   const up=document.getElementById('updated'); if(up) up.textContent = (document.getElementById('updated')?.textContent||'') ;
   try{ if(typeof history !== 'undefined' && history.replaceState) history.replaceState(null,'','#'+tab); }catch(e){}
+  // Workstation tabs load on demand so the first paint stays fast.
+  try{ if(typeof onTabShown === 'function') onTabShown(tab); }catch(e){}
 }
 function card(title, inner, span){ return `<div class="card" ${span?'style="grid-column:1/-1"':''}><h2>${title}</h2>${inner}</div>`; }
 /* ── Market-sentiment colour signal ───────────────────────────────────────
@@ -1197,6 +1513,14 @@ function render(d){
   loadReadiness(); loadLoop();
   const symE=document.getElementById('sym'); const tfE=document.getElementById('tf');
   loadChart((symE?symE.value:'BTCUSDT').toUpperCase(), tfE?tfE.value:'15m');
+  // Keep the workstation tabs in sync with the asset/timeframe just scanned.
+  try{
+    _chartSym=(symE?symE.value:'BTCUSDT').toUpperCase();
+    _chartTf=tfE?tfE.value:'15m';
+    document.querySelectorAll('#chartSymSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===_chartSym));
+    document.querySelectorAll('#chartTfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===_chartTf));
+    onTabShown(_activeTab);
+  }catch(e){}
 }
 
 async function loadWatchlist(){
@@ -2014,11 +2338,743 @@ async function loadLoop(){
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   TRADING WORKSTATION — chart workspace, trade manager, risk center,
+   journal form, command center and module catalog.
+   Everything below is clickable: no CLI knowledge is required.
+   ══════════════════════════════════════════════════════════════════════ */
+
+// ── Chart workspace ───────────────────────────────────────────────────
+let _chartData=null, _charts=[], _chartSym=null, _chartTf=null, _chartLoading=false;
+
+function chartSym(){ return _chartSym || (document.getElementById('sym')?.value||'BTCUSDT').toUpperCase(); }
+function chartTf(){ return _chartTf || (document.getElementById('tf')?.value||'15m'); }
+function chartSetSymbol(sym){
+  _chartSym=sym;
+  document.querySelectorAll('#chartSymSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym));
+  const el=document.getElementById('sym'); if(el) el.value=sym;
+  document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym));
+  loadChartWorkspace(true);
+}
+function chartSetTF(tf){
+  _chartTf=tf;
+  document.querySelectorAll('#chartTfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf));
+  const el=document.getElementById('tf'); if(el) el.value=tf;
+  document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf));
+  loadChartWorkspace(true);
+}
+function chartsAvailable(){
+  return (typeof LightweightCharts !== 'undefined' && LightweightCharts.createChart) ? LightweightCharts.createChart
+       : (typeof createChart !== 'undefined' ? createChart : null);
+}
+async function loadChartWorkspace(force){
+  if(_chartLoading) return;
+  const main=document.getElementById('chartMain'); if(!main) return;
+  _chartLoading=true;
+  const head=document.getElementById('chartHead');
+  if(head) head.innerHTML='<span class="muted">loading '+esc(chartSym())+' '+esc(chartTf())+'…</span>';
+  try{
+    const r=await fetch('/api/chart?symbol='+encodeURIComponent(chartSym())+'&tf='+encodeURIComponent(chartTf())+'&limit=300'+(force?'&_='+Date.now():''));
+    const d=await r.json();
+    if(d.error && !(d.candles||[]).length){
+      if(head) head.innerHTML='<span class="err">chart unavailable: '+esc(d.error)+'</span>';
+      return;
+    }
+    _chartData=d;
+    drawChart();
+    renderChartHead(d);
+    renderChartStats(d);
+    renderChartLevels(d);
+  }catch(e){
+    if(head) head.innerHTML='<span class="err">chart error: '+esc(String(e))+'</span>';
+  }finally{ _chartLoading=false; }
+}
+function disposeCharts(){
+  _charts.forEach(c=>{ try{ c.remove(); }catch(e){} });
+  _charts=[];
+}
+function newPane(el, height, extra){
+  const create=chartsAvailable(); if(!create) return null;
+  el.innerHTML='';
+  const opts={
+    width: el.clientWidth || 900, height: height,
+    layout:{ background:{ color:'#0b1120' }, textColor:'#8aa0bd', fontSize:11 },
+    grid:{ vertLines:{ color:'rgba(30,51,88,.55)' }, horzLines:{ color:'rgba(30,51,88,.55)' } },
+    rightPriceScale:{ borderColor:'#1e3358' },
+    timeScale:{ borderColor:'#1e3358', timeVisible:true, secondsVisible:false },
+    crosshair:{ mode:0, vertLine:{ color:'#6b84a6', labelBackgroundColor:'#1e3358' },
+                horzLine:{ color:'#6b84a6', labelBackgroundColor:'#1e3358' } },
+    handleScroll:true, handleScale:true
+  };
+  Object.assign(opts, extra||{});
+  const chart=create(el, opts);
+  _charts.push(chart);
+  return chart;
+}
+function syncPanes(){
+  // TradingView-style linked time scales across price / volume / RSI / MACD
+  _charts.forEach(src=>{
+    try{
+      src.timeScale().subscribeVisibleLogicalRangeChange(range=>{
+        if(!range) return;
+        _charts.forEach(dst=>{ if(dst!==src){ try{ dst.timeScale().setVisibleLogicalRange(range); }catch(e){} } });
+      });
+    }catch(e){}
+  });
+}
+function drawChart(){
+  const d=_chartData; if(!d) return;
+  const main=document.getElementById('chartMain'); if(!main) return;
+  if(!chartsAvailable()){ main.innerHTML='<div class="err" style="padding:14px">Chart engine failed to load — reload the page (Ctrl+F5).</div>'; return; }
+  disposeCharts();
+  const on=id=> !!document.getElementById(id)?.checked;
+
+  // ── price pane ──
+  const price=newPane(main, 420);
+  const candle=price.addCandlestickSeries({
+    upColor:'#22c55e', downColor:'#ef4444', borderUpColor:'#22c55e',
+    borderDownColor:'#ef4444', wickUpColor:'#22c55e', wickDownColor:'#ef4444' });
+  candle.setData(d.candles||[]);
+  const ov=d.overlays||{};
+  if(on('ovEma')){
+    [['ema20','#3b82f6',1],['ema50','#f59e0b',1],['ema200','#8b5cf6',2]].forEach(([k,c,w])=>{
+      if((ov[k]||[]).length){ const s=price.addLineSeries({color:c,lineWidth:w,priceLineVisible:false,lastValueVisible:false}); s.setData(ov[k]); }
+    });
+  }
+  if(on('ovVwap') && (ov.vwap||[]).length){
+    const s=price.addLineSeries({color:'#06b6d4',lineWidth:2,lineStyle:2,priceLineVisible:false,lastValueVisible:false});
+    s.setData(ov.vwap);
+  }
+  if(on('ovBb')){
+    [['bb_upper','rgba(139,92,246,.7)'],['bb_lower','rgba(139,92,246,.7)']].forEach(([k,c])=>{
+      if((ov[k]||[]).length){ const s=price.addLineSeries({color:c,lineWidth:1,priceLineVisible:false,lastValueVisible:false}); s.setData(ov[k]); }
+    });
+  }
+  if(on('ovLevels')){
+    (d.levels||[]).forEach(l=>{
+      try{ candle.createPriceLine({ price:l.price, color:l.color||'#8aa0bd', lineWidth:1,
+        lineStyle:2, axisLabelVisible:true, title:l.label||l.kind }); }catch(e){}
+    });
+  }
+  if(on('ovPlan') && d.plan && (d.plan.entry||d.plan.stop_loss||d.plan.take_profit)){
+    const p=d.plan;
+    const lines=[[p.entry,'#e6edf7','ENTRY'],[p.stop_loss,'#ef4444','STOP'],[p.take_profit,'#22c55e','TARGET']];
+    lines.forEach(([v,c,t])=>{ if(v!=null){ try{ candle.createPriceLine({price:v,color:c,lineWidth:2,lineStyle:0,axisLabelVisible:true,title:t}); }catch(e){} } });
+  }
+
+  // ── volume pane ──
+  const volEl=document.getElementById('chartVol');
+  if(volEl){
+    volEl.style.display='';
+    const vol=newPane(volEl, 110);
+    const vs=vol.addHistogramSeries({ priceFormat:{type:'volume'}, priceLineVisible:false });
+    vs.setData((d.panes&&d.panes.volume)||[]);
+  }
+
+  // ── RSI pane ──
+  const rsiEl=document.getElementById('chartRsi');
+  if(rsiEl){
+    if(on('ovRsi') && ((d.panes&&d.panes.rsi)||[]).length){
+      rsiEl.style.display='';
+      const rsi=newPane(rsiEl, 120);
+      const rs=rsi.addLineSeries({color:'#f59e0b',lineWidth:2,priceLineVisible:false});
+      rs.setData(d.panes.rsi);
+      try{ rs.createPriceLine({price:70,color:'rgba(239,68,68,.6)',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'70'}); }catch(e){}
+      try{ rs.createPriceLine({price:30,color:'rgba(34,197,94,.6)',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'30'}); }catch(e){}
+    } else { rsiEl.style.display='none'; }
+  }
+
+  // ── MACD pane ──
+  const macdEl=document.getElementById('chartMacd');
+  if(macdEl){
+    if(on('ovMacd') && ((d.panes&&d.panes.macd)||[]).length){
+      macdEl.style.display='';
+      const m=newPane(macdEl, 120);
+      const hist=(d.panes.macd_hist||[]).map(p=> ({time:p.time, value:p.value, color: p.value>=0?'rgba(34,197,94,.6)':'rgba(239,68,68,.6)'}));
+      if(hist.length){ const hs=m.addHistogramSeries({priceLineVisible:false}); hs.setData(hist); }
+      const ms=m.addLineSeries({color:'#3b82f6',lineWidth:2,priceLineVisible:false}); ms.setData(d.panes.macd);
+      if((d.panes.macd_signal||[]).length){ const ss=m.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false}); ss.setData(d.panes.macd_signal); }
+    } else { macdEl.style.display='none'; }
+  }
+  _charts.forEach(c=>{ try{ c.timeScale().fitContent(); }catch(e){} });
+  syncPanes();
+  if(!window.__chartResizeBound){
+    window.__chartResizeBound=true;
+    window.addEventListener('resize', ()=>{
+      const w=document.getElementById('chartMain')?.clientWidth||900;
+      _charts.forEach(c=>{ try{ c.applyOptions({width:w}); }catch(e){} });
+    });
+  }
+}
+function renderChartHead(d){
+  const el=document.getElementById('chartHead'); if(!el) return;
+  const st=d.stats||{}, chg=d.change_pct;
+  const chgCls = chg==null?'muted':(chg>=0?'okc':'err');
+  const ind=(k,v,dp)=> `<span class="ind">${k} <b>${v==null?'—':Number(v).toFixed(dp==null?2:dp)}</b></span>`;
+  el.innerHTML = `<span class="px">${d.last_price==null?'—':fmt(d.last_price)}</span>
+    <span class="${chgCls}" style="font-weight:700">${chg==null?'':(chg>=0?'+':'')+chg.toFixed(2)+'%'}</span>
+    <span class="badge">${esc(d.symbol||'')} · ${esc(d.timeframe||'')}</span>
+    <span class="badge">${d.count||0} candles</span>
+    ${ind('RSI', st.rsi, 1)} ${ind('ADX', st.adx, 1)} ${ind('ATR%', st.atr_pct, 2)}
+    ${ind('VWAP', st.vwap)} ${ind('EMA20', st.ema20)} ${ind('EMA200', st.ema200)}`;
+}
+function renderChartStats(d){
+  const el=document.getElementById('chartStats'); if(!el) return;
+  const st=d.stats||{}, p=d.plan||{};
+  const row=(k,v)=> `<b>${k}</b><span class="mono">${v==null?'—':(typeof v==='number'?fmt(v):esc(v))}</span>`;
+  el.innerHTML=`<div class="kv">
+    ${row('Last price', d.last_price)} ${row('Range high', st.range_high)} ${row('Range low', st.range_low)}
+    ${row('RSI', st.rsi)} ${row('ADX', st.adx)} ${row('ATR', st.atr)}
+    ${row('MACD', st.macd)} ${row('MACD signal', st.macd_signal)}
+    ${row('VWAP', st.vwap)} ${row('Volume', st.volume)} ${row('Volume vs avg', st.volume_ratio)}
+    ${p.action?row('Plan', p.action+(p.setup?' · '+p.setup:'')):''}
+    ${p.entry!=null?row('Entry', p.entry):''} ${p.stop_loss!=null?row('Stop-loss', p.stop_loss):''}
+    ${p.take_profit!=null?row('Take-profit', p.take_profit):''}
+    ${p.risk_reward!=null?row('Risk / reward', '1:'+Number(p.risk_reward).toFixed(2)):''}
+  </div>`;
+}
+function renderChartLevels(d){
+  const el=document.getElementById('chartLevels'); if(!el) return;
+  const levels=(d.levels||[]);
+  if(!levels.length){ el.innerHTML='<span class="muted">no key levels on this timeframe yet</span>'; return; }
+  const last=d.last_price;
+  el.innerHTML='<table>'+levels.map(l=>{
+    const dist = (last && l.price) ? ((l.price-last)/last*100) : null;
+    return `<tr><td><span style="color:${l.color}">●</span> ${esc(l.label||l.kind)}</td>
+      <td class="mono">${fmt(l.price)}</td>
+      <td class="mono ${dist==null?'':(dist>=0?'okc':'err')}">${dist==null?'—':(dist>=0?'+':'')+dist.toFixed(2)+'%'}</td></tr>`;
+  }).join('')+'</table>';
+}
+
+// ── Trade manager ─────────────────────────────────────────────────────
+async function loadTradeManager(){
+  const host=document.getElementById('tradeManager'); if(!host) return;
+  try{
+    const d=await (await fetch('/api/trades')).json();
+    const rows=d.open||[];
+    const cnt=document.getElementById('tmCount'); if(cnt) cnt.textContent=rows.length;
+    if(!rows.length){
+      host.innerHTML='<span class="muted">no open positions. Approve a signal in <b>Trades</b>, then run the paper check.</span>';
+    } else {
+      host.innerHTML='<div style="overflow:auto"><table class="tmtable"><tr>'
+        +['Trade','Side','Entry','Current','Stop','Target','R now','MAE','MFE','In trade','Status','Action'].map(h=>'<th>'+h+'</th>').join('')
+        +'</tr>'+rows.map(t=>{
+          const r=t.current_r;
+          const rCls=r==null?'':(r>=0?'rpos':'rneg');
+          const mins=t.minutes_in_trade||0;
+          const dur = mins>=60 ? Math.floor(mins/60)+'h '+(mins%60)+'m' : mins+'m';
+          return `<tr>
+            <td>#${t.scan_id} <span class="note">${esc(t.symbol||'')} ${esc(t.timeframe||'')}</span><br><span class="note">${esc(t.plan_type||'')}</span></td>
+            <td><span class="pill ${cls(t.action)}" style="padding:2px 8px;font-size:11px">${esc(t.action||'')}</span></td>
+            <td class="mono">${fmt(t.entry_price||t.entry)}</td>
+            <td class="mono">${fmt(t.current_price)}</td>
+            <td class="mono" style="color:var(--red)">${fmt(t.stop_loss)}</td>
+            <td class="mono" style="color:var(--green)">${fmt(t.take_profit)}</td>
+            <td class="mono ${rCls}">${r==null?'—':(r>=0?'+':'')+r.toFixed(2)+'R'}</td>
+            <td class="mono">${t.mae==null?'—':Number(t.mae).toFixed(2)}</td>
+            <td class="mono">${t.mfe==null?'—':Number(t.mfe).toFixed(2)}</td>
+            <td>${dur}</td>
+            <td><span class="badge">${esc(t.status||'')}</span></td>
+            <td><button class="rowbtn" onclick="openModal(${t.scan_id})">Detail</button>
+                <button class="rowbtn ok" onclick="journalFor(${t.scan_id})">Journal</button>
+                <button class="rowbtn no" onclick="decide(${t.scan_id},'CLOSED')">Close</button></td>
+          </tr>
+          <tr><td colspan="12" class="note" style="padding-top:0">${(t.management||[]).map(m=>'• '+esc(m)).join('<br>')}</td></tr>`;
+        }).join('')+'</table></div>';
+    }
+    const rec=document.getElementById('tmRecent');
+    if(rec){
+      const recent=(d.recent||[]).slice(0,10);
+      rec.innerHTML = recent.length ? '<table><tr><th>Scan</th><th>Symbol</th><th>Setup</th><th>Outcome</th><th>R</th><th>Reason</th></tr>'
+        + recent.map(t=>`<tr><td>#${t.scan_id}</td><td>${esc(t.symbol||'')}</td><td>${esc(t.plan_type||'')}</td>
+          <td>${esc(t.outcome||t.status||'')}</td>
+          <td class="mono ${t.rr_achieved>=0?'okc':'err'}">${t.rr_achieved==null?'—':Number(t.rr_achieved).toFixed(2)+'R'}</td>
+          <td class="note">${esc(t.close_reason||'')}</td></tr>`).join('')+'</table>'
+        : '<span class="muted">no closed paper trades yet</span>';
+    }
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+
+// ── Risk center ───────────────────────────────────────────────────────
+async function loadRiskCenter(){
+  const gateEl=document.getElementById('riskCenterGate'); if(!gateEl) return;
+  try{
+    const d=await (await fetch('/api/risk')).json();
+    if(d.error){ gateEl.innerHTML='<span class="err">'+esc(d.error)+'</span>'; return; }
+    const g=d.gate||{}, det=g.details||{}, eff=det.effective_risk||{}, prog=det.progression||{},
+          dw=det.daily_weekly||{}, dd=det.drawdown||{}, kelly=det.kelly||{}, ts=d.trader_state||{};
+    const open=!!g.allowed;
+    const bar=(used, limit, color)=>{
+      const pct=limit?Math.min(100, Math.abs(used)/limit*100):0;
+      return `<div class="bar"><i style="width:${pct.toFixed(0)}%;background:${color}"></i></div>`;
+    };
+    const today=(dw.today||{}).pct||0, week=(dw.week||{}).pct||0;
+    gateEl.innerHTML=`
+      <div class="flex" style="margin-bottom:10px">
+        <span class="pill ${open?'BUY':'SELL'}">${open?'GATE OPEN':'GATE CLOSED'}</span>
+        <span class="badge">level: ${esc(prog.level||'—')}</span>
+        <span class="badge">${esc(prog.label||'')}</span>
+        <span class="badge">risk ${eff.risk_pct}%/trade</span>
+      </div>
+      ${(g.blocked_by||[]).length?`<div class="note" style="background:rgba(239,68,68,.10);border:1px solid rgba(239,68,68,.3);padding:9px;border-radius:10px;margin-bottom:10px">
+        <b>Why you cannot trade right now</b>${(g.blocked_by||[]).map(b=>'<div>• '+esc(b)+'</div>').join('')}</div>`:''}
+      <div class="grid2">
+        <div>
+          <div class="note"><b>Daily budget</b> ${today.toFixed(2)}% of −${eff.daily}%</div>${bar(today, eff.daily, today<0?'var(--red)':'var(--green)')}
+          <div class="note" style="margin-top:8px"><b>Weekly budget</b> ${week.toFixed(2)}% of −${eff.weekly}%</div>${bar(week, eff.weekly, week<0?'var(--red)':'var(--green)')}
+          <div class="note" style="margin-top:8px"><b>Drawdown</b> ${(dd.max_drawdown_pct||0).toFixed(2)}% · ladder ${esc(dd.level||'normal')}</div>
+        </div>
+        <div class="kv">
+          <b>Trades today</b><span>${(dw.today||{}).trades||0}</span>
+          <b>Trades this week</b><span>${(dw.week||{}).trades||0}</span>
+          <b>Kelly advisory</b><span>${kelly.clamped_size!=null?(kelly.clamped_size+'% (clamped at '+kelly.max_risk_pct+'%)'):esc(kelly.note||'unavailable')}</span>
+          <b>Kelly win rate</b><span>${kelly.win_rate!=null?(kelly.win_rate*100).toFixed(1)+'%':'—'}</span>
+          <b>Rule violations</b><span>${(d.journal||{}).n?((d.journal.violation_rate*100).toFixed(1)+'% of '+d.journal.n):'no journal yet'}</span>
+        </div>
+      </div>`;
+    const flags=['angry','tired','revenge','chasing'].filter(k=> ts[k]);
+    const st=document.getElementById('traderStateNow');
+    if(st) st.innerHTML = flags.length
+      ? '<span class="err"><b>Active flags:</b> '+flags.join(', ')+'</span> — the gate stays closed until you clear them.'
+      : '<span class="okc">No behavioral flags set — you are declaring a clear head.</span>';
+    const mc=document.getElementById('riskMonte');
+    if(mc){
+      const m=d.monte||{};
+      const rows=(m.rows||m.table||[]);
+      mc.innerHTML = rows.length
+        ? '<table><tr><th>Risk %</th><th>Expected DD</th><th>Ruin prob</th><th>Worst streak</th><th>Time to recover</th></tr>'
+          + rows.map(r=>`<tr><td class="mono">${r.risk_pct!=null?r.risk_pct+'%':'—'}</td>
+            <td class="mono">${r.expected_drawdown_pct!=null?Number(r.expected_drawdown_pct).toFixed(1)+'%':'—'}</td>
+            <td class="mono ${(r.ruin_prob||0)>0.05?'err':'okc'}">${r.ruin_prob!=null?(r.ruin_prob*100).toFixed(1)+'%':'—'}</td>
+            <td class="mono">${r.worst_losing_streak??'—'}</td>
+            <td class="mono">${r.time_to_recover??'—'}</td></tr>`).join('')+'</table>'
+          + '<div class="note" style="margin-top:6px">'+esc(m.note||'Simulated from your recorded outcomes. Advisory only.')+'</div>'
+        : '<span class="muted">'+esc(m.note||'not enough decided trades yet for a Monte Carlo run')+'</span>';
+    }
+  }catch(e){ gateEl.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+async function clearTraderState(){
+  try{
+    await fetch('/api/trader-state',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({angry:false,tired:false,revenge:false,chasing:false,note:'cleared from dashboard'})});
+    showToast('Trader state cleared','ok'); loadRiskCenter(); loadRiskGate();
+  }catch(e){ showToast('Could not clear state','err'); }
+}
+function fillSizerFromSignal(){
+  const d=_chartData&&_chartData.plan;
+  if(!d || (d.entry==null && d.stop_loss==null)){ showToast('No live plan yet — run a scan first','err'); return; }
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el && v!=null) el.value=v; };
+  set('psEntry', d.entry); set('psStop', d.stop_loss); set('psTp', d.take_profit);
+  showToast('Filled from the live plan','ok');
+}
+async function calcPositionSize(){
+  const out=document.getElementById('psResult'); if(!out) return;
+  const num=id=>{ const v=document.getElementById(id)?.value; return v===''||v==null?null:Number(v); };
+  out.innerHTML='calculating…';
+  try{
+    const r=await fetch('/api/position-size',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({symbol:chartSym(), balance:num('psBalance'), risk_pct:num('psRisk'),
+        entry:num('psEntry'), stop_loss:num('psStop'), take_profit:num('psTp'), leverage:num('psLev')})});
+    const d=await r.json();
+    if(!d.ok){ out.innerHTML='<span class="err">'+esc(d.error||'could not size this trade')+'</span>'; return; }
+    out.innerHTML=`
+      <div class="statrow" style="margin-bottom:8px">
+        <div class="stat"><div class="v mono">${fmt(d.recommended_units,6)}</div><div class="k">Units to buy</div></div>
+        <div class="stat"><div class="v mono">${fmt(d.risk_amount)}</div><div class="k">Money at risk</div></div>
+        <div class="stat"><div class="v mono">${fmt(d.notional)}</div><div class="k">Notional</div></div>
+        <div class="stat"><div class="v mono">${d.risk_reward==null?'—':'1:'+d.risk_reward}</div><div class="k">Risk / reward</div></div>
+      </div>
+      <div class="kv">
+        <b>Applied risk</b><span>${d.risk_pct_applied}% (level ${esc(d.progression||'')}, cap ${d.ladder_cap_pct}%)</span>
+        <b>Stop distance</b><span class="mono">${fmt(d.stop_distance)} (${d.stop_pct}%)</span>
+        <b>Margin at ${d.leverage}x</b><span class="mono">${fmt(d.margin_required)}</span>
+        <b>Losses to daily stop</b><span>${d.losses_to_daily_limit} in a row</span>
+        <b>Losses to weekly stop</b><span>${d.losses_to_weekly_limit} in a row</span>
+      </div>
+      <div class="note" style="margin-top:8px;padding:8px;border-radius:10px;border:1px solid ${d.gate_open?'var(--line)':'rgba(239,68,68,.4)'};background:${d.gate_open?'rgba(255,255,255,.04)':'rgba(239,68,68,.10)'}">${esc(d.verdict||'')}</div>
+      ${(d.warnings||[]).map(w=>'<div class="note" style="color:var(--amber)">⚠ '+esc(w)+'</div>').join('')}`;
+  }catch(e){ out.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+
+// ── Journal ───────────────────────────────────────────────────────────
+async function loadJournalCenter(){
+  const sel=document.getElementById('jScan'); if(!sel) return;
+  try{
+    const d=await (await fetch('/api/journal')).json();
+    const em=document.getElementById('jEmotion');
+    if(em && !em.options.length) em.innerHTML=(d.emotions||['calm']).map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join('');
+    const keep=sel.value;
+    sel.innerHTML='<option value="">— pick a trade —</option>'+(d.journalable||[]).map(s=>
+      `<option value="${s.id}">#${s.id} · ${esc(s.symbol||'')} ${esc(s.action||'')} · ${esc(s.status||'')}</option>`).join('');
+    if(keep) sel.value=keep;
+    const sum=document.getElementById('jSummary');
+    if(sum){
+      const s=d.summary||{};
+      sum.innerHTML = s.n
+        ? `<div class="statrow">
+            <div class="stat"><div class="v">${s.n}</div><div class="k">Journalled trades</div></div>
+            <div class="stat"><div class="v ${s.violations?'err':'okc'}">${s.violations||0}</div><div class="k">Rule violations</div></div>
+            <div class="stat"><div class="v">${((s.violation_rate||0)*100).toFixed(1)}%</div><div class="k">Violation rate</div></div>
+          </div><div class="note" style="margin-top:8px">The goal is 0%. A loss with the rules followed is an excellent trade; a win with rules broken is a terrible one.</div>`
+        : '<span class="muted">no journal entries yet — close a paper trade, then journal it here</span>';
+    }
+  }catch(e){ /* keep the form usable */ }
+}
+async function loadJournalEntry(){
+  const id=document.getElementById('jScan')?.value;
+  const cl=document.getElementById('jChecklist');
+  if(!id){ if(cl) cl.textContent='Pick a trade to see the plan you actually took.'; return; }
+  try{
+    const d=await (await fetch('/api/journal?scan_id='+encodeURIComponent(id))).json();
+    const e=d.entry||{}, c=d.checklist||{}, q=d.quality||{};
+    const set=(elid,v)=>{ const el=document.getElementById(elid); if(el && v!=null && v!=='') el.value=v; };
+    if(e.followed_rules!=null) set('jFollowed', String(e.followed_rules?1:0));
+    set('jEmotion', e.emotion); set('jMistake', e.mistake);
+    set('jNotes', e.notes); set('jChange', e.would_change);
+    if(cl) cl.innerHTML=`<div class="kv">
+      <b>Asset</b><span>${esc(c.asset||'—')} ${esc(c.timeframe||'')}</span>
+      <b>Setup</b><span>${esc(c.setup||'—')}</span>
+      <b>Regime</b><span>${esc(c.regime||'—')}</span>
+      <b>HTF bias</b><span>${esc(c.htf_bias||'—')}</span>
+      <b>Planned entry</b><span class="mono">${fmt(c.entry)}</span>
+      <b>Planned stop</b><span class="mono">${fmt(c.stop_loss)}</span>
+      <b>Planned target</b><span class="mono">${fmt(c.take_profit)}</span>
+      <b>Planned R:R</b><span>${c.planned_rr==null?'—':'1:'+c.planned_rr}</span>
+      <b>News environment</b><span>${esc(c.news_environment||'—')}</span>
+      ${q.recorded?`<b>Execution grade</b><span><b>${esc(q.quality||'')}</b> — ${esc(q.verdict||'')}</span>`:''}
+    </div>`;
+  }catch(err){ if(cl) cl.innerHTML='<span class="err">'+esc(String(err))+'</span>'; }
+}
+function journalFor(scanId){
+  switchTab('journal');
+  setTimeout(async ()=>{
+    await loadJournalCenter();
+    const sel=document.getElementById('jScan');
+    if(sel){
+      if(![...sel.options].some(o=>o.value===String(scanId))){
+        const o=document.createElement('option'); o.value=String(scanId); o.textContent='#'+scanId; sel.appendChild(o);
+      }
+      sel.value=String(scanId); loadJournalEntry();
+    }
+  }, 120);
+}
+async function saveJournal(){
+  const st=document.getElementById('jStatus');
+  const id=document.getElementById('jScan')?.value;
+  if(!id){ if(st) st.innerHTML='<span class="err">pick a trade first</span>'; return; }
+  const val=i=> document.getElementById(i)?.value||'';
+  if(st) st.textContent='saving…';
+  try{
+    const r=await fetch('/api/journal',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({scan_id:Number(id), followed_rules:val('jFollowed'), emotion:val('jEmotion'),
+        mistake:val('jMistake'), notes:val('jNotes'), would_change:val('jChange')})});
+    const d=await r.json();
+    if(!d.ok){ if(st) st.innerHTML='<span class="err">'+esc(d.error||'save failed')+'</span>'; return; }
+    const q=d.quality||{};
+    if(st) st.innerHTML='<span class="okc">✓ saved</span>'+(q.recorded?' — '+esc(q.verdict||''):'');
+    showToast('Journal saved for #'+id,'ok');
+    loadJournalCenter(); loadJournalEntry();
+  }catch(e){ if(st) st.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+
+// ── Command center ────────────────────────────────────────────────────
+let _commands=null, _cmdCat='All';
+async function loadCommands(){
+  const host=document.getElementById('commandList'); if(!host || _commands) return;
+  try{
+    const d=await (await fetch('/api/commands')).json();
+    _commands=d;
+    const cnt=document.getElementById('cmdCount'); if(cnt) cnt.textContent=(d.count||0)+' actions';
+    const cats=document.getElementById('cmdCats');
+    if(cats) cats.innerHTML=['All',...(d.categories||[]).map(c=>c.category)].map(c=>
+      `<span class="catchip ${c===_cmdCat?'active':''}" onclick="setCmdCat('${esc(c)}')">${esc(c)}</span>`).join('');
+    renderCommands();
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+function setCmdCat(cat){
+  _cmdCat=cat;
+  document.querySelectorAll('#cmdCats .catchip').forEach(c=> c.classList.toggle('active', c.textContent===cat));
+  renderCommands();
+}
+function cmdInputHtml(cmd, spec){
+  const id='in_'+cmd.id+'_'+spec.name;
+  if(spec.type==='bool')
+    return `<label class="check" style="text-transform:none;letter-spacing:normal"><input type="checkbox" id="${id}" ${spec.default?'checked':''}> ${esc(spec.label)}</label>`;
+  if(spec.type==='choice')
+    return `<label>${esc(spec.label)}<select id="${id}">${(spec.options||[]).map(o=>
+      `<option value="${esc(o)}" ${o===spec.default?'selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
+  return `<label>${esc(spec.label)}<input id="${id}" type="${spec.type==='int'?'number':'text'}"
+    value="${esc(spec.default==null?'':spec.default)}" placeholder="${esc(spec.placeholder||'')}"></label>`;
+}
+function renderCommands(){
+  const host=document.getElementById('commandList'); if(!host || !_commands) return;
+  const q=(document.getElementById('cmdSearch')?.value||'').toLowerCase();
+  const badge={read:'🟢 read-only', write:'🟡 writes locally', long:'🟠 slow', blocked:'🔒 terminal only'};
+  let html='';
+  (_commands.categories||[]).forEach(group=>{
+    if(_cmdCat!=='All' && group.category!==_cmdCat) return;
+    const items=(group.commands||[]).filter(c=> !q ||
+      (c.title+' '+c.what+' '+c.cli+' '+c.id).toLowerCase().includes(q));
+    if(!items.length) return;
+    html+=`<div class="sectionTitle cmdcat">${esc(group.category)}</div><div class="cmdgrid">`;
+    items.forEach(c=>{
+      html+=`<div class="cmdcard">
+        <h3>${esc(c.title)} <span class="safety ${esc(c.safety)}">${badge[c.safety]||c.safety}</span></h3>
+        <div class="note">${esc(c.what)}</div>
+        <div class="cli">${esc(c.cli)}</div>
+        ${c.inputs&&c.inputs.length?`<div class="inputs">${c.inputs.map(s=>cmdInputHtml(c,s)).join('')}</div>`:''}
+        <div class="flex" style="margin-top:9px">
+          ${c.safety==='blocked'
+            ? `<span class="note">🔒 ${esc(c.note||'run this one in a terminal')}</span>`
+            : `<button class="btn primary" onclick="runCommand('${esc(c.id)}')">▶ Run</button>`}
+          ${(c.related||[]).length?`<span class="note">related: ${c.related.map(r=>
+            `<a href="#" onclick="jumpCommand('${esc(r)}');return false">${esc(r)}</a>`).join(', ')}</span>`:''}
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  host.innerHTML = html || '<span class="muted">no actions match that search</span>';
+}
+function jumpCommand(id){
+  const s=document.getElementById('cmdSearch'); if(s){ s.value=id.replace(/_/g,' '); }
+  _cmdCat='All'; renderCommands();
+}
+function collectParams(cmd){
+  const out={};
+  (cmd.inputs||[]).forEach(spec=>{
+    const el=document.getElementById('in_'+cmd.id+'_'+spec.name);
+    if(!el) return;
+    out[spec.name] = spec.type==='bool' ? el.checked : el.value;
+  });
+  return out;
+}
+async function runCommand(id){
+  const cmd=(_commands.categories||[]).flatMap(g=>g.commands||[]).find(c=>c.id===id);
+  if(!cmd) return;
+  const out=document.getElementById('cmdOut'), state=document.getElementById('cmdRunning');
+  switchTab('commands');
+  if(state) state.innerHTML='<b>'+esc(cmd.title)+'</b> running… ('+esc(cmd.cli)+')';
+  if(out) out.textContent='working…';
+  try{
+    const r=await fetch('/api/commands/run',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:id, params:collectParams(cmd)})});
+    const d=await r.json();
+    if(state) state.innerHTML = (d.ok?'<span class="okc">✓ finished</span>':'<span class="err">✗ failed (exit '+d.exit_code+')</span>')
+      +' · <span class="mono">'+esc(d.cli||cmd.cli)+'</span>'+(d.elapsed_ms?' · '+(d.elapsed_ms/1000).toFixed(1)+'s':'');
+    if(out) out.textContent = d.output || d.error || '(no output)';
+    showToast(cmd.title+(d.ok?' finished':' failed'), d.ok?'ok':'err');
+    try{ if(out) out.scrollIntoView({behavior:'smooth',block:'nearest'}); }catch(e){}
+  }catch(e){
+    if(state) state.innerHTML='<span class="err">request failed</span>';
+    if(out) out.textContent=String(e);
+  }
+}
+
+// ── Module catalog ────────────────────────────────────────────────────
+let _modules=null;
+async function loadModules(){
+  const host=document.getElementById('moduleList'); if(!host || _modules) return;
+  try{
+    const d=await (await fetch('/api/modules')).json();
+    _modules=d;
+    const cnt=document.getElementById('modCount'); if(cnt) cnt.textContent=(d.count||0)+' modules';
+    renderModules();
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+function renderModules(){
+  const host=document.getElementById('moduleList'); if(!host || !_modules) return;
+  const q=(document.getElementById('modSearch')?.value||'').toLowerCase();
+  let html='';
+  (_modules.packages||[]).forEach(p=>{
+    const mods=(p.modules||[]).filter(m=> !q || (m.name+' '+m.summary).toLowerCase().includes(q));
+    if(!mods.length) return;
+    html+=`<div class="sectionTitle">${esc(p.label)} · ${esc(p.package)}/ <span class="note">${mods.length}</span></div>`;
+    html+=mods.map(m=>`<div class="modrow"><code>${esc(m.name)}</code>
+      <span class="note">${esc(m.summary)}</span>
+      <span class="note mono">${m.lines} ln</span></div>`).join('');
+  });
+  host.innerHTML = html || '<span class="muted">no modules match that search</span>';
+}
+
+// ── Connections: what SKY is really plugged into ──────────────────────
+let _connections=null;
+async function loadConnections(force){
+  const host=document.getElementById('connectionList'); if(!host) return;
+  if(_connections && !force){ renderConnections(); return; }
+  host.innerHTML='<span class="muted">probing every connection…</span>';
+  try{
+    const d=await (await fetch('/api/connections')).json();
+    _connections=d; renderConnections(); loadAccount();
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+function renderConnections(){
+  const d=_connections; if(!d) return;
+  const strip=document.getElementById('connStrip');
+  if(strip){
+    strip.className='strip lvl-'+(d.level||'degraded');
+    const dot=d.level==='ok'?'var(--green)':d.level==='down'?'var(--red)':'var(--amber)';
+    strip.innerHTML=`<span class="verdict"><span class="dot" style="background:${dot}"></span>${esc(d.headline||'')}</span>
+      <span class="pillars"><span class="pill-chip">${d.live_count||0}/${d.total||0} live</span>
+      ${d.demo_mode?'<span class="pill-chip" style="color:var(--amber)">DEMO MODE</span>':'<span class="pill-chip" style="color:var(--green)">REAL MARKET</span>'}</span>`;
+  }
+  const cnt=document.getElementById('connCount');
+  if(cnt) cnt.textContent=(d.live_count||0)+'/'+(d.total||0)+' live';
+  const host=document.getElementById('connectionList'); if(!host) return;
+  const tiers=d.tiers||{};
+  const groups={};
+  (d.connections||[]).forEach(c=>{ (groups[c.tier]=groups[c.tier]||[]).push(c); });
+  let html='';
+  ['core','context','alerts','ai','account'].forEach(tier=>{
+    const list=groups[tier]; if(!list||!list.length) return;
+    html+=`<div class="sectionTitle">${esc(tiers[tier]||tier)}</div>`;
+    list.forEach(c=>{
+      const state=c.live?'live':(c.configured?'fail':'off');
+      const label=c.live?'● LIVE':(c.configured?'● NOT REACHABLE':'○ NOT CONNECTED');
+      const testable=['telegram','discord'].includes(c.id);
+      html+=`<div class="conncard ${state}">
+        <h3>${esc(c.label)} <span class="connstate ${state}">${label}</span>
+          ${c.latency_ms!=null?`<span class="note">${c.latency_ms}ms</span>`:''}</h3>
+        <div class="note"><b>Gives you:</b> ${esc(c.gives||'')}</div>
+        <div class="note"><b>Needs:</b> ${esc(c.needs||'')}</div>
+        ${c.detail?`<div class="note"><b>Status:</b> ${esc(c.detail)}</div>`:''}
+        ${c.safety?`<div class="note" style="color:var(--green)">🔒 ${esc(c.safety)}</div>`:''}
+        ${!c.live&&(c.how||[]).length?`<div class="note" style="margin-top:6px"><b>How to switch it on:</b></div>
+          <ol class="connhow">${(c.how||[]).map(s=>'<li>'+esc(s).replace(/([A-Z][A-Z0-9_]{4,})/g,'<code>$1</code>')+'</li>').join('')}</ol>`:''}
+        <div class="flex" style="margin-top:8px">
+          <button class="btn" onclick="testConnection('${esc(c.id)}')">Test this connection</button>
+          ${testable?`<button class="btn primary" onclick="testAlert('${esc(c.id)}')">Send me a test alert</button>`:''}
+          <span class="note" id="conntest-${esc(c.id)}"></span>
+        </div></div>`;
+    });
+  });
+  host.innerHTML=html || '<span class="muted">no connections defined</span>';
+}
+async function testConnection(id){
+  const out=document.getElementById('conntest-'+id); if(out) out.textContent='testing…';
+  try{
+    const r=await fetch('/api/connections/test',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:id})});
+    const d=await r.json();
+    if(out) out.innerHTML = d.live ? '<span class="okc">✓ live — '+esc(d.detail||'')+'</span>'
+                                   : '<span class="err">✗ '+esc(d.detail||d.error||'not reachable')+'</span>';
+    showToast((d.label||id)+(d.live?' is live':' is not connected'), d.live?'ok':'err');
+  }catch(e){ if(out) out.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+async function testAlert(channel){
+  const out=document.getElementById('conntest-'+channel); if(out) out.textContent='sending…';
+  try{
+    const r=await fetch('/api/alerts/test',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({channel:channel})});
+    const d=await r.json();
+    if(out) out.innerHTML = d.ok ? '<span class="okc">✓ '+esc(d.detail||'sent')+'</span>'
+                                 : '<span class="err">✗ '+esc(d.error||'failed')+'</span>';
+    showToast(d.ok?'Test alert sent — check your phone':'Could not send: '+(d.error||''), d.ok?'ok':'err');
+  }catch(e){ if(out) out.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+async function loadAccount(){
+  const host=document.getElementById('accountPanel'); if(!host) return;
+  try{
+    const d=await (await fetch('/api/account')).json();
+    if(!d.configured){
+      host.innerHTML=`<div class="note">${esc(d.note||'no read-only key set')}</div>
+        <div class="note" style="margin-top:8px">Connect a <b>read-only</b> key to see your real balance
+        beside the paper book, so position sizing uses your true equity. The card above shows the exact steps.</div>`;
+      return;
+    }
+    if(!d.connected){ host.innerHTML='<span class="err">'+esc(d.error||'not connected')+'</span>'; return; }
+    const bal=(d.balances||[]);
+    host.innerHTML=`
+      <div class="flex" style="margin-bottom:10px">
+        <span class="pill ${d.read_only?'BUY':'SELL'}">${d.read_only?'READ-ONLY KEY ✓':'⚠ KEY CAN TRADE'}</span>
+        <span class="badge">${esc(d.account_type||'SPOT')}</span>
+        <span class="badge">${d.balance_count||0} funded asset(s)</span>
+        <span class="badge">${d.open_order_count||0} open order(s)</span>
+        ${d.demo?'<span class="badge" style="background:var(--amber);color:#111">DEMO</span>':''}
+      </div>
+      ${d.warning?`<div class="note" style="background:rgba(239,68,68,.10);border:1px solid rgba(239,68,68,.3);padding:9px;border-radius:10px;margin-bottom:10px">⚠ ${esc(d.warning)}</div>`:''}
+      ${bal.length?`<table><tr><th>Asset</th><th>Free</th><th>Locked</th><th>Total</th></tr>
+        ${bal.map(b=>`<tr><td><b>${esc(b.asset)}</b></td><td class="mono">${fmt(b.free,6)}</td>
+          <td class="mono">${fmt(b.locked,6)}</td><td class="mono">${fmt(b.total,6)}</td></tr>`).join('')}</table>`
+        :'<span class="muted">no funded balances</span>'}
+      <div class="note" style="margin-top:8px">SKY reads this account. It cannot place or cancel an order —
+      there is no order-placement code path in this application.</div>`;
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+
+// ── Evidence: why blocked + how to unlock ─────────────────────────────
+async function loadEvidence(){
+  const why=document.getElementById('unlockWhy');
+  if(why){
+    try{
+      const d=await (await fetch('/api/unlock')).json();
+      const blocks=(d.blocks||[]);
+      why.innerHTML=`
+        <div class="flex" style="margin-bottom:10px">
+          <span class="pill ${d.allowed?'BUY':'NOTRADE'}">${d.allowed?'GATE OPEN':'GATE CLOSED'}</span>
+          <b>${esc(d.headline||'')}</b>
+        </div>
+        <div class="note" style="margin-bottom:10px">${esc(d.summary||'')}</div>
+        ${blocks.map(b=>`<div class="blockcard ${esc(b.kind)}">
+          <b>${b.kind==='earn'?'🔓':'⏳'} ${esc(b.title)}</b>
+          <div class="note" style="margin-top:4px">${esc(b.plain)}</div>
+          <div class="note" style="margin-top:4px;opacity:.75">Raw rule: ${esc(b.reason||'')}</div>
+          ${b.progress?renderCriteria(b.progress):''}
+          <div class="flex" style="margin-top:8px">
+            ${b.action?`<button class="btn primary" onclick="runCommand('${esc(b.action)}')">▶ ${esc(b.action_label||b.action)}</button>`:''}
+            ${b.alt_action?`<button class="btn" onclick="runCommand('${esc(b.alt_action)}')">▶ ${esc(b.alt_action_label||b.alt_action)}</button>`:''}
+            ${b.ui_hint?`<button class="btn" onclick="switchTab('${esc(b.ui_hint)}')">Go to ${esc(b.ui_hint)}</button>`:''}
+          </div></div>`).join('')}`;
+    }catch(e){ why.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+  }
+  const board=document.getElementById('evidenceBoard');
+  if(board){
+    try{
+      const d=await (await fetch('/api/evidence')).json();
+      const cnt=document.getElementById('evCount');
+      if(cnt) cnt.textContent=(d.proven_count||0)+'/'+(d.count||0)+' proven';
+      const setups=(d.setups||[]);
+      board.innerHTML=`<div class="note" style="margin-bottom:10px"><b>${esc(d.headline||'')}</b> — ${esc(d.next_step||'')}</div>`
+        + (setups.length? setups.map(s=>`<div class="setupcard ${s.proven?'proven':''}">
+            <div class="flex" style="justify-content:space-between">
+              <b>${esc(s.plan_type)}</b>
+              <span class="badge ${s.proven?'strong':''}">${s.proven?'PROVEN ✓':s.met+'/'+s.total+' criteria'}</span>
+            </div>${renderCriteria(s)}</div>`).join('')
+          : '<span class="muted">no setups measured yet</span>');
+    }catch(e){ board.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+  }
+}
+function renderCriteria(p){
+  return (p.criteria||[]).map(c=>{
+    const cur = c.unit==='R per trade'
+      ? (c.current==null?'—':(Number(c.current)>=0?'+':'')+Number(c.current).toFixed(3)+'R')
+      : (c.current||0)+' / '+c.target;
+    return `<div class="critrow">
+      <div class="top"><span>${c.met?'<span class="okc">✓</span>':'<span class="muted">○</span>'} ${esc(c.name)}
+        <span class="note">${esc(c.why||'')}</span></span>
+        <span class="mono">${esc(cur)}</span></div>
+      <div class="bar"><i style="width:${c.pct||0}%;background:${c.met?'var(--green)':'var(--blue)'}"></i></div>
+    </div>`;
+  }).join('');
+}
+
+// ── lazy tab loading ──────────────────────────────────────────────────
+function onTabShown(tab){
+  if(tab==='chart') loadChartWorkspace(false);
+  else if(tab==='manage') loadTradeManager();
+  else if(tab==='risk') loadRiskCenter();
+  else if(tab==='journal') loadJournalCenter();
+  else if(tab==='commands') loadCommands();
+  else if(tab==='modules') loadModules();
+  else if(tab==='connections') loadConnections(false);
+  else if(tab==='evidence') loadEvidence();
+}
+
 // init
 (function(){
   try{
     const h=(typeof location !== 'undefined' && location.hash || '').replace('#','');
-    if(h && ['overview','market','intelligence','trades','learn','system'].includes(h)) _activeTab=h;
+    if(h && ['overview','chart','market','intelligence','trades','manage','risk','evidence','journal','learn','connections','commands','modules','system'].includes(h)) _activeTab=h;
   }catch(e){}
   try{ switchTab(_activeTab); }catch(e){}
   // strip lives outside #app, so it can resolve before the first scan does
@@ -2317,16 +3373,398 @@ def make_app() -> Flask:
 
     @app.get("/api/candles")
     def api_candles():
-        """OHLCV for the inline candlestick chart (no external libs)."""
+        """OHLCV for the candlestick chart.
+
+        Every value goes through :func:`web.chart_data._num`, so Pandas /
+        NumPy scalars (``int64``, ``float64``, ``NaT``, ``NaN``) can never
+        reach Flask's strict jsonify and blank the chart.
+        """
+        from web.chart_data import _epoch_seconds, _num
         symbol = _sym(request.args.get("symbol", SYMBOL))
         tf = request.args.get("tf", TIMEFRAME)
-        limit = min(int(request.args.get("limit", 90)), 300)
+        limit = min(int(request.args.get("limit", 90)), 1000)
         try:
             df = maybe_client().klines(symbol, tf, limit)
-            return jsonify({"candles": df.to_dict("records"),
+            candles = []
+            for row in df.tail(limit).itertuples(index=False):
+                data = row._asdict()
+                time_s = _epoch_seconds(data.get("ts"))
+                if time_s is None:
+                    continue
+                candles.append({
+                    "time": time_s,
+                    "ts": time_s * 1000,
+                    "open": _num(data.get("open")),
+                    "high": _num(data.get("high")),
+                    "low": _num(data.get("low")),
+                    "close": _num(data.get("close")),
+                    "volume": _num(data.get("volume")),
+                })
+            return jsonify({"candles": candles, "count": len(candles),
                             "symbol": symbol, "tf": tf})
         except ConnectionError as exc:
             return jsonify({"error": str(exc)}), 502
+        except Exception as exc:  # never blank the chart on an engine hiccup
+            return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/chart")
+    def api_chart():
+        """Full chart workspace feed: candles + overlays + panes + levels.
+
+        This is what the TradingView-style workspace draws: OHLCV in
+        Lightweight Charts' epoch-second format, EMA/VWAP/Bollinger overlays,
+        volume/RSI/MACD/ADX panes, support & resistance lines and the live
+        plan's entry / stop / take-profit overlay.
+        """
+        from web.chart_data import build_chart
+        symbol = _sym(request.args.get("symbol", SYMBOL))
+        tf = request.args.get("tf", TIMEFRAME)
+        limit = min(int(request.args.get("limit", 300)), 1000)
+        with_plan = request.args.get("plan", "1") != "0"
+        try:
+            df = maybe_client().klines(symbol, tf, max(limit, 250))
+        except ConnectionError as exc:
+            return jsonify({"error": str(exc), "candles": []}), 502
+        except Exception as exc:
+            return jsonify({"error": f"{type(exc).__name__}: {exc}",
+                            "candles": []}), 500
+        payload = None
+        if with_plan:
+            try:
+                payload = compute_payload(symbol, tf, save=False, use_cache=True)
+            except Exception:
+                payload = None
+        try:
+            return jsonify(_sanitize_for_json(
+                build_chart(df, symbol, tf, payload=payload, limit=limit)))
+        except Exception as exc:  # pragma: no cover — defensive
+            return jsonify({"error": f"{type(exc).__name__}: {exc}",
+                            "candles": []}), 500
+
+    # ── Command Center ────────────────────────────────────────────────
+    @app.get("/api/commands")
+    def api_commands():
+        """The clickable catalog of every CLI command (no memorization)."""
+        from web.command_center import catalog
+        return jsonify(catalog())
+
+    @app.post("/api/commands/run")
+    def api_commands_run():
+        """Run one allow-listed catalog command and return its output.
+
+        Only ids that exist in ``web.command_center.COMMANDS`` can run, no
+        shell is used, and blocked (long-lived / interactive) commands are
+        refused with the terminal instruction instead.
+        """
+        from web.command_center import CommandError, run_command
+        body = request.get_json(silent=True) or {}
+        command_id = str(body.get("id") or "").strip()
+        params = body.get("params") or {}
+        if not isinstance(params, dict):
+            return jsonify({"ok": False, "error": "params must be an object"}), 400
+        try:
+            return jsonify(run_command(command_id, params,
+                                       timeout=body.get("timeout")))
+        except CommandError as exc:
+            return jsonify({"ok": False, "error": str(exc),
+                            "command_id": command_id}), 400
+        except Exception as exc:  # pragma: no cover
+            return jsonify({"ok": False,
+                            "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    # ── Risk Center: position-size calculator ─────────────────────────
+    @app.post("/api/position-size")
+    def api_position_size():
+        """Position-size calculator bounded by the live risk gate."""
+        from web.position_sizer import calculate
+        from data.database import SignalDB
+        from brain.risk_gate import evaluate as gate_evaluate
+        body = request.get_json(silent=True) or {}
+        symbol = _sym(body.get("symbol")) if body.get("symbol") else SYMBOL
+        try:
+            with SignalDB() as db:
+                gate = gate_evaluate(db, symbol=symbol)
+        except Exception:
+            gate = {}
+        try:
+            return jsonify(_sanitize_for_json(calculate(
+                balance=body.get("balance"), risk_pct=body.get("risk_pct"),
+                entry=body.get("entry"), stop=body.get("stop_loss"),
+                take_profit=body.get("take_profit"), symbol=symbol,
+                gate=gate, leverage=body.get("leverage"))))
+        except Exception as exc:
+            return jsonify({"ok": False,
+                            "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    # ── Trade manager: the live open book ─────────────────────────────
+    @app.get("/api/trades")
+    def api_trades():
+        """Open paper positions with live R, MAE/MFE and management advice."""
+        from data.database import SignalDB
+        from brain.coach import management_checklist
+        symbol = _sym(request.args.get("symbol")) if request.args.get("symbol") else None
+        try:
+            with SignalDB() as db:
+                rows = db.live_open_rows(symbol=symbol)
+                stats = db.paper_trade_stats(symbol)
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}",
+                            "open": [], "recent": []}), 200
+
+        prices: dict[str, float | None] = {}
+
+        def last_price(sym: str, tf: str) -> float | None:
+            key = f"{sym}:{tf}"
+            if key not in prices:
+                try:
+                    df = maybe_client().klines(sym, tf, 2)
+                    prices[key] = float(df["close"].iloc[-1])
+                except Exception:
+                    prices[key] = None
+            return prices[key]
+
+        now_ms = int(time.time() * 1000)
+        out = []
+        for row in rows:
+            entry = row.get("entry_price") or row.get("entry")
+            stop = row.get("stop_loss")
+            take = row.get("take_profit")
+            price = last_price(row.get("symbol") or SYMBOL,
+                               row.get("timeframe") or TIMEFRAME) or row.get("last_price")
+            risk = abs(float(entry) - float(stop)) if entry and stop else None
+            current_r = None
+            if price is not None and entry and risk:
+                delta = float(price) - float(entry)
+                if str(row.get("action")).upper() == "SELL":
+                    delta = -delta
+                current_r = round(delta / risk, 3)
+            opened = row.get("opened_ts") or row.get("created_ts") or now_ms
+            item = dict(row)
+            item.update({
+                "current_price": price,
+                "current_r": current_r,
+                "risk_per_unit": risk,
+                "stop_distance": (abs(float(price) - float(stop))
+                                  if price is not None and stop else None),
+                "tp_distance": (abs(float(take) - float(price))
+                                if price is not None and take else None),
+                "minutes_in_trade": max(0, int((now_ms - int(opened)) / 60000)),
+                "management": management_checklist({
+                    "entry": entry, "stop_loss": stop,
+                    "take_profits": [take] if take is not None else [],
+                }),
+            })
+            out.append(item)
+        return jsonify(_sanitize_for_json({
+            "ok": True, "open": out, "count": len(out),
+            "recent": (stats or {}).get("recent", []),
+            "overall": (stats or {}).get("overall", {}),
+        }))
+
+    # ── Journal: a real form, not a CLI instruction ───────────────────
+    @app.get("/api/journal")
+    def api_journal_get():
+        """Journal entry for a scan, or the discipline summary when no id."""
+        from data.database import SignalDB
+        from brain.journal import (EMOTIONS, execution_quality, get_journal,
+                                   pre_trade_checklist, violation_rate)
+        scan_id = request.args.get("scan_id", type=int)
+        try:
+            with SignalDB() as db:
+                summary = violation_rate(db)
+                if scan_id is None:
+                    # Every recent decision is journalable — including the ones
+                    # you rejected or stood aside on. "I did not take it, and
+                    # here is why" is the entry that builds discipline fastest.
+                    recent = db.latest_scans(limit=40)
+                    decided = ("CLOSED", "EXECUTED", "APPROVED", "REJECTED", "SKIPPED")
+                    recent.sort(key=lambda r: (r.get("status") not in decided,
+                                               -(r.get("id") or 0)))
+                    return jsonify(_sanitize_for_json({
+                        "ok": True, "summary": summary, "emotions": list(EMOTIONS),
+                        "journalable": recent,
+                    }))
+                scan = db.get_scan(scan_id)
+                entry = get_journal(db, scan_id)
+                quality = execution_quality(db, scan_id)
+                # get_scan() returns the FLAT scans row; pre_trade_checklist
+                # reads the nested scan payload, so re-nest it here (the
+                # checklist silently reported "—" for every field otherwise).
+                checklist = pre_trade_checklist(_scan_row_to_payload(scan))
+                paper = db.paper_trade_for_scan(scan_id)
+            return jsonify(_sanitize_for_json({
+                "ok": True, "scan_id": scan_id, "entry": entry,
+                "scan": scan, "paper": paper, "quality": quality,
+                "checklist": checklist,
+                "emotions": list(EMOTIONS), "summary": summary,
+            }))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.post("/api/journal")
+    def api_journal_save():
+        """Save the post-trade journal from the dashboard form."""
+        from data.database import SignalDB
+        from brain.journal import execution_quality, save_journal
+        body = request.get_json(silent=True) or {}
+        scan_id = body.get("scan_id")
+        try:
+            scan_id = int(scan_id)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "scan_id is required"}), 400
+        followed = body.get("followed_rules")
+        if followed is not None:
+            followed = str(followed).lower() in ("1", "true", "yes", "on")
+        try:
+            with SignalDB() as db:
+                entry = save_journal(
+                    db, scan_id, followed_rules=followed,
+                    emotion=str(body.get("emotion") or ""),
+                    mistake=str(body.get("mistake") or ""),
+                    screenshot_path=str(body.get("screenshot_path") or ""),
+                    would_change=str(body.get("would_change") or ""),
+                    notes=str(body.get("notes") or ""))
+                quality = execution_quality(db, scan_id)
+            return jsonify(_sanitize_for_json({
+                "ok": True, "scan_id": scan_id, "entry": entry, "quality": quality}))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    # ── Real-world connections ────────────────────────────────────────
+    @app.get("/api/connections")
+    def api_connections():
+        """Every real-world link: what it gives you and whether it is live."""
+        from brain.connections import probe_all as probe_connections
+        try:
+            return jsonify(_sanitize_for_json(probe_connections()))
+        except Exception as exc:  # never blank the page
+            return jsonify({"connections": [], "level": "down",
+                            "headline": f"connection probe failed: "
+                                        f"{type(exc).__name__}: {exc}"})
+
+    @app.post("/api/connections/test")
+    def api_connections_test():
+        """Test one connection on demand (the Test button on each card)."""
+        from brain.connections import probe_one
+        body = request.get_json(silent=True) or {}
+        cid = str(body.get("id") or "").strip()
+        try:
+            return jsonify(_sanitize_for_json(probe_one(cid)))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.post("/api/alerts/test")
+    def api_alerts_test():
+        """Send a real test alert so the user can confirm it reaches them."""
+        from output.notifiers import send_test_alert
+        body = request.get_json(silent=True) or {}
+        try:
+            return jsonify(send_test_alert(str(body.get("channel") or "")))
+        except Exception as exc:
+            return jsonify({"ok": False,
+                            "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/account")
+    def api_account():
+        """READ-ONLY exchange account snapshot: real balance, real orders.
+
+        Backed by ``data/exchange_account.py``, which signs GET requests
+        against a read-only allow-list and has no order-placement path.
+        """
+        from data.exchange_account import ExchangeAccount
+        try:
+            return jsonify(_sanitize_for_json(ExchangeAccount().snapshot()))
+        except Exception as exc:
+            return jsonify({"configured": False, "connected": False,
+                            "error": f"{type(exc).__name__}: {exc}",
+                            "balances": [], "open_orders": []})
+
+    # ── Why blocked / how to unlock ───────────────────────────────────
+    @app.get("/api/unlock")
+    def api_unlock():
+        """Why the gate is closed and exactly what to click to open it."""
+        from data.database import SignalDB
+        from brain.unlock import explain
+        plan_type = request.args.get("plan_type") or None
+        symbol = _sym(request.args.get("symbol")) if request.args.get("symbol") else None
+        try:
+            with SignalDB() as db:
+                if plan_type is None:
+                    # default to the setup the live scan is currently proposing
+                    try:
+                        payload = compute_payload(symbol or SYMBOL, TIMEFRAME,
+                                                  save=False, use_cache=True)
+                        plans = payload.get("plans") or []
+                        plan_type = plans[0].get("type") if plans else None
+                    except Exception:
+                        plan_type = None
+                return jsonify(_sanitize_for_json(
+                    explain(db, plan_type=plan_type, symbol=symbol)))
+        except Exception as exc:
+            return jsonify({"allowed": False, "blocks": [],
+                            "headline": "could not evaluate the gate",
+                            "summary": f"{type(exc).__name__}: {exc}"}), 200
+
+    @app.get("/api/evidence")
+    def api_evidence():
+        """Progress toward proving every setup — the honest edge scoreboard."""
+        from data.database import SignalDB
+        from brain.unlock import evidence_overview
+        try:
+            with SignalDB() as db:
+                return jsonify(_sanitize_for_json(evidence_overview(db)))
+        except Exception as exc:
+            return jsonify({"setups": [], "count": 0,
+                            "headline": f"{type(exc).__name__}: {exc}"}), 200
+
+    # ── Module catalog: every module visible ──────────────────────────
+    @app.get("/api/modules")
+    def api_modules():
+        """Every Python module in the engine with its one-line purpose."""
+        import ast
+        groups = {"engine": "Signal engine", "brain": "Decision brain",
+                  "data": "Market data & storage", "output": "Output & notifiers",
+                  "web": "Dashboard", "ai": "LLM & MCP"}
+        root = Path(__file__).resolve().parent.parent
+        out = []
+        for package, label in groups.items():
+            modules = []
+            for path in sorted((root / package).rglob("*.py")):
+                if path.name == "__init__.py":
+                    continue
+                doc = ""
+                try:
+                    doc = (ast.get_docstring(ast.parse(path.read_text())) or "")
+                except Exception:
+                    doc = ""
+                rel = str(path.relative_to(root))
+                summary = doc.strip().split("\n")[0].strip()
+                # Many modules open with "package/file.py — what it does";
+                # show only the explanation, never the filename twice.
+                if summary.startswith(rel) or summary.startswith(f"{package}/"):
+                    for sep in ("—", "-", ":"):
+                        if sep in summary:
+                            summary = summary.split(sep, 1)[1].strip()
+                            break
+                    else:
+                        summary = ""
+                if not summary and len(doc.strip().split("\n")) > 1:
+                    summary = next((ln.strip() for ln in doc.strip().split("\n")[1:]
+                                    if ln.strip()), "")
+                modules.append({
+                    "name": str(path.relative_to(root)),
+                    "module": str(path.relative_to(root)).replace("/", ".")[:-3],
+                    "summary": summary or "—",
+                    "lines": len(path.read_text().splitlines()),
+                })
+            out.append({"package": package, "label": label, "modules": modules,
+                        "count": len(modules)})
+        return jsonify({"packages": out,
+                        "count": sum(g["count"] for g in out)})
+
+    @app.get("/api/state")
 
     @app.get("/api/state")
     def api_state():

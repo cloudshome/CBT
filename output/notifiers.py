@@ -61,3 +61,55 @@ def notify_all(signal: dict, plans: Optional[list] = None) -> dict:
         "telegram": notify_telegram(signal, plans),
         "discord": notify_discord(signal, plans),
     }
+
+
+TEST_MESSAGE = (
+    "✅ *SKY test alert*\n"
+    "Your alert channel is connected.\n\n"
+    "This is what a signal notification will look like. SKY only ever *tells* "
+    "you — it never places an order. You still approve every trade yourself."
+)
+
+
+def send_test_alert(channel: str) -> dict:
+    """Send a real test message so the user can confirm alerts reach them.
+
+    ``channel`` is ``telegram`` or ``discord``. Returns a result dict rather
+    than raising, so the dashboard's Test button can always render an answer.
+    """
+    channel = (channel or "").strip().lower()
+    if channel == "telegram":
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+            return {"ok": False, "channel": channel,
+                    "error": "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID are not set "
+                             "in your .env"}
+        try:
+            r = requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={"chat_id": TELEGRAM_CHAT_ID, "text": TEST_MESSAGE,
+                      "parse_mode": "Markdown"}, timeout=10)
+            if r.status_code == 200:
+                return {"ok": True, "channel": channel,
+                        "detail": "sent — check your Telegram"}
+            return {"ok": False, "channel": channel,
+                    "error": f"Telegram returned {r.status_code}: {r.text[:160]}"}
+        except requests.RequestException as exc:
+            return {"ok": False, "channel": channel,
+                    "error": f"{type(exc).__name__}: {exc}"}
+    if channel == "discord":
+        if not DISCORD_ANNOUNCE_WEBHOOK:
+            return {"ok": False, "channel": channel,
+                    "error": "DISCORD_ANNOUNCE_WEBHOOK is not set in your .env"}
+        try:
+            r = requests.post(DISCORD_ANNOUNCE_WEBHOOK,
+                              json={"content": TEST_MESSAGE}, timeout=10)
+            if r.status_code in (200, 204):
+                return {"ok": True, "channel": channel,
+                        "detail": "sent — check your Discord channel"}
+            return {"ok": False, "channel": channel,
+                    "error": f"Discord returned {r.status_code}: {r.text[:160]}"}
+        except requests.RequestException as exc:
+            return {"ok": False, "channel": channel,
+                    "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": False, "channel": channel,
+            "error": "unknown alert channel — use 'telegram' or 'discord'"}
