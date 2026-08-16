@@ -11,8 +11,19 @@ from brain.journal import (save_journal, execution_quality, violation_rate,
 from brain.metrics import business_metrics
 
 
-def _decided(db: SignalDB, rr: float, n: int = 1, start_id: int = 8000) -> None:
+def _decided(db: SignalDB, rr: float, n: int = 1, start_id: int = 8000,
+             rr_net: float | None = None) -> None:
+    """Insert decided paper rows.
+
+    ``rr_net`` defaults to ``rr``, i.e. a **cost-free** row. These tests pin
+    the B4 arithmetic itself (PF = 12/4 = 3, dd = 25 x 0.25%), so the fixture
+    is deliberately cost-neutral: under the P12.18 net anchor a change in the
+    cost model must not silently rewrite what "profit factor" means. Cost
+    behaviour is covered by tests/test_net_limits.py.
+    """
     ts = int(time.time() * 1000)
+    if rr_net is None:
+        rr_net = rr
     for i in range(n):
         outcome = "TP_HIT" if rr > 0 else "STOP_LOSS"
         db.conn.execute(
@@ -20,11 +31,11 @@ def _decided(db: SignalDB, rr: float, n: int = 1, start_id: int = 8000) -> None:
                                         action, entry, stop_loss, take_profit, risk_reward,
                                         confidence_pct, status, created_ts, opened_ts,
                                         closed_ts, entry_price, exit_price, outcome,
-                                        rr_achieved, close_reason)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                        rr_achieved, rr_net, close_reason)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (start_id + i, f"SIG{start_id+i}", "Buy Pullback", "BTCUSDT", "15m",
              "BUY", 100.0, 99.0, 102.0, 2.0, 70, "CLOSED", ts, ts, ts,
-             100.0, 99.0 if rr < 0 else 102.0, outcome, rr, "test"))
+             100.0, 99.0 if rr < 0 else 102.0, outcome, rr, rr_net, "test"))
     db.conn.commit()
 
 

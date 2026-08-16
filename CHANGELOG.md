@@ -10,6 +10,208 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.25.0] — 2026-08-16 · P12.18 the net anchor at the hard limits
+
+MINOR: finish what P12.8 started. P12.6 restated the desk's numbers net of
+costs and P12.8 set the doctrine — *a measurement only matters where something
+acts on it* — then walked the net anchor into the two decision sites it found
+(`multiplier_from_score()`, `setup_proven()`). It stopped short of the **hard
+risk limits** in decision B6, which act harder than anything else in the
+system: they are the desk's stop-loss on itself.
+
+### The gap
+
+`closed_pnl()` (daily/weekly limits), `drawdown()` (the ladder) and
+`brain/metrics.py` (the business scorecard's equity, expectancy, profit
+factor, win rate and streaks) all judged **gross** `rr_achieved`.
+
+This bites hardest on the live paper book, because `close_paper_trade()`
+writes `rr_achieved` only — **every live row has `rr_net IS NULL`**. Costs for
+those rows existed solely as a compute-on-read step (`_net_outcome()`, already
+used by the Monte Carlo surfaces) that the limits never took.
+
+Measured with the repo's own cost model:
+
+| Surface | Gross reading | Net reality |
+|---|---|---|
+| Daily limit, 8 × −0.4R | −0.80% → **open** | −1.09% → past the 1.0% limit |
+| Weekly limit, 16 × −0.4R | −1.60% → **open** | −2.19% → past the 2.0% limit |
+| Drawdown, 32 × −0.5R | 4.00% → `normal` | 5.18% → `reduce_risk` |
+| Scorecard, 6 × +1.5R / 8 × −1.0R | **+0.071R (an edge)** | **−0.076R (a losing book)** |
+
+The loss limits failed **open**: a desk past its limit once fees were paid
+read comfortably inside it and kept trading.
+
+### Fixed
+
+- `data.costs.net_r_of_row()` is the single definition of a row's net R:
+  stored `rr_net` wins, otherwise costs are computed from the row's own
+  levels, symbol and holding time; a row with no gross R contributes 0.0.
+  It lives beside the cost model so the risk gate, scorecard and analytics
+  cannot drift apart (invariant #10).
+- `closed_pnl()`, `drawdown()`, `_equity_curve()` and `_metrics()` all read it.
+  A **win is now a net win** — a trade that cleared its target but not its
+  fees is no longer counted as a winner.
+- `brain.analytics._net_outcome()` delegates to the shared helper.
+- `closed_pnl()` additionally reports `gross_r_sum`, `gross_pct` and `cost_r`,
+  and `status_text()` prints the gross figure and cost drag beside the net
+  percentage, so the number can never be mistaken for a gross read.
+
+### Unchanged
+
+Every threshold (`MAX_DAILY_LOSS_PCT`, `MAX_WEEKLY_LOSS_PCT`, the ladder rungs,
+the graduation bar) is untouched — only the number compared against them is now
+the honest one. A **cost-free book (`rr_net == rr_achieved`) behaves exactly as
+before**, pinned by controls in every group. P12.11–P12.17 source isolation,
+XAU research-only status and the no-order-placement contract are unaffected.
+
+### Verification
+
+- `tests/test_net_limits.py` — 14 new regressions.
+- `ops/probes/p12_18_netlimits_probe.py` — reproduction harness; all six cases
+  (A–F) behave as specified, exit 0.
+- Four pre-existing tests pinned gross arithmetic and were updated to
+  cost-neutral fixtures (`rr_net == rr_achieved`) so they keep testing what
+  they were written to test — source isolation and date arithmetic — rather
+  than being silently rewritten by the cost model.
+- The P12.14–P12.17 probes still exit 0; full suite **797 passed, 1 skipped**;
+  compileall and `pip check` pass.
+
+---
+
+## [2.24.1] — 2026-08-16 · P12.17 week-boundary risk-gate crash
+
+PATCH: fix a latent `ValueError` that took the **entire risk gate** offline for
+roughly one day in ten.
+
+### The bug
+
+`brain.risk_gate._week_start_utc()` computed Monday 00:00 UTC as:
+
+```python
+start = start.replace(day=start.day - start.weekday())   # Monday
+```
+
+`datetime.replace()` cannot cross a month boundary. Whenever the current week
+began in the previous month, `start.day - start.weekday()` was zero or
+negative and the call raised `ValueError: day is out of range for month`. On a
+Monday-start week that is **every week spanning a month end — 38 days of
+2026**, including 1 January (whose week begins in the previous *year*).
+
+The weekly loss limit is one of the two hard limits in decision B6, so this was
+never cosmetic. On those dates `daily_weekly()`, `drawdown()`'s caller
+`evaluate()`, `status_text()` and every downstream surface raised instead of
+answering, and each caller's behaviour depended on whether it happened to sit
+inside a `try`:
+
+- `main.py approve` propagated the `ValueError` at the human instead of
+  returning a decision;
+- the paper runner failed closed but recorded the nonsense reason
+  `"day is out of range for month"` against the scan rather than a risk reason;
+- `brain.immune.check_risk_system()` — the diagnostic whose entire job is to
+  notice a broken risk system — had **no** `except` around the gate, so it
+  raised and took `run_health_check()` down with it, reporting nothing at all.
+
+A gate that raises is neither open nor closed, which is the most dangerous
+state a risk control can occupy.
+
+### Fixed
+
+- `_week_start_utc()` subtracts the weekday as a `timedelta`, which crosses
+  month and year boundaries correctly. Verified by an exhaustive sweep of
+  every date from 2024 through 2029 (6,576 datetimes): always the correct
+  Monday, never a crash.
+- `check_risk_system()` now catches an unanswerable gate and reports
+  `CRITICAL` with the underlying error, so a broken risk system surfaces as a
+  loud diagnostic instead of a stack trace. `run_health_check()` keeps
+  reporting its other checks.
+
+### Unchanged
+
+Every threshold and limit, `_day_start_utc()`, the drawdown ladder, the
+graduation bar, P12.11–P12.16 source isolation, XAU research-only status, and
+the no-order-placement contract. Losses that fall in the previous-month part of
+the current week still count toward the weekly limit — pinned by a regression.
+
+### Verification
+
+- `tests/test_week_boundary.py` — 19 new regressions.
+- `ops/probes/p12_17_weekstart_probe.py` — reproduction harness; all six cases
+  (A–F) behave as specified, exit 0.
+- The P12.14/P12.15/P12.16 probes still exit 0; full suite **783 passed, 1
+  skipped**; compileall and `pip check` pass.
+
+---
+
+## [2.24.0] — 2026-08-16 · P12.16 open-book source isolation
+
+MINOR: the source boundary reaches the **open** book. P12.11 → P12.15 walked
+provenance through every surface that reads *decided* paper trades —
+calibration and setup-proof, the global graduation gate, the discipline
+criterion, then every live risk control and the scorecard execution metric —
+but stopped at the closed book. `open_exposure()` and `active_paper_trades()`
+still selected `status IN ('WAITING_ENTRY','OPEN')` with **no** `sim_key`
+filter and **no** `source_key` filter, so the positions the desk was told it
+was carrying pooled research imports and simulator orphans into live exposure.
+
+### The gap (measured on `731119d`, all six cases reproduced)
+
+- **The portfolio veto failed CLOSED.** One open `dukascopy:spot:bid` row in
+  BTCUSDT filled a slot in the live crypto risk bucket, so
+  `portfolio_veto(db, "BTCUSDT", "BUY")` refused a real live trade with
+  "correlated exposure" against a book that was flat. Research must neither
+  unlock nor block (P12.13); here it blocked.
+- **The bucket risk cap failed CLOSED** the same way: two research positions
+  read `n_open=2 / planned_risk_pct=1.0`, exhausting
+  `CRYPTO_BUCKET_MAX_TRADES` and `MAX_CRYPTO_EXPOSURE_RISK_PCT`.
+- **Interrupted simulator runs leaked live exposure.** The simulator inserts
+  its samples `status='OPEN'` and closes them in the same pass, so a crash
+  left `sim_key IS NOT NULL` orphans that read as live positions permanently
+  and held real risk slots.
+- **The paper runner polled research and simulator rows as live work.**
+  `active_paper_trades()` handed them to a runner that fetches candles from the
+  *canonical live* client, so a Dukascopy XAU setup could be priced off Binance
+  candles and then opened, closed and journaled onto the live book.
+- **Reported exposure overstated the book:** a desk carrying one live position
+  reported six across the CLI, the agent briefing, the watchdog agent and the
+  dashboard.
+
+### Fixed
+
+- `SignalDB.live_open_rows()` is now the single definition of the live *open*
+  book — active (`WAITING_ENTRY`/`OPEN`), `sim_key IS NULL`, canonical-live
+  (`COALESCE(source_key,'')=''`, legacy NULL rows kept) — the open-side twin
+  of P12.15's `live_book_rows()`.
+- `open_exposure()` restricts its paper-trade half to that population via the
+  new `_open_book_clause()` helper; its approved-scan half is unchanged, since
+  a scan awaiting enrolment has no provenance yet and is a live intention.
+- `active_paper_trades()` defaults to the live open book, so the runner polls
+  only positions it can legitimately price. `include_all_sources=True`
+  restores the unfiltered read for maintenance/inspection callers.
+- The watchdog agent reads `live_open_rows()` instead of raw SQL, so simulator
+  orphans no longer raise stale-entry alerts about phantom desk positions.
+- `paper_trade_stats()` keeps its broad inventory totals (they are how a
+  reviewer sees what the store holds) and adds `live_open`; the CLI paper
+  summary and `agent ask` print the live count whenever it differs.
+
+### Unchanged
+
+Every threshold and cap (`CRYPTO_BUCKET_MAX_TRADES`,
+`MAX_CRYPTO_EXPOSURE_RISK_PCT`, the loss limits, the drawdown ladder, the
+graduation bar), the decided-book surfaces from P12.11–P12.15, the broad paper
+inventory and journal reports, the source-key algebra, XAU research-only
+status, and the no-order-placement contract.
+
+### Verification
+
+- `tests/test_openbook_isolation.py` — 14 new regressions.
+- `ops/probes/p12_16_openbook_probe.py` — reproduction harness; all six cases
+  (A–F) behave as specified, exit 0.
+- The P12.14 and P12.15 probes still exit 0; full suite **764 passed, 1
+  skipped**; compileall and `pip check` pass.
+
+---
+
 ## [2.23.4] — 2026-08-16 · P12.15 execution-metric follow-up
 
 PATCH: finish the P12.15 live-book boundary inside the business scorecard.

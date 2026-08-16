@@ -76,6 +76,8 @@ def test_empty_paper_stats_are_zeroed_for_cli_and_dashboard(tmp_path):
     assert overall == {
         "n": 0, "waiting": 0, "open": 0, "closed": 0, "cancelled": 0,
         "wins": 0, "losses": 0, "win_rate": None, "avg_rr": 0.0,
+        # P12.16 — the live open book is reported alongside the broad totals.
+        "live_open": 0,
     }
     db.close()
 

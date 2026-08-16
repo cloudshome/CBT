@@ -198,6 +198,29 @@ P12.15 closes that gap:
   stands aside on a book with no net winners.
 - The scorecard keeps its explicit `source_key` / `by_source` research
   surfaces; `decided_paper_rows()` is unchanged for explicit callers.
+
+### P12.16 — the open book
+
+P12.11–P12.15 all isolated surfaces that read **decided** trades. The **open**
+book had no boundary at all: `open_exposure()` and `active_paper_trades()`
+selected `status IN ('WAITING_ENTRY','OPEN')` with no `sim_key` and no
+`source_key` filter. This failed **closed** — the opposite direction to
+P12.15 — because a research position occupying a slot in the live crypto
+bucket made the correlated-exposure veto refuse *real* live trades. Orphaned
+simulator rows from an interrupted walk-forward run did the same permanently,
+and the paper runner polled both as live work, pricing them off the canonical
+live candle client.
+
+- `SignalDB.live_open_rows()` is the single definition of the live *open*
+  book — active (`WAITING_ENTRY`/`OPEN`), non-simulator (`sim_key IS NULL`),
+  canonical-live (`COALESCE(source_key, '') = ''`, legacy NULL rows kept).
+- `open_exposure()` (hence `brain/portfolio.py`'s veto and bucket risk cap),
+  `active_paper_trades()` (the runner's polling set), the watchdog agent and
+  the desk/briefing exposure counts all read it.
+- `paper_trade_stats()` keeps its broad inventory totals — that report is how
+  a reviewer sees research and simulator rows exist — and adds `live_open`.
+- `active_paper_trades(include_all_sources=True)` is the explicit escape hatch
+  for maintenance and inspection callers.
 - The business scorecard's `execution` block now uses
   `brain.journal.live_execution_stats()` over the same canonical live book.
   The broad `violation_rate()` report remains unchanged for the journal CLI,

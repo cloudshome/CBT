@@ -78,7 +78,7 @@
 | `scorecard.py` | P12.3/P12.6 — boxed strategy scorecard reporting gross + net metrics, Sharpe/Sortino/Calmar, holding time, split by side/regime/session/setup/conditions |
 | `quality_score.py` | P12.4 — Backtest Quality Score 0–100 (edge / curve robustness / sample confidence / BT5 parameter-plateau with isolated-peak cap at 50); `python main.py quality` store sweep |
 | `strategy_score.py` | P12.5 — strategy score on the calibrator: `E_R × sample-quality × regime-fit × execution` (weighted geometric mean, NET of costs), `multiplier_from_score()` trust dial |
-| `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB.live_book_rows()` defines the P12.15 live book |
+| `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB.live_book_rows()` defines the P12.15 live (closed) book and `SignalDB.live_open_rows()` the P12.16 live open book |
 | `backtester.py` | Walk-forward grading of plans at +1h/+4h/+24h; P10.11 `run_backtest_on_store()` reads the Parquet store instead of a live fetch |
 | `paper_trading.py` | Approved-signal lifecycle: monitor + auto-close at SL/TP1 (no real orders) |
 | `ws_client.py` | P10.10 — public Binance WebSocket streams (`!forceOrder@arr` + klines) with reconnect/backoff; offline-safe demo stream; feeds readiness + feature store |
@@ -285,6 +285,31 @@
     canonical-live rows, with legacy NULL provenance retained. Research rows
     remain inspectable through explicit scorecard/source queries but cannot
     mask, deepen or otherwise move a live risk reading.
+
+18. **Live exposure is canonical-live-only** (P12.16).
+    `SignalDB.live_open_rows()` is the open-side twin of #17 and the one
+    population for the portfolio veto, the correlated-bucket risk cap, the
+    paper runner's polling set, the watchdog agent and every reported
+    "open exposure" count: active (`WAITING_ENTRY`/`OPEN`), non-simulator,
+    canonical-live, with legacy NULL provenance retained. A research import
+    must not occupy a slot in the live risk bucket (that fails **closed** —
+    refusing real trades), an interrupted simulator run must not leave orphans
+    holding live risk, and the runner must never price a research row off the
+    canonical live candle client. The approved-scan half of `open_exposure()`
+    stays unfiltered: a scan awaiting enrolment has no provenance yet and is a
+    live intention.
+
+19. **The hard limits judge NET P&L** (P12.18). `data.costs.net_r_of_row()` is
+    the single definition of a decided row's net R — stored `rr_net` when
+    present, otherwise costs computed from the row's own levels, symbol and
+    holding time. The daily/weekly loss limits, the drawdown ladder and the
+    business scorecard all read it, because P12.8's rule ("a measurement only
+    matters where something acts on it") applies most of all to the controls
+    that stop the desk trading. The live paper runner writes `rr_achieved`
+    only, so live rows are NULL-net and the compute-on-read path is the normal
+    one, not an edge case. A **win is a net win**: a trade that cleared its
+    target but not its fees is not a winner. Thresholds are unchanged — only
+    the number compared against them is honest.
 
 ---
 

@@ -70,6 +70,27 @@ def _split_key(key: str):
     return parse_source_key(key)
 
 
+def _open_book_clause(conn, alias: str = "") -> str:
+    """SQL fragment restricting ACTIVE paper rows to the live open book (P12.16).
+
+    The parameterless twin of ``_source_clause(conn, 'paper_trades', '')``
+    plus the simulator exclusion, written for queries that cannot easily carry
+    bound arguments (the ``open_exposure()`` UNION). Both halves are literal
+    (``sim_key IS NULL``, ``COALESCE(source_key,'')=''``), so no binding is
+    needed and the legacy-NULL convention of P12.11 is preserved.
+
+    ``alias`` prefixes the columns for joined queries (e.g. ``"p"``).
+    """
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(paper_trades)")}
+    pre = f"{alias}." if alias else ""
+    frag = ""
+    if "sim_key" in cols:  # pragma: no branch - post-migration DBs always have it
+        frag += f" AND {pre}sim_key IS NULL"
+    if "source_key" in cols:  # pragma: no branch - post-migration DBs always have it
+        frag += f" AND COALESCE({pre}source_key,'')=''"
+    return frag
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -392,9 +413,25 @@ class SignalDB:
             raise RuntimeError("paper trade insert did not return a row")
         return row, bool(cur.rowcount)
 
-    def active_paper_trades(self, symbol: str | None = None) -> list[dict]:
+    def active_paper_trades(self, symbol: str | None = None,
+                            include_all_sources: bool = False) -> list[dict]:
+        """Positions the paper runner should poll — the live open book (P12.16).
+
+        Defaults to :func:`live_open_rows`' population: ``WAITING_ENTRY`` /
+        ``OPEN``, ``sim_key IS NULL``, canonical-live provenance. The runner
+        fetches candles from the *canonical live* client, so polling a research
+        row would price a Dukascopy XAU setup off Binance candles and could
+        open/close/journal it onto the live book. Simulator rows are inserted
+        ``status='OPEN'`` and closed in the same pass, so an interrupted run
+        leaves orphans that are machine samples, not live work.
+
+        ``include_all_sources=True`` restores the unfiltered read for explicit
+        maintenance/inspection callers.
+        """
         q = "SELECT * FROM paper_trades WHERE status IN ('WAITING_ENTRY','OPEN')"
         args: tuple = ()
+        if not include_all_sources:
+            q += _open_book_clause(self.conn)
         if symbol:
             q += " AND symbol=?"
             args = (symbol,)
@@ -565,17 +602,60 @@ class SignalDB:
         return [dict(r) for r in rows]
 
     # ── exposure + decided outcomes for risk/portfolio engines ───────────
+    def live_open_rows(self, symbol: str | None = None) -> list[dict]:
+        """THE live *open* paper book (P12.16): active, non-simulator, canonical.
+
+        The open-side twin of :func:`live_book_rows`, and the population every
+        live exposure surface must read: the portfolio veto and bucket risk
+        cap, the paper runner's polling set, and the desk/briefing "open
+        exposure" counts.
+
+        * active only (``WAITING_ENTRY`` / ``OPEN``) — the positions the desk
+          is actually carrying right now;
+        * ``sim_key IS NULL`` — simulator samples are inserted ``OPEN`` and
+          closed within the same pass, so an interrupted walk-forward run
+          leaves orphans that would hold live risk slots forever;
+        * canonical live source only (``COALESCE(source_key,'') = ''``, which
+          by P12.11 convention also matches legacy NULL-provenance rows).
+
+        P12.11–P12.15 walked the source boundary through every surface reading
+        *decided* trades but stopped at the closed book. On the open side a
+        research-book position (e.g. ``dukascopy:spot:bid``) still occupied a
+        slot in the live crypto bucket, so the correlated-exposure veto blocked
+        real live trades the desk was entitled to take — research must neither
+        unlock nor block (P12.13). Research books remain fully inspectable
+        through the source-filtered scorecard surfaces.
+        """
+        q = ("SELECT * FROM paper_trades "
+             "WHERE status IN ('WAITING_ENTRY','OPEN')")
+        args: tuple = ()
+        q += _open_book_clause(self.conn)
+        if symbol:
+            q += " AND symbol=?"
+            args = (symbol,)
+        q += " ORDER BY COALESCE(opened_ts, created_ts) ASC, id ASC"
+        return [dict(r) for r in self.conn.execute(q, args).fetchall()]
+
     def open_exposure(self) -> list[dict]:
         """Open/planned exposure: active paper trades plus approved scans not
-        yet enrolled by the paper runner."""
+        yet enrolled by the paper runner.
+
+        P12.16: the paper-trade half is restricted to the live open book
+        (:func:`live_open_rows`) — simulator orphans and research-book
+        positions are not this desk's exposure and must not consume the
+        correlated-risk bucket. The approved-scan half is unfiltered by
+        construction: a scan awaiting enrolment has no provenance yet and is
+        a live intention.
+        """
         rows = self.conn.execute(
-            """SELECT COALESCE(s.symbol, p.symbol) AS symbol,
+            f"""SELECT COALESCE(s.symbol, p.symbol) AS symbol,
                       COALESCE(s.action, p.action) AS action,
                       p.status AS status,
                       p.plan_type AS plan_type, p.risk_reward AS risk_reward,
                       COALESCE(p.id, 0) AS paper_id, s.id AS scan_id
                FROM paper_trades p LEFT JOIN scans s ON s.id = p.scan_id
                WHERE p.status IN ('WAITING_ENTRY','OPEN')
+                 {_open_book_clause(self.conn, "p")}
                UNION ALL
                SELECT s.symbol AS symbol, s.action AS action,
                       'APPROVED' AS status, NULL AS plan_type, NULL AS risk_reward,
@@ -736,7 +816,17 @@ class SignalDB:
         }
 
     def paper_trade_stats(self, symbol: str | None = None, limit: int = 12) -> dict:
-        """Paper-runner dashboard/CLI stats, kept separate from backtests."""
+        """Paper-runner dashboard/CLI stats, kept separate from backtests.
+
+        This is the **broad** inventory report and deliberately still counts
+        every paper row, including simulator samples and research books — it
+        is how a reviewer sees what the store actually holds.
+
+        P12.16 adds ``live_open``: the count of positions the desk is really
+        carrying (:func:`live_open_rows`). The surfaces that state exposure as
+        a fact read that key, so a research import can no longer be presented
+        as an open live position, while the broad totals stay unchanged.
+        """
         where = ""
         args: tuple = ()
         if symbol:
@@ -763,6 +853,7 @@ class SignalDB:
         recent = [dict(r) for r in self.conn.execute(
             f"SELECT * FROM paper_trades{where} ORDER BY COALESCE(closed_ts, opened_ts, created_ts) DESC LIMIT ?",
             args + (max(1, min(int(limit), 50)),)).fetchall()]
+        overall["live_open"] = len(self.live_open_rows(symbol=symbol))
         return {"overall": overall, "by_type": by_type, "recent": recent}
 
     def source_inventory(self) -> dict:

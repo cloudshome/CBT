@@ -250,3 +250,48 @@ def calculate_trade_cost(
         holding_hours=holding_hours,
         funding_rate_8h=funding_rate_8h,
     )
+
+def net_r_of_row(row: dict) -> float:
+    """The NET R of one decided paper/backtest row — the single definition.
+
+    P12.6 restated the desk's numbers net of costs and P12.8 stated the rule
+    that matters: *a measurement only matters where something acts on it.*
+    P12.18 extends that from the two sites P12.8 fixed to the hard risk limits
+    in decision B6, which act harder than anything else in the system.
+
+    Resolution order:
+
+    * a stored ``rr_net`` wins — backtest and simulator rows carry one (P12.6);
+    * otherwise costs are computed on read from ``entry``/``stop_loss``/
+      ``action``/holding time via :func:`calculate_trade_cost`. **This is the
+      normal path for the live paper book**: ``close_paper_trade()`` writes
+      ``rr_achieved`` only, so every live row has ``rr_net IS NULL``;
+    * a row with no gross R at all contributes 0.0 rather than guessing.
+
+    Defined here, next to the cost model, so the risk gate, the business
+    scorecard and the analytics surfaces cannot drift apart about what "net"
+    means (invariant #10).
+    """
+    gross = row.get("rr_achieved")
+    if gross is None:
+        return 0.0
+    gross = float(gross)
+
+    stored = row.get("rr_net")
+    if stored is not None:
+        return float(stored)
+
+    opened, closed = row.get("opened_ts"), row.get("closed_ts")
+    hold_hours = None
+    if opened and closed and closed >= opened:
+        hold_hours = (closed - opened) / 3_600_000.0
+
+    return calculate_trade_cost(
+        entry=row.get("entry"),
+        stop_loss=row.get("stop_loss"),
+        action=row.get("action", "BUY"),
+        gross_r=gross,
+        holding_hours=hold_hours,
+        symbol=row.get("symbol", "BTCUSDT"),
+        ts=closed or opened,
+    ).net_r

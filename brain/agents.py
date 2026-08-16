@@ -57,9 +57,11 @@ class WatchdogAgent(BaseAgent):
             close_db = True
 
         try:
-            # Check open paper trades and risk gate
-            open_trades = db.conn.execute(
-                "SELECT * FROM paper_trades WHERE status IN ('WAITING_ENTRY', 'OPEN')").fetchall()
+            # Check open paper trades and risk gate.
+            # P12.16: the watchdog reports the *live* book — raw SQL here used
+            # to count simulator orphans and research-book rows as active desk
+            # positions and raise stale-entry alerts about them.
+            open_trades = db.live_open_rows()
             rg = evaluate_risk_gate(db)
 
             issues = []

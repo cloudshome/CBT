@@ -139,6 +139,17 @@ def check_risk_system(db: Optional[SignalDB] = None) -> dict:
             "status": "OK",
             "detail": f"Risk gate OPEN (Level: {rg.get('progression', {}).get('level')}, Max risk: {rg.get('progression', {}).get('risk_pct')}%)",
         }
+    except Exception as exc:
+        # P12.17 — a risk gate that RAISES is the most dangerous state there
+        # is: it is neither open nor closed, and every caller then behaves
+        # according to whether it happens to sit inside a try. The check whose
+        # job is to notice a broken risk system must always return a verdict,
+        # and an unanswerable gate is CRITICAL, never silence.
+        return {
+            "name": "risk_system",
+            "status": "CRITICAL",
+            "detail": f"Risk gate could not be evaluated: {type(exc).__name__}: {exc}",
+        }
     finally:
         if close_db:
             db.close()

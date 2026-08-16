@@ -783,6 +783,12 @@ def cmd_paper(args) -> int:
         print(f"  total paper trades {stats['n']} | waiting {stats.get('waiting', 0)} | "
               f"open {stats.get('open', 0)} | wins/losses {stats['wins']}/{stats['losses']} | "
               f"avg R {stats['avg_rr']}")
+        # P12.16 — say how much of that open count is the live book when the
+        # store also holds simulator samples or research-book positions.
+        _active = (stats.get("waiting", 0) or 0) + (stats.get("open", 0) or 0)
+        if _active != stats.get("live_open", _active):
+            print(f"  live open positions {stats['live_open']} "
+                  f"(of {_active} active rows — the rest are simulator/research)")
     return 0
 
 

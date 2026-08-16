@@ -180,30 +180,15 @@ def monte_carlo_equity(db, start: float = 10_000.0, risk_pct: float = None,
 
 
 def _net_outcome(row: dict) -> float:
-    """Return the net R for a decided paper row, computing costs if needed."""
-    rr = float(row.get("rr_achieved") or 0.0)
-    rr_net = row.get("rr_net")
-    if rr_net is not None:
-        return float(rr_net)
+    """Return the net R for a decided paper row, computing costs if needed.
 
-    from data.costs import calculate_trade_cost
+    P12.18: delegates to :func:`data.costs.net_r_of_row`, the single
+    definition of "net R" shared with the risk gate and the business
+    scorecard, so these surfaces cannot drift apart.
+    """
+    from data.costs import net_r_of_row
 
-    opened = row.get("opened_ts")
-    closed = row.get("closed_ts")
-    hold_hours = None
-    if opened and closed and closed >= opened:
-        hold_hours = (closed - opened) / 3_600_000.0
-
-    cost = calculate_trade_cost(
-        entry=row.get("entry"),
-        stop_loss=row.get("stop_loss"),
-        action=row.get("action", "BUY"),
-        gross_r=rr,
-        holding_hours=hold_hours,
-        symbol=row.get("symbol", "BTCUSDT"),
-        ts=closed or opened,
-    )
-    return cost.net_r
+    return net_r_of_row(row)
 
 
 def _historical_metrics(rows: list[dict]) -> dict:

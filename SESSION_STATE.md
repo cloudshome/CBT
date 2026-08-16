@@ -1,24 +1,137 @@
-**Last updated:** 2026-08-16 (P12.15 follow-up on the fixed Arena session
-branch `arena/01a0099b-sky`). The repository is at **v2.23.4**: the business
-scorecard's execution metric now uses the same canonical live population as
-its P&L/equity/risk reads, while the broad journal report remains unchanged.
+**Last updated:** 2026-08-16 (**P12.16 + P12.17 + P12.18** on the fixed Arena
+session branch `arena/01a009c0-sky`). The repository is at **v2.25.0**: the
+source boundary now reaches the **open** book (P12.16), the risk gate no longer
+crashes on weeks that span a month boundary (P12.17), and every hard risk limit
+now judges P&L **net of costs** (P12.18).
 
-**Branch:** `arena/01a0099b-sky` (fixed session branch)
-**HEAD commit:** verify with `git rev-parse HEAD` (the current tip is the P12.15 follow-up checkpoint)
-**Upstream:** PR #38 is merged; PR #39 carries this follow-up and remains open for review.
-**Previous implementation branch:** `arena/01a0096b-sky` (P12.15 implementation, merged as PR #38)
-**Version:** 2.23.4
-**Python:** 3.11 (venv `.venv`) — suite green (**750 pass / 1 skip**)
+> **Third build this session (v2.25.0 / P12.18 — the net anchor at the hard
+> limits).** P12.8 set the doctrine "a measurement only matters where something
+> acts on it" and fixed the two *expectancy* sites; it missed the *P&L* sites.
+> `closed_pnl()` (daily/weekly limits), `drawdown()` (the ladder) and
+> `brain/metrics.py` (equity, expectancy, PF, win rate, streaks) all judged
+> **gross** `rr_achieved`. This bites hardest on the live book because
+> `close_paper_trade()` writes `rr_achieved` only — **every live paper row has
+> `rr_net IS NULL`** — so costs existed purely as a compute-on-read step the
+> limits never took.
+>
+> **Measured** with the repo's own cost model: 8 × −0.4R reads −0.80% gross and
+> the gate stays **open**, but the book is −1.09% net, past the 1.0% daily
+> limit (**fails open**); 16 × −0.4R likewise breaches the weekly limit unseen;
+> 32 × −0.5R reads `4.00% / normal` instead of `5.18% / reduce_risk`; and a
+> 6W/8L book reports **+0.071R (an edge)** when it is **−0.076R (a loser)**.
+>
+> **Fix.** `data.costs.net_r_of_row()` is the single definition of a row's net
+> R — stored `rr_net` wins, else computed from the row's own levels, symbol and
+> holding time, else 0.0 — placed beside the cost model so the risk gate,
+> scorecard and analytics cannot drift apart. Every hard limit and the
+> scorecard read it; `_net_outcome()` delegates to it; a **win is now a net
+> win**. `closed_pnl()` additionally reports `gross_r_sum`/`gross_pct`/`cost_r`
+> and the CLI prints the drag beside the net figure.
+>
+> **Unchanged.** No threshold moved — only the number compared against them.
+> A cost-free book (`rr_net == rr_achieved`) behaves exactly as before, pinned
+> by a control in every test group. Four pre-existing tests that pinned gross
+> arithmetic while testing source isolation / date arithmetic were made
+> explicitly cost-free rather than relaxed, so a future change in fee
+> assumptions cannot silently rewrite what they mean.
+>
+> **Verification.** `tests/test_net_limits.py` (14 regressions); harness
+> `ops/probes/p12_18_netlimits_probe.py` (A–F, exit 0); the P12.14–P12.17
+> probes still exit 0; full suite **797 passed / 1 skipped**. Contract:
+> `docs/HANDOVER_2026-08-16_P12_18.md`.
 
-> **Current state.** P12.1–P12.15 and the P12.15 execution-metric follow-up
-> are shipped. The next work in sequence is operational, not a speculative
-> trading feature: on the real-data host, rerun canonical learning, import and
-> validate the separate Dukascopy XAU history, archive the read-only
-> `xau-evidence --json` dossier, and continue the canonical live paper book.
-> This clean checkout has no real store/database, so it must not manufacture
-> either result. The graduation bar remains closed; XAU remains research-only;
-> micro-live remains blocked until the unchanged graduation gate is READY and
-> the user separately approves it.
+> **Second build this session (v2.24.1 / P12.17 — week-boundary risk-gate
+> crash).** After P12.16 was pushed, continued review found that
+> `_week_start_utc()` computed Monday as
+> `start.replace(day=start.day - start.weekday())`. `datetime.replace()` cannot
+> cross a month boundary, so every week beginning in the previous month raised
+> `ValueError: day is out of range for month` — **38 days of 2026**, including
+> 1 January. The weekly loss limit is a hard B6 control, so the entire gate
+> raised instead of answering: `daily_weekly()`, `evaluate()` and
+> `status_text()` all threw; `main.py approve` propagated the error at the
+> human; the paper runner failed closed but recorded the reason "day is out of
+> range for month" rather than a risk reason; and `check_risk_system()` — the
+> diagnostic whose job is to notice a broken risk system — had **no** `except`
+> and took `run_health_check()` down with it. A gate that raises is neither
+> open nor closed; the outcome became an accident of exception handling.
+>
+> **Fix.** `timedelta` arithmetic, exhaustively verified over every date from
+> 2024 through 2029 (6,576 datetimes: always the correct Monday, never a
+> crash). Defence in depth: `check_risk_system()` now returns `CRITICAL` with
+> the underlying error when the gate cannot be evaluated, so this class of
+> failure can never be silent again. Losses falling in the previous-month part
+> of the current week still count toward the weekly limit (pinned by
+> regression). No threshold moved. `tests/test_week_boundary.py` (19
+> regressions); harness `ops/probes/p12_17_weekstart_probe.py`; contract
+> `docs/HANDOVER_2026-08-16_P12_17.md`.
+
+**Branch:** `arena/01a009c0-sky` (fixed session branch)
+**HEAD commit:** verify with `git rev-parse HEAD` (the current tip is the P12.18 checkpoint)
+**Upstream:** PR #39 is merged; PR #40 carries this session's P12.16 + P12.17 + P12.18 work.
+**Previous implementation branch:** `arena/01a0099b-sky` (P12.15 follow-up, merged as PR #39)
+**Version:** 2.25.0
+**Python:** 3.11 (venv `.venv`) — suite green (**797 pass / 1 skip**)
+
+> **Current state.** P12.1–P12.18 are shipped. The next work in sequence is
+> operational, not a speculative trading feature: on the real-data host, rerun
+> canonical learning, import and validate the separate Dukascopy XAU history,
+> archive the read-only `xau-evidence --json` dossier, and continue the
+> canonical live paper book. This clean checkout has no real store/database,
+> so it must not manufacture either result. The graduation bar remains closed;
+> XAU remains research-only; micro-live remains blocked until the unchanged
+> graduation gate is READY and the user separately approves it.
+
+> **This session (`arena/01a009c0-sky`): v2.24.0 / P12.16 open-book source
+> isolation.** PR #39 had merged and every ordered next action is real-host
+> operational work this checkout cannot honestly perform, so the session opened
+> as a safety review and produced `docs/HANDOVER_2026-08-16_P12_16.md` plus the
+> reproduction `ops/probes/p12_16_openbook_probe.py`; the fix was then built
+> against that contract.
+>
+> **The gap.** P12.11–P12.15 walked the source boundary through every surface
+> reading *decided* paper trades, but the **open** book was never isolated:
+> `open_exposure()` and `active_paper_trades()` selected
+> `status IN ('WAITING_ENTRY','OPEN')` with no `sim_key` filter and no
+> `source_key` filter. Measured on `731119d`: one open `dukascopy:spot:bid`
+> BTCUSDT row made `portfolio_veto()` refuse a real live trade for "correlated
+> exposure (1 open)" against a **flat** live bucket — this fails **closed**,
+> the mirror of P12.15; two research rows read `n_open=2 /
+> planned_risk_pct=1.0`, exhausting `CRYPTO_BUCKET_MAX_TRADES` and
+> `MAX_CRYPTO_EXPOSURE_RISK_PCT`; simulator samples (inserted `status='OPEN'`
+> and closed in the same pass) left orphans after any interrupted run that held
+> live risk slots permanently; the paper runner polled research and simulator
+> rows as live work, pricing them off the *canonical live* candle client and
+> able to open/close/journal them onto the live book; and a desk carrying 1
+> live position reported 6 across the CLI, `agent ask`, the briefing, the
+> watchdog agent and the dashboard.
+>
+> **Fix.** `SignalDB.live_open_rows()` is now the single definition of the live
+> open book — active (`WAITING_ENTRY`/`OPEN`), `sim_key IS NULL`,
+> canonical-live (`COALESCE(source_key,'')=''`, legacy NULL rows kept) — the
+> open-side twin of P12.15's `live_book_rows()`. `_open_book_clause()` supplies
+> the same predicate as a literal fragment for the `open_exposure()` UNION.
+> `open_exposure()`, `active_paper_trades()`, the watchdog agent and the
+> desk/briefing counts all read it; `paper_trade_stats()` keeps its broad
+> inventory totals and adds `live_open`.
+>
+> **Demonstration.** The probe's six cases (A–F) all behave as specified: the
+> research position no longer blocks (`allowed=True, n_open=0`), research rows
+> consume no bucket capacity, simulator orphans hold no slots, the runner polls
+> only scan #30 of three active rows, reported exposure reads 1 of 6, and the
+> canonical-only control book (including legacy NULL rows) still fills the
+> bucket at 2 and still vetoes the duplicate direction.
+>
+> **Unchanged.** Every threshold and cap (`CRYPTO_BUCKET_MAX_TRADES`,
+> `MAX_CRYPTO_EXPOSURE_RISK_PCT`, loss limits, drawdown ladder, graduation
+> bar), the decided-book surfaces from P12.11–P12.15, the approved-scan half of
+> `open_exposure()`, the broad paper inventory and journal reports, the
+> source-key algebra, XAU research-only status, and the no-order-placement
+> contract.
+>
+> **Verification.** `tests/test_openbook_isolation.py` (14 new regressions);
+> full suite **764 passed, 1 skipped**; the P12.14 and P12.15 probes still exit
+> 0; compileall and `pip check` pass. Contract:
+> `docs/HANDOVER_2026-08-16_P12_16.md`.
 
 **Previous:** 2026-08-16 (**v2.23.2 /
 P12.14 — graduation discipline isolation**. The 90% compliance criterion no

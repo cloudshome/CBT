@@ -559,6 +559,13 @@ def ask(question: str, symbol: str | None = None,
                      f"open {p.get('open', 0)} | closed {p.get('closed', 0)} | "
                      f"wins/losses {p['wins']}/{p['losses']} | avg "
                      f"{p['avg_rr']:+.2f}R"]
+            # P12.16 — the tracked totals are the broad store inventory; state
+            # the live book separately when they differ.
+            _active = (p.get("waiting", 0) or 0) + (p.get("open", 0) or 0)
+            if _active != p.get("live_open", _active):
+                lines.append(f"  live open positions: {p['live_open']} "
+                             f"(of {_active} active — simulator/research rows "
+                             f"are not this desk's exposure)")
             if not p["n"]:
                 lines.append("  Approve a signal, then run `python main.py paper --watch`.")
             return {"intent": intent, "question": question, "answer": lines,

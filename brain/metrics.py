@@ -10,6 +10,7 @@ Expectancy formula:
 """
 from __future__ import annotations
 
+from data.costs import net_r_of_row
 from data.database import SignalDB
 from brain.risk_gate import effective_risk
 
@@ -23,9 +24,11 @@ def _equity_curve(db: SignalDB, start: float = 10_000.0) -> list[dict]:
     equity = start
     out = []
     for r in rows:
-        rr = r.get("rr_achieved")
-        if rr is None:
+        if r.get("rr_achieved") is None:
             continue
+        # P12.18 — the business equity curve is NET of costs, matching the
+        # P12.6 strategy scorecard and the hard risk limits.
+        rr = net_r_of_row(r)
         dollar_risk = equity * (risk["risk_pct"] / 100.0)
         pnl = dollar_risk * rr
         equity = max(100.0, equity + pnl)
@@ -48,24 +51,27 @@ def _metrics(rows: list[dict]) -> dict:
             "win_streak": 0, "loss_streak": 0, "max_win_streak": 0,
             "max_loss_streak": 0,
         }
-    wins = [r for r in rows if (r.get("rr_achieved") or 0) > 0]
-    losses = [r for r in rows if (r.get("rr_achieved") or 0) < 0]
+    # P12.18 — every judgement below is NET of costs. A win is a NET win:
+    # a trade that cleared its target but not its fees is not a winner, and
+    # counting it as one flatters the win rate and the profit factor.
+    net_rs = [net_r_of_row(r) for r in rows]
+    wins = [rr for rr in net_rs if rr > 0]
+    losses = [rr for rr in net_rs if rr < 0]
     n = len(rows)
     w_cnt, l_cnt = len(wins), len(losses)
     win_rate = w_cnt / n if n else 0.0
     loss_rate = l_cnt / n if n else 0.0
-    avg_win = sum(r["rr_achieved"] for r in wins) / w_cnt if w_cnt else 0.0
-    avg_loss = sum(r["rr_achieved"] for r in losses) / l_cnt if l_cnt else 0.0
+    avg_win = sum(wins) / w_cnt if w_cnt else 0.0
+    avg_loss = sum(losses) / l_cnt if l_cnt else 0.0
     exp = (win_rate * avg_win) + (loss_rate * avg_loss)  # avg_loss is negative
 
-    gross_profit = sum(r["rr_achieved"] for r in wins)
-    gross_loss = abs(sum(r["rr_achieved"] for r in losses))
+    gross_profit = sum(wins)
+    gross_loss = abs(sum(losses))
     pf = (gross_profit / gross_loss) if gross_loss > 0 else (99.0 if gross_profit > 0 else None)
 
     # Streaks
     cur_w, cur_l, max_w, max_l = 0, 0, 0, 0
-    for r in rows:
-        rr = r.get("rr_achieved") or 0
+    for rr in net_rs:
         if rr > 0:
             cur_w += 1
             cur_l = 0

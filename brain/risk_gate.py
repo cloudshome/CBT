@@ -22,12 +22,13 @@ The gate combines:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from config import (PROGRESSION, PROGRESSION_LEVELS, ENFORCE_RISK_LIMITS,
                     TRADER_STATE_BLOCK, DRAWDOWN_REDUCE_PCT, DRAWDOWN_STOP_PCT,
                     DRAWDOWN_REVIEW_PCT, RISK_PCT, MAX_DAILY_LOSS_PCT,
                     MAX_WEEKLY_LOSS_PCT, ACCOUNT_BALANCE, KELLY_MAX_RISK_PCT)
+from data.costs import net_r_of_row
 from data.database import SignalDB
 from data.provenance import LIVE_SOURCE_KEY
 
@@ -66,10 +67,18 @@ def _day_start_utc(now: datetime | None = None) -> int:
 
 
 def _week_start_utc(now: datetime | None = None) -> int:
+    """Monday 00:00 UTC of the current week, in epoch milliseconds.
+
+    Subtract the weekday as a **timedelta**, never via ``replace(day=...)``:
+    ``replace`` cannot cross a month boundary, so the previous
+    ``start.replace(day=start.day - start.weekday())`` raised
+    ``ValueError: day is out of range for month`` for every week that began in
+    the previous month (38 days of 2026). The weekly loss limit is a hard B6
+    control, so on those dates the whole risk gate raised instead of answering.
+    """
     now = now or datetime.now(timezone.utc)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start = start.replace(day=start.day - start.weekday())  # Monday
-    return int(start.timestamp() * 1000)
+    return int((start - timedelta(days=start.weekday())).timestamp() * 1000)
 
 
 def closed_pnl(db: SignalDB, since_ts: int, risk_pct: float) -> dict:
@@ -81,11 +90,25 @@ def closed_pnl(db: SignalDB, since_ts: int, risk_pct: float) -> dict:
     books (non-canonical ``source_key``) are not this desk's trading — a
     research win must not offset a real loss past the daily limit, and a
     research loss must not trip a limit the live book never hit.
+
+    P12.18: the sum is **net of costs**. P12.6 restated the desk's numbers as
+    ``E_net`` and P12.8 set the rule that a measurement only matters where
+    something acts on it — the daily/weekly limits act harder than anything
+    else here, so they judge the same number the scorecard reports. The live
+    runner writes ``rr_achieved`` only (``rr_net IS NULL``), so costs are
+    computed on read from the row's own levels and holding time. A book that
+    is past its loss limit once fees are paid now blocks, instead of reading
+    comfortably inside the limit gross.
     """
     rows = db.live_book_rows(since_ts=since_ts)
-    r_sum = round(sum(float(r["rr_achieved"] or 0.0) for r in rows), 3)
+    r_sum = round(sum(net_r_of_row(r) for r in rows), 3)
+    gross_sum = round(sum(float(r["rr_achieved"] or 0.0) for r in rows), 3)
     return {"n": len(rows), "r_sum": r_sum,
-            "pct": round(r_sum * risk_pct, 3)}
+            "pct": round(r_sum * risk_pct, 3),
+            # Kept visible so a reviewer can see the cost drag explicitly.
+            "gross_r_sum": gross_sum,
+            "gross_pct": round(gross_sum * risk_pct, 3),
+            "cost_r": round(gross_sum - r_sum, 3)}
 
 
 def daily_weekly(db: SignalDB) -> dict:
@@ -110,7 +133,9 @@ def drawdown(db: SignalDB) -> dict:
     """Equity-curve drawdown from decided paper trades (B6 ladder).
 
     Equity starts at the configured account balance (or $10,000) and applies
-    each decided trade's ``rr_achieved * risk_pct`` in chronological order.
+    each decided trade's **net** R (``data.costs.net_r_of_row``) times
+    ``risk_pct`` in chronological order (P12.18 — the ladder is a hard control,
+    so it judges the same net anchor the scorecard reports).
     The population is :func:`SignalDB.live_book_rows` (P12.15): simulator
     samples are historical walk-forward rows, and research-book trades are
     another price series entirely — a research win interleaved into the
@@ -125,7 +150,10 @@ def drawdown(db: SignalDB) -> dict:
     peak = balance
     max_dd = 0.0
     for r in rows:
-        equity += balance * (float(r["rr_achieved"] or 0.0) * risk["risk_pct"] / 100.0)
+        # P12.18 — the ladder walks the NET equity curve. A drawdown measured
+        # before costs is not the drawdown the account actually suffered, and
+        # under-reporting it parks the desk a rung lower than reality.
+        equity += balance * (net_r_of_row(r) * risk["risk_pct"] / 100.0)
         peak = max(peak, equity)
         max_dd = max(max_dd, (peak - equity) / peak * 100.0 if peak else 0.0)
     if max_dd >= DRAWDOWN_REVIEW_PCT:
@@ -312,8 +340,14 @@ def status_text(db: SignalDB) -> str:
         f"RISK & DISCIPLINE GATE   progression={prog['level']}  ({prog['label']})",
         "-" * 66,
         f"  effective risk      {risk['risk_pct']}%/trade   {risk['daily']}%/day   {risk['weekly']}%/week",
-        f"  today  {dws['today']['n']:>3} trades  {dws['today']['pct']:+.2f}%   (limit {risk['daily']}%)",
-        f"  week   {dws['week']['n']:>3} trades  {dws['week']['pct']:+.2f}%   (limit {risk['weekly']}%)",
+        # P12.18 — these percentages are NET of costs; show the drag when
+        # there is any, so the number is never mistaken for a gross read.
+        f"  today  {dws['today']['n']:>3} trades  {dws['today']['pct']:+.2f}%   (limit {risk['daily']}%)"
+        + (f"   [gross {dws['today']['gross_pct']:+.2f}%, costs {dws['today']['cost_r']:.2f}R]"
+           if dws['today'].get('cost_r') else ""),
+        f"  week   {dws['week']['n']:>3} trades  {dws['week']['pct']:+.2f}%   (limit {risk['weekly']}%)"
+        + (f"   [gross {dws['week']['gross_pct']:+.2f}%, costs {dws['week']['cost_r']:.2f}R]"
+           if dws['week'].get('cost_r') else ""),
         f"  drawdown           {dw['max_drawdown_pct']:.2f}%  -> {dw['level']}   equity {dw['equity']:,.2f}",
         f"  trader state       {', '.join(ts['flags']) if ts['flags'] else 'clear'}",
         f"  enforced           {'yes' if d['enforced'] else 'no (advisory only)'}",

@@ -37,8 +37,17 @@ def _paper(db: SignalDB, scan_id: int, *, rr: float = 2.0,
            source_key: str | None = LIVE_SOURCE_KEY,
            ts: int | None = None,
            mae: float | None = None, mfe: float | None = None) -> None:
-    """Insert one decided (CLOSED) paper trade with explicit provenance."""
+    """Insert one decided (CLOSED) paper trade with explicit provenance.
+
+    ``rr_net`` defaults to ``rr`` (a cost-free row). These tests isolate rows
+    by *source*, not by cost accounting: pinning the net equal to the gross
+    keeps the P12.15 assertions exact under the P12.18 net anchor, so a change
+    in the cost model can never silently rewrite what "source isolation" means.
+    Cost behaviour itself is covered by tests/test_net_limits.py.
+    """
     ts = ts if ts is not None else int(time.time() * 1000)
+    if rr_net is None:
+        rr_net = rr
     outcome = "TP_HIT" if rr > 0 else "STOP_LOSS"
     db.conn.execute(
         """INSERT INTO paper_trades(scan_id, signal_id, plan_type, symbol, timeframe,
@@ -79,7 +88,11 @@ def test_research_wins_cannot_mask_daily_losses(tmp_path):
     for i in range(6):                       # research profit the desk never made
         _paper(db, 200 + i, rr=2.0, source_key=RESEARCH_KEY, ts=_NOW)
     dw = daily_weekly(db)
-    assert dw["today"] == {"n": 5, "r_sum": -5.0, "pct": -1.25}
+    # P12.18 added gross_* / cost_r alongside the net figures; assert the
+    # fields this test is about rather than the whole payload shape.
+    assert dw["today"]["n"] == 5
+    assert dw["today"]["r_sum"] == -5.0
+    assert dw["today"]["pct"] == -1.25
     assert dw["daily_blocked"] is True
     db.close()
 
@@ -255,7 +268,9 @@ def test_canonical_only_book_is_unchanged(tmp_path):
     for i in range(2):
         _paper(db, 1500 + i, rr=-1.0, ts=_NOW)
     dw = daily_weekly(db)
-    assert dw["today"] == {"n": 5, "r_sum": 4.0, "pct": 1.0}
+    assert dw["today"]["n"] == 5
+    assert dw["today"]["r_sum"] == 4.0
+    assert dw["today"]["pct"] == 1.0
     assert dw["daily_blocked"] is False
     # identical to the unfiltered read on this book — strictly a no-op here
     pooled = db.decided_paper_rows(exclude_sim=True)
