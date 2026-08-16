@@ -84,15 +84,13 @@ moves nothing. Data first, validation second, wrappers last, bots never.
 
 ---
 
-## Human actions this token cannot do
+## Human/admin action still open
 
-1. **Protect `main`.** GitHub reports `protected: false`. The Arena
-   token gets HTTP 403 on the protection API. A repo admin should
-   enable: require PR, no direct push, require status checks once
-   CI is active (TODO-7).
-2. **Activate CI / paste the wheel-gate job** into the real
-   `.github/workflows/ci.yml`. The spec sits at
-   `docs/.github/workflows/ci.yml`, which is **inert** — nested under
-   `docs/`, so GitHub Actions never reads it (TODO-7).
+1. **Verify and protect `main` (TODO-8).** The Arena integration gets HTTP 403
+   on the branch-protection read API, so it cannot confirm or modify the
+   setting. A repo admin should require PRs, disallow force-push/deletion, and
+   require both active CI jobs: **Offline test suite** and **Wheel gate**.
 
-Tracked as TODO-8 and TODO-7 in [`TODO.md`](../TODO.md).
+TODO-7 is complete: root `.github/workflows/ci.yml` runs both jobs, and merged
+P12.12 passed them on `main` (run `31907327643`). See
+[`TODO.md`](../TODO.md) and [`HUMAN_ACTIONS.md`](HUMAN_ACTIONS.md).

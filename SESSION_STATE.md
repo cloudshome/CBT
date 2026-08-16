@@ -10,20 +10,48 @@
 > re-read the entire file, fix pre-existing placeholders and stale
 > status lines, not just append new sections.
 
-**Last updated:** 2026-08-16 (this session: **v2.23.0 — P12.12 read-only
-PAXG-vs-XAU promotion-evidence dossier**: exact-time basis measurement,
-strict one-sided XAU provenance, and read-only sealed-envelope inspection.
-Synthetic mechanics are green; real-host evidence and approval remain open.)
+**Last updated:** 2026-08-16 (this session: **v2.23.1 / P12.13 —
+graduation source isolation**. The global permission path now admits canonical
+live evidence only; research books can neither unlock nor block micro-live.
+Also reconciled merged PR/CI state and closed stale TODO-7 instructions.)
 
-**Previous:** 2026-08-16 (**v2.22.0 P12.11 — source provenance in saved
-keys**: research histories can no longer recalibrate the live book; all three
-Dukascopy adapter blockers closed, but XAU promotion did not.)
-**Branch:** `arena/01a006ec-sky` (this session's branch)
-**HEAD commit:** `ee4ed1d` feat: add read-only XAU evidence dossier
-**Python:** 3.11 (venv `.venv`) — suite green (**723 pass / 1 skip**)
+**Previous:** 2026-08-16 (**v2.23.0 P12.12 — read-only PAXG-vs-XAU
+promotion-evidence dossier**. Synthetic mechanics are green; real-host
+evidence and approval remain open.)
+**Branch:** `arena/01a008b9-sky` (this session's fixed branch)
+**HEAD commit:** handoff-only commit on top of `5320281` (the exact implementation commit below; use `git rev-parse HEAD` for the self-referential handoff tip)
+**Python:** 3.11 (venv `.venv`) — suite green (**726 pass / 1 skip**)
 
-> **This session (`arena/01a006ec-sky`): v2.23.0 — P12.12 PAXG-vs-XAU
-> promotion-evidence dossier.**
+> **This session (`arena/01a008b9-sky`): v2.23.1 / P12.13 graduation
+> source isolation.** Review found a safety gap left after P12.11:
+> calibration, the live confidence hook, and `setup_proven()` were isolated by
+> source, but `data.simulator.paper_progress()` still pooled every source into
+> the global graduation report used by CLI, agent, desk/API/dashboard and MCP.
+> A strong research book could help unlock micro-live; a weak one could block
+> the canonical live book.
+>
+> **Fix.** `paper_progress()` now filters both decided tables to
+> `COALESCE(source_key, '') = ''`: canonical Binance spot only, with legacy
+> NULL rows intentionally preserved. Every progress row declares that source.
+> `grind_verdict()` and `graduation_status()` independently fail closed when a
+> caller provides explicit non-canonical progress, even when every sample and
+> performance criterion passes. Research remains inspectable through existing
+> source-filtered scorecards. No threshold changed; this is strictly tighter.
+>
+> **Repository reconciliation.** `origin/main` and the session branch began
+> identical at `5345e9e`; PR #35 is merged. Root CI already includes the wheel
+> gate, and GitHub run `31907327643` passed both jobs on that SHA, so TODO-7 and
+> its obsolete nested workflow copy were closed. Branch protection remains
+> unverified because the integration receives HTTP 403; TODO-8 stays open.
+>
+> **Verification.** Rebuilt `.venv`; focused simulator/provenance tests **41
+> passed**; full suite **726 passed, 1 skipped** in 94.44s; compileall and
+> `pip check` pass; v2.23.1 wheel builds with no duplicate entries. This
+> checkout has no real store/database, so no real evidence claim was made and
+> the graduation/micro-live gates remain closed.
+>
+> **Previous engineering session (`arena/01a006ec-sky`): v2.23.0 — P12.12
+> PAXG-vs-XAU promotion-evidence dossier.**
 >
 > **What shipped.** `data/gold_basis.py` reads
 > `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD` as independent canonical
@@ -302,7 +330,7 @@ Independence has two halves: **decision independence** (our own engine
 + risk gate + approval loop — ✅ done, P1–P9) and **data independence**
 (our own stored market history — ✅ P10.1–P10.12 shipped, with real BTC
 market data imported and verified; research-validation tooling — ✅
-P12.1–P12.12 shipped). The next executable work is the real-host XAU evidence
+P12.1–P12.13 shipped). The next executable work is the real-host XAU evidence
 run plus continued paper proof. **Micro-live remains blocked** until the
 unchanged graduation report says READY and the user explicitly approves it.
 Every phase below is ordered by how directly it moves those two lines.
@@ -311,7 +339,7 @@ Every phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**P12 (SKY Quant Validation Engine) — P12.12 evidence tooling shipped.**
+**P12 (SKY Quant Validation Engine) — P12.1–P12.13 shipped.**
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real BTC data and the graduation gate is honestly closed (+0.348R
 gross, negative net on 1h/4h primary). Freqtrade rejected (F1–F8);
@@ -321,7 +349,7 @@ source-keyed calibration (P12.11), and a read-only PAXG-vs-XAU basis/seal
 dossier (P12.12). Adapter blockers are closed, but **promotion evidence is
 not**: this checkout has no real basis measurement or XAU seal, approval is
 open, and XAU remains non-tradeable. Open items: real-host evidence, the P11
-paper gate, TODO-7, TODO-8; micro-live is blocked.
+paper gate, and TODO-8; micro-live is blocked. TODO-7 is complete.
 
 | Phase | Theme | Status | Notes |
 |---|---|---|---|
@@ -333,10 +361,10 @@ paper gate, TODO-7, TODO-8; micro-live is blocked.
 | P6 | Hidden Alpha & Variance | ✅ Complete | `engine/hidden_alpha.py`, `engine/execution.py`, `engine/correlation.py`, `brain/analytics.py` |
 | P7 | Agent Surface (SKILL + CLI) | ✅ Complete | `SKILL.md`, `python main.py doctor`, `python main.py skill` |
 | P8 | Source Channels (router) | ✅ Complete | `brain/channels.py` + `/api/channels` + dashboard "Channels" panel |
-| **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; wheel-gate content landed (CI activation = TODO-7) |
+| **P9** | **Capability Endpoints** | **✅ Complete** | MCP 13 tools (incl. `desk_status`, `readiness`); readiness strip on all surfaces; root CI runs offline suite + wheel gate (TODO-7 complete) |
 | **P11** | **Paper-book proof** | 🔄 In progress | First grind shipped (38,439 decided; all four primary setups ≥100/20; compliance 100%); first real-data grind shipped (+8,300 bt / +494 paper). Gate honestly closed. |
 | **P10** | **Data infrastructure + market terminal** | ✅ Complete | **P10.1–P10.12 shipped** (PR #18): store, backfill, gaps/rollups, derivatives, quality pillar, Bybit, cross-exchange, Lightweight Charts, futures/flow cards, WS tier, store-backtester, feature store. [`docs/DATA_INFRASTRUCTURE_ROADMAP.md`](docs/DATA_INFRASTRUCTURE_ROADMAP.md) |
-| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.1–P12.12 shipped** — locked/sealed validation, lookahead guard, scorecard, real-data path, fees-first `E_net`, effective sample size, quality/strategy scores, Monte Carlo survivability, net decision anchor, market calendars, XAU costs, source-separated saved keys, and the read-only PAXG-vs-XAU promotion-evidence dossier. Tooling completion does not promote XAU: run P12.12 on the real-data host, retain human review, and keep micro-live locked until the global bar says READY plus explicit approval. |
+| **P12** | **Quant Validation Engine** | ✅ Complete | **P12.1–P12.13 shipped** — locked/sealed validation, lookahead guard, scorecard, real-data path, fees-first `E_net`, effective sample size, quality/strategy scores, Monte Carlo survivability, net decision anchor, calendars, XAU costs, source-separated saved keys, read-only XAU promotion evidence, and canonical-only global graduation. Tooling completion does not promote XAU: run P12.12 on the real-data host, retain human review, and keep micro-live locked until the unchanged global bar says READY plus explicit approval. |
 
 Full phase matrix: [`AI_ANATOMY_ROADMAP.md`](./AI_ANATOMY_ROADMAP.md).
 Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./ROADMAP_AGENT_REACH_UPGRADE.md).
@@ -344,6 +372,34 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 ---
 
 ## Completed work
+
+### Session 2026-08-16 (this branch `arena/01a008b9-sky`): v2.23.1 / P12.13 — graduation source isolation
+
+Inherited merged P12.12 at `5345e9e`; branch and `origin/main` were identical.
+Review found one remaining P12.11 source leak in the permission path and fixed
+it without changing the graduation bar or adding execution capability.
+
+- `data/simulator.py`: `paper_progress()` now reads only canonical live
+  outcomes from both books (`COALESCE(source_key, '') = ''`), preserving legacy
+  NULL rows. Progress carries explicit provenance.
+- `grind_verdict()` / `graduation_status()` veto explicit non-canonical
+  progress even when the quantitative bar passes; human and JSON output expose
+  the evidence source.
+- `tests/test_provenance.py`: +3 regressions prove positive/negative research
+  books cannot move canonical progress, legacy rows remain visible, and a
+  perfect bid-only research book cannot graduate.
+- Repository-state correction: PR #35 recorded merged, TODO-7 recorded done,
+  root CI's two passing jobs verified, obsolete nested workflow copy removed;
+  TODO-8 remains unverified due GitHub API HTTP 403.
+- Version `2.23.0 → 2.23.1`; docs/roadmaps/source contract reconciled.
+- Verification: focused **41 pass**; full **726 pass / 1 skip**; compileall,
+  `pip check`, and wheel duplicate-entry gate pass.
+
+**Files changed:** `data/simulator.py`, `tests/test_provenance.py`, `config.py`,
+`pyproject.toml`, `README.md`, `ARCHITECTURE.md`, `AI_ANATOMY_ROADMAP.md`,
+`TODO.md`, `CHANGELOG.md`, `docs/SOURCE_PROVENANCE.md`,
+`docs/HUMAN_ACTIONS.md`, `docs/INFRASTRUCTURE_LAYERS.md`, removal of obsolete
+`docs/.github/workflows/ci.yml`, and this handoff.
 
 ### Session 2026-08-16 (this branch `arena/01a006ec-sky`): P12.12 — read-only PAXG-vs-XAU promotion evidence
 
@@ -664,10 +720,9 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 3. **Micro-live at trivial size — BLOCKED** until the graduation report says
    READY and the user explicitly approves it. Slippage, partial fills, and
    latency become measurable only after both gates open.
-4. **TODO-7** — human pastes the wheel-gate job into the **real**
-   `.github/workflows/ci.yml` (the `docs/` copy is inert).
-5. **TODO-8** — human protects `main` (require PR). Token: HTTP 403.
-6. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
+4. **TODO-8** — a repo admin verifies/protects `main` (require PR and both CI
+   jobs). The integration cannot read or change protection: HTTP 403.
+5. **TODO-9 / TODO-10** — Dify then LibreChat (parked).
 
 ---
 
@@ -680,9 +735,11 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    for the zero-dep `mcp_server.py`.
 4. **Immune system reports `CRITICAL` in `DEMO_MODE=1`** because the
    committed sample data is stale by design. Expected offline.
-5. **Arena cannot push under `.github/workflows/`.** The wheel-gate
-   job spec lives at `docs/.github/workflows/ci.yml` (TODO-7).
-6. **`CHANGELOG.md` is current** through v2.23.0.
+5. **TODO-7 is complete.** Root `.github/workflows/ci.yml` runs the offline
+   suite and wheel gate; both passed on merged P12.12 (`main`, run
+   `31907327643`). The obsolete nested workflow copy was removed.
+6. **`CHANGELOG.md` is current** through v2.23.0 plus an Unreleased maintenance
+   correction.
 7. **Real market data is imported offline**: Binance spot BTCUSDT 1m
    (696,960 bars, sha256-pinned `c4ad6029…b934b7`). The store is
    gitignored; re-import with `backfill --from-csv` if starting in a clean sandbox.
@@ -710,7 +767,7 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 14. **`config.VERSION` was stale after P12.4** (2.14.0 instead of 2.15.0) —
     fixed to **2.17.0** in this session; `config.py` and `pyproject.toml` are
     now in step.
-16. **P12.8 changed decisions, not measurements.** The scorecard, quality
+15. **P12.8 changed decisions, not measurements.** The scorecard, quality
     score and strategy score were already net-correct; only the calibrator
     multiplier and the proven gate were reading gross. If a setup's
     multiplier or `proven` flag looks *worse* than in a pre-2.18.0 run, that
@@ -718,7 +775,7 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
     Where `rr_net` is absent (old rows, costs disabled) behaviour falls back
     to gross exactly as before, so historical books do not silently change
     meaning; `proven_on` says which anchor was used.
-15. **P12.7 is a report, not a gate-bypass**: the Monte Carlo ruin table
+16. **P12.7 is a report, not a gate-bypass**: the Monte Carlo ruin table
     reads the decided paper book NET of costs and surfaces survivability
     estimates. It does not approve trades, loosen the graduation bar, or
     replace the risk gate.
@@ -761,6 +818,10 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 25. **This checkout has no real basis evidence.** Synthetic fixtures prove
     mechanics only. The clean-checkout failure is the correct fail-closed
     result and must not be reported as real-host validation.
+26. **Global graduation is canonical-live-only (P12.13).** Do not remove the
+    `COALESCE(source_key, '') = ''` filters from `paper_progress()` or treat
+    its output as a pooled research report. Use the source-filtered scorecard
+    for research. Legacy NULL keys remain canonical by deliberate contract.
 
 ---
 
@@ -779,16 +840,17 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 4. Continue P11 live-data paper proof until the unchanged graduation report
    says READY. **Micro-live remains blocked** until that result and separate
    explicit user approval both exist.
-5. A human does TODO-7 + TODO-8 from [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
+5. A repo admin verifies/completes TODO-8 from
+   [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md); TODO-7 is already done.
 6. Do not install Freqtrade or Backtrader, pool PAXG/XAU calibration histories,
    loosen the graduation bar, or build order placement while gates are open.
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first and
-> confirm P12.12 merged. P12.1–P12.12 are shipped; do not rewrite the locked
-> protocol, source-key algebra, calendars, gold costs, or `data/gold_basis.py`.
-> Preserve separate `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD`
+> confirm P12.13 merged. P12.1–P12.13 are shipped; do not rewrite the locked
+> protocol, source-key algebra, canonical-only graduation filters, calendars,
+> gold costs, or `data/gold_basis.py`. Preserve separate `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD`
 > histories and exact-time-only alignment. Run the documented P12.12 procedure
 > on the real-data host; never substitute synthetic fixtures, pool calibration,
 > or create/reseal evidence from `xau-evidence`. Treat a passing dossier as
@@ -804,7 +866,7 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 723 passed, 1 skipped
+# 726 passed, 1 skipped
 ```
 
 PAXG-vs-XAU evidence (P12.12):
@@ -830,7 +892,7 @@ DEMO_MODE=1 .venv/bin/python -m pytest tests/test_costs.py -q
 Wheel gate:
 ```bash
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# builds cryptobrain-2.23.0-py3-none-any.whl ; no duplicate entries
+# builds cryptobrain-2.23.1-py3-none-any.whl ; no duplicate entries
 ```
 
 Market calendar (P12.9):
@@ -876,12 +938,11 @@ python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau swe
 ## Last implementation commit
 
 ```
-ee4ed1d  feat: add read-only XAU evidence dossier
+5320281  fix: isolate graduation evidence by source
 ```
 
-P12.12 is committed and pushed on `arena/01a006ec-sky`. Pull request **#35**
-is open from that branch to `main`. The inherited branch base remains `f34540e`
-(P12.11 / PR #34).
+Session base: `5345e9e` (merged P12.12 / PR #35). P12.13 is committed at
+`5320281`; the final branch-tip commit only reconciles this handoff file.
 
 ---
 
@@ -920,7 +981,7 @@ Rules:
 - Implement the next highest-priority task from TODO.md.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
-- Maintain test count at ≥ 723 pass / 1 skip.
+- Maintain test count at ≥ 726 pass / 1 skip.
 - Update SESSION_STATE.md with completed/current/remaining/known/
   next action. Full-document reconciliation, not append-only.
 - Update CHANGELOG.md.
@@ -936,22 +997,11 @@ main (Arena allows one PR per chat session). Do not merge it yourself.
 
 ## End-of-session checklist (run before closing this session)
 
-1. [x] Finish or safely stop the current task. — **P12.12 shipped**
-   (read-only exact-time PAXG/XAU basis and sealed-evidence dossier).
-2. [x] Run `DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q` —
-   **723 pass / 1 skip** with the optional MCP extra installed; focused P12.12
-   run **54 pass**.
-3. [x] Fix any obvious failures. — none left open.
-4. [x] Update `SESSION_STATE.md` with the exact current state and preserve the
-   exact `HEAD commit:` handoff header.
-5. [x] Update `TODO.md` — P12.12 tooling marked shipped; real-host evidence is
-   next; micro-live remains blocked.
-6. [x] Update `CHANGELOG.md` — v2.23.0 P12.12 entry.
-7. [x] Record all files changed in `SESSION_STATE.md`.
-8. [x] Record the last successful test command.
-9. [x] Record the P12.12 implementation commit reference — `ee4ed1d`.
-10. [x] Record known limitations — synthetic-only mechanics here, no real
-    basis/seal/promotion evidence.
-11. [x] `git add` / `git commit` and push only to
-    `origin/arena/01a006ec-sky`.
-12. [x] Open the session PR from `arena/01a006ec-sky` — **PR #35**.
+1. [x] Fix the reviewed safety gap — canonical-only global graduation.
+2. [x] Rebuild `.venv`; run focused tests — **41 passed**.
+3. [x] Run full suite — **726 passed, 1 skipped**.
+4. [x] Run compileall, `pip check`, and v2.23.1 wheel gate.
+5. [x] Reconcile TODO/architecture/roadmap/source docs and stale TODO-7 state.
+6. [x] Keep thresholds, XAU status, and no-order-placement contract unchanged.
+7. [x] Commit and push only to `origin/arena/01a008b9-sky`.
+8. [x] Open one PR from `arena/01a008b9-sky` to `main`; do not merge it.

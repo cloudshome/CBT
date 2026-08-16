@@ -17,6 +17,8 @@ The contract now:
   4. The live engine resolves canonical keys only, so a research profile
      cannot reach a live signal.
   5. A one-sided (bid/ask-only) series can never be "proven".
+  6. Global graduation counts canonical live evidence only; research books
+     can neither grant nor withdraw micro-live permission.
 """
 from __future__ import annotations
 
@@ -300,6 +302,109 @@ def test_setup_proven_still_counts_legacy_rows_as_live(tmp_path):
     verdict = setup_proven(db, "Buy Pullback")
     assert verdict["backtest_n"] == 120
     db.close()
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Global graduation — permission must be isolated by source too (P12.13)
+# ──────────────────────────────────────────────────────────────────────────
+def _save_paper_outcome(db, *, scan_id: int, plan_type: str,
+                        rr: float, prov=None):
+    """Minimal decided paper row for source-isolation regression tests."""
+    prov = prov or {}
+    outcome = "TP_HIT" if rr > 0 else "STOP_LOSS"
+    db.conn.execute(
+        """INSERT INTO paper_trades
+           (scan_id, signal_id, plan_id, plan_type, symbol, timeframe, action,
+            entry, stop_loss, take_profit, risk_reward, confidence_pct,
+            status, created_ts, opened_ts, closed_ts, entry_price, exit_price,
+            outcome, rr_achieved, close_reason, exchange, market, price_type,
+            source_key)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (scan_id, f"sig-{scan_id}", "p", plan_type,
+         prov.get("symbol", "BTCUSDT"), "15m", "BUY",
+         100.0, 99.0, 102.0, 2.0, 80, "CLOSED",
+         1_700_000_000_000 + scan_id, 1_700_000_000_000 + scan_id,
+         1_700_000_000_001 + scan_id, 100.0, 102.0 if rr > 0 else 99.0,
+         outcome, rr, "test", prov.get("exchange", "binance"),
+         prov.get("market", "spot"), prov.get("price_type", ""),
+         prov.get("source_key", "")),
+    )
+    db.conn.commit()
+
+
+def test_graduation_progress_ignores_noncanonical_books_both_directions(tmp_path):
+    """Research wins cannot unlock live; research losses cannot block it."""
+    from data.simulator import paper_progress
+
+    live = SignalDB(tmp_path / "live.db")
+    live.save_backtest_rows(_rows(n=60), run_id="live")
+    _save_paper_outcome(live, scan_id=1, plan_type="Buy Pullback", rr=2.0)
+    baseline = paper_progress(live)
+    live.close()
+
+    mixed = SignalDB(tmp_path / "mixed.db")
+    mixed.save_backtest_rows(_rows(n=60), run_id="live")
+    _save_paper_outcome(mixed, scan_id=1, plan_type="Buy Pullback", rr=2.0)
+    # Extremely positive and negative research evidence. Before P12.13 all of
+    # it entered paper_progress() and moved the global micro-live verdict.
+    mixed.save_backtest_rows(_rows(n=200, win_r=6.0, loss_r=-0.05,
+                                   prov={"exchange": "dukascopy",
+                                         "market": "spot", "price_type": "bid",
+                                         "symbol": "XAUUSD"}), run_id="research-up")
+    mixed.save_backtest_rows(_rows(n=200, win_r=0.05, loss_r=-6.0,
+                                   prov={"exchange": "bybit", "market": "spot"}),
+                             run_id="research-down")
+    _save_paper_outcome(
+        mixed, scan_id=2, plan_type="Buy Pullback", rr=6.0,
+        prov={"exchange": "dukascopy", "market": "spot", "price_type": "bid",
+              "source_key": DUKA, "symbol": "XAUUSD"})
+    _save_paper_outcome(
+        mixed, scan_id=3, plan_type="Buy Pullback", rr=-6.0,
+        prov={"exchange": "bybit", "market": "spot",
+              "source_key": "bybit:spot"})
+
+    actual = paper_progress(mixed)
+    assert actual == baseline
+    assert actual[0]["source_key"] == LIVE_SOURCE_KEY
+    assert actual[0]["backtest_n"] == 60
+    assert actual[0]["paper_n"] == 1
+    mixed.close()
+
+
+def test_graduation_progress_keeps_legacy_null_rows_as_canonical(tmp_path):
+    from data.simulator import paper_progress
+
+    db = SignalDB(tmp_path / "legacy_progress.db")
+    db.save_backtest_rows(_rows(n=12), run_id="legacy")
+    db.conn.execute("UPDATE backtest_results SET source_key=NULL")
+    db.conn.commit()
+    progress = paper_progress(db)
+    assert progress[0]["backtest_n"] == 12
+    assert progress[0]["source_key"] == LIVE_SOURCE_KEY
+    db.close()
+
+
+def test_graduation_evaluator_fails_closed_on_explicit_research_progress():
+    """Even a caller-built perfect research book cannot grant permission."""
+    from data.simulator import graduation_status, primary_plan_types
+
+    progress = []
+    for plan_type in primary_plan_types():
+        progress.append({
+            "plan_type": plan_type, "source_key": DUKA,
+            "backtest_n": 120, "paper_n": 20, "n": 140,
+            "wins": 84, "losses": 56, "wins_net": 84,
+            "win_r": 168.0, "loss_r": 56.0,
+            "win_r_net": 168.0, "loss_r_net": 56.0,
+            "expectancy": 0.8, "expectancy_net": 0.8,
+            "proven": True,
+        })
+    gate = graduation_status(progress, compliance=0.95)
+    assert all(gate["met"].values())  # performance itself clears the bar
+    assert gate["source_is_canonical"] is False
+    assert gate["samples_proven"] is False
+    assert gate["ready"] is False
+    assert "canonical live-series" in gate["source_block"]
 
 
 # ──────────────────────────────────────────────────────────────────────────

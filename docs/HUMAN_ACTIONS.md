@@ -1,51 +1,34 @@
-# Human actions this token cannot do
+# Human/admin actions
 
-Arena's GitHub App can push code to `arena/*` and open a PR.
-It **cannot** change branch protection or workflow files.
+Arena's GitHub integration can push session branches and open pull requests.
+It cannot read or change repository branch-protection settings in this repo
+(the API returns HTTP 403), so one admin check remains.
 
-Do these two in the GitHub UI. Two minutes. Then SKY's
-`main` is a real stable branch.
-
-## TODO-8 — Protect `main`
+## TODO-8 — Verify and protect `main`
 
 1. Open https://github.com/Azimshawon/SKY/settings/branches
-2. **Add branch protection rule** → branch name `main`
-3. Enable:
-   - **Require a pull request before merging**
-   - **Do not allow bypassing the above settings** (optional but recommended)
-   - **Do not allow force pushes**
-   - **Do not allow deletions**
-4. After TODO-7 is live, also tick **Require status checks to pass**
-   and select `Offline test suite`.
+2. Inspect or add the rule/ruleset for `main`.
+3. Require:
+   - a pull request before merging;
+   - both status checks: **Offline test suite** and **Wheel gate**;
+   - no force pushes;
+   - no branch deletion;
+   - no bypass (recommended).
 
-Until this is on, an Arena session (or anyone with write) can push
-straight to `main` and rewrite a risk calculation.
+The integration cannot tell whether this is already configured. Treat TODO-8
+as **unverified** until a repository admin confirms it in the GitHub UI.
 
-## TODO-7 — Paste the wheel-gate job
+## TODO-7 — CI wheel-gate · ✅ complete
 
-CI is already **active** (`.github/workflows/ci.yml` runs the offline
-suite). The wheel-gate *job* is not in that file because the token
-was refused when it tried to edit it.
+The root `.github/workflows/ci.yml` contains both the offline suite and wheel
+gate. GitHub Actions run `31907327643` passed both jobs on merged P12.12 at
+commit `5345e9e` on `main`. No workflow copy/paste action remains.
 
-> **Heads-up:** the job spec currently lives at
-> [`docs/.github/workflows/ci.yml`](./.github/workflows/ci.yml). That
-> path is **inert** — it is nested under `docs/`, so GitHub Actions
-> never reads it. Only a file at the repository root's
-> `.github/workflows/` is executed. Copying it is still a human step.
-
-1. Open https://github.com/Azimshawon/SKY/edit/main/.github/workflows/ci.yml
-   (or edit it in a tiny follow-up PR from the GitHub UI)
-2. Append the `wheel-gate` job from
-   [`docs/.github/workflows/ci.yml`](./.github/workflows/ci.yml)
-   under the existing `jobs:` map (same indent as `test:`).
-   Skip the leading comment block; start at the `wheel-gate:` key.
-3. Commit on `main` from the UI, or via a one-file PR.
-
-Local equivalent, no GitHub needed:
+Local equivalents:
 
 ```bash
-python ci/wheel_gate.py            # build + duplicate-entry check
-python ci/wheel_gate.py --install  # also smoke-test a clean venv
+python ci/wheel_gate.py
+python ci/wheel_gate.py --install
 ```
 
 ## Do not do next
@@ -53,3 +36,5 @@ python ci/wheel_gate.py --install  # also smoke-test a clean venv
 - Do not install OpenHands, Dify, or LibreChat into this repo.
 - Do not start TODO-9 / TODO-10 until
   `python main.py agent ask "am i ready for micro?"` is READY.
+- Do not build order placement while the graduation and explicit-approval
+  gates remain open.

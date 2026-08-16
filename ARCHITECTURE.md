@@ -86,7 +86,7 @@
 | `validation.py` | P12.1 locked train/val/OOS/recent protocol + sealed OOS envelope; P12.2 AST guard rejects negative `shift(-n)` feature code; `python main.py validate [lookahead]` |
 | `provenance.py` | P12.11 source-series identity for graded rows and calibration keys; canonical live rows remain backward-compatible while one-sided imports stay unreachable from live calibration |
 | `gold_basis.py` | P12.12 read-only exact-time PAXGUSDT/XAUUSD basis measurement + current sealed-OOS inspection; always reports XAU research-only and leaves human approval open; `python main.py xau-evidence` |
-| `simulator.py` | The paper-sample grind (100/20 sample proof); `graduation_status` |
+| `simulator.py` | The paper-sample grind (100/20 sample proof); canonical-live-only `paper_progress` and fail-closed `graduation_status` |
 | `symbols.py` | Alias resolution (BTC → BTCUSDT, ETH → ETHUSDT, GOLD → XAUUSD) |
 | `sources/cryptodada_website.py` | Connector for the private CryptoDada site (api/browser modes) |
 | `sources/discord_reader.py` | Connector for the private Discord group (read + webhook push) |
@@ -120,7 +120,7 @@
 |---|---|
 | `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
 
-### `tests/` — 59 test modules, 723 pass / 1 skip
+### `tests/` — 59 test modules, 726 pass / 1 skip
 - Most modules have a matching `test_*.py`.
 - `tests/test_calendar.py` — **NEW (P12.9)** gold-week boundaries + DST, holidays, trading-time counting,
   calendar-aware gaps/quality, Dukascopy import gap report, `calendar` CLI.
@@ -160,8 +160,8 @@
 - `REAL_DATA_RUN_2026-08-14.md` — first real BTCUSDT 1m imported and re-run.
 - `DUKASCOPY_XAU_ADAPTER.md` / `SOURCE_PROVENANCE.md` — external XAU import and source-separated learning contract.
 - `XAU_PROMOTION_EVIDENCE.md` — P12.12 real-host procedure, exact-time basis contract, and still-open promotion gates.
-- `wheel-gate-job.yml` — job spec a human pastes into
-  `.github/workflows/ci.yml` (TODO-7).
+- `.github/workflows/ci.yml` — active offline-suite and wheel-gate jobs;
+  both passed on merged P12.12 (`main`, run `31907327643`).
 
 ---
 
@@ -200,7 +200,7 @@
    read-only. `python main.py skill --install` requires
    `--system` to write under `$HOME`.
 
-7. **Tests must stay ≥ 723 pass / 1 skip.** The 1 skip is the
+7. **Tests must stay ≥ 726 pass / 1 skip.** The 1 skip is the
    SDK-already-installed fallback (pre-existing, per `MERGE_NOTES.md`).
    Any new feature must add at least as many tests as it adds source
    lines of complexity (rule of thumb: ≥ 1 test per non-trivial
@@ -259,6 +259,13 @@
     passing sealed-OOS envelope make a dossier eligible for human review, not
     tradeable. Explicit human approval and the repository-wide graduation gate
     remain mandatory; no evidence command can unlock micro-live.
+
+15. **Graduation is canonical-live-only.** `paper_progress()` is a permission
+    input, not a pooled research report: it counts only the canonical Binance
+    spot source key (`""`), including legacy NULL rows. Non-canonical histories
+    remain visible through source-filtered scorecards but can neither unlock
+    nor block micro-live. `grind_verdict()` / `graduation_status()` fail closed
+    when a caller explicitly supplies research-source progress.
 
 ---
 
@@ -350,5 +357,5 @@ DEMO_MODE=1 python -m pytest tests/test_risk_gate.py -v
 DEMO_MODE=1 python -m pytest tests/ --cov=brain --cov=engine --cov=data
 ```
 
-The expected baseline is **723 pass, 1 skip**. Any new feature must
+The expected baseline is **726 pass, 1 skip**. Any new feature must
 maintain or increase this count.

@@ -34,6 +34,7 @@ from config import (SYMBOLS, TIMEFRAME, BARS, MIN_CONFIDENCE, BACKTEST_HORIZONS,
 from data.symbols import parse_symbol_list
 from data.sample_client import maybe_client
 from data.backtester import _evaluate, GradedPlan
+from data.provenance import LIVE_SOURCE_KEY, describe_source, is_canonical
 from engine.signal_engine import analyze_frame
 
 
@@ -244,11 +245,17 @@ def simulate_round(symbols: list[str] | None = None, timeframe: str = TIMEFRAME,
 
 
 def paper_progress(db) -> list[dict]:
-    """Per-plan-type learning progress: unique backtest + paper samples.
+    """Canonical-live graduation progress by plan type.
 
     Counts are honest because the simulator dedupes by sim_key at insert time
-    (re-runs over the same history add zero rows) and real backtest/paper
-    rows (sim_key IS NULL) are unique by construction.
+    (re-runs over the same history add zero rows) and real backtest/paper rows
+    (sim_key IS NULL) are unique by construction.
+
+    P12.13 safety boundary: graduation is a permission decision, not a pooled
+    research report. It therefore reads only the canonical live source key
+    (Binance spot, represented by ``""``). Legacy NULL source keys are that
+    same canonical history. Non-canonical books remain inspectable through the
+    source-filtered scorecard, but can neither unlock nor block micro-live.
     """
     bt = db.conn.execute(
         """SELECT plan_type,
@@ -268,7 +275,8 @@ def paper_progress(db) -> list[dict]:
                   SUM(CASE WHEN COALESCE(rr_net, rr_achieved) > 0 THEN 1 ELSE 0 END) wins_net
            FROM backtest_results
            WHERE outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')
-           GROUP BY plan_type ORDER BY n DESC""").fetchall()
+             AND COALESCE(source_key,'')=?
+           GROUP BY plan_type ORDER BY n DESC""", (LIVE_SOURCE_KEY,)).fetchall()
     pp = db.conn.execute(
         """SELECT plan_type,
                   SUM(CASE WHEN sim_key IS NULL THEN 1 ELSE 0 END) + COUNT(DISTINCT sim_key) n,
@@ -287,7 +295,8 @@ def paper_progress(db) -> list[dict]:
                   SUM(CASE WHEN COALESCE(rr_net, rr_achieved) > 0 THEN 1 ELSE 0 END) wins_net
            FROM paper_trades
            WHERE outcome IN ('TP_HIT','STOP_LOSS')
-           GROUP BY plan_type ORDER BY n DESC""").fetchall()
+             AND COALESCE(source_key,'')=?
+           GROUP BY plan_type ORDER BY n DESC""", (LIVE_SOURCE_KEY,)).fetchall()
     bt_map = {r["plan_type"]: dict(r) for r in bt}
     pp_map = {r["plan_type"]: dict(r) for r in pp}
     plan_types = sorted(set(bt_map) | set(pp_map))
@@ -321,6 +330,11 @@ def paper_progress(db) -> list[dict]:
         decided = wins + losses
         progress.append({
             "plan_type": pt,
+            # Permission-bearing progress always belongs to the canonical live
+            # source. Keeping this field explicit lets downstream gate code
+            # fail closed if a caller constructs non-canonical progress.
+            "source_key": LIVE_SOURCE_KEY,
+            "source": describe_source(LIVE_SOURCE_KEY),
             "backtest_n": b_n,
             "paper_n": p_n,
             "backtest_target": CALIBRATE_MIN_N,
@@ -352,11 +366,24 @@ def primary_plan_types() -> list[str]:
 
 
 def grind_verdict(progress: list[dict]) -> dict:
-    """Is the primary setup family proven enough for PROGRESSION=micro?"""
+    """Is the canonical live setup family proven for PROGRESSION=micro?
+
+    Rows produced before P12.13 (and lightweight test/report callers) may omit
+    ``source_key``; those are legacy canonical rows. An explicit non-canonical
+    key is research evidence and fails this permission gate closed, even when
+    its sample counts and expectancy are excellent.
+    """
     primary = primary_plan_types()
     by_type = {p["plan_type"]: p for p in progress}
+    source_keys = {
+        (p.get("source_key") if "source_key" in p else LIVE_SOURCE_KEY)
+        for p in progress
+    }
+    source_is_canonical = all(
+        key is not None and is_canonical(key) for key in source_keys
+    )
     needed = []
-    ready = True
+    ready = source_is_canonical
     for pt in primary:
         p = by_type.get(pt)
         if p is None:
@@ -389,9 +416,25 @@ def grind_verdict(progress: list[dict]) -> dict:
                 "expectancy_net": exp_net,
                 "missing": ", ".join(parts),
             })
-    return {"ready": ready, "primary_setup_family": PRIMARY_SETUP_FAMILY,
-            "primary_plan_types": primary, "missing": needed,
-            "targets": {"backtest": CALIBRATE_MIN_N, "paper": CALIBRATE_MIN_PAPER_N}}
+    source_labels = sorted(
+        "pooled/unknown" if key is None else describe_source(key)
+        for key in source_keys
+    )
+    return {
+        "ready": ready,
+        "primary_setup_family": PRIMARY_SETUP_FAMILY,
+        "primary_plan_types": primary,
+        "missing": needed,
+        "source_is_canonical": source_is_canonical,
+        "source_keys": sorted("<pooled>" if key is None else str(key)
+                              for key in source_keys),
+        "source_labels": source_labels or [describe_source(LIVE_SOURCE_KEY)],
+        "source_block": (None if source_is_canonical else
+                         "graduation requires canonical live-series evidence; "
+                         "research sources are reporting-only"),
+        "targets": {"backtest": CALIBRATE_MIN_N,
+                    "paper": CALIBRATE_MIN_PAPER_N},
+    }
 
 
 # ── graduation gate (BLUEPRINT Step 2 → Step 3) ──────────────────────────
@@ -454,6 +497,10 @@ def graduation_status(progress: list[dict], compliance: float | None = None) -> 
     return {"ready": bool(samples_ok and all(met.values())),
             "samples_proven": bool(samples_ok),
             "sample_gaps": verdict["missing"],
+            "source_is_canonical": verdict["source_is_canonical"],
+            "source_keys": verdict["source_keys"],
+            "source_labels": verdict["source_labels"],
+            "source_block": verdict["source_block"],
             "criteria": dict(GRADUATION_CRITERIA),
             "stats": stats, "met": met}
 
@@ -466,6 +513,10 @@ def format_graduation(g: dict) -> str:
                        "(BLUEPRINT Step 2 → 3)", "-" * 70]
     lines.append(f"  primary family : {', '.join(s['plan_types']) or 'none'} "
                  f"({s['n']} decided samples)")
+    source_mark = "✓" if g.get("source_is_canonical", True) else "✗"
+    source_labels = ", ".join(g.get("source_labels") or
+                              [describe_source(LIVE_SOURCE_KEY)])
+    lines.append(f"  {source_mark} evidence source : {source_labels}")
     exp_str = (f"{s.get('expectancy_net', s['expectancy']):+.3f}R (net)"
                if "expectancy_net" in s else f"{s['expectancy']:+.3f}R")
     wr = s.get("win_rate_net", s.get("win_rate"))
@@ -515,6 +566,8 @@ def format_progress(progress: list[dict], verdict: dict) -> str:
                      "in .env (paper-trade 100–200 samples on small real capital).")
     else:
         lines.append("  ⏳ not proven yet:")
+        if verdict.get("source_block"):
+            lines.append(f"     source: {verdict['source_block']}")
         for m in verdict["missing"]:
             lines.append(f"     {m['plan_type']}: missing {m['missing']} "
                          f"(backtest {m['backtest_n']}/{CALIBRATE_MIN_N}, "

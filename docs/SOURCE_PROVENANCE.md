@@ -1,4 +1,4 @@
-# Source provenance in saved keys (P12.11)
+# Source provenance in saved keys and graduation (P12.11 / P12.13)
 
 > **Status:** shipped in v2.22.0.
 > **Closes:** Dukascopy blocker #3 — *"source provenance reaches saved
@@ -146,6 +146,27 @@ Other surfaces:
 * It does not touch the graduation bar. `≥ +0.50R` net, `> 55%` WR, `PF ≥ 1.5`
   are unchanged, and the remaining acceptance-gate items (PAXG-vs-XAU basis,
   sealed-OOS results, human approval) are still open.
+
+## P12.13 closure: the global permission path
+
+P12.11 separated saved rows, calibration profiles, the live confidence hook,
+and `setup_proven()`. A later review found one remaining pooled consumer:
+`data.simulator.paper_progress()` queried all decided rows without filtering
+`source_key`, and its output feeds every global graduation surface (CLI, desk,
+dashboard/API, MCP/agent advice). A sufficiently strong research book could
+therefore help unlock micro-live, while a poor one could block the live book.
+
+P12.13 closes that gap:
+
+- `paper_progress()` reads only `COALESCE(source_key, '') = ''` from both
+  backtest and paper tables. Legacy NULL rows remain canonical by contract.
+- Every progress row declares the canonical source explicitly.
+- `grind_verdict()` and `graduation_status()` fail closed if a caller supplies
+  explicit non-canonical progress, even when sample and performance bars pass.
+- Source-filtered scorecards remain the reporting surface for research books.
+
+This is strictly tighter and changes no numeric criterion. Research evidence
+can neither grant nor withdraw live-trading permission.
 
 `--save` on a Dukascopy XAU backtest is now **permitted** — its rows land in
 their own keys and cannot recalibrate the live proxy. Promotion of that series

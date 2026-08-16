@@ -10,6 +10,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.23.1] — 2026-08-16 · P12.13 graduation source isolation
+
+PATCH: close the last source-provenance leak in the permission path. P12.11
+separated calibration and setup proof, but global graduation still pooled
+research and canonical outcomes. Thresholds are unchanged; the gate is now
+strictly narrower.
+
+### Fixed
+
+- `data.simulator.paper_progress()` filters both backtest and paper outcomes to
+  canonical Binance spot (`COALESCE(source_key, '') = ''`). Legacy NULL rows
+  remain included by the P12.11 compatibility contract.
+- Progress rows now expose their source, and `grind_verdict()` /
+  `graduation_status()` reject explicit non-canonical evidence even if every
+  count and performance criterion passes.
+- Research wins can no longer unlock live graduation; research losses can no
+  longer block it. Research books remain visible via source-filtered scorecard
+  surfaces.
+- Added three regression tests covering bid-only/Bybit isolation in both
+  directions, legacy NULL compatibility, and the direct evaluator veto.
+
+### Corrected
+
+- Closed stale TODO-7 instructions: root `.github/workflows/ci.yml` already
+  contains both the offline suite and wheel gate; GitHub Actions run
+  `31907327643` passed both jobs on merged P12.12/`main` at `5345e9e`.
+- Updated the handoff to record PR #35 as merged and this session's actual
+  branch/base instead of the predecessor branch and pre-merge commit.
+- Removed the obsolete nested `docs/.github/workflows/ci.yml` job-spec copy.
+- Kept TODO-8 as an unverified admin action: the GitHub integration receives
+  HTTP 403 when reading branch protection, so no protection claim is made.
+
+### Verification
+
+- Full offline suite: **726 passed, 1 skipped**.
+- Compileall, dependency check, and v2.23.1 wheel duplicate-entry gate pass.
+- No graduation threshold, XAU promotion status, or order-placement
+  capability changed; source eligibility is strictly tighter.
+
+---
+
 ## [2.23.0] — 2026-08-16 · P12.12: PAXG-vs-XAU promotion-evidence dossier
 
 MINOR: add the missing read-only measurement between separately stored Binance

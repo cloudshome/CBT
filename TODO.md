@@ -6,17 +6,20 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-16 (this session: **P12.12 shipped — read-only
-PAXG-vs-XAU promotion-evidence dossier**. `data/gold_basis.py` exact-time
-aligns the separately stored series, measures basis/deviation, fingerprints
-the observations, and verifies the current XAU sealed-OOS envelope without
+**Last updated:** 2026-08-16 (**v2.23.1 / P12.13 shipped — global
+graduation source isolation**). Review found that P12.11 isolated calibration
+and per-setup proof, but `paper_progress()` still pooled all sources into the
+global micro-live gate. Graduation now counts canonical Binance spot evidence
+only (legacy NULL rows included) and fails closed on explicit research
+progress. Research wins/losses can neither unlock nor block live graduation.
+Suite green: **726 pass / 1 skip**. TODO-7 was also reconciled as complete.
+
+**Previous:** 2026-08-16 (**P12.12 shipped — read-only PAXG-vs-XAU
+promotion-evidence dossier**. `data/gold_basis.py` exact-time aligns the
+separately stored series, measures basis/deviation, fingerprints the
+observations, and verifies the current XAU sealed-OOS envelope without
 pooling, calibrating, approving, or trading. The clean checkout correctly
 finds no real evidence. Suite green: **723 pass / 1 skip**.)
-
-**Previous:** 2026-08-16 (**P12.11 shipped — source provenance in saved
-keys** (Dukascopy blocker #3). `--save` is unblocked but XAU remains
-research-only pending measured real-host basis, passing sealed OOS, and human
-approval. Suite green: **704 pass / 1 skip**.)
 
 **Earlier:** 2026-08-15 (**P12.10 shipped — XAU bid/ask cost model**
 (Dukascopy blocker #2): gold auto-detection in `data/costs.py`. Suite green:
@@ -41,7 +44,7 @@ unit of work that ends in a reviewable PR:
    sessions merge while you work (PR #13 learned this the hard way);
    reconcile BEFORE building
 3. Pick the top unblocked item
-4. Implement it; keep the suite green (≥ 723 pass / 1 skip)
+4. Implement it; keep the suite green (≥ 726 pass / 1 skip)
 5. Reconcile SESSION_STATE.md + TODO.md + CHANGELOG.md (full pass)
 6. Commit + push to the session branch
 7. Open ONE PR as the closing step  ← Arena allows one PR per session
@@ -64,7 +67,7 @@ Independence has two halves. SKY currently owns one of them:
 |---|---|---|
 | **Decision independence** | Our own engine, risk gate, approval loop | ✅ P1–P9 |
 | **Data independence** | Our own stored market history | ✅ **P10** (P10.1–P10.12 shipped, PR #18) |
-| **Validation independence** | Research-grade proof on our own data | ✅ **P12.1–P12.12 shipped** — locked/sealed validation, fees-first `E_net`, effective sample size, quality/strategy scores, MC risk, calendars, gold costs, source isolation, and the read-only XAU promotion-evidence dossier |
+| **Validation independence** | Research-grade proof on our own data | ✅ **P12.1–P12.13 shipped** — locked/sealed validation, fees-first `E_net`, effective sample size, quality/strategy scores, MC risk, calendars, gold costs, source isolation, and the read-only XAU promotion-evidence dossier |
 
 Everything below is ordered by how directly it moves those two lines.
 Anything that moves neither is out of scope. Two 2026-08-13 audits are
@@ -121,6 +124,14 @@ Do not reopen them to install a bot or a second backtest engine.
 > open, XAU non-tradeable, and micro-live locked. Synthetic tests establish
 > mechanics only; the actual measurement remains to be run on the real-data
 > host. Docs: `docs/XAU_PROMOTION_EVIDENCE.md`. Suite: **723 pass / 1 skip**.
+>
+> **P12.13 shipped — graduation source isolation.** P12.11's source boundary
+> now reaches the global permission path: `paper_progress()` filters both
+> backtest and paper outcomes to canonical Binance spot (`source_key=""`),
+> preserving legacy NULL rows; `grind_verdict()` / `graduation_status()` reject
+> explicitly non-canonical progress even when every performance threshold is
+> met. Research remains reportable via source-filtered scorecards. Thresholds
+> are unchanged. Suite: **726 pass / 1 skip**.
 >
 > **Next executable work:** run the real-host evidence procedure: rerun
 > `learn` so saved rows adopt source keys, run the locked Dukascopy XAU
@@ -186,6 +197,7 @@ order changed as a result.
 | **P12.10** | **XAU bid/ask cost model** | ✅ **shipped** — gold auto-detection in `data/costs.py`; spot market model with spread-based costs, no funding, ECN commission; Dukascopy blocker #2 closed | M |
 | **P12.11** | **source provenance in saved keys** | ✅ **shipped** — `data/provenance.py`; source-keyed calibration, live-path isolation, `by_source` scorecard split, `--source-key`; Dukascopy blocker #3 closed; `docs/SOURCE_PROVENANCE.md` | S |
 | **P12.12** | **PAXG-vs-XAU promotion evidence** | ✅ **tooling shipped** — `data/gold_basis.py`, CLI `xau-evidence`, exact-time basis/tracking report + current sealed-OOS inspection; real-host evidence remains open; never approves or trades | S |
+| **P12.13** | **graduation source isolation** | ✅ **shipped** — global progress is canonical-live-only; direct research progress fails closed; scorecards retain research visibility | XS |
 | micro-live | trivial size | ⛔ **blocked** — only after unchanged graduation bar says READY and explicit user approval; slippage / partial fills / latency can then be measured | L |
 
 **The bar is restated, not loosened.** `≥ +0.50R` was always meant to be
@@ -306,18 +318,15 @@ the roadmap doc — these are the load-bearing ones):
 `DEMO_MODE=1` must keep the suite green offline; bad data quarantines
 instead of producing a signal; `data/store/**` is gitignored.
 
-### TODO-7 · Activate GitHub Actions wheel-gate · human action
+### TODO-7 · Activate GitHub Actions wheel-gate · ✅ DONE
 
-The job spec sits at **`docs/.github/workflows/ci.yml`**, which is
-**inert** — nested under `docs/`, so GitHub Actions never reads it.
-Only the repository-root `.github/workflows/ci.yml` is executed, and
-Arena's GitHub App token cannot write that path (push rejected twice:
-`d40ff00`, and again this session's predecessor).
+The executable job now lives in the root
+**`.github/workflows/ci.yml`** beside the offline suite. GitHub Actions run
+`31907327643` on merged P12.12/`main` passed both jobs on 2026-08-15:
+**Offline test suite** and **Wheel gate**. The obsolete nested job-spec copy
+under `docs/` was removed during the 2026-08-16 reconciliation.
 
-A human with the `workflows` permission pastes the `wheel-gate` job
-from the GitHub UI. Click-path: [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
-
-Until then, run the gate locally:
+Local equivalents remain:
 
 ```bash
 python ci/wheel_gate.py            # build + duplicate-entry check
@@ -326,8 +335,9 @@ python ci/wheel_gate.py --install  # also smoke-test a clean venv
 
 ### TODO-8 · Protect `main` · human / repo admin
 
-GitHub reports `main.protected = false`. Arena token gets HTTP 403
-on the branch-protection API. Click-path is in
+The integration gets HTTP 403 on the branch-protection read API, so current
+protection is **unverified**, not assumed false. A repo admin should confirm
+required PRs and both active status checks. Click-path is in
 [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md).
 A trading risk-calc change must never land on `main` unreviewed.
 
@@ -340,7 +350,7 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 **Both are now behind P10 as well as the graduation gate.** Owning our
 data moves the aim; wrapping the engine in another chat UI does not.
 
-### TODO-13 · P12 · SKY Quant Validation Engine · ✅ P12.1–P12.12 shipped
+### TODO-13 · P12 · SKY Quant Validation Engine · ✅ P12.1–P12.13 shipped
 
 📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8,
 extended by [`docs/BACKTRADER_REVIEW.md`](docs/BACKTRADER_REVIEW.md) §8.**
@@ -371,6 +381,7 @@ train/val/OOS windows have real multi-window history to split.
 | **P12.10** | Gold transaction costs | XAU evidence uses the correct point size and one-sided quote limitations | ✅ **shipped** — bid/ask-aware gold cost model and evidence surfaces |
 | **P12.11** | Source-separated saved keys | Research histories cannot pool into or recalibrate the canonical live profile | ✅ **shipped** — canonical provenance keys throughout save/learn/scorecard paths |
 | **P12.12** | PAXG-vs-XAU promotion-evidence dossier | Exact-time basis and sealed-OOS evidence are inspectable without self-promotion | ✅ **tooling shipped** — `data/gold_basis.py`, `xau-evidence`, operator guide; real-host run and approval remain open |
+| **P12.13** | Graduation source isolation | Research histories can neither unlock nor block canonical live graduation | ✅ **shipped** — canonical-only `paper_progress`; evaluator provenance veto; 3 regression tests |
 
 **Not in P12:** Hyperopt, FreqAI, Backtrader optimization or a second
 backtest engine (BT4/BT7), ML direction-prediction, a strategy-module
@@ -531,8 +542,9 @@ One readiness verdict across channels + immune system + risk gate
 
 | ID | Decision | Default |
 |---|---|---|
-| TODO-7 | Paste the wheel-gate job into the real `.github/workflows/ci.yml` | human |
-| TODO-8 | Protect `main` (require PR, no direct push) | human / recommend yes |
+| TODO-8 | Verify/protect `main` (require PR, no direct push, require both CI jobs) | human / recommend yes |
+
+**Completed:** TODO-7 — root CI runs both the offline suite and wheel gate.
 
 D1–D5, **F1–F8** and **BT1–BT8** are already recorded. P12 is complete;
 no further quant-engine TODOs are active. Do **not** reopen F1–F3 or
