@@ -93,6 +93,7 @@ bypasses the risk gate. The deny list is enforced at the top of
 | Post-review | `python main.py postreview <scan_id>` | `postreview` | Closed-trade post-mortem: R, MAE/MFE, rule compliance |
 | Health | `python main.py health` / `python main.py doctor` | `health` | Immune-system diagnostic: stale data, DB integrity, risk limits, behavioral flags |
 | **Desk status** | `python main.py desk` | `desk_status` | One-call advisory: gate + today's P&L + graduation + next agent + "what would a professional do right now?" |
+| **Daily ritual** | `python main.py daily` | `loop_health` | The 10-minute loop: readiness → real paper n / net expectancy / graduation bar → gate → journal prompt. Alias: `loop-health`. |
 | **Readiness** | `python main.py doctor --strip` | `readiness` | One combined verdict across channels + immune system + risk gate + stored-data quality. Ask this first. |
 | Risk gate | `python main.py risk` | `risk` | Open/closed status, daily/weekly P&L, progression ladder |
 | Trader state | `python main.py tradestate` | `tradestate` | Behavioral flags: angry/tired/revenge/chasing — operator-controlled |

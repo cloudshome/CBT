@@ -27,7 +27,7 @@ MAIN = ROOT / "main.py"
 TOOL_NAMES = ["cryptobrain_health", "cryptobrain_morning", "cryptobrain_scan",
               "cryptobrain_desk", "cryptobrain_risk", "cryptobrain_monte",
               "cryptobrain_ask", "cryptobrain_pending", "cryptobrain_stats",
-              "cryptobrain_paper", "cryptobrain_learn"]
+              "cryptobrain_paper", "cryptobrain_learn", "cryptobrain_loop"]
 
 
 @pytest.fixture

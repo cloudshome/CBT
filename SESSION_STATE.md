@@ -1,4 +1,23 @@
-**Last updated:** 2026-08-16 (**P12.16 + P12.17 + P12.18** on the fixed Arena
+**Last updated:** 2026-08-16 (**P14** on the fixed Arena session branch
+`arena/01a00a75-sky`). The repository is at **v2.27.0**: the 10-minute daily
+ritual and the one loop-health number are the product surface for operating
+the paper→graduation loop.
+
+> **This build (v2.27.0 / P14 — operate the loop).** The user's project
+> review said success is operating the paper→graduation loop, not another
+> cook. `loop_health()` composes `desk_status()` + `readiness_strip()` +
+> `paper_progress()` (canonical live book; simulator excluded) into one
+> number: real paper n, net expectancy, per-setup progress, is the
+> graduation bar moving. `python main.py daily` (alias `loop-health`) is
+> the 10-minute ritual: readiness → loop → gate → journal prompt. The
+> same payload is `GET /api/loop-health`, MCP `loop_health` /
+> `cryptobrain_loop`, `agent ask "how is the loop?"`, and the dashboard
+> LOOP HEALTH card. P13 web follow-up shipped with it: KEY LEVELS card +
+> POSITION MANAGER on LIVE SIGNAL / pending / coach; coach JS joins
+> `five_levels`. No threshold moved. No order placed. Micro-live still
+> blocked. `moon/` leftover images stay untracked.
+
+**Previous:** 2026-08-16 (**P12.16 + P12.17 + P12.18** on the fixed Arena
 session branch `arena/01a009c0-sky`). The repository is at **v2.25.0**: the
 source boundary now reaches the **open** book (P12.16), the risk gate no longer
 crashes on weeks that span a month boundary (P12.17), and every hard risk limit
@@ -65,25 +84,25 @@ now judges P&L **net of costs** (P12.18).
 > regressions); harness `ops/probes/p12_17_weekstart_probe.py`; contract
 > `docs/HANDOVER_2026-08-16_P12_17.md`.
 
-**Branch:** `arena/01a00a3d-sky` (fixed session branch)
-**HEAD commit:** verify with `git rev-parse HEAD` (the current tip is the P13 checkpoint)
-**Upstream:** PR #40 merged P12.16 + P12.17 + P12.18; P13 is the current session's work.
-**Previous implementation branch:** `arena/01a009c0-sky` (P12.18 checkpoint, merged as PR #40)
-**Version:** 2.26.0
-**Python:** 3.11 (venv `.venv`) — suite green (**807 pass / 1 skip**)
+**Branch:** `arena/01a00a75-sky` (fixed session branch)
+**HEAD commit:** verify with `git rev-parse HEAD` (the current tip is the P14 checkpoint)
+**Upstream:** PR #40 merged P12.16 + P12.17 + P12.18; P13 shipped as v2.26.0; P14 is this session.
+**Previous implementation branch:** `arena/01a00a3d-sky` (P13 checkpoint)
+**Version:** 2.27.0
+**Python:** 3.11 (venv `.venv`) — suite green (**815 pass / 1 skip**)
 
-> **Current state.** P12.1–P12.18 and P13 are shipped. The next work in sequence
-> remains operational, not a speculative trading feature: on the real-data
-> host, rerun canonical learning, import and validate the separate Dukascopy
-> XAU history, archive the read-only `xau-evidence --json` dossier, and
-> continue the canonical live paper book. This clean checkout has no real
-> store/database, so it must not manufacture either result. The graduation bar
+> **Current state.** P12.1–P12.18, P13 and P14 are shipped. Operate the loop
+> with `python main.py daily`. The next work in sequence remains operational,
+> not a speculative trading feature: on the real-data host, rerun canonical
+> learning, import and validate the separate Dukascopy XAU history, archive
+> the read-only `xau-evidence --json` dossier, and continue the canonical live
+> paper book. This clean checkout has no real store/database, so it must not
+> manufacture either result. The graduation bar
 > remains closed; XAU remains research-only; micro-live remains blocked until
 > the unchanged graduation gate is READY and the user separately approves it.
-> **P13 (v2.26.0, this session)** shipped the four adopted ideas from the
-> ChatGPT desk-review — five-question coach, A/B/C key-level ranking,
-> approval-time position-manager card, no-martingale invariant — as
-> `docs/HANDOVER_2026-08-16_P13.md`; no threshold moved.
+> **P14 (v2.27.0, this session)** shipped the 10-minute daily ritual and the
+> one loop-health number across CLI / HTTP / MCP / ask / dashboard, plus the
+> P13 web follow-up (KEY LEVELS + POSITION MANAGER). No threshold moved.
 
 > **This session (`arena/01a009c0-sky`): v2.24.0 / P12.16 open-book source
 > isolation.** PR #39 had merged and every ordered next action is real-host

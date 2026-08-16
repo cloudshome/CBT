@@ -31,6 +31,7 @@ Endpoints
   GET /api/channels ordered-backend channel registry (P8; Panniantong/Agent-Reach pattern)
   GET /api/doctor   human-readable doctor report (same as `python main.py doctor`)
   GET /api/desk     one-call desk advisory (gate + P&L + graduation + advice)
+  GET /api/loop-health  the one daily number (real paper n / E_net / graduation bar)
 """
 from __future__ import annotations
 
@@ -100,6 +101,17 @@ def _sym(value: str | None) -> str:
     return normalize_symbol(value or SYMBOL)
 
 
+def _attach_management(payload: dict) -> dict:
+    """P13/P14: attach the HOLD/REDUCE/TRAIL/EXIT card to a scan payload."""
+    try:
+        from brain.coach import management_checklist
+        plans = payload.get("plans") or []
+        payload["management"] = management_checklist(plans[0] if plans else None)
+    except Exception:
+        payload.setdefault("management", [])
+    return payload
+
+
 def _persist(payload: dict) -> tuple[int, str]:
     """Save the scan to the learning DB (deduped by signal_id) and return
     (scan_id, lifecycle_status)."""
@@ -159,6 +171,7 @@ def _basic_scan(symbol: str, tf: str, save: bool) -> dict:
             payload["validation"] = validate_output(payload)
             payload["degraded"] = True
             payload["degraded_reason"] = "full analysis timed out — showing engine-only signal"
+            _attach_management(payload)
             result["payload"] = payload
         except Exception as exc:  # pragma: no cover
             result["error"] = f"{type(exc).__name__}: {exc}"
@@ -237,6 +250,7 @@ def compute_payload(symbol: str, tf: str, save: bool = True, use_cache: bool = T
         return payload
 
     payload = result["payload"]
+    _attach_management(payload)
     if save:
         try:
             _persist(payload)
@@ -519,6 +533,20 @@ function switchTab(tab){
   try{ if(typeof history !== 'undefined' && history.replaceState) history.replaceState(null,'','#'+tab); }catch(e){}
 }
 function card(title, inner, span){ return `<div class="card" ${span?'style="grid-column:1/-1"':''}><h2>${title}</h2>${inner}</div>`; }
+function renderKeyLevels(levels){
+  if(!levels || !levels.length) return '<div class="muted">no ranked levels — the desk has nothing to map yet</div>';
+  const col = {A:'var(--red)', B:'var(--amber)', C:'var(--mut)'};
+  const groups = {A:[], B:[], C:[]};
+  levels.forEach(l => { if(groups[l.tier]) groups[l.tier].push(l); });
+  return ['A','B','C'].map(t => {
+    const rows = groups[t];
+    if(!rows.length) return '';
+    return `<div style="margin-bottom:8px"><b style="color:${col[t]}">Tier ${t}</b>
+      <table><tr><th>Level</th><th>Price</th><th>Dist</th><th>Note</th></tr>
+      ${rows.map(l=>`<tr><td>${esc(l.name)}</td><td class="mono">${fmt(l.level)}</td><td class="mono">${l.distance_pct!=null?Number(l.distance_pct).toFixed(3)+'%':'—'}</td><td class="note">${esc(l.note||'')}</td></tr>`).join('')}
+      </table></div>`;
+  }).join('');
+}
 
 function render(d){
   const s=d.signal||{}, plans=d.plans||[], snap=d.snapshot||{}, f=snap.features||{}, sc=snap.scores||{}, ctx=d.market_context||{}, lc=d.lifecycle||{};
@@ -534,6 +562,11 @@ function render(d){
          <button class="btn primary" onclick="decide(${sid},'EXECUTED')">▶ Mark executed</button>
          <button class="btn no" onclick="decide(${sid},'SKIPPED')">Skip</button></div>`
        : (st==='EXECUTED' ? `<button class="btn" style="background:var(--amber);color:#111" onclick="decide(${sid},'CLOSED')">✔ Close (record outcome)</button>` : ''));
+  const mgmt = d.management || [];
+  const mgmtHtml = mgmt.length ? `<div style="margin-top:10px;background:rgba(255,255,255,.04);padding:10px;border-radius:12px;border:1px solid var(--line)">
+      <b>POSITION MANAGER</b>
+      ${mgmt.map(c=>`<div class="note">• ${esc(c)}</div>`).join('')}
+    </div>` : '';
 
   // Build grouped tab panels
   let overview = '';
@@ -559,6 +592,7 @@ function render(d){
     ${d.degraded?`<div class="note" style="margin-top:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);padding:8px;border-radius:10px">⚠️ ${esc(d.degraded_reason||'degraded mode')} — <a href="#" onclick="load(true);return false">retry full scan</a></div>`:''}
     ${d.stale?`<div class="note" style="margin-top:6px">Showing last good data for ${esc(s.asset)} ${esc(s.timeframe)} — <a href="#" onclick="load(true);return false">retry</a></div>`:''}
     ${decideBtns}
+    ${mgmtHtml}
   `, true);
 
   const dec=d.decision||{};
@@ -660,6 +694,11 @@ function render(d){
   marketCards += card(`CANDLESTICK — ${s.asset||''} ${s.timeframe||''}`,
     `<div id="chart" style="width:100%;height:260px;display:grid;place-items:center"><span class="muted">loading candles…</span></div>
      <div class="note" style="margin-top:6px">last 90 candles · EMA 20/50 overlay · volume bars · hover a candle for OHLC (coming soon)</div>`, true);
+
+  marketCards += card('KEY LEVELS — A / B / C',
+    renderKeyLevels((intel.key_levels)||[]) +
+    '<div class="note" style="margin-top:6px">A = liquidity &amp; major structure · B = decision zones · C = reference. Ranked by distance from price; nothing invented.</div>',
+    true);
 
   const mtf=d.mtf||{}, views=mtf.views||{}, al=mtf.alignment||{};
   marketCards += card('MULTI-TIMEFRAME (HTF → LTF)', `
@@ -889,6 +928,7 @@ function render(d){
   const html = `
     <div class="tabpanel active" data-tab="overview">
       ${heroStats}
+      <div class="grid">${card('LOOP HEALTH', '<div id="loop"><span class="muted">loading…</span></div>', true)}</div>
       <div class="watchlist" style="margin-bottom:14px" id="watchlist"><span class="muted">loading watchlist…</span></div>
       <div class="grid">${overview}</div>
       ${intelCard?`<div style="margin-top:14px" class="grid">${intelCard}</div>`:''}
@@ -921,7 +961,7 @@ function render(d){
   // load async sub-panels
   loadPending(); loadPaper(); loadHistory(); loadLearning(); loadScorecard(); loadSources();
   loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels(); loadDesk();
-  loadReadiness();
+  loadReadiness(); loadLoop();
   const symE=document.getElementById('sym'); const tfE=document.getElementById('tf');
   loadChart((symE?symE.value:'BTCUSDT').toUpperCase(), tfE?tfE.value:'15m');
 }
@@ -1078,13 +1118,15 @@ async function loadPending(){
     const el=document.getElementById('queue'); if(!el) return;
     const q=d.pending||[];
     if(!q.length){ el.innerHTML='<span class="muted">All caught up — no signals waiting 🎉</span>'; return; }
-    el.innerHTML=q.map(x=>`<div class="row">
+    el.innerHTML=q.map(x=>`<div class="row" style="flex-wrap:wrap">
       <span onclick="openModal(${x.id})" style="flex:1;min-width:0">#${x.id} <b>${esc(x.symbol)}</b> ${esc(x.timeframe)} <span class="pill ${cls(x.action)}" style="padding:2px 8px;font-size:11px">${esc(x.action)}</span> <span class="mono">${fmt(x.entry)}</span> <span class="note">${esc((x.reason||'').slice(0,48))}</span></span>
       <span class="btns">
         <button class="rowbtn ok" onclick="decide(${x.id},'APPROVED'); showToast('Approved #${x.id}','ok')">✓</button>
         <button class="rowbtn no" onclick="decide(${x.id},'REJECTED')">✗</button>
         <button class="rowbtn" onclick="openModal(${x.id})">🔍</button>
-      </span></div>`).join('');
+      </span>
+      ${(x.management||[]).length?`<div class="note" style="flex-basis:100%;padding:4px 6px 2px">POSITION MANAGER: ${(x.management||[]).slice(0,3).map(esc).join(' · ')}</div>`:''}
+      </div>`).join('');
   }catch(e){ const el=document.getElementById('queue'); if(el) el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
 
@@ -1638,6 +1680,7 @@ async function openModal(id){
       ${decs.length?decs.map(x=>`<div class="muted" style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06)">${esc(x.from_state||'')} → <b>${esc(x.to_state||'')}</b> by ${esc(x.reviewer||'')} <span class="note"> ${esc(x.note||'')}</span> <span class="note">${esc(x.ts||'')}</span></div>`).join(''):'<span class="muted">no decisions yet</span>'}
       <h3 style="margin:14px 0 6px;font-size:13px">Plans</h3>
       ${plans.length?plans.map(p=>`<div class="plan"><div class="h"><b>${esc(p.type||'')}</b><span class="badge">${p.confidence??''}% ${esc(p.confidence_label||'')}</span></div><div class="c">${esc(p.condition||'')}</div><div class="c mono">entry ${fmt(p.entry)} · sl ${fmt(p.stop_loss)} · tp ${tps(p)} · RR ${p.risk_reward??'—'}</div></div>`).join(''):'<span class="muted">none</span>'}
+      ${(d.management||[]).length?`<h3 style="margin:14px 0 6px;font-size:13px">POSITION MANAGER</h3>${(d.management||[]).map(c=>`<div class="note">• ${esc(c)}</div>`).join('')}`:''}
       <div class="flex" style="margin-top:16px">
         ${s.status==='PENDING_REVIEW'?`<button class="btn ok" onclick="decide(${s.id},'APPROVED')">✓ Approve</button><button class="btn no" onclick="decide(${s.id},'REJECTED')">✗ Reject</button>`:''}
         ${s.status==='APPROVED'?`<button class="btn primary" onclick="decide(${s.id},'EXECUTED')">▶ Mark executed</button><button class="btn no" onclick="decide(${s.id},'SKIPPED')">Skip</button>`:''}
@@ -1658,8 +1701,64 @@ async function coach(){
   try{
     const d=await (await fetch(`/api/coach?symbol=${sym}&tf=${tf}`)).json();
     const nl=String.fromCharCode(10);
-    el.textContent=(d.explain||[]).join(nl)+nl+nl+d.mentor+nl+nl+'📈 YOUR FEEDBACK'+nl+(d.feedback||[]).join(nl);
+    const levels=d.five_levels||[];
+    const mgmt=d.management||[];
+    el.textContent=(d.explain||[]).join(nl)+nl+nl
+      +(levels.length?('🎯 FIVE QUESTIONS'+nl+levels.join(nl)+nl+nl):'')
+      +d.mentor+nl+nl+'📈 YOUR FEEDBACK'+nl+(d.feedback||[]).join(nl)
+      +(mgmt.length?(nl+nl+'📋 POSITION MANAGER'+nl+mgmt.map(c=>'• '+c).join(nl)):'');
   }catch(e){ el.textContent='Error: '+e; }
+}
+
+async function loadLoop(){
+  const el=document.getElementById('loop'); if(!el) return;
+  try{
+    const d=await (await fetch('/api/loop-health')).json();
+    if(d.error){ el.innerHTML='<span class="err">'+esc(d.error)+'</span>'; return; }
+    const loop=d.loop||{}, g=d.graduation||{}, advice=d.advice||{},
+          gate=d.gate||{}, ready=d.readiness||{};
+    const wr=loop.win_rate!=null?(loop.win_rate*100).toFixed(1)+'%':'n/a';
+    const exp=loop.expectancy_net!=null?(loop.expectancy_net>=0?'+':'')+Number(loop.expectancy_net).toFixed(3)+'R':'n/a';
+    const pf=loop.profit_factor!=null?Number(loop.profit_factor).toFixed(2):'n/a';
+    const open=!!gate.open;
+    const action=advice.action||'STAND_ASIDE';
+    const actionCls=action==='SCAN'?'BUY':(action==='CLEAR_STATE'||action==='STAND_ASIDE'?'NOTRADE':'SELL');
+    const dis=loop.eligible
+      ? ((loop.compliance!=null?(loop.compliance*100).toFixed(1)+'%':'n/a')
+         +' ('+loop.eligible+' real canonical'
+         +(loop.missing_journals?', '+loop.missing_journals+' missing journal(s)':'')+')')
+      : 'unproven — no decided real trades on the canonical live book';
+    const criteria=(g.criteria||[]).map(c=>{
+      const mark=c.met?'✓':'✗';
+      return `<div class="note">${mark} ${esc(c.name)} ${c.current!=null?esc(String(c.current)):'n/a'}</div>`;
+    }).join('');
+    const setups=(g.by_setup||[]).filter(s=>s.primary).map(s=>
+      `<tr><td>${esc(s.plan_type)}</td><td>${s.paper_n||0}/${s.paper_target||20}</td>`
+      +`<td>${s.backtest_n||0}/${s.backtest_target||100}</td>`
+      +`<td>${s.expectancy_net!=null?(s.expectancy_net>=0?'+':'')+Number(s.expectancy_net).toFixed(3)+'R':'—'}</td>`
+      +`<td>${s.proven?'<span class="okc">✓</span>':'·'}</td></tr>`).join('');
+    el.innerHTML=`<div class="flex" style="margin-bottom:10px">
+        <span class="pill ${open?'BUY':'NOTRADE'}" style="${open?'background:rgba(34,197,94,.14);color:var(--green);border-color:rgba(34,197,94,.32)':''}">GATE ${open?'OPEN':'CLOSED'}</span>
+        <span class="pill ${actionCls}">${esc(action)}</span>
+        <span class="badge">readiness: ${esc(ready.level||'?')}</span>
+        <span class="badge">graduation: ${g.ready?'READY':'NOT READY'}</span></div>
+      <div class="statrow" style="margin-bottom:10px">
+        <div class="stat"><div class="v">${loop.real_paper_n||0}</div><div class="k">Real paper n</div></div>
+        <div class="stat"><div class="v">${esc(exp)}</div><div class="k">Expectancy (net)</div></div>
+        <div class="stat"><div class="v">${esc(wr)}</div><div class="k">Win rate</div></div>
+        <div class="stat"><div class="v">${esc(pf)}</div><div class="k">Profit factor</div></div>
+      </div>
+      <div class="kv">
+        <b>Advice</b><span><b>${esc(advice.headline||'')}</b></span>
+        <b>Discipline</b><span>${esc(dis)}</span>
+        <b>Pending</b><span>${loop.pending_reviews||0} review(s) · open ${loop.open_exposure||0}</span>
+        <b>Journal</b><span>${esc((d.journal_prompt||{}).question||'Did I follow the system today?')}</span>
+      </div>
+      ${criteria?`<div style="margin-top:8px"><b>Graduation bar</b>${criteria}</div>`:''}
+      ${setups?`<div style="margin-top:8px;overflow:auto"><b>By setup</b><table><tr><th>Setup</th><th>Paper</th><th>Backtest</th><th>E net</th><th></th></tr>${setups}</table></div>`:''}
+      <div class="note" style="margin-top:8px;background:rgba(255,255,255,.04);padding:8px;border-radius:10px;border:1px solid var(--line)">${esc(d.next_step||advice.detail||'')}</div>
+      <div class="note" style="margin-top:6px">Same number as <code>python main.py daily</code> · MCP <code>loop_health</code>. Canonical live book only — simulator excluded. Advisory, never places an order.</div>`;
+  }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
 
 // init
@@ -1677,7 +1776,7 @@ setInterval(()=>{ if(document.getElementById('auto').checked) load(false, true);
 // Channels panel is diagnostic-state (which backend is *serving*),
 // not signal-state, so refresh on a slower 5-minute cadence — not on
 // every 30s scan tick.  Cheap: probe_all() is config-driven.
-setInterval(()=>{ loadChannels(); loadMcp(); loadDesk(); loadReadiness(); }, 5 * 60 * 1000);
+setInterval(()=>{ loadChannels(); loadMcp(); loadDesk(); loadReadiness(); loadLoop(); }, 5 * 60 * 1000);
 // keep seg active state in sync on load
 try{ if(document.querySelectorAll) document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===document.getElementById('sym').value)); }catch(e){}
 try{ if(document.querySelectorAll) document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===document.getElementById('tf').value)); }catch(e){}
@@ -1728,8 +1827,17 @@ def make_app() -> Flask:
     @app.get("/api/pending")
     def api_pending():
         from data.database import SignalDB
+        from brain.coach import management_checklist
         with SignalDB() as db:
-            return jsonify({"pending": db.pending_reviews()})
+            pending = db.pending_reviews()
+        for item in pending:
+            tp = item.get("take_profit")
+            item["management"] = management_checklist({
+                "entry": item.get("entry"),
+                "stop_loss": item.get("stop_loss"),
+                "take_profits": [tp] if tp is not None else [],
+            })
+        return jsonify({"pending": pending})
 
     @app.get("/api/paper")
     def api_paper():
@@ -1876,8 +1984,16 @@ def make_app() -> Flask:
             decisions = db.decision_history(scan_id)
             paper_trade = db.paper_trade_for_scan(scan_id)
             journal = db.get_journal(scan_id)
+        from brain.coach import management_checklist
+        plan0 = plans[0] if plans else {
+            "entry": scan.get("entry"),
+            "stop_loss": scan.get("stop_loss"),
+            "take_profit": scan.get("take_profit"),
+        }
+        management = management_checklist(plan0)
         return jsonify({"scan": scan, "plans": plans, "decisions": decisions,
-                        "paper_trade": paper_trade, "journal": journal})
+                        "paper_trade": paper_trade, "journal": journal,
+                        "management": management})
 
     @app.get("/api/learning")
     def api_learning():
@@ -1904,15 +2020,21 @@ def make_app() -> Flask:
     def api_coach():
         symbol = _sym(request.args.get("symbol", SYMBOL))
         tf = request.args.get("tf", TIMEFRAME)
-        from brain.coach import explain_signal, mentor, personal_feedback
+        from brain.coach import (explain_signal, five_levels,
+                                 management_checklist, mentor,
+                                 personal_feedback)
         from data.database import SignalDB
         payload = compute_payload(symbol, tf, save=False, use_cache=False)
         with SignalDB() as db:
             feedback = personal_feedback(db)
+        plans = payload.get("plans") or []
         return jsonify({
             "explain": explain_signal(payload),
             "mentor": mentor(payload),
             "feedback": feedback,
+            "five_levels": five_levels(payload),
+            "management": (payload.get("management")
+                           or management_checklist(plans[0] if plans else None)),
         })
 
     @app.get("/api/candles")
@@ -2095,6 +2217,15 @@ def make_app() -> Flask:
         try:
             from brain.agent import desk_status
             return jsonify(_sanitize_for_json(desk_status()))
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.get("/api/loop-health")
+    def api_loop_health():
+        """The one daily number — same snapshot as `python main.py daily`."""
+        try:
+            from brain.agent import loop_health
+            return jsonify(_sanitize_for_json(loop_health()))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
 

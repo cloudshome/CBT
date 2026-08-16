@@ -149,6 +149,7 @@ python main.py sourcetrust discord_group 5 0.3 --note "private signals: context 
 python main.py health         # system health: data feeds, DB, risk gate, MCP, LLM
 python main.py doctor --strip # ONE readiness verdict: channels + immune + risk gate + data quality
 python main.py desk           # one-call advisory: what would a professional do now?
+python main.py daily          # 10-minute ritual: readiness + loop health + gate + journal
 python main.py brief          # daily desk briefing (alias for `agent morning`)
 python main.py agent morning  # desk morning briefing across BTC/ETH/GOLD
 python main.py agent ask "is the risk gate open?"   # natural-language question
@@ -176,13 +177,20 @@ the **graduation gate** passes (see `BLUEPRINT.md`).
 
 #### Desk agent (`agent`, `health`)
 
+* `python main.py daily` — the 10-minute ritual that operates the
+  paper→graduation loop: readiness → real/canonical paper n, net expectancy,
+  per-setup progress, is the graduation bar moving → risk gate → journal
+  prompt. Same payload as `GET /api/loop-health` and MCP `loop_health`.
+  Alias: `python main.py loop-health`. Does not scan the market unless
+  `--brief` is passed. Read-only; never places an order.
 * `python main.py agent morning` — one briefing for the whole watchlist: every
   asset with its final **desk decision** (desk-first), playbook + regime,
   risk-gate state, pending reviews, open exposure and paper-book stats, plus a
   plain-English narrative. `--save` also persists each scan.
 * `python main.py agent ask "..."` — intent-based answers from live engine +
   DB state: risk gate, exposure, pending queue, journal discipline,
-  calibration, stats, paper book, market scan, sources, progression, and the
+  calibration, stats, paper book, market scan, sources, progression, the
+  **loop** (`"how is the loop?"`), and the
   **graduation gate** (`"am i ready for micro?"`) — the BLUEPRINT Step 2→3
   checklist: expectancy ≥ +0.50R, win rate > 55%, profit factor ≥ 1.5,
   rule compliance ≥ 90%, plus the 100/20 sample proof. Compliance (P12.14) is
@@ -253,8 +261,8 @@ Offline it runs on the committed sample + deterministic synthetic data
 #### MCP server (`mcp`)
 
 `python main.py mcp` exposes the desk to Claude Desktop / Cursor / any MCP
-client over stdio (10 tools: health, morning briefing, scan, desk report,
-risk gate, ask, pending, stats, paper, learn).  Add to your MCP client config:
+client over stdio (12 tools: health, morning briefing, scan, desk report,
+risk gate, Monte Carlo, ask, pending, stats, paper, learn, loop).  Add to your MCP client config:
 
 ```json
 { "mcpServers": { "cryptobrain": {
@@ -265,10 +273,10 @@ There is also a **zero-dependency** MCP server at the repo root
 (`python mcp_server.py`) for environments where the `mcp` SDK cannot be
 installed.  It speaks newline-delimited JSON-RPC 2.0 and exposes read-only
 desk tools behind an explicit permission map — no order placement, no
-gate bypass. 13 tools: `ask`, `risk`, `health`, `brief`, `tradestate`,
+gate bypass. 15 tools: `ask`, `risk`, `health`, `brief`, `tradestate`,
 `postreview`, `channels`, `correlation`, `hidden_chart_read`,
-`hidden_analytics_mae`, `hidden_analytics_mc`, `desk_status`, and
-`readiness`.
+`hidden_analytics_mae`, `hidden_analytics_mc`, `desk_status`,
+`readiness`, `scorecard`, and `loop_health`.
 
 #### AI anatomy suite (RAG · briefs · agents · immune system)
 
@@ -784,7 +792,7 @@ crypto-brain/
 │   ├── analytics.py         # MAE/MFE summary + Monte-Carlo equity resampling
 │   ├── trading_intelligence.py  # strict desk report + institutional signal card
 │   ├── institutional_score.py   # IPS score, trade grades, TP ladders, Kelly
-│   ├── agent.py             # desk agent: morning briefing / health / ask / graduation
+│   ├── agent.py             # desk agent: morning / health / ask / graduation / loop_health / daily ritual
 │   ├── agents.py            # autonomous agents: watchdog / reviewer / weekly (audit-logged)
 │   ├── brief.py             # cross-asset morning brief + post-trade reviews
 │   ├── immune.py            # system diagnostics: staleness, DB, gate, calibration alarms

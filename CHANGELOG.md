@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.27.0] — 2026-08-16 · P14 operate the loop: daily ritual + one loop-health number
+
+MINOR: the project-review answer. Success is operating the paper→graduation
+loop, not another indicator. One composed number, four surfaces, no new cook.
+
+- **P14.1 loop health** (`brain/agent.py::loop_health`) — composes
+  `desk_status()` + `readiness_strip()` + `paper_progress()` (canonical live
+  book; simulator excluded). Answers: how many real paper trades, what is
+  net expectancy, how each primary setup is doing, is the graduation bar
+  moving. Ritual: doctor --strip → daily → risk → act + journal prompt.
+- **P14.2 daily CLI** — `python main.py daily` (alias `loop-health`).
+  `--json` dumps the payload; `--brief` optionally adds the morning briefing.
+  Exit 0 (a report, not a gate).
+- **P14.3 same number everywhere** — `GET /api/loop-health` (never 500),
+  root MCP `loop_health` (SERVER_VERSION 1.11.0), SDK `cryptobrain_loop`,
+  `agent ask "how is the loop?"`, dashboard LOOP HEALTH card.
+- **P14.4 P13 web follow-up** — KEY LEVELS A/B/C card, POSITION MANAGER on
+  LIVE SIGNAL / pending / coach, coach JS joins `five_levels` as `list[str]`.
+
+No thresholds moved. No order placed. Micro-live still blocked.
+Suite green: **815 pass / 1 skip** (+8).
+
+---
+
 ## [2.26.0] — 2026-08-16 · P13 the desk teaches: five-question coach, A/B/C key levels, position-manager card
 
 MINOR: the first build of **P13**, the decision-support phase. It adopts the

@@ -421,6 +421,9 @@ _INTENT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     # desk_status is the one-call advisory; match before generic "risk"/"health".
     ("desk", ("desk status", "what should i do", "what would a professional",
               "stand aside", "what now")),
+    # loop_health before "risk": "daily ritual" contains the word "daily".
+    ("loop", ("loop health", "loop-health", "daily ritual", "how is the loop",
+              "how many paper trades", "is the bar moving")),
     ("risk", ("risk", "gate", "limit", "drawdown", "daily", "weekly", "trader state",
               "stop trading", "allowed")),
     ("exposure", ("exposure", "portfolio", "position", "bucket", "correlation", "open trade")),
@@ -468,6 +471,11 @@ def ask(question: str, symbol: str | None = None,
             status = desk_status()
             return {"intent": intent, "question": question,
                     "answer": format_desk_status(status).splitlines(),
+                    "data": status}
+        if intent == "loop":
+            status = loop_health()
+            return {"intent": intent, "question": question,
+                    "answer": format_loop_health(status).splitlines(),
                     "data": status}
         if intent == "risk":
             from brain.risk_gate import evaluate as gate_evaluate
@@ -634,7 +642,7 @@ def ask(question: str, symbol: str | None = None,
     return {"intent": "help", "question": question,
             "answer": ["I can answer questions about: " + intents,
                        "Try: 'is the risk gate open?', 'what's pending?', "
-                       "'how is my journal discipline?', 'scan BTC'."],
+                       "'how is the loop?', 'scan BTC'."],
             "data": {"intents": intents}}
 
 
@@ -1004,6 +1012,283 @@ def format_desk_status(status: dict) -> str:
     detail = advice.get("detail")
     if detail:
         lines.append(f"               {detail}")
+    return "\n".join(lines)
+
+
+# ── loop_health (P14) ─────────────────────────────────────────────────────
+# The one number a trader should open daily. Composes desk_status +
+# readiness_strip + paper_progress (canonical live book). Does not invent
+# a new cook, does not scan the market, never places an order.
+
+_RITUAL_COMMANDS = {
+    "CLEAR_STATE": "python main.py tradestate --clear",
+    "STAND_ASIDE": "python main.py risk",
+    "REVIEW_QUEUE": "python main.py review",
+    "JOURNAL": "python main.py journal <scan_id> --followed-rules 1",
+    "PAPER_GRIND": "python main.py paper --watch",
+    "SCAN": "python main.py scan",
+}
+
+
+def _ritual_command(action: str | None) -> str:
+    return _RITUAL_COMMANDS.get(action or "", "python main.py desk")
+
+
+def loop_health(status: dict | None = None, strip: dict | None = None) -> dict:
+    """The one number a trader should open daily.
+
+    Answers: how many *real* / canonical paper trades, what is net
+    expectancy, how each primary setup is doing, and whether the
+    graduation bar is moving.
+
+    Composes ``desk_status()`` + ``readiness_strip()`` +
+    ``paper_progress()`` (canonical live book; simulator rows are
+    excluded from the live scorecard). Read-only. Never places an
+    order, never scans the market, never changes a threshold.
+    """
+    if status is None:
+        status = desk_status()
+    if strip is None:
+        strip = readiness_strip(status)
+
+    score = status.get("scorecard") or {}
+    gate = status.get("risk_gate") or {}
+    g = status.get("graduation") or {}
+    gstats = g.get("stats") or {}
+    discipline = status.get("discipline") or g.get("discipline") or {}
+    advice = status.get("advice") or {}
+
+    by_setup: list[dict] = []
+    try:
+        from data.database import SignalDB
+        from data.simulator import paper_progress, primary_plan_types
+        from config import CALIBRATE_MIN_N, CALIBRATE_MIN_PAPER_N
+        with SignalDB() as db:
+            progress = paper_progress(db)
+        primary = list(primary_plan_types())
+        primary_set = set(primary)
+        for p in progress:
+            if p["plan_type"] in primary_set or (p.get("paper_n") or 0) > 0:
+                by_setup.append({
+                    "plan_type": p["plan_type"],
+                    "primary": p["plan_type"] in primary_set,
+                    "backtest_n": int(p.get("backtest_n") or 0),
+                    "backtest_target": int(p.get("backtest_target") or CALIBRATE_MIN_N),
+                    "paper_n": int(p.get("paper_n") or 0),
+                    "paper_target": int(p.get("paper_target") or CALIBRATE_MIN_PAPER_N),
+                    "expectancy_net": p.get("expectancy_net"),
+                    "win_rate_net": p.get("win_rate_net"),
+                    "proven": bool(p.get("proven")),
+                })
+        seen = {r["plan_type"] for r in by_setup}
+        for pt in primary:
+            if pt not in seen:
+                by_setup.append({
+                    "plan_type": pt, "primary": True,
+                    "backtest_n": 0, "backtest_target": CALIBRATE_MIN_N,
+                    "paper_n": 0, "paper_target": CALIBRATE_MIN_PAPER_N,
+                    "expectancy_net": None, "win_rate_net": None,
+                    "proven": False,
+                })
+        by_setup.sort(key=lambda r: (not r["primary"], r["plan_type"]))
+    except Exception:
+        by_setup = []
+
+    bars = g.get("criteria") or {}
+    met = g.get("met") or {}
+    current = {
+        "expectancy": gstats.get("expectancy_net", gstats.get("expectancy")),
+        "win_rate": gstats.get("win_rate_net", gstats.get("win_rate")),
+        "pf": gstats.get("pf_net", gstats.get("pf")),
+        "compliance": gstats.get("compliance"),
+    }
+    criteria = [{"name": name, "bar": bar, "current": current.get(name),
+                 "met": bool(met.get(name))}
+                for name, bar in bars.items()]
+
+    loop = {
+        "real_paper_n": int(score.get("n") or 0),
+        "wins": int(score.get("wins") or 0),
+        "losses": int(score.get("losses") or 0),
+        "expectancy_net": score.get("expectancy_r"),
+        "win_rate": score.get("win_rate"),
+        "profit_factor": score.get("profit_factor"),
+        "compliance": (discipline or {}).get("compliance"),
+        "eligible": int((discipline or {}).get("eligible") or 0),
+        "missing_journals": int((discipline or {}).get("missing_journals") or 0),
+        "pending_reviews": int(status.get("pending_reviews") or 0),
+        "open_exposure": int(status.get("open_exposure") or 0),
+    }
+
+    ritual = [
+        {"step": 1, "name": "readiness",
+         "ok": (strip.get("level") or "down") != "down",
+         "level": strip.get("level"),
+         "label": strip.get("headline") or "",
+         "command": "python main.py doctor --strip"},
+        {"step": 2, "name": "loop", "ok": True,
+         "label": (f"n={loop['real_paper_n']} real paper · "
+                   f"graduation {'READY' if g.get('ready') else 'NOT READY'}"),
+         "command": "python main.py daily"},
+        {"step": 3, "name": "gate",
+         "ok": bool(gate.get("allowed")),
+         "label": "OPEN" if gate.get("allowed") else "CLOSED",
+         "command": "python main.py risk"},
+        {"step": 4, "name": "act", "ok": False,
+         "label": f"{advice.get('action', '?')} — {advice.get('headline', '')}",
+         "command": _ritual_command(advice.get("action"))},
+    ]
+
+    mode = _data_mode()
+    return json_safe({
+        "time": status.get("time"),
+        "version": status.get("version", VERSION),
+        "data_mode": mode.get("mode"),
+        "ready": bool(strip.get("ready")),
+        "readiness": {
+            "level": strip.get("level"),
+            "headline": strip.get("headline"),
+            "ready": bool(strip.get("ready")),
+        },
+        "gate": {
+            "open": bool(gate.get("allowed")),
+            "blocked_by": list(gate.get("blocked_by") or []),
+            "flags": list(gate.get("trader_flags") or []),
+        },
+        "advice": {
+            "action": advice.get("action"),
+            "headline": advice.get("headline"),
+            "detail": advice.get("detail"),
+        },
+        "loop": loop,
+        "graduation": {
+            "ready": bool(g.get("ready")),
+            "samples_proven": bool(g.get("samples_proven")),
+            "criteria": criteria,
+            "by_setup": by_setup,
+            "sample_gaps": g.get("sample_gaps") or [],
+            "n": gstats.get("n", 0),
+        },
+        "journal_prompt": {
+            "question": "Did I follow the system today?",
+            "command": "python main.py journal <scan_id> --followed-rules 1",
+            "missing": loop["missing_journals"],
+            "note": "Unjournaled real trades lower graduation compliance (P12.14).",
+        },
+        "ritual": ritual,
+        "next_step": f"{advice.get('action', '?')} — {advice.get('headline', '')}",
+    })
+
+
+def format_loop_health(health: dict) -> str:
+    """Human-readable 10-minute daily ritual for `python main.py daily`."""
+    loop = health.get("loop") or {}
+    g = health.get("graduation") or {}
+    advice = health.get("advice") or {}
+    readiness = health.get("readiness") or {}
+    gate = health.get("gate") or {}
+    journal = health.get("journal_prompt") or {}
+    flags = gate.get("flags") or []
+
+    def _num(v, kind="plain"):
+        if v is None:
+            return "n/a"
+        try:
+            x = float(v)
+        except (TypeError, ValueError):
+            return "n/a"
+        if kind == "r":
+            return f"{x:+.3f}R"
+        if kind == "pct":
+            return f"{x * 100:.1f}%"
+        if kind == "pf":
+            return f"{x:.2f}"
+        return str(v)
+
+    wr_s = _num(loop.get("win_rate"), "pct")
+    exp_s = _num(loop.get("expectancy_net"), "r")
+    pf_s = _num(loop.get("profit_factor"), "pf")
+    gate_word = "OPEN" if gate.get("open") else "CLOSED"
+    ready_lvl = (readiness.get("level") or "?").upper()
+    if loop.get("eligible"):
+        disc = (f"{(loop.get('compliance') or 0) * 100:.1f}% compliance  "
+                f"({loop.get('eligible')} real canonical trades)")
+        if loop.get("missing_journals"):
+            disc += f"  ✗ {loop['missing_journals']} missing journal(s)"
+    else:
+        disc = ("unproven — no decided real trades on the "
+                "canonical live book (simulator samples excluded)")
+
+    lines = [
+        "=" * 66,
+        f"DAILY RITUAL — CryptoBrain v{health.get('version')}  {health.get('time')}",
+        "-" * 66,
+        f"  1. READINESS   : {ready_lvl} — {readiness.get('headline', '')}",
+        f"  2. LOOP        : n={loop.get('real_paper_n', 0)} real paper · "
+        f"E {exp_s} · WR {wr_s}",
+        f"                   graduation "
+        f"{'READY' if g.get('ready') else 'NOT READY'} "
+        f"({g.get('n', 0)} decided primary)",
+        f"  3. GATE        : {gate_word}"
+        + (f"  flags={', '.join(flags)}" if flags else "  flags=clear"),
+        f"  4. ACT         : {advice.get('action', '?')} — "
+        f"{advice.get('headline', '')}",
+        "-" * 66,
+        "  LOOP HEALTH",
+        f"    real paper   : {loop.get('real_paper_n', 0)} decided "
+        f"({loop.get('wins', 0)}W/{loop.get('losses', 0)}L — "
+        "canonical live, simulator excluded)",
+        f"    expectancy   : {exp_s}",
+        f"    win rate     : {wr_s}",
+        f"    profit factor: {pf_s}",
+        f"    discipline   : {disc}",
+        f"    pending      : {loop.get('pending_reviews', 0)} review(s)  ·  "
+        f"open {loop.get('open_exposure', 0)}",
+        "-" * 66,
+        "  GRADUATION BAR",
+    ]
+
+    bar_label = {
+        "expectancy": ("≥ +0.50R", "r"),
+        "win_rate": ("> 55%", "pct"),
+        "pf": ("≥ 1.50", "pf"),
+        "compliance": ("≥ 90%", "pct"),
+    }
+    for c in g.get("criteria") or []:
+        name = c.get("name") or "?"
+        target, kind = bar_label.get(name, ("", "plain"))
+        mark = "✓" if c.get("met") else "✗"
+        lines.append(f"    {mark} {name:<12} {_num(c.get('current'), kind):<14}{target}")
+    lines.append(f"    sample proof : "
+                 f"{'✓ 100 backtest + 20 paper per primary setup' if g.get('samples_proven') else '✗ grind more history first'}")
+
+    setups = [s for s in (g.get("by_setup") or []) if s.get("primary")]
+    if setups:
+        lines.append("-" * 66)
+        lines.append("  BY SETUP (primary family)")
+        for s in setups:
+            mark = "✓" if s.get("proven") else "·"
+            exp = _num(s.get("expectancy_net"), "r")
+            lines.append(
+                f"    {s['plan_type']:<22} paper {s.get('paper_n', 0):>3}/"
+                f"{s.get('paper_target', 20)}  bt {s.get('backtest_n', 0):>5}/"
+                f"{s.get('backtest_target', 100)}  E {exp:<9} {mark}")
+
+    lines.extend([
+        "-" * 66,
+        "  JOURNAL PROMPT",
+        f"    {journal.get('question', 'Did I follow the system today?')}",
+        f"      {journal.get('command', 'python main.py journal <scan_id> --followed-rules 1')}",
+        f"    {journal.get('note', '')}",
+        "-" * 66,
+        f"  NEXT         : {health.get('next_step', '')}",
+    ])
+    detail = advice.get("detail")
+    if detail:
+        lines.append(f"                 {detail}")
+    act = next((r for r in (health.get("ritual") or []) if r.get("name") == "act"), None)
+    if act and act.get("command"):
+        lines.append(f"                 {act['command']}")
     return "\n".join(lines)
 
 

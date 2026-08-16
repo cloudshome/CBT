@@ -16,6 +16,7 @@ Usage:
   python main.py agent all                                   # health + briefing + graduation
   python main.py health                                      # system health (+ KuCoin/OKX/Bybit cross-check)
   python main.py desk                                        # one-call desk advisory (gate + P&L + graduation + advice)
+  python main.py daily                                       # 10-minute daily ritual (readiness + loop health + gate + journal)
   python main.py preflight                                   # strict live-paper operations gate
   python main.py simulator                                   # grind 100/20 sample proof
   python main.py backfill --symbol BTCUSDT --market perp     # P10.2: paginated Binance history → Parquet store
@@ -1442,6 +1443,36 @@ def cmd_desk(args) -> int:
     return 0
 
 
+def cmd_daily(args) -> int:
+    """10-minute daily ritual: readiness → loop health → gate → journal.
+
+    The one command that operates the paper→graduation loop. Composes
+    ``loop_health()`` (itself desk_status + readiness_strip + paper_progress).
+    Does not scan the market unless ``--brief`` is passed. Read-only.
+    Same payload as ``GET /api/loop-health`` and MCP ``loop_health``.
+    """
+    from brain.agent import format_loop_health, loop_health
+    health = loop_health()
+    if args.json:
+        payload: dict = health
+        if getattr(args, "brief", False):
+            from brain.agent import morning_briefing
+            payload = {"loop": health,
+                       "briefing": morning_briefing(
+                           timeframe=getattr(args, "tf", TIMEFRAME),
+                           bars=getattr(args, "bars", BARS))}
+        print(json.dumps(payload, indent=2, default=str))
+        return 0
+    print(format_loop_health(health))
+    if getattr(args, "brief", False):
+        from brain.agent import format_briefing, morning_briefing
+        print()
+        print(format_briefing(morning_briefing(
+            timeframe=getattr(args, "tf", TIMEFRAME),
+            bars=getattr(args, "bars", BARS))))
+    return 0
+
+
 # ── Agent-Reach-inspired CLI surface (P7/P8, additive) ─────────────────
 # These three commands are the install/doctor/SKILL trio borrowed from
 # Panniantong/Agent-Reach, scoped to CryptoBrain's read-only safety
@@ -2536,6 +2567,28 @@ def main(argv: list[str] | None = None) -> int:
     p_desk.add_argument("--json", action="store_true")
     p_desk.set_defaults(func=cmd_desk)
 
+    p_daily = sub.add_parser(
+        "daily",
+        help="10-minute daily ritual: readiness + loop health + gate + journal prompt",
+    )
+    p_daily.add_argument("--json", action="store_true")
+    p_daily.add_argument("--brief", action="store_true",
+                         help="also run the morning briefing (scans the watchlist)")
+    p_daily.add_argument("--tf", default=TIMEFRAME)
+    p_daily.add_argument("--bars", type=int, default=BARS)
+    p_daily.set_defaults(func=cmd_daily)
+
+    p_loop = sub.add_parser(
+        "loop-health",
+        help="alias for `daily` — the one loop-health number",
+    )
+    p_loop.add_argument("--json", action="store_true")
+    p_loop.add_argument("--brief", action="store_true",
+                        help="also run the morning briefing (scans the watchlist)")
+    p_loop.add_argument("--tf", default=TIMEFRAME)
+    p_loop.add_argument("--bars", type=int, default=BARS)
+    p_loop.set_defaults(func=cmd_daily)
+
     p_preflight = sub.add_parser(
         "preflight",
         help="strict safety/readiness gate before unattended live paper trading",
@@ -2789,7 +2842,7 @@ def main(argv: list[str] | None = None) -> int:
         print("   advanced/automation: scan | intelligence | watch | paper | analyze | backtest |")
         print("                        learn | stats | coach | review | sources | state | glossary |")
         print("                        brief | ask | postreview | agent (morning/health/ask/all/) |")
-        print("                        health | desk | doctor | channels | skill | preflight | simulator |")
+        print("                        health | desk | daily | doctor | channels | skill | preflight | simulator |")
         print("                        validate | quality | scorecard | hidden | correlation | backfill | store |")
         print("                        derivatives | mcp | monte")
         print("=" * 62)

@@ -32,6 +32,8 @@ ROOT_TOOLS = {
     "readiness",
     # P12.3: boxed strategy scorecard (read-only report over graded outcomes)
     "scorecard",
+    # P14: the one daily number (real paper n / E_net / graduation bar)
+    "loop_health",
 }
 
 
@@ -272,6 +274,25 @@ def test_root_mcp_readiness_tool(env):
         assert data["headline"]
         names = {p["name"] for p in data["pillars"]}
         assert names == {"channels", "immune", "risk_gate", "data"}
+    finally:
+        client.close()
+
+
+def test_root_mcp_loop_health_tool(env):
+    """loop_health is the one daily number — same shape as the library."""
+    client = StdioClient(env)
+    try:
+        client.send("initialize")
+        resp = client.send("tools/call", {"name": "loop_health", "arguments": {}})
+        data = json.loads(resp["result"]["content"][0]["text"])
+        assert "loop" in data
+        assert "real_paper_n" in data["loop"]
+        assert "graduation" in data
+        assert "ritual" in data
+        assert data["advice"]["action"] in {
+            "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
+            "JOURNAL", "PAPER_GRIND", "SCAN",
+        }
     finally:
         client.close()
 

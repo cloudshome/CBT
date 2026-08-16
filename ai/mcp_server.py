@@ -24,6 +24,7 @@ Tools exposed (all offline-capable; DEMO_MODE=1 uses sample data):
   * cryptobrain_stats       what the engine has learned (backtests/calibration)
   * cryptobrain_paper       paper-trade book stats
   * cryptobrain_learn       recompute the calibration profile
+  * cryptobrain_loop        the one daily number (real paper n / E_net / graduation bar)
 
 The server speaks the standard MCP protocol over stdio (JSON-RPC 2.0).  It
 requires the official `mcp` package (pip install mcp) — a clear error is
@@ -124,6 +125,11 @@ def _learn() -> dict:
     return {"profile": result["profile"]}
 
 
+def _loop() -> dict:
+    from brain.agent import loop_health
+    return loop_health()
+
+
 TOOLS = [
     {
         "name": "cryptobrain_health",
@@ -207,6 +213,13 @@ TOOLS = [
                        "stored backtest + paper outcomes.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
+    {
+        "name": "cryptobrain_loop",
+        "description": "The one daily number: real/canonical paper n, net expectancy, "
+                       "per-setup progress, and whether the graduation bar is moving. "
+                       "Same payload as `python main.py daily` / GET /api/loop-health.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
 ]
 
 
@@ -237,6 +250,8 @@ def _call_tool(name: str, arguments: dict | None) -> dict:
         return _paper()
     if name == "cryptobrain_learn":
         return _learn()
+    if name == "cryptobrain_loop":
+        return _loop()
     raise ValueError(f"unknown tool: {name}")
 
 

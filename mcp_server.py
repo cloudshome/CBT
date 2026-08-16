@@ -28,7 +28,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.10.0"  # bumped: P12.11 source provenance — scorecard source_key filter + source inventory
+SERVER_VERSION = "1.11.0"  # bumped: P14 loop_health — the one daily number
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -177,6 +177,14 @@ ALLOWED_TOOLS = {
             "properties": {},
         },
     },
+    # ── P14: the one daily number (operate the paper→graduation loop) ──
+    "loop_health": {
+        "description": "The one number a trader should open daily: how many real/canonical paper trades, net expectancy, per-setup progress, and whether the graduation bar is moving. Composes desk_status + readiness + paper_progress. Read-only; the same as `python main.py daily --json` and GET /api/loop-health. Never places an order.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
 }
 
 
@@ -309,6 +317,11 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         # every pillar is exception-isolated inside readiness_strip().
         from brain.agent import readiness_strip
         return readiness_strip()
+
+    elif name == "loop_health":
+        # P14 daily ritual. Composes desk_status + readiness + paper_progress.
+        from brain.agent import loop_health
+        return loop_health()
 
     raise ValueError(f"Unhandled tool: {name}")
 

@@ -178,7 +178,7 @@ def test_skill_md_lists_the_core_tools():
     skill = ROOT / "SKILL.md"
     text = skill.read_text(encoding="utf-8").lower()
     for tool in ("scan", "intelligence", "brief", "ask", "postreview",
-                 "health", "risk", "doctor", "skill"):
+                 "health", "risk", "doctor", "skill", "daily"):
         assert tool in text, f"SKILL.md must mention the '{tool}' tool"
 
 
@@ -208,7 +208,7 @@ def test_main_help_mentions_doctor_channels_skill():
     )
     assert res.returncode == 0, res.stderr
     out = res.stdout.lower()
-    for cmd in ("doctor", "channels", "skill", "desk"):
+    for cmd in ("doctor", "channels", "skill", "desk", "daily"):
         assert cmd in out, f"`main.py --help` should list the {cmd!r} subcommand"
 
 

@@ -268,6 +268,56 @@ def test_ask_desk_intent(desk_env):
     assert any("ADVICE" in line or "DESK STATUS" in line for line in r["answer"])
 
 
+# ── loop_health (P14) ────────────────────────────────────────────────────
+
+def test_loop_health_shape_and_json(desk_env):
+    """loop_health() is the one daily number: required keys, JSON-safe."""
+    import json
+    from brain.agent import loop_health
+    health = loop_health()
+    for key in ("time", "version", "data_mode", "ready", "readiness",
+                "gate", "advice", "loop", "graduation", "journal_prompt",
+                "ritual", "next_step"):
+        assert key in health, f"loop_health missing {key!r}"
+    loop = health["loop"]
+    for key in ("real_paper_n", "expectancy_net", "win_rate", "profit_factor",
+                "compliance", "eligible", "pending_reviews", "open_exposure"):
+        assert key in loop, f"loop missing {key!r}"
+    assert loop["real_paper_n"] == 0
+    assert health["gate"]["open"] is True
+    assert health["advice"]["action"] in {
+        "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
+        "JOURNAL", "PAPER_GRIND", "SCAN",
+    }
+    assert health["advice"]["action"] == "PAPER_GRIND"
+    assert health["graduation"]["ready"] is False
+    assert isinstance(health["graduation"]["criteria"], list)
+    assert isinstance(health["graduation"]["by_setup"], list)
+    ritual_names = [s["name"] for s in health["ritual"]]
+    assert ritual_names == ["readiness", "loop", "gate", "act"]
+    assert health["journal_prompt"]["question"]
+    json.dumps(health)  # must not raise
+
+
+def test_loop_health_format(desk_env):
+    from brain.agent import format_loop_health, loop_health
+    text = format_loop_health(loop_health())
+    assert "DAILY RITUAL" in text
+    assert "LOOP HEALTH" in text
+    assert "GRADUATION BAR" in text
+    assert "JOURNAL PROMPT" in text
+    assert "Did I follow the system today?" in text
+
+
+def test_ask_loop_intent(desk_env):
+    from brain.agent import ask
+    r = ask("how is the loop?")
+    assert r["intent"] == "loop"
+    assert r["data"]["loop"]["real_paper_n"] == 0
+    assert any("LOOP HEALTH" in line or "DAILY RITUAL" in line
+               for line in r["answer"])
+
+
 def test_health_report_skips_cross_exchange_in_demo(desk_env):
     """Demo mode has no live Binance prices, so the multi-exchange
     cross-check must degrade to a note instead of running."""

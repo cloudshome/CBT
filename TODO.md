@@ -6,7 +6,20 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-16 (**v2.26.0 / P13 shipped — the desk teaches**.
+**Last updated:** 2026-08-16 (**v2.27.0 / P14 shipped — operate the loop**.
+The project-review answer: success is operating the paper→graduation loop, not
+another indicator. **P14.1** `brain/agent.py::loop_health` — one number
+(real/canonical paper n, net expectancy, per-setup progress, is the graduation
+bar moving) composed from `desk_status` + `readiness_strip` + `paper_progress`.
+**P14.2** `python main.py daily` (alias `loop-health`) — the 10-minute ritual
+doctor --strip → loop → risk → journal prompt. **P14.3** same payload on
+`GET /api/loop-health`, MCP `loop_health` / `cryptobrain_loop`, `agent ask
+"how is the loop?"`, and the dashboard LOOP HEALTH card. **P14.4** P13 web
+follow-up: KEY LEVELS card + POSITION MANAGER on LIVE SIGNAL / pending /
+coach, coach JS joins `five_levels`. No threshold moved; no order placed;
+simulator still excluded from the live book. Suite green: **815 pass / 1 skip** (+8).)
+
+**Previous:** 2026-08-16 (**v2.26.0 / P13 shipped — the desk teaches**.
 Fourth build of the session, the first of the P13 decision-support phase and
 the only code shipped after the user's project review. It adopts the **four
 ideas that survived the ChatGPT desk-review** (`docs/TRADING_DESK_CHATGPT_REVIEW.md`)
@@ -150,6 +163,31 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Current sequence — next executable work (operational, not a new code milestone)
 
+### TODO-22 / P14 · Operate the loop: daily ritual + one loop-health number · ✅ SHIPPED (v2.27.0)
+
+The user's project review (`docs/PROJECT_REVIEW_2026-08-16.md`) restated
+success as **operating the paper→graduation loop**, not another cook.
+P14 is that loop as a product surface.
+
+- **P14.1** `brain/agent.loop_health()` / `format_loop_health()` — composes
+  `desk_status()` + `readiness_strip()` + `paper_progress()` (canonical live
+  book; simulator excluded). Payload: readiness, gate, advice, loop
+  (`real_paper_n`, `expectancy_net`, win rate, PF, compliance, pending,
+  open exposure), graduation (criteria + by_setup), 4-step ritual, journal
+  prompt. Does not recompute, does not scan, never places an order.
+- **P14.2** `python main.py daily` (alias `loop-health`) — 10-minute ritual.
+  Optional `--brief` adds the morning briefing. `--json` dumps the payload.
+  Exit 0 (a report, not a gate).
+- **P14.3** same number everywhere: `GET /api/loop-health` (never 500),
+  root MCP `loop_health`, SDK `cryptobrain_loop`, `agent ask "how is the
+  loop?"`, dashboard LOOP HEALTH card (`loadLoop()` on render + 5-min tick).
+- **P14.4** P13 web follow-up: KEY LEVELS A/B/C card, POSITION MANAGER on
+  LIVE SIGNAL / pending / coach, `/api/coach` ships `five_levels` (joined
+  as `list[str]`, not `.name`).
+
+**Unchanged.** Graduation bar, risk limits, source isolation, no-order
+invariant. Next work is still the real-host operational list below.
+
 ### TODO-21 / P13 · The desk teaches: five-question coach, A/B/C key levels, position-manager card · ✅ SHIPPED (v2.26.0)
 
 **Report:** [`docs/HANDOVER_2026-08-16_P13.md`](docs/HANDOVER_2026-08-16_P13.md)
@@ -169,9 +207,8 @@ unchanged.
 - **P13.4** BLUEPRINT.md Golden Rule 6 + playbooks docstring — no-martingale /
   immutable risk-budget invariant.
 
-**Web follow-up (not done, front-end only):** render `key_levels` on the
-dashboard chart page and the position-manager card on the approval queue; the
-JSON is already emitted by `/api/scan` and MCP.
+**Web follow-up:** ✅ done in P14.4 — KEY LEVELS card + POSITION MANAGER on
+LIVE SIGNAL / pending / coach. JSON was already emitted by `/api/scan`.
 
 ### TODO-20 / P12.18 · The net anchor at the hard limits · ✅ SHIPPED (v2.25.0)
 

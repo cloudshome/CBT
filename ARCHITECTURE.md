@@ -10,7 +10,7 @@
 **Last updated:** 2026-08-16
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
 **Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.23.4` (also `pyproject.toml`).
+**Version:** `config.VERSION` = `2.27.0` (also `pyproject.toml`).
 
 ---
 
@@ -20,7 +20,7 @@
 | File | Purpose |
 |---|---|
 | `main.py` | argparse CLI dispatcher (~30 `cmd_*` subcommands) |
-| `config.py` | Env-driven config; `VERSION = "2.23.4"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
+| `config.py` | Env-driven config; `VERSION = "2.27.0"`; exports `SYMBOL`, `SYMBOLS`, `TIMEFRAME`, risk caps, progression ladder |
 | `mcp_server.py` | Zero-dep stdio JSON-RPC 2.0 MCP server (read-only tool permission map) |
 | `SKILL.md` | Agent-facing skill file (the one AI agents read first) |
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
@@ -38,7 +38,7 @@
 ### `brain/` — the desk brain
 | Module | Purpose | Used by |
 |---|---|---|
-| `agent.py` | `health_report`, `format_health`, `desk_status`, `format_desk_status`, `readiness_strip`, `format_readiness_strip` | `cmd_health`, `cmd_desk`, `cmd_doctor`, MCP `desk_status` / `readiness`, `/api/desk`, `/api/readiness` |
+| `agent.py` | `health_report`, `format_health`, `desk_status`, `format_desk_status`, `readiness_strip`, `format_readiness_strip`, `loop_health`, `format_loop_health` | `cmd_health`, `cmd_desk`, `cmd_daily`, `cmd_doctor`, MCP `desk_status` / `readiness` / `loop_health`, `/api/desk`, `/api/readiness`, `/api/loop-health` |
 | `agents.py` | Autonomous desk agents (morning, watchdog, paper-reviewer, weekly-review), audit-logged to `agent_runs` | `cmd_agent` |
 | `analytics.py` | MAE/MFE summary, Monte Carlo equity/drawdown over the canonical live book (P12.15) | `hidden analytics mae/mc` |
 | `ask.py` | RAG query with grounded citations | `cmd_ask`, MCP `ask` |

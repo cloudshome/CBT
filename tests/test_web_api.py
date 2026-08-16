@@ -198,6 +198,56 @@ def test_desk_endpoint_returns_advisory(client):
     json.loads(resp.get_data(as_text=True))  # numpy-leak safety
 
 
+def test_loop_health_endpoint_returns_advisory(client):
+    """`/api/loop-health` is the one daily number (same as `python main.py daily`)."""
+    import json
+    resp = client.get("/api/loop-health")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    payload = resp.get_json()
+    assert "loop" in payload
+    assert "real_paper_n" in payload["loop"]
+    assert "graduation" in payload
+    assert "ritual" in payload
+    assert payload["advice"]["action"] in {
+        "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
+        "JOURNAL", "PAPER_GRIND", "SCAN",
+    }
+    json.loads(resp.get_data(as_text=True))  # numpy-leak safety
+
+
+def test_loop_health_endpoint_never_500s(client, monkeypatch):
+    """A crashing loop_health degrades to a JSON error, never an HTTP 500."""
+    import brain.agent as agent
+    monkeypatch.setattr(agent, "loop_health",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    resp = client.get("/api/loop-health")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["ok"] is False
+    assert "RuntimeError" in payload["error"]
+
+
+def test_pending_includes_management(client):
+    """Every pending review carries the HOLD/REDUCE/TRAIL/EXIT checklist."""
+    payload = client.get("/api/pending").get_json()
+    assert "pending" in payload
+    assert isinstance(payload["pending"], list)
+    for item in payload["pending"]:
+        assert "management" in item
+        assert isinstance(item["management"], list)
+
+
+def test_coach_includes_five_levels_and_management(client):
+    """`/api/coach` ships the five-question ladder + position-manager card."""
+    resp = client.get("/api/coach?symbol=BTCUSDT")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    payload = resp.get_json()
+    assert isinstance(payload.get("five_levels"), list)
+    assert payload["five_levels"]
+    assert isinstance(payload.get("management"), list)
+    assert isinstance(payload.get("explain"), list)
+
+
 def test_scorecard_endpoint_empty_db_refuses_cleanly(client):
     """`/api/scorecard` on a fresh DB reports the truth, not an error page."""
     resp = client.get("/api/scorecard")
