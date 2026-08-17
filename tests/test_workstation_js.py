@@ -178,6 +178,83 @@ def test_chart_workspace_feeds_the_chart_engine():
     assert "Support" in out["levels"]
 
 
+def test_chart_draws_zone_overlays():
+    """W2 — order blocks, FVGs, liquidity, sweep and dealing range all become
+    horizontal price lines on the price pane (the data used to be text-only)."""
+    payload = _chart_payload()
+    payload["zones"] = {
+        "order_blocks": [
+            {"side": "bullish", "top": 63100.0, "bottom": 62900.0,
+             "tested": False, "broken": False, "kind": "order_block"},
+            {"side": "bearish", "top": 64000.0, "bottom": 63800.0,
+             "tested": True, "broken": False, "kind": "order_block"},
+        ],
+        "fvgs": [{"side": "bullish", "top": 63500.0, "bottom": 63300.0,
+                  "filled": False, "kind": "fvg"}],
+        "liquidity": [{"price": 64500.0, "side": "above", "kind": "liquidity"},
+                      {"price": 61500.0, "side": "below", "kind": "liquidity"}],
+        "sweep": {"level": 64400.0, "side": "buyside", "recovered": True,
+                  "kind": "sweep"},
+        "dealing_range": {"top": 64200.0, "bottom": 61600.0, "zone": "premium",
+                          "position": 0.7, "kind": "dealing_range"},
+    }
+    out = _run({"/api/chart": payload}, """
+      ['ovEma','ovVwap','ovBb','ovLevels','ovPlan','ovRsi','ovMacd','ovZones']
+        .forEach(id => { el(id).checked = true; });
+      await loadChartWorkspace(true);
+      const candle = CHARTS.find(c => c.pane === 'chartMain')
+        .series.find(s => s.kind === 'candle');
+      console.log(JSON.stringify({ lines: candle.lines }));
+    """)
+    lines = out["lines"]
+    # order blocks (2×2) + fvg (2) + liquidity (2) + sweep (1) + range (2) = 9
+    assert "OB bull top" in lines and "OB bull low" in lines
+    assert "OB bear top (done)" in lines          # tested → dashed + tag
+    assert "FVG bull top" in lines
+    assert "Buyside liq" in lines and "Sellside liq" in lines
+    assert "buyside sweep (recovered)" in lines
+    assert "range high (premium)" in lines and "range low (premium)" in lines
+
+
+def test_replay_mode_is_clearly_labelled_and_stoppable():
+    """W2 — replay walks the loaded candles and is unmistakably labelled
+    'historical playback', never confused with live or paper evidence."""
+    out = _run({"/api/chart": _chart_payload()}, """
+      await loadChartWorkspace(true);
+      toggleReplay();
+      const running = !!_replay;
+      const buttonBefore = elements['replayBtn'].textContent;
+      const replayHead = elements['chartHead'].innerHTML;
+      // force the replay cursor to the end so the next tick finishes
+      if(_replay){ _replay.idx = _replay.candles.length; replayTick(); }
+      const runningAfter = !!_replay;
+      console.log(JSON.stringify({ running, buttonBefore, replayHead, runningAfter }));
+    """)
+    assert out["running"] is True, "replay did not start"
+    assert "Stop" in out["buttonBefore"], "replay button did not switch to Stop"
+    assert "REPLAY — historical playback, not live" in out["replayHead"]
+    assert out["runningAfter"] is False, "replay did not stop at the end"
+
+
+def test_chart_reload_stops_replay_before_redrawing():
+    """A reload/series change cannot leave a historical timer running over the
+    newly loaded chart or repaint its header as replay."""
+    out = _run({"/api/chart": _chart_payload()}, """
+      await loadChartWorkspace(true);
+      toggleReplay();
+      await loadChartWorkspace(true);
+      console.log(JSON.stringify({
+        running: !!_replay,
+        button: elements['replayBtn'].textContent,
+        head: elements['chartHead'].innerHTML,
+      }));
+    """)
+    assert out["running"] is False
+    assert out["button"] == "▶ Replay"
+    assert "historical playback" not in out["head"]
+    assert "63,500" in out["head"]
+
+
 def test_chart_toggles_hide_panes():
     """Unchecking RSI/MACD removes those panes — the toggles really work."""
     out = _run({"/api/chart": _chart_payload()}, """
@@ -540,6 +617,39 @@ def test_guided_evidence_build_submits_selected_series_inline():
     assert out["streamUrl"].endswith("/ev123/events")
     assert out["display"] == "block"
     assert "queued" in out["state"]
+
+
+def test_guided_evidence_restores_active_inline_job_after_reload():
+    """Loading the Evidence tab discovers persisted active work and reconnects
+    its inline SSE stream instead of redirecting to Command center."""
+    active = {
+        "job_id": "restored123", "kind": "evidence", "title": "Build my evidence",
+        "status": "running", "phase": "Simulator", "step_index": 2,
+        "step_total": 4, "log_tail": "still measuring",
+    }
+    out = _run({
+        "/api/loop-health": {"evidence_guidance": {
+            "result": "incomplete", "projection_state": "unknown",
+            "backtest_gap": 40, "paper_gap": 8, "caveat": "Not a promise."}},
+        "/api/v1/jobs": {"ok": True, "data": {"jobs": [active]}},
+        "/api/unlock": {"allowed": False, "blocks": []},
+        "/api/evidence": {"setups": [], "count": 0},
+    }, """
+      let streamUrl='';
+      global.EventSource=class { constructor(url){ streamUrl=url; }
+        addEventListener(){} close(){} };
+      await loadEvidence();
+      console.log(JSON.stringify({
+        streamUrl,
+        display: elements['evJob'].style.display,
+        state: elements['evJobState'].textContent,
+        log: elements['evJobLog'].textContent,
+      }));
+    """)
+    assert out["streamUrl"].endswith("/restored123/events")
+    assert out["display"] == "block"
+    assert "Simulator" in out["state"] and "2/4" in out["state"]
+    assert "still measuring" in out["log"]
 
 
 def test_evidence_guidance_says_no_edge_plainly():

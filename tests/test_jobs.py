@@ -138,6 +138,57 @@ def test_evidence_guidance_projects_from_observed_rounds_and_reports_no_edge(tmp
     assert "Do not tune" in finished["headline"]
 
 
+def test_evidence_guidance_reports_completed_no_edge_amid_other_gaps(tmp_path):
+    mgr = _manager(tmp_path)
+    guidance = mgr.evidence_guidance([
+        {
+            "plan_type": "Sweep Reversal", "primary": True,
+            "backtest_n": 100, "backtest_target": 100,
+            "paper_n": 20, "paper_target": 20,
+            "expectancy_net": -0.2, "proven": False,
+        },
+        {
+            "plan_type": "Trend Continuation", "primary": True,
+            "backtest_n": 40, "backtest_target": 100,
+            "paper_n": 5, "paper_target": 20,
+            "expectancy_net": 0.1, "proven": False,
+        },
+    ])
+    assert guidance["result"] == "mixed"
+    assert guidance["no_edge_setups"] == ["Sweep Reversal"]
+    assert "No positive net edge measured for Sweep Reversal" in guidance["headline"]
+    assert "Do not tune" in guidance["headline"]
+    assert guidance["backtest_gap"] == 60 and guidance["paper_gap"] == 15
+
+
+def test_evidence_guidance_is_unknown_then_stalled_without_inventing_a_rate(tmp_path):
+    def zero_yield(argv, *, on_line, should_cancel):
+        on_line("round 1: +0 backtest samples, +0 paper samples (run sim_zero)")
+        return 0
+
+    mgr = _manager(tmp_path, runner=zero_yield)
+    gap = [{
+        "plan_type": "Sweep Reversal", "primary": True,
+        "backtest_n": 60, "backtest_target": 100,
+        "paper_n": 12, "paper_target": 20,
+        "expectancy_net": None, "proven": False,
+    }]
+
+    unknown = mgr.evidence_guidance(gap)
+    assert unknown["projection_state"] == "unknown"
+    assert unknown["projected_rounds"] is None
+    assert unknown["observed_rate"] == {
+        "backtest_per_round": None, "paper_per_round": None}
+
+    res = mgr.submit("simulator", {"rounds": 1})
+    _wait(res["job_id"], mgr, {"succeeded"})
+    stalled = mgr.evidence_guidance(gap)
+    assert stalled["projection_state"] == "stalled"
+    assert stalled["projected_rounds"] is None
+    assert stalled["observed_rate"] == {
+        "backtest_per_round": 0.0, "paper_per_round": 0.0}
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # 2. allow-list + validation
 # ══════════════════════════════════════════════════════════════════════════
@@ -189,6 +240,7 @@ def test_evidence_composite_refuses_unknown_or_unbounded_inputs(tmp_path):
         mgr.submit("evidence", {"rounds": 0})
     with pytest.raises(jobsmod.JobError):
         mgr.submit("evidence", {"tf": "3h"})
+    assert mgr.list_jobs() == []  # every refusal happened before persistence
 
 
 # ══════════════════════════════════════════════════════════════════════════

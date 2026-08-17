@@ -2,10 +2,11 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-17 · branch `arena/01a010bb-sky` · **W1 shipped as
-v2.32.0** — guided evidence controls, inline SSE progress, projected sample gap
-and honest no-edge reporting. P18.3 jobs/SSE, P18.2 `/api/v1`, and P18.1 auth
-shipped in the preceding releases.
+Last updated: 2026-08-17 · **W1 + W2 (part 1) consolidated** — the guided
+“Build my evidence” flow keeps the stricter W1 validation, coherent run inputs,
+inline reload recovery, observed-rate projection and explicit no-edge result;
+the chart workstation now also has zone overlays and historical replay.
+P18.3 jobs/SSE, P18.2 `/api/v1`, and P18.1 auth shipped previously.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -13,32 +14,79 @@ shipped in the preceding releases.
 > [`ROADMAP.md`](ROADMAP.md) is the canonical merged P1–P22 roadmap. The current
 > build is still source-installed; do not claim installers exist.
 >
-> **Next code: P18.4 mobile-responsive PWA foundation.** Chosen topology: one
-> Ubuntu Hub owns DB/workers/risk/audit; browser/PWA, Windows and Android are
-> companion clients. Packaging never adds exchange-order code or changes the
-> graduation bar.
+> **Next code:** finish W2 with live candle streaming and interactive drawing
+> tools, then build the P18.4 mobile-responsive PWA. Chosen topology: one Ubuntu
+> Hub owns DB/workers/risk/audit; browser/PWA, Windows and Android are companion
+> clients. Packaging never adds exchange-order code or changes graduation.
 
 ## Next session — start here
 
-Build **P18.4 as a working installable PWA**, not another plan:
+Finish the **remaining W2** as working, clickable UI:
 
-1. Add a web manifest, generated project-owned icons, theme metadata and an
-   install button/prompt for Chrome/Edge desktop and Android.
-2. Add a safe service worker that caches only the static shell/assets. **Never
-   cache `/api/*`, auth responses, job SSE, private state or mutations.** When
-   disconnected, show a conspicuous offline/stale banner and disable every
-   mutation; never present cached market data as live.
-3. Create a mobile compact path for the daily ritual, risk gate, paper
-   positions, approvals and journal completion. Preserve CSRF/auth and the
-   viewer/operator role boundary.
-4. Add tests for manifest/icon routes, service-worker cache exclusions,
-   offline mutation blocking and responsive controls. Verify installability
-   with static/browser harnesses; say plainly if a real device was not tested.
+1. **Live streaming** — push candle updates over SSE/WebSocket from
+   `data/ws_client.py` and call `series.update()` instead of redrawing. Preserve
+   reconnect semantics and label stale/disconnected data honestly.
+2. **Drawing tools** — trendlines, horizontal rays and boxes placed with the
+   mouse, persisted per symbol/timeframe (localStorage to start), and
+   attachable to the scan record.
 
-**Done when:** the workstation can be installed from a modern browser, opens to
-an honest offline shell when the Hub is unreachable, never leaks private API
-payloads into shared caches, and cannot mutate while offline. After that, P19
-is the signed Ubuntu Hub package; do not jump to Windows/Android wrappers first.
+After W2, build P18.4: manifest/project-owned icons/install prompt; a service
+worker that never caches `/api/*`, auth, SSE, private state or mutations; an
+obvious offline/stale state with mutations disabled; and a compact mobile path
+for daily ritual, risk, paper positions, approvals and journal completion.
+
+---
+
+## 1c. Consolidated W1 — guided “Build my evidence” flow
+
+The W1 implementation from PR #51 is the retained safety boundary. Full
+contract: [`docs/HANDOVER_2026-08-17_W1.md`](docs/HANDOVER_2026-08-17_W1.md).
+
+- **Fail closed before persistence.** Composite inputs reject unknown fields,
+  unsupported choices, non-positive integers and oversized values. Expanded
+  children are validated again through the same allow-list before execution.
+- **One coherent run.** Asset/timeframe propagate through Backfill, Backtest and
+  Simulator; market/history, backtest bars and simulator rounds reach their
+  applicable steps. Explicit defaults and `{}` deduplicate identically.
+- **Inline persisted progress.** The Evidence tab streams the four-step job in
+  place and reconnects to an active evidence job after reload; it does not
+  redirect the user to Command center.
+- **Observed, honest projection.** Recent successful simulator/evidence log
+  additions establish the aggregate pace. With no observations the estimate is
+  `unknown`; zero additions with an outstanding gap is `stalled`; no fixed or
+  invented sample yield is presented as fact.
+- **Explicit no-edge result.** Once sample floors are met, absent/non-positive
+  net expectancy is reported as `no_edge`, with a direct warning not to tune
+  parameters merely to turn the result green. Graduation and risk gates remain
+  separate and unchanged.
+
+---
+
+## 1d. What THIS session shipped — W2 (part 1): zone overlays + replay mode
+
+Working code + UI. `web/chart_data.py` (`_zones` + `build_chart` "zones"),
+`web/app.py` (Zones toggle + `drawZones` + replay controls), `tests/test_chart_data.py`
+(new) and +2 tests in `tests/test_workstation_js.py`. Full contract:
+[`docs/HANDOVER_2026-08-17_W2.md`](docs/HANDOVER_2026-08-17_W2.md).
+
+- **Zone overlays.** `payload["snapshot"]["structure"]` (order blocks, fair-value
+  gaps, buyside/sellside liquidity, sweeps, premium/discount dealing range) was
+  text-only on the chart. `_zones` turns it into JSON-safe bands; the chart's
+  "Zones" toggle draws each as paired top/bottom price lines — bullish green,
+  bearish red, **dashed once tested/broken/filled** — plus liquidity lines and a
+  highlighted sweep. Nothing invented; every level is engine-computed.
+- **Replay mode.** A ▶ Replay button walks the already-loaded candles bar-by-bar
+  (`series.setData` on a growing slice, no network, no new endpoint), with a
+  1×–4× speed toggle and an unmissable "▶ REPLAY — historical playback, not
+  live" badge so it can never be read as live or paper evidence.
+
+> **Flagging honestly (per §0a):** no browser was opened in this sandbox — the
+> zones and replay were verified through the node/jsdom harness (real dashboard
+> JS against a stubbed chart library), the Flask test client, and a direct
+> `build_chart` run on real engine structure output; the pixel look of the
+> bands was not eyeballed. Zones render as paired price lines (Lightweight
+> Charts v4 has no rectangle primitive). Drawing tools and live streaming are
+> NOT here — see §4 of the W2 doc for the honest boundary.
 
 ---
 
@@ -369,11 +417,10 @@ is reported as **no positive edge**, never tuned into a green result. See
 2. **Drawing tools** — trendlines, horizontal rays and boxes the user can
    place, persisted per symbol/timeframe (localStorage is fine to start) and
    attachable to the scan record.
-3. **Zone overlays** — order blocks, fair-value gaps and liquidity sweeps as
-   chart rectangles. The data already exists in `payload["snapshot"]["structure"]`
-   and `intelligence.order_block` / `.fair_value_gap`; it is currently only text.
-4. **Replay mode** over stored candles, clearly labelled so it can never be
-   confused with live or paper evidence.
+3. ✅ **Zone overlays** — order blocks, fair-value gaps, liquidity and sweeps
+   as chart bands (shipped this session — §1d, `docs/HANDOVER_2026-08-17_W2.md`).
+4. ✅ **Replay mode** over stored candles, clearly labelled so it can never be
+   confused with live or paper evidence (shipped this session — §1d).
 
 ### Priority 2 — the weekly trader review
 

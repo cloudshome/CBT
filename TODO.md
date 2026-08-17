@@ -6,7 +6,17 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-17 (**v2.30.0 / P18.2 shipped — the stable
+**Last updated:** 2026-08-17 (**W1 + W2 (part 1) consolidated**.
+W1 keeps fail-closed composite validation, coherent asset/timeframe propagation,
+inline job restoration after reload, observed-rate projections with
+unknown/stalled states, and explicit no-edge reporting without auto-tuning
+(`docs/HANDOVER_2026-08-17_W1.md`). W2 part 1 adds engine-derived order-block,
+FVG, liquidity, sweep and dealing-range overlays plus clearly labelled
+historical replay (`docs/HANDOVER_2026-08-17_W2.md`). No threshold moved and no
+order path was added. Next code is the W2 remainder — live streaming and
+interactive drawing tools — then P18.4 PWA.)
+
+**Previous:** 2026-08-17 (**v2.30.0 / P18.2 shipped — the stable
 `/api/v1` client contract**. One envelope, typed error codes, a public
 compatibility range checked before auth, idempotency keys on the four human
 mutations, and device registration/revocation. It is a contract over existing

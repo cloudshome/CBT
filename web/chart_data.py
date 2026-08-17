@@ -141,6 +141,7 @@ def build_chart(df, symbol: str, timeframe: str, *, payload: dict | None = None,
 
     levels = _levels(payload)
     plan = _plan_overlay(payload)
+    zones = _zones(payload)
     stats = _stats(frame, candles)
 
     return {
@@ -152,6 +153,7 @@ def build_chart(df, symbol: str, timeframe: str, *, payload: dict | None = None,
         "overlays": overlays,
         "panes": panes,
         "levels": levels,
+        "zones": zones,
         "plan": plan,
         "last_price": last.get("close"),
         "change_pct": change_pct,
@@ -202,6 +204,77 @@ def _levels(payload: dict | None) -> list[dict]:
         out.append({"price": pivot, "kind": "pivot", "label": "Pivot",
                     "color": "#f59e0b"})
     return out
+
+
+def _zones(payload: dict | None) -> dict:
+    """W2 — Smart-Money-Concept zone overlays (order blocks, fair-value gaps,
+    liquidity pools, sweeps, dealing range) from the scan's market structure.
+
+    ``payload["snapshot"]["structure"]`` already holds this data (``engine/
+    structure.MarketStructure.as_dict``); the chart used to leave it as text
+    only. Each zone becomes a pair of horizontal levels the front end draws as
+    a translucent band. All values funnel through :func:`_num`, so a NumPy
+    scalar can never reach Flask and blank the chart.
+    """
+    if not payload:
+        return {}
+    structure = ((payload.get("snapshot") or {}).get("structure") or {})
+
+    def _band(top, bottom):
+        t, b = _num(top), _num(bottom)
+        if t is None or b is None:
+            return None
+        return {"top": max(t, b), "bottom": min(t, b)}
+
+    order_blocks = []
+    for ob in (structure.get("order_blocks") or [])[-6:]:
+        band = _band(ob.get("top"), ob.get("bottom"))
+        if band:
+            band.update({"side": ob.get("side"), "tested": bool(ob.get("tested")),
+                         "broken": bool(ob.get("broken")), "kind": "order_block"})
+            order_blocks.append(band)
+
+    fvgs = []
+    for f in (structure.get("fvgs") or [])[-6:]:
+        band = _band(f.get("top"), f.get("bottom"))
+        if band:
+            band.update({"side": f.get("side"), "filled": bool(f.get("filled")),
+                         "kind": "fvg"})
+            fvgs.append(band)
+
+    liquidity = []
+    for price in (structure.get("liquidity_above") or [])[:4]:
+        val = _num(price)
+        if val is not None:
+            liquidity.append({"price": val, "side": "above", "kind": "liquidity"})
+    for price in (structure.get("liquidity_below") or [])[:4]:
+        val = _num(price)
+        if val is not None:
+            liquidity.append({"price": val, "side": "below", "kind": "liquidity"})
+
+    sweep = None
+    s = structure.get("sweep")
+    if s and _num(s.get("level")) is not None:
+        sweep = {"level": _num(s.get("level")), "side": s.get("side"),
+                 "recovered": bool(s.get("recovered")), "kind": "sweep"}
+
+    dealing_range = None
+    pd_ = structure.get("premium_discount")
+    if pd_:
+        band = _band(pd_.get("top"), pd_.get("bottom"))
+        if band:
+            band.update({"zone": pd_.get("zone"),
+                         "position": _num(pd_.get("position")),
+                         "kind": "dealing_range"})
+            dealing_range = band
+
+    return {
+        "order_blocks": order_blocks,
+        "fvgs": fvgs,
+        "liquidity": liquidity,
+        "sweep": sweep,
+        "dealing_range": dealing_range,
+    }
 
 
 def _plan_overlay(payload: dict | None) -> dict:

@@ -709,11 +709,16 @@ HTML = """<!doctype html>
           <label class="check"><input type="checkbox" id="ovVwap" checked onchange="drawChart()"> VWAP</label>
           <label class="check"><input type="checkbox" id="ovBb" onchange="drawChart()"> Bollinger</label>
           <label class="check"><input type="checkbox" id="ovLevels" checked onchange="drawChart()"> S/R levels</label>
+          <label class="check"><input type="checkbox" id="ovZones" checked onchange="drawChart()"> Zones (OB / FVG / liq)</label>
           <label class="check"><input type="checkbox" id="ovPlan" checked onchange="drawChart()"> Entry / SL / TP</label>
           <label class="check"><input type="checkbox" id="ovRsi" checked onchange="drawChart()"> RSI</label>
           <label class="check"><input type="checkbox" id="ovMacd" onchange="drawChart()"> MACD</label>
         </div>
         <span class="spacer" style="flex:1"></span>
+        <div class="seg" id="replaySeg" style="align-items:center">
+          <button class="btn" id="replayBtn" onclick="toggleReplay()">▶ Replay</button>
+          <button class="btn" id="replaySpeedBtn" onclick="cycleReplaySpeed()" title="playback speed">1×</button>
+        </div>
         <button class="btn" onclick="loadChartWorkspace(true)">↻ Reload chart</button>
       </div>
       <div class="chart-head" id="chartHead"><span class="muted">loading chart…</span></div>
@@ -2674,6 +2679,10 @@ function chartsAvailable(){
 async function loadChartWorkspace(force){
   if(_chartLoading) return;
   const main=document.getElementById('chartMain'); if(!main) return;
+  // Reloading or changing the selected series always leaves historical replay.
+  // Otherwise its timer would keep updating a chart that has been disposed and
+  // could repaint a REPLAY label over the newly loaded series.
+  if(_replay) stopReplay(false);
   _chartLoading=true;
   const head=document.getElementById('chartHead');
   if(head) head.innerHTML='<span class="muted">loading '+esc(chartSym())+' '+esc(chartTf())+'…</span>';
@@ -2730,6 +2739,9 @@ function drawChart(){
   const d=_chartData; if(!d) return;
   const main=document.getElementById('chartMain'); if(!main) return;
   if(!chartsAvailable()){ main.innerHTML='<div class="err" style="padding:14px">Chart engine failed to load — reload the page (Ctrl+F5).</div>'; return; }
+  // Overlay toggles call drawChart directly. Treat that interaction as leaving
+  // historical playback instead of letting its old timer mutate a removed pane.
+  if(_replay) stopReplay(false);
   disposeCharts();
   const on=id=> !!document.getElementById(id)?.checked;
 
@@ -2760,6 +2772,7 @@ function drawChart(){
         lineStyle:2, axisLabelVisible:true, title:l.label||l.kind }); }catch(e){}
     });
   }
+  if(on('ovZones')) drawZones(candle, d.zones);
   if(on('ovPlan') && d.plan && (d.plan.entry||d.plan.stop_loss||d.plan.take_profit)){
     const p=d.plan;
     const lines=[[p.entry,'#e6edf7','ENTRY'],[p.stop_loss,'#ef4444','STOP'],[p.take_profit,'#22c55e','TARGET']];
@@ -2810,6 +2823,109 @@ function drawChart(){
     });
   }
 }
+/* ── W2 zone overlays (order blocks / FVG / liquidity / sweep) ─────────
+   Lightweight Charts v4 has no rectangle primitive, so a zone is drawn as
+   its top + bottom price lines; the shared colour reads as a band. Bullish =
+   green, bearish = red; tested/broken/filled zones are dashed so a dead
+   zone is visibly different from a fresh one. Nothing here is invented —
+   every level comes from engine/structure.py via /api/chart. */
+function drawZones(candle, zones){
+  if(!zones) return;
+  const band=(z, label)=>{
+    const side=z.side==='bearish';
+    const col=side?'rgba(239,68,68,.55)':'rgba(34,197,94,.55)';
+    const done=z.tested||z.broken||z.filled;
+    const style=done?2:1;   // dashed when a zone has been touched/closed
+    const tag=z.broken?'broken':(z.tested||z.filled)?'done':'';
+    try{ candle.createPriceLine({price:z.top,color:col,lineWidth:1,lineStyle:style,
+      axisLabelVisible:true,title:(label||'')+' top'+(tag?' ('+tag+')':'')}); }catch(e){}
+    try{ candle.createPriceLine({price:z.bottom,color:col,lineWidth:1,lineStyle:style,
+      axisLabelVisible:true,title:(label||'')+' low'+(tag?' ('+tag+')':'')}); }catch(e){}
+  };
+  (zones.order_blocks||[]).forEach(z=> band(z, z.side==='bullish'?'OB bull':'OB bear'));
+  (zones.fvgs||[]).forEach(z=> band(z, z.side==='bullish'?'FVG bull':'FVG bear'));
+  (zones.liquidity||[]).forEach(l=>{
+    const above=l.side==='above';
+    const col=above?'rgba(139,92,246,.6)':'rgba(6,182,212,.6)';
+    try{ candle.createPriceLine({price:l.price,color:col,lineWidth:1,lineStyle:2,
+      axisLabelVisible:true,title:above?'Buyside liq':'Sellside liq'}); }catch(e){}
+  });
+  if(zones.sweep){
+    const col=zones.sweep.recovered?'rgba(245,158,11,.9)':'rgba(239,68,68,.9)';
+    try{ candle.createPriceLine({price:zones.sweep.level,color:col,lineWidth:2,lineStyle:0,
+      axisLabelVisible:true,title:(zones.sweep.side||'')+' sweep '+(zones.sweep.recovered?'(recovered)':'(failed)')}); }catch(e){}
+  }
+  if(zones.dealing_range){
+    const col='rgba(59,130,246,.5)';
+    const pos=zones.dealing_range.zone||'';
+    try{ candle.createPriceLine({price:zones.dealing_range.top,color:col,lineWidth:1,lineStyle:2,
+      axisLabelVisible:true,title:'range high ('+pos+')'}); }catch(e){}
+    try{ candle.createPriceLine({price:zones.dealing_range.bottom,color:col,lineWidth:1,lineStyle:2,
+      axisLabelVisible:true,title:'range low ('+pos+')'}); }catch(e){}
+  }
+}
+
+/* ── W2 replay mode — walk already-loaded candles bar-by-bar ────────────
+   A clearly-labelled historical playback. It reuses the candles /api/chart
+   already returned (no live data), and the chart head is overwritten with a
+   REPLAY badge so it can never be mistaken for live or paper evidence. */
+let _replay=null;   // {timer, idx, candles, candle, speedIdx}
+const _replaySpeeds=[200,120,60,25];
+function stopReplay(restore=true){
+  if(_replay){ try{ clearInterval(_replay.timer); }catch(e){} _replay=null; }
+  const btn=document.getElementById('replayBtn'); if(btn) btn.textContent='▶ Replay';
+  const spd=document.getElementById('replaySpeedBtn'); if(spd) spd.textContent='1×';
+  if(restore){
+    const head=document.getElementById('chartHead');
+    if(head && _chartData) renderChartHead(_chartData);
+    drawChart();                                        // restore the full workspace
+  }
+}
+function renderReplayHead(n){
+  if(!_replay || !_replay.candles.length) return;
+  const shown=Math.max(1,Math.min(n,_replay.candles.length));
+  const c=_replay.candles[shown-1]||{};
+  const head=document.getElementById('chartHead');
+  if(head) head.innerHTML='<span class="badge" style="background:var(--amber);color:#111;font-weight:800">▶ REPLAY — historical playback, not live</span>'
+    +' <span class="note mono">bar '+shown+'/'+_replay.candles.length+' · '+new Date((c.time||0)*1000).toLocaleString()+'</span>';
+}
+function cycleReplaySpeed(){
+  if(!_replay) return;
+  _replay.speedIdx=(_replay.speedIdx+1)%_replaySpeeds.length;
+  const btn=document.getElementById('replaySpeedBtn'); if(btn) btn.textContent=(_replay.speedIdx+1)+'×';
+  try{ clearInterval(_replay.timer); }catch(e){}
+  _replay.timer=setInterval(replayTick, _replaySpeeds[_replay.speedIdx]);
+}
+function replayTick(){
+  if(!_replay) return;
+  _replay.idx++;
+  const n=Math.min(_replay.idx, _replay.candles.length);
+  try{ _replay.candle.setData(_replay.candles.slice(0, n)); }catch(e){}
+  renderReplayHead(n);
+  if(n>=_replay.candles.length) stopReplay();
+}
+function toggleReplay(){
+  if(_replay){ stopReplay(); return; }
+  const d=_chartData; if(!d || !(d.candles||[]).length) return;
+  const main=document.getElementById('chartMain'); if(!main) return;
+  const create=chartsAvailable(); if(!create) return;
+  disposeCharts();
+  const price=newPane(main, 420);
+  const candle=price.addCandlestickSeries({
+    upColor:'#22c55e', downColor:'#ef4444', borderUpColor:'#22c55e',
+    borderDownColor:'#ef4444', wickUpColor:'#22c55e', wickDownColor:'#ef4444' });
+  _replay={timer:null, idx:0, candles:d.candles.slice(), candle:candle,
+           speedIdx:0};
+  const btn=document.getElementById('replayBtn'); if(btn) btn.textContent='■ Stop';
+  const spd=document.getElementById('replaySpeedBtn'); if(spd) spd.textContent='1×';
+  // Start with a small warm window so the first frames have context, while
+  // leaving at least one bar to reveal when history contains multiple bars.
+  _replay.idx=Math.min(20, Math.max(1, d.candles.length-1));
+  try{ candle.setData(d.candles.slice(0, _replay.idx)); }catch(e){}
+  renderReplayHead(_replay.idx);                       // label replay immediately
+  _replay.timer=setInterval(replayTick, _replaySpeeds[0]);
+}
+
 function renderChartHead(d){
   const el=document.getElementById('chartHead'); if(!el) return;
   const st=d.stats||{}, chg=d.change_pct;
@@ -3249,7 +3365,8 @@ function renderEvidenceGuidance(g){
   if(g.projection_state==='complete') projection='Sample-count gap: complete.';
   else if(g.projection_state==='estimated') projection=`At the recently observed aggregate pace: ~${g.projected_rounds} more simulator round(s).`;
   else if(g.projection_state==='stalled') projection='Recent rounds added no new unique samples — change data coverage, not strategy parameters.';
-  const tone=g.result==='edge_measured'?'okc':(g.result==='no_edge'?'err':'');
+  const tone=g.result==='edge_measured'?'okc':
+    ((g.result==='no_edge'||(g.no_edge_setups||[]).length)?'err':'');
   el.innerHTML=`<b class="${tone}">${esc(g.headline||'')}</b><br>${esc(projection)} `
     +`Gap: ${g.backtest_gap||0} backtest + ${g.paper_gap||0} paper sample(s). `
     +`<span style="opacity:.72">${esc(g.caveat||'')}</span>`;

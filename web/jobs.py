@@ -469,24 +469,40 @@ class JobManager:
                 math.ceil(pp_gap / pp_rate) if pp_gap else 0)
             projection_state = "estimated"
 
-        enough = bool(primary) and all(
-            int(s.get("backtest_n") or 0) >= int(s.get("backtest_target") or 0)
-            and int(s.get("paper_n") or 0) >= int(s.get("paper_target") or 0)
-            for s in primary)
-        no_edge = [s for s in primary if enough and
-                   (s.get("expectancy_net") is None or float(s.get("expectancy_net")) <= 0)]
+        def _sample_complete(setup: dict) -> bool:
+            bt_target = int(setup.get("backtest_target") or 0)
+            pp_target = int(setup.get("paper_target") or 0)
+            return (bt_target > 0 and pp_target > 0
+                    and int(setup.get("backtest_n") or 0) >= bt_target
+                    and int(setup.get("paper_n") or 0) >= pp_target)
+
+        incomplete = [s for s in primary if not _sample_complete(s)]
+        # Report a completed setup's losing/absent net expectancy immediately,
+        # even if another primary setup is still gathering samples. Hiding that
+        # result behind the family-wide gap would invite more grinding or tuning
+        # of a setup for which the honest measured result is already “no edge”.
+        no_edge = [s for s in primary if _sample_complete(s) and
+                   (s.get("expectancy_net") is None
+                    or float(s.get("expectancy_net")) <= 0)]
         proven = [s for s in primary if s.get("proven")]
+        no_edge_names = [str(s.get("plan_type")) for s in no_edge]
         if not primary:
             result = "unmeasured"
             headline = "No primary setup has been measured yet."
-        elif not enough:
+        elif no_edge:
+            names = ", ".join(no_edge_names)
+            if incomplete:
+                result = "mixed"
+                headline = (f"No positive net edge measured for {names}; other primary "
+                            "setups are still incomplete. Do not tune parameters just "
+                            "to turn this green.")
+            else:
+                result = "no_edge"
+                headline = (f"No positive net edge measured for {names}. "
+                            "Do not tune parameters just to turn this green.")
+        elif incomplete:
             result = "incomplete"
             headline = "Evidence is incomplete — keep measuring; do not infer an edge yet."
-        elif no_edge:
-            result = "no_edge"
-            names = ", ".join(str(s.get("plan_type")) for s in no_edge)
-            headline = (f"No positive net edge measured for {names}. "
-                        "Do not tune parameters just to turn this green.")
         elif len(proven) == len(primary):
             result = "edge_measured"
             headline = "Positive net edge measured at the sample bar; graduation rules still apply."
@@ -496,6 +512,7 @@ class JobManager:
 
         return {
             "result": result, "headline": headline,
+            "no_edge_setups": no_edge_names,
             "primary_setups": len(primary), "backtest_gap": bt_gap,
             "paper_gap": pp_gap, "projection_state": projection_state,
             "projected_rounds": projected, "observed_rounds": len(observed),

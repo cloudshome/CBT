@@ -95,10 +95,12 @@ are enabled only after authentication and TLS are configured.
 
 The unfinished items from `WEB_TRADER_ROADMAP.md` are merged here:
 
-- **W1 Evidence UX:** one guided evidence build with streaming progress and an
-  honest projected gap.
+- **W1 Evidence UX:** one guided evidence build with inline persisted progress,
+  fail-closed coherent inputs, observed-rate projection and honest no-edge
+  reporting. ✅ shipped — see `docs/HANDOVER_2026-08-17_W1.md`.
 - **W2 Chart UX:** live incremental updates, drawings, zones, replay, and
-  multi-chart views.
+  multi-chart views. 🟡 zones + replay shipped (part 1); live streaming +
+  drawing tools remain — see `docs/HANDOVER_2026-08-17_W2.md`.
 - **W3 Trader development:** weekly review, equity/R charts, daily ritual,
   enforced journaling, and practice scoring.
 - **W4 Reliability:** stale-data age, mobile compact layout, background jobs,
@@ -311,9 +313,11 @@ diagnosed without opening the source tree.
 
 ```text
 DONE      P18.1 auth/roles (v2.29.2) → P18.2 versioned API (v2.30.0) → P18.3 jobs/SSE (v2.31.0)
-DONE      W1 guided evidence UX (v2.32.0; builds on the P18.3 job layer)
-NOW       P18.4 PWA
+DONE      W1 guided evidence UX (v2.32.0; strict validation + inline restore + honest projection)
+DONE      W2 (part 1): zone overlays (OB/FVG/liquidity/sweep) + historical replay
+NOW       W2 remainder: live streaming + drawing tools
 PARALLEL  W4 mobile/stale-state reliability
+THEN      P18.4 installable, offline-safe PWA
 THEN      P19 Ubuntu Hub package (first production release)
 THEN      P20 Windows companion
 THEN      P21 Android companion

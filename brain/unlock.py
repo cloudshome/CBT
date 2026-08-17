@@ -26,10 +26,14 @@ from __future__ import annotations
 
 from typing import Optional
 
+from config import CALIBRATE_MIN_N, CALIBRATE_MIN_PAPER_N
 from data.database import SignalDB
 
-BACKTEST_TARGET = 100
-PAPER_TARGET = 20
+# Display progress must use the same floors as the permission-bearing gate.
+# Aliases keep the established public names while preventing UI drift when an
+# operator configures stricter calibration requirements.
+BACKTEST_TARGET = CALIBRATE_MIN_N
+PAPER_TARGET = CALIBRATE_MIN_PAPER_N
 
 
 def _pct(current: float, target: float) -> float:
@@ -93,8 +97,9 @@ def _classify(reason: str) -> dict:
             "kind": "earn",
             "title": "This setup has not proven itself yet",
             "plain": "SKY will not risk money on a pattern it has never "
-                     "measured. It needs 100 graded backtest trades, 20 decided "
-                     "paper trades, and positive expectancy after costs.",
+                     f"measured. It needs {BACKTEST_TARGET} graded backtest trades, "
+                     f"{PAPER_TARGET} decided paper trades, and positive expectancy "
+                     "after costs.",
             "action": "backtest", "action_label": "Run a backtest",
             "alt_action": "simulator", "alt_action_label": "Grind paper samples",
         }
