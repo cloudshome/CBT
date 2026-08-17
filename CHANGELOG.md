@@ -10,6 +10,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.33.0] — 2026-08-17 · W2 complete: live chart streaming + drawing tools
+
+MINOR: the chart workspace streams the newest bar instead of waiting for a
+manual reload, and the trader can draw on the chart. Display and annotation
+only — no threshold moved, no exchange-order path (none exists in SKY), and
+nothing here writes to the learning store, the paper book or the risk gate.
+
+- **Live candle streaming** — `web/live_stream.py` + `GET /api/chart/stream`
+  push the newest bar over server-sent events; the browser calls
+  `series.update()` in place, so zoom, overlays, zones and drawings survive.
+  Every frame states whether the feed is live, waiting, stale (unchanged for
+  more than 2 × the timeframe) or erroring, and the UI labels disconnects — a
+  silent feed is never presented as a quiet market. A failing source produces
+  an error frame and a capped backoff instead of dropping the connection; the
+  poll cadence is clamped to 2–15 s so one tab cannot hammer the source. The
+  stream follows the selected symbol/timeframe and yields to replay mode.
+- **Drawing tools** — trendlines (two clicks), horizontal rays (one click) and
+  boxes (two corners), with undo, clear, a MY DRAWINGS list with per-item
+  delete, and "📎 Attach to journal note". Marks snap to the nearest loaded
+  bar and persist in `localStorage` per symbol + timeframe; corrupt storage is
+  discarded rather than trusted.
+- **Fixed: the dashboard's inline script was invalid JavaScript in a real
+  browser.** `HTML` is a plain (non-raw) Python string, so a `'\n'` literal in
+  the P18.3 job-log line became a real newline inside a JS string —
+  `SyntaxError` — disabling the *entire* script. Every existing JS check read
+  the file text, never the evaluated template, so nothing caught it. Fixed,
+  and both the test suite and CI now parse the script Flask actually serves.
+- Contract: `docs/HANDOVER_2026-08-17_W2_part2.md`. Suite: 1053 passed /
+  1 skipped (+23).
+
+---
+
 ## [2.32.0] — 2026-08-17 · W1 guided evidence build
 
 MINOR: the Evidence tab now turns the P18.3 four-step background job into a

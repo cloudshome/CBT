@@ -99,8 +99,11 @@ The unfinished items from `WEB_TRADER_ROADMAP.md` are merged here:
   fail-closed coherent inputs, observed-rate projection and honest no-edge
   reporting. ✅ shipped — see `docs/HANDOVER_2026-08-17_W1.md`.
 - **W2 Chart UX:** live incremental updates, drawings, zones, replay, and
-  multi-chart views. 🟡 zones + replay shipped (part 1); live streaming +
-  drawing tools remain — see `docs/HANDOVER_2026-08-17_W2.md`.
+  multi-chart views. ✅ shipped — zones + replay in part 1
+  (`docs/HANDOVER_2026-08-17_W2.md`), SSE live streaming (`series.update()` in
+  place, honest live/waiting/stale/error/disconnected labels) and mouse-placed
+  trendlines/rays/boxes in part 2 (`docs/HANDOVER_2026-08-17_W2_part2.md`).
+  Multi-chart views were not attempted and are not claimed.
 - **W3 Trader development:** weekly review, equity/R charts, daily ritual,
   enforced journaling, and practice scoring.
 - **W4 Reliability:** stale-data age, mobile compact layout, background jobs,
@@ -315,9 +318,9 @@ diagnosed without opening the source tree.
 DONE      P18.1 auth/roles (v2.29.2) → P18.2 versioned API (v2.30.0) → P18.3 jobs/SSE (v2.31.0)
 DONE      W1 guided evidence UX (v2.32.0; strict validation + inline restore + honest projection)
 DONE      W2 (part 1): zone overlays (OB/FVG/liquidity/sweep) + historical replay
-NOW       W2 remainder: live streaming + drawing tools
+DONE      W2 (part 2): SSE live candle streaming + drawing tools (v2.33.0)
 PARALLEL  W4 mobile/stale-state reliability
-THEN      P18.4 installable, offline-safe PWA
+NOW       P18.4 installable, offline-safe PWA (never cache /api/*, auth or SSE)
 THEN      P19 Ubuntu Hub package (first production release)
 THEN      P20 Windows companion
 THEN      P21 Android companion

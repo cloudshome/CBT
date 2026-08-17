@@ -715,12 +715,24 @@ HTML = """<!doctype html>
           <label class="check"><input type="checkbox" id="ovMacd" onchange="drawChart()"> MACD</label>
         </div>
         <span class="spacer" style="flex:1"></span>
+        <div class="seg" id="drawSeg" style="align-items:center">
+          <button class="btn" id="drawTrendline" onclick="setDrawTool('trendline')" title="Trendline — click two points on the chart">╱ Trend</button>
+          <button class="btn" id="drawRay" onclick="setDrawTool('ray')" title="Horizontal ray — click one price on the chart">─ Ray</button>
+          <button class="btn" id="drawBox" onclick="setDrawTool('box')" title="Box — click two opposite corners">▭ Box</button>
+          <button class="btn" id="drawUndoBtn" onclick="undoDrawing()" title="Remove the last drawing">⌫ Undo</button>
+          <button class="btn" id="drawClearBtn" onclick="clearDrawings()" title="Remove every drawing on this symbol + timeframe">🗑 Clear</button>
+        </div>
+        <div class="seg" id="liveSeg" style="align-items:center">
+          <button class="btn" id="liveBtn" onclick="toggleLive()" title="Stream the newest bar instead of reloading">◉ Live</button>
+        </div>
         <div class="seg" id="replaySeg" style="align-items:center">
           <button class="btn" id="replayBtn" onclick="toggleReplay()">▶ Replay</button>
           <button class="btn" id="replaySpeedBtn" onclick="cycleReplaySpeed()" title="playback speed">1×</button>
         </div>
         <button class="btn" onclick="loadChartWorkspace(true)">↻ Reload chart</button>
       </div>
+      <div class="note" id="drawStatus" style="padding:6px 14px 0"></div>
+      <div class="note" id="liveState" style="padding:4px 14px 0">Live stream off — the chart shows the bars loaded at <span id="liveLoadedAt">—</span>.</div>
       <div class="chart-head" id="chartHead"><span class="muted">loading chart…</span></div>
       <div id="chartMain" class="chart-pane" style="height:420px"></div>
       <div id="chartVol" class="chart-pane" style="height:110px"></div>
@@ -731,6 +743,14 @@ HTML = """<!doctype html>
     <div class="grid" style="margin-top:14px">
       <div class="card"><h2>CHART READINGS</h2><div id="chartStats"><span class="muted">—</span></div></div>
       <div class="card"><h2>LEVELS ON THIS CHART</h2><div id="chartLevels"><span class="muted">—</span></div></div>
+      <div class="card" style="grid-column:1/-1">
+        <h2>MY DRAWINGS</h2>
+        <div id="drawList"><span class="muted">—</span></div>
+        <div class="flex" style="margin-top:8px">
+          <button class="btn" onclick="attachDrawingsToJournal()">📎 Attach to journal note</button>
+          <span class="note">Saved in this browser per symbol + timeframe. Drawings are your own marks — the desk never reads them as evidence and they never change a signal, threshold or the risk gate.</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2698,6 +2718,10 @@ async function loadChartWorkspace(force){
     renderChartHead(d);
     renderChartStats(d);
     renderChartLevels(d);
+    const stamp=document.getElementById('liveLoadedAt');
+    if(stamp) stamp.textContent=new Date().toLocaleTimeString();
+    // A running stream follows the selected series: reconnect when it changed.
+    if(_live && (_live.symbol!==chartSym() || _live.tf!==chartTf())){ stopLive(true); startLive(); }
   }catch(e){
     if(head) head.innerHTML='<span class="err">chart error: '+esc(String(e))+'</span>';
   }finally{ _chartLoading=false; }
@@ -2751,6 +2775,7 @@ function drawChart(){
     upColor:'#22c55e', downColor:'#ef4444', borderUpColor:'#22c55e',
     borderDownColor:'#ef4444', wickUpColor:'#22c55e', wickDownColor:'#ef4444' });
   candle.setData(d.candles||[]);
+  _priceSeries=candle;              // live stream updates this series in place
   const ov=d.overlays||{};
   if(on('ovEma')){
     [['ema20','#3b82f6',1],['ema50','#f59e0b',1],['ema200','#8b5cf6',2]].forEach(([k,c,w])=>{
@@ -2773,6 +2798,7 @@ function drawChart(){
     });
   }
   if(on('ovZones')) drawZones(candle, d.zones);
+  mountDrawings(price, candle);
   if(on('ovPlan') && d.plan && (d.plan.entry||d.plan.stop_loss||d.plan.take_profit)){
     const p=d.plan;
     const lines=[[p.entry,'#e6edf7','ENTRY'],[p.stop_loss,'#ef4444','STOP'],[p.take_profit,'#22c55e','TARGET']];
@@ -2865,6 +2891,338 @@ function drawZones(candle, zones){
   }
 }
 
+/* ── W2 live streaming — push the newest bar instead of reloading ──────
+   The server polls the same candle source /api/chart uses and sends one
+   server-sent event per newest bar; the chart calls series.update() in place.
+   Display only: no order path, no writes, no threshold. Every state the feed
+   can be in is labelled — live, waiting, stale, feed error, disconnected —
+   because a silent stream must never read as a quiet market. */
+let _live=null, _priceSeries=null;
+function setLiveState(html){
+  const el=document.getElementById('liveState');
+  if(el) el.innerHTML=html;
+}
+function liveAmber(text){ return '<span style="color:var(--amber);font-weight:700">'+text+'</span>'; }
+function startLive(){
+  if(_live) return;
+  if(_replay){ setLiveState(liveAmber('Stop the replay before streaming.')); return; }
+  if(typeof EventSource==='undefined'){
+    setLiveState('<span class="err">This browser cannot stream (no EventSource) — use ↻ Reload chart.</span>'); return; }
+  const sym=chartSym(), tf=chartTf();
+  let es=null;
+  try{ es=new EventSource('/api/chart/stream?symbol='+encodeURIComponent(sym)+'&tf='+encodeURIComponent(tf)); }
+  catch(e){ setLiveState('<span class="err">live stream failed: '+esc(String(e))+'</span>'); return; }
+  _live={ es:es, symbol:sym, tf:tf, updates:0, state:'connecting' };
+  const btn=document.getElementById('liveBtn');
+  if(btn){ btn.textContent='■ Stop live'; btn.classList.add('active'); }
+  setLiveState('Connecting to the '+esc(sym)+' '+esc(tf)+' stream…');
+  es.addEventListener('candle', onLiveCandle);
+  es.addEventListener('status', onLiveStatus);
+  es.onerror=()=>{
+    if(!_live) return;
+    _live.state='disconnected';
+    setLiveState(liveAmber('⚠ DISCONNECTED')+' — reconnecting. The bars on screen are the last ones received, not the current market.');
+  };
+}
+function stopLive(quiet){
+  if(_live){ try{ _live.es.close(); }catch(e){} }
+  _live=null;
+  const btn=document.getElementById('liveBtn');
+  if(btn){ btn.textContent='◉ Live'; btn.classList.remove('active'); }
+  if(!quiet) setLiveState('Live stream off — press ◉ Live to stream the newest bar.');
+}
+function toggleLive(){ if(_live) stopLive(); else startLive(); }
+function applyLiveCandle(bar){
+  // Keep _chartData in step so a reload, a replay or a drawing's time snap all
+  // see the same bars the chart is showing.
+  const cs=(_chartData&&_chartData.candles)||null;
+  if(cs && cs.length){
+    const tail=cs[cs.length-1];
+    if(tail.time===bar.time) cs[cs.length-1]=Object.assign({}, tail, bar);
+    else if(bar.time>tail.time) cs.push(bar);
+    else return false;                    // an older bar never rewrites history
+  }
+  if(_replay) return true;                // playback owns the pane
+  if(_priceSeries){ try{ _priceSeries.update(bar); }catch(e){} }
+  if(_chartData){
+    _chartData.last_price=bar.close;
+    renderChartHead(_chartData);
+  }
+  return true;
+}
+function onLiveCandle(ev){
+  let d=null; try{ d=JSON.parse(ev.data); }catch(e){ return; }
+  if(!_live || !d || !d.candle) return;
+  if(d.symbol!==_live.symbol || d.tf!==_live.tf) return;   // never paint another series
+  if(!applyLiveCandle(d.candle)) return;
+  _live.updates++; _live.state='live';
+  setLiveState('<span class="okc">● LIVE</span> '+esc(d.symbol)+' '+esc(d.tf)+' — bar '
+    +new Date((d.candle.time||0)*1000).toLocaleTimeString()+' at '+fmt(d.candle.close)
+    +' · '+_live.updates+' update'+(_live.updates===1?'':'s')+' this session.');
+}
+function onLiveStatus(ev){
+  let d=null; try{ d=JSON.parse(ev.data); }catch(e){ return; }
+  if(!_live || !d) return;
+  _live.state=d.state||'';
+  const age=Math.round(Number(d.age)||0);
+  if(d.state==='stale'){
+    setLiveState(liveAmber('⚠ STALE')+' — no new '+esc(d.tf||'')+' data for '+age
+      +'s. You are looking at the last bar received; treat it as unknown, not as a quiet market.');
+  }else if(d.state==='error'){
+    setLiveState('<span class="err">⚠ FEED ERROR</span> — '+esc(d.message||'source unavailable')
+      +'. Retrying; the chart is not updating.');
+  }else{
+    setLiveState('<span class="okc">● LIVE</span> '+esc(d.symbol||'')+' '+esc(d.tf||'')
+      +' — waiting for the next bar ('+age+'s since the last change, '+_live.updates+' update'
+      +(_live.updates===1?'':'s')+' this session).');
+  }
+}
+
+/* ── W2 drawing tools — trendlines, horizontal rays and boxes ──────────
+   Placed with the mouse on the price pane, persisted per symbol+timeframe in
+   this browser's localStorage, and redrawn on every reload/toggle. A drawing
+   is the trader's own mark: it is never read back by the engine, never becomes
+   evidence, and never moves a threshold or the risk gate.
+
+   Lightweight Charts v4 has no free-draw primitive, so each drawing is one or
+   more two-point line series (the same honest technique the zone overlays use
+   for bands): a trendline is one segment, a horizontal ray is a segment held
+   at one price out to the last bar, a box is its top + bottom edges. */
+const DRAW_TOOLS={ trendline:{clicks:2,label:'Trendline',icon:'╱'},
+                   ray:{clicks:1,label:'Horizontal ray',icon:'─'},
+                   box:{clicks:2,label:'Box',icon:'▭'} };
+const DRAW_COLOR='#e6b800';
+// The HTML block is a plain (non-raw) Python string, so backslash escapes are
+// written out of band: newline and apostrophe come from character codes.
+const DRAW_NL=String.fromCharCode(10), DRAW_QT=String.fromCharCode(39);
+let _drawTool=null, _drawPending=null, _drawings=[], _drawSeries=[], _drawCtx=null;
+
+function drawingsKey(sym, tf){ return 'sky.drawings.v1.'+(sym||chartSym())+'.'+(tf||chartTf()); }
+function isDrawing(d){
+  const spec=d && DRAW_TOOLS[d.kind];
+  if(!spec || !Array.isArray(d.points) || d.points.length!==spec.clicks) return false;
+  return d.points.every(p=> p && Number.isFinite(Number(p.time)) && Number.isFinite(Number(p.price)));
+}
+function newDrawingId(){ return 'd'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function loadDrawings(){
+  _drawings=[];
+  try{
+    const parsed=JSON.parse(localStorage.getItem(drawingsKey())||'[]');
+    if(Array.isArray(parsed)){
+      _drawings=parsed.filter(isDrawing).map(d=>{
+        // Storage is user-writable: keep only ids that are safe to place in
+        // the remove button's onclick, and normalise the numbers.
+        const id=/^[A-Za-z0-9_-]{1,40}$/.test(String(d.id||''))?String(d.id):newDrawingId();
+        const points=d.points.map(p=> ({time:Number(p.time), price:Number(p.price)}));
+        return { id:id, kind:d.kind, points:points, created:Number(d.created)||0,
+                 color:(typeof d.color==='string' && /^#[0-9a-f]{3,8}$/i.test(d.color))?d.color:DRAW_COLOR };
+      });
+    }
+  }catch(e){ _drawings=[]; }      // corrupt storage never breaks the chart
+  return _drawings;
+}
+function saveDrawings(){
+  try{ localStorage.setItem(drawingsKey(), JSON.stringify(_drawings)); }catch(e){}
+}
+function setDrawStatus(msg){
+  const el=document.getElementById('drawStatus');
+  if(el) el.innerHTML=msg?esc(msg):'';
+}
+function setDrawTool(kind){
+  if(_replay){ setDrawTool_off(); setDrawStatus('Stop the replay before drawing.'); return; }
+  const next=(_drawTool===kind)?null:kind;
+  _drawTool=DRAW_TOOLS[next]?next:null;
+  _drawPending=null;
+  Object.keys(DRAW_TOOLS).forEach(k=>{
+    const b=document.getElementById('draw'+k.charAt(0).toUpperCase()+k.slice(1));
+    if(b) b.classList.toggle('active', k===_drawTool);
+  });
+  if(!_drawTool){ setDrawStatus(''); return; }
+  const spec=DRAW_TOOLS[_drawTool];
+  setDrawStatus(spec.label+': click '+(spec.clicks===1?'a price on the chart.':'the first point on the chart.'));
+}
+function setDrawTool_off(){
+  _drawTool=null; _drawPending=null;
+  Object.keys(DRAW_TOOLS).forEach(k=>{
+    const b=document.getElementById('draw'+k.charAt(0).toUpperCase()+k.slice(1));
+    if(b) b.classList.remove('active');
+  });
+}
+function candleTimes(){ return ((_chartData&&_chartData.candles)||[]).map(c=> Number(c.time)); }
+function snapDrawTime(t){
+  // Snap to the nearest loaded bar so a drawing sits on the chart's own time
+  // scale instead of inventing a timestamp between bars.
+  const times=candleTimes(); if(!times.length) return Number(t);
+  let best=times[0], gap=Math.abs(times[0]-t);
+  for(let i=1;i<times.length;i++){
+    const g=Math.abs(times[i]-t);
+    if(g<gap){ gap=g; best=times[i]; }
+  }
+  return best;
+}
+function chartPointFrom(param){
+  if(!param || !param.point || !_drawCtx) return null;
+  let price=null, time=(param.time==null?null:Number(param.time));
+  try{ price=_drawCtx.series.coordinateToPrice(param.point.y); }catch(e){}
+  if(time==null || !Number.isFinite(time)){
+    try{ time=Number(_drawCtx.chart.timeScale().coordinateToTime(param.point.x)); }catch(e){}
+  }
+  price=Number(price);
+  if(!Number.isFinite(price) || !Number.isFinite(time)) return null;
+  return { time: snapDrawTime(time), price: price };
+}
+function onChartClick(param){
+  if(!_drawTool || !_drawCtx) return;
+  const pt=chartPointFrom(param);
+  if(!pt){ setDrawStatus('Click inside the price pane to place a point.'); return; }
+  const spec=DRAW_TOOLS[_drawTool];
+  if(spec.clicks===1){ commitDrawing(_drawTool, [pt]); return; }
+  if(!_drawPending){
+    _drawPending=pt;
+    setDrawStatus(spec.label+': now click the second point.');
+    return;
+  }
+  const pts=[_drawPending, pt].sort((a,b)=> a.time-b.time);
+  _drawPending=null;
+  commitDrawing(_drawTool, pts);
+}
+function commitDrawing(kind, points){
+  const spec=DRAW_TOOLS[kind]; if(!spec) return null;
+  const d={ id:newDrawingId(),
+            kind:kind, points:points, created:Date.now(),
+            symbol:chartSym(), tf:chartTf() };
+  if(!isDrawing(d)) return null;
+  _drawings.push(d);
+  saveDrawings();
+  renderDrawings();
+  setDrawTool_off();
+  setDrawStatus(spec.label+' saved — '+_drawings.length+' drawing'+(_drawings.length===1?'':'s')
+    +' on '+chartSym()+' '+chartTf()+'.');
+  return d;
+}
+function drawingSegments(d){
+  const p=d.points||[], times=candleTimes();
+  const last=times.length?times[times.length-1]:null;
+  if(d.kind==='trendline' && p.length===2)
+    return [[{time:p[0].time,value:p[0].price},{time:p[1].time,value:p[1].price}]];
+  if(d.kind==='ray' && p.length===1){
+    const end=(last!=null && last>p[0].time)?last:p[0].time;
+    return [[{time:p[0].time,value:p[0].price},{time:end,value:p[0].price}]];
+  }
+  if(d.kind==='box' && p.length===2){
+    const top=Math.max(p[0].price,p[1].price), bot=Math.min(p[0].price,p[1].price);
+    const t0=Math.min(p[0].time,p[1].time), t1=Math.max(p[0].time,p[1].time);
+    return [[{time:t0,value:top},{time:t1,value:top}],
+            [{time:t0,value:bot},{time:t1,value:bot}]];
+  }
+  return [];
+}
+function clearDrawingSeries(){
+  const chart=_drawCtx&&_drawCtx.chart;
+  _drawSeries.forEach(s=>{ try{ chart.removeSeries(s); }catch(e){} });
+  _drawSeries=[];
+}
+function renderDrawings(){
+  if(_drawCtx){
+    clearDrawingSeries();
+    _drawings.forEach(d=>{
+      drawingSegments(d).forEach(seg=>{
+        if(seg.length<2 || seg[0].time===seg[1].time) return;   // degenerate → nothing to draw
+        let s=null;
+        try{
+          s=_drawCtx.chart.addLineSeries({ color:d.color||DRAW_COLOR, lineWidth:2,
+            lineStyle:(d.kind==='box'?2:0), priceLineVisible:false,
+            lastValueVisible:false, crosshairMarkerVisible:false });
+        }catch(e){}
+        if(!s) return;
+        try{ s.setData(seg); }catch(e){}
+        _drawSeries.push(s);
+      });
+    });
+  }
+  renderDrawingList();
+}
+function drawingLabel(d){
+  const spec=DRAW_TOOLS[d.kind]||{label:d.kind,icon:'·'};
+  const p=d.points||[];
+  if(d.kind==='ray') return spec.icon+' '+spec.label+' @ '+fmt(p[0].price);
+  if(d.kind==='box') return spec.icon+' '+spec.label+' '+fmt(Math.min(p[0].price,p[1].price))
+    +' → '+fmt(Math.max(p[0].price,p[1].price));
+  const dir=(p[1].price>=p[0].price)?'rising':'falling';
+  return spec.icon+' '+spec.label+' '+dir+' '+fmt(p[0].price)+' → '+fmt(p[1].price);
+}
+function renderDrawingList(){
+  const el=document.getElementById('drawList'); if(!el) return;
+  if(!_drawings.length){
+    el.innerHTML='<span class="muted">No drawings on '+esc(chartSym())+' '+esc(chartTf())
+      +' — pick ╱ Trend, ─ Ray or ▭ Box, then click the chart.</span>';
+    return;
+  }
+  el.innerHTML=_drawings.map(d=>
+    '<div class="flex" style="justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--line)">'
+    +'<span class="mono">'+esc(drawingLabel(d))+'</span>'
+    +'<span class="note">'+esc(new Date(d.created||0).toLocaleString())
+    +' <button class="rowbtn" onclick="removeDrawing('+DRAW_QT+esc(d.id)+DRAW_QT+')">✕</button></span></div>').join('');
+}
+function removeDrawing(id){
+  const before=_drawings.length;
+  _drawings=_drawings.filter(d=> d.id!==id);
+  if(_drawings.length===before) return;
+  saveDrawings(); renderDrawings();
+  setDrawStatus('Drawing removed — '+_drawings.length+' left on '+chartSym()+' '+chartTf()+'.');
+}
+function undoDrawing(){
+  if(!_drawings.length){ setDrawStatus('Nothing to undo on '+chartSym()+' '+chartTf()+'.'); return; }
+  _drawings.pop();
+  saveDrawings(); renderDrawings();
+  setDrawStatus('Last drawing removed — '+_drawings.length+' left on '+chartSym()+' '+chartTf()+'.');
+}
+function clearDrawings(){
+  if(!_drawings.length){ setDrawStatus('Nothing to clear on '+chartSym()+' '+chartTf()+'.'); return; }
+  const n=_drawings.length;
+  _drawings=[];
+  saveDrawings(); renderDrawings();
+  setDrawStatus('Cleared '+n+' drawing'+(n===1?'':'s')+' on '+chartSym()+' '+chartTf()+'.');
+}
+function drawingsAsText(){
+  if(!_drawings.length) return '';
+  return 'Chart marks — '+chartSym()+' '+chartTf()+':'+DRAW_NL
+    + _drawings.map(d=> '· '+drawingLabel(d)).join(DRAW_NL);
+}
+function attachDrawingsToJournal(){
+  // "Attachable to the scan record": the drawings are appended to the journal
+  // note, which the user then saves against a specific trade. Nothing is
+  // written automatically — the human still picks the trade and presses save.
+  const text=drawingsAsText();
+  if(!text){ setDrawStatus('No drawings to attach on '+chartSym()+' '+chartTf()+'.'); return; }
+  switchTab('journal');
+  setTimeout(()=>{
+    const notes=document.getElementById('jNotes');
+    if(notes){
+      notes.value=(notes.value?notes.value.trimEnd()+DRAW_NL+DRAW_NL:'')+text;
+      try{ notes.scrollIntoView(); }catch(e){}
+    }
+    const st=document.getElementById('jStatus');
+    if(st) st.innerHTML='<span class="okc">chart marks added to the note</span> — pick the trade and save';
+  }, 120);
+}
+function mountDrawings(chart, series){
+  // Called by drawChart() after the price pane exists: adopt the new pane,
+  // load this symbol+timeframe's saved drawings and take chart clicks.
+  _drawCtx={ chart:chart, series:series };
+  _drawSeries=[];
+  _drawPending=null;
+  loadDrawings();
+  renderDrawings();
+  try{ chart.subscribeClick(onChartClick); }catch(e){}
+}
+function unmountDrawings(){
+  // The pane is about to be removed (replay). Drop the context so a stray
+  // click can never touch a disposed chart; storage keeps the drawings.
+  _drawCtx=null; _drawSeries=[]; _drawPending=null;
+  setDrawTool_off();
+}
+
 /* ── W2 replay mode — walk already-loaded candles bar-by-bar ────────────
    A clearly-labelled historical playback. It reuses the candles /api/chart
    already returned (no live data), and the chart head is overwritten with a
@@ -2909,6 +3267,9 @@ function toggleReplay(){
   const d=_chartData; if(!d || !(d.candles||[]).length) return;
   const main=document.getElementById('chartMain'); if(!main) return;
   const create=chartsAvailable(); if(!create) return;
+  if(_live) stopLive();       // playback and a live feed must never share a pane
+  unmountDrawings();          // the price pane is about to be replaced
+  _priceSeries=null;
   disposeCharts();
   const price=newPane(main, 420);
   const candle=price.addCandlestickSeries({
@@ -3381,7 +3742,10 @@ function showEvidenceJob(j){
   if(badge) badge.textContent=j.status||'queued';
   if(state) state.textContent=(j.phase||j.status||'queued')+' · step '+done+'/'+total;
   if(bar){ bar.style.width=Math.max(0,Math.min(100,done/total*100))+'%'; bar.style.background=j.status==='failed'?'var(--red)':(j.status==='succeeded'?'var(--green)':'var(--blue)'); }
-  if(log && j.log_tail!=null){ const lines=String(j.log_tail).split('\n'); log.textContent=lines.slice(-12).join('\n'); log.scrollTop=log.scrollHeight; }
+  // HTML is a plain Python string: a backslash-n literal here would become a
+  // real newline inside this JS string and break the whole script. Use the
+  // character code instead (see the note above the HTML template).
+  if(log && j.log_tail!=null){ const nl=String.fromCharCode(10); const lines=String(j.log_tail).split(nl); log.textContent=lines.slice(-12).join(nl); log.scrollTop=log.scrollHeight; }
   if(btn) btn.disabled=(j.status==='queued'||j.status==='running');
 }
 function watchEvidenceJob(jobId){
@@ -4405,6 +4769,46 @@ def make_app(job_manager=None) -> Flask:
         except Exception as exc:  # pragma: no cover — defensive
             return jsonify({"error": f"{type(exc).__name__}: {exc}",
                             "candles": []}), 500
+
+    @app.get("/api/chart/stream")
+    def api_chart_stream():
+        """W2 — server-sent stream of the newest bar for one symbol/timeframe.
+
+        Read-only market data: the chart calls ``series.update()`` with each
+        frame instead of reloading. Every frame states whether the feed is
+        live, waiting, stale or erroring, so a dead source can never be read
+        as a quiet market. No order path, no writes, no threshold touched.
+        """
+        from flask import Response
+        from web.live_stream import candle_events, poll_interval
+        symbol = _sym(request.args.get("symbol", SYMBOL))
+        tf = request.args.get("tf", TIMEFRAME)
+        frames = request.args.get("frames")
+        try:
+            max_frames = max(1, min(600, int(frames))) if frames else None
+        except (TypeError, ValueError):
+            max_frames = None
+        interval = poll_interval(tf)
+        asked = request.args.get("interval")
+        if asked:
+            # A client may ask for a different cadence, but never a faster one
+            # than the shared floor — one browser tab must not become a load
+            # generator against the market source.
+            try:
+                from web.live_stream import MAX_INTERVAL, MIN_INTERVAL
+                interval = max(MIN_INTERVAL, min(MAX_INTERVAL, float(asked)))
+            except (TypeError, ValueError):
+                pass
+
+        def fetch(sym: str, timeframe: str, limit: int):
+            return maybe_client().klines(sym, timeframe, limit)
+
+        gen = candle_events(fetch, symbol, tf, interval=interval,
+                            max_frames=max_frames)
+        return Response(gen, mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache",
+                                 "X-Accel-Buffering": "no",
+                                 "Connection": "keep-alive"})
 
     # ── Command Center ────────────────────────────────────────────────
     @app.get("/api/commands")

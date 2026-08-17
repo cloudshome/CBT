@@ -1,4 +1,38 @@
-**Last updated:** 2026-08-17 (**v2.30.0 / P18.2 — the stable `/api/v1`
+**Last updated:** 2026-08-17 (**v2.33.0 / W2 complete — live chart streaming
+and drawing tools** on `arena/01a01103-sky`). The chart workspace stopped being
+a snapshot: `web/live_stream.py` + `GET /api/chart/stream` push the newest bar
+over server-sent events and the browser calls `series.update()` in place, so
+zoom, overlays, zones and drawings survive an update. The feed never lies about
+itself — every frame is labelled `live`, `waiting`, `stale` (unchanged for more
+than 2 × the timeframe), or `error`, the UI adds `disconnected`, a failing
+source backs off instead of dropping the connection, and the poll cadence is
+clamped to 2–15 s so one tab cannot hammer the source. Alongside it, the trader
+can now **draw**: trendlines, horizontal rays and boxes placed with the mouse,
+snapped to the nearest loaded bar, persisted per symbol + timeframe in
+`localStorage`, listed in a MY DRAWINGS card with per-item delete, and
+attachable to a journal note (the human still picks the trade and saves).
+Display and annotation only: no threshold moved, no order path exists, nothing
+writes to the learning store, the paper book or the risk gate. Suite:
+**1053 passed / 1 skipped** (+23). Contract:
+`docs/HANDOVER_2026-08-17_W2_part2.md`. Next code is **P18.4 — the PWA**.
+
+> **Flagged honestly:** the “stream” is server-side polling of the same REST
+> candle source `/api/chart` already uses, not a WebSocket — swapping in
+> `data/ws_client.py` later changes no client code, since the SSE contract stays
+> the same. In `DEMO_MODE` the sample candles never change, so the stream
+> correctly degrades to `waiting` → `stale`. No real browser exists in this
+> sandbox, so the UI was proven with the node/jsdom harness, the Flask test
+> client and `curl` against a running dev server. Drawings are browser-local.
+
+> **Fixed a live-on-`main` defect:** `web/app.py`'s `HTML` is a plain (non-raw)
+> Python string, so the P18.3/W1 job-log line's `'\n'` became a real newline
+> inside a JS string literal — a `SyntaxError` that disabled the **entire**
+> dashboard script in any real browser. Both JS harnesses and the CI step read
+> the file text, never the evaluated template, so nothing caught it. Fixed, and
+> a new test (`test_served_script_is_valid_javascript`) plus an extended CI step
+> now parse exactly what Flask serves.
+
+**Previous:** 2026-08-17 (**v2.30.0 / P18.2 — the stable `/api/v1`
 contract** on `arena/01a00eac-sky`). The workstation now publishes one
 documented API that the browser and the future Windows/Android companions can
 all speak: a single response envelope, a closed vocabulary of typed error

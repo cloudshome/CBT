@@ -6,7 +6,20 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-17 (**W1 + W2 (part 1) consolidated**.
+**Last updated:** 2026-08-17 (**v2.33.0 — W2 complete (part 2)**. The chart
+workspace now streams the newest bar over SSE (`web/live_stream.py`,
+`GET /api/chart/stream`) and updates the series in place, labelling
+live / waiting / stale / feed-error / disconnected honestly; trendlines,
+horizontal rays and boxes are placed with the mouse, persist per symbol +
+timeframe in `localStorage`, and can be attached to a journal note. While
+proving it, the new served-script check caught and fixed a **pre-existing
+`SyntaxError` that disabled the whole dashboard script in real browsers**.
+No threshold moved and no order path was added
+(`docs/HANDOVER_2026-08-17_W2_part2.md`). Suite: 1053 passed / 1 skipped.
+**Next code is P18.4 — the installable, mobile-responsive PWA**; its service
+worker must never cache `/api/*`, auth, SSE, private state or mutations.)
+
+**Previous:** 2026-08-17 (**W1 + W2 (part 1) consolidated**.
 W1 keeps fail-closed composite validation, coherent asset/timeframe propagation,
 inline job restoration after reload, observed-rate projections with
 unknown/stalled states, and explicit no-edge reporting without auto-tuning

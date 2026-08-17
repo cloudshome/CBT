@@ -2,11 +2,14 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-17 · **W1 + W2 (part 1) consolidated** — the guided
-“Build my evidence” flow keeps the stricter W1 validation, coherent run inputs,
-inline reload recovery, observed-rate projection and explicit no-edge result;
-the chart workstation now also has zone overlays and historical replay.
-P18.3 jobs/SSE, P18.2 `/api/v1`, and P18.1 auth shipped previously.
+Last updated: 2026-08-17 · **v2.33.0 — W2 complete (part 2: live streaming +
+drawing tools)**. The chart streams the newest bar over SSE and calls
+`series.update()` in place, labelling live / waiting / stale / feed-error /
+disconnected honestly; trendlines, horizontal rays and boxes are drawn with the
+mouse and persist per symbol + timeframe. This build also fixed a
+**dashboard-killing JavaScript bug that was live on `main`** (see §1d).
+W1 evidence UX, W2 part 1 (zones + replay), P18.3 jobs/SSE, P18.2 `/api/v1` and
+P18.1 auth shipped previously.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -14,26 +17,68 @@ P18.3 jobs/SSE, P18.2 `/api/v1`, and P18.1 auth shipped previously.
 > [`ROADMAP.md`](ROADMAP.md) is the canonical merged P1–P22 roadmap. The current
 > build is still source-installed; do not claim installers exist.
 >
-> **Next code:** finish W2 with live candle streaming and interactive drawing
-> tools, then build the P18.4 mobile-responsive PWA. Chosen topology: one Ubuntu
-> Hub owns DB/workers/risk/audit; browser/PWA, Windows and Android are companion
-> clients. Packaging never adds exchange-order code or changes graduation.
+> **Next code:** P18.4 — the mobile-responsive, installable PWA (W2 is done).
+> Chosen topology: one Ubuntu Hub owns DB/workers/risk/audit; browser/PWA,
+> Windows and Android are companion clients. Packaging never adds
+> exchange-order code or changes graduation.
 
 ## Next session — start here
 
-Finish the **remaining W2** as working, clickable UI:
+**W2 is complete.** Build **P18.4 — the PWA**: manifest / project-owned icons /
+install prompt; a service worker that never caches `/api/*`, auth, SSE, private
+state or mutations; an obvious offline/stale state with mutations disabled; and
+a compact mobile path for the daily ritual, risk, paper positions, approvals and
+journal completion.
 
-1. **Live streaming** — push candle updates over SSE/WebSocket from
-   `data/ws_client.py` and call `series.update()` instead of redrawing. Preserve
-   reconnect semantics and label stale/disconnected data honestly.
-2. **Drawing tools** — trendlines, horizontal rays and boxes placed with the
-   mouse, persisted per symbol/timeframe (localStorage to start), and
-   attachable to the scan record.
+Two things to carry into it:
 
-After W2, build P18.4: manifest/project-owned icons/install prompt; a service
-worker that never caches `/api/*`, auth, SSE, private state or mutations; an
-obvious offline/stale state with mutations disabled; and a compact mobile path
-for daily ritual, risk, paper positions, approvals and journal completion.
+- **Never cache the SSE routes** (`/api/chart/stream`, `/api/v1/jobs/*/events`).
+  A cached event stream is a lie about the market; the live chart already
+  labels stale data, and the service worker must not defeat that.
+- **The served-script trap.** `web/app.py`'s `HTML` is a plain (non-raw) Python
+  string: a backslash escape written inside the embedded JavaScript is eaten by
+  Python before the browser sees it. Use `String.fromCharCode(10)` for a
+  newline. `tests/test_dashboard_js.py::test_served_script_is_valid_javascript`
+  and the CI syntax step now parse the *evaluated* template — keep them.
+
+Optional W2 follow-ups (not required by the roadmap): swap the stream's source
+to a real WebSocket tier (`data/ws_client.py`) behind the same SSE contract;
+drag-to-edit or Fibonacci drawing tools; server-side drawing persistence.
+
+---
+
+## 1b. What THIS session shipped — W2 (part 2): live streaming + drawing tools
+
+Working code + UI. Full contract:
+[`docs/HANDOVER_2026-08-17_W2_part2.md`](docs/HANDOVER_2026-08-17_W2_part2.md).
+
+- **`web/live_stream.py` + `GET /api/chart/stream`** — SSE frames of the newest
+  bar for one symbol/timeframe, polled from the same source `/api/chart` uses.
+  Cadence clamped to 2–15 s; a failing source emits an `error` frame and backs
+  off instead of dropping the connection; every frame is a full snapshot with an
+  `id:`, so a reconnect resumes with no server-side cursor. Behind the P18.1
+  auth gate.
+- **◉ Live toggle** — the browser calls `series.update()` in place (no rebuild,
+  so zoom/overlays/zones/drawings survive) and the status line always says which
+  of *off / connecting / live / waiting / stale / feed error / disconnected* is
+  true. Foreign symbols and older bars are dropped; the stream follows the
+  selected series and stops when replay starts.
+- **Drawing tools** — ╱ Trend, ─ Ray, ▭ Box, ⌫ Undo, 🗑 Clear, a MY DRAWINGS
+  list with per-item delete, and 📎 Attach to journal note (the human still
+  picks the trade and saves). Marks snap to the nearest loaded bar and persist
+  in `localStorage` per symbol + timeframe; corrupt storage is discarded.
+
+### 1d. The bug this build caught: the dashboard was dead in real browsers
+
+`HTML` in `web/app.py` is a plain (non-raw) triple-quoted Python string. The
+P18.3/W1 job-log line contained a literal `'\n'`, which Python turned into a
+real newline **inside a JavaScript string literal** — a `SyntaxError` that
+disabled the entire inline script in any browser. Every JS check (both test
+harnesses and CI) extracted the script from the *file text*, so none of them
+could see it. Fixed with `String.fromCharCode(10)`, plus a new test and a CI
+step that parse the evaluated template Flask actually serves.
+
+Suite: **1053 passed / 1 skipped** (+23).
 
 ---
 

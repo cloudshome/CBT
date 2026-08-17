@@ -47,27 +47,41 @@ def _run(api: dict, body: str) -> dict:
     const API = {json.dumps(api)};
     const elements = {{}};
     function mkEl(id){{
+      const cls = new Set();
       return {{ id, innerHTML:'', className:'', textContent:'', value:'',
         checked:true, disabled:false, clientWidth:900, style:{{}},
-        options:[], appendChild(){{}}, scrollIntoView(){{}},
+        options:[], appendChild(){{}}, scrollIntoView(){{}}, classes: cls,
         addEventListener:()=>{{}}, querySelector:()=>null,
-        querySelectorAll:()=>[], classList:{{ toggle(){{}}, add(){{}}, remove(){{}} }} }};
+        querySelectorAll:()=>[],
+        classList:{{
+          toggle(c, on){{ const want = (on === undefined) ? !cls.has(c) : !!on;
+            if(want) cls.add(c); else cls.delete(c); return want; }},
+          add(c){{ cls.add(c); }}, remove(c){{ cls.delete(c); }},
+          contains(c){{ return cls.has(c); }} }} }};
     }}
     function el(id){{ if(!elements[id]) elements[id]=mkEl(id); return elements[id]; }}
     const CHARTS = [];
     function mkSeries(kind, chart){{
-      const s = {{ kind, lines: [], data: [],
+      const s = {{ kind, lines: [], data: [], opts: null, updates: [],
         setData(d){{ this.data = d || []; }}, setMarkers(){{}},
+        update(bar){{ this.updates.push(bar); }},
         createPriceLine(o){{ this.lines.push(o && o.title); }},
+        // W2 drawing tools read a click's y coordinate back as a price.
+        coordinateToPrice(y){{ return 64000 - Number(y); }},
         priceScale(){{ return {{ applyOptions(){{}} }}; }}, applyOptions(){{}} }};
       chart.series.push(s); return s;
     }}
     global.LightweightCharts = {{ createChart: (target, opts) => {{
       const chart = {{ pane: target && target.id, height: opts && opts.height, series: [],
+        clickHandler: null, removed: [],
         addCandlestickSeries(){{ return mkSeries('candle', this); }},
-        addLineSeries(){{ return mkSeries('line', this); }},
+        addLineSeries(o){{ const s = mkSeries('line', this); s.opts = o || null; return s; }},
         addHistogramSeries(){{ return mkSeries('hist', this); }},
+        removeSeries(s){{ const i = this.series.indexOf(s);
+          if(i >= 0){{ this.series.splice(i, 1); this.removed.push(s); }} }},
+        subscribeClick(fn){{ this.clickHandler = fn; }},
         timeScale(){{ return {{ fitContent(){{}}, applyOptions(){{}},
+          coordinateToTime(x){{ return 1780000000 + Number(x) * 900; }},
           subscribeVisibleLogicalRangeChange(){{}}, setVisibleLogicalRange(){{}} }}; }},
         applyOptions(){{}}, remove(){{}} }};
       CHARTS.push(chart); return chart;
@@ -75,7 +89,11 @@ def _run(api: dict, body: str) -> dict:
     global.window = {{ addEventListener: ()=>{{}}, LightweightCharts: global.LightweightCharts }};
     global.document = {{ getElementById: el, addEventListener: ()=>{{}},
       querySelectorAll: ()=>[], createElement: ()=>mkEl('tmp') }};
-    global.localStorage = {{ getItem: ()=>null, setItem: ()=>{{}} }};
+    global.localStorage = {{ store: {{}},
+      getItem(k){{ return Object.prototype.hasOwnProperty.call(this.store, k) ? this.store[k] : null; }},
+      setItem(k, v){{ this.store[k] = String(v); }},
+      removeItem(k){{ delete this.store[k]; }} }};
+    const STORE = global.localStorage.store;
     global.history = {{ replaceState: ()=>{{}} }};
     global.location = {{ hash: '' }};
     global.fetch = async (url) => {{
@@ -86,6 +104,17 @@ def _run(api: dict, body: str) -> dict:
       return {{ json: async () => key ? API[key] : {{}} }};
     }};
     global.AbortController = class {{ constructor(){{ this.signal={{}}; }} abort(){{}} }};
+    // SSE stub: tests open a stream, then push frames into it by hand.
+    const STREAMS = [];
+    global.EventSource = class {{
+      constructor(url){{ this.url = url; this.handlers = {{}}; this.closed = false;
+        STREAMS.push(this); }}
+      addEventListener(name, fn){{ this.handlers[name] = fn; }}
+      close(){{ this.closed = true; }}
+      emit(name, data){{ const fn = this.handlers[name];
+        if(fn) fn({{ data: JSON.stringify(data) }}); }}
+      fail(){{ if(this.onerror) this.onerror({{}}); }}
+    }};
     global.setInterval = () => 0; global.clearInterval = () => {{}};
     global.setTimeout = (fn) => {{ if(typeof fn === 'function') fn(); return 0; }};
     global.clearTimeout = () => {{}};
@@ -253,6 +282,313 @@ def test_chart_reload_stops_replay_before_redrawing():
     assert out["button"] == "▶ Replay"
     assert "historical playback" not in out["head"]
     assert "63,500" in out["head"]
+
+
+# ── W2: live candle streaming ────────────────────────────────────────────
+LIVE_HELPERS = """
+      const priceSeries = () => CHARTS.filter(c => c.pane === 'chartMain').pop()
+        .series.find(s => s.kind === 'candle');
+      const stream = () => STREAMS[STREAMS.length - 1];
+"""
+
+
+def test_live_stream_updates_the_last_bar_in_place():
+    """W2 — a streamed bar reaches series.update(); the chart is not redrawn."""
+    out = _run({"/api/chart": _chart_payload()}, LIVE_HELPERS + """
+      await loadChartWorkspace(true);
+      const panesBefore = CHARTS.length;
+      toggleLive();
+      const url = stream().url, connecting = elements['liveState'].innerHTML;
+      stream().emit('candle', { symbol:'BTCUSDT', tf:'15m', state:'live',
+        time: 1780053100, candle: { time: 1780053100, open: 63500, high: 63700,
+                                    low: 63400, close: 63650 } });
+      console.log(JSON.stringify({ url, connecting,
+        panesAdded: CHARTS.length - panesBefore,
+        updates: priceSeries().updates,
+        head: elements['chartHead'].innerHTML,
+        state: elements['liveState'].innerHTML,
+        button: elements['liveBtn'].textContent,
+        lastCandle: _chartData.candles[_chartData.candles.length - 1] }));
+    """)
+    assert "/api/chart/stream?symbol=BTCUSDT&tf=15m" in out["url"]
+    assert "Connecting" in out["connecting"]
+    assert out["panesAdded"] == 0, "a live update must not rebuild the chart"
+    assert out["updates"] == [{"time": 1780053100, "open": 63500, "high": 63700,
+                               "low": 63400, "close": 63650}]
+    assert "63,650" in out["head"], "the head price did not follow the stream"
+    assert "LIVE" in out["state"] and "1 update" in out["state"]
+    assert "Stop live" in out["button"]
+    # the loaded candle array follows the stream, so a reload/replay agrees
+    assert out["lastCandle"]["close"] == 63650
+
+
+def test_live_stream_labels_stale_and_broken_feeds_honestly():
+    """A silent or failing feed must never look like a quiet market."""
+    out = _run({"/api/chart": _chart_payload()}, LIVE_HELPERS + """
+      await loadChartWorkspace(true);
+      toggleLive();
+      stream().emit('status', { symbol:'BTCUSDT', tf:'15m', state:'waiting',
+                                age: 8, message:'' });
+      const waiting = elements['liveState'].innerHTML;
+      stream().emit('status', { symbol:'BTCUSDT', tf:'15m', state:'stale',
+                                age: 240, message:'no new data for 240s' });
+      const stale = elements['liveState'].innerHTML;
+      stream().emit('status', { symbol:'BTCUSDT', tf:'15m', state:'error',
+                                age: 300, message:'ConnectionError: unreachable' });
+      const failed = elements['liveState'].innerHTML;
+      stream().fail();
+      console.log(JSON.stringify({ waiting, stale, failed,
+        dropped: elements['liveState'].innerHTML,
+        updates: priceSeries().updates.length }));
+    """)
+    assert "LIVE" in out["waiting"] and "waiting for the next bar" in out["waiting"]
+    assert "STALE" in out["stale"] and "240s" in out["stale"]
+    assert "not as a quiet market" in out["stale"]
+    assert "FEED ERROR" in out["failed"] and "unreachable" in out["failed"]
+    assert "DISCONNECTED" in out["dropped"] and "reconnecting" in out["dropped"]
+    assert out["updates"] == 0, "a status frame must never paint a bar"
+
+
+def test_live_stream_ignores_frames_for_another_series_and_older_bars():
+    out = _run({"/api/chart": _chart_payload()}, LIVE_HELPERS + """
+      await loadChartWorkspace(true);
+      toggleLive();
+      stream().emit('candle', { symbol:'ETHUSDT', tf:'15m', state:'live',
+        candle: { time: 1780053100, open: 1, high: 2, low: 0.5, close: 1.5 } });
+      const wrongSeries = priceSeries().updates.length;
+      stream().emit('candle', { symbol:'BTCUSDT', tf:'15m', state:'live',
+        candle: { time: 1770000000, open: 1, high: 2, low: 0.5, close: 1.5 } });
+      console.log(JSON.stringify({ wrongSeries, older: priceSeries().updates.length,
+        lastClose: _chartData.candles[_chartData.candles.length - 1].close }));
+    """)
+    assert out["wrongSeries"] == 0, "an ETHUSDT frame painted the BTCUSDT chart"
+    assert out["older"] == 0, "an older bar rewrote history"
+    assert out["lastClose"] == 63109, "the loaded candles were mutated"
+
+
+def test_live_stream_follows_the_selected_series_and_yields_to_replay():
+    out = _run({"/api/chart": _chart_payload()}, LIVE_HELPERS + """
+      await loadChartWorkspace(true);
+      toggleLive();
+      const first = stream().url;
+      chartSetTF('1h'); await new Promise(r => setImmediate(r));
+      const reconnected = stream().url;
+      const closedOld = STREAMS[0].closed;
+      toggleReplay();                       // replay owns the pane
+      console.log(JSON.stringify({ first, reconnected, closedOld,
+        liveAfterReplay: !!_live, closedAll: STREAMS.every(s => s.closed),
+        button: elements['liveBtn'].textContent }));
+    """)
+    assert "tf=15m" in out["first"] and "tf=1h" in out["reconnected"]
+    assert out["closedOld"] is True, "the old stream was left open"
+    assert out["liveAfterReplay"] is False, "replay and live shared the pane"
+    assert out["closedAll"] is True
+    assert out["button"] == "◉ Live"
+
+
+def test_live_toggle_stops_cleanly():
+    out = _run({"/api/chart": _chart_payload()}, LIVE_HELPERS + """
+      await loadChartWorkspace(true);
+      toggleLive(); toggleLive();
+      console.log(JSON.stringify({ live: !!_live, closed: stream().closed,
+        state: elements['liveState'].innerHTML,
+        button: elements['liveBtn'].textContent }));
+    """)
+    assert out["live"] is False and out["closed"] is True
+    assert "Live stream off" in out["state"]
+    assert out["button"] == "◉ Live"
+
+
+# ── W2: interactive drawing tools ────────────────────────────────────────
+DRAW_SEGMENTS = """
+      const drawn = () => CHARTS.filter(c => c.pane === 'chartMain').pop()
+        .series.filter(s => s.kind === 'line' && s.data.length === 2)
+        .map(s => ({ points: s.data, style: s.opts && s.opts.lineStyle,
+                     color: s.opts && s.opts.color }));
+      const click = (x, y, t) => CHARTS.filter(c => c.pane === 'chartMain').pop()
+        .clickHandler({ point: { x: x, y: y }, time: t });
+      const flush = () => new Promise(r => setImmediate(r));
+"""
+
+
+def test_trendline_is_placed_by_two_clicks_and_persisted():
+    """W2 — the trader clicks two points and a real segment appears on the
+    price pane, saved under this symbol + timeframe."""
+    out = _run({"/api/chart": _chart_payload()}, DRAW_SEGMENTS + """
+      await loadChartWorkspace(true);
+      setDrawTool('trendline');
+      const afterPick = elements['drawStatus'].innerHTML;
+      click(0, 500, 1780000000);          // price 63500 at the first bar
+      const midway = elements['drawStatus'].innerHTML;
+      click(0, 100, 1780009000);          // price 63900, snapped to a real bar
+      console.log(JSON.stringify({
+        afterPick, midway,
+        status: elements['drawStatus'].innerHTML,
+        segments: drawn(),
+        stored: JSON.parse(STORE['sky.drawings.v1.BTCUSDT.15m'] || 'null'),
+        list: elements['drawList'].innerHTML,
+        toolActive: [...elements['drawTrendline'].classes],
+      }));
+    """)
+    assert "click the first point" in out["afterPick"]
+    assert "second point" in out["midway"], "the tool never asked for point two"
+    assert len(out["segments"]) == 1, "the trendline never reached the chart"
+    seg = out["segments"][0]["points"]
+    assert [p["value"] for p in seg] == [63500.0, 63900.0]
+    # the second click's time was snapped onto a real bar (900s grid)
+    assert seg[0]["time"] == 1780000000 and (seg[1]["time"] - 1780000000) % 900 == 0
+    stored = out["stored"]
+    assert len(stored) == 1 and stored[0]["kind"] == "trendline"
+    assert len(stored[0]["points"]) == 2
+    assert "Trendline" in out["list"] and "rising" in out["list"]
+    assert "saved" in out["status"]
+    assert out["toolActive"] == [], "the tool stayed armed after placing"
+
+
+def test_ray_runs_to_the_last_bar_and_a_box_draws_both_edges():
+    out = _run({"/api/chart": _chart_payload()}, DRAW_SEGMENTS + """
+      await loadChartWorkspace(true);
+      setDrawTool('ray');
+      click(0, 200, 1780009000);                       // one click completes
+      const ray = drawn();
+      setDrawTool('box');
+      click(0, 300, 1780018000);
+      click(0, 900, 1780027000);
+      console.log(JSON.stringify({ ray, all: drawn(),
+        stored: JSON.parse(STORE['sky.drawings.v1.BTCUSDT.15m'] || 'null'),
+        list: elements['drawList'].innerHTML }));
+    """)
+    assert len(out["ray"]) == 1
+    (a, b) = out["ray"][0]["points"]
+    assert a["value"] == b["value"] == 63800.0, "a horizontal ray must stay flat"
+    assert b["time"] == 1780000000 + 59 * 900, "the ray must reach the last bar"
+    box = [s for s in out["all"] if s["style"] == 2]
+    assert len(box) == 2, "a box is drawn as its top and bottom edge"
+    tops = sorted({p["value"] for s in box for p in s["points"]})
+    assert tops == [63100.0, 63700.0]
+    assert {s["points"][0]["time"] for s in box} == {min(
+        s["points"][0]["time"] for s in box)}, "box edges must start on one bar"
+    assert {s["points"][1]["time"] for s in box} == {max(
+        s["points"][1]["time"] for s in box)}, "box edges must end on one bar"
+    assert [d["kind"] for d in out["stored"]] == ["ray", "box"]
+    assert "Horizontal ray" in out["list"] and "Box" in out["list"]
+
+
+def test_drawings_survive_a_reload_and_are_scoped_per_symbol_and_timeframe():
+    out = _run({"/api/chart": _chart_payload()}, DRAW_SEGMENTS + """
+      await loadChartWorkspace(true);
+      setDrawTool('ray');
+      click(0, 200, 1780009000);
+      await loadChartWorkspace(true);                  // reload the same series
+      const afterReload = drawn().length;
+      chartSetTF('1h'); await flush();                 // different timeframe
+      const onOtherTf = drawn().length;
+      const otherList = elements['drawList'].innerHTML;
+      chartSetTF('15m'); await flush();                // back to the saved one
+      console.log(JSON.stringify({ afterReload, onOtherTf, otherList,
+        back: drawn().length, keys: Object.keys(STORE).filter(k => k.startsWith('sky.drawings')) }));
+    """)
+    assert out["afterReload"] == 1, "the drawing vanished on reload"
+    assert out["onOtherTf"] == 0, "a 15m drawing leaked onto the 1h chart"
+    assert "No drawings on BTCUSDT 1h" in out["otherList"]
+    assert out["back"] == 1, "the drawing did not come back with its series"
+    assert out["keys"] == ["sky.drawings.v1.BTCUSDT.15m"]
+
+
+def test_undo_and_clear_remove_drawings_from_storage():
+    out = _run({"/api/chart": _chart_payload()}, DRAW_SEGMENTS + """
+      await loadChartWorkspace(true);
+      setDrawTool('ray'); click(0, 200, 1780009000);
+      setDrawTool('ray'); click(0, 400, 1780018000);
+      const two = drawn().length;
+      undoDrawing();
+      const afterUndo = { n: drawn().length,
+        stored: JSON.parse(STORE['sky.drawings.v1.BTCUSDT.15m']).length };
+      clearDrawings();
+      console.log(JSON.stringify({ two, afterUndo,
+        afterClear: drawn().length,
+        stored: JSON.parse(STORE['sky.drawings.v1.BTCUSDT.15m']),
+        status: elements['drawStatus'].innerHTML,
+        list: elements['drawList'].innerHTML }));
+    """)
+    assert out["two"] == 2
+    assert out["afterUndo"] == {"n": 1, "stored": 1}
+    assert out["afterClear"] == 0 and out["stored"] == []
+    assert "Cleared 1 drawing" in out["status"]
+    assert "No drawings" in out["list"]
+
+
+def test_a_single_drawing_can_be_removed_from_the_list():
+    out = _run({"/api/chart": _chart_payload()}, DRAW_SEGMENTS + """
+      await loadChartWorkspace(true);
+      setDrawTool('ray'); click(0, 200, 1780009000);
+      setDrawTool('ray'); click(0, 400, 1780018000);
+      const first = JSON.parse(STORE['sky.drawings.v1.BTCUSDT.15m'])[0].id;
+      removeDrawing(first);
+      const left = JSON.parse(STORE['sky.drawings.v1.BTCUSDT.15m']);
+      console.log(JSON.stringify({ n: drawn().length, kept: left.length,
+        keptPrice: left[0].points[0].price, status: elements['drawStatus'].innerHTML }));
+    """)
+    assert out["n"] == 1 and out["kept"] == 1
+    assert out["keptPrice"] == 63600.0, "the wrong drawing was removed"
+    assert "1 left" in out["status"]
+
+
+def test_drawing_ignores_clicks_outside_the_pane_and_is_disabled_in_replay():
+    out = _run({"/api/chart": _chart_payload()}, DRAW_SEGMENTS + """
+      await loadChartWorkspace(true);
+      setDrawTool('trendline');
+      CHARTS.filter(c => c.pane === 'chartMain').pop().clickHandler({});   // off-pane
+      const offPane = { status: elements['drawStatus'].innerHTML, n: drawn().length };
+      toggleReplay();                       // replay replaces the price pane
+      setDrawTool('box');
+      console.log(JSON.stringify({ offPane, tool: _drawTool, ctx: !!_drawCtx,
+        status: elements['drawStatus'].innerHTML }));
+    """)
+    assert "Click inside the price pane" in out["offPane"]["status"]
+    assert out["offPane"]["n"] == 0, "a click with no coordinates drew something"
+    assert out["tool"] is None and out["ctx"] is False
+    assert "Stop the replay before drawing" in out["status"]
+
+
+def test_corrupt_saved_drawings_never_break_the_chart():
+    """Storage is user-writable. Garbage is dropped, the chart still paints."""
+    out = _run({"/api/chart": _chart_payload()}, DRAW_SEGMENTS + """
+      STORE['sky.drawings.v1.BTCUSDT.15m'] = JSON.stringify([
+        'not-an-object',
+        { kind: 'trendline', points: [{ time: 1780000000, price: 'oops' }] },
+        { kind: 'nuke', points: [] },
+        { id: '<img src=x onerror=alert(1)>', kind: 'ray',
+          points: [{ time: 1780009000, price: 63900 }], created: 1 },
+      ]);
+      await loadChartWorkspace(true);
+      const stored = JSON.parse(STORE['sky.drawings.v1.BTCUSDT.15m']);
+      console.log(JSON.stringify({ n: drawn().length, candles:
+        CHARTS.filter(c => c.pane === 'chartMain').pop()
+          .series.find(s => s.kind === 'candle').data.length,
+        list: elements['drawList'].innerHTML, storedBefore: stored.length }));
+    """)
+    assert out["candles"] == 60, "corrupt drawings blanked the chart"
+    assert out["n"] == 1, "only the one valid drawing should survive"
+    assert "onerror" not in out["list"], "an unsafe id reached the DOM"
+
+
+def test_drawings_can_be_attached_to_the_journal_note():
+    out = _run({"/api/chart": _chart_payload(), "/api/journal": {"journalable": []}},
+               DRAW_SEGMENTS + """
+      await loadChartWorkspace(true);
+      setDrawTool('ray'); click(0, 200, 1780009000);
+      elements['jNotes'] = el('jNotes');
+      el('jNotes').value = 'took the retest';
+      attachDrawingsToJournal();
+      console.log(JSON.stringify({ tab: _activeTab, notes: elements['jNotes'].value,
+        jStatus: elements['jStatus'].innerHTML }));
+    """)
+    assert out["tab"] == "journal", "attaching did not open the journal"
+    assert out["notes"].startswith("took the retest")
+    assert "Chart marks — BTCUSDT 15m" in out["notes"]
+    assert "Horizontal ray @ 63,800" in out["notes"]
+    assert "pick the trade and save" in out["jStatus"]
 
 
 def test_chart_toggles_hide_panes():

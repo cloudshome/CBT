@@ -128,6 +128,8 @@ def test_unauthenticated_cannot_read_or_mutate(client):
     assert anon.post("/api/learn").status_code == 401
     assert anon.post("/api/backtest", json={}).status_code == 401
     assert anon.post("/api/paper/run", json={}).status_code == 401
+    # W2 live candle streaming is market data, but it is still private state
+    assert anon.get("/api/chart/stream?frames=1").status_code == 401
 
 
 def _fresh_client(client):

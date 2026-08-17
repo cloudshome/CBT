@@ -232,6 +232,34 @@ def test_dashboard_js_syntax():
 
 
 @pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_served_script_is_valid_javascript():
+    """Check the *evaluated* template, not the file text.
+
+    ``HTML`` is a plain (non-raw) triple-quoted Python string, so a backslash
+    escape written inside the embedded JavaScript is consumed by Python before
+    the browser ever sees it: ``'a\\nb'`` becomes a real newline inside a JS
+    string literal (an unterminated-string SyntaxError that kills the whole
+    dashboard), and ``\\s`` raises a SyntaxWarning today / SyntaxError later.
+    The source-text extractor above cannot see either, because it reads the
+    characters on disk. This one parses what Flask actually serves.
+    """
+    from web.app import HTML
+    scripts = re.findall(r"<script>(.*?)</script>", HTML, re.S)
+    assert scripts, "no inline script in the served template"
+    for i, js in enumerate(scripts):
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+            f.write(js)
+            path = f.name
+        try:
+            r = subprocess.run([NODE, "--check", path], capture_output=True, text=True)
+            assert r.returncode == 0, (
+                f"served <script> #{i} is not valid JS "
+                f"(a backslash escape was probably eaten by Python):\n{r.stderr}")
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_render_with_synthetic_payload():
     _run_harness(json.dumps(_synthetic_payload()))
 

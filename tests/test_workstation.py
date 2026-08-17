@@ -257,7 +257,9 @@ def test_dashboard_exposes_every_workstation_tab(client):
         assert f'data-tab="{tab}"' in html, f"tab {tab} missing from the shell"
     # the clickable panels the trader asked for
     for anchor in ("chartMain", "tradeManager", "riskCenterGate", "psResult",
-                   "jScan", "commandList", "moduleList"):
+                   "jScan", "commandList", "moduleList",
+                   "drawTrendline", "drawRay", "drawBox", "drawList", "drawStatus",
+                   "liveBtn", "liveState"):
         assert f'id="{anchor}"' in html, f"panel {anchor} missing"
 
 
