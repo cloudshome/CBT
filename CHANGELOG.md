@@ -10,6 +10,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.32.0] — 2026-08-17 · W1 guided evidence build
+
+MINOR: the Evidence tab now turns the P18.3 four-step background job into a
+working guided flow instead of a defaults-only button. This release changes
+measurement UX and job parameters only; it does not move a trading threshold,
+claim profitability, or add exchange execution.
+
+- **One coherent series** — choose asset, timeframe, market, history range,
+  backtest bars and simulator rounds in the Evidence tab. The validated values
+  flow into Backfill → Backtest → Simulator → Scorecard; unknown, invalid and
+  unbounded values fail before a job row is persisted.
+- **Inline progress** — step/phase, a real 0–4 progress bar and the streamed log
+  remain in the Evidence tab. An active evidence run is restored after reload;
+  users no longer have to open Command center to see it.
+- **Projected gap** — recent successful job logs provide the observed aggregate
+  backtest/paper additions per simulator round. SKY shows approximately how
+  many rounds remain, labels the estimate as non-guaranteed, says “unknown”
+  before any observed pace exists, and says “stalled” when deduped rounds add
+  no unique evidence.
+- **Honest result** — insufficient samples remain “incomplete.” Once sample
+  targets are met, non-positive net expectancy is reported plainly as “no
+  positive net edge”; the UI explicitly warns against parameter-tuning merely
+  to turn the result green. A positive sample result still does not bypass the
+  separate graduation, discipline or risk gates.
+- **Tests** — composite parameter propagation/refusal, projection math and
+  no-edge reporting are covered in Python; the Node/jsdom harness clicks the
+  real guided flow and verifies the selected values, inline stream and result.
+
+---
+
 ## [2.31.0] — 2026-08-17 · P18.3 background job manager + streaming (SSE)
 
 MINOR: long commands no longer run inside one blocking POST. They move behind a

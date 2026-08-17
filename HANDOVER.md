@@ -2,42 +2,43 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-17 · branch `arena/01a00f0e-sky` · **P18.3 shipped** —
-persisted background jobs + SSE (see §1b). P18.2 (`/api/v1`) and P18.1
-(authn/authz) shipped in the previous sessions (see §1a, §1).
+Last updated: 2026-08-17 · branch `arena/01a010bb-sky` · **W1 shipped as
+v2.32.0** — guided evidence controls, inline SSE progress, projected sample gap
+and honest no-edge reporting. P18.3 jobs/SSE, P18.2 `/api/v1`, and P18.1 auth
+shipped in the preceding releases.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
 > Android (`.apk`) that he can use and monitor without managing source code.
-> [`ROADMAP.md`](ROADMAP.md) is now the canonical merged P1–P22 roadmap. The
-> current build is still source-installed; do not claim installers exist.
+> [`ROADMAP.md`](ROADMAP.md) is the canonical merged P1–P22 roadmap. The current
+> build is still source-installed; do not claim installers exist.
 >
-> **Next code:** W1 guided “Build my evidence” flow (uses the P18.3 job layer),
-> then P18.4 PWA. P18.2 is done: `/api/v1` is stable, so native wrappers now
-> have a contract to build against; P18.3 is done: long jobs no longer block a
-> POST and survive a browser close. Chosen topology: one Ubuntu Hub owns
-> DB/workers/risk/audit; Windows and Android begin as companion clients.
-> Packaging never adds exchange-order code or changes graduation.
+> **Next code: P18.4 mobile-responsive PWA foundation.** Chosen topology: one
+> Ubuntu Hub owns DB/workers/risk/audit; browser/PWA, Windows and Android are
+> companion clients. Packaging never adds exchange-order code or changes the
+> graduation bar.
 
 ## Next session — start here
 
-The single highest-value job is **W1, the guided "Build my evidence" flow**
-(§2 "Carried-forward W1"). P18.3 already shipped the hard part — `submit("evidence", …)`
-chains Backfill → Backtest → Simulator → Scorecard with live step progress +
-SSE, and the Evidence tab has a one-click button. What is still missing:
+Build **P18.4 as a working installable PWA**, not another plan:
 
-1. **Per-symbol / per-timeframe selection** on the "Build my evidence" button
-   (today it runs defaults), plus a **projected-unlock** estimate ("at this
-   rate, ~N more simulator rounds").
-2. **Honest result reporting** — when the run finishes, say plainly whether the
-   setups have an edge; do not tune parameters until something passes (that is
-   curve-fitting, and `validate lookahead` / `scorecard --quality` exist to
-   catch it).
+1. Add a web manifest, generated project-owned icons, theme metadata and an
+   install button/prompt for Chrome/Edge desktop and Android.
+2. Add a safe service worker that caches only the static shell/assets. **Never
+   cache `/api/*`, auth responses, job SSE, private state or mutations.** When
+   disconnected, show a conspicuous offline/stale banner and disable every
+   mutation; never present cached market data as live.
+3. Create a mobile compact path for the daily ritual, risk gate, paper
+   positions, approvals and journal completion. Preserve CSRF/auth and the
+   viewer/operator role boundary.
+4. Add tests for manifest/icon routes, service-worker cache exclusions,
+   offline mutation blocking and responsive controls. Verify installability
+   with static/browser harnesses; say plainly if a real device was not tested.
 
-Deliverable = **working, clickable UI**, not a plan (see §0). After W1, the
-next code is P18.4 PWA, with Priority 1 (live chart streaming / drawing tools /
-zone overlays / replay) and Priority 3 (daily-ritual checklist + graduation
-tracker + enforced journalling) as parallel polish.
+**Done when:** the workstation can be installed from a modern browser, opens to
+an honest offline shell when the Hub is unreachable, never leaks private API
+payloads into shared caches, and cannot mutate while offline. After that, P19
+is the signed Ubuntu Hub package; do not jump to Windows/Android wrappers first.
 
 ---
 
@@ -351,25 +352,14 @@ See §1b and
 **Not shipped (honest):** live candle/health SSE (Priority 1 below) and the W1
 projection UX — both are separate follow-ups that now have a layer to build on.
 
-### Carried-forward W1 — help him actually earn the unlock
+### Carried-forward W1 — ✅ shipped v2.32.0
 
-This is now the highest-value work, because the Evidence tab makes the gap
-visible and the user will immediately want to close it. P18.3 shipped the
-foundation: `submit("evidence", …)` already chains Backfill → Backtest →
-Simulator → Scorecard with live step progress + SSE, and the Evidence tab has a
-one-click button. What remains is the **guided** part:
-
-1. ~~A single "Build my evidence" flow with live progress~~ ✅ the composite
-   `evidence` job + Background-jobs panel exist. What is missing: per-symbol /
-   per-timeframe selection on the button (currently defaults) and a clearer
-   inline progress readout that does not require opening the Command center.
-2. ~~Stream the output (SSE)~~ ✅ shipped — `GET /api/v1/jobs/<id>/events`.
-3. Show the **projected** unlock: "at this rate, ~N more simulator rounds".
-4. Then, honestly report the result. **If the setups turn out to have no edge,
-   say so plainly** — the correct outcome may be "this strategy does not work,
-   here is what the data says", not a green bar. Do not tune parameters until
-   something passes; that is curve-fitting and `validate lookahead` /
-   `scorecard --quality` exist specifically to catch it.
+The guided Evidence flow is complete: selected asset/timeframe/market/history
+propagate through the four validated child jobs; progress and log stream inline
+and restore after reload; observed unique-sample additions produce a caveated
+round projection; and a completed sample bar with non-positive net expectancy
+is reported as **no positive edge**, never tuned into a green result. See
+`docs/HANDOVER_2026-08-17_W1.md`.
 
 ### Priority 1 — finish the chart workstation
 

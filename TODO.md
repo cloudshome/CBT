@@ -204,9 +204,10 @@ Ordered code milestones:
 2. ~~**P18.2 `/api/v1`**~~ — ✅ shipped v2.30.0. Stable typed client contract,
    compatibility range, idempotent human mutations, device
    registration/revocation. `docs/HANDOVER_2026-08-17_P18_2.md`.
-3. **P18.3 jobs/SSE** ← **NEXT CODE** — persisted allow-listed long jobs, progress/cancel,
-   reconnect, guided evidence flow; never a shell endpoint.
-4. **P18.4 PWA/mobile** — installable responsive UI with honest stale/offline
+3. ~~**P18.3 jobs/SSE**~~ — ✅ shipped v2.31.0; persisted allow-listed long
+   jobs, progress/cancel and reconnect. ~~W1 guided evidence UX~~ — ✅ shipped
+   v2.32.0 with per-series controls, inline progress and an honest projection.
+4. **P18.4 PWA/mobile** ← **NEXT CODE** — installable responsive UI with honest stale/offline
    behavior and no private API cache.
 5. **P19 Ubuntu package** — signed `.deb`, first-run setup, hardened systemd,
    HTTPS, backup/restore/upgrade/rollback.

@@ -790,10 +790,24 @@ HTML = """<!doctype html>
       <div class="note" style="margin-bottom:10px">The gate opens when a setup is
         <b>measured</b>, not when you feel ready. Run these in order. Each one is
         the same command the pros run — it just takes time, not luck.</div>
-      <div class="flex" style="margin-bottom:12px">
-        <button class="btn primary" onclick="buildEvidence()">▶ Build my evidence (all 4 steps)</button>
-        <span class="note">Runs Backfill → Backtest → Simulator → Scorecard in the
-          background with live progress. You can close this tab.</span>
+      <div class="formgrid" style="margin-bottom:10px">
+        <label>Asset<select id="evSymbol"><option>BTCUSDT</option><option>ETHUSDT</option><option>XAUUSD</option></select></label>
+        <label>Timeframe<select id="evTf"><option>1m</option><option>5m</option><option selected>15m</option><option>1h</option><option>4h</option><option>1d</option></select></label>
+        <label>Market<select id="evMarket"><option selected>spot</option><option>perp</option></select></label>
+        <label>History<select id="evSince"><option>7d</option><option selected>30d</option><option>90d</option><option>180d</option><option>365d</option></select></label>
+        <label>Backtest bars<input id="evBars" type="number" min="1" max="100000" value="500"></label>
+        <label>Simulator rounds<input id="evRounds" type="number" min="1" max="1000" value="3"></label>
+      </div>
+      <div class="flex" style="margin-bottom:10px">
+        <button id="evBuildBtn" class="btn primary" onclick="buildEvidence()">▶ Build my evidence (all 4 steps)</button>
+        <span class="note">One coherent asset/timeframe through Backfill → Backtest → Simulator → Scorecard. Runs in the background; closing this tab does not stop it.</span>
+      </div>
+      <div id="evProjection" class="note" style="margin-bottom:10px">Calculating the honest evidence gap…</div>
+      <div id="evJob" class="blockcard earn" style="display:none;margin-bottom:12px">
+        <div class="flex" style="justify-content:space-between"><b id="evJobTitle">Build my evidence</b><span id="evJobBadge" class="badge">queued</span></div>
+        <div class="critrow" style="margin:9px 0 5px"><div class="bar"><i id="evJobBar" style="width:0%;background:var(--blue)"></i></div></div>
+        <div id="evJobState" class="note">Submitting…</div>
+        <pre id="evJobLog" class="termout" style="max-height:160px;margin-top:8px"></pre>
       </div>
       <div class="pipeline">
         <div class="pipestep"><span class="n">1</span>
@@ -3228,12 +3242,66 @@ async function submitJob(kind, params){
     if(out) out.textContent=String(e);
   }
 }
+let _evidenceStream=null;
+function renderEvidenceGuidance(g){
+  const el=document.getElementById('evProjection'); if(!el || !g) return;
+  let projection='Run one guided build to establish an observed pace.';
+  if(g.projection_state==='complete') projection='Sample-count gap: complete.';
+  else if(g.projection_state==='estimated') projection=`At the recently observed aggregate pace: ~${g.projected_rounds} more simulator round(s).`;
+  else if(g.projection_state==='stalled') projection='Recent rounds added no new unique samples — change data coverage, not strategy parameters.';
+  const tone=g.result==='edge_measured'?'okc':(g.result==='no_edge'?'err':'');
+  el.innerHTML=`<b class="${tone}">${esc(g.headline||'')}</b><br>${esc(projection)} `
+    +`Gap: ${g.backtest_gap||0} backtest + ${g.paper_gap||0} paper sample(s). `
+    +`<span style="opacity:.72">${esc(g.caveat||'')}</span>`;
+}
+function showEvidenceJob(j){
+  const box=document.getElementById('evJob'); if(!box) return;
+  box.style.display='block';
+  const badge=document.getElementById('evJobBadge'), state=document.getElementById('evJobState'),
+        bar=document.getElementById('evJobBar'), log=document.getElementById('evJobLog'),
+        btn=document.getElementById('evBuildBtn');
+  const total=Math.max(1,Number(j.step_total)||4), done=j.status==='succeeded'?total:(Number(j.step_index)||0);
+  if(badge) badge.textContent=j.status||'queued';
+  if(state) state.textContent=(j.phase||j.status||'queued')+' · step '+done+'/'+total;
+  if(bar){ bar.style.width=Math.max(0,Math.min(100,done/total*100))+'%'; bar.style.background=j.status==='failed'?'var(--red)':(j.status==='succeeded'?'var(--green)':'var(--blue)'); }
+  if(log && j.log_tail!=null){ const lines=String(j.log_tail).split('\n'); log.textContent=lines.slice(-12).join('\n'); log.scrollTop=log.scrollHeight; }
+  if(btn) btn.disabled=(j.status==='queued'||j.status==='running');
+}
+function watchEvidenceJob(jobId){
+  if(_evidenceStream){ try{_evidenceStream.close();}catch(e){} }
+  const es=new EventSource('/api/v1/jobs/'+encodeURIComponent(jobId)+'/events');
+  _evidenceStream=es;
+  es.addEventListener('job',ev=>{
+    let j={}; try{j=JSON.parse(ev.data);}catch(e){}
+    showEvidenceJob(j);
+    if({succeeded:1,failed:1,cancelled:1,interrupted:1}[j.status]){
+      es.close(); _evidenceStream=null;
+      showToast('Evidence run '+j.status,j.status==='succeeded'?'ok':'err');
+      loadEvidence();
+    }
+  });
+  es.onerror=()=>{ es.close(); _evidenceStream=null; };
+}
 async function buildEvidence(){
-  switchTab('commands');
-  const out=document.getElementById('cmdOut'), state=document.getElementById('cmdRunning');
-  if(state) state.innerHTML='<b>Build my evidence</b> — submitting the 4-step run…';
-  if(out) out.textContent='submitting…';
-  await submitJob('evidence', {});
+  const params={
+    symbol:(document.getElementById('evSymbol')?.value||'BTCUSDT').trim().toUpperCase(),
+    tf:document.getElementById('evTf')?.value||'15m',
+    market:document.getElementById('evMarket')?.value||'spot',
+    since:document.getElementById('evSince')?.value||'30d',
+    bars:Number(document.getElementById('evBars')?.value||500),
+    rounds:Number(document.getElementById('evRounds')?.value||3)
+  };
+  const box=document.getElementById('evJob'); if(box) box.style.display='block';
+  const state=document.getElementById('evJobState'); if(state) state.textContent='Validating and submitting…';
+  try{
+    const r=await fetch('/api/v1/jobs',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({kind:'evidence',params})});
+    const d=await r.json();
+    if(!d.ok){ if(state) state.innerHTML='<span class="err">'+esc((d.error&&d.error.message)||'Submission failed')+'</span>'; return; }
+    showEvidenceJob(d.data.job);
+    showToast(d.data.duplicate?'This exact evidence run is already active':'Evidence build started','ok');
+    watchEvidenceJob(d.data.job.job_id);
+  }catch(e){ if(state) state.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
 }
 async function cancelJob(ev, jobId){
   if(ev && ev.stopPropagation) ev.stopPropagation();
@@ -3397,6 +3465,16 @@ async function loadAccount(){
 
 // ── Evidence: why blocked + how to unlock ─────────────────────────────
 async function loadEvidence(){
+  try{
+    const loop=await (await fetch('/api/loop-health')).json();
+    renderEvidenceGuidance(loop.evidence_guidance||{});
+    const jobsPayload=await (await fetch('/api/v1/jobs?limit=20')).json();
+    const active=((jobsPayload.data||{}).jobs||[]).find(j=>j.kind==='evidence'&&(j.status==='queued'||j.status==='running'));
+    if(active){ showEvidenceJob(active); watchEvidenceJob(active.job_id); }
+  }catch(e){
+    const projection=document.getElementById('evProjection');
+    if(projection) projection.innerHTML='<span class="err">Could not calculate evidence gap: '+esc(String(e))+'</span>';
+  }
   const why=document.getElementById('unlockWhy');
   if(why){
     try{
@@ -4718,7 +4796,10 @@ def make_app(job_manager=None) -> Flask:
         """The one daily number — same snapshot as `python main.py daily`."""
         try:
             from brain.agent import loop_health
-            return jsonify(_sanitize_for_json(loop_health()))
+            payload = loop_health()
+            payload["evidence_guidance"] = _jobs.evidence_guidance(
+                (payload.get("graduation") or {}).get("by_setup") or [])
+            return jsonify(_sanitize_for_json(payload))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
 

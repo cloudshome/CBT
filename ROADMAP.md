@@ -165,15 +165,17 @@ old client receives a clear upgrade message instead of corrupt behavior.
   Center.
 - Duplicate clicks return the existing live job (`params_hash`), never a
   second run; a server restart marks orphaned runs `interrupted`, not lost.
-- The W1 guided “Build my evidence” flow now has this layer to build on (a
-  one-click composite job already exists in the Evidence tab).
+- The W1 guided “Build my evidence” flow now uses this layer: the Evidence tab
+  selects one asset/timeframe/market/history, streams the four steps inline,
+  resumes an active run after reload, projects the remaining simulator rounds
+  from observed additions, and reports no positive net edge plainly.
 
 **Done when:** closing a browser does not kill a job, duplicate clicks do not
 start duplicate runs, and progress survives reconnect/restart. ✅ met
 (`tests/test_jobs.py`, 23 tests).
 
-> **Deferred (honest):** the *live health/candle* SSE stream (Priority 1 in
-> `HANDOVER.md`) and the W1 projection UX are separate follow-ups, not P18.3.
+> **After P18.3:** W1 projection UX shipped in v2.32.0. The *live
+> health/candle* SSE stream (Priority 1 in `HANDOVER.md`) remains separate.
 
 ### P18.4 Mobile-responsive PWA foundation
 
@@ -309,9 +311,9 @@ diagnosed without opening the source tree.
 
 ```text
 DONE      P18.1 auth/roles (v2.29.2) → P18.2 versioned API (v2.30.0) → P18.3 jobs/SSE (v2.31.0)
-NOW       W1 guided evidence UX (builds on the P18.3 job layer)
+DONE      W1 guided evidence UX (v2.32.0; builds on the P18.3 job layer)
+NOW       P18.4 PWA
 PARALLEL  W4 mobile/stale-state reliability
-THEN      P18.4 PWA
 THEN      P19 Ubuntu Hub package (first production release)
 THEN      P20 Windows companion
 THEN      P21 Android companion

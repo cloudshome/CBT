@@ -39,7 +39,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -144,11 +146,31 @@ COMPOSITE_JOBS: dict[str, dict] = {
         "title": "Build my evidence",
         "what": "One guided run: Backfill → Backtest → Simulator → Scorecard, "
                 "streamed with live progress.",
+        # W1: these are deliberately closed/validated inputs, not arbitrary
+        # command arguments.  The selected asset/timeframe flow into every
+        # applicable child step so the four-stage run measures one coherent
+        # series rather than silently mixing defaults.
+        "inputs": [
+            {"name": "symbol", "label": "Asset", "type": "text",
+             "default": "BTCUSDT"},
+            {"name": "tf", "label": "Timeframe", "type": "choice",
+             "options": ["1m", "5m", "15m", "1h", "4h", "1d"],
+             "default": "15m"},
+            {"name": "market", "label": "Market", "type": "choice",
+             "options": ["spot", "perp"], "default": "spot"},
+            {"name": "since", "label": "History", "type": "choice",
+             "options": ["7d", "30d", "90d", "180d", "365d"], "default": "30d"},
+            {"name": "bars", "label": "Backtest bars", "type": "int", "default": 500,
+             "max": 100_000},
+            {"name": "rounds", "label": "Simulator rounds", "type": "int", "default": 3,
+             "max": 1_000},
+        ],
         "steps": [
-            {"kind": "backfill", "params": {}},
-            {"kind": "backtest", "params": {}},
-            {"kind": "simulator", "params": {}},
-            {"kind": "scorecard", "params": {}},
+            {"kind": "backfill", "params_from": ["symbol", "tf", "market", "since"]},
+            {"kind": "backtest", "params_from": ["symbol", "tf", "bars"]},
+            {"kind": "simulator", "params_map": {"symbol": "symbols", "tf": "tf",
+                                                    "rounds": "rounds"}},
+            {"kind": "scorecard", "params": {"source": "db"}},
         ],
     },
 }
@@ -200,6 +222,27 @@ def _coerce_param(spec: dict, raw: Any) -> Any:
     return text
 
 
+def _validated_params(spec: dict, params: dict | None) -> dict:
+    """Return only declared, coerced parameters for a job specification."""
+    params = params or {}
+    allowed = {field["name"] for field in spec.get("inputs", [])}
+    unknown = sorted(set(params) - allowed)
+    if unknown:
+        raise JobError("unknown parameter(s): " + ", ".join(unknown))
+    values = {}
+    for field in spec.get("inputs", []):
+        value = _coerce_param(field, params.get(field["name"], field.get("default")))
+        if field.get("type") == "int" and value is not None:
+            if value < 1:
+                raise JobError(f"{field['name']} must be at least 1")
+            # Browser jobs must remain bounded. This is an operational limit,
+            # not a trading threshold, and prevents an accidental huge click.
+            if value > int(field.get("max", 100_000)):
+                raise JobError(f"{field['name']} is too large")
+        values[field["name"]] = value
+    return values
+
+
 def build_argv(kind: str, params: dict | None) -> list[str]:
     """Translate a job kind + params into a validated ``main.py`` argv list.
 
@@ -209,14 +252,34 @@ def build_argv(kind: str, params: dict | None) -> list[str]:
     spec = JOB_KINDS.get(kind)
     if spec is None:
         raise JobError(f"unknown job kind: {kind}")
-    params = params or {}
+    values = _validated_params(spec, params)
     argv = list(spec["argv"])
     for field in spec.get("inputs", []):
-        value = _coerce_param(field, params.get(field["name"], field.get("default")))
+        value = values.get(field["name"])
         if value in (None, ""):
             continue
         argv.extend([field["flag"], str(value)])
     return argv
+
+
+def validate_composite(kind: str, params: dict | None) -> dict:
+    """Validate and normalize a composite job's public inputs.
+
+    Every expanded child is also checked before the parent row is persisted,
+    so a bad mapping can never leave a job stuck in ``running``.
+    """
+    spec = COMPOSITE_JOBS.get(kind)
+    if spec is None:
+        raise JobError(f"unknown composite job: {kind}")
+    values = _validated_params(spec, params)
+    for step in spec.get("steps", []):
+        child = dict(step.get("params") or {})
+        for name in step.get("params_from") or []:
+            child[name] = values.get(name)
+        for source, target in (step.get("params_map") or {}).items():
+            child[target] = values.get(source)
+        build_argv(step["kind"], child)
+    return values
 
 
 def _job_row_to_payload(row: dict) -> dict:
@@ -288,8 +351,12 @@ class JobManager:
         if kind not in JOB_KINDS and kind not in COMPOSITE_JOBS:
             raise JobError(f"unknown job kind: {kind}")
         # Validate now (before persisting) so a bad job is never enqueued.
+        # Composite values are normalized too: ``{}`` and an explicit set of
+        # defaults deduplicate as the same guided run.
         if kind in JOB_KINDS:
             build_argv(kind, params)
+        else:
+            params = validate_composite(kind, params)
         fingerprint = params_hash(kind, params)
         job_id = uuid.uuid4().hex[:16]
         username = (user or {}).get("username")
@@ -353,6 +420,92 @@ class JobManager:
             return ""
         lines = data.splitlines()
         return "\n".join(lines[-n:])
+
+    def evidence_guidance(self, by_setup: list[dict]) -> dict:
+        """Honest W1 result and rough simulator-round projection.
+
+        The estimate uses additions printed by completed simulator/evidence
+        jobs. It is explicitly aggregate and approximate: deduplication can
+        slow future rounds and aggregate additions may include non-primary
+        setups. If no observed pace exists we say ``unknown`` rather than
+        inventing a percentage.
+        """
+        primary = [s for s in (by_setup or []) if s.get("primary", True)]
+        bt_gap = sum(max(0, int(s.get("backtest_target") or 0)
+                         - int(s.get("backtest_n") or 0)) for s in primary)
+        pp_gap = sum(max(0, int(s.get("paper_target") or 0)
+                         - int(s.get("paper_n") or 0)) for s in primary)
+
+        pattern = re.compile(
+            r"round\s+\d+:\s+\+(\d+)\s+backtest samples,\s+\+(\d+)\s+paper samples")
+        observed: list[tuple[int, int]] = []
+        # list_jobs is newest-first; reverse to chronological order before
+        # keeping the last observations below.
+        for job in reversed(self.list_jobs(limit=100)):
+            if job.get("kind") not in {"simulator", "evidence"}:
+                continue
+            if job.get("status") != "succeeded":
+                continue
+            for match in pattern.finditer(self.tail(job["job_id"], 500)):
+                observed.append((int(match.group(1)), int(match.group(2))))
+        # Cap the history so ancient/high-yield runs do not dominate a pace
+        # that has slowed because most windows now deduplicate.
+        observed = observed[-30:]
+        bt_rate = sum(x for x, _ in observed) / len(observed) if observed else None
+        pp_rate = sum(x for _, x in observed) / len(observed) if observed else None
+
+        if bt_gap == 0 and pp_gap == 0:
+            projected = 0
+            projection_state = "complete"
+        elif not observed:
+            projected = None
+            projection_state = "unknown"
+        elif (bt_gap and not bt_rate) or (pp_gap and not pp_rate):
+            projected = None
+            projection_state = "stalled"
+        else:
+            projected = max(
+                math.ceil(bt_gap / bt_rate) if bt_gap else 0,
+                math.ceil(pp_gap / pp_rate) if pp_gap else 0)
+            projection_state = "estimated"
+
+        enough = bool(primary) and all(
+            int(s.get("backtest_n") or 0) >= int(s.get("backtest_target") or 0)
+            and int(s.get("paper_n") or 0) >= int(s.get("paper_target") or 0)
+            for s in primary)
+        no_edge = [s for s in primary if enough and
+                   (s.get("expectancy_net") is None or float(s.get("expectancy_net")) <= 0)]
+        proven = [s for s in primary if s.get("proven")]
+        if not primary:
+            result = "unmeasured"
+            headline = "No primary setup has been measured yet."
+        elif not enough:
+            result = "incomplete"
+            headline = "Evidence is incomplete — keep measuring; do not infer an edge yet."
+        elif no_edge:
+            result = "no_edge"
+            names = ", ".join(str(s.get("plan_type")) for s in no_edge)
+            headline = (f"No positive net edge measured for {names}. "
+                        "Do not tune parameters just to turn this green.")
+        elif len(proven) == len(primary):
+            result = "edge_measured"
+            headline = "Positive net edge measured at the sample bar; graduation rules still apply."
+        else:
+            result = "mixed"
+            headline = "The evidence is mixed; no blanket edge claim is justified."
+
+        return {
+            "result": result, "headline": headline,
+            "primary_setups": len(primary), "backtest_gap": bt_gap,
+            "paper_gap": pp_gap, "projection_state": projection_state,
+            "projected_rounds": projected, "observed_rounds": len(observed),
+            "observed_rate": {
+                "backtest_per_round": round(bt_rate, 2) if bt_rate is not None else None,
+                "paper_per_round": round(pp_rate, 2) if pp_rate is not None else None,
+            },
+            "caveat": ("Rough estimate from recent aggregate additions; unique-window "
+                       "deduplication can slow later rounds. It is not a promise."),
+        }
 
     # ── cancellation ─────────────────────────────────────────────────────
     def request_cancel(self, job_id: str, user: Optional[dict] = None) -> dict:
@@ -461,9 +614,24 @@ class JobManager:
 
     # ── execution ────────────────────────────────────────────────────────
     def _steps_for(self, kind: str, params: dict) -> list[tuple[str, dict]]:
-        """Expand a job into its ordered (kind, params) steps."""
+        """Expand a job into its ordered (kind, params) steps.
+
+        Composite mappings are declarative and closed: only names declared in
+        the composite specification can reach a child allow-listed job.
+        """
         if kind in COMPOSITE_JOBS:
-            return [(s["kind"], dict(s["params"])) for s in COMPOSITE_JOBS[kind]["steps"]]
+            expanded = []
+            for step in COMPOSITE_JOBS[kind]["steps"]:
+                child = dict(step.get("params") or {})
+                for name in step.get("params_from") or []:
+                    child[name] = params.get(name)
+                for source, target in (step.get("params_map") or {}).items():
+                    child[target] = params.get(source)
+                # Validate the concrete child now as a second fail-closed
+                # boundary before it reaches the runner.
+                build_argv(step["kind"], child)
+                expanded.append((step["kind"], child))
+            return expanded
         return [(kind, params)]
 
     def _run_job(self, job_id: str) -> None:

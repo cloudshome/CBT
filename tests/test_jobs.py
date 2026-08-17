@@ -109,6 +109,35 @@ def test_job_runs_outside_the_calling_thread(tmp_path):
     assert started["n"] == 1
 
 
+def test_evidence_guidance_projects_from_observed_rounds_and_reports_no_edge(tmp_path):
+    def measured(argv, *, on_line, should_cancel):
+        on_line("round 1: +20 backtest samples, +4 paper samples (run sim_test)")
+        return 0
+    mgr = _manager(tmp_path, runner=measured)
+    res = mgr.submit("simulator", {"rounds": 1})
+    _wait(res["job_id"], mgr, {"succeeded"})
+
+    incomplete = mgr.evidence_guidance([{
+        "plan_type": "Sweep Reversal", "primary": True,
+        "backtest_n": 60, "backtest_target": 100,
+        "paper_n": 12, "paper_target": 20,
+        "expectancy_net": -0.1, "proven": False,
+    }])
+    assert incomplete["result"] == "incomplete"
+    assert incomplete["projected_rounds"] == 2
+    assert incomplete["observed_rounds"] == 1
+
+    finished = mgr.evidence_guidance([{
+        "plan_type": "Sweep Reversal", "primary": True,
+        "backtest_n": 100, "backtest_target": 100,
+        "paper_n": 20, "paper_target": 20,
+        "expectancy_net": -0.1, "proven": False,
+    }])
+    assert finished["result"] == "no_edge"
+    assert finished["projected_rounds"] == 0
+    assert "Do not tune" in finished["headline"]
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # 2. allow-list + validation
 # ══════════════════════════════════════════════════════════════════════════
@@ -134,6 +163,32 @@ def test_newline_in_param_is_refused(tmp_path):
     mgr = _manager(tmp_path)
     with pytest.raises(jobsmod.JobError):
         mgr.submit("backfill", {"symbol": "BTC\nUSDT"})
+
+
+def test_evidence_composite_validates_and_maps_one_series(tmp_path):
+    mgr = _manager(tmp_path)
+    params = jobsmod.validate_composite("evidence", {
+        "symbol": "ETHUSDT", "tf": "1h", "market": "spot",
+        "since": "90d", "bars": 900, "rounds": 7})
+    steps = mgr._steps_for("evidence", params)
+    assert steps == [
+        ("backfill", {"symbol": "ETHUSDT", "tf": "1h", "market": "spot", "since": "90d"}),
+        ("backtest", {"symbol": "ETHUSDT", "tf": "1h", "bars": 900}),
+        ("simulator", {"symbols": "ETHUSDT", "tf": "1h", "rounds": 7}),
+        ("scorecard", {"source": "db"}),
+    ]
+    assert "ETHUSDT" in jobsmod.build_argv(*steps[0])
+    assert "ETHUSDT" in jobsmod.build_argv(*steps[2])
+
+
+def test_evidence_composite_refuses_unknown_or_unbounded_inputs(tmp_path):
+    mgr = _manager(tmp_path)
+    with pytest.raises(jobsmod.JobError):
+        mgr.submit("evidence", {"shell": "anything"})
+    with pytest.raises(jobsmod.JobError):
+        mgr.submit("evidence", {"rounds": 0})
+    with pytest.raises(jobsmod.JobError):
+        mgr.submit("evidence", {"tf": "3h"})
 
 
 # ══════════════════════════════════════════════════════════════════════════

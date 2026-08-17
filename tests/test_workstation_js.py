@@ -513,3 +513,42 @@ def test_api_contract_card_reports_an_error_without_blanking():
       console.log(JSON.stringify({ html: elements['apiv1'].innerHTML }));
     """)
     assert "boom" in out["html"]
+
+
+# ── W1: guided evidence build ─────────────────────────────────────────────
+def test_guided_evidence_build_submits_selected_series_inline():
+    out = _run({}, """
+      let submitted=null, streamUrl='';
+      global.EventSource=class { constructor(url){ streamUrl=url; }
+        addEventListener(){} close(){} };
+      global.fetch=async (url, opts)=>{
+        submitted=JSON.parse(opts.body);
+        return {json:async()=>({ok:true,data:{duplicate:false,job:{
+          job_id:'ev123',kind:'evidence',title:'Build my evidence',status:'queued',
+          step_index:0,step_total:4,phase:'queued',log_tail:''}}})};
+      };
+      el('evSymbol').value='ETHUSDT'; el('evTf').value='1h';
+      el('evMarket').value='spot'; el('evSince').value='90d';
+      el('evBars').value='900'; el('evRounds').value='7';
+      await buildEvidence();
+      console.log(JSON.stringify({submitted,streamUrl,display:elements['evJob'].style.display,
+        state:elements['evJobState'].textContent}));
+    """)
+    assert out["submitted"] == {"kind": "evidence", "params": {
+        "symbol": "ETHUSDT", "tf": "1h", "market": "spot", "since": "90d",
+        "bars": 900, "rounds": 7}}
+    assert out["streamUrl"].endswith("/ev123/events")
+    assert out["display"] == "block"
+    assert "queued" in out["state"]
+
+
+def test_evidence_guidance_says_no_edge_plainly():
+    out = _run({}, """
+      renderEvidenceGuidance({result:'no_edge',headline:'No positive net edge measured.',
+        projection_state:'complete',projected_rounds:0,backtest_gap:0,paper_gap:0,
+        caveat:'Not a promise.'});
+      console.log(JSON.stringify({html:elements['evProjection'].innerHTML}));
+    """)
+    assert "No positive net edge measured" in out["html"]
+    assert "Sample-count gap: complete" in out["html"]
+    assert "Not a promise" in out["html"]
