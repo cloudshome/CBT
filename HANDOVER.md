@@ -2,9 +2,9 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-17 · branch `arena/01a00eac-sky` · **P18.2 shipped** —
-the versioned `/api/v1` contract is working code + UI (see §1a). P18.1
-authentication/authorization shipped in the previous session (see §1).
+Last updated: 2026-08-17 · branch `arena/01a00f0e-sky` · **P18.3 shipped** —
+persisted background jobs + SSE (see §1b). P18.2 (`/api/v1`) and P18.1
+(authn/authz) shipped in the previous sessions (see §1a, §1).
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -12,16 +12,76 @@ authentication/authorization shipped in the previous session (see §1).
 > [`ROADMAP.md`](ROADMAP.md) is now the canonical merged P1–P22 roadmap. The
 > current build is still source-installed; do not claim installers exist.
 >
-> **Next code:** P18.3 persisted background jobs + SSE (long jobs — `backfill`,
-> `backtest`, `simulator`, evidence build — still run inside one blocking POST),
+> **Next code:** W1 guided “Build my evidence” flow (uses the P18.3 job layer),
 > then P18.4 PWA. P18.2 is done: `/api/v1` is stable, so native wrappers now
-> have a contract to build against. Chosen topology: one Ubuntu Hub owns
+> have a contract to build against; P18.3 is done: long jobs no longer block a
+> POST and survive a browser close. Chosen topology: one Ubuntu Hub owns
 > DB/workers/risk/audit; Windows and Android begin as companion clients.
 > Packaging never adds exchange-order code or changes graduation.
 
+## Next session — start here
+
+The single highest-value job is **W1, the guided "Build my evidence" flow**
+(§2 "Carried-forward W1"). P18.3 already shipped the hard part — `submit("evidence", …)`
+chains Backfill → Backtest → Simulator → Scorecard with live step progress +
+SSE, and the Evidence tab has a one-click button. What is still missing:
+
+1. **Per-symbol / per-timeframe selection** on the "Build my evidence" button
+   (today it runs defaults), plus a **projected-unlock** estimate ("at this
+   rate, ~N more simulator rounds").
+2. **Honest result reporting** — when the run finishes, say plainly whether the
+   setups have an edge; do not tune parameters until something passes (that is
+   curve-fitting, and `validate lookahead` / `scorecard --quality` exist to
+   catch it).
+
+Deliverable = **working, clickable UI**, not a plan (see §0). After W1, the
+next code is P18.4 PWA, with Priority 1 (live chart streaming / drawing tools /
+zone overlays / replay) and Priority 3 (daily-ritual checklist + graduation
+tracker + enforced journalling) as parallel polish.
+
 ---
 
-## 1a. What THIS session shipped — P18.2 stable application API
+## 1b. What THIS session shipped — P18.3 background jobs + SSE
+
+Working code + UI. New module `web/jobs.py` (stdlib only), `web/app.py`
+integration, one new `jobs` table in `data/database.py`, `tests/test_jobs.py`
+(23 tests) and a clickable Background-jobs panel + one-click “Build my
+evidence”. Full contract:
+[`docs/HANDOVER_2026-08-17_P18_3.md`](docs/HANDOVER_2026-08-17_P18_3.md).
+
+- Long jobs (`backfill`, `backtest`, `simulator`, `scorecard`, derivatives /
+  cross collect, and the composite `evidence` Backfill→Backtest→Simulator→
+  Scorecard) now run behind a **persisted queue** in the server process — a
+  browser close cannot kill them, and status/progress/log survive a reload or
+  a server restart (orphaned `running` rows are marked `interrupted`, never
+  silently re-run).
+- **Allow-list + validated args only** — always `python main.py <validated
+  argv>`, never a shell string; `web/jobs.build_argv` reuses the Command
+  Center's validation so the two share one allow-list.
+- **Deduplication** — `params_hash = sha256(kind + canonical params)`; a
+  duplicate click while a job is live returns the existing run instead of
+  starting a second one.
+- **Cancel** — queued jobs cancel outright; running jobs get a cancel request
+  (SIGTERM→SIGKILL); finished jobs refuse.
+- **SSE** — `GET /api/v1/jobs/<id>/events` streams full state snapshots
+  (`event: job`), one terminal frame then close; reconnect resumes from the
+  persisted state. New v1 typed codes `JOB_NOT_FOUND` / `JOB_NOT_CANCELLABLE`,
+  routes declared in `apiv1.NATIVE_ROUTES` so the role gate and the published
+  catalog stay in sync (path templates like `/jobs/<job_id>` now match).
+- **UI** — Command center gained a Background-jobs panel (status badges,
+  cancel, live streamed output); slow `🟠` commands submit jobs instead of
+  blocking; the Evidence tab gained one-click “Build my evidence”.
+
+> **Flagging honestly (per §0a):** no browser was opened in this sandbox — the
+> UI was verified via jsdom + the Flask test client + a live `curl` smoke test
+> (job submitted, ran in DEMO mode, streamed its log, SSE framed and closed),
+> not by a human clicking. Within-step progress is whatever the command
+> prints (mostly a final summary); only the *step* progress of the `evidence`
+> composite is genuinely fractional — I did not fake a percentage.
+
+---
+
+## 1a. What the previous session shipped — P18.2 stable application API
 
 Working code + UI. New module `web/api_v1.py` (stdlib only), `web/app.py`
 integration, one new table in `data/database.py`, `tests/test_api_v1.py`
@@ -270,36 +330,40 @@ Build these **as working UI**, not as a second roadmap.
 All six sub-items shipped; see §1a and
 [`docs/HANDOVER_2026-08-17_P18_2.md`](docs/HANDOVER_2026-08-17_P18_2.md).
 
-### Priority 0 — P18.3 background job manager and streaming
+### Priority 0 — P18.3 background job manager and streaming — ✅ SHIPPED this session
 
-This is now the top of the queue, and W1 below depends on it.
+See §1b and
+[`docs/HANDOVER_2026-08-17_P18_3.md`](docs/HANDOVER_2026-08-17_P18_3.md).
 
-1. Move long jobs (`backfill`, `backtest`, `simulator`, evidence build) behind
-   a **persisted** job queue with status, progress, cancel and audit history.
-   They currently run inside one blocking POST behind a timeout.
-2. **Server-sent events** for job progress; reconnect resumes from the last
-   event rather than restarting work.
-3. Only allow-listed jobs and validated arguments — no shell-command endpoint.
-   `web/command_center.py` already models the allow-list correctly; extend it,
-   do not replace it.
-4. **Reuse `web/api_v1.py::IdempotencyStore`** as the deduplication key for job
-   submission rather than inventing a second mechanism — duplicate clicks must
-   not start duplicate runs, which is the same problem P18.2 already solved.
-5. Expose it in the v1 contract (`/api/v1/jobs`…) using the existing envelope
-   and error codes, and add the route declarations to `apiv1.ROUTES` so the
-   role gate and the published catalog stay in sync.
+1. ✅ Long jobs run behind a **persisted** queue with status, progress, cancel
+   and (audit rows for submit/cancel). No more blocking POST.
+2. ✅ **SSE** (`/api/v1/jobs/<id>/events`); reconnect resumes from persisted
+   state.
+3. ✅ Allow-list + validated args only — `web/jobs.py` extends, does not
+   replace, `web/command_center.py`'s allow-list.
+4. ✅ Deduplication via `params_hash` (natural) on top of the v1 idempotency
+   contract — duplicate clicks do not start duplicate runs.
+5. ✅ Exposed in the v1 contract (`/api/v1/jobs`…) with the existing envelope
+   and error codes; routes declared in `apiv1.NATIVE_ROUTES` (not `ROUTES`,
+   because they are v1-native with no legacy equivalent) so the role gate and
+   catalog stay in sync.
+
+**Not shipped (honest):** live candle/health SSE (Priority 1 below) and the W1
+projection UX — both are separate follow-ups that now have a layer to build on.
 
 ### Carried-forward W1 — help him actually earn the unlock
 
 This is now the highest-value work, because the Evidence tab makes the gap
-visible and the user will immediately want to close it. Everything he needs
-exists as separate buttons; what is missing is the **guided run**:
+visible and the user will immediately want to close it. P18.3 shipped the
+foundation: `submit("evidence", …)` already chains Backfill → Backtest →
+Simulator → Scorecard with live step progress + SSE, and the Evidence tab has a
+one-click button. What remains is the **guided** part:
 
-1. A single **"Build my evidence"** flow that chains Backfill → Backtest →
-   Simulator → Scorecard with live progress, instead of four separate clicks
-   that each block for minutes.
-2. Stream the output (SSE) — `backfill` and `simulator` can run for many
-   minutes and currently sit behind one blocking POST with only a timeout.
+1. ~~A single "Build my evidence" flow with live progress~~ ✅ the composite
+   `evidence` job + Background-jobs panel exist. What is missing: per-symbol /
+   per-timeframe selection on the button (currently defaults) and a clearer
+   inline progress readout that does not require opening the Command center.
+2. ~~Stream the output (SSE)~~ ✅ shipped — `GET /api/v1/jobs/<id>/events`.
 3. Show the **projected** unlock: "at this rate, ~N more simulator rounds".
 4. Then, honestly report the result. **If the setups turn out to have no edge,
    say so plainly** — the correct outcome may be "this strategy does not work,
@@ -341,8 +405,8 @@ guided, stateful flow in the browser:
 
 ### Priority 4 — polish
 
-- Server-sent events so slow commands (`backtest`, `simulator`, `backfill`)
-  stream output instead of blocking for minutes behind one POST.
+- ~~Server-sent events so slow commands stream output instead of blocking for
+  minutes behind one POST~~ → **done** (P18.3).
 - Stale-data age badge on every market card.
 - Mobile compact mode for the ritual and approval flow.
 - ~~Optional auth before the dashboard is exposed beyond localhost~~ → **done**

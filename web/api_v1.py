@@ -112,6 +112,10 @@ class ErrorCode:
     LIFECYCLE_INVALID = "LIFECYCLE_INVALID"
     CONFLICT = "CONFLICT"
 
+    # background jobs (P18.3)
+    JOB_NOT_FOUND = "JOB_NOT_FOUND"
+    JOB_NOT_CANCELLABLE = "JOB_NOT_CANCELLABLE"
+
     # infrastructure
     UPSTREAM_UNAVAILABLE = "UPSTREAM_UNAVAILABLE"
     INTERNAL = "INTERNAL"
@@ -483,6 +487,22 @@ NATIVE_ROUTES: tuple[dict, ...] = (
      "summary": "Revoke one device token."},
     {"path": "/audit", "method": "GET", "role": "operator",
      "summary": "Recent sensitive-action audit rows."},
+    # ── P18.3 background jobs ──────────────────────────────────────────
+    # Path parameters (<job_id>) are declared as templates; the role gate
+    # matches them with a segment wildcard so the published catalog and the
+    # enforced minimum role can never disagree.
+    {"path": "/jobs", "method": "GET", "role": "viewer",
+     "summary": "List background jobs, newest first."},
+    {"path": "/jobs", "method": "POST", "role": "operator",
+     "summary": "Submit an allow-listed background job (backfill, backtest, "
+                "simulator, evidence build, …). Duplicate submissions return "
+                "the existing job."},
+    {"path": "/jobs/<job_id>", "method": "GET", "role": "viewer",
+     "summary": "One job's status, progress and log tail."},
+    {"path": "/jobs/<job_id>/cancel", "method": "POST", "role": "operator",
+     "summary": "Request cancellation of a queued or running job."},
+    {"path": "/jobs/<job_id>/events", "method": "GET", "role": "viewer",
+     "summary": "Server-sent events stream of a job's progress."},
 )
 
 

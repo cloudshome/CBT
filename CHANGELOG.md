@@ -10,6 +10,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.31.0] — 2026-08-17 · P18.3 background job manager + streaming (SSE)
+
+MINOR: long commands no longer run inside one blocking POST. They move behind a
+**persisted background-job queue** with status, progress, cancel and a streamed
+log, so a browser close cannot kill a run and progress survives reload/restart.
+No signal, risk, paper, graduation or execution behavior changed; the job layer
+runs the *same* allow-listed commands the Command Center already ran, never a
+shell string, and adds no exchange-order path (none exists anywhere in SKY).
+
+- **`web/jobs.py`** — a `JobManager` (submit/get/list/tail/cancel/events) and a
+  single in-process worker; `jobs` table in `data/database.py`, log files under
+  `data/job_logs/` (gitignored). Allow-listed kinds: `backfill`, `backtest`,
+  `simulator`, `scorecard`, `derivatives_collect`, `cross_collect`, plus the
+  composite `evidence` (Backfill → Backtest → Simulator → Scorecard).
+- **Deduplication** — `params_hash = sha256(kind + canonical params)`; a
+  duplicate click while a job is live returns the existing run instead of
+  starting a second one. A finished job is legitimately re-runnable.
+- **Cancel** — queued jobs cancel outright; running jobs get a cancel request
+  (SIGTERM→SIGKILL); terminal jobs refuse.
+- **Restart safety** — orphaned `running` rows are adopted at boot and marked
+  `interrupted` (with a note to resubmit), never silently re-run.
+- **SSE** — `GET /api/v1/jobs/<job_id>/events` streams full state snapshots
+  (`event: job`), one terminal frame then close; reconnect resumes from the
+  persisted state.
+- **v1 contract** — `GET/POST /api/v1/jobs`, `GET /api/v1/jobs/<id>`,
+  `POST /api/v1/jobs/<id>/cancel`, `GET /api/v1/jobs/<id>/events`; new typed
+  error codes `JOB_NOT_FOUND` and `JOB_NOT_CANCELLABLE`; routes declared in
+  `apiv1.NATIVE_ROUTES` so the role gate and the published catalog stay in sync
+  (path templates like `/jobs/<job_id>` now match). Submit = operator,
+  list/get/stream = viewer.
+- **UI** — Command center gained a Background-jobs panel (status badges, cancel,
+  live streamed output); slow `🟠` commands submit jobs instead of blocking;
+  the Evidence tab gained a one-click “Build my evidence” button.
+- **Tests** — `tests/test_jobs.py` (24 tests): persistence + worker,
+  allow-list/validation refusal, dedup, cancel, restart adoption, idle-worker
+  blocking (no DB polling), the v1 envelope + typed codes, the operator/viewer
+  role split, SSE framing, route catalog.
+
+> **Fixed this release (CI timeout):** the worker originally polled the `jobs`
+> table on a fixed interval when idle. Because every `make_app()` constructs a
+> `JobManager`, the test suite leaked one polling thread per app — each
+> re-running the schema DDL against its (soon-deleted) `tmp_path` database —
+> enough to blow CI's 10-minute budget. The worker now blocks on an event and
+> wakes only on submit/cancel; a regression test pins zero DB opens while idle.
+
+---
+
 ## [2.30.0] — 2026-08-17 · P18.2 stable application API (`/api/v1`)
 
 MINOR: the workstation now publishes **one documented contract** that the

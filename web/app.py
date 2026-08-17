@@ -56,6 +56,7 @@ from engine.signal_engine import analyze_frame
 from output.signal_schema import validate_output
 from web import auth as authmod
 from web import api_v1 as apiv1
+from web import jobs as jobsmod
 
 _CACHE: dict = {"payload": None, "ts": 0, "ttl": 40}
 _LAST_GOOD: dict[tuple[str, str], dict] = {}   # last successful payload by (symbol, timeframe)
@@ -599,6 +600,10 @@ HTML = """<!doctype html>
   .devrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.06)}
   .devrow .meta{font-size:12px}
   .devrow .meta b{font-weight:800}
+  .jobrow{display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:.13s;font-size:12.5px}
+  .jobrow:hover{border-color:var(--line2);background:rgba(255,255,255,.04)}
+  .jobrow.active{border-color:var(--blue);background:rgba(58,116,255,.08)}
+  .jobrow b{font-weight:800}
   .tokenout{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;word-break:break-all;background:#05080f;border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;color:var(--green)}
 </style>
 <script src="/static/lightweight-charts.standalone.js"></script>
@@ -785,6 +790,11 @@ HTML = """<!doctype html>
       <div class="note" style="margin-bottom:10px">The gate opens when a setup is
         <b>measured</b>, not when you feel ready. Run these in order. Each one is
         the same command the pros run — it just takes time, not luck.</div>
+      <div class="flex" style="margin-bottom:12px">
+        <button class="btn primary" onclick="buildEvidence()">▶ Build my evidence (all 4 steps)</button>
+        <span class="note">Runs Backfill → Backtest → Simulator → Scorecard in the
+          background with live progress. You can close this tab.</span>
+      </div>
       <div class="pipeline">
         <div class="pipestep"><span class="n">1</span>
           <div><b>Get real history</b><div class="note">Download real candles into local storage.</div>
@@ -872,6 +882,19 @@ HTML = """<!doctype html>
       <h2>RESULT</h2>
       <div id="cmdRunning" class="note"></div>
       <pre id="cmdOut" class="mono termout">Click any action above. Its output appears here — you never need a terminal.</pre>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>BACKGROUND JOBS <span class="count" id="jobCount">—</span></h2>
+      <div class="note" style="margin-bottom:10px">Slow work (backfill, backtest, simulator, evidence)
+        runs <b>here</b> in the background — closing this tab or the browser will not stop it,
+        and progress survives a reload.</div>
+      <div class="flex" style="margin-bottom:10px">
+        <button class="btn" onclick="loadJobs(true)">↻ Refresh jobs</button>
+        <span class="note" id="jobStatus">no jobs yet</span>
+      </div>
+      <div id="jobList"><span class="muted">loading jobs…</span></div>
+      <h3 style="margin-top:14px">LIVE OUTPUT</h3>
+      <pre id="jobOut" class="mono termout">Select a job to watch its output stream here.</pre>
     </div>
   </div>
 
@@ -3124,6 +3147,14 @@ async function runCommand(id){
   if(state) state.innerHTML='<b>'+esc(cmd.title)+'</b> running… ('+esc(cmd.cli)+')';
   if(out) out.textContent='working…';
   try{
+    // Slow commands (backfill, backtest, simulator, …) are background jobs:
+    // they run server-side, survive a browser close, and stream progress.
+    if(cmd.safety==='long'){
+      if(state) state.innerHTML='<b>'+esc(cmd.title)+'</b> submitted as a background job…';
+      if(out) out.textContent='submitting…';
+      await submitJob(id, collectParams(cmd));
+      return;
+    }
     const r=await fetch('/api/commands/run',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:id, params:collectParams(cmd)})});
     const d=await r.json();
@@ -3136,6 +3167,101 @@ async function runCommand(id){
     if(state) state.innerHTML='<span class="err">request failed</span>';
     if(out) out.textContent=String(e);
   }
+}
+
+/* ── Background jobs (P18.3) ─────────────────────────────────────────── */
+let _activeJob=null, _jobStream=null;
+function jobStatusBadge(s){
+  const map={queued:'<span class="badge">queued</span>',
+    running:'<span class="badge strong">running</span>',
+    succeeded:'<span class="badge ok">✓ done</span>',
+    failed:'<span class="badge err">✗ failed</span>',
+    cancelled:'<span class="badge">cancelled</span>',
+    interrupted:'<span class="badge">interrupted</span>'};
+  return map[s]||('<span class="badge">'+esc(s)+'</span>');
+}
+function jobProgress(j){
+  if(!j || j.step_total<=1) return '';
+  return ' · step '+(j.step_index||0)+'/'+j.step_total;
+}
+async function loadJobs(force){
+  const host=document.getElementById('jobList'); if(!host) return;
+  try{
+    const d=await (await fetch('/api/v1/jobs')).json();
+    const jobs=(d.data&&d.data.jobs)||[];
+    const cnt=document.getElementById('jobCount'); if(cnt) cnt.textContent=jobs.length+' jobs';
+    const st=document.getElementById('jobStatus');
+    const live=jobs.filter(j=>j.status==='queued'||j.status==='running').length;
+    if(st) st.textContent = live? (live+' running/queued') : 'idle — nothing running';
+    if(!jobs.length){ host.innerHTML='<span class="muted">no jobs yet — run a backfill, backtest or simulator.</span>'; return; }
+    host.innerHTML=jobs.map(j=>{
+      const active=j.job_id===_activeJob;
+      const cancelBtn=(j.status==='queued'||j.status==='running')
+        ? `<button class="rowbtn no" onclick="cancelJob(event,'${esc(j.job_id)}')">✕ cancel</button>` : '';
+      const phase=j.phase?`<div class="note">${esc(j.phase)}${jobProgress(j)}</div>`:'';
+      return `<div class="jobrow ${active?'active':''}" onclick="watchJob('${esc(j.job_id)}')">
+        <div style="flex:1"><b>${esc(j.title||j.kind)}</b> ${jobStatusBadge(j.status)}
+          ${phase}</div>
+        <span class="note mono">${esc(j.kind)}</span>${cancelBtn}</div>`;
+    }).join('');
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+async function submitJob(kind, params){
+  const out=document.getElementById('cmdOut'), state=document.getElementById('cmdRunning');
+  try{
+    const r=await fetch('/api/v1/jobs',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({kind:kind, params:params||{}})});
+    const d=await r.json();
+    if(!d.ok){
+      if(state) state.innerHTML='<span class="err">✗ '+esc((d.error&&d.error.message)||'failed')+'</span>';
+      if(out) out.textContent=JSON.stringify(d,null,2);
+      return;
+    }
+    const job=d.data.job;
+    if(state) state.innerHTML = (d.data.duplicate?'<span class="okc">already running</span>':'<span class="okc">✓ job submitted</span>')
+      +' · <span class="mono">'+esc(job.job_id)+'</span> · '+esc(job.title||kind);
+    showToast((d.data.duplicate?'Already queued: ':'Started: ')+(job.title||kind),'ok');
+    await loadJobs(true);
+    await watchJob(job.job_id);
+  }catch(e){
+    if(state) state.innerHTML='<span class="err">request failed</span>';
+    if(out) out.textContent=String(e);
+  }
+}
+async function buildEvidence(){
+  switchTab('commands');
+  const out=document.getElementById('cmdOut'), state=document.getElementById('cmdRunning');
+  if(state) state.innerHTML='<b>Build my evidence</b> — submitting the 4-step run…';
+  if(out) out.textContent='submitting…';
+  await submitJob('evidence', {});
+}
+async function cancelJob(ev, jobId){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  try{
+    const r=await fetch('/api/v1/jobs/'+encodeURIComponent(jobId)+'/cancel',{method:'POST'});
+    const d=await r.json();
+    showToast(d.ok?'Cancellation requested':'Could not cancel: '+(d.error&&d.error.message), d.ok?'ok':'err');
+    await loadJobs(true);
+  }catch(e){ showToast(String(e),'err'); }
+}
+async function watchJob(jobId){
+  _activeJob=jobId;
+  if(_jobStream){ try{_jobStream.close();}catch(e){} _jobStream=null; }
+  const out=document.getElementById('jobOut'); if(out) out.textContent='connecting…';
+  await loadJobs(true);
+  try{
+    const es=new EventSource('/api/v1/jobs/'+encodeURIComponent(jobId)+'/events');
+    _jobStream=es;
+    es.addEventListener('job', ev=>{
+      let j={}; try{ j=JSON.parse(ev.data); }catch(e){}
+      if(out && j.log_tail!=null) out.textContent=j.log_tail;
+      const term={succeeded:1,failed:1,cancelled:1,interrupted:1};
+      if(term[j.status]){ es.close(); _jobStream=null; showToast((j.title||'Job')+' '+j.status,j.status==='succeeded'?'ok':'err'); }
+      loadJobs(true);
+    });
+    es.addEventListener('error', ()=>{ /* reconnect resumes from persisted state */ });
+    es.onerror=()=>{ es.close(); _jobStream=null; };
+  }catch(e){ if(out) out.textContent=String(e); }
 }
 
 // ── Module catalog ────────────────────────────────────────────────────
@@ -3331,7 +3457,7 @@ function onTabShown(tab){
   else if(tab==='manage') loadTradeManager();
   else if(tab==='risk') loadRiskCenter();
   else if(tab==='journal') loadJournalCenter();
-  else if(tab==='commands') loadCommands();
+  else if(tab==='commands'){ loadCommands(); loadJobs(false); }
   else if(tab==='modules') loadModules();
   else if(tab==='connections') loadConnections(false);
   else if(tab==='evidence') loadEvidence();
@@ -3367,7 +3493,7 @@ try{ if(document.querySelectorAll) document.querySelectorAll('#tfSeg button').fo
 """
 
 
-def make_app() -> Flask:
+def make_app(job_manager=None) -> Flask:
     app = Flask(__name__)
 
     # ── P18.1 authentication & authorization ──────────────────────────────
@@ -3471,15 +3597,42 @@ def make_app() -> Flask:
     for _r in apiv1.ROUTES + apiv1.NATIVE_ROUTES:
         _V1_ROLES[(_r["path"], _r["method"])] = _r.get("role", "operator")
 
+    def _path_matches(template: str, actual: str) -> bool:
+        """Match a declared v1 path template against a concrete request path.
+
+        ``/jobs/<job_id>/cancel`` must match ``/jobs/abc123/cancel``: segments
+        are compared in order and ``<...>`` matches any single non-empty
+        segment.
+        """
+        t_segs = [s for s in template.split("/") if s]
+        a_segs = [s for s in actual.split("/") if s]
+        if len(t_segs) != len(a_segs):
+            return False
+        for t, a in zip(t_segs, a_segs):
+            if t.startswith("<") and t.endswith(">"):
+                if not a:
+                    return False
+                continue
+            if t != a:
+                return False
+        return True
+
     def _required_role(path: str) -> str:
         """Minimum role for a mutating request.
 
-        v1 reads its answer from the declared route table; anything mutating
-        and *undeclared* defaults to ``operator``, so forgetting to declare a
-        new route fails closed rather than open.
+        v1 reads its answer from the declared route table (with path-parameter
+        templates matched); anything mutating and *undeclared* defaults to
+        ``operator``, so forgetting to declare a new route fails closed rather
+        than open.
         """
         if _is_v1(path):
-            role = _V1_ROLES.get((_v1_sub(path), request.method))
+            sub = _v1_sub(path)
+            role = _V1_ROLES.get((sub, request.method))
+            if role is None:
+                for (tmpl, meth), r in _V1_ROLES.items():
+                    if meth == request.method and _path_matches(tmpl, sub):
+                        role = r
+                        break
             if role in (None, "public"):
                 return "operator"
             return role
@@ -4695,6 +4848,15 @@ def make_app() -> Flask:
     # exchange-order path (SKY has none).
     # ══════════════════════════════════════════════════════════════════════
     _idem = apiv1.IdempotencyStore()
+    # P18.3 — the persisted background-job queue. One worker, one job at a
+    # time; long commands (backfill/backtest/simulator/evidence) run here so
+    # a browser close or a timeout cannot kill them. Tests inject a manager
+    # with a fake runner so no real subprocess spawns.
+    _jobs = job_manager or jobsmod.JobManager()
+    # Start the worker at boot so orphaned rows from a previous process are
+    # adopted immediately and queued jobs resume without waiting for a new
+    # submission. Idempotent — a manager injected by a test may already run.
+    _jobs.start()
 
     def _unwrap(rv) -> tuple[Any, int]:
         """Normalize a Flask return value into ``(json_payload, status)``.
@@ -4994,6 +5156,94 @@ def make_app() -> Flask:
                 {"field": "limit"})), 400
         rows = auth.recent_audit(limit)
         return jsonify(apiv1.envelope_ok({"rows": rows, "count": len(rows)}))
+
+    # ════════════════════════════════════════════════════════════════════
+    # P18.3 — background jobs (/api/v1/jobs). v1-native (no legacy
+    # equivalent): the old path ran long commands synchronously behind one
+    # blocking POST. Jobs are the replacement, exposed only in v1.
+    # ════════════════════════════════════════════════════════════════════
+    def _job_user():
+        u = getattr(g, "user", None) or _current_user()
+        return u or {}
+
+    @app.get(f"{V1_PREFIX}/jobs")
+    def v1_jobs_list():
+        try:
+            limit = int(request.args.get("limit", 50))
+        except (TypeError, ValueError):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED, "limit must be an integer",
+                {"field": "limit"})), 400
+        status = request.args.get("status")
+        jobs = _jobs.list_jobs(limit=limit, status=status)
+        return jsonify(apiv1.envelope_ok({
+            "jobs": jobs, "count": len(jobs),
+            "kinds": sorted(set(jobsmod.JOB_KINDS) | set(jobsmod.COMPOSITE_JOBS)),
+        }))
+
+    @app.post(f"{V1_PREFIX}/jobs")
+    def v1_jobs_submit():
+        body = request.get_json(silent=True) or {}
+        kind = str(body.get("kind") or "").strip()
+        params = body.get("params") or {}
+        if not isinstance(params, dict):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED, "params must be an object",
+                {"field": "params"})), 400
+        try:
+            result = _jobs.submit(kind, params, user=_job_user())
+        except jobsmod.JobError as exc:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED, str(exc),
+                {"field": "kind", "allowed": sorted(set(jobsmod.JOB_KINDS)
+                                                    | set(jobsmod.COMPOSITE_JOBS))})), 400
+        _audit("job_submitted", kind, ok=True,
+               detail={"job_id": result["job_id"], "created": result["created"]})
+        job = _jobs.get(result["job_id"])
+        return jsonify(apiv1.envelope_ok({
+            "job": job, "created": result["created"],
+            "duplicate": not result["created"],
+        })), 201
+
+    @app.get(f"{V1_PREFIX}/jobs/<job_id>")
+    def v1_jobs_get(job_id):
+        job = _jobs.get(job_id)
+        if job is None:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.JOB_NOT_FOUND, f"no such job: {job_id}",
+                {"job_id": job_id})), 404
+        return jsonify(apiv1.envelope_ok({"job": job}))
+
+    @app.post(f"{V1_PREFIX}/jobs/<job_id>/cancel")
+    def v1_jobs_cancel(job_id):
+        try:
+            job = _jobs.request_cancel(job_id, user=_job_user())
+        except jobsmod.JobError as exc:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.JOB_NOT_CANCELLABLE, str(exc),
+                {"job_id": job_id})), 409
+        _audit("job_cancel_requested", job_id, ok=True)
+        return jsonify(apiv1.envelope_ok({"job": job}))
+
+    @app.get(f"{V1_PREFIX}/jobs/<job_id>/events")
+    def v1_jobs_events(job_id):
+        """Server-sent events stream of a job's progress.
+
+        Each frame is a full snapshot of the persisted state, so a reconnect
+        (or a server restart) resumes from the last event rather than
+        restarting work. ``Last-Event-ID`` is accepted but only informational
+        — the source of truth is the jobs table.
+        """
+        if _jobs.get(job_id) is None:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.JOB_NOT_FOUND, f"no such job: {job_id}",
+                {"job_id": job_id})), 404
+        from flask import Response
+        last_id = request.headers.get("Last-Event-ID")
+        gen = _jobs.events(job_id, last_event_id=last_id)
+        return Response(gen, mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache",
+                                 "X-Accel-Buffering": "no"})
 
     @app.errorhandler(404)
     def _v1_404(exc):

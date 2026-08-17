@@ -256,6 +256,35 @@ CREATE TABLE IF NOT EXISTS idempotency_keys(
   created_ts INTEGER,
   PRIMARY KEY(key, user_id, endpoint)
 );
+-- ── P18.3 background job manager ─────────────────────────────────────────
+-- jobs: one row per submitted background run (backfill / backtest /
+-- simulator / evidence build / other allow-listed "long" commands). Status,
+-- progress and the running log are persisted here so a browser close, a page
+-- reload or a server restart can never silently lose a run: the job keeps
+-- running in the server process, and on reconnect the client resumes from
+-- the last persisted state rather than restarting work.
+--   params_hash = sha256(kind + canonical params_json) — the natural
+--     deduplication key: a duplicate click on the same job returns the
+--     already-queued job instead of starting a second run.
+CREATE TABLE IF NOT EXISTS jobs(
+  job_id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  params_json TEXT NOT NULL,
+  params_hash TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',  -- queued|running|succeeded|failed|cancelled|interrupted
+  user_id INTEGER,
+  username TEXT,
+  created_ts INTEGER,
+  started_ts INTEGER,
+  finished_ts INTEGER,
+  step_index INTEGER NOT NULL DEFAULT 0,
+  step_total INTEGER NOT NULL DEFAULT 1,
+  phase TEXT,
+  exit_code INTEGER,
+  error TEXT,
+  cancel_requested INTEGER NOT NULL DEFAULT 0,
+  log_path TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_sentiment_sym_tf_ts ON sentiment_history(symbol, timeframe, ts);
 CREATE INDEX IF NOT EXISTS idx_plans_scan ON plans(scan_id);
 CREATE INDEX IF NOT EXISTS idx_bt_type ON backtest_results(plan_type);
@@ -266,6 +295,8 @@ CREATE INDEX IF NOT EXISTS idx_paper_scan ON paper_trades(scan_id);
 CREATE INDEX IF NOT EXISTS idx_paper_status ON paper_trades(status);
 CREATE INDEX IF NOT EXISTS idx_paper_symbol ON paper_trades(symbol);
 CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency_keys(created_ts);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_hash ON jobs(params_hash);
 """
 
 

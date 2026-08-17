@@ -88,7 +88,8 @@ are enabled only after authentication and TLS are configured.
 | P15–P16 | Market sentiment colour and measured sentiment-conditioned outcomes | `CHANGELOG.md` | ✅ shipped |
 | P17 | Clickable Trading Workstation and real-world read-only connections | `WEB_TRADER_ROADMAP.md`, `HANDOVER.md` | ✅ foundation shipped; listed workstation follow-ups remain |
 | P18.1–P18.2 | Owner auth/roles/CSRF/audit, then the stable `/api/v1` client contract | `docs/HANDOVER_2026-08-17_P18_2.md` | ✅ shipped |
-| P18.3–P22 | Jobs/SSE, PWA, then secure production distribution for Ubuntu, Windows, and Android | this document | 🔄 next product phase |
+| P18.3 | Persisted background jobs + SSE | `docs/HANDOVER_2026-08-17_P18_3.md` | ✅ shipped |
+| P18.4–P22 | PWA, then secure production distribution for Ubuntu, Windows, and Android | this document | 🔄 next product phase |
 
 ### Workstation items carried forward—not lost
 
@@ -151,17 +152,28 @@ the risk gate; security tests cover every write endpoint.
 **Done when:** web, Windows, and Android can use one documented contract and an
 old client receives a clear upgrade message instead of corrupt behavior.
 
-### P18.3 Background job manager and streaming — 🔄 next code
+### P18.3 Background job manager and streaming — ✅ shipped (v2.31.0)
 
-- Move long jobs (backfill, backtest, simulator, evidence build) behind a
-  persisted job queue with status, progress, cancel, and audit history.
-- Server-sent events for job progress and live health/candle notifications;
-  reconnect resumes from the last event rather than restarting work.
-- Only allow-listed jobs and validated arguments; no shell-command endpoint.
-- W1 guided “Build my evidence” flow uses this layer.
+- Long jobs (backfill, backtest, simulator, scorecard, derivatives / cross
+  collect, and the composite `evidence` Backfill→Backtest→Simulator→Scorecard)
+  run behind a persisted queue with status, progress, cancel, and audit rows —
+  no more blocking POST. `web/jobs.py`.
+- Server-sent events for job progress (`GET /api/v1/jobs/<id>/events`); every
+  frame is a full persisted snapshot so reconnect resumes from the last event.
+- Only allow-listed jobs and validated arguments — always `python main.py
+  <validated argv>`, never a shell string; validation shared with the Command
+  Center.
+- Duplicate clicks return the existing live job (`params_hash`), never a
+  second run; a server restart marks orphaned runs `interrupted`, not lost.
+- The W1 guided “Build my evidence” flow now has this layer to build on (a
+  one-click composite job already exists in the Evidence tab).
 
 **Done when:** closing a browser does not kill a job, duplicate clicks do not
-start duplicate runs, and progress survives reconnect/restart.
+start duplicate runs, and progress survives reconnect/restart. ✅ met
+(`tests/test_jobs.py`, 23 tests).
+
+> **Deferred (honest):** the *live health/candle* SSE stream (Priority 1 in
+> `HANDOVER.md`) and the W1 projection UX are separate follow-ups, not P18.3.
 
 ### P18.4 Mobile-responsive PWA foundation
 
@@ -296,9 +308,9 @@ diagnosed without opening the source tree.
 ## 5. Build order and release gates
 
 ```text
-DONE      P18.1 auth/roles (v2.29.2) → P18.2 versioned API (v2.30.0)
-NOW       P18.3 jobs/SSE
-PARALLEL  W1 guided evidence UX + W4 mobile/stale-state reliability
+DONE      P18.1 auth/roles (v2.29.2) → P18.2 versioned API (v2.30.0) → P18.3 jobs/SSE (v2.31.0)
+NOW       W1 guided evidence UX (builds on the P18.3 job layer)
+PARALLEL  W4 mobile/stale-state reliability
 THEN      P18.4 PWA
 THEN      P19 Ubuntu Hub package (first production release)
 THEN      P20 Windows companion
