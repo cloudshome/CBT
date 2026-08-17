@@ -114,6 +114,39 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8050"))
 
+# ── Authentication & authorization (P18.1) ───────────────────────────────
+# SKY_AUTH_MODE:
+#   auto      -> auth turns on once an owner account exists (first-run setup)
+#   required  -> auth is always on (a bare local checkout is read-only until setup)
+#   disabled  -> auth off entirely (unsafe; only for tests/development)
+SKY_AUTH_MODE = os.getenv("SKY_AUTH_MODE", "auto").strip().lower()
+
+# Session signing key. Leave unset to auto-generate and persist one next to
+# the database (survives restarts). Set explicitly for multi-process deploys.
+SKY_SECRET_KEY = os.getenv("SKY_SECRET_KEY", "")
+
+# Browser cookie sessions: absolute and idle lifetimes (hours).
+SKY_SESSION_TTL_HOURS = int(os.getenv("SKY_SESSION_TTL_HOURS", "12"))
+SKY_SESSION_IDLE_HOURS = int(os.getenv("SKY_SESSION_IDLE_HOURS", "2"))
+
+# Companion-device bearer tokens (scoped, revocable) live this long.
+SKY_DEVICE_TOKEN_TTL_DAYS = int(os.getenv("SKY_DEVICE_TOKEN_TTL_DAYS", "365"))
+
+# Login throttling: after this many failures, lock the username + IP for the
+# lockout window.
+SKY_LOGIN_MAX_ATTEMPTS = int(os.getenv("SKY_LOGIN_MAX_ATTEMPTS", "5"))
+SKY_LOGIN_LOCKOUT_SECONDS = int(os.getenv("SKY_LOGIN_LOCKOUT_SECONDS", "300"))
+
+# The approve endpoint normally cannot bypass the risk gate. This explicit
+# opt-in re-enables the legacy "force approve" escape hatch (always audited).
+SKY_ALLOW_FORCE_APPROVE = os.getenv("SKY_ALLOW_FORCE_APPROVE", "false").lower() in ("1", "true", "yes")
+
+# Remote deployment guard: binding to a non-loopback host is refused unless an
+# owner account exists AND a TLS-terminating reverse proxy is configured
+# (SKY_TRUSTED_PROXY_IPS), or SKY_ALLOW_REMOTE_NO_TLS is explicitly enabled.
+SKY_ALLOW_REMOTE_NO_TLS = os.getenv("SKY_ALLOW_REMOTE_NO_TLS", "false").lower() in ("1", "true", "yes")
+SKY_TRUSTED_PROXY_IPS = [i.strip() for i in os.getenv("SKY_TRUSTED_PROXY_IPS", "").split(",") if i.strip()]
+
 # ── Signal database (learning store) ─────────────────────────────────────
 DB_PATH = os.getenv("DB_PATH", str(ROOT / "data" / "cryptobrain.db"))
 

@@ -187,6 +187,58 @@ CREATE TABLE IF NOT EXISTS sentiment_history(
   symbol TEXT, timeframe TEXT, ts INTEGER,
   score REAL, direction TEXT, label TEXT, parts_json TEXT
 );
+-- ── P18.1 authentication & authorization ─────────────────────────────────
+-- users: the owner (first-run) plus any additional named operators/viewers.
+-- password_hash is PBKDF2-HMAC-SHA256 hex; salt is hex. No plaintext ever.
+CREATE TABLE IF NOT EXISTS users(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'viewer',
+  created_ts INTEGER,
+  last_login_ts INTEGER
+);
+-- sessions: browser cookie sessions. token_hash = sha256(cookie value); the
+-- raw value never touches disk, so a DB leak cannot replay a session.
+CREATE TABLE IF NOT EXISTS sessions(
+  token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  created_ts INTEGER,
+  expires_ts INTEGER,
+  last_seen_ts INTEGER,
+  ip TEXT, user_agent TEXT,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+-- device_tokens: revocable, scoped bearer tokens for companion clients.
+CREATE TABLE IF NOT EXISTS device_tokens(
+  token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  name TEXT,
+  scope TEXT NOT NULL DEFAULT 'viewer',
+  created_ts INTEGER,
+  expires_ts INTEGER,
+  last_used_ts INTEGER,
+  revoked INTEGER DEFAULT 0,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+-- audit_log: one row per sensitive action (approve/reject/close, login,
+-- device ops, password change, force-approve, ...). Immutable append-only.
+CREATE TABLE IF NOT EXISTS audit_log(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER, user_id INTEGER, username TEXT, role TEXT,
+  action TEXT, target TEXT, ip TEXT, user_agent TEXT,
+  ok INTEGER, detail_json TEXT
+);
+-- login_attempts: throttling counters keyed by username and by IP.
+CREATE TABLE IF NOT EXISTS login_attempts(
+  key TEXT PRIMARY KEY, failures INTEGER DEFAULT 0,
+  lock_until_ts INTEGER, last_ts INTEGER
+);
+-- auth_meta: small persisted settings (session secret, setup flag).
+CREATE TABLE IF NOT EXISTS auth_meta(
+  key TEXT PRIMARY KEY, value TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_sentiment_sym_tf_ts ON sentiment_history(symbol, timeframe, ts);
 CREATE INDEX IF NOT EXISTS idx_plans_scan ON plans(scan_id);
 CREATE INDEX IF NOT EXISTS idx_bt_type ON backtest_results(plan_type);

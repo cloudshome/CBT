@@ -37,20 +37,23 @@ Endpoints
 from __future__ import annotations
 
 import json
+import secrets
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, g, jsonify, render_template_string, request, session
 
+import config
 from config import SYMBOL, SYMBOLS, TIMEFRAME, BARS, MIN_CONFIDENCE, DEFAULT_RISK_REWARD, DASHBOARD_HOST, DASHBOARD_PORT, VERSION
 from data.symbols import normalize_symbol, resolve_symbol, symbol_choices
 from data.sample_client import maybe_client
 from data.binance_client import BinanceClient
 from engine.signal_engine import analyze_frame
 from output.signal_schema import validate_output
+from web import auth as authmod
 
 _CACHE: dict = {"payload": None, "ts": 0, "ttl": 40}
 _LAST_GOOD: dict[tuple[str, str], dict] = {}   # last successful payload by (symbol, timeframe)
@@ -576,6 +579,25 @@ HTML = """<!doctype html>
   /* glossary */
   .gloss-term{cursor:pointer;border-bottom:1px dashed var(--line2)}
   .kbd{font-size:11px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid var(--line);font-family:ui-monospace,monospace}
+  /* ── P18.1 authentication ── */
+  #userChip{display:none;align-items:center;gap:8px;margin-left:4px}
+  #userChip .who{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:rgba(255,255,255,.05);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
+  #userChip .who .avatar{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--violet));display:grid;place-items:center;font-size:11px}
+  #userChip .who .role{font-size:10px;padding:1px 6px;border-radius:999px;background:rgba(139,92,246,.16);color:var(--violet);border:1px solid rgba(139,92,246,.3);text-transform:uppercase;letter-spacing:.04em}
+  #authLayer{display:none;position:fixed;inset:0;z-index:90;background:rgba(4,8,16,.88);backdrop-filter:blur(12px);overflow:auto;padding:20px}
+  #authLayer .authbox{max-width:420px;margin:7vh auto 0;background:linear-gradient(180deg,#111c33,#0f1a30);border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  #authLayer .authbox h2{margin:0 0 6px;font-size:19px;letter-spacing:-.02em}
+  #authLayer .authbox .logo-big{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--blue),var(--violet));display:grid;place-items:center;font-size:22px;margin-bottom:14px}
+  #authLayer .afield{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+  #authLayer .afield label{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  #authLayer .afield input{font-size:14px;padding:10px 12px}
+  #authLayer .aerr{color:var(--red);font-size:12.5px;margin-bottom:10px;min-height:18px}
+  #authLayer .ahint{color:var(--mut);font-size:11.5px;line-height:1.6;margin-top:12px}
+  .adetail{font-size:12px;line-height:1.5;color:var(--mut)}
+  .devrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .devrow .meta{font-size:12px}
+  .devrow .meta b{font-weight:800}
+  .tokenout{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;word-break:break-all;background:#05080f;border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;color:var(--green)}
 </style>
 <script src="/static/lightweight-charts.standalone.js"></script>
 </head><body>
@@ -614,6 +636,11 @@ HTML = """<!doctype html>
         <button class="btn primary" onclick="load(true)">↻ Refresh</button>
         <label class="check"><input type="checkbox" id="auto" checked> auto 30s</label>
       </div>
+    </div>
+    <div id="userChip">
+      <span class="who"><span class="avatar" id="userAvatar">🧠</span><span id="userName">—</span><span class="role" id="userRole">—</span></span>
+      <button class="btn" onclick="openAccount()">⚙ Account</button>
+      <button class="btn ghost" onclick="doLogout()">Log out</button>
     </div>
   </div>
 </div>
@@ -857,9 +884,12 @@ HTML = """<!doctype html>
 
   <div class="note" style="margin-top:14px;text-align:center;opacity:.7">Paper trading only — public Binance candles, no API key, no real orders. The desk decision is the only output you act on.</div>
 </div>
+<div id="authLayer"><div class="authbox" id="authBox"></div></div>
+<div id="accountModal" style="display:none;position:fixed;inset:0;background:rgba(2,6,14,.7);backdrop-filter:blur(10px);z-index:75;padding:18px;overflow:auto"><div class="box" id="accountBody" style="max-width:640px"></div></div>
 <div id="toasts"></div>
 <div id="modal"><div class="box" id="mbody"></div></div>
 <noscript><div class="shell"><div class="card" style="grid-column:1/-1"><div class="err">JavaScript is disabled — the dashboard needs JS. Enable it and reload.</div></div></div></noscript>
+<script type="application/json" id="__auth_state__">{{ auth_state|tojson }}</script>
 <script>
 window.onerror = function(msg, src, line){
   try{
@@ -888,6 +918,190 @@ function showToast(msg, kind){
   el.innerHTML = `<span style="font-size:16px">${kind==='err'?'⚠️':kind==='ok'?'✓':'ℹ️'}</span><span style="flex:1">${esc(msg)}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--mut);cursor:pointer">✕</button>`;
   c.appendChild(el); setTimeout(()=>{ try{el.remove()}catch(e){} }, 4200);
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   P18.1 — authentication & authorization (client side).
+   The server is authoritative; this only paints the right screen and
+   carries the CSRF token on same-origin mutations.
+   ══════════════════════════════════════════════════════════════════════ */
+const __auth = (function(){
+  try{
+    const el = document.getElementById('__auth_state__');
+    if(el && el.textContent) return JSON.parse(el.textContent);
+  }catch(e){}
+  return {enabled:false, setup_required:false, authenticated:true,
+          user:null, role:null, csrf:''};
+})();
+function authLocked(){ return !!__auth.setup_required || (__auth.enabled && !__auth.authenticated); }
+
+// Inject the CSRF token into every same-origin mutation, so the browser
+// cannot be tricked into cross-site approve/reject/close requests.
+(function(){
+  if(typeof window === 'undefined' || !window.fetch) return;
+  const orig = window.fetch.bind(window);
+  window.fetch = function(url, opts){
+    opts = opts || {};
+    const csrf = (window.__AUTH__ && window.__AUTH__.csrf) || __auth.csrf || '';
+    if(csrf){
+      const method = String(opts.method || (opts.body ? 'POST' : 'GET')).toUpperCase();
+      const sameOrigin = typeof url === 'string' && (url.charAt(0)==='/' || url.indexOf(window.location&&window.location.origin)===0);
+      if(method !== 'GET' && sameOrigin){
+        const h = {};
+        try{ if(opts.headers){ for(const k in opts.headers) h[k]=opts.headers[k]; } }catch(e){}
+        h['X-CSRF-Token'] = csrf;
+        opts.headers = h;
+      }
+    }
+    return orig(url, opts);
+  };
+})();
+
+function refreshUserChip(){
+  const chip=document.getElementById('userChip'); if(!chip) return;
+  if(__auth.enabled && __auth.authenticated){
+    chip.style.display='flex';
+    const n=document.getElementById('userName'); if(n) n.textContent=__auth.user||'';
+    const r=document.getElementById('userRole'); if(r) r.textContent=__auth.role||'viewer';
+    const a=document.getElementById('userAvatar'); if(a) a.textContent=(__auth.user||'?').charAt(0).toUpperCase();
+  } else chip.style.display='none';
+}
+function showAuth(){
+  const layer=document.getElementById('authLayer'); if(!layer) return;
+  const box=document.getElementById('authBox'); if(!box) return;
+  if(__auth.setup_required){
+    box.innerHTML = `<div class="logo-big">🧠</div>
+      <h2>Create the owner account</h2>
+      <div class="adetail" style="margin-top:6px">First run: pick a username and a strong password. This becomes the <b>operator</b> — the only role allowed to approve paper actions. Nobody else can read private state until this exists.</div>
+      <div class="afield" style="margin-top:16px"><label>Username</label><input id="suUser" autocomplete="username"></div>
+      <div class="afield"><label>Password (8+ characters)</label><input id="suPass" type="password" autocomplete="new-password"></div>
+      <div class="afield"><label>Confirm password</label><input id="suPass2" type="password" autocomplete="new-password"></div>
+      <div class="aerr" id="suErr"></div>
+      <button class="btn primary" style="width:100%;justify-content:center" onclick="doSetup()">Create owner</button>
+      <div class="ahint">Passwords are stored PBKDF2-HMAC-SHA256 hashed — never plaintext. No role can place a live exchange order; this app has no order path.</div>`;
+  } else {
+    box.innerHTML = `<div class="logo-big">🧠</div>
+      <h2>Sign in to SKY</h2>
+      <div class="adetail" style="margin-top:6px">Authentication is required to read private state or take any paper action.</div>
+      <div class="afield" style="margin-top:16px"><label>Username</label><input id="liUser" autocomplete="username"></div>
+      <div class="afield"><label>Password</label><input id="liPass" type="password" autocomplete="current-password"></div>
+      <div class="aerr" id="liErr"></div>
+      <button class="btn primary" style="width:100%;justify-content:center" onclick="doLogin()">Sign in</button>
+      <div class="ahint">Sessions expire after ${__auth.session_ttl_hours||12}h (or ${__auth.session_idle_hours||2}h idle). Too many failed attempts locks sign-in temporarily.</div>`;
+  }
+  layer.style.display='block';
+}
+function hideAuth(){ const l=document.getElementById('authLayer'); if(l) l.style.display='none'; }
+async function doSetup(){
+  const u=(document.getElementById('suUser')||{}).value||''; u=u.trim();
+  const p=(document.getElementById('suPass')||{}).value||'';
+  const p2=(document.getElementById('suPass2')||{}).value||'';
+  const e=document.getElementById('suErr');
+  if(!u || p.length<8){ e.textContent='Username and a password of at least 8 characters are required.'; return; }
+  if(p!==p2){ e.textContent='Passwords do not match.'; return; }
+  e.textContent='creating…';
+  try{
+    const r=await fetch('/api/auth/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d=await r.json();
+    if(!r.ok){ e.textContent=d.error||'setup failed'; return; }
+    location.reload();
+  }catch(err){ e.textContent=String(err); }
+}
+async function doLogin(){
+  const u=(document.getElementById('liUser')||{}).value||''; u=u.trim();
+  const p=(document.getElementById('liPass')||{}).value||'';
+  const e=document.getElementById('liErr'); e.textContent='';
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const d=await r.json();
+    if(!r.ok){ e.textContent=d.error||'sign-in failed'; return; }
+    location.reload();
+  }catch(err){ e.textContent=String(err); }
+}
+async function doLogout(){
+  try{ await fetch('/api/auth/logout',{method:'POST'}); }catch(e){}
+  location.reload();
+}
+async function doLogoutAll(){
+  try{
+    const r=await fetch('/api/auth/logout-all',{method:'POST'});
+    const d=await r.json();
+    showToast(d.ok?('Signed out '+d.sessions+' session(s), revoked '+d.devices+' device token(s)'):(d.error||'failed'), d.ok?'ok':'err');
+  }catch(e){ showToast(String(e),'err'); }
+  closeAccount();
+}
+async function doChangePassword(){
+  const cur=(document.getElementById('pwCur')||{}).value||'';
+  const neu=(document.getElementById('pwNew')||{}).value||'';
+  const m=document.getElementById('pwMsg');
+  try{
+    const r=await fetch('/api/auth/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current:cur,new:neu})});
+    const d=await r.json();
+    m.innerHTML = d.ok?'<span class="okc">✓ password changed</span>':'<span class="err">'+esc(d.error||'failed')+'</span>';
+    if(d.ok){ document.getElementById('pwCur').value=''; document.getElementById('pwNew').value=''; }
+  }catch(e){ m.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+async function loadDevices(){
+  const host=document.getElementById('devList'); if(!host) return;
+  try{
+    const d=await (await fetch('/api/auth/devices')).json();
+    const devs=(d.devices||[]).filter(x=>!x.revoked);
+    host.innerHTML = devs.length
+      ? devs.map(x=>`<div class="devrow"><span class="meta"><b>${esc(x.name)}</b> <span class="note">· ${esc(x.scope)} · ${esc(x.id)}</span><br><span class="note">last used ${x.last_used_ts?new Date(x.last_used_ts).toLocaleString():'never'}</span></span><button class="rowbtn no" onclick="doRevokeDevice('${esc(x.id)}')">Revoke</button></div>`).join('')
+      : '<span class="muted">no device tokens issued. Companion clients (Windows/Android) authenticate with a scoped bearer token created here.</span>';
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+async function doRevokeDevice(id){
+  try{
+    await fetch('/api/auth/devices/revoke',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+    showToast('Device token revoked','ok'); loadDevices();
+  }catch(e){ showToast(String(e),'err'); }
+}
+async function doCreateDevice(){
+  const name=(document.getElementById('devName')||{}).value||'device';
+  const scope=(document.getElementById('devScope')||{}).value||'viewer';
+  try{
+    const r=await fetch('/api/auth/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,scope:scope})});
+    const d=await r.json();
+    const out=document.getElementById('devToken');
+    if(!r.ok){ out.innerHTML='<span class="err">'+esc(d.error||'failed')+'</span>'; return; }
+    out.innerHTML=`<div class="tokenout">${esc(d.token)}</div><div class="note" style="margin-top:6px">Use as <code>Authorization: Bearer &lt;token&gt;</code>. ${esc(d.note||'')}</div>`;
+    loadDevices();
+  }catch(e){ document.getElementById('devToken').innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+async function loadAudit(){
+  const host=document.getElementById('auditList'); if(!host) return;
+  try{
+    const d=await (await fetch('/api/auth/audit')).json();
+    const rows=(d.rows||[]).slice(0,40);
+    host.innerHTML = rows.length
+      ? rows.map(r=>`<div class="devrow"><span class="meta">${esc(new Date(r.ts).toLocaleString())} <b>${esc(r.action)}</b> <span class="note">${esc(r.target||'')}${r.username?' · by '+esc(r.username):''}</span></span><span class="badge" style="${r.ok?'color:var(--green)':'color:var(--red)'}">${r.ok?'✓':'✗'}</span></div>`).join('')
+      : '<span class="muted">no sensitive actions recorded yet.</span>';
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+function openAccount(){
+  const m=document.getElementById('accountModal');
+  const body=document.getElementById('accountBody');
+  if(!m||!body) return;
+  let html=`<div class="flex" style="justify-content:space-between;margin-bottom:6px"><h2 style="margin:0;font-size:14px">ACCOUNT — ${esc(__auth.user||'')} <span class="badge strong">${esc(__auth.role||'viewer')}</span></h2><button class="btn ghost" onclick="closeAccount()">✕</button></div>
+    <div class="note" style="margin-bottom:6px">Roles: <b>viewer</b> reads dashboards/evidence/health/paper state; <b>operator</b> additionally approves, rejects and closes paper actions. Neither can bypass the risk gate or place a live order.</div>
+    <div class="sep"></div><b>CHANGE PASSWORD</b>
+    <div class="flex" style="margin-top:8px"><input id="pwCur" type="password" placeholder="current password" style="flex:1"><input id="pwNew" type="password" placeholder="new password (8+)" style="flex:1"><button class="btn primary" onclick="doChangePassword()">Change</button></div>
+    <div id="pwMsg" class="note" style="margin-top:6px"></div>
+    <div class="sep"></div><div class="flex"><b style="flex:1">CONNECTED DEVICES</b><button class="btn no" onclick="doLogoutAll()">Log out all devices</button></div>
+    <div id="devList" class="note" style="margin-top:8px">loading…</div>`;
+  if(__auth.role==='operator'){
+    html+=`<div class="sep"></div><b>CREATE DEVICE TOKEN</b> <span class="note">(companion clients: Windows / Android)</span>
+      <div class="flex" style="margin-top:8px"><input id="devName" placeholder="name e.g. 'phone'" style="flex:1"><select id="devScope"><option value="viewer">viewer</option><option value="operator">operator</option></select><button class="btn primary" onclick="doCreateDevice()">Create token</button></div>
+      <div id="devToken" style="margin-top:6px"></div>
+      <div class="sep"></div><b>AUDIT LOG</b><div id="auditList" class="note" style="margin-top:8px">loading…</div>`;
+  }
+  body.innerHTML=html;
+  m.style.display='block';
+  loadDevices();
+  if(__auth.role==='operator') loadAudit();
+}
+function closeAccount(){ const m=document.getElementById('accountModal'); if(m) m.style.display='none'; }
+
 function setSymbol(sym){
   const el=document.getElementById('sym'); if(el) el.value=sym;
   document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym));
@@ -1639,6 +1853,7 @@ async function load(force, quiet){
   const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(), 90000);
   try{
     const r=await fetch(`/api/scan?symbol=${sym}&tf=${tf}`+(force?'&force=1':''), {signal:ctrl.signal});
+    if(r.status===401){ clearTimeout(to); clearInterval(tick); try{ location.reload(); }catch(e){} return; }
     const d=await r.json(); clearTimeout(to); clearInterval(tick);
     if(d.error || d.stale_error){
       if(quiet && __lastGood){
@@ -3077,15 +3292,22 @@ function onTabShown(tab){
     if(h && ['overview','chart','market','intelligence','trades','manage','risk','evidence','journal','learn','connections','commands','modules','system'].includes(h)) _activeTab=h;
   }catch(e){}
   try{ switchTab(_activeTab); }catch(e){}
+})();
+refreshUserChip();
+if(authLocked()){
+  // Show sign-in / first-run setup; no private data is fetched until the
+  // server authorizes this browser.
+  showAuth();
+} else {
   // strip lives outside #app, so it can resolve before the first scan does
   try{ loadReadiness(); }catch(e){}
-})();
-load(true);
-setInterval(()=>{ if(document.getElementById('auto').checked) load(false, true); }, 30000);
-// Channels panel is diagnostic-state (which backend is *serving*),
-// not signal-state, so refresh on a slower 5-minute cadence — not on
-// every 30s scan tick.  Cheap: probe_all() is config-driven.
-setInterval(()=>{ loadChannels(); loadMcp(); loadDesk(); loadReadiness(); loadLoop(); }, 5 * 60 * 1000);
+  load(true);
+  setInterval(()=>{ if(!authLocked() && document.getElementById('auto').checked) load(false, true); }, 30000);
+  // Channels panel is diagnostic-state (which backend is *serving*),
+  // not signal-state, so refresh on a slower 5-minute cadence — not on
+  // every 30s scan tick.  Cheap: probe_all() is config-driven.
+  setInterval(()=>{ if(!authLocked()){ loadChannels(); loadMcp(); loadDesk(); loadReadiness(); loadLoop(); } }, 5 * 60 * 1000);
+}
 // keep seg active state in sync on load
 try{ if(document.querySelectorAll) document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===document.getElementById('sym').value)); }catch(e){}
 try{ if(document.querySelectorAll) document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===document.getElementById('tf').value)); }catch(e){}
@@ -3096,10 +3318,282 @@ try{ if(document.querySelectorAll) document.querySelectorAll('#tfSeg button').fo
 def make_app() -> Flask:
     app = Flask(__name__)
 
+    # ── P18.1 authentication & authorization ──────────────────────────────
+    auth = authmod.AuthManager()
+    app.secret_key = auth.secret_key()
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        # Secure cookies only make sense behind a TLS-terminating proxy; on a
+        # loopback http bind we keep them non-secure so local use stays simple.
+        SESSION_COOKIE_SECURE=bool(config.SKY_TRUSTED_PROXY_IPS),
+    )
+    from datetime import timedelta
+    app.permanent_session_lifetime = timedelta(hours=config.SKY_SESSION_TTL_HOURS)
+    if config.SKY_TRUSTED_PROXY_IPS:  # pragma: no cover - deployment-only
+        try:
+            from werkzeug.middleware.proxy_fix import ProxyFix
+            app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+        except Exception:
+            pass
+
+    def _client_ip() -> str:
+        fwd = request.headers.get("X-Forwarded-For", "")
+        return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or ""
+
+    def _client_ua() -> str:
+        return request.headers.get("User-Agent", "")[:200]
+
+    def _current_user() -> dict | None:
+        """Resolve the authenticated principal from cookie session or bearer."""
+        sid = session.get("sid")
+        if sid and session.get("uid"):
+            user = auth.resolve_session(sid)
+            if user is not None:
+                return user
+        authz = request.headers.get("Authorization", "")
+        if authz.lower().startswith("bearer "):
+            user = auth.resolve_device_token(authz[7:].strip())
+            if user is not None:
+                return user
+        return None
+
+    def _using_cookie_session() -> bool:
+        return bool(session.get("sid") and session.get("uid"))
+
+    def _csrf_token() -> str:
+        tok = session.get("_csrf")
+        if not tok:
+            tok = secrets.token_hex(16)
+            session["_csrf"] = tok
+        return tok
+
+    def _csrf_ok() -> bool:
+        supplied = (request.headers.get("X-CSRF-Token")
+                    or (request.get_json(silent=True) or {}).get("_csrf")
+                    or (request.form or {}).get("_csrf"))
+        expected = session.get("_csrf")
+        if not expected or not supplied:
+            return False
+        import hmac as _hmac
+        return _hmac.compare_digest(str(supplied), str(expected))
+
+    def _audit(action: str, target: str = "", ok: bool = True,
+               detail: dict | None = None) -> None:
+        try:
+            user = getattr(g, "user", None)
+            auth.audit(action, target, user=user, ok=ok, ip=_client_ip(),
+                       user_agent=_client_ua(), detail=detail)
+        except Exception:
+            pass
+
+    def _auth_state() -> dict:
+        enabled = auth.is_enabled()
+        has_owner = auth.owner_exists()
+        setup = (config.SKY_AUTH_MODE != "disabled") and not has_owner
+        user = _current_user()
+        return {
+            "enabled": enabled,
+            "setup_required": setup,
+            "authenticated": user is not None,
+            "user": user.get("username") if user else None,
+            "role": user.get("role") if user else None,
+            "csrf": _csrf_token(),
+            "session_ttl_hours": config.SKY_SESSION_TTL_HOURS,
+            "session_idle_hours": config.SKY_SESSION_IDLE_HOURS,
+        }
+
+    @app.before_request
+    def _auth_gate():
+        path = request.path or "/"
+        if path == "/" or path.startswith("/static/"):
+            return None
+        if path.startswith("/api/auth/"):
+            if path in ("/api/auth/status", "/api/auth/setup", "/api/auth/login"):
+                return None
+            user = _current_user()
+            if user is None:
+                return jsonify({"ok": False, "error": "authentication required",
+                                "code": "UNAUTHENTICATED"}), 401
+            g.user = user
+            if request.method in ("POST", "PUT", "PATCH", "DELETE") and \
+                    _using_cookie_session() and not _csrf_ok():
+                return jsonify({"ok": False, "error": "CSRF token missing or invalid",
+                                "code": "CSRF"}), 403
+            return None
+        if not auth.is_enabled():
+            return None
+        user = _current_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "authentication required",
+                            "code": "UNAUTHENTICATED"}), 401
+        g.user = user
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            required = ("operator" if path not in authmod.VIEWER_POST_PATHS
+                        else "viewer")
+            if not authmod.role_allows(user.get("role"), required):
+                return jsonify({"ok": False,
+                                "error": f"insufficient role — {required} required",
+                                "code": "FORBIDDEN"}), 403
+            if _using_cookie_session() and not _csrf_ok():
+                return jsonify({"ok": False, "error": "CSRF token missing or invalid",
+                                "code": "CSRF"}), 403
+        return None
+
     @app.get("/")
     def index():
         return render_template_string(HTML, symbol=SYMBOL, tf=TIMEFRAME,
-                                      version=VERSION, symbols=symbol_choices(SYMBOLS))
+                                      version=VERSION, symbols=symbol_choices(SYMBOLS),
+                                      auth_state=_auth_state())
+
+    # ── auth API ────────────────────────────────────────────────────────
+    @app.get("/api/auth/status")
+    def api_auth_status():
+        return jsonify(_auth_state())
+
+    @app.post("/api/auth/setup")
+    def api_auth_setup():
+        if auth.owner_exists():
+            return jsonify({"ok": False, "error": "an owner account already exists"}), 409
+        body = request.get_json(silent=True) or {}
+        try:
+            user = auth.create_owner(str(body.get("username") or ""),
+                                     str(body.get("password") or ""),
+                                     role="operator")
+        except (ValueError, PermissionError) as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        token = auth.create_session(user["id"], ip=_client_ip(), user_agent=_client_ua())
+        session.clear()
+        session["uid"] = user["id"]
+        session["sid"] = token
+        session["_csrf"] = secrets.token_hex(16)
+        session.permanent = True
+        auth.audit("owner_created", user["username"], user=user, ok=True,
+                   ip=_client_ip(), user_agent=_client_ua())
+        return jsonify({"ok": True, "user": user["username"], "role": user["role"],
+                        "csrf": session["_csrf"]})
+
+    @app.post("/api/auth/login")
+    def api_auth_login():
+        body = request.get_json(silent=True) or {}
+        username = str(body.get("username") or "").strip()
+        password = str(body.get("password") or "")
+        ip = _client_ip()
+        if auth.is_locked(username, ip):
+            auth.audit("login_failed", username, ok=False, ip=ip,
+                       user_agent=_client_ua(), detail={"reason": "locked_out"})
+            return jsonify({"ok": False,
+                            "error": "Too many failed attempts. Try again later."}), 429
+        user = auth.authenticate(username, password, ip=ip)
+        if user is None:
+            return jsonify({"ok": False, "error": "Invalid username or password."}), 401
+        token = auth.create_session(user["id"], ip=ip, user_agent=_client_ua())
+        session.clear()
+        session["uid"] = user["id"]
+        session["sid"] = token
+        session["_csrf"] = secrets.token_hex(16)
+        session.permanent = True
+        auth.audit("login", username, user=user, ok=True, ip=ip, user_agent=_client_ua())
+        return jsonify({"ok": True, "user": user["username"], "role": user["role"],
+                        "csrf": session["_csrf"]})
+
+    @app.post("/api/auth/logout")
+    def api_auth_logout():
+        user = _current_user()
+        sid = session.get("sid")
+        if sid:
+            auth.revoke_session(sid)
+        if user:
+            auth.audit("logout", user["username"], user=user, ok=True,
+                       ip=_client_ip(), user_agent=_client_ua())
+        session.clear()
+        return jsonify({"ok": True})
+
+    @app.post("/api/auth/logout-all")
+    def api_auth_logout_all():
+        user = _current_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "authentication required"}), 401
+        n_sessions = auth.revoke_all_sessions(user["id"])
+        n_devices = auth.revoke_all_devices(user["id"])
+        auth.audit("logout_all", user["username"], user=user, ok=True,
+                   ip=_client_ip(), user_agent=_client_ua(),
+                   detail={"sessions": n_sessions, "devices": n_devices})
+        session.clear()
+        return jsonify({"ok": True, "sessions": n_sessions, "devices": n_devices})
+
+    @app.get("/api/auth/me")
+    def api_auth_me():
+        user = _current_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "authentication required"}), 401
+        return jsonify({"ok": True, "user": user["username"], "role": user["role"]})
+
+    @app.post("/api/auth/password")
+    def api_auth_password():
+        user = _current_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "authentication required"}), 401
+        body = request.get_json(silent=True) or {}
+        try:
+            auth.change_password(user["id"], str(body.get("current") or ""),
+                                 str(body.get("new") or ""))
+        except (ValueError, PermissionError) as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        auth.audit("password_changed", user["username"], user=user, ok=True,
+                   ip=_client_ip(), user_agent=_client_ua())
+        return jsonify({"ok": True})
+
+    @app.get("/api/auth/devices")
+    def api_auth_devices():
+        user = _current_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "authentication required"}), 401
+        return jsonify({"ok": True, "devices": auth.list_device_tokens(user["id"])})
+
+    @app.post("/api/auth/devices")
+    def api_auth_device_create():
+        user = _current_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "authentication required"}), 401
+        if not authmod.role_allows(user.get("role"), "operator"):
+            return jsonify({"ok": False, "error": "operator role required"}), 403
+        body = request.get_json(silent=True) or {}
+        scope = str(body.get("scope") or "viewer")
+        # a token can never exceed its creator's role
+        if not authmod.role_allows(user.get("role"), scope):
+            scope = "viewer"
+        token = auth.create_device_token(user["id"], str(body.get("name") or "device"),
+                                         scope=scope)
+        auth.audit("device_token_created", user["username"], user=user, ok=True,
+                   ip=_client_ip(), user_agent=_client_ua(),
+                   detail={"name": body.get("name"), "scope": scope})
+        return jsonify({"ok": True, "token": token, "scope": scope,
+                        "note": "Copy this token now — it is shown only once."})
+
+    @app.post("/api/auth/devices/revoke")
+    def api_auth_device_revoke():
+        user = _current_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "authentication required"}), 401
+        if not authmod.role_allows(user.get("role"), "operator"):
+            return jsonify({"ok": False, "error": "operator role required"}), 403
+        body = request.get_json(silent=True) or {}
+        handle = str(body.get("id") or "").strip()
+        ok = auth.revoke_device_token(user["id"], handle)
+        auth.audit("device_token_revoked", handle, user=user, ok=ok,
+                   ip=_client_ip(), user_agent=_client_ua())
+        return jsonify({"ok": ok})
+
+    @app.get("/api/auth/audit")
+    def api_auth_audit():
+        user = _current_user()
+        if user is None:
+            return jsonify({"ok": False, "error": "authentication required"}), 401
+        if not authmod.role_allows(user.get("role"), "operator"):
+            return jsonify({"ok": False, "error": "operator role required"}), 403
+        return jsonify({"ok": True,
+                        "rows": auth.recent_audit(request.args.get("limit", 100))})
 
     @app.get("/api/scan")
     def api_scan():
@@ -3196,6 +3690,9 @@ def make_app() -> Flask:
             from data.paper_trading import PaperTradingRunner
             with SignalDB() as db:
                 run = PaperTradingRunner(db=db, client=maybe_client()).run_once(symbol=symbol).as_dict()
+            _audit("paper_run", symbol or "all",
+                   detail={"checked": run.get("checked"), "opened": run.get("opened"),
+                           "closed": run.get("closed")})
             return jsonify({"ok": True, "run": run})
         except Exception as exc:
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
@@ -3207,6 +3704,7 @@ def make_app() -> Flask:
         decision = (body.get("decision") or "").upper()
         note = body.get("note", "")
         force = bool(body.get("force"))
+        reviewer = (getattr(g, "user", None) or {}).get("username") or "dashboard"
         if decision not in ("APPROVED", "REJECTED", "EXECUTED", "CLOSED", "SKIPPED"):
             return jsonify({"error": f"bad decision {decision}"}), 400
         from data.database import SignalDB
@@ -3223,18 +3721,26 @@ def make_app() -> Flask:
                 gate = gate_evaluate(db, symbol=scan.get("symbol"),
                                      plan_type=plan_type, action=scan.get("action"))
                 if not gate["allowed"]:
+                    # P18.1: an operator cannot bypass the risk gate. The legacy
+                    # force-approve escape hatch is disabled unless explicitly
+                    # opted into, and always audited.
                     return jsonify({
                         "error": "Risk gate CLOSED — " + "; ".join(gate["blocked_by"]),
                         "blocked_by": gate["blocked_by"],
-                        "force_available": True,
+                        "force_available": config.SKY_ALLOW_FORCE_APPROVE,
                     }), 409
+            if decision == "APPROVED" and force and not config.SKY_ALLOW_FORCE_APPROVE:
+                return jsonify({"error": "force approve is disabled "
+                                         "(SKY_ALLOW_FORCE_APPROVE is not set)"}), 403
             try:
                 new = db.update_status(int(scan_id), decision, note=note,
-                                       reviewer="dashboard")
+                                       reviewer=reviewer)
             except (LifecycleError, TypeError, ValueError) as exc:
                 return jsonify({"error": str(exc)}), 400
             if new is None:
                 return jsonify({"error": f"scan #{scan_id} not found"}), 404
+        _audit("review", str(scan_id),
+               detail={"decision": decision, "note": note, "forced": force})
         return jsonify({"ok": True, "scan_id": scan_id, "status": new})
 
     @app.get("/api/risk")
@@ -3298,6 +3804,8 @@ def make_app() -> Flask:
                 angry=body.get("angry"), tired=body.get("tired"),
                 revenge=body.get("revenge"), chasing=body.get("chasing"),
                 note=body.get("note", ""))
+        _audit("trader_state", "set",
+               detail={k: body.get(k) for k in ("angry", "tired", "revenge", "chasing")})
         return jsonify({"ok": True, "state": state})
 
     @app.get("/api/history")
@@ -3463,8 +3971,9 @@ def make_app() -> Flask:
         if not isinstance(params, dict):
             return jsonify({"ok": False, "error": "params must be an object"}), 400
         try:
-            return jsonify(run_command(command_id, params,
-                                       timeout=body.get("timeout")))
+            result = run_command(command_id, params, timeout=body.get("timeout"))
+            _audit("command_run", command_id, ok=bool(result.get("ok")))
+            return jsonify(result)
         except CommandError as exc:
             return jsonify({"ok": False, "error": str(exc),
                             "command_id": command_id}), 400
@@ -3625,6 +4134,7 @@ def make_app() -> Flask:
                     would_change=str(body.get("would_change") or ""),
                     notes=str(body.get("notes") or ""))
                 quality = execution_quality(db, scan_id)
+            _audit("journal", str(scan_id), detail={"followed_rules": followed})
             return jsonify(_sanitize_for_json({
                 "ok": True, "scan_id": scan_id, "entry": entry, "quality": quality}))
         except Exception as exc:
@@ -3661,7 +4171,9 @@ def make_app() -> Flask:
         from output.notifiers import send_test_alert
         body = request.get_json(silent=True) or {}
         try:
-            return jsonify(send_test_alert(str(body.get("channel") or "")))
+            res = send_test_alert(str(body.get("channel") or ""))
+            _audit("test_alert", str(body.get("channel") or ""), ok=bool(res.get("ok")))
+            return jsonify(res)
         except Exception as exc:
             return jsonify({"ok": False,
                             "error": f"{type(exc).__name__}: {exc}"}), 500
@@ -3781,6 +4293,7 @@ def make_app() -> Flask:
         from brain.calibrator import learn
         try:
             res = learn()
+            _audit("learn", "calibration")
             return jsonify({"ok": True, **res})
         except Exception as exc:  # pragma: no cover
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
@@ -3811,6 +4324,8 @@ def make_app() -> Flask:
             with SignalDB() as db:
                 n = db.save_backtest_rows(rows, run_id)
             profile = learn()
+            _audit("backtest", f"{symbol}:{tf}",
+                   detail={"bars": bars, "saved": n})
             return jsonify(_sanitize_for_json(
                 {"ok": True, "saved": n, "report": res["report"],
                  "calibration": profile["profile"]}))
@@ -4065,4 +4580,7 @@ def make_app() -> Flask:
 
 
 def serve(app: Flask, host: str = DASHBOARD_HOST, port: int = DASHBOARD_PORT) -> None:
+    # P18.1 — refuse to expose the desk on a non-loopback host without an owner
+    # account and a TLS-terminating reverse proxy (see web/auth.enforce_deployment).
+    authmod.enforce_deployment(host)
     app.run(host=host, port=port, debug=False, threaded=True)

@@ -2,8 +2,8 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-17 · branch `arena/01a00df1-sky` · production roadmap
-reconciliation after PR #45.
+Last updated: 2026-08-17 · branch `arena/01a00e6f-sky` · **P18.1 shipped** —
+authentication/authorization is now working code + UI (see §1).
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -11,11 +11,12 @@ reconciliation after PR #45.
 > [`ROADMAP.md`](ROADMAP.md) is now the canonical merged P1–P22 roadmap. The
 > current build is still source-installed; do not claim installers exist.
 >
-> **Next code:** P18.1 authentication/authorization, then `/api/v1`, persisted
-> jobs/SSE, and PWA. Do not build native wrappers around the current
-> unauthenticated dashboard. Chosen topology: one Ubuntu Hub owns DB/workers/
-> risk/audit; Windows and Android begin as companion clients. Packaging never
-> adds exchange-order code or changes graduation.
+> **Next code:** P18.2 versioned `/api/v1` contract + idempotency keys +
+> device registration/revocation (device tokens already exist from P18.1),
+> then P18.3 persisted jobs/SSE, then P18.4 PWA. Do not build native wrappers
+> around the current dashboard until the API is stable. Chosen topology: one
+> Ubuntu Hub owns DB/workers/risk/audit; Windows and Android begin as companion
+> clients. Packaging never adds exchange-order code or changes graduation.
 
 ---
 
@@ -75,6 +76,40 @@ Everything else must be reachable by clicking.
 ---
 
 ## 1. What this session shipped
+
+### P18.1 — authentication & authorization (this session's main deliverable)
+
+Working code + UI, not a plan. New module `web/auth.py` (stdlib only) plus
+`web/app.py` integration, `data/database.py` schema additions, and
+`tests/test_auth.py` (17 security tests).
+
+- **First-run owner creation** with PBKDF2-HMAC-SHA256 (260k iter) hashed
+  passwords; constant-time verify; only hash+salt stored.
+- **Roles:** `viewer` (read dashboards/evidence/health/paper state) and
+  `operator` (viewer + approve/reject/execute/close). No role grants live
+  execution (no order path exists).
+- **Sessions & devices:** signed httpOnly/SameSite=Lax cookie sessions with
+  absolute+idle expiry; revocable, **scoped** bearer device tokens for
+  companion clients (a viewer-scoped token cannot act as operator).
+- **CSRF** on every cookie-authenticated mutation (a fetch wrapper injects
+  `X-CSRF-Token`), **login throttling** (username+IP lockout),
+  **logout-all-devices**, and an **audit row per sensitive action**
+  (`audit_log` table; viewable in the Account panel).
+- **Remote guard:** `web/auth.enforce_deployment` refuses to bind non-loopback
+  without an owner account **and** a TLS proxy (`SKY_TRUSTED_PROXY_IPS`) unless
+  `SKY_ALLOW_REMOTE_NO_TLS=1`.
+- **The review endpoint can no longer bypass the risk gate.** Force-approve is
+  disabled unless `SKY_ALLOW_FORCE_APPROVE=1`, and always audited.
+- **Activation model:** `SKY_AUTH_MODE` = `auto` (auth on once owner exists) |
+  `required` | `disabled`. `auto` is the default so existing local use stays
+  simple but locks the moment an owner is created.
+- **UI:** first-run "create owner" screen, sign-in screen, top-bar user chip
+  with role badge, and an ⚙ Account panel (change password, device list with
+  create/revoke token, audit log for operators).
+
+Auth is per `config.DB_PATH` (tables: `users`, `sessions`, `device_tokens`,
+`audit_log`, `login_attempts`, `auth_meta`), idempotently migrated. The session
+secret auto-persists next to the DB; set `SKY_SECRET_KEY` for multi-process.
 
 ### The chart is fixed and real
 
@@ -177,13 +212,33 @@ and the sandbox has no outbound network.
 
 ## 2. Your job next session
 
-> **2026-08-17 priority update:** start P18.1 from `ROADMAP.md`—working
-> authentication, authorization, CSRF/device-token boundaries, audit, and
-> endpoint tests. The workstation priorities below remain W1–W4 and should be
-> integrated through the secured API/job foundation; they no longer precede
-> that foundation. Deliver working UI/code after this roadmap checkpoint.
+> **2026-08-17:** P18.1 is shipped (see §1). Next is **P18.2** from
+> `ROADMAP.md` — a versioned `/api/v1` contract with one response envelope,
+> typed error codes, min/max server-version detection, **idempotency keys** for
+> human mutations, and device registration/revocation (device tokens already
+> exist from P18.1 — surface them as a stable API + connected-device list). The
+> workstation W1–W4 items below remain companions, integrated through the
+> secured API/job foundation; they no longer precede it. Deliver working
+> UI/code after each roadmap checkpoint.
 
 Build these **as working UI**, not as a second roadmap.
+
+### Priority 0 — P18.2 stable application API
+
+1. `/api/v1/*` prefix (or `/api/v1` version header) that web, Windows and
+   Android all use; keep the legacy `/api/*` endpoints working so the current
+   dashboard does not break mid-migration.
+2. One response envelope (`{ok, data, error{code,message}, meta}`) and typed
+   error codes; no client parses terminal text.
+3. Compatibility: a `/api/v1/version` or header so a client can detect
+   min/max supported server version and show a clear "upgrade" message.
+4. **Idempotency keys** on `review`/`journal`/`paper/run` mutations so a
+   retried request cannot double-apply (store the key + result, return the
+   cached result on replay).
+5. Device registration/revocation + a visible connected-device list (extend
+   the P18.1 `/api/auth/devices` surface into the v1 contract).
+6. Add `/api/v1` security tests that mirror `tests/test_auth.py` (unauthenticated
+   can't read/mutate, viewer can't write, operator can't bypass the gate).
 
 ### Carried-forward W1 — help him actually earn the unlock
 
@@ -241,7 +296,8 @@ guided, stateful flow in the browser:
   stream output instead of blocking for minutes behind one POST.
 - Stale-data age badge on every market card.
 - Mobile compact mode for the ritual and approval flow.
-- Optional auth before the dashboard is exposed beyond localhost.
+- ~~Optional auth before the dashboard is exposed beyond localhost~~ → **done**
+  (P18.1). Beyond localhost now *requires* auth + TLS proxy.
 
 ---
 
