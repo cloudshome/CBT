@@ -2,8 +2,9 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-17 · branch `arena/01a00e6f-sky` · **P18.1 shipped** —
-authentication/authorization is now working code + UI (see §1).
+Last updated: 2026-08-17 · branch `arena/01a00eac-sky` · **P18.2 shipped** —
+the versioned `/api/v1` contract is working code + UI (see §1a). P18.1
+authentication/authorization shipped in the previous session (see §1).
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -11,12 +12,56 @@ authentication/authorization is now working code + UI (see §1).
 > [`ROADMAP.md`](ROADMAP.md) is now the canonical merged P1–P22 roadmap. The
 > current build is still source-installed; do not claim installers exist.
 >
-> **Next code:** P18.2 versioned `/api/v1` contract + idempotency keys +
-> device registration/revocation (device tokens already exist from P18.1),
-> then P18.3 persisted jobs/SSE, then P18.4 PWA. Do not build native wrappers
-> around the current dashboard until the API is stable. Chosen topology: one
-> Ubuntu Hub owns DB/workers/risk/audit; Windows and Android begin as companion
-> clients. Packaging never adds exchange-order code or changes graduation.
+> **Next code:** P18.3 persisted background jobs + SSE (long jobs — `backfill`,
+> `backtest`, `simulator`, evidence build — still run inside one blocking POST),
+> then P18.4 PWA. P18.2 is done: `/api/v1` is stable, so native wrappers now
+> have a contract to build against. Chosen topology: one Ubuntu Hub owns
+> DB/workers/risk/audit; Windows and Android begin as companion clients.
+> Packaging never adds exchange-order code or changes graduation.
+
+---
+
+## 1a. What THIS session shipped — P18.2 stable application API
+
+Working code + UI. New module `web/api_v1.py` (stdlib only), `web/app.py`
+integration, one new table in `data/database.py`, `tests/test_api_v1.py`
+(59 tests) and 4 new dashboard-JS tests. Full contract:
+[`docs/HANDOVER_2026-08-17_P18_2.md`](docs/HANDOVER_2026-08-17_P18_2.md).
+
+- **One envelope** for every `/api/v1` response —
+  `{ok, data, error{code,message,details}, meta{api_version, server_version,
+  request_id, ts}}`. Legacy `/api/*` keeps its old shapes so the shipped
+  dashboard does not break mid-migration (pinned by a test).
+- **Typed error codes** (`ErrorCode`): clients branch on `error.code`, never on
+  wording, and **never on terminal text**. The desk's deliberate refusals keep
+  their own codes — a closed gate is `RISK_GATE_CLOSED` (409) carrying the
+  structured `blocked_by` reasons.
+- **Compatibility:** `GET /api/v1/version` is public (a client must discover
+  the range before it can authenticate) and publishes min/max client versions.
+  An out-of-range `X-SKY-Client-Version` gets `CLIENT_TOO_OLD`/`CLIENT_TOO_NEW`
+  with an upgrade message — checked **before** auth, so an old app never shows
+  the user a spurious "wrong password".
+- **Idempotency keys** on `review` / `journal` / `paper/run` / `trader-state`.
+  A retry replays the stored response (`meta.idempotent_replay: true`) instead
+  of re-applying; four identical approvals write exactly **one** `decisions`
+  row (test), with a no-key control proving the endpoint is not merely harmless
+  to repeat. Same key + different body → `IDEMPOTENCY_KEY_REUSED`.
+- **Device registration/revocation** as a stable contract plus `/api/v1/me`,
+  `/api/v1/audit` and a machine-readable `/api/v1/routes` catalog.
+- **UI:** System-tab card showing the version range, capability flags and the
+  route catalog — including an honest ✗ for `live_exchange_execution`.
+- **Security inherited, not re-implemented.** The P18.1 gate already covers
+  `/api/`; v1 refusals are just rendered in the v1 envelope. Every P18.1
+  invariant is re-asserted against the new surface — and **an operator still
+  cannot bypass the risk gate**.
+
+> **Flagging honestly (per §0a):** no real companion client exists yet, so the
+> contract is proven against `curl`, the Flask test client and the node/jsdom
+> harness — not against a real Windows or Android app, and not by a human
+> looking at a browser (none is installable in this sandbox). P20/P21 will be
+> the first true consumers. Also: `min == max == 1` today, so the upgrade paths
+> are exercised with synthetic version headers rather than a genuinely old
+> client.
 
 ---
 
@@ -212,33 +257,37 @@ and the sandbox has no outbound network.
 
 ## 2. Your job next session
 
-> **2026-08-17:** P18.1 is shipped (see §1). Next is **P18.2** from
-> `ROADMAP.md` — a versioned `/api/v1` contract with one response envelope,
-> typed error codes, min/max server-version detection, **idempotency keys** for
-> human mutations, and device registration/revocation (device tokens already
-> exist from P18.1 — surface them as a stable API + connected-device list). The
+> **2026-08-17 (update):** P18.1 (§1) **and** P18.2 (§1a) are shipped. Next is
+> **P18.3** from `ROADMAP.md` — persisted background jobs + SSE. The
 > workstation W1–W4 items below remain companions, integrated through the
 > secured API/job foundation; they no longer precede it. Deliver working
 > UI/code after each roadmap checkpoint.
 
 Build these **as working UI**, not as a second roadmap.
 
-### Priority 0 — P18.2 stable application API
+### ~~Priority 0 — P18.2 stable application API~~ → **DONE** (v2.30.0)
 
-1. `/api/v1/*` prefix (or `/api/v1` version header) that web, Windows and
-   Android all use; keep the legacy `/api/*` endpoints working so the current
-   dashboard does not break mid-migration.
-2. One response envelope (`{ok, data, error{code,message}, meta}`) and typed
-   error codes; no client parses terminal text.
-3. Compatibility: a `/api/v1/version` or header so a client can detect
-   min/max supported server version and show a clear "upgrade" message.
-4. **Idempotency keys** on `review`/`journal`/`paper/run` mutations so a
-   retried request cannot double-apply (store the key + result, return the
-   cached result on replay).
-5. Device registration/revocation + a visible connected-device list (extend
-   the P18.1 `/api/auth/devices` surface into the v1 contract).
-6. Add `/api/v1` security tests that mirror `tests/test_auth.py` (unauthenticated
-   can't read/mutate, viewer can't write, operator can't bypass the gate).
+All six sub-items shipped; see §1a and
+[`docs/HANDOVER_2026-08-17_P18_2.md`](docs/HANDOVER_2026-08-17_P18_2.md).
+
+### Priority 0 — P18.3 background job manager and streaming
+
+This is now the top of the queue, and W1 below depends on it.
+
+1. Move long jobs (`backfill`, `backtest`, `simulator`, evidence build) behind
+   a **persisted** job queue with status, progress, cancel and audit history.
+   They currently run inside one blocking POST behind a timeout.
+2. **Server-sent events** for job progress; reconnect resumes from the last
+   event rather than restarting work.
+3. Only allow-listed jobs and validated arguments — no shell-command endpoint.
+   `web/command_center.py` already models the allow-list correctly; extend it,
+   do not replace it.
+4. **Reuse `web/api_v1.py::IdempotencyStore`** as the deduplication key for job
+   submission rather than inventing a second mechanism — duplicate clicks must
+   not start duplicate runs, which is the same problem P18.2 already solved.
+5. Expose it in the v1 contract (`/api/v1/jobs`…) using the existing envelope
+   and error codes, and add the route declarations to `apiv1.ROUTES` so the
+   role gate and the published catalog stay in sync.
 
 ### Carried-forward W1 — help him actually earn the unlock
 

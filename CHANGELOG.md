@@ -10,6 +10,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.30.0] — 2026-08-17 · P18.2 stable application API (`/api/v1`)
+
+MINOR: the workstation now publishes **one documented contract** that the
+browser, the future Windows `.exe` and the future Android `.apk` can all speak.
+No signal, risk, paper, graduation or execution behavior changed; no threshold
+moved. `/api/v1` is a *contract over existing behavior*, not a second engine.
+
+- **One envelope.** Every `/api/v1` response is
+  `{ok, data, error{code,message,details}, meta{api_version, server_version,
+  request_id, ts}}` — success or failure, no exceptions. Legacy `/api/*`
+  endpoints keep their historical shapes so the shipped dashboard does not
+  break mid-migration (pinned by a regression test).
+- **Typed error codes.** `web/api_v1.py::ErrorCode` is a closed vocabulary
+  (`UNAUTHENTICATED`, `FORBIDDEN`, `CSRF`, `VALIDATION_FAILED`, `NOT_FOUND`,
+  `RISK_GATE_CLOSED`, `LIFECYCLE_INVALID`, `IDEMPOTENCY_KEY_REUSED`,
+  `CLIENT_TOO_OLD`, …). Clients branch on `error.code`; `error.message` is for
+  humans and may be reworded without it being a breaking change. **No client
+  parses terminal text.** The desk's deliberate refusals keep their own codes:
+  a closed risk gate is `RISK_GATE_CLOSED` (409) carrying the structured
+  `blocked_by` reasons, not a generic bad-request.
+- **Compatibility negotiation.** `GET /api/v1/version` is public — a client
+  must be able to discover the range *before* it can authenticate — and
+  publishes `api_version` plus `min_client_version`/`max_client_version`. A
+  client declaring `X-SKY-Client-Version` outside the range receives
+  `CLIENT_TOO_OLD`/`CLIENT_TOO_NEW` with an upgrade message. The check runs
+  **before** authentication, so an out-of-date app never shows the user a
+  spurious "wrong password".
+- **Idempotency keys.** `review`, `journal`, `paper/run` and `trader-state`
+  accept `Idempotency-Key`. The first call executes and its rendered response
+  is persisted (`idempotency_keys` table, 24h TTL, scoped per user+endpoint);
+  a retry replays that exact response with `meta.idempotent_replay=true`
+  instead of re-applying. A retried approval therefore cannot double-apply —
+  pinned by a test asserting exactly one `decisions` row after four identical
+  calls, with a no-key control proving the endpoint is not merely harmless to
+  repeat. Reusing one key for a *different* body is `IDEMPOTENCY_KEY_REUSED`
+  (409) rather than a silently wrong cached answer, and a too-short key is
+  refused instead of ignored (a client that thinks it has retry safety and
+  does not is the dangerous case).
+- **Device registration/revocation** as a first-class contract:
+  `GET/POST /api/v1/devices`, `POST /api/v1/devices/revoke`, plus
+  `/api/v1/me`, `/api/v1/audit` and a machine-readable `/api/v1/routes`
+  catalog. Raw tokens are never listed back; a revoked token stops working
+  immediately.
+- **Honest capability advertisement.** `/api/v1/version` reports
+  `live_exchange_execution: false`, so a companion client can discover that
+  SKY cannot place an order instead of shipping a Trade button that can never
+  work.
+- **Security is inherited, not re-implemented.** The P18.1 `before_request`
+  gate already covers `/api/`, so v1 is authenticated, role-checked and
+  CSRF-protected by the same code path; refusals are simply rendered in the v1
+  envelope. Mutating v1 routes take their minimum role from the declared route
+  table, and an *undeclared* mutating route defaults to `operator` — a
+  forgotten declaration fails closed. `tests/test_api_v1.py` re-asserts every
+  P18.1 invariant against the new surface: unauthenticated cannot read or
+  mutate, a viewer-scoped token cannot approve/reject/close or mint an
+  operator token, and **an operator still cannot bypass the risk gate**
+  (force-approve remains disabled).
+- **UI:** a System-tab card renders the negotiated version range, the
+  capability flags (including the honest ✗ for live execution) and the full
+  route catalog on demand — the contract is clickable, not documentation-only.
+- Fixed while building: `_unwrap` preferred a `jsonify` Response's default
+  200 over the real status in `return jsonify(...), 400`, which would have
+  turned every legacy 4xx into a mislabeled `INTERNAL`.
+
+Verification: `tests/test_api_v1.py` (59 new tests) and 4 new dashboard-JS
+tests; full suite **982 passed / 1 skipped**, with the same three pre-existing
+environmental failures (`mcp` package absent, no outbound network). Contract:
+`docs/HANDOVER_2026-08-17_P18_2.md`.
+
+---
+
 ## [2.29.2] — 2026-08-17 · Canonical production-install roadmap
 
 PATCH planning checkpoint: merged the delivered P1–P17 AI-anatomy,

@@ -41,6 +41,7 @@ import secrets
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -54,6 +55,7 @@ from data.binance_client import BinanceClient
 from engine.signal_engine import analyze_frame
 from output.signal_schema import validate_output
 from web import auth as authmod
+from web import api_v1 as apiv1
 
 _CACHE: dict = {"payload": None, "ts": 0, "ttl": 40}
 _LAST_GOOD: dict[tuple[str, str], dict] = {}   # last successful payload by (symbol, timeframe)
@@ -1684,6 +1686,11 @@ function render(d){
   systemCards += card('AGENTS — MORNING BRIEFING', '<div id="agents"><span class="muted">building briefing…</span></div>', true);
   systemCards += card('MCP SERVER', '<div id="mcp"><span class="muted">loading…</span></div>');
   systemCards += card('CHANNELS — ordered-backend registry (P8)', '<div id="channels"><span class="muted">loading…</span></div>');
+  systemCards += card('API — /api/v1 CONTRACT <span class="count">P18.2</span>',
+    `<div class="note">The stable contract companion clients (Windows, Android, PWA) use. One envelope, typed error codes, a published compatibility range and idempotent human mutations. The legacy <code>/api/*</code> endpoints keep working unchanged.</div>
+     <div id="apiv1"><span class="muted">loading…</span></div>
+     <div class="flex" style="margin-top:8px"><button class="btn ghost" onclick="loadApiV1(true)">Show route catalog</button></div>
+     <div id="apiv1routes"></div>`, true);
   systemCards += `<div class="card" style="grid-column:1/-1"><h2>RAW JSON <span class="count">debug</span></h2><details><summary class="kbd" style="cursor:pointer">show raw JSON</summary><pre style="max-height:360px;overflow:auto;font-size:11px;white-space:pre-wrap;margin-top:8px">${esc(JSON.stringify(d,null,2))}</pre></details><div class="note" style="margin-top:8px">LLM narrative: <span style="white-space:pre-wrap">${esc(d.llm?.narrative||'Enable LLM_PROVIDER in .env, or use rule-based output.')}</span></div></div>`;
 
   const html = `
@@ -1724,7 +1731,7 @@ function render(d){
   // load async sub-panels
   loadPending(); loadPaper(); loadHistory(); loadLearning(); loadScorecard(); loadSources();
   loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels(); loadDesk();
-  loadReadiness(); loadLoop();
+  loadReadiness(); loadLoop(); loadApiV1(false);
   const symE=document.getElementById('sym'); const tfE=document.getElementById('tf');
   loadChart((symE?symE.value:'BTCUSDT').toUpperCase(), tfE?tfE.value:'15m');
   // Keep the workstation tabs in sync with the asset/timeframe just scanned.
@@ -2128,6 +2135,51 @@ async function loadChannels(){
     el.innerHTML = `<div class="flex" style="margin-bottom:6px">${pills}</div>${tables}
       <div class="note" style="margin-top:8px">P8 ordered-backend pattern (Panniantong/Agent-Reach). First configured+ok backend serves; the engine never blocks when nothing is configured. CLI: <code>python main.py channels</code> · <code>python main.py doctor</code>.</div>`;
   }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
+
+/* P18.2 — the /api/v1 contract, visible instead of documented-only.
+   Shows the negotiated version range, the capabilities a companion client can
+   rely on (including the honest "no live execution"), and the full route
+   catalog on demand. */
+async function loadApiV1(showRoutes){
+  const el=document.getElementById('apiv1'); if(!el) return;
+  try{
+    const env=await (await fetch('/api/v1/version')).json();
+    if(!env.ok){ el.innerHTML='<span class="err">'+esc((env.error||{}).message||'unavailable')+'</span>'; return; }
+    const v=env.data||{}, caps=v.capabilities||{};
+    const capPill=(label,on)=>`<span class="badge" style="${on?'color:var(--green);border-color:var(--green)':'color:var(--mut)'}">${on?'✓':'✗'} ${esc(label)}</span>`;
+    el.innerHTML=`<div class="flex" style="margin-top:6px;flex-wrap:wrap;gap:6px">
+        <span class="badge strong">api v${v.api_version}</span>
+        <span class="badge">server ${esc(v.server_version||'')}</span>
+        <span class="badge">clients v${v.min_client_version}–v${v.max_client_version}</span>
+      </div>
+      <div class="flex" style="margin-top:8px;flex-wrap:wrap;gap:6px">
+        ${capPill('paper trading', caps.paper_trading)}
+        ${capPill('human approval', caps.human_approval)}
+        ${capPill('idempotent mutations', caps.idempotent_mutations)}
+        ${capPill('device tokens', caps.device_tokens)}
+        ${capPill('live exchange execution', caps.live_exchange_execution)}
+      </div>
+      <div class="note" style="margin-top:8px">A client declares its build with <code>${esc(v.client_version_header||'')}</code> and retries safely with <code>${esc(v.idempotency_header||'')}</code>. Live exchange execution is <b>absent by design</b> — no role and no client can place an order.</div>`;
+    if(showRoutes) loadApiV1Routes();
+  }catch(e){ el.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+async function loadApiV1Routes(){
+  const host=document.getElementById('apiv1routes'); if(!host) return;
+  host.innerHTML='<span class="muted">loading routes…</span>';
+  try{
+    const env=await (await fetch('/api/v1/routes')).json();
+    if(!env.ok){ host.innerHTML='<span class="err">'+esc((env.error||{}).message||'unavailable')+'</span>'; return; }
+    const rows=(env.data||{}).routes||[];
+    host.innerHTML=`<table style="margin-top:8px"><tr><th>method</th><th>path</th><th>role</th><th>retry-safe</th><th>what it does</th></tr>
+      ${rows.map(r=>`<tr>
+        <td class="mono">${esc(r.method)}</td>
+        <td class="mono">${esc(r.path)}</td>
+        <td>${r.role==='operator'?'<span class="badge strong">operator</span>':r.role==='public'?'<span class="note">public</span>':'<span class="badge">viewer</span>'}</td>
+        <td>${r.idempotent?'<span class="okc">✓ key</span>':'<span class="muted">—</span>'}</td>
+        <td class="note">${esc(r.summary||'')}</td></tr>`).join('')}</table>
+      <div class="note" style="margin-top:8px">${rows.length} routes. Every response is <code>{ok, data, error{code,message,details}, meta}</code>; clients branch on <code>error.code</code>, never on wording.</div>`;
+  }catch(e){ host.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
 }
 
 // P9 desk_status advisory. Same snapshot as `python main.py desk` / MCP
@@ -3403,41 +3455,98 @@ def make_app() -> Flask:
             "session_idle_hours": config.SKY_SESSION_IDLE_HOURS,
         }
 
+    # ── P18.2: the v1 contract needs its refusals in the v1 envelope ──────
+    V1_PREFIX = "/api/v1"
+
+    def _is_v1(path: str) -> bool:
+        return path == V1_PREFIX or path.startswith(V1_PREFIX + "/")
+
+    def _v1_sub(path: str) -> str:
+        """'/api/v1/review' -> '/review' (the ROUTES key)."""
+        return path[len(V1_PREFIX):] or "/"
+
+    # (sub_path, METHOD) -> minimum role, built from the declared route table
+    # so the gate and the published catalog can never disagree.
+    _V1_ROLES: dict[tuple[str, str], str] = {}
+    for _r in apiv1.ROUTES + apiv1.NATIVE_ROUTES:
+        _V1_ROLES[(_r["path"], _r["method"])] = _r.get("role", "operator")
+
+    def _required_role(path: str) -> str:
+        """Minimum role for a mutating request.
+
+        v1 reads its answer from the declared route table; anything mutating
+        and *undeclared* defaults to ``operator``, so forgetting to declare a
+        new route fails closed rather than open.
+        """
+        if _is_v1(path):
+            role = _V1_ROLES.get((_v1_sub(path), request.method))
+            if role in (None, "public"):
+                return "operator"
+            return role
+        return "operator" if path not in authmod.VIEWER_POST_PATHS else "viewer"
+
+    def _deny(path: str, code: str, message: str, status: int,
+              details: dict | None = None):
+        """Auth-gate refusal, rendered in whichever contract the caller used.
+
+        A v1 client must never have to parse the legacy shape, and the legacy
+        dashboard must never suddenly receive the v1 shape.
+        """
+        if _is_v1(path):
+            return jsonify(apiv1.envelope_error(code, message, details)), status
+        return jsonify({"ok": False, "error": message, "code": code}), status
+
     @app.before_request
     def _auth_gate():
         path = request.path or "/"
         if path == "/" or path.startswith("/static/"):
             return None
+        # Compatibility negotiation happens before authentication: a client too
+        # old to speak this contract must be told to upgrade, not handed a 401
+        # it will misreport as "wrong password".
+        if _is_v1(path):
+            bad = apiv1.check_client_version(
+                request.headers.get(apiv1.CLIENT_VERSION_HEADER))
+            if bad is not None:
+                code, message = bad
+                return jsonify(apiv1.envelope_error(
+                    code, message, {"min_client_version": apiv1.MIN_CLIENT_VERSION,
+                                    "max_client_version": apiv1.MAX_CLIENT_VERSION,
+                                    "server_version": config.VERSION})), 400
+            # /api/v1/version is deliberately public: a client must be able to
+            # discover the compatibility range before it can authenticate.
+            if _v1_sub(path) == "/version":
+                return None
         if path.startswith("/api/auth/"):
             if path in ("/api/auth/status", "/api/auth/setup", "/api/auth/login"):
                 return None
             user = _current_user()
             if user is None:
-                return jsonify({"ok": False, "error": "authentication required",
-                                "code": "UNAUTHENTICATED"}), 401
+                return _deny(path, apiv1.ErrorCode.UNAUTHENTICATED,
+                             "authentication required", 401)
             g.user = user
             if request.method in ("POST", "PUT", "PATCH", "DELETE") and \
                     _using_cookie_session() and not _csrf_ok():
-                return jsonify({"ok": False, "error": "CSRF token missing or invalid",
-                                "code": "CSRF"}), 403
+                return _deny(path, apiv1.ErrorCode.CSRF,
+                             "CSRF token missing or invalid", 403)
             return None
         if not auth.is_enabled():
             return None
         user = _current_user()
         if user is None:
-            return jsonify({"ok": False, "error": "authentication required",
-                            "code": "UNAUTHENTICATED"}), 401
+            return _deny(path, apiv1.ErrorCode.UNAUTHENTICATED,
+                         "authentication required", 401)
         g.user = user
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
-            required = ("operator" if path not in authmod.VIEWER_POST_PATHS
-                        else "viewer")
+            required = _required_role(path)
             if not authmod.role_allows(user.get("role"), required):
-                return jsonify({"ok": False,
-                                "error": f"insufficient role — {required} required",
-                                "code": "FORBIDDEN"}), 403
+                return _deny(path, apiv1.ErrorCode.FORBIDDEN,
+                             f"insufficient role — {required} required", 403,
+                             {"required_role": required,
+                              "your_role": user.get("role")})
             if _using_cookie_session() and not _csrf_ok():
-                return jsonify({"ok": False, "error": "CSRF token missing or invalid",
-                                "code": "CSRF"}), 403
+                return _deny(path, apiv1.ErrorCode.CSRF,
+                             "CSRF token missing or invalid", 403)
         return None
 
     @app.get("/")
@@ -4575,6 +4684,334 @@ def make_app() -> Flask:
             return jsonify({"found": True, "term": key, "meaning": meaning, "why": why})
         except Exception as exc:
             return jsonify({"found": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    # ══════════════════════════════════════════════════════════════════════
+    # P18.2 — /api/v1: one envelope, typed errors, versioning, idempotency
+    #
+    # Every delegating route calls the *same* legacy view function the
+    # dashboard calls and re-renders its answer in the v1 envelope. v1 is a
+    # contract over existing behaviour, never a second implementation: it
+    # cannot approve something the legacy path refuses, and it adds no
+    # exchange-order path (SKY has none).
+    # ══════════════════════════════════════════════════════════════════════
+    _idem = apiv1.IdempotencyStore()
+
+    def _unwrap(rv) -> tuple[Any, int]:
+        """Normalize a Flask return value into ``(json_payload, status)``.
+
+        Subtlety worth keeping: legacy handlers return ``jsonify(...), 400``.
+        The ``jsonify`` Response carries the *default* 200 — the real status
+        lives in the tuple. Preferring the response's ``status_code`` here
+        silently turned every legacy 4xx into a 200-shaped INTERNAL error, so
+        the tuple's status must win when present.
+        """
+        status = None
+        if isinstance(rv, tuple):
+            if len(rv) >= 2 and isinstance(rv[1], int):
+                status = rv[1]
+            rv = rv[0]
+        if hasattr(rv, "get_json"):
+            try:
+                payload = rv.get_json(silent=True)
+            except Exception:
+                payload = None
+            if status is None:
+                status = getattr(rv, "status_code", 200) or 200
+            return payload, status
+        return rv, (status if status is not None else 200)
+
+    def _as_v1(payload: Any, status: int, request_id: str):
+        """Render a legacy handler's answer in the v1 envelope.
+
+        Legacy endpoints are inconsistent by history: some return a bare
+        payload, some ``{ok: false, error: ...}`` with HTTP 200, some a real
+        4xx/5xx. A v1 client must not have to know which — so failure is
+        decided here, once, and always surfaces as a typed code.
+        """
+        body = payload if isinstance(payload, dict) else None
+
+        failed = status >= 400 or (body is not None and body.get("ok") is False)
+        # A handler that returns 200 with a bare {"error": "..."} and nothing
+        # else is also a failure; but a rich payload that merely *contains* an
+        # "error" field alongside real data is not.
+        if not failed and body is not None and body.get("error") and \
+                set(body.keys()) <= {"error", "code", "ok", "detail", "details"}:
+            failed = True
+
+        if not failed:
+            data = body if body is not None else payload
+            if isinstance(data, dict) and "ok" in data:
+                data = {k: v for k, v in data.items() if k != "ok"}
+            return jsonify(apiv1.envelope_ok(data, request_id)), status
+
+        message = "request failed"
+        code = None
+        details: dict = {}
+        if body is not None:
+            message = (body.get("error") or body.get("message")
+                       or body.get("detail") or message)
+            code = body.get("code")
+            details = {k: v for k, v in body.items()
+                       if k not in ("ok", "error", "code", "message")}
+        # The desk's deliberate refusals deserve their own codes so a client
+        # can render "the risk gate is closed" instead of a generic failure.
+        if code is None:
+            if isinstance(body, dict) and "blocked_by" in body:
+                # The desk refusing on risk is not a malformed request; a
+                # client should render the gate reasons, not "bad input".
+                code = apiv1.ErrorCode.RISK_GATE_CLOSED
+            elif status == 400 and "cannot go " in str(message):
+                # engine/lifecycle.py rejecting an illegal state transition —
+                # the usual cause is a retried decision, so name it precisely.
+                code = apiv1.ErrorCode.LIFECYCLE_INVALID
+            else:
+                code = apiv1.code_for_status(status)
+        if status < 400:
+            status = 500 if code == apiv1.ErrorCode.INTERNAL else 400
+        return jsonify(apiv1.envelope_error(code, message, details,
+                                            request_id)), status
+
+    def _delegate(legacy_path: str, method: str):
+        """Invoke the legacy view function registered for ``legacy_path``."""
+        for rule in app.url_map.iter_rules():
+            if str(rule.rule) == legacy_path and method in (rule.methods or set()):
+                return app.view_functions[rule.endpoint]()
+        raise KeyError(f"no legacy handler for {method} {legacy_path}")
+
+    def _make_v1_view(route: dict):
+        legacy_path = route["legacy"]
+        method = route["method"]
+        sub = route["path"]
+        idempotent = bool(route.get("idempotent"))
+
+        def view():
+            request_id = apiv1.new_request_id()
+            user = getattr(g, "user", None)
+            user_id = (user or {}).get("id")
+
+            key = None
+            fingerprint = ""
+            if idempotent:
+                try:
+                    key = apiv1.validate_key(
+                        request.headers.get(apiv1.IDEMPOTENCY_HEADER))
+                except ValueError as exc:
+                    return jsonify(apiv1.envelope_error(
+                        apiv1.ErrorCode.BAD_REQUEST, str(exc),
+                        request_id=request_id)), 400
+            if key:
+                body = request.get_json(silent=True) or {}
+                fingerprint = apiv1.request_fingerprint(sub, body)
+                try:
+                    state, cached = _idem.lookup(key, user_id, sub, fingerprint)
+                except Exception:
+                    state, cached = ("miss", None)   # never fail on the cache
+                if state == "replay":
+                    status, stored = cached
+                    if isinstance(stored, dict):
+                        stored = dict(stored)
+                        stored["meta"] = dict(stored.get("meta") or {})
+                        stored["meta"]["idempotent_replay"] = True
+                        stored["meta"]["request_id"] = request_id
+                    return jsonify(stored), status
+                if state == "conflict":
+                    return jsonify(apiv1.envelope_error(
+                        apiv1.ErrorCode.IDEMPOTENCY_KEY_REUSED,
+                        "This Idempotency-Key was already used for a different "
+                        "request. Generate a new key per distinct action.",
+                        {"key": key, "endpoint": sub},
+                        request_id=request_id)), 409
+                if state == "in_progress":
+                    return jsonify(apiv1.envelope_error(
+                        apiv1.ErrorCode.IDEMPOTENCY_IN_PROGRESS,
+                        "An identical request is still being processed. "
+                        "Retry shortly.",
+                        {"key": key}, request_id=request_id)), 409
+                try:
+                    if not _idem.reserve(key, user_id, sub, fingerprint):
+                        return jsonify(apiv1.envelope_error(
+                            apiv1.ErrorCode.IDEMPOTENCY_IN_PROGRESS,
+                            "An identical request is still being processed. "
+                            "Retry shortly.",
+                            {"key": key}, request_id=request_id)), 409
+                except Exception:
+                    key = None   # cache unavailable → execute without replay
+
+            try:
+                payload, status = _unwrap(_delegate(legacy_path, method))
+            except Exception as exc:
+                if key:
+                    try:
+                        _idem.release(key, user_id, sub)
+                    except Exception:
+                        pass
+                return jsonify(apiv1.envelope_error(
+                    apiv1.ErrorCode.INTERNAL, f"{type(exc).__name__}: {exc}",
+                    request_id=request_id)), 500
+
+            response = _as_v1(payload, status, request_id)
+            if key:
+                rendered, rendered_status = response
+                try:
+                    stored = rendered.get_json(silent=True)
+                    if stored is not None:
+                        _idem.complete(key, user_id, sub, rendered_status, stored)
+                    else:
+                        _idem.release(key, user_id, sub)
+                except Exception:
+                    pass
+            return response
+
+        view.__name__ = f"v1_{method.lower()}_{sub.strip('/').replace('/', '_') or 'root'}"
+        return view
+
+    for _route in apiv1.ROUTES:
+        app.add_url_rule(f"{V1_PREFIX}{_route['path']}",
+                         endpoint=f"v1_{_route['method'].lower()}"
+                                  f"_{_route['path'].strip('/').replace('/', '_')}",
+                         view_func=_make_v1_view(_route),
+                         methods=[_route["method"]])
+
+    # ── v1-native routes (no legacy equivalent) ───────────────────────────
+    @app.get(f"{V1_PREFIX}/version")
+    def v1_version():
+        """Public: a client must discover compatibility before authenticating.
+
+        This deliberately reports the *absence* of live execution as a
+        capability flag, so a companion app cannot ship a Trade button that
+        can never work.
+        """
+        return jsonify(apiv1.envelope_ok(apiv1.version_info()))
+
+    @app.get(f"{V1_PREFIX}/routes")
+    def v1_routes():
+        return jsonify(apiv1.envelope_ok(apiv1.route_catalog()))
+
+    @app.get(f"{V1_PREFIX}/me")
+    def v1_me():
+        user = getattr(g, "user", None) or _current_user()
+        if user is None:
+            # auth disabled locally — report the unauthenticated local mode
+            # honestly rather than inventing an identity.
+            return jsonify(apiv1.envelope_ok({
+                "authenticated": False, "username": None,
+                "role": "operator" if not auth.is_enabled() else None,
+                "auth_enabled": auth.is_enabled(),
+                "setup_required": (config.SKY_AUTH_MODE != "disabled"
+                                   and not auth.owner_exists()),
+            }))
+        return jsonify(apiv1.envelope_ok({
+            "authenticated": True,
+            "username": user.get("username"),
+            "role": user.get("role"),
+            "scope": user.get("scope"),
+            "auth_enabled": auth.is_enabled(),
+            "setup_required": False,
+        }))
+
+    @app.get(f"{V1_PREFIX}/devices")
+    def v1_devices_list():
+        user = getattr(g, "user", None) or _current_user()
+        if user is None:
+            return jsonify(apiv1.envelope_ok({"devices": [], "count": 0}))
+        devices = auth.list_device_tokens(user["id"])
+        return jsonify(apiv1.envelope_ok({
+            "devices": devices,
+            "count": len([d for d in devices if not d["revoked"]]),
+        }))
+
+    @app.post(f"{V1_PREFIX}/devices")
+    def v1_devices_create():
+        user = getattr(g, "user", None) or _current_user()
+        if user is None:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.UNAUTHENTICATED,
+                "authentication required")), 401
+        if not authmod.role_allows(user.get("role"), "operator"):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.FORBIDDEN, "operator role required",
+                {"required_role": "operator"})), 403
+        body = request.get_json(silent=True) or {}
+        name = str(body.get("name") or "").strip()
+        if not name:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED,
+                "a device name is required so it can be recognised and revoked",
+                {"field": "name"})), 400
+        scope = str(body.get("scope") or "viewer")
+        if scope not in authmod.ROLES:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED,
+                f"scope must be one of {list(authmod.ROLES)}",
+                {"field": "scope"})), 400
+        # A token can never exceed its creator's role.
+        if not authmod.role_allows(user.get("role"), scope):
+            scope = "viewer"
+        token = auth.create_device_token(user["id"], name, scope=scope)
+        _audit("device_token_created", name, detail={"scope": scope, "api": "v1"})
+        return jsonify(apiv1.envelope_ok({
+            "token": token,
+            "name": name,
+            "scope": scope,
+            "usage": "Authorization: Bearer <token>",
+            "note": "Copy this token now — it is shown only once.",
+        })), 201
+
+    @app.post(f"{V1_PREFIX}/devices/revoke")
+    def v1_devices_revoke():
+        user = getattr(g, "user", None) or _current_user()
+        if user is None:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.UNAUTHENTICATED, "authentication required")), 401
+        if not authmod.role_allows(user.get("role"), "operator"):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.FORBIDDEN, "operator role required")), 403
+        handle = str((request.get_json(silent=True) or {}).get("id") or "").strip()
+        if not handle:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED, "device id is required",
+                {"field": "id"})), 400
+        ok = auth.revoke_device_token(user["id"], handle)
+        _audit("device_token_revoked", handle, ok=ok, detail={"api": "v1"})
+        if not ok:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.NOT_FOUND,
+                f"no device token {handle!r} belongs to this account",
+                {"id": handle})), 404
+        return jsonify(apiv1.envelope_ok({"revoked": True, "id": handle}))
+
+    @app.get(f"{V1_PREFIX}/audit")
+    def v1_audit():
+        user = getattr(g, "user", None) or _current_user()
+        if user is not None and not authmod.role_allows(user.get("role"), "operator"):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.FORBIDDEN, "operator role required")), 403
+        try:
+            limit = int(request.args.get("limit", 100))
+        except (TypeError, ValueError):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED, "limit must be an integer",
+                {"field": "limit"})), 400
+        rows = auth.recent_audit(limit)
+        return jsonify(apiv1.envelope_ok({"rows": rows, "count": len(rows)}))
+
+    @app.errorhandler(404)
+    def _v1_404(exc):
+        if _is_v1(request.path or ""):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.NOT_FOUND,
+                f"no such endpoint: {request.method} {request.path}",
+                {"see": "/api/v1/routes"})), 404
+        return jsonify({"ok": False, "error": "not found"}), 404
+
+    @app.errorhandler(405)
+    def _v1_405(exc):
+        if _is_v1(request.path or ""):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.METHOD_NOT_ALLOWED,
+                f"{request.method} is not allowed on {request.path}",
+                {"see": "/api/v1/routes"})), 405
+        return jsonify({"ok": False, "error": "method not allowed"}), 405
 
     return app
 

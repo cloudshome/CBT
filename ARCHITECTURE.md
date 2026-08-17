@@ -133,10 +133,34 @@ code or weakens server-side risk enforcement.
 | `signal_schema.py` | The exact JSON contract (`signal_id`, `timestamp`, `asset`, `action`, `entry`, `stop_loss`, `take_profit`, `risk_reward`, `confidence`, `timeframe`, `reason`) + `validate_output` |
 | `notifiers.py` | Telegram + Discord webhook push |
 
-### `web/` — Flask dashboard
+### `web/` — Flask dashboard + client API
 | Module | Purpose |
 |---|---|
-| `app.py` | Flask app factory `make_app()`, all `/api/*` routes, `serve()` runner |
+| `app.py` | Flask app factory `make_app()`, all `/api/*` and `/api/v1/*` routes, `serve()` runner |
+| `auth.py` | **P18.1** owner account, `viewer`/`operator` roles, cookie sessions, scoped device tokens, CSRF, login throttling, audit, remote-deployment guard |
+| `api_v1.py` | **P18.2** the stable client contract: response envelope, typed `ErrorCode` vocabulary, version negotiation, `IdempotencyStore`, and the declared route table |
+| `command_center.py` | Allow-listed CLI catalog behind `/api/commands` |
+| `position_sizer.py` | Position-size calculator bounded by the risk gate |
+| `chart_data.py` | Chart payload: candles, overlays, panes, levels |
+
+**The `/api/v1` boundary (P18.2).** Two API surfaces coexist deliberately:
+
+* `/api/*` — the original endpoints. Shapes are historical and inconsistent
+  (some bare payloads, some `{ok, error}`, some 200-with-a-failure). The
+  shipped dashboard uses these, and they are frozen so it cannot break.
+* `/api/v1/*` — the contract for *external* clients (PWA, Windows, Android).
+  Every response is `{ok, data, error{code,message,details}, meta}`.
+
+Each delegating v1 route calls the **same view function** the legacy route
+uses and re-renders the result. This is the load-bearing design decision: v1
+is a contract, not a second implementation, so it cannot drift from the
+dashboard's behaviour, cannot acquire its own bugs, and cannot need its own
+security review. `tests/test_api_v1.py` enforces that every v1 route maps to a
+legacy route that already existed.
+
+Authorization for v1 mutations is read from `api_v1.ROUTES`, so the enforced
+policy and the catalog published at `/api/v1/routes` cannot disagree; an
+undeclared mutating route defaults to `operator` (fails closed).
 
 ### `tests/` — 61 test modules, 750 pass / 1 skip
 - Most modules have a matching `test_*.py`.

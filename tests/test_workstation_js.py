@@ -439,3 +439,77 @@ def test_journal_form_requires_a_trade():
       console.log(JSON.stringify({ status: elements['jStatus'].innerHTML }));
     """)
     assert "pick a trade" in out["status"]
+
+
+# ── P18.2: the /api/v1 contract card ──────────────────────────────────────
+def _v1_version_env(**caps) -> dict:
+    capabilities = {"live_exchange_execution": False, "paper_trading": True,
+                    "human_approval": True, "idempotent_mutations": True,
+                    "device_tokens": True}
+    capabilities.update(caps)
+    return {"ok": True, "error": None,
+            "meta": {"api_version": 1, "server_version": "2.30.0",
+                     "request_id": "abc", "ts": 1},
+            "data": {"api_version": 1, "server_version": "2.30.0",
+                     "min_client_version": 1, "max_client_version": 1,
+                     "client_version_header": "X-SKY-Client-Version",
+                     "idempotency_header": "Idempotency-Key",
+                     "capabilities": capabilities}}
+
+
+def test_api_contract_card_paints_the_version_range():
+    out = _run({"/api/v1/version": _v1_version_env()}, """
+      await loadApiV1(false);
+      console.log(JSON.stringify({ html: elements['apiv1'].innerHTML }));
+    """)
+    html = out["html"]
+    assert "api v1" in html
+    assert "clients v1–v1" in html
+    assert "X-SKY-Client-Version" in html
+
+
+def test_api_contract_card_shows_no_live_execution_honestly():
+    """The card must not imply the desk can trade. A ✓ here would be a lie
+    the packaging phases would then build a Trade button on."""
+    out = _run({"/api/v1/version": _v1_version_env()}, """
+      await loadApiV1(false);
+      console.log(JSON.stringify({ html: elements['apiv1'].innerHTML }));
+    """)
+    html = out["html"]
+    assert "✗ live exchange execution" in html
+    assert "✓ paper trading" in html
+    assert "✓ idempotent mutations" in html
+
+
+def test_api_contract_card_lists_the_route_catalog():
+    routes = {"ok": True, "error": None,
+              "meta": {"api_version": 1, "server_version": "2.30.0",
+                       "request_id": "r", "ts": 1},
+              "data": {"count": 2, "routes": [
+                  {"path": "/api/v1/risk", "method": "GET", "role": "viewer",
+                   "idempotent": False, "native": False, "legacy": "/api/risk",
+                   "summary": "Risk & discipline gate status."},
+                  {"path": "/api/v1/review", "method": "POST", "role": "operator",
+                   "idempotent": True, "native": False, "legacy": "/api/review",
+                   "summary": "Approve / reject / execute / close a signal."}]}}
+    out = _run({"/api/v1/routes": routes}, """
+      await loadApiV1Routes();
+      console.log(JSON.stringify({ html: elements['apiv1routes'].innerHTML }));
+    """)
+    html = out["html"]
+    assert "/api/v1/review" in html
+    assert "operator" in html
+    assert "✓ key" in html          # the retry-safe marker
+    assert "2 routes" in html
+
+
+def test_api_contract_card_reports_an_error_without_blanking():
+    out = _run({"/api/v1/version": {
+        "ok": False, "data": None,
+        "error": {"code": "INTERNAL", "message": "boom", "details": {}},
+        "meta": {"api_version": 1, "server_version": "x", "request_id": "r", "ts": 1}}},
+        """
+      await loadApiV1(false);
+      console.log(JSON.stringify({ html: elements['apiv1'].innerHTML }));
+    """)
+    assert "boom" in out["html"]

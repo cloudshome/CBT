@@ -1,4 +1,26 @@
-**Last updated:** 2026-08-17 (**v2.29.2 production-roadmap checkpoint** on
+**Last updated:** 2026-08-17 (**v2.30.0 / P18.2 — the stable `/api/v1`
+contract** on `arena/01a00eac-sky`). The workstation now publishes one
+documented API that the browser and the future Windows/Android companions can
+all speak: a single response envelope, a closed vocabulary of typed error
+codes, a public compatibility range checked *before* authentication, and
+idempotency keys so a retried human decision cannot double-apply. `/api/v1` is
+a **contract over existing behaviour** — every delegating route calls the same
+handler the dashboard calls, so it adds no capability, moves no threshold and
+introduces no exchange-order path. Security is inherited from the P18.1 gate
+rather than re-implemented, and every P18.1 invariant is re-asserted against
+the new surface (an operator still cannot bypass the risk gate). Legacy
+`/api/*` is untouched. Suite: **982 passed / 1 skipped** (3 pre-existing
+environmental failures: no `mcp` package, no network). Next code is **P18.3**
+persisted jobs + SSE — long jobs still run inside one blocking POST. Contract:
+`docs/HANDOVER_2026-08-17_P18_2.md`.
+
+> **Flagged honestly:** no real companion client exists yet, so the contract is
+> proven against `curl`, the Flask test client and the node/jsdom harness — not
+> against a real Windows or Android app, and not by a human looking at a
+> browser (none is installable in this sandbox). `min == max == 1` today, so
+> the upgrade paths are exercised with synthetic version headers.
+
+**Previous:** 2026-08-17 (**v2.29.2 production-roadmap checkpoint** on
 `arena/01a00df1-sky`). [`ROADMAP.md`](ROADMAP.md) is now the canonical merged
 P1–P22 roadmap. Delivered AI anatomy, Agent-Reach, data/validation, teaching,
 sentiment, and Trading Workstation work is preserved; P18–P22 adds the ordered

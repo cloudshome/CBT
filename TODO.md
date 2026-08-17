@@ -6,15 +6,24 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-17 (**v2.29.2 planning checkpoint — one merged
+**Last updated:** 2026-08-17 (**v2.30.0 / P18.2 shipped — the stable
+`/api/v1` client contract**. One envelope, typed error codes, a public
+compatibility range checked before auth, idempotency keys on the four human
+mutations, and device registration/revocation. It is a contract over existing
+behaviour: no new capability, no threshold moved, no exchange-order path, and
+legacy `/api/*` untouched. Next code is **P18.3** persisted jobs + SSE — long
+jobs still run inside one blocking POST. Contract:
+`docs/HANDOVER_2026-08-17_P18_2.md`.)
+
+**Previous:** 2026-08-17 (**v2.29.2 planning checkpoint — one merged
 product roadmap**). [`ROADMAP.md`](ROADMAP.md) is now the active source of
 truth: delivered P1–P17 and the old AI-anatomy / Agent-Reach / web-trader plans
 are merged with P18–P22 production distribution. The chosen path is one Ubuntu
 Hub (single database/risk authority), then an installable PWA, Windows `.exe`
 companion, and Android `.apk` companion. **Current software is still a source
 installation**; signed `.deb`/`.exe`/`.apk` artifacts are planned, not claimed.
-Next code is **P18.1 authentication and authorization**, then the versioned API
-and persisted jobs/SSE. No future env variables or packaging dependencies were
+Next code is **P18.3 persisted jobs/SSE** (P18.1 auth and P18.2 `/api/v1`
+are shipped). No future env variables or packaging dependencies were
 added before their code exists. The canonical paper→graduation loop continues
 in parallel; packaging never unlocks trading.)
 
@@ -190,11 +199,12 @@ Browser/PWA ──┘
 
 Ordered code milestones:
 
-1. **P18.1 auth/roles** — owner login, viewer/operator separation, CSRF,
-   revocable device tokens, audit; remote mode fails closed without auth/TLS.
-2. **P18.2 `/api/v1`** — stable typed client contract, compatibility range,
-   idempotent human mutations, device registration/revocation.
-3. **P18.3 jobs/SSE** — persisted allow-listed long jobs, progress/cancel,
+1. ~~**P18.1 auth/roles**~~ — ✅ shipped v2.29.2. Owner login, viewer/operator
+   separation, CSRF, revocable device tokens, audit; remote mode fails closed.
+2. ~~**P18.2 `/api/v1`**~~ — ✅ shipped v2.30.0. Stable typed client contract,
+   compatibility range, idempotent human mutations, device
+   registration/revocation. `docs/HANDOVER_2026-08-17_P18_2.md`.
+3. **P18.3 jobs/SSE** ← **NEXT CODE** — persisted allow-listed long jobs, progress/cancel,
    reconnect, guided evidence flow; never a shell endpoint.
 4. **P18.4 PWA/mobile** — installable responsive UI with honest stale/offline
    behavior and no private API cache.
@@ -207,9 +217,12 @@ Ordered code milestones:
 8. **P22 releases/ops** — CI install tests, signing, checksums, SBOM, release
    channels, diagnostics, support and rollback.
 
-**Next implementation is P18.1, not an installer wrapper.** Wrapping today's
-unauthenticated development dashboard would create unsafe software and force a
-rewrite. The P11 canonical paper-evidence operation remains parallel and no
+**Next implementation is P18.3, not an installer wrapper.** The dashboard is
+now authenticated (P18.1) and speaks a stable contract (P18.2); what it still
+lacks is durable background work — closing a browser kills a running job, and
+duplicate clicks can start duplicate runs. Reuse
+`web/api_v1.py::IdempotencyStore` as the job-submission dedupe key rather than
+inventing a second mechanism. The P11 canonical paper-evidence operation remains parallel and no
 trading/graduation threshold changes.
 
 ### TODO-22 / P14 · Operate the loop: daily ritual + one loop-health number · ✅ SHIPPED (v2.27.0)

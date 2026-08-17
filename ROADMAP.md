@@ -87,7 +87,8 @@ are enabled only after authentication and TLS are configured.
 | P13–P14 | Teaching and daily loop-health ritual | `CHANGELOG.md` | ✅ shipped |
 | P15–P16 | Market sentiment colour and measured sentiment-conditioned outcomes | `CHANGELOG.md` | ✅ shipped |
 | P17 | Clickable Trading Workstation and real-world read-only connections | `WEB_TRADER_ROADMAP.md`, `HANDOVER.md` | ✅ foundation shipped; listed workstation follow-ups remain |
-| P18–P22 | Secure production distribution for Ubuntu, browser/PWA, Windows, and Android | this document | 🔄 next product phase |
+| P18.1–P18.2 | Owner auth/roles/CSRF/audit, then the stable `/api/v1` client contract | `docs/HANDOVER_2026-08-17_P18_2.md` | ✅ shipped |
+| P18.3–P22 | Jobs/SSE, PWA, then secure production distribution for Ubuntu, Windows, and Android | this document | 🔄 next product phase |
 
 ### Workstation items carried forward—not lost
 
@@ -114,7 +115,7 @@ roadmap.
 **Goal:** make the existing workstation safe to use as an installed/remote
 product before wrapping it in `.exe` or `.apk` files.
 
-### P18.1 Authentication and authorization
+### P18.1 Authentication and authorization — ✅ shipped v2.29.2
 
 - First-run owner creation with a securely hashed password.
 - Roles:
@@ -132,7 +133,13 @@ product before wrapping it in `.exe` or `.apk` files.
 anything; a viewer cannot approve/reject/close; an operator still cannot bypass
 the risk gate; security tests cover every write endpoint.
 
-### P18.2 Stable application API
+### P18.2 Stable application API — ✅ shipped v2.30.0
+
+> Delivered: one envelope, typed `ErrorCode` vocabulary, public
+> `/api/v1/version` compatibility range (checked before auth), idempotency
+> keys on the four human mutations, device registration/revocation, and a
+> machine-readable `/api/v1/routes` catalog. Legacy `/api/*` still works.
+> Contract: `docs/HANDOVER_2026-08-17_P18_2.md`.
 
 - Versioned `/api/v1` contract for dashboard and companion clients.
 - One response envelope and typed error codes; no client parses terminal text.
@@ -144,7 +151,7 @@ the risk gate; security tests cover every write endpoint.
 **Done when:** web, Windows, and Android can use one documented contract and an
 old client receives a clear upgrade message instead of corrupt behavior.
 
-### P18.3 Background job manager and streaming
+### P18.3 Background job manager and streaming — 🔄 next code
 
 - Move long jobs (backfill, backtest, simulator, evidence build) behind a
   persisted job queue with status, progress, cancel, and audit history.
@@ -289,7 +296,8 @@ diagnosed without opening the source tree.
 ## 5. Build order and release gates
 
 ```text
-NOW       P18.1 auth/roles → P18.2 versioned API → P18.3 jobs/SSE
+DONE      P18.1 auth/roles (v2.29.2) → P18.2 versioned API (v2.30.0)
+NOW       P18.3 jobs/SSE
 PARALLEL  W1 guided evidence UX + W4 mobile/stale-state reliability
 THEN      P18.4 PWA
 THEN      P19 Ubuntu Hub package (first production release)

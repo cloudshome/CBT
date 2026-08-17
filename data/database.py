@@ -239,6 +239,23 @@ CREATE TABLE IF NOT EXISTS login_attempts(
 CREATE TABLE IF NOT EXISTS auth_meta(
   key TEXT PRIMARY KEY, value TEXT
 );
+-- ── P18.2 versioned API — idempotent human mutations ─────────────────────
+-- idempotency_keys: one row per (user, endpoint, client-supplied key). The
+-- stored response is replayed verbatim on retry so a flaky mobile connection
+-- or a double-tap can never apply a human decision twice. `request_hash`
+-- pins the body the key was first used with: reusing one key for a DIFFERENT
+-- request is a client bug and must be reported, never silently answered with
+-- the old result.
+CREATE TABLE IF NOT EXISTS idempotency_keys(
+  key TEXT NOT NULL,
+  user_id INTEGER,
+  endpoint TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status_code INTEGER,
+  response_json TEXT,
+  created_ts INTEGER,
+  PRIMARY KEY(key, user_id, endpoint)
+);
 CREATE INDEX IF NOT EXISTS idx_sentiment_sym_tf_ts ON sentiment_history(symbol, timeframe, ts);
 CREATE INDEX IF NOT EXISTS idx_plans_scan ON plans(scan_id);
 CREATE INDEX IF NOT EXISTS idx_bt_type ON backtest_results(plan_type);
@@ -248,6 +265,7 @@ CREATE INDEX IF NOT EXISTS idx_decisions_scan ON decisions(scan_id);
 CREATE INDEX IF NOT EXISTS idx_paper_scan ON paper_trades(scan_id);
 CREATE INDEX IF NOT EXISTS idx_paper_status ON paper_trades(status);
 CREATE INDEX IF NOT EXISTS idx_paper_symbol ON paper_trades(symbol);
+CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency_keys(created_ts);
 """
 
 

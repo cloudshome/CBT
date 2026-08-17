@@ -6,6 +6,7 @@ files a *next* session is told to read first.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -239,7 +240,13 @@ def test_product_surfaces_state_installers_are_planned_not_shipped():
         assert "ubuntu" in text
     assert "not released yet" in readme
     assert "do not exist yet" in skill
-    assert "next implementation is p18.1" in todo
+    # The load-bearing invariant is the *ordering*: the next code is the current
+    # P18 sub-phase, never an installer wrapper around it. Pinning one exact
+    # sub-phase number made this fail every time a phase shipped, which trains
+    # the next session to edit the test instead of reading it — so pin the rule.
+    assert re.search(r"next implementation is p18\.\d", todo), (
+        "TODO.md must name the next P18 sub-phase as the next implementation")
+    assert "not an installer wrapper" in todo
 
 
 def test_product_decisions_keep_one_authority_and_server_side_gate():
