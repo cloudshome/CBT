@@ -5,6 +5,12 @@ Everything below is also visible and testable in the dashboard:
 gives you, whether it is live right now, and the exact steps to switch it on.
 You never have to read this file — it exists so the steps are also written down.
 
+> **Production clients:** the Ubuntu Hub, Windows `.exe`, and Android `.apk`
+> plan is now in [`ROADMAP.md`](ROADMAP.md). Those installers do not exist yet.
+> Until P18 authentication/roles and HTTPS land, keep this write-capable
+> dashboard on loopback or behind an SSH tunnel/authenticated reverse proxy;
+> never expose port 8050 directly to the internet.
+
 ---
 
 ## Step 1 — the real market (required, free, no account)

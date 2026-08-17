@@ -129,6 +129,30 @@ Sweep a fixed portion of profits (e.g. 50%) into long-term spot reserves:
 > (dependency/adapter/second-grader rejected; see
 > `docs/BACKTRADER_REVIEW.md`, BT1–BT8).
 
+## 📦 Product delivery lane (separate from trading graduation)
+
+The trading ladder above measures whether an edge deserves capital. The
+software-delivery ladder measures whether SKY is safe and reliable to install.
+Neither can substitute for the other.
+
+Per the merged [`ROADMAP.md`](ROADMAP.md), distribution proceeds as:
+
+```text
+secure/authenticated API + background jobs
+        ↓
+installable responsive PWA
+        ↓
+Ubuntu Hub package (one data/risk authority)
+        ↓
+Windows .exe and Android .apk companion clients
+        ↓
+signed releases, backup/restore, monitoring, upgrade/rollback
+```
+
+A successful installer does not unlock live trading. Windows and Android begin
+as clients of the Ubuntu Hub, so one user never has three databases or three
+risk gates disagreeing. No remote client can bypass the server-side gate.
+
 ## 🛡️ The 5 Golden Rules of the Trading Brain
 
 1. **Protect capital above all** — a stopped-out trade with rules followed is

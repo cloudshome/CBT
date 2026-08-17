@@ -1,5 +1,10 @@
 # CryptoBrain × Your Professional-Trader Goal — Review & Decision List
 
+> **2026-08-17 product-distribution addendum:** the active merged phase order is
+> [`ROADMAP.md`](ROADMAP.md). The professional trading decisions below remain
+> binding; packaging is a separate software-delivery lane and cannot count as
+> trading evidence or relax a risk/graduation decision.
+
 **Status:** A1–B10 implemented 2026-08-09 (see the log at the bottom).
 This file is the historical decision list — do not re-litigate it.
 
@@ -167,6 +172,23 @@ A1=1, A2=1, A3=1, A4=1, A5=1, A6=1, B1=1, B2=1, B3=1, B4=1, B5=1, B6=1, B7=1, B8
 | 13. Scale only after evidence | ❌ No gate → **B9/B10** |
 | 14. Never risk living-expense money | ⚠️ Advisory only → **A3** (your numbers) |
 | 15. Survival + positive expectancy + controlled drawdown | ⚠️ Core loop exists → needs A+B to become the *operating system* |
+
+---
+
+## Product distribution decisions — PD1–PD8 (2026-08-17)
+
+| ID | Decision | Binding consequence |
+|---|---|---|
+| **PD1** | Ubuntu Hub is the first production authority. | One DB, worker set, risk gate, evidence book, and audit history. |
+| **PD2** | Windows and Android begin as companion clients. | `.exe`/`.apk` do not embed a second trading engine or evidence store. |
+| **PD3** | Security precedes wrappers. | Auth/roles, CSRF, device tokens, audit, HTTPS boundary, and `/api/v1` land before native packaging. |
+| **PD4** | PWA proves the shared client behavior first. | Responsive/stale/offline behavior is solved once before `.exe`/`.apk`. |
+| **PD5** | Remote mutations are fresh, authenticated, idempotent, and server-gated. | No offline queued approval and no client-side risk authority. |
+| **PD6** | User data survives upgrades/uninstall by default. | Backup, restore, migration, rollback, and explicit separate deletion are release gates. |
+| **PD7** | Production artifacts are signed and inspectable. | Checksums, SBOM, compatibility, release notes, and CI clean-install tests. |
+| **PD8** | Distribution never grants live execution. | No trading credentials/order path; the unchanged graduation and human-control decisions still win. |
+
+Full phases and acceptance criteria: [`ROADMAP.md`](ROADMAP.md), P18–P22.
 
 ---
 

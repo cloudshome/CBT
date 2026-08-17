@@ -1,7 +1,12 @@
 # SKY Web Trader Roadmap
 
-The goal in one sentence: **you run `python3 main.py`, open the browser, and
-operate the entire system by clicking — no command is ever memorized.**
+> **Roadmap status:** P17 workstation specification and carried-forward UX
+> backlog. The merged product roadmap—including Ubuntu installation, Windows
+> `.exe`, Android `.apk`, security, updates, and monitoring—is now
+> [`ROADMAP.md`](ROADMAP.md). Where priorities conflict, `ROADMAP.md` wins.
+
+The goal in one sentence: **you install/open SKY and operate the entire system
+by clicking—no command is ever memorized.**
 
 ## Shipped now — the Trading Workstation
 
@@ -47,7 +52,11 @@ operate the entire system by clicking — no command is ever memorized.**
   **zero size** with the blocking reason whenever the gate is closed.
 - Nothing in the UI can place a real order: there is no exchange key.
 
-## Next build order
+## Workstation backlog carried into the canonical roadmap
+
+These items are retained as W1–W4 in [`ROADMAP.md`](ROADMAP.md). Production
+security and the stable API/job boundary (P18) now precede native wrappers;
+none of the workstation work below is discarded.
 
 ### Phase 1 — decision clarity
 

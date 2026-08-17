@@ -1,5 +1,9 @@
 # 🛰️ Agent-Reach → CryptoBrain Upgrade Roadmap
 
+> **Roadmap status:** delivered P7–P9 design record. The active merged product
+> roadmap is [`ROADMAP.md`](ROADMAP.md). Do not start a second competing phase
+> sequence from this historical specification.
+
 **Date:** 2026-08-11
 **Source inspiration:** [`Panniantong/Agent-Reach`](https://github.com/Panniantong/Agent-Reach) (canonical, v1.5.0, 70.5k★) — also mirrored at `Cloudslover/Agent-Reach`.
 **Target repo:** `Azimshawon/SKY` (this repository, CryptoBrain v2.0.0).

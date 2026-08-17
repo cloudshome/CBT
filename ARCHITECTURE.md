@@ -7,10 +7,26 @@
 > **Read when:** starting work on a module you haven't touched in
 > ≥1 session.
 
-**Last updated:** 2026-08-16
+**Last updated:** 2026-08-17
 **Stack:** Python 3.10+, Flask 3, SQLite, stdlib JSON-RPC MCP server.
-**Single-process, single-user, single-machine.**
-**Version:** `config.VERSION` = `2.27.0` (also `pyproject.toml`).
+**Current runtime:** single-user and one authoritative machine; Gunicorn plus
+separate supervised scan/paper workers are supported on Ubuntu.
+**Version:** `config.VERSION` = `2.29.2` (also `pyproject.toml`).
+
+---
+
+## Production distribution direction (P18–P22)
+
+[`ROADMAP.md`](ROADMAP.md) is the active merged roadmap. The target topology is
+one Ubuntu SKY Hub owning the database, market workers, evidence, risk gate,
+and audit history. Browser/PWA, Windows `.exe`, and Android `.apk` are clients
+of a secured, versioned API—not independent trading engines.
+
+This topology is a **plan, not a current capability**. Before any remote/native
+client ships, P18 must add authentication/roles, CSRF and revocable device
+tokens, `/api/v1` compatibility, idempotent mutations, and persisted jobs/SSE.
+Remote access requires HTTPS. No package or client adds live exchange-order
+code or weakens server-side risk enforcement.
 
 ---
 
@@ -26,7 +42,8 @@
 | `SESSION_STATE.md` | Handoff memory between Arena sessions |
 | `TODO.md` | Prioritised remaining work |
 | `ARCHITECTURE.md` | This file |
-| `CHANGELOG.md` | What shipped, when (current through v2.23.4) |
+| `ROADMAP.md` | Canonical merged P1–P22 product roadmap; production install/security/distribution source of truth |
+| `CHANGELOG.md` | What shipped, when |
 | `BLUEPRINT.md` | The 4-step path from paper to real capital |
 | `PROFESSIONAL_PLAN_DECISIONS.md` | The 18-phase professional plan + D-list |
 | `ROADMAP_AGENT_REACH_UPGRADE.md` | The P7/P8/P9 Agent-Reach-inspired plan |
@@ -34,6 +51,7 @@
 | `AI_ANATOMY_ROADMAP.md` | Live status of P1–P12 |
 | `docs/FREQTRADE_REVIEW.md` | **F1–F8** — Freqtrade rejected; P12 is our validation engine |
 | `docs/BACKTRADER_REVIEW.md` | **BT1–BT8** — Backtrader rejected as dependency/grader; P12 definitions extended |
+| `docs/NEEDLE_REVIEW.md` | **N1–N8** — Needle 2 parked as a conditional external read-only MCP client; not a brain or authority |
 
 ### `brain/` — the desk brain
 | Module | Purpose | Used by |
@@ -254,21 +272,29 @@
     until the primary family (`sweep_trend_continuation`) clears the
     graduation bar (F4).
 
-14. **XAU evidence is source-separated and cannot self-promote.** Dukascopy
+14. **A tool router is a client, not an authority.** Cactus Needle 2 is not
+    part of SKY's runtime and must not be installed merely to duplicate the
+    existing typed MCP boundary (`docs/NEEDLE_REVIEW.md`, N1–N8). If a real
+    offline/privacy/edge-device constraint justifies a pilot, Needle may only
+    be evaluated as an external read-only MCP client. Its confidence can
+    choose call / clarify / escalate / abstain; it can never approve, mutate,
+    open the risk gate, count toward graduation, or reach an exchange.
+
+15. **XAU evidence is source-separated and cannot self-promote.** Dukascopy
     XAU and Binance PAXG histories are never concatenated; P12.12 joins exact
     timestamps only for a read-only basis report. A measured basis and a
     passing sealed-OOS envelope make a dossier eligible for human review, not
     tradeable. Explicit human approval and the repository-wide graduation gate
     remain mandatory; no evidence command can unlock micro-live.
 
-15. **Graduation is canonical-live-only.** `paper_progress()` is a permission
+16. **Graduation is canonical-live-only.** `paper_progress()` is a permission
     input, not a pooled research report: it counts only the canonical Binance
     spot source key (`""`), including legacy NULL rows. Non-canonical histories
     remain visible through source-filtered scorecards but can neither unlock
     nor block micro-live. `grind_verdict()` / `graduation_status()` fail closed
     when a caller explicitly supplies research-source progress.
 
-16. **Graduation discipline is earned, never inherited.** The 90% compliance
+17. **Graduation discipline is earned, never inherited.** The 90% compliance
     criterion reads one computation — `brain.journal.graduation_discipline()` —
     over decided, non-simulator (`sim_key IS NULL`), canonical-live paper
     trades only. A trade counts as journaled only when `followed_rules` is 0 or
@@ -279,15 +305,15 @@
     separate, deliberately broader number for the scorecard and risk card, and
     must never be substituted back into the gate.
 
-17. **Live risk controls are canonical-live-only.** `SignalDB.live_book_rows()`
+18. **Live risk controls are canonical-live-only.** `SignalDB.live_book_rows()`
     is the one population for daily/weekly loss limits, drawdown, Kelly,
     Monte-Carlo risk, MAE/MFE and business metrics: decided, non-simulator,
     canonical-live rows, with legacy NULL provenance retained. Research rows
     remain inspectable through explicit scorecard/source queries but cannot
     mask, deepen or otherwise move a live risk reading.
 
-18. **Live exposure is canonical-live-only** (P12.16).
-    `SignalDB.live_open_rows()` is the open-side twin of #17 and the one
+19. **Live exposure is canonical-live-only** (P12.16).
+    `SignalDB.live_open_rows()` is the open-side twin of #18 and the one
     population for the portfolio veto, the correlated-bucket risk cap, the
     paper runner's polling set, the watchdog agent and every reported
     "open exposure" count: active (`WAITING_ENTRY`/`OPEN`), non-simulator,
@@ -299,7 +325,7 @@
     stays unfiltered: a scan awaiting enrolment has no provenance yet and is a
     live intention.
 
-19. **The hard limits judge NET P&L** (P12.18). `data.costs.net_r_of_row()` is
+20. **The hard limits judge NET P&L** (P12.18). `data.costs.net_r_of_row()` is
     the single definition of a decided row's net R — stored `rr_net` when
     present, otherwise costs computed from the row's own levels, symbol and
     holding time. The daily/weekly loss limits, the drawdown ladder and the

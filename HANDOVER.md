@@ -2,8 +2,20 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-16 · branch `arena/01a00c52-sky` · PR #45
-"Trading Workstation + real-world connections".
+Last updated: 2026-08-17 · branch `arena/01a00df1-sky` · production roadmap
+reconciliation after PR #45.
+
+> **Current direction supersedes the old “two terminal lines” end state.** The
+> owner wants installable production software on Ubuntu, Windows (`.exe`), and
+> Android (`.apk`) that he can use and monitor without managing source code.
+> [`ROADMAP.md`](ROADMAP.md) is now the canonical merged P1–P22 roadmap. The
+> current build is still source-installed; do not claim installers exist.
+>
+> **Next code:** P18.1 authentication/authorization, then `/api/v1`, persisted
+> jobs/SSE, and PWA. Do not build native wrappers around the current
+> unauthenticated dashboard. Chosen topology: one Ubuntu Hub owns DB/workers/
+> risk/audit; Windows and Android begin as companion clients. Packaging never
+> adds exchange-order code or changes graduation.
 
 ---
 
@@ -165,10 +177,15 @@ and the sandbox has no outbound network.
 
 ## 2. Your job next session
 
-Build these **as working UI**, in this order. Each is a browser feature, not a
-document.
+> **2026-08-17 priority update:** start P18.1 from `ROADMAP.md`—working
+> authentication, authorization, CSRF/device-token boundaries, audit, and
+> endpoint tests. The workstation priorities below remain W1–W4 and should be
+> integrated through the secured API/job foundation; they no longer precede
+> that foundation. Deliver working UI/code after this roadmap checkpoint.
 
-### Priority 0 — help him actually earn the unlock
+Build these **as working UI**, not as a second roadmap.
+
+### Carried-forward W1 — help him actually earn the unlock
 
 This is now the highest-value work, because the Evidence tab makes the gap
 visible and the user will immediately want to close it. Everything he needs

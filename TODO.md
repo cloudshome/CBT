@@ -6,7 +6,19 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-16 (**v2.27.0 / P14 shipped — operate the loop**.
+**Last updated:** 2026-08-17 (**v2.29.2 planning checkpoint — one merged
+product roadmap**). [`ROADMAP.md`](ROADMAP.md) is now the active source of
+truth: delivered P1–P17 and the old AI-anatomy / Agent-Reach / web-trader plans
+are merged with P18–P22 production distribution. The chosen path is one Ubuntu
+Hub (single database/risk authority), then an installable PWA, Windows `.exe`
+companion, and Android `.apk` companion. **Current software is still a source
+installation**; signed `.deb`/`.exe`/`.apk` artifacts are planned, not claimed.
+Next code is **P18.1 authentication and authorization**, then the versioned API
+and persisted jobs/SSE. No future env variables or packaging dependencies were
+added before their code exists. The canonical paper→graduation loop continues
+in parallel; packaging never unlocks trading.)
+
+**Previous:** 2026-08-16 (**v2.27.0 / P14 shipped — operate the loop**.
 The project-review answer: success is operating the paper→graduation loop, not
 another indicator. **P14.1** `brain/agent.py::loop_health` — one number
 (real/canonical paper n, net expectancy, per-setup progress, is the graduation
@@ -161,7 +173,44 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ---
 
-## 🔥 Current sequence — next executable work (operational, not a new code milestone)
+## 🔥 Current sequence — production software + honest evidence
+
+### TODO-23 / P18–P22 · Installable production product · 🔄 NEXT
+
+📄 **Canonical plan:** [`ROADMAP.md`](ROADMAP.md)
+
+The owner wants normal production installation and monitoring on Ubuntu,
+Windows, and Android. Build one system, not three independent brains:
+
+```text
+Windows .exe ─┐
+Android .apk ─┼─ HTTPS ─► Ubuntu SKY Hub (one DB, risk gate, workers, audit)
+Browser/PWA ──┘
+```
+
+Ordered code milestones:
+
+1. **P18.1 auth/roles** — owner login, viewer/operator separation, CSRF,
+   revocable device tokens, audit; remote mode fails closed without auth/TLS.
+2. **P18.2 `/api/v1`** — stable typed client contract, compatibility range,
+   idempotent human mutations, device registration/revocation.
+3. **P18.3 jobs/SSE** — persisted allow-listed long jobs, progress/cancel,
+   reconnect, guided evidence flow; never a shell endpoint.
+4. **P18.4 PWA/mobile** — installable responsive UI with honest stale/offline
+   behavior and no private API cache.
+5. **P19 Ubuntu package** — signed `.deb`, first-run setup, hardened systemd,
+   HTTPS, backup/restore/upgrade/rollback.
+6. **P20 Windows companion** — signed `.exe`/MSIX, pairing, Credential Manager,
+   tray health, no local duplicate engine initially.
+7. **P21 Android companion** — signed APK, Keystore, biometric re-check for
+   writes, push/deep links, online-only mutations.
+8. **P22 releases/ops** — CI install tests, signing, checksums, SBOM, release
+   channels, diagnostics, support and rollback.
+
+**Next implementation is P18.1, not an installer wrapper.** Wrapping today's
+unauthenticated development dashboard would create unsafe software and force a
+rewrite. The P11 canonical paper-evidence operation remains parallel and no
+trading/graduation threshold changes.
 
 ### TODO-22 / P14 · Operate the loop: daily ritual + one loop-health number · ✅ SHIPPED (v2.27.0)
 
@@ -643,6 +692,19 @@ Full rationale: [`docs/INFRASTRUCTURE_LAYERS.md`](docs/INFRASTRUCTURE_LAYERS.md)
 **Both are now behind P10 as well as the graduation gate.** Owning our
 data moves the aim; wrapping the engine in another chat UI does not.
 
+### Needle 2 local tool router · PARKED, conditional (N1–N8)
+
+📄 **Decision:** [`docs/NEEDLE_REVIEW.md`](docs/NEEDLE_REVIEW.md).
+
+Do not install `cactus-needle`, add a `SKY-NODE`, or expand MCP to an arbitrary
+30–50 tools now. SKY already has the proposed typed boundary in its two MCP
+servers, and router speed does not move the real-paper graduation evidence.
+Needle becomes eligible only as an **external read-only MCP client** for a
+named offline/privacy/edge-device deployment with measured latency or resource
+constraints. Any pilot must use a pinned artifact, sealed SKY-domain exact-call
+evaluation, zero forbidden-action false accepts, and shadow mode. Model
+confidence never grants permission; N1–N8 are binding.
+
 ### TODO-13 · P12 · SKY Quant Validation Engine · ✅ P12.1–P12.15 shipped
 
 📄 **Full keep/cut: [`docs/FREQTRADE_REVIEW.md`](docs/FREQTRADE_REVIEW.md) §8,
@@ -888,6 +950,11 @@ BT1–BT4 to install a trading bot or a second backtest engine.
   backtest engine "for cross-validation" (two fill semantics = two
   truths). The audit's good ideas are already ours or named P12 on
   *our* grader.
+- **Needle 2 as an in-process dependency, strategy brain, execution router,
+  or reason to manufacture a 30–50-tool catalogue.** Reviewed 2026-08-17
+  (`docs/NEEDLE_REVIEW.md`, N1–N8). A future measured edge-device pilot may
+  use it only as an external read-only MCP client; confidence is never
+  authorization.
 - **A new catalog of strategy modules** (trend / mean-reversion /
   momentum / …) before the primary family clears the graduation bar
   (F4). A1 stands: `sweep_trend_continuation` only.

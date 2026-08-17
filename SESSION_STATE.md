@@ -1,5 +1,16 @@
-**Last updated:** 2026-08-16 (**P14** on the fixed Arena session branch
-`arena/01a00a75-sky`). The repository is at **v2.27.0**: the 10-minute daily
+**Last updated:** 2026-08-17 (**v2.29.2 production-roadmap checkpoint** on
+`arena/01a00df1-sky`). [`ROADMAP.md`](ROADMAP.md) is now the canonical merged
+P1–P22 roadmap. Delivered AI anatomy, Agent-Reach, data/validation, teaching,
+sentiment, and Trading Workstation work is preserved; P18–P22 adds the ordered
+production path: secure auth/roles → `/api/v1` → persisted jobs/SSE → PWA →
+Ubuntu Hub package → Windows `.exe` companion → Android `.apk` companion →
+signed release operations. Current software remains source-installed; no
+`.deb`, `.exe`, or `.apk` is claimed. Next code is P18.1. One Ubuntu Hub owns
+DB/workers/risk/audit; clients never become duplicate engines. Packaging never
+adds live exchange execution or changes graduation.
+
+**Previous:** 2026-08-16 (**P14** on the fixed Arena session branch
+`arena/01a00a75-sky`). The repository was at **v2.27.0**: the 10-minute daily
 ritual and the one loop-health number are the product surface for operating
 the paper→graduation loop.
 

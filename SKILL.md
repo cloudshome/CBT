@@ -35,6 +35,11 @@ plus a web dashboard. This file tells you what you can call, what you
 
 ## Install (one-time)
 
+> Current releases are source-installed. Signed Ubuntu `.deb`, Windows `.exe`,
+> and Android `.apk` artifacts are planned in [`ROADMAP.md`](ROADMAP.md),
+> P18–P22, but do not exist yet. Never direct an operator to an unofficial
+> binary. The target is one Ubuntu Hub plus Windows/Android companion clients.
+
 Tell the operator to run:
 
 ```bash

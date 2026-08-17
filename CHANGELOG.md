@@ -10,6 +10,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.29.2] — 2026-08-17 · Canonical production-install roadmap
+
+PATCH planning checkpoint: merged the delivered P1–P17 AI-anatomy,
+Agent-Reach, data/validation, teaching, sentiment, and Trading Workstation plans
+with the owner's requested Ubuntu/Windows/Android production direction. No
+runtime, signal, risk, paper, API, authentication, or packaging behavior is
+claimed by this documentation release.
+
+- Added root `ROADMAP.md` as the active P1–P22 source of truth. Older roadmap
+  files remain detailed delivered/backlog records and now point to it instead
+  of starting competing phase sequences.
+- Chose one-authority topology: an always-on Ubuntu SKY Hub owns database,
+  collectors/workers, risk gate, evidence, and audit history; browser/PWA,
+  Windows `.exe`, and Android `.apk` begin as companion clients.
+- Defined P18 security and platform foundation (owner auth, viewer/operator
+  roles, CSRF, scoped/revocable device tokens, audit, versioned `/api/v1`,
+  idempotent mutations, persisted allow-listed jobs and SSE, responsive PWA).
+- Defined P19 signed Ubuntu package and operations; P20 signed Windows
+  companion; P21 signed Android companion; P22 CI, signing, checksums, SBOM,
+  monitoring, backups, upgrades, rollback, and support diagnostics.
+- Merged the unfinished web-trader items as W1–W4 instead of dropping them:
+  guided evidence, chart/replay, trader development, and reliability/mobile
+  UX now build on the secure P18 boundary.
+- Reconciled `TODO.md`, `README.md`, `ARCHITECTURE.md`, `BLUEPRINT.md`,
+  `HANDOVER.md`, and `SESSION_STATE.md`. Next code is P18.1 authentication and
+  authorization—not an installer wrapper around an unauthenticated local app.
+- Deliberately left `.env.example`, runtime dependencies, `main.py`, MCP, and
+  packaging ignores unchanged: configuration/dependencies are added only when
+  executable P18+ code reads/uses them.
+
+Current truth remains explicit: source installation and hardened Ubuntu service
+pieces exist; signed `.deb`, `.exe`, and `.apk` releases do not. Packaging does
+not add live exchange execution or move any graduation threshold. Four durable
+handoff contracts pin the merged phases, platform topology, honest artifact
+status, and PD1–PD8 decisions; full suite: **909 passed / 1 skipped**.
+
+---
+
+## [2.29.1] — 2026-08-17 · Needle 2 architecture decision
+
+PATCH: reviewed the proposed Cactus Needle / `SKY-NODE` local trading-tool
+router against the current repository and upstream Needle 2 documentation.
+No runtime, model, signal, risk, or execution behavior changed.
+
+- Added `docs/NEEDLE_REVIEW.md` with decisions **N1–N8**. The useful role is
+  preserved as a conditional **external read-only MCP client** for a concrete
+  offline/privacy/edge-device constraint; it is not P0/P1 infrastructure, a
+  strategy brain, a calculator, or an authorization layer.
+- Recorded that SKY already owns the proposed typed boundary in
+  `mcp_server.ALLOWED_TOOLS` and `ai/mcp_server.py::TOOLS`; a target of 30–50
+  tools would expand ambiguity and permission surface rather than add an
+  architectural layer.
+- Defined the only acceptable future pilot: pinned package/model/engine
+  provenance, a deduplicated sealed SKY-domain call corpus, exact tool and
+  argument metrics, resource measurements on target hardware, zero forbidden-
+  action false accepts, fail-closed confidence routing, and shadow mode.
+- Added architecture invariant #14: model confidence may select call /
+  clarify / escalate / abstain, but can never approve, mutate, open the risk
+  gate, count toward graduation, or reach an exchange.
+- Updated the infrastructure and TODO memory plus handoff contract tests so a
+  future session does not install `cactus-needle` merely to duplicate MCP.
+
+The real canonical paper-to-graduation loop remains the active priority. No
+threshold moved; root MCP remains read-only; SKY still contains no exchange
+order code.
+
+---
+
 ## [2.29.0] — 2026-08-16 · P16 prove the colour: sentiment-conditioned expectancy
 
 MINOR: the colour is no longer a belief — it is measured. Every graded plan

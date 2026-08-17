@@ -1,5 +1,9 @@
 # 🧠 AI Trading Brain Anatomy Roadmap & Status Tracker
 
+> **Roadmap status:** delivered anatomy/phase record. The active merged product
+> roadmap is [`ROADMAP.md`](ROADMAP.md), which carries this work forward into
+> the production Ubuntu, Windows, Android, security, and operations phases.
+
 ```
 Progress: [████████████████████████████████████████] P1–P10 + P12 tooling shipped; P11 proof in progress
 Tests:    750 passed / 1 skip (offline, DEMO_MODE=1)

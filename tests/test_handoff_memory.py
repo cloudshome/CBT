@@ -176,3 +176,79 @@ def test_p12_roadmap_mentions_both_reviews():
     anatomy = (ROOT / "AI_ANATOMY_ROADMAP.md").read_text(encoding="utf-8")
     assert "FREQTRADE_REVIEW.md" in anatomy
     assert "BACKTRADER_REVIEW.md" in anatomy
+
+
+def test_needle_review_keeps_router_outside_the_authority_boundary():
+    """N1–N8 preserve Needle as a conditional client, never a trader."""
+    doc = ROOT / "docs" / "NEEDLE_REVIEW.md"
+    assert doc.exists(), "Needle decision record missing — see N1–N8"
+    text = doc.read_text(encoding="utf-8")
+    lower = text.lower()
+    for decision in ("N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8"):
+        assert decision in text, f"Needle review must keep decision {decision}"
+    assert "external" in lower and "read-only mcp client" in lower
+    assert "confidence" in lower and "not authorization" in lower
+    assert "no path: needle → approval → exchange" in lower
+
+
+def test_todo_and_architecture_park_needle_without_installing_it():
+    todo = (ROOT / "TODO.md").read_text(encoding="utf-8").lower()
+    arch = (ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").lower()
+    layers = (ROOT / "docs" / "INFRASTRUCTURE_LAYERS.md").read_text(
+        encoding="utf-8"
+    ).lower()
+    assert "needle_review.md" in todo and "parked" in todo
+    assert "cactus-needle" in todo and "do not install" in todo
+    assert "needle_review.md" in arch and "tool router is a client" in arch
+    assert "needle 2" in layers and "external read-only mcp client" in layers
+
+
+def test_canonical_roadmap_merges_history_and_production_distribution():
+    doc = ROOT / "ROADMAP.md"
+    assert doc.exists(), "ROADMAP.md must remain the active merged roadmap"
+    text = doc.read_text(encoding="utf-8")
+    lower = text.lower()
+    for phase in ("P1–P6", "P7–P9", "P10", "P11", "P12", "P17", "P18", "P19", "P20", "P21", "P22"):
+        assert phase in text, f"merged roadmap missing {phase}"
+    assert "ubuntu sky hub" in lower
+    assert "windows companion" in lower and "android companion" in lower
+    assert "one database" in lower or "one db" in lower
+    assert "do not exist yet" in lower, "roadmap must not claim installers exist"
+    assert "authentication and authorization" in lower
+    assert "no live order execution" in lower
+
+
+def test_old_roadmaps_defer_to_the_canonical_roadmap():
+    for name in (
+        "AI_ANATOMY_ROADMAP.md",
+        "ROADMAP_AGENT_REACH_UPGRADE.md",
+        "WEB_TRADER_ROADMAP.md",
+    ):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        assert "ROADMAP.md" in text, f"{name} must point to canonical roadmap"
+
+
+def test_product_surfaces_state_installers_are_planned_not_shipped():
+    roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8").lower()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8").lower()
+    skill = (ROOT / "SKILL.md").read_text(encoding="utf-8").lower()
+    todo = (ROOT / "TODO.md").read_text(encoding="utf-8").lower()
+    for text in (roadmap, readme, skill, todo):
+        assert "windows" in text and ".exe" in text
+        assert "android" in text and ".apk" in text
+        assert "ubuntu" in text
+    assert "not released yet" in readme
+    assert "do not exist yet" in skill
+    assert "next implementation is p18.1" in todo
+
+
+def test_product_decisions_keep_one_authority_and_server_side_gate():
+    decisions = (ROOT / "PROFESSIONAL_PLAN_DECISIONS.md").read_text(
+        encoding="utf-8"
+    ).lower()
+    blueprint = (ROOT / "BLUEPRINT.md").read_text(encoding="utf-8").lower()
+    assert all(f"pd{i}" in decisions for i in range(1, 9))
+    assert "companion clients" in decisions
+    assert "distribution never grants live execution" in decisions
+    assert "one user never has three databases" in blueprint
+    assert "no remote client can bypass" in blueprint

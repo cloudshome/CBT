@@ -1,9 +1,9 @@
 # Infrastructure layers — what matters for SKY
 
 > **Purpose:** distill the OpenHands / Dify / LibreChat / Freqtrade /
-> Backtrader discussion into *this* repository's terms. Read once. Do
-> not re-derive next session.
-> **Last updated:** 2026-08-13
+> Backtrader / Needle discussion into *this* repository's terms. Read once.
+> Do not re-derive next session.
+> **Last updated:** 2026-08-17
 
 **One rule:** these projects are **not** dependencies of SKY and
 must never be vendored, forked-into, or `pip install`ed here.
@@ -19,6 +19,7 @@ case, a *different product* we are not becoming:
 | Chat UI | LibreChat | Human control panel | After Dify |
 | Trading bot | **Freqtrade** | None. SKY is the brain; Freqtrade places orders | **Never** — see `docs/FREQTRADE_REVIEW.md` |
 | Research backtester | **Backtrader** | None as a dependency. Its discipline (expectancy, WF/OOS, MC, regime matrix) is already P12 on our grader | **Never** — see `docs/BACKTRADER_REVIEW.md` (BT1–BT8) |
+| Edge tool router | **Cactus Needle 2** | Possible external, read-only MCP client only when a real offline/privacy/edge-device constraint exists; SKY already owns the typed tool boundary | **Parked, conditional** — see `docs/NEEDLE_REVIEW.md` (N1–N8) |
 
 Persistent memory is **this GitHub repo** (commits + `SESSION_STATE.md`
 + `TODO.md` + tests). Nothing else "hacks" an Arena session limit.
@@ -54,6 +55,10 @@ cover that job. A sixth agent that writes code is Arena itself.
 - Dify as an in-process dependency — would wrap an engine that is still
   in `PROGRESSION=student/simulator`.
 - LibreChat inside `web/app.py` — the dashboard already exists.
+- Needle inside SKY's default runtime — the typed routing boundary already
+  exists as MCP, and data/paper evidence rather than router latency is the
+  current bottleneck. It is only an external-client experiment after the
+  N5 deployment trigger in `NEEDLE_REVIEW.md`.
 - "Install all three so Arena has permanent memory" — false. Memory is
   GitHub. Dify only helps if *you* deploy it and point SKY at it later.
 
@@ -69,6 +74,7 @@ THEN    P12 · SKY Quant Validation Engine on OUR backtester + OUR store
                expectancy / risk-of-ruin — per both review docs)
 AFTER   Dify as a *separate* research layer (never imported by the engine)
 LAST    LibreChat-style chat UI, if the dashboard is not enough
+PARKED  Needle as an external read-only MCP client, only on a measured edge-device need
 NEVER   Freqtrade / Hyperopt / FreqAI / Backtrader / signed order APIs
 ```
 
