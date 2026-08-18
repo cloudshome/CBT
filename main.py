@@ -2220,7 +2220,7 @@ def cmd_companion(args) -> int:
 
 
 def cmd_hub(args) -> int:
-    """P19 Ubuntu Hub: setup / status / logs / backup / restore / doctor / uninstall."""
+    """Ubuntu Hub operations, including the P22 redacted support bundle."""
     from ops.hub import dispatch, format_doctor, format_status
 
     action = args.hub_action
@@ -2969,11 +2969,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p_hub = sub.add_parser(
         "hub",
-        help="P19 Ubuntu Hub: setup, status, logs, backup, restore, doctor, uninstall")
+        help="Ubuntu Hub: setup, status, backup/restore, doctor, diagnostics, uninstall")
     p_hub.set_defaults(func=cmd_hub)
     p_hub.add_argument("hub_action",
                        choices=("setup", "status", "logs", "backup",
-                                "restore", "doctor", "uninstall",
+                                "restore", "doctor", "diagnostics", "uninstall",
                                 "first-night", "pair"),
                        help="hub subcommand")
     p_hub.add_argument("--mode", choices=("local", "remote"), default="local",
@@ -2983,7 +2983,7 @@ def main(argv: list[str] | None = None) -> int:
     p_hub.add_argument("--prefix", default=None,
                        help="sandbox FHS prefix (tests / dry hosts)")
     p_hub.add_argument("--archive", default=None,
-                       help="restore: path to sky-backup-*.tar.gz")
+                       help="restore input, or diagnostics output .tar.gz path")
     p_hub.add_argument("--overwrite", action="store_true",
                        help="setup: rewrite env; restore: replace existing data")
     p_hub.add_argument("--purge", action="store_true",

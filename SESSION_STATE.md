@@ -1,4 +1,4 @@
-**Last updated:** 2026-08-18 (**v2.37.0 — P21 Android companion contract** on `arena/01a01486-sky`). `ops/android_companion.py` (Keystore token contract, biometric re-check policy, online-only mutations, deep links), `companion … --platform android` + `hub pair --platform android`, unsigned `packaging/android/`. Next code is **P22 signed release engineering**. P11 paper grind stays parallel.
+**Last updated:** 2026-08-18 (**v2.38.0 — P22.1 release-operations foundation** on `arena/01a014b8-sky`). `ops/release.py` + `packaging/build_release.py` (SHA-256 manifest, SPDX SBOM/license inventory, stable/beta), `hub diagnostics` (redacted private support bundle), an admin-activation release/package/security CI spec, and `docs/RELEASE_OPERATIONS.md`. Direct Debian build/runtime bootstrap defects fixed. No signed/native artifact claimed. Next code is **P22.2 real Windows/Android projects + trusted signing/physical-target drills**. P11 paper grind stays parallel.
 
 **Previous:** 2026-08-18 (**v2.35.0 — P19 + home-PC first-night guide** on `arena/01a013b2-sky`). `docs/HOME_HUB_FIRST_NIGHT.md` / `hub first-night` / `ops/first_night.sh`. `ops/hub.py` + `python main.py hub setup/status/logs/backup/restore/doctor/uninstall`, FHS `/opt/sky` `/etc/sky` `/var/lib/sky`, hardened `ops/systemd/sky-*` units, Caddy/nginx TLS examples, unsigned Debian packaging (`packaging/`). SQLite-safe backups, redacted secrets, uninstall keeps data unless `--purge`. No threshold moved, no order path. Contract: `docs/HANDOVER_2026-08-18_P19.md`. Next code is **P20 Windows companion** after a real Hub host is stable; P11 paper grind stays parallel.
 
@@ -1219,7 +1219,7 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 python -m pytest tests/test_windows_companion.py tests/test_hub.py tests/test_handoff_memory.py -q
-# 1115 passed, 1 skipped  (v2.37.0 P21: android companion + P20/hub/handoff)
+# 1125 passed, 1 skipped  (v2.38.0 P22.1 full suite; +10 release/privacy regressions)
 
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q

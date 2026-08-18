@@ -28,7 +28,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "2.36.0"
+from config import VERSION
+
 PACKAGE_NAME = "sky-hub"
 SERVICE_USER = "sky"
 UNITS = (
@@ -547,6 +548,35 @@ def doctor(*, prefix: Path | str | None = None) -> dict[str, Any]:
     }
 
 
+def diagnostics(*, prefix: Path | str | None = None,
+                output: Path | str | None = None) -> dict[str, Any]:
+    """Export a private, secret-free P22 support bundle.
+
+    The bundle deliberately excludes the database, market store, environment
+    and raw logs.  The operator can inspect its single JSON member before
+    sharing it with support.
+    """
+    from ops.release import sha256_file, write_support_bundle
+
+    paths = HubPaths.resolve(prefix)
+    if output is None:
+        ensure_layout(paths)
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        output = paths.backup_dir / f"sky-support-{stamp}.tar.gz"
+    output = Path(output)
+    write_support_bundle(output, hub_status=status(prefix=prefix),
+                         hub_doctor=doctor(prefix=prefix))
+    return {
+        "ok": True,
+        "archive": str(output),
+        "sha256": sha256_file(output),
+        "bytes": output.stat().st_size,
+        "contains": ["diagnostics.json"],
+        "excludes": ["database", "market_store", "environment", "raw_logs", "secrets"],
+        "live_exchange_execution": False,
+    }
+
+
 def logs(*, unit: str = "sky-dashboard.service", lines: int = 80) -> dict[str, Any]:
     exe = shutil.which("journalctl")
     if not exe:
@@ -686,6 +716,8 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
         return restore(archive, prefix=prefix, overwrite=overwrite)
     if action == "logs":
         return logs(unit=unit, lines=lines)
+    if action in ("diagnostics", "support-bundle"):
+        return diagnostics(prefix=prefix, output=archive)
     if action == "uninstall":
         return uninstall(prefix=prefix, purge=purge)
     if action in ("first-night", "first_night", "guide"):

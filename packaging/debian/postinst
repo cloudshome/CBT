@@ -10,8 +10,17 @@ case "$1" in
     mkdir -p /opt/sky /etc/sky /var/lib/sky /var/lib/sky/store /var/lib/sky/backups
     chown -R sky:sky /var/lib/sky /etc/sky
     chmod 0750 /etc/sky /var/lib/sky /var/lib/sky/store /var/lib/sky/backups
+    # P19's first recipe copied source but never installed its Python runtime,
+    # so /usr/bin/sky failed on a clean host. Build a package-owned venv now.
+    # Stable P22 promotion must build from a reviewed/pinned wheelhouse; this
+    # beta fallback resolves requirements from the configured Python index.
+    if [ ! -x /opt/sky/.venv/bin/python ]; then
+      python3 -m venv /opt/sky/.venv
+      /opt/sky/.venv/bin/python -m pip install --disable-pip-version-check \
+        -r /opt/sky/requirements.txt
+    fi
     if [ ! -f /etc/sky/sky.env ]; then
-      python3 /opt/sky/main.py hub setup --mode local --json >/dev/null 2>&1 || true
+      /opt/sky/.venv/bin/python /opt/sky/main.py hub setup --mode local --json >/dev/null
     fi
     if command -v systemctl >/dev/null 2>&1; then
       systemctl daemon-reload || true

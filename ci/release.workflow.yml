@@ -1,0 +1,112 @@
+# GitHub Actions workflow specification. Arena's GitHub App cannot write
+# .github/workflows; a repository admin must review and copy this file to
+# .github/workflows/release.yml to activate it.
+name: Release foundation
+
+on:
+  pull_request:
+    paths:
+      - "ops/**"
+      - "packaging/**"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - ".github/workflows/release.yml"
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-smoke:
+    name: ${{ matrix.target }} contract smoke
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: Ubuntu Hub
+            os: ubuntu-latest
+            platform: windows
+          - target: Windows companion
+            os: windows-latest
+            platform: windows
+          - target: Android companion
+            os: ubuntu-latest
+            platform: android
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test runtime
+        run: python -m pip install -r requirements.txt
+      - name: Contract and release tests
+        run: python -m pytest tests/test_release_ops.py tests/test_api_v1.py tests/test_${{ matrix.platform }}_companion.py -q
+      - name: Emit companion contract artifact
+        shell: bash
+        run: |
+          mkdir -p dist/contracts
+          python main.py companion spec --platform "${{ matrix.platform }}" --json > "dist/contracts/${{ matrix.platform }}.json"
+          python packaging/build_release.py --channel beta --output dist/release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}-release-metadata
+          path: |
+            dist/contracts/*.json
+            dist/release/*
+
+  ubuntu-package-smoke:
+    name: Ubuntu package install / backup / remove smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build unsigned Debian artifact
+        run: SKY_DEB_VERSION=$(python -c "import config; print(config.VERSION)") sh packaging/build_deb.sh
+      - name: Inspect and install package on clean runner
+        run: |
+          deb=$(find dist -name 'sky-hub_*.deb' -print -quit)
+          dpkg-deb --info "$deb"
+          sudo apt-get update
+          sudo apt-get install -y "$deb"
+          test -x /usr/bin/sky
+          test -f /opt/sky/main.py
+          sudo SKY_HUB_PREFIX=/tmp/sky-release-smoke /usr/bin/sky setup --mode local --json
+          sudo SKY_HUB_PREFIX=/tmp/sky-release-smoke /usr/bin/sky backup --no-store --json
+          sudo dpkg -r sky-hub
+          test ! -e /opt/sky
+          test -d /var/lib/sky
+      - name: Build checksums and SPDX SBOM
+        run: |
+          deb=$(find dist -name 'sky-hub_*.deb' -print -quit)
+          python packaging/build_release.py --channel beta --artifact "$deb" --output dist/release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-unsigned-package
+          path: |
+            dist/*.deb
+            dist/release/*
+
+  dependency-audit:
+    name: Dependency vulnerability inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Audit declared dependencies
+        run: |
+          python -m pip install pip-audit
+          pip-audit -r requirements.txt --progress-spinner off
+
+# Trusted signing is deliberately NOT performed in pull-request CI. The
+# promotion workflow described in docs/RELEASE_OPERATIONS.md must verify these
+# unsigned outputs, sign them in an isolated release environment, then publish
+# detached verifier records and stable/beta channel metadata.

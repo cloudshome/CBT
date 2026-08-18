@@ -343,8 +343,11 @@ Companion client contracts are shipped as **unsigned recipes**: the Windows
 companion (`P20`, v2.36.0, `ops/windows_companion.py`) and the Android
 companion (`P21`, v2.37.0, `ops/android_companion.py` — Keystore token
 storage, biometric re-check policy, online-only mutations, `sky://record/…`
-deep links). Code signing and public checksum channels are P22; no signed
-`.exe`/`.apk` exists in this repository.
+deep links). P22.1 (v2.38.0) adds release manifests/SHA-256, SPDX SBOM,
+stable/beta metadata, a package/security CI spec (admin activation pending), private redacted support bundles
+(`python main.py hub diagnostics`) and the incident/rollback runbook. Native
+projects and trusted code signing remain P22.2; no signed `.deb`, `.exe` or
+`.apk` exists in this repository.
 
 ## 🚀 Quickstart
 

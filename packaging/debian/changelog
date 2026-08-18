@@ -1,3 +1,11 @@
+sky-hub (2.38.0-1) unstable; urgency=medium
+
+  * P22.1: deterministic checksums/release manifest, SPDX SBOM,
+    private redacted support bundle and clean-runner package smoke gate.
+    Artifact/repository signing remains isolated release-environment work.
+
+ -- Azimshawon <noreply@localhost>  Tue, 18 Aug 2026 18:00:00 +0000
+
 sky-hub (2.35.0-1) unstable; urgency=medium
 
   * P19: first Ubuntu Hub package — FHS layout, hardened systemd,

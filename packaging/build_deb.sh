@@ -3,7 +3,8 @@
 # Signing is P22 / the release environment — this script never embeds a key.
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
-VERSION="${SKY_DEB_VERSION:-2.35.0}"
+VERSION="${SKY_DEB_VERSION:-$(sed -n 's/^version = "\([^"]*\)"/\1/p' "$ROOT/pyproject.toml" | head -n 1)}"
+[ -n "$VERSION" ] || { echo "cannot determine package version" >&2; exit 2; }
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/sky-deb.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 
@@ -24,6 +25,7 @@ install -m 0755 "$ROOT/packaging/sky" "$STAGE/usr/bin/sky"
 
 SIZE_KB=$(du -sk "$STAGE" | awk '{print $1}')
 sed -e "s/^Architecture:.*/Architecture: all/" \
+    -e 's/${misc:Depends}, //' \
     "$ROOT/packaging/debian/control" | awk '
   /^Package:/ {p=1}
   p {print}

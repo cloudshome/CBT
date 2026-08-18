@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
-# Uninstall preserves /var/lib/sky and /etc/sky unless purge.
+# The package-owned venv and Python caches are generated at configure/runtime,
+# so dpkg does not know their files. Remove the application tree on uninstall;
+# preserve operator data/config unless this is a purge.
+case "$1" in
+  remove|purge)
+    rm -rf /opt/sky
+    ;;
+esac
 case "$1" in
   purge)
     rm -rf /var/lib/sky /etc/sky

@@ -2,7 +2,7 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-18 · **v2.37.0 — P21 Android companion contract** (`docs/HANDOVER_2026-08-18_P21.md`, branch `arena/01a01486-sky`). Keystore token contract, biometric re-check policy, online-only mutations, deep links, unsigned APK recipe; no signed APK. Next: P22 signed release/ops. P20 pairing/client (Windows) and P19 Hub mechanics shipped. P18.4 PWA remains the browser delivery shell. No threshold moved; no order path.
+Last updated: 2026-08-18 · **v2.38.0 — P22.1 release-operations foundation** (`docs/HANDOVER_2026-08-18_P22_1.md`). SHA-256/release manifests, SPDX SBOM/license inventory, stable/beta metadata, redacted private diagnostics, an admin-activation package/security CI spec and incident/rollback runbook. No signed installer is claimed. Next: P22.2 real native projects + trusted signing/physical-target drills. No threshold moved; no order path.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -10,8 +10,9 @@ Last updated: 2026-08-18 · **v2.37.0 — P21 Android companion contract** (`doc
 > [`ROADMAP.md`](ROADMAP.md) is the canonical merged P1–P22 roadmap. The current
 > build is still source-installed; do not claim installers exist.
 >
-> **Next code:** P22 signed release engineering. P21 Android + P20 Windows
-> pairing/client contracts shipped (unsigned recipes only).
+> **Next code:** P22.2 native Windows/Android projects, then trusted signing
+> and clean physical-target drills. P22.1 release metadata/CI/diagnostics is
+> shipped; P21 Android + P20 Windows remain contracts and unsigned recipes.
 > Chosen topology: one Ubuntu Hub owns DB/workers/risk/audit; browser/PWA,
 > Windows and Android are companion clients. Packaging never adds
 > exchange-order code or changes graduation.
@@ -20,7 +21,7 @@ Last updated: 2026-08-18 · **v2.37.0 — P21 Android companion contract** (`doc
 
 > **Triage durable (2026-08-18):** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` is still the `6-idea -> Take/Park/Reject` decision — `P18.4` already satisfied `*02/#3 + *05 compact` as shell-only PWA; `*01/*04/*06` stay parked as external labs after `P19+graduation`. **Do not re-triage, do not add torch/OpenDataLoader/LMRing deps.**
 
-**P19, P20 and P21 contracts are done (v2.35.0 / v2.36.0 / v2.37.0).** Build **P22 — signed release engineering**: CI install/smoke matrix (Ubuntu package, Windows package, Android build), code signing for Windows + Android + signed Debian repo metadata, reproducible SHA-256 artifacts, SBOM + dependency/license inventory, stable/beta channels, in-app System page, privacy-respecting diagnostics export, and documented incident/support/rollback paths. Do not wrap an unauthenticated Flask. P11 paper grind stays parallel.
+**P19, P20, P21 and P22.1 are done (v2.35.0–v2.38.0).** P22.1 shipped release metadata (SHA-256 manifest, SPDX SBOM/license inventory, stable/beta), redacted diagnostics, Ubuntu package smoke/security CI and incident/support/rollback paths; it also fixed the direct Debian builder/runtime bootstrap. Build **P22.2** by creating real Windows and Android native projects before claiming their build/lint/instrumented jobs, then sign Windows + Android and Debian repository metadata only in the trusted release environment. Run clean physical install/upgrade/rollback drills. Do not mark P22 complete from contract JSON or synthetic CI. P11 paper grind stays parallel.
 
 Two things to carry into P19:
 

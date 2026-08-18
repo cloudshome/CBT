@@ -9,6 +9,7 @@ Rules-Requires-Root: no
 
 Package: sky-hub
 Architecture: all
+Maintainer: Azimshawon <noreply@localhost>
 Depends: ${misc:Depends}, python3 (>= 3.10), python3-venv, python3-pip, adduser
 Recommends: gunicorn
 Description: SKY trading desk Ubuntu Hub (paper-first, no live orders)

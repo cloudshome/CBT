@@ -10,6 +10,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.38.0] — 2026-08-18 · P22.1 release-operations foundation
+
+MINOR: release outputs are now inspectable, channelled and diagnosable without
+pretending this Linux checkout can sign or install native clients. No threshold
+moved and no exchange-order path was added.
+
+- **Release metadata** — `ops/release.py` + `packaging/build_release.py` emit
+  sorted SHA-256 checksums, a version/channel/API compatibility manifest,
+  SPDX 2.3 SBOM and dependency/license inventory. Channels are the closed
+  vocabulary `stable|beta`; metadata cannot claim `signed=true` without a
+  detached verifier record.
+- **Private diagnostics** — `python main.py hub diagnostics` writes a mode-0600
+  support bundle with one recursively redacted JSON snapshot. Database,
+  market store, environment, raw logs and secrets are excluded.
+- **CI foundation spec** — `ci/release.workflow.yml` defines API/client/release
+  contracts across Ubuntu and Windows, clean-runner Debian install/backup/
+  remove smoke, metadata/SBOM generation and `pip-audit`. PR CI receives no
+  signing secrets. Arena's GitHub App cannot activate workflow files; a repo
+  admin must review/copy it to `.github/workflows/release.yml`.
+- **Operations** — `docs/RELEASE_OPERATIONS.md` defines stable/beta promotion,
+  isolated Debian/Windows/Android signing, signature verification, support,
+  incident and rollback paths.
+- **Debian correctness** — direct builds now resolve `${misc:Depends}`, derive
+  the current version, carry a maintainer, create the package runtime on a
+  clean host, and remove generated venv/caches with `/opt/sky` while preserving
+  `/etc/sky` + `/var/lib/sky` on ordinary uninstall.
+- **Tests** — `tests/test_release_ops.py` pins channels, checksums, SBOM,
+  redaction, private bundles, signing readiness and workflow/runbook safety.
+
+Honest limitation: this is P22.1, not P22 completion. P20/P21 contain native
+client contracts and recipes, not native projects; no signed `.deb`, `.exe`,
+`.msix`, `.apk` or `.aab` was produced. Clean physical target drills and
+trusted signing remain release-environment work.
+
+---
+
 ## [2.37.0] — 2026-08-18 · P21 Android companion contract
 
 MINOR: the Hub can pair an Android companion over `/api/v1` without
