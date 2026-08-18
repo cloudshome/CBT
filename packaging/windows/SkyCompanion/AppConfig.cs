@@ -8,7 +8,7 @@ public static class AppConfig
 {
     public const string ClientName = "sky-windows";
     public const int ClientBuild = 1;
-    public const string Version = "2.39.0";
+    public const string Version = "2.40.0";
     public const bool LiveExchangeExecution = false;
     public const string ApiPrefix = "/api/v1";
     public const string CredentialTarget = "SKY/HubDeviceToken";

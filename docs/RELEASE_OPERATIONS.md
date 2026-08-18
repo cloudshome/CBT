@@ -146,7 +146,20 @@ tokens, a database, signing material, or exchange credentials.
 5. Keep clients within the published `/api/v1` compatibility range. Record the
    incident and do not re-promote until the root cause has a regression test.
 
-## 6. Current honest limitations
+## 6. P22.3 drill evidence
+
+```bash
+python main.py release drills --json
+python main.py release check --drill ubuntu-clean-vm --evidence /path/to/ubuntu-clean-vm.json
+```
+
+A drill is **OPEN** until an operator JSON file supplies every required field
+from `ops/release_drills.py`. Claims that “this sandbox signed” or that Linux
+CI installed Windows/Android are rejected. `live_exchange_execution` must stay
+false. P22 is complete only when every drill file in an evidence directory
+passes — never because the catalog exists.
+
+## 7. Current honest limitations
 
 - No signing key is available to this repository, by design.
 - P22.2 added native project trees. Linux CI static-lints them; it still

@@ -11,7 +11,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "2.39.0"
+        versionName = "2.40.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "LIVE_EXCHANGE_EXECUTION", "false")
         buildConfigField("int", "CLIENT_BUILD", "1")

@@ -6,12 +6,10 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-18 (**v2.39.0 — P22.2 native companion projects
-shipped**. Real `packaging/windows/SkyCompanion` (.NET 8) and
-`packaging/android/SkyCompanion` (Gradle/Kotlin) trees + `companion lint`.
-No signed installer and no physical-target drill is claimed. **Next is trusted
-signing + clean Windows/Android install/upgrade/rollback drills.** P11
-real-paper grind continues; packaging is not the edge.)
+**Last updated:** 2026-08-18 (**v2.40.0 — P22.3 signing + clean-target drill
+contracts**. Catalog + fail-closed evidence check. No signed installer is
+claimed. **Next is executing those drills on trusted hosts.** P11 paper grind
+continues; packaging is not the edge.)
 
 **Previous:** 2026-08-18 (**v2.35.0 — P19 Ubuntu Hub package shipped**.
 `python main.py hub setup|status|logs|backup|restore|doctor|uninstall`,
@@ -239,18 +237,13 @@ Ordered code milestones:
 7. ~~**P21 Android companion**~~ — ✅ shipped v2.37.0 contract
    (`ops/android_companion.py`; Keystore, biometric re-check policy,
    online-only mutations, deep links, unsigned APK recipe).
-8. **P22 releases/ops** — 🔄 P22.1 shipped v2.38.0 (metadata/CI/diagnostics).
-   P22.2 shipped v2.39.0 (real Windows/Android project trees + static lint).
-   Remaining: native compile on platform hosts, trusted Windows/Android
-   signing, signed Debian repository metadata, and physical clean-target
-   install/upgrade/rollback drills.
+8. **P22 releases/ops** — 🔄 P22.1–P22.3 shipped (metadata, native trees,
+   drill contracts). Remaining: actually compile/sign on platform hosts and
+   attach operator evidence so `p22_complete` can flip.
 
-**Next implementation is P22 trusted signing + physical-target drills.**
-P19–P22.2 shipped the Hub mechanics, client contracts and native project trees
-(unsigned recipes). A signed Debian *repository* and a clean-VM
-install/reboot/restore drill still need a trusted release host. Windows and
-Android signing wait on those same hosts — not more source trees.
-The P11 canonical paper-evidence operation remains parallel.
+**Next implementation is P22 trusted-host drills** (execute the P22.3 catalog
+on real Windows/Android/Ubuntu signers — not more Python catalogs). P11
+canonical paper-evidence remains parallel.
 
 ### TODO-22 / P14 · Operate the loop: daily ritual + one loop-health number · ✅ SHIPPED (v2.27.0)
 

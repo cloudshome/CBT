@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>2.39.0</Version>
+    <Version>2.40.0</Version>
     <AssemblyName>SkyCompanion</AssemblyName>
     <RootNamespace>Sky.Companion</RootNamespace>
     <Description>SKY Windows companion — HTTPS client of the Ubuntu Hub. No local trading brain. No exchange orders.</Description>

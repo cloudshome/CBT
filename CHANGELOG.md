@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.40.0] — 2026-08-18 · P22.3 signing + clean-target drill contracts
+
+MINOR: trusted-signing and physical install/upgrade/rollback work is now a
+fail-closed catalog with operator evidence, not a claim from Linux CI. No
+threshold moved and no exchange-order path was added.
+
+- **Drills** — `ops/release_drills.py` publishes six checklists (Debian repo
+  sign, Authenticode, apksigner, Ubuntu clean VM, Windows 11 clean target,
+  Android physical target).
+- **CLI** — `python main.py release drills|check` and Command Center cards.
+  Evidence JSON must include every required field; sandbox/CI completion
+  claims are rejected; `p22_complete` stays false without a full evidence dir.
+- Honest limitation: this checkout still produced no signed installer.
+
 ## [2.39.0] — 2026-08-18 · P22.2 native companion projects
 
 MINOR: real Windows (.NET 8 / WebView2) and Android (Gradle / Kotlin) project

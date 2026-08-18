@@ -2172,6 +2172,35 @@ def cmd_correlation(args) -> int:
     return 0 if res.get("available") else 1
 
 
+def cmd_release(args) -> int:
+    """P22.3 signing + clean-target drill catalog / evidence check."""
+    from ops.release_drills import (DrillError, evaluate_file, format_catalog,
+                                    p22_status)
+    action = getattr(args, "release_action", "drills")
+    if action in ("drills", "sign-plan", "status"):
+        payload = p22_status(getattr(args, "evidence_dir", None))
+        if args.json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(format_catalog(payload))
+        return 0
+    if action == "check":
+        try:
+            verdict = evaluate_file(args.drill, args.evidence)
+        except DrillError as exc:
+            print(f"[!] {exc}", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps(verdict, indent=2, default=str))
+        else:
+            print(f"{verdict['drill']}: {verdict['note']}")
+            if verdict["missing"]:
+                print("  missing: " + ", ".join(verdict["missing"]))
+        return 0 if verdict["passed"] else 1
+    print(f"[!] unknown release action {action}", file=sys.stderr)
+    return 1
+
+
 def cmd_companion(args) -> int:
     """P20/P21 contracts + P22.2 native project lint (unsigned)."""
     platform = getattr(args, "platform", "windows")
@@ -2963,6 +2992,20 @@ def main(argv: list[str] | None = None) -> int:
     p_skill.set_defaults(func=cmd_skill)
 
     # ── P19 Ubuntu Hub ────────────────────────────────────────────────
+    p_rel = sub.add_parser(
+        "release",
+        help="P22.3 signing + clean-target drills (catalog / evidence check)")
+    p_rel.set_defaults(func=cmd_release)
+    p_rel.add_argument("release_action", nargs="?", default="drills",
+                       choices=("drills", "sign-plan", "status", "check"))
+    p_rel.add_argument("--drill", default="",
+                       help="check: drill id from the catalog")
+    p_rel.add_argument("--evidence", default="",
+                       help="check: path to operator evidence JSON")
+    p_rel.add_argument("--evidence-dir", default=None,
+                       help="directory of <drill-id>.json files")
+    p_rel.add_argument("--json", action="store_true")
+
     p_comp = sub.add_parser(
         "companion",
         help="P20 Windows / P21 Android companion: spec, validate-url, status (unsigned recipe)")

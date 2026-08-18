@@ -2,7 +2,7 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-18 · **v2.39.0 — P22.2 native companion projects** (`docs/HANDOVER_2026-08-18_P22_2.md`). Real Windows .NET 8 and Android Gradle/Kotlin trees plus `companion lint`. No signed installer and no physical drill is claimed. Next: trusted signing + clean-target drills. No threshold moved; no order path.
+Last updated: 2026-08-18 · **v2.40.0 — P22.3 signing + clean-target drills** (`docs/HANDOVER_2026-08-18_P22_3.md`). Catalog + fail-closed evidence. No signed installer claimed. Next: run drills on trusted hosts. No threshold moved; no order path.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -21,10 +21,9 @@ Last updated: 2026-08-18 · **v2.39.0 — P22.2 native companion projects** (`do
 
 > **Triage durable (2026-08-18):** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` is still the `6-idea -> Take/Park/Reject` decision — `P18.4` already satisfied `*02/#3 + *05 compact` as shell-only PWA; `*01/*04/*06` stay parked as external labs after `P19+graduation`. **Do not re-triage, do not add torch/OpenDataLoader/LMRing deps.**
 
-**P19–P22.2 are done (v2.35.0–v2.39.0).** P22.2 added the Windows and Android
-project trees and a static lint. Sign and physically drill only in the trusted
-release environment. Do not mark P22 complete from contract JSON or Linux CI.
-P11 paper grind stays parallel.
+**P19–P22.3 are done as source contracts (v2.35.0–v2.40.0).** Sign and
+physically drill only in the trusted release environment. Do not mark P22
+complete from catalog JSON or Linux CI. P11 paper grind stays parallel.
 
 Two things to carry into P19:
 

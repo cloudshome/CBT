@@ -337,6 +337,14 @@ COMMANDS: list[dict] = [
          "SQLite-safe + redacted-config backup under /var/lib/sky/backups. "
          "Secrets are stripped. Archives are mode 0600.",
          safety="write", related=["hub_status"]),
+    _cmd("release_drills", "Hub", "Release drills", ["release", "drills"],
+         "P22.3 catalog of trusted signing and clean-target install/upgrade/"
+         "rollback drills. Linux CI cannot pass them; attach operator evidence.",
+         related=["hub_doctor", "companion_lint"]),
+    _cmd("companion_lint", "Hub", "Companion lint", ["companion", "lint"],
+         "Static inventory of the Windows and Android project trees. "
+         "Refuses committed keystores and any live-order path.",
+         related=["release_drills"]),
     _cmd("mcp", "Integration", "MCP server", ["mcp"],
          "Long-lived Model Context Protocol server for Claude Desktop or "
          "Cursor. Start it from a terminal, not the browser.",
