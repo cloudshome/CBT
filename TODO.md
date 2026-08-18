@@ -6,18 +6,9 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-17 (**v2.33.0 — W2 complete (part 2)**. The chart
-workspace now streams the newest bar over SSE (`web/live_stream.py`,
-`GET /api/chart/stream`) and updates the series in place, labelling
-live / waiting / stale / feed-error / disconnected honestly; trendlines,
-horizontal rays and boxes are placed with the mouse, persist per symbol +
-timeframe in `localStorage`, and can be attached to a journal note. While
-proving it, the new served-script check caught and fixed a **pre-existing
-`SyntaxError` that disabled the whole dashboard script in real browsers**.
-No threshold moved and no order path was added
-(`docs/HANDOVER_2026-08-17_W2_part2.md`). Suite: 1053 passed / 1 skipped.
-**Next code is P18.4 — the installable, mobile-responsive PWA**; its service
-worker must never cache `/api/*`, auth, SSE, private state or mutations.)
+**Last updated:** 2026-08-18 (**v2.34.0 — P18.4 PWA foundation shipped**. The desk is now installable from Chrome/Edge (desktop + Android) via `web/static/manifest.json` + `web/static/sw.js` (shell-only precache; never caches `/api/*`, auth, `/api/chart/stream` or `/api/v1/jobs/*/events`). Sticky offline banner + `body.offline` mutation guard + `offline.html` precached shell + `beforeinstallprompt` banner + `640px` compact mode for daily ritual/risk/paper/approvals/journal. `Service-Worker-Allowed: /` at `/sw.js` with `no-cache`. No threshold moved, no order path was added
+(`docs/HANDOVER_2026-08-18_P18_4.md`, `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` triage). Suite: 1063 passed / 1 skipped (+10 `tests/test_pwa.py`).
+**Next code is P19 — Ubuntu Hub package** (`sky setup/backup/restore`, hardened systemd, TLS); Windows `.exe` (P20) and Android `.apk` (P21) only after Hub stable. `P11` real-paper grind continues; `P18.4` is the delivery shell, not the edge.)
 
 **Previous:** 2026-08-17 (**W1 + W2 (part 1) consolidated**.
 W1 keeps fail-closed composite validation, coherent asset/timeframe propagation,
@@ -230,9 +221,9 @@ Ordered code milestones:
 3. ~~**P18.3 jobs/SSE**~~ — ✅ shipped v2.31.0; persisted allow-listed long
    jobs, progress/cancel and reconnect. ~~W1 guided evidence UX~~ — ✅ shipped
    v2.32.0 with per-series controls, inline progress and an honest projection.
-4. **P18.4 PWA/mobile** ← **NEXT CODE** — installable responsive UI with honest stale/offline
-   behavior and no private API cache.
-5. **P19 Ubuntu package** — signed `.deb`, first-run setup, hardened systemd,
+   ~~W2 live streaming + drawings~~ — ✅ shipped v2.33.0 `series.update()` + trend/ray/box in `localStorage`.
+4. ~~**P18.4 PWA/mobile**~~ — ✅ shipped v2.34.0; `manifest.json + sw.js` (shell-only; never `/api/*`/SSE), `offline.html` precached, offline banner + mutation guard + `beforeinstallprompt` + `640px` compact + `Service-Worker-Allowed: /`.
+5. **P19 Ubuntu package** ← **NEXT CODE** — signed `.deb`, first-run setup, hardened systemd,
    HTTPS, backup/restore/upgrade/rollback.
 6. **P20 Windows companion** — signed `.exe`/MSIX, pairing, Credential Manager,
    tray health, no local duplicate engine initially.
@@ -241,13 +232,7 @@ Ordered code milestones:
 8. **P22 releases/ops** — CI install tests, signing, checksums, SBOM, release
    channels, diagnostics, support and rollback.
 
-**Next implementation is P18.3, not an installer wrapper.** The dashboard is
-now authenticated (P18.1) and speaks a stable contract (P18.2); what it still
-lacks is durable background work — closing a browser kills a running job, and
-duplicate clicks can start duplicate runs. Reuse
-`web/api_v1.py::IdempotencyStore` as the job-submission dedupe key rather than
-inventing a second mechanism. The P11 canonical paper-evidence operation remains parallel and no
-trading/graduation threshold changes.
+**Next implementation is P19 Ubuntu Hub package, not an installer wrapper.** P18.1 auth/roles (v2.29.2) → P18.2 `/api/v1` (v2.30.0) → P18.3 jobs/SSE (v2.31.0) → W1 guided evidence (v2.32.0) → W2 live streaming + drawings (v2.33.0) → P18.4 PWA (v2.34.0) are shipped. What the desk still lacks is **production install**: one `sky` service user, `/opt/sky` + `/etc/sky` + `/var/lib/sky`, hardened `gunicorn/scan/paper` units, `sky setup/status/logs/backup/restore/doctor`, TLS proxy. The P11 canonical paper-evidence operation remains parallel and no trading/graduation threshold changes.
 
 ### TODO-22 / P14 · Operate the loop: daily ritual + one loop-health number · ✅ SHIPPED (v2.27.0)
 

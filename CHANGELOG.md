@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.34.0] — 2026-08-18 · P18.4 PWA foundation — installable, offline-safe shell
+
+MINOR: the desk is now installable (Chrome/Edge desktop + Android) and honest offline. No threshold moved, no order path exists, nothing here writes to the learning store, the paper book or the risk gate. This is a delivery shell over existing behaviour.
+
+- **Manifest + icons** — `web/static/manifest.json` (name SKY, `start_url /?source=pwa`, `display standalone`, `theme #070b14`, 192/512 any + 512 maskable + 180 apple, 3 shortcuts) + project-owned PNGs under `web/static/icons/`. No CDN.
+- **Service worker** — `web/static/sw.js` (`sky-shell-v2.34.0`) precaches **shell only** (`/`, `/offline.html`, manifest, chart lib, icons). **Never** caches `/api/*`, auth, `/api/chart/stream` or `/api/v1/jobs/*/events` (bare `return` → network-only, so private JSON never enters CacheStorage). Navigation is network-first → offline fallback; `/static/*` is stale-while-revalidate. Served at `/sw.js` with `Service-Worker-Allowed: /` + `Cache-Control: no-cache`.
+- **Offline shell** — `web/static/offline.html` always-available precached page: *You are offline — cached shell only; Mutations disabled; API/auth/SSE are never cached — network-only.* Shows `sky:lastUpdated`, connection, SW state, actions.
+- **Dashboard wiring** — `<link rel="manifest">`, `theme-color`, `apple-touch-icon`, sticky `#offlineBanner` (⚠️ Offline — showing cached shell. Data may be stale. Mutations disabled.) + `#installBanner` (📲 Install SKY + 7-day snooze), `640px` compact mode for daily ritual/risk/paper/approvals/journal, `beforeinstallprompt`/`appinstalled`, `online/offline` → `body.offline` + disable mutation buttons, `serviceWorker.register('/sw.js', {scope:'/'})` with update toast, `SKY_push` stub + `SKY_compact()` helper. Kept `node --check` clean (no `\n` literal inside Python string).
+- **Routes & gate** — `GET /sw.js`, `/manifest.json`, `/offline.html`, `/offline` are public before auth (`_auth_gate` exempt) so installability works even when auth is enabled.
+- **Docs & tests** — `docs/HANDOVER_2026-08-18_P18_4.md`, `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` (6-idea Take/Park/Reject, no code). Suite: **1063 passed / 1 skipped** (+10 `tests/test_pwa.py`: manifest/icons/sw safety/never-cache/offline/HTML links/routes/headers/version/`node --check`).
+
+---
+
 ## [2.33.0] — 2026-08-17 · W2 complete: live chart streaming + drawing tools
 
 MINOR: the chart workspace streams the newest bar instead of waiting for a

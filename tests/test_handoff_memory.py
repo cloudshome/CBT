@@ -241,11 +241,12 @@ def test_product_surfaces_state_installers_are_planned_not_shipped():
     assert "not released yet" in readme
     assert "do not exist yet" in skill
     # The load-bearing invariant is the *ordering*: the next code is the current
-    # P18 sub-phase, never an installer wrapper around it. Pinning one exact
+    # phase after P18, never an installer wrapper around it. Pinning one exact
     # sub-phase number made this fail every time a phase shipped, which trains
     # the next session to edit the test instead of reading it — so pin the rule.
-    assert re.search(r"next implementation is p18\.\d", todo), (
-        "TODO.md must name the next P18 sub-phase as the next implementation")
+    # After P18.4 the next implementation is P19 (Ubuntu Hub), so allow both.
+    assert re.search(r"next implementation is p(18\.\d|19)", todo), (
+        "TODO.md must name the next P18 sub-phase or P19 as the next implementation")
     assert "not an installer wrapper" in todo
 
 

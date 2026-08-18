@@ -2,14 +2,7 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-17 · **v2.33.0 — W2 complete (part 2: live streaming +
-drawing tools)**. The chart streams the newest bar over SSE and calls
-`series.update()` in place, labelling live / waiting / stale / feed-error /
-disconnected honestly; trendlines, horizontal rays and boxes are drawn with the
-mouse and persist per symbol + timeframe. This build also fixed a
-**dashboard-killing JavaScript bug that was live on `main`** (see §1d).
-W1 evidence UX, W2 part 1 (zones + replay), P18.3 jobs/SSE, P18.2 `/api/v1` and
-P18.1 auth shipped previously.
+Last updated: 2026-08-18 · **v2.34.0 — P18.4 PWA shipped + 6-idea triage durable** (`docs/HANDOVER_2026-08-18_P18_4.md` + `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md`, branch `arena/01a0135d-sky`). The desk is now installable from Chrome/Edge (desktop + Android) — `manifest.json` + 4 icons, `sw.js` `sky-shell-v2.34.0` (shell-only; never `/api/*`, auth, SSE), `offline.html` precached, offline banner + mutation guard + install prompt + `640px` compact. Underneath, W2 live streaming (`series.update()`, `live/waiting/stale/error/disconnected`) + mouse drawings per `symbol+tf` + the dashboard-killing JS bug fix on `main` (see §1d) remain. W1, W2 p1, P18.3 jobs/SSE, P18.2 `/api/v1`, P18.1 auth shipped before. The 6-idea triage (`*01 LMRing, *02 desk, *03 evidence engine, *04 OpenDataLoader, *05 harness, *06 AirLLM` → `Take/Park/Reject`) survives as `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` so the next session does not re-install them.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -17,33 +10,23 @@ P18.1 auth shipped previously.
 > [`ROADMAP.md`](ROADMAP.md) is the canonical merged P1–P22 roadmap. The current
 > build is still source-installed; do not claim installers exist.
 >
-> **Next code:** P18.4 — the mobile-responsive, installable PWA (W2 is done).
+> **Next code:** P19 Ubuntu Hub package (first production release) — `sky setup/backup/restore`, hardened systemd, TLS. W2 and P18.4 are done.
 > Chosen topology: one Ubuntu Hub owns DB/workers/risk/audit; browser/PWA,
 > Windows and Android are companion clients. Packaging never adds
 > exchange-order code or changes graduation.
 
 ## Next session — start here
 
-**W2 is complete.** Build **P18.4 — the PWA**: manifest / project-owned icons /
-install prompt; a service worker that never caches `/api/*`, auth, SSE, private
-state or mutations; an obvious offline/stale state with mutations disabled; and
-a compact mobile path for the daily ritual, risk, paper positions, approvals and
-journal completion.
+> **Triage durable (2026-08-18):** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` is still the `6-idea -> Take/Park/Reject` decision — `P18.4` already satisfied `*02/#3 + *05 compact` as shell-only PWA; `*01/*04/*06` stay parked as external labs after `P19+graduation`. **Do not re-triage, do not add torch/OpenDataLoader/LMRing deps.**
 
-Two things to carry into it:
+**P18.4 is done (v2.34.0).** Build **P19 — Ubuntu Hub package**: one `sky` service user, `/opt/sky` + `/etc/sky` + `/var/lib/sky`, hardened `gunicorn/scan/paper` units, `sky setup/status/logs/backup/restore/doctor`, TLS proxy. The PWA foundation (`manifest.json` + `sw.js` shell-only + `offline.html` + offline banner/mutation guard + `640px` compact) is the delivery shell for it.
 
-- **Never cache the SSE routes** (`/api/chart/stream`, `/api/v1/jobs/*/events`).
-  A cached event stream is a lie about the market; the live chart already
-  labels stale data, and the service worker must not defeat that.
-- **The served-script trap.** `web/app.py`'s `HTML` is a plain (non-raw) Python
-  string: a backslash escape written inside the embedded JavaScript is eaten by
-  Python before the browser sees it. Use `String.fromCharCode(10)` for a
-  newline. `tests/test_dashboard_js.py::test_served_script_is_valid_javascript`
-  and the CI syntax step now parse the *evaluated* template — keep them.
+Two things to carry into P19:
 
-Optional W2 follow-ups (not required by the roadmap): swap the stream's source
-to a real WebSocket tier (`data/ws_client.py`) behind the same SSE contract;
-drag-to-edit or Fibonacci drawing tools; server-side drawing persistence.
+- **Never cache private payloads in the package either.** The `sw.js` never-caches `/api/*`, auth, SSE, private state or mutations; the Hub's reverse proxy and any backup tool must also never capture `data/cryptobrain.db` or `data/store/**` as world-readable artifacts.
+- **The served-script trap.** `web/app.py`'s `HTML` is a plain (non-raw) Python string: a backslash escape written inside the embedded JavaScript is eaten by Python before the browser sees it. Use `String.fromCharCode(10)` for a newline. `tests/test_dashboard_js.py::test_served_script_is_valid_javascript` and `tests/test_pwa.py::test_html_still_valid_js` now parse the *evaluated* template — keep them.
+
+Optional P18.4 polish (not P19): designed icons (replace solid-color placeholders in `web/static/icons/`), iOS `navigator.standalone` handling, push VAPID wiring.
 
 ---
 

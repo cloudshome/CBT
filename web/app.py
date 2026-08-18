@@ -339,9 +339,18 @@ def build_payload(symbol: str, tf: str) -> dict:
 # of a `\n` string escape, which stays correct without a raw Python literal.
 HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SKY">
+<meta name="application-name" content="SKY">
+<meta name="mobile-web-app-capable" content="yes">
 <title>CryptoBrain — Trading Desk</title>
-<link rel="icon" href="data:,">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <style>
   :root{
@@ -605,10 +614,46 @@ HTML = """<!doctype html>
   .jobrow.active{border-color:var(--blue);background:rgba(58,116,255,.08)}
   .jobrow b{font-weight:800}
   .tokenout{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;word-break:break-all;background:#05080f;border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;color:var(--green)}
+  /* ── P18.4 PWA: offline banner, install prompt, responsive compact ── */
+  #offlineBanner{display:none;position:sticky;top:0;z-index:35;background:linear-gradient(90deg,#f59e0b,#f97316);color:#111827;padding:7px 14px;text-align:center;font:700 12.5px/1.4 Inter,system-ui;letter-spacing:.01em;border-bottom:1px solid rgba(0,0,0,.12)}
+  #offlineBanner.show{display:block}
+  #offlineBanner a{color:#111827;text-decoration:underline;font-weight:800}
+  #installBanner{display:none;position:sticky;top:0;z-index:34;background:linear-gradient(90deg,#111c33,#1e293b);color:var(--txt);border-bottom:1px solid var(--line);padding:8px 14px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  #installBanner.show{display:flex}
+  #installBanner b{font-size:12.5px}
+  #installBanner .note{margin:0}
+  body.offline .mutation{opacity:.45;pointer-events:none}
+  /* Compact mode: P18.4 responsive — daily ritual, risk, paper, approvals, journal */
+  @media(max-width:640px){
+    .topbar{padding:8px 10px;gap:8px}
+    .brand{min-width:0;flex:1 1 180px}
+    .brand h1{font-size:15px}
+    .brand .sub{font-size:10.5px}
+    .controls{gap:6px;width:100%}
+    .controls .cg{flex:1 1 120px}
+    .tabbar{gap:4px;padding:6px 8px}
+    .tabbtn{padding:6px 10px;font-size:12px}
+    .shell{padding:10px 8px 18px}
+    .card{padding:10px}
+    .hero{grid-template-columns:1fr;gap:8px}
+    .quickbar{gap:6px}
+    .quickbar .btn{padding:6px 9px;font-size:11.5px;border-radius:999px}
+    .statrow{grid-template-columns:repeat(2,1fr)}
+    .watchlist{grid-template-columns:1fr}
+    .grid{grid-template-columns:1fr}
+    .grid2{grid-template-columns:1fr}
+    .formgrid{grid-template-columns:1fr}
+    .cmdgrid{grid-template-columns:1fr}
+    .modrow{grid-template-columns:1fr}
+    #offlineBanner{font-size:11.5px;padding:6px 10px}
+  }
+  @media(max-width:380px){ .tabbtn{padding:5px 8px;font-size:11.5px} .brand h1 .ver{display:none} }
 </style>
 <script src="/static/lightweight-charts.standalone.js"></script>
 </head><body>
 <div id="moodbar" title="market sentiment — green = bullish, red = bearish, deeper = longer"></div>
+<div id="offlineBanner" role="status" aria-live="polite">⚠️ Offline — showing cached shell. Data may be stale. Mutations disabled. <a href="/offline.html">Open offline page</a> · <span id="offlineWhen" style="opacity:.8"></span></div>
+<div id="installBanner" role="region" aria-label="Install prompt"><div><b>📲 Install SKY</b> <span class="note">Add to home screen for daily ritual, risk & approvals — works offline.</span></div><div class="flex"><button class="btn primary" id="installBtn">Install</button><button class="btn ghost" onclick="dismissInstall()">Not now</button></div></div>
 <div class="topbar">
   <div class="brand">
     <div class="logo">🧠</div>
@@ -4046,6 +4091,116 @@ if(authLocked()){
   setInterval(()=>{ if(!authLocked()){ loadChannels(); loadMcp(); loadDesk(); loadReadiness(); loadLoop(); } }, 5 * 60 * 1000);
 }
 // keep seg active state in sync on load
+// ── P18.4 PWA — install prompt, offline banner, service worker, push stub ──
+(function(){
+  var offBanner=document.getElementById('offlineBanner');
+  var offWhen=document.getElementById('offlineWhen');
+  var installBanner=document.getElementById('installBanner');
+  var installBtn=document.getElementById('installBtn');
+  var deferredPrompt=null;
+  function updateOffline(){
+    var online=false; try{ online=navigator.onLine; }catch(e){ online=true; }
+    if(offBanner) offBanner.classList.toggle('show', !online);
+    try{ document.body.classList.toggle('offline', !online); }catch(e){}
+    if(offWhen){
+      try{
+        var t=localStorage.getItem('sky:lastUpdated');
+        offWhen.textContent = t ? ('last good scan: '+t) : 'no scan yet';
+      }catch(e){ offWhen.textContent=''; }
+    }
+    // Disable mutation buttons while offline — the risk gate cannot be checked fresh
+    try{
+      var muts=document.querySelectorAll('button[onclick*=\"decide\"], button[onclick*=\"runPaper\"], button[onclick*=\"saveJournal\"], button[onclick*=\"clearTraderState\"], .mutation');
+      for(var i=0;i<muts.length;i++){
+        muts[i].disabled = !online;
+        muts[i].title = online ? '' : 'Offline — reconnect to use this action';
+      }
+    }catch(e){}
+  }
+  window.addEventListener('online', updateOffline);
+  window.addEventListener('offline', updateOffline);
+  try{ updateOffline(); }catch(e){}
+  // Wrap original load to persist lastUpdated even when offline
+  var _loadOrig=window.load;
+  if(_loadOrig){
+    window.load=function(force,quiet){
+      try{ localStorage.setItem('sky:lastUpdated', new Date().toLocaleString()); }catch(e){}
+      return _loadOrig.apply(this, arguments);
+    };
+  } else {
+    try{ localStorage.setItem('sky:lastUpdated', new Date().toLocaleString()); }catch(e){}
+  }
+  // Install prompt — beforeinstallprompt is not fired on desktop without SW, so wait for it
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferredPrompt=e;
+    try{
+      var dismissed=localStorage.getItem('sky:installDismissed');
+      var last=Number(localStorage.getItem('sky:installDismissedAt')||0);
+      // Show again after 7 days
+      if(!dismissed || Date.now()-last > 7*24*60*60*1000){
+        if(installBanner) installBanner.classList.add('show');
+      }
+    }catch(err){ if(installBanner) installBanner.classList.add('show'); }
+  });
+  window.dismissInstall=function(){
+    if(installBanner) installBanner.classList.remove('show');
+    try{ localStorage.setItem('sky:installDismissed','1'); localStorage.setItem('sky:installDismissedAt', String(Date.now())); }catch(e){}
+  };
+  if(installBtn){
+    installBtn.addEventListener('click', function(){
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(choice){
+        try{ localStorage.setItem('sky:installChoice', choice.outcome); }catch(e){}
+        deferredPrompt=null;
+        if(installBanner) installBanner.classList.remove('show');
+      });
+    });
+  }
+  window.addEventListener('appinstalled', function(){
+    try{ localStorage.setItem('sky:installed','1'); }catch(e){}
+    if(installBanner) installBanner.classList.remove('show');
+    showToast('SKY installed — open from home screen','ok');
+  });
+  // Service worker registration — scope / so it can control the whole desk
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('/sw.js', {scope:'/'})
+        .then(function(reg){
+          // Update available -> show reload
+          reg.addEventListener('updatefound', function(){
+            var nw=reg.installing;
+            if(!nw) return;
+            nw.addEventListener('statechange', function(){
+              if(nw.state==='installed' && navigator.serviceWorker.controller){
+                showToast('SKY updated — reload to get the new shell','ok');
+                // Auto-skipWaiting after 5s if user stays
+                setTimeout(function(){ try{ reg.waiting && reg.waiting.postMessage({type:'SKIP_WAITING'}); }catch(e){} }, 5000);
+              }
+            });
+          });
+        })
+        .catch(function(err){ /* silent — offline or not https, still works as normal site */ });
+      // Reload when new worker takes over
+      var refreshing=false;
+      navigator.serviceWorker.addEventListener('controllerchange', function(){
+        if(refreshing) return; refreshing=true; window.location.reload();
+      });
+    });
+  }
+  // Push abstraction stub — real push needs VAPID + server; this wires the UI
+  window.SKY_push = {
+    supported: !!('PushManager' in window) && !!('serviceWorker' in navigator) && !!('Notification' in window),
+    permission: function(){ try{ return Notification.permission; }catch(e){ return 'unknown'; } },
+    request: function(){
+      if(!('Notification' in window)) return Promise.resolve('unsupported');
+      return Notification.requestPermission();
+    }
+  };
+  // Compact-mode helper: expose current breakpoint for tests
+  window.SKY_compact = function(){ try{ return window.matchMedia('(max-width:640px)').matches; }catch(e){ return false; } };
+})();
 try{ if(document.querySelectorAll) document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===document.getElementById('sym').value)); }catch(e){}
 try{ if(document.querySelectorAll) document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===document.getElementById('tf').value)); }catch(e){}
 </script></body></html>
@@ -4211,7 +4366,7 @@ def make_app(job_manager=None) -> Flask:
     @app.before_request
     def _auth_gate():
         path = request.path or "/"
-        if path == "/" or path.startswith("/static/"):
+        if path == "/" or path.startswith("/static/") or path in ("/sw.js", "/manifest.json", "/offline.html", "/offline"):
             return None
         # Compatibility negotiation happens before authentication: a client too
         # old to speak this contract must be told to upgrade, not handed a 401
@@ -4266,6 +4421,30 @@ def make_app(job_manager=None) -> Flask:
         return render_template_string(HTML, symbol=SYMBOL, tf=TIMEFRAME,
                                       version=VERSION, symbols=symbol_choices(SYMBOLS),
                                       auth_state=_auth_state())
+
+    # ── P18.4 PWA foundation — installable shell, offline, never-cache API ─
+    @app.get("/sw.js")
+    def sw_js():
+        from flask import send_from_directory, make_response
+        resp = make_response(send_from_directory(str(Path(__file__).parent / "static"), "sw.js", mimetype="application/javascript"))
+        resp.headers["Service-Worker-Allowed"] = "/"
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
+
+    @app.get("/manifest.json")
+    def pwa_manifest():
+        from flask import send_from_directory
+        return send_from_directory(str(Path(__file__).parent / "static"), "manifest.json", mimetype="application/manifest+json")
+
+    @app.get("/offline.html")
+    def offline_page():
+        from flask import send_from_directory
+        return send_from_directory(str(Path(__file__).parent / "static"), "offline.html", mimetype="text/html")
+
+    @app.get("/offline")
+    def offline_alias():
+        from flask import send_from_directory
+        return send_from_directory(str(Path(__file__).parent / "static"), "offline.html", mimetype="text/html")
 
     # ── auth API ────────────────────────────────────────────────────────
     @app.get("/api/auth/status")

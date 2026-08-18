@@ -89,7 +89,8 @@ are enabled only after authentication and TLS are configured.
 | P17 | Clickable Trading Workstation and real-world read-only connections | `WEB_TRADER_ROADMAP.md`, `HANDOVER.md` | ✅ foundation shipped; listed workstation follow-ups remain |
 | P18.1–P18.2 | Owner auth/roles/CSRF/audit, then the stable `/api/v1` client contract | `docs/HANDOVER_2026-08-17_P18_2.md` | ✅ shipped |
 | P18.3 | Persisted background jobs + SSE | `docs/HANDOVER_2026-08-17_P18_3.md` | ✅ shipped |
-| P18.4–P22 | PWA, then secure production distribution for Ubuntu, Windows, and Android | this document | 🔄 next product phase |
+| P18.4 | Installable, offline-safe PWA (manifest, SW shell-only, offline, compact) | `docs/HANDOVER_2026-08-18_P18_4.md` | ✅ shipped v2.34.0 |
+| P19–P22 | Secure production distribution for Ubuntu, Windows, and Android | this document | 🔄 next product phase |
 
 ### Workstation items carried forward—not lost
 
@@ -182,7 +183,7 @@ start duplicate runs, and progress survives reconnect/restart. ✅ met
 > **After P18.3:** W1 projection UX shipped in v2.32.0. The *live
 > health/candle* SSE stream (Priority 1 in `HANDOVER.md`) remains separate.
 
-### P18.4 Mobile-responsive PWA foundation
+### P18.4 Mobile-responsive PWA foundation — ✅ shipped v2.34.0
 
 - Web app manifest, icons, install prompt, safe service worker, and offline
   shell/status page.
@@ -191,8 +192,10 @@ start duplicate runs, and progress survives reconnect/restart. ✅ met
 - Never cache private API payloads in a shared browser cache.
 - Push-notification abstraction; Telegram/Discord remain supported fallbacks.
 
+**Shipped:** `web/static/manifest.json` + 4 icons, `web/static/sw.js` (shell-only `sky-shell-v2.34.0`; never `/api/*`, auth, `/api/chart/stream`, `/api/v1/jobs/*/events`), `web/static/offline.html` precached, sticky offline banner + `body.offline` mutation guard + `beforeinstallprompt` banner + `640px` compact, `GET /sw.js` (`Service-Worker-Allowed: /` + `no-cache`), `/manifest.json` + `/offline*` public before auth. Suite 1063/1 (+10 `tests/test_pwa.py`). Contract: `docs/HANDOVER_2026-08-18_P18_4.md`.
+
 **Done when:** the workstation can be installed from Chrome/Edge on desktop and
-Android and remains safe under lost connectivity.
+Android and remains safe under lost connectivity. ✅ met (manual install + offline shell verified via manifest+SW validity + Flask test-client public routes + `node --check` on served script).
 
 ---
 
@@ -319,9 +322,9 @@ DONE      P18.1 auth/roles (v2.29.2) → P18.2 versioned API (v2.30.0) → P18.3
 DONE      W1 guided evidence UX (v2.32.0; strict validation + inline restore + honest projection)
 DONE      W2 (part 1): zone overlays (OB/FVG/liquidity/sweep) + historical replay
 DONE      W2 (part 2): SSE live candle streaming + drawing tools (v2.33.0)
-PARALLEL  W4 mobile/stale-state reliability
-NOW       P18.4 installable, offline-safe PWA (never cache /api/*, auth or SSE)
-THEN      P19 Ubuntu Hub package (first production release)
+DONE      P18.4 installable, offline-safe PWA (v2.34.0 — manifest+SW shell-only; never /api/*, auth or SSE; offline shell + compact)
+PARALLEL  W4 mobile/stale-state reliability (now covered by P18.4 compact)
+NOW       P19 Ubuntu Hub package (first production release)
 THEN      P20 Windows companion
 THEN      P21 Android companion
 FINISH    P22 signed multi-platform release/operations contract

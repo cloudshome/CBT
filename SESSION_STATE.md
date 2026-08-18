@@ -1,20 +1,6 @@
-**Last updated:** 2026-08-17 (**v2.33.0 / W2 complete — live chart streaming
-and drawing tools** on `arena/01a01103-sky`). The chart workspace stopped being
-a snapshot: `web/live_stream.py` + `GET /api/chart/stream` push the newest bar
-over server-sent events and the browser calls `series.update()` in place, so
-zoom, overlays, zones and drawings survive an update. The feed never lies about
-itself — every frame is labelled `live`, `waiting`, `stale` (unchanged for more
-than 2 × the timeframe), or `error`, the UI adds `disconnected`, a failing
-source backs off instead of dropping the connection, and the poll cadence is
-clamped to 2–15 s so one tab cannot hammer the source. Alongside it, the trader
-can now **draw**: trendlines, horizontal rays and boxes placed with the mouse,
-snapped to the nearest loaded bar, persisted per symbol + timeframe in
-`localStorage`, listed in a MY DRAWINGS card with per-item delete, and
-attachable to a journal note (the human still picks the trade and saves).
-Display and annotation only: no threshold moved, no order path exists, nothing
-writes to the learning store, the paper book or the risk gate. Suite:
-**1053 passed / 1 skipped** (+23). Contract:
-`docs/HANDOVER_2026-08-17_W2_part2.md`. Next code is **P18.4 — the PWA**.
+**Last updated:** 2026-08-18 (**v2.34.0 — P18.4 PWA shipped + 6-idea triage durable** on `arena/01a0135d-sky`). Two deliverables in one branch: (1) `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` triaged all six external ideas (`*01 LMRing, *02 desk, *03 evidence engine, *04 OpenDataLoader, *05 harness, *06 AirLLM`) to **Take/Park/Reject** and survives as the durable recipe even if the user forgets; (2) **P18.4 built**: `web/static/manifest.json + 4 icons`, `web/static/sw.js` (`sky-shell-v2.34.0`, shell-only, never `/api/*`/auth/`/api/chart/stream`/`/api/v1/jobs/*/events`), `web/static/offline.html` precached, `web/app.py` sticky offline banner + `body.offline` mutation guard + install banner (`beforeinstallprompt` 7-day snooze) + `640px` compact + `Service-Worker-Allowed: /` at `/sw.js`, `/manifest.json` + `/offline*` public before auth. No threshold moved, no order path. Suite **1063 passed / 1 skipped** (+10 `tests/test_pwa.py`). Contract for code is `docs/HANDOVER_2026-08-18_P18_4.md`; contract for triage is `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md`; previous code contract remains `docs/HANDOVER_2026-08-17_W2_part2.md`. Next code is **P19 Ubuntu Hub package**.
+
+> **If you are the next session and the user forgot to tell you:** read `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` first (after `SESSION_STATE.md`). It contains the `6-idea -> Take/Park/Reject` map and the `*03 evidence engine` gap list so you do not re-install LMRing/OpenDataLoader/AirLLM or add new families/tools. Continue `P19 -> P11 real-paper grind`; `P18.4` is already done.
 
 > **Flagged honestly:** the “stream” is server-side polling of the same REST
 > candle source `/api/chart` already uses, not a WebSocket — swapping in
@@ -1185,23 +1171,13 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Next recommended action
 
-1. **On the real-data host**, rerun `learn` so existing canonical rows pick up
-   source keys; the live profile should remain unchanged. Do not substitute
-   demo or synthetic rows.
-2. Acquire/version-pin Dukascopy XAU m1 **bid** or **ask** data if not already
-   present, import it per `docs/DUKASCOPY_XAU_ADAPTER.md`, and run the locked
-   train/validation/OOS/recent protocol under the expected XAU seal key.
-3. Run and archive `python main.py xau-evidence --tf 15m --json` per
-   `docs/XAU_PROMOTION_EVIDENCE.md`. Review overlap, provenance, fingerprint,
-   all four seal windows, envelope integrity, and reseal history. Do not
-   create/reseal evidence from the audit.
-4. Continue P11 live-data paper proof until the unchanged graduation report
-   says READY. **Micro-live remains blocked** until that result and separate
-   explicit user approval both exist.
-5. A repo admin verifies/completes TODO-8 from
-   [`docs/HUMAN_ACTIONS.md`](docs/HUMAN_ACTIONS.md); TODO-7 is already done.
-6. Do not install Freqtrade or Backtrader, pool PAXG/XAU calibration histories,
-   loosen the graduation bar, or build order placement while gates are open.
+1. **Keep the passed-through triage:** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` (6 ideas -> Take/Park/Reject) remains the durable decision for LMRing/OpenDataLoader/AirLLM/harness — `P18.4` already satisfied it as `P12.19` after `P19`.
+2. **`P18.4 is done — verify it:*** `web/static/manifest.json` (installable), `web/static/sw.js` (shell-only, never `/api/*`/SSE), `/offline.html` precached, offline banner + mutation guard + compact `640px` in `web/app.py`. Install on Chrome/Edge desktop + Android, toggle Offline in DevTools → reload → `Mutations disabled` banner + offline page.
+3. **Code `P19 Ubuntu Hub package` next** — `ROADMAP.md:5` + `TODO.md`: one `sky` service user, `/opt/sky` + `/etc/sky` + `/var/lib/sky`, hardened `gunicorn/scan/paper` units, `sky setup/status/logs/backup/restore/doctor`, TLS proxy. This is where `*02 #1/#2` (backup/init) land. `P18.4` delivery shell is done.
+4. **Operate the loop while P19 is built:** `python main.py daily` (loop-health), `python main.py paper --watch`, weekly `python main.py scorecard --conditioned --source store` net + `python main.py validate --source store --tf 15m` on the real-data host. Grow canonical `binance/spot/BTCUSDT 15m` paper `n` toward `100-200` decided net — that is the only graduation evidence.
+5. **On the real-data host (parallel, not blocking P19):** rerun `learn` so existing canonical rows pick up source keys (live profile unchanged, demo/synthetic never substituted); acquire/version-pin Dukascopy XAU m1 `bid` or `ask` per `docs/DUKASCOPY_XAU_ADAPTER.md`; run locked `train/val/sealed-OOS/recent` under expected XAU seal key; archive `python main.py xau-evidence --tf 15m --json` per `docs/XAU_PROMOTION_EVIDENCE.md` (overlap/provenance/fingerprint/windows/envelope/reseal). Do not create/reseal from the audit.
+6. **Do not** install `LMRing / OpenDataLoader / AirLLM / torch / 70B models`, pool `binance/spot` with `dukascopy/spot/XAUUSD`, loosen `+0.50R/55%/PF1.5 + compliance100%`, add new strategy families, or build live-order code. `*04/*06/*01` are external labs after `P19` + `graduation==READY`; `*03 L2/L4/L5` is `P12.19` after `P19`.
+7. Repo admin verifies/completes `TODO-8` (`docs/HUMAN_ACTIONS.md`); `TODO-7` already done.
 
 **Suggested next-session prompt:**
 
@@ -1226,7 +1202,11 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 750 passed, 1 skipped
+# 1063 passed, 1 skipped  (v2.34.0 P18.4 PWA — +10 tests/test_pwa.py)
+
+# PWA installability + safety
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_pwa.py tests/test_dashboard_js.py -q
+# 19 passed (10 PWA + 9 dashboard JS)
 
 # P12.14 discipline harness (exits non-zero if any case fails open)
 .venv/bin/python ops/probes/p12_14_discipline_probe.py
@@ -1307,14 +1287,14 @@ python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau swe
 ## Last implementation commit
 
 ```
-P12.15 follow-up: live execution-metric source isolation (v2.23.4) — PR #39
-00eedff  P12.15: isolate the live risk controls by source (v2.23.3) (#38) — merged
-015366f  P12.14: isolate graduation discipline (v2.23.2) (#37) — merged
+P18.4 PWA foundation — installable, offline-safe shell (v2.34.0) — this session arena/01a0135d-sky
+07e8a50 docs: pass ChatGPT 6-idea triage to next session (P18.4 stays next)
+97725e7 W2 complete: live chart streaming + drawing tools (v2.33.0) (#53) — merged
+P12.15 follow-up: live execution-metric source isolation (v2.23.4) — PR #39 — merged
 ```
 
-PR #38: https://github.com/Azimshawon/SKY/pull/38 — merged into `main`.
-This reconciliation branch is intentionally at the same commit as
-`origin/main`; use `git rev-parse HEAD` for the tip.
+This branch `arena/01a0135d-sky` is ahead of `origin/main` at `97725e7`.
+Use `git rev-parse HEAD` for the tip (now v2.34.0).
 
 ---
 
@@ -1330,13 +1310,15 @@ First, inspect the GitHub repository before making changes:
 
 Read in this order:
 1. SESSION_STATE.md         (current state, current TODO, last commit)
-2. TODO.md                  (prioritised remaining work)
-3. ARCHITECTURE.md          (module map + invariants)
-4. CHANGELOG.md             (what shipped, when)
-5. README.md                (user-facing overview)
-6. ROADMAP_AGENT_REACH_UPGRADE.md  (the P7/P8/P9 plan + D1–D5 decisions)
-7. docs/FREQTRADE_REVIEW.md        (F1–F8 — do not install a bot)
-8. docs/BACKTRADER_REVIEW.md       (BT1–BT8 — do not add a second grader)
+2. docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md  (6-idea Take/Park/Reject — durable even if user forgets)
+3. TODO.md                  (prioritised remaining work)
+4. HANDOVER.md              (next-session start here — P18.4 PWA)
+5. ARCHITECTURE.md          (module map + invariants)
+6. CHANGELOG.md             (what shipped, when)
+7. README.md                (user-facing overview)
+8. ROADMAP_AGENT_REACH_UPGRADE.md  (the P7/P8/P9 plan + D1–D5 decisions)
+9. docs/FREQTRADE_REVIEW.md        (F1–F8 — do not install a bot)
+10. docs/BACKTRADER_REVIEW.md       (BT1–BT8 — do not add a second grader)
 
 Then inspect the relevant source files and tests.
 
@@ -1350,7 +1332,7 @@ Rules:
   reason to change it.
 - Before modifying code, explain briefly what you found and what
   the next implementation step is.
-- Implement the next highest-priority task from TODO.md.
+- Implement the next highest-priority task from TODO.md (which after this triage is P18.4 PWA — do not start LMRing/OpenDataLoader/AirLLM instead).
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
 - Maintain test count at ≥ 748 pass / 1 skip.
@@ -1365,11 +1347,25 @@ state.
 
 Before ending the session, open ONE pull request from this branch to
 main (Arena allows one PR per chat session). Do not merge it yourself.
+
+Triage carry-over rule (this session `arena/01a0135d-sky`):
+If the user does not mention the 6-idea review, you still have `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` — treat its `Take/Park/Reject` as already decided. Do NOT ask the user to re-explain *01-*06, and do NOT re-triage from scratch. Just point to the file and continue `P18.4`.
 ```
 
 ## End-of-session checklist (run before closing this session)
 
-**Current reconciliation session `arena/01a0099b-sky` (2026-08-16):**
+**Current build session `arena/01a0135d-sky` (2026-08-18) — ChatGPT 6-idea triage + P18.4 PWA:**
+
+1. [x] Read all 6 ChatGPT ideas (`*01` LMRing + `*02` 10-item desk + `*03` 5-layer evidence engine + `*04` OpenDataLoader PDF + `*05` harness/CLAUDE.md + `*06` AirLLM) against `ROADMAP.md` P18-P22, `P10-P12`, `HANDOVER.md`, `TODO.md`, `config.py`, `engine/*`, `brain/*`, `data/*`.
+2. [x] Write `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` — 6-row `Take/Park/Reject` + `§8` decision + `§9` `P18.4->P19->P11` actions + `§10` guardrails. No `requirements.txt`/`config.py`/`env` change, no threshold moved, advisory only.
+3. [x] Patch `SESSION_STATE.md` + `HANDOVER.md` to durable-pass the triage (reads as #2 even if user forgets).
+4. [x] Build **P18.4 PWA** — `manifest.json` + 4 icons, `sw.js` shell-only `sky-shell-v2.34.0` (never `/api/*`/SSE), `offline.html` precached, `web/app.py` banners + compact `640px` + `Service-Worker-Allowed: /` + public `/sw.js`/`/manifest.json`/`/offline*` before auth, `config`+`pyproject` `2.33.0→2.34.0`, `tests/test_pwa.py` 10 tests.
+5. [x] Verify: `node --check` on served `HTML` + `tests/test_pwa.py` 10 pass + `tests/test_dashboard_js.py` 9 pass + full suite **1063 passed / 1 skipped** + `ci/wheel_gate.py` no duplicate entries.
+6. [x] Reconcile durable docs: `CHANGELOG.md` 2.34.0, `TODO.md` P18.4→✅, `ROADMAP.md` P18.4→✅, `HANDOVER.md` Next=P19, `SESSION_STATE.md` Next=P19, handover `docs/HANDOVER_2026-08-18_P18_4.md`.
+7. [ ] Commit + push to `origin/arena/01a0135d-sky` and open one PR to `main` (Arena allows one per session).
+8. [ ] Next code is **P19 Ubuntu Hub package** — `sky setup/backup/restore`, hardened systemd, TLS.
+
+**Previous reconciliation session `arena/01a0099b-sky` (2026-08-16):**
 
 1. [x] Fetch `origin` and confirm PR #38 is merged; keep work on the fixed session branch.
 2. [x] Review P12.1–P12.15 and find the remaining pooled business execution metric.

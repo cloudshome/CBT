@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070b14">
+<title>SKY — Offline</title>
+<style>
+  :root{--bg:#070b14;--card:#111c33;--line:#1e3358;--txt:#e6edf7;--mut:#8aa0bd;--blue:#3b82f6;--violet:#8b5cf6;--amber:#f59e0b}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.6 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;min-height:100vh;display:grid;place-items:center;padding:18px}
+  .card{max-width:560px;width:100%;background:linear-gradient(180deg,rgba(17,28,51,.94),rgba(22,36,71,.98));border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+  h1{margin:0 0 6px;font-size:20px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+  .badge{font-size:11px;font-weight:800;letter-spacing:.06em;padding:4px 10px;border-radius:999px;background:rgba(245,158,11,.14);color:var(--amber);border:1px solid rgba(245,158,11,.32)}
+  p{color:var(--mut);margin:8px 0 0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  .stat{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(255,255,255,.02)}
+  .k{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  .v{font-weight:700;margin-top:2px;word-break:break-all}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+  a.btn{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--txt);padding:9px 13px;border-radius:11px;font:700 12.5px/1 Inter;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+  a.btn.primary{background:linear-gradient(135deg,var(--blue),#2563eb);border-color:transparent;color:#fff}
+  code{color:#8ecbff;background:rgba(0,0,0,.35);padding:1px 5px;border-radius:5px;font-size:11.5px}
+  .foot{color:var(--mut);font-size:11.5px;margin-top:12px;line-height:1.6}
+</style></head><body>
+<div class="card">
+  <h1><span style="width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--violet));display:grid;place-items:center">🧠</span> You are offline <span class="badge">OFFLINE SHELL</span></h1>
+  <p>SKY is showing the <b>cached shell</b> — no fresh signal, risk, or paper state can be fetched until you reconnect. Nothing private is stored in the shared cache.</p>
+  <p><b>Safe rule:</b> Mutations disabled — approvals, rejections, paper runs and journal writes stay disabled while offline. Reconnect, let <code>/api/readiness</code> return fresh, then act.</p>
+  <div class="grid">
+    <div class="stat"><div class="k">Last signal update</div><div class="v" id="lastUpdated">—</div></div>
+    <div class="stat"><div class="k">Connection</div><div class="v" id="conn">checking…</div></div>
+    <div class="stat"><div class="k">Service worker</div><div class="v" id="sw">checking…</div></div>
+    <div class="stat"><div class="k">Install</div><div class="v">Chrome/Edge · Share → Add to Home Screen on iOS</div></div>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="/">↻ Reload live desk</a>
+    <a class="btn" href="/" onclick="if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.update()))}">⟳ Check for update</a>
+    <a class="btn" href="javascript:history.back()">← Back</a>
+  </div>
+  <div class="foot">This page is always available offline (precached by <code>/sw.js</code>). API payloads, auth and SSE are <b>never</b> cached — they stay network-only by design. If the page stays here after reconnecting, hard-reload.</div>
+</div>
+<script>
+try{ var t=localStorage.getItem('sky:lastUpdated'); document.getElementById('lastUpdated').textContent=t||'— (no successful scan cached yet)'; }catch(e){}
+try{ document.getElementById('conn').textContent=navigator.onLine?'online ✓':'offline — showing shell'; }catch(e){}
+try{ if('serviceWorker' in navigator){ navigator.serviceWorker.getRegistration().then(function(r){ var el=document.getElementById('sw'); el.textContent=r?(r.active?'active ✓':'installing…'):'not registered'; }); } else { document.getElementById('sw').textContent='unsupported'; } }catch(e){}
+window.addEventListener('online', function(){ document.getElementById('conn').textContent='online ✓ — reload!'; });
+window.addEventListener('offline', function(){ document.getElementById('conn').textContent='offline — shell only'; });
+</script>
+</body></html>
