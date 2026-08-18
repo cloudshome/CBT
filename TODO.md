@@ -6,11 +6,12 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-18 (**v2.36.0 — P20 Windows companion contract shipped**.
-`python main.py companion spec|status`, `hub pair`, `/api/v1/pair`.
-Unsigned recipe only. No threshold moved, no order path. Contract:
-`docs/HANDOVER_2026-08-18_P20.md`.
-**Next code is P21 Android companion**.
+**Last updated:** 2026-08-18 (**v2.37.0 — P21 Android companion contract shipped**.
+`python main.py companion spec|validate-url|status --platform android`,
+`hub pair --platform android`, `ops/android_companion.py`. Unsigned APK recipe
+only. No threshold moved, no order path. Contract:
+`docs/HANDOVER_2026-08-18_P21.md`.
+**Next code is P22 signed release/ops**.
 P11 real-paper grind continues; packaging is not the edge.)
 
 **Previous:** 2026-08-18 (**v2.35.0 — P19 Ubuntu Hub package shipped**.
@@ -236,14 +237,16 @@ Ordered code milestones:
 5. ~~**P19 Ubuntu package**~~ — ✅ shipped v2.35.0 mechanics (`ops/hub.py`,
    systemd, proxy, unsigned deb recipe). Signed apt repo + clean-VM drill = P22 / real host.
 6. ~~**P20 Windows companion**~~ — ✅ shipped v2.36.0 contract (pairing + client; unsigned recipe).
-7. **P21 Android companion** — signed APK, Keystore, biometric re-check for
-   writes, push/deep links, online-only mutations.
+7. ~~**P21 Android companion**~~ — ✅ shipped v2.37.0 contract
+   (`ops/android_companion.py`; Keystore, biometric re-check policy,
+   online-only mutations, deep links, unsigned APK recipe).
 8. **P22 releases/ops** — CI install tests, signing, checksums, SBOM, release
    channels, diagnostics, support and rollback.
 
-**Next implementation is P21 Android companion.**
+**Next implementation is P22 signed release engineering.**
 P19 Hub mechanics shipped (v2.35.0). A signed Debian *repository* and a
-clean-VM install/reboot/restore drill still need a real Ubuntu host (P22).
+clean-VM install/reboot/restore drill still need a real Ubuntu host (P22);
+Android + Windows signing also land in P22.
 The P11 canonical paper-evidence operation remains parallel.
 
 ### TODO-22 / P14 · Operate the loop: daily ritual + one loop-health number · ✅ SHIPPED (v2.27.0)

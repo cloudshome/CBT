@@ -669,7 +669,7 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
              purge: bool = False, include_store: bool = True,
              retention_days: int = DEFAULT_RETENTION_DAYS,
              unit: str = "sky-dashboard.service",
-             lines: int = 80) -> dict[str, Any]:
+             lines: int = 80, platform: str = "windows") -> dict[str, Any]:
     action = (action or "").strip().lower()
     if action == "setup":
         return setup(mode=mode, owner=owner, prefix=prefix, overwrite_env=overwrite)
@@ -692,7 +692,11 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
         return first_night()
     if action == "pair":
         from web.auth import AuthManager, ROLE_VIEWER
-        from ops.windows_companion import pairing_payload, pairing_qr_text
+        platform = (platform or "windows").lower()
+        if platform == "android":
+            from ops.android_companion import pairing_payload, pairing_qr_text
+        else:
+            from ops.windows_companion import pairing_payload, pairing_qr_text
         mgr = AuthManager()
         if not mgr.owner_exists():
             raise ValueError("create the owner account first (dashboard setup)")
@@ -701,7 +705,7 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
             row = db.conn.execute(
                 "SELECT id FROM users WHERE role='operator' ORDER BY id LIMIT 1"
             ).fetchone()
-        minted = mgr.create_pairing_code(int(row["id"]), name=owner or "windows",
+        minted = mgr.create_pairing_code(int(row["id"]), name=owner or platform,
                                          scope=ROLE_VIEWER)
         hub_url = "https://127.0.0.1"
         payload = pairing_payload(hub_url=hub_url, code=minted["raw"])
@@ -711,7 +715,8 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
             "expires_ts": minted["expires_ts"],
             "qr": pairing_qr_text(payload),
             "payload": payload,
+            "platform": platform,
             "live_exchange_execution": False,
-            "note": "Enter this code in the Windows companion within 10 minutes.",
+            "note": f"Enter this code in the {platform.title()} companion within 10 minutes.",
         }
     raise ValueError(f"unknown hub action: {action}")

@@ -2,7 +2,7 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-18 · **v2.36.0 — P20 Windows companion contract** (`docs/HANDOVER_2026-08-18_P20.md`, branch `arena/01a01407-sky`). Pairing + client contract; no signed exe. Next: P21 Android. Operator CLI `python main.py hub …`, FHS layout, hardened `sky-*` units, TLS examples, unsigned Debian recipe. P18.4 PWA remains the browser delivery shell. No threshold moved; no order path.
+Last updated: 2026-08-18 · **v2.37.0 — P21 Android companion contract** (`docs/HANDOVER_2026-08-18_P21.md`, branch `arena/01a01486-sky`). Keystore token contract, biometric re-check policy, online-only mutations, deep links, unsigned APK recipe; no signed APK. Next: P22 signed release/ops. P20 pairing/client (Windows) and P19 Hub mechanics shipped. P18.4 PWA remains the browser delivery shell. No threshold moved; no order path.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -10,7 +10,8 @@ Last updated: 2026-08-18 · **v2.36.0 — P20 Windows companion contract** (`doc
 > [`ROADMAP.md`](ROADMAP.md) is the canonical merged P1–P22 roadmap. The current
 > build is still source-installed; do not claim installers exist.
 >
-> **Next code:** P21 Android companion. P20 pairing/client contract shipped (unsigned Windows recipe only).
+> **Next code:** P22 signed release engineering. P21 Android + P20 Windows
+> pairing/client contracts shipped (unsigned recipes only).
 > Chosen topology: one Ubuntu Hub owns DB/workers/risk/audit; browser/PWA,
 > Windows and Android are companion clients. Packaging never adds
 > exchange-order code or changes graduation.
@@ -19,7 +20,7 @@ Last updated: 2026-08-18 · **v2.36.0 — P20 Windows companion contract** (`doc
 
 > **Triage durable (2026-08-18):** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` is still the `6-idea -> Take/Park/Reject` decision — `P18.4` already satisfied `*02/#3 + *05 compact` as shell-only PWA; `*01/*04/*06` stay parked as external labs after `P19+graduation`. **Do not re-triage, do not add torch/OpenDataLoader/LMRing deps.**
 
-**P19 and P20 contracts are done (v2.35.0 / v2.36.0).** Build **P21 — Android companion**: same `/api/v1` + pairing codes, Keystore token storage, HTTPS-only, online-only mutations, no signed APK claimed. Do not wrap an unauthenticated Flask. P11 paper grind stays parallel.
+**P19, P20 and P21 contracts are done (v2.35.0 / v2.36.0 / v2.37.0).** Build **P22 — signed release engineering**: CI install/smoke matrix (Ubuntu package, Windows package, Android build), code signing for Windows + Android + signed Debian repo metadata, reproducible SHA-256 artifacts, SBOM + dependency/license inventory, stable/beta channels, in-app System page, privacy-respecting diagnostics export, and documented incident/support/rollback paths. Do not wrap an unauthenticated Flask. P11 paper grind stays parallel.
 
 Two things to carry into P19:
 

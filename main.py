@@ -2173,14 +2173,15 @@ def cmd_correlation(args) -> int:
 
 
 def cmd_companion(args) -> int:
-    """P20 Windows companion: spec / pair-check / status (no signed exe)."""
-    from ops.windows_companion import (
-        CompanionError, TokenStore, companion_spec, format_spec,
-        pair_with_hub, validate_hub_url,
-    )
+    """P20 Windows / P21 Android companion: spec / pair-check / status (unsigned)."""
+    platform = getattr(args, "platform", "windows")
     action = getattr(args, "companion_action", "spec")
     if action == "spec":
-        spec = companion_spec()
+        if platform == "android":
+            from ops.android_companion import android_spec, format_spec
+        else:
+            from ops.windows_companion import companion_spec, format_spec
+        spec = android_spec() if platform == "android" else companion_spec()
         if args.json:
             print(json.dumps(spec, indent=2))
         else:
@@ -2188,6 +2189,10 @@ def cmd_companion(args) -> int:
         return 0
     if action == "validate-url":
         try:
+            if platform == "android":
+                from ops.android_companion import CompanionError, validate_hub_url
+            else:
+                from ops.windows_companion import CompanionError, validate_hub_url
             url = validate_hub_url(args.hub)
         except CompanionError as exc:
             print(f"[!] {exc}", file=sys.stderr)
@@ -2195,6 +2200,10 @@ def cmd_companion(args) -> int:
         print(url)
         return 0
     if action == "status":
+        if platform == "android":
+            from ops.android_companion import KeystoreTokenStore as TokenStore
+        else:
+            from ops.windows_companion import TokenStore
         store = TokenStore(args.state)
         rec = store.load()
         if rec is None:
@@ -2228,6 +2237,7 @@ def cmd_hub(args) -> int:
             retention_days=int(getattr(args, "retention_days", 14) or 14),
             unit=getattr(args, "unit", "sky-dashboard.service"),
             lines=int(getattr(args, "lines", 80) or 80),
+            platform=getattr(args, "platform", "windows"),
         )
     except (ValueError, FileNotFoundError, FileExistsError, PermissionError) as exc:
         print(f"[!] hub {action}: {exc}", file=sys.stderr)
@@ -2947,10 +2957,12 @@ def main(argv: list[str] | None = None) -> int:
     # ── P19 Ubuntu Hub ────────────────────────────────────────────────
     p_comp = sub.add_parser(
         "companion",
-        help="P20 Windows companion: spec, validate-url, status (unsigned recipe)")
+        help="P20 Windows / P21 Android companion: spec, validate-url, status (unsigned recipe)")
     p_comp.set_defaults(func=cmd_companion)
     p_comp.add_argument("companion_action", nargs="?", default="spec",
                         choices=("spec", "validate-url", "status"))
+    p_comp.add_argument("--platform", choices=("windows", "android"), default="windows",
+                        help="which companion contract to report (default: windows)")
     p_comp.add_argument("--hub", default="https://127.0.0.1")
     p_comp.add_argument("--state", default=None)
     p_comp.add_argument("--json", action="store_true")
@@ -2978,6 +2990,8 @@ def main(argv: list[str] | None = None) -> int:
                        help="uninstall: also delete /etc/sky and /var/lib/sky")
     p_hub.add_argument("--no-store", action="store_true",
                        help="backup: skip the Parquet store")
+    p_hub.add_argument("--platform", choices=("windows", "android"), default="windows",
+                       help="pair: which companion client the code is for (default: windows)")
     p_hub.add_argument("--retention-days", type=int, default=14)
     p_hub.add_argument("--unit", default="sky-dashboard.service")
     p_hub.add_argument("--lines", type=int, default=80)

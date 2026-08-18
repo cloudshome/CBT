@@ -185,9 +185,9 @@ def test_no_private_caching_in_sw_headers():
 
 def test_version_bumped():
     import config
-    assert config.VERSION == "2.36.0", f"VERSION should be 2.36.0, got {config.VERSION}"
+    assert config.VERSION == "2.37.0", f"VERSION should be 2.37.0, got {config.VERSION}"
     txt = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
-    assert 'version = "2.36.0"' in txt, "pyproject version not bumped"
+    assert 'version = "2.37.0"' in txt, "pyproject version not bumped"
 
 
 def test_html_still_valid_js():

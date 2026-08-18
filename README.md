@@ -339,6 +339,13 @@ operations. This avoids packaging today's local development server as an unsafe
 public product. Packaging does not add live exchange execution or alter the
 paper/graduation gate.
 
+Companion client contracts are shipped as **unsigned recipes**: the Windows
+companion (`P20`, v2.36.0, `ops/windows_companion.py`) and the Android
+companion (`P21`, v2.37.0, `ops/android_companion.py` — Keystore token
+storage, biometric re-check policy, online-only mutations, `sky://record/…`
+deep links). Code signing and public checksum channels are P22; no signed
+`.exe`/`.apk` exists in this repository.
+
 ## 🚀 Quickstart
 
 **The normal way to use SKY is two lines. Everything else is optional.**

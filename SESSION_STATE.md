@@ -1,4 +1,4 @@
-**Last updated:** 2026-08-18 (**v2.36.0 — P20 Windows companion contract** on `arena/01a01407-sky`). Pairing codes, `/api/v1/pair`, `ops/windows_companion.py`, unsigned `packaging/windows/`. Next code is **P21 Android companion**. P11 paper grind stays parallel.
+**Last updated:** 2026-08-18 (**v2.37.0 — P21 Android companion contract** on `arena/01a01486-sky`). `ops/android_companion.py` (Keystore token contract, biometric re-check policy, online-only mutations, deep links), `companion … --platform android` + `hub pair --platform android`, unsigned `packaging/android/`. Next code is **P22 signed release engineering**. P11 paper grind stays parallel.
 
 **Previous:** 2026-08-18 (**v2.35.0 — P19 + home-PC first-night guide** on `arena/01a013b2-sky`). `docs/HOME_HUB_FIRST_NIGHT.md` / `hub first-night` / `ops/first_night.sh`. `ops/hub.py` + `python main.py hub setup/status/logs/backup/restore/doctor/uninstall`, FHS `/opt/sky` `/etc/sky` `/var/lib/sky`, hardened `ops/systemd/sky-*` units, Caddy/nginx TLS examples, unsigned Debian packaging (`packaging/`). SQLite-safe backups, redacted secrets, uninstall keeps data unless `--purge`. No threshold moved, no order path. Contract: `docs/HANDOVER_2026-08-18_P19.md`. Next code is **P20 Windows companion** after a real Hub host is stable; P11 paper grind stays parallel.
 
@@ -650,8 +650,11 @@ Every phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**P20 Windows companion contract — shipped v2.36.0.** Pairing + client
-contract; unsigned Windows recipe only. Next product code is **P21 Android**.
+**P21 Android companion contract — shipped v2.37.0.** `ops/android_companion.py`
+(Keystore token contract, biometric re-check policy, online-only mutations,
+deep links), `companion … --platform android` + `hub pair --platform android`,
+unsigned APK recipe only. P20 Windows and P19 Hub contracts remain shipped.
+Next product code is **P22 signed release engineering**.
 P11 real-paper grind remains parallel. P12.1–P12.18 tooling is shipped.
 
 **P12 (SKY Quant Validation Engine) — P12.1–P12.15 shipped, including the P12.15 execution-metric follow-up.**
@@ -1063,8 +1066,12 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
-0. **P21 Android companion** — Keystore, QR pairing reuse, online-only
-   mutations, push/deep links. Do not claim a signed APK.
+0. **P22 signed release engineering** — CI install/smoke matrix (Ubuntu pkg,
+   Windows pkg, Android build), code signing (Windows + Android + signed Debian
+   repo), reproducible SHA-256 artifacts, SBOM + dependency/license inventory,
+   stable/beta channels, in-app System page, privacy-respecting diagnostics
+   export, documented incident/support/rollback paths. Do not claim signed
+   artifacts until produced on a real build host.
 1. **Run P12.12 on the real-data host** — rerun `learn` to adopt source keys,
    build/retain the locked Dukascopy XAU validation evidence, then archive
    `python main.py xau-evidence --json`. Do not reseal from the audit command.
@@ -1212,11 +1219,11 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 python -m pytest tests/test_windows_companion.py tests/test_hub.py tests/test_handoff_memory.py -q
-# 36+ passed (P20 pairing/client + hub + handoff)
+# 1115 passed, 1 skipped  (v2.37.0 P21: android companion + P20/hub/handoff)
 
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# prior baseline 1063 passed, 1 skipped  (v2.34.0 P18.4) + P20 tests
+# prior baseline 1063 passed, 1 skipped  (v2.34.0 P18.4) + P20 + P21 tests
 
 # PWA installability + safety
 DEMO_MODE=1 .venv/bin/python -m pytest tests/test_pwa.py tests/test_dashboard_js.py -q

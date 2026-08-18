@@ -92,7 +92,8 @@ are enabled only after authentication and TLS are configured.
 | P18.4 | Installable, offline-safe PWA (manifest, SW shell-only, offline, compact) | `docs/HANDOVER_2026-08-18_P18_4.md` | ✅ shipped v2.34.0 |
 | P19 | Ubuntu Hub package (layout, CLI, units, backup, TLS examples) | `docs/HANDOVER_2026-08-18_P19.md` | ✅ mechanics v2.35.0 |
 | P20 | Windows companion contract (pairing, client, unsigned recipe) | `docs/HANDOVER_2026-08-18_P20.md` | ✅ v2.36.0 |
-| P21–P22 | Android companion + signed release ops | this document | 🔄 next |
+| P21 | Android companion contract (Keystore, biometric policy, deep links, unsigned recipe) | `docs/HANDOVER_2026-08-18_P21.md` | ✅ v2.37.0 |
+| P22 | Signed release ops (signing, CI install/smoke, checksums, SBOM) | this document | 🔄 next |
 
 ### Workstation items carried forward—not lost
 
@@ -328,8 +329,8 @@ DONE      P18.4 installable, offline-safe PWA (v2.34.0 — manifest+SW shell-onl
 PARALLEL  W4 mobile/stale-state reliability (now covered by P18.4 compact)
 DONE      P19 Ubuntu Hub mechanics (v2.35.0 — layout/CLI/units/backup; unsigned deb recipe)
 DONE      P20 Windows companion contract (v2.36.0 — pairing; unsigned recipe)
-NOW       P21 Android companion
-THEN      P21 Android companion
+DONE      P21 Android companion contract (v2.37.0 — Keystore/biometric/deep-link policy; unsigned recipe)
+NOW       P22 signed release engineering (signing, CI install/smoke matrix, checksums, SBOM)
 FINISH    P22 signed multi-platform release/operations contract
 ALWAYS    P11 real canonical paper evidence; never lower the graduation bar
 ```

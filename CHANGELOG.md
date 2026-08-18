@@ -10,6 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.37.0] — 2026-08-18 · P21 Android companion contract
+
+MINOR: the Hub can pair an Android companion over `/api/v1` without
+duplicating the engine. No signed `.apk` is claimed. No threshold moved,
+no exchange-order path.
+
+- **Android client contract** — `ops/android_companion.py`: HTTPS-only Hub
+  URL rules + configured-host allowlist (`host_allowed`), Keystore-backed
+  token storage (guarded file fallback is test-only), a declarative
+  **biometric re-check policy** (`biometric_policy`, `requires_biometric`)
+  for operator mutations, **online-only mutations** (`connection_snapshot`
+  never queues a paper approval offline), and a **push/deep-link contract**
+  (`sky://record/<signal|risk|paper|journal|dashboard>[/<id>]`). Reuses the
+  P20 pairing + version negotiation with `client=sky-android`.
+- **CLI** — `python main.py companion spec|validate-url|status --platform
+  android` and `python main.py hub pair --platform android`.
+- **Packaging** — unsigned recipe `packaging/android/README.md` (signing is
+  P22).
+- **Tests** — `tests/test_android_companion.py` (16 tests). Full suite:
+  1115 passed, 1 skipped.
+- Contract: `docs/HANDOVER_2026-08-18_P21.md`.
+
+Honest: no signed APK, no Android device/emulator install drill in this
+sandbox; the module describes the client contract the native shell implements.
+
+---
+
 ## [2.36.0] — 2026-08-18 · P20 Windows companion contract
 
 MINOR: the Hub can pair a Windows companion over `/api/v1` without
