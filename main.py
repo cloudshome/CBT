@@ -2173,9 +2173,17 @@ def cmd_correlation(args) -> int:
 
 
 def cmd_companion(args) -> int:
-    """P20 Windows / P21 Android companion: spec / pair-check / status (unsigned)."""
+    """P20/P21 contracts + P22.2 native project lint (unsigned)."""
     platform = getattr(args, "platform", "windows")
     action = getattr(args, "companion_action", "spec")
+    if action == "lint":
+        from ops.native_projects import format_status, native_status
+        payload = native_status()
+        if args.json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(format_status(payload))
+        return 0 if payload.get("ok") else 1
     if action == "spec":
         if platform == "android":
             from ops.android_companion import android_spec, format_spec
@@ -2960,7 +2968,7 @@ def main(argv: list[str] | None = None) -> int:
         help="P20 Windows / P21 Android companion: spec, validate-url, status (unsigned recipe)")
     p_comp.set_defaults(func=cmd_companion)
     p_comp.add_argument("companion_action", nargs="?", default="spec",
-                        choices=("spec", "validate-url", "status"))
+                        choices=("spec", "validate-url", "status", "lint"))
     p_comp.add_argument("--platform", choices=("windows", "android"), default="windows",
                         help="which companion contract to report (default: windows)")
     p_comp.add_argument("--hub", default="https://127.0.0.1")

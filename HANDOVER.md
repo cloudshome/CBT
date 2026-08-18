@@ -2,7 +2,7 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-18 · **v2.38.0 — P22.1 release-operations foundation** (`docs/HANDOVER_2026-08-18_P22_1.md`). SHA-256/release manifests, SPDX SBOM/license inventory, stable/beta metadata, redacted private diagnostics, an admin-activation package/security CI spec and incident/rollback runbook. No signed installer is claimed. Next: P22.2 real native projects + trusted signing/physical-target drills. No threshold moved; no order path.
+Last updated: 2026-08-18 · **v2.39.0 — P22.2 native companion projects** (`docs/HANDOVER_2026-08-18_P22_2.md`). Real Windows .NET 8 and Android Gradle/Kotlin trees plus `companion lint`. No signed installer and no physical drill is claimed. Next: trusted signing + clean-target drills. No threshold moved; no order path.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and
@@ -21,7 +21,10 @@ Last updated: 2026-08-18 · **v2.38.0 — P22.1 release-operations foundation** 
 
 > **Triage durable (2026-08-18):** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` is still the `6-idea -> Take/Park/Reject` decision — `P18.4` already satisfied `*02/#3 + *05 compact` as shell-only PWA; `*01/*04/*06` stay parked as external labs after `P19+graduation`. **Do not re-triage, do not add torch/OpenDataLoader/LMRing deps.**
 
-**P19, P20, P21 and P22.1 are done (v2.35.0–v2.38.0).** P22.1 shipped release metadata (SHA-256 manifest, SPDX SBOM/license inventory, stable/beta), redacted diagnostics, Ubuntu package smoke/security CI and incident/support/rollback paths; it also fixed the direct Debian builder/runtime bootstrap. Build **P22.2** by creating real Windows and Android native projects before claiming their build/lint/instrumented jobs, then sign Windows + Android and Debian repository metadata only in the trusted release environment. Run clean physical install/upgrade/rollback drills. Do not mark P22 complete from contract JSON or synthetic CI. P11 paper grind stays parallel.
+**P19–P22.2 are done (v2.35.0–v2.39.0).** P22.2 added the Windows and Android
+project trees and a static lint. Sign and physically drill only in the trusted
+release environment. Do not mark P22 complete from contract JSON or Linux CI.
+P11 paper grind stays parallel.
 
 Two things to carry into P19:
 

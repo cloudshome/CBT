@@ -6,15 +6,12 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-18 (**v2.38.0 — P22.1 release-operations
-foundation shipped**. Deterministic SHA-256/release manifests, SPDX SBOM +
-license inventory, stable/beta metadata, redacted mode-0600 support bundles,
-release/package/security CI spec (repo-admin activation pending), and incident/rollback runbook. The Debian recipe's
-clean-host defects (unresolved `${misc:Depends}` and missing runtime venv) are
-fixed. No signed native artifact is claimed. **Next is P22.2: create real
-Windows/Android native projects, then trusted signing and physical-target
-install/upgrade/rollback drills.** P11 real-paper grind continues; packaging is
-not the edge.)
+**Last updated:** 2026-08-18 (**v2.39.0 — P22.2 native companion projects
+shipped**. Real `packaging/windows/SkyCompanion` (.NET 8) and
+`packaging/android/SkyCompanion` (Gradle/Kotlin) trees + `companion lint`.
+No signed installer and no physical-target drill is claimed. **Next is trusted
+signing + clean Windows/Android install/upgrade/rollback drills.** P11
+real-paper grind continues; packaging is not the edge.)
 
 **Previous:** 2026-08-18 (**v2.35.0 — P19 Ubuntu Hub package shipped**.
 `python main.py hub setup|status|logs|backup|restore|doctor|uninstall`,
@@ -242,18 +239,17 @@ Ordered code milestones:
 7. ~~**P21 Android companion**~~ — ✅ shipped v2.37.0 contract
    (`ops/android_companion.py`; Keystore, biometric re-check policy,
    online-only mutations, deep links, unsigned APK recipe).
-8. **P22 releases/ops** — 🔄 P22.1 shipped v2.38.0: CI contract/package
-   smoke, checksums, SPDX SBOM/license inventory, stable/beta metadata,
-   secret-free diagnostics, support + rollback runbook. P22.2 remains: real
-   Windows/Android projects and native build/lint/instrumented tests; trusted
-   Windows/Android signing, signed Debian repository metadata, and physical
-   clean-target install/upgrade/rollback drills.
+8. **P22 releases/ops** — 🔄 P22.1 shipped v2.38.0 (metadata/CI/diagnostics).
+   P22.2 shipped v2.39.0 (real Windows/Android project trees + static lint).
+   Remaining: native compile on platform hosts, trusted Windows/Android
+   signing, signed Debian repository metadata, and physical clean-target
+   install/upgrade/rollback drills.
 
-**Next implementation is P22.2 native clients + trusted promotion.**
-P19 Hub mechanics shipped (v2.35.0); P22.1 fixed the direct Debian builder and
-added its clean-runner smoke gate. A signed Debian *repository* and a
-clean-VM install/reboot/restore drill still need a trusted release host;
-Android + Windows cannot be signed until their native projects exist.
+**Next implementation is P22 trusted signing + physical-target drills.**
+P19–P22.2 shipped the Hub mechanics, client contracts and native project trees
+(unsigned recipes). A signed Debian *repository* and a clean-VM
+install/reboot/restore drill still need a trusted release host. Windows and
+Android signing wait on those same hosts — not more source trees.
 The P11 canonical paper-evidence operation remains parallel.
 
 ### TODO-22 / P14 · Operate the loop: daily ritual + one loop-health number · ✅ SHIPPED (v2.27.0)

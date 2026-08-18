@@ -43,9 +43,11 @@ replace the Hub or change channels.
    environment and never signs.
 3. Download artifacts and verify `SHA256SUMS`, `release.json`,
    `sky.spdx.json`, `dependencies.json`, tests, and vulnerability findings.
-4. On isolated native build hosts, build the actual Windows and Android
-   projects when those projects exist. Current P20/P21 output is a client
-   **contract**, not an installer.
+4. On isolated native build hosts, compile
+   `packaging/windows/SkyCompanion` (dotnet) and
+   `packaging/android/SkyCompanion` (Gradle). P20/P21 remain the client
+   **contracts**; P22.2 added the project trees. This checkout still does
+   not ship installers.
 5. Sign using platform-native tooling:
    - Debian: sign repository `Release` metadata (`InRelease` plus detached
      `Release.gpg`); do not embed a private key in the `.deb`.
@@ -147,9 +149,10 @@ tokens, a database, signing material, or exchange credentials.
 ## 6. Current honest limitations
 
 - No signing key is available to this repository, by design.
-- P20 and P21 shipped executable client contracts and unsigned packaging
-  recipes, not native application projects. Windows installer and Android
-  build/lint/instrumented smoke remain blocked until those projects exist.
+- P22.2 added native project trees. Linux CI static-lints them; it still
+  cannot compile, Authenticode-sign, or `apksigner`-verify. Physical
+  Windows/Android install, notification, biometric, upgrade and rollback
+  drills remain open.
 - A clean physical Windows/Android install, notification and biometric drill
   cannot be claimed from Linux CI.
 - Packaging never proves trading edge and never opens micro-live graduation.

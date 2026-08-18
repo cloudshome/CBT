@@ -1,11 +1,10 @@
 # SKY Android companion (P21)
 
-This folder is the **unsigned** packaging recipe for a native Android
-companion that talks to an Ubuntu SKY Hub over `/api/v1`.
+This folder holds the **unsigned** packaging notes plus the real
+`SkyCompanion/` Gradle/Kotlin project (P22.2).
 
-**This repository does not ship a signed `.apk`.** Code signing and a public
-checksum channel are P22. Do not claim an installer exists until a release
-artifact is produced on an Android build host.
+**This repository does not ship a signed `.apk`.** Assemble on an Android
+SDK host; signing is a trusted-release step.
 
 ## What the companion is
 

@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.39.0] — 2026-08-18 · P22.2 native companion projects
+
+MINOR: real Windows (.NET 8 / WebView2) and Android (Gradle / Kotlin) project
+trees replace recipe-only folders. Static lint inventories them and refuses
+order paths, signing material and a true live-execution flag. No threshold
+moved and no exchange-order path was added.
+
+- **Windows** — `packaging/windows/SkyCompanion/` SDK-style WinForms + WebView2
+  client. HTTPS (loopback HTTP only), Credential Manager target, hard-coded
+  `LiveExchangeExecution = false`.
+- **Android** — `packaging/android/SkyCompanion/` Kotlin app, Keystore contract,
+  biometric re-check gate, `sky://` deep links, cleartext refused.
+- **Lint** — `ops/native_projects.py` and `python main.py companion lint`.
+  Physical install/upgrade/rollback drills remain pending. Unsigned.
+
 ## [2.38.0] — 2026-08-18 · P22.1 release-operations foundation
 
 MINOR: release outputs are now inspectable, channelled and diagnosable without

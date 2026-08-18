@@ -1,11 +1,10 @@
 # SKY Windows companion (P20)
 
-This folder is the **unsigned** packaging recipe for a WebView2 shell
-that talks to an Ubuntu SKY Hub over `/api/v1`.
+This folder holds the **unsigned** packaging notes plus the real
+`SkyCompanion/` .NET 8 project (P22.2).
 
-**This repository does not ship a signed `.exe` or MSIX.** Code signing
-and a public checksum channel are P22. Do not claim an installer exists
-until a release artifact is produced on a Windows build host.
+**This repository does not ship a signed `.exe` or MSIX.** Compile on a
+Windows host; code signing is a trusted-release step.
 
 ## What the companion is
 
