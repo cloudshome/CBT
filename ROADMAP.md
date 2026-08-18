@@ -2,8 +2,8 @@
 
 > **Status:** active source of truth
 > **Last updated:** 2026-08-17
-> **Current software:** v2.29.x source installation; Ubuntu service units exist;
-> signed `.deb`, Windows `.exe`, and Android `.apk` releases do not exist yet.
+> **Current software:** v2.35.0 source + Hub mechanics; a signed Debian
+> repository, Windows `.exe`, and Android `.apk` releases do not exist yet.
 >
 > This roadmap merges the delivered AI-anatomy, Agent-Reach, data/validation,
 > teaching, workstation, and web-trader plans with the new production-install
@@ -63,7 +63,7 @@ lose connectivity, or be killed by the operating system.
 | Profile | Purpose | State |
 |---|---|---|
 | Source/developer | Current Python checkout and test workflow | ✅ available |
-| Ubuntu Hub | 24/7 single-user production service | 🟡 systemd pieces exist; installer/security/backup UX pending |
+| Ubuntu Hub | 24/7 single-user production service | 🟡 P19 mechanics shipped v2.35.0; signed repo + clean-VM drill pending |
 | Browser/PWA | Same workstation, installable from a modern browser | 🔴 planned |
 | Windows companion `.exe` | Native launcher/monitor connected to an Ubuntu Hub | 🔴 planned |
 | Android companion `.apk` | Mobile monitoring, alerts, ritual, approval/journal flow | 🔴 planned |
@@ -90,7 +90,8 @@ are enabled only after authentication and TLS are configured.
 | P18.1–P18.2 | Owner auth/roles/CSRF/audit, then the stable `/api/v1` client contract | `docs/HANDOVER_2026-08-17_P18_2.md` | ✅ shipped |
 | P18.3 | Persisted background jobs + SSE | `docs/HANDOVER_2026-08-17_P18_3.md` | ✅ shipped |
 | P18.4 | Installable, offline-safe PWA (manifest, SW shell-only, offline, compact) | `docs/HANDOVER_2026-08-18_P18_4.md` | ✅ shipped v2.34.0 |
-| P19–P22 | Secure production distribution for Ubuntu, Windows, and Android | this document | 🔄 next product phase |
+| P19 | Ubuntu Hub package (layout, CLI, units, backup, TLS examples) | `docs/HANDOVER_2026-08-18_P19.md` | ✅ mechanics v2.35.0 |
+| P20–P22 | Windows/Android companions + signed release ops | this document | 🔄 next product phase |
 
 ### Workstation items carried forward—not lost
 
@@ -324,8 +325,8 @@ DONE      W2 (part 1): zone overlays (OB/FVG/liquidity/sweep) + historical repla
 DONE      W2 (part 2): SSE live candle streaming + drawing tools (v2.33.0)
 DONE      P18.4 installable, offline-safe PWA (v2.34.0 — manifest+SW shell-only; never /api/*, auth or SSE; offline shell + compact)
 PARALLEL  W4 mobile/stale-state reliability (now covered by P18.4 compact)
-NOW       P19 Ubuntu Hub package (first production release)
-THEN      P20 Windows companion
+DONE      P19 Ubuntu Hub mechanics (v2.35.0 — layout/CLI/units/backup; unsigned deb recipe)
+NOW       P20 Windows companion (after a real Hub host is stable)
 THEN      P21 Android companion
 FINISH    P22 signed multi-platform release/operations contract
 ALWAYS    P11 real canonical paper evidence; never lower the graduation bar

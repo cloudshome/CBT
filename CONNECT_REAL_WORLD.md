@@ -1,5 +1,9 @@
 # Connecting SKY to the real world
 
+**Home PC first night:** [`docs/HOME_HUB_FIRST_NIGHT.md`](docs/HOME_HUB_FIRST_NIGHT.md)
+(`python3 main.py hub first-night` or `bash ops/first_night.sh`).
+Arena cannot keep the desk up 24h — the Ubuntu machine at home can.
+
 Everything below is also visible and testable in the dashboard:
 **open http://localhost:8050 → 🔌 Connections**. Each card says what the link
 gives you, whether it is live right now, and the exact steps to switch it on.

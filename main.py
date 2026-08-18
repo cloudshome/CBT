@@ -2172,6 +2172,47 @@ def cmd_correlation(args) -> int:
     return 0 if res.get("available") else 1
 
 
+def cmd_hub(args) -> int:
+    """P19 Ubuntu Hub: setup / status / logs / backup / restore / doctor / uninstall."""
+    from ops.hub import dispatch, format_doctor, format_status
+
+    action = args.hub_action
+    try:
+        payload = dispatch(
+            action,
+            prefix=getattr(args, "prefix", None),
+            mode=getattr(args, "mode", "local"),
+            owner=getattr(args, "owner", "") or "",
+            archive=getattr(args, "archive", None),
+            overwrite=bool(getattr(args, "overwrite", False)),
+            purge=bool(getattr(args, "purge", False)),
+            include_store=not bool(getattr(args, "no_store", False)),
+            retention_days=int(getattr(args, "retention_days", 14) or 14),
+            unit=getattr(args, "unit", "sky-dashboard.service"),
+            lines=int(getattr(args, "lines", 80) or 80),
+        )
+    except (ValueError, FileNotFoundError, FileExistsError, PermissionError) as exc:
+        print(f"[!] hub {action}: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(payload, indent=2, default=str))
+    elif action == "status":
+        print(format_status(payload))
+    elif action == "doctor":
+        print(format_doctor(payload))
+    elif action == "logs":
+        for line in payload.get("lines") or []:
+            print(line)
+        if not payload.get("ok"):
+            print(payload.get("error") or "journalctl unavailable", file=sys.stderr)
+            return 1
+    elif action in ("first-night", "first_night", "guide"):
+        print(payload.get("guide") or "")
+    else:
+        print(json.dumps(payload, indent=2, default=str))
+    return 0 if payload.get("ok", True) else 1
+
+
 def cmd_hidden(args) -> int:
     """Hidden alpha CLI: regime + CVD + kelly + MAE/MFE + Monte Carlo.
 
@@ -2864,6 +2905,35 @@ def main(argv: list[str] | None = None) -> int:
     p_skill.add_argument("--target-dir", default=None,
                          help="override the install directory (default: ~/.claude/skills/cryptobrain)")
     p_skill.set_defaults(func=cmd_skill)
+
+    # ── P19 Ubuntu Hub ────────────────────────────────────────────────
+    p_hub = sub.add_parser(
+        "hub",
+        help="P19 Ubuntu Hub: setup, status, logs, backup, restore, doctor, uninstall")
+    p_hub.set_defaults(func=cmd_hub)
+    p_hub.add_argument("hub_action",
+                       choices=("setup", "status", "logs", "backup",
+                                "restore", "doctor", "uninstall",
+                                "first-night"),
+                       help="hub subcommand")
+    p_hub.add_argument("--mode", choices=("local", "remote"), default="local",
+                       help="setup: local-only or remote-behind-TLS")
+    p_hub.add_argument("--owner", default="",
+                       help="setup: owner hint (password still created in the UI)")
+    p_hub.add_argument("--prefix", default=None,
+                       help="sandbox FHS prefix (tests / dry hosts)")
+    p_hub.add_argument("--archive", default=None,
+                       help="restore: path to sky-backup-*.tar.gz")
+    p_hub.add_argument("--overwrite", action="store_true",
+                       help="setup: rewrite env; restore: replace existing data")
+    p_hub.add_argument("--purge", action="store_true",
+                       help="uninstall: also delete /etc/sky and /var/lib/sky")
+    p_hub.add_argument("--no-store", action="store_true",
+                       help="backup: skip the Parquet store")
+    p_hub.add_argument("--retention-days", type=int, default=14)
+    p_hub.add_argument("--unit", default="sky-dashboard.service")
+    p_hub.add_argument("--lines", type=int, default=80)
+    p_hub.add_argument("--json", action="store_true")
 
     # ── hidden alpha CLI (regime + CVD + kelly + MAE/MFE + Monte Carlo) ──
     p_hidden = sub.add_parser(

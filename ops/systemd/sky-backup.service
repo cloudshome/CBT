@@ -1,0 +1,26 @@
+[Unit]
+Description=SKY Hub SQLite-safe daily backup
+Documentation=file:/opt/sky/docs/HANDOVER_2026-08-18_P19.md
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=sky
+Group=sky
+WorkingDirectory=/opt/sky
+EnvironmentFile=/etc/sky/sky.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/sky/.venv/bin/python -u main.py hub backup --json
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/sky
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=

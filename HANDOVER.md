@@ -2,7 +2,7 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-18 · **v2.34.0 — P18.4 PWA shipped + 6-idea triage durable** (`docs/HANDOVER_2026-08-18_P18_4.md` + `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md`, branch `arena/01a0135d-sky`). The desk is now installable from Chrome/Edge (desktop + Android) — `manifest.json` + 4 icons, `sw.js` `sky-shell-v2.34.0` (shell-only; never `/api/*`, auth, SSE), `offline.html` precached, offline banner + mutation guard + install prompt + `640px` compact. Underneath, W2 live streaming (`series.update()`, `live/waiting/stale/error/disconnected`) + mouse drawings per `symbol+tf` + the dashboard-killing JS bug fix on `main` (see §1d) remain. W1, W2 p1, P18.3 jobs/SSE, P18.2 `/api/v1`, P18.1 auth shipped before. The 6-idea triage (`*01 LMRing, *02 desk, *03 evidence engine, *04 OpenDataLoader, *05 harness, *06 AirLLM` → `Take/Park/Reject`) survives as `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` so the next session does not re-install them.
+Last updated: 2026-08-18 · **v2.35.0 — P19 Ubuntu Hub package** (`docs/HANDOVER_2026-08-18_P19.md`, branch `arena/01a013b2-sky`). Operator CLI `python main.py hub …`, FHS layout, hardened `sky-*` units, TLS examples, unsigned Debian recipe. P18.4 PWA remains the browser delivery shell. No threshold moved; no order path.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and

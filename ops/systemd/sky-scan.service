@@ -1,0 +1,32 @@
+[Unit]
+Description=SKY Hub watchlist scan (human approval remains mandatory)
+Documentation=file:/opt/sky/docs/PAPER_TRADING_OPERATIONS.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=sky
+Group=sky
+WorkingDirectory=/opt/sky
+EnvironmentFile=/etc/sky/sky.env
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/opt/sky/.venv/bin/python -u main.py preflight --json
+ExecStart=/opt/sky/.venv/bin/python -u main.py scan --symbols BTCUSDT,ETHUSDT,XAUUSD --tf 15m --json
+TimeoutStartSec=10min
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/sky
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=

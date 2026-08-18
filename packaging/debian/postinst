@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  configure)
+    if ! getent passwd sky >/dev/null; then
+      adduser --system --group --home /var/lib/sky --no-create-home \
+        --gecos "SKY Hub" sky
+    fi
+    mkdir -p /opt/sky /etc/sky /var/lib/sky /var/lib/sky/store /var/lib/sky/backups
+    chown -R sky:sky /var/lib/sky /etc/sky
+    chmod 0750 /etc/sky /var/lib/sky /var/lib/sky/store /var/lib/sky/backups
+    if [ ! -f /etc/sky/sky.env ]; then
+      python3 /opt/sky/main.py hub setup --mode local --json >/dev/null 2>&1 || true
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl daemon-reload || true
+    fi
+    ;;
+esac
+
+exit 0

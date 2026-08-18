@@ -322,6 +322,21 @@ COMMANDS: list[dict] = [
                  _positional("tier", "Tier 1-5", "int", default=3),
                  _positional("trust", "Trust 0-1", "text", default="0.5")],
          safety="write", related=["channels"]),
+    _cmd("hub_first_night", "Hub", "First night (home PC)", ["hub", "first-night"],
+         "One-page checklist to run SKY 24h on a home Ubuntu PC. "
+         "No trade keys, no public :8050.",
+         related=["hub_status", "hub_doctor"]),
+    _cmd("hub_status", "Hub", "Hub status", ["hub", "status"],
+         "Ubuntu Hub layout, disk, backups and systemd snapshot. "
+         "Does not place an order.",
+         related=["hub_doctor", "hub_backup"]),
+    _cmd("hub_doctor", "Hub", "Hub doctor", ["hub", "doctor"],
+         "Hub health: private env, loopback bind, disk, backup privacy.",
+         related=["hub_status", "doctor"]),
+    _cmd("hub_backup", "Hub", "Hub backup", ["hub", "backup"],
+         "SQLite-safe + redacted-config backup under /var/lib/sky/backups. "
+         "Secrets are stripped. Archives are mode 0600.",
+         safety="write", related=["hub_status"]),
     _cmd("mcp", "Integration", "MCP server", ["mcp"],
          "Long-lived Model Context Protocol server for Claude Desktop or "
          "Cursor. Start it from a terminal, not the browser.",

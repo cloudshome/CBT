@@ -1,0 +1,20 @@
+# SKY Hub TLS terminator (Caddy).
+# Gunicorn stays on 127.0.0.1:8050. Caddy owns certificates.
+# Replace hub.example.com with the real hostname.
+
+hub.example.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:8050
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		-Server
+	}
+
+	# Never cache private API / auth / SSE.
+	@private path /api/* /login /logout /auth* /sw.js
+	header @private Cache-Control "no-store"
+}

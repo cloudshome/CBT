@@ -1,0 +1,42 @@
+[Unit]
+Description=SKY Hub dashboard (Gunicorn, loopback only)
+Documentation=file:/opt/sky/docs/PAPER_TRADING_OPERATIONS.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sky
+Group=sky
+WorkingDirectory=/opt/sky
+EnvironmentFile=/etc/sky/sky.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/sky/.venv/bin/gunicorn --workers 1 --threads 4 --timeout 120 --bind 127.0.0.1:8050 "web.app:make_app()"
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=20s
+UMask=0077
+
+# Dashboard is write-capable (approve/journal). Never bind a public address.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/sky /etc/sky
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

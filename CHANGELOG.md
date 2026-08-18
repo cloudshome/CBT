@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.35.0] — 2026-08-18 · P19 Ubuntu Hub package
+
+MINOR: first production-install path for a single Ubuntu Hub. No threshold
+moved, no exchange-order path, uninstall keeps user data unless `--purge`.
+
+- **Hub CLI** — `python main.py hub setup|status|logs|backup|restore|doctor|uninstall`
+  (`ops/hub.py`). FHS roots `/opt/sky`, `/etc/sky`, `/var/lib/sky`; tests
+  override with `SKY_HUB_PREFIX`.
+- **Backup/restore** — SQLite backup API + redacted env + optional Parquet
+  store; archives `0600`; 14-day retention; restore refuses overwrite unless asked.
+- **Hardened systemd** — `ops/systemd/sky-{dashboard,paper,scan,backup}`
+  (loopback gunicorn, `NoNewPrivileges`, `ProtectSystem=strict`, `User=sky`).
+- **TLS examples** — `ops/proxy/Caddyfile` and `nginx-sky.conf`; API `no-store`.
+- **Debian packaging** — `packaging/debian/*`, `/usr/bin/sky`,
+  `packaging/build_deb.sh` (unsigned artifact; signing is P22).
+- **Command Center** — Hub status / doctor / backup buttons.
+- **Tests** — `tests/test_hub.py`. Contract: `docs/HANDOVER_2026-08-18_P19.md`.
+
+- **First night** — `docs/HOME_HUB_FIRST_NIGHT.md`, `bash ops/first_night.sh`,
+  `python main.py hub first-night` (home-PC 24h checklist; no trade keys).
+
+Honest: no signed apt repo, no clean-VM install drill in this sandbox.
+
+---
+
 ## [2.34.0] — 2026-08-18 · P18.4 PWA foundation — installable, offline-safe shell
 
 MINOR: the desk is now installable (Chrome/Edge desktop + Android) and honest offline. No threshold moved, no order path exists, nothing here writes to the learning store, the paper book or the risk gate. This is a delivery shell over existing behaviour.

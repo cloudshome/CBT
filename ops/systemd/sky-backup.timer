@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily SKY Hub backup (03:17 UTC)
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=sky-backup.service
+
+[Install]
+WantedBy=timers.target

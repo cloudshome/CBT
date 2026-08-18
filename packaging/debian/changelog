@@ -1,0 +1,7 @@
+sky-hub (2.35.0-1) unstable; urgency=medium
+
+  * P19: first Ubuntu Hub package — FHS layout, hardened systemd,
+    sky setup/status/logs/backup/restore/doctor/uninstall, TLS proxy
+    examples. Signing of the repository is a P22 release-ops step.
+
+ -- Azimshawon <noreply@localhost>  Tue, 18 Aug 2026 12:00:00 +0000

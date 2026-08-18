@@ -1,0 +1,11 @@
+#!/bin/sh
+# Operator entrypoint installed as /usr/bin/sky.
+# Delegates to the Hub checkout so one command covers setup/status/backup.
+set -eu
+ROOT="${SKY_OPT:-/opt/sky}"
+if [ -x "$ROOT/.venv/bin/python" ]; then
+  PY="$ROOT/.venv/bin/python"
+else
+  PY="python3"
+fi
+exec "$PY" "$ROOT/main.py" hub "$@"

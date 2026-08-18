@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+# Uninstall preserves /var/lib/sky and /etc/sky unless purge.
+case "$1" in
+  purge)
+    rm -rf /var/lib/sky /etc/sky
+    if getent passwd sky >/dev/null; then
+      deluser --system sky >/dev/null 2>&1 || true
+    fi
+    ;;
+esac
+exit 0

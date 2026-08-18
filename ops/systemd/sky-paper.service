@@ -1,0 +1,41 @@
+[Unit]
+Description=SKY Hub live-data paper monitor (never sends orders)
+Documentation=file:/opt/sky/docs/PAPER_TRADING_OPERATIONS.md
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=10min
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=sky
+Group=sky
+WorkingDirectory=/opt/sky
+EnvironmentFile=/etc/sky/sky.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/sky/.venv/bin/python -u main.py paper --watch --json
+Restart=on-failure
+RestartSec=60s
+KillSignal=SIGINT
+TimeoutStopSec=20s
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+ReadWritePaths=/var/lib/sky
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

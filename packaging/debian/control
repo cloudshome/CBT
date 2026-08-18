@@ -1,0 +1,19 @@
+Source: sky-hub
+Section: misc
+Priority: optional
+Maintainer: Azimshawon <noreply@localhost>
+Build-Depends: debhelper-compat (= 13), python3, python3-venv, python3-pip, dh-python
+Standards-Version: 4.6.2
+Homepage: https://github.com/Azimshawon/SKY
+Rules-Requires-Root: no
+
+Package: sky-hub
+Architecture: all
+Depends: ${misc:Depends}, python3 (>= 3.10), python3-venv, python3-pip, adduser
+Recommends: gunicorn
+Description: SKY trading desk Ubuntu Hub (paper-first, no live orders)
+ Always-on SKY Hub: Flask/Gunicorn dashboard, scan timer, paper monitor,
+ SQLite + Parquet evidence store, risk gate and backups.
+ .
+ This package does not contain an exchange-order path. Packaging is not
+ evidence of trading profitability.
