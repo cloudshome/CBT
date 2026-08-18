@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "2.35.0"
+VERSION = "2.36.0"
 PACKAGE_NAME = "sky-hub"
 SERVICE_USER = "sky"
 UNITS = (
@@ -690,4 +690,28 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
         return uninstall(prefix=prefix, purge=purge)
     if action in ("first-night", "first_night", "guide"):
         return first_night()
+    if action == "pair":
+        from web.auth import AuthManager, ROLE_VIEWER
+        from ops.windows_companion import pairing_payload, pairing_qr_text
+        mgr = AuthManager()
+        if not mgr.owner_exists():
+            raise ValueError("create the owner account first (dashboard setup)")
+        from data.database import SignalDB
+        with SignalDB() as db:
+            row = db.conn.execute(
+                "SELECT id FROM users WHERE role='operator' ORDER BY id LIMIT 1"
+            ).fetchone()
+        minted = mgr.create_pairing_code(int(row["id"]), name=owner or "windows",
+                                         scope=ROLE_VIEWER)
+        hub_url = "https://127.0.0.1"
+        payload = pairing_payload(hub_url=hub_url, code=minted["raw"])
+        return {
+            "ok": True,
+            "code": minted["code"],
+            "expires_ts": minted["expires_ts"],
+            "qr": pairing_qr_text(payload),
+            "payload": payload,
+            "live_exchange_execution": False,
+            "note": "Enter this code in the Windows companion within 10 minutes.",
+        }
     raise ValueError(f"unknown hub action: {action}")

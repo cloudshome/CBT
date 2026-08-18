@@ -401,6 +401,68 @@ class AuthManager:
             db.conn.commit()
             return True
 
+    # ── pairing codes (P20 companion first-run) ────────────────────────
+    PAIRING_TTL_SECONDS = 10 * 60
+    PAIRING_CODE_LEN = 8
+
+    def create_pairing_code(self, user_id: int, name: str = "windows",
+                            scope: str = ROLE_VIEWER,
+                            ttl_seconds: int | None = None) -> dict:
+        """Mint a short-lived one-time pairing code. Raw code shown once."""
+        if scope not in ROLES:
+            raise ValueError(f"bad scope {scope!r}")
+        alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        raw = "".join(secrets.choice(alphabet) for _ in range(self.PAIRING_CODE_LEN))
+        display = f"{raw[:4]}-{raw[4:]}"
+        now = int(time.time() * 1000)
+        ttl = int(ttl_seconds or self.PAIRING_TTL_SECONDS)
+        expires = now + ttl * 1000
+        from data.database import SignalDB
+        with SignalDB(self.db_path) as db:
+            db.conn.execute(
+                "INSERT INTO pairing_codes(code_hash, user_id, name, scope, "
+                "created_ts, expires_ts, used_ts) VALUES(?,?,?,?,?,?,NULL)",
+                (_token_hash(raw), user_id, (name or "").strip() or "windows",
+                 scope, now, expires))
+            db.conn.commit()
+        return {"code": display, "raw": raw, "expires_ts": expires,
+                "ttl_seconds": ttl, "name": (name or "").strip() or "windows",
+                "scope": scope}
+
+    def redeem_pairing_code(self, code: str, device_name: str = "windows") -> dict:
+        """Exchange a one-time pairing code for a scoped device token.
+
+        Codes are case-insensitive and may include a hyphen. Used and expired
+        codes fail closed. The pairing row is marked used atomically.
+        """
+        cleaned = "".join(ch for ch in (code or "").upper() if ch.isalnum())
+        if len(cleaned) != self.PAIRING_CODE_LEN:
+            raise ValueError("pairing code must be 8 characters")
+        now = int(time.time() * 1000)
+        th = _token_hash(cleaned)
+        from data.database import SignalDB
+        with SignalDB(self.db_path) as db:
+            row = db.conn.execute(
+                "SELECT user_id, name, scope, expires_ts, used_ts "
+                "FROM pairing_codes WHERE code_hash=?", (th,)).fetchone()
+            if row is None:
+                raise PermissionError("unknown pairing code")
+            if row["used_ts"]:
+                raise PermissionError("pairing code already used")
+            if row["expires_ts"] and now > row["expires_ts"]:
+                raise PermissionError("pairing code expired")
+            cur = db.conn.execute(
+                "UPDATE pairing_codes SET used_ts=? WHERE code_hash=? AND used_ts IS NULL",
+                (now, th))
+            db.conn.commit()
+            if cur.rowcount != 1:
+                raise PermissionError("pairing code already used")
+            user_id = int(row["user_id"])
+            scope = row["scope"] or ROLE_VIEWER
+            label = (device_name or row["name"] or "windows").strip()
+        token = self.create_device_token(user_id, label, scope=scope)
+        return {"token": token, "scope": scope, "name": label, "user_id": user_id}
+
     def revoke_all_devices(self, user_id: int) -> int:
         from data.database import SignalDB
         with SignalDB(self.db_path) as db:

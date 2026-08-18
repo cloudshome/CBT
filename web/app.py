@@ -4384,6 +4384,8 @@ def make_app(job_manager=None) -> Flask:
             # discover the compatibility range before it can authenticate.
             if _v1_sub(path) == "/version":
                 return None
+            if request.method == "POST" and _v1_sub(path) == "/pair":
+                return None
         if path.startswith("/api/auth/"):
             if path in ("/api/auth/status", "/api/auth/setup", "/api/auth/login"):
                 return None
@@ -5816,6 +5818,66 @@ def make_app(job_manager=None) -> Flask:
                          methods=[_route["method"]])
 
     # ── v1-native routes (no legacy equivalent) ───────────────────────────
+    @app.post(f"{V1_PREFIX}/pair")
+    def v1_pair_redeem():
+        """Public: exchange a one-time Hub pairing code for a device token."""
+        body = request.get_json(silent=True) or {}
+        try:
+            result = auth.redeem_pairing_code(
+                str(body.get("code") or ""),
+                device_name=str(body.get("name") or "windows"))
+        except ValueError as exc:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED, str(exc))), 400
+        except PermissionError as exc:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.FORBIDDEN, str(exc))), 403
+        auth.audit("companion_paired", result.get("name") or "windows",
+                   ok=True, ip=_client_ip(), user_agent=_client_ua(),
+                   detail={"scope": result.get("scope"), "api": "v1"})
+        return jsonify(apiv1.envelope_ok({
+            "token": result["token"],
+            "scope": result["scope"],
+            "name": result["name"],
+            "usage": "Authorization: Bearer <token>",
+            "note": "Copy this token now — it is shown only once.",
+            "live_exchange_execution": False,
+        })), 201
+
+    @app.post(f"{V1_PREFIX}/pair/code")
+    def v1_pair_mint():
+        user = getattr(g, "user", None) or _current_user()
+        if user is None:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.UNAUTHENTICATED, "authentication required")), 401
+        if not authmod.role_allows(user.get("role"), "operator"):
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.FORBIDDEN, "operator role required")), 403
+        body = request.get_json(silent=True) or {}
+        name = str(body.get("name") or "windows").strip() or "windows"
+        scope = str(body.get("scope") or "viewer")
+        if scope not in authmod.ROLES:
+            return jsonify(apiv1.envelope_error(
+                apiv1.ErrorCode.VALIDATION_FAILED,
+                f"scope must be one of {list(authmod.ROLES)}")), 400
+        if not authmod.role_allows(user.get("role"), scope):
+            scope = "viewer"
+        minted = auth.create_pairing_code(user["id"], name=name, scope=scope)
+        from ops.windows_companion import pairing_payload, pairing_qr_text
+        hub = str(body.get("hub_url") or request.host_url or "http://127.0.0.1:8050")
+        payload = pairing_payload(hub_url=hub, code=minted["raw"])
+        _audit("pairing_code_created", name, detail={"scope": scope, "api": "v1"})
+        return jsonify(apiv1.envelope_ok({
+            "code": minted["code"],
+            "expires_ts": minted["expires_ts"],
+            "ttl_seconds": minted["ttl_seconds"],
+            "scope": scope,
+            "name": name,
+            "qr": pairing_qr_text(payload),
+            "payload": payload,
+            "note": "Show this code once. It expires in 10 minutes.",
+        })), 201
+
     @app.get(f"{V1_PREFIX}/version")
     def v1_version():
         """Public: a client must discover compatibility before authenticating.

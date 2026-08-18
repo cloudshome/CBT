@@ -6,7 +6,14 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-18 (**v2.35.0 — P19 Ubuntu Hub package shipped**.
+**Last updated:** 2026-08-18 (**v2.36.0 — P20 Windows companion contract shipped**.
+`python main.py companion spec|status`, `hub pair`, `/api/v1/pair`.
+Unsigned recipe only. No threshold moved, no order path. Contract:
+`docs/HANDOVER_2026-08-18_P20.md`.
+**Next code is P21 Android companion**.
+P11 real-paper grind continues; packaging is not the edge.)
+
+**Previous:** 2026-08-18 (**v2.35.0 — P19 Ubuntu Hub package shipped**.
 `python main.py hub setup|status|logs|backup|restore|doctor|uninstall`,
 hardened `sky-*` systemd units, TLS proxy examples, unsigned `.deb` recipe.
 No threshold moved, no order path. Contract: `docs/HANDOVER_2026-08-18_P19.md`.
@@ -228,13 +235,13 @@ Ordered code milestones:
 4. ~~**P18.4 PWA/mobile**~~ — ✅ shipped v2.34.0; `manifest.json + sw.js` (shell-only; never `/api/*`/SSE), `offline.html` precached, offline banner + mutation guard + `beforeinstallprompt` + `640px` compact + `Service-Worker-Allowed: /`.
 5. ~~**P19 Ubuntu package**~~ — ✅ shipped v2.35.0 mechanics (`ops/hub.py`,
    systemd, proxy, unsigned deb recipe). Signed apt repo + clean-VM drill = P22 / real host.
-6. **P20 Windows companion** ← **NEXT CODE** — signed `.exe`/MSIX after Hub stable.
+6. ~~**P20 Windows companion**~~ — ✅ shipped v2.36.0 contract (pairing + client; unsigned recipe).
 7. **P21 Android companion** — signed APK, Keystore, biometric re-check for
    writes, push/deep links, online-only mutations.
 8. **P22 releases/ops** — CI install tests, signing, checksums, SBOM, release
    channels, diagnostics, support and rollback.
 
-**Next implementation is P20 Windows companion, not an installer wrapper.**
+**Next implementation is P21 Android companion.**
 P19 Hub mechanics shipped (v2.35.0). A signed Debian *repository* and a
 clean-VM install/reboot/restore drill still need a real Ubuntu host (P22).
 The P11 canonical paper-evidence operation remains parallel.

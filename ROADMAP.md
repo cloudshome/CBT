@@ -65,7 +65,7 @@ lose connectivity, or be killed by the operating system.
 | Source/developer | Current Python checkout and test workflow | ✅ available |
 | Ubuntu Hub | 24/7 single-user production service | 🟡 P19 mechanics shipped v2.35.0; signed repo + clean-VM drill pending |
 | Browser/PWA | Same workstation, installable from a modern browser | 🔴 planned |
-| Windows companion `.exe` | Native launcher/monitor connected to an Ubuntu Hub | 🔴 planned |
+| Windows companion `.exe` | Native launcher/monitor connected to an Ubuntu Hub | 🟡 P20 contract v2.36.0; signed exe pending |
 | Android companion `.apk` | Mobile monitoring, alerts, ritual, approval/journal flow | 🔴 planned |
 | Windows all-in-one engine | Local engine for users with no Ubuntu host | ⏸ optional after the Hub and companion clients are stable |
 | Android all-in-one engine | Engine/database running continuously on Android | ❌ rejected; unreliable background runtime and duplicated authority |
@@ -91,7 +91,8 @@ are enabled only after authentication and TLS are configured.
 | P18.3 | Persisted background jobs + SSE | `docs/HANDOVER_2026-08-17_P18_3.md` | ✅ shipped |
 | P18.4 | Installable, offline-safe PWA (manifest, SW shell-only, offline, compact) | `docs/HANDOVER_2026-08-18_P18_4.md` | ✅ shipped v2.34.0 |
 | P19 | Ubuntu Hub package (layout, CLI, units, backup, TLS examples) | `docs/HANDOVER_2026-08-18_P19.md` | ✅ mechanics v2.35.0 |
-| P20–P22 | Windows/Android companions + signed release ops | this document | 🔄 next product phase |
+| P20 | Windows companion contract (pairing, client, unsigned recipe) | `docs/HANDOVER_2026-08-18_P20.md` | ✅ v2.36.0 |
+| P21–P22 | Android companion + signed release ops | this document | 🔄 next |
 
 ### Workstation items carried forward—not lost
 
@@ -326,7 +327,8 @@ DONE      W2 (part 2): SSE live candle streaming + drawing tools (v2.33.0)
 DONE      P18.4 installable, offline-safe PWA (v2.34.0 — manifest+SW shell-only; never /api/*, auth or SSE; offline shell + compact)
 PARALLEL  W4 mobile/stale-state reliability (now covered by P18.4 compact)
 DONE      P19 Ubuntu Hub mechanics (v2.35.0 — layout/CLI/units/backup; unsigned deb recipe)
-NOW       P20 Windows companion (after a real Hub host is stable)
+DONE      P20 Windows companion contract (v2.36.0 — pairing; unsigned recipe)
+NOW       P21 Android companion
 THEN      P21 Android companion
 FINISH    P22 signed multi-platform release/operations contract
 ALWAYS    P11 real canonical paper evidence; never lower the graduation bar

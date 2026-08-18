@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.36.0] — 2026-08-18 · P20 Windows companion contract
+
+MINOR: the Hub can pair a Windows companion over `/api/v1` without
+duplicating the engine. No signed `.exe` is claimed. No threshold moved,
+no exchange-order path.
+
+- **Pairing** — one-time 8-character codes (`pairing_codes`), 10-minute
+  TTL, hashed, single use. `POST /api/v1/pair` (public redeem) and
+  `POST /api/v1/pair/code` (operator mint + QR JSON).
+- **Client contract** — `ops/windows_companion.py`: HTTPS-only remotes,
+  compatibility check, Credential Manager / refuse world-readable token
+  files, tray snapshot, idempotent mutation headers.
+- **CLI** — `python main.py hub pair`, `python main.py companion spec|status|validate-url`.
+- **Packaging** — unsigned recipe `packaging/windows/README.md` (signing is P22).
+- **Tests** — `tests/test_windows_companion.py`.
+- Contract: `docs/HANDOVER_2026-08-18_P20.md`.
+
+Honest: no Windows 11 install, no signed binary in this sandbox.
+
+---
+
 ## [2.35.0] — 2026-08-18 · P19 Ubuntu Hub package
 
 MINOR: first production-install path for a single Ubuntu Hub. No threshold

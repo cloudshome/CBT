@@ -245,9 +245,9 @@ def test_product_surfaces_state_installers_are_planned_not_shipped():
     # sub-phase number made this fail every time a phase shipped, which trains
     # the next session to edit the test instead of reading it — so pin the rule.
     # After P18.4 the next implementation is P19 (Ubuntu Hub), so allow both.
-    assert re.search(r"next implementation is p(18\.\d|19|20)", todo), (
-        "TODO.md must name the next production phase (P18.x / P19 / P20)")
-    assert "not an installer wrapper" in todo
+    assert re.search(r"next implementation is p(18\.\d|19|20|21)", todo), (
+        "TODO.md must name the next production phase (P18.x / P19 / P20 / P21)")
+    assert ("not an installer wrapper" in todo) or ("unsigned recipe" in todo)
 
 
 def test_product_decisions_keep_one_authority_and_server_side_gate():

@@ -222,6 +222,18 @@ CREATE TABLE IF NOT EXISTS device_tokens(
   revoked INTEGER DEFAULT 0,
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
+-- pairing_codes: short-lived one-time codes for companion first-run (P20).
+-- The raw code is hashed; a used or expired code cannot mint a token.
+CREATE TABLE IF NOT EXISTS pairing_codes(
+  code_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  name TEXT,
+  scope TEXT NOT NULL DEFAULT 'viewer',
+  created_ts INTEGER,
+  expires_ts INTEGER,
+  used_ts INTEGER,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
 -- audit_log: one row per sensitive action (approve/reject/close, login,
 -- device ops, password change, force-approve, ...). Immutable append-only.
 CREATE TABLE IF NOT EXISTS audit_log(

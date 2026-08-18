@@ -2172,6 +2172,44 @@ def cmd_correlation(args) -> int:
     return 0 if res.get("available") else 1
 
 
+def cmd_companion(args) -> int:
+    """P20 Windows companion: spec / pair-check / status (no signed exe)."""
+    from ops.windows_companion import (
+        CompanionError, TokenStore, companion_spec, format_spec,
+        pair_with_hub, validate_hub_url,
+    )
+    action = getattr(args, "companion_action", "spec")
+    if action == "spec":
+        spec = companion_spec()
+        if args.json:
+            print(json.dumps(spec, indent=2))
+        else:
+            print(format_spec(spec))
+        return 0
+    if action == "validate-url":
+        try:
+            url = validate_hub_url(args.hub)
+        except CompanionError as exc:
+            print(f"[!] {exc}", file=sys.stderr)
+            return 1
+        print(url)
+        return 0
+    if action == "status":
+        store = TokenStore(args.state)
+        rec = store.load()
+        if rec is None:
+            print("not paired")
+            return 1
+        rec = {k: v for k, v in rec.items() if k != "token"}
+        if args.json:
+            print(json.dumps(rec, indent=2, default=str))
+        else:
+            print(f"paired to {rec.get('hub_url')}  scope={rec.get('scope')}")
+        return 0
+    print(f"[!] unknown companion action {action}", file=sys.stderr)
+    return 1
+
+
 def cmd_hub(args) -> int:
     """P19 Ubuntu Hub: setup / status / logs / backup / restore / doctor / uninstall."""
     from ops.hub import dispatch, format_doctor, format_status
@@ -2907,6 +2945,16 @@ def main(argv: list[str] | None = None) -> int:
     p_skill.set_defaults(func=cmd_skill)
 
     # ── P19 Ubuntu Hub ────────────────────────────────────────────────
+    p_comp = sub.add_parser(
+        "companion",
+        help="P20 Windows companion: spec, validate-url, status (unsigned recipe)")
+    p_comp.set_defaults(func=cmd_companion)
+    p_comp.add_argument("companion_action", nargs="?", default="spec",
+                        choices=("spec", "validate-url", "status"))
+    p_comp.add_argument("--hub", default="https://127.0.0.1")
+    p_comp.add_argument("--state", default=None)
+    p_comp.add_argument("--json", action="store_true")
+
     p_hub = sub.add_parser(
         "hub",
         help="P19 Ubuntu Hub: setup, status, logs, backup, restore, doctor, uninstall")
@@ -2914,7 +2962,7 @@ def main(argv: list[str] | None = None) -> int:
     p_hub.add_argument("hub_action",
                        choices=("setup", "status", "logs", "backup",
                                 "restore", "doctor", "uninstall",
-                                "first-night"),
+                                "first-night", "pair"),
                        help="hub subcommand")
     p_hub.add_argument("--mode", choices=("local", "remote"), default="local",
                        help="setup: local-only or remote-behind-TLS")

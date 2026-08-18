@@ -635,10 +635,22 @@ def test_connected_device_list_is_visible(client):
 
 def test_every_mutating_v1_route_is_declared_with_a_role():
     """Fail-closed guard: an undeclared mutating route defaults to operator,
-    but it should never be undeclared in the first place."""
+    but it should never be undeclared in the first place.
+
+    Pairing redeem (``POST /pair``) is the only public mutation: the device
+    does not have a token yet. The one-time code is the credential. Every
+    other POST stays viewer/operator.
+    """
+    public_posts = set()
     for route in apiv1.ROUTES + apiv1.NATIVE_ROUTES:
-        if route["method"] == "POST":
-            assert route.get("role") in ("viewer", "operator"), route
+        if route["method"] != "POST":
+            continue
+        role = route.get("role")
+        if role == "public":
+            public_posts.add(route["path"])
+            continue
+        assert role in ("viewer", "operator"), route
+    assert public_posts == {"/pair"}
 
 
 def test_v1_adds_no_route_the_legacy_api_did_not_have():

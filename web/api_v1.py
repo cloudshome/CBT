@@ -197,6 +197,7 @@ def version_info() -> dict:
             "human_approval": True,
             "idempotent_mutations": True,
             "device_tokens": True,
+            "pairing": True,
             "roles": ["viewer", "operator"],
         },
     }
@@ -475,6 +476,10 @@ ROUTES: tuple[dict, ...] = (
 NATIVE_ROUTES: tuple[dict, ...] = (
     {"path": "/version", "method": "GET", "role": "public",
      "summary": "API version and compatibility range."},
+    {"path": "/pair", "method": "POST", "role": "public",
+     "summary": "Redeem a one-time Hub pairing code for a device token (P20)."},
+    {"path": "/pair/code", "method": "POST", "role": "operator",
+     "summary": "Mint a short-lived pairing code / QR payload for a companion."},
     {"path": "/routes", "method": "GET", "role": "viewer",
      "summary": "Machine-readable route catalog."},
     {"path": "/me", "method": "GET", "role": "viewer",

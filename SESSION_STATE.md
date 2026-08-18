@@ -1,4 +1,6 @@
-**Last updated:** 2026-08-18 (**v2.35.0 — P19 + home-PC first-night guide** on `arena/01a013b2-sky`). `docs/HOME_HUB_FIRST_NIGHT.md` / `hub first-night` / `ops/first_night.sh`. `ops/hub.py` + `python main.py hub setup/status/logs/backup/restore/doctor/uninstall`, FHS `/opt/sky` `/etc/sky` `/var/lib/sky`, hardened `ops/systemd/sky-*` units, Caddy/nginx TLS examples, unsigned Debian packaging (`packaging/`). SQLite-safe backups, redacted secrets, uninstall keeps data unless `--purge`. No threshold moved, no order path. Contract: `docs/HANDOVER_2026-08-18_P19.md`. Next code is **P20 Windows companion** after a real Hub host is stable; P11 paper grind stays parallel.
+**Last updated:** 2026-08-18 (**v2.36.0 — P20 Windows companion contract** on `arena/01a01407-sky`). Pairing codes, `/api/v1/pair`, `ops/windows_companion.py`, unsigned `packaging/windows/`. Next code is **P21 Android companion**. P11 paper grind stays parallel.
+
+**Previous:** 2026-08-18 (**v2.35.0 — P19 + home-PC first-night guide** on `arena/01a013b2-sky`). `docs/HOME_HUB_FIRST_NIGHT.md` / `hub first-night` / `ops/first_night.sh`. `ops/hub.py` + `python main.py hub setup/status/logs/backup/restore/doctor/uninstall`, FHS `/opt/sky` `/etc/sky` `/var/lib/sky`, hardened `ops/systemd/sky-*` units, Caddy/nginx TLS examples, unsigned Debian packaging (`packaging/`). SQLite-safe backups, redacted secrets, uninstall keeps data unless `--purge`. No threshold moved, no order path. Contract: `docs/HANDOVER_2026-08-18_P19.md`. Next code is **P20 Windows companion** after a real Hub host is stable; P11 paper grind stays parallel.
 
 > **If you are the next session and the user forgot to tell you:** P19 is the Hub *mechanics* (layout, CLI, units, backup). A signed apt repo and a clean-VM install/reboot/restore drill were **not** done in this sandbox — do not claim they were. Do not start P20 wrappers around an unauthenticated laptop Flask. Continue `P11` real-paper grind.
 
@@ -139,12 +141,12 @@ now judges P&L **net of costs** (P12.18).
 > regressions); harness `ops/probes/p12_17_weekstart_probe.py`; contract
 > `docs/HANDOVER_2026-08-16_P12_17.md`.
 
-**Branch:** `arena/01a00a75-sky` (fixed session branch)
-**HEAD commit:** verify with `git rev-parse HEAD` (the current tip is the P14 checkpoint)
-**Upstream:** PR #40 merged P12.16 + P12.17 + P12.18; P13 shipped as v2.26.0; P14 is this session.
-**Previous implementation branch:** `arena/01a00a3d-sky` (P13 checkpoint)
-**Version:** 2.27.0
-**Python:** 3.11 (venv `.venv`) — suite green (**815 pass / 1 skip**)
+**Branch:** `arena/01a01407-sky` (fixed session branch)
+**HEAD commit:** verify with `git rev-parse HEAD` (P20 checkpoint after commit)
+**Upstream:** `main` at `269cc7f` (P19 v2.35.0 #55). This session ships P20.
+**Previous implementation branch:** `arena/01a013b2-sky` (P19 checkpoint)
+**Version:** 2.36.0
+**Python:** 3.11 — P20 tests green (`tests/test_windows_companion.py` + hub/handoff)
 
 > **Current state.** P12.1–P12.18, P13 and P14 are shipped. Operate the loop
 > with `python main.py daily`. The next work in sequence remains operational,
@@ -648,6 +650,10 @@ Every phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
+**P20 Windows companion contract — shipped v2.36.0.** Pairing + client
+contract; unsigned Windows recipe only. Next product code is **P21 Android**.
+P11 real-paper grind remains parallel. P12.1–P12.18 tooling is shipped.
+
 **P12 (SKY Quant Validation Engine) — P12.1–P12.15 shipped, including the P12.15 execution-metric follow-up.**
 P10 (data infrastructure) is fully shipped (P10.1–P10.12, PR #18); P11 grind
 re-run on real BTC data and the graduation gate is honestly closed (+0.348R
@@ -1057,6 +1063,8 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
+0. **P21 Android companion** — Keystore, QR pairing reuse, online-only
+   mutations, push/deep links. Do not claim a signed APK.
 1. **Run P12.12 on the real-data host** — rerun `learn` to adopt source keys,
    build/retain the locked Dukascopy XAU validation evidence, then archive
    `python main.py xau-evidence --json`. Do not reseal from the audit command.
@@ -1203,8 +1211,12 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ```bash
 cd /home/user/SKY
+DEMO_MODE=1 python -m pytest tests/test_windows_companion.py tests/test_hub.py tests/test_handoff_memory.py -q
+# 36+ passed (P20 pairing/client + hub + handoff)
+
+cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 1063 passed, 1 skipped  (v2.34.0 P18.4 PWA — +10 tests/test_pwa.py)
+# prior baseline 1063 passed, 1 skipped  (v2.34.0 P18.4) + P20 tests
 
 # PWA installability + safety
 DEMO_MODE=1 .venv/bin/python -m pytest tests/test_pwa.py tests/test_dashboard_js.py -q
