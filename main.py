@@ -2838,7 +2838,7 @@ def main(argv: list[str] | None = None) -> int:
     p_monte.add_argument("--risk-pcts", default="0.25,0.5,1.0,1.5,2.0",
                          help="comma-separated risk percentages per trade to sweep")
     p_monte.add_argument("--ruin-threshold", type=float, default=50.0,
-                         help="drawdown % that counts as ruin (default 50)")
+                         help="drawdown %% that counts as ruin (default 50)")
     p_monte.add_argument("--samples", type=int, default=2000,
                          help="Monte Carlo samples (default 2000)")
     p_monte.add_argument("--seed", type=int, default=None,
