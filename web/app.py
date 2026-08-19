@@ -1240,7 +1240,7 @@ function showAuth(){
 }
 function hideAuth(){ const l=document.getElementById('authLayer'); if(l) l.style.display='none'; }
 async function doSetup(){
-  const u=(document.getElementById('suUser')||{}).value||''; u=u.trim();
+  let u=(document.getElementById('suUser')||{}).value||''; u=u.trim();
   const p=(document.getElementById('suPass')||{}).value||'';
   const p2=(document.getElementById('suPass2')||{}).value||'';
   const e=document.getElementById('suErr');
@@ -1255,7 +1255,7 @@ async function doSetup(){
   }catch(err){ e.textContent=String(err); }
 }
 async function doLogin(){
-  const u=(document.getElementById('liUser')||{}).value||''; u=u.trim();
+  let u=(document.getElementById('liUser')||{}).value||''; u=u.trim();
   const p=(document.getElementById('liPass')||{}).value||'';
   const e=document.getElementById('liErr'); e.textContent='';
   try{

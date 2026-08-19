@@ -410,3 +410,57 @@ def test_sentiment_fallback_renders_without_backend_block():
     assert out["estimate"], out
     assert out["bar"].startswith("hsl("), out
     assert out["label"], out
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_auth_form_setup_and_login_js():
+    """doSetup() and doLogin() must trim username without TypeError (const reassignment)."""
+    js = _extract_js()
+    harness = f"""
+    const elements = {{
+      suUser: {{ value: '  alice  ', style: {{}} }},
+      suPass: {{ value: 'secret1234', style: {{}} }},
+      suPass2: {{ value: 'secret1234', style: {{}} }},
+      suErr: {{ textContent: '', style: {{}} }},
+      liUser: {{ value: '  bob  ', style: {{}} }},
+      liPass: {{ value: 'secret1234', style: {{}} }},
+      liErr: {{ textContent: '', style: {{}} }}
+    }};
+    function el(id) {{
+      if (!elements[id]) elements[id] = {{ value: '', textContent: '', innerHTML: '', style: {{}}, addEventListener: () => {{}} }};
+      return elements[id];
+    }}
+    global.window = {{ addEventListener: () => {{}} }};
+    global.document = {{ getElementById: el, addEventListener: () => {{}} }};
+    const posted = [];
+    global.fetch = async (url, opts) => {{
+      posted.push({{ url, body: JSON.parse(opts.body) }});
+      return {{ ok: true, json: async () => ({{ ok: true }}) }};
+    }};
+    global.location = {{ reload: () => {{}} }};
+    global.setInterval = () => 0; global.clearInterval = () => {{}};
+    global.setTimeout = () => 0; global.clearTimeout = () => {{}};
+
+    {js}
+
+    (async () => {{
+      await doSetup();
+      await doLogin();
+      console.log(JSON.stringify(posted));
+    }})().catch(err => {{
+      console.error(err);
+      process.exit(1);
+    }});
+    """
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        f.write(harness)
+        path = f.name
+    try:
+        r = subprocess.run([NODE, path], capture_output=True, text=True)
+        assert r.returncode == 0, f"auth js failed:\n{r.stdout}\n{r.stderr}"
+        out = json.loads(r.stdout.strip().splitlines()[-1])
+        assert out[0] == {"url": "/api/auth/setup", "body": {"username": "alice", "password": "secret1234"}}
+        assert out[1] == {"url": "/api/auth/login", "body": {"username": "bob", "password": "secret1234"}}
+    finally:
+        Path(path).unlink(missing_ok=True)
+
