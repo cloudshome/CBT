@@ -529,6 +529,11 @@ HTML = """<!doctype html>
   .chart-head .ind b{color:var(--txt);font-variant-numeric:tabular-nums}
   .chart-pane{width:100%;background:#0b1120}
   .chart-pane + .chart-pane{border-top:1px solid var(--line)}
+  .multi-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:10px;background:#0b1120}
+  .multi-chart-card{min-width:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#0e1524}
+  .multi-chart-title{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;font-weight:700;font-size:12px}
+  .multi-chart-canvas{height:250px;width:100%}
+  @media(max-width:760px){.multi-chart-grid{grid-template-columns:1fr}.multi-chart-canvas{height:220px}}
   /* ── forms (journal, sizer, command inputs) ── */
   .formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
   .formgrid label,.fullfield{display:flex;flex-direction:column;gap:5px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:700}
@@ -776,6 +781,7 @@ HTML = """<!doctype html>
           <button class="btn" id="replaySpeedBtn" onclick="cycleReplaySpeed()" title="playback speed">1×</button>
         </div>
         <button class="btn" onclick="loadChartWorkspace(true)">↻ Reload chart</button>
+        <button class="btn" id="multiChartBtn" onclick="toggleMultiChart()" title="Compare four synchronized market views">▦ Multi-chart</button>
       </div>
       <div class="note" id="drawStatus" style="padding:6px 14px 0"></div>
       <div class="note" id="liveState" style="padding:4px 14px 0">Live stream off — the chart shows the bars loaded at <span id="liveLoadedAt">—</span>.</div>
@@ -784,7 +790,8 @@ HTML = """<!doctype html>
       <div id="chartVol" class="chart-pane" style="height:110px"></div>
       <div id="chartRsi" class="chart-pane" style="height:120px"></div>
       <div id="chartMacd" class="chart-pane" style="height:120px;display:none"></div>
-      <div class="note" style="padding:10px 14px">Candles, volume, EMA, VWAP, Bollinger, RSI, MACD, support/resistance and your entry / stop / take-profit — all from the same scan the desk decided on. Chart engine: TradingView Lightweight Charts, vendored locally (no internet needed).</div>
+      <div id="multiChart" class="multi-chart-grid" style="display:none" aria-label="Multi-chart comparison"></div>
+      <div class="note" style="padding:10px 14px">Candles, volume, EMA, VWAP, Bollinger, RSI, MACD, support/resistance and your entry / stop / take-profit — all from the same scan the desk decided on. Chart engine: TradingView Lightweight Charts, vendored locally (no internet needed). Multi-chart is a comparison view only; it does not combine signals or change the desk.</div>
     </div>
     <div class="grid" style="margin-top:14px">
       <div class="card"><h2>CHART READINGS</h2><div id="chartStats"><span class="muted">—</span></div></div>
@@ -2840,6 +2847,90 @@ function chartSetTF(tf){
   document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf));
   loadChartWorkspace(true);
 }
+let _multiChart=false, _multiCharts=[], _multiLoading=false;
+function toggleMultiChart(){
+  _multiChart=!_multiChart;
+  const btn=document.getElementById('multiChartBtn');
+  if(btn){ btn.classList.toggle('active',_multiChart); btn.textContent=_multiChart?'▦ Single chart':'▦ Multi-chart'; }
+  ['chartMain','chartVol','chartRsi','chartMacd','chartHead','chartStats','chartLevels','drawStatus','liveState'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.style.display=_multiChart?'none':'';
+  });
+  const host=document.getElementById('multiChart'); if(host) host.style.display=_multiChart?'grid':'none';
+  if(_multiChart) loadMultiChart(); else disposeMultiCharts();
+}
+function disposeMultiCharts(){
+  _multiCharts.forEach(c=>{ try{c.chart.remove();}catch(e){} }); _multiCharts=[];
+}
+const MULTI_SYMBOLS=['BTCUSDT','ETHUSDT','XAUUSD'];
+const MULTI_TFS=['5m','15m','1h','4h','1d'];
+function multiDefaults(){
+  const primary=chartSym(), tf=chartTf();
+  return [{symbol:primary,tf:tf},{symbol:primary,tf:tf==='15m'?'1h':'15m'},
+          {symbol:'BTCUSDT',tf:'1h'},{symbol:'ETHUSDT',tf:'1h'}];
+}
+function multiSlotState(){
+  let slots=multiDefaults();
+  try{
+    const saved=JSON.parse(localStorage.getItem('sky.multiChartSlots')||'null');
+    if(Array.isArray(saved)&&saved.length===4) slots=saved.map((s,i)=>({
+      symbol:MULTI_SYMBOLS.includes(String(s.symbol))?String(s.symbol):slots[i].symbol,
+      tf:MULTI_TFS.includes(String(s.tf))?String(s.tf):slots[i].tf}));
+  }catch(e){}
+  return slots;
+}
+function saveMultiSlots(slots){
+  try{localStorage.setItem('sky.multiChartSlots',JSON.stringify(slots));}catch(e){}
+}
+function multiChartSpecs(){
+  const slots=multiSlotState(), seen=new Set();
+  return slots.filter(s=>{const k=s.symbol+' '+s.tf;if(seen.has(k))return false;seen.add(k);return true;});
+}
+function renderMultiControls(host,slots){
+  const bar=document.createElement('div'); bar.className='multi-chart-title';
+  bar.style.cssText='grid-column:1/-1;flex-wrap:wrap;background:rgba(255,255,255,.03)';
+  bar.innerHTML='<span>Comparison slots</span><span class="muted">Saved in this browser only · no combined signal</span>';
+  slots.forEach((slot,i)=>{
+    const label=document.createElement('label'); label.style.cssText='display:flex;gap:5px;align-items:center;font-weight:400';
+    const sym=document.createElement('select'), tf=document.createElement('select');
+    sym.setAttribute('aria-label','comparison symbol '+(i+1)); tf.setAttribute('aria-label','comparison timeframe '+(i+1));
+    MULTI_SYMBOLS.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sym.appendChild(o);});
+    MULTI_TFS.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;tf.appendChild(o);});
+    sym.value=slot.symbol;tf.value=slot.tf;label.appendChild(document.createTextNode((i+1)+'.'));label.appendChild(sym);label.appendChild(tf);bar.appendChild(label);
+    const changed=()=>{const next=multiSlotState();next[i]={symbol:sym.value,tf:tf.value};saveMultiSlots(next);loadMultiChart();};
+    sym.addEventListener('change',changed);tf.addEventListener('change',changed);
+  });
+  host.appendChild(bar);
+}
+function multiCandleData(candles){
+  return (candles||[]).map(c=>{const raw=c.ts||c.time||c.timestamp||c.open_time||c.date;
+    const t=raw?new Date(raw).getTime()/1000:Date.now()/1000;
+    return {time:t,open:Number(c.open||0),high:Number(c.high||0),low:Number(c.low||0),close:Number(c.close||0)};
+  }).filter(c=>Number.isFinite(c.time)&&c.high>0);
+}
+async function loadMultiChart(){
+  if(_multiLoading)return; const host=document.getElementById('multiChart'); if(!host)return;
+  _multiLoading=true; disposeMultiCharts(); host.innerHTML='<div class="muted" style="padding:12px">loading comparison charts…</div>';
+  try{
+    const specs=multiChartSpecs();
+    const results=await Promise.all(specs.map(async s=>{const r=await fetch('/api/chart?symbol='+encodeURIComponent(s.symbol)+'&tf='+encodeURIComponent(s.tf)+'&limit=180');return {spec:s,data:await r.json()};}));
+    host.innerHTML=''; renderMultiControls(host,multiSlotState()); const make=chartsAvailable();
+    if(!make){host.innerHTML+='<div class="err" style="padding:12px">chart engine failed to load</div>';return;}
+    results.forEach((item,i)=>{
+      const card=document.createElement('div'); card.className='multi-chart-card';
+      const title=document.createElement('div'); title.className='multi-chart-title';
+      title.innerHTML='<span>'+esc(item.spec.symbol)+' · '+esc(item.spec.tf)+'</span><span class="muted">comparison only</span>';
+      const canvas=document.createElement('div'); canvas.className='multi-chart-canvas'; card.appendChild(title);card.appendChild(canvas);host.appendChild(card);
+      const chart=make(canvas,{width:canvas.clientWidth||500,height:250,layout:{background:{color:'#0e1524'},textColor:'#8aa0bd'},grid:{vertLines:{color:'#1e3358'},horzLines:{color:'#1e3358'}},timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1e3358'}});
+      const series=chart.addCandlestickSeries({upColor:'#22c55e',downColor:'#ef4444',borderUpColor:'#22c55e',borderDownColor:'#ef4444',wickUpColor:'#22c55e',wickDownColor:'#ef4444'});
+      series.setData(multiCandleData(item.data.candles)); chart.timeScale().fitContent(); _multiCharts.push({chart,series});
+    });
+    // Keep zoom/pan aligned without forcing different markets to share prices.
+    _multiCharts.forEach((item,i)=>item.chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{
+      if(_multiChart && !_multiSync && range){_multiSync=true;_multiCharts.forEach((other,j)=>{if(i!==j)try{other.chart.timeScale().setVisibleLogicalRange(range);}catch(e){}});_multiSync=false;}
+    }));
+  }catch(e){host.innerHTML='<div class="err" style="padding:12px">multi-chart error: '+esc(String(e))+'</div>';}finally{_multiLoading=false;}
+}
+let _multiSync=false;
 function chartsAvailable(){
   return (typeof LightweightCharts !== 'undefined' && LightweightCharts.createChart) ? LightweightCharts.createChart
        : (typeof createChart !== 'undefined' ? createChart : null);
@@ -2870,6 +2961,7 @@ async function loadChartWorkspace(force){
     if(stamp) stamp.textContent=new Date().toLocaleTimeString();
     // A running stream follows the selected series: reconnect when it changed.
     if(_live && (_live.symbol!==chartSym() || _live.tf!==chartTf())){ stopLive(true); startLive(); }
+    if(_multiChart) loadMultiChart();
   }catch(e){
     if(head) head.innerHTML='<span class="err">chart error: '+esc(String(e))+'</span>';
   }finally{ _chartLoading=false; }

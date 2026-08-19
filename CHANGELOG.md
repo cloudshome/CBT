@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.43.0] — 2026-08-19 · W3.5 multi-chart comparison views
+
+- Added an optional four-up multi-chart workspace to the Chart tab.
+- Compares the selected symbol/timeframe with a nearby timeframe plus BTCUSDT
+  and ETHUSDT reference views; charts are independently fetched from `/api/chart`.
+- Synchronizes zoom and pan across tiles while keeping candles, prices and
+  signals separate. The view is explicitly comparison-only and never combines
+  or changes desk decisions, practice scoring, risk, paper, or graduation.
+- Responsive 2×2 layout collapses to one column on narrow screens.
+- Existing single-chart overlays, replay, live streaming and drawings remain
+  the default path.
+
+
 All notable changes to **CryptoBrain / SKY** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
