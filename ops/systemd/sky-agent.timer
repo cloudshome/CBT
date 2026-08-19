@@ -1,0 +1,11 @@
+[Unit]
+Description=SKY Daily Intelligence Report (05:00 UTC)
+Documentation=https://github.com/Azimshawon/SKY
+
+[Timer]
+OnCalendar=05:00
+Persistent=true
+Unit=sky-agent.service
+
+[Install]
+WantedBy=timers.target

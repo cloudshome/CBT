@@ -205,6 +205,41 @@ ALLOWED_TOOLS = {
             },
         },
     },
+    # ── 24/7 SKY Intelligence Agent — research & monitoring (read-only) ──
+    "sky_agent_status": {
+        "description": "24/7 SKY Intelligence Agent status: recent hypotheses, intelligence reports, market regime log and SEC events. Read-only; same as `python main.py sky-agent status --json`. Never trades, never bypasses risk gate.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    "sky_agent_report": {
+        "description": "Daily intelligence report builder (Market / Regime / Strategies / Research / Risk / Recommendations). Only evidence-backed suggestions; never BUY NOW. Read-only; same as `python main.py sky-agent report --json`.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "demo": {"type": "boolean", "default": False, "description": "Use deterministic demo data (offline)"},
+            },
+        },
+    },
+    "sky_agent_health": {
+        "description": "Combined 24/7 agent health: readiness strip + system probe (CPU/RAM/disk/DB) + agent liveness. Read-only; same as `python main.py sky-agent health --json`.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    "sky_agent_hypotheses": {
+        "description": "List and optionally backtest trading hypotheses (e.g. H-001 Buy Pullback when 4H bullish + 1H bullish). Proposing is free; testing runs SKY's deterministic backtester on the stored Parquet series and returns baseline vs filtered metrics (N, expectancy R, PF, DD). Hypothesis remains unproven until it clears the graduation bar net of costs. Read-only; same as `python main.py sky-agent hypothesize --json`.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "hypothesis_id": {"type": "string", "description": "Optional: which hypothesis to backtest (e.g. H-001). Omit to just list."},
+                "symbol": {"type": "string", "default": "BTCUSDT"},
+                "timeframe": {"type": "string", "default": "15m"},
+            },
+        },
+    },
 }
 
 
@@ -356,6 +391,39 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         days = min(365, max(1, int(args.get("days", 30))))
         with SignalDB() as db:
             return practice_scorecard(db, days=days)
+
+    elif name == "sky_agent_status":
+        from sky_agent.memory import ensure_memory_schema
+        with SignalDB() as db:
+            ensure_memory_schema(db)
+            hyps = [dict(r) for r in db.conn.execute("SELECT hypothesis_id,setup,status,created_ts FROM research_hypotheses ORDER BY created_ts DESC LIMIT 20").fetchall()]
+            reports = [dict(r) for r in db.conn.execute("SELECT report_date,kind,asset,recommendation,level,created_ts FROM intelligence_reports ORDER BY created_ts DESC LIMIT 10").fetchall()]
+            regimes = [dict(r) for r in db.conn.execute("SELECT symbol,timeframe,regime,volatility_state,ts FROM market_regime_log ORDER BY ts DESC LIMIT 10").fetchall()]
+            filings = [dict(r) for r in db.conn.execute("SELECT accession,event_type,severity FROM sec_events ORDER BY created_ts DESC LIMIT 10").fetchall()]
+        return {"hypotheses": hyps, "reports": reports, "regimes": regimes, "sec_events": filings}
+
+    elif name == "sky_agent_report":
+        from sky_agent.daily_report import build_daily_report
+        demo = bool(args.get("demo", False))
+        return build_daily_report(demo=demo)
+
+    elif name == "sky_agent_health":
+        from brain.agent import readiness_strip
+        from sky_agent.monitor_system import probe_system
+        try:
+            strip = readiness_strip()
+        except Exception as exc:
+            strip = {"error": str(exc)}
+        return {"readiness": strip, "system": probe_system(), "agent": "sky_agent"}
+
+    elif name == "sky_agent_hypotheses":
+        from sky_agent.hypothesis import propose_hypotheses, run_hypothesis_backtest
+        hyps = propose_hypotheses()
+        out: dict[str, Any] = {"hypotheses": hyps}
+        hid = args.get("hypothesis_id")
+        if hid:
+            out["backtest"] = run_hypothesis_backtest(str(hid), symbol=str(args.get("symbol", "BTCUSDT")), timeframe=str(args.get("timeframe", "15m")))
+        return out
 
     raise ValueError(f"Unhandled tool: {name}")
 

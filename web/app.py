@@ -6667,6 +6667,54 @@ def make_app(job_manager=None) -> Flask:
                         headers={"Cache-Control": "no-cache",
                                  "X-Accel-Buffering": "no"})
 
+    # ── 24/7 SKY Intelligence Agent — dashboard + API surface ───────────
+    # Read-only research & monitoring; never trades, never bypasses risk gate.
+    @app.get("/api/sky-agent/health")
+    def api_sky_agent_health():
+        try:
+            from brain.agent import readiness_strip
+            from sky_agent.monitor_system import probe_system
+            try:
+                strip = readiness_strip()
+            except Exception as exc:
+                strip = {"error": str(exc)}
+            return jsonify(_sanitize_for_json({"ok": True, "readiness": strip, "system": probe_system(), "agent": "sky_agent"}))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/sky-agent/status")
+    def api_sky_agent_status():
+        try:
+            from data.database import SignalDB
+            from sky_agent.memory import ensure_memory_schema
+            with SignalDB() as db:
+                ensure_memory_schema(db)
+                hyps = [dict(r) for r in db.conn.execute("SELECT hypothesis_id,setup,status,created_ts FROM research_hypotheses ORDER BY created_ts DESC LIMIT 20").fetchall()]
+                reports = [dict(r) for r in db.conn.execute("SELECT report_date,kind,asset,recommendation,level,created_ts FROM intelligence_reports ORDER BY created_ts DESC LIMIT 10").fetchall()]
+                regimes = [dict(r) for r in db.conn.execute("SELECT symbol,timeframe,regime,volatility_state,ts FROM market_regime_log ORDER BY ts DESC LIMIT 10").fetchall()]
+                filings = [dict(r) for r in db.conn.execute("SELECT accession,event_type,severity FROM sec_events ORDER BY created_ts DESC LIMIT 10").fetchall()]
+            return jsonify(_sanitize_for_json({"ok": True, "hypotheses": hyps, "reports": reports, "regimes": regimes, "sec_events": filings}))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/sky-agent/report")
+    def api_sky_agent_report():
+        try:
+            from sky_agent.daily_report import build_daily_report
+            demo = request.args.get("demo", "").lower() in ("1", "true", "yes")
+            return jsonify(_sanitize_for_json(build_daily_report(demo=demo)))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/sky-agent/hypotheses")
+    def api_sky_agent_hypotheses():
+        try:
+            from sky_agent.hypothesis import propose_hypotheses
+            hyps = propose_hypotheses()
+            return jsonify(_sanitize_for_json({"ok": True, "hypotheses": hyps}))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
     @app.errorhandler(404)
     def _v1_404(exc):
         if _is_v1(request.path or ""):

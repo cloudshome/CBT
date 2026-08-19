@@ -2232,6 +2232,121 @@ def cmd_correlation(args) -> int:
     return 0 if res.get("available") else 1
 
 
+def cmd_sky_agent(args) -> int:
+    """24/7 SKY Intelligence Agent — research & monitoring (never trades).
+
+    Subcommands:
+      health   — readiness + system probe (cheap, runs in <1s)
+      status   — agent memory / recent reports / hypotheses
+      collect  — one polling pass (market / edgar / news / system)
+      report   — daily intelligence report (markdown or json)
+      run      — daemon loop (systemd ExecStart; --demo for offline)
+      hypothesize — propose/test trading hypotheses
+    """
+    action = getattr(args, "sky_agent_action", "health")
+    is_json = getattr(args, "json", False)
+
+    if action == "health":
+        from sky_agent.monitor_system import probe_system
+        from brain.agent import readiness_strip
+        try:
+            strip = readiness_strip()
+        except Exception as exc:
+            strip = {"error": str(exc)}
+        sys_probe = probe_system()
+        payload = {"readiness": strip, "system": sys_probe, "agent": "sky_agent", "ok": sys_probe.get("level") not in ("HIGH", "CRITICAL") or not sys_probe.get("alerts")}
+        if is_json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(f"SKY Agent health — system level {sys_probe.get('level')}  alerts: {sys_probe.get('alerts') or 'none'}")
+            print(f"  cpu {sys_probe.get('cpu_pct')}%  ram {sys_probe.get('ram_pct')}%  disk {sys_probe.get('disk_pct')}%")
+            print(f"  db_ok={sys_probe.get('db_ok')}")
+            if strip.get("readiness") or strip.get("error"):
+                print(f"  readiness: {str(strip)[:400]}")
+        return 0
+
+    if action == "status":
+        from data.database import SignalDB
+        from sky_agent.memory import ensure_memory_schema
+        with SignalDB() as db:
+            ensure_memory_schema(db)
+            hyps = db.conn.execute("SELECT hypothesis_id,setup,status,created_ts FROM research_hypotheses ORDER BY created_ts DESC LIMIT 20").fetchall()
+            reports = db.conn.execute("SELECT report_date,kind,asset,recommendation,level,created_ts FROM intelligence_reports ORDER BY created_ts DESC LIMIT 10").fetchall()
+            regimes = db.conn.execute("SELECT symbol,timeframe,regime,volatility_state,ts FROM market_regime_log ORDER BY ts DESC LIMIT 10").fetchall()
+            filings = db.conn.execute("SELECT accession,event_type,severity FROM sec_events ORDER BY created_ts DESC LIMIT 10").fetchall()
+        payload = {"hypotheses": [dict(r) for r in hyps], "reports": [dict(r) for r in reports], "regimes": [dict(r) for r in regimes], "sec_events": [dict(r) for r in filings]}
+        if is_json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(f"hypotheses: {len(hyps)}  reports: {len(reports)}  regimes: {len(regimes)}  sec_events: {len(filings)}")
+            for r in hyps[:5]:
+                print(f"  {r['hypothesis_id']} {r['setup']} [{r['status']}]")
+            for r in reports[:5]:
+                print(f"  report {r['report_date']} {r['kind']} {r['asset']} → {r['recommendation']} [{r['level']}]")
+        return 0
+
+    if action == "collect":
+        demo = bool(getattr(args, "demo", False))
+        target = getattr(args, "target", "all")
+        results: dict = {}
+        if target in ("all", "market"):
+            from sky_agent.monitor_market import scan_market_snapshot
+            results["market"] = {"events": len(scan_market_snapshot(demo=demo))}
+        if target in ("all", "system"):
+            from sky_agent.monitor_system import probe_system
+            results["system"] = probe_system()
+        if target in ("all", "edgar"):
+            from sky_agent.collectors.edgar import ingest_recent_filings, upsert_filings
+            rows = ingest_recent_filings(demo=demo)
+            results["edgar"] = {"filings": upsert_filings(rows)}
+        if target in ("all", "news"):
+            from sky_agent.collectors.news import collect_news
+            results["news"] = {"items": len(collect_news(limit=10))}
+        if is_json:
+            print(json.dumps(results, indent=2, default=str))
+        else:
+            print(json.dumps(results, indent=2, default=str))
+        return 0
+
+    if action == "report":
+        demo = bool(getattr(args, "demo", False))
+        from sky_agent.daily_report import build_daily_report, format_report_md
+        report = build_daily_report(demo=demo)
+        if is_json:
+            print(json.dumps(report, indent=2, default=str))
+        else:
+            print(format_report_md(report))
+        return 0
+
+    if action == "run":
+        demo = bool(getattr(args, "demo", False))
+        max_ticks = getattr(args, "max_ticks", None)
+        from sky_agent.daemon import run_forever
+        result = run_forever(demo=demo, max_ticks=max_ticks)
+        if is_json:
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            print(json.dumps(result, indent=2, default=str))
+        return 0
+
+    if action == "hypothesize":
+        demo = bool(getattr(args, "demo", False))
+        from sky_agent.hypothesis import propose_hypotheses, run_hypothesis_backtest
+        hyps = propose_hypotheses()
+        target = getattr(args, "hypothesis_id", None)
+        payload: dict = {"proposed": hyps}
+        if target:
+            payload["backtest"] = run_hypothesis_backtest(target, symbol=getattr(args, "symbol", "BTCUSDT"), timeframe=getattr(args, "tf", "15m"))
+        if is_json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(json.dumps(payload, indent=2, default=str))
+        return 0
+
+    print(f"[!] unknown sky-agent action: {action}", file=sys.stderr)
+    return 1
+
+
 def cmd_release(args) -> int:
     """P22.3 signing + clean-target drill catalog / evidence check."""
     from ops.release_drills import (DrillError, evaluate_file, format_catalog,
@@ -3136,6 +3251,18 @@ def main(argv: list[str] | None = None) -> int:
     # ── hidden alpha CLI (regime + CVD + kelly + MAE/MFE + Monte Carlo) ──
     p_hidden = sub.add_parser(
         "hidden", help="hidden alpha layer: regime, CVD, kelly, MAE/MFE, Monte Carlo")
+    # ── 24/7 SKY Intelligence Agent (research & monitoring, never trades) ──
+    p_sa = sub.add_parser("sky-agent", help="24/7 SKY Intelligence & Research Agent (discovery doc: docs/DISCOVERY_2026-08-19_AGENT.md)")
+    p_sa.set_defaults(func=cmd_sky_agent)
+    p_sa.add_argument("sky_agent_action", nargs="?", default="health", choices=("health", "status", "collect", "report", "run", "hypothesize"), help="health|status|collect|report|run|hypothesize")
+    p_sa.add_argument("--json", action="store_true", help="machine-readable JSON")
+    p_sa.add_argument("--demo", action="store_true", help="offline deterministic demo (no network)")
+    p_sa.add_argument("--target", default="all", choices=("all", "market", "system", "edgar", "news"), help="collect: which poller")
+    p_sa.add_argument("--hypothesis-id", default=None, help="hypothesize: which H-XXX to backtest")
+    p_sa.add_argument("--symbol", default=SYMBOL, help="hypothesis symbol")
+    p_sa.add_argument("--tf", default=TIMEFRAME, help="hypothesis timeframe")
+    p_sa.add_argument("--max-ticks", type=int, default=None, help="run: cap ticks (tests)")
+
     p_hidden.set_defaults(func=cmd_hidden)
     p_hidden.add_argument("--symbol", default=SYMBOL,
                           help="asset (aliases: BTC, ETH, XAU/GOLD)")

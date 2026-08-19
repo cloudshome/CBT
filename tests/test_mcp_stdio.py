@@ -40,6 +40,8 @@ ROOT_TOOLS = {
     # W3.4: practice calibration (your reads vs the desk) — read-only
     # coaching memory; feeds no gate
     "practice_scorecard",
+    # 24/7 Intelligence Agent (read-only research & monitoring)
+    "sky_agent_status", "sky_agent_report", "sky_agent_health", "sky_agent_hypotheses",
 }
 
 
