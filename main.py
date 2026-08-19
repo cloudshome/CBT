@@ -740,6 +740,7 @@ def cmd_approve(args) -> int:
     from brain.risk_gate import evaluate as gate_evaluate, gate_message
     from brain.coach import management_checklist
     from data.paper_trading import _primary_plan
+    from brain.weekly import missing_journals
     with SignalDB() as db:
         scan = db.get_scan(args.scan_id)
         if scan is None:
@@ -749,11 +750,29 @@ def cmd_approve(args) -> int:
         plan_type = plan.get("type")
         gate = gate_evaluate(db, symbol=scan.get("symbol"), plan_type=plan_type,
                              action=scan.get("action"))
+        journal_gate = missing_journals(db)
     if not gate["allowed"] and not args.force:
         print("[!] Approval blocked by the risk & discipline gate.", file=sys.stderr)
         for b in gate["blocked_by"]:
             print(f"    ✗ {b}", file=sys.stderr)
         print("    (re-run with --force to override consciously)", file=sys.stderr)
+        return 2
+    # W3.3 journal-first discipline: a decided real trade without its
+    # journal answer means the last commitment was never processed — the
+    # next one waits. P12.14 already counts every missing journal against
+    # the graduation 90% compliance bar; this is the trainer-side prompt.
+    # Strictly tighter only on the human. Never loosens the risk gate.
+    if journal_gate["missing"] and not getattr(args, "acknowledge_journal", False):
+        print("[!] Approve held — journal-first discipline (W3.3).", file=sys.stderr)
+        print(f"    {journal_gate['missing']} decided real trade(s) still have no "
+              f"journal answer:", file=sys.stderr)
+        for t in journal_gate["trades"]:
+            print(f"    ✗ scan #{t['scan_id']}  {t['day']}  {t['plan_type']}  {t['outcome']}",
+                  file=sys.stderr)
+        print("    Journal them first:  python main.py journal <scan_id> --followed-rules 1",
+              file=sys.stderr)
+        print("    or re-run with --acknowledge-journal to commit consciously (audited).",
+              file=sys.stderr)
         return 2
     # P13: position-manager card — see how the trade will be managed
     # (HOLD / REDUCE / TRAIL / EXIT) BEFORE you commit to it.
@@ -1535,6 +1554,47 @@ def cmd_daily(args) -> int:
         print(format_briefing(morning_briefing(
             timeframe=getattr(args, "tf", TIMEFRAME),
             bars=getattr(args, "bars", BARS))))
+    return 0
+
+
+def cmd_weekly(args) -> int:
+    """W3 — the weekly trader review: one page a developing trader rereads
+    every Sunday. Same computation as ``GET /api/weekly``, the dashboard
+    Review tab, MCP ``weekly_review`` and the ``weekly_review`` agent
+    payload. Read-only over the canonical live book; NET of costs; no
+    threshold moved.
+    """
+    from brain.weekly import format_weekly_review, weekly_review
+    from data.database import SignalDB
+    with SignalDB() as db:
+        review = weekly_review(db, days=getattr(args, "days", 7))
+    export = getattr(args, "export", None)
+    if export:
+        with open(export, "w", encoding="utf-8") as fh:
+            json.dump(review, fh, indent=2, default=str)
+        print(f"[weekly] exported → {export}")
+    if args.json:
+        print(json.dumps(review, indent=2, default=str))
+        return 0
+    print(format_weekly_review(review))
+    return 0
+
+
+def cmd_practice(args) -> int:
+    """W3.4 — practice calibration: your committed reads vs the desk's,
+    scored and aggregated. Same computation as ``GET /api/practice``, the
+    Chart-tab ✍ PRACTICE card, the Review-tab PRACTICE CALIBRATION card and
+    the read-only MCP ``practice_scorecard`` tool. Coaching memory only —
+    agreement with the desk is not evidence and never feeds any gate.
+    """
+    from brain.practice import format_practice_scorecard, practice_scorecard
+    from data.database import SignalDB
+    with SignalDB() as db:
+        card = practice_scorecard(db, days=getattr(args, "days", 30))
+    if args.json:
+        print(json.dumps(card, indent=2, default=str))
+        return 0
+    print(format_practice_scorecard(card))
     return 0
 
 
@@ -2580,6 +2640,9 @@ def main(argv: list[str] | None = None) -> int:
     p_app.add_argument("--note", default="")
     p_app.add_argument("--force", action="store_true",
                        help="override a closed risk gate consciously")
+    p_app.add_argument("--acknowledge-journal", action="store_true",
+                       help="approve even though decided real trades are "
+                            "unjournaled (W3.3; audited; journal them after)")
     p_app.set_defaults(func=cmd_approve)
 
     p_rej = sub.add_parser("reject", help="reject a pending signal")
@@ -2779,6 +2842,28 @@ def main(argv: list[str] | None = None) -> int:
     p_loop.add_argument("--tf", default=TIMEFRAME)
     p_loop.add_argument("--bars", type=int, default=BARS)
     p_loop.set_defaults(func=cmd_daily)
+
+    p_wk = sub.add_parser(
+        "weekly",
+        help="weekly trader review: this week vs all time, R distribution, "
+             "violations, graduation tracker, next practice task",
+    )
+    p_wk.add_argument("--json", action="store_true")
+    p_wk.add_argument("--days", type=int, default=7,
+                      help="review window in days (default 7)")
+    p_wk.add_argument("--export", default=None,
+                      help="also write the full JSON review to this path")
+    p_wk.set_defaults(func=cmd_weekly)
+
+    p_pr = sub.add_parser(
+        "practice",
+        help="practice calibration: your committed reads vs the desk, "
+             "agreement rates, weakest component, one coaching takeaway",
+    )
+    p_pr.add_argument("--json", action="store_true")
+    p_pr.add_argument("--days", type=int, default=30,
+                      help="window in days (default 30)")
+    p_pr.set_defaults(func=cmd_practice)
 
     p_preflight = sub.add_parser(
         "preflight",

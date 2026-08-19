@@ -45,7 +45,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from flask import Flask, g, jsonify, render_template_string, request, session
+from flask import Flask, Response, g, jsonify, render_template_string, request, session
 
 import config
 from config import SYMBOL, SYMBOLS, TIMEFRAME, BARS, MIN_CONFIDENCE, DEFAULT_RISK_REWARD, DASHBOARD_HOST, DASHBOARD_PORT, VERSION
@@ -706,6 +706,7 @@ HTML = """<!doctype html>
   <button class="tabbtn" data-tab="risk" onclick="switchTab('risk')">🛡 Risk center</button>
   <button class="tabbtn" data-tab="evidence" onclick="switchTab('evidence')">🔓 Evidence</button>
   <button class="tabbtn" data-tab="journal" onclick="switchTab('journal')">📓 Journal</button>
+  <button class="tabbtn" data-tab="weekly" onclick="switchTab('weekly')">🗓 Review</button>
   <button class="tabbtn" data-tab="learn" onclick="switchTab('learn')">🧑‍🏫 Learning</button>
   <button class="tabbtn" data-tab="connections" onclick="switchTab('connections')">🔌 Connections</button>
   <button class="tabbtn" data-tab="commands" onclick="switchTab('commands')">⌘ Command center</button>
@@ -795,6 +796,31 @@ HTML = """<!doctype html>
           <button class="btn" onclick="attachDrawingsToJournal()">📎 Attach to journal note</button>
           <span class="note">Saved in this browser per symbol + timeframe. Drawings are your own marks — the desk never reads them as evidence and they never change a signal, threshold or the risk gate.</span>
         </div>
+      </div>
+      <div class="card" style="grid-column:1/-1">
+        <h2>✍ PRACTICE — commit your read BEFORE the Signal desk <span class="count" id="pracCount">—</span></h2>
+        <div class="note" style="margin-bottom:10px">Look at the chart. Write <b>your</b> call — direction, the decision
+          you would take, and (for full marks) your entry / stop / target ladder — then submit to reveal what the
+          desk currently reads on the same chart and how your read compares. This is a study mirror: agreement
+          with the desk is <b>not</b> evidence and grants nothing — the desk itself still has to prove its edge in
+          the canonical paper book under the unchanged graduation bar.</div>
+        <div class="flex" style="gap:10px;flex-wrap:wrap;align-items:end">
+          <label class="note">bias<br><select id="pracBias" style="min-width:110px">
+            <option value="bullish">bullish</option><option value="bearish">bearish</option>
+            <option value="neutral" selected>neutral</option></select></label>
+          <label class="note">decision<br><select id="pracDecision" style="min-width:110px">
+            <option value="no_trade" selected>no-trade</option><option value="buy">buy</option>
+            <option value="sell">sell</option></select></label>
+          <label class="note">entry (optional)<br><input id="pracEntry" size="9" placeholder="price"></label>
+          <label class="note">stop<br><input id="pracStop" size="9" placeholder="price"></label>
+          <label class="note">target<br><input id="pracTarget" size="9" placeholder="price"></label>
+          <label class="note">conf 0-100<br><input id="pracConf" size="3" placeholder="—"></label>
+          <label class="note" style="flex:1;min-width:160px">note<br><input id="pracNote" style="width:100%" maxlength="500" placeholder="why — one line (optional)"></label>
+          <button class="btn primary" onclick="submitPractice()">📝 Commit my read</button>
+        </div>
+        <div id="pracResult" style="margin-top:10px"><span class="muted">Nothing committed yet — your read is scored
+          against the desk's live read of this symbol + timeframe the moment you submit.</span></div>
+        <div id="pracMini" class="note" style="margin-top:8px">—</div>
       </div>
     </div>
   </div>
@@ -948,6 +974,54 @@ HTML = """<!doctype html>
       </div>
       <div class="card"><h2>PRE-TRADE CHECKLIST (AUTO)</h2><div id="jChecklist" class="note">Pick a trade to see the plan you actually took.</div></div>
       <div class="card" style="grid-column:1/-1"><h2>DISCIPLINE SUMMARY</h2><div id="jSummary"><span class="muted">—</span></div></div>
+    </div>
+  </div>
+
+  <!-- ── Weekly Review: the Sunday desk mirror (W3) ── -->
+  <div class="tabpanel" data-tab="weekly">
+    <div class="card" style="grid-column:1/-1">
+      <h2>WEEKLY TRADER REVIEW <span class="count" id="wkCount">—</span></h2>
+      <div class="note" style="margin-bottom:10px">One page to reread every week: what <b>your own
+        decisions</b> did, always net of costs. Canonical live book only — simulator grinds and
+        research books never count here. Advisory; the unchanged graduation bar stays the real gate.
+        Same computation as <code>python main.py weekly</code> and MCP <code>weekly_review</code>.
+        <a class="btn" style="margin-left:8px" href="/api/weekly/export">⬇ Export JSON</a></div>
+      <div id="wkStats"><span class="muted">loading…</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>DAILY RITUAL — remembers what you finished <span class="count" id="ritCount">—</span></h2>
+      <div id="ritualList"><span class="muted">loading…</span></div>
+      <div class="note" style="margin-top:8px">Ticks are memory, not permission — the risk gate and the
+        graduation bar never read them. Every UTC day starts fresh.</div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>NEXT PRACTICE TASK</h2>
+      <div id="wkTask"><span class="muted">—</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>PRACTICE CALIBRATION — your reads vs the desk <span class="count" id="pracCardCount">—</span></h2>
+      <div class="note" style="margin-bottom:8px">Every read you commit on the 📊 Chart tab (✍ PRACTICE card) is
+        scored against the desk's live read and remembered here. Study metric only — agreement is not evidence
+        and not permission. Same computation as <code>python main.py practice</code> and MCP
+        <code>practice_scorecard</code>.</div>
+      <div id="wkPractice"><span class="muted">—</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>EQUITY CURVE <span class="count">net · compounding · live book</span></h2>
+      <div id="wkEquity" style="height:220px"></div>
+      <div id="wkEquityNote" class="note" style="margin-top:6px">—</div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>R-MULTIPLE DISTRIBUTION <span class="count">net, all time</span></h2>
+      <div id="wkDist"><span class="muted">—</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>DISCIPLINE — violations, mistakes, missing journals</h2>
+      <div id="wkViol"><span class="muted">—</span></div>
+    </div>
+    <div class="card" style="margin-top:14px;grid-column:1/-1">
+      <h2>GRADUATION TRACKER — exactly which evidence is missing</h2>
+      <div id="wkTrack"><span class="muted">—</span></div>
     </div>
   </div>
 
@@ -2588,12 +2662,41 @@ async function systemCheck(){
 
 async function decide(id, decision, note){
   const n=document.getElementById('note-'+id); const noteTxt=(n&&n.value)||'';
+  const NL=String.fromCharCode(10);
+  const post=async (extra)=>{
+    const r=await fetch('/api/review',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({scan_id:id,decision:decision,note:noteTxt},extra||{}))});
+    return {r:r, d:await r.json()};
+  };
   try{
-    const res=await fetch('/api/review',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({scan_id:id,decision:decision,note:noteTxt})});
-    const d=await res.json();
-    if(!res.ok){ showToast(d.error||'blocked by risk gate','err'); if(d.force_available){ if(confirm(d.error+'\\nForce approve anyway?')){ await fetch('/api/review',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scan_id:id,decision:decision,note:noteTxt,force:true})}); showToast('Force-approved #'+id,'ok'); } } return; }
-    showToast(decision+' #'+id,'ok');
+    const first=await post(); const res=first.r, d=first.d;
+    if(!res.ok){
+      // W3.3 journal-first discipline: the last decided real trade is not
+      // processed until it is journaled, so the next commitment waits.
+      if(d.journal_block && d.acknowledge_available
+         && decision==='APPROVED'){
+        const ids=((d.journal_block.trades||[]).map(t=>'#'+t.scan_id+' '+t.outcome).join(NL))||'';
+        if(confirm(d.error+NL+NL+ids+NL+NL+'OK = approve anyway (audited) · Cancel = go journal now')){
+          const second=await post({acknowledge_journal:true});
+          if(second.r.ok && second.d.ok){ showToast('Approved #'+id+' (journal acknowledged — audited)','ok'); }
+          else{ showToast((second.d&&second.d.error)||'blocked by risk gate','err'); closeModal(); return; }
+        }else{
+          showToast('Journal first — approval held','err');
+          switchTab('journal');
+          closeModal();
+          return;
+        }
+      }else{
+        showToast(d.error||'blocked by risk gate','err');
+        if(d.force_available && confirm(d.error+NL+'Force approve anyway?')){
+          const third=await post({force:true});
+          if(third.r.ok && third.d.ok){ showToast('Force-approved #'+id,'ok'); }
+        }
+        closeModal(); return;
+      }
+    }else{
+      showToast(decision+' #'+id,'ok');
+    }
   }catch(e){ showToast(String(e),'err'); }
   closeModal();
   await load(true, true);
@@ -4056,11 +4159,249 @@ function renderCriteria(p){
 }
 
 // ── lazy tab loading ──────────────────────────────────────────────────
+// ── Weekly Review (W3) — weekly review + daily ritual with memory ───────
+let _weeklyData=null, _wkChart=null;
+function _wkR(v,d){ return v==null?'n/a':((v>=0?'+':'')+Number(v).toFixed(d==null?3:d)+'R'); }
+function _wkPct(v,d){ return v==null?'n/a':(Number(v)*100).toFixed(d==null?1:d)+'%'; }
+async function loadWeekly(){
+  const st=document.getElementById('wkStats'); if(!st) return;
+  try{
+    const d=await (await fetch('/api/weekly')).json();
+    if(d.error){ st.innerHTML='<span class="err">'+esc(d.error)+'</span>'; return; }
+    _weeklyData=d; renderWeekly(d);
+  }catch(e){ st.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
+async function loadRitual(){
+  const el=document.getElementById('ritualList'); if(!el) return;
+  try{
+    const d=await (await fetch('/api/ritual')).json();
+    if(d.error){ el.innerHTML='<span class="err">'+esc(d.error)+'</span>'; return; }
+    renderRitual(d);
+  }catch(e){ el.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
+async function toggleRitual(name, done){
+  try{
+    const res=await fetch('/api/ritual',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({step:name,done:done})});
+    const d=await res.json();
+    if(!res.ok||d.error){ showToast(d.error||('ritual update failed ('+res.status+')'),'err'); loadRitual(); return; }
+    renderRitual(d);
+    if(d.complete) showToast('Daily ritual complete — see you tomorrow','ok');
+  }catch(e){ showToast(String(e),'err'); loadRitual(); }
+}
+function renderRitual(d){
+  const el=document.getElementById('ritualList'); if(!el) return;
+  const cnt=document.getElementById('ritCount');
+  if(cnt) cnt.textContent=d.done+'/'+d.total+(d.complete?' — complete':'');
+  const rows=(d.steps||[]).map(s=>{
+    const okIcon=s.ok===null?'·':(s.ok?'✓':'✗');
+    const okCls=s.ok===false?'err':(s.ok===true?'okc':'muted');
+    return `<div class="critrow" style="align-items:center">
+      <label class="flex" style="gap:8px;align-items:center;cursor:pointer">
+        <input type="checkbox" ${s.done?'checked':''} onchange="toggleRitual('${esc(s.name)}',this.checked)">
+        <b>${esc(s.name)}</b></label>
+      <span class="${okCls}" style="margin-left:8px">${okIcon}</span>
+      <span class="note" style="flex:1">${esc(s.label||'')}</span>
+      <code class="note">${esc(s.command||'')}</code>
+      ${s.done_ts?`<span class="muted note">ticked ${new Date(s.done_ts).toLocaleTimeString()}</span>`:''}
+    </div>`;
+  }).join('')||'<span class="muted">no ritual steps</span>';
+  el.innerHTML=rows+(d.health_error?`<div class="err" style="margin-top:6px">loop health unavailable: ${esc(d.health_error)}</div>`:'');
+}
+function renderWeekly(d){
+  const w=d.week||{}, a=d.all_time||{}, g=d.grade||{}, dd=d.drawdown||{}, v=d.violations||{};
+  const cnt=document.getElementById('wkCount'); if(cnt) cnt.textContent=((d.window||{}).label||'')+' — grade '+(g.grade||'—');
+  const st=document.getElementById('wkStats');
+  const gc=(g.grade&&g.grade!=='—')?(g.score>=70?'var(--green)':(g.score>=50?'var(--amber,#e0a458)':'var(--red)')):'var(--line)';
+  st.innerHTML=`<div class="flex" style="margin-bottom:10px">
+      <span class="pill" style="border-color:${gc};color:${gc};font-size:15px">grade ${esc(g.grade||'—')} · ${g.score??0}/${g.max??100}</span>
+      <span class="badge">window: ${esc((d.window||{}).label||'')}</span></div>
+    <div class="statrow">
+      <div class="stat"><div class="v">${w.n||0}</div><div class="k">This week decided</div></div>
+      <div class="stat"><div class="v">${_wkR(w.expectancy_net)}</div><div class="k">Week E (net)</div></div>
+      <div class="stat"><div class="v">${_wkPct(w.win_rate)}</div><div class="k">Week win rate</div></div>
+      <div class="stat"><div class="v">${w.profit_factor==null?'n/a':w.profit_factor}</div><div class="k">Week PF</div></div>
+      <div class="stat"><div class="v">${_wkR(w.total_r_net)}</div><div class="k">Week total (net)</div></div>
+    </div>
+    <div class="kv" style="margin-top:8px">
+      <b>All time</b><span>${a.n||0} decided (${a.wins||0}W/${a.losses||0}L) · E ${_wkR(a.expectancy_net)} net · PF ${a.profit_factor==null?'n/a':a.profit_factor} · max DD ${dd.max_drawdown_pct!=null?dd.max_drawdown_pct+'%':'—'}</span>
+      <b>Bar (unchanged, net)</b><span>E ≥ +${(d.bar&&d.bar.expectancy!=null?d.bar.expectancy.toFixed(2):'0.50')}R · WR > ${_wkPct(d.bar&&d.bar.win_rate,0)} · PF ≥ ${d.bar&&d.bar.pf} · compliance ≥ ${_wkPct(d.bar&&d.bar.compliance,0)}</span>
+    </div>`;
+  const t=d.next_practice_task||{};
+  document.getElementById('wkTask').innerHTML=t.title
+    ? `<div class="blockcard earn"><b>➤ ${esc(t.title)}</b>
+       <div class="note" style="margin-top:6px">${esc(t.detail||'')}</div>
+       <div class="note" style="margin-top:6px"><code>${esc(t.action||'')}</code></div></div>`
+    : '<span class="muted">—</span>';
+  _wkRenderEquity(d);
+  const dist=(d.r_distribution||[]).map(b=>{
+    const neg=b.bucket.indexOf('-')===0||b.bucket.indexOf('≤')===0;
+    const col=b.n===0?'rgba(255,255,255,.12)':(neg?'var(--red)':(b.bucket.indexOf('0R')===0?'var(--muted)':'var(--green)'));
+    return `<div class="critrow" style="align-items:center">
+      <span class="note" style="width:110px;text-align:right">${esc(b.bucket)}</span>
+      <div class="bar" style="flex:1;margin:0 8px"><i style="width:${Math.min(100,b.pct||0)}%;background:${col}"></i></div>
+      <span class="note" style="width:70px">${b.n} (${b.pct}%)</span></div>`;
+  }).join('');
+  document.getElementById('wkDist').innerHTML=dist||'<span class="muted">no decided trades yet</span>';
+  const miss=(v.missing_scan_ids||[]).map(s=>'#'+s).join(', ');
+  const mks=Object.entries(v.by_mistake||{}).map(([k,n])=>`${esc(k)} ×${n}`).join(' · ')||'—';
+  const emos=Object.entries(v.by_emotion||{}).map(([k,n])=>`${esc(k)} ×${n}`).join(' · ')||'—';
+  const violRows=(v.recent||[]).filter(r=>r.followed_rules===0).map(r=>
+    `<tr><td>#${r.scan_id}</td><td>${esc(r.day||'')}</td><td>${esc(r.outcome||'')}</td><td>${esc(r.mistake||'')}</td><td>${esc(r.emotion||'')}</td></tr>`).join('');
+  document.getElementById('wkViol').innerHTML=`<div class="statrow" style="margin-bottom:8px">
+      <div class="stat"><div class="v">${v.journaled??0}/${v.eligible??0}</div><div class="k">Journaled</div></div>
+      <div class="stat"><div class="v">${v.violations??0}</div><div class="k">Violations</div></div>
+      <div class="stat"><div class="v">${_wkPct(v.compliance)}</div><div class="k">Compliance (bar ${((v.compliance_bar||0.9)*100).toFixed(0)}%)</div></div>
+      <div class="stat"><div class="v">${v.missing_journals??0}</div><div class="k">Missing journals</div></div>
+    </div>
+    <div class="kv"><b>Repeating mistakes</b><span>${mks}</span><b>Emotions on violations</b><span>${emos}</span></div>
+    ${v.missing_journals?`<div class="err" style="margin-top:8px">Unjournaled decided trades: ${esc(miss)} — journal them in the 📓 Journal tab; the next approval will wait for these.</div>`:''}
+    ${violRows?`<div style="overflow:auto;margin-top:8px"><table><tr><th>Scan</th><th>Day</th><th>Outcome</th><th>Mistake</th><th>Emotion</th></tr>${violRows}</table></div>`:''}`;
+  const trk=(d.graduation_tracker||[]).map(t=>{
+    const proven=t.proven?'<span class="okc">✓ proven</span>':'<span class="muted">building</span>';
+    const bt=t.backtest_pct||0, pp=t.paper_pct||0;
+    const missTxt=(t.missing||[]).map(esc).join(' · ')||'watching';
+    return `<div class="critrow" style="align-items:center">
+      <b style="width:190px">${esc(t.plan_type)}${t.primary?'':' <span class="muted">(earned)</span>'}</b>
+      <span class="note" style="width:120px">bt ${t.backtest_n}/${t.backtest_target}</span>
+      <div class="bar" style="width:90px"><i style="width:${bt}%"></i></div>
+      <span class="note" style="width:120px">paper ${t.paper_n}/${t.paper_target}</span>
+      <div class="bar" style="width:90px"><i style="width:${pp}%"></i></div>
+      <span class="note" style="width:110px">E ${_wkR(t.expectancy_net)}</span>
+      ${proven}<span class="note" style="flex:1;margin-left:10px">${missTxt}</span></div>`;
+  }).join('');
+  document.getElementById('wkTrack').innerHTML=trk||'<span class="muted">no setups on record yet — run Backtest + Simulator on real history</span>';
+  const comps=(g.components||[]).map(c=>`<div class="note">[${c.points}/${c.max}] ${esc(c.name)}${c.current!=null?' — '+esc(String(c.current)):''}</div>`).join('');
+  const note=document.getElementById('wkEquityNote');
+  if(note) note.innerHTML=((d.grade||{}).note?`<b>Grade basis (advisory):</b>${comps}<div class="note" style="margin-top:4px">${esc((d.grade||{}).note||'')}</div>`:'');
+}
+function _wkRenderEquity(d){
+  const el=document.getElementById('wkEquity'); if(!el) return;
+  const raw=(d.equity_curve||[]);
+  const cc=chartsAvailable();
+  if(!cc || raw.length<2){
+    el.innerHTML='<span class="muted">'+(raw.length<2?'not enough decided trades yet — the curve appears as your book grows':'chart library unavailable')+'</span>'; return;
+  }
+  const pts=[]; let last=0;
+  for(const p of raw){
+    let t=Math.floor((p.closed_ts||0)/1000); if(t<=last) t=last+1; last=t;
+    pts.push({time:t,value:Number(p.equity)});
+  }
+  el.innerHTML='';
+  try{
+    if(_wkChart && _wkChart.remove){ try{ _wkChart.remove(); }catch(e){} }
+    _wkChart=cc(el,{height:220,layout:{background:{type:'solid',color:'transparent'},textColor:'#93a4bd'},
+      grid:{vertLines:{color:'rgba(255,255,255,.06)'},horzLines:{color:'rgba(255,255,255,.06)'}},
+      rightPriceScale:{borderColor:'rgba(255,255,255,.12)'},timeScale:{borderColor:'rgba(255,255,255,.12)'}});
+    const start=pts.length?pts[0].value:10000;
+    const s=_wkChart.addLineSeries({color:(pts[pts.length-1].value>=start)?'#22c55e':'#ef4444',lineWidth:2});
+    s.setData(pts); _wkChart.timeScale().fitContent();
+  }catch(e){ el.innerHTML='<span class="muted">'+esc(e)+'</span>'; }
+}
+
+// ── Practice mode (W3.4) — commit your read, see the desk's, score the gap ──
+function _pracNum(id){
+  const raw=(document.getElementById(id)||{}).value;
+  if(raw==null||String(raw).trim()==='') return null;
+  const f=parseFloat(raw);
+  return isFinite(f)?f:raw;  // non-numeric stays a string so the server rejects it honestly (400)
+}
+function _pracGradeColor(g,s){
+  if(!g) return 'var(--line)';
+  return (s>=70)?'var(--green)':(s>=50?'var(--amber,#e0a458)':'var(--red)');
+}
+async function submitPractice(){
+  const out=document.getElementById('pracResult');
+  const conf=parseInt((document.getElementById('pracConf')||{}).value,10);
+  const body={
+    symbol:chartSym(), tf:chartTf(),
+    bias:(document.getElementById('pracBias')||{}).value||'neutral',
+    decision:(document.getElementById('pracDecision')||{}).value||'no_trade',
+    entry:_pracNum('pracEntry'), stop:_pracNum('pracStop'), target:_pracNum('pracTarget'),
+    confidence:isFinite(conf)?conf:null,
+    note:((document.getElementById('pracNote')||{}).value||'')
+  };
+  out.innerHTML='<span class="muted">scoring your read against the desk…</span>';
+  try{
+    const res=await fetch('/api/practice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await res.json();
+    if(!res.ok||d.error){ out.innerHTML='<span class="err">'+esc(d.error||('practice submit failed ('+res.status+')'))+'</span>'; return; }
+    renderPracticeResult(d);
+    loadPracticeScorecard();
+  }catch(e){ out.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
+function renderPracticeResult(d){
+  const out=document.getElementById('pracResult'); if(!out) return;
+  const desk=d.desk||{}, sc=d.score||{}, u=d.user||{};
+  const act=desk.action||'?';
+  const actCol=act==='BUY'?'var(--green)':(act==='SELL'?'var(--red)':'var(--muted)');
+  const gc=_pracGradeColor(sc.grade, sc.total||0);
+  const lvl=function(v){ return (v==null)?'—':v; };
+  const comps=(sc.components||[]).map(c=>{
+    const pts=(c.points==null)?'—':(c.points+'/'+c.max);
+    return '<div class="critrow" style="align-items:center"><span class="note" style="width:230px">'+esc(c.name||'')+
+      '</span><b class="mono" style="width:64px">'+pts+'</b><span class="note" style="flex:1">'+esc(c.detail||'')+'</span></div>';
+  }).join('');
+  out.innerHTML=
+    (d.duplicate?'<div class="note" style="margin-bottom:6px">↺ identical read within 2 minutes — showing the original attempt, nothing double-counted.</div>':'')+
+    '<div class="flex" style="gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'+
+      '<span class="pill" style="border-color:'+actCol+';color:'+actCol+'">desk: '+esc(act)+'</span>'+
+      '<span class="badge">desk bias '+esc(desk.bias||'—')+' · '+esc(desk.regime||'—')+'</span>'+
+      (desk.entry?'<span class="badge">desk ladder '+lvl(desk.entry)+' / '+lvl(desk.stop)+' / '+lvl(desk.target)+'</span>':'')+
+      '<span class="pill" style="border-color:'+gc+';color:'+gc+';font-size:15px">your read '+(sc.total!=null?sc.total:'—')+'/100 · '+esc(sc.grade||'—')+'</span>'+
+    '</div>'+
+    '<div class="note" style="margin-bottom:6px">you: '+esc(u.bias||'—')+' / '+esc(u.decision||'—')+
+      (u.levels_given?(' · '+lvl(u.entry)+' / '+lvl(u.stop)+' / '+lvl(u.target)):' · no ladder committed')+
+      (u.note?' · “'+esc(u.note)+'”':'')+'</div>'+
+    comps+
+    '<div class="note" style="margin-top:8px">'+esc(sc.disclaimer||d.disclaimer||'')+'</div>';
+}
+async function loadPracticeScorecard(){
+  try{
+    const d=await (await fetch('/api/practice')).json();
+    if(d.error) throw new Error(d.error);
+    renderPracticeScorecard(d);
+  }catch(e){
+    const w=document.getElementById('wkPractice'); if(w) w.innerHTML='<span class="err">'+esc(e)+'</span>';
+    const m=document.getElementById('pracMini'); if(m) m.textContent='practice scorecard unavailable';
+  }
+}
+function renderPracticeScorecard(d){
+  const mini=document.getElementById('pracMini');
+  const cnt=document.getElementById('pracCardCount'); if(cnt) cnt.textContent=((d.window||{}).label||'')+' — '+(d.n||0)+' reads';
+  const pct=function(v){ return (v==null)?'n/a':(Number(v)*100).toFixed(1)+'%'; };
+  if(mini) mini.textContent=d.n
+    ? ('last '+((d.window||{}).days||30)+'d: '+d.n+' committed reads · bias agreement '+pct(d.bias_agreement)+
+       ' · call agreement '+pct(d.decision_agreement)+' · avg '+(d.avg_score!=null?d.avg_score:'—')+'/100 — full mirror on the 🗓 Review tab')
+    : 'no committed reads yet — this card is where you start: bias → call → ladder, then submit';
+  const w=document.getElementById('wkPractice'); if(!w) return;
+  if(!d.n){ w.innerHTML='<span class="muted">'+esc(d.coaching||'No practice attempts yet.')+'</span>'; return; }
+  const means=d.component_means||{};
+  const grades=['A','B','C','D','E'].filter(g=>(d.grades||{})[g]).map(g=>'<span class="badge">'+g+' ×'+d.grades[g]+'</span>').join(' ');
+  const rows=(d.recent||[]).map(r=>'<tr><td>#'+r.id+'</td><td>'+esc(r.day||'')+'</td><td>'+esc(r.symbol||'')+' '+esc(r.timeframe||'')+
+    '</td><td>'+esc(r.user_decision||'—')+'</td><td>'+esc(r.desk_action||'—')+'</td><td>'+(r.score!=null?r.score:'—')+'</td><td>'+esc(r.grade||'—')+'</td></tr>').join('');
+  w.innerHTML=
+    '<div class="statrow" style="margin-bottom:8px">'+
+      '<div class="stat"><div class="v">'+d.n+'</div><div class="k">Committed reads</div></div>'+
+      '<div class="stat"><div class="v">'+pct(d.bias_agreement)+'</div><div class="k">Bias agreement</div></div>'+
+      '<div class="stat"><div class="v">'+pct(d.decision_agreement)+'</div><div class="k">Call agreement</div></div>'+
+      '<div class="stat"><div class="v">'+(d.avg_score!=null?d.avg_score:'—')+'</div><div class="k">Avg score /100</div></div>'+
+    '</div>'+
+    '<div class="kv"><b>Components</b><span>'+
+      ['bias','decision','levels'].filter(k=>means[k]!=null).map(k=>k+' '+pct(means[k])).join(' · ')+'</span>'+
+      '<b>Grades</b><span>'+grades+'</span></div>'+
+    '<div class="blockcard earn" style="margin-top:8px"><b>➤ Weakest link: '+esc(d.weakest_component||'none in window')+'</b>'+
+      '<div class="note" style="margin-top:4px">'+esc(d.coaching||'')+'</div></div>'+
+    (rows?'<div style="overflow:auto;margin-top:8px"><table><tr><th>#</th><th>Day</th><th>Chart</th><th>You</th><th>Desk</th><th>Score</th><th>Grade</th></tr>'+rows+'</table></div>':'')+
+    '<div class="note" style="margin-top:8px">'+esc(d.disclaimer||'')+'</div>';
+}
+
 function onTabShown(tab){
-  if(tab==='chart') loadChartWorkspace(false);
+  if(tab==='chart'){ loadChartWorkspace(false); loadPracticeScorecard(); }
   else if(tab==='manage') loadTradeManager();
   else if(tab==='risk') loadRiskCenter();
   else if(tab==='journal') loadJournalCenter();
+  else if(tab==='weekly'){ loadWeekly(); loadRitual(); loadPracticeScorecard(); }
   else if(tab==='commands'){ loadCommands(); loadJobs(false); }
   else if(tab==='modules') loadModules();
   else if(tab==='connections') loadConnections(false);
@@ -4071,7 +4412,7 @@ function onTabShown(tab){
 (function(){
   try{
     const h=(typeof location !== 'undefined' && location.hash || '').replace('#','');
-    if(h && ['overview','chart','market','intelligence','trades','manage','risk','evidence','journal','learn','connections','commands','modules','system'].includes(h)) _activeTab=h;
+    if(h && ['overview','chart','market','intelligence','trades','manage','risk','evidence','journal','weekly','learn','connections','commands','modules','system'].includes(h)) _activeTab=h;
   }catch(e){}
   try{ switchTab(_activeTab); }catch(e){}
 })();
@@ -4734,6 +5075,22 @@ def make_app(job_manager=None) -> Flask:
             if decision == "APPROVED" and force and not config.SKY_ALLOW_FORCE_APPROVE:
                 return jsonify({"error": "force approve is disabled "
                                          "(SKY_ALLOW_FORCE_APPROVE is not set)"}), 403
+            # W3.3 journal-first discipline: a decided real trade without its
+            # journal answer means the last commitment was never processed,
+            # so the next one waits. Same fail-closed population as the
+            # graduation discipline criterion (P12.14). Never bypasses the
+            # risk gate; only delays commitments, and the escape is audited.
+            if decision == "APPROVED" and not body.get("acknowledge_journal"):
+                from brain.weekly import missing_journals
+                jg = missing_journals(db)
+                if jg["missing"]:
+                    return jsonify({
+                        "error": (f"Journal-first discipline: {jg['missing']} decided "
+                                  "real trade(s) unjournaled — journal them before the "
+                                  "next commitment"),
+                        "journal_block": jg,
+                        "acknowledge_available": True,
+                    }), 409
             try:
                 new = db.update_status(int(scan_id), decision, note=note,
                                        reviewer=reviewer)
@@ -4742,7 +5099,8 @@ def make_app(job_manager=None) -> Flask:
             if new is None:
                 return jsonify({"error": f"scan #{scan_id} not found"}), 404
         _audit("review", str(scan_id),
-               detail={"decision": decision, "note": note, "forced": force})
+               detail={"decision": decision, "note": note, "forced": force,
+                       "acknowledged_journal": bool(body.get("acknowledge_journal"))})
         return jsonify({"ok": True, "scan_id": scan_id, "status": new})
 
     @app.get("/api/risk")
@@ -5504,6 +5862,135 @@ def make_app(job_manager=None) -> Flask:
             return jsonify(_sanitize_for_json(payload))
         except Exception as exc:  # never 500 — degrade gracefully
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.get("/api/weekly")
+    def api_weekly():
+        """W3 weekly trader review — the same computation as
+        `python main.py weekly`, the MCP ``weekly_review`` tool and the
+        ``weekly_review`` desk agent. Read-only over the canonical live
+        book, NET of costs; advisory only, never a gate."""
+        try:
+            from brain.weekly import weekly_review
+            days = request.args.get("days", 7)
+            days = min(90, max(1, int(days)))
+            from data.database import SignalDB
+            with SignalDB() as db:
+                payload = weekly_review(db, days=days)
+            return jsonify(_sanitize_for_json(payload))
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.get("/api/weekly/export")
+    def api_weekly_export():
+        """Download the weekly review as a JSON attachment (evidence archive)."""
+        try:
+            from brain.weekly import weekly_review
+            days = request.args.get("days", 7)
+            days = min(90, max(1, int(days)))
+            from data.database import SignalDB
+            with SignalDB() as db:
+                payload = weekly_review(db, days=days)
+            body = json.dumps(_sanitize_for_json(payload), indent=2, default=str)
+            day = time.strftime("%Y-%m-%d", time.gmtime())
+            return Response(
+                body,
+                mimetype="application/json",
+                headers={"Content-Disposition":
+                         f"attachment; filename=sky-weekly-review-{day}.json"},
+            )
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.get("/api/ritual")
+    def api_ritual():
+        """W3.2 — today's daily-ritual checklist with its persisted ticks."""
+        try:
+            from brain.ritual import ritual_today
+            from data.database import SignalDB
+            with SignalDB() as db:
+                payload = ritual_today(db)
+            return jsonify(_sanitize_for_json(payload))
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.post("/api/ritual")
+    def api_ritual_set():
+        """W3.2 — tick/untick one canonical ritual step for today.
+
+        Fail-closed on unknown step names (no invented ritual history), and
+        audited like every human action. A tick is a memory note, never
+        permission and never a threshold."""
+        body = request.get_json(silent=True) or {}
+        name = str(body.get("step") or body.get("name") or "")
+        try:
+            done = bool(body.get("done"))
+            from brain.ritual import ritual_set
+            from data.database import SignalDB
+            with SignalDB() as db:
+                payload = ritual_set(db, name, done)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+        _audit("ritual", name, detail={"done": done, "day": payload.get("day")})
+        return jsonify(_sanitize_for_json(payload))
+
+    @app.get("/api/practice")
+    def api_practice():
+        """W3.4 practice calibration — the same computation as
+        `python main.py practice`, the Chart/Review tab cards and the
+        read-only MCP ``practice_scorecard`` tool. Coaching memory only:
+        agreement with the desk is not evidence, and this payload is never
+        read by any gate or graduation surface."""
+        try:
+            from brain.practice import practice_scorecard
+            from data.database import SignalDB
+            days = min(365, max(1, int(request.args.get("days", 30))))
+            with SignalDB() as db:
+                payload = practice_scorecard(db, days=days)
+            return jsonify(_sanitize_for_json(payload))
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    @app.post("/api/practice")
+    def api_practice_submit():
+        """W3.4 — commit one practice read and score it against the desk's
+        current read.
+
+        The engine payload is computed with ``save=False``: a practice
+        attempt never enters the scans table, the review queue or the live
+        book. Fail-closed validation (400) before the desk read is computed;
+        if the engine itself cannot produce a read, nothing is recorded
+        (502) — an unscored attempt would corrupt the calibration history.
+        """
+        body = request.get_json(silent=True) or {}
+        from brain.practice import (desk_read_from_payload, submit_attempt,
+                                    validate_user_read)
+        try:
+            user = validate_user_read(body)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        try:
+            payload = compute_payload(user["symbol"], user["tf"],
+                                      save=False, use_cache=True)
+        except Exception as exc:
+            return jsonify({"ok": False,
+                            "error": f"desk read unavailable — attempt not recorded: "
+                                     f"{type(exc).__name__}: {exc}"}), 502
+        try:
+            desk = desk_read_from_payload(payload, user["symbol"], user["tf"])
+            from data.database import SignalDB
+            with SignalDB() as db:
+                result = submit_attempt(db, user, desk)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        except Exception as exc:  # never 500 — degrade gracefully
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+        _audit("practice", f"{user['symbol']} {user['tf']}",
+               detail={"score": result["score"]["total"],
+                       "grade": result["score"]["grade"],
+                       "duplicate": bool(result.get("duplicate"))})
+        return jsonify(_sanitize_for_json(result))
 
     @app.get("/api/readiness")
     def api_readiness():

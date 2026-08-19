@@ -1,4 +1,8 @@
-**Last updated:** 2026-08-18 (**v2.40.0 — P22.3 signing + clean-target drill contracts** on `arena/01a01621-sky`). `python main.py release drills` / `check`. No signed installer. Next is **executing those drills on trusted hosts**. P11 paper grind stays parallel.
+**Last updated:** 2026-08-19 (**v2.42.0 — W3.4 practice mode** on `arena/01a01842-sky`, same PR #62). Commit your read on the 📊 Chart tab (bias → call → ladder) → the desk's read freezes at that moment → deterministic score, visible components → 🗓 Review-tab PRACTICE CALIBRATION mirror; `python main.py practice`, `GET/POST /api/practice`, MCP `practice_scorecard` 1.13.0 / `cryptobrain_practice`. Coaching memory only — the live book, risk gate and graduation never read it. Suite **1213 passed / 1 skipped** (also fixed a CI-caught TODO.md doc-pin regression). Contract: `docs/HANDOVER_2026-08-19_W34.md`. Next code: **W3.5 multi-chart** (sandbox-feasible) or P22 trusted-host drills (real signers only). P11 paper grind stays parallel.
+
+**Previous:** 2026-08-19 (**v2.41.0 — W3 trader development: weekly review page + ritual memory + journal-first gate** on `arena/01a01842-sky`). `python main.py weekly`, `GET /api/weekly`, dashboard 🗓 Review tab, MCP `weekly_review`; `GET/POST /api/ritual` per-day memory; `approve` holds while decided real trades are unjournaled (`--acknowledge-journal` audited escape). Suite 1177 passed / 1 skipped. Contract: `docs/HANDOVER_2026-08-19_W3.md`.
+
+**Previous:** 2026-08-18 (**v2.40.0 — P22.3 signing + clean-target drill contracts** on `arena/01a01621-sky`). `python main.py release drills` / `check`. No signed installer. Next is **executing those drills on trusted hosts**.
 
 **Previous:** 2026-08-18 (**v2.35.0 — P19 + home-PC first-night guide** on `arena/01a013b2-sky`). `docs/HOME_HUB_FIRST_NIGHT.md` / `hub first-night` / `ops/first_night.sh`. `ops/hub.py` + `python main.py hub setup/status/logs/backup/restore/doctor/uninstall`, FHS `/opt/sky` `/etc/sky` `/var/lib/sky`, hardened `ops/systemd/sky-*` units, Caddy/nginx TLS examples, unsigned Debian packaging (`packaging/`). SQLite-safe backups, redacted secrets, uninstall keeps data unless `--purge`. No threshold moved, no order path. Contract: `docs/HANDOVER_2026-08-18_P19.md`. Next code is **P20 Windows companion** after a real Hub host is stable; P11 paper grind stays parallel.
 
@@ -141,12 +145,12 @@ now judges P&L **net of costs** (P12.18).
 > regressions); harness `ops/probes/p12_17_weekstart_probe.py`; contract
 > `docs/HANDOVER_2026-08-16_P12_17.md`.
 
-**Branch:** `arena/01a01407-sky` (fixed session branch)
-**HEAD commit:** verify with `git rev-parse HEAD` (P20 checkpoint after commit)
-**Upstream:** `main` at `269cc7f` (P19 v2.35.0 #55). This session ships P20.
-**Previous implementation branch:** `arena/01a013b2-sky` (P19 checkpoint)
-**Version:** 2.36.0
-**Python:** 3.11 — P20 tests green (`tests/test_windows_companion.py` + hub/handoff)
+**Branch:** `arena/01a01842-sky` (fixed session branch)
+**HEAD commit:** verify with `git rev-parse HEAD` (W3 checkpoint after commit)
+**Upstream:** `main` at `30b80d5` (P22.3 v2.40.0 #61). This session ships W3.4.
+**Previous implementation branch:** `arena/01a01621-sky` (P22.3 checkpoint)
+**Version:** 2.41.0
+**Python:** 3.11 — W3 tests green (`tests/test_weekly_review.py` + `tests/test_ritual.py` + `tests/test_weekly_js.py`, 37 new)
 
 > **Current state.** P12.1–P12.18, P13 and P14 are shipped. Operate the loop
 > with `python main.py daily`. The next work in sequence remains operational,
@@ -650,11 +654,37 @@ Every phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**P21 Android companion contract — shipped v2.37.0.** `ops/android_companion.py`
-(Keystore token contract, biometric re-check policy, online-only mutations,
-deep links), `companion … --platform android` + `hub pair --platform android`,
-unsigned APK recipe only. P20 Windows and P19 Hub contracts remain shipped.
-Next product code is **P22 signed release engineering**.
+**W3.4 practice mode — shipped v2.42.0 (this session).** `brain/practice.py`
+one computation → `python main.py practice`, `GET/POST /api/practice`, Chart-tab
+✍ PRACTICE card + Review-tab PRACTICE CALIBRATION card, MCP
+`practice_scorecard` (root 1.13.0) / `cryptobrain_practice`, Command Center
+card. The human commits bias/final-call/entry-stop-target BEFORE the Signal
+desk; the server freezes the desk read (`save=False` — practice never enters
+the scans queue), scores agreement deterministically (bias 35 / call 35 /
+ladder 30 with ATR-proximity, stop-side and ≥1.5R checks; no-ladder renorms
+over 70; grade A–E same bands as weekly), and remembers it in
+`practice_attempts` (double-submit guard: identical read < 2 min returns the
+original). Fail-closed vocabularies; a half-plan is rejected, not scored.
+Coaching memory ONLY — no live-book/risk-gate/graduation surface reads it
+(pinned by `test_practice_rows_never_reach_the_live_book_or_graduation`).
+
+**W3 trader development — shipped v2.41.0 (earlier).** The weekly trader
+review is a first-class page (`brain/weekly.py` → `python main.py weekly`,
+`GET /api/weekly` + `/export`, 🗓 Review tab, MCP `weekly_review` 1.12.0 /
+`cryptobrain_weekly`, `WeeklyReviewAgent` payload, Command Center card): week
+vs all-time (NET), reused business-metrics equity curve, net-R distribution,
+violations with repeating mistakes/emotions, per-setup graduation tracker with
+exact missing evidence, deterministic next practice task, advisory grade.
+`brain/ritual.py` + `ritual_checks` = per-UTC-day persistent daily ritual.
+Journal-first gate: `approve` (CLI + web) holds while decided canonical-live
+real trades are unjournaled; `--acknowledge-journal` / `acknowledge_journal:
+true` is the audited escape; rejects/closes/skips and simulator/research debt
+are never held. No threshold moved; strictly tighter on the human only.
+
+**P19–P22.3 production contracts — shipped v2.35.0–v2.40.0.** Hub mechanics,
+Windows + Android native trees, release metadata, signing + drill contracts.
+Remaining: physically compile/sign/drill on trusted Windows 11 / Android /
+Ubuntu hosts — not executable from a Linux sandbox.
 P11 real-paper grind remains parallel. P12.1–P12.18 tooling is shipped.
 
 **P12 (SKY Quant Validation Engine) — P12.1–P12.15 shipped, including the P12.15 execution-metric follow-up.**
@@ -1072,6 +1102,9 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    stable/beta channels, in-app System page, privacy-respecting diagnostics
    export, documented incident/support/rollback paths. Do not claim signed
    artifacts until produced on a real build host.
+0b. ~~**W3.4 practice mode**~~ — shipped v2.42.0. Next sandbox code:
+   **W3.5 multi-chart views** (W2 remainder) and optional P18.4 polish
+   (designed icons, iOS standalone, VAPID push).
 1. **Run P12.12 on the real-data host** — rerun `learn` to adopt source keys,
    build/retain the locked Dukascopy XAU validation evidence, then archive
    `python main.py xau-evidence --json`. Do not reseal from the audit command.
@@ -1189,34 +1222,47 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ## Next recommended action
 
 1. **Keep the passed-through triage:** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` (6 ideas -> Take/Park/Reject) remains the durable decision for LMRing/OpenDataLoader/AirLLM/harness — `P18.4` already satisfied it as `P12.19` after `P19`.
-2. **`P18.4 is done — verify it:*** `web/static/manifest.json` (installable), `web/static/sw.js` (shell-only, never `/api/*`/SSE), `/offline.html` precached, offline banner + mutation guard + compact `640px` in `web/app.py`. Install on Chrome/Edge desktop + Android, toggle Offline in DevTools → reload → `Mutations disabled` banner + offline page.
-3. **Code `P19 Ubuntu Hub package` next** — `ROADMAP.md:5` + `TODO.md`: one `sky` service user, `/opt/sky` + `/etc/sky` + `/var/lib/sky`, hardened `gunicorn/scan/paper` units, `sky setup/status/logs/backup/restore/doctor`, TLS proxy. This is where `*02 #1/#2` (backup/init) land. `P18.4` delivery shell is done.
-4. **Operate the loop while P19 is built:** `python main.py daily` (loop-health), `python main.py paper --watch`, weekly `python main.py scorecard --conditioned --source store` net + `python main.py validate --source store --tf 15m` on the real-data host. Grow canonical `binance/spot/BTCUSDT 15m` paper `n` toward `100-200` decided net — that is the only graduation evidence.
-5. **On the real-data host (parallel, not blocking P19):** rerun `learn` so existing canonical rows pick up source keys (live profile unchanged, demo/synthetic never substituted); acquire/version-pin Dukascopy XAU m1 `bid` or `ask` per `docs/DUKASCOPY_XAU_ADAPTER.md`; run locked `train/val/sealed-OOS/recent` under expected XAU seal key; archive `python main.py xau-evidence --tf 15m --json` per `docs/XAU_PROMOTION_EVIDENCE.md` (overlap/provenance/fingerprint/windows/envelope/reseal). Do not create/reseal from the audit.
-6. **Do not** install `LMRing / OpenDataLoader / AirLLM / torch / 70B models`, pool `binance/spot` with `dukascopy/spot/XAUUSD`, loosen `+0.50R/55%/PF1.5 + compliance100%`, add new strategy families, or build live-order code. `*04/*06/*01` are external labs after `P19` + `graduation==READY`; `*03 L2/L4/L5` is `P12.19` after `P19`.
-7. Repo admin verifies/completes `TODO-8` (`docs/HUMAN_ACTIONS.md`); `TODO-7` already done.
+2. **W3 + W3.4 shipped (v2.41.0/v2.42.0) — verify them:** `python main.py weekly` prints the Sunday mirror; `python main.py practice` prints the calibration mirror; dashboard 📊 Chart tab ✍ PRACTICE card scores a committed read against the desk; 🗓 Review tab PRACTICE CALIBRATION card paints the window; `GET/POST /api/ritual` persists ticks per UTC day; `approve` on a desk with an unjournaled decided real trade returns exit 2 / HTTP 409 `journal_block` until journaled or `--acknowledge-journal`. Contracts: `docs/HANDOVER_2026-08-19_W3.md`, `docs/HANDOVER_2026-08-19_W34.md`.
+3. **Sandbox-feasible next code:** **W3.5 multi-chart views** (W2 remainder), then optional P18.4 polish (designed icons, iOS standalone, VAPID push wiring). Small, self-contained, keeps the suite green.
+4. **Trusted-host-only work (do NOT simulate in this checkout):** execute the P22.3 drill catalog (`python main.py release drills`) on real Windows 11 / Android / Ubuntu signers and attach operator evidence JSON; then `p22_complete` may flip.
+5. **Operate the loop on the real-data host:** `python main.py daily` (loop-health), `python main.py paper --watch`, Sunday `python main.py weekly --export reviews/$(date +%F).json`, weekly `python main.py scorecard --conditioned --source store` net + `python main.py validate --source store --tf 15m`. Grow canonical `binance/spot/BTCUSDT 15m` paper `n` toward `100-200` decided net — that is the only graduation evidence.
+6. **On the real-data host (parallel):** rerun `learn` so existing canonical rows pick up source keys (live profile unchanged, demo/synthetic never substituted); acquire/version-pin Dukascopy XAU m1 `bid` or `ask` per `docs/DUKASCOPY_XAU_ADAPTER.md`; run locked `train/val/sealed-OOS/recent` under expected XAU seal key; archive `python main.py xau-evidence --tf 15m --json` per `docs/XAU_PROMOTION_EVIDENCE.md`. Do not create/reseal from the audit.
+7. **Do not** install `LMRing / OpenDataLoader / AirLLM / torch / 70B models`, pool `binance/spot` with `dukascopy/spot/XAUUSD`, loosen `+0.50R/55%/PF1.5 + compliance100%`, add new strategy families, or build live-order code. `*04/*06/*01` are external labs after `P19` + `graduation==READY`; `*03 L2/L4/L5` is `P12.19` after `P19`.
+8. Repo admin verifies/completes `TODO-8` (`docs/HUMAN_ACTIONS.md`); `TODO-7` already done.
 
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first and
-> confirm P12.15 / PR #38 is merged. P12.1–P12.15 are shipped; do not rewrite
-> the locked protocol, source-key algebra, canonical-only graduation and live
-> risk filters, calendars, gold costs, or `data/gold_basis.py`. Preserve
-> separate `binance/spot/PAXGUSDT` and `dukascopy/spot/XAUUSD` histories and
-> exact-time-only alignment. On the real-data host, rerun `learn`, run the
-> documented P12.12 validation/evidence procedure, and archive
-> `xau-evidence --json`; never substitute synthetic fixtures, pool calibration,
-> or create/reseal evidence from the audit command. Treat a passing dossier as
-> eligible for human review only. Continue canonical paper proof, keep XAU
-> non-tradeable, and keep micro-live blocked until the unchanged graduation bar
-> says READY and the user separately gives explicit approval. Do not adopt
-> Freqtrade or Backtrader, loosen any gate, or build order placement.
+> confirm the W3/W3.4 PR (v2.41.0+v2.42.0, #62) is merged. P12.1–P12.18 are shipped; do not
+> rewrite the locked protocol, source-key algebra, canonical-only graduation
+> and live risk filters, calendars, gold costs, or `data/gold_basis.py`. Do
+> not water down the W3.3 journal-first gate — missing journals hold the next
+> approval by design; the audited escape is intentional, not a bug to remove.
+> Sandbox-feasible next code is W3.5 multi-chart views; trusted P22 drills
+> need real
+> signers. On the real-data host, rerun `learn`, run the documented P12.12
+> validation/evidence procedure, archive `xau-evidence --json`, and export the
+> weekly review every Sunday; never substitute synthetic fixtures, pool
+> calibration, or create/reseal evidence from the audit command. Treat a
+> passing dossier as eligible for human review only. Continue canonical paper
+> proof, keep XAU non-tradeable, and keep micro-live blocked until the
+> unchanged graduation bar says READY and the user separately gives explicit
+> approval. Do not adopt Freqtrade or Backtrader, loosen any gate, or build
+> order placement.
 
 ---
 
 ## Last successful test command
 
 ```bash
+cd /home/user/SKY
+DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
+# 1213 passed, 1 skipped  (v2.42.0 W3.4 full suite; +36 practice/JS regressions)
+
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_practice.py tests/test_practice_js.py -q
+# 36 passed  (W3.4: extraction, fail-closed validation, every score component,
+#             dedupe, scorecard aggregation, live-book isolation, HTTP+CLI, jsdom)
+
 cd /home/user/SKY
 DEMO_MODE=1 python -m pytest tests/test_windows_companion.py tests/test_hub.py tests/test_handoff_memory.py -q
 # 1125 passed, 1 skipped  (v2.38.0 P22.1 full suite; +10 release/privacy regressions)
@@ -1375,7 +1421,20 @@ If the user does not mention the 6-idea review, you still have `docs/CHATGPT_6ID
 
 ## End-of-session checklist (run before closing this session)
 
-**Current build session `arena/01a0135d-sky` (2026-08-18) — ChatGPT 6-idea triage + P18.4 PWA:**
+**Current build session `arena/01a01842-sky` (2026-08-19) — W3 trader development:**
+
+1. [x] Review project state: read SESSION_STATE.md → triage → TODO.md → HANDOVER.md → ROADMAP.md; confirm branch starts at origin/main `30b80d5` (v2.40.0 P22.3); CI green on main (run 32172407910).
+2. [x] Establish the sandbox-feasible next work: P22 drills need real signers (not executable), P12.12/P11 need the real-data host → W3 (HANDOVER Priority 2/3) is the honest next build.
+3. [x] Baseline suite re-verified green before any change: **1140 passed / 1 skipped**.
+4. [x] Build `brain/weekly.py` (one computation) + `brain/ritual.py` + `ritual_checks` table; CLI `weekly`; `/api/weekly`(+export), `/api/ritual` GET/POST; 🗓 Review tab; MCP `weekly_review` 1.12.0 + `cryptobrain_weekly`; agent payload; Command Center card.
+5. [x] Journal-first gate in `cmd_approve` + `POST /api/review` (audited escape; rejects/sim+research debt never held).
+6. [x] Fix the seeded-ordering lesson: risk gate fires first in `/api/review`, journal gate only when the trade is otherwise viable (design confirmed, tests pin it).
+7. [x] Fix a self-inflicted silent defect: `set_trader_state` lost its `_retry_write` call via a bad indentation edit — caught by the pre-existing tradestate roundtrip test; indentation restored and both behaviors pinned.
+8. [x] +37 tests (`test_weekly_review.py` 15, `test_ritual.py` 17, `test_weekly_js.py` 5 jsdom); full suite **1177 passed / 1 skipped**; `node --check` served script valid; curl smoke against a live dev server green.
+9. [x] Docs reconciled: CHANGELOG 2.41.0, TODO, ARCHITECTURE (+weekly/ritual rows), README (tab + command + journal-first row + 16 MCP tools), SKILL.md, HANDOVER contract doc, SESSION_STATE full pass.
+10. [ ] Bump versions 2.40.0 → 2.41.0 (`config.py`, `pyproject.toml`) — done pre-final; wheel gate green. Commit + push; open ONE PR from `arena/01a01842-sky` to `main`; do not merge.
+
+**Previous checklist `arena/01a0135d-sky` (2026-08-18) — ChatGPT 6-idea triage + P18.4 PWA:**
 
 1. [x] Read all 6 ChatGPT ideas (`*01` LMRing + `*02` 10-item desk + `*03` 5-layer evidence engine + `*04` OpenDataLoader PDF + `*05` harness/CLAUDE.md + `*06` AirLLM) against `ROADMAP.md` P18-P22, `P10-P12`, `HANDOVER.md`, `TODO.md`, `config.py`, `engine/*`, `brain/*`, `data/*`.
 2. [x] Write `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` — 6-row `Take/Park/Reject` + `§8` decision + `§9` `P18.4->P19->P11` actions + `§10` guardrails. No `requirements.txt`/`config.py`/`env` change, no threshold moved, advisory only.

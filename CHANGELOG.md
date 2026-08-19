@@ -10,6 +10,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.42.0] — 2026-08-19 · W3.4 practice mode — commit your read, the desk answers, the score remembers
+
+MINOR: the trader can now practise reading the chart *before* peeking at the
+Signal desk: commit a read (bias → final call → entry/stop/target ladder,
+optional confidence + note) and the server freezes the desk's read at that
+exact moment, scores the agreement deterministically with visible components,
+and remembers it. The Review tab gains a PRACTICE CALIBRATION mirror:
+agreement rates, component means, the weakest link, one coaching takeaway,
+recent attempts. Coaching memory only — practice rows are never read by the
+live book, the risk gate, calibration, or graduation; agreement with the desk
+is study, not evidence; the graduation bar is quoted, never moved.
+
+- **`brain/practice.py`** — one computation, many surfaces:
+  `desk_read_from_payload()` (freezes action/bias/ladder/regime/ATR from the
+  live engine payload), `validate_user_read()` (fail-closed vocabularies;
+  a half-plan — entry without stop — is rejected, not scored), `score_attempt()`
+  (bias 35 / final call 35 / ladder 30 with proximity-vs-ATR, stop-side and
+  ≥1.5R floor checks; no-ladder reads renorm over 70; grade A–E identical to
+  the weekly bands), `practice_scorecard()` (windowed agreement rates,
+  component means, weakest link → deterministic coaching, honest empty state),
+  `format_practice_scorecard()`.
+- **`practice_attempts` table** — per-attempt store (user read, frozen desk
+  read, score). Double-submit guard: an identical read inside 2 minutes
+  returns the original attempt — history is never inflated.
+- **Surfaces (invariant #10)** — `python main.py practice [--days N] [--json]`;
+  `GET /api/practice` + audited `POST /api/practice` (400 fail-closed on bad
+  vocabulary; 502 and *nothing recorded* when the engine read is unavailable;
+  `save=False` — a practice read never enters the scans queue); dashboard
+  **📊 Chart tab ✍ PRACTICE card** (form + reveal: desk pill vs your call,
+  component table) and **🗓 Review tab PRACTICE CALIBRATION card**; root MCP
+  `practice_scorecard` (server 1.13.0) + SDK `cryptobrain_practice`; Command
+  Center "Practice calibration" card.
+- **Tests +36 (1177 → 1213 passed / 1 skipped)** —
+  `tests/test_practice.py` (30: extraction, fail-closed validation, every
+  score component and renorm path, dedupe, scorecard aggregation + honest
+  empties, the standing invariant that practice rows never reach the live
+  book / weekly review / `paper_progress()`, HTTP happy/400/502 paths, `save=False`
+  proof, CLI) and `tests/test_practice_js.py` (6 jsdom: POST capture, reveal
+  paint, duplicate note, rejected-read reason, scorecard weakest-link paint,
+  honest empty).
+
+---
+
+MINOR: the weekly trader review is now a first-class page instead of a plain
+`<pre>` dump of `agent weekly-review` (HANDOVER Priority 2), the daily ritual
+remembers what you ticked today (Priority 3.1), and the journal-first gate
+holds the next approval while a decided real trade is unjournaled
+(Priority 3.3). Strictly tighter on the human only: no threshold moved, the
+risk gate is untouched, no order path exists. Canonical live book only
+(simulator + research excluded); every judgement NET of costs.
+
+- **`brain/weekly.py`** — `weekly_review(db)`: this week vs all time
+  (E_net, win rate, PF, totals), equity curve (reuses `business_metrics` so
+  the page cannot disagree with the Risk center), net-R distribution buckets,
+  violations with the repeating-mistake and emotion breakdowns, per-setup
+  graduation tracker naming the exact missing evidence, one deterministic
+  next practice task, and an advisory grade with visible components. The bar
+  (+0.50R / 55% / PF 1.5 / compliance 90%) is quoted, never moved.
+  `missing_journals(db)` is the journal-first gate population (same
+  fail-closed P12.14 discipline rows).
+- **Surfaces, one computation (invariant #10)** — `python main.py weekly
+  [--days N] [--json] [--export PATH]`; `GET /api/weekly` + `/api/weekly/export`
+  (JSON attachment); dashboard **🗓 Review tab** (stats, task card, ritual,
+  equity chart, R-distribution, discipline card, tracker table, export);
+  root MCP `weekly_review` (server 1.12.0) + SDK `cryptobrain_weekly`;
+  `WeeklyReviewAgent` now archives the full review payload inside
+  `agent_runs`; Command Center "Weekly trader review" card.
+- **W3.2 daily ritual with memory** — `brain/ritual.py` + `ritual_checks`
+  table: the four loop-health steps persist per UTC day; a new day starts
+  empty by construction; `GET/POST /api/ritual` (unknown step names fail
+  closed; ticks are audited and explicitly not permission).
+- **W3.3 journal-first approval gate** — `python main.py approve` and
+  `POST /api/review` hold APPROVED decisions while decided real trades are
+  unjournaled: a commitment waits until the last one is processed. Escape:
+  `--acknowledge-journal` / `acknowledge_journal: true` (audited). Rejects,
+  closes and skips are never held; simulator and research debt never holds;
+  `--force` overrides the risk gate only, not the journal gate.
+- **Tests** — +37: `tests/test_weekly_review.py` (15: window math, source
+  isolation, R-distribution, task ladder, grade, agent payload, MCP tool,
+  text format), `tests/test_ritual.py` (17: persistence, day isolation,
+  unknown names, API roundtrip, journal gate web+CLI, approvals never held
+  once journaled/by rejects/by sim+research debt), `tests/test_weekly_js.py`
+  (5: panel painting, ritual POST+repaint, acknowledge/cancel flows, honest
+  empty book). Suite 1140 → **1177 passed / 1 skipped** (+37).
+
+Honest limits: verified with the node/jsdom harness, the Flask test client
+and curl against a running dev server; no real browser exists in this
+sandbox. The weekly-review *agent* summary line is unchanged (payload grew).
+The practice task is advisory coaching text — it blocks nothing by itself.
+
 ## [2.40.0] — 2026-08-18 · P22.3 signing + clean-target drill contracts
 
 MINOR: trusted-signing and physical install/upgrade/rollback work is now a

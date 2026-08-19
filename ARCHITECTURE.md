@@ -75,9 +75,12 @@ code or weakens server-side risk enforcement.
 | `playbooks.py` | Per-asset playbooks (BTC / ETH / GOLD) | `library`, `ask` |
 | `portfolio.py` | Portfolio-level risk (BTC+ETH = one bucket) | `intelligence` |
 | `risk_gate.py` | **The gate.** Canonical-live Kelly advisory, daily/weekly stop, drawdown ladder, progression | `cmd_approve`, `cmd_risk` |
+| `ritual.py` | **W3.2** daily ritual with memory — four canonical steps + per-day persisted ticks (`ritual_checks`) | `/api/ritual`, Review tab |
 | `state_memory.py` | 8D state fingerprint + historical similarity | `cmd_state` |
 | `styles.py` | Scalp/Day/Swing/Momentum/Position style routing | `analyze_full` |
 | `trading_intelligence.py` | The institutional desk report | `cmd_intelligence`, `cmd_card` |
+| `weekly.py` | **W3** weekly trader review — week vs all-time (NET), R-distribution, violations + mistakes, graduation tracker, `missing_journals()` journal-first gate, next practice task, advisory grade | `cmd_weekly`, `/api/weekly`, MCP `weekly_review`, Review tab, `WeeklyReviewAgent` |
+| `practice.py` | **W3.4** practice mode — freeze the desk read at commit time, score the trader's read deterministically (bias/call/ladder components, renorm without ladder, A–E grade), calibration scorecard. Coaching memory ONLY: no live/gate/graduation surface reads it | `cmd_practice`, `GET/POST /api/practice`, MCP `practice_scorecard`, Chart + Review tabs |
 
 ### `data/` — sources + persistence
 | Module | Purpose |
@@ -96,7 +99,7 @@ code or weakens server-side risk enforcement.
 | `scorecard.py` | P12.3/P12.6 — boxed strategy scorecard reporting gross + net metrics, Sharpe/Sortino/Calmar, holding time, split by side/regime/session/setup/conditions |
 | `quality_score.py` | P12.4 — Backtest Quality Score 0–100 (edge / curve robustness / sample confidence / BT5 parameter-plateau with isolated-peak cap at 50); `python main.py quality` store sweep |
 | `strategy_score.py` | P12.5 — strategy score on the calibrator: `E_R × sample-quality × regime-fit × execution` (weighted geometric mean, NET of costs), `multiplier_from_score()` trust dial |
-| `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state); `SignalDB.live_book_rows()` defines the P12.15 live (closed) book and `SignalDB.live_open_rows()` the P12.16 live open book |
+| `database.py` | SQLite schema (scans, plans, backtest_results, paper_trades, agent_runs, journal_entries, trader_state, ritual_checks W3.2, practice_attempts W3.4 — coaching memory, never joined into the live book); `SignalDB.live_book_rows()` defines the P12.15 live (closed) book and `SignalDB.live_open_rows()` the P12.16 live open book |
 | `backtester.py` | Walk-forward grading of plans at +1h/+4h/+24h; P10.11 `run_backtest_on_store()` reads the Parquet store instead of a live fetch |
 | `paper_trading.py` | Approved-signal lifecycle: monitor + auto-close at SL/TP1 (no real orders) |
 | `ws_client.py` | P10.10 — public Binance WebSocket streams (`!forceOrder@arr` + klines) with reconnect/backoff; offline-safe demo stream; feeds readiness + feature store |

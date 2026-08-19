@@ -28,7 +28,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.11.0"  # bumped: P14 loop_health — the one daily number
+SERVER_VERSION = "1.13.0"  # bumped: W3.4 practice_scorecard — your reads vs the desk
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -185,6 +185,26 @@ ALLOWED_TOOLS = {
             "properties": {},
         },
     },
+    # ── W3: the weekly trader review ────────────────────────────────────
+    "weekly_review": {
+        "description": "W3 weekly trader review: this week vs all time on the canonical live paper book (net of costs), R-multiple distribution, rule violations + repeating mistakes, per-setup graduation tracker with the exact missing evidence, one next practice task and an advisory grade. Read-only; the same as `python main.py weekly --json`, GET /api/weekly, the dashboard Review tab and the weekly_review desk agent. Advisory only — the unchanged graduation bar remains the only gate.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer", "default": 7, "description": "Review window in days (1-90, default 7)"},
+            },
+        },
+    },
+    # ── W3.4: practice calibration (your reads vs the desk) ─────────────
+    "practice_scorecard": {
+        "description": "W3.4 practice calibration: every read the trader committed on the Chart tab, scored for agreement with the desk's read at that moment — bias agreement, final-call agreement, component means, the weakest link with one coaching takeaway, and recent attempts. Coaching memory only: agreement with the desk is study, not evidence, and this tool feeds no gate or graduation surface. Read-only; the same as `python main.py practice --json`, GET /api/practice and the Review-tab PRACTICE CALIBRATION card.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer", "default": 30, "description": "Window in days (1-365, default 30)"},
+            },
+        },
+    },
 }
 
 
@@ -322,6 +342,20 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         # P14 daily ritual. Composes desk_status + readiness + paper_progress.
         from brain.agent import loop_health
         return loop_health()
+
+    elif name == "weekly_review":
+        # W3 weekly trader review. Canonical live book only, NET of costs.
+        from brain.weekly import weekly_review
+        days = min(90, max(1, int(args.get("days", 7))))
+        with SignalDB() as db:
+            return weekly_review(db, days=days)
+
+    elif name == "practice_scorecard":
+        # W3.4 practice calibration. Coaching memory only — feeds no gate.
+        from brain.practice import practice_scorecard
+        days = min(365, max(1, int(args.get("days", 30))))
+        with SignalDB() as db:
+            return practice_scorecard(db, days=days)
 
     raise ValueError(f"Unhandled tool: {name}")
 

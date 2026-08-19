@@ -144,6 +144,7 @@ configurable via `.env`; defaults are conservative.
 | **Regime-tagged learning** | Every backtest/paper trade records its market regime; calibration works per `setup × regime`, stats report per regime. | `python main.py stats` |
 | **Business scorecard** | Win rate, avg win/loss, expectancy, profit factor, max drawdown, streaks, rolling 50/100 windows, canonical-live execution discipline (missing journals visible). | `python main.py stats` |
 | **Professional journal** | Post-trade fields with "did I follow my system?" as the headline; MAE/MFE recorded per paper trade. | `python main.py journal <scan_id> --followed-rules 1 ...` |
+| **Journal-first gate (W3.3)** | The next approval waits while a decided real trade is unjournaled — the last commitment must be processed before the next one. Simulator/research debt never holds; rejects are never held. Escape is `--acknowledge-journal` (audited). | `python main.py approve <id> --acknowledge-journal` |
 
 New CLI:
 
@@ -191,6 +192,20 @@ the **graduation gate** passes (see `BLUEPRINT.md`).
   prompt. Same payload as `GET /api/loop-health` and MCP `loop_health`.
   Alias: `python main.py loop-health`. Does not scan the market unless
   `--brief` is passed. Read-only; never places an order.
+* `python main.py weekly [--days N] [--json] [--export PATH]` — the weekly
+  trader review (W3): this week vs all time on the canonical live book
+  (NET of costs), the R-multiple distribution, violations with repeating
+  mistakes and emotions, the per-setup graduation tracker naming the exact
+  missing evidence, one next practice task and an advisory grade. Same
+  computation as the 🗓 Review tab, `GET /api/weekly` and MCP
+  `weekly_review`. Read-only; the unchanged graduation bar stays the gate.
+* `python main.py practice [--days N] [--json]` — W3.4 practice calibration:
+  every read you committed on the 📊 Chart tab (bias → final call →
+  entry/stop/target) scored against the desk's read at that moment — bias and
+  final-call agreement, component means, the weakest link and one coaching
+  takeaway. Same computation as the 🗓 Review tab PRACTICE CALIBRATION card,
+  `GET /api/practice` and MCP `practice_scorecard`. Study metric ONLY — never
+  read by the live book, risk gate or graduation.
 * `python main.py agent morning` — one briefing for the whole watchlist: every
   asset with its final **desk decision** (desk-first), playbook + regime,
   risk-gate state, pending reviews, open exposure and paper-book stats, plus a
@@ -269,8 +284,9 @@ Offline it runs on the committed sample + deterministic synthetic data
 #### MCP server (`mcp`)
 
 `python main.py mcp` exposes the desk to Claude Desktop / Cursor / any MCP
-client over stdio (12 tools: health, morning briefing, scan, desk report,
-risk gate, Monte Carlo, ask, pending, stats, paper, learn, loop).  Add to your MCP client config:
+client over stdio (14 tools: health, morning briefing, scan, desk report,
+risk gate, Monte Carlo, ask, pending, stats, paper, learn, loop, weekly
+review, practice calibration).  Add to your MCP client config:
 
 ```json
 { "mcpServers": { "cryptobrain": {
@@ -281,10 +297,11 @@ There is also a **zero-dependency** MCP server at the repo root
 (`python mcp_server.py`) for environments where the `mcp` SDK cannot be
 installed.  It speaks newline-delimited JSON-RPC 2.0 and exposes read-only
 desk tools behind an explicit permission map — no order placement, no
-gate bypass. 15 tools: `ask`, `risk`, `health`, `brief`, `tradestate`,
+gate bypass. The read-only map holds `ask`, `risk`, `health`, `brief`, `tradestate`,
 `postreview`, `channels`, `correlation`, `hidden_chart_read`,
 `hidden_analytics_mae`, `hidden_analytics_mc`, `desk_status`,
-`readiness`, `scorecard`, and `loop_health`.
+`readiness`, `scorecard`, `loop_health`, `weekly_review` (W3) and
+`practice_scorecard` (W3.4). 17 tools in total.
 
 #### AI anatomy suite (RAG · briefs · agents · immune system)
 
@@ -364,7 +381,7 @@ where every function is a button. You never need to memorize a command.
 
 | Tab | What you click |
 |---|---|
-| 📊 **Chart** | Candles, volume, EMA 20/50/200, VWAP, Bollinger, RSI, MACD, support/resistance and your entry / stop / take-profit — TradingView Lightweight Charts with linked time scales. Asset and timeframe are one click. |
+| 📊 **Chart** | Candles, volume, EMA 20/50/200, VWAP, Bollinger, RSI, MACD, support/resistance and your entry / stop / take-profit — TradingView Lightweight Charts with linked time scales. Asset and timeframe are one click. Plus the **✍ PRACTICE card**: commit your read (bias → call → ladder) *before* the Signal desk; the desk's read freezes at that moment and your agreement score is revealed with visible components. |
 | 🎯 **Signal desk** | BUY / SELL / NO TRADE with entry, stop, target, R:R, confidence, setup, regime, invalidation, why it exists and why it may fail. |
 | ⚡ **Trades** | Approve · Reject · Execute · Close. The risk gate is enforced; overriding it is a separate, conscious click. |
 | 🎛 **Trade manager** | Open positions with live price, current R, stop/target distance, MAE, MFE, time in trade and the management instruction. Close or journal from the row. |
@@ -372,6 +389,7 @@ where every function is a button. You never need to memorize a command.
 | 🔓 **Evidence** | *Why* you cannot trade right now, in plain language, with a progress bar per criterion and a 4-step one-click pipeline (Backfill → Backtest → Simulator → Scorecard) that actually earns the unlock. |
 | 🔌 **Connections** | Every real-world link — market data, funding/OI, news, Fear & Greed, macro, Telegram/Discord alerts, LLM, and your **read-only** exchange account — with a live badge, a Test button and setup steps. See `CONNECT_REAL_WORLD.md`. |
 | 📓 **Journal** | A real form: followed rules, emotion, mistake, what happened, what you would change — plus the auto-derived pre-trade checklist and your execution grade. |
+| 🗓 **Review** | The weekly trader review (W3): week vs all-time stats (net), equity curve, R-multiple distribution, violations + repeating mistakes, per-setup graduation tracker with the exact missing evidence, one next practice task, an advisory grade, JSON export — plus the **daily ritual checklist that remembers what you ticked today** and the **PRACTICE CALIBRATION mirror (W3.4)**: agreement rates vs the desk, component means, the weakest link and one coaching takeaway. |
 | 🧑‍🏫 **Learning** | Backtest, calibrate, scorecard by setup/regime/side/session, simulator and graduation progress. |
 | ⌘ **Command center** | **Every CLI command as a documented button** with its inputs, a Run button and its output in the page. Colour-coded: 🟢 read-only · 🟡 writes locally · 🟠 slow · 🔒 terminal only. |
 | 🧩 **Modules** | Every module in the engine and what it does, searchable. |

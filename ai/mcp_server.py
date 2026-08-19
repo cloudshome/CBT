@@ -25,6 +25,8 @@ Tools exposed (all offline-capable; DEMO_MODE=1 uses sample data):
   * cryptobrain_paper       paper-trade book stats
   * cryptobrain_learn       recompute the calibration profile
   * cryptobrain_loop        the one daily number (real paper n / E_net / graduation bar)
+  * cryptobrain_weekly      W3 weekly trader review (week vs all-time, R dist, tracker)
+  * cryptobrain_practice    W3.4 practice calibration (your reads vs the desk)
 
 The server speaks the standard MCP protocol over stdio (JSON-RPC 2.0).  It
 requires the official `mcp` package (pip install mcp) — a clear error is
@@ -130,6 +132,20 @@ def _loop() -> dict:
     return loop_health()
 
 
+def _weekly(days: int = 7) -> dict:
+    from brain.weekly import weekly_review
+    from data.database import SignalDB
+    with SignalDB() as db:
+        return weekly_review(db, days=min(90, max(1, int(days))))
+
+
+def _practice(days: int = 30) -> dict:
+    from brain.practice import practice_scorecard
+    from data.database import SignalDB
+    with SignalDB() as db:
+        return practice_scorecard(db, days=min(365, max(1, int(days))))
+
+
 TOOLS = [
     {
         "name": "cryptobrain_health",
@@ -220,6 +236,30 @@ TOOLS = [
                        "Same payload as `python main.py daily` / GET /api/loop-health.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
+    {
+        "name": "cryptobrain_weekly",
+        "description": "W3 weekly trader review: this week vs all time on the canonical "
+                       "live paper book (net of costs), R-multiple distribution, rule "
+                       "violations + repeating mistakes, per-setup graduation tracker "
+                       "with the exact missing evidence, one next practice task and an "
+                       "advisory grade. Same computation as `python main.py weekly`, "
+                       "GET /api/weekly, and the root MCP weekly_review tool.",
+        "inputSchema": {"type": "object",
+                        "properties": {"days": {"type": "integer", "default": 7}},
+                        "additionalProperties": False},
+    },
+    {
+        "name": "cryptobrain_practice",
+        "description": "W3.4 practice calibration: reads the trader committed on the Chart "
+                       "tab, scored for agreement with the desk's read at that moment — bias "
+                       "and final-call agreement, component means, weakest link with one "
+                       "coaching takeaway and recent attempts. Coaching memory only — not "
+                       "evidence, feeds no gate. Same computation as `python main.py practice`, "
+                       "GET /api/practice, and the root MCP practice_scorecard tool.",
+        "inputSchema": {"type": "object",
+                        "properties": {"days": {"type": "integer", "default": 30}},
+                        "additionalProperties": False},
+    },
 ]
 
 
@@ -252,6 +292,10 @@ def _call_tool(name: str, arguments: dict | None) -> dict:
         return _learn()
     if name == "cryptobrain_loop":
         return _loop()
+    if name == "cryptobrain_weekly":
+        return _weekly(int(args.get("days", 7)))
+    if name == "cryptobrain_practice":
+        return _practice(int(args.get("days", 30)))
     raise ValueError(f"unknown tool: {name}")
 
 

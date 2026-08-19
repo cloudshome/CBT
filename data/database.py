@@ -297,6 +297,28 @@ CREATE TABLE IF NOT EXISTS jobs(
   cancel_requested INTEGER NOT NULL DEFAULT 0,
   log_path TEXT
 );
+-- W3.2 daily ritual with memory: one row per (UTC day, ritual step).
+CREATE TABLE IF NOT EXISTS ritual_checks(
+  day TEXT NOT NULL,
+  name TEXT NOT NULL,
+  done INTEGER NOT NULL DEFAULT 0,
+  ts INTEGER,
+  PRIMARY KEY(day, name)
+);
+-- W3.4 practice mode: one row per committed user read, scored against the
+-- desk's read at that moment. Coaching memory ONLY — no risk-gate,
+-- graduation, calibration, live-book or any P12 surface ever reads this
+-- table; agreement with the desk is not evidence and not permission.
+CREATE TABLE IF NOT EXISTS practice_attempts(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  symbol TEXT NOT NULL,
+  timeframe TEXT NOT NULL,
+  user_read_json TEXT NOT NULL,
+  desk_read_json TEXT NOT NULL,
+  score_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_practice_ts ON practice_attempts(ts);
 CREATE INDEX IF NOT EXISTS idx_sentiment_sym_tf_ts ON sentiment_history(symbol, timeframe, ts);
 CREATE INDEX IF NOT EXISTS idx_plans_scan ON plans(scan_id);
 CREATE INDEX IF NOT EXISTS idx_bt_type ON backtest_results(plan_type);
@@ -716,6 +738,92 @@ class SignalDB:
             self.conn.commit()
         self._retry_write(_do_save)
         return self.get_trader_state()
+
+    # ── W3.2 daily ritual with memory ────────────────────────────────────
+    # One row per (UTC day, step name). A new day has no rows, so yesterday's
+    # checkmarks can never pretend today's ritual happened.
+
+    def ritual_state(self, day: str) -> dict:
+        """All ticked ritual steps for one UTC day: {name: {done, ts}}."""
+        rows = self.conn.execute(
+            "SELECT name, done, ts FROM ritual_checks WHERE day=?", (day,)).fetchall()
+        return {r["name"]: {"done": bool(r["done"]), "ts": r["ts"]} for r in rows
+                if r["done"]}
+
+    def ritual_mark(self, day: str, name: str, done: bool) -> None:
+        """Upsert one ritual step for a day (idempotent)."""
+        def _do_save():
+            self.conn.execute(
+                "INSERT INTO ritual_checks(day, name, done, ts) VALUES (?,?,?,?) "
+                "ON CONFLICT(day, name) DO UPDATE SET done=excluded.done, ts=excluded.ts",
+                (day, name, 1 if done else 0, int(time.time() * 1000)))
+            self.conn.commit()
+        self._retry_write(_do_save)
+
+    # ── W3.4 practice mode (coaching memory ONLY — see the schema note) ──
+    # Rows here are never joined into live_book_rows / live_open_rows /
+    # discipline_rows or any graduation surface: a practice read is the
+    # user studying, not a decided trade.
+
+    def save_practice_attempt(self, symbol: str, timeframe: str,
+                              user_read: dict, desk_read: dict, score: dict,
+                              *, ts: int | None = None) -> int:
+        """Persist one scored practice attempt; returns its row id."""
+        def _do_save() -> int:
+            cur = self.conn.execute(
+                "INSERT INTO practice_attempts(ts, symbol, timeframe, "
+                "user_read_json, desk_read_json, score_json) VALUES (?,?,?,?,?,?)",
+                (int(ts if ts is not None else time.time() * 1000),
+                 symbol, timeframe,
+                 json.dumps(user_read, sort_keys=True),
+                 json.dumps(desk_read, sort_keys=True),
+                 json.dumps(score, sort_keys=True)))
+            self.conn.commit()
+            return int(cur.lastrowid)
+        return self._retry_write(_do_save)
+
+    @staticmethod
+    def _practice_row(row) -> dict:
+        def _dec(raw):
+            try:
+                out = json.loads(raw) if raw else {}
+            except (TypeError, ValueError):
+                out = {}
+            return out if isinstance(out, dict) else {}
+        return {"id": row["id"], "ts": row["ts"], "symbol": row["symbol"],
+                "timeframe": row["timeframe"],
+                "user_read": _dec(row["user_read_json"]),
+                "desk_read": _dec(row["desk_read_json"]),
+                "score": _dec(row["score_json"])}
+
+    def latest_practice_attempt(self, symbol: str, timeframe: str) -> dict | None:
+        """The newest attempt for one symbol+timeframe (double-submit guard).
+        The row is reshaped to the submit payload: {attempt, user_read,
+        desk_read, score} so callers can return it verbatim."""
+        row = self.conn.execute(
+            "SELECT * FROM practice_attempts WHERE symbol=? AND timeframe=? "
+            "ORDER BY ts DESC, id DESC LIMIT 1", (symbol, timeframe)).fetchone()
+        if row is None:
+            return None
+        r = self._practice_row(row)
+        r["attempt"] = {"id": r["id"], "ts": r["ts"], "symbol": r["symbol"],
+                        "timeframe": r["timeframe"],
+                        "day": time.strftime("%Y-%m-%d", time.gmtime(r["ts"] / 1000))}
+        return r
+
+    def practice_attempts(self, *, days: int | None = None,
+                          limit: int = 500, now: int | None = None) -> list[dict]:
+        """Attempts newest-first; ``days`` bounds the window (ms epoch)."""
+        sql = "SELECT * FROM practice_attempts"
+        params: list = []
+        if days is not None:
+            now = int(now if now is not None else time.time() * 1000)
+            sql += " WHERE ts >= ?"
+            params.append(now - int(days) * 86_400_000)
+        sql += " ORDER BY ts DESC, id DESC LIMIT ?"
+        params.append(int(limit))
+        return [self._practice_row(r) for r in self.conn.execute(sql, params).fetchall()]
+
 
     # ── information hierarchy / source trust (decision A5) ──────────────
     def save_source_score(self, source: str, tier: int, trust: float,

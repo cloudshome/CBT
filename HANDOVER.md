@@ -2,7 +2,11 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-18 · **v2.40.0 — P22.3 signing + clean-target drills** (`docs/HANDOVER_2026-08-18_P22_3.md`). Catalog + fail-closed evidence. No signed installer claimed. Next: run drills on trusted hosts. No threshold moved; no order path.
+Last updated: 2026-08-19 · **v2.42.0 — W3.4 practice mode: commit your read, the desk answers, the score remembers** (`docs/HANDOVER_2026-08-19_W34.md`). On the 📊 Chart tab the trader commits bias → final call → entry/stop/target BEFORE the Signal desk; the server freezes the desk's read at that moment and scores agreement deterministically (visible bias/call/ladder components, A–E grade); the 🗓 Review tab mirrors the calibration (agreement rates, weakest link, one coaching takeaway). Coaching memory only — the live book, risk gate and graduation never read practice rows. Next code: **W3.5 multi-chart** (sandbox-feasible); P22 drills need real signers. No threshold moved; no order path.
+
+**Previous:** 2026-08-19 · **v2.41.0 — W3 trader development: weekly review page + ritual memory + journal-first gate** (`docs/HANDOVER_2026-08-19_W3.md`). The weekly trader review is now a page (CLI/HTTP/🗓 Review tab/MCP/agent share `brain/weekly.weekly_review()`), the daily ritual remembers ticks per UTC day (`/api/ritual`), and `approve` holds while decided real trades are unjournaled (audited `--acknowledge-journal` escape — intentional, not a bug to remove). No threshold moved; no order path.
+
+**Previous:** 2026-08-18 · **v2.40.0 — P22.3 signing + clean-target drills** (`docs/HANDOVER_2026-08-18_P22_3.md`). Catalog + fail-closed evidence. No signed installer claimed.
 
 > **Current direction supersedes the old “two terminal lines” end state.** The
 > owner wants installable production software on Ubuntu, Windows (`.exe`), and

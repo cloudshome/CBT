@@ -34,6 +34,12 @@ ROOT_TOOLS = {
     "scorecard",
     # P14: the one daily number (real paper n / E_net / graduation bar)
     "loop_health",
+    # W3: the weekly trader review (week vs all-time, R dist, violations,
+    # tracker, next task) — read-only, canonical live book only
+    "weekly_review",
+    # W3.4: practice calibration (your reads vs the desk) — read-only
+    # coaching memory; feeds no gate
+    "practice_scorecard",
 }
 
 

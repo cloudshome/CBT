@@ -6,10 +6,27 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-18 (**v2.40.0 — P22.3 signing + clean-target drill
+**Last updated:** 2026-08-19 (**v2.42.0 — W3.4 practice mode shipped**.
+Commit your read on the 📊 Chart tab → the desk's read freezes at that
+moment → deterministic agreement score with visible components → Review-tab
+PRACTICE CALIBRATION mirror. Coaching memory only; the live book, risk gate
+and graduation never read it. `brain/practice.py` + `practice_attempts`;
+surfaces CLI/HTTP/dashboard/MCP/command-center. Suite 1177 → 1213/1. Also
+fixed a CI-caught doc-pin regression in this file (the "next implementation
+is P22" ordering phrase had been dropped). **Next:** P22 trusted-host
+drills (real signers) or W3.5 multi-chart; P11 real paper proof stays
+parallel.)
+
+**Previous:** 2026-08-19 (**v2.41.0 — W3 trader development: weekly
+review page + ritual memory + journal-first gate**. `brain/weekly.py` one
+computation → CLI/HTTP/dashboard 🗓 Review tab/MCP/agent; `ritual_checks`
+per-day memory; approve holds while decided real trades are unjournaled
+(strictly tighter on the human, audited escape). Suite 1140 → 1177/1.
+Contract: `docs/HANDOVER_2026-08-19_W3.md`.)
+
+**Previous:** 2026-08-18 (**v2.40.0 — P22.3 signing + clean-target drill
 contracts**. Catalog + fail-closed evidence check. No signed installer is
-claimed. **Next is executing those drills on trusted hosts.** P11 paper grind
-continues; packaging is not the edge.)
+claimed. The drills themselves need trusted Windows/Android/Ubuntu hosts.)
 
 **Previous:** 2026-08-18 (**v2.35.0 — P19 Ubuntu Hub package shipped**.
 `python main.py hub setup|status|logs|backup|restore|doctor|uninstall`,
@@ -240,10 +257,20 @@ Ordered code milestones:
 8. **P22 releases/ops** — 🔄 P22.1–P22.3 shipped (metadata, native trees,
    drill contracts). Remaining: actually compile/sign on platform hosts and
    attach operator evidence so `p22_complete` can flip.
+9. ~~**W3 trader development**~~ — ✅ shipped v2.41.0 + v2.42.0 (weekly
+   review page, ritual memory, journal-first gate, practice mode;
+   `docs/HANDOVER_2026-08-19_W3.md`, `docs/HANDOVER_2026-08-19_W34.md`).
+   Remaining W3.5 multi-chart views are optional polish.
 
-**Next implementation is P22 trusted-host drills** (execute the P22.3 catalog
-on real Windows/Android/Ubuntu signers — not more Python catalogs). P11
-canonical paper-evidence remains parallel.
+**Next implementation is P22 (trusted-host drills — real signers only);
+choose the work by environment:**
+- **Sandbox/code** — W3.5 multi-chart views, optional P18.4 polish
+  (designed icons, iOS standalone, VAPID push wiring). Small, self-contained,
+  keeps the suite green.
+- **Trusted hosts** — P22 drills (execute the P22.3 catalog on real
+  Windows/Android/Ubuntu signers — not more Python catalogs).
+- **Real-data host** — P12.12 XAU evidence procedure + P11 canonical paper
+  grind.
 
 ### TODO-22 / P14 · Operate the loop: daily ritual + one loop-health number · ✅ SHIPPED (v2.27.0)
 

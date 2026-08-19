@@ -178,6 +178,15 @@ class WeeklyReviewAgent(BaseAgent):
                        f"Rule compliance {rule_rate}%. {change_note}")
 
             payload = {"metrics": metrics, "change_detection": change_note}
+            # W3 — attach the full weekly review (same computation as
+            # `main.py weekly` / GET /api/weekly) to the agent run archive
+            # so Sunday history carries the R distribution, tracker and
+            # next practice task, not only the flat scorecard.
+            try:
+                from brain.weekly import weekly_review
+                payload["weekly"] = weekly_review(db)
+            except Exception as exc:  # never break the agent on a report
+                payload["weekly_error"] = f"{type(exc).__name__}: {exc}"
             db.record_agent_run(self.name, "COMPLETED", summary=summary, payload=payload)
 
             return {

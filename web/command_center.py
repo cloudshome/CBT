@@ -153,6 +153,21 @@ COMMANDS: list[dict] = [
          "The ten-minute daily routine and the one number that matters: "
          "real paper sample count, net expectancy and graduation progress.",
          related=["desk", "scorecard"]),
+    _cmd("weekly", "Desk", "Weekly trader review", ["weekly"],
+         "W3 Sunday mirror: this week vs all time (net), the R-multiple "
+         "distribution, violations and repeating mistakes, the per-setup "
+         "graduation tracker, one next practice task and an advisory grade.",
+         inputs=[_int("days", "Window (days)", 7),
+                 _bool("json", "Raw JSON output")],
+         related=["daily", "agent_weekly", "journal"]),
+    _cmd("practice", "Desk", "Practice calibration", ["practice"],
+         "W3.4 your reads vs the desk: every read committed on the Chart tab "
+         "scored for agreement — bias, final call and the ladder — with the "
+         "weakest component named and one coaching takeaway. Study metric "
+         "only; it feeds no gate.",
+         inputs=[_int("days", "Window (days)", 30),
+                 _bool("json", "Raw JSON output")],
+         related=["weekly", "daily", "coach"]),
     _cmd("brief", "Desk", "Morning brief", ["brief"],
          "Desk briefing across the whole watchlist before you trade.",
          inputs=[_text("symbols", "Watchlist", "", "BTCUSDT,ETHUSDT,XAUUSD"), _TF],
