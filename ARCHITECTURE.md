@@ -80,7 +80,7 @@ code or weakens server-side risk enforcement.
 | `styles.py` | Scalp/Day/Swing/Momentum/Position style routing | `analyze_full` |
 | `trading_intelligence.py` | The institutional desk report | `cmd_intelligence`, `cmd_card` |
 | `weekly.py` | **W3** weekly trader review — week vs all-time (NET), R-distribution, violations + mistakes, graduation tracker, `missing_journals()` journal-first gate, next practice task, advisory grade | `cmd_weekly`, `/api/weekly`, MCP `weekly_review`, Review tab, `WeeklyReviewAgent` |
-| `practice.py` | **W3.4** practice mode — freeze the desk read at commit time, score the trader's read deterministically (bias/call/ladder components, renorm without ladder, A–E grade), calibration scorecard. Coaching memory ONLY: no live/gate/graduation surface reads it | `cmd_practice`, `GET/POST /api/practice`, MCP `practice_scorecard`, Chart + Review tabs |
+| `practice.py` | **W3.4+W3.6** practice mode — desk-agreement (bias/call/ladder, A–E grade) plus replay tape: walk the hidden forward window after Replay Freeze (`walk_tape` / `score_tape`, `exit_event` stop-first). Scorecard desk keys stay desk-only; tape is a sibling block. Coaching memory ONLY: no live/gate/graduation surface reads it | `cmd_practice`, `GET/POST /api/practice`, `POST /api/practice/tape`, MCP `practice_scorecard`, Chart + Review tabs |
 
 ### `data/` — sources + persistence
 | Module | Purpose |

@@ -264,5 +264,77 @@ def test_html_exposes_the_practice_cards():
     for marker in ("id=\"pracBias\"", "id=\"pracDecision\"", "id=\"pracEntry\"",
                    "id=\"pracStop\"", "id=\"pracTarget\"", "id=\"pracResult\"",
                    "id=\"pracMini\"", "id=\"wkPractice\"", "BEFORE the Signal desk",
-                   "submitPractice()", "loadPracticeScorecard()"):
+                   "submitPractice()", "loadPracticeScorecard()",
+                   "id=\"pracTapeBtn\"", "id=\"pracTapeBanner\"",
+                   "submitTapePractice()", "freezeReplay()",
+                   "/api/practice/tape"):
         assert marker in src, f"dashboard missing {marker}"
+
+
+def _tape_payload() -> dict:
+    return {
+        "duplicate": False,
+        "attempt": {"id": 9, "ts": 1780000000000, "day": "2026-05-29",
+                    "symbol": "BTCUSDT", "timeframe": "15m", "kind": "tape"},
+        "user": {"symbol": "BTCUSDT", "tf": "15m", "bias": "bullish",
+                 "decision": "buy", "entry": 61250.0, "stop": 60800.0,
+                 "target": 62400.0, "confidence": 70, "note": "tape",
+                 "levels_given": True},
+        "desk": {"kind": "tape", "available": True, "symbol": "BTCUSDT",
+                 "timeframe": "15m", "commit_time": 1780000000000,
+                 "horizon_bars": 16, "future_bars": 16, "outcome": "TP_HIT",
+                 "bars_used": 4, "rr_achieved": 2.5},
+        "score": {"kind": "tape", "total": 100, "grade": "A",
+                  "outcome": "TP_HIT", "rr_achieved": 2.5, "bars_used": 4,
+                  "components": [{"name": "ladder vs the tape", "points": 100,
+                                  "max": 100, "detail": "target hit in 4 bars (+2.50R)"}],
+                  "disclaimer": "Tape score = what the hidden future bars did. "
+                                "Historical playback only."},
+        "disclaimer": "Tape score = what the hidden future bars did. "
+                      "Historical playback only.",
+    }
+
+
+def test_tape_without_replay_refuses_honestly():
+    out = _run({"/api/practice/tape": [(200, _tape_payload())]},
+               "await submitTapePractice();\n" + _OUT)
+    assert "Start Replay" in out["pracResult"]
+    assert out["posts"] == []
+
+
+def test_tape_posts_commit_time_and_paints_outcome():
+    setup = ("_replay={timer:null,idx:12,candles:["
+             "{time:1780000000},{time:1780000900},{time:1780001800},"
+             "{time:1780002700},{time:1780003600},{time:1780004500},"
+             "{time:1780005400},{time:1780006300},{time:1780007200},"
+             "{time:1780008100},{time:1780009000},{time:1780009900}],"
+             "candle:{setData:function(){}},speedIdx:0};")
+    out = _run({"/api/practice/tape": [(200, _tape_payload()),
+                                       (200, _card_payload())],
+                "/api/practice": [(200, _card_payload())]},
+               setup + _FILL + "\n await submitTapePractice();\n" + _OUT)
+    assert any(p["url"].endswith("/api/practice/tape") for p in out["posts"])
+    body = next(p["body"] for p in out["posts"] if p["url"].endswith("/api/practice/tape"))
+    assert body["commit_time"] == 1780009900
+    assert body["horizon_bars"] == 16
+    assert body["decision"] == "buy"
+    r = out["pracResult"]
+    assert "tape: TP_HIT" in r and "your read 100/100 · A" in r
+    assert "Historical playback" in r
+
+
+def test_scorecard_paints_tape_sibling():
+    card = _card_payload()
+    card["tape"] = {"n": 2, "avg_score": 50, "win_rate": 0.5,
+                    "outcomes": {"TP_HIT": 1, "STOP_LOSS": 1},
+                    "recent": [{"id": 11, "day": "2026-08-18", "symbol": "BTCUSDT",
+                                "timeframe": "15m", "user_decision": "buy",
+                                "outcome": "TP_HIT", "score": 100, "grade": "A"}],
+                    "coaching": "Tape scores measure the hidden bars.",
+                    "disclaimer": "Historical playback only."}
+    out = _run({"/api/practice": [(200, card)]},
+               "await loadPracticeScorecard();\n" + _OUT)
+    w = out["wkPractice"]
+    assert "TAPE — replay outcomes" in w
+    assert "Ladder win rate" in w and "50.0%" in w
+    assert "TP_HIT" in w and "Historical playback only" in w

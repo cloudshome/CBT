@@ -1,7 +1,7 @@
-"""brain/practice.py — W3.4 practice mode: your read vs the desk's, scored.
+"""brain/practice.py — W3.4 practice mode + W3.6 replay tape.
 
-The last W3 item: a developing trader improves by *committing to a read
-before seeing the answer* and then measuring the gap honestly. Flow:
+W3.4: a developing trader improves by *committing to a read before seeing
+the answer* and then measuring the gap honestly.
 
 1. On the Chart tab the trader writes their own read — bias, the decision
    they would take, and (optionally) their entry / stop / target ladder —
@@ -12,29 +12,36 @@ before seeing the answer* and then measuring the gap honestly. Flow:
 3. :func:`score_attempt` grades the agreement deterministically with every
    component visible — nobody has to trust the letter grade.
 4. The attempt is remembered in the ``practice_attempts`` table, and
-   :func:`practice_scorecard` turns the history into a calibration mirror:
-   how often your bias agrees with the desk, how often your final call does,
-   which component is weakest, and one deterministic coaching takeaway.
+   :func:`practice_scorecard` turns the history into a calibration mirror.
+
+W3.6: replay hides future bars. The trader commits a read at the last
+visible bar; the server walks the *next* ``horizon_bars`` candles (default
+16, clamped 4–64) and grades what actually happened. Ladder fills reuse
+``data.paper_trading.exit_event`` — the same conservative stop-first rule
+the live paper runner uses — so two graders cannot disagree.
 
 Safety invariants held here (the project's standing rules):
 
-* **Practice is not evidence.** Agreement with the desk never feeds the risk
-  gate, graduation, calibration, the live book, or any P12 surface — the
-  table is coaching memory, like the journal and the ritual ticks. Tests pin
-  that the live-book population is unchanged by practice rows.
+* **Practice is not evidence.** Desk agreement and tape outcomes never feed
+  the risk gate, graduation, calibration, the live book, or any P12
+  surface — the table is coaching memory. Tests pin that the live-book
+  population is unchanged by practice rows.
 * **The desk is not assumed right.** A high agreement score means "you read
   like the desk" — the desk itself still has to prove its edge in canonical
   paper trading under the unchanged +0.50R / 55% / PF 1.5 / compliance ≥90%
   bar (P12.13/P12.14). Every payload says so in ``disclaimer``.
+* **The tape is not paper evidence.** A tape TP_HIT is historical playback,
+  never a decided ``paper_trades`` row.
 * **Fail-closed validation.** Unknown bias/decision values, partial level
-  ladders and unbounded notes are rejected, never coerced into history.
+  ladders, missing commit times and unbounded notes are rejected.
 * **Read-only with respect to trading.** No threshold is moved, nothing is
   approved, nothing is traded.
 
-Surfaces: ``python main.py practice``, ``GET/POST /api/practice``, the Chart
-tab ✍ PRACTICE card, the Review tab PRACTICE CALIBRATION card, and the
-read-only ``practice_scorecard`` / ``cryptobrain_practice`` MCP tools. Same
-computation everywhere (invariant #10).
+Surfaces: ``python main.py practice``, ``GET/POST /api/practice``,
+``POST /api/practice/tape``, the Chart tab ✍ PRACTICE card, the Review tab
+PRACTICE CALIBRATION card, and the read-only ``practice_scorecard`` /
+``cryptobrain_practice`` MCP tools. Same computation everywhere
+(invariant #10).
 """
 from __future__ import annotations
 
@@ -68,6 +75,20 @@ DISCLAIMER = (
     "metric, not evidence the desk is right and never a trading permission: "
     "the desk proves itself only in canonical paper trading under the "
     "unchanged +0.50R / 55% WR / PF 1.5 / compliance ≥90% graduation bar."
+)
+
+# W3.6 — replay tape. Separate kind so desk-agreement stats stay desk-only.
+TAPE_KIND = "tape"
+DEFAULT_HORIZON = 16
+MIN_HORIZON = 4
+MAX_HORIZON = 64
+
+TAPE_DISCLAIMER = (
+    "Tape score = what the hidden future bars did after your commit. "
+    "Historical playback only — not live evidence, not paper evidence, "
+    "and never a trading permission. The desk proves itself only in "
+    "canonical paper trading under the unchanged +0.50R / 55% WR / PF 1.5 "
+    "/ compliance ≥90% graduation bar."
 )
 
 
@@ -304,6 +325,312 @@ def score_attempt(user: dict, desk: dict) -> dict:
     }
 
 
+# ── W3.6 replay tape (outcome vs the hidden forward window) ─────────────
+
+
+def _as_epoch_ms(raw) -> int:
+    """Candle open time → epoch milliseconds. Accepts seconds or ms."""
+    value = int(float(raw))
+    if value < 0:
+        raise ValueError("commit_time must be a positive epoch")
+    if value < 10 ** 11:  # seconds
+        return value * 1000
+    return value
+
+
+def normalize_horizon(raw) -> int:
+    """Closed horizon: default 16, clamped 4–64. Fail closed on garbage."""
+    if raw in (None, ""):
+        return DEFAULT_HORIZON
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"horizon_bars must be an integer {MIN_HORIZON}-{MAX_HORIZON}")
+    if n < MIN_HORIZON or n > MAX_HORIZON:
+        raise ValueError(
+            f"horizon_bars must be {MIN_HORIZON}-{MAX_HORIZON} (got {n})")
+    return n
+
+
+def frame_to_ohlc(frame) -> list[dict]:
+    """DataFrame → list of {ts, open, high, low, close} (ts in epoch-ms)."""
+    if frame is None:
+        return []
+    try:
+        empty = bool(getattr(frame, "empty", True))
+    except Exception:
+        return []
+    if empty:
+        return []
+    out: list[dict] = []
+    for row in frame.itertuples(index=False):
+        data = row._asdict() if hasattr(row, "_asdict") else dict(row)
+        ts = _f(data.get("ts"))
+        o, h, low, c = (_f(data.get("open")), _f(data.get("high")),
+                        _f(data.get("low")), _f(data.get("close")))
+        if ts is None or o is None or h is None or low is None or c is None:
+            continue
+        try:
+            ts_ms = _as_epoch_ms(ts)
+        except ValueError:
+            continue
+        out.append({"ts": ts_ms, "open": o, "high": h, "low": low, "close": c})
+    out.sort(key=lambda r: r["ts"])
+    return out
+
+
+def load_ohlc(symbol: str, timeframe: str, *, bars: int = 500,
+              client=None) -> list[dict]:
+    """Fetch the same series the chart draws (DEMO_MODE stays offline)."""
+    if client is None:
+        from data.sample_client import maybe_client
+        client = maybe_client()
+    df = client.klines(symbol, timeframe, max(int(bars), 60))
+    return frame_to_ohlc(df)
+
+
+def locate_commit(candles: list[dict], commit_ms: int) -> int:
+    """Index of the commit bar. Fail closed if the bar is not on the series."""
+    if not candles:
+        raise ValueError("no candles to grade against")
+    try:
+        commit_ms = _as_epoch_ms(commit_ms)
+    except (TypeError, ValueError):
+        raise ValueError(
+            "commit_time must be a candle open time (epoch seconds or ms)")
+    for i, c in enumerate(candles):
+        if int(c["ts"]) == int(commit_ms):
+            return i
+    # Half-bar slack: Lightweight Charts seconds vs store milliseconds.
+    for i, c in enumerate(candles):
+        if abs(int(c["ts"]) - int(commit_ms)) <= 500:
+            return i
+    raise ValueError(
+        "commit_time is not a loaded candle — freeze replay on a visible bar")
+
+
+def _atr_proxy(bar: dict) -> float:
+    """One-bar range, floored so we never divide by zero."""
+    span = abs(float(bar["high"]) - float(bar["low"]))
+    floor = 0.001 * abs(float(bar["close"]))
+    return span if span > floor else (floor if floor > 0 else 1.0)
+
+
+def validate_tape_request(body: dict) -> tuple[dict, int, int]:
+    """Fail-closed tape payload → (user, commit_ms, horizon)."""
+    user = validate_user_read(body)
+    raw = body.get("commit_time", body.get("commit_ts"))
+    if raw in (None, ""):
+        raise ValueError(
+            "commit_time is required — freeze replay at the bar you are reading")
+    try:
+        commit_ms = _as_epoch_ms(raw)
+    except (TypeError, ValueError):
+        raise ValueError(
+            "commit_time must be a candle open time (epoch seconds or ms)")
+    if commit_ms <= 0:
+        raise ValueError("commit_time must be a positive epoch")
+    horizon = normalize_horizon(body.get("horizon_bars"))
+    if user["levels_given"] and user["decision"] in ("buy", "sell"):
+        from data.paper_trading import PaperTradeError, validate_levels
+        side = "BUY" if user["decision"] == "buy" else "SELL"
+        try:
+            validate_levels(side, user["entry"], user["stop"], user["target"])
+        except PaperTradeError as exc:
+            raise ValueError(str(exc)) from exc
+    return user, commit_ms, horizon
+
+
+def walk_tape(user: dict, future: list[dict], commit: dict) -> dict:
+    """The W3.6 outcome contract. ``future`` is the hidden forward window.
+
+    * no-trade → ATR-normalised close-to-close move (standing aside).
+    * buy/sell without a ladder → signed ATR move of the close.
+    * buy/sell with a ladder → ``exit_event`` walk, stop-first on ties.
+    """
+    if not future:
+        raise ValueError(
+            "no forward window — rewind replay or load more history")
+    commit_close = float(commit["close"])
+    atr = _atr_proxy(commit)
+    end_close = float(future[-1]["close"])
+    horizon = len(future)
+
+    if user["decision"] == "no_trade":
+        move = abs(end_close - commit_close) / atr
+        return {"outcome": "STOOD_ASIDE", "move_atr": round(move, 3),
+                "rr_achieved": None, "ambiguous": False,
+                "bars_used": horizon, "exit_price": end_close,
+                "mae": None, "mfe": None, "atr": atr,
+                "commit_close": commit_close, "end_close": end_close}
+
+    if not user["levels_given"]:
+        delta = end_close - commit_close
+        if user["decision"] == "sell":
+            delta = -delta
+        return {"outcome": "DIRECTION", "move_atr": round(delta / atr, 3),
+                "rr_achieved": None, "ambiguous": False,
+                "bars_used": horizon, "exit_price": end_close,
+                "mae": None, "mfe": None, "atr": atr,
+                "commit_close": commit_close, "end_close": end_close}
+
+    from data.paper_trading import exit_event
+    trade = {"action": "BUY" if user["decision"] == "buy" else "SELL",
+             "entry": user["entry"], "stop_loss": user["stop"],
+             "take_profit": user["target"]}
+    entry = float(user["entry"])
+    mae = mfe = 0.0
+    for i, candle in enumerate(future):
+        if user["decision"] == "buy":
+            mae = max(mae, max(0.0, entry - float(candle["low"])))
+            mfe = max(mfe, max(0.0, float(candle["high"]) - entry))
+        else:
+            mae = max(mae, max(0.0, float(candle["high"]) - entry))
+            mfe = max(mfe, max(0.0, entry - float(candle["low"])))
+        event = exit_event(trade, candle)
+        if event is None:
+            continue
+        return {"outcome": event["outcome"],
+                "rr_achieved": event["rr_achieved"],
+                "ambiguous": bool(event.get("ambiguous")),
+                "bars_used": i + 1, "exit_price": event["exit_price"],
+                "mae": round(mae, 6), "mfe": round(mfe, 6),
+                "atr": atr, "commit_close": commit_close,
+                "end_close": float(candle["close"]),
+                "move_atr": None}
+    return {"outcome": "EXPIRED", "rr_achieved": 0.0, "ambiguous": False,
+            "bars_used": horizon, "exit_price": end_close,
+            "mae": round(mae, 6), "mfe": round(mfe, 6),
+            "atr": atr, "commit_close": commit_close, "end_close": end_close,
+            "move_atr": None}
+
+
+def score_tape(user: dict, walk: dict) -> dict:
+    """Visible components from a :func:`walk_tape` result. Grade bands match
+    the weekly / W3.4 letters so the mirror stays comparable."""
+    outcome = walk.get("outcome") or "EXPIRED"
+    comps: list[dict] = []
+    if outcome == "STOOD_ASIDE":
+        move = float(walk.get("move_atr") or 0.0)
+        if move < 0.5:
+            pts, detail = 100, (f"price stayed inside 0.5 ATR ({move:.2f}) — "
+                                "standing aside was right")
+        elif move < 1.0:
+            pts, detail = 55, (f"price drifted {move:.2f} ATR — chop; "
+                               "standing aside is defensible")
+        else:
+            pts, detail = 25, f"price moved {move:.2f} ATR — you missed a move"
+        comps.append({"name": "standing aside", "points": pts, "max": 100,
+                      "detail": detail})
+    elif outcome == "DIRECTION":
+        move = float(walk.get("move_atr") or 0.0)
+        if move >= 0.5:
+            pts, detail = 85, f"price moved {move:.2f} ATR your way"
+        elif move > -0.5:
+            pts, detail = 45, "price chopped — direction not proven"
+        else:
+            pts, detail = 0, f"price moved {abs(move):.2f} ATR against you"
+        comps.append({"name": "direction vs the tape", "points": pts, "max": 100,
+                      "detail": detail})
+    elif outcome == "TP_HIT":
+        rr = walk.get("rr_achieved")
+        pts, detail = 100, (f"target hit in {walk.get('bars_used')} bars "
+                            f"({rr:+.2f}R)" if rr is not None else
+                            f"target hit in {walk.get('bars_used')} bars")
+        comps.append({"name": "ladder vs the tape", "points": pts, "max": 100,
+                      "detail": detail})
+    elif outcome == "STOP_LOSS":
+        extra = (" — ambiguous candle, conservative stop-first"
+                 if walk.get("ambiguous") else "")
+        pts, detail = 0, f"stop hit in {walk.get('bars_used')} bars{extra}"
+        comps.append({"name": "ladder vs the tape", "points": pts, "max": 100,
+                      "detail": detail})
+    else:
+        risk = 0.0
+        if user.get("levels_given") and user.get("entry") is not None and user.get("stop") is not None:
+            risk = abs(float(user["entry"]) - float(user["stop"]))
+        mfe_r = (float(walk.get("mfe") or 0.0) / risk) if risk else 0.0
+        if mfe_r >= 1.0:
+            pts, detail = 40, (f"window expired; MFE {mfe_r:.2f}R — right idea, "
+                               "not enough time")
+        else:
+            pts, detail = 20, "window expired without target or stop"
+        comps.append({"name": "ladder vs the tape", "points": pts, "max": 100,
+                      "detail": detail})
+
+    total = int(comps[0]["points"])
+    return {
+        "kind": TAPE_KIND,
+        "total": total,
+        "earned_max": 100,
+        "grade": _grade_of(total),
+        "outcome": outcome,
+        "rr_achieved": walk.get("rr_achieved"),
+        "ambiguous": bool(walk.get("ambiguous")),
+        "bars_used": walk.get("bars_used"),
+        "move_atr": walk.get("move_atr"),
+        "mae": walk.get("mae"),
+        "mfe": walk.get("mfe"),
+        "components": comps,
+        "disclaimer": TAPE_DISCLAIMER,
+    }
+
+
+def submit_tape_attempt(db: SignalDB, body: dict, candles: list[dict],
+                        *, now_ms: Optional[int] = None) -> dict:
+    """Validate, walk the hidden window, score and remember one tape read.
+
+    ``candles`` must be the same series the chart loaded (server-fetched —
+    the client cannot supply the future). A double-submit of the same read
+    at the same commit bar within two minutes returns the original row.
+    """
+    user, commit_ms, horizon = validate_tape_request(body)
+    idx = locate_commit(candles, commit_ms)
+    future = candles[idx + 1: idx + 1 + horizon]
+    if len(future) < MIN_HORIZON:
+        raise ValueError(
+            f"need at least {MIN_HORIZON} hidden bars after the commit "
+            f"(have {len(future)}) — rewind replay or load more history")
+    commit = candles[idx]
+    now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
+
+    last = db.latest_practice_attempt(user["symbol"], user["tf"])
+    if last and now_ms - int(last["ts"]) <= DEDUPE_WINDOW_MS:
+        last_score = last.get("score") or {}
+        last_desk = last.get("desk_read") or {}
+        if last_score.get("kind") == TAPE_KIND and last.get("user_read") == user \
+                and int(last_desk.get("commit_time") or 0) == int(commit_ms):
+            return {"duplicate": True, "attempt": last["attempt"],
+                    "user": last["user_read"], "desk": last["desk_read"],
+                    "score": last["score"], "disclaimer": TAPE_DISCLAIMER}
+
+    walk = walk_tape(user, future, commit)
+    score = score_tape(user, walk)
+    tape = {
+        "kind": TAPE_KIND,
+        "available": True,
+        "symbol": user["symbol"],
+        "timeframe": user["tf"],
+        "commit_time": commit_ms,
+        "commit_close": commit["close"],
+        "horizon_bars": horizon,
+        "future_bars": len(future),
+        "outcome": walk["outcome"],
+        "bars_used": walk["bars_used"],
+        "rr_achieved": walk.get("rr_achieved"),
+        "ambiguous": walk.get("ambiguous"),
+        "end_close": walk.get("end_close"),
+    }
+    attempt_id = db.save_practice_attempt(
+        user["symbol"], user["tf"], user, tape, score, ts=now_ms)
+    attempt = {"id": attempt_id, "ts": now_ms, "day": _day_key(now_ms),
+               "symbol": user["symbol"], "timeframe": user["tf"],
+               "kind": TAPE_KIND}
+    return {"duplicate": False, "attempt": attempt, "user": user,
+            "desk": tape, "score": score, "disclaimer": TAPE_DISCLAIMER}
+
+
 # ── persistence ─────────────────────────────────────────────────────────
 
 
@@ -322,7 +649,8 @@ def submit_attempt(db: SignalDB, body: dict, desk_read: dict,
 
     last = db.latest_practice_attempt(user["symbol"], user["tf"])
     if last and now_ms - int(last["ts"]) <= DEDUPE_WINDOW_MS and \
-            last.get("user_read") == user:
+            last.get("user_read") == user and \
+            (last.get("score") or {}).get("kind") != TAPE_KIND:
         return {"duplicate": True, "attempt": last["attempt"],
                 "user": last["user_read"], "desk": last["desk_read"],
                 "score": last["score"], "disclaimer": DISCLAIMER}
@@ -354,17 +682,66 @@ _COACHING = {
 }
 
 
+def _is_tape(row: dict) -> bool:
+    return (row.get("score") or {}).get("kind") == TAPE_KIND
+
+
+def _tape_block(tape_rows: list[dict]) -> dict:
+    """Sibling scorecard for W3.6 tape attempts. Never mixed into desk n."""
+    n = len(tape_rows)
+    scores = [int((r.get("score") or {}).get("total") or 0) for r in tape_rows]
+    outcomes: dict[str, int] = {}
+    for r in tape_rows:
+        key = str((r.get("score") or {}).get("outcome") or "—")
+        outcomes[key] = outcomes.get(key, 0) + 1
+    decided = outcomes.get("TP_HIT", 0) + outcomes.get("STOP_LOSS", 0)
+    wins = outcomes.get("TP_HIT", 0)
+    recent = [{
+        "id": r.get("id"), "day": _day_key(int(r.get("ts") or 0)),
+        "symbol": r.get("symbol"), "timeframe": r.get("timeframe"),
+        "user_decision": (r.get("user_read") or {}).get("decision"),
+        "outcome": (r.get("score") or {}).get("outcome"),
+        "score": (r.get("score") or {}).get("total"),
+        "grade": (r.get("score") or {}).get("grade"),
+        "kind": TAPE_KIND,
+    } for r in tape_rows[:10]]
+    if n == 0:
+        coaching = ("No tape reads yet — start Replay on the Chart tab, freeze "
+                    "at a bar, commit your read, and the hidden future grades you.")
+    else:
+        coaching = ("Tape scores measure what the hidden bars did after your "
+                    "commit. They are historical playback, not paper evidence "
+                    "and not permission.")
+    return {
+        "n": n,
+        "avg_score": round(sum(scores) / n, 1) if n else None,
+        "best_score": max(scores) if n else None,
+        "worst_score": min(scores) if n else None,
+        "outcomes": outcomes,
+        "win_rate": round(wins / decided, 3) if decided else None,
+        "recent": recent,
+        "coaching": coaching,
+        "disclaimer": TAPE_DISCLAIMER,
+    }
+
+
 def practice_scorecard(db: SignalDB, days: int = 30,
                        *, now_ms: Optional[int] = None) -> dict:
     """Aggregate practice history into the calibration mirror.
 
     Read-only coaching memory — no P12 surface ever reads it. ``days`` is the
     window (default 30), ``now_ms`` injects "now" so tests are deterministic.
+
+    Desk-agreement keys (``n``, ``bias_agreement``, …) stay desk-only so a
+    tape history cannot rewrite the W3.4 mirror. Tape attempts live under
+    the sibling ``tape`` block.
     """
     days = max(1, int(days))
     now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
     since_ts = now_ms - days * 86_400_000
-    rows = db.practice_attempts(days=days, limit=500)
+    all_rows = db.practice_attempts(days=days, limit=500)
+    rows = [r for r in all_rows if not _is_tape(r)]
+    tape_rows = [r for r in all_rows if _is_tape(r)]
 
     n = len(rows)
     scores = [int((r.get("score") or {}).get("total") or 0) for r in rows]
@@ -409,6 +786,7 @@ def practice_scorecard(db: SignalDB, days: int = 30,
         "desk_action": (r.get("score") or {}).get("desk_action"),
         "score": (r.get("score") or {}).get("total"),
         "grade": (r.get("score") or {}).get("grade"),
+        "kind": "desk",
     } for r in rows[:10]]
 
     if n == 0:
@@ -437,6 +815,7 @@ def practice_scorecard(db: SignalDB, days: int = 30,
         "weakest_component": weakest,
         "coaching": coaching,
         "recent": recent,
+        "tape": _tape_block(tape_rows),
         "disclaimer": DISCLAIMER,
     }
 
@@ -478,6 +857,22 @@ def format_practice_scorecard(sc: dict) -> str:
                 f"    #{r['id']:<4} {r['day']}  {r['symbol']:<9} {r['timeframe']:<4} "
                 f"you {str(r['user_decision'] or '?'):<9} vs desk "
                 f"{str(r['desk_action'] or '?'):<9} → {r['score']:>3}/100 ({r['grade']})")
+    tape = sc.get("tape") or {}
+    if tape.get("n"):
+        outs = tape.get("outcomes") or {}
+        tally = "  ".join(f"{k}×{outs[k]}" for k in sorted(outs))
+        lines += [
+            "-" * 74,
+            f"  TAPE (replay)  {tape['n']} reads   ·   avg {_fmt_num(tape.get('avg_score'))}/100"
+            f"   ·   ladder win rate {_pct(tape.get('win_rate'))}",
+            f"  outcomes       {tally or '—'}",
+            f"     {tape.get('coaching') or ''}",
+        ]
+        for r in tape.get("recent") or []:
+            lines.append(
+                f"    #{r['id']:<4} {r['day']}  {r['symbol']:<9} {r['timeframe']:<4} "
+                f"you {str(r['user_decision'] or '?'):<9} → "
+                f"{str(r['outcome'] or '?'):<12} {r['score']:>3}/100 ({r['grade']})")
     lines += [
         "-" * 74,
         f"  {sc['disclaimer']}",

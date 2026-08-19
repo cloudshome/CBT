@@ -781,6 +781,7 @@ HTML = """<!doctype html>
         </div>
         <div class="seg" id="replaySeg" style="align-items:center">
           <button class="btn" id="replayBtn" onclick="toggleReplay()">▶ Replay</button>
+          <button class="btn" id="replayFreezeBtn" onclick="freezeReplay()" title="Pause at this bar to commit a tape read">Freeze</button>
           <button class="btn" id="replaySpeedBtn" onclick="cycleReplaySpeed()" title="playback speed">1×</button>
         </div>
         <button class="btn" onclick="loadChartWorkspace(true)">↻ Reload chart</button>
@@ -814,6 +815,7 @@ HTML = """<!doctype html>
           desk currently reads on the same chart and how your read compares. This is a study mirror: agreement
           with the desk is <b>not</b> evidence and grants nothing — the desk itself still has to prove its edge in
           the canonical paper book under the unchanged graduation bar.</div>
+        <div id="pracTapeBanner" class="note" style="margin-bottom:10px;display:none;border:1px solid var(--amber);padding:8px;border-radius:10px;background:rgba(245,158,11,.10)">▶ REPLAY TAPE — historical playback, not live or paper evidence. Freeze at this bar, commit your read, and the hidden future grades you. The desk is not scored here.</div>
         <div class="flex" style="gap:10px;flex-wrap:wrap;align-items:end">
           <label class="note">bias<br><select id="pracBias" style="min-width:110px">
             <option value="bullish">bullish</option><option value="bearish">bearish</option>
@@ -826,7 +828,8 @@ HTML = """<!doctype html>
           <label class="note">target<br><input id="pracTarget" size="9" placeholder="price"></label>
           <label class="note">conf 0-100<br><input id="pracConf" size="3" placeholder="—"></label>
           <label class="note" style="flex:1;min-width:160px">note<br><input id="pracNote" style="width:100%" maxlength="500" placeholder="why — one line (optional)"></label>
-          <button class="btn primary" onclick="submitPractice()">📝 Commit my read</button>
+          <button class="btn primary" onclick="submitPractice()">📝 Commit vs desk</button>
+          <button class="btn" id="pracTapeBtn" onclick="submitTapePractice()">▶ Grade against the tape</button>
         </div>
         <div id="pracResult" style="margin-top:10px"><span class="muted">Nothing committed yet — your read is scored
           against the desk's live read of this symbol + timeframe the moment you submit.</span></div>
@@ -1011,8 +1014,10 @@ HTML = """<!doctype html>
     <div class="card" style="margin-top:14px">
       <h2>PRACTICE CALIBRATION — your reads vs the desk <span class="count" id="pracCardCount">—</span></h2>
       <div class="note" style="margin-bottom:8px">Every read you commit on the 📊 Chart tab (✍ PRACTICE card) is
-        scored against the desk's live read and remembered here. Study metric only — agreement is not evidence
-        and not permission. Same computation as <code>python main.py practice</code> and MCP
+        scored against the desk's live read and remembered here. Replay Freeze + Grade against the tape is a
+        sibling score — what the hidden bars did after your commit, never mixed into desk agreement.
+        Study metric only — agreement and tape outcomes are not evidence and not permission. Same
+        computation as <code>python main.py practice</code> and MCP
         <code>practice_scorecard</code>.</div>
       <div id="wkPractice"><span class="muted">—</span></div>
     </div>
@@ -3531,6 +3536,23 @@ function stopReplay(restore=true){
     if(head && _chartData) renderChartHead(_chartData);
     drawChart();                                        // restore the full workspace
   }
+  setTapeBanner(false);
+}
+function freezeReplay(){
+  if(!_replay) return;
+  try{ clearInterval(_replay.timer); }catch(e){}
+  _replay.timer=null;
+  const btn=document.getElementById('replayBtn'); if(btn) btn.textContent='▶ Resume';
+  setTapeBanner(true);
+}
+function replayCommitTime(){
+  if(!_replay || !_replay.candles || !_replay.candles.length) return null;
+  const n=Math.max(1, Math.min(_replay.idx||1, _replay.candles.length));
+  const c=_replay.candles[n-1]||{};
+  return (c.time!=null)?c.time:null;
+}
+function setTapeBanner(on){
+  const b=document.getElementById('pracTapeBanner'); if(b) b.style.display=on?'block':'none';
 }
 function renderReplayHead(n){
   if(!_replay || !_replay.candles.length) return;
@@ -3556,7 +3578,13 @@ function replayTick(){
   if(n>=_replay.candles.length) stopReplay();
 }
 function toggleReplay(){
-  if(_replay){ stopReplay(); return; }
+  if(_replay && _replay.timer){ stopReplay(); return; }
+  if(_replay && !_replay.timer){
+    _replay.timer=setInterval(replayTick, _replaySpeeds[_replay.speedIdx||0]);
+    const btn=document.getElementById('replayBtn'); if(btn) btn.textContent='■ Stop';
+    setTapeBanner(true);
+    return;
+  }
   const d=_chartData; if(!d || !(d.candles||[]).length) return;
   const main=document.getElementById('chartMain'); if(!main) return;
   const create=chartsAvailable(); if(!create) return;
@@ -3578,6 +3606,7 @@ function toggleReplay(){
   try{ candle.setData(d.candles.slice(0, _replay.idx)); }catch(e){}
   renderReplayHead(_replay.idx);                       // label replay immediately
   _replay.timer=setInterval(replayTick, _replaySpeeds[0]);
+  setTapeBanner(true);
 }
 
 function renderChartHead(d){
@@ -4455,10 +4484,9 @@ function _pracGradeColor(g,s){
   if(!g) return 'var(--line)';
   return (s>=70)?'var(--green)':(s>=50?'var(--amber,#e0a458)':'var(--red)');
 }
-async function submitPractice(){
-  const out=document.getElementById('pracResult');
+function _pracBody(){
   const conf=parseInt((document.getElementById('pracConf')||{}).value,10);
-  const body={
+  return {
     symbol:chartSym(), tf:chartTf(),
     bias:(document.getElementById('pracBias')||{}).value||'neutral',
     decision:(document.getElementById('pracDecision')||{}).value||'no_trade',
@@ -4466,6 +4494,10 @@ async function submitPractice(){
     confidence:isFinite(conf)?conf:null,
     note:((document.getElementById('pracNote')||{}).value||'')
   };
+}
+async function submitPractice(){
+  const out=document.getElementById('pracResult');
+  const body=_pracBody();
   out.innerHTML='<span class="muted">scoring your read against the desk…</span>';
   try{
     const res=await fetch('/api/practice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -4475,11 +4507,36 @@ async function submitPractice(){
     loadPracticeScorecard();
   }catch(e){ out.innerHTML='<span class="err">'+esc(e)+'</span>'; }
 }
+async function submitTapePractice(){
+  const out=document.getElementById('pracResult');
+  const commit=replayCommitTime();
+  if(commit==null){
+    out.innerHTML='<span class="err">Start Replay and Freeze at the bar you are reading — the tape grades the hidden future, so it cannot run on the live chart.</span>';
+    return;
+  }
+  freezeReplay();
+  const body=_pracBody();
+  body.commit_time=commit;
+  body.horizon_bars=16;
+  out.innerHTML='<span class="muted">walking the hidden bars…</span>';
+  try{
+    const res=await fetch('/api/practice/tape',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await res.json();
+    if(!res.ok||d.error){ out.innerHTML='<span class="err">'+esc(d.error||('tape submit failed ('+res.status+')'))+'</span>'; return; }
+    if(_replay && _replay.candle && _replay.candles){
+      try{ _replay.candle.setData(_replay.candles); }catch(e){}
+      renderReplayHead(_replay.candles.length);
+    }
+    renderPracticeResult(d);
+    loadPracticeScorecard();
+  }catch(e){ out.innerHTML='<span class="err">'+esc(e)+'</span>'; }
+}
 function renderPracticeResult(d){
   const out=document.getElementById('pracResult'); if(!out) return;
   const desk=d.desk||{}, sc=d.score||{}, u=d.user||{};
-  const act=desk.action||'?';
-  const actCol=act==='BUY'?'var(--green)':(act==='SELL'?'var(--red)':'var(--muted)');
+  const isTape=(sc.kind==='tape')||(desk.kind==='tape');
+  const act=isTape?(sc.outcome||desk.outcome||'TAPE'):(desk.action||'?');
+  const actCol=isTape?'var(--amber)':(act==='BUY'?'var(--green)':(act==='SELL'?'var(--red)':'var(--muted)'));
   const gc=_pracGradeColor(sc.grade, sc.total||0);
   const lvl=function(v){ return (v==null)?'—':v; };
   const comps=(sc.components||[]).map(c=>{
@@ -4490,9 +4547,12 @@ function renderPracticeResult(d){
   out.innerHTML=
     (d.duplicate?'<div class="note" style="margin-bottom:6px">↺ identical read within 2 minutes — showing the original attempt, nothing double-counted.</div>':'')+
     '<div class="flex" style="gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'+
-      '<span class="pill" style="border-color:'+actCol+';color:'+actCol+'">desk: '+esc(act)+'</span>'+
-      '<span class="badge">desk bias '+esc(desk.bias||'—')+' · '+esc(desk.regime||'—')+'</span>'+
-      (desk.entry?'<span class="badge">desk ladder '+lvl(desk.entry)+' / '+lvl(desk.stop)+' / '+lvl(desk.target)+'</span>':'')+
+      '<span class="pill" style="border-color:'+actCol+';color:'+actCol+'">'+(isTape?'tape: ':'desk: ')+esc(act)+'</span>'+
+      (isTape
+        ? ('<span class="badge">horizon '+(desk.horizon_bars||16)+' · used '+(sc.bars_used!=null?sc.bars_used:(desk.bars_used!=null?desk.bars_used:'—'))+'</span>'
+           +(sc.rr_achieved!=null?'<span class="badge">'+((Number(sc.rr_achieved)>0)?'+':'')+sc.rr_achieved+'R</span>':''))
+        : ('<span class="badge">desk bias '+esc(desk.bias||'—')+' · '+esc(desk.regime||'—')+'</span>'
+           +(desk.entry?'<span class="badge">desk ladder '+lvl(desk.entry)+' / '+lvl(desk.stop)+' / '+lvl(desk.target)+'</span>':'')))+
       '<span class="pill" style="border-color:'+gc+';color:'+gc+';font-size:15px">your read '+(sc.total!=null?sc.total:'—')+'/100 · '+esc(sc.grade||'—')+'</span>'+
     '</div>'+
     '<div class="note" style="margin-bottom:6px">you: '+esc(u.bias||'—')+' / '+esc(u.decision||'—')+
@@ -4520,7 +4580,11 @@ function renderPracticeScorecard(d){
        ' · call agreement '+pct(d.decision_agreement)+' · avg '+(d.avg_score!=null?d.avg_score:'—')+'/100 — full mirror on the 🗓 Review tab')
     : 'no committed reads yet — this card is where you start: bias → call → ladder, then submit';
   const w=document.getElementById('wkPractice'); if(!w) return;
-  if(!d.n){ w.innerHTML='<span class="muted">'+esc(d.coaching||'No practice attempts yet.')+'</span>'; return; }
+  if(!d.n && !(d.tape&&d.tape.n)){ w.innerHTML='<span class="muted">'+esc(d.coaching||'No practice attempts yet.')+'</span>'; return; }
+  if(!d.n){
+    w.innerHTML='<span class="muted">'+esc(d.coaching||'No desk-agreement reads yet.')+'</span>'+_pracTapeCard(d.tape||{});
+    return;
+  }
   const means=d.component_means||{};
   const grades=['A','B','C','D','E'].filter(g=>(d.grades||{})[g]).map(g=>'<span class="badge">'+g+' ×'+d.grades[g]+'</span>').join(' ');
   const rows=(d.recent||[]).map(r=>'<tr><td>#'+r.id+'</td><td>'+esc(r.day||'')+'</td><td>'+esc(r.symbol||'')+' '+esc(r.timeframe||'')+
@@ -4538,7 +4602,29 @@ function renderPracticeScorecard(d){
     '<div class="blockcard earn" style="margin-top:8px"><b>➤ Weakest link: '+esc(d.weakest_component||'none in window')+'</b>'+
       '<div class="note" style="margin-top:4px">'+esc(d.coaching||'')+'</div></div>'+
     (rows?'<div style="overflow:auto;margin-top:8px"><table><tr><th>#</th><th>Day</th><th>Chart</th><th>You</th><th>Desk</th><th>Score</th><th>Grade</th></tr>'+rows+'</table></div>':'')+
+    _pracTapeCard(d.tape||{})+
     '<div class="note" style="margin-top:8px">'+esc(d.disclaimer||'')+'</div>';
+}
+function _pracTapeCard(t){
+  if(!t || !t.n){
+    return '<div class="note" style="margin-top:10px">No tape reads yet — start Replay, Freeze, then Grade against the tape.</div>';
+  }
+  const pct=function(v){ return (v==null)?'n/a':(Number(v)*100).toFixed(1)+'%'; };
+  const outs=Object.keys(t.outcomes||{}).map(function(k){ return k+' ×'+(t.outcomes[k]); }).join(' · ');
+  const rows=(t.recent||[]).map(function(r){
+    return '<tr><td>#'+r.id+'</td><td>'+esc(r.day||'')+'</td><td>'+esc(r.symbol||'')+' '+esc(r.timeframe||'')+
+      '</td><td>'+esc(r.user_decision||'—')+'</td><td>'+esc(r.outcome||'—')+'</td><td>'+(r.score!=null?r.score:'—')+'</td><td>'+esc(r.grade||'—')+'</td></tr>';
+  }).join('');
+  return '<div class="blockcard" style="margin-top:10px"><b>▶ TAPE — replay outcomes</b>'+
+    '<div class="statrow" style="margin:8px 0">'+
+      '<div class="stat"><div class="v">'+t.n+'</div><div class="k">Tape reads</div></div>'+
+      '<div class="stat"><div class="v">'+(t.avg_score!=null?t.avg_score:'—')+'</div><div class="k">Avg /100</div></div>'+
+      '<div class="stat"><div class="v">'+pct(t.win_rate)+'</div><div class="k">Ladder win rate</div></div>'+
+    '</div>'+
+    '<div class="note">'+esc(outs||'—')+'</div>'+
+    '<div class="note" style="margin-top:4px">'+esc(t.coaching||'')+'</div>'+
+    (rows?'<div style="overflow:auto;margin-top:8px"><table><tr><th>#</th><th>Day</th><th>Chart</th><th>You</th><th>Outcome</th><th>Score</th><th>Grade</th></tr>'+rows+'</table></div>':'')+
+    '<div class="note" style="margin-top:6px">'+esc(t.disclaimer||'')+'</div></div>';
 }
 
 // ── W4.2 — this PC is the Hub; one research agent, no second PC agent ──
@@ -6286,6 +6372,43 @@ def make_app(job_manager=None) -> Flask:
         _audit("practice", f"{user['symbol']} {user['tf']}",
                detail={"score": result["score"]["total"],
                        "grade": result["score"]["grade"],
+                       "duplicate": bool(result.get("duplicate"))})
+        return jsonify(_sanitize_for_json(result))
+
+    @app.post("/api/practice/tape")
+    def api_practice_tape():
+        """W3.6 — commit one practice read against the hidden replay window.
+
+        The server fetches the same candle series the chart draws and walks
+        the bars *after* ``commit_time``. The client cannot supply the
+        future. Fail-closed validation (400) before any row is written.
+        Never writes scans or paper_trades — coaching memory only.
+        """
+        body = request.get_json(silent=True) or {}
+        from brain.practice import (load_ohlc, submit_tape_attempt,
+                                    validate_tape_request)
+        try:
+            user, _commit_ms, _horizon = validate_tape_request(body)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        try:
+            candles = load_ohlc(user["symbol"], user["tf"])
+        except Exception as exc:
+            return jsonify({"ok": False,
+                            "error": "tape candles unavailable — attempt not "
+                                     f"recorded: {type(exc).__name__}: {exc}"}), 502
+        try:
+            from data.database import SignalDB
+            with SignalDB() as db:
+                result = submit_tape_attempt(db, body, candles)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+        _audit("practice_tape", f"{user['symbol']} {user['tf']}",
+               detail={"score": result["score"]["total"],
+                       "grade": result["score"]["grade"],
+                       "outcome": result["score"].get("outcome"),
                        "duplicate": bool(result.get("duplicate"))})
         return jsonify(_sanitize_for_json(result))
 

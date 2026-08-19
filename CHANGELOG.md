@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.46.0] — 2026-08-19 · W3.6 replay tape practice
+
+MINOR: Replay Freeze + **Grade against the tape**. Commit a chart read at
+the last visible bar; the server walks the hidden forward window (default
+16 bars, clamp 4–64) and grades what actually happened. Ladder fills reuse
+`data.paper_trading.exit_event` (stop-first). Desk-agreement keys stay
+desk-only; tape lives in a sibling `tape` block. Coaching memory only —
+never writes `paper_trades` / scans / graduation / the risk gate.
+
+- **Grader** — `brain/practice.py`: `walk_tape` / `score_tape` /
+  `submit_tape_attempt`. no-trade → ATR stand-aside; buy/sell without a
+  ladder → signed ATR close move; buy/sell with a ladder → `exit_event`.
+- **Dashboard** — Chart PRACTICE card: Freeze, tape banner, Grade against
+  the tape. Review tab paints the sibling tape card.
+- **API** — `POST /api/practice/tape`. Client cannot supply the future.
+  Fail-closed validation. MCP `practice_scorecard` 1.14.0 mentions the
+  tape sibling.
+
+Honest: no browser in this sandbox. Proven with Flask client + Node JS
+harness + `python -m py_compile`. Tape ≠ paper evidence. P22 still needs
+real signers.
+
 ## [2.45.0] — 2026-08-19 · W4.2 Ubuntu PC is the Hub; one research agent
 
 MINOR: the always-on Ubuntu PC is now an explicit Hub role, not a second

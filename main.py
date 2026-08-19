@@ -1581,11 +1581,11 @@ def cmd_weekly(args) -> int:
 
 
 def cmd_practice(args) -> int:
-    """W3.4 — practice calibration: your committed reads vs the desk's,
-    scored and aggregated. Same computation as ``GET /api/practice``, the
-    Chart-tab ✍ PRACTICE card, the Review-tab PRACTICE CALIBRATION card and
-    the read-only MCP ``practice_scorecard`` tool. Coaching memory only —
-    agreement with the desk is not evidence and never feeds any gate.
+    """W3.4+W3.6 — practice calibration: desk-agreement plus a sibling
+    tape block of replay outcomes. Same computation as ``GET /api/practice``,
+    the Chart-tab ✍ PRACTICE card, the Review-tab PRACTICE CALIBRATION card
+    and the read-only MCP ``practice_scorecard`` tool. Coaching memory only —
+    agreement and tape outcomes are not evidence and never feed any gate.
     """
     from brain.practice import format_practice_scorecard, practice_scorecard
     from data.database import SignalDB
@@ -2983,7 +2983,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_pr = sub.add_parser(
         "practice",
-        help="practice calibration: your committed reads vs the desk, "
+        help="practice calibration: desk-agreement plus replay-tape outcomes, "
              "agreement rates, weakest component, one coaching takeaway",
     )
     p_pr.add_argument("--json", action="store_true")

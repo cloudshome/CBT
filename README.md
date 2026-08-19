@@ -199,13 +199,14 @@ the **graduation gate** passes (see `BLUEPRINT.md`).
   missing evidence, one next practice task and an advisory grade. Same
   computation as the 🗓 Review tab, `GET /api/weekly` and MCP
   `weekly_review`. Read-only; the unchanged graduation bar stays the gate.
-* `python main.py practice [--days N] [--json]` — W3.4 practice calibration:
-  every read you committed on the 📊 Chart tab (bias → final call →
-  entry/stop/target) scored against the desk's read at that moment — bias and
-  final-call agreement, component means, the weakest link and one coaching
-  takeaway. Same computation as the 🗓 Review tab PRACTICE CALIBRATION card,
-  `GET /api/practice` and MCP `practice_scorecard`. Study metric ONLY — never
-  read by the live book, risk gate or graduation.
+* `python main.py practice [--days N] [--json]` — W3.4+W3.6 practice
+  calibration: every read you committed on the 📊 Chart tab scored against
+  the desk's read (bias / final call / ladder) plus a sibling **tape**
+  block of Replay Freeze outcomes (hidden forward window, stop-first
+  ladder fills). Same computation as the 🗓 Review tab PRACTICE CALIBRATION
+  card, `GET /api/practice` and MCP `practice_scorecard`. Study metric ONLY
+  — never read by the live book, risk gate or graduation. Tape is not
+  paper evidence.
 * `python main.py agent morning` — one briefing for the whole watchlist: every
   asset with its final **desk decision** (desk-first), playbook + regime,
   risk-gate state, pending reviews, open exposure and paper-book stats, plus a
@@ -301,7 +302,7 @@ gate bypass. The read-only map holds `ask`, `risk`, `health`, `brief`, `tradesta
 `postreview`, `channels`, `correlation`, `hidden_chart_read`,
 `hidden_analytics_mae`, `hidden_analytics_mc`, `desk_status`,
 `readiness`, `scorecard`, `loop_health`, `weekly_review` (W3) and
-`practice_scorecard` (W3.4). 17 tools in total.
+`practice_scorecard` (W3.4+W3.6 tape sibling). 17 tools in total.
 
 #### AI anatomy suite (RAG · briefs · agents · immune system)
 
@@ -381,7 +382,7 @@ where every function is a button. You never need to memorize a command.
 
 | Tab | What you click |
 |---|---|
-| 📊 **Chart** | Candles, volume, EMA 20/50/200, VWAP, Bollinger, RSI, MACD, support/resistance and your entry / stop / take-profit — TradingView Lightweight Charts with linked time scales. Asset and timeframe are one click. Plus the **✍ PRACTICE card**: commit your read (bias → call → ladder) *before* the Signal desk; the desk's read freezes at that moment and your agreement score is revealed with visible components. |
+| 📊 **Chart** | Candles, volume, EMA 20/50/200, VWAP, Bollinger, RSI, MACD, support/resistance and your entry / stop / take-profit — TradingView Lightweight Charts with linked time scales. Asset and timeframe are one click. Plus the **✍ PRACTICE card**: commit your read (bias → call → ladder) *before* the Signal desk, or **Replay → Freeze → Grade against the tape** so the hidden future grades you. Study only. |
 | 🎯 **Signal desk** | BUY / SELL / NO TRADE with entry, stop, target, R:R, confidence, setup, regime, invalidation, why it exists and why it may fail. |
 | ⚡ **Trades** | Approve · Reject · Execute · Close. The risk gate is enforced; overriding it is a separate, conscious click. |
 | 🎛 **Trade manager** | Open positions with live price, current R, stop/target distance, MAE, MFE, time in trade and the management instruction. Close or journal from the row. |

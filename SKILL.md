@@ -100,7 +100,7 @@ bypasses the risk gate. The deny list is enforced at the top of
 | **Desk status** | `python main.py desk` | `desk_status` | One-call advisory: gate + today's P&L + graduation + next agent + "what would a professional do right now?" |
 | **Daily ritual** | `python main.py daily` | `loop_health` | The 10-minute loop: readiness → real paper n / net expectancy / graduation bar → gate → journal prompt. Alias: `loop-health`. |
 | **Weekly review** | `python main.py weekly [--days N] [--export PATH]` | `weekly_review` | W3 Sunday mirror: week vs all-time (net), R-distribution, violations + mistakes, per-setup graduation tracker, next practice task, advisory grade. |
-| **Practice calibration** | `python main.py practice [--days N]` | `practice_scorecard` | W3.4 your reads vs the desk: bias/call agreement, component means, weakest link + one coaching takeaway. Study metric only — feeds no gate. |
+| **Practice calibration** | `python main.py practice [--days N]` | `practice_scorecard` | W3.4+W3.6 your reads vs the desk plus a sibling tape block of replay outcomes. Study metric only — feeds no gate. |
 | **Readiness** | `python main.py doctor --strip` | `readiness` | One combined verdict across channels + immune system + risk gate + stored-data quality. Ask this first. |
 | Risk gate | `python main.py risk` | `risk` | Open/closed status, daily/weekly P&L, progression ladder |
 | Trader state | `python main.py tradestate` | `tradestate` | Behavioral flags: angry/tired/revenge/chasing — operator-controlled |

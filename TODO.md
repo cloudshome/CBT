@@ -6,13 +6,16 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-19 (**v2.45.0 — W4.2 Ubuntu PC is the Hub**.
-One always-on PC = one Hub + one research agent (`sky-agent.service`).
-Clickable THIS PC card. No second PC-use agent. Contract:
-`docs/HANDOVER_2026-08-19_W42.md`, `docs/UBUNTU_PC_ROLE.md`.
-**Next implementation is P22 (trusted-host drills — real signers only);
-choose the work by environment.** P11 real paper proof stays parallel and
-is still the money path.)
+**Last updated:** 2026-08-19 (**v2.46.0 — W3.6 replay tape practice**.
+Chart Replay Freeze + Grade against the tape. Server grades the hidden
+forward window. Tape is a sibling score, never mixed into desk agreement
+and never paper evidence. Contract: `docs/HANDOVER_2026-08-19_W36.md`.
+**P22 still needs real signers — do not claim it from this sandbox.**
+P11 real paper proof stays parallel and is still the money path.)
+
+**Previous:** 2026-08-19 (**v2.45.0 — W4.2 Ubuntu PC is the Hub**.
+One always-on PC = one Hub + one research agent. Contract:
+`docs/HANDOVER_2026-08-19_W42.md`.)
 
 **Previous:** 2026-08-19 (**v2.41.0 — W3 trader development: weekly
 review page + ritual memory + journal-first gate**. `brain/weekly.py` one

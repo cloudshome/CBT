@@ -1,4 +1,6 @@
-**Last updated:** 2026-08-19 (**v2.45.0 — W4.2 Ubuntu PC is the Hub**). The always-on Ubuntu PC is the SKY Hub: one research agent, no second PC-use agent. Hub FHS catalogs `sky-agent.service`; dashboard THIS PC card + `hub role`. Contract: `docs/HANDOVER_2026-08-19_W42.md`. Next: first-night on the real PC, then operate the paper loop. P22 drills need real signers. Do not treat agent recommendations as evidence.
+**Last updated:** 2026-08-19 (**v2.46.0 — W3.6 replay tape practice**). Chart Replay Freeze + Grade against the tape. Server grades the hidden forward window (`horizon_bars` 16, clamp 4–64). Ladder fills reuse `exit_event` (stop-first). Tape lives under a sibling `tape` block so desk-agreement stats stay desk-only. Contract: `docs/HANDOVER_2026-08-19_W36.md`. Next sandbox: review tape UX in a real browser, or operate the paper loop. **P22 drills need real signers.** Tape ≠ paper evidence.
+
+**Previous:** 2026-08-19 (**v2.45.0 — W4.2 Ubuntu PC is the Hub**). One research agent, no second PC-use agent. Contract: `docs/HANDOVER_2026-08-19_W42.md`.
 
 **Previous:** 2026-08-19 (**v2.41.0 — W3 trader development: weekly review page + ritual memory + journal-first gate** on `arena/01a01842-sky`). `python main.py weekly`, `GET /api/weekly`, dashboard 🗓 Review tab, MCP `weekly_review`; `GET/POST /api/ritual` per-day memory; `approve` holds while decided real trades are unjournaled (`--acknowledge-journal` audited escape). Suite 1177 passed / 1 skipped. Contract: `docs/HANDOVER_2026-08-19_W3.md`.
 

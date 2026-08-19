@@ -28,7 +28,7 @@ from data.database import SignalDB
 from data.symbols import normalize_symbol
 
 SERVER_NAME = "cryptobrain-mcp"
-SERVER_VERSION = "1.13.0"  # bumped: W3.4 practice_scorecard — your reads vs the desk
+SERVER_VERSION = "1.14.0"  # bumped: W3.6 tape block on practice_scorecard
 PROTOCOL_VERSION = "2024-11-05"
 
 # Read-only / research tools allowed. No order or approval bypass tools.
@@ -197,7 +197,7 @@ ALLOWED_TOOLS = {
     },
     # ── W3.4: practice calibration (your reads vs the desk) ─────────────
     "practice_scorecard": {
-        "description": "W3.4 practice calibration: every read the trader committed on the Chart tab, scored for agreement with the desk's read at that moment — bias agreement, final-call agreement, component means, the weakest link with one coaching takeaway, and recent attempts. Coaching memory only: agreement with the desk is study, not evidence, and this tool feeds no gate or graduation surface. Read-only; the same as `python main.py practice --json`, GET /api/practice and the Review-tab PRACTICE CALIBRATION card.",
+        "description": "W3.4+W3.6 practice calibration: desk-agreement (bias/call/ladder) plus a sibling tape block of replay outcomes. Desk keys stay desk-only so tape history cannot rewrite agreement. Coaching memory only: not evidence, feeds no gate. Read-only; same as `python main.py practice --json`, GET /api/practice and the Review-tab PRACTICE CALIBRATION card.",
         "inputSchema": {
             "type": "object",
             "properties": {

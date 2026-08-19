@@ -161,9 +161,9 @@ COMMANDS: list[dict] = [
                  _bool("json", "Raw JSON output")],
          related=["daily", "agent_weekly", "journal"]),
     _cmd("practice", "Desk", "Practice calibration", ["practice"],
-         "W3.4 your reads vs the desk: every read committed on the Chart tab "
-         "scored for agreement — bias, final call and the ladder — with the "
-         "weakest component named and one coaching takeaway. Study metric "
+         "W3.4 your reads vs the desk plus W3.6 replay-tape outcomes: every "
+         "read committed on the Chart tab scored for agreement, and tape "
+         "reads graded against the hidden forward window. Study metric "
          "only; it feeds no gate.",
          inputs=[_int("days", "Window (days)", 30),
                  _bool("json", "Raw JSON output")],
