@@ -188,6 +188,34 @@ COMMANDS: list[dict] = [
     _cmd("agent_reviewer", "Desk", "Paper reviewer", ["agent", "paper-reviewer"],
          "Post-mortem aggregation over every closed paper trade.",
          safety="write", related=["scorecard"]),
+    _cmd("sky_agent_health", "Desk", "24/7 agent health", ["sky-agent", "health"],
+         "System probe for the research daemon: CPU/RAM/disk plus the "
+         "readiness strip. Research only — never trades.",
+         inputs=[_bool("json", "Raw JSON output")],
+         related=["sky_agent_status", "doctor", "health"]),
+    _cmd("sky_agent_status", "Desk", "24/7 agent status", ["sky-agent", "status"],
+         "Recent hypotheses, archived intelligence reports, regime log and "
+         "SEC event rows. Read-only memory, not evidence for graduation.",
+         inputs=[_bool("json", "Raw JSON output")],
+         related=["sky_agent_report", "sky_agent_health"]),
+    _cmd("sky_agent_report", "Desk", "24/7 agent daily report", ["sky-agent", "report"],
+         "Evidence-backed daily intelligence report. Recommendations are "
+         "WATCH / CONSIDER / WAIT / AVOID only — never BUY NOW.",
+         inputs=[_bool("demo", "Offline demo payload"),
+                 _bool("json", "Raw JSON output")],
+         related=["sky_agent_status", "daily"]),
+    _cmd("sky_agent_collect", "Desk", "24/7 agent collect", ["sky-agent", "collect"],
+         "One polling pass: market snapshot, system probe, news, optional "
+         "EDGAR demo ingest. Writes research memory only.",
+         inputs=[_choice("target", "Target", ["all", "market", "system", "edgar", "news"], "all"),
+                 _bool("demo", "Offline demo (no network)"),
+                 _bool("json", "Raw JSON output")],
+         safety="write", related=["sky_agent_status"]),
+    _cmd("sky_agent_run", "Desk", "24/7 agent daemon", ["sky-agent", "run"],
+         "Long-lived research daemon. It never exits, so run it under "
+         "systemd or a terminal — not from the browser.",
+         safety="blocked",
+         note="run in a terminal: python main.py sky-agent run --demo"),
     _cmd("ask", "Desk", "Ask the desk", ["ask"],
          "Ask a natural-language question; the answer is grounded in the "
          "trading library with citations.",
@@ -340,7 +368,11 @@ COMMANDS: list[dict] = [
     _cmd("hub_first_night", "Hub", "First night (home PC)", ["hub", "first-night"],
          "One-page checklist to run SKY 24h on a home Ubuntu PC. "
          "No trade keys, no public :8050.",
-         related=["hub_status", "hub_doctor"]),
+         related=["hub_status", "hub_doctor", "hub_role"]),
+    _cmd("hub_role", "Hub", "This PC role", ["hub", "role"],
+         "How the always-on Ubuntu PC is used: one Hub, one research agent, "
+         "no second PC-use agent, no live execution.",
+         related=["hub_status", "hub_first_night", "sky_agent_health"]),
     _cmd("hub_status", "Hub", "Hub status", ["hub", "status"],
          "Ubuntu Hub layout, disk, backups and systemd snapshot. "
          "Does not place an order.",
@@ -387,7 +419,7 @@ COMMANDS: list[dict] = [
 ]
 
 CATEGORY_ORDER = ["Scan", "Risk", "Desk", "Trades", "Learning", "Journal",
-                  "Data", "Integration", "Education"]
+                  "Data", "Hub", "Integration", "Education"]
 
 BY_ID: dict[str, dict] = {c["id"]: c for c in COMMANDS}
 

@@ -2,7 +2,7 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-19 · **v2.43.0 — W3.5 multi-chart comparison views** (`docs/HANDOVER_2026-08-19_W35.md`). The 📊 Chart tab now has an optional responsive 2×2 comparison view: selected symbol/timeframe, nearby timeframe, BTCUSDT 1h and ETHUSDT 1h, with synchronized zoom/pan but independent candles and desk reads. It is explicitly display-only: no combined signal, practice/risk/paper/graduation change, threshold move, or order path. Next session: review the multi-chart slot editor and responsive behavior in a real browser/mobile viewport; then consider replay-integrated practice with an explicit forward-window outcome contract. P22 drills need real signers; P11 paper grind stays parallel.
+Last updated: 2026-08-19 · **v2.45.0 — W4.2 Ubuntu PC is the Hub** (`docs/HANDOVER_2026-08-19_W42.md`). The always-on Ubuntu PC runs **one** research agent (`sky-agent.service`) inside Hub FHS. Do **not** add a second PC-use agent. Clickable **THIS PC** card on the 🧠 Agent tab. Kept ideas: `docs/KEPT_IDEAS.md`. Next: first-night + sudo enable on the real PC; operate the paper loop. Do not spend a sandbox session on EDGAR event studies or a second agent.
 
 **Previous:** 2026-08-19 · **v2.41.0 — W3 trader development: weekly review page + ritual memory + journal-first gate** (`docs/HANDOVER_2026-08-19_W3.md`). The weekly trader review is now a page (CLI/HTTP/🗓 Review tab/MCP/agent share `brain/weekly.weekly_review()`), the daily ritual remembers ticks per UTC day (`/api/ritual`), and `approve` holds while decided real trades are unjournaled (audited `--acknowledge-journal` escape — intentional, not a bug to remove). No threshold moved; no order path.
 

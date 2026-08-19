@@ -6,16 +6,13 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-19 (**v2.42.0 — W3.4 practice mode shipped**.
-Commit your read on the 📊 Chart tab → the desk's read freezes at that
-moment → deterministic agreement score with visible components → Review-tab
-PRACTICE CALIBRATION mirror. Coaching memory only; the live book, risk gate
-and graduation never read it. `brain/practice.py` + `practice_attempts`;
-surfaces CLI/HTTP/dashboard/MCP/command-center. Suite 1177 → 1213/1. Also
-fixed a CI-caught doc-pin regression in this file (the "next implementation
-is P22" ordering phrase had been dropped). **Next:** P22 trusted-host
-drills (real signers) or W3.5 multi-chart; P11 real paper proof stays
-parallel.)
+**Last updated:** 2026-08-19 (**v2.45.0 — W4.2 Ubuntu PC is the Hub**.
+One always-on PC = one Hub + one research agent (`sky-agent.service`).
+Clickable THIS PC card. No second PC-use agent. Contract:
+`docs/HANDOVER_2026-08-19_W42.md`, `docs/UBUNTU_PC_ROLE.md`.
+**Next implementation is P22 (trusted-host drills — real signers only);
+choose the work by environment.** P11 real paper proof stays parallel and
+is still the money path.)
 
 **Previous:** 2026-08-19 (**v2.41.0 — W3 trader development: weekly
 review page + ritual memory + journal-first gate**. `brain/weekly.py` one

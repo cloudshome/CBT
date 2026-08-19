@@ -10,9 +10,11 @@ from pathlib import Path
 import pytest
 
 from ops.hub import (
+    REQUIRED_UNITS,
     SECRET_ENV_KEYS,
     UNITS,
     HubPaths,
+    host_role,
     backup,
     default_env_body,
     dispatch,
@@ -56,6 +58,8 @@ def test_setup_creates_private_layout(prefix):
     env = paths.env_file.read_text()
     assert "DASHBOARD_HOST=127.0.0.1" in env
     assert "DB_PATH=/var/lib/sky/cryptobrain.db" in env
+    assert "SKY_AGENT_MARKET_POLL_SECONDS=" in env
+    assert "BINANCE_API_SECRET" not in env
 
 
 def test_remote_mode_still_loopback(prefix):
@@ -154,6 +158,8 @@ def test_doctor_and_status_shapes(prefix):
     setup(prefix=prefix)
     st = status(prefix=prefix)
     assert st["live_exchange_execution"] is False
+    assert st["host_role"]["role"] == "ubuntu_hub"
+    assert st["host_role"]["second_agent"] is False
     assert "opt/sky" in st["paths"]["opt"]
     doc = doctor(prefix=prefix)
     names = {c["name"] for c in doc["checks"]}
@@ -221,11 +227,28 @@ def test_first_night_guide_is_honest():
     payload = first_night()
     assert payload["ok"] and payload["live_exchange_execution"] is False
     assert "port-forward 8050" in payload["forbidden"]
+    assert any("second" in x.lower() and "agent" in x.lower()
+               for x in payload["forbidden"])
+    assert payload["host_role"]["second_agent"] is False
 
 
 def test_dispatch_first_night():
     payload = dispatch("first-night")
     assert "hub setup" in payload["guide"].lower() or "first night" in payload["guide"].lower()
+
+
+def test_host_role_is_one_hub_one_agent():
+    role = host_role()
+    assert role["role"] == "ubuntu_hub"
+    assert role["second_agent"] is False
+    assert role["live_exchange_execution"] is False
+    units = {item["unit"] for item in role["run"]}
+    assert "sky-agent.service" in units
+    assert "sky-paper.service" in units
+    assert "sky-agent.service" in UNITS
+    assert "sky-agent.timer" in UNITS
+    assert "sky-agent.service" in REQUIRED_UNITS
+    assert dispatch("role")["role"] == "ubuntu_hub"
 
 
 def test_no_order_path_in_hub_module():

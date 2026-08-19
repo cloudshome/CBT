@@ -27,6 +27,18 @@ def test_session_state_has_required_headers():
         assert needle in text, f"SESSION_STATE.md missing {needle!r}"
 
 
+def test_ubuntu_pc_role_and_kept_ideas_survive_session_death():
+    """W4.2: do not throw away the Hub-role decision or parked ideas."""
+    role = (ROOT / "docs" / "UBUNTU_PC_ROLE.md").read_text(encoding="utf-8").lower()
+    kept = (ROOT / "docs" / "KEPT_IDEAS.md").read_text(encoding="utf-8").lower()
+    assert "one" in role and "research agent" in role
+    assert "second" in role and "agent" in role
+    assert "sky-agent.service" in role
+    assert "take now" in kept and "park" in kept and "reject" in kept
+    assert "freqtrade" in kept
+    assert "second" in kept and "agent" in kept
+
+
 def test_todo_lists_human_and_parked_items():
     text = (ROOT / "TODO.md").read_text(encoding="utf-8")
     assert "TODO-7" in text

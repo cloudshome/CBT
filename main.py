@@ -2468,6 +2468,17 @@ def cmd_hub(args) -> int:
             return 1
     elif action in ("first-night", "first_night", "guide"):
         print(payload.get("guide") or "")
+    elif action in ("role", "host-role", "pc"):
+        print(f"SKY Hub role: {payload.get('role')}")
+        print(f"  {payload.get('decision')}")
+        print(f"  {payload.get('why')}")
+        print("  run on this PC:")
+        for item in payload.get("run") or []:
+            mark = "*" if item.get("required") else "-"
+            print(f"    {mark} {item.get('unit')}: {item.get('job')}")
+        print("  human still does: " + "; ".join(payload.get("human_still_does") or []))
+        print("  do not run: " + "; ".join(payload.get("do_not_run") or []))
+        print("  live exchange execution  NO")
     else:
         print(json.dumps(payload, indent=2, default=str))
     return 0 if payload.get("ok", True) else 1

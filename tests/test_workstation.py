@@ -253,8 +253,10 @@ def test_module_catalog_lists_the_engine(client):
 def test_dashboard_exposes_every_workstation_tab(client):
     html = client.get("/").get_data(as_text=True)
     for tab in ("chart", "market", "intelligence", "trades", "manage",
-                "risk", "journal", "learn", "commands", "modules", "system"):
+                "risk", "journal", "learn", "commands", "modules", "system",
+                "agent"):
         assert f'data-tab="{tab}"' in html, f"tab {tab} missing from the shell"
+    assert 'id="hubRole"' in html
     # the clickable panels the trader asked for
     for anchor in ("chartMain", "tradeManager", "riskCenterGate", "psResult",
                    "jScan", "commandList", "moduleList",

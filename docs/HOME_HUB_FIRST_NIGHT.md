@@ -96,8 +96,8 @@ sudo cp /opt/sky/ops/systemd/sky-*.service /opt/sky/ops/systemd/sky-*.timer \
   /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now sky-dashboard.service sky-paper.service \
-  sky-scan.timer sky-backup.timer
-sudo systemctl status sky-dashboard.service --no-pager
+  sky-scan.timer sky-backup.timer sky-agent.service sky-agent.timer
+sudo systemctl status sky-dashboard.service sky-agent.service --no-pager
 ```
 
 Dashboard is still **127.0.0.1:8050**. Phone access = SSH tunnel or Caddy
@@ -119,7 +119,7 @@ python3 ~/SKY/main.py health
 |---|---|
 | `hub doctor` | verdict **ok**; env not world-readable; loopback bind |
 | `hub status` | disk not tiny; at least one backup after first night |
-| systemd | `sky-dashboard` **active**, timers **enabled** |
+| systemd | `sky-dashboard` + `sky-paper` + `sky-agent` **active**, timers **enabled** |
 | `daily` | readiness prints; gate may still be **closed** (no edge yet — correct) |
 | browser | http://127.0.0.1:8050 opens; Connections ≠ DEMO MODE |
 | Telegram (if set) | Connections → Send test alert reaches your phone |

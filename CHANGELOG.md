@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.45.0] — 2026-08-19 · W4.2 Ubuntu PC is the Hub; one research agent
+
+MINOR: the always-on Ubuntu PC is now an explicit Hub role, not a second
+agent. `sky-agent.service` joins the Hub unit catalog and reads the same
+`/etc/sky/sky.env` as the dashboard. The 🧠 Agent tab shows **THIS PC —
+24/7 HUB ROLE**. No threshold moved. No order path. No second PC-use agent.
+
+- **Decision** — `docs/UBUNTU_PC_ROLE.md` + `docs/KEPT_IDEAS.md`. Use one
+  research agent. Park scoring-tune / EDGAR-as-strategy / second AutoGPT.
+- **Hub FHS** — `UNITS` includes `sky-agent.service` + timer; `hub role`;
+  `hub status` / `hub doctor` report the agent; generated env carries poll
+  keys; first-night + Debian prerm include the unit.
+- **Dashboard** — Hub role card, `GET /api/hub/role` + `/api/hub/status`,
+  Command Center `hub_role`.
+- **Packaging** — `sky_agent*` in the wheel find list (missed in 2.44.0).
+
+Honest: this sandbox cannot enable systemd on a live host. P11/P22 remain
+human/host work.
+
+## [2.44.0] — 2026-08-19 · W4.1 Agent dashboard tab + report archive
+
+MINOR: the 24/7 research daemon is now a clickable **🧠 Agent** tab. Health,
+daily report, hypotheses, regime log and SEC rows share the existing
+`/api/sky-agent/*` payloads. Archive writes one `intelligence_reports` row
+and never feeds the risk gate or graduation. Recommendations stay
+WATCH / CONSIDER / WAIT / AVOID. No threshold moved. No order path.
+
+- **Dashboard** — new tab + quick-bar button; Command Center cards for
+  `sky-agent health|status|report|collect`; daemon stays terminal-only.
+- **`POST /api/sky-agent/report`** — audited archive via
+  `sky_agent.daily_report.archive_daily_report`.
+- **Packaging** — `sky_agent*` included in the wheel find list.
+
+Honest: scoring still needs live days before any weight change. EDGAR event
+studies were not built — they do not move the paper graduation bar.
+
 ## [2.43.0] — 2026-08-19 · W3.5 multi-chart comparison views
 
 - Added an optional four-up multi-chart workspace to the Chart tab.

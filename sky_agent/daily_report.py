@@ -95,6 +95,27 @@ def build_daily_report(*, demo: bool = False) -> dict[str, Any]:
     return report
 
 
+def archive_daily_report(report: dict[str, Any]) -> dict[str, Any]:
+    """Persist one daily report row. Never a trade, never a gate input."""
+    from data.database import SignalDB
+    from sky_agent.memory import record_report
+
+    recs = report.get("recommendations") or []
+    rec = recs[0] if recs else {}
+    with SignalDB() as db:
+        rid = record_report(
+            db,
+            kind="daily",
+            asset=str(rec.get("asset") or "DESK"),
+            timeframe=str(rec.get("timeframe") or ""),
+            recommendation=str(rec.get("recommendation") or "WATCH"),
+            confidence=str(rec.get("confidence") or "LOW"),
+            level="MEDIUM",
+            evidence=report,
+        )
+    return {"ok": True, "archived": True, "report_id": rid}
+
+
 def format_report_md(report: dict[str, Any]) -> str:
     lines = [f"# SKY Daily Intelligence Report — {report.get('generated_at')}", ""]
     lines += ["## Market", f"```json\n{report.get('market')}\n```", ""]

@@ -24,9 +24,10 @@ python main.py hub doctor                    # must be green
 
 # 2. Enable the dashboard (already)
 sudo systemctl enable --now sky-dashboard.service
+python main.py hub role                      # this PC = Hub, one agent
 python main.py sky-agent health --json       # readiness strip
 
-# 3. Enable the 24/7 intelligence agent
+# 3. Enable the 24/7 intelligence agent (same FHS env as the dashboard)
 sudo cp ops/systemd/sky-agent.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now sky-agent.service

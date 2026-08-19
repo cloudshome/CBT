@@ -39,6 +39,16 @@ UNITS = (
     "sky-scan.timer",
     "sky-backup.service",
     "sky-backup.timer",
+    "sky-agent.service",
+    "sky-agent.timer",
+)
+# Units that must stay up on the always-on Ubuntu Hub (W4.2).
+REQUIRED_UNITS = (
+    "sky-dashboard.service",
+    "sky-paper.service",
+    "sky-scan.timer",
+    "sky-backup.timer",
+    "sky-agent.service",
 )
 SECRET_ENV_KEYS = (
     "TELEGRAM_BOT_TOKEN",
@@ -142,6 +152,15 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 DISCORD_ANNOUNCE_WEBHOOK=
 LLM_PROVIDER=off
+# 24/7 research agent — advisory only. Never trades. Read by
+# EnvironmentFile=-/etc/sky/sky.env on sky-agent.service.
+SKY_AGENT_MARKET_POLL_SECONDS=300
+SKY_AGENT_DERIVATIVES_POLL_SECONDS=600
+SKY_AGENT_NEWS_POLL_SECONDS=900
+SKY_AGENT_EDGAR_POLL_SECONDS=1800
+SKY_AGENT_SYSTEM_POLL_SECONDS=300
+SKY_AGENT_NOTIFY_LEVEL=HIGH
+SKY_SEC_USER_AGENT=SKY Research Agent (azimshawon@SKY; educational)
 """
 
 
@@ -450,6 +469,67 @@ def _systemctl(*args: str) -> dict[str, Any]:
             "stderr": (proc.stderr or "").strip()}
 
 
+def host_role() -> dict[str, Any]:
+    """How the always-on Ubuntu PC should be used. Durable decision.
+
+    One Hub. One research agent. No second \"PC-use\" agent. The human
+    still approves every paper trade. This is not evidence of an edge.
+    """
+    return {
+        "ok": True,
+        "role": "ubuntu_hub",
+        "title": "This always-on Ubuntu PC is the SKY Hub",
+        "decision": (
+            "Use ONE research agent (sky-agent.service). "
+            "Do not add a second PC-use / AutoGPT / login agent."
+        ),
+        "why": (
+            "The Hub already owns the database, paper watcher, dashboard "
+            "and research daemon. A second agent would duplicate authority "
+            "and could look like it is trading. SKY is the brain; the human "
+            "is the decision maker."
+        ),
+        "run": [
+            {"unit": "sky-dashboard.service",
+             "job": "clickable desk at 127.0.0.1:8050",
+             "required": True},
+            {"unit": "sky-paper.service",
+             "job": "paper --watch — the money path (P11)",
+             "required": True},
+            {"unit": "sky-scan.timer",
+             "job": "scheduled scans into the store",
+             "required": True},
+            {"unit": "sky-backup.timer",
+             "job": "nightly SQLite-safe backup",
+             "required": True},
+            {"unit": "sky-agent.service",
+             "job": "24/7 research: WATCH / CONSIDER / WAIT / AVOID",
+             "required": True},
+            {"unit": "sky-agent.timer",
+             "job": "05:00 UTC daily-report nudge",
+             "required": False},
+        ],
+        "human_still_does": [
+            "approve or reject every paper trade",
+            "journal every decided real trade",
+            "Sunday weekly review",
+            "never lower the graduation bar",
+        ],
+        "do_not_run": [
+            "a second AutoGPT / PC-use agent that logs into accounts",
+            "Freqtrade / Backtrader / Needle as a trader",
+            "live exchange execution",
+            "EDGAR as a BTC/ETH/GOLD strategy",
+            "port-forward 8050 on the router",
+        ],
+        "second_agent": False,
+        "live_exchange_execution": False,
+        "guide": "docs/UBUNTU_PC_ROLE.md",
+        "kept_ideas": "docs/KEPT_IDEAS.md",
+        "required_units": list(REQUIRED_UNITS),
+    }
+
+
 def unit_status() -> dict[str, Any]:
     """Best-effort systemd snapshot. Offline / no-root → reported, not faked."""
     if not shutil.which("systemctl"):
@@ -489,6 +569,7 @@ def status(*, prefix: Path | str | None = None) -> dict[str, Any]:
         "storage": storage,
         "backups": backups,
         "services": unit_status(),
+        "host_role": host_role(),
         "live_exchange_execution": False,
     }
 
@@ -533,8 +614,18 @@ def doctor(*, prefix: Path | str | None = None) -> dict[str, Any]:
     svc = unit_status()
     if svc["available"]:
         add("systemd", True, f"{len(svc['units'])} units queried")
+        agent = (svc.get("units") or {}).get("sky-agent.service") or {}
+        # Inactive on first night is a warning, not a hard fail — sudo
+        # enable happens after the no-root bootstrap.
+        add("sky_agent_unit", True,
+            f"sky-agent.service {agent.get('active', 'unknown')} / "
+            f"{agent.get('enabled', 'unknown')}",
+            level="ok" if agent.get("active") == "active" else "degraded")
     else:
         add("systemd", True, svc.get("note") or "not installed (dev)",
+            level="degraded")
+        add("sky_agent_unit", True,
+            "catalogued (sky-agent.service + timer) — enable on the Hub",
             level="degraded")
     # backup absence is a warning, not a hard fail on first day
     blocked = [c for c in checks if not c["ok"] and c["name"] != "backup"]
@@ -645,6 +736,9 @@ def format_status(payload: dict[str, Any]) -> str:
     else:
         for name, u in (svc.get("units") or {}).items():
             lines.append(f"  {name:<24} {u.get('active')} / {u.get('enabled')}")
+    role = payload.get("host_role") or {}
+    if role:
+        lines.append(f"  host  {role.get('role', '?')} — one research agent, no second PC agent")
     lines.append("  live exchange execution  NO")
     return "\n".join(lines)
 
@@ -682,13 +776,16 @@ def first_night() -> dict[str, Any]:
             "python3 main.py hub doctor",
             "python3 main.py daily",
             "python3 main.py health",
+            "python3 main.py sky-agent health --json",
         ],
         "forbidden": [
             "exchange trade or withdraw keys",
             "Gmail/bank/social agent login",
+            "a second PC-use / AutoGPT agent",
             "port-forward 8050",
             "lower the graduation bar",
         ],
+        "host_role": host_role(),
         "live_exchange_execution": False,
     }
 
@@ -722,6 +819,8 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
         return uninstall(prefix=prefix, purge=purge)
     if action in ("first-night", "first_night", "guide"):
         return first_night()
+    if action in ("role", "host-role", "pc"):
+        return host_role()
     if action == "pair":
         from web.auth import AuthManager, ROLE_VIEWER
         platform = (platform or "windows").lower()

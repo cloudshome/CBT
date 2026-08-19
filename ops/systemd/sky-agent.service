@@ -3,16 +3,17 @@ Description=SKY 24/7 Trading Intelligence & Research Agent
 Documentation=https://github.com/Azimshawon/SKY
 After=network-online.target
 Wants=network-online.target
-# The dashboard and paper runner are separate units; the agent only needs network + disk.
+# Same FHS env as sky-dashboard.service. Dashboard / paper are separate units.
 
 [Service]
 Type=simple
 User=sky
 Group=sky
 WorkingDirectory=/opt/sky
-# Environment file is created by `python main.py hub setup`; optional during first boot.
+# Created by `python main.py hub setup`. Optional during first boot (- prefix).
 EnvironmentFile=-/etc/sky/sky.env
-# No trading credentials are required for the research agent; market-data is public.
+Environment=PYTHONUNBUFFERED=1
+# No trading credentials. Market data is public. DB_PATH comes from sky.env.
 ExecStart=/opt/sky/.venv/bin/python -m sky_agent.daemon
 Restart=always
 RestartSec=5

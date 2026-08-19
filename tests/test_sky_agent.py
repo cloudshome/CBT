@@ -164,6 +164,8 @@ def test_cli_sky_agent_report():
 def test_systemd_unit_exists():
     assert Path("ops/systemd/sky-agent.service").exists()
     txt = Path("ops/systemd/sky-agent.service").read_text()
+    assert "EnvironmentFile=-/etc/sky/sky.env" in txt
+    assert "PYTHONUNBUFFERED=1" in txt
     assert "Restart=always" in txt
     assert "sky_agent.daemon" in txt
     assert "NoNewPrivileges=yes" in txt

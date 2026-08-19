@@ -717,6 +717,7 @@ HTML = """<!doctype html>
   <button class="tabbtn" data-tab="commands" onclick="switchTab('commands')">⌘ Command center</button>
   <button class="tabbtn" data-tab="modules" onclick="switchTab('modules')">🧩 Modules</button>
   <button class="tabbtn" data-tab="system" onclick="switchTab('system')">⚙️ System</button>
+  <button class="tabbtn" data-tab="agent" onclick="switchTab('agent')">🧠 Agent</button>
   <span class="spacer"></span>
   <span id="updated" class="updated"></span>
 </nav>
@@ -740,6 +741,8 @@ HTML = """<!doctype html>
     <button class="btn" onclick="systemCheck(); switchTab('system')">🔍 System check</button>
     <button class="btn" onclick="runPaper(); switchTab('trades')">▶ Check paper trades</button>
     <button class="btn" onclick="dailyRitual()">⏱ Daily ritual</button>
+    <button class="btn" onclick="switchTab('agent')">🧠 Research agent</button>
+    <button class="btn" onclick="switchTab('agent'); setTimeout(function(){ if(typeof loadHubRole==='function') loadHubRole(); },80)">🖥 This PC (Hub)</button>
     <button class="btn" onclick="switchTab('learn'); setTimeout(()=>{ const el=document.getElementById('learn'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },120)">⚡ Learn now</button>
     <button class="btn primary" onclick="backtestNow()">▶ Quick backtest + learn</button>
   </div>
@@ -1060,6 +1063,56 @@ HTML = """<!doctype html>
       <div id="jobList"><span class="muted">loading jobs…</span></div>
       <h3 style="margin-top:14px">LIVE OUTPUT</h3>
       <pre id="jobOut" class="mono termout">Select a job to watch its output stream here.</pre>
+    </div>
+  </div>
+
+  <!-- ── 24/7 research agent (W4.1) — advisory only, never trades ── -->
+  <div class="tabpanel" data-tab="agent">
+    <div class="card" style="grid-column:1/-1">
+      <h2>THIS PC — 24/7 HUB ROLE <span class="count" id="hubRoleCount">one agent</span></h2>
+      <div class="note" style="margin-bottom:10px">This always-on Ubuntu PC is the SKY Hub.
+        Use <b>one</b> research agent (<code>sky-agent.service</code>). Do not add a second
+        PC-use / AutoGPT agent. The human still approves every paper trade.
+        Same payload as <code>python main.py hub role</code> and <code>GET /api/hub/role</code>.</div>
+      <div class="flex" style="margin-bottom:10px">
+        <button class="btn primary" onclick="loadHubRole()">↻ Refresh Hub</button>
+        <button class="btn" onclick="runCommand('hub_status')">▶ Hub status</button>
+        <button class="btn" onclick="runCommand('hub_doctor')">▶ Hub doctor</button>
+        <span class="note" id="hubRoleStatus">not loaded yet</span>
+      </div>
+      <div id="hubRole"><span class="muted">loading Hub role…</span></div>
+    </div>
+    <div class="card" style="grid-column:1/-1;margin-top:14px">
+      <h2>24/7 RESEARCH AGENT <span class="count" id="agCount">advisory only</span></h2>
+      <div class="note" style="margin-bottom:10px">This is the research daemon from
+        <code>sky_agent/</code>. It watches, scores and proposes. It cannot
+        place a trade, bypass the risk gate, or move the graduation bar.
+        Recommendations are <b>WATCH / CONSIDER / WAIT / AVOID</b> only — never BUY NOW.
+        Same payloads as <code>python main.py sky-agent</code> and
+        <code>GET /api/sky-agent/*</code>.</div>
+      <div class="flex" style="margin-bottom:10px">
+        <button class="btn primary" onclick="loadAgent(true)">↻ Refresh agent</button>
+        <button class="btn" onclick="archiveAgentReport()">⬇ Archive today's report</button>
+        <button class="btn" onclick="runCommand('sky_agent_collect')">▶ Collect (demo)</button>
+        <span class="note" id="agStatus">not loaded yet</span>
+      </div>
+      <div id="agHealth"><span class="muted">loading health…</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>DAILY INTELLIGENCE REPORT</h2>
+      <div id="agReport"><span class="muted">—</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>HYPOTHESES — stay hypotheses until the net bar</h2>
+      <div id="agHyps"><span class="muted">—</span></div>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="card"><h2>REGIME LOG</h2><div id="agRegimes"><span class="muted">—</span></div></div>
+      <div class="card"><h2>SEC EVENTS (research)</h2><div id="agSec"><span class="muted">—</span></div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>ARCHIVED REPORTS</h2>
+      <div id="agArchive"><span class="muted">—</span></div>
     </div>
   </div>
 
@@ -4488,6 +4541,157 @@ function renderPracticeScorecard(d){
     '<div class="note" style="margin-top:8px">'+esc(d.disclaimer||'')+'</div>';
 }
 
+// ── W4.2 — this PC is the Hub; one research agent, no second PC agent ──
+async function loadHubRole(){
+  const st=document.getElementById('hubRoleStatus');
+  if(st) st.textContent='loading…';
+  try{
+    const [role,hub]=await Promise.all([
+      fetch('/api/hub/role').then(function(x){return x.json();}),
+      fetch('/api/hub/status').then(function(x){return x.json();})
+    ]);
+    renderHubRole(role,hub);
+    if(st) st.textContent='updated '+new Date().toLocaleTimeString();
+  }catch(e){
+    if(st) st.textContent='failed';
+    const el=document.getElementById('hubRole');
+    if(el) el.innerHTML='<span class="err">'+esc(e)+'</span>';
+  }
+}
+function renderHubRole(role,hub){
+  const cnt=document.getElementById('hubRoleCount');
+  if(cnt) cnt.textContent=(role&&role.second_agent)?'second agent — refuse':'one research agent';
+  const el=document.getElementById('hubRole'); if(!el) return;
+  const units=((hub&&hub.services)||{}).units||{};
+  const rows=(role&&role.run||[]).map(function(item){
+    const u=units[item.unit]||{};
+    const active=u.active||(hub&&hub.services&&hub.services.available===false?'not installed':'unknown');
+    return '<tr><td>'+esc(item.unit)+'</td><td>'+esc(item.job)+'</td><td>'
+      +esc(active)+'</td><td>'+(item.required?'required':'optional')+'</td></tr>';
+  }).join('');
+  const human=(role&&role.human_still_does||[]).map(function(x){return '<div class="note">• '+esc(x)+'</div>';}).join('');
+  const no=(role&&role.do_not_run||[]).map(function(x){return '<div class="note">✗ '+esc(x)+'</div>';}).join('');
+  const disk=((hub&&hub.storage)||{}).free_mb;
+  el.innerHTML='<div class="flex" style="margin-bottom:8px">'
+    +'<span class="pill BUY">'+esc((role&&role.role)||'ubuntu_hub')+'</span>'
+    +'<span class="badge">live execution: NO</span>'
+    +'<span class="badge">disk '+(disk==null?'—':disk+' MB free')+'</span>'
+    +'</div>'
+    +'<div class="note" style="margin-bottom:8px"><b>'+esc((role&&role.decision)||'')+'</b></div>'
+    +'<div class="note" style="margin-bottom:8px">'+esc((role&&role.why)||'')+'</div>'
+    +(rows?'<table><tr><th>Unit</th><th>Job</th><th>Now</th><th></th></tr>'+rows+'</table>':'')
+    +'<div class="grid2" style="margin-top:10px"><div><b>You still do</b>'+human+'</div><div><b>Do not run</b>'+no+'</div></div>'
+    +'<div class="note" style="margin-top:8px">systemd snapshot is honest: this sandbox often has no units. Enable them on the Ubuntu PC — see docs/UBUNTU_PC_ROLE.md.</div>';
+}
+
+// ── 24/7 research agent (W4.1) — health / report / hypotheses, never a trade ──
+async function loadAgent(force){
+  const st=document.getElementById('agStatus');
+  if(st) st.textContent = force ? 'refreshing…' : 'loading…';
+  try{
+    const [h,s,r,y] = await Promise.all([
+      fetch('/api/sky-agent/health').then(x=>x.json()),
+      fetch('/api/sky-agent/status').then(x=>x.json()),
+      fetch('/api/sky-agent/report').then(x=>x.json()),
+      fetch('/api/sky-agent/hypotheses').then(x=>x.json())
+    ]);
+    renderAgent(h,s,r,y);
+    loadHubRole();
+    if(st) st.textContent = 'updated '+new Date().toLocaleTimeString();
+  }catch(e){
+    if(st) st.textContent = 'failed';
+    const el=document.getElementById('agHealth');
+    if(el) el.innerHTML='<span class="err">'+esc(e)+'</span>';
+  }
+}
+function renderAgent(h,s,r,y){
+  const sys=(h&&h.system)||{};
+  const recs=(r&&r.recommendations)||[];
+  const cnt=document.getElementById('agCount');
+  if(cnt) cnt.textContent = (sys.level||'—')+' · '+(recs[0]&&recs[0].recommendation||'no rec');
+  const health=document.getElementById('agHealth');
+  if(health){
+    const alerts=(sys.alerts||[]).join(' · ')||'none';
+    const ready=((h&&h.readiness)||{}).headline || ((h&&h.readiness)||{}).level || '—';
+    health.innerHTML='<div class="statrow">'
+      +'<div class="stat"><div class="v">'+esc(sys.level||'—')+'</div><div class="k">System level</div></div>'
+      +'<div class="stat"><div class="v">'+esc(sys.cpu_pct==null?'—':sys.cpu_pct+'%')+'</div><div class="k">CPU</div></div>'
+      +'<div class="stat"><div class="v">'+esc(sys.ram_pct==null?'—':sys.ram_pct+'%')+'</div><div class="k">RAM</div></div>'
+      +'<div class="stat"><div class="v">'+esc(sys.disk_pct==null?'—':sys.disk_pct+'%')+'</div><div class="k">Disk</div></div>'
+      +'<div class="stat"><div class="v">'+(sys.db_ok?'ok':'fail')+'</div><div class="k">DB</div></div>'
+      +'</div><div class="note" style="margin-top:8px">alerts: '+esc(alerts)
+      +' · desk readiness: '+esc(String(ready))
+      +'</div><div class="note">Research daemon only. The risk gate and paper book never read this card.</div>';
+  }
+  const rep=document.getElementById('agReport');
+  if(rep){
+    const rec=recs[0]||{};
+    const ev=(rec.evidence||[]).map(e=>'<div class="note">• '+esc(e)+'</div>').join('');
+    const recCol = rec.recommendation==='AVOID'?'var(--red)':(rec.recommendation==='CONSIDER'?'var(--green)':'var(--amber)');
+    rep.innerHTML='<div class="flex" style="margin-bottom:8px">'
+      +'<span class="pill" style="border-color:'+recCol+';color:'+recCol+'">'
+      +esc(rec.recommendation||'WAIT')+'</span>'
+      +'<span class="badge">'+esc(rec.asset||'DESK')+' · '+esc(rec.timeframe||'—')+'</span>'
+      +'<span class="badge">kind '+esc(rec.kind||'HYPOTHESIS')+'</span>'
+      +'<span class="badge">risk '+esc(rec.risk_status||'UNKNOWN')+'</span>'
+      +'</div>'
+      +'<div class="kv"><b>Detected</b><span>'+esc(rec.detected||'—')+'</span>'
+      +'<b>Expectancy</b><span>'+(rec.expectancy_R==null?'n/a':rec.expectancy_R+'R')+' · N='+(rec.sample_n==null?'—':rec.sample_n)+'</span>'
+      +'<b>Invalidation</b><span>'+esc(rec.invalidation||'—')+'</span></div>'
+      +ev
+      +'<div class="note" style="margin-top:8px">'+esc((r&&r.disclaimer)||'Research only.')+'</div>'
+      +'<div class="note">generated '+(r&&r.generated_at?esc(r.generated_at):'—')+'</div>';
+  }
+  const hyps=document.getElementById('agHyps');
+  if(hyps){
+    const rows=((y&&y.hypotheses)||(s&&s.hypotheses)||[]).map(function(h){
+      return '<tr><td>'+esc(h.hypothesis_id||h.id||'—')+'</td><td>'+esc(h.setup||'—')
+        +'</td><td>'+esc(h.status||'proposed')+'</td></tr>';
+    }).join('');
+    hyps.innerHTML = rows
+      ? '<table><tr><th>ID</th><th>Setup</th><th>Status</th></tr>'+rows+'</table>'
+        +'<div class="note" style="margin-top:6px">A hypothesis is not a proven setup. Promotion still needs the unchanged net graduation bar.</div>'
+      : '<span class="muted">no hypotheses yet — run Collect or `python main.py sky-agent hypothesize`</span>';
+  }
+  const reg=document.getElementById('agRegimes');
+  if(reg){
+    const rows=((s&&s.regimes)||[]).map(function(x){
+      return '<div class="note">'+esc(x.symbol||'')+' '+esc(x.timeframe||'')+' · '
+        +esc(x.regime||'—')+' / '+esc(x.volatility_state||'—')+'</div>';
+    }).join('');
+    reg.innerHTML = rows || '<span class="muted">no regime log yet</span>';
+  }
+  const sec=document.getElementById('agSec');
+  if(sec){
+    const rows=((s&&s.sec_events)||[]).map(function(x){
+      return '<div class="note">'+esc(x.accession||'')+' · '+esc(x.event_type||'—')
+        +' sev '+esc(x.severity)+'</div>';
+    }).join('');
+    sec.innerHTML = rows || '<span class="muted">no SEC events (crypto desk — this is optional research)</span>';
+  }
+  const arc=document.getElementById('agArchive');
+  if(arc){
+    const rows=((s&&s.reports)||[]).map(function(x){
+      return '<tr><td>'+esc(x.report_date||'')+'</td><td>'+esc(x.kind||'')+'</td><td>'
+        +esc(x.asset||'')+'</td><td>'+esc(x.recommendation||'')+'</td><td>'+esc(x.level||'')+'</td></tr>';
+    }).join('');
+    arc.innerHTML = rows
+      ? '<table><tr><th>Day</th><th>Kind</th><th>Asset</th><th>Rec</th><th>Level</th></tr>'+rows+'</table>'
+      : '<span class="muted">no archived reports — click Archive the daily report</span>';
+  }
+}
+async function archiveAgentReport(){
+  const st=document.getElementById('agStatus');
+  if(st) st.textContent='archiving…';
+  try{
+    const res=await fetch('/api/sky-agent/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+    const d=await res.json();
+    if(!res.ok||d.error){ showToast(d.error||('archive failed ('+res.status+')'),'err'); return; }
+    showToast('Daily report archived (#'+(d.report_id||'?')+') — still not evidence','ok');
+    loadAgent(true);
+  }catch(e){ showToast(String(e),'err'); }
+}
+
 function onTabShown(tab){
   if(tab==='chart'){ loadChartWorkspace(false); loadPracticeScorecard(); }
   else if(tab==='manage') loadTradeManager();
@@ -4498,13 +4702,14 @@ function onTabShown(tab){
   else if(tab==='modules') loadModules();
   else if(tab==='connections') loadConnections(false);
   else if(tab==='evidence') loadEvidence();
+  else if(tab==='agent') loadAgent(false);
 }
 
 // init
 (function(){
   try{
     const h=(typeof location !== 'undefined' && location.hash || '').replace('#','');
-    if(h && ['overview','chart','market','intelligence','trades','manage','risk','evidence','journal','weekly','learn','connections','commands','modules','system'].includes(h)) _activeTab=h;
+    if(h && ['overview','chart','market','intelligence','trades','manage','risk','evidence','journal','weekly','learn','connections','commands','modules','system','agent'].includes(h)) _activeTab=h;
   }catch(e){}
   try{ switchTab(_activeTab); }catch(e){}
 })();
@@ -6712,6 +6917,42 @@ def make_app(job_manager=None) -> Flask:
             from sky_agent.hypothesis import propose_hypotheses
             hyps = propose_hypotheses()
             return jsonify(_sanitize_for_json({"ok": True, "hypotheses": hyps}))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/hub/role")
+    def api_hub_role():
+        """W4.2 — how this always-on Ubuntu PC should be used."""
+        try:
+            from ops.hub import host_role
+            return jsonify(_sanitize_for_json(host_role()))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/hub/status")
+    def api_hub_status():
+        """W4.2 — Hub FHS + systemd snapshot + host role. Never starts units."""
+        try:
+            from ops.hub import status as hub_status
+            return jsonify(_sanitize_for_json(hub_status()))
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.post("/api/sky-agent/report")
+    def api_sky_agent_report_archive():
+        """W4.1 — archive today's intelligence report. Memory only.
+
+        Never a trade, never a gate input, never a graduation sample.
+        """
+        try:
+            from sky_agent.daily_report import archive_daily_report, build_daily_report
+            body = request.get_json(silent=True) or {}
+            demo = bool(body.get("demo")) or request.args.get("demo", "").lower() in ("1", "true", "yes")
+            report = build_daily_report(demo=demo)
+            archived = archive_daily_report(report)
+            _audit("sky_agent_report", "daily",
+                   detail={"report_id": archived.get("report_id"), "demo": demo})
+            return jsonify(_sanitize_for_json({**archived, "report": report}))
         except Exception as exc:
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
