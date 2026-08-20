@@ -60,15 +60,27 @@ _HARNESS_HEAD = r"""
     global.LightweightCharts = { createChart: (target, opts) => {
       const chart = { pane: target && target.id, height: opts && opts.height,
         series: [],
-        addCandlestickSeries(){ const s={lines:[],setData(d){this.data=d;},
-          createPriceLine(){}}; this.series.push(s); return s; },
+        addCandlestickSeries(){ const s={lines:[], data:null,
+          setData(d){ this.data=d; this.sets=(this.sets||0)+1; },
+          update(d){ this.lastUpdate=d; },
+          createPriceLine(){ const pl={}; this.lines.push(pl); return pl; },
+          removePriceLine(){}}; this.series.push(s); return s; },
         addLineSeries(o){ const s={kind:'line',data:null,opts:o||null,
-          setData(d){ this.data = d; }, update(){}, setMarkers(){},
-          createPriceLine(){}}; this.series.push(s); return s; },
-        addHistogramSeries(){ const s={kind:'hist',setData(){}};
+          setData(d){ this.data = d; this.sets=(this.sets||0)+1; }, update(){}, setMarkers(){},
+          createPriceLine(){return {};}, removePriceLine(){}}; this.series.push(s); return s; },
+        addHistogramSeries(){ const s={kind:'hist',data:null, setData(d){ this.data=d; this.sets=(this.sets||0)+1; }};
           this.series.push(s); return s; },
-        timeScale(){ return { fitContent(){}, applyOptions(){} }; },
-        applyOptions(){}, remove(){ this.removed = true; } };
+        timeScale(){ if(!this._ts) this._ts = {
+            range: {from:10, to:50}, fitted:0, restored:0, scrolled:0,
+            fitContent(){ this.fitted++; },
+            applyOptions(){},
+            getVisibleLogicalRange(){ return this.range; },
+            setVisibleLogicalRange(r){ this.range=r; this.restored++; },
+            subscribeVisibleLogicalRangeChange(fn){ this._sub=fn; },
+            scrollToRealTime(){ this.scrolled++; }
+          }; return this._ts; },
+        applyOptions(){}, remove(){ this.removed = true; },
+        removeSeries(){} };
       CHARTS.push(chart); return chart;
     } };
     global.window = { addEventListener: ()=>{}, LightweightCharts: global.LightweightCharts };
@@ -96,7 +108,7 @@ _HARNESS_HEAD = r"""
       return { ok: status < 400, status: status, json: async () => payload };
     };
     global.setInterval = () => 0; global.clearInterval = () => {};
-    global.setTimeout = (fn) => { if(typeof fn === 'function') fn(); return 0; };
+    global.setTimeout = (fn, ms) => { if(typeof ms === 'number' && ms > 100) return 0; if(typeof fn === 'function') fn(); return 0; };
     global.clearTimeout = () => {};
 
 __DASHBOARD_JS__
@@ -321,3 +333,229 @@ def test_confirm_retry_reuses_the_same_ticket_id():
         "a retried confirm must reuse its ticket id"
     assert any("Ticket error" in t for t in out["toasts"]), out["toasts"]
     assert any("Paper position open" in t for t in out["toasts"])
+
+
+
+_CHART_SEED = """
+      el('sym').value = 'BTCUSDT'; el('tf').value = '15m';
+      _chartSym = 'BTCUSDT'; _chartTf = '15m';
+      _chartData = {
+        symbol:'BTCUSDT', timeframe:'15m', last_price:100, change_pct:1,
+        candles: Array.from({length:80}, (_,i)=>({time:i+1, open:100, high:101, low:99, close:100+i/100})),
+        overlays: { ema20:[{time:1,value:100}], ema50:[], ema200:[], vwap:[{time:1,value:100}] },
+        panes: { volume:[{time:1,value:1,color:'#22c55e'}], rsi:[{time:1,value:50}], macd:[{time:1,value:1}], macd_hist:[], macd_signal:[] },
+        levels: [], plan: {}, stats: {rsi:50, adx:20}
+      };
+      drawChart({fit:true});
+"""
+
+_REFRESH_OUT = ("console.log(JSON.stringify({chartCount: CHARTS.length, "
+                "removed: CHARTS.filter(c=>c.removed).length, "
+                "fitted: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.fitted)||0),0), "
+                "restored: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.restored)||0),0), "
+                "scrolled: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.scrolled)||0),0), "
+                "sets: (CHARTS[0]&&CHARTS[0].series[0]&&CHARTS[0].series[0].sets)||0, "
+                "wl: (elements['wlList']||{}).innerHTML||'', "
+                "entry: (elements['tEntry']||{}).value||'', "
+                "updated: (elements['updated']||{}).textContent||'', "
+                "feed: (elements['feedTxt']||{}).textContent||'', "
+                "toasts: TOASTS, "
+                "liveFollow: !!_chartLiveFollow, "
+                "sym: (elements['sym']||{}).value||'', "
+                "range: (CHARTS[0]&&CHARTS[0]._ts&&CHARTS[0]._ts.range)||null "
+                "}));")
+
+
+def test_quiet_refresh_does_not_recreate_chart_or_fit_content():
+    """A 30s data refresh must update series in place, never remount or fitContent."""
+    out = _run({}, _CHART_SEED + """
+      const before = CHARTS.length;
+      const fittedBefore = CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.fitted)||0),0);
+      CHARTS[0].timeScale().range = {from:5, to:20};
+      _chartLiveFollow = false;
+      _chartViewport = {from:5, to:20};
+      _chartData.candles = _chartData.candles.concat([{time:81, open:101, high:102, low:100, close:101}]);
+      drawChart({preserveViewport:true});
+      global.__before = before;
+      global.__fittedBefore = fittedBefore;
+    """ + _DRAIN + """
+    """ + _REFRESH_OUT.replace("chartCount: CHARTS.length",
+                               "chartCount: CHARTS.length, before: global.__before, fittedBefore: global.__fittedBefore"))
+    assert out["chartCount"] == out["before"] == out.get("before", out["chartCount"])
+    assert out["removed"] == 0
+    assert out["fitted"] == out.get("fittedBefore", out["fitted"]), out
+    assert out["sets"] >= 2  # initial + in-place update
+    assert out["range"]["from"] == 5 and out["range"]["to"] == 20
+
+
+def test_historical_viewport_survives_refresh_live_follows():
+    out = _run({}, _CHART_SEED + """
+      CHARTS[0].timeScale().range = {from:8, to:18};
+      _chartLiveFollow = false;
+      _chartViewport = {from:8, to:18};
+      drawChart({preserveViewport:true});
+      const hist = Object.assign({}, CHARTS[0].timeScale().range);
+      _chartLiveFollow = true;
+      drawChart({preserveViewport:true});
+      global.__hist = hist;
+      global.__scrolled = CHARTS[0].timeScale().scrolled;
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({hist: global.__hist, scrolled: global.__scrolled, liveFollow: !!_chartLiveFollow, restored: CHARTS[0]._ts.restored}));")
+    assert out["hist"]["from"] == 8 and out["hist"]["to"] == 18
+    assert out["scrolled"] >= 1
+    assert out["restored"] >= 1
+
+
+def test_watchlist_refresh_never_blanks_existing_rows():
+    api = {"/api/agents": {"status": 200, "body": {
+        "assets": [{"symbol":"BTCUSDT","entry":60000,"change_pct_24h":1.2,
+                    "desk_action":"BUY","reason":"x","confidence_pct":70}]}}}
+    out = _run(api, """
+      await loadWatchlistPrices();
+      const first = el('wlList').innerHTML;
+      const origFetch = fetch;
+      let started = false;
+      fetch = async (url, opts) => {
+        if(String(url).includes('/api/agents')){
+          started = true;
+          if(el('wlList').innerHTML.indexOf('loading prices')>=0)
+            global.__blanked = true;
+        }
+        return origFetch(url, opts);
+      };
+      const p = loadWatchlistPrices();
+      global.__during = el('wlList').innerHTML;
+      await p;
+      global.__first = first;
+      global.__after = el('wlList').innerHTML;
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({first: global.__first, during: global.__during, after: global.__after, blanked: !!global.__blanked}));")
+    assert "BTCUSDT" in out["first"]
+    assert "loading prices" not in (out["during"] or "")
+    assert not out["blanked"]
+    assert "BTCUSDT" in out["after"]
+
+
+def test_quiet_scan_keeps_ticket_and_does_not_toast_failure():
+    api = {
+        "/api/scan": [
+            {"status": 200, "body": {
+                "signal": {"action":"BUY","asset":"BTCUSDT","timeframe":"15m",
+                           "entry": 61000, "stop_loss": 60000, "take_profit": 63000,
+                           "confidence":"MEDIUM","reason":"boot"},
+                "plans": [{"entry":61000,"stop_loss":60000,"take_profits":[63000],"type":"Manual"}],
+                "decision": {"action":"BUY"},
+                "snapshot": {"features":{}, "scores":{}},
+            }},
+            {"status": 502, "body": {"error": "upstream down"}},
+        ]
+    }
+    out = _run(api, """
+      el('sym').value='BTCUSDT'; el('tf').value='15m';
+      el('tEntry').value='111'; _ticketDirty = true;
+      await load(false, true);
+      const afterOk = el('tEntry').value;
+      await load(false, true);
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({entry: elements['tEntry'].value, afterOk: null, updated: elements['updated'].textContent, toasts: TOASTS, payload: !!__lastPayload}));")
+    # first quiet success must not overwrite a dirty ticket
+    assert out["entry"] == "111"
+    assert "Data stale" in (out["updated"] or "") or "stale" in (out["updated"] or "").lower()
+    assert not any("Refresh failed" in t for t in out["toasts"])
+
+
+def test_stale_scan_response_cannot_overwrite_newer():
+    api = {"/api/scan": {"status": 200, "body": {
+        "signal": {"action":"SELL","asset":"ETHUSDT","timeframe":"15m","entry":1},
+        "plans": [], "decision": {}, "snapshot": {"features":{}, "scores":{}},
+    }}}
+    out = _run(api, """
+      el('sym').value='BTCUSDT'; el('tf').value='15m';
+      const orig = fetch;
+      const deferred = [];
+      fetch = async (url, opts) => {
+        if(String(url).includes('/api/scan')){
+          return await new Promise(resolve => deferred.push(resolve));
+        }
+        return orig(url, opts);
+      };
+      const p1 = load(false, true);
+      const p2 = load(false, true);
+      // resolve newer first, then older
+      deferred[1]({ ok:true, status:200, json: async () => ({
+        signal:{action:'BUY',asset:'BTCUSDT',timeframe:'15m',entry:2,reason:'new'},
+        plans:[], decision:{}, snapshot:{features:{},scores:{}}
+      })});
+      await Promise.resolve();
+      deferred[0]({ ok:true, status:200, json: async () => ({
+        signal:{action:'SELL',asset:'ETHUSDT',timeframe:'15m',entry:9,reason:'old'},
+        plans:[], decision:{}, snapshot:{features:{},scores:{}}
+      })});
+      await p1; await p2;
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({reason: (__lastPayload&&__lastPayload.signal&&__lastPayload.signal.reason)||'', action: (__lastPayload&&__lastPayload.signal&&__lastPayload.signal.action)||''}));")
+    assert out["reason"] == "new"
+    assert out["action"] == "BUY"
+
+
+def test_symbol_survives_quiet_refresh():
+    api = {"/api/scan": {"status": 200, "body": {
+        "signal": {"action":"BUY","asset":"ETHUSDT","timeframe":"1h","entry":1},
+        "plans": [], "decision": {}, "snapshot": {"features":{}, "scores":{}},
+    }}}
+    out = _run(api, """
+      el('sym').value='ETHUSDT'; el('tf').value='1h';
+      await load(false, true);
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({sym: elements['sym'].value, tf: elements['tf'].value, live: (elements['updated']||{}).textContent||''}));")
+    assert out["sym"] == "ETHUSDT"
+    assert out["tf"] == "1h"
+    assert "Data live" in out["live"]
+
+
+def test_thirty_second_refresh_updates_data_only():
+    """The auto-refresh callback is load(false, true). It must not remount
+    the chart, jump the viewport, blank the watchlist, or clobber a dirty ticket."""
+    api = {
+        "/api/scan": {"status": 200, "body": {
+            "signal": {"action": "BUY", "asset": "BTCUSDT", "timeframe": "15m",
+                       "entry": 77777, "stop_loss": 70000, "take_profit": 80000,
+                       "confidence": "MEDIUM", "reason": "tick"},
+            "plans": [{"entry": 77777, "stop_loss": 70000, "take_profits": [80000],
+                       "type": "Manual"}],
+            "decision": {"action": "BUY"},
+            "snapshot": {"features": {}, "scores": {}},
+        }},
+        "/api/agents": {"status": 200, "body": {
+            "assets": [{"symbol": "BTCUSDT", "entry": 60000, "change_pct_24h": 1.2,
+                        "desk_action": "BUY", "reason": "x", "confidence_pct": 70}]}},
+    }
+    out = _run(api, _CHART_SEED + """
+      await loadWatchlistPrices();
+      el('tEntry').value = '111'; _ticketDirty = true;
+      CHARTS[0].timeScale().range = {from:12, to:30};
+      _chartLiveFollow = false; _chartViewport = {from:12, to:30};
+      const n0 = CHARTS.length;
+      const fitted0 = CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.fitted)||0),0);
+      const wl0 = el('wlList').innerHTML;
+      await load(false, true);   // 30s auto-refresh tick
+      global.__out = {
+        n0, n1: CHARTS.length, removed: CHARTS.filter(c=>c.removed).length,
+        fitted0, fitted1: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.fitted)||0),0),
+        range: CHARTS[0].timeScale().range,
+        entry: el('tEntry').value, wl0, wl1: el('wlList').innerHTML,
+        updated: el('updated').textContent, toasts: TOASTS,
+        live: (window._skyPayload&&window._skyPayload.signal&&window._skyPayload.signal.reason)||''
+      };
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify(global.__out));")
+    assert out["n1"] == out["n0"]
+    assert out["removed"] == 0
+    assert out["fitted1"] == out["fitted0"]
+    assert out["range"]["from"] == 12 and out["range"]["to"] == 30
+    assert out["entry"] == "111"
+    assert "BTCUSDT" in out["wl0"] and "BTCUSDT" in out["wl1"]
+    assert "loading prices" not in out["wl1"]
+    assert out["live"] == "tick"
+    assert "Data live" in out["updated"]
+    assert not any("Refresh failed" in t for t in out["toasts"])

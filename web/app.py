@@ -941,14 +941,14 @@ HTML = """<!doctype html>
             {% for t in ['1m','5m','15m','30m','1h','4h','1d','1w'] %}<button data-tf="{{t}}" onclick="chartSetTF('{{t}}')" class="{{'active' if t==tf}}">{{t}}</button>{% endfor %}
           </div>
           <div class="chart-toggles">
-            <label class="check"><input type="checkbox" id="ovEma" checked onchange="drawChart()"> EMA</label>
-            <label class="check"><input type="checkbox" id="ovVwap" checked onchange="drawChart()"> VWAP</label>
-            <label class="check"><input type="checkbox" id="ovBb" onchange="drawChart()"> BB</label>
-            <label class="check"><input type="checkbox" id="ovLevels" checked onchange="drawChart()"> Levels</label>
-            <label class="check"><input type="checkbox" id="ovZones" checked onchange="drawChart()"> Zones</label>
-            <label class="check"><input type="checkbox" id="ovPlan" checked onchange="drawChart()"> Plan</label>
-            <label class="check"><input type="checkbox" id="ovRsi" checked onchange="drawChart()"> RSI</label>
-            <label class="check"><input type="checkbox" id="ovMacd" onchange="drawChart()"> MACD</label>
+            <label class="check"><input type="checkbox" id="ovEma" checked onchange="drawChart({preserveViewport:true})"> EMA</label>
+            <label class="check"><input type="checkbox" id="ovVwap" checked onchange="drawChart({preserveViewport:true})"> VWAP</label>
+            <label class="check"><input type="checkbox" id="ovBb" onchange="drawChart({preserveViewport:true})"> BB</label>
+            <label class="check"><input type="checkbox" id="ovLevels" checked onchange="drawChart({preserveViewport:true})"> Levels</label>
+            <label class="check"><input type="checkbox" id="ovZones" checked onchange="drawChart({preserveViewport:true})"> Zones</label>
+            <label class="check"><input type="checkbox" id="ovPlan" checked onchange="drawChart({preserveViewport:true})"> Plan</label>
+            <label class="check"><input type="checkbox" id="ovRsi" checked onchange="drawChart({preserveViewport:true})"> RSI</label>
+            <label class="check"><input type="checkbox" id="ovMacd" onchange="drawChart({preserveViewport:true})"> MACD</label>
           </div>
           <span class="spacer" style="flex:1"></span>
           <div class="seg" style="align-items:center">
@@ -1009,15 +1009,15 @@ HTML = """<!doctype html>
             <button data-otype="limit" onclick="ticketType('limit')">Limit</button>
             <button data-otype="conditional" onclick="ticketType('conditional')">Conditional</button>
           </div>
-          <div class="t-field"><label>Entry price</label><input id="tEntry" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
+          <div class="t-field"><label>Entry price</label><input id="tEntry" type="number" step="any" placeholder="—" oninput="_ticketDirty=true;recalcTicket()"></div>
           <div class="t-row">
-            <div class="t-field"><label>Stop loss</label><input id="tSL" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
-            <div class="t-field"><label>Risk %</label><input id="tRisk" type="number" step="0.05" value="0.5" oninput="recalcTicket()"></div>
+            <div class="t-field"><label>Stop loss</label><input id="tSL" type="number" step="any" placeholder="—" oninput="_ticketDirty=true;recalcTicket()"></div>
+            <div class="t-field"><label>Risk %</label><input id="tRisk" type="number" step="0.05" value="0.5" oninput="_ticketDirty=true;recalcTicket()"></div>
           </div>
           <div class="t-row three">
-            <div class="t-field"><label>TP1</label><input id="tTP1" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
-            <div class="t-field"><label>TP2</label><input id="tTP2" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
-            <div class="t-field"><label>TP3</label><input id="tTP3" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
+            <div class="t-field"><label>TP1</label><input id="tTP1" type="number" step="any" placeholder="—" oninput="_ticketDirty=true;recalcTicket()"></div>
+            <div class="t-field"><label>TP2</label><input id="tTP2" type="number" step="any" placeholder="—" oninput="_ticketDirty=true;recalcTicket()"></div>
+            <div class="t-field"><label>TP3</label><input id="tTP3" type="number" step="any" placeholder="—" oninput="_ticketDirty=true;recalcTicket()"></div>
           </div>
           <div class="t-field"><label>Position size (units)</label><input id="tSize" type="text" readonly placeholder="auto from risk"></div>
           <div class="t-est">
@@ -1691,12 +1691,18 @@ function closeAccount(){ const m=document.getElementById('accountModal'); if(m) 
 function setSymbol(sym){
   const el=document.getElementById('sym'); if(el) el.value=sym;
   document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym));
+  try{ document.querySelectorAll('#chartSymSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym)); }catch(e){}
+  _chartSym=sym; _ticketDirty=false;
   load(true);
+  try{ loadChartWorkspace(true, {fit:true}); }catch(e){}
 }
 function setTF(tf){
   const el=document.getElementById('tf'); if(el) el.value=tf;
   document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf));
+  try{ document.querySelectorAll('#chartTfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf)); }catch(e){}
+  _chartTf=tf; _ticketDirty=false;
   load(true);
+  try{ loadChartWorkspace(true, {fit:true}); }catch(e){}
 }
 let _activeTab = (typeof localStorage !== 'undefined' && localStorage.getItem('cb_tab')) || 'overview';
 function switchTab(tab){
@@ -2314,24 +2320,25 @@ function render(d){
     </div>
   `;
 
-  document.getElementById('app').innerHTML = html;
+  const appEl=document.getElementById('app'); if(appEl) appEl.innerHTML = html;
   // colour the mood bar + sentiment strip from this scan's reading
   try{ renderSentiment(sent); }catch(e){}
-  // re-apply active tab
-  switchTab(_activeTab);
+  // re-apply active tab for the *legacy* shell only — never remount the trade
+  // terminal or recreate the chart as a side-effect of a data refresh.
+  if(_activeTab && _activeTab!=='chart' && _activeTab!=='trade'){
+    try{ switchTab(_activeTab); }catch(e){}
+  }
   // load async sub-panels
   loadPending(); loadPaper(); loadHistory(); loadLearning(); loadScorecard(); loadSources();
   loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels(); loadDesk();
   loadReadiness(); loadLoop(); loadApiV1(false);
   const symE=document.getElementById('sym'); const tfE=document.getElementById('tf');
   loadChart((symE?symE.value:'BTCUSDT').toUpperCase(), tfE?tfE.value:'15m');
-  // Keep the workstation tabs in sync with the asset/timeframe just scanned.
   try{
-    _chartSym=(symE?symE.value:'BTCUSDT').toUpperCase();
-    _chartTf=tfE?tfE.value:'15m';
+    if(!_chartSym) _chartSym=(symE?symE.value:'BTCUSDT').toUpperCase();
+    if(!_chartTf) _chartTf=tfE?tfE.value:'15m';
     document.querySelectorAll('#chartSymSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===_chartSym));
     document.querySelectorAll('#chartTfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===_chartTf));
-    onTabShown(_activeTab);
   }catch(e){}
 }
 
@@ -2432,51 +2439,82 @@ function renderLightweightChart(container, candles){
 
 let __lastGood = '';
 let __lastGoodAt = null;
+function setDataFreshness(state, err){
+  const up=document.getElementById('updated');
+  const chip=document.getElementById('feedChip');
+  const txt=document.getElementById('feedTxt');
+  const when=__lastGoodAt?new Date(__lastGoodAt).toLocaleTimeString():'—';
+  if(state==='live'){
+    if(up) up.textContent='● Data live · '+new Date().toLocaleTimeString();
+    if(chip){ chip.className='status-chip ok'; chip.title='last successful update '+when; }
+    if(txt && (txt.textContent||'').indexOf('gate')<0) txt.textContent='data live';
+  }else{
+    if(up) up.textContent='● Data stale · last success '+when+' · retrying in 30s';
+    if(chip){ chip.className='status-chip warn'; chip.title=err||'stale'; }
+    if(txt) txt.textContent='data stale';
+  }
+}
+function applyScanData(d, opts){
+  opts=opts||{};
+  window._skyPayload=d;
+  try{ fillTicketFromSignal(d, {dataOnly: !!opts.quiet}); }catch(e){}
+  if(opts.quiet){
+    try{ renderSentiment(d.sentiment||fallbackSentiment(d)); }catch(e){}
+    try{ if(typeof loadWatchlistPrices==='function') loadWatchlistPrices(); }catch(e){}
+    try{ if(typeof loadTerminalPositions==='function') loadTerminalPositions(); }catch(e){}
+    try{ if(typeof loadRiskChip==='function') loadRiskChip(); }catch(e){}
+    return;
+  }
+  render(d);
+}
 async function load(force, quiet){
-  const sym=document.getElementById('sym').value.trim().toUpperCase()||'BTCUSDT';
-  const tf=document.getElementById('tf').value;
+  const symEl=document.getElementById('sym'), tfEl=document.getElementById('tf');
+  if(!symEl || !tfEl) return;
+  const sym=symEl.value.trim().toUpperCase()||'BTCUSDT';
+  const tf=tfEl.value;
+  const req=++_scanReq;
   let t0=Date.now();
   const app=document.getElementById('app');
-  if(!quiet && !__lastGood){
+  const firstPaint = !quiet && !__lastPayload && !__lastGood;
+  if(firstPaint && app){
     app.innerHTML = `<div class="card" style="grid-column:1/-1"><h2>Scanning ${esc(sym)} ${esc(tf)}</h2>
       <div class="muted" id="scanstatus">fetching timeframes + news + macro + context…</div><div style="margin-top:10px"><div class="skeleton" style="height:10px;width:70%"></div><div class="skeleton" style="height:10px;width:92%;margin-top:8px"></div><div class="skeleton" style="height:10px;width:84%;margin-top:8px"></div></div></div>`;
   }
-  const tick=setInterval(()=>{
+  const tick= firstPaint ? setInterval(()=>{
     const el=document.getElementById('scanstatus'); if(!el) return;
     const s=((Date.now()-t0)/1000).toFixed(0);
     el.textContent = s<10 ? `fetching timeframes + news + macro + context… (${s}s)` :
                      s<30 ? `still working (${s}s) — your network may be slow, hang on…` :
                             `this is taking long (${s}s) — will show engine-only signal shortly…`;
-  }, 1000);
+  }, 1000) : 0;
   const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(), 90000);
   try{
     const r=await fetch(`/api/scan?symbol=${sym}&tf=${tf}`+(force?'&force=1':''), {signal:ctrl.signal});
-    if(r.status===401){ clearTimeout(to); clearInterval(tick); try{ location.reload(); }catch(e){} return; }
-    const d=await r.json(); clearTimeout(to); clearInterval(tick);
+    if(req!==_scanReq){ clearTimeout(to); if(tick) clearInterval(tick); return; }
+    if(r.status===401){ clearTimeout(to); if(tick) clearInterval(tick); try{ location.reload(); }catch(e){} return; }
+    const d=await r.json(); clearTimeout(to); if(tick) clearInterval(tick);
     if(d.error || d.stale_error){
-      if(quiet && __lastGood){
-        const up=document.getElementById('updated');
-        if(up) up.textContent='⚠ refresh failed ('+new Date().toLocaleTimeString()+') — showing last data';
-        showToast('Refresh failed — showing last data', 'err');
+      if(__lastPayload || (quiet && __lastGood)){
+        setDataFreshness('stale', d.error||d.stale_error);
         return;
       }
-      app.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="err">${esc(d.error||d.stale_error)}</div><button class="btn" onclick="load(true)" style="margin-top:10px">Retry</button></div>`;
+      if(app) app.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="err">${esc(d.error||d.stale_error)}</div><button class="btn" onclick="load(true)" style="margin-top:10px">Retry</button></div>`;
       return;
     }
-    render(d);
-    __lastGood = app.innerHTML;
+    applyScanData(d, {quiet: !!quiet, force: !!force});
+    __lastPayload = d;
+    if(app) __lastGood = app.innerHTML;
     __lastGoodAt = Date.now();
-    const up=document.getElementById('updated');
-    if(up) up.textContent='updated '+new Date().toLocaleTimeString();
-    if(force) showToast('Scan refreshed — '+esc(sym)+' '+esc(tf), 'ok');
+    setDataFreshness('live');
+    if(force && !quiet) showToast('Scan refreshed — '+esc(sym)+' '+esc(tf), 'ok');
   }catch(e){
-    clearTimeout(to); clearInterval(tick);
-    if(quiet && __lastGood){
-      const up=document.getElementById('updated');
-      if(up) up.textContent='⚠ refresh failed ('+new Date().toLocaleTimeString()+') — showing last data';
+    clearTimeout(to); if(tick) clearInterval(tick);
+    if(req!==_scanReq) return;
+    if(__lastPayload || (quiet && __lastGood)){
+      setDataFreshness('stale', e.name==='AbortError'?'timed out':String(e));
       return;
     }
-    app.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="err">Load failed: ${esc(e.name==='AbortError'?'timed out (90s)':String(e))}</div>
+    if(app) app.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="err">Load failed: ${esc(e.name==='AbortError'?'timed out (90s)':String(e))}</div>
       <div class="note" style="margin-top:6px">Click <b>🔍 System check</b> (Connections card) to see which source is blocked, or retry.</div>
       <button class="btn" onclick="load(true)" style="margin-top:10px">Retry</button></div>`;
   }
@@ -3428,40 +3466,86 @@ function chartsAvailable(){
   return (typeof LightweightCharts !== 'undefined' && LightweightCharts.createChart) ? LightweightCharts.createChart
        : (typeof createChart !== 'undefined' ? createChart : null);
 }
-async function loadChartWorkspace(force){
-  if(_chartLoading) return;
+let _chartSeries=null, _chartViewport=null, _chartLiveFollow=true, _chartBuiltKey=null;
+let _chartReq=0, _scanReq=0, _syncingPanes=false, _ticketDirty=false;
+let __lastPayload=null;
+
+function overlayOn(id){ return !!document.getElementById(id)?.checked; }
+function captureViewport(){
+  if(!_charts.length) return _chartViewport;
+  try{ const r=_charts[0].timeScale().getVisibleLogicalRange(); if(r) _chartViewport=r; return r; }catch(e){ return _chartViewport; }
+}
+function restoreViewport(range){
+  if(!range || !_charts.length) return;
+  _syncingPanes=true;
+  try{ _charts.forEach(c=>{ try{ c.timeScale().setVisibleLogicalRange(range); }catch(e){} }); }finally{ _syncingPanes=false; }
+}
+function noteViewport(range){
+  if(_syncingPanes || !range) return;
+  _chartViewport=range;
+  const n=((_chartData&&_chartData.candles)||[]).length;
+  if(n) _chartLiveFollow = (range.to >= n-3);
+}
+function applyChartViewport(opts){
+  opts=opts||{};
+  if(opts.fit){
+    _charts.forEach(c=>{ try{ c.timeScale().fitContent(); }catch(e){} });
+    _chartLiveFollow=true;
+    return;
+  }
+  if(_chartLiveFollow){
+    _charts.forEach(c=>{ try{ const ts=c.timeScale(); if(ts.scrollToRealTime) ts.scrollToRealTime(); }catch(e){} });
+    return;
+  }
+  if(_chartViewport) restoreViewport(_chartViewport);
+}
+function subscribeViewportTracking(chart){
+  try{ chart.timeScale().subscribeVisibleLogicalRangeChange(noteViewport); }catch(e){}
+}
+async function loadChartWorkspace(force, opts){
+  opts=opts||{};
   const main=document.getElementById('chartMain'); if(!main) return;
-  // Reloading or changing the selected series always leaves historical replay.
-  // Otherwise its timer would keep updating a chart that has been disposed and
-  // could repaint a REPLAY label over the newly loaded series.
-  if(_replay) stopReplay(false);
+  const req=++_chartReq;
+  const preserve = !opts.fit && (_charts.length>0) && !opts.rebuild;
+  if(_replay && (force || opts.rebuild)) stopReplay(false);
   _chartLoading=true;
   const head=document.getElementById('chartHead');
-  if(head) head.innerHTML='<span class="muted">loading '+esc(chartSym())+' '+esc(chartTf())+'…</span>';
+  if(head && !_chartData) head.innerHTML='<span class="muted">loading '+esc(chartSym())+' '+esc(chartTf())+'…</span>';
   try{
     const r=await fetch('/api/chart?symbol='+encodeURIComponent(chartSym())+'&tf='+encodeURIComponent(chartTf())+'&limit=300'+(force?'&_='+Date.now():''));
     const d=await r.json();
+    if(req!==_chartReq) return;
     if(d.error && !(d.candles||[]).length){
-      if(head) head.innerHTML='<span class="err">chart unavailable: '+esc(d.error)+'</span>';
+      if(!_chartData && head) head.innerHTML='<span class="err">chart unavailable: '+esc(d.error)+'</span>';
       return;
     }
     _chartData=d;
-    drawChart();
+    const key=chartSym()+'|'+chartTf();
+    const sameSeries = (_chartBuiltKey===key);
+    drawChart({
+      preserveViewport: preserve && sameSeries,
+      fit: !!opts.fit || (force && !sameSeries) || (!_charts.length),
+      rebuild: !!opts.rebuild
+    });
     renderChartHead(d);
     renderChartStats(d);
     renderChartLevels(d);
     const stamp=document.getElementById('liveLoadedAt');
     if(stamp) stamp.textContent=new Date().toLocaleTimeString();
-    // A running stream follows the selected series: reconnect when it changed.
     if(_live && (_live.symbol!==chartSym() || _live.tf!==chartTf())){ stopLive(true); startLive(); }
-    if(_multiChart) loadMultiChart();
+    if(_multiChart && force) loadMultiChart();
   }catch(e){
-    if(head) head.innerHTML='<span class="err">chart error: '+esc(String(e))+'</span>';
-  }finally{ _chartLoading=false; }
+    if(req!==_chartReq) return;
+    if(!_chartData && head) head.innerHTML='<span class="err">chart error: '+esc(String(e))+'</span>';
+  }finally{ if(req===_chartReq) _chartLoading=false; }
 }
 function disposeCharts(){
+  try{ unmountDrawings(); }catch(e){}
   _charts.forEach(c=>{ try{ c.remove(); }catch(e){} });
   _charts=[];
+  _chartSeries=null;
+  _priceSeries=null;
+  _chartBuiltKey=null;
 }
 function newPane(el, height, extra){
   const create=chartsAvailable(); if(!create) return null;
@@ -3482,98 +3566,183 @@ function newPane(el, height, extra){
   return chart;
 }
 function syncPanes(){
-  // TradingView-style linked time scales across price / volume / RSI / MACD
   _charts.forEach(src=>{
     try{
       src.timeScale().subscribeVisibleLogicalRangeChange(range=>{
-        if(!range) return;
-        _charts.forEach(dst=>{ if(dst!==src){ try{ dst.timeScale().setVisibleLogicalRange(range); }catch(e){} } });
+        if(!range || _syncingPanes) return;
+        noteViewport(range);
+        _syncingPanes=true;
+        try{ _charts.forEach(dst=>{ if(dst!==src){ try{ dst.timeScale().setVisibleLogicalRange(range); }catch(e){} } }); }
+        finally{ _syncingPanes=false; }
       });
     }catch(e){}
   });
 }
-function drawChart(){
+function clearPriceLines(){
+  if(!_chartSeries || !_chartSeries.candle || !(_chartSeries.priceLines||[]).length) return;
+  (_chartSeries.priceLines||[]).forEach(pl=>{ try{ _chartSeries.candle.removePriceLine(pl); }catch(e){} });
+  _chartSeries.priceLines=[];
+}
+function addPriceLine(candle, spec){
+  try{
+    const pl=candle.createPriceLine(spec);
+    if(_chartSeries){ _chartSeries.priceLines=_chartSeries.priceLines||[]; _chartSeries.priceLines.push(pl); }
+    return pl;
+  }catch(e){ return null; }
+}
+function removeOverlaySeries(keys){
+  if(!_chartSeries) return;
+  keys.forEach(k=>{
+    const s=_chartSeries[k];
+    if(!s) return;
+    try{ if(_chartSeries.priceChart && _chartSeries.priceChart.removeSeries) _chartSeries.priceChart.removeSeries(s); }catch(e){}
+    _chartSeries[k]=null;
+  });
+}
+function applyOverlays(d){
+  if(!_chartSeries || !_chartSeries.priceChart) return;
+  const price=_chartSeries.priceChart, candle=_chartSeries.candle, ov=d.overlays||{};
+  const dataFor=(key)=> key==='bbU'?(ov.bb_upper||[]): key==='bbL'?(ov.bb_lower||[]): (ov[key]||[]);
+  const addLine=(key, color, w, style)=>{
+    let s=_chartSeries[key];
+    if(!s){
+      s=price.addLineSeries({color:color,lineWidth:w,lineStyle:style||0,priceLineVisible:false,lastValueVisible:false});
+      _chartSeries[key]=s;
+    }
+    try{ s.setData(dataFor(key)); }catch(e){}
+  };
+  if(overlayOn('ovEma')){
+    addLine('ema20','#3b82f6',1); addLine('ema50','#f59e0b',1); addLine('ema200','#8b5cf6',2);
+  } else removeOverlaySeries(['ema20','ema50','ema200']);
+  if(overlayOn('ovVwap') && (ov.vwap||[]).length){ addLine('vwap','#06b6d4',2,2); }
+  else removeOverlaySeries(['vwap']);
+  if(overlayOn('ovBb')){ addLine('bbU','rgba(139,92,246,.7)',1); addLine('bbL','rgba(139,92,246,.7)',1); }
+  else removeOverlaySeries(['bbU','bbL']);
+  clearPriceLines();
+  if(overlayOn('ovLevels')){
+    (d.levels||[]).forEach(l=> addPriceLine(candle, { price:l.price, color:l.color||'#8aa0bd', lineWidth:1, lineStyle:2, axisLabelVisible:true, title:l.label||l.kind }));
+  }
+  if(overlayOn('ovZones')) drawZones(candle, d.zones);
+  if(overlayOn('ovPlan') && d.plan && (d.plan.entry||d.plan.stop_loss||d.plan.take_profit)){
+    const p=d.plan;
+    [[p.entry,'#e6edf7','ENTRY'],[p.stop_loss,'#ef4444','STOP'],[p.take_profit,'#22c55e','TARGET']].forEach(([v,c,t])=>{
+      if(v!=null) addPriceLine(candle, {price:v,color:c,lineWidth:2,lineStyle:0,axisLabelVisible:true,title:t});
+    });
+  }
+}
+function ensureAuxPane(kind, el, height){
+  if(!el) return null;
+  if(_chartSeries && _chartSeries[kind+'Chart']) return _chartSeries[kind+'Chart'];
+  const chart=newPane(el, height);
+  if(_chartSeries) _chartSeries[kind+'Chart']=chart;
+  subscribeViewportTracking(chart);
+  return chart;
+}
+function updateChartSeries(d){
+  if(!_chartSeries || !_chartSeries.candle) return false;
+  try{ _chartSeries.candle.setData(d.candles||[]); }catch(e){}
+  applyOverlays(d);
+  if(_chartSeries.vol){ try{ _chartSeries.vol.setData((d.panes&&d.panes.volume)||[]); }catch(e){} }
+  const rsiEl=document.getElementById('chartRsi');
+  if(overlayOn('ovRsi') && ((d.panes&&d.panes.rsi)||[]).length){
+    if(rsiEl) rsiEl.style.display='';
+    if(_chartSeries.rsi){ try{ _chartSeries.rsi.setData(d.panes.rsi); }catch(e){} }
+    else {
+      const rsi=ensureAuxPane('rsi', rsiEl, 120);
+      if(rsi && !_chartSeries.rsi){
+        const rs=rsi.addLineSeries({color:'#f59e0b',lineWidth:2,priceLineVisible:false});
+        rs.setData(d.panes.rsi); _chartSeries.rsi=rs;
+        try{ rs.createPriceLine({price:70,color:'rgba(239,68,68,.6)',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'70'}); }catch(e){}
+        try{ rs.createPriceLine({price:30,color:'rgba(34,197,94,.6)',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'30'}); }catch(e){}
+      }
+    }
+  } else if(rsiEl) rsiEl.style.display='none';
+  const macdEl=document.getElementById('chartMacd');
+  if(overlayOn('ovMacd') && ((d.panes&&d.panes.macd)||[]).length){
+    if(macdEl) macdEl.style.display='';
+    const hist=(d.panes.macd_hist||[]).map(p=> ({time:p.time, value:p.value, color: p.value>=0?'rgba(34,197,94,.6)':'rgba(239,68,68,.6)'}));
+    if(_chartSeries.macd){
+      try{ if(_chartSeries.macdHist) _chartSeries.macdHist.setData(hist); }catch(e){}
+      try{ _chartSeries.macd.setData(d.panes.macd); }catch(e){}
+      try{ if(_chartSeries.macdSig) _chartSeries.macdSig.setData(d.panes.macd_signal||[]); }catch(e){}
+    } else {
+      const m=ensureAuxPane('macd', macdEl, 120);
+      if(m){
+        if(hist.length){ const hs=m.addHistogramSeries({priceLineVisible:false}); hs.setData(hist); _chartSeries.macdHist=hs; }
+        const ms=m.addLineSeries({color:'#3b82f6',lineWidth:2,priceLineVisible:false}); ms.setData(d.panes.macd); _chartSeries.macd=ms;
+        if((d.panes.macd_signal||[]).length){ const ss=m.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false}); ss.setData(d.panes.macd_signal); _chartSeries.macdSig=ss; }
+      }
+    }
+  } else if(macdEl) macdEl.style.display='none';
+  return true;
+}
+function drawChart(opts){
+  opts=opts||{};
   const d=_chartData; if(!d) return;
   const main=document.getElementById('chartMain'); if(!main) return;
   if(!chartsAvailable()){ main.innerHTML='<div class="err" style="padding:14px">Chart engine failed to load — reload the page (Ctrl+F5).</div>'; return; }
-  // Overlay toggles call drawChart directly. Treat that interaction as leaving
-  // historical playback instead of letting its old timer mutate a removed pane.
-  if(_replay) stopReplay(false);
+  if(_replay && !opts.fromReplay) stopReplay(false);
+  const key=chartSym()+'|'+chartTf();
+  const saved = (opts.preserveViewport!==false) ? (captureViewport()||_chartViewport) : null;
+  if(!opts.rebuild && _charts.length && _chartSeries && _chartBuiltKey===key){
+    updateChartSeries(d);
+    if(opts.fit) applyChartViewport({fit:true});
+    else if(_chartLiveFollow) applyChartViewport({});
+    else if(saved) restoreViewport(saved);
+    return;
+  }
   disposeCharts();
-  const on=id=> !!document.getElementById(id)?.checked;
-
-  // ── price pane ──
   const price=newPane(main, 420);
   const candle=price.addCandlestickSeries({
     upColor:'#22c55e', downColor:'#ef4444', borderUpColor:'#22c55e',
     borderDownColor:'#ef4444', wickUpColor:'#22c55e', wickDownColor:'#ef4444' });
   candle.setData(d.candles||[]);
-  _priceSeries=candle;              // live stream updates this series in place
-  const ov=d.overlays||{};
-  if(on('ovEma')){
-    [['ema20','#3b82f6',1],['ema50','#f59e0b',1],['ema200','#8b5cf6',2]].forEach(([k,c,w])=>{
-      if((ov[k]||[]).length){ const s=price.addLineSeries({color:c,lineWidth:w,priceLineVisible:false,lastValueVisible:false}); s.setData(ov[k]); }
-    });
-  }
-  if(on('ovVwap') && (ov.vwap||[]).length){
-    const s=price.addLineSeries({color:'#06b6d4',lineWidth:2,lineStyle:2,priceLineVisible:false,lastValueVisible:false});
-    s.setData(ov.vwap);
-  }
-  if(on('ovBb')){
-    [['bb_upper','rgba(139,92,246,.7)'],['bb_lower','rgba(139,92,246,.7)']].forEach(([k,c])=>{
-      if((ov[k]||[]).length){ const s=price.addLineSeries({color:c,lineWidth:1,priceLineVisible:false,lastValueVisible:false}); s.setData(ov[k]); }
-    });
-  }
-  if(on('ovLevels')){
-    (d.levels||[]).forEach(l=>{
-      try{ candle.createPriceLine({ price:l.price, color:l.color||'#8aa0bd', lineWidth:1,
-        lineStyle:2, axisLabelVisible:true, title:l.label||l.kind }); }catch(e){}
-    });
-  }
-  if(on('ovZones')) drawZones(candle, d.zones);
-  mountDrawings(price, candle);
-  if(on('ovPlan') && d.plan && (d.plan.entry||d.plan.stop_loss||d.plan.take_profit)){
-    const p=d.plan;
-    const lines=[[p.entry,'#e6edf7','ENTRY'],[p.stop_loss,'#ef4444','STOP'],[p.take_profit,'#22c55e','TARGET']];
-    lines.forEach(([v,c,t])=>{ if(v!=null){ try{ candle.createPriceLine({price:v,color:c,lineWidth:2,lineStyle:0,axisLabelVisible:true,title:t}); }catch(e){} } });
-  }
+  _priceSeries=candle;
+  _chartSeries={ priceChart:price, candle:candle, priceLines:[] };
+  applyOverlays(d);
+  try{ mountDrawings(price, candle); }catch(e){}
 
-  // ── volume pane ──
   const volEl=document.getElementById('chartVol');
   if(volEl){
     volEl.style.display='';
     const vol=newPane(volEl, 110);
     const vs=vol.addHistogramSeries({ priceFormat:{type:'volume'}, priceLineVisible:false });
     vs.setData((d.panes&&d.panes.volume)||[]);
+    _chartSeries.volChart=vol; _chartSeries.vol=vs;
   }
-
-  // ── RSI pane ──
   const rsiEl=document.getElementById('chartRsi');
   if(rsiEl){
-    if(on('ovRsi') && ((d.panes&&d.panes.rsi)||[]).length){
+    if(overlayOn('ovRsi') && ((d.panes&&d.panes.rsi)||[]).length){
       rsiEl.style.display='';
       const rsi=newPane(rsiEl, 120);
       const rs=rsi.addLineSeries({color:'#f59e0b',lineWidth:2,priceLineVisible:false});
       rs.setData(d.panes.rsi);
       try{ rs.createPriceLine({price:70,color:'rgba(239,68,68,.6)',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'70'}); }catch(e){}
       try{ rs.createPriceLine({price:30,color:'rgba(34,197,94,.6)',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'30'}); }catch(e){}
+      _chartSeries.rsiChart=rsi; _chartSeries.rsi=rs;
     } else { rsiEl.style.display='none'; }
   }
-
-  // ── MACD pane ──
   const macdEl=document.getElementById('chartMacd');
   if(macdEl){
-    if(on('ovMacd') && ((d.panes&&d.panes.macd)||[]).length){
+    if(overlayOn('ovMacd') && ((d.panes&&d.panes.macd)||[]).length){
       macdEl.style.display='';
       const m=newPane(macdEl, 120);
       const hist=(d.panes.macd_hist||[]).map(p=> ({time:p.time, value:p.value, color: p.value>=0?'rgba(34,197,94,.6)':'rgba(239,68,68,.6)'}));
-      if(hist.length){ const hs=m.addHistogramSeries({priceLineVisible:false}); hs.setData(hist); }
+      if(hist.length){ const hs=m.addHistogramSeries({priceLineVisible:false}); hs.setData(hist); _chartSeries.macdHist=hs; }
       const ms=m.addLineSeries({color:'#3b82f6',lineWidth:2,priceLineVisible:false}); ms.setData(d.panes.macd);
-      if((d.panes.macd_signal||[]).length){ const ss=m.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false}); ss.setData(d.panes.macd_signal); }
+      _chartSeries.macd=ms; _chartSeries.macdChart=m;
+      if((d.panes.macd_signal||[]).length){ const ss=m.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false}); ss.setData(d.panes.macd_signal); _chartSeries.macdSig=ss; }
     } else { macdEl.style.display='none'; }
   }
-  _charts.forEach(c=>{ try{ c.timeScale().fitContent(); }catch(e){} });
+  _chartBuiltKey=key;
+  if(opts.fit || !saved){
+    _charts.forEach(c=>{ try{ c.timeScale().fitContent(); }catch(e){} });
+    _chartLiveFollow=true;
+  } else {
+    restoreViewport(saved);
+  }
   syncPanes();
+  _charts.forEach(subscribeViewportTracking);
   if(!window.__chartResizeBound){
     window.__chartResizeBound=true;
     window.addEventListener('resize', ()=>{
@@ -3596,31 +3765,31 @@ function drawZones(candle, zones){
     const done=z.tested||z.broken||z.filled;
     const style=done?2:1;   // dashed when a zone has been touched/closed
     const tag=z.broken?'broken':(z.tested||z.filled)?'done':'';
-    try{ candle.createPriceLine({price:z.top,color:col,lineWidth:1,lineStyle:style,
-      axisLabelVisible:true,title:(label||'')+' top'+(tag?' ('+tag+')':'')}); }catch(e){}
-    try{ candle.createPriceLine({price:z.bottom,color:col,lineWidth:1,lineStyle:style,
-      axisLabelVisible:true,title:(label||'')+' low'+(tag?' ('+tag+')':'')}); }catch(e){}
+    addPriceLine(candle,{price:z.top,color:col,lineWidth:1,lineStyle:style,
+      axisLabelVisible:true,title:(label||'')+' top'+(tag?' ('+tag+')':'')});
+    addPriceLine(candle,{price:z.bottom,color:col,lineWidth:1,lineStyle:style,
+      axisLabelVisible:true,title:(label||'')+' low'+(tag?' ('+tag+')':'')});
   };
   (zones.order_blocks||[]).forEach(z=> band(z, z.side==='bullish'?'OB bull':'OB bear'));
   (zones.fvgs||[]).forEach(z=> band(z, z.side==='bullish'?'FVG bull':'FVG bear'));
   (zones.liquidity||[]).forEach(l=>{
     const above=l.side==='above';
     const col=above?'rgba(139,92,246,.6)':'rgba(6,182,212,.6)';
-    try{ candle.createPriceLine({price:l.price,color:col,lineWidth:1,lineStyle:2,
-      axisLabelVisible:true,title:above?'Buyside liq':'Sellside liq'}); }catch(e){}
+    addPriceLine(candle,{price:l.price,color:col,lineWidth:1,lineStyle:2,
+      axisLabelVisible:true,title:above?'Buyside liq':'Sellside liq'});
   });
   if(zones.sweep){
     const col=zones.sweep.recovered?'rgba(245,158,11,.9)':'rgba(239,68,68,.9)';
-    try{ candle.createPriceLine({price:zones.sweep.level,color:col,lineWidth:2,lineStyle:0,
-      axisLabelVisible:true,title:(zones.sweep.side||'')+' sweep '+(zones.sweep.recovered?'(recovered)':'(failed)')}); }catch(e){}
+    addPriceLine(candle,{price:zones.sweep.level,color:col,lineWidth:2,lineStyle:0,
+      axisLabelVisible:true,title:(zones.sweep.side||'')+' sweep '+(zones.sweep.recovered?'(recovered)':'(failed)')});
   }
   if(zones.dealing_range){
     const col='rgba(59,130,246,.5)';
     const pos=zones.dealing_range.zone||'';
-    try{ candle.createPriceLine({price:zones.dealing_range.top,color:col,lineWidth:1,lineStyle:2,
-      axisLabelVisible:true,title:'range high ('+pos+')'}); }catch(e){}
-    try{ candle.createPriceLine({price:zones.dealing_range.bottom,color:col,lineWidth:1,lineStyle:2,
-      axisLabelVisible:true,title:'range low ('+pos+')'}); }catch(e){}
+    addPriceLine(candle,{price:zones.dealing_range.top,color:col,lineWidth:1,lineStyle:2,
+      axisLabelVisible:true,title:'range high ('+pos+')'});
+    addPriceLine(candle,{price:zones.dealing_range.bottom,color:col,lineWidth:1,lineStyle:2,
+      axisLabelVisible:true,title:'range low ('+pos+')'});
   }
 }
 
@@ -3677,6 +3846,7 @@ function applyLiveCandle(bar){
   }
   if(_replay) return true;                // playback owns the pane
   if(_priceSeries){ try{ _priceSeries.update(bar); }catch(e){} }
+  if(_chartLiveFollow) applyChartViewport({});
   if(_chartData){
     _chartData.last_price=bar.close;
     renderChartHead(_chartData);
@@ -5283,7 +5453,7 @@ async function archiveAgentReport(){
 }
 
 function onTabShown(tab){
-  if(tab==='chart'){ loadChartWorkspace(false); loadPracticeScorecard(); }
+  if(tab==='chart'){ if(!_charts.length) loadChartWorkspace(false); loadPracticeScorecard(); }
   else if(tab==='manage') loadTradeManager();
   else if(tab==='risk'){ loadRiskCenter(); loadVetoTimeline(); loadRDistribution(); }
   else if(tab==='journal') loadJournalCenter();
@@ -5309,7 +5479,7 @@ if(authLocked()){
   // Show sign-in / first-run setup; no private data is fetched until the
   // server authorizes this browser.
   showAuth();
-} else {
+} else if(typeof isRealBrowser==='function' ? isRealBrowser() : true){
   // strip lives outside #app, so it can resolve before the first scan does
   try{ loadReadiness(); }catch(e){}
   load(true);
@@ -5641,7 +5811,10 @@ async function loadFeedChip(){
 let _wlPrices = [];
 async function loadWatchlistPrices(){
   const list=document.getElementById('wlList'); if(!list) return;
-  list.innerHTML='<div class="b-empty">loading prices…</div>';
+  const had = _wlPrices && _wlPrices.length;
+  if(!had){
+    list.innerHTML='<div class="b-empty">loading prices…</div>';
+  }
   try{
     const d=await (await fetch('/api/agents')).json();
     _wlPrices = (d.assets||[]).map(a=>({
@@ -5650,7 +5823,7 @@ async function loadWatchlistPrices(){
     }));
     renderTerminalWatchlist();
   }catch(e){
-    list.innerHTML='<div class="b-empty">watchlist unavailable — '+esc(String(e))+'</div>';
+    if(!had) list.innerHTML='<div class="b-empty">watchlist unavailable — '+esc(String(e))+'</div>';
   }
 }
 
@@ -5722,8 +5895,9 @@ function switchOrderTab(tab){
   document.querySelectorAll('.otab').forEach(o=> o.classList.toggle('active', o.id==='otab-'+tab));
 }
 
-function fillTicketFromSignal(d){
+function fillTicketFromSignal(d, opts){
   if(!d) return;
+  opts=opts||{};
   _ticketPayload=d;
   const s=d.signal||{}, plans=d.plans||[];
   const plan=plans[0]||{};
@@ -5731,9 +5905,12 @@ function fillTicketFromSignal(d){
   const sl=s.stop_loss||plan.stop_loss||null;
   const tps=(plan.take_profits&&plan.take_profits.length)?plan.take_profits:
             (s.take_profit?[s.take_profit]:[]);
+  const skipInputs = !!(opts.dataOnly && _ticketDirty);
   const set=(id,v)=> { const el=document.getElementById(id); if(el&&v!=null) el.value=v; };
-  set('tEntry', entry); set('tSL', sl);
-  set('tTP1', tps[0]); set('tTP2', tps[1]); set('tTP3', tps[2]);
+  if(!skipInputs){
+    set('tEntry', entry); set('tSL', sl);
+    set('tTP1', tps[0]); set('tTP2', tps[1]); set('tTP3', tps[2]);
+  }
   // signal tab
   const tab=document.getElementById('otab-signal');
   if(tab){
@@ -6390,7 +6567,7 @@ async function aiSend(which){
   if(typeof _r==='function'){
     window.render=function(d){
       window._skyPayload=d;
-      try{ fillTicketFromSignal(d); }catch(e){}
+      try{ fillTicketFromSignal(d, {dataOnly: !!_ticketDirty}); }catch(e){}
       const out=_r(d);
       try{ applyNavPanels(); }catch(e){}
       return out;

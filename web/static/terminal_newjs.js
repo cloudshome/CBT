@@ -121,7 +121,10 @@ async function loadFeedChip(){
 let _wlPrices = [];
 async function loadWatchlistPrices(){
   const list=document.getElementById('wlList'); if(!list) return;
-  list.innerHTML='<div class="b-empty">loading prices…</div>';
+  const had = _wlPrices && _wlPrices.length;
+  if(!had){
+    list.innerHTML='<div class="b-empty">loading prices…</div>';
+  }
   try{
     const d=await (await fetch('/api/agents')).json();
     _wlPrices = (d.assets||[]).map(a=>({
@@ -130,7 +133,7 @@ async function loadWatchlistPrices(){
     }));
     renderTerminalWatchlist();
   }catch(e){
-    list.innerHTML='<div class="b-empty">watchlist unavailable — '+esc(String(e))+'</div>';
+    if(!had) list.innerHTML='<div class="b-empty">watchlist unavailable — '+esc(String(e))+'</div>';
   }
 }
 
@@ -202,8 +205,9 @@ function switchOrderTab(tab){
   document.querySelectorAll('.otab').forEach(o=> o.classList.toggle('active', o.id==='otab-'+tab));
 }
 
-function fillTicketFromSignal(d){
+function fillTicketFromSignal(d, opts){
   if(!d) return;
+  opts=opts||{};
   _ticketPayload=d;
   const s=d.signal||{}, plans=d.plans||[];
   const plan=plans[0]||{};
@@ -211,9 +215,12 @@ function fillTicketFromSignal(d){
   const sl=s.stop_loss||plan.stop_loss||null;
   const tps=(plan.take_profits&&plan.take_profits.length)?plan.take_profits:
             (s.take_profit?[s.take_profit]:[]);
+  const skipInputs = !!(opts.dataOnly && (typeof _ticketDirty!=='undefined' && _ticketDirty));
   const set=(id,v)=> { const el=document.getElementById(id); if(el&&v!=null) el.value=v; };
-  set('tEntry', entry); set('tSL', sl);
-  set('tTP1', tps[0]); set('tTP2', tps[1]); set('tTP3', tps[2]);
+  if(!skipInputs){
+    set('tEntry', entry); set('tSL', sl);
+    set('tTP1', tps[0]); set('tTP2', tps[1]); set('tTP3', tps[2]);
+  }
   // signal tab
   const tab=document.getElementById('otab-signal');
   if(tab){
@@ -870,7 +877,7 @@ async function aiSend(which){
   if(typeof _r==='function'){
     window.render=function(d){
       window._skyPayload=d;
-      try{ fillTicketFromSignal(d); }catch(e){}
+      try{ fillTicketFromSignal(d, {dataOnly: typeof _ticketDirty!=='undefined' && !!_ticketDirty}); }catch(e){}
       const out=_r(d);
       try{ applyNavPanels(); }catch(e){}
       return out;
