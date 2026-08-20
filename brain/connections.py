@@ -126,6 +126,25 @@ def _probe_discord() -> dict:
             "detail": "webhook configured (not pinged — posting is the only test)"}
 
 
+def _probe_webpush() -> dict:
+    try:
+        from data.push_notifications import get_vapid_public_key
+        from data.database import SignalDB
+        pub = get_vapid_public_key()
+        db = SignalDB()
+        subs = db.list_push_subscriptions()
+        db.close()
+        return {
+            "configured": bool(pub),
+            "live": True,
+            "detail": f"VAPID active — {len(subs)} active browser subscription(s)",
+            "public_key": pub,
+            "subscriptions": len(subs),
+        }
+    except Exception as exc:
+        return {"configured": False, "live": False, "detail": str(exc)}
+
+
 def _probe_llm() -> dict:
     provider = (_env("LLM_PROVIDER") or "off").lower()
     if provider in ("", "off", "none"):
@@ -232,6 +251,16 @@ CONNECTIONS: list[dict] = [
                 "Copy the URL into DISCORD_ANNOUNCE_WEBHOOK in your .env.",
                 "Restart SKY and press Test on this card."],
         "probe": _probe_discord,
+    },
+    {
+        "id": "webpush", "tier": "alerts", "label": "PWA Web Push notifications",
+        "gives": "Instant desktop/mobile notifications when risk gate alerts, "
+                 "daily ritual or trade decisions occur.",
+        "needs": "Browser notification permission on PWA client.",
+        "how": ["Open SKY in Chrome/Edge PWA.",
+                "Click Enable Web Push Notifications in the PWA banner or System tab.",
+                "Grant browser notification permission."],
+        "probe": _probe_webpush,
     },
     {
         "id": "llm", "tier": "ai", "label": "AI narrative (LLM)",

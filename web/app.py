@@ -1937,6 +1937,13 @@ function render(d){
      <div id="apiv1"><span class="muted">loading…</span></div>
      <div class="flex" style="margin-top:8px"><button class="btn ghost" onclick="loadApiV1(true)">Show route catalog</button></div>
      <div id="apiv1routes"></div>`, true);
+  systemCards += card('📢 PWA WEB PUSH NOTIFICATIONS', `
+    <div id="pwaPushStatus"><span class="muted">checking Web Push status…</span></div>
+    <div class="flex" style="margin-top:10px">
+      <button class="btn primary" onclick="SKY_push.subscribe()">Enable Web Push</button>
+      <button class="btn" onclick="SKY_push.unsubscribe()">Disable Web Push</button>
+      <button class="btn ghost" onclick="SKY_push.sendTest()">Send Test Push</button>
+    </div>`);
   systemCards += `<div class="card" style="grid-column:1/-1"><h2>RAW JSON <span class="count">debug</span></h2><details><summary class="kbd" style="cursor:pointer">show raw JSON</summary><pre style="max-height:360px;overflow:auto;font-size:11px;white-space:pre-wrap;margin-top:8px">${esc(JSON.stringify(d,null,2))}</pre></details><div class="note" style="margin-top:8px">LLM narrative: <span style="white-space:pre-wrap">${esc(d.llm?.narrative||'Enable LLM_PROVIDER in .env, or use rule-based output.')}</span></div></div>`;
 
   const html = `
@@ -3754,7 +3761,76 @@ async function loadRiskCenter(){
           + '<div class="note" style="margin-top:6px">'+esc(m.note||'Simulated from your recorded outcomes. Advisory only.')+'</div>'
         : '<span class="muted">'+esc(m.note||'not enough decided trades yet for a Monte Carlo run')+'</span>';
     }
+    loadVetoTimeline();
+    loadRDistribution();
   }catch(e){ gateEl.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+
+async function loadVetoTimeline(){
+  const el=document.getElementById('riskVetoTimeline'); if(!el) return;
+  try{
+    const res=await fetch('/api/risk/veto-timeline');
+    const d=await res.json();
+    const vetoes=d.vetoes||[];
+    if(!vetoes.length){
+      el.innerHTML='<span class="okc">✓ No recent risk-gate or playbook vetoes recorded. Clean operating record.</span>';
+      return;
+    }
+    el.innerHTML='<table><tr><th>Time</th><th>Symbol</th><th>Setup</th><th>Type</th><th>Reason</th></tr>'+
+      vetoes.map(v=>{
+        const t=new Date((v.ts||0)*1000).toLocaleString();
+        return `<tr><td class="note">${esc(t)}</td><td class="mono">${esc(v.symbol||'—')}</td><td>${esc(v.setup||'—')}</td><td><span class="pill SELL" style="padding:2px 6px;font-size:11px">${esc(v.veto_type||'veto')}</span></td><td class="note err">${esc(v.reason||'')}</td></tr>`;
+      }).join('')+'</table>';
+  }catch(e){ el.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+
+async function loadRDistribution(){
+  const el=document.getElementById('riskRDist'); if(!el) return;
+  try{
+    const res=await fetch('/api/analytics/r-distribution');
+    const data=await res.json();
+    const d=data.r_distribution||{};
+    if(!d.available || !d.total_trades){
+      el.innerHTML='<span class="muted">'+esc(d.note||'no decided paper trades yet')+'</span>';
+      return;
+    }
+    const bins=d.bins||[];
+    let barHtml=`<div class="kv" style="margin-bottom:10px">
+      <b>Total Decided</b><span>${d.total_trades}</span>
+      <b>Mean Net R</b><span class="${d.mean_r>=0?'okc':'err'}">${d.mean_r}R</span>
+      <b>Median Net R</b><span class="${d.median_r>=0?'okc':'err'}">${d.median_r}R</span>
+      <b>Wins / Losses</b><span>${d.wins_count} / ${d.losses_count}</span>
+      <b>Max Win / Loss</b><span class="okc">+${d.max_win_r}R / ${d.max_loss_r}R</span>
+    </div><div style="display:flex;flex-direction:column;gap:6px">`;
+    bins.forEach(b=>{
+      const isLoss=b.label.includes('-');
+      const color=isLoss?'var(--red)':'var(--green)';
+      const pct=(b.pct*100).toFixed(1);
+      barHtml+=`<div>
+        <div class="flex" style="justify-content:space-between;font-size:12px;margin-bottom:2px">
+          <span><b>${esc(b.label)}</b></span>
+          <span>${b.count} trade(s) (${pct}%)</span>
+        </div>
+        <div class="bar"><i style="width:${pct}%;background:${color}"></i></div>
+      </div>`;
+    });
+    barHtml+='</div>';
+    el.innerHTML=barHtml;
+  }catch(e){ el.innerHTML='<span class="err">'+esc(String(e))+'</span>'; }
+}
+
+function loadPushStatus(){
+  const el=document.getElementById('pwaPushStatus'); if(!el) return;
+  if(!window.SKY_push || !window.SKY_push.supported){
+    el.innerHTML='<span class="note">Web Push is unsupported in this browser mode or browser environment.</span>';
+    return;
+  }
+  const perm=window.SKY_push.permission();
+  el.innerHTML=`<div class="kv">
+    <b>Browser Push API</b><span class="okc">Supported</span>
+    <b>Permission</b><span class="${perm==='granted'?'okc':'err'}">${esc(perm)}</span>
+    <b>VAPID Server</b><span class="okc">Active (/api/push/vapid-key)</span>
+  </div>`;
 }
 async function clearTraderState(){
   try{
@@ -4781,12 +4857,13 @@ async function archiveAgentReport(){
 function onTabShown(tab){
   if(tab==='chart'){ loadChartWorkspace(false); loadPracticeScorecard(); }
   else if(tab==='manage') loadTradeManager();
-  else if(tab==='risk') loadRiskCenter();
+  else if(tab==='risk'){ loadRiskCenter(); loadVetoTimeline(); loadRDistribution(); }
   else if(tab==='journal') loadJournalCenter();
   else if(tab==='weekly'){ loadWeekly(); loadRitual(); loadPracticeScorecard(); }
   else if(tab==='commands'){ loadCommands(); loadJobs(false); }
   else if(tab==='modules') loadModules();
   else if(tab==='connections') loadConnections(false);
+  else if(tab==='system') loadPushStatus();
   else if(tab==='evidence') loadEvidence();
   else if(tab==='agent') loadAgent(false);
 }
@@ -4913,15 +4990,99 @@ if(authLocked()){
       });
     });
   }
-  // Push abstraction stub — real push needs VAPID + server; this wires the UI
+  function urlBase64ToUint8Array(base64String) {
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  // P18.4 PWA Web Push (VAPID) UI Integration
   window.SKY_push = {
     supported: !!('PushManager' in window) && !!('serviceWorker' in navigator) && !!('Notification' in window),
     permission: function(){ try{ return Notification.permission; }catch(e){ return 'unknown'; } },
     request: function(){
       if(!('Notification' in window)) return Promise.resolve('unsupported');
       return Notification.requestPermission();
+    },
+    subscribe: async function(){
+      if(!this.supported) return {ok:false, error:'Web Push unsupported'};
+      var perm = await this.request();
+      if(perm !== 'granted') {
+        showToast('Notification permission denied', 'err');
+        return {ok:false, error:'Permission denied'};
+      }
+      try {
+        var reg = await navigator.serviceWorker.ready;
+        var keyResp = await fetch('/api/push/vapid-key');
+        var keyData = await keyResp.json();
+        if(!keyData.ok || !keyData.public_key) return {ok:false, error:'Failed to fetch VAPID key'};
+        var sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(keyData.public_key)
+        });
+        var subJson = sub.toJSON();
+        var res = await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(subJson)
+        });
+        var resData = await res.json();
+        if(resData.ok) {
+          showToast('Web Push enabled for this device', 'ok');
+          loadPushStatus();
+        }
+        return resData;
+      } catch(e) {
+        showToast(e.message||String(e), 'err');
+        return {ok:false, error:e.message||String(e)};
+      }
+    },
+    unsubscribe: async function(){
+      if(!('serviceWorker' in navigator)) return {ok:false};
+      try {
+        var reg = await navigator.serviceWorker.ready;
+        var sub = await reg.pushManager.getSubscription();
+        if(sub) {
+          var ep = sub.endpoint;
+          await sub.unsubscribe();
+          await fetch('/api/push/unsubscribe', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({endpoint: ep})
+          });
+          showToast('Web Push unsubscribed', 'ok');
+          loadPushStatus();
+        }
+        return {ok:true};
+      } catch(e) {
+        return {ok:false, error:e.message||String(e)};
+      }
+    },
+    sendTest: async function(){
+      try {
+        var res = await fetch('/api/push/test', {method:'POST'});
+        var data = await res.json();
+        if(data.ok) showToast('Test push broadcast sent', 'ok');
+        else showToast(data.error||'Failed to send test push', 'err');
+        return data;
+      } catch(e) {
+        showToast(String(e), 'err');
+        return {ok:false, error:e.message||String(e)};
+      }
     }
   };
+
+  // iOS standalone display mode handling
+  try {
+    var isStandalone = ('standalone' in window.navigator && window.navigator.standalone) || window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) document.body.classList.add('standalone', 'ios-standalone');
+  } catch(e){}
+
   // Compact-mode helper: expose current breakpoint for tests
   window.SKY_compact = function(){ try{ return window.matchMedia('(max-width:640px)').matches; }catch(e){ return false; } };
 })();
@@ -5090,7 +5251,7 @@ def make_app(job_manager=None) -> Flask:
     @app.before_request
     def _auth_gate():
         path = request.path or "/"
-        if path == "/" or path.startswith("/static/") or path in ("/sw.js", "/manifest.json", "/offline.html", "/offline"):
+        if path == "/" or path.startswith("/static/") or path in ("/sw.js", "/manifest.json", "/offline.html", "/offline", "/api/push/vapid-key"):
             return None
         # Compatibility negotiation happens before authentication: a client too
         # old to speak this contract must be told to upgrade, not handed a 401
@@ -5171,6 +5332,55 @@ def make_app(job_manager=None) -> Flask:
     def offline_alias():
         from flask import send_from_directory
         return send_from_directory(str(Path(__file__).parent / "static"), "offline.html", mimetype="text/html")
+
+    # ── PWA Web Push (VAPID) API ──────────────────────────────────────────
+    @app.get("/api/push/vapid-key")
+    def api_push_vapid_key():
+        from data.push_notifications import get_vapid_public_key
+        pub = get_vapid_public_key()
+        return jsonify({"ok": True, "public_key": pub})
+
+    @app.post("/api/push/subscribe")
+    def api_push_subscribe():
+        from data.database import SignalDB
+        body = request.get_json(silent=True) or {}
+        endpoint = body.get("endpoint")
+        keys = body.get("keys") or {}
+        p256dh = keys.get("p256dh")
+        auth_key = keys.get("auth")
+        if not endpoint or not p256dh or not auth_key:
+            return jsonify({"ok": False, "error": "missing endpoint or subscription keys"}), 400
+        ua = request.headers.get("User-Agent", "")
+        user = _current_user()
+        uid = user.get("id") if user else None
+        with SignalDB() as db:
+            res = db.save_push_subscription(endpoint, p256dh, auth_key, user_id=uid, user_agent=ua)
+        return jsonify({"ok": True, "registered": res})
+
+    @app.post("/api/push/unsubscribe")
+    def api_push_unsubscribe():
+        from data.database import SignalDB
+        body = request.get_json(silent=True) or {}
+        endpoint = body.get("endpoint")
+        if not endpoint:
+            return jsonify({"ok": False, "error": "missing endpoint"}), 400
+        with SignalDB() as db:
+            removed = db.remove_push_subscription(endpoint)
+        return jsonify({"ok": True, "removed": removed})
+
+    @app.post("/api/push/test")
+    def api_push_test():
+        from data.database import SignalDB
+        from data.push_notifications import broadcast_push_notification
+        with SignalDB() as db:
+            res = broadcast_push_notification(
+                db,
+                title="SKY Trading Desk",
+                body="Web Push notification connected and active!",
+                icon="/static/icons/icon-192.png",
+                url="/",
+            )
+        return jsonify({"ok": True, "broadcast": res})
 
     # ── auth API ────────────────────────────────────────────────────────
     @app.get("/api/auth/status")
@@ -5536,6 +5746,25 @@ def make_app(job_manager=None) -> Flask:
             return jsonify(result)
         except Exception as exc:
             return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/risk/veto-timeline")
+    def api_risk_veto_timeline():
+        """Audit timeline of trade vetoes and risk gate blocks."""
+        from data.database import SignalDB
+        sym = request.args.get("symbol")
+        limit = request.args.get("limit", 50, type=int)
+        with SignalDB() as db:
+            vetoes = db.get_risk_vetoes(symbol=sym, limit=limit)
+        return jsonify({"ok": True, "vetoes": vetoes, "total": len(vetoes)})
+
+    @app.get("/api/analytics/r-distribution")
+    def api_analytics_r_distribution():
+        """Histogram distribution of realized net R-multiples."""
+        from data.database import SignalDB
+        from brain.analytics import r_distribution
+        with SignalDB() as db:
+            dist = r_distribution(db)
+        return jsonify({"ok": True, "r_distribution": dist})
 
     @app.post("/api/trader-state")
     def api_trader_state():

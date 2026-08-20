@@ -6,12 +6,20 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-19 (**v2.46.0 — W3.6 replay tape practice**.
-Chart Replay Freeze + Grade against the tape. Server grades the hidden
-forward window. Tape is a sibling score, never mixed into desk agreement
-and never paper evidence. Contract: `docs/HANDOVER_2026-08-19_W36.md`.
+**Last updated:** 2026-08-20 (**v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution**.
+PWA Web Push (VAPID) notification manager (`data/push_notifications.py` +
+`/api/push/*` + `window.SKY_push` UI + `_probe_webpush`), vector PNG icons,
+iOS safe-area insets & standalone mode, Risk Center "Why Blocked?" Veto Timeline
+(`risk_vetoes` + `/api/risk/veto-timeline`), and R-Multiple Distribution
+analytics (`r_distribution` + `/api/analytics/r-distribution`).
+Contract: `docs/HANDOVER_2026-08-20_v2.47.0.md`.
 **P22 still needs real signers — do not claim it from this sandbox.**
 P11 real paper proof stays parallel and is still the money path.)
+
+**Previous:** 2026-08-19 (**v2.46.0 — W3.6 replay tape practice**.
+Chart Replay Freeze + Grade against the tape. Server grades the hidden
+forward window. Tape is a sibling score, never mixed into desk agreement
+and never paper evidence. Contract: `docs/HANDOVER_2026-08-19_W36.md`.)
 
 **Previous:** 2026-08-19 (**v2.45.0 — W4.2 Ubuntu PC is the Hub**.
 One always-on PC = one Hub + one research agent. Contract:

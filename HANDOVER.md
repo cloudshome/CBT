@@ -2,7 +2,9 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-19 · **v2.46.0 — W3.6 replay tape practice** (`docs/HANDOVER_2026-08-19_W36.md`). Chart Replay Freeze + Grade against the tape. Server walks the hidden forward window and scores the outcome. Desk-agreement keys stay desk-only; tape is a sibling block. Coaching memory only — not paper evidence, not permission. P22 drills still need real signers. Do not spend a sandbox session claiming signed installers.
+Last updated: 2026-08-20 · **v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution** (`docs/HANDOVER_2026-08-20_v2.47.0.md`). PWA Web Push (VAPID) notification manager (`data/push_notifications.py` + `/api/push/*` + `window.SKY_push` UI + `_probe_webpush`), generated high-resolution 32-bit RGBA icons (`packaging/generate_icons.py` -> `web/static/icons/*.png`), iOS safe-area insets & standalone mode handling, Risk Center "Why Blocked?" Veto Timeline (`risk_vetoes` + `/api/risk/veto-timeline`), and R-Multiple Distribution analytics (`r_distribution` + `/api/analytics/r-distribution`). P22 drills still need real signers.
+
+**Previous:** 2026-08-19 · **v2.46.0 — W3.6 replay tape practice** (`docs/HANDOVER_2026-08-19_W36.md`). Chart Replay Freeze + Grade against the tape. Server walks the hidden forward window and scores the outcome. Desk-agreement keys stay desk-only; tape is a sibling block. Coaching memory only — not paper evidence, not permission.
 
 **Previous:** 2026-08-19 · **v2.45.0 — W4.2 Ubuntu PC is the Hub** (`docs/HANDOVER_2026-08-19_W42.md`). The always-on Ubuntu PC runs **one** research agent (`sky-agent.service`) inside Hub FHS. Do **not** add a second PC-use agent.
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.47.0] — 2026-08-20 · PWA Push (VAPID), Veto Timeline & R-Distribution
+
+MINOR: Web Push (VAPID) notifications, designed vector PWA app icons,
+iOS safe-area insets and standalone display mode handling, Risk Center
+"Why Blocked?" Veto Timeline, and R-Multiple Distribution analytics.
+
+- **Web Push (VAPID)** — `data/push_notifications.py` RFC 8292 Web Push
+  manager using `cryptography` SECP256R1 keys and IEEE P1363 ECDSA JWT
+  signatures. Endpoints: `GET /api/push/vapid-key`, `POST /api/push/subscribe`,
+  `POST /api/push/unsubscribe`, `POST /api/push/test`. `web/static/sw.js` and
+  `window.SKY_push` UI integration. Probe `_probe_webpush()` in `brain/connections.py`.
+- **App Icons & iOS Polish** — `packaging/generate_icons.py` creates 180x180,
+  192x192, 512x512, and 512x512 maskable PNG icons under `web/static/icons/`.
+  iOS safe-area insets (`env(safe-area-inset-top)`) and standalone detection
+  (`body.standalone` / `body.ios-standalone`).
+- **Veto Timeline** — `risk_vetoes` table and `record_risk_veto()` in
+  `data/database.py`, auto-logged from `brain/decision.py`. Endpoint
+  `GET /api/risk/veto-timeline` + "🛡 VETO TIMELINE" card in Risk Center.
+- **R-Distribution** — `r_distribution(db)` in `brain/analytics.py` computing
+  realized net R histogram bins (`<-2R` to `>=3R`), mean/median R, and win/loss
+  counts. Endpoint `GET /api/analytics/r-distribution` + "📊 R-MULTIPLE DISTRIBUTION" card.
+
 ## [2.46.0] — 2026-08-19 · W3.6 replay tape practice
 
 MINOR: Replay Freeze + **Grade against the tape**. Commit a chart read at

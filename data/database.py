@@ -331,6 +331,30 @@ CREATE INDEX IF NOT EXISTS idx_paper_symbol ON paper_trades(symbol);
 CREATE INDEX IF NOT EXISTS idx_idem_created ON idempotency_keys(created_ts);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_hash ON jobs(params_hash);
+-- P18.4 PWA Web Push notification subscriptions
+CREATE TABLE IF NOT EXISTS push_subscriptions(
+  endpoint TEXT PRIMARY KEY,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_id INTEGER,
+  user_agent TEXT,
+  created_ts INTEGER NOT NULL,
+  last_active_ts INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_push_sub_active ON push_subscriptions(last_active_ts);
+-- W4.3 / Risk Center: audit log of trade/scan risk veto decisions
+CREATE TABLE IF NOT EXISTS risk_vetoes(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  symbol TEXT,
+  setup TEXT,
+  action TEXT,
+  reason TEXT NOT NULL,
+  veto_type TEXT NOT NULL,
+  detail_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_risk_vetoes_ts ON risk_vetoes(ts);
+CREATE INDEX IF NOT EXISTS idx_risk_vetoes_sym ON risk_vetoes(symbol);
 """
 
 
@@ -1459,6 +1483,76 @@ class SignalDB:
                 d["payload"] = json.loads(d.get("payload_json") or "{}")
             except Exception:
                 d["payload"] = {}
+            out.append(d)
+        return out
+
+    # ── P18.4 PWA Push Subscriptions ──────────────────────────────────────────
+    def save_push_subscription(self, endpoint: str, p256dh: str, auth: str,
+                                user_id: int | None = None, user_agent: str = "") -> dict:
+        """Register or update a Web Push subscription."""
+        now = int(time.time())
+
+        def _op():
+            self.conn.execute(
+                "INSERT INTO push_subscriptions(endpoint, p256dh, auth, user_id, user_agent, created_ts, last_active_ts) "
+                "VALUES(?,?,?,?,?,?,?) "
+                "ON CONFLICT(endpoint) DO UPDATE SET "
+                "p256dh=excluded.p256dh, auth=excluded.auth, user_id=excluded.user_id, "
+                "user_agent=excluded.user_agent, last_active_ts=excluded.last_active_ts",
+                (endpoint, p256dh, auth, user_id, user_agent, now, now))
+            self.conn.commit()
+            return {"endpoint": endpoint, "ok": True, "ts": now}
+        return self._retry_write(_op)
+
+    def remove_push_subscription(self, endpoint: str) -> bool:
+        """Unregister a Web Push subscription."""
+        def _op():
+            cur = self.conn.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,))
+            self.conn.commit()
+            return cur.rowcount > 0
+        return self._retry_write(_op)
+
+    def list_push_subscriptions(self) -> list[dict]:
+        """Return all active Web Push subscriptions."""
+        rows = self.conn.execute(
+            "SELECT endpoint, p256dh, auth, user_id, user_agent, created_ts, last_active_ts "
+            "FROM push_subscriptions ORDER BY last_active_ts DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── W4.3 / Risk Center Veto History ───────────────────────────────────────
+    def record_risk_veto(self, symbol: str, setup: str, action: str, reason: str,
+                         veto_type: str = "desk", detail: dict | None = None) -> dict:
+        """Log a trade veto event for timeline review."""
+        now = int(time.time())
+        detail_json = json.dumps(detail or {}, default=str)
+
+        def _op():
+            cur = self.conn.execute(
+                "INSERT INTO risk_vetoes(ts, symbol, setup, action, reason, veto_type, detail_json) "
+                "VALUES(?,?,?,?,?,?,?)",
+                (now, symbol, setup or "", action, reason, veto_type, detail_json))
+            self.conn.commit()
+            return {"id": cur.lastrowid, "ts": now, "symbol": symbol, "reason": reason}
+        return self._retry_write(_op)
+
+    def get_risk_vetoes(self, symbol: str | None = None, limit: int = 50) -> list[dict]:
+        """Return newest risk veto events first."""
+        if symbol:
+            rows = self.conn.execute(
+                "SELECT * FROM risk_vetoes WHERE symbol=? ORDER BY ts DESC, id DESC LIMIT ?",
+                (symbol, limit)).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM risk_vetoes ORDER BY ts DESC, id DESC LIMIT ?",
+                (limit,)).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["detail"] = json.loads(d.get("detail_json") or "{}")
+            except Exception:
+                d["detail"] = {}
             out.append(d)
         return out
 

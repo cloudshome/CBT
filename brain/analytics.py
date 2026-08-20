@@ -364,3 +364,80 @@ def monte_carlo_ruin_table(
         "historical": historical,
         "table": table,
     }
+
+
+def r_distribution(db) -> dict:
+    """Distribution histogram of realized net R-multiples for decided paper/live trades.
+
+    Categorizes trades into bins:
+      <-2.0R, [-2.0R, -1.0R), [-1.0R, 0.0R), [0.0R, 1.0R), [1.0R, 2.0R), [2.0R, 3.0R), >=3.0R
+    """
+    from data.costs import net_r_of_row
+
+    rows = db.live_book_rows() if hasattr(db, "live_book_rows") else []
+    if not rows:
+        return {
+            "available": False,
+            "note": "no decided paper trades yet",
+            "total_trades": 0,
+            "bins": [],
+        }
+
+    r_vals = [net_r_of_row(r) for r in rows if net_r_of_row(r) is not None]
+    if not r_vals:
+        return {
+            "available": False,
+            "note": "no trades with valid net R yet",
+            "total_trades": 0,
+            "bins": [],
+        }
+
+    bin_counts = {
+        "<-2R": 0,
+        "-2R to -1R": 0,
+        "-1R to 0R": 0,
+        "0R to 1R": 0,
+        "1R to 2R": 0,
+        "2R to 3R": 0,
+        ">=3R": 0,
+    }
+
+    for r in r_vals:
+        if r < -2.0:
+            bin_counts["<-2R"] += 1
+        elif -2.0 <= r < -1.0:
+            bin_counts["-2R to -1R"] += 1
+        elif -1.0 <= r < 0.0:
+            bin_counts["-1R to 0R"] += 1
+        elif 0.0 <= r < 1.0:
+            bin_counts["0R to 1R"] += 1
+        elif 1.0 <= r < 2.0:
+            bin_counts["1R to 2R"] += 1
+        elif 2.0 <= r < 3.0:
+            bin_counts["2R to 3R"] += 1
+        else:
+            bin_counts[">=3R"] += 1
+
+    total = len(r_vals)
+    bins = [
+        {"label": k, "count": v, "pct": round(v / total, 3)}
+        for k, v in bin_counts.items()
+    ]
+
+    wins = [r for r in r_vals if r > 0]
+    losses = [r for r in r_vals if r < 0]
+    scratches = [r for r in r_vals if r == 0]
+
+    return {
+        "available": True,
+        "total_trades": total,
+        "bins": bins,
+        "mean_r": round(float(np.mean(r_vals)), 3),
+        "median_r": round(float(np.median(r_vals)), 3),
+        "std_r": round(float(np.std(r_vals)), 3) if total > 1 else 0.0,
+        "wins_count": len(wins),
+        "losses_count": len(losses),
+        "scratch_count": len(scratches),
+        "max_win_r": round(float(np.max(r_vals)), 3),
+        "max_loss_r": round(float(np.min(r_vals)), 3),
+    }

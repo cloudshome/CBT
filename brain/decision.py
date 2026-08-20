@@ -106,6 +106,14 @@ def _build_decision_inner(payload: dict, symbol: str, db: SignalDB, intel: dict,
         if not gates["risk"]["ok"]:
             blocked_by += rg["blocked_by"]
 
+        if blocked_by and hasattr(db, "record_risk_veto"):
+            reason_str = "; ".join(blocked_by)
+            vtype = "playbook" if not gates["playbook"]["ok"] else ("portfolio" if not gates["portfolio"]["ok"] else "risk_gate")
+            try:
+                db.record_risk_veto(symbol=symbol, setup=plan_type, action=desk_action, reason=reason_str, veto_type=vtype)
+            except Exception:
+                pass
+
     final = "NO TRADE" if blocked_by or desk_action == "NO TRADE" else desk_action
     return {
         "action": final,
