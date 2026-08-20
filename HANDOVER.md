@@ -2,7 +2,7 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-20 · **v2.48.1 — PWA cache + test-environment reliability** (`docs/HANDOVER_2026-08-20_v2.48.1.md`). The service-worker cache now rolls with the application version, a regression keeps `config.py` / `pyproject.toml` / `sw.js` in lockstep, and agent CLI subprocess tests keep the active Python interpreter. No trading behavior or safety boundary changed.
+Last updated: 2026-08-20 · **v2.49.0 — The Trade Terminal, professional layout** (`docs/HANDOVER_2026-08-20_v2.49.0.md`). The web dashboard is now one professional trading platform: watchlist left, chart centre, paper-ticket + AI Copilot right, tabbed trading panel bottom, six-area navigation, professional dark theme. Full suite 1282/1; wheel gate green. Roadmap rewritten around the terminal vision. Next code is T2–T4 (AI polish, paper workflow wiring, panel persistence). No trading behavior or safety boundary changed.
 
 **Previous:** 2026-08-20 · **v2.48.0 — W3.5 part 2: 2×2 multi-chart synchronized crosshair** (`docs/HANDOVER_2026-08-20_W35_part2.md`). Completes the W2/W3.5 chart backlog: one pointer moves the crosshair on all four panes (`subscribeCrosshairMove` → `setCrosshairPosition`), per-browser Zoom/Crosshair sync toggles, four distinct default slots, honest "no candles" empty slots, a 1970-date timestamp fix, and a Python-eaten `/\-/g` escape cleanup. Full suite 1282 passed / 1 skipped. No threshold moved; multi-chart stays a comparison view only.
 
@@ -33,6 +33,34 @@ Last updated: 2026-08-20 · **v2.48.1 — PWA cache + test-environment reliabili
 ## Next session — start here
 
 > **Triage durable (2026-08-18):** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` is still the `6-idea -> Take/Park/Reject` decision — `P18.4` already satisfied `*02/#3 + *05 compact` as shell-only PWA; `*01/*04/*06` stay parked as external labs after `P19+graduation`. **Do not re-triage, do not add torch/OpenDataLoader/LMRing deps.**
+
+**The Trade Terminal is shipped (v2.49.0, T1).** The dashboard is now a
+professional one-screen trading platform. Begin with **visual QA on a real
+browser** (the sandbox has no browser), then proceed to **T2–T4** per the
+roadmap:
+
+1. **Visual QA** — open `python main.py web` on a real host (or the Hub),
+   confirm the terminal renders correctly at desktop and mobile widths. Fix
+   any visual issues.
+2. **T2 — AI Copilot polish** — improve the structured-section parser, add
+   per-answer sources, and a "prepare ticket from AI" flow (AI may prepare
+   a ticket but never approve).
+3. **T3 — Paper-trade workflow wiring** — make the Confirm button create the
+   actual approved paper trade through the existing desk approval flow:
+   ticket → approved scan → enrolled paper position → bottom-panel
+   management (live R, MAE/MFE, stop/trail/exit) → close → auto-journal.
+   This is the roadmap's core workflow: *chart → understand → paper trade →
+   manage → close → journal*.
+4. **T4 — Professional polish** — resizable/collapsible panels, localStorage
+   persistence of panel sizes/watchlist/symbol/timeframe/layout, loading
+   skeletons, explicit stale/error states in the terminal, tooltips.
+5. **T5 — Home screen** — concise post-login command dashboard with an
+   "Open Trading Terminal" primary button.
+6. **T6 — Focused pages** — deepen Markets/Portfolio/Journal/Evidence/System
+   beyond grouped legacy panels; mobile four-section layout.
+
+The real-host lane (P11 paper proof, P12.12 XAU evidence, P22 trusted-signer
+drills) continues in parallel and is unaffected by the terminal work.
 
 **P19–P22.3 are done as source contracts (v2.35.0–v2.40.0).** Sign and
 physically drill only in the trusted release environment. Do not mark P22

@@ -1,41 +1,306 @@
-# SKY Canonical Product Roadmap
+# SKY — Professional Trading Terminal
 
 > **Status:** active source of truth
-> **Last updated:** 2026-08-17
-> **Current software:** v2.35.0 source + Hub mechanics; a signed Debian
-> repository, Windows `.exe`, and Android `.apk` releases do not exist yet.
+> **Last updated:** 2026-08-20
+> **Current software:** v2.48.1
 >
-> This roadmap merges the delivered AI-anatomy, Agent-Reach, data/validation,
-> teaching, workstation, and web-trader plans with the new production-install
-> plan. Older roadmap files remain as detailed historical specifications; when
-> priorities conflict, this file and `TODO.md` win.
+> **Vision:** SKY should feel like one professional trading platform, not a
+> collection of Python functions and separate dashboard cards. A user opens
+> one website, selects a market, studies the chart, asks the AI, creates a
+> paper trade, manages it, closes it, and journals it — without seeing
+> terminal commands.
+>
+> This roadmap defines the unified Trade Terminal product. Older roadmap
+> files remain as detailed historical specifications; when priorities
+> conflict, this file and `TODO.md` win.
 
 ---
 
 ## 1. Product promise
 
-SKY should feel like installed production software, not a Git repository:
+SKY is a professional trading terminal that never places a real order.
 
-1. Install it using the normal method for the platform.
-2. Open SKY from an icon or URL.
-3. See whether the market, services, database, and alerts are healthy.
-4. Monitor signals, evidence, risk, paper positions, and the journal.
-5. Perform permitted human actions through the interface.
-6. Receive safe updates without losing configuration or history.
-7. Ask for later changes without manually editing source code.
+A user should:
+1. Open one website — the **Trade Terminal**.
+2. Select a market (BTC, ETH, XAU) and a timeframe.
+3. Study a professional chart with indicators, zones, and drawings.
+4. Ask the AI Copilot to explain the setup.
+5. Create a paper trade with prefilled entry, stop, targets, and risk.
+6. See the risk-gate verdict before committing.
+7. Manage the open position with live R, MAE/MFE, and management advice.
+8. Close the position and automatically open the journal.
+9. Review performance, evidence, and discipline in one place.
+10. Never type a terminal command to do any of the above.
 
 The software goal does **not** change the trading-safety goal:
-
 - SKY remains paper-first and advisory.
 - No package contains an automatic exchange-order path.
-- A model, mobile client, or desktop client cannot bypass the risk gate.
-- Packaging success is not evidence of trading profitability.
+- The risk gate is enforced on every paper approval.
+- The AI is advisory — it prepares a ticket but cannot bypass the gate.
 
 ---
 
-## 2. One system, three installation experiences
+## 2. The Trade Terminal — professional layout
 
-### Chosen architecture
+```
++----------------------------------------------------------------------------+
+| SKY   BTC/USDT v   15m v   Risk Gate: OPEN   Alerts   Account              |
++----------------+----------------------------------+-----------------------+
+| WATCHLIST      |       MAIN CHART                | ORDER / AI PANEL      |
+|                |  Candles, drawings, zones,       | Paper trade ticket   |
+| BTCUSDT  +1.2% |  levels, indicators, overlays  | Buy/Sell, Entry, SL,  |
+| ETHUSDT  -0.5% |                                  | TP, Risk %, Size      |
+| XAUUSD   +0.3% |                                  | Risk-gate verdict     |
+| Search...      |                                  | AI Copilot chat       |
++----------------+----------------------------------+-----------------------+
+| Positions | Orders | Trade history | Journal | Alerts | Strategy evidence |
++----------------------------------------------------------------------------+
+```
+
+This is the default and primary page. The user rarely needs to leave it.
+
+### Layout principles
+- **Left panel:** searchable watchlist with live prices and daily change.
+- **Center:** large professional chart (Lightweight Charts) with overlays.
+- **Right panel:** paper-trade ticket or AI Copilot (resizable/collapsible).
+- **Bottom panel:** tabbed view of positions, orders, history, journal, alerts, evidence.
+- **Top bar:** symbol selector, timeframe selector, feed freshness, risk status, alerts, account.
+- **Panel sizes, watchlist, symbol, timeframe, and layout are remembered.**
+- **Persistent AI Copilot** available as a right-side drawer from every page.
+
+---
+
+## 3. One clear paper-trade workflow
+
+The professional workflow:
+1. Select `BTCUSDT`.
+2. Choose timeframe.
+3. Review the chart and SKY signal.
+4. Ask AI: "Explain this setup."
+5. Click **Create Paper Trade**.
+6. Entry, stop, targets, risk, and size are prefilled.
+7. SKY shows the risk-gate verdict and checklist.
+8. User confirms.
+9. Position immediately appears under the chart.
+10. Live R, MAE/MFE, stop, targets, and management advice update.
+11. Click **Close Position**.
+12. Journal drawer opens automatically.
+
+That is the complete experience: **chart -> understand -> paper trade -> manage -> close -> journal**.
+
+---
+
+## 4. Navigation - six primary areas
+
+The current interface has many functions displayed simultaneously. Professional
+software exposes complexity through organized panels and contextual actions.
+
+### Trade (default)
+Chart, watchlist, paper order ticket, AI Copilot, positions, and trade management.
+The terminal - everything a trader needs in one screen.
+
+### Markets
+BTC, ETH, XAU overview: price, trend, funding, open interest, flow, news, and data freshness.
+
+### Portfolio
+Paper equity, current exposure, realized R, drawdown, performance, and trade history.
+
+### Journal
+Calendar, journal entries, screenshots/drawings, mistakes, emotions, and rule compliance.
+
+### Evidence
+Backtests, scorecards, expectancy, sample progress, setup graduation, and validation.
+
+### System
+Connections, data health, background jobs, devices, backups, updates, and advanced tools.
+
+"Modules" and "Command Center" remain available under **System -> Advanced**.
+
+---
+
+## 5. Professional visual language
+
+- **Dark neutral background** (`#070b14`) - consistent, calm.
+- **Thin borders** (`1px solid #1e3358`) instead of many floating cards.
+- **Compact SVG icons** - no emojis in primary navigation.
+- **Gren/red** only for market direction and P&L.
+- **Amber** for warnings and blocked conditions.
+- **Cyan/blue** for neutral SKY actions.
+- **Compact typography** - `Inter`, `12-13.5px`, numeric values aligned.
+- **Chart gets most of the screen** - resizable panels.
+- **Toltips** instead of long explanations occupying space.
+- **Loding skeletons** rather than blank areas.
+- **Explicit stale, disconnected, waiting, and error states.**
+- **Panel sizes, watchlist, symbol, timeframe, and layout are remembered.**
+
+A professional terminal should feel **dense but calm**, not crowded.
+
+---
+
+## 6. Trade ticket design
+
+The right-side paper ticket resembles a real exchange ticket while clearly marked:
+
+> **PAPER - NO REAL ORDER WILL BE SENT**
+
+- Buy / Sell toggle
+- Market / Limit / Conditional
+- Entry price
+- Stop loss
+- TP1 / TP2 / TP3
+- Risk percentage
+- Position size
+- Estimated fees and slippage
+- Plnned R:R
+- Risk-gate result (Open / Blocked with reason)
+- Setup evidence
+- **Confirm Paper Trade** button
+
+When blocked, the button remains disabled and the exact reason appears beside it.
+
+---
+
+## 7. Bottom trading panel
+
+Like Binance and TradingView, the lower panel has tabs:
+
+- **Oen positions** - entry, SL, TP, current P&L, MAE/MFE, management
+- **Pnding plans** - approved but not yet entered
+- **Trade history** - closed trades with outcome, R, journal status
+- **Aerts** - price, signal, and system alerts
+- **Journal** - recent entries, compliance rate
+- **Strategy evidence** - per-setup stats, expectancy, sample count
+- **Bckground activity** - jobs, health, system events
+
+Selecting a position paints its entry, stop, and targets on the chart and opens
+its management controls.---
+
+## 8. Persistent AI Copilot
+
+AI chat is available from every page as a right-side drawer - not hidden inside
+a separate technical page.
+
+Quick-action buttons above the chat:
+- **Explain this chart**
+- **Why is trading blocked?**
+- **Review this signal**
+- **Review my open position**
+- **What invalidates this setup?**
+- **Summarize today**
+- **Help me journal**
+- **Am I ready for graduation?**
+
+The AI automatically receives current context:
+- Selected symbol and timeframe
+- Visible chart range
+- Latest signal and regime
+- Risk-gate status
+- Open paper positions
+- Measured strategy evidence
+- Relevant journal history
+
+The response visibly separates:
+- **Market facts**
+- **SKY interpretation**
+- **Risk concerns**
+- **Suggested next action**
+
+---
+
+## 9. Home screen
+
+The first screen after login is a concise command dashboard:
+
+- Continue last market
+- Risk gate status
+- Data freshness
+- Open positions
+- Today's P&L
+- Journal tasks
+- Evidence progress
+- Important alerts
+- **"Oen Trading Terminal"** primary button
+
+It does not show every technical module.
+
+---
+
+## 10. Mobile experience
+
+Mobile uses four primary sections:
+- **Markets** - price overview and quick scan
+- **Chart** - full chart with taps for trade
+- **Position** - open and closed positions
+- **AI** - AI Copilot chat
+
+The paper ticket opens as a full-screen sheet. Approval remains online-only;
+the current risk status is refreshed immediately before confirmation.
+
+---
+
+## 11. Implementation phases
+
+### Phase T1 - Trade Terminal layout (NEXT)
+- Rewrite the dashboard HTML to the professional 3-column layout.
+- Watchlist left, chart center, order/AI panel right.
+- Bottom panel with tabs (positions, orders, history, journal, alerts, evidence).
+- Simplified 6-area navigation.
+- Professional dark theme with thin borders and compact typography.
+- Trade ticket UI with buy/sell, entry, SL, TP, risk, size.
+- AI Copilot drawer with quick-action buttons.
+
+### Phase T2 - Persistent AI Copilot
+- AI chat as a right-side drawer on every page.
+- Contet-aware quick-action buttons.
+- Structured response market facts, SKY interpretation, risk concerns, suggested action).
+- Automatic context injection (symbol, timeframe, signal, risk gate, positions).
+
+### Phase T3 - Paper trade workflow
+- Click chart -> prefilled ticket.
+- Risk-gate verdict shown inline.
+- Position management from bottom panel.
+- Cloe -> auto-journal flow.
+- Live R, MAE/MFE, management advice updates.
+
+### Phase T4 - Professional polish
+- Resizable and collapsible panels.
+- Panel/symbol/timeframe/layout persistence (localStorage).
+- Loading skeletons.
+- Explicit stale/disconnected/error states.
+- Tooltips for all icons.
+- Compact mobile layout.
+
+### Phase T5 - Home screen & onboarding
+- Concise post-login command dashboard.
+- "Oen Trading Terminal" primary button.
+- Onboarding flow for new users.
+
+### Phase T6 - Markets, Portfolio, Journal, Evidence, System pages
+- Full content for each of the 6 navigation areas.
+- Each page is a focused view, not a card colection.
+
+---
+
+## 12. Merged roadmap history (delivered capability)
+
+| Phases | Delivered capability | Status |
+|---|---|---|
+| P1–P6 | Signal engine, context, risk, learning, agents, immune system | Shipped |
+| P7–P9 | Agent surface, source channels, typed MCP capabilities | Shipped |
+| P10 | Owned normalised market history, derivatives, charts, streaming/store | Shipped |
+| P11 | Paper evidence and graduation loop | Operational |
+| P12 | Locked validation, scorecards, costs, provenance, source isolation | Shipped |
+| P13–P14 | Teaching and daily loop-health ritual | Shipped |
+| P15–P16 | Market sentiment colour and measured outcomes | Shipped |
+| P17 | Clickable Trading Workstation and real-world read-only connections | Foundation shipped |
+| P18 | Auth/roles, stable `/api/v1` contract, jobs/SSE, PWA | Shipped (P18.1–P18.4) |
+| P19 | Ubuntu Hub package (layout, CLI, units, backup, TLS examples) | Mechanics shipped; signed apt repo + clean-VM drill do not exist yet |
+| P20 | Windows companion contract (pairing, client, unsigned recipe) | Contract shipped; signed `.exe` does not exist yet |
+| P21 | Android companion contract (Keystore, biometric, deep links, unsigned recipe) | Contract shipped; signed `.apk` does not exist yet |
+| P22 | Release engineering and operations (checksums, SBOM, drills) | Foundation shipped; trusted-signer drills pending |
+| **T1–T6** | **Professional Trade Terminal** | **In progress (this roadmap)** |
+
+### Deployment profile (production distribution)
 
 ```text
                          HTTPS
@@ -43,363 +308,31 @@ The software goal does **not** change the trading-safety goal:
  Android .apk  ───────────┼──► Ubuntu SKY Hub
  Browser / installed PWA ─┘       ├─ Flask/Gunicorn application API
                                   ├─ scanner + paper monitor services
-                                  ├─ SQLite + Parquet evidence store
+                                  ├─ SQLite + Parquet evidence store (one DB)
                                   ├─ risk gate + audit log
                                   └─ backups + health supervision
 ```
 
-**Ubuntu is the recommended always-on authority.** One database, one risk
-gate, and one evidence book live there; the Hub also owns market collectors,
-scanner, paper runner, and audit history.
-Windows and Android are companion clients: they monitor and perform only the
-human actions the authenticated API permits.
-
-This avoids three independent engines producing three different answers. It
-also keeps account data and long-running workers off a phone that may sleep,
-lose connectivity, or be killed by the operating system.
-
-### Supported deployment profiles
-
-| Profile | Purpose | State |
-|---|---|---|
-| Source/developer | Current Python checkout and test workflow | ✅ available |
-| Ubuntu Hub | 24/7 single-user production service | 🟡 P19 mechanics shipped v2.35.0; signed repo + clean-VM drill pending |
-| Browser/PWA | Same workstation, installable from a modern browser | 🔴 planned |
-| Windows companion `.exe` | Native launcher/monitor connected to an Ubuntu Hub | 🟡 P20 contract v2.36.0; signed exe pending |
-| Android companion `.apk` | Mobile monitoring, alerts, ritual, approval/journal flow | 🔴 planned |
-| Windows all-in-one engine | Local engine for users with no Ubuntu host | ⏸ optional after the Hub and companion clients are stable |
-| Android all-in-one engine | Engine/database running continuously on Android | ❌ rejected; unreliable background runtime and duplicated authority |
-
-A local-only Ubuntu installation remains the safest default. Remote clients
-are enabled only after authentication and TLS are configured.
+**Ubuntu Hub is the always-on authority**: one database, one risk gate, and
+one evidence book. Windows and Android begin as companion clients — they
+monitor and perform only the human actions the authenticated API permits.
+This avoids three independent engines producing three different answers.
+Production distribution never adds live exchange execution; no package
+contains an automatic exchange-order path, and the risk gate is enforced
+server-side (authentication and authorization, roles, CSRF, device tokens,
+audit). Installers remain planned: signed releases do not exist yet.
 
 ---
 
-## 3. Merged roadmap history
-
-| Phases | Delivered capability | Detailed record | Status |
-|---|---|---|---|
-| P1–P6 | Signal engine, context, risk, learning, agents, immune system | `AI_ANATOMY_ROADMAP.md` | ✅ shipped |
-| P7–P9 | Agent surface, source channels, typed MCP capabilities | `ROADMAP_AGENT_REACH_UPGRADE.md` | ✅ shipped |
-| P10 | Owned normalized market history, derivatives, charts, streaming/store layers | `docs/DATA_INFRASTRUCTURE_ROADMAP.md` | ✅ shipped |
-| P11 | Paper evidence and graduation loop | `BLUEPRINT.md`, `TODO.md` | 🔄 operational; real canonical evidence remains the work |
-| P12 | Locked validation, scorecards, costs, provenance, source isolation, hard limits | `TODO.md`, validation audit documents | ✅ code shipped; real-host evidence remains |
-| P13–P14 | Teaching and daily loop-health ritual | `CHANGELOG.md` | ✅ shipped |
-| P15–P16 | Market sentiment colour and measured sentiment-conditioned outcomes | `CHANGELOG.md` | ✅ shipped |
-| P17 | Clickable Trading Workstation and real-world read-only connections | `WEB_TRADER_ROADMAP.md`, `HANDOVER.md` | ✅ foundation shipped; listed workstation follow-ups remain |
-| P18.1–P18.2 | Owner auth/roles/CSRF/audit, then the stable `/api/v1` client contract | `docs/HANDOVER_2026-08-17_P18_2.md` | ✅ shipped |
-| P18.3 | Persisted background jobs + SSE | `docs/HANDOVER_2026-08-17_P18_3.md` | ✅ shipped |
-| P18.4 | Installable, offline-safe PWA (manifest, SW shell-only, offline, compact) | `docs/HANDOVER_2026-08-18_P18_4.md` | ✅ shipped v2.34.0 |
-| P19 | Ubuntu Hub package (layout, CLI, units, backup, TLS examples) | `docs/HANDOVER_2026-08-18_P19.md` | ✅ mechanics v2.35.0 |
-| P20 | Windows companion contract (pairing, client, unsigned recipe) | `docs/HANDOVER_2026-08-18_P20.md` | ✅ v2.36.0 |
-| P21 | Android companion contract (Keystore, biometric policy, deep links, unsigned recipe) | `docs/HANDOVER_2026-08-18_P21.md` | ✅ v2.37.0 |
-| P22 | Signed release ops (signing, CI install/smoke, checksums, SBOM) | `docs/RELEASE_OPERATIONS.md` | 🔄 P22.1 foundation v2.38.0; native/signing drills remain |
-
-### Workstation items carried forward—not lost
-
-The unfinished items from `WEB_TRADER_ROADMAP.md` are merged here:
-
-- **W1 Evidence UX:** one guided evidence build with inline persisted progress,
-  fail-closed coherent inputs, observed-rate projection and honest no-edge
-  reporting. ✅ shipped — see `docs/HANDOVER_2026-08-17_W1.md`.
-- **W2 Chart UX:** live incremental updates, drawings, zones, replay, and
-  multi-chart views. ✅ shipped — zones + replay in part 1
-  (`docs/HANDOVER_2026-08-17_W2.md`), SSE live streaming (`series.update()` in
-  place, honest live/waiting/stale/error/disconnected labels) and mouse-placed
-  trendlines/rays/boxes in part 2 (`docs/HANDOVER_2026-08-17_W2_part2.md`).
-  Multi-chart views ✅ shipped — 2×2 grid + zoom sync (v2.43.0,
-  `docs/HANDOVER_2026-08-19_W35.md`) and synchronized crosshair, sync
-  toggles, honest empty slots + 1970-date fix (v2.48.0 W3.5 part 2,
-  `docs/HANDOVER_2026-08-20_W35_part2.md`).
-- **W3 Trader development:** weekly review, equity/R charts, daily ritual,
-  enforced journaling, and practice scoring.
-- **W4 Reliability:** stale-data age, mobile compact layout, background jobs,
-  and streamed command output.
-
-They are prerequisites or companions to P18–P22, not a separate competing
-roadmap.
-
----
-
-## 4. New production roadmap
-
-## P18 — Product boundary, security, and background jobs
-
-**Goal:** make the existing workstation safe to use as an installed/remote
-product before wrapping it in `.exe` or `.apk` files.
-
-### P18.1 Authentication and authorization — ✅ shipped v2.29.2
-
-- First-run owner creation with a securely hashed password.
-- Roles:
-  - `viewer`: read dashboards, evidence, health, and paper state;
-  - `operator`: viewer plus explicitly permitted human paper actions;
-  - no role grants live exchange execution because that capability is absent.
-- Secure cookie sessions for browsers; revocable, scoped device tokens for
-  companion clients.
-- CSRF protection for browser mutations, login throttling, session expiry,
-  logout-all-devices, and an audit row for every sensitive action.
-- Existing local loopback mode remains simple; remote mode refuses to start
-  without an owner account and an HTTPS-aware deployment configuration.
-
-**Done when:** an unauthenticated user cannot read private state or mutate
-anything; a viewer cannot approve/reject/close; an operator still cannot bypass
-the risk gate; security tests cover every write endpoint.
-
-### P18.2 Stable application API — ✅ shipped v2.30.0
-
-> Delivered: one envelope, typed `ErrorCode` vocabulary, public
-> `/api/v1/version` compatibility range (checked before auth), idempotency
-> keys on the four human mutations, device registration/revocation, and a
-> machine-readable `/api/v1/routes` catalog. Legacy `/api/*` still works.
-> Contract: `docs/HANDOVER_2026-08-17_P18_2.md`.
-
-- Versioned `/api/v1` contract for dashboard and companion clients.
-- One response envelope and typed error codes; no client parses terminal text.
-- Compatibility policy: clients can detect minimum/maximum server versions.
-- Idempotency keys for human mutation requests so retries cannot duplicate an
-  action.
-- Device registration/revocation and a visible connected-device list.
-
-**Done when:** web, Windows, and Android can use one documented contract and an
-old client receives a clear upgrade message instead of corrupt behavior.
-
-### P18.3 Background job manager and streaming — ✅ shipped (v2.31.0)
-
-- Long jobs (backfill, backtest, simulator, scorecard, derivatives / cross
-  collect, and the composite `evidence` Backfill→Backtest→Simulator→Scorecard)
-  run behind a persisted queue with status, progress, cancel, and audit rows —
-  no more blocking POST. `web/jobs.py`.
-- Server-sent events for job progress (`GET /api/v1/jobs/<id>/events`); every
-  frame is a full persisted snapshot so reconnect resumes from the last event.
-- Only allow-listed jobs and validated arguments — always `python main.py
-  <validated argv>`, never a shell string; validation shared with the Command
-  Center.
-- Duplicate clicks return the existing live job (`params_hash`), never a
-  second run; a server restart marks orphaned runs `interrupted`, not lost.
-- The W1 guided “Build my evidence” flow now uses this layer: the Evidence tab
-  selects one asset/timeframe/market/history, streams the four steps inline,
-  resumes an active run after reload, projects the remaining simulator rounds
-  from observed additions, and reports no positive net edge plainly.
-
-**Done when:** closing a browser does not kill a job, duplicate clicks do not
-start duplicate runs, and progress survives reconnect/restart. ✅ met
-(`tests/test_jobs.py`, 23 tests).
-
-> **After P18.3:** W1 projection UX shipped in v2.32.0. The *live
-> health/candle* SSE stream (Priority 1 in `HANDOVER.md`) remains separate.
-
-### P18.4 Mobile-responsive PWA foundation — ✅ shipped v2.34.0
-
-- Web app manifest, icons, install prompt, safe service worker, and offline
-  shell/status page.
-- Responsive compact mode for daily ritual, alerts, risk, paper positions,
-  approvals, and journal completion.
-- Never cache private API payloads in a shared browser cache.
-- Push-notification abstraction; Telegram/Discord remain supported fallbacks.
-
-**Shipped:** `web/static/manifest.json` + 4 icons, `web/static/sw.js` (shell-only `sky-shell-v2.34.0`; never `/api/*`, auth, `/api/chart/stream`, `/api/v1/jobs/*/events`), `web/static/offline.html` precached, sticky offline banner + `body.offline` mutation guard + `beforeinstallprompt` banner + `640px` compact, `GET /sw.js` (`Service-Worker-Allowed: /` + `no-cache`), `/manifest.json` + `/offline*` public before auth. Suite 1063/1 (+10 `tests/test_pwa.py`). Contract: `docs/HANDOVER_2026-08-18_P18_4.md`.
-
-**Done when:** the workstation can be installed from Chrome/Edge on desktop and
-Android and remains safe under lost connectivity. ✅ met (manual install + offline shell verified via manifest+SW validity + Flask test-client public routes + `node --check` on served script).
-
----
-
-## P19 — Ubuntu production installation
-
-**Goal:** one supported command/package installs an always-on SKY Hub.
-
-### Deliverables
-
-1. **Signed Debian package/repository** for supported Ubuntu LTS versions.
-2. Installer creates:
-   - locked `sky` service user;
-   - immutable app files under `/opt/sky`;
-   - configuration under `/etc/sky`;
-   - database/store/backups under `/var/lib/sky`;
-   - logs under journald (no secrets in logs).
-3. Harden and package the existing Gunicorn dashboard, scan timer, and paper
-   monitor systemd units from `ops/systemd/`.
-4. `sky setup` first-run wizard: local-only or remote mode, owner account,
-   market profile, notification test, storage check, and final health verdict.
-5. `sky status`, `sky logs`, `sky backup`, `sky restore`, `sky doctor`, and
-   `sky uninstall` commands. Uninstall preserves user data unless separately
-   and explicitly requested.
-6. Reverse-proxy/TLS path using a supported configuration (Caddy or nginx),
-   with loopback binding preserved behind the proxy.
-7. Automatic daily SQLite-safe + Parquet/config backup, retention policy,
-   restore drill, disk-space alert, and schema-migration rollback plan.
-
-**Done when:** a clean supported Ubuntu VM installs, reboots, passes health,
-serves HTTPS, runs scheduled scans/paper monitoring, backs up, restores onto a
-second VM, upgrades, and rolls back without losing evidence.
-
----
-
-## P20 — Windows `.exe` companion
-
-**Goal:** a normal signed Windows installer and Start-menu application for
-monitoring and human control of the Ubuntu Hub.
-
-### Deliverables
-
-- Lightweight native shell around the production web client (WebView2-based;
-  packaging framework chosen and pinned during implementation).
-- Installer `.exe`/MSIX, Start-menu entry, uninstall, application icon, and
-  automatic update notification.
-- First-run pairing by one-time code/QR from the Ubuntu Hub.
-- Server URL validation, certificate verification, Windows Credential Manager
-  storage for the revocable device token, and no secret in files/logs.
-- System tray status for hub online/offline, data stale, risk gate, open paper
-  positions, and alert count.
-- Connection-loss banner and strictly idempotent retry behavior.
-- Signed release plus SHA-256 checksum and published compatibility range.
-
-**Done when:** a clean Windows 11 machine installs without Python/Git, pairs,
-monitors all core surfaces, performs authorized paper actions, updates, and
-uninstalls without touching Hub data.
-
-### Deferred Windows all-in-one
-
-A self-contained local Windows engine may be evaluated after P22. It must use
-the same migration/backup/service semantics and cannot become a second
-simultaneous authority for the same user. It is not required for the first
-production release.
-
----
-
-## P21 — Android `.apk`
-
-**Goal:** a signed Android companion focused on monitoring, alerts, daily
-ritual, paper approvals, and journaling.
-
-### Deliverables
-
-- Native Android shell using the same `/api/v1` contract; responsive web UI may
-  be reused, but navigation, secure storage, and notifications are native.
-- Pair using a short-lived QR/one-time code; store the scoped token in Android
-  Keystore; biometric re-check for operator mutations when available.
-- HTTPS only, certificate validation, configured-host allowlist, no arbitrary
-  web navigation, file upload, or JavaScript bridge exposing device secrets.
-- Push notifications deep-link to the exact signal/risk/paper record.
-- Offline behavior is read-only cached shell + “last updated” timestamp. No
-  approval is queued offline; the user must reconnect and see fresh risk state.
-- Signed APK for direct install; Play Store/AAB is a later release-channel
-  option. Include checksums, version compatibility, and revoke-device control.
-
-**Done when:** a clean supported Android device installs, pairs, receives an
-alert, displays fresh/stale state honestly, performs an authorized paper action
-only while online, journals a trade, and can be remotely revoked.
-
----
-
-## P22 — Release engineering and operations
-
-**Goal:** make releases repeatable, inspectable, supportable, and reversible.
-
-### Deliverables
-
-- CI matrix: Python/unit/security/API contract; Ubuntu package install/upgrade/
-  rollback; Windows package smoke test; Android build/lint/instrumented smoke.
-- Reproducible versioned artifacts with SHA-256 checksums, SBOM, dependency and
-  license inventory, vulnerability scan, and release notes.
-- Code signing for Windows and Android; signed Debian repository metadata.
-  Signing credentials live only in the release environment, never the repo.
-- Stable/beta channels; no silent major migration. The operator sees changes
-  and can postpone within a supported window.
-- In-app System page: app/client/API versions, service state, last successful
-  scan/paper poll/backup, data age, disk usage, connected devices, and update
-  availability.
-- Privacy-respecting diagnostics export with explicit secret redaction.
-- Support bundle and documented incident paths: hub offline, stale data,
-  database locked/corrupt, disk full, certificate expired, failed migration,
-  lost phone, and rollback.
-
-**Done when:** one tagged commit produces reviewable artifacts, a release can be
-installed on clean targets, monitored, backed up, upgraded, rolled back, and
-diagnosed without opening the source tree.
-
----
-
-## 5. Build order and release gates
-
-```text
-DONE      P18.1 auth/roles (v2.29.2) → P18.2 versioned API (v2.30.0) → P18.3 jobs/SSE (v2.31.0)
-DONE      W1 guided evidence UX (v2.32.0; strict validation + inline restore + honest projection)
-DONE      W2 (part 1): zone overlays (OB/FVG/liquidity/sweep) + historical replay
-DONE      W2 (part 2): SSE live candle streaming + drawing tools (v2.33.0)
-DONE      P18.4 installable, offline-safe PWA (v2.34.0 — manifest+SW shell-only; never /api/*, auth or SSE; offline shell + compact)
-PARALLEL  W4 mobile/stale-state reliability (now covered by P18.4 compact)
-DONE      P19 Ubuntu Hub mechanics (v2.35.0 — layout/CLI/units/backup; unsigned deb recipe)
-DONE      P20 Windows companion contract (v2.36.0 — pairing; unsigned recipe)
-DONE      P21 Android companion contract (v2.37.0 — Keystore/biometric/deep-link policy; unsigned recipe)
-DONE      P22.1 release foundation (checksums/SPDX/channels/redacted diagnostics/package smoke/runbook; v2.38.0)
-NOW       P22.2 real native projects + trusted signing and clean physical-target drills
-FINISH    P22 signed multi-platform release/operations contract
-ALWAYS    P11 real canonical paper evidence; never lower the graduation bar
-```
-
-Why Ubuntu first: Windows and Android need a stable, secure server contract to
-connect to. Building wrappers first would produce attractive installers around
-an unauthenticated development server and force all clients to be rewritten.
-
----
-
-## 6. Production acceptance checklist
-
-A release is not “production” merely because it launches.
-
-| Area | Required evidence |
-|---|---|
-| Install | clean-machine install with no Git/Python knowledge |
-| Startup | survives reboot and reports service health |
-| Security | auth/role/CSRF/token/revocation tests; TLS for remote use |
-| Safety | no live-order code; risk gate enforced server-side |
-| Data | migrations, backup, restore, retention, disk-full handling |
-| Network | reconnect, stale-state display, timeout, idempotent retries |
-| Monitoring | service/data/job/backup/update status visible in the app |
-| Upgrade | previous supported release upgrades without data loss |
-| Rollback | failed release can return to prior version with compatible data |
-| Packaging | signed artifact, checksum, SBOM, release notes |
-| Trading truth | demo/research/paper/live provenance never mixed |
-
----
-
-## 7. Files affected—and files deliberately unchanged today
-
-### Roadmap/documentation integration
-
-- `ROADMAP.md` — canonical merged roadmap (this file).
-- `WEB_TRADER_ROADMAP.md` — detailed P17/workstation backlog; now subordinate.
-- `AI_ANATOMY_ROADMAP.md` and `ROADMAP_AGENT_REACH_UPGRADE.md` — delivered
-  historical phase specifications; now subordinate.
-- `TODO.md` — executable next milestone.
-- `ARCHITECTURE.md`, `BLUEPRINT.md`, `README.md`, `HANDOVER.md`, and
-  `SESSION_STATE.md` — point to the same product direction.
-
-### No speculative configuration or dependency
-
-`.env.example`, `requirements.txt`, `config.py`, `main.py`, `mcp_server.py`,
-and packaging ignore rules should change **only when their corresponding P18+
-code lands**. We do not add fake future environment variables, Android/Windows
-build dependencies, or configuration that the current program cannot read.
-
----
-
-## 8. Decisions already made
-
-1. **Ubuntu Hub first.** One always-on source of truth.
-2. **Windows and Android begin as companion clients.** No duplicated trading
-   brain or evidence store.
-3. **PWA before native wrappers.** It proves mobile/responsive/auth/API behavior
-   once; `.exe` and `.apk` package the proven contract.
-4. **Remote access requires auth + HTTPS.** No public unauthenticated Flask.
-5. **No live order execution in this roadmap.** Distribution does not bypass
-   graduation or require exchange trading credentials.
-6. **User data survives application updates/uninstall by default.** Deletion is
-   a separate explicit operation.
-7. **Stable releases are manually reviewable.** No unannounced strategy,
-   threshold, or schema change.
-8. **Needle remains parked.** It is unrelated to packaging unless a measured
-   edge-device routing requirement later satisfies N1–N8 in
-   `docs/NEEDLE_REVIEW.md`.
+## 13. Key decisions
+
+1. **Trade Terminal first.** One screen dominates.
+2. **Six nav areas.** Trade, Markets, Portfolio, Journal, Evidence, System.
+3. **AI Copilot is a persistent drawer.** Available from every page.
+4. **Paper-first and advisory.** No exchange-order path; no live order execution in this roadmap.
+5. **Risk gate is server-enforced.** No client-side bypass.
+6. **Panel layout is remembered.** localStorage for sizes, symbol, timeframe.
+7. **Professional dark theme.** Dense but calm, never crowded.
+8. **Bottom panel for trading data.** Positions, orders, history, journal, alerts, evidence.
+9. **Mobile is four sections.** Markets, Chart, Positions, AI.
+10. **Everything is accessible, nothing is visible at once.** Organized panels.

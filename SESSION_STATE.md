@@ -1,4 +1,4 @@
-**Last updated:** 2026-08-20 (**v2.48.1 — PWA cache + test-environment reliability**). `sw.js` now advances its shell cache with the release; `tests/test_pwa.py` keeps `config.py` / `pyproject.toml` / service-worker cache versions in exact lockstep; the two `sky-agent` CLI tests use the active interpreter and absolute entrypoint instead of ambient `python`/cwd assumptions. Contract: `docs/HANDOVER_2026-08-20_v2.48.1.md`. **No trading behavior changed. P22 drills need real signers.**
+**Last updated:** 2026-08-20 (**v2.49.0 — The Trade Terminal, professional layout**). The web dashboard is now one professional trading platform: watchlist (left), large chart (centre), paper-trade ticket + AI Copilot (right), tabbed trading panel (bottom), six-area navigation (Trade, Markets, Portfolio, Journal, Evidence, System) with compact SVG icons, and a professional dark theme. The roadmap was rewritten around this vision with phases T1–T6. This is a **presentation-layer** release: every server endpoint, the risk gate, the graduation bar, auth/roles/CSRF, `/api/v1`, jobs/SSE, PWA and all trading logic are untouched; no threshold moved; no order path exists. Full suite **1282 passed / 1 skipped**; wheel gate green. Contract: `docs/HANDOVER_2026-08-20_v2.49.0.md`. **P22 drills still need real signers; P11 real paper proof stays parallel and remains the money path.**
 
 **Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2: synchronized crosshair**). 2×2 multi-chart crosshair sync, sync toggles, four distinct defaults, honest empty slots, and timestamp normalisation. Contract: `docs/HANDOVER_2026-08-20_W35_part2.md`.
 
@@ -153,25 +153,27 @@ now judges P&L **net of costs** (P12.18).
 > regressions); harness `ops/probes/p12_17_weekstart_probe.py`; contract
 > `docs/HANDOVER_2026-08-16_P12_17.md`.
 
-**Branch:** `arena/01a01e1a-sky` (fixed session branch)
-**HEAD commit:** verify with `git rev-parse HEAD` (v2.48.1 reliability patch after commit)
-**Upstream:** `main` at `5c79c40` (v2.48.0 W3.5 part 2).
-**Previous implementation branch:** `arena/01a01dbf-sky` (v2.48.0 checkpoint)
-**Version:** 2.48.1
+**Branch:** `arena/01a01e46-sky` (fixed session branch)
+**HEAD commit:** verify with `git rev-parse HEAD` (v2.49.0 Trade Terminal)
+**Upstream:** `main` (v2.48.1).
+**Previous implementation branch:** `arena/01a01e1a-sky` (v2.48.1 reliability patch)
+**Version:** 2.49.0
 **Python:** 3.11 — full suite 1282 passed / 1 skipped
 
-> **Current state.** P12.1–P12.18, P13 and P14 are shipped. Operate the loop
-> with `python main.py daily`. The next work in sequence remains operational,
-> not a speculative trading feature: on the real-data host, rerun canonical
-> learning, import and validate the separate Dukascopy XAU history, archive
-> the read-only `xau-evidence --json` dossier, and continue the canonical live
-> paper book. This clean checkout has no real store/database, so it must not
-> manufacture either result. The graduation bar
-> remains closed; XAU remains research-only; micro-live remains blocked until
-> the unchanged graduation gate is READY and the user separately approves it.
-> **P14 (v2.27.0, this session)** shipped the 10-minute daily ritual and the
-> one loop-health number across CLI / HTTP / MCP / ask / dashboard, plus the
-> P13 web follow-up (KEY LEVELS + POSITION MANAGER). No threshold moved.
+> **Current state.** The web dashboard is now the **Trade Terminal**
+> (v2.49.0): watchlist left, chart centre, paper-trade ticket + AI Copilot
+> right, tabbed trading panel bottom, six-area navigation, professional dark
+> theme. The roadmap was rewritten around this vision (phases T1–T6; T1
+> shipped). This is presentation-layer work — the risk gate, graduation bar,
+> auth, `/api/v1`, jobs/SSE, PWA and all trading logic are untouched. The
+> real-host lane is unchanged and remains the money path: rerun canonical
+> learning, import/validate the Dukascopy XAU history, archive
+> `xau-evidence --json`, and continue the canonical live paper book. This
+> clean checkout has no real store/database, so it must not manufacture
+> either result. The graduation bar remains closed; XAU remains research-only;
+> micro-live remains blocked until the unchanged graduation gate is READY and
+> the user separately approves it. Next code is T2–T4 (AI polish, paper
+> workflow wiring, panel persistence/polish), then the T5 home screen.
 
 > **This session (`arena/01a009c0-sky`): v2.24.0 / P12.16 open-book source
 > isolation.** PR #39 had merged and every ordered next action is real-host

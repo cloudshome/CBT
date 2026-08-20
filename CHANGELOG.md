@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.49.0] — 2026-08-20 · The Trade Terminal — professional layout
+
+MINOR: the web dashboard is now a **professional Trade Terminal**. One screen
+holds a watchlist (left), a large chart (centre), a paper-trade ticket + AI
+panel (right) and a tabbed trading panel (bottom). Six primary navigation
+areas replace the sixteen-tab bar. The roadmap was rewritten around this
+vision. This is a **presentation-layer** release: every server endpoint, the
+risk gate, the graduation bar, auth/roles/CSRF, `/api/v1`, jobs/SSE, PWA and
+all trading logic are untouched. No threshold moved; no order path exists.
+
+- **Trade Terminal (default view)** — `web/static/terminal_head.html` +
+  `web/static/terminal_newjs.js` spliced into the `web/app.py` template:
+  watchlist with search + live prices + 24h change + compact positions list;
+  full chart workspace (EMA/VWAP/BB/levels/zones/plan/RSI/MACD, drawings,
+  replay, live stream, 2×2 multi-chart, readings + levels strip); paper
+  ticket (Buy/Sell, Market/Limit/Conditional, entry, SL, TP1–TP3, risk %,
+  auto size, planned R:R, est. fees, risk-gate verdict, disabled-while-blocked
+  Confirm); bottom panel with **Open positions · Pending plans · Trade
+  history · Journal · Alerts · Strategy evidence · Background** tabs.
+- **Six-area navigation** — Trade, Markets, Portfolio, Journal, Evidence,
+  System with compact inline SVG icons. Modules and Command Center moved
+  under System. The legacy dashboard shell is preserved intact as the
+  non-Trade views (grouped), so no previous function was lost.
+- **AI Copilot** — persistent right-side drawer (✦ in the top bar) plus a
+  Copilot tab in the order panel. Eight quick actions + free chat through
+  the existing `POST /api/ask` with automatic context injection (symbol,
+  timeframe, signal, desk decision, risk-gate reasons, MTF, sentiment) and
+  structured sectioned replies (Market facts / SKY interpretation / Risk
+  concerns / Suggested next action). Advisory only.
+- **Top-bar status chips** — feed freshness (`/api/readiness`), risk gate
+  (`/api/risk`), open-position count (`/api/paper`).
+- **Professional visual language** — flat dark `#0b0e14`, thin 1px borders,
+  compact typography, green/red only for direction & P&L, amber warnings,
+  cyan SKY actions.
+- **Roadmap** — rewritten as the Professional Trading Terminal product plan
+  with phases T1–T6 (T1 layout shipped here; T2 AI polish, T3 paper
+  workflow wiring, T4 panel persistence/polish, T5 home screen, T6 focused
+  pages).
+- **Tests** — the jsdom harnesses (`test_dashboard_js.py`,
+  `test_workstation_js.py`, `test_practice_js.py`, `test_weekly_js.py`) stay
+  green against the spliced template; `test_served_script_is_valid_javascript`
+  parses the served script; full suite **1282 passed / 1 skipped**; wheel
+  gate builds `cryptobrain-2.49.0-py3-none-any.whl` with no duplicates.
+- Contract: `docs/HANDOVER_2026-08-20_v2.49.0.md`.
+
 ## [2.48.1] — 2026-08-20 · PWA cache + test-environment reliability
 
 PATCH: closes two release/reliability gaps found while establishing the clean

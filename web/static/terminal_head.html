@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SKY">
+<meta name="application-name" content="SKY">
+<meta name="mobile-web-app-capable" content="yes">
+<title>SKY — Trading Terminal</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  /* ═══════════════════════════════════════════════════════════════════
+     SKY — Professional Trading Terminal
+     Dense but calm. Thin borders. Compact typography.
+     Green/red only for direction & P&L. Amber for warnings.
+     Cyan/blue for SKY actions.
+     ═══════════════════════════════════════════════════════════════════ */
+  :root{
+    --bg:#0b0e14; --bg2:#0f131c; --panel:#11151f; --panel2:#151a26; --panel3:#1a202e;
+    --line:#1e2533; --line2:#2a3345; --txt:#d7dde8; --mut:#7e8a9c; --mut2:#5c6a80;
+    --green:#26a69a; --green2:#1f8f84; --red:#ef5350; --red2:#d64545; --amber:#f0a83c;
+    --blue:#4aa3ff; --violet:#8b7cf6; --cyan:#38c3e8;
+    --radius:6px; --r-sm:4px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font:12.5px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    -webkit-font-smoothing:antialiased; min-height:100vh; overflow-x:hidden}
+  a{color:var(--blue); text-decoration:none}
+  a:hover{text-decoration:underline}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#232b3b;border-radius:5px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-thumb:hover{background:#2f394d}
+
+  /* ── Top bar ─────────────────────────────────────────────────────── */
+  .topbar{position:sticky;top:0;z-index:40;background:rgba(11,14,20,.92);
+    backdrop-filter:blur(14px) saturate(1.2);border-bottom:1px solid var(--line);
+    padding:6px 12px;display:flex;align-items:center;gap:10px;min-height:46px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:9px;flex-shrink:0}
+  .logo{width:26px;height:26px;border-radius:6px;
+    background:linear-gradient(135deg,var(--blue),var(--violet));
+    display:grid;place-items:center;font-size:12px;color:#fff;font-weight:800}
+  .brand h1{font-size:14px;font-weight:800;letter-spacing:.02em;margin:0;line-height:1;
+    display:flex;align-items:center;gap:7px}
+  .brand h1 .ver{font-size:10px;font-weight:600;padding:1px 6px;border-radius:999px;
+    background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--mut)}
+  .topbar .spacer{flex:1}
+  .market-picker{display:flex;align-items:center;gap:8px}
+  .seg{display:flex;background:var(--bg2);border:1px solid var(--line);
+    border-radius:var(--radius);padding:2px;gap:1px;align-items:center}
+  .seg button{border:none;background:transparent;color:var(--mut);padding:4px 8px;
+    border-radius:var(--r-sm);font-size:11.5px;font-weight:600;cursor:pointer;transition:.12s}
+  .seg button.active{background:var(--panel3);color:var(--txt);
+    box-shadow:inset 0 0 0 1px var(--line2)}
+  .seg button:hover{color:var(--txt)}
+  .seg input{background:transparent;border:none;color:var(--txt);padding:4px 6px;
+    font:inherit;outline:none;min-width:76px}
+  .cg{display:flex;flex-direction:column;gap:2px}
+  .cg label{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  .status-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+    padding:3px 8px;border-radius:999px;border:1px solid var(--line);
+    background:rgba(255,255,255,.03);color:var(--mut);white-space:nowrap}
+  .status-chip .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+  .status-chip.ok{color:var(--green);border-color:rgba(38,166,154,.35)}
+  .status-chip.ok .dot{background:var(--green)}
+  .status-chip.warn{color:var(--amber);border-color:rgba(240,168,60,.4)}
+  .status-chip.warn .dot{background:var(--amber)}
+  .status-chip.blocked{color:var(--red);border-color:rgba(239,83,80,.4)}
+  .status-chip.blocked .dot{background:var(--red)}
+  .icon-btn{appearance:none;border:1px solid var(--line);background:var(--bg2);color:var(--mut);
+    width:27px;height:27px;border-radius:var(--radius);cursor:pointer;display:grid;place-items:center;
+    font-size:12px;transition:.12s;position:relative}
+  .icon-btn:hover{color:var(--txt);border-color:var(--line2);background:var(--panel2)}
+
+  /* ── Primary navigation — 6 areas ────────────────────────────────── */
+  .nav6{display:flex;align-items:center;gap:2px;background:var(--bg);
+    border-bottom:1px solid var(--line);padding:0 10px;overflow-x:auto;scrollbar-width:none}
+  .nav6::-webkit-scrollbar{display:none}
+  .nav6 .spacer{flex:1}
+  .nav6 .updated{font-size:10.5px;color:var(--mut);white-space:nowrap;padding:0 6px}
+  .navbtn{appearance:none;border:none;background:transparent;color:var(--mut);
+    padding:9px 13px;font:600 12px/1 Inter;cursor:pointer;white-space:nowrap;transition:.12s;
+    display:inline-flex;align-items:center;gap:6px;border-bottom:2px solid transparent;
+    letter-spacing:.01em}
+  .navbtn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
+    stroke-linecap:round;stroke-linejoin:round}
+  .navbtn:hover{color:var(--txt);background:rgba(255,255,255,.03)}
+  .navbtn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+  .navbtn .cnt{font-size:9.5px;padding:1px 5px;border-radius:999px;
+    background:rgba(255,255,255,.07);color:var(--mut);font-weight:700}
+
+  /* ── Views ───────────────────────────────────────────────────────── */
+  .view{display:none}
+  .view.active{display:block}
+  .view-body{padding:10px 12px 20px}
+  .shell{max-width:1500px;margin:0 auto;padding:12px 14px 24px}
+
+  /* ── Cards / panels (shared with legacy render()) ────────────────── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:760px){.grid,.grid2{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:11px 12px;position:relative}
+  .card h2{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);
+    margin:0 0 8px;display:flex;align-items:center;gap:7px;font-weight:800}
+  .card h2 .count{margin-left:auto;font-size:9.5px;background:rgba(255,255,255,.05);
+    border:1px solid var(--line);padding:1px 6px;border-radius:999px;color:var(--mut);
+    letter-spacing:.03em;text-transform:none}
+  .card h3{font-size:12px;font-weight:700;margin:10px 0 6px}
+
+  /* ── Buttons ─────────────────────────────────────────────────────── */
+  .btn{appearance:none;border:1px solid var(--line);background:var(--bg2);color:var(--txt);
+    padding:5px 10px;border-radius:var(--radius);font:600 11.5px/1 Inter;cursor:pointer;
+    transition:.12s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .btn:hover{border-color:var(--line2);background:var(--panel2)}
+  .btn.primary{background:var(--blue);border-color:transparent;color:#06121f;font-weight:700}
+  .btn.primary:hover{background:#5cb0ff}
+  .btn.ok{background:var(--green);color:#041210;border-color:transparent;font-weight:700}
+  .btn.ok:hover{background:#2cb5a8}
+  .btn.no{background:var(--red);color:#fff;border-color:transparent;font-weight:700}
+  .btn.no:hover{background:#f46865}
+  .btn.ghost{background:transparent}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.sm{padding:3px 8px;font-size:10.5px}
+
+  /* ── Pills / badges ──────────────────────────────────────────────── */
+  .pill{padding:2px 8px;border-radius:999px;font-weight:800;font-size:10.5px;
+    border:1px solid transparent;letter-spacing:.02em;display:inline-flex;align-items:center;gap:4px}
+  .BUY{background:rgba(38,166,154,.14);color:var(--green);border-color:rgba(38,166,154,.35)}
+  .SELL{background:rgba(239,83,80,.13);color:var(--red);border-color:rgba(239,83,80,.35)}
+  .NOTRADE{background:rgba(126,138,156,.09);color:var(--mut);border-color:rgba(126,138,156,.2)}
+  .badge{font-size:10px;padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.04);
+    border:1px solid var(--line);color:var(--mut);display:inline-flex;align-items:center;gap:4px}
+  .badge.strong{background:var(--blue);color:#06121f;border-color:var(--blue);font-weight:800}
+  .muted{color:var(--mut)} .mono{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  .err{color:var(--red)} .okc{color:var(--green)} .note{font-size:11px;color:var(--mut);line-height:1.5}
+  .sep{height:1px;background:var(--line);margin:8px 0}
+
+  /* ── Forms ───────────────────────────────────────────────────────── */
+  input,select,textarea{background:var(--bg2);border:1px solid var(--line);color:var(--txt);
+    padding:5px 8px;border-radius:var(--r-sm);font:inherit;outline:none;transition:.12s}
+  input:focus,select:focus,textarea:focus{border-color:var(--blue);
+    box-shadow:0 0 0 2px rgba(74,163,255,.14)}
+  .check{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--mut);cursor:pointer;user-select:none}
+  .check input{accent-color:var(--blue);width:12px;height:12px}
+  .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}
+  .kv b{color:var(--mut);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.05)}
+  th{color:var(--mut);font-weight:700;font-size:10px;letter-spacing:.05em;text-transform:uppercase}
+  tr:hover td{background:rgba(255,255,255,.02)}
+
+  /* ── Readiness strip ─────────────────────────────────────────────── */
+  .strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;
+    padding:7px 10px;border-radius:var(--radius);border:1px solid var(--line);
+    background:var(--panel);font-size:11.5px}
+  .strip.lvl-ok{border-color:rgba(38,166,154,.35)}
+  .strip.lvl-degraded{border-color:rgba(240,168,60,.35)}
+  .strip.lvl-blocked{border-color:rgba(239,83,80,.4)}
+  .strip.lvl-down{border-color:rgba(239,83,80,.5)}
+  .strip .verdict{font-weight:800;letter-spacing:.02em;font-size:12px;
+    display:inline-flex;align-items:center;gap:6px}
+  .strip .verdict .dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .strip .pillars{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
+  .strip .pill-chip{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;
+    border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--mut);
+    display:inline-flex;align-items:center;gap:5px;cursor:help}
+  .strip .strip-detail{flex-basis:100%;font-size:11px;color:var(--mut);line-height:1.5}
+
+  /* ── Sentiment strip ─────────────────────────────────────────────── */
+  .sentistrip{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;
+    padding:8px 12px;border-radius:var(--radius);border:1px solid var(--line);
+    background:var(--panel)}
+  .sentistrip .sdot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .slabel{font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+  .scale{position:relative;height:4px;flex:1;min-width:140px;max-width:260px;
+    background:linear-gradient(90deg,#ef5350,#3a4150,#26a69a);border-radius:999px}
+  .scale .tick{position:absolute;top:-2px;width:1px;height:8px;background:rgba(255,255,255,.25)}
+  .scale .needle{position:absolute;top:-4px;width:9px;height:12px;border-radius:2px;
+    background:var(--txt);transform:translateX(-50%);transition:left .8s ease}
+  .smeta{display:flex;gap:14px;font-size:10.5px}
+  .smeta .k{color:var(--mut);font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+  .smeta .v{font-weight:800;font-size:11.5px}
+
+  /* ── Quick bar ───────────────────────────────────────────────────── */
+  .quickbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .quickbar .btn{padding:6px 10px;border-radius:var(--radius)}
+
+  /* ── Watchlist cards (legacy) ────────────────────────────────────── */
+  .watchlist{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  @media(max-width:760px){.watchlist{grid-template-columns:1fr}}
+  .mini{border:1px solid var(--line);border-radius:var(--radius);padding:8px 9px;
+    background:var(--panel);cursor:pointer;transition:.12s}
+  .mini:hover{border-color:var(--line2);background:var(--panel2)}
+  .mini.active{border-color:var(--blue);box-shadow:0 0 0 1px rgba(74,163,255,.25)}
+  .mini .sym{font-weight:700;letter-spacing:-.01em;font-size:12px}
+  .mini .price{font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* ── Stats ───────────────────────────────────────────────────────── */
+  .statrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+  .stat{border:1px solid var(--line);border-radius:var(--radius);padding:8px;
+    background:var(--panel);text-align:center}
+  .stat .v{font-size:15px;font-weight:800;letter-spacing:-.01em}
+  .stat .k{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:700}
+
+  /* ── Rows / plans / bars ─────────────────────────────────────────── */
+  .row{display:flex;justify-content:space-between;gap:8px;align-items:center;
+    padding:6px 5px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;
+    transition:.1s;border-radius:var(--r-sm)}
+  .row:hover{background:rgba(255,255,255,.03)}
+  .row .btns{display:flex;gap:5px;flex-shrink:0}
+  .rowbtn{background:var(--blue);border:none;color:#06121f;padding:4px 9px;border-radius:var(--r-sm);
+    cursor:pointer;font:inherit;font-size:11px;font-weight:700;transition:.12s}
+  .rowbtn:hover{opacity:.9}
+  .rowbtn.ok{background:var(--green);color:#041210} .rowbtn.no{background:var(--red);color:#fff}
+  .plan{border:1px solid var(--line);border-radius:var(--radius);padding:8px 9px;margin-bottom:8px;
+    background:var(--panel);transition:.12s}
+  .plan:hover{border-color:var(--line2)}
+  .plan .h{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+  .plan .c{color:var(--mut);margin-top:4px;font-size:11.5px;line-height:1.5}
+  .bar{height:4px;border-radius:999px;background:var(--bg2);margin-top:6px;overflow:hidden;
+    border:1px solid var(--line)}
+  .bar i{display:block;height:100%;border-radius:999px}
+
+  /* ═══ TRADE TERMINAL ═══════════════════════════════════════════════ */
+  .terminal{display:flex;flex-direction:column;height:calc(100vh - 88px);min-height:480px}
+  .terminal-grid{display:grid;grid-template-columns:200px minmax(0,1fr) 300px;gap:0;
+    flex:1;min-height:0;border-bottom:1px solid var(--line)}
+  @media(max-width:1100px){.terminal-grid{grid-template-columns:170px minmax(0,1fr) 270px}}
+  @media(max-width:860px){.terminal-grid{grid-template-columns:1fr;overflow:auto}
+    .terminal{height:auto}.t-watchlist{display:none}}
+  .t-watchlist{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;
+    background:var(--bg)}
+  .t-chart{min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+  .t-order{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;
+    background:var(--bg);overflow:hidden}
+  .panel-head{display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid var(--line);
+    font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:800}
+  .panel-head .grow{flex:1}
+  .panel-head .btn{padding:2px 6px;font-size:10px}
+  .t-wl-search{padding:6px 8px;border-bottom:1px solid var(--line)}
+  .t-wl-search input{width:100%;font-size:11.5px;padding:4px 8px}
+  .t-wl-list{flex:1;overflow-y:auto;min-height:0}
+  .wl-row{display:flex;align-items:center;gap:6px;padding:6px 9px;cursor:pointer;transition:.1s;
+    border-bottom:1px solid rgba(255,255,255,.04)}
+  .wl-row:hover{background:var(--panel)}
+  .wl-row.active{background:rgba(74,163,255,.07);box-shadow:inset 2px 0 0 var(--blue)}
+  .wl-row .s{font-weight:700;font-size:11.5px;flex:1}
+  .wl-row .p{font-weight:700;font-size:11.5px;font-variant-numeric:tabular-nums}
+  .wl-row .chg{font-size:10.5px;font-weight:700;min-width:52px;text-align:right}
+  .chg.pos{color:var(--green)} .chg.neg{color:var(--red)} .chg.flat{color:var(--mut)}
+
+  /* ── Chart toolbar / panes ───────────────────────────────────────── */
+  .chart-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 8px;
+    border-bottom:1px solid var(--line);background:var(--panel)}
+  .chart-toolbar .seg button{padding:3px 7px;font-size:10.5px}
+  .chart-toggles{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .chart-toggles .check{font-size:10px}
+  .chart-pane{position:relative;background:var(--bg)}
+  .chart-head{padding:5px 9px;font-size:11.5px;color:var(--mut);display:flex;align-items:center;gap:8px;
+    flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.04);min-height:24px}
+  .chart-head .price-now{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+  .chart-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:5px 9px;
+    border-top:1px solid var(--line);font-size:10.5px;color:var(--mut);background:var(--panel)}
+
+  /* ── Order ticket ────────────────────────────────────────────────── */
+  .order-tabs{display:flex;border-bottom:1px solid var(--line);background:var(--panel)}
+  .order-tabs button{flex:1;appearance:none;border:none;background:transparent;color:var(--mut);
+    padding:7px 4px;font:700 10.5px/1 Inter;cursor:pointer;letter-spacing:.04em;
+    text-transform:uppercase;border-bottom:2px solid transparent;transition:.12s}
+  .order-tabs button.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+  .otab{display:none;padding:9px 10px;overflow-y:auto;flex:1;min-height:0}
+  .otab.active{display:block}
+  .paper-notice{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-align:center;
+    padding:3px 6px;border-radius:var(--r-sm);border:1px solid rgba(240,168,60,.35);
+    color:var(--amber);background:rgba(240,168,60,.07);margin-bottom:8px}
+  .ticket-side{display:flex;gap:6px;margin-bottom:8px}
+  .ticket-side button{flex:1;appearance:none;border:1px solid var(--line);background:var(--bg2);
+    color:var(--mut);padding:7px 0;border-radius:var(--radius);font:800 12px/1 Inter;cursor:pointer}
+  .ticket-side button.buy.active{background:rgba(38,166,154,.14);color:var(--green);
+    border-color:var(--green)}
+  .ticket-side button.sell.active{background:rgba(239,83,80,.13);color:var(--red);
+    border-color:var(--red)}
+  .ticket-type{display:flex;gap:4px;margin-bottom:8px;border:1px solid var(--line);
+    border-radius:var(--radius);padding:2px;background:var(--bg2)}
+  .ticket-type button{flex:1;appearance:none;border:none;background:transparent;color:var(--mut);
+    padding:4px 0;border-radius:var(--r-sm);font:600 10.5px/1 Inter;cursor:pointer}
+  .ticket-type button.active{background:var(--panel3);color:var(--txt)}
+  .t-field{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+  .t-field label{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);font-weight:700}
+  .t-field input{font-family:var(--mono);font-size:12px;padding:5px 8px}
+  .t-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .t-row.three{grid-template-columns:1fr 1fr 1fr}
+  .t-est{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:8px 0;
+    padding:7px 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+  .t-est div{display:flex;flex-direction:column;gap:1px}
+  .t-est span{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+  .t-est b{font-size:11.5px;font-variant-numeric:tabular-nums}
+  .t-gate{margin:8px 0;padding:7px 9px;border-radius:var(--radius);font-size:11px;line-height:1.5;
+    border:1px solid var(--line);background:var(--panel)}
+  .t-gate.ok{border-color:rgba(38,166,154,.4);color:var(--green)}
+  .t-gate.blocked{border-color:rgba(239,83,80,.4);color:var(--red)}
+  .t-gate.warn{border-color:rgba(240,168,60,.4);color:var(--amber)}
+  .t-evidence{margin:8px 0;font-size:10.5px;color:var(--mut);line-height:1.5}
+  .t-confirm{width:100%;padding:9px 0;font-size:12.5px;font-weight:800}
+  .t-mini{font-size:10px;color:var(--mut);display:flex;justify-content:space-between;padding:2px 0}
+  .t-mini b{color:var(--txt)}
+
+  /* ── AI Copilot ──────────────────────────────────────────────────── */
+  .ai-drawer{position:fixed;top:0;right:0;bottom:0;width:350px;max-width:94vw;z-index:70;
+    background:var(--panel);border-left:1px solid var(--line);
+    box-shadow:-14px 0 40px rgba(0,0,0,.4);display:flex;flex-direction:column;
+    transform:translateX(102%);transition:transform .2s ease}
+  .ai-drawer.open{transform:none}
+  .ai-head{display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--line)}
+  .ai-head b{font-size:12.5px;display:flex;align-items:center;gap:6px}
+  .ai-head .grow{flex:1}
+  .ai-actions{display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .ai-actions button{appearance:none;border:1px solid var(--line);background:var(--bg2);
+    color:var(--mut);padding:4px 8px;border-radius:999px;font:600 10px/1 Inter;cursor:pointer;transition:.12s}
+  .ai-actions button:hover{color:var(--cyan);border-color:rgba(56,195,232,.4)}
+  .ai-chat{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:0}
+  .ai-msg{max-width:94%;padding:7px 10px;border-radius:var(--radius);font-size:11.5px;line-height:1.55;
+    white-space:pre-wrap;word-break:break-word}
+  .ai-msg.user{align-self:flex-end;background:var(--blue);color:#06121f;font-weight:600}
+  .ai-msg.bot{align-self:flex-start;background:var(--bg2);border:1px solid var(--line);color:var(--txt)}
+  .ai-msg .ai-sec{font-weight:800;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--cyan);margin-top:6px}
+  .ai-msg .ai-sec:first-child{margin-top:0}
+  .ai-input{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--line)}
+  .ai-input input{flex:1;font-size:11.5px}
+  .ai-typing{color:var(--mut);font-style:italic;font-size:11px}
+
+  /* ── Bottom panel ────────────────────────────────────────────────── */
+  .t-bottom{background:var(--panel);display:flex;flex-direction:column;max-height:260px;min-height:130px}
+  .bottom-tabs{display:flex;gap:0;border-bottom:1px solid var(--line);overflow-x:auto;
+    scrollbar-width:none;background:var(--bg)}
+  .bottom-tabs::-webkit-scrollbar{display:none}
+  .bottom-tabs button{appearance:none;border:none;background:transparent;color:var(--mut);
+    padding:7px 12px;font:600 11px/1 Inter;cursor:pointer;white-space:nowrap;
+    border-bottom:2px solid transparent;transition:.12s}
+  .bottom-tabs button:hover{color:var(--txt)}
+  .bottom-tabs button.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+  .bottom-content{flex:1;overflow-y:auto;padding:8px 10px;display:none;min-height:0}
+  .bottom-content.active{display:block}
+  .b-table{width:100%;font-size:11px}
+  .b-table th{font-size:9.5px;padding:3px 6px}
+  .b-table td{padding:4px 6px}
+  .b-pos-row{cursor:pointer}
+  .b-pos-row:hover td{background:rgba(74,163,255,.05)}
+  .b-empty{color:var(--mut);font-size:11px;text-align:center;padding:16px 0}
+
+  /* ── Legacy tab panels ───────────────────────────────────────────── */
+  .tabpanel{display:none}
+  .tabpanel.active{display:block;animation:fade .16s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .tabbtn{display:none}  /* replaced by .navbtn */
+
+  /* ── Modal / auth / toasts ───────────────────────────────────────── */
+  #modal{display:none;position:fixed;inset:0;background:rgba(3,6,11,.7);backdrop-filter:blur(8px);
+    z-index:80;padding:14px;overflow:auto}
+  #modal .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    max-width:860px;margin:12px auto;padding:14px}
+  #authLayer{display:none;position:fixed;inset:0;z-index:95;background:rgba(5,8,14,.9);
+    backdrop-filter:blur(10px);overflow:auto;padding:16px}
+  #authLayer .authbox{max-width:380px;margin:8vh auto 0;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  #authLayer .authbox h2{margin:0 0 5px;font-size:16px}
+  #authLayer .authbox .logo-big{width:38px;height:38px;border-radius:9px;
+    background:linear-gradient(135deg,var(--blue),var(--violet));
+    display:grid;place-items:center;font-size:19px;margin-bottom:10px;color:#fff}
+  #authLayer .afield{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+  #authLayer .afield label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--mut);font-weight:700}
+  #authLayer .afield input{font-size:13px;padding:8px 10px}
+  #authLayer .aerr{color:var(--red);font-size:12px;margin-bottom:8px;min-height:16px}
+  #authLayer .ahint{color:var(--mut);font-size:11px;line-height:1.55;margin-top:10px}
+  #userChip{display:none;align-items:center;gap:6px;margin-left:2px}
+  #userChip .who{display:flex;align-items:center;gap:6px;border:1px solid var(--line);
+    background:rgba(255,255,255,.03);padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700}
+  #userChip .who .avatar{width:18px;height:18px;border-radius:50%;
+    background:linear-gradient(135deg,var(--blue),var(--violet));display:grid;
+    place-items:center;font-size:10px;color:#fff}
+  #userChip .who .role{font-size:9px;padding:1px 5px;border-radius:999px;
+    background:rgba(139,124,246,.15);color:var(--violet);border:1px solid rgba(139,124,246,.3);
+    text-transform:uppercase;letter-spacing:.04em}
+  #toasts{position:fixed;bottom:14px;right:12px;display:flex;flex-direction:column;gap:6px;
+    z-index:99;max-width:340px}
+  .toast{background:var(--panel);border:1px solid var(--line);padding:9px 11px;border-radius:8px;
+    box-shadow:0 12px 30px rgba(0,0,0,.45);font-size:12px;display:flex;gap:8px;align-items:flex-start;
+    animation:slideIn .2s ease}
+  @keyframes slideIn{from{transform:translateX(10px);opacity:0}to{transform:none;opacity:1}}
+  #moodbar{position:fixed;left:0;top:0;bottom:0;width:3px;z-index:90;background:#3a4150;
+    transition:background 1.4s ease}
+
+  /* ── PWA ─────────────────────────────────────────────────────────── */
+  #offlineBanner{display:none;position:sticky;top:0;z-index:45;background:linear-gradient(90deg,#f0a83c,#e8892b);
+    color:#14100a;padding:6px 12px;text-align:center;font:700 11.5px/1.4 Inter;border-bottom:1px solid rgba(0,0,0,.15)}
+  #offlineBanner.show{display:block}
+  #offlineBanner a{color:#14100a;text-decoration:underline;font-weight:800}
+  #installBanner{display:none;position:sticky;top:0;z-index:44;background:var(--panel);color:var(--txt);
+    border-bottom:1px solid var(--line);padding:6px 12px;align-items:center;justify-content:space-between;
+    gap:10px;flex-wrap:wrap}
+  #installBanner.show{display:flex}
+  #installBanner b{font-size:12px}
+  #installBanner .note{margin:0}
+  body.offline .mutation{opacity:.4;pointer-events:none}
+
+  /* ── Misc legacy widgets ─────────────────────────────────────────── */
+  .formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+  .fullfield{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;font-size:11px}
+  .fullfield label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:700}
+  .fullfield textarea{font:inherit}
+  .cmdgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:8px}
+  .cmdcard{border:1px solid var(--line);border-radius:var(--radius);padding:9px;background:var(--panel)}
+  .cmdcard .inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-top:6px}
+  .modrow{display:grid;grid-template-columns:200px 1fr 60px;gap:8px;padding:5px 6px;
+    border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;align-items:baseline}
+  .modrow code{color:var(--cyan);font-size:11px}
+  .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+  .pipestep{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);
+    border-radius:var(--radius);padding:9px;background:var(--panel)}
+  .pipestep .n{width:22px;height:22px;flex-shrink:0;border-radius:50%;
+    background:linear-gradient(135deg,var(--blue),var(--violet));display:grid;place-items:center;
+    font-weight:800;font-size:12px;color:#fff}
+  .pipestep .btn{margin-top:6px;margin-right:5px}
+  .critrow{margin-bottom:7px}
+  .critrow .top{display:flex;justify-content:space-between;gap:8px;font-size:12px;align-items:baseline}
+  .critrow .bar{margin-top:4px}
+  .setupcard{border:1px solid var(--line);border-radius:var(--radius);padding:9px;margin-bottom:8px;
+    background:var(--panel)}
+  .setupcard.proven{border-color:rgba(38,166,154,.4)}
+  .blockcard{border-radius:var(--radius);padding:10px;margin-bottom:8px;
+    border:1px solid rgba(240,168,60,.35);background:rgba(240,168,60,.06)}
+  .blockcard.earn{border-color:rgba(74,163,255,.4);background:rgba(74,163,255,.06)}
+  .conncard{border:1px solid var(--line);border-radius:var(--radius);padding:10px;
+    background:var(--panel);margin-bottom:8px}
+  .conncard.live{border-color:rgba(38,166,154,.35)}
+  .conncard.fail{border-color:rgba(239,83,80,.4)}
+  .conncard h3{margin:0 0 3px;font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .connstate{font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.04em}
+  .connstate.live{background:rgba(38,166,154,.13);color:var(--green);border:1px solid rgba(38,166,154,.35)}
+  .connstate.off{background:rgba(255,255,255,.04);color:var(--mut);border:1px solid var(--line)}
+  .connstate.fail{background:rgba(239,83,80,.12);color:var(--red);border:1px solid rgba(239,83,80,.4)}
+  .connhow{margin:6px 0 0;padding-left:16px;font-size:11.5px;color:var(--mut);line-height:1.65}
+  .connhow code{color:var(--cyan);background:rgba(0,0,0,.25);padding:1px 4px;border-radius:4px}
+  .termout{background:#06080d;border:1px solid var(--line);border-radius:var(--radius);
+    padding:10px;font-size:11px;line-height:1.5;overflow:auto;max-height:420px;color:#a8b6c8}
+  .jobrow{display:flex;gap:8px;align-items:center;padding:7px 9px;border:1px solid var(--line);
+    border-radius:var(--radius);margin-bottom:6px;cursor:pointer;transition:.12s;font-size:11.5px}
+  .jobrow:hover{border-color:var(--line2)}
+  .jobrow.active{border-color:var(--blue);background:rgba(74,163,255,.07)}
+  .jobrow b{font-weight:800}
+  .devrow{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 4px;
+    border-bottom:1px solid rgba(255,255,255,.05);font-size:11.5px}
+  .devrow .meta b{font-weight:800}
+  .tokenout{font-family:var(--mono);font-size:10.5px;word-break:break-all;background:#06080d;
+    border:1px solid var(--line);border-radius:var(--radius);padding:8px;margin-top:6px;color:var(--green)}
+  .gloss-term{cursor:pointer;border-bottom:1px dashed var(--line2)}
+  .kbd{font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.07);
+    border:1px solid var(--line);font-family:var(--mono)}
+  .multi-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+    padding:8px;background:var(--bg)}
+  @media(max-width:760px){.multi-chart-grid{grid-template-columns:1fr}.multi-chart-canvas{height:200px}}
+  .sectionTitle{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);
+    font-weight:800;margin:12px 2px 7px;display:flex;align-items:center;gap:8px}
+  .sectionTitle::after{content:'';flex:1;height:1px;background:var(--line);margin-left:6px}
+  .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:10px;margin-bottom:10px}
+  @media(max-width:980px){.hero{grid-template-columns:1fr}}
+
+  /* ── Responsive ──────────────────────────────────────────────────── */
+  @media(max-width:760px){
+    .topbar{padding:5px 8px;gap:6px}
+    .brand h1 .ver{display:none}
+    .market-picker{order:3;width:100%}
+    .market-picker .seg{flex:1;justify-content:space-between}
+    .nav6{padding:0 4px}
+    .navbtn{padding:8px 9px;font-size:11px}
+    .terminal{height:auto}
+    .terminal-grid{grid-template-columns:1fr}
+    .t-watchlist{display:none}
+    .t-order{min-height:380px}
+    .t-bottom{max-height:none;min-height:0}
+    .ai-drawer{width:100%;top:0}
+    .view-body{padding:8px 8px 14px}
+    .shell{padding:8px 8px 14px}
+    .hero{grid-template-columns:1fr}
+    .statrow{grid-template-columns:repeat(2,1fr)}
+    .watchlist{grid-template-columns:1fr}
+    .formgrid{grid-template-columns:1fr}
+    .cmdgrid{grid-template-columns:1fr}
+    .modrow{grid-template-columns:1fr}
+  }
+  @media(max-width:400px){ .navbtn{padding:7px 7px;font-size:10.5px} }
+  @media(max-width:640px){
+    .shell{padding:8px 6px 12px}
+    .view-body{padding:8px 6px 12px}
+    .strip,.sentistrip{padding:6px 8px}
+    .quickbar .btn{font-size:11px}
+    #offlineBanner{font-size:10.5px;padding:5px 8px}
+  }
+</style>
+<script src="/static/lightweight-charts.standalone.js"></script>
+</head><body>
+<div id="moodbar" title="market sentiment — green = bullish, red = bearish, deeper = longer"></div>
+<div id="offlineBanner" role="status" aria-live="polite">⚠️ Offline — showing cached shell. Data may be stale. Mutations disabled. <a href="/offline.html">Open offline page</a> · <span id="offlineWhen" style="opacity:.8"></span></div>
+<div id="installBanner" role="region" aria-label="Install prompt"><div><b>📲 Install SKY</b> <span class="note">Add to home screen for daily ritual, risk & approvals — works offline.</span></div><div class="flex"><button class="btn primary" id="installBtn">Install</button><button class="btn ghost" onclick="dismissInstall()">Not now</button></div></div>
+
+<!-- ═══ TOP BAR ═══════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="brand">
+    <div class="logo">▲</div>
+    <h1>SKY <span class="ver">v{{version}}</span></h1>
+  </div>
+  <div class="market-picker">
+    <div class="cg">
+      <label>Symbol</label>
+      <div class="seg" id="symSeg">
+        {% for s in symbols %}<button data-sym="{{s.symbol}}" onclick="setSymbol('{{s.symbol}}')" class="{{'active' if s.symbol==symbol}}">{{s.symbol}}</button>{% endfor %}
+        <input id="sym" list="symbols" value="{{symbol}}" size="8" title="BTCUSDT, ETHUSDT, XAUUSD/GOLD, or any Binance USDT pair" placeholder="SYMBOL">
+      </div>
+      <datalist id="symbols">
+        {% for s in symbols %}<option value="{{s.symbol}}">{{s.label}}{% if s.data_symbol != s.symbol %} · {{s.data_symbol}}{% endif %}</option>{% endfor %}
+      </datalist>
+    </div>
+    <div class="cg">
+      <label>Timeframe</label>
+      <div class="seg" id="tfSeg">
+        {% for t in ['1m','5m','15m','30m','1h','4h','1d','1w','1M'] %}<button data-tf="{{t}}" onclick="setTF('{{t}}')" class="{{'active' if t==tf}}">{{t}}</button>{% endfor %}
+      </div>
+      <select id="tf" style="display:none">
+        {% for t in ['1m','5m','15m','30m','1h','4h','1d','1w','1M'] %}<option value="{{t}}" {{'selected' if t==tf}}>{{t}}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="flex" style="gap:6px;align-items:center">
+    <span class="status-chip ok" id="feedChip" title="market data freshness"><span class="dot"></span><span id="feedTxt">data…</span></span>
+    <span class="status-chip" id="riskChip" title="risk gate status"><span class="dot"></span><span id="riskTxt">gate…</span></span>
+    <span class="status-chip" id="posChip" title="open paper positions"><span class="dot"></span><span id="posTxt">0 open</span></span>
+    <button class="icon-btn" onclick="openAiDrawer()" title="AI Copilot — available everywhere">✦</button>
+    <button class="icon-btn" onclick="load(true)" title="Refresh">↻</button>
+    <label class="check" title="auto refresh 30s"><input type="checkbox" id="auto" checked> auto</label>
+  </div>
+  <div id="userChip">
+    <span class="who"><span class="avatar" id="userAvatar">▲</span><span id="userName">—</span><span class="role" id="userRole">—</span></span>
+    <button class="btn sm" onclick="openAccount()" title="Account & devices">⚙</button>
+    <button class="btn sm ghost" onclick="doLogout()">Log out</button>
+  </div>
+</div>
+
+<!-- ═══ PRIMARY NAVIGATION — SIX AREAS ═════════════════════════════════ -->
+<nav class="nav6" id="nav6">
+  <button class="navbtn active" data-nav="trade" onclick="navTo('trade')">
+    <svg viewBox="0 0 16 16"><path d="M2 12V5M6 12V2M10 12V7M14 12V3"/></svg>Trade</button>
+  <button class="navbtn" data-nav="markets" onclick="navTo('markets')">
+    <svg viewBox="0 0 16 16"><path d="M2 14V8M6 14V3M10 14v-7M14 14V5"/></svg>Markets</button>
+  <button class="navbtn" data-nav="portfolio" onclick="navTo('portfolio')">
+    <svg viewBox="0 0 16 16"><path d="M1 6h14M3 6v7M8 6v7M13 6v7M1 10h14"/></svg>Portfolio</button>
+  <button class="navbtn" data-nav="journal" onclick="navTo('journal')">
+    <svg viewBox="0 0 16 16"><path d="M4 1v14M4 4h8M4 8h8M4 12h5M13 1h1v14h-1"/></svg>Journal</button>
+  <button class="navbtn" data-nav="evidence" onclick="navTo('evidence')">
+    <svg viewBox="0 0 16 16"><path d="M8 1l2 4 4 .6-3 3 .7 4.2L8 11l-3.7 1.8.7-4.2-3-3L6 5z"/></svg>Evidence</button>
+  <button class="navbtn" data-nav="system" onclick="navTo('system')">
+    <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"/></svg>System</button>
+  <span class="spacer"></span>
+  <span class="updated" id="updated"></span>
+</nav>
+
+<!-- ═══ TRADE TERMINAL — THE DEFAULT VIEW ══════════════════════════════ -->
+<div id="view-trade" class="view active" data-tab="chart">
+  <div class="terminal">
+    <div class="terminal-grid">
+      <!-- LEFT: watchlist -->
+      <aside class="t-watchlist">
+        <div class="panel-head">Watchlist <span class="grow"></span><button class="btn sm" onclick="loadWatchlistPrices()" title="refresh prices">↻</button></div>
+        <div class="t-wl-search"><input id="wlSearch" placeholder="Search symbol…" oninput="renderTerminalWatchlist()"></div>
+        <div class="t-wl-list" id="wlList">
+          <div class="b-empty">loading watchlist…</div>
+        </div>
+        <div class="panel-head" style="border-top:1px solid var(--line)">Positions <span class="grow"></span><span id="wlPosCount" class="badge">0</span></div>
+        <div class="t-wl-list" id="wlPositions" style="max-height:150px"><div class="b-empty">no open positions</div></div>
+      </aside>
+
+      <!-- CENTER: chart -->
+      <main class="t-chart">
+        <div class="chart-toolbar">
+          <div class="seg" id="chartSymSeg">
+            {% for s in symbols %}<button data-sym="{{s.symbol}}" onclick="chartSetSymbol('{{s.symbol}}')" class="{{'active' if s.symbol==symbol}}">{{s.symbol}}</button>{% endfor %}
+          </div>
+          <div class="seg" id="chartTfSeg">
+            {% for t in ['1m','5m','15m','30m','1h','4h','1d','1w'] %}<button data-tf="{{t}}" onclick="chartSetTF('{{t}}')" class="{{'active' if t==tf}}">{{t}}</button>{% endfor %}
+          </div>
+          <div class="chart-toggles">
+            <label class="check"><input type="checkbox" id="ovEma" checked onchange="drawChart()"> EMA</label>
+            <label class="check"><input type="checkbox" id="ovVwap" checked onchange="drawChart()"> VWAP</label>
+            <label class="check"><input type="checkbox" id="ovBb" onchange="drawChart()"> BB</label>
+            <label class="check"><input type="checkbox" id="ovLevels" checked onchange="drawChart()"> Levels</label>
+            <label class="check"><input type="checkbox" id="ovZones" checked onchange="drawChart()"> Zones</label>
+            <label class="check"><input type="checkbox" id="ovPlan" checked onchange="drawChart()"> Plan</label>
+            <label class="check"><input type="checkbox" id="ovRsi" checked onchange="drawChart()"> RSI</label>
+            <label class="check"><input type="checkbox" id="ovMacd" onchange="drawChart()"> MACD</label>
+          </div>
+          <span class="spacer" style="flex:1"></span>
+          <div class="seg" style="align-items:center">
+            <button class="btn sm" id="drawTrendline" onclick="setDrawTool('trendline')" title="Trendline — click two points">╱</button>
+            <button class="btn sm" id="drawRay" onclick="setDrawTool('ray')" title="Horizontal ray — click one price">─</button>
+            <button class="btn sm" id="drawBox" onclick="setDrawTool('box')" title="Box — click two corners">▭</button>
+            <button class="btn sm" id="drawUndoBtn" onclick="undoDrawing()" title="Remove last drawing">⌫</button>
+            <button class="btn sm" id="drawClearBtn" onclick="clearDrawings()" title="Clear all drawings">✕</button>
+          </div>
+          <div class="seg" style="align-items:center">
+            <button class="btn sm" id="liveBtn" onclick="toggleLive()" title="Stream the newest bar">●</button>
+            <button class="btn sm" id="replayBtn" onclick="toggleReplay()" title="Historical replay">▶</button>
+            <button class="btn sm" id="replayFreezeBtn" onclick="freezeReplay()" title="Pause at this bar">⏸</button>
+            <button class="btn sm" id="replaySpeedBtn" onclick="cycleReplaySpeed()" title="Playback speed">1×</button>
+          </div>
+          <button class="btn sm" onclick="loadChartWorkspace(true)" title="Reload chart">↻</button>
+          <button class="btn sm" id="multiChartBtn" onclick="toggleMultiChart()" title="2×2 comparison">▦</button>
+        </div>
+        <div class="note" id="drawStatus" style="padding:4px 9px 0"></div>
+        <div class="note" id="liveState" style="padding:3px 9px 0">Live stream off — chart shows bars loaded at <span id="liveLoadedAt">—</span>.</div>
+        <div class="chart-head" id="chartHead"><span class="muted">loading chart…</span></div>
+        <div id="chartMain" class="chart-pane" style="height:min(52vh,440px)"></div>
+        <div id="chartVol" class="chart-pane" style="height:64px"></div>
+        <div id="chartRsi" class="chart-pane" style="height:70px"></div>
+        <div id="chartMacd" class="chart-pane" style="height:70px;display:none"></div>
+        <div id="multiChart" class="multi-chart-grid" style="display:none"></div>
+        <div class="chart-foot">
+          <span id="chartStats"><span class="muted">readings…</span></span>
+          <span style="flex:1"></span>
+          <span id="chartLevels" class="muted" style="font-size:10px">levels…</span>
+          <button class="btn sm ghost" onclick="toggleDrawList()" title="My drawings">✎ <span id="drawCount">0</span></button>
+        </div>
+        <div id="drawPanel" style="display:none;border-top:1px solid var(--line);padding:6px 9px;max-height:110px;overflow-y:auto">
+          <div class="flex" style="justify-content:space-between">
+            <b style="font-size:10px;color:var(--mut);text-transform:uppercase">My drawings</b>
+            <button class="btn sm ghost" onclick="attachDrawingsToJournal()">📎 to journal</button>
+          </div>
+          <div id="drawList"><span class="muted">—</span></div>
+        </div>
+      </main>
+
+      <!-- RIGHT: order + AI -->
+      <aside class="t-order">
+        <div class="order-tabs">
+          <button class="active" data-otab="ticket" onclick="switchOrderTab('ticket')">Ticket</button>
+          <button data-otab="signal" onclick="switchOrderTab('signal')">Signal</button>
+          <button data-otab="risk" onclick="switchOrderTab('risk')">Risk</button>
+          <button data-otab="copilot" onclick="switchOrderTab('copilot')">Copilot</button>
+        </div>
+        <div id="otab-ticket" class="otab active">
+          <div class="paper-notice">PAPER — NO REAL ORDER WILL BE SENT</div>
+          <div class="ticket-side">
+            <button class="buy active" onclick="ticketSide('BUY')">Buy</button>
+            <button class="sell" onclick="ticketSide('SELL')">Sell</button>
+          </div>
+          <div class="ticket-type">
+            <button class="active" data-otype="market" onclick="ticketType('market')">Market</button>
+            <button data-otype="limit" onclick="ticketType('limit')">Limit</button>
+            <button data-otype="conditional" onclick="ticketType('conditional')">Conditional</button>
+          </div>
+          <div class="t-field"><label>Entry price</label><input id="tEntry" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
+          <div class="t-row">
+            <div class="t-field"><label>Stop loss</label><input id="tSL" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
+            <div class="t-field"><label>Risk %</label><input id="tRisk" type="number" step="0.05" value="0.5" oninput="recalcTicket()"></div>
+          </div>
+          <div class="t-row three">
+            <div class="t-field"><label>TP1</label><input id="tTP1" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
+            <div class="t-field"><label>TP2</label><input id="tTP2" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
+            <div class="t-field"><label>TP3</label><input id="tTP3" type="number" step="any" placeholder="—" oninput="recalcTicket()"></div>
+          </div>
+          <div class="t-field"><label>Position size (units)</label><input id="tSize" type="text" readonly placeholder="auto from risk"></div>
+          <div class="t-est">
+            <div><span>R:R</span><b id="tRR">—</b></div>
+            <div><span>Est. fees</span><b id="tFees">—</b></div>
+            <div><span>Risk $</span><b id="tRiskUsd">—</b></div>
+          </div>
+          <div class="t-gate" id="tGate">checking risk gate…</div>
+          <div class="t-evidence" id="tEvidence">No signal loaded — scan the market first.</div>
+          <div class="t-mini"><span>Setup</span><b id="tSetup">—</b></div>
+          <div class="t-mini"><span>Regime</span><b id="tRegime">—</b></div>
+          <button class="btn primary t-confirm" id="tConfirm" disabled onclick="submitPaperTicket()">Confirm Paper Trade</button>
+        </div>
+        <div id="otab-signal" class="otab"><div class="b-empty">signal summary appears here</div></div>
+        <div id="otab-risk" class="otab"><div class="b-empty">risk summary appears here</div></div>
+        <div id="otab-copilot" class="otab">
+          <div class="ai-actions" style="padding:0 0 8px">
+            <button onclick="aiAsk('Explain this chart')">Explain chart</button>
+            <button onclick="aiAsk('Why is trading blocked?')">Why blocked?</button>
+            <button onclick="aiAsk('Review this signal')">Review signal</button>
+            <button onclick="aiAsk('Review my open position')">Open position</button>
+            <button onclick="aiAsk('What invalidates this setup?')">Invalidation</button>
+            <button onclick="aiAsk('Summarize today')">Today</button>
+            <button onclick="aiAsk('Help me journal')">Journal</button>
+            <button onclick="aiAsk('Am I ready for graduation?')">Graduation</button>
+          </div>
+          <div class="ai-chat" id="otabChat" style="padding:0">
+            <div class="ai-msg bot">Ask me about this chart, the signal, your positions, or your progress. I see the same market data the desk sees — I am advisory, never permission.</div>
+          </div>
+          <div class="ai-input" style="padding:8px 0 0">
+            <input id="otabAiInput" placeholder="Ask the desk…" onkeydown="if(event.key==='Enter')aiSend('otab')">
+            <button class="btn primary" onclick="aiSend('otab')">Send</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- BOTTOM PANEL -->
+    <div class="t-bottom">
+      <div class="bottom-tabs">
+        <button class="active" data-btab="positions" onclick="switchBottomTab('positions')">Open positions</button>
+        <button data-btab="orders" onclick="switchBottomTab('orders')">Pending plans</button>
+        <button data-btab="history" onclick="switchBottomTab('history')">Trade history</button>
+        <button data-btab="journal" onclick="switchBottomTab('journal')">Journal</button>
+        <button data-btab="alerts" onclick="switchBottomTab('alerts')">Alerts</button>
+        <button data-btab="evidence" onclick="switchBottomTab('evidence')">Strategy evidence</button>
+        <button data-btab="activity" onclick="switchBottomTab('activity')">Background</button>
+      </div>
+      <div class="bottom-content active" id="btab-positions"><div class="b-empty">loading positions…</div></div>
+      <div class="bottom-content" id="btab-orders"><div class="b-empty">loading…</div></div>
+      <div class="bottom-content" id="btab-history"><div class="b-empty">loading…</div></div>
+      <div class="bottom-content" id="btab-journal"><div class="b-empty">loading…</div></div>
+      <div class="bottom-content" id="btab-alerts">
+        <div class="flex" style="margin-bottom:6px">
+          <button class="btn sm" onclick="SKY_push.subscribe()">Enable push</button>
+          <button class="btn sm" onclick="SKY_push.sendTest()">Test push</button>
+          <span id="pwaPushStatus2" class="muted" style="font-size:10px"></span>
+        </div>
+        <div id="btab-alerts-inner"><div class="b-empty">no alerts — push + Telegram/Discord configured in System</div></div>
+      </div>
+      <div class="bottom-content" id="btab-evidence"><div class="b-empty">loading…</div></div>
+      <div class="bottom-content" id="btab-activity"><div class="b-empty">loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LEGACY VIEW — the classic dashboard shell (grouped by area) ════ -->
+<!-- LEGACY_SHELL_PLACEHOLDER -->
+
+<!-- ═══ AI COPILOT GLOBAL DRAWER ═══════════════════════════════════════ -->
+<div id="aiDrawer" class="ai-drawer" aria-label="AI Copilot">
+  <div class="ai-head">
+    <b>✦ AI Copilot</b>
+    <span class="muted" style="font-size:10px;font-weight:400">advisory — never permission</span>
+    <span class="grow"></span>
+    <button class="btn sm ghost" onclick="closeAiDrawer()">✕</button>
+  </div>
+  <div class="ai-actions">
+    <button onclick="aiAsk('Explain this chart')">Explain chart</button>
+    <button onclick="aiAsk('Why is trading blocked?')">Why blocked?</button>
+    <button onclick="aiAsk('Review this signal')">Review signal</button>
+    <button onclick="aiAsk('Review my open position')">Open position</button>
+    <button onclick="aiAsk('What invalidates this setup?')">Invalidation</button>
+    <button onclick="aiAsk('Summarize today')">Today</button>
+    <button onclick="aiAsk('Help me journal')">Journal</button>
+    <button onclick="aiAsk('Am I ready for graduation?')">Graduation</button>
+  </div>
+  <div class="ai-chat" id="aiChat">
+    <div class="ai-msg bot">Ask me about this chart, the signal, your positions, or your progress. I see the same market data the desk sees — I am advisory, never permission.</div>
+  </div>
+  <div class="ai-input">
+    <input id="aiInput" placeholder="Ask the desk…" onkeydown="if(event.key==='Enter')aiSend('drawer')">
+    <button class="btn primary" onclick="aiSend('drawer')">Send</button>
+  </div>
+</div>
+
+<div id="authLayer"><div class="authbox" id="authBox"></div></div>
+<div id="accountModal" style="display:none;position:fixed;inset:0;background:rgba(3,6,11,.7);backdrop-filter:blur(8px);z-index:85;padding:14px;overflow:auto"><div class="box" id="accountBody" style="max-width:620px"></div></div>
+<div id="toasts"></div>
+<div id="modal"><div class="box" id="mbody"></div></div>
+<noscript><div class="shell"><div class="card" style="grid-column:1/-1"><div class="err">JavaScript is disabled — the dashboard needs JS. Enable it and reload.</div></div></div></noscript>

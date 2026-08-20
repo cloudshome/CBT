@@ -6,12 +6,16 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-20 (**v2.48.1 — PWA cache + test-environment reliability**.
-The service-worker cache now rolls with the application version; a regression
-keeps `config.py`, `pyproject.toml`, and `sw.js` in lockstep; agent CLI tests
-keep the active Python interpreter. Contract:
-`docs/HANDOVER_2026-08-20_v2.48.1.md`. **P22 still needs real signers — do not
-claim it from this sandbox. P11 real paper proof stays parallel and remains the
+**Last updated:** 2026-08-20 (**v2.49.0 — The Trade Terminal, professional
+layout**. The web dashboard is now one professional trading platform: watchlist
+left, chart centre, paper-trade ticket + AI Copilot right, tabbed trading panel
+bottom, six-area navigation, professional dark theme. Roadmap rewritten around
+the terminal vision (phases T1–T6). This is a presentation-layer release — the
+risk gate, graduation bar, auth, `/api/v1`, jobs/SSE, PWA and all trading logic
+are untouched; full suite 1282/1; wheel gate green. Contract:
+`docs/HANDOVER_2026-08-20_v2.49.0.md`. Next code is **T2–T4 terminal wiring and
+polish**, then the home screen. **P22 still needs real signers — do not claim
+it from this sandbox. P11 real paper proof stays parallel and remains the
 money path.**)
 
 **Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2 synchronized crosshair**.
@@ -237,9 +241,40 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ---
 
-## 🔥 Current sequence — production software + honest evidence
+## 🔥 Current sequence — professional trading terminal + honest evidence
 
-### TODO-23 / P18–P22 · Installable production product · 🔄 NEXT
+### TODO-24 / T1–T6 · Professional Trade Terminal · 🔄 NEXT (T1 shipped v2.49.0)
+
+📄 **Canonical plan:** [`ROADMAP.md`](ROADMAP.md) — *SKY should feel like one
+professional trading platform, not a collection of Python functions and
+separate dashboard cards.*
+
+The dashboard is now a Trade Terminal (T1 shipped in v2.49.0): watchlist left,
+chart centre, paper ticket + AI Copilot right, tabbed trading panel bottom,
+six-area navigation, professional dark theme. Ordered code milestones:
+
+1. **T1 Trade Terminal layout — ✅ shipped v2.49.0.** Terminal view (default),
+   watchlist, chart, ticket, bottom panel, 6-area nav, AI drawer scaffold.
+2. **T2 Persistent AI Copilot** — 🔄 part shipped: drawer + quick actions +
+   context injection + sectioned replies. Polish: better structured-section
+   parsing, per-answer sources, "prepare ticket from AI" (never approves).
+3. **T3 Paper-trade workflow wiring** — 🔄 next real build: make the Confirm
+   button run the full desk path (ticket → scan/approval → enrolled position →
+   bottom-panel management → close → auto-journal). Currently the ticket
+   sizes, validates and points at the approval queue.
+4. **T4 Professional polish** — resizable/collapsible panels, localStorage
+   persistence of panel sizes/watchlist/symbol/timeframe/layout, loading
+   skeletons, explicit stale/error states in the terminal, tooltips.
+5. **T5 Home screen** — concise post-login command dashboard with an
+   "Open Trading Terminal" primary button.
+6. **T6 Focused pages** — deepen Markets / Portfolio / Journal / Evidence /
+   System beyond grouped legacy panels; mobile four-section layout
+   (Markets, Chart, Positions, AI).
+
+**Verification for every T step:** keep `test_served_script_is_valid_javascript`
+and the jsdom harnesses green; full suite ≥ 1282 / 1; wheel gate green.
+
+### TODO-23 / P18–P22 · Installable production product · 🔄 (foundation shipped)
 
 📄 **Canonical plan:** [`ROADMAP.md`](ROADMAP.md)
 
