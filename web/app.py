@@ -676,6 +676,7 @@ HTML = """<!doctype html>
   .ai-msg .ai-sec{font-weight:800;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
     color:var(--cyan);margin-top:6px}
   .ai-msg .ai-sec:first-child{margin-top:0}
+  .ai-msg.ai-sources{border-style:dashed;color:var(--mut);font-size:10.5px}
   .ai-input{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--line)}
   .ai-input input{flex:1;font-size:11.5px}
   .ai-typing{color:var(--mut);font-style:italic;font-size:11px}
@@ -698,6 +699,12 @@ HTML = """<!doctype html>
   .b-pos-row{cursor:pointer}
   .b-pos-row:hover td{background:rgba(74,163,255,.05)}
   .b-empty{color:var(--mut);font-size:11px;text-align:center;padding:16px 0}
+  .skel{position:relative;overflow:hidden;background:var(--panel2);border-radius:4px}
+  .skel::after{content:'';position:absolute;inset:0;transform:translateX(-100%);
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);
+    animation:skel 1.2s infinite}
+  @keyframes skel{100%{transform:translateX(100%)}}
+  .skel-row{height:12px;margin:8px 0}
 
   /* ── Legacy tab panels ───────────────────────────────────────────── */
   .tabpanel{display:none}
@@ -1035,6 +1042,7 @@ HTML = """<!doctype html>
         <div id="otab-risk" class="otab"><div class="b-empty">risk summary appears here</div></div>
         <div id="otab-copilot" class="otab">
           <div class="ai-actions" style="padding:0 0 8px">
+            <button onclick="aiPrepareTicket()">Prepare ticket</button>
             <button onclick="aiAsk('Explain this chart')">Explain chart</button>
             <button onclick="aiAsk('Why is trading blocked?')">Why blocked?</button>
             <button onclick="aiAsk('Review this signal')">Review signal</button>
@@ -1450,6 +1458,7 @@ HTML = """<!doctype html>
     <button class="btn sm ghost" onclick="closeAiDrawer()">✕</button>
   </div>
   <div class="ai-actions">
+    <button onclick="aiPrepareTicket()">Prepare ticket</button>
     <button onclick="aiAsk('Explain this chart')">Explain chart</button>
     <button onclick="aiAsk('Why is trading blocked?')">Why blocked?</button>
     <button onclick="aiAsk('Review this signal')">Review signal</button>
@@ -1694,6 +1703,7 @@ function setSymbol(sym){
   try{ document.querySelectorAll('#chartSymSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym)); }catch(e){}
   _chartSym=sym; _ticketDirty=false;
   load(true);
+  try{ loadTicketMeta(); }catch(e){}
   try{ loadChartWorkspace(true, {fit:true}); }catch(e){}
 }
 function setTF(tf){
@@ -5764,6 +5774,7 @@ async function loadTerminal(){
   try{ loadWatchlistPrices(); }catch(e){}
   try{ loadChartWorkspace(false); }catch(e){}
   try{ loadTerminalPositions(); }catch(e){}
+  try{ loadTicketMeta(); }catch(e){}
   try{ renderBottomTab('positions'); }catch(e){}
   try{ renderBottomTab('orders'); }catch(e){}
   try{ renderBottomTab('history'); }catch(e){}
@@ -5771,6 +5782,13 @@ async function loadTerminal(){
   try{ renderBottomTab('evidence'); }catch(e){}
   try{ renderBottomTab('activity'); }catch(e){}
   try{ loadRiskChip(); }catch(e){}
+}
+
+// T4 — loading skeletons: shimmer rows painted before any fetch resolves,
+// so a slow feed reads as "loading" rather than a blank panel.
+function _skeleton(rows){
+  rows=rows||3;
+  return '<div class="skel skel-row"></div>'.repeat(rows);
 }
 
 /* ── Top-bar status chips ───────────────────────────────────────────── */
@@ -5813,7 +5831,7 @@ async function loadWatchlistPrices(){
   const list=document.getElementById('wlList'); if(!list) return;
   const had = _wlPrices && _wlPrices.length;
   if(!had){
-    list.innerHTML='<div class="b-empty">loading prices…</div>';
+    list.innerHTML=_skeleton(5);
   }
   try{
     const d=await (await fetch('/api/agents')).json();
@@ -5999,16 +6017,33 @@ function recalcTicket(){
     const rr=Math.abs(tp1-entry)/risk;
     if(rrEl) rrEl.textContent=rr.toFixed(2);
   } else if(rrEl) rrEl.textContent='—';
-  // rough estimate: 0.05% taker per side + slippage
-  const notional=Math.abs(entry)||1;
-  const feePct=0.001; // 0.1% round trip
-  if(feeEl) feeEl.textContent='~$'+(notional*feePct).toFixed(2);
-  // risk dollars (assume $100k account unless /api/risk says otherwise)
-  const account=_riskAccountUsd || 100000;
-  const riskUsd=account*(riskPct/100);
-  if(riskUsdEl) riskUsdEl.textContent='$'+riskUsd.toFixed(0);
-  const size=riskUsd/risk;
-  if(sizeEl) sizeEl.value=isFinite(size)?size.toFixed(size<1?6:4):'—';
+  // T4 — honest sizing: real account balance from /api/ticket/meta, never an
+  // invented $100k. Risk dollars and units stay "—" until the account exists.
+  const meta=_ticketMeta||{};
+  const account=Number(meta.account_balance)||0;
+  let size=null;
+  if(account>0){
+    const riskUsd=account*(riskPct/100);
+    if(riskUsdEl) riskUsdEl.textContent='$'+riskUsd.toFixed(0);
+    size=riskUsd/risk;
+    if(sizeEl) sizeEl.value=isFinite(size)?size.toFixed(size<1?6:4):'—';
+    if(sizeEl) sizeEl.title='units so that being wrong costs exactly '+riskPct+'% of account';
+  } else {
+    if(riskUsdEl) riskUsdEl.textContent='—';
+    if(sizeEl){ sizeEl.value='—'; sizeEl.title='Set ACCOUNT_BALANCE in .env to enable sizing'; }
+  }
+  // T4 — honest fees from the same cost model the backtester uses
+  // (round-trip taker fee + full spread + slippage). The % is always shown;
+  // the dollar figure needs a sized notional.
+  const rtPct=Number(meta.round_trip_cost_pct);
+  if(isFinite(rtPct) && rtPct>0){
+    if(size && entry>0){
+      const notional=size*entry;
+      if(feeEl) feeEl.textContent='~$'+(notional*rtPct).toFixed(2)+' ('+(rtPct*100).toFixed(2)+'% rt)';
+    } else if(feeEl){
+      feeEl.textContent=(rtPct*100).toFixed(2)+'% round-trip';
+    }
+  } else if(feeEl) feeEl.textContent='—';
   // gate verdict
   const d=_ticketPayload||{};
   const dec=d.decision||{};
@@ -6027,12 +6062,14 @@ function recalcTicket(){
   }
 }
 
-let _riskAccountUsd=null;
-async function loadRiskAccount(){
+let _ticketMeta=null;
+async function loadTicketMeta(){
   try{
-    const d=await (await fetch('/api/risk')).json();
-    _riskAccountUsd = (d.account_balance || d.balance || 0) || null;
-  }catch(e){}
+    const sym=(document.getElementById('sym')||{}).value||'BTCUSDT';
+    const d=await (await fetch('/api/ticket/meta?symbol='+encodeURIComponent(sym))).json();
+    if(d && typeof d.account_balance==='number') _ticketMeta=d;
+  }catch(e){ _ticketMeta=null; }
+  recalcTicket();
 }
 
 let _ticketId=null, _ticketSig=null;
@@ -6146,24 +6183,29 @@ function finishConfirm(j){
   }else{
     showToast('Paper position open — #'+(t.id||j.scan_id)+' '+esc(t.action||'')+' '+esc(t.symbol||'')+' @ '+fmt(t.entry_price||t.entry),'ok');
   }
-  delete _bottomLoaded.positions;
   switchBottomTab('positions');
   try{ loadTerminalPositions(); }catch(e){}
   try{ loadRiskChip(); }catch(e){}
 }
 
 /* ── Bottom panel ───────────────────────────────────────────────────── */
-let _bottomLoaded={};
+let _bottomTab='positions';
 let _selectedPosId=null;
 function switchBottomTab(tab){
   document.querySelectorAll('.bottom-tabs button').forEach(b=> b.classList.toggle('active', b.dataset.btab===tab));
   document.querySelectorAll('.bottom-content').forEach(c=> c.classList.toggle('active', c.id==='btab-'+tab));
+  _bottomTab=tab;
   renderBottomTab(tab);
 }
 
 async function renderBottomTab(tab){
-  if(_bottomLoaded[tab]) return; // already painted
   const host=document.getElementById('btab-'+tab); if(!host) return;
+  // Alerts has static content (push buttons) painted by the push path — never
+  // overwrite it with a skeleton.
+  if(tab==='alerts') return;
+  // T4 — drop the one-shot cache: every switch re-fetches so a position the
+  // runner just closed cannot linger as a stale row. Skeleton while fetching.
+  host.innerHTML=_skeleton(3);
   try{
     if(tab==='positions') await paintBottomPositions(host);
     else if(tab==='orders') await paintBottomOrders(host);
@@ -6171,8 +6213,6 @@ async function renderBottomTab(tab){
     else if(tab==='journal') await paintBottomJournal(host);
     else if(tab==='evidence') await paintBottomEvidence(host);
     else if(tab==='activity') await paintBottomActivity(host);
-    else if(tab==='alerts'){ /* alerts painted by loadPushStatus path */ }
-    _bottomLoaded[tab]=true;
   }catch(e){
     host.innerHTML='<div class="b-empty">'+esc(String(e))+'</div>';
   }
@@ -6180,7 +6220,6 @@ async function renderBottomTab(tab){
 
 // re-fetch one bottom tab (positions after confirm/close, journal after save)
 function refreshBottomTab(tab){
-  delete _bottomLoaded[tab];
   renderBottomTab(tab);
 }
 
@@ -6473,6 +6512,26 @@ function aiAsk(question){
   aiSend('drawer');
 }
 
+// T2 — prepare the ticket from the desk plan. Advisory only: fills the
+// ticket fields and switches to the Ticket tab, but never confirms and
+// never touches the server. The human still reviews and Confirms.
+function aiPrepareTicket(){
+  const d=window._skyPayload||{};
+  const s=d.signal||{};
+  const dec=d.decision||{};
+  const action=(dec.action==='BUY'||dec.action==='SELL')?dec.action
+              :(s.action==='BUY'||s.action==='SELL')?s.action:null;
+  if(!action){
+    showToast('No actionable desk plan right now — the desk says stand aside','err');
+    return;
+  }
+  ticketSide(action);
+  ticketType('market');
+  fillTicketFromSignal(d);
+  switchOrderTab('ticket');
+  showToast('Ticket prepared from the desk plan — advisory only; you still review & Confirm','ok');
+}
+
 function aiAppendMsg(container, who, text, sections){
   const msg=document.createElement('div');
   msg.className='ai-msg '+who;
@@ -6490,6 +6549,14 @@ function aiAppendMsg(container, who, text, sections){
   container.scrollTop=container.scrollHeight;
 }
 
+function aiAppendSources(container, sources){
+  const msg=document.createElement('div');
+  msg.className='ai-msg bot ai-sources';
+  msg.textContent='Sources: '+(sources||[]).join(' · ');
+  container.appendChild(msg);
+  container.scrollTop=container.scrollHeight;
+}
+
 async function aiSend(which){
   const isDrawer = which==='drawer';
   const input=isDrawer?document.getElementById('aiInput'):document.getElementById('otabAiInput');
@@ -6503,33 +6570,35 @@ async function aiSend(which){
   typing.className='ai-typing'; typing.textContent='SKY is thinking…';
   chat.appendChild(typing);
   try{
+    // Tell the desk which market the trader is looking at — the backend
+    // answers about THIS symbol/timeframe, not the server default.
+    const sym=(document.getElementById('sym')||{}).value||'BTCUSDT';
+    const tf=(document.getElementById('tf')||{}).value||'15m';
     const ctx=aiContext();
     const res=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({question:q, context:ctx})});
+      body:JSON.stringify({question:q, context:ctx, symbol:sym, tf:tf})});
     const d=await res.json();
     typing.remove();
-    const answer=d.answer||d.message||(d.error?('⚠ '+d.error):'no answer');
-    // split the answer into the four professional sections when present
-    const sections={};
-    const lines=String(answer).split(String.fromCharCode(10));
-    let cur=null;
-    for(const line of lines){
-      const m=line.match(/^\\s*(market facts|sky interpretation|risk concerns|suggested next action|interpretation|concerns|next action)\\s*[:.]/i);
-      if(m){ cur=m[1].toLowerCase(); sections[cur]=[]; }
-      else if(cur && sections[cur]) sections[cur].push(line);
-    }
-    const hasSections=Object.keys(sections).length>=2;
-    if(hasSections){
-      const clean={};
-      for(const[k,v] of Object.entries(sections)) clean[k]=v.join(String.fromCharCode(10)).trim();
-      aiAppendMsg(chat,'bot',null,clean);
-      const rest=lines.filter(l=>!l.match(/^\\s*(market facts|sky interpretation|risk concerns|suggested next action|interpretation|concerns|next action)\\s*[:.]/i) || true);
-      aiAppendMsg(chat,'bot',rest.join(String.fromCharCode(10)).trim());
+    // The backend returns answer as a list of lines; join them, then render
+    // its own structured sections when present. Never double-print the raw
+    // text — the sections ARE the answer, formatted.
+    const answer = Array.isArray(d.answer)
+      ? d.answer.join(String.fromCharCode(10))
+      : (d.answer||d.message||(d.error?('⚠ '+d.error):'no answer'));
+    const sections = Array.isArray(d.sections)
+      ? d.sections.filter(s=> s && String(s.body||'').trim())
+      : null;
+    if(sections && sections.length){
+      const byTitle={};
+      for(const s of sections){
+        byTitle[s.title||'Answer'] = s.body;
+      }
+      aiAppendMsg(chat,'bot',null,byTitle);
     } else {
       aiAppendMsg(chat,'bot',String(answer));
     }
-    if(d.citations&&d.citations.length){
-      aiAppendMsg(chat,'bot','Citations: '+d.citations.join(', '));
+    if(d.sources&&d.sources.length){
+      aiAppendSources(chat,d.sources);
     }
   }catch(e){
     typing.remove();
@@ -6585,8 +6654,8 @@ async function aiSend(which){
       try{ loadTerminalPositions(); }catch(e){}
       try{ loadRiskChip(); }catch(e){}
       try{ loadFeedChip(); }catch(e){}
-      // keep open-position R / MAE / MFE live while the tab is visible
-      try{ if(_bottomLoaded.positions&&!_journalTarget) refreshBottomTab('positions'); }catch(e){}
+      // keep the visible bottom tab fresh — positions R / MAE / MFE live
+      try{ if(_bottomTab==='positions'&&!_journalTarget) refreshBottomTab('positions'); }catch(e){}
     }, 60000);
   }catch(e){}
 })();
@@ -7519,6 +7588,49 @@ def make_app(job_manager=None) -> Flask:
         except Exception as exc:
             return jsonify({"ok": False,
                             "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    @app.get("/api/ticket/meta")
+    def api_ticket_meta():
+        """Honest inputs for the terminal trade ticket (T4).
+
+        The ticket's risk-dollar and fee estimates must never be invented
+        client-side. This returns the real account balance (``ACCOUNT_BALANCE``,
+        0 when unset — the UI shows ``—`` rather than a fake $100k) and the
+        per-symbol cost model (``data.costs.cost_model_for_symbol``) the
+        backtester uses, so the fee estimate agrees with the desk's cost
+        doctrine: round-trip taker fee + full spread + slippage, no funding on
+        gold spot. Read-only; no order path.
+        """
+        from config import ACCOUNT_BALANCE, RISK_PCT, MAX_RISK_PCT, KELLY_MAX_RISK_PCT
+        from data.costs import (SPREADS, DEFAULT_HALF_SPREAD, DEFAULT_HOLDING_HOURS,
+                                DEFAULT_FUNDING_RATE_8H, cost_model_for_symbol,
+                                is_gold_symbol)
+        symbol = _sym(request.args.get("symbol", SYMBOL))
+        model = cost_model_for_symbol(symbol)
+        is_gold = is_gold_symbol(symbol)
+        half_spread = (model.spread_pct if model.spread_pct is not None
+                       else SPREADS.get(symbol, DEFAULT_HALF_SPREAD))
+        fee_per_side = model.spot_fee_pct if model.market == "spot" else model.taker_fee_pct
+        round_trip_cost_pct = round(2.0 * fee_per_side + 2.0 * half_spread
+                                    + 2.0 * model.slip_pct, 6)
+        return jsonify(_sanitize_for_json({
+            "symbol": symbol,
+            "market": model.market,
+            "account_balance": float(ACCOUNT_BALANCE or 0.0),
+            "account_configured": bool(ACCOUNT_BALANCE and ACCOUNT_BALANCE > 0),
+            "default_risk_pct": RISK_PCT,
+            "max_risk_pct": MAX_RISK_PCT,
+            "kelly_max_risk_pct": KELLY_MAX_RISK_PCT,
+            "taker_fee_pct": model.taker_fee_pct,
+            "spot_fee_pct": model.spot_fee_pct,
+            "half_spread_pct": half_spread,
+            "slip_pct": model.slip_pct,
+            "funding_rate_8h": 0.0 if is_gold else DEFAULT_FUNDING_RATE_8H,
+            "holding_hours": DEFAULT_HOLDING_HOURS,
+            "round_trip_cost_pct": round_trip_cost_pct,
+            "note": (None if ACCOUNT_BALANCE
+                     else "Set ACCOUNT_BALANCE in .env to enable position sizing."),
+        }))
 
     # ── Trade manager: the live open book ─────────────────────────────
     @app.get("/api/trades")

@@ -6,18 +6,19 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-20 (**v2.50.0 — T3 shipped**. The Trade Terminal
-now runs the whole paper loop: `POST /api/terminal/confirm` turns the ticket
-into a real scan, re-reads the risk & discipline gate fresh on the server
-before the APPROVED decision (same journal-first gate and force semantics as
-`/api/review`), and the paper runner enrolls the position; `POST
-/api/terminal/close` records the real outcome in the existing
-`TP_HIT`/`STOP_LOSS` buckets and opens the journal drawer automatically.
-Contract: `docs/HANDOVER_2026-08-20_T3.md`. Suite 1302 passed / 1 skipped.
-Next sandbox **code** is **T2 Copilot polish / T4 professional polish**
+**Last updated:** 2026-08-20 (**v2.52.0 — T4 part 1 shipped**. The ticket is
+honest about money: `GET /api/ticket/meta` serves the real `ACCOUNT_BALANCE`
++ per-symbol cost model; `recalcTicket` sizes from that balance (shows **—**
+instead of the old fabricated $100k when unset) and estimates fees from the
+desk's real round-trip model. Bottom tabs **re-fetch on every switch** (the
+one-shot cache is gone), and the watchlist + bottom tabs paint **loading
+skeletons**. Contract: `docs/HANDOVER_2026-08-20_T4.md`.
+Next sandbox **code** is **T4 part 2** — resizable/collapsible panels,
+localStorage persistence of panel sizes/watchlist/layout, explicit
+stale/disconnected/error states, tooltips sweep, compact mobile layout
 (visual QA of the T3 loop on a real browser first). Next **money** work is
-still P11 on the real-data Hub. **P22 still needs real signers. No threshold
-moved. No order path.**)
+still P11 on the real-data Hub. **P22 still needs real signers. No
+threshold moved. No order path.**)
 
 **Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2 synchronized crosshair**.
 The 2×2 grid now synchronizes crosshairs as well as zoom, has per-browser sync

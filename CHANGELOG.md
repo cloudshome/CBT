@@ -1,5 +1,61 @@
 # Changelog
 
+## [2.52.0] — 2026-08-20 · T4 (part 1) — honest sizing, live bottom tabs, skeletons
+
+MINOR: the terminal's trade ticket no longer invents numbers, the bottom
+tabs always re-fetch, and slow panels paint loading skeletons instead of
+blank space. No new trading capability — advisory UI and one read-only
+endpoint; no threshold moved, no exchange-order path.
+
+- **`GET /api/ticket/meta`** — the honest inputs for the ticket: the real
+  `ACCOUNT_BALANCE` (0 when unset) and the per-symbol cost model
+  (`data.costs.cost_model_for_symbol` — round-trip taker/spot fee + full
+  spread + slippage, no funding on gold spot). Read-only.
+- **Honest ticket sizing** (`recalcTicket`) — risk dollars and units come
+  from the server's account balance; when no `ACCOUNT_BALANCE` is set the
+  ticket shows **—** (with a "set ACCOUNT_BALANCE" hint) instead of the old
+  fabricated **$100k** default. The fee estimate now uses the desk's real
+  cost model and shows both the dollar figure (when sized) and the
+  round-trip %.
+- **Bottom tabs re-fetch on every switch** — the one-shot `_bottomLoaded`
+  cache is gone, so a position the paper runner just closed can no longer
+  linger as a stale row. Alerts keeps its static content; skeletons paint
+  while each tab loads.
+- **Loading skeletons** — shimmer rows (`.skel`) for the watchlist and the
+  bottom tabs while fetches are in flight.
+
+## [2.51.0] — 2026-08-20 · T2 — AI Copilot polish
+
+MINOR: the Copilot now renders the desk's answers as **titled sections**
+with a **sources footer**, prepares (never approves) the trade ticket from
+the desk plan, and answers about the market the trader is actually looking
+at. No new trading capability — advisory UI and additive answer metadata
+only; no threshold moved, no exchange-order path.
+
+- **Structured answers + grounding sources** (`brain/agent.py::ask`). Every
+  intent now returns `sections` (a list of `{title, body}`) and `sources`
+  (the exact surfaces the numbers came from — e.g. `risk gate —
+  brain.risk_gate.evaluate`, `open paper book — SignalDB.live_open_rows`).
+  `market` answers split into **Market read** and **Desk decision**; the
+  plain `answer` list is unchanged, so the CLI, MCP `cryptobrain_ask` and
+  every existing test still read what they read before.
+- **Richer exposure context** (`ask` exposure intent). Open-position answers
+  now state the canonical live-book count (P12.16 `live_open_rows`) split
+  from planned exposure, and attach the **measured expectancy** for each
+  plan type the exposure is carrying (from the calibration profile).
+- **Copilot rendering fixed** (served `web/app.py` script +
+  `web/static/terminal_newjs.js`). The old section parser double-printed the
+  raw answer and comma-joined the answer list into one line. The Copilot now
+  joins list answers with newlines, renders the backend's own sections, and
+  shows a dashed **Sources** footer — never a duplicate raw blob.
+- **Prepare ticket from AI** (`aiPrepareTicket`). A new quick action (global
+  drawer + order-panel Copilot) pre-fills side/type/entry/SL/TP from the desk
+  plan and switches to the Ticket tab. Advisory only — it never confirms,
+  never posts, and stands aside with a toast when the desk has no action.
+- **Symbol/timeframe-aware Copilot** — `aiSend` now sends the selected
+  `symbol`/`tf`, so "Review this signal" / "Explain this chart" target the
+  market on screen instead of the server default.
+
 ## [2.50.0] — 2026-08-20 · T3 — the Trade Terminal runs the whole paper loop
 
 MINOR: the terminal Confirm button now wires the **complete paper-trade

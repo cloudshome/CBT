@@ -74,6 +74,7 @@ async function loadTerminal(){
   try{ loadWatchlistPrices(); }catch(e){}
   try{ loadChartWorkspace(false); }catch(e){}
   try{ loadTerminalPositions(); }catch(e){}
+  try{ loadTicketMeta(); }catch(e){}
   try{ renderBottomTab('positions'); }catch(e){}
   try{ renderBottomTab('orders'); }catch(e){}
   try{ renderBottomTab('history'); }catch(e){}
@@ -81,6 +82,13 @@ async function loadTerminal(){
   try{ renderBottomTab('evidence'); }catch(e){}
   try{ renderBottomTab('activity'); }catch(e){}
   try{ loadRiskChip(); }catch(e){}
+}
+
+// T4 — loading skeletons: shimmer rows painted before any fetch resolves,
+// so a slow feed reads as "loading" rather than a blank panel.
+function _skeleton(rows){
+  rows=rows||3;
+  return '<div class="skel skel-row"></div>'.repeat(rows);
 }
 
 /* ── Top-bar status chips ───────────────────────────────────────────── */
@@ -123,7 +131,7 @@ async function loadWatchlistPrices(){
   const list=document.getElementById('wlList'); if(!list) return;
   const had = _wlPrices && _wlPrices.length;
   if(!had){
-    list.innerHTML='<div class="b-empty">loading prices…</div>';
+    list.innerHTML=_skeleton(5);
   }
   try{
     const d=await (await fetch('/api/agents')).json();
@@ -309,16 +317,33 @@ function recalcTicket(){
     const rr=Math.abs(tp1-entry)/risk;
     if(rrEl) rrEl.textContent=rr.toFixed(2);
   } else if(rrEl) rrEl.textContent='—';
-  // rough estimate: 0.05% taker per side + slippage
-  const notional=Math.abs(entry)||1;
-  const feePct=0.001; // 0.1% round trip
-  if(feeEl) feeEl.textContent='~$'+(notional*feePct).toFixed(2);
-  // risk dollars (assume $100k account unless /api/risk says otherwise)
-  const account=_riskAccountUsd || 100000;
-  const riskUsd=account*(riskPct/100);
-  if(riskUsdEl) riskUsdEl.textContent='$'+riskUsd.toFixed(0);
-  const size=riskUsd/risk;
-  if(sizeEl) sizeEl.value=isFinite(size)?size.toFixed(size<1?6:4):'—';
+  // T4 — honest sizing: real account balance from /api/ticket/meta, never an
+  // invented $100k. Risk dollars and units stay "—" until the account exists.
+  const meta=_ticketMeta||{};
+  const account=Number(meta.account_balance)||0;
+  let size=null;
+  if(account>0){
+    const riskUsd=account*(riskPct/100);
+    if(riskUsdEl) riskUsdEl.textContent='$'+riskUsd.toFixed(0);
+    size=riskUsd/risk;
+    if(sizeEl) sizeEl.value=isFinite(size)?size.toFixed(size<1?6:4):'—';
+    if(sizeEl) sizeEl.title='units so that being wrong costs exactly '+riskPct+'% of account';
+  } else {
+    if(riskUsdEl) riskUsdEl.textContent='—';
+    if(sizeEl){ sizeEl.value='—'; sizeEl.title='Set ACCOUNT_BALANCE in .env to enable sizing'; }
+  }
+  // T4 — honest fees from the same cost model the backtester uses
+  // (round-trip taker fee + full spread + slippage). The % is always shown;
+  // the dollar figure needs a sized notional.
+  const rtPct=Number(meta.round_trip_cost_pct);
+  if(isFinite(rtPct) && rtPct>0){
+    if(size && entry>0){
+      const notional=size*entry;
+      if(feeEl) feeEl.textContent='~$'+(notional*rtPct).toFixed(2)+' ('+(rtPct*100).toFixed(2)+'% rt)';
+    } else if(feeEl){
+      feeEl.textContent=(rtPct*100).toFixed(2)+'% round-trip';
+    }
+  } else if(feeEl) feeEl.textContent='—';
   // gate verdict
   const d=_ticketPayload||{};
   const dec=d.decision||{};
@@ -337,12 +362,14 @@ function recalcTicket(){
   }
 }
 
-let _riskAccountUsd=null;
-async function loadRiskAccount(){
+let _ticketMeta=null;
+async function loadTicketMeta(){
   try{
-    const d=await (await fetch('/api/risk')).json();
-    _riskAccountUsd = (d.account_balance || d.balance || 0) || null;
-  }catch(e){}
+    const sym=(document.getElementById('sym')||{}).value||'BTCUSDT';
+    const d=await (await fetch('/api/ticket/meta?symbol='+encodeURIComponent(sym))).json();
+    if(d && typeof d.account_balance==='number') _ticketMeta=d;
+  }catch(e){ _ticketMeta=null; }
+  recalcTicket();
 }
 
 let _ticketId=null, _ticketSig=null;
@@ -456,24 +483,29 @@ function finishConfirm(j){
   }else{
     showToast('Paper position open — #'+(t.id||j.scan_id)+' '+esc(t.action||'')+' '+esc(t.symbol||'')+' @ '+fmt(t.entry_price||t.entry),'ok');
   }
-  delete _bottomLoaded.positions;
   switchBottomTab('positions');
   try{ loadTerminalPositions(); }catch(e){}
   try{ loadRiskChip(); }catch(e){}
 }
 
 /* ── Bottom panel ───────────────────────────────────────────────────── */
-let _bottomLoaded={};
+let _bottomTab='positions';
 let _selectedPosId=null;
 function switchBottomTab(tab){
   document.querySelectorAll('.bottom-tabs button').forEach(b=> b.classList.toggle('active', b.dataset.btab===tab));
   document.querySelectorAll('.bottom-content').forEach(c=> c.classList.toggle('active', c.id==='btab-'+tab));
+  _bottomTab=tab;
   renderBottomTab(tab);
 }
 
 async function renderBottomTab(tab){
-  if(_bottomLoaded[tab]) return; // already painted
   const host=document.getElementById('btab-'+tab); if(!host) return;
+  // Alerts has static content (push buttons) painted by the push path — never
+  // overwrite it with a skeleton.
+  if(tab==='alerts') return;
+  // T4 — drop the one-shot cache: every switch re-fetches so a position the
+  // runner just closed cannot linger as a stale row. Skeleton while fetching.
+  host.innerHTML=_skeleton(3);
   try{
     if(tab==='positions') await paintBottomPositions(host);
     else if(tab==='orders') await paintBottomOrders(host);
@@ -481,8 +513,6 @@ async function renderBottomTab(tab){
     else if(tab==='journal') await paintBottomJournal(host);
     else if(tab==='evidence') await paintBottomEvidence(host);
     else if(tab==='activity') await paintBottomActivity(host);
-    else if(tab==='alerts'){ /* alerts painted by loadPushStatus path */ }
-    _bottomLoaded[tab]=true;
   }catch(e){
     host.innerHTML='<div class="b-empty">'+esc(String(e))+'</div>';
   }
@@ -490,7 +520,6 @@ async function renderBottomTab(tab){
 
 // re-fetch one bottom tab (positions after confirm/close, journal after save)
 function refreshBottomTab(tab){
-  delete _bottomLoaded[tab];
   renderBottomTab(tab);
 }
 
@@ -783,6 +812,26 @@ function aiAsk(question){
   aiSend('drawer');
 }
 
+// T2 — prepare the ticket from the desk plan. Advisory only: fills the
+// ticket fields and switches to the Ticket tab, but never confirms and
+// never touches the server. The human still reviews and Confirms.
+function aiPrepareTicket(){
+  const d=window._skyPayload||{};
+  const s=d.signal||{};
+  const dec=d.decision||{};
+  const action=(dec.action==='BUY'||dec.action==='SELL')?dec.action
+              :(s.action==='BUY'||s.action==='SELL')?s.action:null;
+  if(!action){
+    showToast('No actionable desk plan right now — the desk says stand aside','err');
+    return;
+  }
+  ticketSide(action);
+  ticketType('market');
+  fillTicketFromSignal(d);
+  switchOrderTab('ticket');
+  showToast('Ticket prepared from the desk plan — advisory only; you still review & Confirm','ok');
+}
+
 function aiAppendMsg(container, who, text, sections){
   const msg=document.createElement('div');
   msg.className='ai-msg '+who;
@@ -800,6 +849,14 @@ function aiAppendMsg(container, who, text, sections){
   container.scrollTop=container.scrollHeight;
 }
 
+function aiAppendSources(container, sources){
+  const msg=document.createElement('div');
+  msg.className='ai-msg bot ai-sources';
+  msg.textContent='Sources: '+(sources||[]).join(' · ');
+  container.appendChild(msg);
+  container.scrollTop=container.scrollHeight;
+}
+
 async function aiSend(which){
   const isDrawer = which==='drawer';
   const input=isDrawer?document.getElementById('aiInput'):document.getElementById('otabAiInput');
@@ -813,33 +870,35 @@ async function aiSend(which){
   typing.className='ai-typing'; typing.textContent='SKY is thinking…';
   chat.appendChild(typing);
   try{
+    // Tell the desk which market the trader is looking at — the backend
+    // answers about THIS symbol/timeframe, not the server default.
+    const sym=(document.getElementById('sym')||{}).value||'BTCUSDT';
+    const tf=(document.getElementById('tf')||{}).value||'15m';
     const ctx=aiContext();
     const res=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({question:q, context:ctx})});
+      body:JSON.stringify({question:q, context:ctx, symbol:sym, tf:tf})});
     const d=await res.json();
     typing.remove();
-    const answer=d.answer||d.message||(d.error?('⚠ '+d.error):'no answer');
-    // split the answer into the four professional sections when present
-    const sections={};
-    const lines=String(answer).split(String.fromCharCode(10));
-    let cur=null;
-    for(const line of lines){
-      const m=line.match(/^\\s*(market facts|sky interpretation|risk concerns|suggested next action|interpretation|concerns|next action)\\s*[:.]/i);
-      if(m){ cur=m[1].toLowerCase(); sections[cur]=[]; }
-      else if(cur && sections[cur]) sections[cur].push(line);
-    }
-    const hasSections=Object.keys(sections).length>=2;
-    if(hasSections){
-      const clean={};
-      for(const[k,v] of Object.entries(sections)) clean[k]=v.join(String.fromCharCode(10)).trim();
-      aiAppendMsg(chat,'bot',null,clean);
-      const rest=lines.filter(l=>!l.match(/^\\s*(market facts|sky interpretation|risk concerns|suggested next action|interpretation|concerns|next action)\\s*[:.]/i) || true);
-      aiAppendMsg(chat,'bot',rest.join(String.fromCharCode(10)).trim());
+    // The backend returns answer as a list of lines; join them, then render
+    // its own structured sections when present. Never double-print the raw
+    // text — the sections ARE the answer, formatted.
+    const answer = Array.isArray(d.answer)
+      ? d.answer.join(String.fromCharCode(10))
+      : (d.answer||d.message||(d.error?('⚠ '+d.error):'no answer'));
+    const sections = Array.isArray(d.sections)
+      ? d.sections.filter(s=> s && String(s.body||'').trim())
+      : null;
+    if(sections && sections.length){
+      const byTitle={};
+      for(const s of sections){
+        byTitle[s.title||'Answer'] = s.body;
+      }
+      aiAppendMsg(chat,'bot',null,byTitle);
     } else {
       aiAppendMsg(chat,'bot',String(answer));
     }
-    if(d.citations&&d.citations.length){
-      aiAppendMsg(chat,'bot','Citations: '+d.citations.join(', '));
+    if(d.sources&&d.sources.length){
+      aiAppendSources(chat,d.sources);
     }
   }catch(e){
     typing.remove();
@@ -895,8 +954,8 @@ async function aiSend(which){
       try{ loadTerminalPositions(); }catch(e){}
       try{ loadRiskChip(); }catch(e){}
       try{ loadFeedChip(); }catch(e){}
-      // keep open-position R / MAE / MFE live while the tab is visible
-      try{ if(_bottomLoaded.positions&&!_journalTarget) refreshBottomTab('positions'); }catch(e){}
+      // keep the visible bottom tab fresh — positions R / MAE / MFE live
+      try{ if(_bottomTab==='positions'&&!_journalTarget) refreshBottomTab('positions'); }catch(e){}
     }, 60000);
   }catch(e){}
 })();

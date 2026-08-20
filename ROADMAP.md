@@ -2,7 +2,7 @@
 
 > **Status:** active source of truth
 > **Last updated:** 2026-08-20
-> **Current software:** v2.50.0
+> **Current software:** v2.52.0
 > **Suite at this version:** 1282 passed / 1 skipped (offline)
 >
 > **This file + `TODO.md` win** when other roadmaps, anatomy notes, or
@@ -32,7 +32,7 @@ loses 50% needs a 100% gain just to break even.
 | **Decision independence** | Own engine, risk gate, human-approval loop | ✅ P1–P9 |
 | **Data independence** | Own stored market history | ✅ P10.1–P10.12 |
 | **Validation independence** | Research-grade proof on our grader + our store | ✅ P12.1–P12.18 *tooling*; real-host XAU evidence still open |
-| **Operating independence** | Click the desk; do not memorise CLI | 🔄 Trade Terminal T1 + T3 shipped (v2.50.0); T2, T4–T6 remaining |
+| **Operating independence** | Click the desk; do not memorise CLI | 🔄 Trade Terminal T1 + T2 + T3 + T4(pt.1) shipped (v2.52.0); T4 pt.2, T5–T6 remaining |
 | **Evidence independence** | Canonical live paper book that can open the graduation bar | 🔄 **P11 — this is the money path** |
 
 Those halves cannot substitute for each other. A beautiful terminal
@@ -83,8 +83,8 @@ aim.
 │ LANE B — PRODUCT PATH (sandbox-feasible code)                       │
 │ Trade Terminal so the owner never types a command for the daily     │
 │ loop: chart → understand → paper ticket → gate → manage → close →   │
-│ journal. Phases T1–T6. T1 + T3 shipped (the full paper loop).      │
-│ Next: T2 polish → T4.                                                 │
+│ journal. Phases T1–T6. T1 + T2 + T3 + T4(pt.1) shipped (full loop).│
+│ Next: T4 part 2 — panels/persistence/states/tooltips/mobile.          │
 ├─────────────────────────────────────────────────────────────────────┤
 │ LANE C — DISTRIBUTION PATH (trusted signers only)                   │
 │ Ubuntu Hub is the one authority. Browser/PWA, Windows .exe and      │
@@ -100,7 +100,7 @@ signed installers here.
 
 ---
 
-## 2. Current software — honest snapshot (v2.50.0)
+## 2. Current software — honest snapshot (v2.52.0)
 
 What a user actually has after `python3 main.py`:
 
@@ -110,7 +110,7 @@ What a user actually has after `python3 main.py`:
 | Chart | Lightweight Charts v4.2.3 with EMA/VWAP/BB, RSI, MACD, zones, drawings, replay, live SSE stream, 2×2 multi-chart (zoom + crosshair sync) |
 | Paper ticket | Prefills from the latest scan; sizes; shows a live server gate read; Confirm is **disabled while the gate says blocked** |
 | Confirm Paper Trade | **Enrolls the real paper trade (T3).** Ticket → scan row → fresh server gate → APPROVED (desk path) → paper-runner position in the bottom panel → live R/MAE/MFE → Close records the outcome → journal drawer opens. Market tickets fill at entry; limit/conditional wait for the level. Still paper-only. |
-| AI Copilot | Drawer + 8 quick actions + `/api/ask` with context injection. Structured-section parsing is incomplete. AI cannot approve. |
+| AI Copilot | Drawer + 9 quick actions + `/api/ask` with symbol/timeframe context. Answers render as titled sections with a Sources footer (v2.51.0); Prepare-ticket pre-fills the ticket (advisory). AI cannot approve. |
 | Other five nav areas | Existing panels **grouped**, not rewritten |
 | Risk gate / graduation / `/api/v1` / jobs / PWA / auth | Untouched by v2.50.0 (T3 calls the existing desk approval + paper runner; no threshold, no order path) |
 | Visual QA | **Not done.** No browser in the sandbox that shipped T1. |
@@ -446,18 +446,22 @@ confirmation.
 Confirm creating a paper position; resizable/persisted panel sizes;
 focused Markets/Portfolio/Journal/Evidence/System pages.
 
-### T2 — Persistent AI Copilot · 🔄 scaffold shipped, polish remaining
+### T2 — Persistent AI Copilot · ✅ shipped v2.51.0
 
 Shipped in v2.49.0: drawer, eight quick actions, context injection,
-attempted sectioned replies.
+attempted sectioned replies. Shipped in v2.51.0 (T2 polish):
 
-Remaining:
-
-- Reliable structured-section parsing (do not double-print the raw
-  answer)
-- Per-answer citations/sources
-- **Prepare ticket from AI** (never approves)
-- Context: open positions + measured evidence, not only the last scan
+- Reliable structured sections — the backend returns `sections` +
+  `sources` on every answer; the Copilot renders titled sections with a
+  dashed Sources footer and never double-prints the raw text
+- Per-answer citations/sources — every intent names the grounding surface
+  (`risk gate — brain.risk_gate.evaluate`, `open paper book —
+  SignalDB.live_open_rows`, …)
+- **Prepare ticket from AI** (never approves) — pre-fills side/type/
+  entry/SL/TP from the desk plan and switches to the Ticket tab
+- Context: open positions + measured evidence — the exposure answer adds
+  the canonical live-book count and per-plan-type calibrated expectancy,
+  and the Copilot asks about the selected symbol/timeframe
 
 ### T3 — Paper-trade workflow wiring · ✅ shipped v2.50.0
 
@@ -486,17 +490,26 @@ This is the product expression of the money path.
   nothing journaled.
 - **Still paper-only. Still no exchange order.**
 
-### T4 — Professional polish
+### T4 — Professional polish · 🔄 part 1 shipped v2.52.0
+
+Shipped in v2.52.0:
+
+- **Honest ticket fees/size** — `GET /api/ticket/meta` serves the real
+  `ACCOUNT_BALANCE` + the per-symbol cost model; the ticket sizes from that
+  balance (shows **—** with a "set ACCOUNT_BALANCE" hint when unset — the
+  invented $100k default is gone) and estimates fees from the desk's real
+  round-trip fee/spread/slippage model.
+- **Loading skeletons** — shimmer rows for the watchlist and bottom tabs.
+- **Bottom tabs re-fetch** — the one-shot cache is dropped; switching always
+  re-fetches so a runner-closed position cannot linger as a stale row.
+
+Remaining (T4 part 2):
 
 - Resizable and collapsible panels
 - localStorage for panel sizes / watchlist / symbol / timeframe / layout
-- Loading skeletons
 - Explicit stale / disconnected / error states in the terminal
 - Tooltips for all icons
 - Compact mobile layout
-- Bottom tabs must re-fetch (drop the one-shot cache)
-- Ticket fees/size must use the real cost model and account balance
-  (no invented $100k default presented as fact)
 
 ### T5 — Home screen and onboarding
 
@@ -558,7 +571,7 @@ XAU dossier is neither condition.
 | P20 | Windows companion contract (pairing, client, unsigned recipe) | ✅ Contract shipped; signed `.exe` does not exist yet |
 | P21 | Android companion contract (Keystore, biometric, unsigned recipe) | ✅ Contract shipped; signed `.apk` does not exist yet |
 | P22 | Release engineering (checksums, SBOM, drill contracts) | ✅ Foundation shipped; trusted-signer drills pending |
-| **T1–T6** | **Professional Trade Terminal** | **T1 + T3 shipped v2.50.0; T2, T4–T6 remaining** |
+| **T1–T6** | **Professional Trade Terminal** | **T1 + T2 + T3 + T4(pt.1) shipped v2.52.0; T4 pt.2, T5–T6 remaining** |
 
 Freqtrade (F1–F8) and Backtrader (BT1–BT8) stay **rejected**. Needle 2
 (N1–N8) stays parked. Do not reopen those audits to install a bot or
@@ -663,11 +676,12 @@ in the **same** environment is unblocked.
 2. **Visual QA of the T3 loop** — if a real browser is available:
    confirm a ticket, watch the position appear, close it, journal it.
    Fix visual issues only; do not fake screenshots.
-3. **T2 polish** — section parser, per-answer sources,
-   prepare-ticket-from-AI (never approves), richer copilot context.
-4. **T4** — resizable/persisted panels, loading skeletons,
-   stale/error states, tooltips, honest sizing/fees, drop the
-   one-shot bottom-tab cache.
+3. **T2 polish — ✅ shipped v2.51.0** (sections + sources, prepare
+   ticket from AI, richer context).
+4. **T4 — 🔄 part 1 shipped v2.52.0** (honest sizing/fees via
+   `/api/ticket/meta`, loading skeletons, drop the one-shot bottom-tab
+   cache). **Part 2** remains: resizable/persisted panels, localStorage
+   layout, stale/error states, tooltips, compact mobile.
 5. **T5** then **T6**.
 
 Keep the suite green. Bump `config.VERSION` / `pyproject.toml` /

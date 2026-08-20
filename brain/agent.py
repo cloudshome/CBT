@@ -449,9 +449,66 @@ def _detect_intent(question: str) -> str:
     return "help"
 
 
+# ── structured answers: what a claim is grounded on ─────────────────────
+# The Copilot renders an ask() result as titled sections plus a source list,
+# so the trader can always see which surface produced each number. The plain
+# ``answer`` list is unchanged — the CLI and MCP still read exactly what they
+# read before this existed.
+
+_SOURCES_BY_INTENT: dict[str, list[str]] = {
+    "graduation": ["graduation gate — data.simulator.graduation_status + paper_progress (canonical live book)",
+                   "journal discipline — brain.journal.graduation_discipline + violation_rate"],
+    "desk": ["desk snapshot — brain.agent.desk_status"],
+    "loop": ["daily loop — brain.agent.loop_health (desk_status + readiness_strip + paper_progress)"],
+    "risk": ["risk gate — brain.risk_gate.evaluate",
+             "progression ladder — brain.risk_gate.progression"],
+    "exposure": ["open paper book — SignalDB.open_exposure / live_open_rows",
+                 "correlation buckets — brain.portfolio.bucket_state",
+                 "measured expectancy — SignalDB.load_calibration"],
+    "pending": ["human approval queue — SignalDB.pending_reviews"],
+    "journal": ["journal discipline — brain.journal.violation_rate"],
+    "calibration": ["calibration profile — SignalDB.load_calibration"],
+    "stats": ["backtest store — SignalDB.backtest_stats",
+              "business scorecard — brain.metrics.business_metrics"],
+    "paper": ["paper book — SignalDB.paper_trade_stats"],
+    "market": ["engine scan — main.run_scan (analyze_frame + desk decision)"],
+    "health": ["system health — brain.agent.health_report"],
+    "sources": ["source trust table — SignalDB.load_source_scores"],
+    "progression": ["progression ladder — brain.risk_gate.progression"],
+    "morning": ["morning briefing — brain.agent.morning_briefing"],
+    "help": ["intent catalogue — brain.agent._INTENT_KEYWORDS"],
+}
+
+_SECTION_TITLES_BY_INTENT: dict[str, str] = {
+    "graduation": "Graduation gate",
+    "desk": "Desk status",
+    "loop": "Daily loop",
+    "risk": "Risk gate",
+    "exposure": "Open positions",
+    "pending": "Pending review",
+    "journal": "Journal discipline",
+    "calibration": "Calibration",
+    "stats": "Learning store",
+    "paper": "Paper book",
+    "market": "Market read",
+    "health": "System health",
+    "sources": "Source trust",
+    "progression": "Progression",
+    "morning": "Morning briefing",
+    "help": "What I can answer",
+}
+
+
 def ask(question: str, symbol: str | None = None,
         timeframe: str = TIMEFRAME, bars: int = BARS) -> dict:
     """Answer a natural-language question from live DB + engine state."""
+    result = _ask_impl(question, symbol=symbol, timeframe=timeframe, bars=bars)
+    return _decorate_answer(result)
+
+
+def _ask_impl(question: str, symbol: str | None = None,
+              timeframe: str = TIMEFRAME, bars: int = BARS) -> dict:
+    """The intent routers; :func:`ask` decorates the result with sections."""
     intent = _detect_intent(question)
     from data.database import SignalDB
     with SignalDB() as db:
@@ -489,6 +546,8 @@ def ask(question: str, symbol: str | None = None,
         if intent == "exposure":
             from brain.portfolio import bucket_state
             trades = db.open_exposure()
+            live = db.live_open_rows()
+            calib = db.load_calibration()
             lines = [f"Open exposure: {len(trades)} paper trade(s)"]
             buckets = {}
             for t in trades:
@@ -504,9 +563,31 @@ def ask(question: str, symbol: str | None = None,
                                  f"({t.get('status', '')})")
             if not trades:
                 lines.append("  The book is flat — no correlated risk.")
+            # P12.16 — the exposure counts include approved-not-enrolled
+            # intentions; state the canonical live open book separately.
+            if len(live) != len(trades):
+                lines.append(f"  canonical live open positions: {len(live)} "
+                             f"(of {len(trades)} incl. approved-not-enrolled)")
+            # Measured evidence for the setups this exposure is carrying —
+            # the calibrated expectancy behind each open plan type.
+            plan_types = sorted({t.get("plan_type") or "signal" for t in trades})
+            for pt in plan_types:
+                prof = calib.get(pt) or {}
+                exp = prof.get("expectancy")
+                if exp is not None:
+                    lines.append(f"  measured evidence — {pt}: expectancy "
+                                 f"{exp:+.2f}R · paper n="
+                                 f"{prof.get('paper_samples') or 0} · "
+                                 f"{'proven' if prof.get('proven') else 'unproven'}")
             return {"intent": intent, "question": question, "answer": lines,
-                    "data": {"trades": trades,
-                             "buckets": {k: {"n": len(v)} for k, v in buckets.items()}}}
+                    "sections": [{"title": "Open positions",
+                                  "body": "\n".join(lines)}],
+                    "data": {"trades": trades, "live_open": len(live),
+                             "buckets": {k: {"n": len(v)} for k, v in buckets.items()},
+                             "calibration": {k: {"expectancy": v.get("expectancy"),
+                                                 "proven": v.get("proven"),
+                                                 "paper_samples": v.get("paper_samples")}
+                                             for k, v in calib.items()}}}
         if intent == "pending":
             rows = db.pending_reviews()
             lines = [f"Pending human review: {len(rows)}"]
@@ -590,13 +671,22 @@ def ask(question: str, symbol: str | None = None,
                          for p in payload.get("plans", [])]
             conf = f"{max(plan_conf)}%" if plan_conf else \
                 str(sig.get("confidence") or "—")
-            lines = [f"{sig.get('asset')} {sig.get('timeframe')}: "
-                     f"{decision.get('action', sig.get('action'))} "
-                     f"conf={conf} {entry_s}",
-                     f"  reason: {sig.get('reason')}"]
-            for b in decision.get("blocked_by", []):
-                lines.append(f"  desk veto: {b}")
+            read_lines = [f"{sig.get('asset')} {sig.get('timeframe')}: "
+                          f"{decision.get('action', sig.get('action'))} "
+                          f"conf={conf} {entry_s}"]
+            if sig.get("reason"):
+                read_lines.append(f"  reason: {sig.get('reason')}")
+            decision_lines = ([f"  desk veto: {b}"
+                               for b in decision.get("blocked_by", [])]
+                              or [f"  desk {decision.get('action', sig.get('action'))} "
+                                  f"— no veto."])
+            lines = read_lines + decision_lines
             return {"intent": intent, "question": question, "answer": lines,
+                    "sections": [
+                        {"title": "Market read", "body": "\n".join(read_lines)},
+                        {"title": "Desk decision",
+                         "body": "\n".join(decision_lines)},
+                    ],
                     "data": {"signal": sig, "decision": decision}}
         if intent == "health":
             report = health_report()
@@ -644,6 +734,23 @@ def ask(question: str, symbol: str | None = None,
                        "Try: 'is the risk gate open?', 'what's pending?', "
                        "'how is the loop?', 'scan BTC'."],
             "data": {"intents": intents}}
+
+
+def _decorate_answer(result: dict) -> dict:
+    """Attach the Copilot's structured sections + grounding sources.
+
+    A handler may already have set ``result["sections"]`` (the market and
+    exposure intents split theirs into two). Otherwise one titled section is
+    derived from the whole answer. The plain ``answer`` list is never
+    altered — the CLI and MCP still read exactly what they read before.
+    """
+    intent = result.get("intent") or "help"
+    result.setdefault("sources", list(_SOURCES_BY_INTENT.get(intent, [])))
+    if not result.get("sections"):
+        title = _SECTION_TITLES_BY_INTENT.get(intent, "Answer")
+        body = "\n".join(result.get("answer") or []).strip()
+        result["sections"] = [{"title": title, "body": body}]
+    return result
 
 
 def graduation_report() -> dict:

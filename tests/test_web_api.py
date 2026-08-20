@@ -321,3 +321,23 @@ def test_scorecard_endpoint_never_500s(client, monkeypatch):
     payload = resp.get_json()
     assert payload["ok"] is False
     assert "RuntimeError" in payload["error"]
+
+
+def test_ticket_meta_endpoint_returns_honest_inputs(client):
+    """T4 — the ticket's sizing/fee inputs must come from the server, never
+    invented client-side. Unset ACCOUNT_BALANCE reports 0, not a fake $100k."""
+    import json
+    resp = client.get("/api/ticket/meta?symbol=BTCUSDT")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
+    meta = resp.get_json()
+    assert meta["symbol"] == "BTCUSDT"
+    assert isinstance(meta["account_balance"], float)
+    assert meta["account_configured"] in (True, False)
+    assert 0 < meta["round_trip_cost_pct"] < 0.05
+    assert meta["market"] in ("spot", "perp")
+    assert meta["holding_hours"] > 0
+    # gold is spot: no funding, commission-based model
+    gold = client.get("/api/ticket/meta?symbol=XAUUSD").get_json()
+    assert gold["market"] == "spot"
+    assert gold["funding_rate_8h"] == 0.0
+    json.loads(resp.get_data(as_text=True))  # numpy-leak safety

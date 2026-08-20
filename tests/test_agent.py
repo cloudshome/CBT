@@ -378,3 +378,47 @@ def test_cross_exchange_probe_uses_newest_candle(monkeypatch):
     assert cross["exchanges"]["bybit"]["symbols"]["BTCUSDT"] == {
         "price": 100.0, "deviation_pct": 0.0, "flag": False,
     }
+
+
+# ── T2 — AI Copilot: structured sections + grounding sources ─────────────
+
+def test_ask_results_carry_sections_and_sources(desk_env):
+    """The Copilot contract: every ask() answer names its grounding sources
+    and ships structured sections without changing the plain answer list."""
+    from brain.agent import ask
+    for question, intent in [("is the risk gate open?", "risk"),
+                             ("how is the loop?", "loop"),
+                             ("what should I do right now?", "desk"),
+                             ("am i ready for micro?", "graduation")]:
+        r = ask(question)
+        assert r["intent"] == intent
+        assert isinstance(r["answer"], list) and r["answer"]
+        assert r["sources"], f"{intent} must cite its grounding surfaces"
+        assert all(isinstance(s, str) and s for s in r["sources"])
+        assert r["sections"]
+        assert all("title" in s and "body" in s for s in r["sections"])
+        assert r["sections"][0]["body"]
+
+
+def test_ask_market_splits_read_and_decision_sections(desk_env):
+    """'scan BTC' answers in two titled sections: the market read and the
+    desk decision (with its vetoes), not one undifferentiated blob."""
+    from brain.agent import ask
+    r = ask("scan BTC", symbol="BTCUSDT", bars=200)
+    assert r["intent"] == "market"
+    titles = [s["title"] for s in r["sections"]]
+    assert titles == ["Market read", "Desk decision"]
+    assert "BTCUSDT" in r["sections"][0]["body"]
+    assert r["sections"][1]["body"]
+
+
+def test_ask_exposure_reports_measured_evidence_and_live_book(desk_env):
+    """Open-position answers carry the calibrated (measured) expectancy and
+    split the canonical live book from planned exposure."""
+    from brain.agent import ask
+    r = ask("any exposure right now?")
+    assert r["intent"] == "exposure"
+    assert r["sections"][0]["title"] == "Open positions"
+    assert "flat" in r["sections"][0]["body"].lower()
+    assert "live_open" in r["data"]
+    assert "calibration" in r["data"]

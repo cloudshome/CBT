@@ -46,7 +46,7 @@ _HARNESS_HEAD = r"""
       const cls = new Set();
       return { id, innerHTML:'', className:'', textContent:'', value:'',
         checked:true, disabled:false, clientWidth:900, style:{},
-        options:[], appendChild(){}, scrollIntoView(){}, classes: cls,
+        options:[], appendChild(){}, remove(){}, scrollIntoView(){}, classes: cls,
         addEventListener:()=>{}, setAttribute:()=>{}, querySelector:()=>null,
         querySelectorAll:()=>[],
         classList:{
@@ -559,3 +559,169 @@ def test_thirty_second_refresh_updates_data_only():
     assert out["live"] == "tick"
     assert "Data live" in out["updated"]
     assert not any("Refresh failed" in t for t in out["toasts"])
+
+
+# ── T2 — AI Copilot polish ───────────────────────────────────────────────
+
+def test_copilot_renders_sections_and_sources_without_double_print():
+    """A structured answer renders its titled sections + a sources footer,
+    and never re-prints the raw text after the sectioned version."""
+    api = {"/api/ask": {"status": 200, "body": {
+        "intent": "desk",
+        "answer": ["DESK STATUS", "  risk gate: OPEN", "  ADVICE: STAND_ASIDE"],
+        "sections": [{"title": "Desk status",
+                      "body": "DESK STATUS\n  risk gate: OPEN\n  ADVICE: STAND_ASIDE"}],
+        "sources": ["desk snapshot — brain.agent.desk_status"],
+    }}}
+    out = _run(api, """
+      const messages = [];
+      const _origMsg = aiAppendMsg;
+      const _origSrc = aiAppendSources;
+      aiAppendMsg = (c, who, text, sections) => { messages.push({kind:'msg', who, text, sections}); return _origMsg(c, who, text, sections); };
+      aiAppendSources = (c, sources) => { messages.push({kind:'src', sources}); return _origSrc(c, sources); };
+      el('aiInput').value = 'what should I do?';
+      await aiSend('drawer');
+      global.__messages = messages;
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify(global.__messages));")
+    assert out[0]["kind"] == "msg" and out[0]["who"] == "user"
+    bot_msgs = [m for m in out if m.get("kind") == "msg" and m.get("who") == "bot"]
+    assert len(bot_msgs) == 1, "exactly one bot answer — no double-print of the raw text"
+    assert bot_msgs[0]["sections"] == {
+        "Desk status": "DESK STATUS\n  risk gate: OPEN\n  ADVICE: STAND_ASIDE"}
+    src = [m for m in out if m.get("kind") == "src"]
+    assert len(src) == 1
+    assert src[0]["sources"] == ["desk snapshot — brain.agent.desk_status"]
+
+
+def test_copilot_joins_list_answers_when_no_sections():
+    """When the backend sends only a list answer (no sections), it must be
+    joined with newlines, not comma-joined into one line."""
+    api = {"/api/ask": {"status": 200, "body": {
+        "intent": "paper",
+        "answer": ["Paper trading: 3 tracked", "  open 1 · closed 2"],
+        "sources": ["paper book — SignalDB.paper_trade_stats"],
+    }}}
+    out = _run(api, """
+      const messages = [];
+      const _origMsg = aiAppendMsg;
+      aiAppendMsg = (c, who, text, sections) => { messages.push({who, text, sections}); return _origMsg(c, who, text, sections); };
+      el('aiInput').value = 'paper book?';
+      await aiSend('drawer');
+      global.__messages = messages;
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify(global.__messages));")
+    bot = [m for m in out if m.get("who") == "bot" and m.get("text")][0]
+    assert bot["text"] == "Paper trading: 3 tracked\n  open 1 · closed 2"
+
+
+def test_copilot_prepare_ticket_fills_but_never_confirms():
+    """Prepare-ticket pre-fills the ticket from the desk plan and switches to
+    the Ticket tab — advisory only, it must never POST a confirm."""
+    out = _run({}, """
+      window._skyPayload = {
+        signal:{asset:'BTCUSDT',timeframe:'15m',action:'BUY',entry:61000,
+                stop_loss:60000,take_profit:63000,confidence:'MEDIUM',reason:'test'},
+        plans:[{type:'Buy Pullback',entry:61000,stop_loss:60000,
+                take_profits:[63000,65000],confidence:70}],
+        decision:{action:'BUY'},
+        snapshot:{features:{},scores:{}},
+      };
+      aiPrepareTicket();
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({side:_ticketSide, type:_ticketType, "
+        "entry:elements['tEntry'].value, sl:elements['tSL'].value, "
+        "tp1:elements['tTP1'].value, tp2:elements['tTP2'].value, "
+        "posts:POSTS, toasts:TOASTS}));")
+    assert out["side"] == "BUY"
+    assert out["type"] == "market"
+    assert float(out["entry"]) == 61000
+    assert float(out["sl"]) == 60000
+    assert float(out["tp1"]) == 63000
+    assert float(out["tp2"]) == 65000
+    assert out["posts"] == [], "prepare-ticket is advisory — it never confirms"
+    assert any("advisory" in t for t in out["toasts"])
+
+
+def test_copilot_prepare_ticket_refuses_without_action():
+    """When the desk has no actionable plan, prepare-ticket stands aside."""
+    out = _run({}, """
+      window._skyPayload = { signal:{asset:'BTCUSDT',action:'NO TRADE'},
+        plans:[], decision:{action:'NO TRADE'} };
+      aiPrepareTicket();
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({posts:POSTS, toasts:TOASTS}));")
+    assert out["posts"] == []
+    assert any("stand aside" in t for t in out["toasts"])
+
+
+# ── T4 — professional polish: honest sizing/fees + bottom-tab re-fetch ───
+
+def test_ticket_sizing_uses_real_account_balance():
+    """Risk dollars and units come from the server's account balance, not an
+    invented $100k default."""
+    out = _run({}, """
+      _ticketMeta = {account_balance: 10000, round_trip_cost_pct: 0.0012};
+      el('tEntry').value = 61000; el('tSL').value = 60000;
+      el('tTP1').value = 62000; el('tRisk').value = '0.5';
+      recalcTicket();
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({risk:elements['tRiskUsd'].textContent, "
+        "size:elements['tSize'].value, fees:elements['tFees'].textContent}));")
+    assert out["risk"] == "$50"
+    assert float(out["size"]) == 0.05
+    assert "0.12% rt" in out["fees"]
+
+
+def test_ticket_sizing_never_invents_account():
+    """With no ACCOUNT_BALANCE the ticket shows '—', never a fake $100k."""
+    out = _run({}, """
+      _ticketMeta = {account_balance: 0, round_trip_cost_pct: 0.0014};
+      el('tEntry').value = 61000; el('tSL').value = 60000;
+      recalcTicket();
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({risk:elements['tRiskUsd'].textContent, "
+        "size:elements['tSize'].value, fees:elements['tFees'].textContent}));")
+    assert out["risk"] == "—"
+    assert out["size"] == "—"
+    assert "100000" not in out["risk"] and "100000" not in out["size"]
+    assert "0.14% round-trip" in out["fees"]
+
+
+def test_load_ticket_meta_fetches_real_meta():
+    """loadTicketMeta() reads /api/ticket/meta for the selected symbol."""
+    api = {"/api/ticket/meta": {"status": 200, "body": {
+        "account_balance": 25000, "account_configured": True,
+        "round_trip_cost_pct": 0.0014, "market": "perp"}}}
+    out = _run(api, """
+      el('sym').value = 'BTCUSDT';
+      await loadTicketMeta();
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({meta: _ticketMeta}));")
+    assert out["meta"]["account_balance"] == 25000
+    assert out["meta"]["round_trip_cost_pct"] == 0.0014
+
+
+def test_bottom_tabs_refetch_on_every_switch():
+    """The one-shot bottom-tab cache is gone: switching re-fetches, so a
+    position the runner just closed cannot linger as a stale row."""
+    api = {
+        "/api/journal": {"status": 200, "body": {
+            "journalable": [], "emotions": ["calm"], "summary": {}}},
+        "/api/trades": {"status": 200, "body": {"ok": True, "open": []}},
+    }
+    out = _run(api, """
+      const hits = [];
+      const origFetch = fetch;
+      fetch = async (url, opts) => {
+        if(String(url).indexOf('/api/journal')>=0) hits.push('journal');
+        if(String(url).indexOf('/api/trades')>=0) hits.push('trades');
+        return origFetch(url, opts);
+      };
+      switchBottomTab('journal');
+      switchBottomTab('positions');
+      switchBottomTab('journal');
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({hits: hits}));")
+    assert out["hits"].count("journal") == 2, out["hits"]
+    assert out["hits"].count("trades") == 1, out["hits"]

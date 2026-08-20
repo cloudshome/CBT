@@ -335,6 +335,7 @@
   .ai-msg .ai-sec{font-weight:800;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
     color:var(--cyan);margin-top:6px}
   .ai-msg .ai-sec:first-child{margin-top:0}
+  .ai-msg.ai-sources{border-style:dashed;color:var(--mut);font-size:10.5px}
   .ai-input{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--line)}
   .ai-input input{flex:1;font-size:11.5px}
   .ai-typing{color:var(--mut);font-style:italic;font-size:11px}
@@ -357,6 +358,12 @@
   .b-pos-row{cursor:pointer}
   .b-pos-row:hover td{background:rgba(74,163,255,.05)}
   .b-empty{color:var(--mut);font-size:11px;text-align:center;padding:16px 0}
+  .skel{position:relative;overflow:hidden;background:var(--panel2);border-radius:4px}
+  .skel::after{content:'';position:absolute;inset:0;transform:translateX(-100%);
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);
+    animation:skel 1.2s infinite}
+  @keyframes skel{100%{transform:translateX(100%)}}
+  .skel-row{height:12px;margin:8px 0}
 
   /* ── Legacy tab panels ───────────────────────────────────────────── */
   .tabpanel{display:none}
@@ -694,6 +701,7 @@
         <div id="otab-risk" class="otab"><div class="b-empty">risk summary appears here</div></div>
         <div id="otab-copilot" class="otab">
           <div class="ai-actions" style="padding:0 0 8px">
+            <button onclick="aiPrepareTicket()">Prepare ticket</button>
             <button onclick="aiAsk('Explain this chart')">Explain chart</button>
             <button onclick="aiAsk('Why is trading blocked?')">Why blocked?</button>
             <button onclick="aiAsk('Review this signal')">Review signal</button>
@@ -755,6 +763,7 @@
     <button class="btn sm ghost" onclick="closeAiDrawer()">✕</button>
   </div>
   <div class="ai-actions">
+    <button onclick="aiPrepareTicket()">Prepare ticket</button>
     <button onclick="aiAsk('Explain this chart')">Explain chart</button>
     <button onclick="aiAsk('Why is trading blocked?')">Why blocked?</button>
     <button onclick="aiAsk('Review this signal')">Review signal</button>
