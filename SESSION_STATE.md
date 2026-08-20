@@ -1,4 +1,4 @@
-**Last updated:** 2026-08-20 (**v2.49.0 — The Trade Terminal, professional layout**). The web dashboard is now one professional trading platform: watchlist (left), large chart (centre), paper-trade ticket + AI Copilot (right), tabbed trading panel (bottom), six-area navigation (Trade, Markets, Portfolio, Journal, Evidence, System) with compact SVG icons, and a professional dark theme. The roadmap was rewritten around this vision with phases T1–T6. This is a **presentation-layer** release: every server endpoint, the risk gate, the graduation bar, auth/roles/CSRF, `/api/v1`, jobs/SSE, PWA and all trading logic are untouched; no threshold moved; no order path exists. Full suite **1282 passed / 1 skipped**; wheel gate green. Contract: `docs/HANDOVER_2026-08-20_v2.49.0.md`. **P22 drills still need real signers; P11 real paper proof stays parallel and remains the money path.**
+**Last updated:** 2026-08-20 (**combined roadmap after v2.49.0**). Software is still **v2.49.0** (Trade Terminal *layout*, PR #72). `ROADMAP.md` is again the combined source of truth: core aim (independent profitable trader; accumulate BTC/ETH/GOLD) + three lanes (P11 paper proof / T1–T6 terminal / P18–P22 distribution). PR #72's rewrite had dropped the money path and still marked T1 as NEXT at v2.48.1. Review: `docs/PR_REVIEW_2026-08-20.md`. Confirm does **not** enroll a paper trade — that is T3, the next sandbox code. Presentation-layer only: risk gate, graduation bar, auth, `/api/v1`, jobs/SSE, PWA and trading logic untouched. Full suite **1282 passed / 1 skipped**. **P22 drills still need real signers; P11 real paper proof stays the money path.**
 
 **Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2: synchronized crosshair**). 2×2 multi-chart crosshair sync, sync toggles, four distinct defaults, honest empty slots, and timestamp normalisation. Contract: `docs/HANDOVER_2026-08-20_W35_part2.md`.
 
@@ -160,20 +160,18 @@ now judges P&L **net of costs** (P12.18).
 **Version:** 2.49.0
 **Python:** 3.11 — full suite 1282 passed / 1 skipped
 
-> **Current state.** The web dashboard is now the **Trade Terminal**
-> (v2.49.0): watchlist left, chart centre, paper-trade ticket + AI Copilot
-> right, tabbed trading panel bottom, six-area navigation, professional dark
-> theme. The roadmap was rewritten around this vision (phases T1–T6; T1
-> shipped). This is presentation-layer work — the risk gate, graduation bar,
-> auth, `/api/v1`, jobs/SSE, PWA and all trading logic are untouched. The
-> real-host lane is unchanged and remains the money path: rerun canonical
-> learning, import/validate the Dukascopy XAU history, archive
-> `xau-evidence --json`, and continue the canonical live paper book. This
-> clean checkout has no real store/database, so it must not manufacture
-> either result. The graduation bar remains closed; XAU remains research-only;
-> micro-live remains blocked until the unchanged graduation gate is READY and
-> the user separately approves it. Next code is T2–T4 (AI polish, paper
-> workflow wiring, panel persistence/polish), then the T5 home screen.
+> **Current state.** The web dashboard is the **Trade Terminal layout**
+> (v2.49.0, PR #72): watchlist left, chart centre, paper-trade ticket + AI
+> Copilot right, tabbed trading panel bottom, six-area navigation. Confirm
+> does not enroll a paper trade. `ROADMAP.md` is the combined source of
+> truth (core aim + three lanes + honest T1–T6). Presentation-layer only —
+> the risk gate, graduation bar, auth, `/api/v1`, jobs/SSE, PWA and all
+> trading logic are untouched. The real-host lane remains the money path:
+> rerun canonical learning, import/validate Dukascopy XAU, archive
+> `xau-evidence --json`, continue the canonical live paper book. This
+> checkout has no real store/database. Graduation bar closed; XAU
+> research-only; micro-live blocked until the unchanged gate is READY and
+> the owner separately approves it. Next sandbox code is **T3**.
 
 > **This session (`arena/01a009c0-sky`): v2.24.0 / P12.16 open-book source
 > isolation.** PR #39 had merged and every ordered next action is real-host
@@ -664,13 +662,13 @@ Every phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**v2.48.1 reliability patch — shipped this session.** The application and
-installed-PWA cache version are synchronized again, and CI now enforces exact
-lockstep across `config.py`, `pyproject.toml`, and `web/static/sw.js`. The two
-`sky-agent` subprocess tests retain the interpreter running pytest and use an
-absolute entrypoint. No trading behavior, threshold, evidence population, or
-safety boundary changed. Contract: `docs/HANDOVER_2026-08-20_v2.48.1.md`.
-Full suite 1282 passed / 1 skipped; wheel gate built v2.48.1 cleanly.
+**v2.49.0 Trade Terminal layout — shipped (PR #72).** Combined roadmap
+restored this session: core aim + three lanes + honest T1–T6. Confirm does
+not enroll a paper trade (T3 is next sandbox code). No trading behavior,
+threshold, evidence population, or safety boundary changed. Contracts:
+`docs/HANDOVER_2026-08-20_v2.49.0.md`, `docs/PR_REVIEW_2026-08-20.md`.
+Full suite 1282 passed / 1 skipped at v2.49.0. Software version is unchanged
+by this docs session.
 
 **W3.5 part 2 — 2×2 multi-chart synchronized crosshair — shipped v2.48.0.**
 Completes the W2/W3.5 chart backlog
@@ -1199,11 +1197,11 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    and Android hosts and attach real clean-target evidence. Do not claim signed
    artifacts or `p22_complete` from this sandbox.
 0b. ~~**W3.4 practice mode**~~ — shipped v2.42.0. ~~**W3.5 multi-chart
-   views**~~ — shipped v2.43.0 + v2.48.0 part 2 (synchronized crosshair,
-   sync toggles, honest empty slots, 1970-date fix). ~~P18.4 polish~~ —
-   shipped v2.47.0 (designed icons, iOS standalone, VAPID push). The
-   W2/W3.5 chart backlog and P18.4 are **complete**; future sandbox code
-   is optional polish only, chosen deliberately.
+   views**~~ — shipped v2.43.0 + v2.48.0 part 2. ~~P18.4 polish~~ —
+   shipped v2.47.0. ~~**T1 Trade Terminal layout**~~ — shipped v2.49.0.
+   Next sandbox **code** is **T3** (Confirm → existing approval →
+   position in the terminal → close → journal). T2/T4 polish follow.
+   P11 paper proof and P22 signers still outrank chrome.
 1. **Run P12.12 on the real-data host** — rerun `learn` to adopt source keys,
    build/retain the locked Dukascopy XAU validation evidence, then archive
    `python main.py xau-evidence --json`. Do not reseal from the audit command.
@@ -1343,7 +1341,10 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 1. **Keep the passed-through triage:** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` (6 ideas -> Take/Park/Reject) remains the durable decision for LMRing/OpenDataLoader/AirLLM/harness — `P18.4` already satisfied it as `P12.19` after `P19`.
 2. **W3 + W3.4 + W3.5 shipped (v2.41.0/v2.42.0/v2.43.0+v2.48.0) — verify them:** `python main.py weekly` prints the Sunday mirror; `python main.py practice` prints the calibration mirror; dashboard 📊 Chart tab ✍ PRACTICE card scores a committed read against the desk; 🗓 Review tab PRACTICE CALIBRATION card paints the window; `GET/POST /api/ritual` persists ticks per UTC day; `approve` on a desk with an unjournaled decided real trade returns exit 2 / HTTP 409 `journal_block` until journaled or `--acknowledge-journal`. Multi-chart: ▦ Multi-chart button → 2×2 grid with synchronized zoom + crosshair and per-browser toggles. Contracts: `docs/HANDOVER_2026-08-19_W3.md`, `docs/HANDOVER_2026-08-19_W34.md`, `docs/HANDOVER_2026-08-19_W35.md`, `docs/HANDOVER_2026-08-20_W35_part2.md`.
-3. **Sandbox-feasible next code:** the W2/W3.5 chart backlog and P18.4 polish are **complete** — remaining sandbox work is optional polish only, chosen deliberately, never at the expense of the suite. Trusted-host and real-data work outrank it.
+3. **Sandbox-feasible next code:** **T3** — Confirm Paper Trade must run the
+   existing desk approval path and put the position in the terminal. Do not
+   start T5/T6 first. Visual QA only if a real browser exists. Trusted-host
+   and real-data work still outrank chrome.
 4. **Trusted-host-only work (do NOT simulate in this checkout):** execute the P22.3 drill catalog (`python main.py release drills`) on real Windows 11 / Android / Ubuntu signers and attach operator evidence JSON; then `p22_complete` may flip.
 5. **Operate the loop on the real-data host:** `python main.py daily` (loop-health), `python main.py paper --watch`, Sunday `python main.py weekly --export reviews/$(date +%F).json`, weekly `python main.py scorecard --conditioned --source store` net + `python main.py validate --source store --tf 15m`. Grow canonical `binance/spot/BTCUSDT 15m` paper `n` toward `100-200` decided net — that is the only graduation evidence.
 6. **On the real-data host (parallel):** rerun `learn` so existing canonical rows pick up source keys (live profile unchanged, demo/synthetic never substituted); acquire/version-pin Dukascopy XAU m1 `bid` or `ask` per `docs/DUKASCOPY_XAU_ADAPTER.md`; run locked `train/val/sealed-OOS/recent` under expected XAU seal key; archive `python main.py xau-evidence --tf 15m --json` per `docs/XAU_PROMOTION_EVIDENCE.md`. Do not create/reseal from the audit.
@@ -1638,3 +1639,4 @@ If the user does not mention the 6-idea review, you still have `docs/CHATGPT_6ID
 6. [x] Keep thresholds, XAU status, and no-order-placement contract unchanged.
 7. [x] Commit and push only to `origin/arena/01a008b9-sky`.
 8. [x] Open one PR from `arena/01a008b9-sky` to `main`; do not merge it.
+erge it.

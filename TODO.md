@@ -6,17 +6,14 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-20 (**v2.49.0 — The Trade Terminal, professional
-layout**. The web dashboard is now one professional trading platform: watchlist
-left, chart centre, paper-trade ticket + AI Copilot right, tabbed trading panel
-bottom, six-area navigation, professional dark theme. Roadmap rewritten around
-the terminal vision (phases T1–T6). This is a presentation-layer release — the
-risk gate, graduation bar, auth, `/api/v1`, jobs/SSE, PWA and all trading logic
-are untouched; full suite 1282/1; wheel gate green. Contract:
-`docs/HANDOVER_2026-08-20_v2.49.0.md`. Next code is **T2–T4 terminal wiring and
-polish**, then the home screen. **P22 still needs real signers — do not claim
-it from this sandbox. P11 real paper proof stays parallel and remains the
-money path.**)
+**Last updated:** 2026-08-20 (**combined roadmap restored**. PR #72 shipped
+the Trade Terminal layout (v2.49.0, T1) but its `ROADMAP.md` rewrite dropped
+the money path and still marked T1 as NEXT at v2.48.1. `ROADMAP.md` is again
+the combined source of truth: core aim → three lanes (paper proof / terminal /
+distribution) → honest T1–T6 status. Review: `docs/PR_REVIEW_2026-08-20.md`.
+Next sandbox **code** is **T3** (Confirm → existing approval → position in the
+terminal → close → journal). Next **money** work is still P11 on the real-data
+Hub. **P22 still needs real signers. No threshold moved. No order path.**)
 
 **Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2 synchronized crosshair**.
 The 2×2 grid now synchronizes crosshairs as well as zoom, has per-browser sync
@@ -243,36 +240,44 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Current sequence — professional trading terminal + honest evidence
 
-### TODO-24 / T1–T6 · Professional Trade Terminal · 🔄 NEXT (T1 shipped v2.49.0)
+### TODO-24 / T1–T6 · Professional Trade Terminal · 🔄 T1 shipped; T3 next code
 
-📄 **Canonical plan:** [`ROADMAP.md`](ROADMAP.md) — *SKY should feel like one
-professional trading platform, not a collection of Python functions and
-separate dashboard cards.*
+📄 **Canonical plan:** [`ROADMAP.md`](ROADMAP.md) — combined: core trading aim
++ Trade Terminal + remaining distribution. *SKY should feel like one
+professional trading platform, not a collection of Python functions — and
+that platform still has to prove a NET edge before any real capital.*
 
-The dashboard is now a Trade Terminal (T1 shipped in v2.49.0): watchlist left,
-chart centre, paper ticket + AI Copilot right, tabbed trading panel bottom,
-six-area navigation, professional dark theme. Ordered code milestones:
+The dashboard is a Trade Terminal **layout** (T1, v2.49.0 / PR #72): watchlist
+left, chart centre, paper ticket + AI Copilot right, tabbed trading panel
+bottom, six-area navigation, professional dark theme. Confirm does **not**
+yet enroll a paper trade. Ordered code milestones:
 
 1. **T1 Trade Terminal layout — ✅ shipped v2.49.0.** Terminal view (default),
-   watchlist, chart, ticket, bottom panel, 6-area nav, AI drawer scaffold.
-2. **T2 Persistent AI Copilot** — 🔄 part shipped: drawer + quick actions +
-   context injection + sectioned replies. Polish: better structured-section
-   parsing, per-answer sources, "prepare ticket from AI" (never approves).
-3. **T3 Paper-trade workflow wiring** — 🔄 next real build: make the Confirm
-   button run the full desk path (ticket → scan/approval → enrolled position →
-   bottom-panel management → close → auto-journal). Currently the ticket
-   sizes, validates and points at the approval queue.
+   watchlist, chart, ticket UI, bottom panel, 6-area nav, AI drawer scaffold.
+   Visual QA on a real browser is still open (sandbox has none).
+2. **T2 Persistent AI Copilot** — 🔄 scaffold shipped: drawer + quick actions +
+   context injection. Polish: structured-section parsing (do not double-print),
+   per-answer sources, "prepare ticket from AI" (never approves).
+3. **T3 Paper-trade workflow wiring** — 🔄 **next real build:** Confirm runs
+   the existing desk path (ticket → scan/approval → enrolled position →
+   bottom-panel management → close → auto-journal). Today the ticket sizes,
+   validates, POSTs `/api/position-size`, and toasts “review the queue”.
 4. **T4 Professional polish** — resizable/collapsible panels, localStorage
    persistence of panel sizes/watchlist/symbol/timeframe/layout, loading
-   skeletons, explicit stale/error states in the terminal, tooltips.
+   skeletons, explicit stale/error states, tooltips, drop the one-shot
+   bottom-tab cache, ticket fees/size from the real cost model (no invented
+   $100k book).
 5. **T5 Home screen** — concise post-login command dashboard with an
    "Open Trading Terminal" primary button.
 6. **T6 Focused pages** — deepen Markets / Portfolio / Journal / Evidence /
    System beyond grouped legacy panels; mobile four-section layout
    (Markets, Chart, Positions, AI).
 
+Lane A (P11 paper proof) and Lane C (P22 signers) do not wait for T6.
+
 **Verification for every T step:** keep `test_served_script_is_valid_javascript`
-and the jsdom harnesses green; full suite ≥ 1282 / 1; wheel gate green.
+and the jsdom harnesses green; add regressions for new terminal behaviour;
+full suite ≥ 1282 / 1; wheel gate green; version/PWA-cache lockstep.
 
 ### TODO-23 / P18–P22 · Installable production product · 🔄 (foundation shipped)
 

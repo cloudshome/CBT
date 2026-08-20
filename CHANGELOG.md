@@ -1,5 +1,21 @@
 # Changelog
 
+## Docs — 2026-08-20 · Combined roadmap (core aim + terminal + evidence)
+
+Documentation only. Software remains **v2.49.0**. No threshold moved. No
+order path. No PWA cache bump.
+
+- **`ROADMAP.md`** restored as the combined source of truth after PR #72's
+  rewrite: the core aim (independent profitable trader; accumulate BTC /
+  ETH / GOLD), three non-substitutable lanes (P11 paper proof / T1–T6
+  terminal / P18–P22 distribution), and honest T1–T6 status (T1 layout
+  shipped; Confirm does not enroll a paper trade; T3 is the next code
+  build). Version header was still v2.48.1 with T1 marked NEXT; that is
+  corrected.
+- **`docs/PR_REVIEW_2026-08-20.md`** — review of merged PRs #62–#72.
+- `TODO.md`, `HANDOVER.md`, `SESSION_STATE.md` reconciled to the same
+  next step.
+
 ## [2.49.0] — 2026-08-20 · The Trade Terminal — professional layout
 
 MINOR: the web dashboard is now a **professional Trade Terminal**. One screen
