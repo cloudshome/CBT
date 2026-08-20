@@ -1,8 +1,12 @@
 """tests/test_sky_agent.py — 24/7 Intelligence Agent tests (offline, DEMO_MODE)."""
 import json
 import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
 
 os.environ["SKY_NO_AUTO_INSTALL"] = "1"
 os.environ["DEMO_MODE"] = "1"
@@ -147,16 +151,22 @@ def test_daemon_one_tick():
 
 
 def test_cli_sky_agent_health():
-    import subprocess
-    out = subprocess.check_output(["python", "main.py", "sky-agent", "health", "--json"], env={**os.environ, "DEMO_MODE": "1", "SKY_NO_AUTO_INSTALL": "1"}, text=True)
+    out = subprocess.check_output(
+        [sys.executable, str(ROOT / "main.py"), "sky-agent", "health", "--json"],
+        env={**os.environ, "DEMO_MODE": "1", "SKY_NO_AUTO_INSTALL": "1"},
+        text=True,
+    )
     payload = json.loads(out)
     assert "system" in payload
     assert "readiness" in payload
 
 
 def test_cli_sky_agent_report():
-    import subprocess
-    out = subprocess.check_output(["python", "main.py", "sky-agent", "report", "--demo", "--json"], env={**os.environ, "DEMO_MODE": "1", "SKY_NO_AUTO_INSTALL": "1"}, text=True)
+    out = subprocess.check_output(
+        [sys.executable, str(ROOT / "main.py"), "sky-agent", "report", "--demo", "--json"],
+        env={**os.environ, "DEMO_MODE": "1", "SKY_NO_AUTO_INSTALL": "1"},
+        text=True,
+    )
     payload = json.loads(out)
     assert "recommendations" in payload
 

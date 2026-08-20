@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.48.1] — 2026-08-20 · PWA cache + test-environment reliability
+
+PATCH: closes two release/reliability gaps found while establishing the clean
+v2.48.0 baseline. Trading logic, thresholds, evidence populations, and the
+no-order boundary are unchanged.
+
+- **PWA cache rollover** — advances `web/static/sw.js` from the stale
+  `sky-shell-v2.47.0` cache to `sky-shell-v2.48.1`, ensuring the worker source
+  changes and activation retires the previous release precache.
+- **Release invariant** — `tests/test_pwa.py` now requires `config.VERSION`,
+  `pyproject.toml`, and the service-worker cache suffix to match exactly, so a
+  future version bump cannot silently omit installed PWA clients.
+- **Hermetic agent CLI tests** — the two `sky-agent` subprocess tests now use
+  `sys.executable` and an absolute `main.py` path, matching the rest of the
+  CLI suite instead of escaping a valid virtual environment through ambient
+  `python`/working-directory assumptions.
+
 ## [2.48.0] — 2026-08-20 · W3.5 part 2 — 2×2 multi-chart synchronized crosshair
 
 MINOR: completes the "multi-chart layout (2×2) with a synchronized

@@ -1,4 +1,8 @@
-**Last updated:** 2026-08-20 (**v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution**). PWA Web Push (VAPID) notification manager (`data/push_notifications.py` + `/api/push/*` + `window.SKY_push` UI + `_probe_webpush`), vector PNG icons (`packaging/generate_icons.py`), iOS safe-area insets & standalone mode, Risk Center "Why Blocked?" Veto Timeline (`risk_vetoes` + `/api/risk/veto-timeline`), and R-Multiple Distribution analytics (`r_distribution` + `/api/analytics/r-distribution`). Contract: `docs/HANDOVER_2026-08-20_v2.47.0.md`. **P22 drills need real signers.**
+**Last updated:** 2026-08-20 (**v2.48.1 — PWA cache + test-environment reliability**). `sw.js` now advances its shell cache with the release; `tests/test_pwa.py` keeps `config.py` / `pyproject.toml` / service-worker cache versions in exact lockstep; the two `sky-agent` CLI tests use the active interpreter and absolute entrypoint instead of ambient `python`/cwd assumptions. Contract: `docs/HANDOVER_2026-08-20_v2.48.1.md`. **No trading behavior changed. P22 drills need real signers.**
+
+**Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2: synchronized crosshair**). 2×2 multi-chart crosshair sync, sync toggles, four distinct defaults, honest empty slots, and timestamp normalisation. Contract: `docs/HANDOVER_2026-08-20_W35_part2.md`.
+
+**Previous:** 2026-08-20 (**v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution**). PWA Web Push (VAPID), designed icons, iOS standalone polish, Risk Center veto timeline, and R-Multiple Distribution analytics. Contract: `docs/HANDOVER_2026-08-20_v2.47.0.md`.
 
 **Previous:** 2026-08-19 (**v2.46.0 — W3.6 replay tape practice**). Chart Replay Freeze + Grade against the tape. Server grades the hidden forward window (`horizon_bars` 16, clamp 4–64). Ladder fills reuse `exit_event` (stop-first). Tape lives under a sibling `tape` block so desk-agreement stats stay desk-only. Contract: `docs/HANDOVER_2026-08-19_W36.md`.
 
@@ -149,12 +153,12 @@ now judges P&L **net of costs** (P12.18).
 > regressions); harness `ops/probes/p12_17_weekstart_probe.py`; contract
 > `docs/HANDOVER_2026-08-16_P12_17.md`.
 
-**Branch:** `arena/01a01842-sky` (fixed session branch)
-**HEAD commit:** verify with `git rev-parse HEAD` (W3 checkpoint after commit)
-**Upstream:** `main` at `30b80d5` (P22.3 v2.40.0 #61). This session ships W3.4.
-**Previous implementation branch:** `arena/01a01621-sky` (P22.3 checkpoint)
-**Version:** 2.41.0
-**Python:** 3.11 — W3 tests green (`tests/test_weekly_review.py` + `tests/test_ritual.py` + `tests/test_weekly_js.py`, 37 new)
+**Branch:** `arena/01a01e1a-sky` (fixed session branch)
+**HEAD commit:** verify with `git rev-parse HEAD` (v2.48.1 reliability patch after commit)
+**Upstream:** `main` at `5c79c40` (v2.48.0 W3.5 part 2).
+**Previous implementation branch:** `arena/01a01dbf-sky` (v2.48.0 checkpoint)
+**Version:** 2.48.1
+**Python:** 3.11 — full suite 1282 passed / 1 skipped
 
 > **Current state.** P12.1–P12.18, P13 and P14 are shipped. Operate the loop
 > with `python main.py daily`. The next work in sequence remains operational,
@@ -658,8 +662,16 @@ Every phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**W3.5 part 2 — 2×2 multi-chart synchronized crosshair — shipped v2.48.0
-(this session).** Completes the W2/W3.5 chart backlog
+**v2.48.1 reliability patch — shipped this session.** The application and
+installed-PWA cache version are synchronized again, and CI now enforces exact
+lockstep across `config.py`, `pyproject.toml`, and `web/static/sw.js`. The two
+`sky-agent` subprocess tests retain the interpreter running pytest and use an
+absolute entrypoint. No trading behavior, threshold, evidence population, or
+safety boundary changed. Contract: `docs/HANDOVER_2026-08-20_v2.48.1.md`.
+Full suite 1282 passed / 1 skipped; wheel gate built v2.48.1 cleanly.
+
+**W3.5 part 2 — 2×2 multi-chart synchronized crosshair — shipped v2.48.0.**
+Completes the W2/W3.5 chart backlog
 (`docs/HANDOVER_2026-08-20_W35_part2.md`): one pointer over any of the four
 comparison panes moves the crosshair on all of them (vendored Lightweight
 Charts v4.2.3 `subscribeCrosshairMove` → `setCrosshairPosition(price, time,
@@ -741,7 +753,25 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 
 ## Completed work
 
-### Session 2026-08-20 (this branch `arena/01a01dbf-sky`): v2.48.0 / W3.5 part 2 — 2×2 multi-chart synchronized crosshair
+### Session 2026-08-20 (this branch `arena/01a01e1a-sky`): v2.48.1 / reliability patch
+
+Started from merged `origin/main` v2.48.0. Baseline discovery found the
+application/cache drift (`config.VERSION=2.48.0`, `sky-shell-v2.47.0`) and two
+CLI tests that escaped `.venv/bin/python` through ambient `python`.
+
+- Advanced the shell cache to `sky-shell-v2.48.1`; private/API/SSE/mutation
+  never-cache boundaries are unchanged.
+- Converted the PWA version smoke into an exact three-way release invariant.
+  The regression failed against the inherited drift before the fix.
+- Agent CLI subprocesses now use `sys.executable` + absolute `main.py`.
+- Versions advanced 2.48.0 → 2.48.1; docs reconciled.
+- Focused tests 28 passed; full suite **1282 passed / 1 skipped**; compile and
+  evaluated dashboard `node --check` passed; wheel gate built
+  `cryptobrain-2.48.1-py3-none-any.whl` with no duplicates.
+- No browser was available: worker rollover is proven through the static
+  invariant/source change, not an observed DevTools lifecycle.
+
+### Session 2026-08-20 (branch `arena/01a01dbf-sky`): v2.48.0 / W3.5 part 2 — 2×2 multi-chart synchronized crosshair
 
 Started from origin/main `446c766` (v2.47.0) in sync. The v2.43.0 scaffold
 had shipped the 2×2 grid + zoom sync; this session closed the W2/W3.5
@@ -1161,12 +1191,11 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
-0. **P22 signed release engineering** — CI install/smoke matrix (Ubuntu pkg,
-   Windows pkg, Android build), code signing (Windows + Android + signed Debian
-   repo), reproducible SHA-256 artifacts, SBOM + dependency/license inventory,
-   stable/beta channels, in-app System page, privacy-respecting diagnostics
-   export, documented incident/support/rollback paths. Do not claim signed
-   artifacts until produced on a real build host.
+0. **P22 trusted-host execution** — P22.1–P22.3 source contracts, native
+   project trees, release metadata, diagnostics, and fail-closed drill catalog
+   are shipped. Remaining work is to compile/sign on trusted Ubuntu, Windows,
+   and Android hosts and attach real clean-target evidence. Do not claim signed
+   artifacts or `p22_complete` from this sandbox.
 0b. ~~**W3.4 practice mode**~~ — shipped v2.42.0. ~~**W3.5 multi-chart
    views**~~ — shipped v2.43.0 + v2.48.0 part 2 (synchronized crosshair,
    sync toggles, honest empty slots, 1970-date fix). ~~P18.4 polish~~ —
@@ -1200,8 +1229,8 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    suite and wheel gate; the active jobs have passed on `main` (run
    `31907327643` was the recorded P12.12 verification). The obsolete nested
    workflow copy was removed.
-6. **`CHANGELOG.md` is current** through v2.23.4, including the P12.15
-   execution-metric follow-up.
+6. **`CHANGELOG.md` is current** through v2.48.1, including the installed-PWA
+   cache/version invariant and hermetic agent CLI tests.
 7. **Real market data is imported offline**: Binance spot BTCUSDT 1m
    (696,960 bars, sha256-pinned `c4ad6029…b934b7`). The store is
    gitignored; re-import with `backfill --from-csv` if starting in a clean sandbox.
@@ -1289,10 +1318,9 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
     v2.48.0 with backend-style normalisation and pinned by
     `test_multi_candle_data_normalises_ms_and_keeps_seconds`. The
     single-chart workspace was never affected.
-28. **`tests/test_sky_agent.py` spawns bare `python main.py`.** A fresh
-    sandbox must install `requirements.txt` (+ `cryptography`) for BOTH the
-    venv and the system `python`, or those two tests fail with
-    "Missing dependencies" — an environment issue, not a code issue.
+28. **The inherited PWA/test-environment drifts are fixed in v2.48.1.**
+    `sw.js` cache version must match the application exactly, and agent CLI
+    tests use `sys.executable` + an absolute entrypoint. Keep both regressions.
 29. **Multi-chart stays a comparison view.** Crosshair/zoom sync only
     broadcast chart state; the four panes never combine signals, never write
     to scans/practice/risk/gate/graduation, and XAUUSD panes are display
@@ -1324,7 +1352,8 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first.
 > The W2/W3.5 chart backlog is COMPLETE (v2.48.0 — synchronized crosshair;
-> do not rebuild it). P12.1–P12.18 are shipped; do not
+> v2.48.1 keeps the PWA release cache in lockstep; do not rebuild either).
+> P12.1–P12.18 are shipped; do not
 > rewrite the locked protocol, source-key algebra, canonical-only graduation
 > and live risk filters, calendars, gold costs, or `data/gold_basis.py`. Do
 > not water down the W3.3 journal-first gate — missing journals hold the next
@@ -1347,7 +1376,10 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 ```bash
 cd /home/user/SKY
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
-# 1282 passed, 1 skipped  (v2.48.0 W3.5 part 2 full suite; +5 multi-chart regressions)
+# 1282 passed, 1 skipped  (v2.48.1 reliability patch)
+
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_pwa.py tests/test_sky_agent.py -q
+# 28 passed  (cache-version lockstep + hermetic agent CLI subprocesses)
 
 DEMO_MODE=1 .venv/bin/python -m pytest tests/test_workstation_js.py tests/test_dashboard_js.py -q
 # 43 + 12 passed  (W3.5 part 2: crosshair broadcast/clear/toggle, zoom toggle,
@@ -1355,7 +1387,7 @@ DEMO_MODE=1 .venv/bin/python -m pytest tests/test_workstation_js.py tests/test_d
 #                   served-script + render harnesses)
 
 DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
-# cryptobrain-2.48.0-py3-none-any.whl · no duplicate entries · OK
+# cryptobrain-2.48.1-py3-none-any.whl · no duplicate entries · OK
 
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
 # 1213 passed, 1 skipped  (v2.42.0 W3.4 full suite; +36 practice/JS regressions)
@@ -1455,12 +1487,12 @@ python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau swe
 ## Last implementation commit
 
 ```
-W3.5 part 2: 2×2 multi-chart synchronized crosshair (v2.48.0) — this session arena/01a01dbf-sky
-446c766 v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution Analytics (#69) — merged
+dc9de87 v2.48.1 PWA cache + test-environment reliability — PR #71
+5c79c40 v2.48.0 — W3.5 part 2: 2×2 multi-chart synchronized crosshair (#70) — merged
 ```
 
-This branch `arena/01a01dbf-sky` is ahead of `origin/main` at `446c766`.
-Use `git rev-parse HEAD` for the tip (now v2.48.0).
+This branch `arena/01a01e1a-sky` started from `origin/main` at `5c79c40`.
+Use `git rev-parse HEAD` for the v2.48.1 implementation tip.
 
 ---
 
@@ -1524,7 +1556,18 @@ If the user does not mention the 6-idea review, you still have `docs/CHATGPT_6ID
 
 ## End-of-session checklist (run before closing this session)
 
-**Current build session `arena/01a01dbf-sky` (2026-08-20) — W3.5 part 2: synchronized crosshair:**
+**Current build session `arena/01a01e1a-sky` (2026-08-20) — v2.48.1 reliability patch:**
+
+1. [x] Read the handover, canonical roadmap, TODO, safety boundaries, recent W3.5 contract, and durable six-idea triage; confirmed P22 signer drills and P11 real-data operation cannot be fabricated here.
+2. [x] Establish clean baseline. Found `config.VERSION=2.48.0` vs `sky-shell-v2.47.0`; proved the new release invariant red before fixing it.
+3. [x] Advance application/package/cache to v2.48.1 and pin exact three-way version lockstep.
+4. [x] Fix two non-hermetic `sky-agent` CLI tests (`sys.executable` + absolute entrypoint); focused suite 28 passed.
+5. [x] Full suite **1282 passed / 1 skipped**; compile check + evaluated dashboard `node --check` passed; wheel gate built v2.48.1 with no duplicates; `git diff --check` clean.
+6. [x] Reconcile CHANGELOG, TODO, HANDOVER, SESSION_STATE, and write `docs/HANDOVER_2026-08-20_v2.48.1.md` with the no-browser caveat.
+7. [x] Commit `dc9de87`, push `arena/01a01e1a-sky`, and open the session's one PR — **#71** (`https://github.com/Azimshawon/SKY/pull/71`).
+8. [ ] Next: trusted-host P22 drills and real-data P11/P12.12 operation; do not replace either with speculative sandbox features.
+
+**Previous build session `arena/01a01dbf-sky` (2026-08-20) — W3.5 part 2: synchronized crosshair:**
 
 1. [x] Fetch origin/main — branch starts in sync at `446c766` (v2.47.0); no parallel-session drift.
 2. [x] Pick the sandbox-feasible next work per TODO/SESSION_STATE: the W2/W3.5 "2×2 multi-chart with synchronized crosshair" remainder (P22 drills need real signers; P12.12/P11 need the real-data host).

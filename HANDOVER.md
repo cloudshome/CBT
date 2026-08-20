@@ -2,7 +2,9 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-20 · **v2.48.0 — W3.5 part 2: 2×2 multi-chart synchronized crosshair** (`docs/HANDOVER_2026-08-20_W35_part2.md`). Completes the W2/W3.5 chart backlog: one pointer moves the crosshair on all four panes (`subscribeCrosshairMove` → `setCrosshairPosition`), per-browser Zoom/Crosshair sync toggles, four distinct default slots, honest "no candles" empty slots, a 1970-date timestamp fix, and a Python-eaten `/\-/g` escape cleanup. Full suite 1282 passed / 1 skipped. No threshold moved; multi-chart stays a comparison view only.
+Last updated: 2026-08-20 · **v2.48.1 — PWA cache + test-environment reliability** (`docs/HANDOVER_2026-08-20_v2.48.1.md`). The service-worker cache now rolls with the application version, a regression keeps `config.py` / `pyproject.toml` / `sw.js` in lockstep, and agent CLI subprocess tests keep the active Python interpreter. No trading behavior or safety boundary changed.
+
+**Previous:** 2026-08-20 · **v2.48.0 — W3.5 part 2: 2×2 multi-chart synchronized crosshair** (`docs/HANDOVER_2026-08-20_W35_part2.md`). Completes the W2/W3.5 chart backlog: one pointer moves the crosshair on all four panes (`subscribeCrosshairMove` → `setCrosshairPosition`), per-browser Zoom/Crosshair sync toggles, four distinct default slots, honest "no candles" empty slots, a 1970-date timestamp fix, and a Python-eaten `/\-/g` escape cleanup. Full suite 1282 passed / 1 skipped. No threshold moved; multi-chart stays a comparison view only.
 
 **Previous:** 2026-08-20 · **v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution** (`docs/HANDOVER_2026-08-20_v2.47.0.md`). PWA Web Push (VAPID) notification manager (`data/push_notifications.py` + `/api/push/*` + `window.SKY_push` UI + `_probe_webpush`), generated high-resolution 32-bit RGBA icons (`packaging/generate_icons.py` -> `web/static/icons/*.png`), iOS safe-area insets & standalone mode handling, Risk Center "Why Blocked?" Veto Timeline (`risk_vetoes` + `/api/risk/veto-timeline`), and R-Multiple Distribution analytics (`r_distribution` + `/api/analytics/r-distribution`). P22 drills still need real signers.
 
@@ -20,9 +22,10 @@ Last updated: 2026-08-20 · **v2.48.0 — W3.5 part 2: 2×2 multi-chart synchron
 > [`ROADMAP.md`](ROADMAP.md) is the canonical merged P1–P22 roadmap. The current
 > build is still source-installed; do not claim installers exist.
 >
-> **Next code:** P22.2 native Windows/Android projects, then trusted signing
-> and clean physical-target drills. P22.1 release metadata/CI/diagnostics is
-> shipped; P21 Android + P20 Windows remain contracts and unsigned recipes.
+> **Next work:** P22.1–P22.3 source contracts and native project trees are
+> shipped. Execute signing and clean physical-target drills only on trusted
+> Ubuntu/Windows/Android hosts; do not manufacture completion evidence here.
+> P11 canonical paper evidence continues in parallel on the real-data Hub.
 > Chosen topology: one Ubuntu Hub owns DB/workers/risk/audit; browser/PWA,
 > Windows and Android are companion clients. Packaging never adds
 > exchange-order code or changes graduation.

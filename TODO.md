@@ -6,15 +6,23 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-20 (**v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution**.
-PWA Web Push (VAPID) notification manager (`data/push_notifications.py` +
-`/api/push/*` + `window.SKY_push` UI + `_probe_webpush`), vector PNG icons,
-iOS safe-area insets & standalone mode, Risk Center "Why Blocked?" Veto Timeline
-(`risk_vetoes` + `/api/risk/veto-timeline`), and R-Multiple Distribution
-analytics (`r_distribution` + `/api/analytics/r-distribution`).
-Contract: `docs/HANDOVER_2026-08-20_v2.47.0.md`.
-**P22 still needs real signers — do not claim it from this sandbox.**
-P11 real paper proof stays parallel and is still the money path.)
+**Last updated:** 2026-08-20 (**v2.48.1 — PWA cache + test-environment reliability**.
+The service-worker cache now rolls with the application version; a regression
+keeps `config.py`, `pyproject.toml`, and `sw.js` in lockstep; agent CLI tests
+keep the active Python interpreter. Contract:
+`docs/HANDOVER_2026-08-20_v2.48.1.md`. **P22 still needs real signers — do not
+claim it from this sandbox. P11 real paper proof stays parallel and remains the
+money path.**)
+
+**Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2 synchronized crosshair**.
+The 2×2 grid now synchronizes crosshairs as well as zoom, has per-browser sync
+toggles, four distinct defaults, honest empty-feed slots, and correct timestamp
+normalisation. Contract: `docs/HANDOVER_2026-08-20_W35_part2.md`.)
+
+**Previous:** 2026-08-20 (**v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution**.
+PWA Web Push (VAPID) notification manager, designed icons, iOS standalone
+polish, Risk Center veto timeline, and R-Multiple Distribution analytics.
+Contract: `docs/HANDOVER_2026-08-20_v2.47.0.md`.)
 
 **Previous:** 2026-08-19 (**v2.46.0 — W3.6 replay tape practice**.
 Chart Replay Freeze + Grade against the tape. Server grades the hidden

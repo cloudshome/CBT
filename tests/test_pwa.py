@@ -183,14 +183,30 @@ def test_no_private_caching_in_sw_headers():
     # We just ensure the manifest is cacheable but sw is not.
 
 
-def test_version_bumped():
+def test_release_versions_and_pwa_cache_stay_in_lockstep():
+    """Every release must install a fresh shell cache.
+
+    Browsers only run the service worker install/activate lifecycle when the
+    worker source changes. Keeping an older cache id across a release prevents
+    activation from retiring the previous release's precache.
+    """
     import config
-    import re
+
     txt = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
-    match = re.search(r'^version = "([^"]+)"', txt, re.M)
-    assert match, "pyproject.toml version missing"
-    assert config.VERSION == match.group(1), (
-        f"config.VERSION {config.VERSION} != pyproject {match.group(1)}")
+    project_match = re.search(r'^version = "([^"]+)"', txt, re.M)
+    assert project_match, "pyproject.toml version missing"
+    assert config.VERSION == project_match.group(1), (
+        f"config.VERSION {config.VERSION} != pyproject {project_match.group(1)}")
+
+    sw_match = re.search(
+        r"const CACHE_NAME\s*=\s*['\"]sky-shell-v([^'\"]+)['\"]",
+        SW.read_text(),
+    )
+    assert sw_match, "sw.js versioned sky-shell cache name missing"
+    assert sw_match.group(1) == config.VERSION, (
+        f"PWA cache {sw_match.group(1)} != application {config.VERSION}; "
+        "installed clients would keep the previous release precache"
+    )
     assert tuple(int(p) for p in config.VERSION.split(".")[:2]) >= (2, 39)
 
 
