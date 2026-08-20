@@ -6,19 +6,23 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-20 (**v2.52.0 — T4 part 1 shipped**. The ticket is
-honest about money: `GET /api/ticket/meta` serves the real `ACCOUNT_BALANCE`
-+ per-symbol cost model; `recalcTicket` sizes from that balance (shows **—**
-instead of the old fabricated $100k when unset) and estimates fees from the
-desk's real round-trip model. Bottom tabs **re-fetch on every switch** (the
-one-shot cache is gone), and the watchlist + bottom tabs paint **loading
-skeletons**. Contract: `docs/HANDOVER_2026-08-20_T4.md`.
-Next sandbox **code** is **T4 part 2** — resizable/collapsible panels,
-localStorage persistence of panel sizes/watchlist/layout, explicit
-stale/disconnected/error states, tooltips sweep, compact mobile layout
-(visual QA of the T3 loop on a real browser first). Next **money** work is
-still P11 on the real-data Hub. **P22 still needs real signers. No
-threshold moved. No order path.**)
+**Last updated:** 2026-08-20 (**v2.53.0 — T4 part 2 shipped**. The Trade
+Terminal is now a workspace you can shape and it never freezes silently:
+**resizable** drag gutters (watchlist ↔ chart ↔ order, chart ↔ bottom) write
+panel widths/height as live CSS variables (charts re-measure in place;
+double-click a gutter to reset); **collapsible** panels with a re-open rail /
+▾ toggle; panel sizes, collapsed states, symbol, timeframe and the watchlist
+filter **persist per browser** and re-apply on load; an explicit **connection
+strip** (`reportFeed`) surfaces stale/disconnected feeds with a Retry button;
+**tooltips** on every tab/icon; and a compact **mobile watchlist drawer** (☰).
+Presentation only — no new endpoint, no threshold moved, no order path.
+Contract: `docs/HANDOVER_2026-08-20_T4_part2.md`.
+Next sandbox **code** is **T5** — home screen & onboarding (post-login command
+dashboard, "Open Trading Terminal" primary button, onboarding that points at
+the paper loop), then **T6** focused pages. Standing T1 item: visual QA of the
+drag/collapse/mobile gestures on a real browser (none installable here). Next
+**money** work is still P11 on the real-data Hub. **P22 still needs real
+signers. No threshold moved. No order path.**)
 
 **Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2 synchronized crosshair**.
 The 2×2 grid now synchronizes crosshairs as well as zoom, has per-browser sync

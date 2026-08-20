@@ -32,7 +32,7 @@ loses 50% needs a 100% gain just to break even.
 | **Decision independence** | Own engine, risk gate, human-approval loop | ✅ P1–P9 |
 | **Data independence** | Own stored market history | ✅ P10.1–P10.12 |
 | **Validation independence** | Research-grade proof on our grader + our store | ✅ P12.1–P12.18 *tooling*; real-host XAU evidence still open |
-| **Operating independence** | Click the desk; do not memorise CLI | 🔄 Trade Terminal T1 + T2 + T3 + T4(pt.1) shipped (v2.52.0); T4 pt.2, T5–T6 remaining |
+| **Operating independence** | Click the desk; do not memorise CLI | 🔄 Trade Terminal T1–T4 shipped (v2.53.0); T5–T6 remaining |
 | **Evidence independence** | Canonical live paper book that can open the graduation bar | 🔄 **P11 — this is the money path** |
 
 Those halves cannot substitute for each other. A beautiful terminal
@@ -83,8 +83,8 @@ aim.
 │ LANE B — PRODUCT PATH (sandbox-feasible code)                       │
 │ Trade Terminal so the owner never types a command for the daily     │
 │ loop: chart → understand → paper ticket → gate → manage → close →   │
-│ journal. Phases T1–T6. T1 + T2 + T3 + T4(pt.1) shipped (full loop).│
-│ Next: T4 part 2 — panels/persistence/states/tooltips/mobile.          │
+│ journal. Phases T1–T6. T1 + T2 + T3 + T4 shipped (full loop).          │
+│ Next: T5 — home screen & onboarding; then T6 focused pages.           │
 ├─────────────────────────────────────────────────────────────────────┤
 │ LANE C — DISTRIBUTION PATH (trusted signers only)                   │
 │ Ubuntu Hub is the one authority. Browser/PWA, Windows .exe and      │
@@ -490,9 +490,9 @@ This is the product expression of the money path.
   nothing journaled.
 - **Still paper-only. Still no exchange order.**
 
-### T4 — Professional polish · 🔄 part 1 shipped v2.52.0
+### T4 — Professional polish · ✅ shipped (pt.1 v2.52.0, pt.2 v2.53.0)
 
-Shipped in v2.52.0:
+Shipped in v2.52.0 (part 1):
 
 - **Honest ticket fees/size** — `GET /api/ticket/meta` serves the real
   `ACCOUNT_BALANCE` + the per-symbol cost model; the ticket sizes from that
@@ -503,13 +503,25 @@ Shipped in v2.52.0:
 - **Bottom tabs re-fetch** — the one-shot cache is dropped; switching always
   re-fetches so a runner-closed position cannot linger as a stale row.
 
-Remaining (T4 part 2):
+Shipped in v2.53.0 (part 2):
 
-- Resizable and collapsible panels
-- localStorage for panel sizes / watchlist / symbol / timeframe / layout
-- Explicit stale / disconnected / error states in the terminal
-- Tooltips for all icons
-- Compact mobile layout
+- **Resizable panels** — drag gutters (watchlist ↔ chart ↔ order, chart ↔
+  bottom); widths/height are CSS variables written live during the drag,
+  double-click a gutter to reset. Charts re-measure in place.
+- **Collapsible panels** — watchlist / order / bottom each collapse, with a
+  re-open rail (sides) or ▾/▴ toggle (bottom).
+- **localStorage** — panel sizes, collapsed states, symbol, timeframe and the
+  watchlist filter are remembered per browser and re-applied on load (a
+  remembered symbol/timeframe is only accepted if the server still offers it).
+- **Explicit stale / disconnected / error states** — `reportFeed()` surfaces a
+  "Live data stale — retrying" strip with a Retry button after repeated feed
+  failures, clearing on recovery. No more silently frozen panels.
+- **Tooltips** — every order/bottom tab and icon button carries a `title`.
+- **Compact mobile layout** — the watchlist becomes a slide-over drawer (☰),
+  not `display:none`.
+
+Still open (from T1): visual QA of the drag/collapse/mobile gestures and the
+T3 paper loop on a real browser — no browser is installable in this sandbox.
 
 ### T5 — Home screen and onboarding
 
@@ -571,7 +583,7 @@ XAU dossier is neither condition.
 | P20 | Windows companion contract (pairing, client, unsigned recipe) | ✅ Contract shipped; signed `.exe` does not exist yet |
 | P21 | Android companion contract (Keystore, biometric, unsigned recipe) | ✅ Contract shipped; signed `.apk` does not exist yet |
 | P22 | Release engineering (checksums, SBOM, drill contracts) | ✅ Foundation shipped; trusted-signer drills pending |
-| **T1–T6** | **Professional Trade Terminal** | **T1 + T2 + T3 + T4(pt.1) shipped v2.52.0; T4 pt.2, T5–T6 remaining** |
+| **T1–T6** | **Professional Trade Terminal** | **T1 + T2 + T3 + T4 shipped v2.53.0; T5–T6 remaining** |
 
 Freqtrade (F1–F8) and Backtrader (BT1–BT8) stay **rejected**. Needle 2
 (N1–N8) stays parked. Do not reopen those audits to install a bot or
@@ -678,10 +690,11 @@ in the **same** environment is unblocked.
    Fix visual issues only; do not fake screenshots.
 3. **T2 polish — ✅ shipped v2.51.0** (sections + sources, prepare
    ticket from AI, richer context).
-4. **T4 — 🔄 part 1 shipped v2.52.0** (honest sizing/fees via
+4. **T4 — ✅ shipped** (pt.1 v2.52.0: honest sizing/fees via
    `/api/ticket/meta`, loading skeletons, drop the one-shot bottom-tab
-   cache). **Part 2** remains: resizable/persisted panels, localStorage
-   layout, stale/error states, tooltips, compact mobile.
+   cache; pt.2 v2.53.0: resizable/collapsible panels, localStorage layout +
+   symbol/timeframe/filter memory, stale/error connection states, tooltips,
+   compact mobile drawer).
 5. **T5** then **T6**.
 
 Keep the suite green. Bump `config.VERSION` / `pyproject.toml` /

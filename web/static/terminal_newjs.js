@@ -68,9 +68,33 @@ if(typeof _origSwitchTab === 'function'){
 
 /* ── Terminal lifecycle ─────────────────────────────────────────────── */
 let _termLoaded = false;
+// T4 part 2 — restore the remembered symbol / timeframe / watchlist filter
+// before the first fetch, then apply the saved panel layout.
+function restoreTerminalPrefs(){
+  try{
+    if(typeof localStorage==='undefined') return;
+    const savedSym=localStorage.getItem('sky.symbol');
+    const savedTf=localStorage.getItem('sky.timeframe');
+    const savedFilter=localStorage.getItem('sky.wlFilter');
+    // only accept a symbol/timeframe the server actually offers
+    if(savedSym){
+      const has=document.querySelector('#chartSymSeg button[data-sym="'+savedSym+'"]');
+      if(has){ _chartSym=savedSym; const el=document.getElementById('sym'); if(el) el.value=savedSym;
+        document.querySelectorAll('#chartSymSeg button,#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===savedSym)); }
+    }
+    if(savedTf){
+      const has=document.querySelector('#chartTfSeg button[data-tf="'+savedTf+'"]');
+      if(has){ _chartTf=savedTf; const el=document.getElementById('tf'); if(el) el.value=savedTf;
+        document.querySelectorAll('#chartTfSeg button,#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===savedTf)); }
+    }
+    if(savedFilter){ const s=document.getElementById('wlSearch'); if(s) s.value=savedFilter; }
+  }catch(e){}
+}
 async function loadTerminal(){
   if(_termLoaded) return;
   _termLoaded = true;
+  try{ restoreTerminalPrefs(); }catch(e){}
+  try{ applyLayout(); }catch(e){}
   try{ loadWatchlistPrices(); }catch(e){}
   try{ loadChartWorkspace(false); }catch(e){}
   try{ loadTerminalPositions(); }catch(e){}
@@ -89,6 +113,190 @@ async function loadTerminal(){
 function _skeleton(rows){
   rows=rows||3;
   return '<div class="skel skel-row"></div>'.repeat(rows);
+}
+
+/* ── T4 part 2 — layout persistence, resize, collapse ─────────────────
+   Panel widths, the bottom-panel height, collapsed states, the watchlist
+   filter, and the selected symbol/timeframe are remembered in this browser's
+   localStorage. Presentation only — none of it touches the risk gate, the
+   graduation bar or any order path. Every read is wrapped so a private-mode
+   browser that throws on localStorage still runs. */
+const LAYOUT_KEY='sky.terminal.layout.v1';
+const LAYOUT_BOUNDS={ 'wl':[130,420], 'order':[220,520], 'bottom':[80,560] };
+let _layout=null;
+function loadLayout(){
+  if(_layout) return _layout;
+  let saved={};
+  try{ saved=JSON.parse(localStorage.getItem(LAYOUT_KEY)||'{}')||{}; }catch(e){ saved={}; }
+  _layout=Object.assign({
+    wlWidth:null, orderWidth:null, bottomHeight:null,
+    wlCollapsed:false, orderCollapsed:false, bottomCollapsed:false,
+  }, saved);
+  return _layout;
+}
+function saveLayout(){
+  try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify(_layout||{})); }catch(e){}
+}
+function clampPx(px, kind){
+  const b=LAYOUT_BOUNDS[kind]; if(!b) return px;
+  return Math.max(b[0], Math.min(b[1], px));
+}
+// Apply the remembered layout to the DOM. Safe to call before the terminal
+// is visible; it no-ops when the elements do not exist (jsdom/CI).
+function applyLayout(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout();
+  if(L.wlWidth) term.style.setProperty('--wl-w', clampPx(L.wlWidth,'wl')+'px');
+  if(L.orderWidth) term.style.setProperty('--order-w', clampPx(L.orderWidth,'order')+'px');
+  if(L.bottomHeight) term.style.setProperty('--bottom-h', clampPx(L.bottomHeight,'bottom')+'px');
+  term.classList.toggle('wl-collapsed', !!L.wlCollapsed);
+  term.classList.toggle('order-collapsed', !!L.orderCollapsed);
+  term.classList.toggle('bottom-collapsed', !!L.bottomCollapsed);
+  const bc=document.getElementById('bottomCollapseBtn');
+  if(bc){ bc.textContent=L.bottomCollapsed?'▴':'▾';
+    bc.title=(L.bottomCollapsed?'Expand':'Collapse')+' bottom panel'; }
+  syncTerminalCharts();
+}
+// Charts are canvas-sized to their container width, so any layout change must
+// nudge them to re-measure. Reuses the same width the resize handler uses.
+function syncTerminalCharts(){
+  try{
+    const w=document.getElementById('chartMain');
+    if(w && typeof _charts!=='undefined' && _charts && _charts.length){
+      const cw=w.clientWidth||900;
+      _charts.forEach(c=>{ try{ c.applyOptions({width:cw}); }catch(e){} });
+    }
+  }catch(e){}
+}
+
+function toggleWatchlistPanel(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout(); L.wlCollapsed=!L.wlCollapsed; saveLayout(); applyLayout();
+}
+function toggleOrderPanel(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout(); L.orderCollapsed=!L.orderCollapsed; saveLayout(); applyLayout();
+}
+function toggleBottomPanel(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout(); L.bottomCollapsed=!L.bottomCollapsed; saveLayout(); applyLayout();
+}
+// Mobile only: the watchlist is a slide-over drawer. Not persisted — it is a
+// transient view, and selecting a symbol closes it.
+function toggleMobileWatchlist(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  term.classList.toggle('mobile-wl-open');
+}
+
+// Column drag: 'wl' grows/shrinks from the left edge, 'order' from the right.
+let _dragState=null;
+function startColResize(ev, which){
+  const term=document.getElementById('terminal'); if(!term) return;
+  ev.preventDefault();
+  const pt=ev.touches?ev.touches[0]:ev;
+  const L=loadLayout();
+  const startX=pt.clientX;
+  const startW=which==='wl'
+    ? (parseFloat(getComputedStyle(term).getPropertyValue('--wl-w'))||200)
+    : (parseFloat(getComputedStyle(term).getPropertyValue('--order-w'))||300);
+  _dragState={which, startX, startW};
+  const handle=document.getElementById(which==='wl'?'resizeWl':'resizeOrder');
+  if(handle) handle.classList.add('dragging');
+  document.body.classList.add('term-resizing');
+  const move=(e)=>{
+    const p=e.touches?e.touches[0]:e;
+    const dx=p.clientX-_dragState.startX;
+    // dragging right grows watchlist; grows-left for the order (right) panel
+    const raw=which==='wl' ? _dragState.startW+dx : _dragState.startW-dx;
+    const px=clampPx(raw, which);
+    term.style.setProperty(which==='wl'?'--wl-w':'--order-w', px+'px');
+    syncTerminalCharts();
+  };
+  const up=()=>{
+    const cur=which==='wl'
+      ? parseFloat(getComputedStyle(term).getPropertyValue('--wl-w'))
+      : parseFloat(getComputedStyle(term).getPropertyValue('--order-w'));
+    const L2=loadLayout();
+    if(which==='wl') L2.wlWidth=cur; else L2.orderWidth=cur;
+    saveLayout();
+    if(handle) handle.classList.remove('dragging');
+    document.body.classList.remove('term-resizing');
+    window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up);
+    window.removeEventListener('touchmove',move); window.removeEventListener('touchend',up);
+    _dragState=null;
+  };
+  window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+}
+// Bottom panel drag: dragging up grows the panel (shrinks the chart).
+function startRowResize(ev){
+  const term=document.getElementById('terminal'); if(!term) return;
+  ev.preventDefault();
+  const pt=ev.touches?ev.touches[0]:ev;
+  const startY=pt.clientY;
+  const startH=parseFloat(getComputedStyle(term).getPropertyValue('--bottom-h'))||220;
+  const handle=document.getElementById('resizeBottom');
+  if(handle) handle.classList.add('dragging');
+  document.body.classList.add('term-resizing-row');
+  const move=(e)=>{
+    const p=e.touches?e.touches[0]:e;
+    const dy=p.clientY-startY;
+    const px=clampPx(startH-dy, 'bottom');
+    term.style.setProperty('--bottom-h', px+'px');
+    syncTerminalCharts();
+  };
+  const up=()=>{
+    const cur=parseFloat(getComputedStyle(term).getPropertyValue('--bottom-h'));
+    const L=loadLayout(); L.bottomHeight=cur; saveLayout();
+    if(handle) handle.classList.remove('dragging');
+    document.body.classList.remove('term-resizing-row');
+    window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up);
+    window.removeEventListener('touchmove',move); window.removeEventListener('touchend',up);
+  };
+  window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+}
+// Double-click a gutter to reset that dimension to its CSS default.
+function resetLayoutDim(kind){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout();
+  if(kind==='wl'){ term.style.removeProperty('--wl-w'); L.wlWidth=null; }
+  else if(kind==='order'){ term.style.removeProperty('--order-w'); L.orderWidth=null; }
+  else if(kind==='bottom'){ term.style.removeProperty('--bottom-h'); L.bottomHeight=null; }
+  saveLayout(); syncTerminalCharts();
+}
+
+/* ── T4 part 2 — explicit terminal connection state ───────────────────
+   Each terminal feed reports success/failure to one place. After a run of
+   failures the strip surfaces "stale"/"disconnected" with a Retry button, so
+   a dead feed is never a silently-frozen panel. Recovering hides it again. */
+let _termConnFails=0, _termConnDown=false;
+function reportFeed(ok, label){
+  if(ok){
+    if(_termConnFails>0 || _termConnDown){ _termConnFails=0; _termConnDown=false; setTermConn(null); }
+    return;
+  }
+  _termConnFails++;
+  if(_termConnFails>=2 && !_termConnDown){
+    _termConnDown=true;
+    setTermConn('warn', 'Live data stale — retrying terminal feeds…');
+  }
+}
+function setTermConn(level, msg){
+  const strip=document.getElementById('termConn');
+  const m=document.getElementById('termConnMsg');
+  if(!strip) return;
+  if(!level){ strip.className='term-conn'; return; }
+  strip.className='term-conn show '+level;
+  if(m) m.textContent=msg||'Reconnecting…';
+}
+function retryTerminal(){
+  setTermConn('warn','Reconnecting…');
+  try{ loadWatchlistPrices(); }catch(e){}
+  try{ loadTerminalPositions(); }catch(e){}
+  try{ loadRiskChip(); }catch(e){}
+  try{ loadFeedChip(); }catch(e){}
+  try{ if(typeof _bottomTab!=='undefined') refreshBottomTab(_bottomTab); }catch(e){}
 }
 
 /* ── Top-bar status chips ───────────────────────────────────────────── */
@@ -140,14 +348,17 @@ async function loadWatchlistPrices(){
       price:a.entry, change:a.change_pct_24h, reason:a.reason||'', conf:a.confidence_pct,
     }));
     renderTerminalWatchlist();
+    try{ reportFeed(true, 'watchlist'); }catch(e){}
   }catch(e){
     if(!had) list.innerHTML='<div class="b-empty">watchlist unavailable — '+esc(String(e))+'</div>';
+    try{ reportFeed(false, 'watchlist'); }catch(_e){}
   }
 }
 
 function renderTerminalWatchlist(){
   const list=document.getElementById('wlList'); if(!list) return;
   const q=((document.getElementById('wlSearch')||{}).value||'').toUpperCase().trim();
+  try{ if(typeof localStorage!=='undefined') localStorage.setItem('sky.wlFilter', q); }catch(e){}
   const rows=_wlPrices.filter(w=> !q || w.symbol.includes(q));
   if(!rows.length){
     list.innerHTML='<div class="b-empty">no symbols match</div>';
@@ -190,7 +401,8 @@ async function loadTerminalPositions(){
         </div>`;
       }).join('');
     }
-  }catch(e){}
+    try{ reportFeed(true, 'positions'); }catch(e){}
+  }catch(e){ try{ reportFeed(false, 'positions'); }catch(_e){} }
 }
 
 /* ── Trade ticket ───────────────────────────────────────────────────── */

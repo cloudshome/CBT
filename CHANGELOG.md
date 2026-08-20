@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.53.0] — 2026-08-20 · T4 (part 2) — resizable/collapsible panels, layout memory, connection state, tooltips, mobile
+
+MINOR: the Trade Terminal becomes a workspace you can shape and it never
+freezes silently. Purely presentation — no threshold moved, no new endpoint,
+no exchange-order path. Every change is wrapped so a private-mode browser
+(localStorage throwing) still runs, and the jsdom/CI harness is unaffected.
+
+- **Resizable panels** — drag gutters between the watchlist ↔ chart, chart ↔
+  order ticket, and chart ↔ bottom panel. Widths/height are CSS variables
+  written live during the drag (charts re-measure in place); double-click a
+  gutter to reset that dimension to its default. Touch-draggable too.
+- **Collapsible panels** — the watchlist, order ticket and bottom panel each
+  collapse to reclaim space; collapsed side panels leave a vertical re-open
+  rail, the bottom panel a ▾/▴ toggle.
+- **Layout memory** — panel sizes, collapsed states, the selected symbol and
+  timeframe, and the watchlist filter are remembered per browser
+  (`localStorage`) and re-applied on the next load. A remembered symbol/
+  timeframe is only accepted if the server still offers it.
+- **Explicit connection state** — every terminal feed reports success/failure
+  to one place; after two consecutive failures a "Live data stale — retrying"
+  strip with a **Retry** button appears, and a recovery clears it. A dead feed
+  is never a silently frozen panel again.
+- **Tooltips** — every order/bottom tab and icon button carries a descriptive
+  `title`.
+- **Compact mobile layout** — on phones the watchlist becomes a slide-over
+  drawer (☰ in the chart toolbar, tap-outside to dismiss, auto-closes on
+  symbol select) instead of vanishing; the bottom panel flows naturally.
+- Regressions: `test_panel_collapse_toggles_persist_to_localstorage`,
+  `test_panel_collapse_round_trips_from_saved_layout`,
+  `test_terminal_connection_state_surfaces_after_repeated_failures`,
+  `test_watchlist_failure_reports_the_feed_down`,
+  `test_selecting_symbol_persists_and_closes_mobile_drawer`
+  (`tests/test_terminal_js.py`). Full suite **1327 passed / 1 skipped**;
+  served-script `node --check` clean; `config.VERSION` = `pyproject.toml` =
+  `sky-shell-v2.53.0` lockstep. Contract: `docs/HANDOVER_2026-08-20_T4_part2.md`.
+
 ## [2.52.0] — 2026-08-20 · T4 (part 1) — honest sizing, live bottom tabs, skeletons
 
 MINOR: the terminal's trade ticket no longer invents numbers, the bottom

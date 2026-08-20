@@ -572,17 +572,70 @@ HTML = """<!doctype html>
   .bar i{display:block;height:100%;border-radius:999px}
 
   /* ═══ TRADE TERMINAL ═══════════════════════════════════════════════ */
-  .terminal{display:flex;flex-direction:column;height:calc(100vh - 88px);min-height:480px}
-  .terminal-grid{display:grid;grid-template-columns:200px minmax(0,1fr) 300px;gap:0;
+  /* T4 part 2 — resizable/collapsible panels. Column widths + bottom height
+     are CSS variables the drag handles write and localStorage remembers. */
+  .terminal{display:flex;flex-direction:column;height:calc(100vh - 88px);min-height:480px;
+    --wl-w:200px; --order-w:300px; --bottom-h:220px}
+  .terminal-grid{display:grid;
+    grid-template-columns:var(--wl-w) 5px minmax(0,1fr) 5px var(--order-w);gap:0;
     flex:1;min-height:0;border-bottom:1px solid var(--line)}
-  @media(max-width:1100px){.terminal-grid{grid-template-columns:170px minmax(0,1fr) 270px}}
-  @media(max-width:860px){.terminal-grid{grid-template-columns:1fr;overflow:auto}
-    .terminal{height:auto}.t-watchlist{display:none}}
+  .terminal.wl-collapsed .terminal-grid{grid-template-columns:0 0 minmax(0,1fr) 5px var(--order-w)}
+  .terminal.order-collapsed .terminal-grid{grid-template-columns:var(--wl-w) 5px minmax(0,1fr) 0 0}
+  .terminal.wl-collapsed.order-collapsed .terminal-grid{grid-template-columns:0 0 minmax(0,1fr) 0 0}
+  .terminal.wl-collapsed .t-watchlist,.terminal.wl-collapsed #resizeWl{display:none}
+  .terminal.order-collapsed .t-order,.terminal.order-collapsed #resizeOrder{display:none}
+  .terminal.bottom-collapsed .t-bottom .bottom-content{display:none}
+  .terminal.bottom-collapsed .t-bottom{height:auto}
+  .terminal.bottom-collapsed #resizeBottom{display:none}
+  /* drag gutters */
+  .t-resizer{background:transparent;cursor:col-resize;position:relative;z-index:5;
+    transition:background .12s}
+  .t-resizer::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:2px;height:26px;border-radius:2px;background:var(--line2);opacity:.5;transition:opacity .12s}
+  .t-resizer:hover,.t-resizer.dragging{background:rgba(74,163,255,.14)}
+  .t-resizer:hover::after,.t-resizer.dragging::after{opacity:1;background:var(--blue)}
+  .t-resizer-h{height:5px;cursor:row-resize;background:transparent;position:relative;
+    z-index:5;transition:background .12s;flex-shrink:0}
+  .t-resizer-h::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    height:2px;width:34px;border-radius:2px;background:var(--line2);opacity:.5;transition:opacity .12s}
+  .t-resizer-h:hover,.t-resizer-h.dragging{background:rgba(74,163,255,.14)}
+  .t-resizer-h:hover::after,.t-resizer-h.dragging::after{opacity:1;background:var(--blue)}
+  body.term-resizing{cursor:col-resize;user-select:none}
+  body.term-resizing-row{cursor:row-resize;user-select:none}
+  @media(max-width:1100px){.terminal{--wl-w:170px;--order-w:270px}}
+  @media(max-width:860px){.terminal-grid{grid-template-columns:1fr!important;overflow:auto}
+    .terminal{height:auto}.t-watchlist{display:none}
+    #resizeWl,#resizeOrder,#resizeBottom{display:none}}
   .t-watchlist{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;
-    background:var(--bg)}
+    background:var(--bg);overflow:hidden}
   .t-chart{min-width:0;display:flex;flex-direction:column;min-height:0;background:var(--bg)}
   .t-order{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;
     background:var(--bg);overflow:hidden}
+  /* collapsed panel re-open rail */
+  .panel-collapse{appearance:none;border:1px solid var(--line);background:var(--bg2);color:var(--mut);
+    width:20px;height:20px;border-radius:var(--r-sm);cursor:pointer;font-size:11px;line-height:1;
+    display:grid;place-items:center;flex-shrink:0;transition:.12s}
+  .panel-collapse:hover{color:var(--txt);border-color:var(--line2);background:var(--panel2)}
+  .term-reopen{position:absolute;top:52px;z-index:8;display:none;padding:6px 4px;writing-mode:vertical-rl;
+    background:var(--bg2);border:1px solid var(--line);color:var(--mut);cursor:pointer;font-size:9px;
+    font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:0 6px 6px 0}
+  .term-reopen.right{right:0;border-radius:6px 0 0 6px}
+  .term-reopen:hover{color:var(--txt);border-color:var(--line2)}
+  .terminal.wl-collapsed #reopenWl{display:block;left:0}
+  .terminal.order-collapsed #reopenOrder{display:block}
+  .mobile-only{display:none!important}
+  .t-wl-backdrop{display:none}
+  /* T4 part 2 — terminal connection state strip (stale/disconnected/error) */
+  .term-conn{display:none;align-items:center;gap:6px;font-size:10.5px;font-weight:700;
+    padding:3px 9px;border-bottom:1px solid var(--line)}
+  .term-conn.show{display:flex}
+  .term-conn.warn{background:rgba(240,168,60,.08);color:var(--amber);border-bottom-color:rgba(240,168,60,.35)}
+  .term-conn.err{background:rgba(239,83,80,.08);color:var(--red);border-bottom-color:rgba(239,83,80,.4)}
+  .term-conn .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;
+    animation:connpulse 1.3s infinite}
+  @keyframes connpulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .term-conn button{margin-left:auto;appearance:none;border:1px solid currentColor;background:transparent;
+    color:inherit;padding:1px 8px;border-radius:999px;font:700 10px/1 Inter;cursor:pointer}
   .panel-head{display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid var(--line);
     font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:800}
   .panel-head .grow{flex:1}
@@ -682,7 +735,8 @@ HTML = """<!doctype html>
   .ai-typing{color:var(--mut);font-style:italic;font-size:11px}
 
   /* ── Bottom panel ────────────────────────────────────────────────── */
-  .t-bottom{background:var(--panel);display:flex;flex-direction:column;max-height:260px;min-height:130px}
+  .t-bottom{background:var(--panel);display:flex;flex-direction:column;
+    height:var(--bottom-h,220px);min-height:36px;flex-shrink:0}
   .bottom-tabs{display:flex;gap:0;border-bottom:1px solid var(--line);overflow-x:auto;
     scrollbar-width:none;background:var(--bg)}
   .bottom-tabs::-webkit-scrollbar{display:none}
@@ -834,9 +888,17 @@ HTML = """<!doctype html>
     .navbtn{padding:8px 9px;font-size:11px}
     .terminal{height:auto}
     .terminal-grid{grid-template-columns:1fr}
-    .t-watchlist{display:none}
+    /* T4 part 2 — mobile: watchlist becomes a slide-over drawer, not gone. */
+    .t-watchlist{position:fixed;top:0;left:0;bottom:0;width:82vw;max-width:320px;z-index:78;
+      display:flex;transform:translateX(-102%);transition:transform .2s ease;
+      box-shadow:14px 0 40px rgba(0,0,0,.5);border-right:1px solid var(--line2)}
+    .terminal.mobile-wl-open .t-watchlist{transform:none}
+    .t-wl-backdrop{display:none;position:fixed;inset:0;z-index:77;background:rgba(3,6,11,.6);
+      backdrop-filter:blur(3px)}
+    .terminal.mobile-wl-open .t-wl-backdrop{display:block}
+    .mobile-only{display:inline-flex!important}
     .t-order{min-height:380px}
-    .t-bottom{max-height:none;min-height:0}
+    .t-bottom{height:auto;max-height:none;min-height:0}
     .ai-drawer{width:100%;top:0}
     .view-body{padding:8px 8px 14px}
     .shell{padding:8px 8px 14px}
@@ -925,11 +987,20 @@ HTML = """<!doctype html>
 
 <!-- ═══ TRADE TERMINAL — THE DEFAULT VIEW ══════════════════════════════ -->
 <div id="view-trade" class="view active" data-tab="chart">
-  <div class="terminal">
+  <div class="terminal" id="terminal">
+    <!-- T4 part 2 — terminal connection state (hidden until a feed goes stale/down) -->
+    <div class="term-conn" id="termConn" role="status" aria-live="polite">
+      <span class="dot"></span><span id="termConnMsg">Reconnecting…</span>
+      <button onclick="retryTerminal()" title="Retry the terminal feeds now">Retry</button>
+    </div>
+    <!-- collapsed-panel re-open rails -->
+    <button class="term-reopen" id="reopenWl" onclick="toggleWatchlistPanel()" title="Show watchlist">Watchlist ▸</button>
+    <button class="term-reopen right" id="reopenOrder" onclick="toggleOrderPanel()" title="Show order panel">◂ Ticket</button>
+    <div class="t-wl-backdrop" onclick="toggleMobileWatchlist()"></div>
     <div class="terminal-grid">
       <!-- LEFT: watchlist -->
       <aside class="t-watchlist">
-        <div class="panel-head">Watchlist <span class="grow"></span><button class="btn sm" onclick="loadWatchlistPrices()" title="refresh prices">↻</button></div>
+        <div class="panel-head">Watchlist <span class="grow"></span><button class="btn sm" onclick="loadWatchlistPrices()" title="Refresh watchlist prices">↻</button><button class="panel-collapse" onclick="toggleWatchlistPanel()" title="Collapse watchlist panel">‹</button></div>
         <div class="t-wl-search"><input id="wlSearch" placeholder="Search symbol…" oninput="renderTerminalWatchlist()"></div>
         <div class="t-wl-list" id="wlList">
           <div class="b-empty">loading watchlist…</div>
@@ -938,9 +1009,13 @@ HTML = """<!doctype html>
         <div class="t-wl-list" id="wlPositions" style="max-height:150px"><div class="b-empty">no open positions</div></div>
       </aside>
 
+      <!-- resize gutter: watchlist ↔ chart -->
+      <div class="t-resizer" id="resizeWl" onmousedown="startColResize(event,'wl')" ontouchstart="startColResize(event,'wl')" ondblclick="resetLayoutDim('wl')" title="Drag to resize — double-click to reset"></div>
+
       <!-- CENTER: chart -->
       <main class="t-chart">
         <div class="chart-toolbar">
+          <button class="btn sm mobile-only" onclick="toggleMobileWatchlist()" title="Show watchlist">☰</button>
           <div class="seg" id="chartSymSeg">
             {% for s in symbols %}<button data-sym="{{s.symbol}}" onclick="chartSetSymbol('{{s.symbol}}')" class="{{'active' if s.symbol==symbol}}">{{s.symbol}}</button>{% endfor %}
           </div>
@@ -997,13 +1072,17 @@ HTML = """<!doctype html>
         </div>
       </main>
 
+      <!-- resize gutter: chart ↔ order -->
+      <div class="t-resizer" id="resizeOrder" onmousedown="startColResize(event,'order')" ontouchstart="startColResize(event,'order')" ondblclick="resetLayoutDim('order')" title="Drag to resize — double-click to reset"></div>
+
       <!-- RIGHT: order + AI -->
       <aside class="t-order">
         <div class="order-tabs">
-          <button class="active" data-otab="ticket" onclick="switchOrderTab('ticket')">Ticket</button>
-          <button data-otab="signal" onclick="switchOrderTab('signal')">Signal</button>
-          <button data-otab="risk" onclick="switchOrderTab('risk')">Risk</button>
-          <button data-otab="copilot" onclick="switchOrderTab('copilot')">Copilot</button>
+          <button class="active" data-otab="ticket" onclick="switchOrderTab('ticket')" title="Paper trade ticket">Ticket</button>
+          <button data-otab="signal" onclick="switchOrderTab('signal')" title="Desk signal summary for this market">Signal</button>
+          <button data-otab="risk" onclick="switchOrderTab('risk')" title="Live risk gate read">Risk</button>
+          <button data-otab="copilot" onclick="switchOrderTab('copilot')" title="AI Copilot — advisory only">Copilot</button>
+          <button class="panel-collapse" style="margin:4px 6px 0 0" onclick="toggleOrderPanel()" title="Collapse order panel">›</button>
         </div>
         <div id="otab-ticket" class="otab active">
           <div class="paper-notice">PAPER — NO REAL ORDER WILL BE SENT</div>
@@ -1063,16 +1142,21 @@ HTML = """<!doctype html>
       </aside>
     </div>
 
+    <!-- resize gutter: chart ↔ bottom panel -->
+    <div class="t-resizer-h" id="resizeBottom" onmousedown="startRowResize(event)" ontouchstart="startRowResize(event)" ondblclick="resetLayoutDim('bottom')" title="Drag to resize — double-click to reset"></div>
+
     <!-- BOTTOM PANEL -->
     <div class="t-bottom">
       <div class="bottom-tabs">
-        <button class="active" data-btab="positions" onclick="switchBottomTab('positions')">Open positions</button>
-        <button data-btab="orders" onclick="switchBottomTab('orders')">Pending plans</button>
-        <button data-btab="history" onclick="switchBottomTab('history')">Trade history</button>
-        <button data-btab="journal" onclick="switchBottomTab('journal')">Journal</button>
-        <button data-btab="alerts" onclick="switchBottomTab('alerts')">Alerts</button>
-        <button data-btab="evidence" onclick="switchBottomTab('evidence')">Strategy evidence</button>
-        <button data-btab="activity" onclick="switchBottomTab('activity')">Background</button>
+        <button class="active" data-btab="positions" onclick="switchBottomTab('positions')" title="Open paper positions with live R / MAE / MFE">Open positions</button>
+        <button data-btab="orders" onclick="switchBottomTab('orders')" title="Pending limit / conditional plans waiting for entry">Pending plans</button>
+        <button data-btab="history" onclick="switchBottomTab('history')" title="Closed paper trades and their outcomes">Trade history</button>
+        <button data-btab="journal" onclick="switchBottomTab('journal')" title="Trade journal">Journal</button>
+        <button data-btab="alerts" onclick="switchBottomTab('alerts')" title="Push / Telegram / Discord alerts">Alerts</button>
+        <button data-btab="evidence" onclick="switchBottomTab('evidence')" title="Strategy scorecard and graduation evidence">Strategy evidence</button>
+        <button data-btab="activity" onclick="switchBottomTab('activity')" title="Background jobs (backfill, backtest, …)">Background</button>
+        <span class="grow" style="flex:1"></span>
+        <button class="panel-collapse" style="margin:4px 6px" onclick="toggleBottomPanel()" id="bottomCollapseBtn" title="Collapse bottom panel">▾</button>
       </div>
       <div class="bottom-content active" id="btab-positions"><div class="b-empty">loading positions…</div></div>
       <div class="bottom-content" id="btab-orders"><div class="b-empty">loading…</div></div>
@@ -1702,6 +1786,8 @@ function setSymbol(sym){
   document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym));
   try{ document.querySelectorAll('#chartSymSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym)); }catch(e){}
   _chartSym=sym; _ticketDirty=false;
+  try{ if(typeof localStorage!=='undefined') localStorage.setItem('sky.symbol', sym); }catch(e){}
+  try{ const t=document.getElementById('terminal'); if(t) t.classList.remove('mobile-wl-open'); }catch(e){}
   load(true);
   try{ loadTicketMeta(); }catch(e){}
   try{ loadChartWorkspace(true, {fit:true}); }catch(e){}
@@ -1711,6 +1797,7 @@ function setTF(tf){
   document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf));
   try{ document.querySelectorAll('#chartTfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf)); }catch(e){}
   _chartTf=tf; _ticketDirty=false;
+  try{ if(typeof localStorage!=='undefined') localStorage.setItem('sky.timeframe', tf); }catch(e){}
   load(true);
   try{ loadChartWorkspace(true, {fit:true}); }catch(e){}
 }
@@ -3289,6 +3376,8 @@ function chartSetSymbol(sym){
   document.querySelectorAll('#chartSymSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym));
   const el=document.getElementById('sym'); if(el) el.value=sym;
   document.querySelectorAll('#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===sym));
+  try{ if(typeof localStorage!=='undefined') localStorage.setItem('sky.symbol', sym); }catch(e){}
+  try{ loadTicketMeta(); }catch(e){}
   loadChartWorkspace(true);
 }
 function chartSetTF(tf){
@@ -3296,6 +3385,7 @@ function chartSetTF(tf){
   document.querySelectorAll('#chartTfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf));
   const el=document.getElementById('tf'); if(el) el.value=tf;
   document.querySelectorAll('#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===tf));
+  try{ if(typeof localStorage!=='undefined') localStorage.setItem('sky.timeframe', tf); }catch(e){}
   loadChartWorkspace(true);
 }
 let _multiChart=false, _multiCharts=[], _multiLoading=false, _multiSync=false, _multiCrosshair=false;
@@ -5768,9 +5858,33 @@ if(typeof _origSwitchTab === 'function'){
 
 /* ── Terminal lifecycle ─────────────────────────────────────────────── */
 let _termLoaded = false;
+// T4 part 2 — restore the remembered symbol / timeframe / watchlist filter
+// before the first fetch, then apply the saved panel layout.
+function restoreTerminalPrefs(){
+  try{
+    if(typeof localStorage==='undefined') return;
+    const savedSym=localStorage.getItem('sky.symbol');
+    const savedTf=localStorage.getItem('sky.timeframe');
+    const savedFilter=localStorage.getItem('sky.wlFilter');
+    // only accept a symbol/timeframe the server actually offers
+    if(savedSym){
+      const has=document.querySelector('#chartSymSeg button[data-sym="'+savedSym+'"]');
+      if(has){ _chartSym=savedSym; const el=document.getElementById('sym'); if(el) el.value=savedSym;
+        document.querySelectorAll('#chartSymSeg button,#symSeg button').forEach(b=> b.classList.toggle('active', b.dataset.sym===savedSym)); }
+    }
+    if(savedTf){
+      const has=document.querySelector('#chartTfSeg button[data-tf="'+savedTf+'"]');
+      if(has){ _chartTf=savedTf; const el=document.getElementById('tf'); if(el) el.value=savedTf;
+        document.querySelectorAll('#chartTfSeg button,#tfSeg button').forEach(b=> b.classList.toggle('active', b.dataset.tf===savedTf)); }
+    }
+    if(savedFilter){ const s=document.getElementById('wlSearch'); if(s) s.value=savedFilter; }
+  }catch(e){}
+}
 async function loadTerminal(){
   if(_termLoaded) return;
   _termLoaded = true;
+  try{ restoreTerminalPrefs(); }catch(e){}
+  try{ applyLayout(); }catch(e){}
   try{ loadWatchlistPrices(); }catch(e){}
   try{ loadChartWorkspace(false); }catch(e){}
   try{ loadTerminalPositions(); }catch(e){}
@@ -5789,6 +5903,190 @@ async function loadTerminal(){
 function _skeleton(rows){
   rows=rows||3;
   return '<div class="skel skel-row"></div>'.repeat(rows);
+}
+
+/* ── T4 part 2 — layout persistence, resize, collapse ─────────────────
+   Panel widths, the bottom-panel height, collapsed states, the watchlist
+   filter, and the selected symbol/timeframe are remembered in this browser's
+   localStorage. Presentation only — none of it touches the risk gate, the
+   graduation bar or any order path. Every read is wrapped so a private-mode
+   browser that throws on localStorage still runs. */
+const LAYOUT_KEY='sky.terminal.layout.v1';
+const LAYOUT_BOUNDS={ 'wl':[130,420], 'order':[220,520], 'bottom':[80,560] };
+let _layout=null;
+function loadLayout(){
+  if(_layout) return _layout;
+  let saved={};
+  try{ saved=JSON.parse(localStorage.getItem(LAYOUT_KEY)||'{}')||{}; }catch(e){ saved={}; }
+  _layout=Object.assign({
+    wlWidth:null, orderWidth:null, bottomHeight:null,
+    wlCollapsed:false, orderCollapsed:false, bottomCollapsed:false,
+  }, saved);
+  return _layout;
+}
+function saveLayout(){
+  try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify(_layout||{})); }catch(e){}
+}
+function clampPx(px, kind){
+  const b=LAYOUT_BOUNDS[kind]; if(!b) return px;
+  return Math.max(b[0], Math.min(b[1], px));
+}
+// Apply the remembered layout to the DOM. Safe to call before the terminal
+// is visible; it no-ops when the elements do not exist (jsdom/CI).
+function applyLayout(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout();
+  if(L.wlWidth) term.style.setProperty('--wl-w', clampPx(L.wlWidth,'wl')+'px');
+  if(L.orderWidth) term.style.setProperty('--order-w', clampPx(L.orderWidth,'order')+'px');
+  if(L.bottomHeight) term.style.setProperty('--bottom-h', clampPx(L.bottomHeight,'bottom')+'px');
+  term.classList.toggle('wl-collapsed', !!L.wlCollapsed);
+  term.classList.toggle('order-collapsed', !!L.orderCollapsed);
+  term.classList.toggle('bottom-collapsed', !!L.bottomCollapsed);
+  const bc=document.getElementById('bottomCollapseBtn');
+  if(bc){ bc.textContent=L.bottomCollapsed?'▴':'▾';
+    bc.title=(L.bottomCollapsed?'Expand':'Collapse')+' bottom panel'; }
+  syncTerminalCharts();
+}
+// Charts are canvas-sized to their container width, so any layout change must
+// nudge them to re-measure. Reuses the same width the resize handler uses.
+function syncTerminalCharts(){
+  try{
+    const w=document.getElementById('chartMain');
+    if(w && typeof _charts!=='undefined' && _charts && _charts.length){
+      const cw=w.clientWidth||900;
+      _charts.forEach(c=>{ try{ c.applyOptions({width:cw}); }catch(e){} });
+    }
+  }catch(e){}
+}
+
+function toggleWatchlistPanel(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout(); L.wlCollapsed=!L.wlCollapsed; saveLayout(); applyLayout();
+}
+function toggleOrderPanel(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout(); L.orderCollapsed=!L.orderCollapsed; saveLayout(); applyLayout();
+}
+function toggleBottomPanel(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout(); L.bottomCollapsed=!L.bottomCollapsed; saveLayout(); applyLayout();
+}
+// Mobile only: the watchlist is a slide-over drawer. Not persisted — it is a
+// transient view, and selecting a symbol closes it.
+function toggleMobileWatchlist(){
+  const term=document.getElementById('terminal'); if(!term) return;
+  term.classList.toggle('mobile-wl-open');
+}
+
+// Column drag: 'wl' grows/shrinks from the left edge, 'order' from the right.
+let _dragState=null;
+function startColResize(ev, which){
+  const term=document.getElementById('terminal'); if(!term) return;
+  ev.preventDefault();
+  const pt=ev.touches?ev.touches[0]:ev;
+  const L=loadLayout();
+  const startX=pt.clientX;
+  const startW=which==='wl'
+    ? (parseFloat(getComputedStyle(term).getPropertyValue('--wl-w'))||200)
+    : (parseFloat(getComputedStyle(term).getPropertyValue('--order-w'))||300);
+  _dragState={which, startX, startW};
+  const handle=document.getElementById(which==='wl'?'resizeWl':'resizeOrder');
+  if(handle) handle.classList.add('dragging');
+  document.body.classList.add('term-resizing');
+  const move=(e)=>{
+    const p=e.touches?e.touches[0]:e;
+    const dx=p.clientX-_dragState.startX;
+    // dragging right grows watchlist; grows-left for the order (right) panel
+    const raw=which==='wl' ? _dragState.startW+dx : _dragState.startW-dx;
+    const px=clampPx(raw, which);
+    term.style.setProperty(which==='wl'?'--wl-w':'--order-w', px+'px');
+    syncTerminalCharts();
+  };
+  const up=()=>{
+    const cur=which==='wl'
+      ? parseFloat(getComputedStyle(term).getPropertyValue('--wl-w'))
+      : parseFloat(getComputedStyle(term).getPropertyValue('--order-w'));
+    const L2=loadLayout();
+    if(which==='wl') L2.wlWidth=cur; else L2.orderWidth=cur;
+    saveLayout();
+    if(handle) handle.classList.remove('dragging');
+    document.body.classList.remove('term-resizing');
+    window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up);
+    window.removeEventListener('touchmove',move); window.removeEventListener('touchend',up);
+    _dragState=null;
+  };
+  window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+}
+// Bottom panel drag: dragging up grows the panel (shrinks the chart).
+function startRowResize(ev){
+  const term=document.getElementById('terminal'); if(!term) return;
+  ev.preventDefault();
+  const pt=ev.touches?ev.touches[0]:ev;
+  const startY=pt.clientY;
+  const startH=parseFloat(getComputedStyle(term).getPropertyValue('--bottom-h'))||220;
+  const handle=document.getElementById('resizeBottom');
+  if(handle) handle.classList.add('dragging');
+  document.body.classList.add('term-resizing-row');
+  const move=(e)=>{
+    const p=e.touches?e.touches[0]:e;
+    const dy=p.clientY-startY;
+    const px=clampPx(startH-dy, 'bottom');
+    term.style.setProperty('--bottom-h', px+'px');
+    syncTerminalCharts();
+  };
+  const up=()=>{
+    const cur=parseFloat(getComputedStyle(term).getPropertyValue('--bottom-h'));
+    const L=loadLayout(); L.bottomHeight=cur; saveLayout();
+    if(handle) handle.classList.remove('dragging');
+    document.body.classList.remove('term-resizing-row');
+    window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up);
+    window.removeEventListener('touchmove',move); window.removeEventListener('touchend',up);
+  };
+  window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+}
+// Double-click a gutter to reset that dimension to its CSS default.
+function resetLayoutDim(kind){
+  const term=document.getElementById('terminal'); if(!term) return;
+  const L=loadLayout();
+  if(kind==='wl'){ term.style.removeProperty('--wl-w'); L.wlWidth=null; }
+  else if(kind==='order'){ term.style.removeProperty('--order-w'); L.orderWidth=null; }
+  else if(kind==='bottom'){ term.style.removeProperty('--bottom-h'); L.bottomHeight=null; }
+  saveLayout(); syncTerminalCharts();
+}
+
+/* ── T4 part 2 — explicit terminal connection state ───────────────────
+   Each terminal feed reports success/failure to one place. After a run of
+   failures the strip surfaces "stale"/"disconnected" with a Retry button, so
+   a dead feed is never a silently-frozen panel. Recovering hides it again. */
+let _termConnFails=0, _termConnDown=false;
+function reportFeed(ok, label){
+  if(ok){
+    if(_termConnFails>0 || _termConnDown){ _termConnFails=0; _termConnDown=false; setTermConn(null); }
+    return;
+  }
+  _termConnFails++;
+  if(_termConnFails>=2 && !_termConnDown){
+    _termConnDown=true;
+    setTermConn('warn', 'Live data stale — retrying terminal feeds…');
+  }
+}
+function setTermConn(level, msg){
+  const strip=document.getElementById('termConn');
+  const m=document.getElementById('termConnMsg');
+  if(!strip) return;
+  if(!level){ strip.className='term-conn'; return; }
+  strip.className='term-conn show '+level;
+  if(m) m.textContent=msg||'Reconnecting…';
+}
+function retryTerminal(){
+  setTermConn('warn','Reconnecting…');
+  try{ loadWatchlistPrices(); }catch(e){}
+  try{ loadTerminalPositions(); }catch(e){}
+  try{ loadRiskChip(); }catch(e){}
+  try{ loadFeedChip(); }catch(e){}
+  try{ if(typeof _bottomTab!=='undefined') refreshBottomTab(_bottomTab); }catch(e){}
 }
 
 /* ── Top-bar status chips ───────────────────────────────────────────── */
@@ -5840,14 +6138,17 @@ async function loadWatchlistPrices(){
       price:a.entry, change:a.change_pct_24h, reason:a.reason||'', conf:a.confidence_pct,
     }));
     renderTerminalWatchlist();
+    try{ reportFeed(true, 'watchlist'); }catch(e){}
   }catch(e){
     if(!had) list.innerHTML='<div class="b-empty">watchlist unavailable — '+esc(String(e))+'</div>';
+    try{ reportFeed(false, 'watchlist'); }catch(_e){}
   }
 }
 
 function renderTerminalWatchlist(){
   const list=document.getElementById('wlList'); if(!list) return;
   const q=((document.getElementById('wlSearch')||{}).value||'').toUpperCase().trim();
+  try{ if(typeof localStorage!=='undefined') localStorage.setItem('sky.wlFilter', q); }catch(e){}
   const rows=_wlPrices.filter(w=> !q || w.symbol.includes(q));
   if(!rows.length){
     list.innerHTML='<div class="b-empty">no symbols match</div>';
@@ -5890,7 +6191,8 @@ async function loadTerminalPositions(){
         </div>`;
       }).join('');
     }
-  }catch(e){}
+    try{ reportFeed(true, 'positions'); }catch(e){}
+  }catch(e){ try{ reportFeed(false, 'positions'); }catch(_e){} }
 }
 
 /* ── Trade ticket ───────────────────────────────────────────────────── */

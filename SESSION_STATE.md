@@ -1,4 +1,25 @@
-**Last updated:** 2026-08-20 (**v2.52.0 — T4 part 1 shipped**). The trade ticket is now honest about money: `GET /api/ticket/meta` returns the real `ACCOUNT_BALANCE` (0 when unset) + the per-symbol cost model, `recalcTicket` sizes from that balance (shows **—** with a "set ACCOUNT_BALANCE" hint instead of the old fabricated **$100k**), and the fee estimate uses the desk's real round-trip fee/spread/slippage model. The bottom tabs **re-fetch on every switch** (one-shot `_bottomLoaded` cache dropped — a runner-closed position can no longer linger as a stale row), and the watchlist + bottom tabs paint **loading skeletons** while fetching. No threshold moved, no exchange-order path. Contract: `docs/HANDOVER_2026-08-20_T4.md`. Next sandbox code: **T4 part 2** — resizable/collapsible panels, localStorage for panel sizes/watchlist/symbol/timeframe/layout, explicit stale/disconnected/error states, tooltips sweep, compact mobile layout (visual QA of the T3 loop on a real browser first). **P22 drills still need real signers; P11 real paper proof stays the money path.**
+**Last updated:** 2026-08-20 (**v2.53.0 — T4 part 2 shipped**). The Trade
+Terminal is now a workspace you can shape and it never freezes silently.
+**Resizable** drag gutters (watchlist ↔ chart ↔ order, chart ↔ bottom) write
+panel widths/height as live CSS variables (charts re-measure in place;
+double-click a gutter to reset); **collapsible** panels leave a re-open rail /
+▾ toggle; **layout + preferences persist** in `localStorage` (panel sizes,
+collapsed states, symbol, timeframe, watchlist filter — a remembered
+symbol/timeframe is only re-applied if the server still offers it); an explicit
+**connection strip** (`reportFeed`) surfaces "Live data stale — retrying" with
+a Retry button after repeated feed failures and clears on recovery; **tooltips**
+on every tab/icon; and on phones the watchlist becomes a **slide-over drawer**
+(☰) instead of vanishing. Presentation only — no new endpoint, no threshold
+moved, no exchange-order path; every localStorage read is wrapped so a
+private-mode browser still runs. Suite **1327 passed / 1 skipped** (with `mcp`
++ `cryptography` installed). Contract: `docs/HANDOVER_2026-08-20_T4_part2.md`.
+Next sandbox code: **T5** — home screen & onboarding (post-login command
+dashboard, "Open Trading Terminal" primary button, onboarding that points at
+the paper loop), then **T6** focused pages. Still open from T1: visual QA of
+the drag/collapse/mobile gestures on a real browser (none installable here).
+**P22 drills still need real signers; P11 real paper proof stays the money path.**
+
+**Previous:** 2026-08-20 (**v2.52.0 — T4 part 1 shipped**). The trade ticket is now honest about money: `GET /api/ticket/meta` returns the real `ACCOUNT_BALANCE` (0 when unset) + the per-symbol cost model, `recalcTicket` sizes from that balance (shows **—** with a "set ACCOUNT_BALANCE" hint instead of the old fabricated **$100k**), and the fee estimate uses the desk's real round-trip fee/spread/slippage model. The bottom tabs **re-fetch on every switch** (one-shot `_bottomLoaded` cache dropped — a runner-closed position can no longer linger as a stale row), and the watchlist + bottom tabs paint **loading skeletons** while fetching. No threshold moved, no exchange-order path. Contract: `docs/HANDOVER_2026-08-20_T4.md`. Next sandbox code: **T4 part 2** — resizable/collapsible panels, localStorage for panel sizes/watchlist/symbol/timeframe/layout, explicit stale/disconnected/error states, tooltips sweep, compact mobile layout (visual QA of the T3 loop on a real browser first). **P22 drills still need real signers; P11 real paper proof stays the money path.**
 
 **Previous:** 2026-08-20 (**v2.51.0 — T2 Copilot polish shipped**). The Copilot now renders the desk's answers as **titled sections** with a dashed **Sources** footer (grounding surfaces, e.g. `risk gate — brain.risk_gate.evaluate`), never double-prints the raw text, and answers about the **selected** symbol/timeframe (it sends `symbol`/`tf`, not the server default). A new **Prepare ticket** quick action pre-fills the ticket from the desk plan (advisory only — never confirms, never posts, stands aside on `NO TRADE`). Backend: `brain.agent.ask` returns `sections` + `sources` on every intent (additive — CLI/MCP unchanged), the `market` intent splits into **Market read** / **Desk decision**, and the `exposure` intent adds the canonical live-book count (P12.16) plus **measured expectancy** per carried plan type. No threshold moved, no exchange-order path. Contract: `docs/HANDOVER_2026-08-20_T2.md`.
 

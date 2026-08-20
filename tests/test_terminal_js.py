@@ -725,3 +725,100 @@ def test_bottom_tabs_refetch_on_every_switch():
     """ + "console.log(JSON.stringify({hits: hits}));")
     assert out["hits"].count("journal") == 2, out["hits"]
     assert out["hits"].count("trades") == 1, out["hits"]
+
+
+# ── T4 part 2 — resizable/collapsible panels, persistence, conn state ──────
+
+def test_panel_collapse_toggles_persist_to_localstorage():
+    """Collapsing a panel flips its class and remembers the choice, so the
+    layout survives a reload. Presentation only — no endpoint is touched."""
+    out = _run({}, """
+      _layout = null;                      // start from a clean layout
+      global.localStorage.store = {};
+      toggleWatchlistPanel();
+      toggleBottomPanel();
+      const term = el('terminal');
+      global.__wlClass = term.classList.contains('wl-collapsed');
+      global.__bottomClass = term.classList.contains('bottom-collapsed');
+      global.__orderClass = term.classList.contains('order-collapsed');
+      global.__saved = global.localStorage.getItem('sky.terminal.layout.v1');
+      global.__btnTxt = (elements['bottomCollapseBtn']||{}).textContent || '';
+    """ + _DRAIN + """
+    """ + ("console.log(JSON.stringify({wl: global.__wlClass, bottom: global.__bottomClass, "
+           "order: global.__orderClass, saved: global.__saved, btnTxt: global.__btnTxt}));"))
+    assert out["wl"] is True and out["bottom"] is True
+    assert out["order"] is False           # untouched panel stays open
+    saved = json.loads(out["saved"])
+    assert saved["wlCollapsed"] is True and saved["bottomCollapsed"] is True
+    assert saved["orderCollapsed"] is False
+    assert out["btnTxt"] == "\u25b4"        # ▴ = expand affordance when collapsed
+
+
+def test_panel_collapse_round_trips_from_saved_layout():
+    """A remembered collapsed state is re-applied on the next load."""
+    out = _run({}, """
+      _layout = null;
+      global.localStorage.store = {};
+      global.localStorage.setItem('sky.terminal.layout.v1',
+        JSON.stringify({wlCollapsed:true, orderCollapsed:false, bottomCollapsed:false}));
+      applyLayout();
+      const term = el('terminal');
+      global.__wl = term.classList.contains('wl-collapsed');
+      global.__order = term.classList.contains('order-collapsed');
+    """ + _DRAIN + """
+    """ + "console.log(JSON.stringify({wl: global.__wl, order: global.__order}));")
+    assert out["wl"] is True and out["order"] is False
+
+
+def test_terminal_connection_state_surfaces_after_repeated_failures():
+    """Two consecutive feed failures raise an explicit stale banner with a
+    Retry affordance; a subsequent success clears it. No silent frozen panel."""
+    out = _run({}, """
+      _termConnFails = 0; _termConnDown = false;
+      reportFeed(false, 'watchlist');
+      const afterOne = (elements['termConn']||{}).className || '';
+      reportFeed(false, 'watchlist');
+      const afterTwo = (elements['termConn']||{}).className || '';
+      const msgDown = (elements['termConnMsg']||{}).textContent || '';
+      reportFeed(true, 'watchlist');
+      const afterRecover = (elements['termConn']||{}).className || '';
+    """ + _DRAIN + """
+    """ + ("console.log(JSON.stringify({afterOne: afterOne, afterTwo: afterTwo, "
+           "msgDown: msgDown, afterRecover: afterRecover}));"))
+    assert "show" not in out["afterOne"]          # one blip is not yet "down"
+    assert "show" in out["afterTwo"] and "warn" in out["afterTwo"]
+    assert "stale" in out["msgDown"].lower()
+    assert out["afterRecover"] == "term-conn"     # recovered → hidden again
+
+
+def test_watchlist_failure_reports_the_feed_down():
+    """A failing watchlist fetch drives the connection state, not just a blank
+    panel."""
+    api = {"/api/agents": {"status": 500, "body": {"error": "boom"}}}
+    out = _run(api, """
+      _termConnFails = 0; _termConnDown = false;
+      _wlPrices = [];
+      const origFetch = fetch;
+      fetch = async (url, opts) => { if(String(url).indexOf('/api/agents')>=0) throw new Error('down'); return origFetch(url, opts); };
+      await loadWatchlistPrices();
+      await loadWatchlistPrices();
+    """ + _DRAIN + """
+    """ + ("console.log(JSON.stringify({conn: (elements['termConn']||{}).className||'', "
+           "wl: (elements['wlList']||{}).innerHTML||''}));"))
+    assert "show" in out["conn"]
+    assert "unavailable" in out["wl"]
+
+
+def test_selecting_symbol_persists_and_closes_mobile_drawer():
+    """Choosing a symbol remembers it for next load and closes the mobile
+    watchlist drawer."""
+    api = {"/api/agents": {"status": 200, "body": {"assets": []}}}
+    out = _run(api, """
+      global.localStorage.store = {};
+      el('terminal').classList.add('mobile-wl-open');
+      setSymbol('ETHUSDT');
+    """ + _DRAIN + """
+    """ + ("console.log(JSON.stringify({sym: global.localStorage.getItem('sky.symbol'), "
+           "drawerOpen: el('terminal').classList.contains('mobile-wl-open')}));"))
+    assert out["sym"] == "ETHUSDT"
+    assert out["drawerOpen"] is False
