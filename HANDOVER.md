@@ -2,7 +2,9 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-20 · **combined roadmap after v2.49.0** (`docs/PR_REVIEW_2026-08-20.md`, `ROADMAP.md`). Software is still **v2.49.0** (T1 layout, PR #72). The #72 roadmap rewrite had dropped the money path and still marked T1 as NEXT at v2.48.1 — that is corrected. Next sandbox **code** is **T3** (Confirm → existing approval → position in the terminal → close → journal). Next **money** work is P11 on the real-data Hub. P22 still needs real signers. No trading behavior or safety boundary changed.
+Last updated: 2026-08-20 · **v2.50.0 — T3: the terminal now runs the whole paper loop** (`docs/HANDOVER_2026-08-20_T3.md`, `ROADMAP.md`). Confirm no longer toasts — it creates the ticket scan, re-reads the risk gate **fresh on the server**, approves through the desk path, and the paper runner enrolls the position into the bottom panel. Live R / MAE / MFE / management advice come from `/api/trades`; Close records the real outcome and opens the journal drawer automatically. Still paper-only; no threshold moved; no exchange-order path. Suite **1302 passed / 1 skipped** locally and in GitHub Actions (PR #75, CI-green). Next sandbox **code** is **T2 polish / T4**; visual QA of the T3 loop on a real browser first if one exists. Next **money** work is P11 on the real-data Hub. P22 still needs real signers.
+
+**Previous:** 2026-08-20 · **combined roadmap after v2.49.0** (`docs/PR_REVIEW_2026-08-20.md`, `ROADMAP.md`) — T1 terminal layout, PR #72. Kept for history; superseded by v2.50.0 above.
 
 **Previous:** 2026-08-20 · **v2.48.0 — W3.5 part 2: 2×2 multi-chart synchronized crosshair** (`docs/HANDOVER_2026-08-20_W35_part2.md`). Completes the W2/W3.5 chart backlog: one pointer moves the crosshair on all four panes (`subscribeCrosshairMove` → `setCrosshairPosition`), per-browser Zoom/Crosshair sync toggles, four distinct default slots, honest "no candles" empty slots, a 1970-date timestamp fix, and a Python-eaten `/\-/g` escape cleanup. Full suite 1282 passed / 1 skipped. No threshold moved; multi-chart stays a comparison view only.
 
@@ -34,30 +36,28 @@ Last updated: 2026-08-20 · **combined roadmap after v2.49.0** (`docs/PR_REVIEW_
 
 > **Triage durable (2026-08-18):** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` is still the `6-idea -> Take/Park/Reject` decision — `P18.4` already satisfied `*02/#3 + *05 compact` as shell-only PWA; `*01/*04/*06` stay parked as external labs after `P19+graduation`. **Do not re-triage, do not add torch/OpenDataLoader/LMRing deps.**
 
-**The Trade Terminal *layout* is shipped (v2.49.0, T1).** Confirm still does
-not enroll a paper trade. [`ROADMAP.md`](ROADMAP.md) is the combined plan
-(aim + three lanes + honest T1–T6). Begin with **visual QA on a real
-browser** if one exists (this sandbox has none), then **T3**:
+**T3 is shipped (v2.50.0) — the terminal runs the whole paper loop.**
+[`ROADMAP.md`](ROADMAP.md) is the combined plan (aim + three lanes +
+honest T1–T6). What remains in this lane, in order:
 
-1. **Visual QA** — open `python main.py web` on a real host (or the Hub),
-   confirm the terminal renders correctly at desktop and mobile widths. Fix
-   any visual issues. Skip if no browser; do not fake screenshots.
-2. **T3 — Paper-trade workflow wiring** — make the Confirm button create the
-   actual approved paper trade through the existing desk approval flow:
-   ticket → approved scan → enrolled paper position → bottom-panel
-   management (live R, MAE/MFE, stop/trail/exit) → close → auto-journal.
-   This is the core workflow: *chart → understand → paper trade →
-   manage → close → journal*. Today Confirm only sizes and toasts.
-3. **T2 — AI Copilot polish** — improve the structured-section parser, add
-   per-answer sources, and a "prepare ticket from AI" flow (AI may prepare
-   a ticket but never approve).
-4. **T4 — Professional polish** — resizable/collapsible panels, localStorage
+1. **Visual QA of the T3 loop** — open `python main.py web` on a real
+   host (or the Hub) and click through: scan → ticket → Confirm →
+   position appears under the chart → live R updates → Close → journal
+   drawer → Save. Fix visual issues only. Skip if no browser; do not
+   fake screenshots. (This sandbox has none.)
+2. **T2 — AI Copilot polish** — improve the structured-section parser,
+   add per-answer sources, and a "prepare ticket from AI" flow (AI may
+   prepare a ticket but never approve). Context: open positions +
+   measured evidence, not only the last scan.
+3. **T4 — Professional polish** — resizable/collapsible panels, localStorage
    persistence of panel sizes/watchlist/symbol/timeframe/layout, loading
    skeletons, explicit stale/error states in the terminal, tooltips,
-   drop the one-shot bottom-tab cache.
-5. **T5 — Home screen** — concise post-login command dashboard with an
+   drop the one-shot bottom-tab cache, and ticket sizing/fees on the real
+   cost model + account balance (no invented $100k default presented as
+   fact).
+4. **T5 — Home screen** — concise post-login command dashboard with an
    "Open Trading Terminal" primary button.
-6. **T6 — Focused pages** — deepen Markets/Portfolio/Journal/Evidence/System
+5. **T6 — Focused pages** — deepen Markets/Portfolio/Journal/Evidence/System
    beyond grouped legacy panels; mobile four-section layout.
 
 The real-host lane (P11 paper proof, P12.12 XAU evidence, P22 trusted-signer
@@ -72,10 +72,12 @@ Two things to carry into P19:
 - **Never cache private payloads in the package either.** The `sw.js` never-caches `/api/*`, auth, SSE, private state or mutations; the Hub's reverse proxy and any backup tool must also never capture `data/cryptobrain.db` or `data/store/**` as world-readable artifacts.
 - **The served-script trap.** `web/app.py`'s `HTML` is a plain (non-raw) Python string: a backslash escape written inside the embedded JavaScript is eaten by Python before the browser sees it. Use `String.fromCharCode(10)` for a newline. `tests/test_dashboard_js.py::test_served_script_is_valid_javascript` and `tests/test_pwa.py::test_html_still_valid_js` now parse the *evaluated* template — keep them.
 
-P18.4 polish is done (designed icons, iOS standalone, VAPID push — v2.47.0)
-and the W2/W3.5 chart backlog is now complete (v2.48.0 crosshair sync). Next
-sandbox-feasible **code** is **T3** (Confirm → existing approval path), not
-T5 home-screen chrome and not another roadmap.
+P18.4 polish is done (designed icons, iOS standalone, VAPID push — v2.47.0),
+the W2/W3.5 chart backlog is complete (v2.48.0 crosshair sync), and **T3 is
+shipped (v2.50.0)** — the terminal now runs Confirm → desk approval → paper
+position → manage → close → auto-journal end to end. Next sandbox-feasible
+**code** is **T2 Copilot polish / T4 professional polish**, not T5
+home-screen chrome and not another roadmap.
 
 ---
 

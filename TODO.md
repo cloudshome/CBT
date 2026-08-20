@@ -6,14 +6,18 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-20 (**combined roadmap restored**. PR #72 shipped
-the Trade Terminal layout (v2.49.0, T1) but its `ROADMAP.md` rewrite dropped
-the money path and still marked T1 as NEXT at v2.48.1. `ROADMAP.md` is again
-the combined source of truth: core aim → three lanes (paper proof / terminal /
-distribution) → honest T1–T6 status. Review: `docs/PR_REVIEW_2026-08-20.md`.
-Next sandbox **code** is **T3** (Confirm → existing approval → position in the
-terminal → close → journal). Next **money** work is still P11 on the real-data
-Hub. **P22 still needs real signers. No threshold moved. No order path.**)
+**Last updated:** 2026-08-20 (**v2.50.0 — T3 shipped**. The Trade Terminal
+now runs the whole paper loop: `POST /api/terminal/confirm` turns the ticket
+into a real scan, re-reads the risk & discipline gate fresh on the server
+before the APPROVED decision (same journal-first gate and force semantics as
+`/api/review`), and the paper runner enrolls the position; `POST
+/api/terminal/close` records the real outcome in the existing
+`TP_HIT`/`STOP_LOSS` buckets and opens the journal drawer automatically.
+Contract: `docs/HANDOVER_2026-08-20_T3.md`. Suite 1302 passed / 1 skipped.
+Next sandbox **code** is **T2 Copilot polish / T4 professional polish**
+(visual QA of the T3 loop on a real browser first). Next **money** work is
+still P11 on the real-data Hub. **P22 still needs real signers. No threshold
+moved. No order path.**)
 
 **Previous:** 2026-08-20 (**v2.48.0 — W3.5 part 2 synchronized crosshair**.
 The 2×2 grid now synchronizes crosshairs as well as zoom, has per-browser sync
@@ -240,17 +244,19 @@ Do not reopen them to install a bot or a second backtest engine.
 
 ## 🔥 Current sequence — professional trading terminal + honest evidence
 
-### TODO-24 / T1–T6 · Professional Trade Terminal · 🔄 T1 shipped; T3 next code
+### TODO-24 / T1–T6 · Professional Trade Terminal · 🔄 T1 + T3 shipped; T2/T4 next code
 
 📄 **Canonical plan:** [`ROADMAP.md`](ROADMAP.md) — combined: core trading aim
 + Trade Terminal + remaining distribution. *SKY should feel like one
 professional trading platform, not a collection of Python functions — and
 that platform still has to prove a NET edge before any real capital.*
 
-The dashboard is a Trade Terminal **layout** (T1, v2.49.0 / PR #72): watchlist
-left, chart centre, paper ticket + AI Copilot right, tabbed trading panel
-bottom, six-area navigation, professional dark theme. Confirm does **not**
-yet enroll a paper trade. Ordered code milestones:
+The dashboard is a Trade Terminal that now runs the **whole paper loop**
+(T1 layout v2.49.0 / PR #72; T3 wiring v2.50.0 / PR #75): watchlist left,
+chart centre, paper ticket + AI Copilot right, tabbed trading panel bottom,
+six-area navigation, professional dark theme — and Confirm → desk approval →
+paper position → live R/MAE/MFE → Close → auto-journal, all in one screen.
+Ordered code milestones:
 
 1. **T1 Trade Terminal layout — ✅ shipped v2.49.0.** Terminal view (default),
    watchlist, chart, ticket UI, bottom panel, 6-area nav, AI drawer scaffold.
@@ -258,10 +264,13 @@ yet enroll a paper trade. Ordered code milestones:
 2. **T2 Persistent AI Copilot** — 🔄 scaffold shipped: drawer + quick actions +
    context injection. Polish: structured-section parsing (do not double-print),
    per-answer sources, "prepare ticket from AI" (never approves).
-3. **T3 Paper-trade workflow wiring** — 🔄 **next real build:** Confirm runs
-   the existing desk path (ticket → scan/approval → enrolled position →
-   bottom-panel management → close → auto-journal). Today the ticket sizes,
-   validates, POSTs `/api/position-size`, and toasts “review the queue”.
+3. **T3 Paper-trade workflow wiring — ✅ shipped v2.50.0 / PR #75.** Confirm
+   runs the existing desk path: ticket → real scan row → fresh server-side
+   gate read → APPROVED → paper-runner position in the bottom panel (live R,
+   MAE/MFE, management advice from `/api/trades`) → Close records the real
+   economic outcome (`TP_HIT`/`STOP_LOSS` buckets) → journal drawer opens
+   automatically. Market tickets fill at entry; limit/conditional tickets
+   wait for the level. Idempotent retries via `ticket_id`.
 4. **T4 Professional polish** — resizable/collapsible panels, localStorage
    persistence of panel sizes/watchlist/symbol/timeframe/layout, loading
    skeletons, explicit stale/error states, tooltips, drop the one-shot

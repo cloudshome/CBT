@@ -1,5 +1,62 @@
 # Changelog
 
+## [2.50.0] — 2026-08-20 · T3 — the Trade Terminal runs the whole paper loop
+
+MINOR: the terminal Confirm button now wires the **complete paper-trade
+workflow** through the existing desk path — chart → understand → paper
+trade → manage → close → journal. No new trading capability: the ticket
+becomes a real scan row, the risk & discipline gate is re-read fresh on
+the server immediately before the APPROVED decision, the paper runner
+enrolls the position, and Close records the outcome into the existing
+`TP_HIT` / `STOP_LOSS` buckets so every discipline surface still counts
+it. No threshold moved; no exchange-order path exists.
+
+- **`POST /api/terminal/confirm`** — fail-closed ticket validation
+  (side, type, positive levels, stop on the correct side, `risk_pct ∈
+  (0,100]` with an explicit `0` rejected, strictly-increasing targets),
+  persists a real PENDING_REVIEW scan (`save_scan`), idempotent via the
+  client `ticket_id` (`signal_id = terminal_<id>`; retries answer
+  `duplicate:true`, used tickets 409), **fresh server-side
+  `gate_evaluate` immediately before the decision** (409 + `blocked_by`
+  + `force_available`, same `SKY_ALLOW_FORCE_APPROVE` force semantics
+  and auditing as `/api/review`), the W3.3 journal-first gate with the
+  same audited `acknowledge_journal` escape, then
+  `PaperTradingRunner.run_once` — market tickets paper-fill at the
+  confirmed entry (scan → EXECUTED), limit/conditional tickets wait for
+  the level (`WAITING_ENTRY`) like any conditional desk plan.
+- **`POST /api/terminal/close`** — closes an open paper position from
+  the terminal: exit price = explicit value → runner `last_price` →
+  latest candle close (refuses 409 rather than inventing one);
+  WAITING_ENTRY positions are cancelled honestly (scan APPROVED →
+  SKIPPED, `journal_required:false`); OPEN positions record the real
+  economic outcome in the existing `TP_HIT` / `STOP_LOSS` buckets with
+  `close_reason = manual terminal close …` + the exact R in the
+  decision note; lifecycle advanced EXECUTED → CLOSED (APPROVED trades
+  get their honest EXECUTED fill step first); concurrent runner closes
+  answer 409. `journal_required` drives the client drawer.
+- **Positions under the chart** — the bottom Open-positions tab now
+  reads `/api/trades` (the same live-open book the Trade Manager uses):
+  live R, MAE/MFE, minutes in trade, an inline management card with the
+  desk management checklist, per-row Close, and re-fetch on
+  confirm/close plus a 60 s visible-tab refresh. The watchlist position
+  chip reads the same book.
+- **Close → auto-journal** — closing switches to the Journal tab with
+  an inline form (outcome + R headline, followed-rules Yes/No, emotion,
+  mistake, notes) posting to the existing `POST /api/journal`; the
+  journal-first gate clears on save.
+- **Ticket gate honesty** — the ticket gate box now shows a live
+  `/api/risk` read labelled as a preview; the confirm endpoint is the
+  authoritative re-check, and a server block paints its real
+  `blocked_by` back into the ticket. A demo runner stop-out is reported
+  as “filled and already closed by the runner” instead of a fake open
+  position.
+- **Tests** — `tests/test_terminal_t3.py` (14 backend) and
+  `tests/test_terminal_js.py` (6 node/jsdom) cover the desk-path
+  confirm, idempotency, fail-closed validation, student-level block +
+  force semantics, trader-state block, journal-first hold/ack, close
+  outcome buckets, last-price closes and the drawer save. Full suite
+  **1302 passed / 1 skipped** (was 1282 / 1).
+
 ## Docs — 2026-08-20 · Combined roadmap (core aim + terminal + evidence)
 
 Documentation only. Software remains **v2.49.0**. No threshold moved. No

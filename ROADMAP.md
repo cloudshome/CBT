@@ -2,7 +2,7 @@
 
 > **Status:** active source of truth
 > **Last updated:** 2026-08-20
-> **Current software:** v2.49.0
+> **Current software:** v2.50.0
 > **Suite at this version:** 1282 passed / 1 skipped (offline)
 >
 > **This file + `TODO.md` win** when other roadmaps, anatomy notes, or
@@ -32,7 +32,7 @@ loses 50% needs a 100% gain just to break even.
 | **Decision independence** | Own engine, risk gate, human-approval loop | ✅ P1–P9 |
 | **Data independence** | Own stored market history | ✅ P10.1–P10.12 |
 | **Validation independence** | Research-grade proof on our grader + our store | ✅ P12.1–P12.18 *tooling*; real-host XAU evidence still open |
-| **Operating independence** | Click the desk; do not memorise CLI | 🔄 Trade Terminal T1 shipped (v2.49.0); T2–T6 remaining |
+| **Operating independence** | Click the desk; do not memorise CLI | 🔄 Trade Terminal T1 + T3 shipped (v2.50.0); T2, T4–T6 remaining |
 | **Evidence independence** | Canonical live paper book that can open the graduation bar | 🔄 **P11 — this is the money path** |
 
 Those halves cannot substitute for each other. A beautiful terminal
@@ -83,7 +83,8 @@ aim.
 │ LANE B — PRODUCT PATH (sandbox-feasible code)                       │
 │ Trade Terminal so the owner never types a command for the daily     │
 │ loop: chart → understand → paper ticket → gate → manage → close →   │
-│ journal. Phases T1–T6. T1 shipped. T3 is the next real build.       │
+│ journal. Phases T1–T6. T1 + T3 shipped (the full paper loop).      │
+│ Next: T2 polish → T4.                                                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │ LANE C — DISTRIBUTION PATH (trusted signers only)                   │
 │ Ubuntu Hub is the one authority. Browser/PWA, Windows .exe and      │
@@ -99,7 +100,7 @@ signed installers here.
 
 ---
 
-## 2. Current software — honest snapshot (v2.49.0)
+## 2. Current software — honest snapshot (v2.50.0)
 
 What a user actually has after `python3 main.py`:
 
@@ -107,11 +108,11 @@ What a user actually has after `python3 main.py`:
 |---|---|
 | Default page | **Trade Terminal** layout (watchlist / chart / ticket / bottom tabs / 6-area nav) |
 | Chart | Lightweight Charts v4.2.3 with EMA/VWAP/BB, RSI, MACD, zones, drawings, replay, live SSE stream, 2×2 multi-chart (zoom + crosshair sync) |
-| Paper ticket | Prefills from the latest scan; sizes; shows a gate verdict; Confirm is **disabled while the scan says blocked** |
-| Confirm Paper Trade | **Does not enroll a paper trade.** It posts `/api/position-size` and toasts “review the approval queue”. That is T3, not T1. |
+| Paper ticket | Prefills from the latest scan; sizes; shows a live server gate read; Confirm is **disabled while the gate says blocked** |
+| Confirm Paper Trade | **Enrolls the real paper trade (T3).** Ticket → scan row → fresh server gate → APPROVED (desk path) → paper-runner position in the bottom panel → live R/MAE/MFE → Close records the outcome → journal drawer opens. Market tickets fill at entry; limit/conditional wait for the level. Still paper-only. |
 | AI Copilot | Drawer + 8 quick actions + `/api/ask` with context injection. Structured-section parsing is incomplete. AI cannot approve. |
 | Other five nav areas | Existing panels **grouped**, not rewritten |
-| Risk gate / graduation / `/api/v1` / jobs / PWA / auth | Untouched by v2.49.0 (presentation layer only) |
+| Risk gate / graduation / `/api/v1` / jobs / PWA / auth | Untouched by v2.50.0 (T3 calls the existing desk approval + paper runner; no threshold, no order path) |
 | Visual QA | **Not done.** No browser in the sandbox that shipped T1. |
 | Graduation bar | **Closed.** First real-data grind: +0.348R gross / 36.8% WR / PF 1.55 — below the NET bar. |
 | XAU | Research-only. `xau-evidence` tooling exists; this checkout has no real basis/seal. |
@@ -217,8 +218,9 @@ This is the default and primary page. The user rarely needs to leave it.
 - **Panel sizes, watchlist, symbol, timeframe, and layout are remembered.**
 - **Persistent AI Copilot** as a right-side drawer from every page.
 
-v2.49.0 shipped the *arrangement*. Remembered panel sizes, loading
-skeletons, and the Confirm→position loop are still T3/T4.
+v2.49.0 shipped the *arrangement* and v2.50.0 shipped the
+Confirm→position→close→journal loop (T3). Remembered panel sizes and
+loading skeletons are still T4.
 
 ---
 
@@ -242,10 +244,14 @@ The professional workflow (this is the product expression of Lane A):
 That is the complete experience:
 **chart → understand → paper trade → manage → close → journal.**
 
-**v2.49.0 status of that loop:** steps 1–7 are presented. Step 8 still
-hands the human to the existing approval queue. Steps 9–12 still live
-in Portfolio / Trade Manager. Wiring this into one terminal flow is
-**T3** — the next real product build.
+**v2.50.0 status of that loop:** all twelve steps run in the terminal.
+Step 8 goes through the *existing* desk approval path (ticket scan →
+fresh server-side risk-gate read → APPROVED) and the paper runner
+enrolls the position — market tickets fill at the confirmed entry,
+limit/conditional tickets wait for the level. Steps 9–12 live in the
+bottom panel: live R / MAE / MFE / management advice, Close Position
+recording the real economic outcome, and the journal drawer opening
+automatically. Still paper-only; still no exchange order.
 
 ---
 
@@ -350,8 +356,8 @@ a second order channel.
 - **Background activity** — jobs, health, system events
 
 Selecting a position paints its entry, stop, and targets on the chart
-and opens its management controls. v2.49.0 currently toasts and jumps
-to Portfolio — that jump is a T3 remainder, not the finished design.
+and opens its management controls inline (live R, MAE/MFE,
+management advice, Close Position).
 
 Bottom-tab contents must refresh; they must not cache forever after
 the first paint.
@@ -453,18 +459,32 @@ Remaining:
 - **Prepare ticket from AI** (never approves)
 - Context: open positions + measured evidence, not only the last scan
 
-### T3 — Paper-trade workflow wiring · 🔄 NEXT REAL BUILD
+### T3 — Paper-trade workflow wiring · ✅ shipped v2.50.0
 
 This is the product expression of the money path.
 
-- Confirm runs the existing desk path: ticket → scan/approval →
-  enrolled paper position → bottom-panel management → close →
-  auto-journal
-- Fresh server-side gate read immediately before confirm
-- Position appears under the chart without a detour to Portfolio
-- Live R, MAE/MFE, management advice update in the terminal
-- Close opens the journal automatically
-- Still paper-only. Still no exchange order.
+- **Confirm runs the existing desk path.** `POST /api/terminal/confirm`
+  turns the ticket into a real scan row (PENDING_REVIEW), re-reads the
+  risk & discipline gate **fresh on the server** immediately before the
+  APPROVED decision, applies the journal-first discipline exactly like
+  `/api/review` (same audited `acknowledge_journal` escape, same
+  `SKY_ALLOW_FORCE_APPROVE` force semantics), then the paper runner
+  enrolls + fills the position. Market tickets fill at the confirmed
+  entry; limit/conditional tickets wait for the level.
+- **Position appears under the chart** — the bottom positions tab
+  re-fetches on confirm; the watchlist chip updates.
+- **Live R, MAE/MFE, management advice update in the terminal** — the
+  positions tab reads `/api/trades` (same live-open book the Trade
+  Manager uses) and refreshes while visible.
+- **Close records the outcome and opens the journal automatically.**
+  `POST /api/terminal/close` advances the scan lifecycle like the desk
+  close decision, records the real economic outcome in the existing
+  `TP_HIT` / `STOP_LOSS` buckets (`close_reason` says it was a manual
+  terminal close), and the journal drawer opens with a prefilled form
+  (`followed_rules` headline) posting to the existing `/api/journal`.
+  A `WAITING_ENTRY` position is cancelled honestly — nothing traded,
+  nothing journaled.
+- **Still paper-only. Still no exchange order.**
 
 ### T4 — Professional polish
 
@@ -538,7 +558,7 @@ XAU dossier is neither condition.
 | P20 | Windows companion contract (pairing, client, unsigned recipe) | ✅ Contract shipped; signed `.exe` does not exist yet |
 | P21 | Android companion contract (Keystore, biometric, unsigned recipe) | ✅ Contract shipped; signed `.apk` does not exist yet |
 | P22 | Release engineering (checksums, SBOM, drill contracts) | ✅ Foundation shipped; trusted-signer drills pending |
-| **T1–T6** | **Professional Trade Terminal** | **T1 shipped v2.49.0; T2–T6 remaining** |
+| **T1–T6** | **Professional Trade Terminal** | **T1 + T3 shipped v2.50.0; T2, T4–T6 remaining** |
 
 Freqtrade (F1–F8) and Backtrader (BT1–BT8) stay **rejected**. Needle 2
 (N1–N8) stays parked. Do not reopen those audits to install a bot or
@@ -640,11 +660,14 @@ in the **same** environment is unblocked.
 
 1. **Visual QA** if a real browser is available; otherwise skip and
    do not fake screenshots.
-2. **T3** — Confirm → existing approval → position in the terminal →
-   close → auto-journal. This is the next code build.
-3. **T2 polish** — section parser, sources, prepare-ticket-from-AI.
-4. **T4** — persistence, skeletons, stale/error, tooltips, honest
-   sizing/fees.
+2. **Visual QA of the T3 loop** — if a real browser is available:
+   confirm a ticket, watch the position appear, close it, journal it.
+   Fix visual issues only; do not fake screenshots.
+3. **T2 polish** — section parser, per-answer sources,
+   prepare-ticket-from-AI (never approves), richer copilot context.
+4. **T4** — resizable/persisted panels, loading skeletons,
+   stale/error states, tooltips, honest sizing/fees, drop the
+   one-shot bottom-tab cache.
 5. **T5** then **T6**.
 
 Keep the suite green. Bump `config.VERSION` / `pyproject.toml` /

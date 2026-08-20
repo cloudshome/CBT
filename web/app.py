@@ -24,6 +24,8 @@ Endpoints
   GET /api/learning backtest stats + calibration profile + plan distribution
   GET /api/paper    paper-trade state, outcomes, and runner statistics
   POST /api/paper/run  enroll/check approved paper trades once
+  POST /api/terminal/confirm  terminal ticket → desk approval → enrolled paper position (T3)
+  POST /api/terminal/close    terminal manual close of an open paper position → auto-journal (T3)
   GET /api/coach    explain + mentor + personal feedback
   GET /api/health   full system health (data feeds, DB, risk gate, MCP, LLM)
   GET /api/agents   desk morning briefing (every watchlist asset + gate + queue)
@@ -5676,8 +5678,8 @@ function renderTerminalWatchlist(){
 /* ── Terminal positions (compact, left + bottom) ────────────────────── */
 async function loadTerminalPositions(){
   try{
-    const d=await (await fetch('/api/paper')).json();
-    const rows=(d.positions||[]).concat(d.open||[]);
+    const d=await (await fetch('/api/trades')).json();
+    const rows=d.open||[];
     const open=rows.filter(r=> ['OPEN','WAITING_ENTRY'].includes(r.status||''));
     const count=document.getElementById('wlPosCount');
     if(count) count.textContent=String(open.length);
@@ -5777,6 +5779,25 @@ function fillTicketFromSignal(d){
     `;
   }
   recalcTicket();
+  try{ loadTicketGate(); }catch(e){}
+}
+
+// Fresh server-side gate read for the ticket preview (the confirm endpoint
+// re-evaluates it again immediately before the decision).
+async function loadTicketGate(){
+  try{
+    const d=await (await fetch('/api/risk')).json();
+    const g=d.gate||{};
+    const gateEl=document.getElementById('tGate');
+    if(!gateEl) return;
+    if(g.allowed===false){
+      gateEl.className='t-gate blocked';
+      gateEl.innerHTML='Risk gate BLOCKED — '+(g.blocked_by||[]).map(b=>esc(b)).join('; ')+'<br><span class="note">re-checked server-side at confirm</span>';
+    }else{
+      gateEl.className='t-gate ok';
+      gateEl.innerHTML='Risk gate OPEN (live read) — re-checked server-side immediately before confirm.';
+    }
+  }catch(e){}
 }
 
 function recalcTicket(){
@@ -5823,7 +5844,7 @@ function recalcTicket(){
       if(confirmEl) confirmEl.disabled=true;
     } else {
       gateEl.className='t-gate ok';
-      gateEl.innerHTML='Risk gate <b>OPEN</b> — paper trade can be confirmed. Still advisory: review the signal tab first.';
+      gateEl.innerHTML='Risk gate preview <b>OPEN</b> — the server re-checks it immediately before confirm.';
       if(confirmEl) confirmEl.disabled=false;
     }
   }
@@ -5837,6 +5858,11 @@ async function loadRiskAccount(){
   }catch(e){}
 }
 
+let _ticketId=null, _ticketSig=null;
+function ticketSignature(){
+  const v=(id)=>String(document.getElementById(id)?.value||'');
+  return [_ticketSide,_ticketType,v('tEntry'),v('tSL'),v('tTP1'),v('tTP2'),v('tTP3'),v('tRisk')].join('|');
+}
 async function submitPaperTicket(){
   const entry=parseFloat(document.getElementById('tEntry')?.value);
   const sl=parseFloat(document.getElementById('tSL')?.value);
@@ -5845,47 +5871,113 @@ async function submitPaperTicket(){
   const tp3=parseFloat(document.getElementById('tTP3')?.value);
   const riskPct=parseFloat(document.getElementById('tRisk')?.value)||0.5;
   if(!entry||!sl){ showToast('Entry and stop are required','err'); return; }
+  if((_ticketSide==='BUY'&&sl>=entry)||(_ticketSide==='SELL'&&sl<=entry)){
+    showToast('Stop is on the wrong side of entry for '+_ticketSide,'err'); return;
+  }
+  // A retried confirm reuses the same ticket id so the server cannot
+  // enroll the same ticket twice; editing any field starts a new ticket.
+  const sig=ticketSignature();
+  if(_ticketSig!==sig){ _ticketId=null; _ticketSig=sig; }
+  if(!_ticketId){
+    _ticketId='t_'+(typeof crypto!=='undefined'&&crypto.randomUUID
+      ?crypto.randomUUID():String(Date.now())+'-'+Math.floor(Math.random()*1e9));
+  }
   const d=_ticketPayload||{};
   const s=d.signal||{};
   const plan=(d.plans||[])[0]||{};
+  const dec=d.decision||{};
   const confirmEl=document.getElementById('tConfirm');
-  if(confirmEl){ confirmEl.disabled=true; confirmEl.textContent='Checking risk gate…'; }
+  if(confirmEl){ confirmEl.disabled=true; confirmEl.textContent='Confirming — server gate check…'; }
+  const body={
+    ticket_id:_ticketId,
+    symbol:s.asset||'BTCUSDT',
+    timeframe:s.timeframe||'15m',
+    action:_ticketSide,
+    ticket_type:_ticketType,
+    entry:entry, stop_loss:sl,
+    take_profits:[tp1,tp2,tp3].filter(v=>v!=null&&!isNaN(v)),
+    risk_pct:riskPct,
+    plan_type:plan.type||dec.plan_type||'Manual',
+    confidence:plan.confidence!=null?plan.confidence:(dec.confidence||null),
+    confidence_label:plan.confidence_label||s.confidence||null,
+    reason:plan.condition||dec.reason||'terminal paper ticket',
+    sentiment:(d.sentiment&&d.sentiment.available!==false)?{bucket:d.sentiment.bucket,score:d.sentiment.score,intensity:d.sentiment.intensity}:null,
+  };
+  const post=async(extra)=>{
+    const res=await fetch('/api/terminal/confirm',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({},body,extra||{}))});
+    let j=null; try{ j=await res.json(); }catch(e){}
+    return {res,j};
+  };
+  const release=()=>{ if(confirmEl){ confirmEl.disabled=false; confirmEl.textContent='Confirm Paper Trade'; } };
   try{
-    // Build the scan-side review payload through the existing desk path:
-    // POST /api/review with APPROVED would require a scan id; instead we
-    // create a reviewable ticket via the desk decision and the paper queue.
-    // The paper runner enrolls APPROVED scans — here we surface the desk
-    // verdict and queue the ticket for the human approval flow.
-    const body={
-      action:_ticketSide,
-      symbol:s.asset||'BTCUSDT',
-      timeframe:s.timeframe||'15m',
-      entry:entry, stop_loss:sl,
-      take_profits:[tp1,tp2,tp3].filter(v=>v!=null&&!isNaN(v)),
-      risk_pct:riskPct,
-      plan_type:plan.type||(d.decision&&d.decision.plan_type)||'Manual',
-      reason:'terminal paper ticket',
-      _source:'terminal'
-    };
-    const res=await fetch('/api/position-size',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:body.symbol,entry,stop_loss:sl,risk_pct:riskPct})});
-    let sizing=null; try{ sizing=await res.json(); }catch(e){}
-    const sizeText=document.getElementById('tSize')?.value||'';
-    if(sizing&&sizing.ok!==false&&sizing.verdict){
-      showToast('Sizing: '+esc(sizing.verdict||'ok'),'ok');
+    const first=await post();
+    const jd=first.j||{};
+    if(!first.res.ok||jd.ok===false){
+      if(jd.journal_block&&jd.acknowledge_available){
+        const NL=String.fromCharCode(10);
+        const ids=((jd.journal_block.trades||[]).map(t=>'#'+t.scan_id+' '+t.outcome).join(NL))||'';
+        if(typeof confirm==='function'&&confirm(jd.error+NL+NL+ids+NL+NL+'OK = confirm anyway (audited) · Cancel = go journal now')){
+          const second=await post({acknowledge_journal:true});
+          if(second.res.ok&&second.j&&second.j.ok){ finishConfirm(second.j); }
+          else{ showToast((second.j&&second.j.error)||'still blocked by the desk','err'); }
+        }else{
+          showToast('Journal first — confirm held','err');
+          switchBottomTab('journal');
+        }
+      }else{
+        showToast(jd.error||'blocked by risk gate','err');
+        const gateEl=document.getElementById('tGate');
+        if(gateEl&&jd.blocked_by&&jd.blocked_by.length){
+          gateEl.className='t-gate blocked';
+          gateEl.innerHTML='Risk gate BLOCKED (server) — '+jd.blocked_by.map(b=>esc(b)).join('; ')
+            +(jd.force_available?'<br><span class="note">Force confirm is enabled (SKY_ALLOW_FORCE_APPROVE) — every force is audited.</span>':'');
+        }
+      }
+      release();
+      return;
     }
-    // queue an approval request through the existing desk flow: the
-    // review endpoint needs a scan id; for a manual ticket we surface
-    // the plan to the human queue via /api/paper/run after approval.
-    showToast('Paper ticket prepared — review the Signal tab and the approval queue in Portfolio.','ok');
+    finishConfirm(first.j||{});
   }catch(e){
     showToast('Ticket error: '+String(e),'err');
-  }finally{
-    if(confirmEl){ confirmEl.disabled=false; confirmEl.textContent='Confirm Paper Trade'; }
+    release();
   }
+}
+function finishConfirm(j){
+  _ticketId=null; // the ticket is used — the next confirm starts a new one
+  const t=j.paper_trade||{};
+  const waiting=(t.status||'')==='WAITING_ENTRY';
+  const confirmEl=document.getElementById('tConfirm');
+  if(confirmEl){ confirmEl.disabled=false; confirmEl.textContent='Confirm Paper Trade'; }
+  const gateEl=document.getElementById('tGate');
+  if(gateEl&&j.gate){
+    if(j.gate.blocked_by&&j.gate.blocked_by.length){
+      gateEl.className='t-gate blocked';
+      gateEl.innerHTML='Risk gate BLOCKED — '+j.gate.blocked_by.map(b=>esc(b)).join('; ');
+    }else{
+      gateEl.className='t-gate ok';
+      gateEl.innerHTML='Risk gate OPEN — paper trade confirmed through the desk approval path.';
+    }
+  }
+  if(waiting){
+    showToast('Ticket confirmed — waiting for entry at '+fmt(t.entry),'ok');
+  }else if((t.status||'')==='CLOSED'){
+    const rrTxt=t.rr_achieved!=null?((t.rr_achieved>=0?'+':'')+Number(t.rr_achieved).toFixed(2)+'R'):'';
+    showToast('Paper position #'+(t.id||j.scan_id)+' filled and already closed by the runner — '+esc(t.outcome||'')+' '+rrTxt+' (journal it below)','ok');
+    _journalTarget={scan_id:t.scan_id,outcome:t.outcome,rr_achieved:t.rr_achieved,exit_price:t.exit_price};
+    try{ switchBottomTab('journal'); }catch(e){}
+  }else{
+    showToast('Paper position open — #'+(t.id||j.scan_id)+' '+esc(t.action||'')+' '+esc(t.symbol||'')+' @ '+fmt(t.entry_price||t.entry),'ok');
+  }
+  delete _bottomLoaded.positions;
+  switchBottomTab('positions');
+  try{ loadTerminalPositions(); }catch(e){}
+  try{ loadRiskChip(); }catch(e){}
 }
 
 /* ── Bottom panel ───────────────────────────────────────────────────── */
 let _bottomLoaded={};
+let _selectedPosId=null;
 function switchBottomTab(tab){
   document.querySelectorAll('.bottom-tabs button').forEach(b=> b.classList.toggle('active', b.dataset.btab===tab));
   document.querySelectorAll('.bottom-content').forEach(c=> c.classList.toggle('active', c.id==='btab-'+tab));
@@ -5909,37 +6001,104 @@ async function renderBottomTab(tab){
   }
 }
 
+// re-fetch one bottom tab (positions after confirm/close, journal after save)
+function refreshBottomTab(tab){
+  delete _bottomLoaded[tab];
+  renderBottomTab(tab);
+}
+
 async function paintBottomPositions(host){
-  const d=await (await fetch('/api/paper')).json();
-  const rows=(d.positions||[]).concat(d.open||[]);
-  const open=rows.filter(r=> ['OPEN','WAITING_ENTRY'].includes(r.status||''));
-  if(!open.length){ host.innerHTML='<div class="b-empty">no open paper positions</div>'; return; }
+  const d=await (await fetch('/api/trades')).json();
+  const rows=d.open||[];
+  if(!rows.length){
+    host.innerHTML='<div class="b-empty">no open paper positions — confirm a ticket above to open one</div>';
+    _selectedPosId=null;
+    return;
+  }
   host.innerHTML=`<table class="b-table"><thead><tr>
-    <th>Symbol</th><th>Side</th><th>Entry</th><th>SL</th><th>TP</th>
-    <th>Current</th><th>R</th><th>Status</th></tr></thead><tbody>
-    ${open.map(p=>{
-      const cur=p.current_price!=null?p.current_price:p.entry;
+    <th>#</th><th>Symbol</th><th>Side</th><th>Entry</th><th>SL</th><th>TP</th>
+    <th>Current</th><th>R</th><th>MAE / MFE</th><th>Status</th><th></th></tr></thead><tbody>
+    ${rows.map(p=>{
+      const id=p.id||p.trade_id||'';
+      const cur=p.current_price!=null?p.current_price:(p.entry_price||p.entry);
       const rr=p.current_r!=null?p.current_r:(p.rr_achieved!=null?p.rr_achieved:null);
-      return `<tr class="b-pos-row" onclick="selectBottomPosition('${esc(p.id||p.trade_id||'')}')">
+      const mae=p.mae!=null?(Number(p.mae)<0?'':'+')+Number(p.mae).toFixed(2)+'R':'—';
+      const mfe=p.mfe!=null?(Number(p.mfe)<0?'':'+')+Number(p.mfe).toFixed(2)+'R':'—';
+      return `<tr class="b-pos-row" onclick="selectBottomPosition('${esc(id)}')">
+        <td>#${esc(id)}</td>
         <td><b>${esc(p.symbol||'?')}</b></td>
         <td><span class="pill ${cls(p.action||p.side||'')}" style="padding:1px 6px;font-size:9.5px">${esc(p.action||p.side||'—')}</span></td>
-        <td class="mono">${fmt(p.entry)}</td>
+        <td class="mono">${fmt(p.entry_price||p.entry)}</td>
         <td class="mono">${fmt(p.stop_loss)}</td>
         <td class="mono">${fmt(p.take_profit||(p.take_profits&&p.take_profits[0]))}</td>
         <td class="mono">${fmt(cur)}</td>
         <td class="mono ${rr!=null?(rr>=0?'okc':'err'):''}">${rr!=null?((rr>=0?'+':'')+rr.toFixed(2)+'R'):'—'}</td>
+        <td class="note">${mae} / ${mfe}</td>
         <td><span class="badge">${esc(p.status||'—')}</span></td>
+        <td><button class="btn sm no" onclick="event.stopPropagation();terminalClosePosition('${esc(id)}')">Close</button></td>
       </tr>`;
     }).join('')}
   </tbody></table>
-  <div class="note" style="margin-top:6px">Select a row to open its management controls. Paper only — no real orders.</div>`;
+  <div id="posDetail"></div>
+  <div class="note" style="margin-top:6px">Click a row for management advice; Close records the outcome and opens the journal. Paper only — no real orders.</div>`;
+  if(_selectedPosId) selectBottomPosition(_selectedPosId);
 }
 
-function selectBottomPosition(id){
+async function selectBottomPosition(id){
   if(!id) return;
-  try{ switchBottomTab('positions'); }catch(e){}
-  showToast('Position '+id+' — open the Trade Manager in Portfolio for full controls','ok');
-  try{ navTo('portfolio'); setTimeout(()=>{ try{ if(typeof loadTradeManager==='function') loadTradeManager(); }catch(e){} },80); }catch(e){}
+  _selectedPosId=id;
+  const host=document.getElementById('posDetail'); if(!host) return;
+  try{
+    const d=await (await fetch('/api/trades')).json();
+    const p=(d.open||[]).find(r=>String(r.id||r.trade_id)===String(id));
+    if(!p){ host.innerHTML='<div class="b-empty">position #'+esc(id)+' is no longer open</div>'; return; }
+    const rr=p.current_r!=null?p.current_r:null;
+    const mgmt=(p.management||[]).map(m=>'<li>'+esc(m)+'</li>').join('');
+    host.innerHTML=`
+      <div class="t-gate ${rr!=null&&rr>=0?'ok':'warn'}" style="margin:8px 0">
+        <b>Position #${esc(id)} — ${esc(p.symbol||'?')} ${esc(p.action||'')}</b>
+        <div style="margin-top:4px">live R <b class="${rr!=null?(rr>=0?'okc':'err'):''}">${rr!=null?((rr>=0?'+':'')+rr.toFixed(2)+'R'):'—'}</b>
+          · MAE ${p.mae!=null?Number(p.mae).toFixed(2)+'R':'—'} · MFE ${p.mfe!=null?Number(p.mfe).toFixed(2)+'R':'—'}
+          ${p.minutes_in_trade!=null?' · '+p.minutes_in_trade+' min':''}
+          ${p.status==='WAITING_ENTRY'?' · waiting for entry '+fmt(p.entry):''}</div>
+      </div>
+      <div class="kv">
+        <b>Entry</b><span class="mono">${fmt(p.entry_price||p.entry)}</span>
+        <b>Stop</b><span class="mono" style="color:var(--red)">${fmt(p.stop_loss)}</span>
+        <b>Target</b><span class="mono" style="color:var(--green)">${fmt(p.take_profit)}</span>
+        <b>Current</b><span class="mono">${fmt(p.current_price)}</span>
+        <b>Setup</b><span>${esc(p.plan_type||'—')}</span>
+        <b>Status</b><span class="badge">${esc(p.status||'—')}</span>
+      </div>
+      <div class="note" style="margin:6px 0"><b>Management advice</b><ul style="margin:4px 0 0 16px;padding:0">${mgmt||'<li>—</li>'}</ul></div>
+      <div class="flex" style="gap:8px">
+        <button class="btn no" onclick="terminalClosePosition('${esc(id)}')">Close Position</button>
+        <button class="btn ghost sm" onclick="refreshBottomTab('positions')">↻ Refresh</button>
+      </div>`;
+  }catch(e){
+    host.innerHTML='<div class="b-empty">management unavailable — '+esc(String(e))+'</div>';
+  }
+}
+
+let _journalTarget=null;
+async function terminalClosePosition(id){
+  if(typeof confirm==='function' && !confirm('Close paper position #'+id+' at the last market price? The outcome is recorded and the journal opens.')) return;
+  try{
+    const res=await fetch('/api/terminal/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({trade_id:id})});
+    let d=null; try{ d=await res.json(); }catch(e){}
+    if(!res.ok||!d||d.ok===false){ showToast((d&&d.error)||'close failed','err'); return; }
+    _selectedPosId=null;
+    if(d.status==='CLOSED'){
+      showToast('Closed #'+id+' — '+d.outcome+' '+(d.rr_achieved!=null?((d.rr_achieved>=0?'+':'')+d.rr_achieved+'R'):'')+' @ '+fmt(d.exit_price),'ok');
+      _journalTarget={scan_id:d.scan_id,outcome:d.outcome,rr_achieved:d.rr_achieved,exit_price:d.exit_price};
+      refreshBottomTab('positions');
+      switchBottomTab('journal'); // close → journal, automatically
+    }else{
+      showToast('Cancelled #'+id+' — it was still waiting for its entry','ok');
+      refreshBottomTab('positions');
+    }
+    try{ loadTerminalPositions(); }catch(e){}
+  }catch(e){ showToast(String(e),'err'); }
 }
 
 async function paintBottomOrders(host){
@@ -5989,26 +6148,75 @@ async function paintBottomHistory(host){
 
 async function paintBottomJournal(host){
   const d=await (await fetch('/api/journal')).json();
-  const entries=d.entries||d.journals||[];
+  const entries=d.journalable||d.entries||d.journals||[];
   const stats=d.stats||d.summary||{};
+  let form='';
+  // T3 — close opens the journal automatically: an inline entry form for
+  // the trade that was just closed (followed_rules is the headline field).
+  if(_journalTarget){
+    try{
+      const chk=await (await fetch('/api/journal?scan_id='+encodeURIComponent(_journalTarget.scan_id))).json();
+      if(chk.entry&&chk.entry.followed_rules!=null){ _journalTarget=null; }
+      else{
+        const rrTxt=_journalTarget.rr_achieved!=null?((_journalTarget.rr_achieved>=0?'+':'')+Number(_journalTarget.rr_achieved).toFixed(2)+'R'):'';
+        form=`
+        <div class="j-form">
+          <div class="flex" style="justify-content:space-between;margin-bottom:4px">
+            <b style="font-size:11px;text-transform:uppercase">Journal this trade — scan #${esc(_journalTarget.scan_id)}</b>
+            <button class="btn sm ghost" onclick="_journalTarget=null;refreshBottomTab('journal')">✕</button>
+          </div>
+          <div class="note" style="margin:4px 0 8px">Outcome <b class="${_journalTarget.rr_achieved!=null&&_journalTarget.rr_achieved>=0?'okc':'err'}">${esc(_journalTarget.outcome||'—')} ${esc(rrTxt)}</b> @ ${fmt(_journalTarget.exit_price)} — your journal answer unlocks the next approval.</div>
+          <div class="t-row">
+            <div class="t-field"><label>Did you follow your system?</label>
+              <select id="jFollowed"><option value="1">Yes — followed the rules</option><option value="0">No — broke a rule</option></select></div>
+            <div class="t-field"><label>Emotion</label>
+              <select id="jEmotion">${(d.emotions||[]).map(e=>'<option value="'+esc(e)+'">'+esc(e)+'</option>').join('')}</select></div>
+          </div>
+          <div class="t-field"><label>Mistake (optional)</label><input id="jMistake" placeholder="what went wrong, if anything"></div>
+          <div class="t-field"><label>Notes</label><textarea id="jNotes" rows="2" placeholder="context, what you would change…"></textarea></div>
+          <button class="btn primary" onclick="saveTerminalJournal()">Save journal</button>
+        </div>`;
+      }
+    }catch(e){}
+  }
   host.innerHTML=`
+    ${form}
     ${stats.n!=null?`<div class="flex" style="margin-bottom:8px">
       <span class="badge">${stats.n} recorded</span>
       <span class="badge">violations ${stats.violations||0}</span>
       <span class="badge">rate ${stats.violation_rate!=null?(Number(stats.violation_rate)*100).toFixed(1)+'%':'—'}</span>
     </div>`:''}
     ${entries.length?`<table class="b-table"><thead><tr>
-      <th>Trade</th><th>Followed rules</th><th>Emotion</th><th>Mistake</th><th>Notes</th></tr></thead><tbody>
+      <th>Trade</th><th>Status</th><th>Followed rules</th><th>Emotion</th><th>Mistake</th><th>Notes</th></tr></thead><tbody>
       ${entries.slice(0,25).map(j=>`
         <tr>
-          <td><b>#${esc(j.scan_id||j.trade_id||'')}</b></td>
+          <td><b>#${esc(j.scan_id||j.trade_id||'')}</b>${j.symbol?' '+esc(j.symbol):''}</td>
+          <td><span class="badge">${esc(j.status||'—')}</span></td>
           <td>${j.followed_rules==null?'<span class="badge" style="color:var(--amber)">missing</span>':(j.followed_rules?'<span class="badge" style="color:var(--green)">yes</span>':'<span class="badge" style="color:var(--red)">no</span>')}</td>
           <td>${esc(j.emotion||'—')}</td>
           <td>${esc((j.mistake||'—').slice(0,40))}</td>
           <td class="note">${esc((j.notes||'—').slice(0,60))}</td>
         </tr>`).join('')}
-      </tbody></table>`:'<div class="b-empty">no journal entries yet — journal your closed trades</div>'}
+      </tbody></table>`:'<div class="b-empty">no journal entries yet — close a trade and its journal form opens here</div>'}
     `;
+}
+
+async function saveTerminalJournal(){
+  if(!_journalTarget){ showToast('no journal target','err'); return; }
+  try{
+    const res=await fetch('/api/journal',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({scan_id:_journalTarget.scan_id,
+        followed_rules:(document.getElementById('jFollowed')?.value||'1')==='1',
+        emotion:document.getElementById('jEmotion')?.value||'',
+        mistake:document.getElementById('jMistake')?.value||'',
+        notes:document.getElementById('jNotes')?.value||''})});
+    const d=await res.json();
+    if(!res.ok||d.ok===false){ showToast(d.error||'journal save failed','err'); return; }
+    showToast('Journal saved for scan #'+_journalTarget.scan_id,'ok');
+    _journalTarget=null;
+    refreshBottomTab('journal');
+    try{ loadTerminalPositions(); }catch(e){}
+  }catch(e){ showToast(String(e),'err'); }
 }
 
 async function paintBottomEvidence(host){
@@ -6200,6 +6408,8 @@ async function aiSend(which){
       try{ loadTerminalPositions(); }catch(e){}
       try{ loadRiskChip(); }catch(e){}
       try{ loadFeedChip(); }catch(e){}
+      // keep open-position R / MAE / MFE live while the tab is visible
+      try{ if(_bottomLoaded.positions&&!_journalTarget) refreshBottomTab('positions'); }catch(e){}
     }, 60000);
   }catch(e){}
 })();
@@ -7197,6 +7407,319 @@ def make_app(job_manager=None) -> Flask:
             "recent": (stats or {}).get("recent", []),
             "overall": (stats or {}).get("overall", {}),
         }))
+
+    # ── T3 — Trade Terminal: confirm ticket → desk path → paper position ─
+    @app.post("/api/terminal/confirm")
+    def api_terminal_confirm():
+        """Turn a confirmed terminal ticket into an enrolled paper trade.
+
+        T3 — the product expression of the money path. This does not bypass
+        the desk: the ticket becomes a real scan row in the human approval
+        queue (``save_scan``, PENDING_REVIEW), the risk & discipline gate is
+        freshly evaluated on the server immediately before the APPROVED
+        decision, the journal-first discipline (W3.3) applies exactly as in
+        ``/api/review``, and the paper runner enrolls + fills the position.
+        ``ticket_id`` makes a retried confirm idempotent. Market tickets are
+        paper-filled at the confirmed entry; limit/conditional tickets wait
+        for the entry level like any conditional desk plan. Still paper-only;
+        never an exchange order.
+        """
+        body = request.get_json(silent=True) or {}
+        symbol = _sym(body.get("symbol"))
+        timeframe = str(body.get("timeframe") or TIMEFRAME)
+        action = str(body.get("action") or "").upper()
+        ticket_type = str(body.get("ticket_type") or "market").lower()
+        if action not in ("BUY", "SELL"):
+            return jsonify({"error": "action must be BUY or SELL"}), 400
+        if ticket_type not in ("market", "limit", "conditional"):
+            return jsonify({"error": f"bad ticket_type {ticket_type!r} "
+                                     "(market | limit | conditional)"}), 400
+        try:
+            entry = float(body.get("entry"))
+            stop = float(body.get("stop_loss"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "entry and stop_loss are required numbers"}), 400
+        if entry <= 0 or stop <= 0:
+            return jsonify({"error": "entry and stop_loss must be positive"}), 400
+        # Side sanity — fail closed on an inverted stop, never on a tight one.
+        if action == "BUY" and stop >= entry:
+            return jsonify({"error": "BUY stop must be below entry"}), 400
+        if action == "SELL" and stop <= entry:
+            return jsonify({"error": "SELL stop must be above entry"}), 400
+        tps = []
+        for value in body.get("take_profits") or []:
+            try:
+                tps.append(float(value))
+            except (TypeError, ValueError):
+                return jsonify({"error": "take_profits must be numbers"}), 400
+        tps = [t for t in tps if t > 0]
+        if tps:
+            for i in (1, 2):
+                if len(tps) > i and tps[i] <= tps[i - 1]:
+                    return jsonify({"error": "take_profits must be strictly increasing"}), 400
+        tp1 = tps[0] if tps else None
+        rr = round(abs(tp1 - entry) / abs(entry - stop), 3) if tp1 is not None else None
+        risk_raw = body.get("risk_pct")
+        try:
+            # `or 0.5` would silently swallow an explicit 0 — fail closed.
+            risk_pct = float(risk_raw) if risk_raw not in (None, "") else 0.5
+        except (TypeError, ValueError):
+            return jsonify({"error": "risk_pct must be a number"}), 400
+        if not (0 < risk_pct <= 100):
+            return jsonify({"error": "risk_pct must be in (0, 100]"}), 400
+        plan_type = (str(body.get("plan_type") or "Manual").strip()[:60]
+                     or "Manual")
+        conf = body.get("confidence")
+        try:
+            conf = int(conf) if conf not in (None, "") else None
+        except (TypeError, ValueError):
+            conf = None
+        conf_label = str(body.get("confidence_label") or "").strip()[:20] or None
+        reason = str(body.get("reason") or "manual terminal ticket")[:300]
+        ticket_id = str(body.get("ticket_id") or "")[:80]
+        sentiment = body.get("sentiment") if isinstance(body.get("sentiment"), dict) else {}
+        now_ms = int(time.time() * 1000)
+        signal_id = (f"terminal_{ticket_id}" if ticket_id
+                     else f"terminal_{symbol}_{now_ms}_{secrets.token_hex(3)}")
+        from data.database import SignalDB
+        from brain.risk_gate import evaluate as gate_evaluate
+        from data.paper_trading import PaperTradingRunner
+        with SignalDB() as db:
+            # Idempotency: a retried confirm reuses the same ticket scan
+            # instead of enrolling a second position.
+            existing = None
+            if ticket_id:
+                row = db.conn.execute(
+                    "SELECT id, status FROM scans WHERE signal_id=?",
+                    (signal_id,)).fetchone()
+                if row:
+                    existing = dict(row)
+            if existing:
+                paper = db.paper_trade_for_scan(int(existing["id"]))
+                if existing["status"] in ("CLOSED", "REJECTED", "SKIPPED"):
+                    return jsonify({"ok": False,
+                                    "error": f"ticket already used "
+                                             f"(scan #{existing['id']} is "
+                                             f"{existing['status']})",
+                                    "scan_id": existing["id"],
+                                    "status": existing["status"]}), 409
+                return jsonify({"ok": True, "duplicate": True,
+                                "scan_id": existing["id"],
+                                "status": existing["status"],
+                                "paper_trade": paper}), 200
+            plan = {
+                "id": "terminal", "type": plan_type, "action": action,
+                "condition": (reason or "manual terminal ticket"),
+                "trigger_level": entry, "entry": entry, "stop_loss": stop,
+                "take_profits": tps, "risk_reward": rr,
+                "confidence": conf, "confidence_label": conf_label,
+                # market tickets fill at the confirmed entry; limit and
+                # conditional tickets wait for the level, like desk plans.
+                "status": "active" if ticket_type == "market" else "waiting",
+            }
+            payload = {
+                "signal": {
+                    "signal_id": signal_id, "timestamp": now_ms,
+                    "asset": symbol, "timeframe": timeframe, "action": action,
+                    "entry": entry, "stop_loss": stop, "take_profit": tp1,
+                    "risk_reward": rr, "confidence": conf_label,
+                    "reason": reason, "signal_type": "SIGNAL",
+                },
+                "plans": [plan],
+                "snapshot": {"features": {
+                    "price": entry, "score_used": conf,
+                    "regime_name": str(body.get("regime") or "").strip()[:40],
+                }},
+                "market_context": {},
+                "sentiment": sentiment,
+            }
+            scan_id = db.save_scan(payload)
+            # Fresh server-side gate read immediately before the decision —
+            # same evaluation the desk uses, with the ticket's own plan type.
+            gate = gate_evaluate(db, symbol=symbol, plan_type=plan_type,
+                                 action=action)
+            force = bool(body.get("force"))
+            if not gate["allowed"] and not force:
+                _audit("terminal_confirm", symbol, ok=False,
+                       detail={"scan_id": scan_id, "action": action,
+                               "plan_type": plan_type,
+                               "blocked_by": gate["blocked_by"]})
+                return jsonify({
+                    "error": "Risk gate CLOSED — " + "; ".join(gate["blocked_by"]),
+                    "blocked_by": gate["blocked_by"],
+                    "force_available": config.SKY_ALLOW_FORCE_APPROVE,
+                }), 409
+            if force and not config.SKY_ALLOW_FORCE_APPROVE:
+                return jsonify({"error": "force confirm is disabled "
+                                         "(SKY_ALLOW_FORCE_APPROVE is not set)"}), 403
+            # W3.3 journal-first discipline — same fail-closed population and
+            # audited escape as /api/review.
+            if not body.get("acknowledge_journal"):
+                from brain.weekly import missing_journals
+                jg = missing_journals(db)
+                if jg["missing"]:
+                    return jsonify({
+                        "error": (f"Journal-first discipline: {jg['missing']} "
+                                  "decided real trade(s) unjournaled — journal "
+                                  "them before the next commitment"),
+                        "journal_block": jg,
+                        "acknowledge_available": True,
+                    }), 409
+            reviewer = (getattr(g, "user", None) or {}).get("username") or "terminal"
+            new_status = db.update_status(
+                scan_id, "APPROVED",
+                note=(f"terminal confirm: {action} {entry:,.8g} SL {stop:,.8g} "
+                      f"TPs {tps} ({plan_type}, {ticket_type}, {risk_pct}% risk)"),
+                reviewer=reviewer)
+            if new_status is None:
+                return jsonify({"error": f"scan #{scan_id} not found"}), 404
+            run = PaperTradingRunner(db=db, client=maybe_client()).run_once(
+                symbol=symbol).as_dict()
+            paper = db.paper_trade_for_scan(scan_id)
+            scan = db.get_scan(scan_id)
+        _audit("terminal_confirm", symbol,
+               detail={"scan_id": scan_id, "action": action, "entry": entry,
+                       "stop_loss": stop, "take_profits": tps,
+                       "risk_pct": risk_pct, "plan_type": plan_type,
+                       "ticket_type": ticket_type, "forced": force,
+                       "acknowledged_journal": bool(body.get("acknowledge_journal"))})
+        return jsonify(_sanitize_for_json({
+            "ok": True, "scan_id": scan_id,
+            "status": (scan or {}).get("status"),
+            "gate": {"allowed": gate["allowed"],
+                     "blocked_by": gate["blocked_by"]},
+            "paper_trade": paper, "run": run,
+        }))
+
+    @app.post("/api/terminal/close")
+    def api_terminal_close():
+        """Close one open paper position from the terminal (T3).
+
+        The scan lifecycle advances exactly like the desk close decision, and
+        the paper row is closed with the real economic outcome: the existing
+        ``TP_HIT`` / ``STOP_LOSS`` buckets (the populations every discipline
+        surface — win-rate, journal gate, graduation — already counts), with
+        ``close_reason`` recording that this was a manual terminal close and
+        the exact exit. A position still ``WAITING_ENTRY`` is cancelled —
+        nothing was traded, nothing needs journaling. Paper-only; never an
+        exchange order.
+        """
+        body = request.get_json(silent=True) or {}
+        try:
+            trade_id = int(body.get("trade_id"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "trade_id is required"}), 400
+        exit_price = body.get("exit_price")
+        if exit_price not in (None, ""):
+            try:
+                exit_price = float(exit_price)
+            except (TypeError, ValueError):
+                return jsonify({"error": "exit_price must be a number"}), 400
+            if exit_price <= 0:
+                return jsonify({"error": "exit_price must be positive"}), 400
+        from data.database import SignalDB
+        from engine.lifecycle import LifecycleError
+        reviewer = (getattr(g, "user", None) or {}).get("username") or "terminal"
+        now_ms = int(time.time() * 1000)
+        with SignalDB() as db:
+            trade = db.get_paper_trade(trade_id)
+            if trade is None:
+                return jsonify({"error": f"paper trade #{trade_id} not found"}), 404
+            if trade.get("status") not in ("WAITING_ENTRY", "OPEN"):
+                return jsonify({"ok": False,
+                                "error": f"paper trade #{trade_id} is already "
+                                         f"{trade.get('status')}",
+                                "status": trade.get("status")}), 409
+            scan = db.get_scan(int(trade["scan_id"]))
+            if scan is None:
+                return jsonify({"error": f"scan #{trade['scan_id']} not found"}), 404
+            scan_status = scan.get("status")
+
+            if trade.get("status") == "WAITING_ENTRY":
+                db.cancel_paper_trade(trade_id, reason="terminal close before entry",
+                                      closed_ts=now_ms)
+                if scan_status == "APPROVED":
+                    try:
+                        db.update_status(int(trade["scan_id"]), "SKIPPED",
+                                         note="terminal close before entry",
+                                         reviewer=reviewer)
+                    except LifecycleError:
+                        pass
+                _audit("terminal_close", str(trade.get("symbol")),
+                       detail={"trade_id": trade_id, "scan_id": trade["scan_id"],
+                               "outcome": "NOT_FILLED"})
+                return jsonify({"ok": True, "trade_id": trade_id,
+                                "scan_id": trade["scan_id"], "status": "CANCELLED",
+                                "outcome": None, "exit_price": None,
+                                "rr_achieved": None, "journal_required": False})
+
+            entry = float(trade["entry_price"] or trade["entry"])
+            stop = float(trade["stop_loss"])
+            risk = abs(entry - stop)
+            if exit_price is None:
+                exit_price = (float(trade["last_price"])
+                              if trade.get("last_price") is not None else None)
+            if exit_price is None:
+                try:
+                    df = maybe_client().klines(trade["symbol"] or SYMBOL,
+                                               trade["timeframe"] or TIMEFRAME, 2)
+                    exit_price = float(df["close"].iloc[-1])
+                except Exception:
+                    exit_price = None
+            if exit_price is None:
+                return jsonify({"error": "no exit price available — pass "
+                                         "exit_price or let the paper runner "
+                                         "populate last_price first"}), 409
+            side = str(trade["action"]).upper()
+            rr = round((entry - exit_price) / risk if side == "SELL"
+                       else (exit_price - entry) / risk, 3)
+            tp = trade.get("take_profit")
+            if side == "SELL":
+                hit_tp = tp is not None and exit_price <= float(tp)
+                hit_sl = exit_price >= stop
+            else:
+                hit_tp = tp is not None and exit_price >= float(tp)
+                hit_sl = exit_price <= stop
+            if hit_tp:
+                outcome = "TP_HIT"
+                reason = "manual terminal close at/through target"
+            elif hit_sl:
+                outcome = "STOP_LOSS"
+                reason = "manual terminal close at/through stop"
+            elif rr >= 0:
+                outcome = "TP_HIT"
+                reason = "manual terminal close in profit before target"
+            else:
+                outcome = "STOP_LOSS"
+                reason = "manual terminal close in loss before stop"
+            # Lifecycle: EXECUTED → CLOSED. A trade the runner never advanced
+            # past APPROVED is advanced honestly first (fill at its entry).
+            try:
+                if scan_status == "APPROVED":
+                    db.update_status(int(trade["scan_id"]), "EXECUTED",
+                                     note=f"terminal close fill at entry {entry:,.8g}",
+                                     reviewer=reviewer)
+                db.update_status(int(trade["scan_id"]), "CLOSED",
+                                 note=(f"terminal manual close at {exit_price:,.8g} "
+                                       f"— {outcome} ({rr:+.2f}R) — {reason}"),
+                                 reviewer=reviewer)
+            except LifecycleError as exc:
+                return jsonify({"error": f"scan cannot be closed: {exc.message}"}), 409
+            closed = db.close_paper_trade(
+                trade_id, outcome=outcome, exit_price=exit_price,
+                rr_achieved=rr, close_reason=reason, closed_ts=now_ms,
+                last_price=exit_price)
+            if not closed:
+                return jsonify({"error": "position was closed concurrently "
+                                         "(runner or another session)"}), 409
+        _audit("terminal_close", str(trade.get("symbol")),
+               detail={"trade_id": trade_id, "scan_id": trade["scan_id"],
+                       "exit_price": exit_price, "outcome": outcome,
+                       "rr_achieved": rr})
+        return jsonify({"ok": True, "trade_id": trade_id,
+                        "scan_id": trade["scan_id"], "status": "CLOSED",
+                        "outcome": outcome, "exit_price": exit_price,
+                        "rr_achieved": rr, "journal_required": True})
 
     # ── Journal: a real form, not a CLI instruction ───────────────────
     @app.get("/api/journal")
