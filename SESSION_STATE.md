@@ -658,7 +658,22 @@ Every phase below is ordered by how directly it moves those two lines.
 
 ## Current phase
 
-**W3.4 practice mode — shipped v2.42.0 (this session).** `brain/practice.py`
+**W3.5 part 2 — 2×2 multi-chart synchronized crosshair — shipped v2.48.0
+(this session).** Completes the W2/W3.5 chart backlog
+(`docs/HANDOVER_2026-08-20_W35_part2.md`): one pointer over any of the four
+comparison panes moves the crosshair on all of them (vendored Lightweight
+Charts v4.2.3 `subscribeCrosshairMove` → `setCrosshairPosition(price, time,
+series)`, `clearCrosshairPosition()` on pointer-leave, re-entrancy guard);
+per-browser **Zoom sync** / **Crosshair sync** toggles (default on,
+`sky.multiSyncZoom` / `sky.multiSyncCrosshair`); four **distinct** default
+slots so the 2×2 grid is actually full for BTCUSDT; honest "no candles for
+SYMBOL TF — error" empty slots; and a **1970-date fix** — `multiCandleData()`
+was re-reading `/api/chart` epoch seconds as milliseconds. Also cleaned one
+Python-eaten `/\-/g` escape in the VAPID base64 helper (identical served
+regex, no warning). Comparison view only: never combines signals, never
+writes to the desk. +5 JS regressions; full suite 1282 passed / 1 skipped.
+
+**W3.4 practice mode — shipped v2.42.0.** `brain/practice.py`
 one computation → `python main.py practice`, `GET/POST /api/practice`, Chart-tab
 ✍ PRACTICE card + Review-tab PRACTICE CALIBRATION card, MCP
 `practice_scorecard` (root 1.13.0) / `cryptobrain_practice`, Command Center
@@ -725,6 +740,52 @@ Full P7/P8/P9 plan with risk + rollback: [`ROADMAP_AGENT_REACH_UPGRADE.md`](./RO
 ---
 
 ## Completed work
+
+### Session 2026-08-20 (this branch `arena/01a01dbf-sky`): v2.48.0 / W3.5 part 2 — 2×2 multi-chart synchronized crosshair
+
+Started from origin/main `446c766` (v2.47.0) in sync. The v2.43.0 scaffold
+had shipped the 2×2 grid + zoom sync; this session closed the W2/W3.5
+backlog item "multi-chart layout (2×2) with a synchronized crosshair".
+
+- `web/app.py` (Chart tab JS): `multiSyncCrosshairTo()` broadcast —
+  pointer price via `series.coordinateToPrice()` (hovered-bar close
+  fallback), `setCrosshairPosition` on the other panes, `clearCrosshairPosition`
+  on pointer-leave, `_multiCrosshair` re-entrancy guard; multi panes set
+  Normal crosshair mode + colours matching the main workspace.
+- Sync toggles: Zoom sync / Crosshair sync checkboxes in the comparison
+  bar (default on, localStorage-persisted, act without reload; disabling
+  crosshair sync clears all crosshairs).
+- `multiDefaults()` now returns four DISTINCT slots (old defaults deduped
+  to three panes when the primary was BTCUSDT); allow-list + dedupe kept.
+- Empty slots paint `no candles for SYMBOL TF — <error>` instead of a
+  blank chart.
+- `multiCandleData()` epoch normalisation fix (silent 1970 dates).
+- `urlBase64ToUint8Array()`: dropped the Python-eaten `/\-/g` escape
+  (DeprecationWarning gone; served regex identical).
+- `tests/test_workstation_js.py`: harness mock extended (persistent
+  timeScale with recorded logical-range handlers/calls, crosshair handlers,
+  `setCrosshairPosition`/`clearCrosshairPosition` recorders,
+  `coordinateToPrice`, `setAttribute`, `createTextNode`, CREATED tracker);
+  +5 regressions (crosshair broadcast/clear/toggle, zoom toggle, empty
+  slot, distinct defaults + save validation, ms/seconds normalisation).
+- Live smoke on loopback: HTTP 200; all four default slots served 60
+  candles via `/api/chart`; evaluated served script passes `node --check`.
+  The P18.1 remote-bind guard correctly refused `--host 0.0.0.0` without
+  an owner account (kept, not bypassed).
+- CI maintenance: GitHub's runner deprecated Node-20 actions
+  (`actions/checkout@v4`, `actions/setup-python@v5` were force-run on
+  Node 24). Verified the newest majors expose `using: node24` via the
+  GitHub API and bumped the dormant `ci/release.workflow.yml` spec
+  (checkout/setup-python/upload-artifact @v7). The ACTIVE
+  `.github/workflows/ci.yml` bump is a documented repo-admin human action
+  (`docs/HUMAN_ACTIONS.md`) — the GitHub App cannot write workflow files
+  (push correctly rejected with "without `workflows` permission"); the
+  workflow still passes green with only the deprecation annotation.
+- Docs reconciled: CHANGELOG 2.48.0, ROADMAP W2 line, WEB_TRADER_ROADMAP
+  Phase 2 item 2, TODO.md item 10, HANDOVER.md header + next-session,
+  handover contract `docs/HANDOVER_2026-08-20_W35_part2.md`, this file.
+- Full suite **1282 passed / 1 skipped** (v2.47.0 baseline 1277 + 5);
+  wheel gate builds `cryptobrain-2.48.0-py3-none-any.whl`, no duplicates.
 
 ### Session 2026-08-16 (this branch `arena/01a008d1-sky`): v2.23.2 / P12.14 — graduation discipline isolation
 
@@ -1106,9 +1167,12 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
    stable/beta channels, in-app System page, privacy-respecting diagnostics
    export, documented incident/support/rollback paths. Do not claim signed
    artifacts until produced on a real build host.
-0b. ~~**W3.4 practice mode**~~ — shipped v2.42.0. Next sandbox code:
-   **W3.5 multi-chart views** (W2 remainder) and optional P18.4 polish
-   (designed icons, iOS standalone, VAPID push).
+0b. ~~**W3.4 practice mode**~~ — shipped v2.42.0. ~~**W3.5 multi-chart
+   views**~~ — shipped v2.43.0 + v2.48.0 part 2 (synchronized crosshair,
+   sync toggles, honest empty slots, 1970-date fix). ~~P18.4 polish~~ —
+   shipped v2.47.0 (designed icons, iOS standalone, VAPID push). The
+   W2/W3.5 chart backlog and P18.4 are **complete**; future sandbox code
+   is optional polish only, chosen deliberately.
 1. **Run P12.12 on the real-data host** — rerun `learn` to adopt source keys,
    build/retain the locked Dukascopy XAU validation evidence, then archive
    `python main.py xau-evidence --json`. Do not reseal from the audit command.
@@ -1220,14 +1284,36 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
     `COALESCE(source_key, '') = ''` filters from `paper_progress()` or treat
     its output as a pooled research report. Use the source-filtered scorecard
     for research. Legacy NULL keys remain canonical by deliberate contract.
+27. **v2.43.0–v2.47.0 multi-chart panes painted 1970 dates.** The front-end
+    fed `/api/chart` epoch seconds to `new Date()` (milliseconds). Fixed in
+    v2.48.0 with backend-style normalisation and pinned by
+    `test_multi_candle_data_normalises_ms_and_keeps_seconds`. The
+    single-chart workspace was never affected.
+28. **`tests/test_sky_agent.py` spawns bare `python main.py`.** A fresh
+    sandbox must install `requirements.txt` (+ `cryptography`) for BOTH the
+    venv and the system `python`, or those two tests fail with
+    "Missing dependencies" — an environment issue, not a code issue.
+29. **Multi-chart stays a comparison view.** Crosshair/zoom sync only
+    broadcast chart state; the four panes never combine signals, never write
+    to scans/practice/risk/gate/graduation, and XAUUSD panes are display
+    only (XAU remains non-tradeable everywhere).
+30. **The GitHub App cannot write `.github/workflows/`** — pushes touching
+    workflow files are rejected ("refusing to allow a GitHub App to create
+    or update workflow files without `workflows` permission"). CI edits to
+    the ACTIVE `ci.yml` are repo-admin human actions
+    (`docs/HUMAN_ACTIONS.md`); only `ci/*.workflow.yml` specs are editable
+    by the integration. The active workflow still runs the working but
+    deprecated Node-20 actions (`checkout@v4` / `setup-python@v5`) with a
+    deprecation annotation until an admin bumps them to the Node-24 `@v7`
+    majors.
 
 ---
 
 ## Next recommended action
 
 1. **Keep the passed-through triage:** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` (6 ideas -> Take/Park/Reject) remains the durable decision for LMRing/OpenDataLoader/AirLLM/harness — `P18.4` already satisfied it as `P12.19` after `P19`.
-2. **W3 + W3.4 shipped (v2.41.0/v2.42.0) — verify them:** `python main.py weekly` prints the Sunday mirror; `python main.py practice` prints the calibration mirror; dashboard 📊 Chart tab ✍ PRACTICE card scores a committed read against the desk; 🗓 Review tab PRACTICE CALIBRATION card paints the window; `GET/POST /api/ritual` persists ticks per UTC day; `approve` on a desk with an unjournaled decided real trade returns exit 2 / HTTP 409 `journal_block` until journaled or `--acknowledge-journal`. Contracts: `docs/HANDOVER_2026-08-19_W3.md`, `docs/HANDOVER_2026-08-19_W34.md`.
-3. **Sandbox-feasible next code:** **W3.5 multi-chart views** (W2 remainder), then optional P18.4 polish (designed icons, iOS standalone, VAPID push wiring). Small, self-contained, keeps the suite green.
+2. **W3 + W3.4 + W3.5 shipped (v2.41.0/v2.42.0/v2.43.0+v2.48.0) — verify them:** `python main.py weekly` prints the Sunday mirror; `python main.py practice` prints the calibration mirror; dashboard 📊 Chart tab ✍ PRACTICE card scores a committed read against the desk; 🗓 Review tab PRACTICE CALIBRATION card paints the window; `GET/POST /api/ritual` persists ticks per UTC day; `approve` on a desk with an unjournaled decided real trade returns exit 2 / HTTP 409 `journal_block` until journaled or `--acknowledge-journal`. Multi-chart: ▦ Multi-chart button → 2×2 grid with synchronized zoom + crosshair and per-browser toggles. Contracts: `docs/HANDOVER_2026-08-19_W3.md`, `docs/HANDOVER_2026-08-19_W34.md`, `docs/HANDOVER_2026-08-19_W35.md`, `docs/HANDOVER_2026-08-20_W35_part2.md`.
+3. **Sandbox-feasible next code:** the W2/W3.5 chart backlog and P18.4 polish are **complete** — remaining sandbox work is optional polish only, chosen deliberately, never at the expense of the suite. Trusted-host and real-data work outrank it.
 4. **Trusted-host-only work (do NOT simulate in this checkout):** execute the P22.3 drill catalog (`python main.py release drills`) on real Windows 11 / Android / Ubuntu signers and attach operator evidence JSON; then `p22_complete` may flip.
 5. **Operate the loop on the real-data host:** `python main.py daily` (loop-health), `python main.py paper --watch`, Sunday `python main.py weekly --export reviews/$(date +%F).json`, weekly `python main.py scorecard --conditioned --source store` net + `python main.py validate --source store --tf 15m`. Grow canonical `binance/spot/BTCUSDT 15m` paper `n` toward `100-200` decided net — that is the only graduation evidence.
 6. **On the real-data host (parallel):** rerun `learn` so existing canonical rows pick up source keys (live profile unchanged, demo/synthetic never substituted); acquire/version-pin Dukascopy XAU m1 `bid` or `ask` per `docs/DUKASCOPY_XAU_ADAPTER.md`; run locked `train/val/sealed-OOS/recent` under expected XAU seal key; archive `python main.py xau-evidence --tf 15m --json` per `docs/XAU_PROMOTION_EVIDENCE.md`. Do not create/reseal from the audit.
@@ -1236,15 +1322,15 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 **Suggested next-session prompt:**
 
-> Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first and
-> confirm the W3/W3.4 PR (v2.41.0+v2.42.0, #62) is merged. P12.1–P12.18 are shipped; do not
+> Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first.
+> The W2/W3.5 chart backlog is COMPLETE (v2.48.0 — synchronized crosshair;
+> do not rebuild it). P12.1–P12.18 are shipped; do not
 > rewrite the locked protocol, source-key algebra, canonical-only graduation
 > and live risk filters, calendars, gold costs, or `data/gold_basis.py`. Do
 > not water down the W3.3 journal-first gate — missing journals hold the next
 > approval by design; the audited escape is intentional, not a bug to remove.
-> Sandbox-feasible next code is W3.5 multi-chart views; trusted P22 drills
-> need real
-> signers. On the real-data host, rerun `learn`, run the documented P12.12
+> Sandbox-feasible work is optional polish only; trusted P22 drills
+> need real signers. On the real-data host, rerun `learn`, run the documented P12.12
 > validation/evidence procedure, archive `xau-evidence --json`, and export the
 > weekly review every Sunday; never substitute synthetic fixtures, pool
 > calibration, or create/reseal evidence from the audit command. Treat a
@@ -1260,6 +1346,17 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ```bash
 cd /home/user/SKY
+DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
+# 1282 passed, 1 skipped  (v2.48.0 W3.5 part 2 full suite; +5 multi-chart regressions)
+
+DEMO_MODE=1 .venv/bin/python -m pytest tests/test_workstation_js.py tests/test_dashboard_js.py -q
+# 43 + 12 passed  (W3.5 part 2: crosshair broadcast/clear/toggle, zoom toggle,
+#                   empty slot, distinct defaults, ms/seconds normalisation;
+#                   served-script + render harnesses)
+
+DEMO_MODE=1 .venv/bin/python ci/wheel_gate.py
+# cryptobrain-2.48.0-py3-none-any.whl · no duplicate entries · OK
+
 DEMO_MODE=1 .venv/bin/python -m pytest tests/ -q
 # 1213 passed, 1 skipped  (v2.42.0 W3.4 full suite; +36 practice/JS regressions)
 
@@ -1358,14 +1455,12 @@ python main.py quality --symbol BTCUSDT --tf 15m --bars 500   # full plateau swe
 ## Last implementation commit
 
 ```
-P18.4 PWA foundation — installable, offline-safe shell (v2.34.0) — this session arena/01a0135d-sky
-07e8a50 docs: pass ChatGPT 6-idea triage to next session (P18.4 stays next)
-97725e7 W2 complete: live chart streaming + drawing tools (v2.33.0) (#53) — merged
-P12.15 follow-up: live execution-metric source isolation (v2.23.4) — PR #39 — merged
+W3.5 part 2: 2×2 multi-chart synchronized crosshair (v2.48.0) — this session arena/01a01dbf-sky
+446c766 v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution Analytics (#69) — merged
 ```
 
-This branch `arena/01a0135d-sky` is ahead of `origin/main` at `97725e7`.
-Use `git rev-parse HEAD` for the tip (now v2.34.0).
+This branch `arena/01a01dbf-sky` is ahead of `origin/main` at `446c766`.
+Use `git rev-parse HEAD` for the tip (now v2.48.0).
 
 ---
 
@@ -1403,7 +1498,11 @@ Rules:
   reason to change it.
 - Before modifying code, explain briefly what you found and what
   the next implementation step is.
-- Implement the next highest-priority task from TODO.md (which after this triage is P18.4 PWA — do not start LMRing/OpenDataLoader/AirLLM instead).
+- Implement the next highest-priority task from TODO.md. As of v2.48.0 the
+  W2/W3.5 chart backlog and P18.4 PWA polish are COMPLETE — sandbox work is
+  optional polish only; trusted-host P22 drills and real-data-host procedures
+  outrank it. Do not start LMRing/OpenDataLoader/AirLLM, and do not rebuild
+  completed components.
 - Run the relevant tests after implementation.
 - Fix failures before considering the task complete.
 - Maintain test count at ≥ 748 pass / 1 skip.
@@ -1420,12 +1519,24 @@ Before ending the session, open ONE pull request from this branch to
 main (Arena allows one PR per chat session). Do not merge it yourself.
 
 Triage carry-over rule (this session `arena/01a0135d-sky`):
-If the user does not mention the 6-idea review, you still have `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` — treat its `Take/Park/Reject` as already decided. Do NOT ask the user to re-explain *01-*06, and do NOT re-triage from scratch. Just point to the file and continue `P18.4`.
+If the user does not mention the 6-idea review, you still have `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` — treat its `Take/Park/Reject` as already decided. Do NOT ask the user to re-explain *01-*06, and do NOT re-triage from scratch. Just point to the file and continue from the current session state.
 ```
 
 ## End-of-session checklist (run before closing this session)
 
-**Current build session `arena/01a01842-sky` (2026-08-19) — W3 trader development:**
+**Current build session `arena/01a01dbf-sky` (2026-08-20) — W3.5 part 2: synchronized crosshair:**
+
+1. [x] Fetch origin/main — branch starts in sync at `446c766` (v2.47.0); no parallel-session drift.
+2. [x] Pick the sandbox-feasible next work per TODO/SESSION_STATE: the W2/W3.5 "2×2 multi-chart with synchronized crosshair" remainder (P22 drills need real signers; P12.12/P11 need the real-data host).
+3. [x] Build it in `web/app.py`: `multiSyncCrosshairTo` broadcast (coordinateToPrice → setCrosshairPosition / clearCrosshairPosition, re-entrancy guard), Zoom/Crosshair sync toggles (persisted, immediate), four distinct default slots, honest "no candles" empty slots, `multiCandleData` epoch normalisation (1970-date fix), `/\-/g` escape cleanup.
+4. [x] Extend the `tests/test_workstation_js.py` harness mock (crosshair + logical-range recorders, persistent timeScale, `setAttribute`/`createTextNode`/CREATED) and add 5 regressions; full suite **1282 passed / 1 skipped**; wheel gate green; live loopback smoke (HTTP 200, 4 slots × 60 candles, served JS passes `node --check`).
+5. [x] Bump 2.47.0 → 2.48.0 (`config.py`, `pyproject.toml`).
+6. [x] Docs reconciled: CHANGELOG, ROADMAP W2 line, WEB_TRADER_ROADMAP Phase 2 item 2, TODO item 10, HANDOVER header + next-session, `docs/HANDOVER_2026-08-20_W35_part2.md`, SESSION_STATE full pass.
+7. [x] Commit `dc3f10d` + push to `origin/arena/01a01dbf-sky`; opened ONE PR — **#70** (`https://github.com/Azimshawon/SKY/pull/70`) — CI green on both jobs (offline suite + wheel gate); not merged.
+8. [x] CI maintenance: GitHub flagged the Node-20 deprecation for `actions/checkout@v4` / `actions/setup-python@v5`. Bumped the dormant `ci/release.workflow.yml` spec to the Node-24 majors (checkout/setup-python/upload-artifact @v7, verified `using: node24` via the API). The ACTIVE `.github/workflows/ci.yml` bump was rejected by the GitHub App (no `workflows` permission) — documented as a repo-admin human action in `docs/HUMAN_ACTIONS.md` instead of bypassing the rejection.
+9. [ ] Next: trusted-host P22 drills (real signers) and real-data host procedures; sandbox work is optional polish only.
+
+**Previous build session `arena/01a01842-sky` (2026-08-19) — W3 trader development:**
 
 1. [x] Review project state: read SESSION_STATE.md → triage → TODO.md → HANDOVER.md → ROADMAP.md; confirm branch starts at origin/main `30b80d5` (v2.40.0 P22.3); CI green on main (run 32172407910).
 2. [x] Establish the sandbox-feasible next work: P22 drills need real signers (not executable), P12.12/P11 need the real-data host → W3 (HANDOVER Priority 2/3) is the honest next build.

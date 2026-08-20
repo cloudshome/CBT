@@ -1,5 +1,43 @@
 # Changelog
 
+## [2.48.0] — 2026-08-20 · W3.5 part 2 — 2×2 multi-chart synchronized crosshair
+
+MINOR: completes the "multi-chart layout (2×2) with a synchronized
+crosshair across assets" backlog item (`docs/HANDOVER_2026-08-20_W35_part2.md`).
+
+- **Synchronized crosshair** — one pointer over any of the four panes moves
+  the crosshair on all of them (`subscribeCrosshairMove` →
+  `setCrosshairPosition(price, time, series)` via the vendored Lightweight
+  Charts v4.2.3 API, with `clearCrosshairPosition()` when the pointer
+  leaves). Re-entrancy guard keeps the broadcast one-way; panes use Normal
+  crosshair mode so magnet snapping cannot fight the sync.
+- **Per-browser sync toggles** — "Zoom sync" / "Crosshair sync" checkboxes
+  in the comparison bar, on by default, persisted as `sky.multiSyncZoom` /
+  `sky.multiSyncCrosshair`; act immediately, no reload.
+- **Four distinct default slots** — the old defaults collapsed to three
+  panes when the primary was BTCUSDT; `multiDefaults()` now fills the 2×2
+  grid with four distinct views (primary on two timeframes + two other
+  markets).
+- **Honest empty slots** — a failed feed or unsupported pair paints an
+  explicit "no candles for SYMBOL TF — error" slot, never a blank chart.
+- **1970-date fix** — `multiCandleData()` handed `/api/chart` epoch seconds
+  to `new Date()` as if milliseconds; every multi-chart pane silently
+  painted January 1970. Times now normalise like the backend.
+- **Served-script trap cleanup** — `urlBase64ToUint8Array()` VAPID helper
+  dropped the Python-eaten `/\-/g` escape (identical served regex, no more
+  DeprecationWarning).
+- **CI maintenance** — GitHub deprecated Node-20 actions; the dormant
+  `ci/release.workflow.yml` spec was bumped to the Node-24 majors
+  (`checkout`/`setup-python`/`upload-artifact` @v7, verified `using: node24`
+  via the GitHub API). The ACTIVE `.github/workflows/ci.yml` bump is a
+  repo-admin human action (`docs/HUMAN_ACTIONS.md`) — the integration's
+  workflow-file push is rejected by GitHub (no `workflows` permission).
+  CI stays green with only the deprecation annotation until then.
+- **Tests** — +5 multi-chart regressions in `tests/test_workstation_js.py`
+  (crosshair broadcast + clear + toggle, zoom toggle, empty slot, distinct
+  defaults + validation, timestamp normalisation); full suite
+  **1282 passed, 1 skipped**; wheel gate green.
+
 ## [2.47.0] — 2026-08-20 · PWA Push (VAPID), Veto Timeline & R-Distribution
 
 MINOR: Web Push (VAPID) notifications, designed vector PWA app icons,

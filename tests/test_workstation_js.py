@@ -51,7 +51,7 @@ def _run(api: dict, body: str) -> dict:
       return {{ id, innerHTML:'', className:'', textContent:'', value:'',
         checked:true, disabled:false, clientWidth:900, style:{{}},
         options:[], appendChild(){{}}, scrollIntoView(){{}}, classes: cls,
-        addEventListener:()=>{{}}, querySelector:()=>null,
+        addEventListener:()=>{{}}, setAttribute:()=>{{}}, querySelector:()=>null,
         querySelectorAll:()=>[],
         classList:{{
           toggle(c, on){{ const want = (on === undefined) ? !cls.has(c) : !!on;
@@ -61,6 +61,7 @@ def _run(api: dict, body: str) -> dict:
     }}
     function el(id){{ if(!elements[id]) elements[id]=mkEl(id); return elements[id]; }}
     const CHARTS = [];
+    const CREATED = [];
     function mkSeries(kind, chart){{
       const s = {{ kind, lines: [], data: [], opts: null, updates: [],
         setData(d){{ this.data = d || []; }}, setMarkers(){{}},
@@ -72,23 +73,31 @@ def _run(api: dict, body: str) -> dict:
       chart.series.push(s); return s;
     }}
     global.LightweightCharts = {{ createChart: (target, opts) => {{
-      const chart = {{ pane: target && target.id, height: opts && opts.height, series: [],
-        clickHandler: null, removed: [],
+      const ts = {{ fitContent(){{}}, applyOptions(){{}},
+        coordinateToTime(x){{ return 1780000000 + Number(x) * 900; }},
+        subscribeVisibleLogicalRangeChange(fn){{ this.lrHandler = fn; }},
+        setVisibleLogicalRange(r){{ (this.lrCalls = this.lrCalls || []).push(r); }} }};
+      const chart = {{ pane: target && target.id, cls: (target && target.className) || '',
+        height: opts && opts.height, series: [], clickHandler: null, removed: [],
+        crosshairHandler: null, crosshairCalls: [], crosshairClears: 0,
         addCandlestickSeries(){{ return mkSeries('candle', this); }},
         addLineSeries(o){{ const s = mkSeries('line', this); s.opts = o || null; return s; }},
         addHistogramSeries(){{ return mkSeries('hist', this); }},
         removeSeries(s){{ const i = this.series.indexOf(s);
           if(i >= 0){{ this.series.splice(i, 1); this.removed.push(s); }} }},
         subscribeClick(fn){{ this.clickHandler = fn; }},
-        timeScale(){{ return {{ fitContent(){{}}, applyOptions(){{}},
-          coordinateToTime(x){{ return 1780000000 + Number(x) * 900; }},
-          subscribeVisibleLogicalRangeChange(){{}}, setVisibleLogicalRange(){{}} }}; }},
+        subscribeCrosshairMove(fn){{ this.crosshairHandler = fn; }},
+        setCrosshairPosition(price, time, series){{ this.crosshairCalls.push({{ price, time }}); }},
+        clearCrosshairPosition(){{ this.crosshairClears += 1; }},
+        timeScale(){{ return ts; }},
         applyOptions(){{}}, remove(){{}} }};
       CHARTS.push(chart); return chart;
     }} }};
     global.window = {{ addEventListener: ()=>{{}}, LightweightCharts: global.LightweightCharts }};
     global.document = {{ getElementById: el, addEventListener: ()=>{{}},
-      querySelectorAll: ()=>[], createElement: ()=>mkEl('tmp') }};
+      querySelectorAll: ()=>[],
+      createElement: (tag)=>{{ const e = mkEl(tag || 'tmp'); CREATED.push(e); return e; }},
+      createTextNode: (t)=>({{ text: String(t) }}) }};
     global.localStorage = {{ store: {{}},
       getItem(k){{ return Object.prototype.hasOwnProperty.call(this.store, k) ? this.store[k] : null; }},
       setItem(k, v){{ this.store[k] = String(v); }},
@@ -998,3 +1007,134 @@ def test_evidence_guidance_says_no_edge_plainly():
     assert "No positive net edge measured" in out["html"]
     assert "Sample-count gap: complete" in out["html"]
     assert "Not a promise" in out["html"]
+
+
+# ── W3.5 part 2: 2×2 multi-chart — synchronized crosshair ────────────────
+def _multi_api() -> dict:
+    """Four slot payloads: the primary series on two timeframes plus two
+    other markets, exactly what multiDefaults() selects for BTCUSDT/15m."""
+    api = {}
+    for symbol, tf in (("BTCUSDT", "15m"), ("BTCUSDT", "1h"),
+                       ("ETHUSDT", "1h"), ("XAUUSD", "1h")):
+        p = _chart_payload()
+        p["symbol"], p["timeframe"] = symbol, tf
+        api[f"/api/chart?symbol={symbol}&tf={tf}"] = p
+    return api
+
+
+MULTI_WAIT = "await new Promise(r => setImmediate(r));"
+
+
+def test_multi_chart_grid_is_2x2_and_crosshair_stays_synchronized():
+    """One pointer over any pane moves the crosshair on all four panes to the
+    same bar time and pointer price; leaving the pane clears the others."""
+    out = _run(_multi_api(), f"""
+      toggleMultiChart();
+      {MULTI_WAIT}
+      const mc = CHARTS.filter(c => c.cls === 'multi-chart-canvas');
+      // pointer on chart 0 → every other chart gets the same time and price
+      mc[0].crosshairHandler({{ time: 1780000000, point: {{ x: 10, y: 50 }},
+        seriesData: new Map([[mc[0].series[0], {{ close: 63500 }}]]) }});
+      const calls = mc.slice(1).map(c => c.crosshairCalls);
+      // pointer leaves → crosshairs cleared on the others, never an error
+      mc[0].crosshairHandler({{}});
+      // disabling the sync stops propagation immediately
+      _multiSyncCrosshair = false;
+      mc[1].crosshairCalls = [];
+      mc[0].crosshairHandler({{ time: 1780000000, point: {{ x: 10, y: 50 }},
+        seriesData: new Map() }});
+      console.log(JSON.stringify({{
+        cards: mc.length,
+        calls, clears: mc.slice(1).map(c => c.crosshairClears),
+        afterOff: mc[1].crosshairCalls.length,
+        selfUntouched: mc[0].crosshairCalls.length,
+        mainHidden: elements['chartMain'].style.display,
+        hostVisible: elements['multiChart'].style.display,
+        times: mc[0].series[0].data.map(c => c.time),
+      }}));
+    """)
+    assert out["cards"] == 4, "the 2×2 grid did not render four charts"
+    assert out["hostVisible"] == "grid" and out["mainHidden"] == "none"
+    assert out["selfUntouched"] == 0, "a chart echoed the crosshair back to itself"
+    for c in out["calls"]:
+        assert c == [{"price": 63950.0, "time": 1780000000}], c
+    assert all(clears >= 1 for clears in out["clears"]), \
+        "leaving the pane did not clear the other crosshairs"
+    assert out["afterOff"] == 0, "the crosshair sync toggle did not stop propagation"
+    assert out["times"][0] == 1780000000, "bar times were mangled off the epoch"
+
+
+def test_multi_chart_zoom_sync_toggle_stops_pan_propagation():
+    """Zoom/pan sync defaults on; the toggle cuts it off without a reload."""
+    out = _run(_multi_api(), f"""
+      toggleMultiChart();
+      {MULTI_WAIT}
+      const mc = CHARTS.filter(c => c.cls === 'multi-chart-canvas');
+      mc[0].timeScale().lrHandler({{ from: 1, to: 50 }});
+      const synced = mc.slice(1).map(c => c.timeScale().lrCalls);
+      _multiSyncZoom = false;
+      mc[1].timeScale().lrCalls = [];
+      mc[0].timeScale().lrHandler({{ from: 10, to: 60 }});
+      console.log(JSON.stringify({{ synced, afterOff: mc[1].timeScale().lrCalls.length }}));
+    """)
+    assert all(r == [{"from": 1, "to": 50}] for r in out["synced"]), out
+    assert out["afterOff"] == 0, "the zoom sync toggle did not stop propagation"
+
+
+def test_multi_chart_renders_missing_data_as_an_explicit_empty_slot():
+    """An unsupported pair or a failed feed is an explicit 'no candles' slot,
+    never an empty chart that reads as a quiet market."""
+    api = _multi_api()
+    api["/api/chart?symbol=XAUUSD&tf=1h"] = {
+        "error": "ConnectionError: gold feed unreachable", "candles": []}
+    out = _run(api, f"""
+      toggleMultiChart();
+      {MULTI_WAIT}
+      const empty = CREATED.filter(e => (e.className || '').includes('multi-chart-empty'));
+      console.log(JSON.stringify({{
+        cards: CHARTS.filter(c => c.cls === 'multi-chart-canvas').length,
+        empty: empty.map(e => e.textContent),
+      }}));
+    """)
+    assert out["cards"] == 3, "the failed slot still painted a chart"
+    assert any("no candles for XAUUSD 1h" in t and "unreachable" in t
+               for t in out["empty"]), out
+
+
+def test_multi_chart_defaults_fill_four_distinct_slots_and_validate_saves():
+    """Defaults must fill the 2×2 grid with four DISTINCT views (the old
+    defaults collapsed to three when the primary was BTCUSDT); duplicate
+    saves collapse, and invalid saved slots fall back to their defaults."""
+    out = _run(_multi_api(), """
+      const defaults = multiDefaults();
+      const specs = multiChartSpecs();
+      saveMultiSlots([{symbol:'ETHUSDT',tf:'4h'},{symbol:'ETHUSDT',tf:'4h'},
+                      {symbol:'ETHUSDT',tf:'4h'},{symbol:'ETHUSDT',tf:'4h'}]);
+      const afterDedupe = multiChartSpecs().length;
+      STORE['sky.multiChartSlots'] = JSON.stringify([
+        {symbol:'NOPE',tf:'1s'},{symbol:'BTCUSDT',tf:'15m'},
+        {symbol:'ETHUSDT',tf:'1h'},{symbol:'XAUUSD',tf:'1d'}]);
+      const validated = multiSlotState();
+      console.log(JSON.stringify({ defaults, specCount: specs.length, afterDedupe, validated }));
+    """)
+    assert out["specCount"] == 4, "default slots are not four distinct views"
+    assert len({f"{s['symbol']} {s['tf']}" for s in out["defaults"]}) == 4, out
+    assert out["afterDedupe"] == 1, "duplicate slots are not collapsed"
+    assert out["validated"][0] == {"symbol": "BTCUSDT", "tf": "15m"}, \
+        "an invalid saved slot did not fall back to its default"
+
+
+def test_multi_candle_data_normalises_ms_and_keeps_seconds():
+    """A millisecond timestamp becomes epoch seconds; a seconds timestamp is
+    left alone — neither is re-read as a 1970 millisecond date."""
+    out = _run(_multi_api(), """
+      const got = multiCandleData([
+        { time: 1780000000, open: 1, high: 2, low: 0.5, close: 1.5 },
+        { time: 1780000000000, open: 1, high: 2, low: 0.5, close: 1.5 },
+        { time: '2026-06-01T00:00:00Z', open: 1, high: 2, low: 0.5, close: 1.5 },
+      ]);
+      console.log(JSON.stringify({ times: got.map(c => c.time) }));
+    """)
+    assert out["times"][0] == 1780000000
+    assert out["times"][1] == 1780000000
+    assert out["times"][2] == 1780272000, out

@@ -2,7 +2,9 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-20 · **v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution** (`docs/HANDOVER_2026-08-20_v2.47.0.md`). PWA Web Push (VAPID) notification manager (`data/push_notifications.py` + `/api/push/*` + `window.SKY_push` UI + `_probe_webpush`), generated high-resolution 32-bit RGBA icons (`packaging/generate_icons.py` -> `web/static/icons/*.png`), iOS safe-area insets & standalone mode handling, Risk Center "Why Blocked?" Veto Timeline (`risk_vetoes` + `/api/risk/veto-timeline`), and R-Multiple Distribution analytics (`r_distribution` + `/api/analytics/r-distribution`). P22 drills still need real signers.
+Last updated: 2026-08-20 · **v2.48.0 — W3.5 part 2: 2×2 multi-chart synchronized crosshair** (`docs/HANDOVER_2026-08-20_W35_part2.md`). Completes the W2/W3.5 chart backlog: one pointer moves the crosshair on all four panes (`subscribeCrosshairMove` → `setCrosshairPosition`), per-browser Zoom/Crosshair sync toggles, four distinct default slots, honest "no candles" empty slots, a 1970-date timestamp fix, and a Python-eaten `/\-/g` escape cleanup. Full suite 1282 passed / 1 skipped. No threshold moved; multi-chart stays a comparison view only.
+
+**Previous:** 2026-08-20 · **v2.47.0 — PWA Push (VAPID), Veto Timeline & R-Distribution** (`docs/HANDOVER_2026-08-20_v2.47.0.md`). PWA Web Push (VAPID) notification manager (`data/push_notifications.py` + `/api/push/*` + `window.SKY_push` UI + `_probe_webpush`), generated high-resolution 32-bit RGBA icons (`packaging/generate_icons.py` -> `web/static/icons/*.png`), iOS safe-area insets & standalone mode handling, Risk Center "Why Blocked?" Veto Timeline (`risk_vetoes` + `/api/risk/veto-timeline`), and R-Multiple Distribution analytics (`r_distribution` + `/api/analytics/r-distribution`). P22 drills still need real signers.
 
 **Previous:** 2026-08-19 · **v2.46.0 — W3.6 replay tape practice** (`docs/HANDOVER_2026-08-19_W36.md`). Chart Replay Freeze + Grade against the tape. Server walks the hidden forward window and scores the outcome. Desk-agreement keys stay desk-only; tape is a sibling block. Coaching memory only — not paper evidence, not permission.
 
@@ -38,7 +40,10 @@ Two things to carry into P19:
 - **Never cache private payloads in the package either.** The `sw.js` never-caches `/api/*`, auth, SSE, private state or mutations; the Hub's reverse proxy and any backup tool must also never capture `data/cryptobrain.db` or `data/store/**` as world-readable artifacts.
 - **The served-script trap.** `web/app.py`'s `HTML` is a plain (non-raw) Python string: a backslash escape written inside the embedded JavaScript is eaten by Python before the browser sees it. Use `String.fromCharCode(10)` for a newline. `tests/test_dashboard_js.py::test_served_script_is_valid_javascript` and `tests/test_pwa.py::test_html_still_valid_js` now parse the *evaluated* template — keep them.
 
-Optional P18.4 polish (not P19): designed icons (replace solid-color placeholders in `web/static/icons/`), iOS `navigator.standalone` handling, push VAPID wiring.
+P18.4 polish is done (designed icons, iOS standalone, VAPID push — v2.47.0)
+and the W2/W3.5 chart backlog is now complete (v2.48.0 crosshair sync). The
+sandbox no longer owes chart work: next sandbox-feasible code is optional
+polish only, chosen deliberately, never at the expense of the suite.
 
 ---
 

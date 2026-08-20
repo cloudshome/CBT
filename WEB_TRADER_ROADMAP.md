@@ -69,6 +69,8 @@ none of the workstation work below is discarded.
 
 1. Replay mode over stored candles, clearly separated from live/paper evidence.
 2. Multi-chart layout (2×2) with a synchronized crosshair across assets.
+   ✅ shipped v2.43.0 + v2.48.0 (crosshair sync, sync toggles, honest empty
+   slots, 1970-date fix).
 3. Live streaming updates via `data/ws_client.py` instead of polling.
 4. Order-block / FVG / liquidity-sweep zones drawn as chart rectangles.
 

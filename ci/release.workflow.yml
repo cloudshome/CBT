@@ -37,8 +37,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -54,7 +54,7 @@ jobs:
           mkdir -p dist/contracts
           python main.py companion spec --platform "${{ matrix.platform }}" --json > "dist/contracts/${{ matrix.platform }}.json"
           python packaging/build_release.py --channel beta --output dist/release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}-release-metadata
           path: |
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build unsigned Debian artifact
         run: SKY_DEB_VERSION=$(python -c "import config; print(config.VERSION)") sh packaging/build_deb.sh
       - name: Inspect and install package on clean runner
@@ -86,7 +86,7 @@ jobs:
         run: |
           deb=$(find dist -name 'sky-hub_*.deb' -print -quit)
           python packaging/build_release.py --channel beta --artifact "$deb" --output dist/release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ubuntu-unsigned-package
           path: |
@@ -98,8 +98,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip

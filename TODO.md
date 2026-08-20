@@ -268,13 +268,16 @@ Ordered code milestones:
 9. ~~**W3 trader development**~~ — ✅ shipped v2.41.0 + v2.42.0 (weekly
    review page, ritual memory, journal-first gate, practice mode;
    `docs/HANDOVER_2026-08-19_W3.md`, `docs/HANDOVER_2026-08-19_W34.md`).
-   Remaining W3.5 multi-chart views are optional polish.
+10. ~~**W3.5 multi-chart views**~~ — ✅ shipped v2.43.0 (2×2 grid + zoom
+   sync) + v2.48.0 part 2 (synchronized crosshair, sync toggles, honest
+   empty slots, 1970-date fix; `docs/HANDOVER_2026-08-19_W35.md`,
+   `docs/HANDOVER_2026-08-20_W35_part2.md`).
 
 **Next implementation is P22 (trusted-host drills — real signers only);
 choose the work by environment:**
-- **Sandbox/code** — W3.5 multi-chart views, optional P18.4 polish
-  (designed icons, iOS standalone, VAPID push wiring). Small, self-contained,
-  keeps the suite green.
+- **Sandbox/code** — optional P18.4/PWA polish (designed icons, iOS
+  standalone, VAPID push wiring — the W2/W3.5 chart backlog is now
+  complete). Small, self-contained, keeps the suite green.
 - **Trusted hosts** — P22 drills (execute the P22.3 catalog on real
   Windows/Android/Ubuntu signers — not more Python catalogs).
 - **Real-data host** — P12.12 XAU evidence procedure + P11 canonical paper

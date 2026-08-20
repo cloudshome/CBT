@@ -107,7 +107,10 @@ The unfinished items from `WEB_TRADER_ROADMAP.md` are merged here:
   (`docs/HANDOVER_2026-08-17_W2.md`), SSE live streaming (`series.update()` in
   place, honest live/waiting/stale/error/disconnected labels) and mouse-placed
   trendlines/rays/boxes in part 2 (`docs/HANDOVER_2026-08-17_W2_part2.md`).
-  Multi-chart views were not attempted and are not claimed.
+  Multi-chart views ✅ shipped — 2×2 grid + zoom sync (v2.43.0,
+  `docs/HANDOVER_2026-08-19_W35.md`) and synchronized crosshair, sync
+  toggles, honest empty slots + 1970-date fix (v2.48.0 W3.5 part 2,
+  `docs/HANDOVER_2026-08-20_W35_part2.md`).
 - **W3 Trader development:** weekly review, equity/R charts, daily ritual,
   enforced journaling, and practice scoring.
 - **W4 Reliability:** stale-data age, mobile compact layout, background jobs,
