@@ -1,5 +1,74 @@
 # Changelog
 
+## [2.55.0] — 2026-08-21 · T6 — focused pages + mobile sections · T1–T6 complete
+
+MINOR: the last Trade Terminal phase. Every nav area is now a **focused page**
+(identity header + sub-section switcher, exactly one section at a time) and
+phones get a four-section bottom bar with the paper ticket as a full-screen
+sheet. Purely presentation: **zero new endpoints**, same `onTabShown()`
+loaders, no threshold moved, no exchange-order path.
+
+- **Focused pages** — Markets (Overview / Market radar / Intelligence),
+  Portfolio (Positions / Decisions / Risk centre / Weekly review), Journal,
+  Evidence (Evidence / Learning), System (Data health / Connections /
+  Hub & agent / Command centre / Modules). One `.tabpanel` active at a time;
+  sub-choice persists per browser with a safe fallback; every section is
+  `#section` deep-linkable (init resolves a section hash to its owning page).
+- **Backwards-compatible routing** — every old `switchTab(name)` call
+  (quickbar, coach, deep links) lands on the right focused page+section;
+  `render()`'s re-apply can never navigate the user off their page on a
+  refresh. `NAV_TABS` removed — `AREA_SUBS` is the single section↔area map.
+- **Mobile four-section bar** — Markets / Chart / Positions / AI (Copilot
+  drawer), with active-state tracking that clears as you move on; full
+  seven-area top nav remains, so no surface is amputated on small screens.
+- **Ticket sheet** — on phones the paper ticket opens as a full-screen sheet
+  from `🎫 Ticket` in the chart toolbar (backdrop / ✕ / area-switch closes
+  it), and opening it **re-reads the risk gate fresh** (`/api/risk`, chip +
+  ticket). Confirm still re-reads the gate on the server before enrolling.
+- Regressions: `tests/test_focused_pages_js.py` (14 tests). Full suite
+  **1348 passed / 1 skipped**; served-script `node --check` clean; wheel gate
+  green; `config.VERSION` = `pyproject.toml` = `sky-shell-v2.55.0` lockstep.
+  Contract: `docs/HANDOVER_2026-08-21_T6.md`.
+
+## [2.54.0] — 2026-08-21 · T5 — Home screen & onboarding
+
+MINOR: the post-login landing is now a concise command dashboard with one
+primary door into the Trading Terminal, and a fresh desk gets onboarding that
+points at the paper loop — never at a CLI. Purely presentation: **zero new
+endpoints** (the board composes the existing read-only `/api/risk`,
+`/api/readiness`, `/api/trades`, `/api/loop-health` payloads), no threshold
+moved, no exchange-order path, no new permission.
+
+- **Home command dashboard** — first nav area, and the landing when no hash or
+  remembered view exists. Hero (time-of-day greeting, the paper-first
+  one-liner), **Continue ‹symbol · timeframe›** (remembered market, validated
+  against what the server still offers) and **Open Trading Terminal ⟶** as the
+  primary button.
+- **Seven concise cards, not every module** — Risk gate (real `blocked_by`
+  reasons when closed), Data freshness (readiness level + data-pillar line,
+  incl. P10.5 quarantine), Open positions (count + live R rows), Today's P&L
+  (net % of equity, decided count, hard daily limit, amber limit warnings),
+  Journal tasks (missing journals with the journal-first hold named, pending
+  reviews, the daily question), Evidence progress (criteria x/4 or
+  `GRADUATION READY`, real paper n, the unmoved bar, per-primary-setup sample
+  rows), and Focus (the desk's advice action/headline + trader-state flags).
+- **Honest states** — skeletons on first paint; every feed settles
+  independently so a dead endpoint paints an explicit `could not load — retry`
+  in its own card while the rest of the board renders; every visit re-reads
+  (no one-shot cache); 60 s refresh while Home is visible. The board never
+  POSTs.
+- **Onboarding** — shown only for a fresh desk (no real paper trades, nothing
+  open, nothing pending, not dismissed): five steps — open terminal → read the
+  setup → prepare the paper ticket → confirm (paper only) → manage & journal —
+  with the same primary CTA. Dismissal persists per browser; a private-mode
+  browser still runs.
+- Regressions: `tests/test_home_js.py` (8 tests — landing, card painting,
+  blocked-gate/journal-first reasons, dead-feed retry, onboarding + dismiss,
+  terminal navigation + remembered market, served markup). Full suite
+  **1334 passed / 1 skipped**; served-script `node --check` clean; wheel gate
+  green; `config.VERSION` = `pyproject.toml` = `sky-shell-v2.54.0` lockstep.
+  Contract: `docs/HANDOVER_2026-08-21_T5.md`.
+
 ## [2.53.0] — 2026-08-20 · T4 (part 2) — resizable/collapsible panels, layout memory, connection state, tooltips, mobile
 
 MINOR: the Trade Terminal becomes a workspace you can shape and it never

@@ -2,8 +2,8 @@
 
 > **Status:** active source of truth
 > **Last updated:** 2026-08-20
-> **Current software:** v2.52.0
-> **Suite at this version:** 1282 passed / 1 skipped (offline)
+> **Current software:** v2.55.0
+> **Suite at this version:** 1348 passed / 1 skipped (offline)
 >
 > **This file + `TODO.md` win** when other roadmaps, anatomy notes, or
 > workstation plans conflict. Older files remain as historical
@@ -32,7 +32,7 @@ loses 50% needs a 100% gain just to break even.
 | **Decision independence** | Own engine, risk gate, human-approval loop | ✅ P1–P9 |
 | **Data independence** | Own stored market history | ✅ P10.1–P10.12 |
 | **Validation independence** | Research-grade proof on our grader + our store | ✅ P12.1–P12.18 *tooling*; real-host XAU evidence still open |
-| **Operating independence** | Click the desk; do not memorise CLI | 🔄 Trade Terminal T1–T4 shipped (v2.53.0); T5–T6 remaining |
+| **Operating independence** | Click the desk; do not memorise CLI | ✅ Trade Terminal T1–T6 complete (v2.55.0); real-browser visual QA open |
 | **Evidence independence** | Canonical live paper book that can open the graduation bar | 🔄 **P11 — this is the money path** |
 
 Those halves cannot substitute for each other. A beautiful terminal
@@ -83,8 +83,8 @@ aim.
 │ LANE B — PRODUCT PATH (sandbox-feasible code)                       │
 │ Trade Terminal so the owner never types a command for the daily     │
 │ loop: chart → understand → paper ticket → gate → manage → close →   │
-│ journal. Phases T1–T6. T1 + T2 + T3 + T4 shipped (full loop).          │
-│ Next: T5 — home screen & onboarding; then T6 focused pages.           │
+│ journal. Phases T1–T6: complete (v2.55.0) — home, full paper loop,   │
+│ focused pages. Next: visual QA of the whole app on a real browser.    │
 ├─────────────────────────────────────────────────────────────────────┤
 │ LANE C — DISTRIBUTION PATH (trusted signers only)                   │
 │ Ubuntu Hub is the one authority. Browser/PWA, Windows .exe and      │
@@ -100,20 +100,20 @@ signed installers here.
 
 ---
 
-## 2. Current software — honest snapshot (v2.52.0)
+## 2. Current software — honest snapshot (v2.54.0+ / v2.55.0)
 
 What a user actually has after `python3 main.py`:
 
 | Surface | Honest state |
 |---|---|
-| Default page | **Trade Terminal** layout (watchlist / chart / ticket / bottom tabs / 6-area nav) |
+| Default page | **Home command dashboard (T5)** post-login; every area is a **focused page** (T6: header + sub-switcher, one section at a time); mobile: four-section bar + ticket sheet |
 | Chart | Lightweight Charts v4.2.3 with EMA/VWAP/BB, RSI, MACD, zones, drawings, replay, live SSE stream, 2×2 multi-chart (zoom + crosshair sync) |
 | Paper ticket | Prefills from the latest scan; sizes; shows a live server gate read; Confirm is **disabled while the gate says blocked** |
 | Confirm Paper Trade | **Enrolls the real paper trade (T3).** Ticket → scan row → fresh server gate → APPROVED (desk path) → paper-runner position in the bottom panel → live R/MAE/MFE → Close records the outcome → journal drawer opens. Market tickets fill at entry; limit/conditional wait for the level. Still paper-only. |
 | AI Copilot | Drawer + 9 quick actions + `/api/ask` with symbol/timeframe context. Answers render as titled sections with a Sources footer (v2.51.0); Prepare-ticket pre-fills the ticket (advisory). AI cannot approve. |
 | Other five nav areas | Existing panels **grouped**, not rewritten |
 | Risk gate / graduation / `/api/v1` / jobs / PWA / auth | Untouched by v2.50.0 (T3 calls the existing desk approval + paper runner; no threshold, no order path) |
-| Visual QA | **Not done.** No browser in the sandbox that shipped T1. |
+| Visual QA | **Not done.** No browser in the sandbox that shipped T1–T6. The single open item on the product lane. |
 | Graduation bar | **Closed.** First real-data grind: +0.348R gross / 36.8% WR / PF 1.55 — below the NET bar. |
 | XAU | Research-only. `xau-evidence` tooling exists; this checkout has no real basis/seal. |
 | Signed `.deb` / `.exe` / `.apk` | **Do not exist yet.** Do not download unofficial installers. |
@@ -399,7 +399,7 @@ the gate, never place an order.
 
 ## 12. Home screen and mobile
 
-### Home (T5)
+### Home (T5) · ✅ shipped v2.54.0 (see §13)
 
 The first screen after login is a concise command dashboard:
 
@@ -415,7 +415,7 @@ The first screen after login is a concise command dashboard:
 
 It does not show every technical module.
 
-### Mobile
+### Mobile · ✅ shipped v2.55.0
 
 Four primary sections:
 
@@ -523,22 +523,46 @@ Shipped in v2.53.0 (part 2):
 Still open (from T1): visual QA of the drag/collapse/mobile gestures and the
 T3 paper loop on a real browser — no browser is installable in this sandbox.
 
-### T5 — Home screen and onboarding
+### T5 — Home screen and onboarding · ✅ shipped v2.54.0
 
-- Concise post-login command dashboard
-- "Open Trading Terminal" primary button
-- Onboarding for new users that points at the paper loop, not at CLI
+- Concise post-login command dashboard (first nav area + the landing when
+  no hash/remembered view exists): hero with time-of-day greeting,
+  continue-last-market (remembered symbol/timeframe, server-validated),
+  **Open Trading Terminal** primary button, and seven concise cards —
+  risk gate with real `blocked_by` reasons, data freshness (readiness +
+  P10.5 data pillar incl. quarantine), open positions with live R,
+  today's P&L net of costs with the hard daily limit, journal tasks with
+  the journal-first hold named, evidence progress with the unmoved bar,
+  and focus (desk advice + trader-state flags)
+- Onboarding for new users that points at the paper loop, not at CLI —
+  five steps (terminal → setup → paper ticket → confirm paper-only →
+  manage & journal), shown only for a fresh desk, dismissal persisted
+- **Zero new endpoints** — pure read-only composition of `/api/risk`,
+  `/api/readiness`, `/api/trades`, `/api/loop-health`; per-feed error +
+  retry states; re-read on every visit; the board never POSTs.
+  Contract: `docs/HANDOVER_2026-08-21_T5.md`. Visual QA on a real
+  browser stays open with the rest of the T-lane QA
 
-### T6 — Focused pages
+### T6 — Focused pages · ✅ shipped v2.55.0
 
-- Full content for Markets / Portfolio / Journal / Evidence / System
-- Each page is a focused view, not a card collection
-- Mobile four-section layout
+- Every area is a focused page: identity header + sub-section switcher,
+  exactly one section visible at a time (Markets: Overview / Market radar /
+  Intelligence; Portfolio: Positions / Decisions / Risk centre / Weekly
+  review; Journal; Evidence: Evidence / Learning; System: Data health /
+  Connections / Hub & agent / Command centre / Modules). Sub-choice persists
+  per browser; every section is `#section` deep-linkable; old
+  `switchTab(name)` calls land on the right focused page+section
+- Mobile four-section layout: bottom bar (Markets / Chart / Positions / AI)
+  with active-state tracking, and the paper ticket as a full-screen sheet
+  that re-reads the risk gate fresh on open (backdrop / ✕ / area-switch
+  closes; confirm still re-reads the gate server-side)
+- Content is a *composition* of the existing panels, not rewrites — all the
+  W3–W4 tests pass untouched. Contract: `docs/HANDOVER_2026-08-21_T6.md`
 
 **Verification for every T step:** keep
 `test_served_script_is_valid_javascript` and the jsdom harnesses
 green; add regressions for any new terminal behaviour; full suite
-≥ 1282 / 1; wheel gate green; `config.VERSION` =
+≥ 1348 / 1; wheel gate green; `config.VERSION` =
 `pyproject.toml` = `sky-shell-v…` lockstep.
 
 ---
@@ -583,7 +607,7 @@ XAU dossier is neither condition.
 | P20 | Windows companion contract (pairing, client, unsigned recipe) | ✅ Contract shipped; signed `.exe` does not exist yet |
 | P21 | Android companion contract (Keystore, biometric, unsigned recipe) | ✅ Contract shipped; signed `.apk` does not exist yet |
 | P22 | Release engineering (checksums, SBOM, drill contracts) | ✅ Foundation shipped; trusted-signer drills pending |
-| **T1–T6** | **Professional Trade Terminal** | **T1 + T2 + T3 + T4 shipped v2.53.0; T5–T6 remaining** |
+| **T1–T6** | **Professional Trade Terminal** | **✅ complete v2.55.0 (visual QA on a real browser is the only open product item)** |
 
 Freqtrade (F1–F8) and Backtrader (BT1–BT8) stay **rejected**. Needle 2
 (N1–N8) stays parked. Do not reopen those audits to install a bot or
@@ -695,7 +719,7 @@ in the **same** environment is unblocked.
    cache; pt.2 v2.53.0: resizable/collapsible panels, localStorage layout +
    symbol/timeframe/filter memory, stale/error connection states, tooltips,
    compact mobile drawer).
-5. **T5** then **T6**.
+5. **T5 + T6 — ✅ shipped** (v2.54.0 home + onboarding; v2.55.0 focused pages + mobile). The **T1–T6 lane is code-complete** — what is left on it is visual QA of the whole app on a real browser, then the Lane-A money path is a behaviour problem, not a code problem.
 
 Keep the suite green. Bump `config.VERSION` / `pyproject.toml` /
 `sky-shell-v…` together. Parse the *served* dashboard script, not the

@@ -443,6 +443,105 @@ HTML = """<!doctype html>
   .view-body{padding:10px 12px 20px}
   .shell{max-width:1500px;margin:0 auto;padding:12px 14px 24px}
 
+  /* ── T5 — Home command dashboard ─────────────────────────────────
+     Concise post-login dashboard: gate, data, positions, P&L, journal,
+     evidence, focus — one primary door into the Trading Terminal. */
+  .home-shell{max-width:1200px}
+  .home-hero{display:flex;align-items:flex-end;justify-content:space-between;
+    gap:12px;padding:10px 4px 14px;flex-wrap:wrap}
+  .home-hi{font-size:19px;font-weight:800;letter-spacing:.01em}
+  .home-sub{font-size:12px;color:var(--mut);margin-top:3px;max-width:640px}
+  .home-cta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .home-open{padding:9px 20px;font-size:13px;font-weight:700;justify-content:center}
+  .home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));
+    gap:10px;padding-bottom:14px}
+  .home-card{background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;
+    gap:6px;min-height:120px}
+  .hc-head{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--mut);
+    text-transform:uppercase;display:flex;align-items:center;gap:7px}
+  .hc-dot{width:8px;height:8px;border-radius:50%;background:var(--mut2);margin-left:auto}
+  .hc-dot.ok{background:var(--green)} .hc-dot.warn{background:var(--amber)}
+  .hc-dot.bad{background:var(--red)} .hc-dot.off{background:var(--mut2)}
+  .hc-body{flex:1;font-size:12px}
+  .hc-big{font-size:16px;font-weight:800}
+  .hc-big.ok{color:var(--green)} .hc-big.warn{color:var(--amber)} .hc-big.bad{color:var(--red)}
+  .hc-sub{color:var(--mut);font-size:11px;margin-top:2px;line-height:1.5}
+  .hc-rows{margin-top:5px;display:flex;flex-direction:column;gap:3px}
+  .hc-row{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;
+    padding:3px 6px;background:var(--bg2);border:1px solid var(--line);
+    border-radius:var(--r-sm)}
+  .hc-row .r{font-weight:700;font-family:var(--mono)}
+  .hc-foot{display:flex;justify-content:flex-end;margin-top:2px}
+  .hc-link{background:none;border:none;color:var(--blue);font-size:11px;
+    cursor:pointer;padding:0;font-family:inherit}
+  .hc-link:hover{text-decoration:underline}
+  .hc-err{color:var(--amber);font-size:11px;line-height:1.5}
+  .home-meta{color:var(--mut2);font-size:10.5px;padding:0 4px 22px;font-family:var(--mono)}
+  .home-onboard{background:linear-gradient(135deg,var(--panel2),var(--panel));
+    border:1px solid var(--line2);border-radius:var(--radius);
+    padding:13px 15px;margin-top:10px}
+  .home-onboard h2{font-size:15px;margin:0 0 3px;font-weight:800}
+  .home-onboard .ob-note{color:var(--mut);font-size:11.5px;max-width:720px}
+  .ob-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:8px;margin-top:10px}
+  .ob-step{background:var(--bg2);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:8px 10px;font-size:11.5px;line-height:1.5}
+  .ob-step b{display:block;margin-bottom:2px;font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--cyan)}
+  .ob-actions{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap;align-items:center}
+  @media(max-width:760px){
+    .home-hero{flex-direction:column;align-items:stretch}
+    .home-cta{flex-direction:column;align-items:stretch}
+    .home-open{width:100%}
+  }
+
+  /* ── T6 — focused pages ────────────────────────────────────────────
+     Each nav area is a focused page: an identity header, a compact
+     sub-section switcher, exactly one section visible at a time —
+     never a stack of old cards. */
+  .areahead{padding:2px 2px 10px;display:flex;flex-wrap:wrap;gap:8px 14px;
+    align-items:flex-end;border-bottom:1px solid var(--line);margin-bottom:10px}
+  .areahead h2{font-size:16px;font-weight:800;letter-spacing:.01em;margin:0}
+  .areahead .adesc{font-size:11.5px;color:var(--mut);max-width:640px;flex:1;min-width:220px}
+  .areasub{display:flex;background:var(--bg2);border:1px solid var(--line);
+    border-radius:var(--radius);padding:2px;gap:1px;overflow-x:auto;max-width:100%}
+  .areasub::-webkit-scrollbar{display:none}
+  .areasub button{appearance:none;border:none;background:transparent;color:var(--mut);
+    padding:5px 11px;border-radius:var(--r-sm);font-size:11.5px;font-weight:600;
+    cursor:pointer;white-space:nowrap;transition:.12s}
+  .areasub button:hover{color:var(--txt)}
+  .areasub button.active{background:var(--panel3);color:var(--txt)}
+  @media(max-width:760px){
+    .areahead{margin-bottom:8px;padding-bottom:8px}
+    .areasub{width:100%}
+  }
+
+  /* ── T6 — mobile four-section bar + ticket sheet ─────────────────── */
+  #mobileNav{display:none}
+  @media(max-width:760px){
+    body{padding-bottom:calc(54px + env(safe-area-inset-bottom))}
+    #mobileNav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;
+      background:rgba(11,14,20,.96);backdrop-filter:blur(12px);
+      border-top:1px solid var(--line);gap:2px;
+      padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+    #mobileNav button{flex:1;appearance:none;border:1px solid transparent;background:transparent;
+      color:var(--mut);padding:6px 2px 5px;border-radius:var(--r-sm);font-size:10px;
+      font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+    #mobileNav button svg{width:17px;height:17px;fill:none;stroke:currentColor;
+      stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    #mobileNav button.active{color:var(--cyan);background:rgba(56,195,232,.09);
+      border-color:rgba(56,195,232,.25)}
+    /* the paper ticket opens as a full-screen sheet, not a squeezed column */
+    .terminal .t-order{position:fixed;inset:0;z-index:79;background:var(--bg);
+      transform:translateX(104%);transition:transform .22s ease;
+      box-shadow:-14px 0 40px rgba(0,0,0,.55);min-height:0;border-left:none}
+    .terminal.ticket-sheet .t-order{transform:none}
+    .t-order-backdrop{display:none;position:fixed;inset:0;z-index:78;
+      background:rgba(3,6,11,.6);backdrop-filter:blur(3px)}
+    .terminal.ticket-sheet .t-order-backdrop{display:block}
+  }
+
   /* ── Cards / panels (shared with legacy render()) ────────────────── */
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -969,7 +1068,9 @@ HTML = """<!doctype html>
 
 <!-- ═══ PRIMARY NAVIGATION — SIX AREAS ═════════════════════════════════ -->
 <nav class="nav6" id="nav6">
-  <button class="navbtn active" data-nav="trade" onclick="navTo('trade')">
+  <button class="navbtn" data-nav="home" onclick="navTo('home')" title="Home — post-login command dashboard">
+    <svg viewBox="0 0 16 16"><path d="M2.5 8.5L8 3.5l5.5 5M4.5 7.5V13h2.8v-3h1.4v3h2.8V7.5"/></svg>Home</button>
+  <button class="navbtn" data-nav="trade" onclick="navTo('trade')" title="Trading Terminal — chart, watchlist, paper ticket, positions">
     <svg viewBox="0 0 16 16"><path d="M2 12V5M6 12V2M10 12V7M14 12V3"/></svg>Trade</button>
   <button class="navbtn" data-nav="markets" onclick="navTo('markets')">
     <svg viewBox="0 0 16 16"><path d="M2 14V8M6 14V3M10 14v-7M14 14V5"/></svg>Markets</button>
@@ -985,6 +1086,66 @@ HTML = """<!doctype html>
   <span class="updated" id="updated"></span>
 </nav>
 
+<!-- ═══ HOME — POST-LOGIN COMMAND DASHBOARD (T5) ═══════════════════════
+     One concise board, not every module: risk gate, data freshness, open
+     positions, today's P&L, journal tasks, evidence progress, focus — and
+     one primary door into the Trading Terminal. Composes the existing
+     read-only endpoints (/api/risk, /api/readiness, /api/trades,
+     /api/loop-health). It adds no capability and moves no threshold. -->
+<div id="view-home" class="view">
+  <div class="shell home-shell">
+    <div class="home-onboard" id="homeOnboard" style="display:none"></div>
+    <div class="home-hero">
+      <div>
+        <div class="home-hi" id="homeGreet">Welcome.</div>
+        <div class="home-sub">SKY is paper-first: the machine proposes, you approve, the runner simulates — no real exchange order exists.</div>
+      </div>
+      <div class="home-cta">
+        <button class="btn ghost" id="homeContinue" onclick="openTradingTerminal()" title="Return to the market and timeframe you studied last">Continue —</button>
+        <button class="btn primary home-open" onclick="openTradingTerminal()" title="Chart, watchlist, paper ticket, AI Copilot, positions — the whole paper loop in one screen">Open Trading Terminal ⟶</button>
+      </div>
+    </div>
+    <div class="home-grid" id="homeGrid">
+      <div class="home-card" id="homeCardGate">
+        <div class="hc-head">Risk gate <span class="hc-dot off" id="homeDotGate"></span></div>
+        <div class="hc-body" id="homeBodyGate"><div class="skel skel-row"></div></div>
+        <div class="hc-foot"><button class="hc-link" onclick="navTo('portfolio')" title="Risk centre, limits, drawdown ladder">Risk centre ▸</button></div>
+      </div>
+      <div class="home-card" id="homeCardData">
+        <div class="hc-head">Data freshness <span class="hc-dot off" id="homeDotData"></span></div>
+        <div class="hc-body" id="homeBodyData"><div class="skel skel-row"></div></div>
+        <div class="hc-foot"><button class="hc-link" onclick="navTo('system')" title="Connections, data health, jobs">System ▸</button></div>
+      </div>
+      <div class="home-card" id="homeCardPositions">
+        <div class="hc-head">Open positions <span class="hc-dot off" id="homeDotPositions"></span></div>
+        <div class="hc-body" id="homeBodyPositions"><div class="skel skel-row"></div></div>
+        <div class="hc-foot"><button class="hc-link" onclick="openTradingTerminal()" title="Live R / MAE / MFE in the terminal's positions tab">Terminal ▸</button></div>
+      </div>
+      <div class="home-card" id="homeCardPnl">
+        <div class="hc-head">Today’s P&amp;L <span class="hc-dot off" id="homeDotPnl"></span></div>
+        <div class="hc-body" id="homeBodyPnl"><div class="skel skel-row"></div></div>
+        <div class="hc-foot"><button class="hc-link" onclick="navTo('portfolio')" title="Paper equity, exposure, trade history">Portfolio ▸</button></div>
+      </div>
+      <div class="home-card" id="homeCardJournal">
+        <div class="hc-head">Journal tasks <span class="hc-dot off" id="homeDotJournal"></span></div>
+        <div class="hc-body" id="homeBodyJournal"><div class="skel skel-row"></div></div>
+        <div class="hc-foot"><button class="hc-link" onclick="navTo('journal')" title="Entries, screenshots, rule compliance">Journal ▸</button></div>
+      </div>
+      <div class="home-card" id="homeCardEvidence">
+        <div class="hc-head">Evidence progress <span class="hc-dot off" id="homeDotEvidence"></span></div>
+        <div class="hc-body" id="homeBodyEvidence"><div class="skel skel-row"></div></div>
+        <div class="hc-foot"><button class="hc-link" onclick="navTo('evidence')" title="Backtests, scorecards, graduation">Evidence ▸</button></div>
+      </div>
+      <div class="home-card" id="homeCardFocus">
+        <div class="hc-head">Focus <span class="hc-dot off" id="homeDotFocus"></span></div>
+        <div class="hc-body" id="homeBodyFocus"><div class="skel skel-row"></div></div>
+        <div class="hc-foot"><button class="hc-link" onclick="loadHome()" title="Re-read every home feed now">Refresh ▸</button></div>
+      </div>
+    </div>
+    <div class="home-meta" id="homeMeta"></div>
+  </div>
+</div>
+
 <!-- ═══ TRADE TERMINAL — THE DEFAULT VIEW ══════════════════════════════ -->
 <div id="view-trade" class="view active" data-tab="chart">
   <div class="terminal" id="terminal">
@@ -997,6 +1158,8 @@ HTML = """<!doctype html>
     <button class="term-reopen" id="reopenWl" onclick="toggleWatchlistPanel()" title="Show watchlist">Watchlist ▸</button>
     <button class="term-reopen right" id="reopenOrder" onclick="toggleOrderPanel()" title="Show order panel">◂ Ticket</button>
     <div class="t-wl-backdrop" onclick="toggleMobileWatchlist()"></div>
+    <!-- T6 — mobile: backdrop behind the full-screen paper-ticket sheet -->
+    <div class="t-order-backdrop" onclick="closeMobileTicket()"></div>
     <div class="terminal-grid">
       <!-- LEFT: watchlist -->
       <aside class="t-watchlist">
@@ -1016,6 +1179,7 @@ HTML = """<!doctype html>
       <main class="t-chart">
         <div class="chart-toolbar">
           <button class="btn sm mobile-only" onclick="toggleMobileWatchlist()" title="Show watchlist">☰</button>
+          <button class="btn sm mobile-only" onclick="openMobileTicket()" title="Open the paper ticket — the risk gate is re-read fresh when this sheet opens">🎫 Ticket</button>
           <div class="seg" id="chartSymSeg">
             {% for s in symbols %}<button data-sym="{{s.symbol}}" onclick="chartSetSymbol('{{s.symbol}}')" class="{{'active' if s.symbol==symbol}}">{{s.symbol}}</button>{% endfor %}
           </div>
@@ -1082,6 +1246,7 @@ HTML = """<!doctype html>
           <button data-otab="signal" onclick="switchOrderTab('signal')" title="Desk signal summary for this market">Signal</button>
           <button data-otab="risk" onclick="switchOrderTab('risk')" title="Live risk gate read">Risk</button>
           <button data-otab="copilot" onclick="switchOrderTab('copilot')" title="AI Copilot — advisory only">Copilot</button>
+          <button class="btn sm mobile-only" style="margin:4px 0 0 auto" onclick="closeMobileTicket()" title="Close the ticket sheet">✕</button>
           <button class="panel-collapse" style="margin:4px 6px 0 0" onclick="toggleOrderPanel()" title="Collapse order panel">›</button>
         </div>
         <div id="otab-ticket" class="otab active">
@@ -1180,6 +1345,8 @@ HTML = """<!doctype html>
 <div id="view-legacy" class="view">
   <div class="shell">
 <div class="shell">
+  <!-- T6 — focused-page header: identity + sub-section switcher, filled by renderAreaHead() -->
+  <div id="areaHead" class="areahead" style="display:none"></div>
   <div class="strip" id="readiness"><span class="muted">checking readiness…</span></div>
   <div class="sentistrip" id="senti">
     <span class="slabel"><span class="sdot" id="sentiDot" style="background:#5f6d84;color:#5f6d84"></span><span id="sentiLabel" style="color:var(--mut)">reading sentiment…</span></span>
@@ -1560,6 +1727,18 @@ HTML = """<!doctype html>
     <button class="btn primary" onclick="aiSend('drawer')">Send</button>
   </div>
 </div>
+
+<!-- ═══ T6 — mobile four-section bar (visible ≤760px only) ═════════════ -->
+<nav id="mobileNav" aria-label="Primary mobile sections">
+  <button data-msec="markets" onclick="mobileGo('markets')" title="Markets — price overview and quick scan">
+    <svg viewBox="0 0 16 16"><path d="M2 14V8M6 14V3M10 14v-7M14 14V5"/></svg>Markets</button>
+  <button data-msec="chart" onclick="mobileGo('chart')" title="Chart — the full chart; tap 🎫 Ticket to trade">
+    <svg viewBox="0 0 16 16"><path d="M2 12V5M6 12V2M10 12V7M14 12V3"/></svg>Chart</button>
+  <button data-msec="positions" onclick="mobileGo('positions')" title="Positions — open and closed paper trades">
+    <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.5"/><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15"/></svg>Positions</button>
+  <button data-msec="ai" onclick="mobileGo('ai')" title="AI Copilot — ask about this market">
+    <svg viewBox="0 0 16 16"><path d="M8 1.5l1.7 4.3 4.3 1.7-4.3 1.7L8 13.5 6.3 9.2 2 7.5l4.3-1.7z"/></svg>AI</button>
+</nav>
 
 <div id="authLayer"><div class="authbox" id="authBox"></div></div>
 <div id="accountModal" style="display:none;position:fixed;inset:0;background:rgba(3,6,11,.7);backdrop-filter:blur(8px);z-index:85;padding:14px;overflow:auto"><div class="box" id="accountBody" style="max-width:620px"></div></div>
@@ -2420,11 +2599,9 @@ function render(d){
   const appEl=document.getElementById('app'); if(appEl) appEl.innerHTML = html;
   // colour the mood bar + sentiment strip from this scan's reading
   try{ renderSentiment(sent); }catch(e){}
-  // re-apply active tab for the *legacy* shell only — never remount the trade
-  // terminal or recreate the chart as a side-effect of a data refresh.
-  if(_activeTab && _activeTab!=='chart' && _activeTab!=='trade'){
-    try{ switchTab(_activeTab); }catch(e){}
-  }
+  // re-apply the current focused section for the legacy shell (T6) — never
+  // switch the area, never remount the terminal as a scan-refresh side effect.
+  try{ applyNavPanels(); }catch(e){}
   // load async sub-panels
   loadPending(); loadPaper(); loadHistory(); loadLearning(); loadScorecard(); loadSources();
   loadRiskGate(); loadHealth(); loadAgents(); loadMcp(); loadWatchlist(); loadChannels(); loadDesk();
@@ -5566,13 +5743,14 @@ function onTabShown(tab){
   else if(tab==='agent') loadAgent(false);
 }
 
-// init
+// init — remember the legacy section; the T6 main init owns the routing
+// (and the hash), so this pre-activates the matching panel only.
 (function(){
   try{
     const h=(typeof location !== 'undefined' && location.hash || '').replace('#','');
     if(h && ['overview','chart','market','intelligence','trades','manage','risk','evidence','journal','weekly','learn','connections','commands','modules','system','agent'].includes(h)) _activeTab=h;
   }catch(e){}
-  try{ switchTab(_activeTab); }catch(e){}
+  try{ document.querySelectorAll('.tabpanel').forEach(p=> p.classList.toggle('active', p.dataset.tab===_activeTab)); }catch(e){}
 })();
 refreshUserChip();
 if(authLocked()){
@@ -5799,14 +5977,7 @@ function isRealBrowser(){
   try{ return typeof window!=='undefined' && !!window.document && window.document===document; }catch(e){ return false; }
 }
 
-const NAV_TABS = {
-  trade:     [],                                    // terminal has its own loaders
-  markets:   ['overview', 'market', 'intelligence'],
-  portfolio: ['trades', 'manage', 'risk', 'weekly'],
-  journal:   ['journal'],
-  evidence:  ['evidence', 'learn'],
-  system:    ['connections', 'commands', 'modules', 'system', 'agent'],
-};
+// section ↔ area mapping lives in AREA_SUBS below (T6 — one source of truth).
 const LEGACY_NAVS = ['markets', 'portfolio', 'journal', 'evidence', 'system'];
 let _currentNav = 'trade';
 
@@ -5814,45 +5985,167 @@ function navTo(nav){
   _currentNav = nav;
   try{
     document.querySelectorAll('.navbtn').forEach(b=> b.classList.toggle('active', b.dataset.nav===nav));
+    const homeView=document.getElementById('view-home');
     const tradeView=document.getElementById('view-trade');
     const legacyView=document.getElementById('view-legacy');
+    if(homeView) homeView.classList.toggle('active', nav==='home');
     if(tradeView) tradeView.classList.toggle('active', nav==='trade');
     if(legacyView) legacyView.classList.toggle('active', LEGACY_NAVS.indexOf(nav)>=0);
   }catch(e){}
   try{ if(typeof localStorage !== 'undefined') localStorage.setItem('sky.nav', nav); }catch(e){}
-  // load the panels that belong to this area
-  const tabs = NAV_TABS[nav] || [];
-  if(tabs.length){
-    // show only this area's tabpanels inside the legacy shell
-    try{
-      document.querySelectorAll('.tabpanel').forEach(p=> p.classList.toggle('active', tabs.indexOf(p.dataset.tab)>=0));
-    }catch(e){}
-    tabs.forEach(t=>{
-      try{ if(typeof onTabShown === 'function') onTabShown(t); }catch(e){}
-    });
+  // a legacy area is a focused page (T6): header + sub-switcher, ONE section
+  if(LEGACY_NAVS.indexOf(nav)>=0){
+    try{ renderAreaHead(nav); }catch(e){}
+    try{ switchSub(nav, _areaSub(nav)); }catch(e){}
+  } else {
+    try{ renderAreaHead(''); }catch(e){}
+  }
+  if(nav === 'home'){
+    loadHome();
   }
   if(nav === 'trade'){
     loadTerminal();
   }
-  try{ if(typeof history !== 'undefined' && history.replaceState) history.replaceState(null, '', '#'+nav); }catch(e){}
+  // leaving any area closes the mobile sheets
+  try{ closeMobileTicket(); }catch(e){}
+  try{ const t=document.getElementById('terminal'); if(t) t.classList.remove('mobile-wl-open'); }catch(e){}
+  try{ if(typeof history !== 'undefined' && history.replaceState && LEGACY_NAVS.indexOf(nav)<0) history.replaceState(null, '', '#'+nav); }catch(e){}
+  try{ paintMobileNav(); }catch(e){}
 }
 
-// re-apply the active panel set after render() rebuilds #app
+/* ═════════════════════════════════════════════════════════════════════
+   T6 — focused pages: every nav area has an identity header and a
+   compact sub-section switcher. Exactly one section is visible at a
+   time — never a stack of old cards — and each switch loads through
+   the existing onTabShown() loaders. Presentation only: no panel
+   content, endpoint, threshold or permission changed.
+   ═════════════════════════════════════════════════════════════════════ */
+const AREA_META = {
+  markets:   {title:'Markets',   desc:'BTC, ETH and XAU at a glance — price, trend, funding, flow, news and data freshness.'},
+  portfolio: {title:'Portfolio', desc:'Paper equity, exposure, realised R, drawdown and the live book.'},
+  journal:   {title:'Journal',   desc:'Entries, drawings, emotions, mistakes and rule compliance — the why, not just the what.'},
+  evidence:  {title:'Evidence',  desc:'Backtests, scorecards, expectancy, sample progress and graduation proof.'},
+  system:    {title:'System',    desc:'Connections, data health, background jobs, the hub and advanced tools.'},
+};
+const AREA_SUBS = {
+  markets:   [['overview','Overview'], ['market','Market radar'], ['intelligence','Intelligence']],
+  portfolio: [['manage','Positions'], ['trades','Decisions'], ['risk','Risk centre'], ['weekly','Weekly review']],
+  journal:   [['journal','Journal']],
+  evidence:  [['evidence','Evidence'], ['learn','Learning']],
+  system:    [['system','Data health'], ['connections','Connections'], ['agent','Hub & agent'], ['commands','Command centre'], ['modules','Modules']],
+};
+const TAB_TO_AREA = {};
+try{ Object.keys(AREA_SUBS).forEach(a=> AREA_SUBS[a].forEach(s=>{ TAB_TO_AREA[s[0]]=a; })); }catch(e){}
+
+function _areaSub(nav){
+  const tabs=(AREA_SUBS[nav]||[]).map(s=>s[0]);
+  let saved=null;
+  try{ if(typeof localStorage!=='undefined') saved=localStorage.getItem('sky.sub.'+nav); }catch(e){}
+  if(saved && tabs.indexOf(saved)>=0) return saved;
+  // honour a deep-linked or remembered section that belongs to this area
+  try{ if(_activeTab && tabs.indexOf(_activeTab)>=0) return _activeTab; }catch(e){}
+  return tabs[0]||null;
+}
+function renderAreaHead(nav){
+  const host=document.getElementById('areaHead');
+  if(!host) return;
+  const meta=AREA_META[nav];
+  if(!meta){ host.style.display='none'; host.innerHTML=''; return; }
+  const subs=AREA_SUBS[nav]||[];
+  const cur=_areaSub(nav);
+  let html='<h2>'+esc(meta.title)+'</h2><div class="adesc">'+esc(meta.desc)+'</div>';
+  if(subs.length>1){
+    html+='<div class="areasub" role="tablist">'
+      + subs.map(s=>'<button data-iarea="'+esc(nav)+'" data-asub="'+esc(s[0])+'"'
+        +' class="'+(s[0]===cur?'active':'')+'" onclick="switchSubTab(this)" title="'+esc(s[1])+'">'+esc(s[1])+'</button>').join('')
+      +'</div>';
+  }
+  host.innerHTML=html;
+  host.style.display='flex';
+}
+function switchSubTab(btn){
+  if(btn && btn.dataset) switchSub(btn.dataset.iarea, btn.dataset.asub);
+}
+function switchSub(nav, tab){
+  const tabs=(AREA_SUBS[nav]||[]).map(s=>s[0]);
+  if(tabs.indexOf(tab)<0) return;
+  try{ if(typeof localStorage!=='undefined') localStorage.setItem('sky.sub.'+nav, tab); }catch(e){}
+  _activeTab=tab;
+  try{
+    document.querySelectorAll('.areasub button').forEach(b=> b.classList.toggle('active', b.dataset.asub===tab));
+    document.querySelectorAll('.tabpanel').forEach(p=> p.classList.toggle('active', p.dataset.tab===tab));
+  }catch(e){}
+  try{ if(typeof history!=='undefined' && history.replaceState) history.replaceState(null,'','#'+tab); }catch(e){}
+  try{ if(typeof onTabShown==='function') onTabShown(tab); }catch(e){}
+}
+
+// re-apply the current focused section after render() rebuilds #app
 function applyNavPanels(){
   const nav=_currentNav||'trade';
-  const tabs=NAV_TABS[nav]||[];
-  if(!tabs.length) return;
+  if(LEGACY_NAVS.indexOf(nav)<0) return;
+  const tab=_areaSub(nav);
+  if(!tab) return;
   try{
-    document.querySelectorAll('.tabpanel').forEach(p=> p.classList.toggle('active', tabs.indexOf(p.dataset.tab)>=0));
+    document.querySelectorAll('.areasub button').forEach(b=> b.classList.toggle('active', b.dataset.asub===tab));
+    document.querySelectorAll('.tabpanel').forEach(p=> p.classList.toggle('active', p.dataset.tab===tab));
   }catch(e){}
 }
 
-// allow old switchTab('chart') semantics to land on the terminal
-const _origSwitchTab = window.switchTab;
+// every old switchTab(name) call lands on the right focused page+section
+const _origSwitchTab = (typeof switchTab==='function') ? switchTab : window.switchTab;
 if(typeof _origSwitchTab === 'function'){
-  window.switchTab = function(tab){
+  switchTab = function(tab){
     if(tab === 'chart' || tab === 'trade'){ navTo('trade'); return; }
+    const area=TAB_TO_AREA[tab];
+    if(area){ navTo(area); switchSub(area, tab); return; }
     _origSwitchTab(tab);
+  };
+}
+
+/* ── T6 mobile — four-section bar + paper-ticket sheet ──────────────
+   Markets / Chart / Positions / AI one thumb-tap away; the ticket is a
+   full-screen sheet that re-reads the risk gate fresh on open (the T3
+   confirm still re-reads it on the server before enrolling). */
+let _mobileSec=null;
+function paintMobileNav(){
+  let sec=_mobileSec;
+  if(_currentNav==='markets') sec='markets';
+  else if(_currentNav==='trade') sec=(sec==='positions'||sec==='ai')?sec:'chart';
+  else sec=null;
+  _mobileSec=sec;
+  try{ document.querySelectorAll('#mobileNav button').forEach(b=> b.classList.toggle('active', b.dataset.msec===sec)); }catch(e){}
+}
+function mobileGo(sec){
+  _mobileSec=sec;
+  if(sec==='markets') navTo('markets');
+  else if(sec==='chart') navTo('trade');
+  else if(sec==='positions'){ navTo('trade'); try{ switchBottomTab('positions'); }catch(e){} paintMobileNav(); }
+  else if(sec==='ai'){ paintMobileNav(); try{ openAiDrawer(); }catch(e){} }
+}
+function openMobileTicket(){
+  const t=document.getElementById('terminal'); if(!t) return;
+  t.classList.add('ticket-sheet');
+  try{ loadRiskChip(); }catch(e){}
+  try{ loadTicketGate(); }catch(e){}
+}
+function closeMobileTicket(){
+  const t=document.getElementById('terminal'); if(t) t.classList.remove('ticket-sheet');
+}
+// mobile section leaves Positions when the user moves on
+const _origSwitchBottomTab = (typeof switchBottomTab==='function') ? switchBottomTab : null;
+if(_origSwitchBottomTab){
+  switchBottomTab = function(tab){
+    const r=_origSwitchBottomTab(tab);
+    try{ if(_mobileSec==='positions' && tab!=='positions'){ _mobileSec='chart'; paintMobileNav(); } }catch(e){}
+    return r;
+  };
+}
+const _origCloseAiDrawer = (typeof closeAiDrawer==='function') ? closeAiDrawer : null;
+if(_origCloseAiDrawer){
+  closeAiDrawer = function(){
+    const r=_origCloseAiDrawer();
+    try{ if(_mobileSec==='ai'){ _mobileSec=null; paintMobileNav(); } }catch(e){}
+    return r;
   };
 }
 
@@ -6908,26 +7201,239 @@ async function aiSend(which){
   }
 }
 
+/* ═════════════════════════════════════════════════════════════════════
+   T5 — Home: post-login command dashboard + onboarding.
+   Read-only composition of the existing /api/risk, /api/readiness,
+   /api/trades and /api/loop-health payloads — no new capability, no
+   threshold moved, no exchange-order path. Every card paints loading,
+   error and empty states explicitly, and every visit re-reads the feeds
+   (no stale one-shot cache — the T4 part-1 lesson).
+   ═════════════════════════════════════════════════════════════════════ */
+function homeSymTf(){
+  let sym='BTCUSDT', tf='15m';
+  try{
+    if(typeof localStorage!=='undefined'){
+      const s=localStorage.getItem('sky.symbol'), t=localStorage.getItem('sky.timeframe');
+      if(s && document.querySelector('#chartSymSeg button[data-sym="'+s+'"]')) sym=s;
+      if(t && document.querySelector('#chartTfSeg button[data-tf="'+t+'"]')) tf=t;
+    }
+  }catch(e){}
+  return {sym:sym, tf:tf};
+}
+function openTradingTerminal(){ navTo('trade'); }
+async function _homeGet(url){
+  const r=await fetch(url);
+  const d=await r.json().catch(()=>({error:'bad response'}));
+  if(!r.ok) throw new Error((d && d.error)||('HTTP '+r.status));
+  return d;
+}
+function _hcDot(id, cls){
+  const el=document.getElementById(id);
+  if(el) el.className='hc-dot '+(cls||'off');
+}
+function _hcBody(id, html){
+  const el=document.getElementById(id);
+  if(el) el.innerHTML=html;
+}
+function _hcErr(id, dotId, msg){
+  _hcBody(id, '<div class="hc-err">⚠ could not load — '+esc(msg)
+    +' <button class="hc-link" onclick="loadHome()" title="Re-read every home feed now">retry</button></div>');
+  _hcDot(dotId, 'warn');
+}
+async function loadHome(){
+  // greeting + continue button stay cheap and synchronous
+  try{
+    const h=new Date().getHours();
+    const part=h<12?'Good morning':h<18?'Good afternoon':'Good evening';
+    const user=(__auth&&__auth.user)||'';
+    const g=document.getElementById('homeGreet');
+    if(g) g.textContent=user?part+', '+user+'.':part+'.';
+  }catch(e){}
+  try{
+    const st=homeSymTf();
+    const c=document.getElementById('homeContinue');
+    if(c) c.textContent='Continue '+st.sym+' · '+st.tf;
+  }catch(e){}
+  // settle each feed independently so one slow endpoint never blanks the board
+  const feeds={risk:'/api/risk', readiness:'/api/readiness',
+               trades:'/api/trades', loop:'/api/loop-health'};
+  const results={};
+  await Promise.all(Object.keys(feeds).map(async (k)=>{
+    try{ results[k]=await _homeGet(feeds[k]); }
+    catch(err){ results[k]={__error:String(err && err.message || err)}; }
+  }));
+  try{ paintHome(results); }catch(e){}
+}
+function paintHome(r){
+  // ── risk gate (and today's P&L from the same payload) ────────────
+  if(r.risk.__error){
+    _hcErr('homeBodyGate','homeDotGate', r.risk.__error);
+    _hcErr('homeBodyPnl','homeDotPnl', r.risk.__error);
+  } else {
+    const g=r.risk.gate||{};
+    const allowed=!!g.allowed;
+    _hcDot('homeDotGate', allowed?'ok':'warn');
+    let html='<div class="hc-big '+(allowed?'ok':'warn')+'">'+(allowed?'OPEN':'BLOCKED')+'</div>';
+    const reasons=g.blocked_by||[];
+    if(allowed) html+='<div class="hc-sub">No blockers — the gate re-reads fresh on the server before every paper confirmation.</div>';
+    else html+='<div class="hc-sub">'+esc(reasons.slice(0,2).join(' · '))+(reasons.length>2?' · +'+String(reasons.length-2)+' more':'')+'</div>';
+    _hcBody('homeBodyGate', html);
+    const dw=(g.details&&g.details.daily_weekly)?g.details.daily_weekly:{};
+    const t=dw.today||{}, wk=dw.week||{};
+    const pct=(typeof t.pct==='number')?t.pct:null;
+    let plc='off', bcls='';
+    if(dw.daily_blocked){ plc='bad'; bcls='bad'; }
+    else if(pct!==null && (t.n||0)>0){ plc=pct>0?'ok':pct<0?'warn':'off'; bcls=pct>0?'ok':pct<0?'warn':''; }
+    _hcDot('homeDotPnl', plc);
+    let p='<div class="hc-big '+bcls+'">'+(pct===null?'—':((pct>0?'+':'')+fmt(pct,2)+'%'))+'</div>';
+    p+='<div class="hc-sub">'+String(t.n||0)+' decided today · net '
+      +((typeof t.r_sum==='number')?((t.r_sum>0?'+':'')+fmt(t.r_sum,2)+'R'):'—');
+    if(dw.daily_limit!=null) p+=' · hard limit −'+fmt(dw.daily_limit,1)+'%';
+    p+='</div>';
+    if(dw.daily_blocked) p+='<div class="hc-sub" style="color:var(--amber)">daily loss limit reached — new trades are blocked</div>';
+    else if(dw.weekly_blocked) p+='<div class="hc-sub" style="color:var(--amber)">weekly limit hit — reduced activity</div>';
+    p+='<div class="hc-sub">week: '+((typeof wk.pct==='number')?((wk.pct>0?'+':'')+fmt(wk.pct,2)+'%'):'—')+'</div>';
+    _hcBody('homeBodyPnl', p);
+  }
+  // ── data freshness (the readiness strip every surface shares) ────
+  if(r.readiness.__error){ _hcErr('homeBodyData','homeDotData', r.readiness.__error); }
+  else{
+    const lvl=r.readiness.level||'down';
+    const dcls=lvl==='ok'?'ok':(lvl==='degraded'||lvl==='blocked')?'warn':'bad';
+    _hcDot('homeDotData', dcls);
+    let d='<div class="hc-big '+dcls+'">'+esc(lvl.toUpperCase())+'</div>';
+    d+='<div class="hc-sub">'+esc(r.readiness.headline||'')+'</div>';
+    const pillars=r.readiness.pillars||[];
+    const dataP=pillars.filter(p=> p && p.name==='data')[0];
+    if(dataP) d+='<div class="hc-sub">data — '+esc(dataP.headline||dataP.detail||'')+'</div>';
+    _hcBody('homeBodyData', d);
+  }
+  // ── open positions ───────────────────────────────────────────────
+  if(r.trades.__error){ _hcErr('homeBodyPositions','homeDotPositions', r.trades.__error); }
+  else{
+    const open=r.trades.open||[];
+    _hcDot('homeDotPositions', open.length?'ok':'off');
+    let o='<div class="hc-big">'+String(open.length)+' open</div>';
+    if(!open.length){ o+='<div class="hc-sub">Nothing running — a paper ticket is one click away.</div>'; }
+    else{
+      o+='<div class="hc-rows">'+open.slice(0,3).map(x=>{
+        const rr=(typeof x.current_r==='number')?x.current_r:null;
+        const rtxt=rr===null?'—':((rr>0?'+':'')+fmt(rr,2)+'R');
+        const rcol=rr===null?'var(--mut)':rr>=0?'var(--green)':'var(--red)';
+        return '<div class="hc-row"><span>'+esc(x.symbol||'?')+' · '+esc(x.action||'?')
+          +'</span><span class="r" style="color:'+rcol+'">'+rtxt+'</span></div>';
+      }).join('')+'</div>';
+      if(open.length>3) o+='<div class="hc-sub">+'+String(open.length-3)+' more in the terminal</div>';
+    }
+    _hcBody('homeBodyPositions', o);
+  }
+  // ── journal tasks, evidence progress, focus (loop-health) ────────
+  if(r.loop.__error){
+    _hcErr('homeBodyJournal','homeDotJournal', r.loop.__error);
+    _hcErr('homeBodyEvidence','homeDotEvidence', r.loop.__error);
+    _hcErr('homeBodyFocus','homeDotFocus', r.loop.__error);
+  } else {
+    const loop=r.loop.loop||{};
+    const miss=loop.missing_journals||0;
+    const pend=loop.pending_reviews||0;
+    _hcDot('homeDotJournal', miss>0?'warn':'ok');
+    let j='<div class="hc-big '+(miss>0?'warn':'ok')+'">'+(miss>0?String(miss)+' unjournaled':'clear')+'</div>';
+    if(miss>0) j+='<div class="hc-sub" style="color:var(--amber)">journal-first: the next confirm holds until these are written</div>';
+    j+='<div class="hc-sub">'+String(pend)+' pending review(s) to decide</div>';
+    j+='<div class="hc-sub">daily question — did I follow the system today?</div>';
+    _hcBody('homeBodyJournal', j);
+
+    const grad=r.loop.graduation||{};
+    const crit=grad.criteria||[];
+    const met=crit.filter(c=> c && c.met).length;
+    _hcDot('homeDotEvidence', grad.ready?'ok':'off');
+    let e='<div class="hc-big '+(grad.ready?'ok':'')+'">'+(grad.ready?'GRADUATION READY':String(met)+'/'+String(crit.length||4)+' criteria')+'</div>';
+    e+='<div class="hc-sub">n='+String(loop.real_paper_n||0)+' real paper trades · the bar stays: E ≥ +0.50R · WR > 55% · PF ≥ 1.5 · compliance ≥ 90%</div>';
+    const prim=(grad.by_setup||[]).filter(s=> s && s.primary);
+    if(prim.length){
+      e+='<div class="hc-rows">'+prim.slice(0,2).map(s=>'<div class="hc-row"><span>'+esc(s.plan_type||'?')
+        +'</span><span class="r">paper '+String(s.paper_n||0)+'/'+String(s.paper_target||'—')
+        +' · backtest '+String(s.backtest_n||0)+'/'+String(s.backtest_target||'—')+'</span></div>').join('')+'</div>';
+    }
+    _hcBody('homeBodyEvidence', e);
+
+    const adv=r.loop.advice||{};
+    const flags=(r.loop.gate&&r.loop.gate.flags)||[];
+    _hcDot('homeDotFocus', flags.length?'warn':'ok');
+    let f='<div class="hc-big">'+esc(adv.action||'—')+'</div>';
+    f+='<div class="hc-sub">'+esc(adv.headline||'')+'</div>';
+    if(flags.length) f+='<div class="hc-sub" style="color:var(--amber)">⚠ trader state: '+esc(flags.join(', '))+' — clear the flag before any new trade</div>';
+    _hcBody('homeBodyFocus', f);
+  }
+  // onboarding — a fresh desk gets pointed at the paper loop, not a CLI
+  try{ _homeOnboard(r); }catch(e){}
+  const meta=document.getElementById('homeMeta');
+  if(meta) meta.textContent='home refreshed '+new Date().toLocaleTimeString()
+    +' · read-only: /api/risk · /api/readiness · /api/trades · /api/loop-health';
+}
+function _homeOnboard(r){
+  const host=document.getElementById('homeOnboard');
+  if(!host) return;
+  let dismissed=false;
+  try{ if(typeof localStorage!=='undefined') dismissed=localStorage.getItem('sky.home.hideIntro')==='1'; }catch(e){}
+  const loop=(!r.loop.__error && r.loop.loop)||{};
+  // a desk with no real paper evidence, nothing open and nothing pending
+  const fresh=!r.loop.__error && !r.trades.__error
+    && (loop.real_paper_n||0)===0
+    && (loop.pending_reviews||0)===0
+    && ((r.trades.open||[]).length===0);
+  if(dismissed || !fresh){ host.style.display='none'; return; }
+  const st=homeSymTf();
+  host.innerHTML=
+    '<h2>Welcome to SKY — start your paper loop</h2>'
+    +'<div class="ob-note">SKY is the brain, not a bot. It proposes, you approve, the runner simulates — '
+    +'<b>no real exchange order exists anywhere in this app</b>. The desk proves an edge on paper before real capital is even a discussion.</div>'
+    +'<div class="ob-steps">'
+    +'<div class="ob-step"><b>1 · Open the terminal</b>Pick a market (BTC, ETH, XAU display) and a timeframe — chart, watchlist, paper ticket and AI Copilot share one screen.</div>'
+    +'<div class="ob-step"><b>2 · Read the setup</b>Study zones, levels and indicators, or ask the Copilot — it answers from the desk&rsquo;s own scan, with sources.</div>'
+    +'<div class="ob-step"><b>3 · Prepare the paper ticket</b>Entry, stop, target and risk % size from your real balance and the desk cost model.</div>'
+    +'<div class="ob-step"><b>4 · Confirm — paper only</b>The server re-checks the risk gate fresh before enrolling. Market tickets fill at entry; limit plans wait for their level.</div>'
+    +'<div class="ob-step"><b>5 · Manage and journal</b>Watch live R / MAE / MFE, close to record the outcome, and journal why — the journal opens for you.</div>'
+    +'</div>'
+    +'<div class="ob-actions">'
+    +'<button class="btn primary" onclick="openTradingTerminal()" title="Open the Trading Terminal on '+esc(st.sym)+' '+esc(st.tf)+'">Open Trading Terminal ⟶</button>'
+    +'<button class="btn ghost" onclick="dismissHomeIntro()" title="Hide this introduction">hide intro</button>'
+    +'</div>';
+  host.style.display='block';
+}
+function dismissHomeIntro(){
+  try{ if(typeof localStorage!=='undefined') localStorage.setItem('sky.home.hideIntro','1'); }catch(e){}
+  const host=document.getElementById('homeOnboard');
+  if(host) host.style.display='none';
+}
+
 /* ── init ───────────────────────────────────────────────────────────── */
 (function(){
   try{
     const nav=localStorage.getItem('sky.nav');
     const h=(typeof location!=='undefined'&&location.hash||'').replace('#','');
-    const target=h&&['trade','markets','portfolio','journal','evidence','system'].includes(h)?h:(nav||'trade');
+    // landing: explicit #area wins; a #section deep-link (T6) lands on its
+    // owning focused page; otherwise the remembered view; else Home (T5)
+    let target=nav||'home', section=null;
+    if(h && ['home','trade','markets','portfolio','journal','evidence','system'].includes(h)) target=h;
+    else if(h && TAB_TO_AREA[h]){ target=TAB_TO_AREA[h]; section=h; }
+    if(target==='chart') target='trade';
     document.querySelectorAll('.navbtn').forEach(b=> b.classList.toggle('active', b.dataset.nav===target));
+    const homeView=document.getElementById('view-home');
     const tradeView=document.getElementById('view-trade');
     const legacyView=document.getElementById('view-legacy');
+    if(homeView) homeView.classList.toggle('active', target==='home');
     if(tradeView) tradeView.classList.toggle('active', target==='trade');
     if(legacyView) legacyView.classList.toggle('active', LEGACY_NAVS.indexOf(target)>=0);
     _currentNav=target;
+    try{ paintMobileNav(); }catch(e){}
     if(!isRealBrowser()) return;   // jsdom/CI harness: no auto-loading
-    if(target==='trade'){
+    if(target==='home'){
+      try{ loadHome(); }catch(e){}
+    } else if(target==='trade'){
       try{ loadTerminal(); }catch(e){}
     } else {
-      const tabs=NAV_TABS[target]||[];
-      try{
-        document.querySelectorAll('.tabpanel').forEach(p=> p.classList.toggle('active', tabs.indexOf(p.dataset.tab)>=0));
-      }catch(e){}
+      try{ renderAreaHead(target); switchSub(target, section||_areaSub(target)); }catch(e){}
     }
   }catch(e){}
 })();
@@ -6958,6 +7464,17 @@ async function aiSend(which){
       try{ loadFeedChip(); }catch(e){}
       // keep the visible bottom tab fresh — positions R / MAE / MFE live
       try{ if(_bottomTab==='positions'&&!_journalTarget) refreshBottomTab('positions'); }catch(e){}
+    }, 60000);
+  }catch(e){}
+})();
+
+// periodic refresh of the home dashboard (T5)
+(function(){
+  if(!isRealBrowser()) return;
+  try{
+    setInterval(()=>{
+      if(_currentNav!=='home') return;
+      try{ loadHome(); }catch(e){}
     }, 60000);
   }catch(e){}
 })();

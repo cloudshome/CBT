@@ -1,5 +1,55 @@
-**Last updated:** 2026-08-20 (**v2.53.0 — T4 part 2 shipped**). The Trade
+**Last updated:** 2026-08-21 (**v2.55.0 — T6 shipped: T1–T6 complete**). The
+product lane is code-complete. Every nav area is now a **focused page** — an
+identity header + sub-section switcher with exactly **one section visible at a
+time** (no more five-panels-stacked shell): Markets (Overview / Market radar /
+Intelligence), Portfolio (Positions / Decisions / Risk centre / Weekly
+review), Journal, Evidence (Evidence / Learning), System (Data health /
+Connections / Hub & agent / Command centre / Modules). Sub-choice persists per
+browser (`sky.sub.<area>`, removed names fall back to the area default), every
+section is `#section` deep-linkable (init resolves a section hash to its
+owning page), every old `switchTab(name)` call lands on the right focused
+page+section, and `render()`'s re-apply can **never navigate the user** on a
+scan refresh. Mobile (≤760px): a **four-section bottom bar** (Markets / Chart
+/ Positions / AI-Copilot with tracked active state) and the **paper ticket as
+a full-screen sheet** (🎫 Ticket in the chart toolbar; backdrop/✕/area-switch
+closes it; opening re-reads `/api/risk` fresh for chip + ticket — confirm
+still re-reads the gate server-side before enrolling). Presentation only —
+same `onTabShown()` loaders, **zero new endpoints**, no threshold moved, no
+exchange-order path. Suite **1348 passed / 1 skipped** (with `mcp` +
+`cryptography`). Contract: `docs/HANDOVER_2026-08-21_T6.md`. **The T-lane's
+only open item: visual QA of the whole app on a real browser** (T4 gestures,
+T3 loop, T5 hero, T6 sheets/bar). Lane A: **P11 real paper proof stays the
+money path — the bar does not move.** Lane C: P22 drills still need real
+signers; P12.12 needs host evidence.
+
+**Previous:** 2026-08-21 (**v2.54.0 — T5 shipped: post-login Home &
+onboarding**). The landing after login is now a concise **command dashboard**
+(first nav area; a remembered view or explicit `#hash` still wins): hero with
+time-of-day greeting, **Continue ‹symbol · timeframe›** (remembered market,
+re-validated against the server) and the **Open Trading Terminal ⟶** primary
+button, over seven honest cards — risk gate with the real `blocked_by`
+reasons, data freshness (readiness + the P10.5 data pillar, quarantine
+included), open positions with live R, today's P&L net of costs beside the
+hard daily limit (amber limit warnings), journal tasks with the
+**journal-first hold named**, evidence progress with the **unmoved** bar +
+per-primary-setup sample rows, and focus (desk advice + trader-state flags).
+**Zero new endpoints** — pure read-only composition of `/api/risk`,
+`/api/readiness`, `/api/trades`, `/api/loop-health`; each feed settles
+independently so a dead one paints `could not load — retry` in its own card
+while the rest render; re-read on every visit; the board never POSTs.
+**Onboarding** shows only for a fresh desk (no real paper, nothing open,
+nothing pending, not dismissed) — five steps pointing at the paper loop, never
+a CLI; dismissal persists per browser. Presentation only — no threshold moved,
+no exchange-order path. Suite **1334 passed / 1 skipped** (with `mcp` +
+`cryptography`). Contract: `docs/HANDOVER_2026-08-21_T5.md`. Next sandbox code:
+**T6 — focused pages** (the last T-phase). Still open from T1: visual QA of
+the T3 loop, the T4 drag/collapse/mobile gestures and now the T5
+hero/onboarding/mobile stacking on a real browser. **P22 drills still need
+real signers; P11 real paper proof stays the money path.**
+
+**Previous:** 2026-08-20 (**v2.53.0 — T4 part 2 shipped**). The Trade
 Terminal is now a workspace you can shape and it never freezes silently.
+
 **Resizable** drag gutters (watchlist ↔ chart ↔ order, chart ↔ bottom) write
 panel widths/height as live CSS variables (charts re-measure in place;
 double-click a gutter to reset); **collapsible** panels leave a re-open rail /
