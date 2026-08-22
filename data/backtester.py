@@ -33,7 +33,8 @@ from config import (BACKTEST_HORIZONS, BACKTEST_MIN_BARS, BACKTEST_STEP,
 from data.symbols import normalize_symbol
 from data.binance_client import TIMEFRAME_TO_MS
 from data.costs import calculate_trade_cost, CostModel
-from engine.signal_engine import analyze_frame
+from engine.signal_engine import analyze_frame_at
+from engine.indicators import add_all_indicators
 from engine.execution import adjust_for_slip
 
 OUTCOMES = ("FULL_WIN", "PARTIAL_WIN", "LOSS", "OPEN", "NOT_TRIGGERED")
@@ -331,6 +332,14 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
     df.attrs["timeframe"] = timeframe
     df.attrs["symbol"] = symbol
 
+    # P13.4 — precompute the indicator columns once over the whole series,
+    # then walk with windowed per-bar analysis instead of re-running the full
+    # indicator suite from bar 0 at every step (was O(N^2), now O(N) +
+    # O(lookback) per step).  Behaviour-identical: every detector only ever
+    # saw its fixed tail window of the prefix, and the prefix always started
+    # at row 0, so the precomputed columns agree bar-for-bar.
+    ind = add_all_indicators(df)
+
     all_graded: list[GradedPlan] = []
     scans_done = 0
     plans_total = 0
@@ -344,9 +353,8 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
     clock = SentimentClock()
 
     for i in range(min_bars, len(df), step):
-        slice_df = df.iloc[: i + 1]
-        out = analyze_frame(slice_df, symbol=symbol, timeframe=timeframe,
-                            min_confidence=min_confidence)
+        out = analyze_frame_at(ind, df, i, symbol=symbol, timeframe=timeframe,
+                               min_confidence=min_confidence)
         bar_ts = int(df.iloc[i]["ts"])
         sig = out.best_signal or {}
         hist_score = compute_historical(

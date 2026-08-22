@@ -6,7 +6,16 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-22 (**P13 Edge Validation — plan + first code shipped**.
+**Last updated:** 2026-08-22 (**v2.56.0 — P13.4 shipped: O(N²) backtest walk
+eliminated** — indicators precomputed once + windowed per-bar analysis
+(`analyze_frame_at`), vectorized structure detectors, cached funding lookup;
+behaviour-identical (16,575 graded rows byte-identical), 5.7× on 500 bars /
+7.9× on 2000 / ~200× at 10k. Contract: `docs/HANDOVER_2026-08-22_P13_4.md`.
+Next sandbox **code**: **P13.5 Monte-Carlo floor**. Lane A stays **P11 real
+paper proof on the real-data Hub** — the bar does not move. No threshold
+moved. No order path.)
+
+**Previous:** 2026-08-22 (**P13 Edge Validation — plan + first code shipped**.
 A second-opinion review of the Accio review
 (`docs/STRATEGIC_CONSIDERATION_2026-08-22.md`) re-prioritised SKY around
 **trading validity** (P0) before architecture and security: realistic
@@ -23,6 +32,7 @@ Contract: `docs/HANDOVER_2026-08-22_EDGE_VALIDATION.md`. **Next session:**
 P13.4 — the O(N²) backtest performance redesign (benchmark → precompute
 indicators → incremental structure → behaviour-identical), then P13.5
 Monte-Carlo floor on the decisive windows.)
+
 
 **Previous:** 2026-08-20 (**v2.53.0 — T4 part 2 shipped**. The Trade
 Terminal is now a workspace you can shape and it never freezes silently:

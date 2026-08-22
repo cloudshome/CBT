@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.56.0] — 2026-08-22 · P13.4 — backtest walk O(N²) eliminated
+
+MAJOR: the backtester and simulator no longer re-run the full indicator suite
+from bar 0 at every walk step. Indicators are precomputed once over the whole
+series and each bar is analyzed through the new windowed `analyze_frame_at`;
+the structure detectors are vectorized in place and the per-trade funding
+lookup is cached per 8h bucket. **Behaviour-identical** by construction and by
+test (16,575 graded rows byte-identical old-vs-new). Measured: **5.7× on 500
+bars, 7.9× on 2000, ~200× on a 10k-bar walk** (est. 2h+ → ~40s). No threshold
+moved, no exchange-order path.
+
+- **Precompute + windowed walk** (`engine/signal_engine.py::analyze_frame_at`,
+  `data/backtester.py`, `data/simulator.py`) — `add_all_indicators` runs once;
+  per bar, structure looks at its tail(200), divergence tail(80), regime
+  tail(20) and the snapshot at the last two rows + prefix length, so each
+  step is O(lookback) instead of O(i).
+- **Vectorized structure detectors** (`engine/structure.py`) — FVG fill and
+  order-block tested/broken use reversed cummin/cummax instead of per-event
+  tail scans; swings/liquidity read numpy arrays (identical results, verified
+  against the pre-change detectors on 33 windows).
+- **Funding lookup cache** (`data/costs.py`) — one store read per (symbol, 8h
+  bucket) instead of per graded trade; the funding series is static during a
+  backtest, so the cached value is the identical row.
+- **Verification** — equivalence harness proves byte-identical graded rows,
+  detectors and per-bar features/plans/structure/scores; suite 1238 passed /
+  1 skipped locally (110 pre-existing JS-harness failures on Node v20 —
+  `navigator` undefined, also failing on the pristine tree; CI's Node v22 is
+  unaffected).
+
 ## [2.55.0+research] — 2026-08-22 · P13 Edge Validation — plan + first code (no version bump)
 
 PATCH-free research/validation addition on top of v2.55.0 (no user-facing
@@ -23,6 +52,7 @@ and the P13 milestone spec (`docs/P13_EDGE_VALIDATION_SPEC.md`).
 - Regressions: `tests/test_edge_validation.py` (11) + 2 execution-alias tests.
   Full suite **1359 passed / 1 skipped**. Contract:
   `docs/HANDOVER_2026-08-22_EDGE_VALIDATION.md`.
+
 
 ## [2.55.0] — 2026-08-21 · T6 — focused pages + mobile sections · T1–T6 complete
 

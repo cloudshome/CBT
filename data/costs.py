@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Optional
 
 # ---------------------------------------------------------------------------
@@ -145,14 +146,32 @@ def get_funding_rate_as_of_t(symbol: str = "BTCUSDT", ts: Optional[int] = None,
     """Look up the stored funding rate as of timestamp *ts*.
 
     If the stored series is unavailable or ts is None, returns *default*.
+
+    The stored funding series is static during a backtest, and the rate only
+    changes on the exchange funding cadence, so lookups are cached per
+    (symbol, 8h bucket) — a multi-year backtest grades hundreds of thousands
+    of trades, and reading the store for every one of them dominated the cost
+    model (P13.4).
     """
     if ts is None:
         return default
     try:
-        if store is None:
-            from data.derivatives import DerivativesStore
-            store = DerivativesStore()
-        df = store.read("binance", "perp", symbol.upper(), "funding_rate", end_ts=ts)
+        from data.derivatives import FUNDING_STEP_MS
+    except Exception:
+        FUNDING_STEP_MS = 8 * 3_600_000
+    bucket = ts - (ts % FUNDING_STEP_MS)
+    return _funding_rate_cached(symbol.upper(), bucket, default)
+
+
+@lru_cache(maxsize=8192)
+def _funding_rate_cached(symbol: str, bucket_ts: int, default: float) -> float:
+    """Cached store read for one (symbol, 8h bucket).  The value at ``ts`` is
+    the last stored funding row <= ts; within one bucket that row is constant,
+    so the bucket-anchored read returns the identical value."""
+    try:
+        from data.derivatives import DerivativesStore
+        df = DerivativesStore().read("binance", "perp", symbol, "funding_rate",
+                                     end_ts=bucket_ts)
         if not df.empty:
             return float(df["value"].iloc[-1])
     except Exception:

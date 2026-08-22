@@ -115,11 +115,17 @@ class MarketStructure:
 
 def detect_swings(df: pd.DataFrame, window: int = 2) -> list[SwingPoint]:
     hi_idx, lo_idx = _fractals(df, window)
-    swings: list[SwingPoint] = []
-    for i in hi_idx:
-        swings.append(SwingPoint(index=int(i), kind="high", price=float(df.high.iloc[i]), ts=int(df.ts.iloc[i])))
-    for i in lo_idx:
-        swings.append(SwingPoint(index=int(i), kind="low", price=float(df.low.iloc[i]), ts=int(df.ts.iloc[i])))
+    highs = df.high.to_numpy()
+    lows = df.low.to_numpy()
+    ts_arr = df.ts.to_numpy()
+    swings: list[SwingPoint] = [
+        SwingPoint(index=int(i), kind="high", price=float(highs[i]), ts=int(ts_arr[i]))
+        for i in hi_idx
+    ]
+    swings += [
+        SwingPoint(index=int(i), kind="low", price=float(lows[i]), ts=int(ts_arr[i]))
+        for i in lo_idx
+    ]
     swings.sort(key=lambda s: s.index)
     return swings
 
@@ -199,34 +205,50 @@ def detect_order_blocks(df: pd.DataFrame, events: list[StructureEvent], window: 
     """Order blocks: the last opposite-color candle before a structure event.
     A bullish OB = the last down candle whose high/low is immediately below the
     price before a bos_up/choch_up event. Zone = [open, high] (bull) / [low, open] (bear)."""
-    blocks: list[OrderBlock] = []
+    n = len(df)
     closes = df.close.to_numpy()
+    opens = df.open.to_numpy()
+    highs = df.high.to_numpy()
+    lows = df.low.to_numpy()
+    ts_arr = df.ts.to_numpy()
+    blocks: list[OrderBlock] = []
     for ev in events:
         i = ev.index
         start = max(0, i - window)
         if ev.kind in ("bos_up", "choch_up"):
-            base = next((j for j in range(i - 1, start - 1, -1) if df.close.iloc[j] < df.open.iloc[j]), None)
-            if base is not None and closes[i] > df.high.iloc[base]:
-                blocks.append(OrderBlock("bullish", base, float(df.high.iloc[base]), float(df.open.iloc[base]),
-                                         int(df.ts.iloc[base])))
+            base = next((j for j in range(i - 1, start - 1, -1) if closes[j] < opens[j]), None)
+            if base is not None and closes[i] > highs[base]:
+                blocks.append(OrderBlock("bullish", base, float(highs[base]), float(opens[base]),
+                                         int(ts_arr[base])))
         elif ev.kind in ("bos_down", "choch_down"):
-            base = next((j for j in range(i - 1, start - 1, -1) if df.close.iloc[j] > df.open.iloc[j]), None)
-            if base is not None and closes[i] < df.low.iloc[base]:
-                blocks.append(OrderBlock("bearish", base, float(df.open.iloc[base]), float(df.low.iloc[base]),
-                                         int(df.ts.iloc[base])))
+            base = next((j for j in range(i - 1, start - 1, -1) if closes[j] > opens[j]), None)
+            if base is not None and closes[i] < lows[base]:
+                blocks.append(OrderBlock("bearish", base, float(opens[base]), float(lows[base]),
+                                         int(ts_arr[base])))
+    # "any later bar reached the level" is a running min/max of the bars AFTER
+    # each position — precompute once with a reversed accumulate instead of a
+    # per-block tail scan (the fast walk calls this every bar).
+    min_low_after = np.full(n, np.nan)
+    max_high_after = np.full(n, np.nan)
+    if n > 1:
+        min_low_after[:-1] = np.minimum.accumulate(lows[::-1])[::-1][1:]
+        max_high_after[:-1] = np.maximum.accumulate(highs[::-1])[::-1][1:]
     # dedupe + status flags
     seen = set()
     unique: list[OrderBlock] = []
-    lows, highs = df.low.to_numpy(), df.high.to_numpy()
     for ob in blocks:
         key = (ob.side, round(ob.top, 2), round(ob.bottom, 2))
         if key in seen:
             continue
         seen.add(key)
-        after = df.iloc[ob.index + 1 :]
-        if not after.empty:
-            ob.tested = bool((after.low <= ob.top).any() if ob.side == "bullish" else (after.high >= ob.bottom).any())
-            ob.broken = bool((after.low < ob.bottom).any() if ob.side == "bullish" else (after.high > ob.top).any())
+        idx = ob.index
+        if idx + 1 < n:
+            if ob.side == "bullish":
+                ob.tested = bool(min_low_after[idx] <= ob.top)
+                ob.broken = bool(min_low_after[idx] < ob.bottom)
+            else:
+                ob.tested = bool(max_high_after[idx] >= ob.bottom)
+                ob.broken = bool(max_high_after[idx] > ob.top)
         unique.append(ob)
     return unique
 
@@ -236,21 +258,29 @@ def detect_fvgs(df: pd.DataFrame, lookback: int = 200) -> list[FVG]:
     high[i+2] < low[i]. A gap is 'filled' once price trades back through it."""
     data = df.tail(lookback).reset_index(drop=True)
     fvgs: list[FVG] = []
+    n = len(data)
     highs, lows = data.high.to_numpy(), data.low.to_numpy()
     ts = data.ts.to_numpy()
-    for i in range(1, len(data) - 1):
+    # "filled once any later bar traded through" = running min of lows / max of
+    # highs AFTER each bar — one reversed accumulate instead of a per-gap scan.
+    min_low_after = np.full(n, np.nan)
+    max_high_after = np.full(n, np.nan)
+    if n > 1:
+        min_low_after[:-1] = np.minimum.accumulate(lows[::-1])[::-1][1:]
+        max_high_after[:-1] = np.maximum.accumulate(highs[::-1])[::-1][1:]
+    for i in range(1, n - 1):
         if lows[i + 1] > highs[i - 1]:
             fvgs.append(FVG("bullish", int(i + 1), float(lows[i + 1]), float(highs[i - 1]), int(ts[i + 1])))
         elif highs[i + 1] < lows[i - 1]:
             fvgs.append(FVG("bearish", int(i + 1), float(lows[i - 1]), float(highs[i + 1]), int(ts[i + 1])))
     for f in fvgs:
-        after = data.iloc[f.index + 1 :]
-        if after.empty:
+        idx = f.index
+        if idx + 1 >= n:
             continue
         if f.side == "bullish":
-            f.filled = bool((after.low <= f.bottom).any())
+            f.filled = bool(min_low_after[idx] <= f.bottom)
         else:
-            f.filled = bool((after.high >= f.top).any())
+            f.filled = bool(max_high_after[idx] >= f.top)
     return fvgs
 
 
@@ -260,18 +290,22 @@ def detect_liquidity(df: pd.DataFrame, swings: list[SwingPoint],
     lows below price. A sweep is a candle that wicks beyond a level then closes
     back inside it (stop hunt / liquidity grab). Scans the last `sweep_scan`
     candles so a sweep that happened a few bars ago is still reported."""
-    price = float(df.close.iloc[-1])
+    closes = df.close.to_numpy()
+    price = float(closes[-1])
     bs = sorted({s.price for s in swings if s.kind == "high" and s.price > price}, reverse=True)
     ss = sorted({s.price for s in swings if s.kind == "low" and s.price < price}, reverse=True)
 
     sweep = None
     window = df.tail(min(sweep_scan, len(df))).reset_index(drop=True)
+    wh = window.high.to_numpy()
+    wl = window.low.to_numpy()
+    wc = window.close.to_numpy()
+    wo = window.open.to_numpy()
     for i in range(len(window) - 1, -1, -1):
-        candle = window.iloc[i]
-        prev_close = window.iloc[i - 1].close if i > 0 else candle.open
+        prev_close = wc[i - 1] if i > 0 else wo[i]
         for level in bs[:4]:
-            if candle.high > level:
-                recovered = candle.close < level
+            if wh[i] > level:
+                recovered = wc[i] < level
                 # only flag if the previous candle did NOT already sit beyond
                 already_beyond = prev_close >= level
                 if not already_beyond or recovered:
@@ -279,8 +313,8 @@ def detect_liquidity(df: pd.DataFrame, swings: list[SwingPoint],
                              "recovered": bool(recovered), "bars_ago": len(window) - 1 - i}
                     return bs, ss, sweep
         for level in ss[:4]:
-            if candle.low < level:
-                recovered = candle.close > level
+            if wl[i] < level:
+                recovered = wc[i] > level
                 already_beyond = prev_close <= level
                 if not already_beyond or recovered:
                     sweep = {"side": "sellside", "level": float(level),

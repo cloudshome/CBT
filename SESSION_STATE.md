@@ -1,4 +1,23 @@
-**Last updated:** 2026-08-22 (**P13 Edge Validation — plan + first code
+**Last updated:** 2026-08-22 (**v2.56.0 — P13.4 shipped: the O(N²) backtest
+walk is gone**). The walk no longer recomputes every indicator from bar 0 at
+each step: `run_backtest` and the simulator precompute the indicator columns
+once (`add_all_indicators` over the full series) and analyze each bar through
+the new `analyze_frame_at` — structure/divergence/regime only inspect their
+fixed tail windows (200/80/20) and the snapshot needs just the last two rows
+plus the prefix length. **Behaviour-identical, verified**: 16,575 graded rows
+byte-identical old-vs-new across the committed sample and a synthetic series;
+detector-level comparison identical across 33 windows; per-bar features/plans/
+structure/scores identical. Measured: **5.7× on 500 bars, 7.9× on 2000, ~200×
+at 10k** (est. 2h+ → ~40s). Structure detectors vectorized in place (reversed
+cummin/cummax fill/break checks, `engine/structure.py`); the cost model's
+per-trade funding-store read is cached per 8h bucket (`data/costs.py`). Suite:
+**1238 passed / 1 skipped** locally (110 pre-existing JS-harness failures on
+Node v20 — `navigator` undefined, also failing on the pristine tree; CI's Node
+v22 unaffected). Contract: `docs/HANDOVER_2026-08-22_P13_4.md`. Next sandbox
+code: **P13.5 Monte-Carlo floor**. Lane A (P11 real paper proof) remains the
+money path — the bar doesn't move. No threshold moved. No order path.
+
+**Previous:** 2026-08-22 (**P13 Edge Validation — plan + first code
 shipped**). A second-opinion review of the Accio review
 (`docs/STRATEGIC_CONSIDERATION_2026-08-22.md`) re-prioritised SKY around
 **trading validity** (P0) before architecture and security. The P13 milestone
@@ -16,6 +35,7 @@ zero slippage). **No threshold moved, no order path, no version bump**
 → precompute indicators → incremental structure → behaviour-identical, ≥ 3–10×
 faster), then P13.5 Monte-Carlo floor. Lane A stays the money path: P11 paper
 proof on the real-data Hub — **the bar does not move.**
+
 
 **Previous:** 2026-08-21 (**v2.55.0 — T6 shipped: T1–T6 complete**). The
 product lane is code-complete. Every nav area is now a **focused page** — an

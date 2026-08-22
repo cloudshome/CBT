@@ -29,14 +29,22 @@ def _f(x, nd: int = 2) -> Optional[float]:
 
 
 def build_snapshot(df: pd.DataFrame, ms: MarketStructure, divergence: dict,
-                   equal_levels: dict) -> dict:
+                   equal_levels: dict, frame_len: Optional[int] = None) -> dict:
     """Assemble the feature snapshot from an indicator-enriched DataFrame and
-    the market-structure result."""
+    the market-structure result.
+
+    ``frame_len`` overrides the frame length used for structure-event age.
+    The fast backtest walk (``analyze_frame_at``) passes a 2-row slice (last
+    two bars) but the event age must be measured against the full walk prefix,
+    so the caller supplies the real prefix length.  When omitted (None) the
+    age is measured against ``len(df)`` exactly as before.
+    """
     if df is None or df.empty:
         return {"empty": True}
     last = df.iloc[-1]
     prev = df.iloc[-2] if len(df) > 1 else last
     price = float(last.close)
+    frame_n = len(df) if frame_len is None else frame_len
 
     # ── Trend ────────────────────────────────────────────────────────────
     ema20, ema50, ema200 = float(last.get("ema_20", price)), float(last.get("ema_50", price)), float(last.get("ema_200", price))
@@ -78,7 +86,7 @@ def build_snapshot(df: pd.DataFrame, ms: MarketStructure, divergence: dict,
     # ── Structure (from MarketStructure) ─────────────────────────────────
     last_event = ms.last_event
     event_kind = last_event.kind if last_event else None
-    event_age = (len(df) - 1 - last_event.index) if last_event else None
+    event_age = (frame_n - 1 - last_event.index) if last_event else None
 
     ob_bull = [ob for ob in ms.order_blocks if ob.side == "bullish" and not ob.broken]
     ob_bear = [ob for ob in ms.order_blocks if ob.side == "bearish" and not ob.broken]

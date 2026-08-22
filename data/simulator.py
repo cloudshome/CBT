@@ -35,7 +35,8 @@ from data.symbols import parse_symbol_list
 from data.sample_client import maybe_client
 from data.backtester import _evaluate, GradedPlan
 from data.provenance import LIVE_SOURCE_KEY, describe_source, is_canonical
-from engine.signal_engine import analyze_frame
+from engine.signal_engine import analyze_frame_at
+from engine.indicators import add_all_indicators
 
 
 WIN_OUTCOME_TO_PAPER = {
@@ -77,10 +78,13 @@ def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
     paper_samples: list[dict] = []  # (plan, graded) ready to persist
     plans_total = 0
 
+    # P13.4 — same precompute + windowed walk as the backtester: indicator
+    # columns once over the full series, then per-bar analysis in O(lookback).
+    ind = add_all_indicators(df)
+
     for i in range(BACKTEST_MIN_BARS, len(df), step):
-        slice_df = df.iloc[: i + 1]
-        out = analyze_frame(slice_df, symbol=symbol, timeframe=timeframe,
-                            min_confidence=min_confidence)
+        out = analyze_frame_at(ind, df, i, symbol=symbol, timeframe=timeframe,
+                               min_confidence=min_confidence)
         plans = out.plans
         if not plans:
             continue
