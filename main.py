@@ -471,6 +471,57 @@ def cmd_validate(args) -> int:
     return 0 if result.get("ok") else 1
 
 
+def cmd_edge_validate(args) -> int:
+    """P13 — the honest, regime-aware edge verdict on the sealed OOS + recent
+    windows (EDGE_CONFIRMED / NO EDGE / INSUFFICIENT_DATA).
+
+    Read-only: runs the same no-look-ahead grader the desk uses, restricts the
+    verdict to the windows the walk never tuned on, and reports the result
+    without tuning anything to look green.  It never moves a threshold and
+    never places an order.  ``--execution`` selects the fill model
+    (``none`` default; ``slip`` / ``impact`` for realistic fills).
+    """
+    from engine.edge_validation import edge_validate_report, format_edge_verdict
+
+    horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
+    decisive = tuple(x.strip() for x in args.decisive_windows.split(",")
+                     if x.strip())
+    symbol = _sym(args.symbol)
+
+    # Honest EXECUTION_MODEL control: default 'none' keeps the verdict
+    # comparable to the gate; 'slip'/'impact' apply the realistic fill model.
+    from data import backtester as _bt_mod
+    prev = _bt_mod.EXECUTION_MODEL
+    _bt_mod.EXECUTION_MODEL = args.execution
+    try:
+        if args.source == "store":
+            from data.store import StoreClient
+            client = StoreClient(exchange=args.exchange, market=args.market)
+        else:
+            client = _client()
+        df = client.klines(symbol, args.tf, args.bars)
+        result = edge_validate_report(
+            df, symbol=symbol, timeframe=args.tf, horizons=horizons,
+            min_bars=args.min_bars, step=args.step,
+            min_confidence=args.min_conf,
+            min_decided=args.min_decided,
+            regime_min_decided=args.regime_min_decided,
+            positive_regime_frac=args.positive_regime_frac,
+            decisive_windows=decisive,
+            train_frac=args.train, val_frac=args.val,
+            oos_frac=args.oos, recent_frac=args.recent,
+        )
+    finally:
+        _bt_mod.EXECUTION_MODEL = prev
+
+    if args.json:
+        print(json.dumps(result, indent=2, default=str))
+        return 0 if result.get("ok") else 1
+
+    print(format_edge_verdict(result))
+    return 0 if result.get("ok") else 1
+
+
 def cmd_xau_evidence(args) -> int:
     """P12.12 — measure PAXG/XAU basis and inspect sealed promotion evidence.
 
@@ -2627,6 +2678,43 @@ def main(argv: list[str] | None = None) -> int:
     p_val.add_argument("--reseal", action="store_true",
                        help="re-open the sealed OOS envelope (recorded in seal history)")
     p_val.set_defaults(func=cmd_validate)
+
+    p_edge = sub.add_parser(
+        "edge-validate",
+        help="P13: honest regime-aware edge verdict on the sealed OOS + recent "
+             "windows (EDGE_CONFIRMED / NO EDGE / INSUFFICIENT_DATA)")
+    p_edge.add_argument("--symbol", default=SYMBOL, help="asset (aliases: BTC, ETH, XAU/GOLD)")
+    p_edge.add_argument("--tf", default=TIMEFRAME)
+    p_edge.add_argument("--bars", type=int, default=2000,
+                        help="most-recent bars to validate over")
+    p_edge.add_argument("--horizons", default="1", help="comma-separated hours; verdict uses the primary")
+    p_edge.add_argument("--step", type=int, default=3,
+                        help="bar step for the walk-forward scan (1 = every bar)")
+    p_edge.add_argument("--min-bars", type=int, default=BACKTEST_MIN_BARS,
+                        help="engine warm-up bars (belong to no window)")
+    p_edge.add_argument("--min-conf", type=int, default=MIN_CONFIDENCE)
+    p_edge.add_argument("--min-decided", type=int, default=30,
+                        help="minimum decided trades on decisive windows for a claim")
+    p_edge.add_argument("--regime-min-decided", type=int, default=10,
+                        help="decided trades a regime needs to count as well-sampled")
+    p_edge.add_argument("--positive-regime-frac", type=float, default=0.5,
+                        help="fraction of well-sampled regimes that must be net-positive")
+    p_edge.add_argument("--decisive-windows", default="oos,recent",
+                        help="comma-separated windows that count as untouched evidence")
+    p_edge.add_argument("--execution", default="none", choices=("none", "slip", "impact"),
+                        help="fill model for the walk (none = raw close fill; "
+                             "slip/impact = realistic slippage)")
+    p_edge.add_argument("--source", default="auto", choices=("auto", "store"),
+                        help="auto = live (or demo) client; store = the P10 Parquet series")
+    p_edge.add_argument("--exchange", default="binance", help="store venue (binance|bybit|dukascopy)")
+    p_edge.add_argument("--market", default="perp", choices=("spot", "perp"),
+                        help="store series market label (used with --source store)")
+    p_edge.add_argument("--train", type=float, default=0.60)
+    p_edge.add_argument("--val", type=float, default=0.15)
+    p_edge.add_argument("--oos", type=float, default=0.15)
+    p_edge.add_argument("--recent", type=float, default=0.10)
+    p_edge.add_argument("--json", action="store_true", help="machine-readable result")
+    p_edge.set_defaults(func=cmd_edge_validate)
 
     p_xau = sub.add_parser(
         "xau-evidence",

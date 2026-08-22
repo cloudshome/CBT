@@ -1,9 +1,14 @@
 """engine/execution.py — realistic fill / slippage model for the simulator.
 
 Applied as a post-grade adjustment to the backtester's GradedPlan when
-EXECUTION_MODEL is set to ``"simple"``.  The default is ``"none"`` (no slip)
-so the existing backtest numbers and the graduation gate stay stable; set
-``EXECUTION_MODEL=simple`` in ``.env`` to enable realistic fills.
+EXECUTION_MODEL is not ``"none"``.  The default is ``"none"`` (no slip) so the
+existing backtest numbers and the graduation gate stay stable; set
+``EXECUTION_MODEL=slip`` in ``.env`` to enable realistic fills.
+
+Accepted model names (config.``EXECUTION_MODEL``): ``none`` | ``slip`` |
+``impact``.  ``slip`` and ``impact`` are aliases for the same one-sided
+fill model (spread + size/volatility impact); ``simple`` is accepted as a
+backwards-compatible alias.
 
 Slippage = half-spread + market impact (size / volatility dependent), applied
 one-sided to the entry fill.  The stop / take-profit *touch* logic is unchanged
@@ -30,9 +35,16 @@ IMPACT_K = 0.40
 
 
 def slip_amount(symbol: str, side: str, entry: float, volume: float,
-                avg_volume: float, atr_pct: float, model: str = "simple") -> float:
-    """One-sided slip in price units (positive).  ``"none"`` -> 0."""
-    if model != "simple":
+                avg_volume: float, atr_pct: float, model: str = "slip") -> float:
+    """One-sided slip in price units (positive).  ``"none"`` -> 0.
+
+    ``slip`` / ``impact`` / ``simple`` all enable the fill model; ``none`` (and
+    any unknown value) disables it.  Previously only ``"simple"`` applied the
+    model, so the config-declared ``slip``/``impact`` values silently produced
+    zero slippage — reconciled so the documented ``none | slip | impact`` set
+    actually works.
+    """
+    if model == "none":
         return 0.0
     spread_half = entry * SPREADS.get(symbol, 0.001)
     size_ratio = volume / max(avg_volume, 1.0)
@@ -62,7 +74,8 @@ def adjust_for_slip(gp, plan: dict, df_row: dict, window: pd.DataFrame,
     """Post-grade slippage adjustment on a GradedPlan (in place).
 
     ``df_row`` is the signal bar; ``window`` is the forward bars used for the
-    SL/TP touch test (for avg-volume / ATR estimation).
+    SL/TP touch test (for avg-volume / ATR estimation).  No-op when
+    ``model == "none"``.
     """
     from numpy import isnan
 

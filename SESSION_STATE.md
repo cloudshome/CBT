@@ -1,4 +1,23 @@
-**Last updated:** 2026-08-21 (**v2.55.0 — T6 shipped: T1–T6 complete**). The
+**Last updated:** 2026-08-22 (**P13 Edge Validation — plan + first code
+shipped**). A second-opinion review of the Accio review
+(`docs/STRATEGIC_CONSIDERATION_2026-08-22.md`) re-prioritised SKY around
+**trading validity** (P0) before architecture and security. The P13 milestone
+spec (`docs/P13_EDGE_VALIDATION_SPEC.md`) is the next session's contract. **Code
+shipped:** `engine/edge_validation.py` + new `python main.py edge-validate` —
+an honest, regime-aware verdict (**EDGE CONFIRMED / NO EDGE /
+INSUFFICIENT_DATA**) computed on the sealed **OOS + recent** windows,
+read-only, net-of-costs, `--execution slip|impact`, `--json`; and a real fix in
+`engine/execution.py` — the config-declared `none | slip | impact` now actually
+applies (previously only `simple` did, so `slip`/`impact` silently produced
+zero slippage). **No threshold moved, no order path, no version bump**
+(config stays v2.55.0 — research/validation layer only). Suite **1359 passed /
+1 skipped** (+11). Contract: `docs/HANDOVER_2026-08-22_EDGE_VALIDATION.md`.
+**Next session: P13.4** — the O(N²) backtest performance redesign (baseline
+→ precompute indicators → incremental structure → behaviour-identical, ≥ 3–10×
+faster), then P13.5 Monte-Carlo floor. Lane A stays the money path: P11 paper
+proof on the real-data Hub — **the bar does not move.**
+
+**Previous:** 2026-08-21 (**v2.55.0 — T6 shipped: T1–T6 complete**). The
 product lane is code-complete. Every nav area is now a **focused page** — an
 identity header + sub-section switcher with exactly **one section visible at a
 time** (no more five-panels-stacked shell): Markets (Overview / Market radar /
@@ -1268,6 +1287,14 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 ## Remaining work (prioritised)
 
+-1. **P13 Edge Validation — P13.4 next (new code lane).** P13.1 (execution
+    model reconciliation) + P13.3 (`edge-validate` honest verdict) shipped
+    2026-08-22. Next: **P13.4 the O(N²) backtest performance redesign** — the
+    walk recomputes indicators/structure from bar 0 at every step; precompute
+    indicators + incremental structure, prove behaviour-identical grading and a
+    ≥ 3–10× speed-up. Then P13.5 (Monte-Carlo floor on the decisive windows),
+    P13.6 (backtest → OOS → paper compare ladder). Full spec:
+    `docs/P13_EDGE_VALIDATION_SPEC.md`.
 0. **P22 trusted-host execution** — P22.1–P22.3 source contracts, native
    project trees, release metadata, diagnostics, and fail-closed drill catalog
    are shipped. Remaining work is to compile/sign on trusted Ubuntu, Windows,
@@ -1418,9 +1445,10 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 
 1. **Keep the passed-through triage:** `docs/CHATGPT_6IDEA_TRIAGE_2026-08-18.md` (6 ideas -> Take/Park/Reject) remains the durable decision for LMRing/OpenDataLoader/AirLLM/harness — `P18.4` already satisfied it as `P12.19` after `P19`.
 2. **W3 + W3.4 + W3.5 shipped (v2.41.0/v2.42.0/v2.43.0+v2.48.0) — verify them:** `python main.py weekly` prints the Sunday mirror; `python main.py practice` prints the calibration mirror; dashboard 📊 Chart tab ✍ PRACTICE card scores a committed read against the desk; 🗓 Review tab PRACTICE CALIBRATION card paints the window; `GET/POST /api/ritual` persists ticks per UTC day; `approve` on a desk with an unjournaled decided real trade returns exit 2 / HTTP 409 `journal_block` until journaled or `--acknowledge-journal`. Multi-chart: ▦ Multi-chart button → 2×2 grid with synchronized zoom + crosshair and per-browser toggles. Contracts: `docs/HANDOVER_2026-08-19_W3.md`, `docs/HANDOVER_2026-08-19_W34.md`, `docs/HANDOVER_2026-08-19_W35.md`, `docs/HANDOVER_2026-08-20_W35_part2.md`.
-3. **Sandbox-feasible next code:** **T3** — Confirm Paper Trade must run the
-   existing desk approval path and put the position in the terminal. Do not
-   start T5/T6 first. Visual QA only if a real browser exists. Trusted-host
+3. **Sandbox-feasible next code:** **P13.4 — the O(N²) backtest performance
+   redesign** (the P13 edge-validation lane; `docs/P13_EDGE_VALIDATION_SPEC.md`).
+   The T-lane is code-complete (v2.55.0); the only open product item is visual
+   QA on a real browser. Do not start new chrome before P13.4/P13.5. Trusted-host
    and real-data work still outrank chrome.
 4. **Trusted-host-only work (do NOT simulate in this checkout):** execute the P22.3 drill catalog (`python main.py release drills`) on real Windows 11 / Android / Ubuntu signers and attach operator evidence JSON; then `p22_complete` may flip.
 5. **Operate the loop on the real-data host:** `python main.py daily` (loop-health), `python main.py paper --watch`, Sunday `python main.py weekly --export reviews/$(date +%F).json`, weekly `python main.py scorecard --conditioned --source store` net + `python main.py validate --source store --tf 15m`. Grow canonical `binance/spot/BTCUSDT 15m` paper `n` toward `100-200` decided net — that is the only graduation evidence.
@@ -1431,8 +1459,19 @@ MCP `SERVER_VERSION` **1.5.0 → 1.6.0**.
 **Suggested next-session prompt:**
 
 > Continue SKY from SESSION_STATE.md. Fetch and diff origin/main first.
-> The W2/W3.5 chart backlog is COMPLETE (v2.48.0 — synchronized crosshair;
-> v2.48.1 keeps the PWA release cache in lockstep; do not rebuild either).
+> The T-lane is code-complete (v2.55.0) and **P13 Edge Validation has started**
+> (`docs/HANDOVER_2026-08-22_EDGE_VALIDATION.md`,
+> `docs/P13_EDGE_VALIDATION_SPEC.md`): `python main.py edge-validate` ships the
+> honest EDGE CONFIRMED / NO EDGE / INSUFFICIENT_DATA verdict on the sealed
+> OOS + recent windows, and `engine/execution.py`'s `none | slip | impact`
+> now actually applies. **Next code is P13.4 — the O(N²) backtest performance
+> redesign**: baseline the walk on a fixed multi-year frame, precompute
+> indicators + incremental structure, prove behaviour-identical grading and a
+> ≥ 3–10× speed-up, keep the suite green and graduation numbers unchanged.
+> Do NOT rewrite the locked P12 protocol, source-key algebra, canonical-only
+> graduation/live-risk filters, or `data/gold_basis.py`. Keep `edge-validate`
+> read-only — it never places an order, moves a threshold, or unlocks micro-live;
+> the graduation gate and default backtest stay on `EXECUTION_MODEL="none"`.
 > P12.1–P12.18 are shipped; do not
 > rewrite the locked protocol, source-key algebra, canonical-only graduation
 > and live risk filters, calendars, gold costs, or `data/gold_basis.py`. Do

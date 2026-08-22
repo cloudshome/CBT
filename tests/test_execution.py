@@ -31,6 +31,25 @@ def test_none_model_returns_zero():
     assert slip_amount("BTCUSDT", "BUY", 60000.0, 1000.0, 1000.0, 0.2,
                        model="none") == 0.0
 
+
+# ── model-name reconciliation (config declares none|slip|impact) ──────────
+def test_slip_and_impact_aliases_apply_the_fill_model():
+    # Regression: previously only model="simple" applied the fill model, so the
+    # documented config values "slip"/"impact" silently produced zero slippage.
+    base = slip_amount("BTCUSDT", "BUY", 60000.0, 2000.0, 1000.0, 0.4,
+                       model="slip")
+    assert base > 0.0
+    assert slip_amount("BTCUSDT", "BUY", 60000.0, 2000.0, 1000.0, 0.4,
+                       model="impact") == pytest.approx(base, abs=1e-9)
+    assert slip_amount("BTCUSDT", "BUY", 60000.0, 2000.0, 1000.0, 0.4,
+                       model="simple") == pytest.approx(base, abs=1e-9)
+
+def test_unknown_model_enables_fill_conservatively():
+    # Only "none" opts out.  An unrecognised value applies the fill model —
+    # the conservative (more realistic) direction if a name is ever mistyped.
+    assert slip_amount("BTCUSDT", "BUY", 60000.0, 2000.0, 1000.0, 0.4,
+                       model="bogus") > 0.0
+
 def test_default_spread_for_unknown_symbol():
     slip = slip_amount("UNKNOWN", "BUY", 100.0, 100.0, 100.0, 0.2)
     assert slip == pytest.approx(100.0 * 0.001, abs=1e-6)   # default 0.1% half-spread

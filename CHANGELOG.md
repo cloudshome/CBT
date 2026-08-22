@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.55.0+research] — 2026-08-22 · P13 Edge Validation — plan + first code (no version bump)
+
+PATCH-free research/validation addition on top of v2.55.0 (no user-facing
+version change, no threshold moved, no order path). Origin: the strategic
+second opinion on the Accio review (`docs/STRATEGIC_CONSIDERATION_2026-08-22.md`)
+and the P13 milestone spec (`docs/P13_EDGE_VALIDATION_SPEC.md`).
+
+- **`engine/execution.py` — model reconciliation.** The config-declared
+  `EXECUTION_MODEL` set `none | slip | impact` now actually works: previously
+  only `"simple"` applied the fill model, so `slip`/`impact` silently produced
+  zero slippage. Now `slip` / `impact` / `simple` enable it; `none` (and only
+  `none`) opts out. The graduation gate and default backtest stay on `none`.
+- **`engine/edge_validation.py` (new) + `python main.py edge-validate`.** An
+  honest, regime-aware edge verdict — **EDGE CONFIRMED / NO EDGE /
+  INSUFFICIENT_DATA** — computed on the **sealed OOS + recent** windows (the
+  slices the walk never tuned on), segmented by market regime, all net of
+  costs. Read-only: never places an order, never moves a threshold, never
+  unlocks micro-live. Flags: `--execution none|slip|impact`, `--json`,
+  `--min-decided`, `--regime-min-decided`, `--positive-regime-frac`,
+  `--decisive-windows`, store/live source.
+- Regressions: `tests/test_edge_validation.py` (11) + 2 execution-alias tests.
+  Full suite **1359 passed / 1 skipped**. Contract:
+  `docs/HANDOVER_2026-08-22_EDGE_VALIDATION.md`.
+
 ## [2.55.0] — 2026-08-21 · T6 — focused pages + mobile sections · T1–T6 complete
 
 MINOR: the last Trade Terminal phase. Every nav area is now a **focused page**

@@ -1,9 +1,9 @@
 # SKY — Combined Roadmap
 
 > **Status:** active source of truth
-> **Last updated:** 2026-08-20
+> **Last updated:** 2026-08-22
 > **Current software:** v2.55.0
-> **Suite at this version:** 1348 passed / 1 skipped (offline)
+> **Suite at this version:** 1359 passed / 1 skipped (offline; P13 edge-validation added)
 >
 > **This file + `TODO.md` win** when other roadmaps, anatomy notes, or
 > workstation plans conflict. Older files remain as historical
@@ -112,6 +112,7 @@ What a user actually has after `python3 main.py`:
 | Confirm Paper Trade | **Enrolls the real paper trade (T3).** Ticket → scan row → fresh server gate → APPROVED (desk path) → paper-runner position in the bottom panel → live R/MAE/MFE → Close records the outcome → journal drawer opens. Market tickets fill at entry; limit/conditional wait for the level. Still paper-only. |
 | AI Copilot | Drawer + 9 quick actions + `/api/ask` with symbol/timeframe context. Answers render as titled sections with a Sources footer (v2.51.0); Prepare-ticket pre-fills the ticket (advisory). AI cannot approve. |
 | Other five nav areas | Existing panels **grouped**, not rewritten |
+| Edge validation (P13) | `python main.py edge-validate` — honest **EDGE CONFIRMED / NO EDGE / INSUFFICIENT_DATA** on the sealed OOS + recent windows, segmented by regime; `--execution slip|impact` for realistic fills. Read-only, 2026-08-22. |
 | Risk gate / graduation / `/api/v1` / jobs / PWA / auth | Untouched by v2.50.0 (T3 calls the existing desk approval + paper runner; no threshold, no order path) |
 | Visual QA | **Not done.** No browser in the sandbox that shipped T1–T6. The single open item on the product lane. |
 | Graduation bar | **Closed.** First real-data grind: +0.348R gross / 36.8% WR / PF 1.55 — below the NET bar. |
@@ -664,6 +665,12 @@ signed releases do not exist yet.
 12. **Professional dark theme.** Dense but calm.
 13. **Mobile is four sections.** Markets, Chart, Positions, AI.
 14. **Everything is accessible, nothing is visible at once.**
+15. **Edge verdicts are read-only and honest.** `python main.py edge-validate`
+    reports **EDGE CONFIRMED / NO EDGE / INSUFFICIENT_DATA** on the sealed
+    OOS + recent windows, segmented by regime — it never tunes a parameter,
+    never moves a threshold, and never unlocks micro-live. The graduation gate
+    and default `backtest` stay on `EXECUTION_MODEL="none"`; realistic fills
+    are a research posture (`--execution slip|impact`), not a gate change.
 
 ---
 
@@ -676,6 +683,9 @@ the named review docs.
 - Freqtrade / Hyperopt / FreqAI / any exchange-order bot (F1–F8)
 - Backtrader as dependency, adapter, or second grader (BT1–BT8)
 - Needle 2 as an in-process router (N1–N8)
+- External AI agent frameworks (OpenHands / Dify / LibreChat / multiple-LLM
+  stacks / autonomous agents / Discord agent / 50-plugin catalogs) until P13
+  edge validation completes (P13.7) — AI sits around the core, never replaces it
 - New strategy-module catalog before the primary family clears the bar
 - Auto capital allocation across strategies
 - Averaging down / martingale
@@ -720,6 +730,24 @@ in the **same** environment is unblocked.
    symbol/timeframe/filter memory, stale/error connection states, tooltips,
    compact mobile drawer).
 5. **T5 + T6 — ✅ shipped** (v2.54.0 home + onboarding; v2.55.0 focused pages + mobile). The **T1–T6 lane is code-complete** — what is left on it is visual QA of the whole app on a real browser, then the Lane-A money path is a behaviour problem, not a code problem.
+
+### Sandbox — P13 Edge Validation (the new code lane)
+
+**Canonical plan:** [`docs/P13_EDGE_VALIDATION_SPEC.md`](docs/P13_EDGE_VALIDATION_SPEC.md).
+*Prove whether existing trading intelligence survives increasingly realistic
+conditions; then say EDGE CONFIRMED or NO EDGE. Never tune to green.*
+
+- **P13.1 + P13.3 — ✅ shipped 2026-08-22.** `engine/execution.py` reconciled
+  (`none | slip | impact` all work now); `engine/edge_validation.py` +
+  `python main.py edge-validate` (regime-aware honest verdict on OOS + recent).
+- **P13.4 — NEXT (O(N²) backtest performance).** Profile the walk on a fixed
+  multi-year frame (baseline bars/s), precompute indicators + incremental
+  structure, prove **behaviour-identical** grading and ≥ 3–10× speed-up.
+- **P13.5 — Monte-Carlo floor** on the decisive windows (5th-pct net exp > 0).
+- **P13.6 — compare ladder** (backtest → OOS → paper) in one report.
+- Then refactor the two largest maintainability debts: `web/app.py` (10,083
+  lines) and `main.py` (3,334) — one domain at a time, `tests → behaviour
+  compare → CI → commit` per step.
 
 Keep the suite green. Bump `config.VERSION` / `pyproject.toml` /
 `sky-shell-v…` together. Parse the *served* dashboard script, not the

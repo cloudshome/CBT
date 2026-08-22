@@ -2,7 +2,23 @@
 
 **Read this first if you are the next coding session.**
 
-Last updated: 2026-08-20 · **v2.53.0 — T4 part 2: resizable/collapsible panels, layout memory, connection state, tooltips, mobile** (`docs/HANDOVER_2026-08-20_T4_part2.md`, `ROADMAP.md`). The Trade Terminal is now a workspace you can shape and it never freezes silently: **drag gutters** resize the watchlist ↔ chart ↔ order and chart ↔ bottom panels (widths/height written live as CSS variables, charts re-measure in place, double-click a gutter to reset); panels **collapse** with a re-open rail / ▾ toggle; panel sizes, collapsed states, symbol, timeframe and the watchlist filter are **remembered per browser** (`localStorage`) and re-applied on load; an explicit **connection strip** (`reportFeed`) surfaces "Live data stale — retrying" with a Retry button after repeated feed failures and clears on recovery; every tab/icon carries a **tooltip**; and on phones the watchlist becomes a **slide-over drawer** (☰). Presentation only — no new endpoint, no threshold moved, no exchange-order path; every localStorage read is wrapped so a private-mode browser still runs. Suite **1327 passed / 1 skipped**. Next sandbox **code** is **T5** (home screen & onboarding) then **T6** (focused pages); visual QA of the drag/collapse/mobile gestures on a real browser is the standing T1 item. Next **money** work is P11 on the real-data Hub. P22 still needs real signers.
+Last updated: 2026-08-22 · **P13 Edge Validation — plan + first code shipped**
+(`docs/HANDOVER_2026-08-22_EDGE_VALIDATION.md`,
+`docs/P13_EDGE_VALIDATION_SPEC.md`, `docs/STRATEGIC_CONSIDERATION_2026-08-22.md`).
+A strategic second opinion on the Accio review re-prioritised SKY around
+**trading validity** (P0) before architecture/security. Code shipped:
+`engine/edge_validation.py` + `python main.py edge-validate` — an honest,
+regime-aware verdict (**EDGE CONFIRMED / NO EDGE / INSUFFICIENT_DATA**) on the
+sealed OOS + recent windows, read-only, net-of-costs, `--execution slip|impact`,
+`--json`; plus `engine/execution.py` reconciled so the config-declared
+`none | slip | impact` actually applies (only `simple` did before). No version
+bump, no threshold moved, no order path. Suite **1359 passed / 1 skipped**.
+**Next session: P13.4 — the O(N²) backtest performance redesign** (precompute
+indicators + incremental structure → behaviour-identical, ≥ 3–10× faster), then
+P13.5 Monte-Carlo floor. Lane A stays the money path: P11 paper proof on the
+real-data Hub — the bar does not move.
+
+**Previous:** 2026-08-20 · **v2.53.0 — T4 part 2: resizable/collapsible panels, layout memory, connection state, tooltips, mobile** (`docs/HANDOVER_2026-08-20_T4_part2.md`, `ROADMAP.md`). The Trade Terminal is now a workspace you can shape and it never freezes silently: **drag gutters** resize the watchlist ↔ chart ↔ order and chart ↔ bottom panels (widths/height written live as CSS variables, charts re-measure in place, double-click a gutter to reset); panels **collapse** with a re-open rail / ▾ toggle; panel sizes, collapsed states, symbol, timeframe and the watchlist filter are **remembered per browser** (`localStorage`) and re-applied on load; an explicit **connection strip** (`reportFeed`) surfaces "Live data stale — retrying" with a Retry button after repeated feed failures and clears on recovery; every tab/icon carries a **tooltip**; and on phones the watchlist becomes a **slide-over drawer** (☰). Presentation only — no new endpoint, no threshold moved, no exchange-order path; every localStorage read is wrapped so a private-mode browser still runs. Suite **1327 passed / 1 skipped**. Next sandbox **code** is **T5** (home screen & onboarding) then **T6** (focused pages); visual QA of the drag/collapse/mobile gestures on a real browser is the standing T1 item. Next **money** work is P11 on the real-data Hub. P22 still needs real signers.
 
 **Previous:** 2026-08-20 · **combined roadmap after v2.49.0** (`docs/PR_REVIEW_2026-08-20.md`, `ROADMAP.md`) — T1 terminal layout, PR #72. Kept for history; superseded by v2.50.0 above.
 

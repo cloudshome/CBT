@@ -6,7 +6,25 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-20 (**v2.53.0 — T4 part 2 shipped**. The Trade
+**Last updated:** 2026-08-22 (**P13 Edge Validation — plan + first code shipped**.
+A second-opinion review of the Accio review
+(`docs/STRATEGIC_CONSIDERATION_2026-08-22.md`) re-prioritised SKY around
+**trading validity** (P0) before architecture and security: realistic
+execution, walk-forward / out-of-sample, regime testing. The P13 milestone spec
+(`docs/P13_EDGE_VALIDATION_SPEC.md`) is now the next session's contract. **Code
+shipped this session:** `engine/edge_validation.py` — an honest,
+regime-aware verdict (**EDGE CONFIRMED / NO EDGE / INSUFFICIENT_DATA**) on the
+sealed **OOS + recent** windows, via new `python main.py edge-validate`
+(read-only; `--execution slip|impact`, `--json`); plus a real fix in
+`engine/execution.py` — the config-declared `none | slip | impact` now actually
+applies (`slip`/`impact` previously did nothing, only `simple` did). No
+threshold moved, no order path. Suite **1359 passed / 1 skipped** (+11).
+Contract: `docs/HANDOVER_2026-08-22_EDGE_VALIDATION.md`. **Next session:**
+P13.4 — the O(N²) backtest performance redesign (benchmark → precompute
+indicators → incremental structure → behaviour-identical), then P13.5
+Monte-Carlo floor on the decisive windows.)
+
+**Previous:** 2026-08-20 (**v2.53.0 — T4 part 2 shipped**. The Trade
 Terminal is now a workspace you can shape and it never freezes silently:
 **resizable** drag gutters (watchlist ↔ chart ↔ order, chart ↔ bottom) write
 panel widths/height as live CSS variables (charts re-measure in place;
@@ -292,6 +310,43 @@ Lane A (P11 paper proof) and Lane C (P22 signers) do not wait for T6.
 **Verification for every T step:** keep `test_served_script_is_valid_javascript`
 and the jsdom harnesses green; add regressions for new terminal behaviour;
 full suite ≥ 1282 / 1; wheel gate green; version/PWA-cache lockstep.
+
+### TODO-25 / P13 · Edge Validation — prove or disprove the edge honestly · 🔄 P13.1 + P13.3 shipped
+
+📄 **Canonical plan:** [`docs/P13_EDGE_VALIDATION_SPEC.md`](docs/P13_EDGE_VALIDATION_SPEC.md)
+**Origin:** [`docs/STRATEGIC_CONSIDERATION_2026-08-22.md`](docs/STRATEGIC_CONSIDERATION_2026-08-22.md)
+(P0-priority second opinion). *Prove whether existing trading intelligence
+survives increasingly realistic conditions — then say EDGE CONFIRMED or
+NO EDGE. Never tune to a green result.*
+
+**Shipped this session (2026-08-22):**
+- **P13.1 (part)** — `engine/execution.py` reconciled: `slip`/`impact` now
+  apply the fill model (previously only `simple` did); `none` (and only `none`)
+  opts out. `--execution` on `edge-validate`.
+- **P13.3** — `engine/edge_validation.py`: honest verdict on the sealed
+  **OOS + recent** windows, segmented by regime. Rules (net-of-costs):
+  thin sample → `INSUFFICIENT_DATA`; overall net expectancy ≤ 0 → `NO EDGE`;
+  net-positive in < half of well-sampled regimes → `NO EDGE`; else
+  `EDGE_CONFIRMED`. New `python main.py edge-validate` (read-only, `--json`).
+  `tests/test_edge_validation.py` (11) + execution regressions. Suite 1359/1.
+
+**Remaining ordered work (next session):**
+1. **P13.4 — O(N²) backtest performance (next big item).** Profile the walk on
+   a fixed multi-year frame (bars/s baseline), precompute indicator columns +
+   incremental structure update, prove **behaviour-identical** grading and a
+   ≥ 3–10× speed-up, keep the suite green and graduation numbers unchanged.
+2. **P13.5 — Monte-Carlo floor.** Resample the decisive-window R series
+   (`brain/analytics.monte_carlo_*`) and require 5th-percentile net expectancy
+   > 0 before `EDGE_CONFIRMED`.
+3. **P13.1 acceptance** — add a monotonicity test: `slip` results are
+   strictly worse-or-equal to `none` (never better).
+4. **P13.6 — compare ladder surface** (backtest → OOS → paper) in one report.
+5. **Review verdict thresholds** (`min_decided=30`, `regime_min_decided=10`,
+   `positive_regime_frac=0.5`) on the real-data host.
+
+**Boundaries:** `edge-validate` is read-only — never places an order, never
+moves a threshold, never unlocks micro-live. Graduation gate and default
+`backtest` stay on `none`. Sandbox verifies mechanics only; real data confirms.
 
 ### TODO-23 / P18–P22 · Installable production product · 🔄 (foundation shipped)
 
@@ -1088,6 +1143,12 @@ BT1–BT4 to install a trading bot or a second backtest engine.
   (`docs/NEEDLE_REVIEW.md`, N1–N8). A future measured edge-device pilot may
   use it only as an external read-only MCP client; confidence is never
   authorization.
+- **External AI agent frameworks until P13 edge validation completes** —
+  OpenHands / Dify / LibreChat / multiple-LLM stacks / autonomous agents /
+  Discord agent / 50-plugin catalogs. Per P13.7
+  (`docs/P13_EDGE_VALIDATION_SPEC.md`), AI agents sit **around** the
+  deterministic core, never replace it; do not add them before the core
+  statistical validation is finished (P13.1–P13.5).
 - **A new catalog of strategy modules** (trend / mean-reversion /
   momentum / …) before the primary family clears the graduation bar
   (F4). A1 stands: `sweep_trend_continuation` only.
