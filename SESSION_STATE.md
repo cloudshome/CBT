@@ -1,4 +1,29 @@
-**Last updated:** 2026-08-22 (**v2.56.0 — P13.4 shipped: the O(N²) backtest
+**Last updated:** 2026-08-22 (**v2.58.0 — P13.6 shipped: Paper + compare
+ladder**). The P13 code lane (P13.1–P13.6) is now complete. `edge-validate
+--ladder` pairs the decisive-window verdict with the **canonical live paper
+book** (P11) in one honest report: Backtest (whole walk) → OOS + recent
+(decisive) → Paper (canonical live), all net of costs, empty rungs render as
+`n/a` (never an invented number), and a one-line note reads the ladder —
+degradation Δ when paper < OOS, "no degradation measured" when paper ≥ OOS,
+"keep grinding P11" when the paper rung is empty. Implementation:
+`paper_stats_from_rows` (aggregates `SignalDB.live_book_rows()`: decided
+TP_HIT/STOP_LOSS, non-simulator, canonical-live; `rr_net` with P12.6 gross
+fallback), `compare_ladder`, `format_compare_ladder`, and `paper_rows=` on
+`edge_validate_report` (result carries `backtest_stats` + `ladder` only when
+paper rows are supplied — pre-P13.6 invocations stay byte-identical).
+Read-only, no threshold moved, no order path, no new endpoint (the CLI
+composes the existing live-book surface). Suite: **1391 passed / 1 skipped**
+(Node 22 + `mcp`; the managed Node v20 lacks the global `navigator` the
+served JS references — 110 pre-existing JS-harness failures also fail on the
+pristine tree; CI's Node v22 unaffected). Contract:
+`docs/HANDOVER_2026-08-22_P13_6.md`. Next sandbox code: **refactor the two
+largest maintainability debts** — `web/app.py` (10,083 lines) and `main.py`
+(3,437) — one domain at a time, tests → behaviour compare → CI → commit per
+step; **no PR until the whole queue is done** (owner instruction; a stacked
+second PR was rejected). Lane A (P11 real paper proof) remains the money
+path — the bar doesn't move.
+
+**Previous:** 2026-08-22 (**v2.56.0 — P13.4 shipped: the O(N²) backtest
 walk is gone**). The walk no longer recomputes every indicator from bar 0 at
 each step: `run_backtest` and the simulator precompute the indicator columns
 once (`add_all_indicators` over the full series) and analyze each bar through

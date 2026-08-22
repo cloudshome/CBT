@@ -359,6 +359,126 @@ def _public_stats(stats: dict) -> dict:
     }
 
 
+# ── P13.6 — the compare ladder (Backtest → OOS → Paper) ──────────────────
+# One honest surface so the owner sees the degradation ladder: the whole-walk
+# backtest, the sealed decisive windows the verdict reads, and the canonical
+# live paper book (P11).  It is a comparison surface only — it never approves,
+# never moves a threshold, never places an order.
+
+def paper_stats_from_rows(rows: list[dict]) -> dict:
+    """Aggregate the canonical live paper book (P11) into public stats.
+
+    ``rows`` are ``SignalDB.live_book_rows()`` — decided (TP_HIT / STOP_LOSS),
+    non-simulator, canonical-live source only.  All figures are **net of
+    costs** (``rr_net``, with the P12.6 gross fallback when costs are absent),
+    exactly like the edge stats, so the paper rung is comparable to the OOS
+    rung.  Returns an empty dict when there is no paper evidence yet — the
+    ladder then shows the rung as empty instead of inventing a number.
+    """
+    decided = [r for r in rows if r.get("outcome") in ("TP_HIT", "STOP_LOSS")]
+    if not decided:
+        return {}
+
+    def net_rr(r: dict) -> float:
+        v = r.get("rr_net")
+        if v is None:
+            v = r.get("rr_achieved")
+        return float(v) if v is not None else 0.0
+
+    net = [net_rr(r) for r in decided]
+    wins = sum(1 for r in decided if r.get("outcome") == "TP_HIT")
+    losses = sum(1 for r in decided if r.get("outcome") == "STOP_LOSS")
+    wins_net = sum(1 for v in net if v > 0)
+    win_r_net = sum(v for v in net if v > 0)
+    loss_r_net = abs(sum(v for v in net if v <= 0))
+    return {
+        "decided": len(decided),
+        "wins": wins,
+        "losses": losses,
+        "expectancy_net": round(float(np.mean(net)), 3),
+        "win_rate_net": round(wins_net / len(decided), 4),
+        "pf_net": (round(win_r_net / loss_r_net, 3) if loss_r_net > 0
+                   else (99.0 if win_r_net > 0 else None)),
+    }
+
+
+def _ladder_note(rungs: dict) -> str:
+    """Honest one-line reading of the ladder (never tunes to green)."""
+    oos = rungs.get("oos") or {}
+    paper = rungs.get("paper") or {}
+    if not oos.get("decided"):
+        return ("OOS rung empty — the decisive-window sample is too thin; "
+                "the ladder cannot show an honest backtest → OOS → paper "
+                "degradation yet")
+    if not paper.get("decided"):
+        return ("paper rung empty — no decided canonical live trades yet; "
+                "simulator rows never count (P12.13). Keep grinding P11.")
+    oos_e = oos.get("expectancy_net")
+    paper_e = paper.get("expectancy_net")
+    if oos_e is None or paper_e is None:
+        return ("rungs have decided samples but net expectancy is missing on "
+                "one of them — treat the ladder as partial")
+    if paper_e < oos_e:
+        return (f"paper expectancy {paper_e:+.3f}R is below OOS "
+                f"{oos_e:+.3f}R (Δ {paper_e - oos_e:+.3f}R) — expected "
+                "degradation as costs, slippage and human decisions enter "
+                "the ladder")
+    return (f"paper expectancy {paper_e:+.3f}R holds at or above OOS "
+            f"{oos_e:+.3f}R — no degradation measured on this book")
+
+
+def compare_ladder(report: dict, paper_stats: dict) -> dict:
+    """Compose the Backtest → OOS → Paper ladder from an edge report.
+
+    ``report`` is the ``edge_validate_report`` result (its ``backtest_stats``
+    and ``edge.overall`` are the backtest / OOS rungs).  ``paper_stats`` is
+    the ``paper_stats_from_rows`` aggregate of the canonical live book.
+    Rungs with no decided samples stay empty (rendered as n/a) — an empty
+    rung is honest, an invented number is not.
+    """
+    backtest = report.get("backtest_stats") or {}
+    oos = (report.get("edge") or {}).get("overall") or {}
+    rungs = {
+        "backtest": (_public_stats(backtest) if backtest else {}),
+        "oos": (_public_stats(oos) if oos else {}),
+        "paper": (_public_stats(paper_stats) if paper_stats else {}),
+    }
+    meta = report.get("meta") or {}
+    return {
+        "rungs": rungs,
+        "note": _ladder_note(rungs),
+        "decisive_windows": meta.get("decisive_windows", list(DECISIVE_WINDOWS)),
+    }
+
+
+def format_compare_ladder(report: dict) -> str:
+    """Human-readable ladder block for ``edge-validate --ladder``."""
+    ladder = report.get("ladder")
+    if not ladder:
+        return ""
+    rungs = ladder.get("rungs", {})
+    lines = ["-" * 70,
+             "  COMPARE LADDER  backtest -> OOS -> paper (P13.6):",
+             f"  {'rung':<26}{'n':>5}{'exp_net':>10}{'wr_net':>9}{'pf_net':>8}"]
+    for name, label in (("backtest", "BACKTEST (all windows)"),
+                        ("oos", "OOS + RECENT (decisive)"),
+                        ("paper", "PAPER (canonical live)")):
+        s = rungs.get(name) or {}
+        if not s or not s.get("decided"):
+            lines.append(f"  {label:<26}{'—':>5}{'n/a':>10}{'':>9}{'':>8}")
+            continue
+        exp = s.get("expectancy_net")
+        wr = s.get("win_rate_net")
+        pf = s.get("pf_net")
+        exp_s = f"{exp:+.3f}R" if exp is not None else "n/a"
+        wr_s = f"{wr * 100:.1f}%" if wr is not None else "n/a"
+        pf_s = f"{pf:.2f}" if pf is not None else "n/a"
+        lines.append(f"  {label:<26}{s['decided']:>5}{exp_s:>10}{wr_s:>9}{pf_s:>8}")
+    lines.append(f"  · {ladder.get('note', '')}")
+    lines.append("-" * 70)
+    return "\n".join(lines)
+
+
 def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
                          horizons: Optional[list[float]] = None,
                          min_bars: int = 120, step: int = 3,
@@ -372,7 +492,8 @@ def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
                          monte: bool = False,
                          monte_samples: int = 2_000,
                          monte_risk_pct: float = 1.0,
-                         monte_seed: Optional[int] = None) -> dict:
+                         monte_seed: Optional[int] = None,
+                         paper_rows: Optional[list] = None) -> dict:
     """Run the no-look-ahead walk and produce the decisive-window edge verdict.
 
     One pass of the engine over the series, outcomes graded only after the
@@ -383,6 +504,11 @@ def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
     When ``monte`` is True (P13.5), resamples the decisive-window net R series
     and incorporates a Monte-Carlo stability floor into the verdict: the 5th-
     percentile net expectancy must be > 0 or the edge is rejected.
+
+    When ``paper_rows`` is provided (P13.6, the canonical live book from
+    ``SignalDB.live_book_rows()``), the result also carries a ``ladder`` block
+    that juxtaposes the whole-walk backtest, the decisive OOS + recent rung,
+    and the canonical paper book — one honest degradation ladder.
     """
     df = df.reset_index(drop=True).copy()
     if len(df) <= min_bars:
@@ -440,7 +566,7 @@ def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
     }
     if mc_block:
         meta["monte"] = True
-    return {
+    out = {
         "ok": True,
         "verdict": verdict["verdict"],
         "edge": verdict,
@@ -449,6 +575,11 @@ def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
         "window_bars": {name: list(windows[name]) for name in windows},
         "meta": meta,
     }
+    # P13.6 — compare ladder: whole-walk backtest rung + canonical paper book.
+    if paper_rows is not None:
+        out["backtest_stats"] = edge_stats(graded)
+        out["ladder"] = compare_ladder(out, paper_stats_from_rows(paper_rows))
+    return out
 
 
 def format_edge_verdict(report: dict) -> str:

@@ -118,3 +118,69 @@ def test_end_to_end_short_series_is_insufficient():
     df = make_ohlcv(n=50, seed=1)
     r = edge_validate_report(df, horizons=[1.0], min_bars=120)
     assert r["ok"] is False
+
+
+# ── P13.1 — execution-model monotonicity (slip ≤ none, never better) ──────
+# The realistic fill model must never improve a graded outcome: slippage can
+# only reduce winners and deepen losers.  Proved on real graded output, not
+# on hand-built plans.
+def test_execution_slip_never_betters_per_trade(monkeypatch):
+    from data import backtester as bt
+    from data.backtester import run_backtest
+
+    df = make_ohlcv(n=900, seed=11)
+    df.attrs["symbol"] = "BTCUSDT"
+
+    monkeypatch.setattr(bt, "EXECUTION_MODEL", "none")
+    base = run_backtest(df, symbol="BTCUSDT", timeframe="15m",
+                        horizons=[1.0], min_bars=120, step=3,
+                        min_confidence=55)
+    monkeypatch.setattr(bt, "EXECUTION_MODEL", "slip")
+    slipped = run_backtest(df, symbol="BTCUSDT", timeframe="15m",
+                           horizons=[1.0], min_bars=120, step=3,
+                           min_confidence=55)
+
+    base_by_ts = {g.ts: g for g in base["graded"]}
+    slipped_by_ts = {g.ts: g for g in slipped["graded"]}
+    assert base_by_ts and slipped_by_ts, "expected graded plans in both runs"
+
+    violations = []
+    for ts, g in slipped_by_ts.items():
+        b = base_by_ts.get(ts)
+        if b is None:
+            continue  # model must not change plan generation; guard anyway
+        if g.rr_achieved > b.rr_achieved + 1e-9:
+            violations.append((ts, "rr_achieved", b.rr_achieved, g.rr_achieved))
+        b_net = getattr(b, "rr_net", b.rr_achieved)
+        g_net = getattr(g, "rr_net", g.rr_achieved)
+        if g_net is not None and b_net is not None and g_net > b_net + 1e-9:
+            violations.append((ts, "rr_net", b_net, g_net))
+    assert not violations, (
+        f"{len(violations)} trades improved under slip — "
+        f"first: {violations[0]}")
+
+
+def test_execution_slip_never_betters_window_expectancy(monkeypatch):
+    """Aggregate expectancy on every window is worse-or-equal under slip."""
+    from data import backtester as bt
+    from engine.edge_validation import edge_validate_report
+
+    df = make_ohlcv(n=1200, seed=23)
+    df.attrs["symbol"] = "BTCUSDT"
+
+    monkeypatch.setattr(bt, "EXECUTION_MODEL", "none")
+    base = edge_validate_report(df, symbol="BTCUSDT", timeframe="15m",
+                                horizons=[1.0], min_bars=120, step=3)
+    monkeypatch.setattr(bt, "EXECUTION_MODEL", "slip")
+    slipped = edge_validate_report(df, symbol="BTCUSDT", timeframe="15m",
+                                   horizons=[1.0], min_bars=120, step=3)
+
+    assert base["ok"] and slipped["ok"]
+    for win in ("train", "val", "oos", "recent"):
+        b_exp = base["windows"][win].get("expectancy_net")
+        s_exp = slipped["windows"][win].get("expectancy_net")
+        if b_exp is None or s_exp is None:
+            continue
+        assert s_exp <= b_exp + 1e-9, (
+            f"window {win}: slip expectancy {s_exp} > none {b_exp} — "
+            "the realistic fill model must never improve the edge")

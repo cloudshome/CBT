@@ -1,5 +1,48 @@
 # Changelog
 
+## [2.58.0] — 2026-08-22 · P13.6 — Paper + compare ladder (backtest → OOS → paper)
+
+MINOR (research/validation): `edge-validate --ladder` now pairs the
+decisive-window verdict with the **canonical live paper book** (P11) in one
+honest report, so the owner sees the degradation ladder — Backtest (whole
+walk) → OOS + recent (decisive) → Paper (canonical live) — instead of three
+disconnected numbers. Every rung is net of costs; an empty rung renders as
+`n/a`, never an invented number. Read-only, no threshold moved, no order
+path, no graduation change.
+
+- **`engine/edge_validation.py::paper_stats_from_rows()`** — aggregates the
+  canonical live book (`SignalDB.live_book_rows()`: decided TP_HIT /
+  STOP_LOSS, non-simulator, canonical-live) into public stats, net of costs
+  with the P12.6 gross fallback; empty dict when there is no paper evidence.
+- **`compare_ladder()`** — composes the three rungs (backtest = whole-walk
+  graded plans, oos = decisive `edge.overall`, paper = canonical book) plus
+  an honest note: explicit Δ in R when paper < OOS (expected degradation),
+  "no degradation measured" when paper ≥ OOS, "keep grinding P11" when the
+  paper rung is empty, "OOS too thin" when the decisive rung is empty.
+- **`format_compare_ladder()`** — human-readable ladder table with n/a rows
+  for empty rungs.
+- **`edge_validate_report(..., paper_rows=None)`** — when `paper_rows` is
+  provided the result carries `backtest_stats` + `ladder`; without it the
+  output is byte-identical to v2.57.0 (existing invocations unaffected).
+- **CLI: `python main.py edge-validate --ladder`** — reads the canonical DB
+  (`db.live_book_rows()`; empty DB → empty rows → honest n/a rung), passes
+  them to the report and prints the ladder block after the verdict. JSON
+  output includes the `ladder` object.
+- **P13.1 monotonicity (closed this session):** two assertion tests on real
+  graded output (`tests/test_edge_validation.py`) prove `--execution slip`
+  results are strictly worse-or-equal to `none` — never better: per-trade
+  `rr_achieved`/`rr_net` and per-window aggregate expectancy. The graduation
+  gate and default `backtest` stay on `none`.
+- **Tests:** 16 new regressions (`tests/test_edge_validation_ladder.py`) —
+  empty rows never fabricate numbers, net-of-costs aggregation, gross
+  fallback, undecided-row exclusion, PF sentinel, rung composition, empty
+  rung honesty, degradation/hold/thin-OOS notes, end-to-end with/without
+  paper rows, empty-rung n/a rendering, absent-ladder returns empty.
+- **Verification:** full suite **1393 passed / 1 skipped** (Node 22 +
+  `mcp`; the managed Node 20 lacks the global `navigator` the served JS
+  references — the JS-harness tests need Node ≥ 21); wheel gate green
+  (`cryptobrain-2.58.0-py3-none-any.whl`).
+
 ## [2.57.0] — 2026-08-22 · P13.5 — Monte-Carlo stability floor on decisive windows
 
 MAJOR (research/validation): the edge verdict now resamples the decisive-window

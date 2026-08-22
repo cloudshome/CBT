@@ -59,13 +59,18 @@ optimistic exact close.
   `none`) opts out. `--execution` flag on `edge-validate`.
 
 **Acceptance criteria (P13.1):**
-- [ ] `slip_amount(..., model="slip")` applies spread+impact; regression tests
+- [x] `slip_amount(..., model="slip")` applies spread+impact; regression tests
       green (done).
-- [ ] A research/validation run can be executed with `slip` and the results
-      are strictly worse-or-equal to `none` (never better). Add an assertion
-      test for this monotonicity on real graded output.
-- [ ] The **graduation gate** and default `python main.py backtest` remain on
-      `none` — the gate is not a research report. Document this decision.
+- [x] A research/validation run can be executed with `slip` and the results
+      are strictly worse-or-equal to `none` (never better). Assertion tests on
+      real graded output shipped 2026-08-22 in
+      `tests/test_edge_validation.py` (`test_execution_slip_never_betters_per_trade`
+      per-trade `rr_achieved`/`rr_net`; `test_execution_slip_never_betters_window_expectancy`
+      per-window aggregate). Slippage can only reduce winners and deepen
+      losers — proved on the same graded output, not on hand-built plans.
+- [x] The **graduation gate** and default `python main.py backtest` remain on
+      `none` — the gate is not a research report. Document this decision
+      (ROADMAP §17.15; `edge-validate --execution` is a research posture).
 
 ### P13.2 — Walk-forward / out-of-sample protocol · ✅ EXISTS (verify + surface)
 
@@ -159,16 +164,28 @@ the pooled paper book.
 - [x] The EDGE verdict incorporates a Monte-Carlo floor (e.g. 5th-percentile
       net expectancy > 0) as a confirm condition.
 
-### P13.6 — Paper + compare ladder surface · PARTLY (P11)
+### P13.6 — Paper + compare ladder surface · ✅ SHIPPED (v2.58.0)
 
 **Goal:** a single dashboard/CLI surface that juxtaposes
 Backtest → Out-of-sample → Paper → (live tiny) so the owner can see the
 degradation ladder honestly.
 
+**What this session shipped:**
+- `engine/edge_validation.py::paper_stats_from_rows()` — aggregates the
+  canonical live paper book (`SignalDB.live_book_rows()`) into public stats,
+  net of costs with the P12.6 gross fallback; empty dict when no paper.
+- `compare_ladder()` / `format_compare_ladder()` — three-rung composition
+  (whole-walk backtest, decisive OOS + recent, canonical paper) plus an
+  honest degradation note; empty rungs render as n/a.
+- `edge_validate_report(..., paper_rows=None)` — `--ladder` in
+  `python main.py edge-validate` reads `db.live_book_rows()` and prints the
+  ladder block after the verdict (also in `--json` under `ladder`).
+- `tests/test_edge_validation_ladder.py` (16 tests). Suite 1391 / 1.
+
 **Acceptance criteria (P13.6):**
-- [ ] `edge-validate` output can be paired with the canonical paper
+- [x] `edge-validate` output can be paired with the canonical paper
       `expectancy_net` in one report.
-- [ ] No new endpoint required; compose from existing `/api/*` if surfaced.
+- [x] No new endpoint required; compose from existing `/api/*` if surfaced.
 
 ### P13.7 — Agent-scope freeze (guardrail) · DOCUMENTED
 
@@ -194,13 +211,14 @@ finished. AI sits **around** the deterministic core, never replaces it.
 
 ## 5. Definition of done for P13
 
-- [ ] P13.1 monotonicity + `--execution slip` proven by test.
+- [x] P13.1 monotonicity + `--execution slip` proven by test (2026-08-22).
 - [ ] P13.3 verdict surfaced via `python main.py edge-validate` (done) and
       reviewed on real data.
 - [x] P13.4 benchmarked speed-up, behaviour-identical grading, suite green.
 - [x] P13.5 Monte-Carlo floor wired into the verdict.
+- [x] P13.6 compare ladder (backtest → OOS → paper) shipped (v2.58.0).
 - [ ] ROADMAP/TODO updated to mark P13 shipped; next milestone chosen
-      (expected: return to Lane A paper grind or P13.4 continuation).
+      (expected: return to Lane A paper grind or the app.py/main.py refactor).
 
 ## 6. Honest boundaries (do not cross)
 

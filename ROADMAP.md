@@ -2,8 +2,8 @@
 
 > **Status:** active source of truth
 > **Last updated:** 2026-08-22
-> **Current software:** v2.55.0
-> **Suite at this version:** 1359 passed / 1 skipped (offline; P13 edge-validation added)
+> **Current software:** v2.58.0
+> **Suite at this version:** 1391 passed / 1 skipped (offline; P13.6 compare ladder added)
 >
 > **This file + `TODO.md` win** when other roadmaps, anatomy notes, or
 > workstation plans conflict. Older files remain as historical
@@ -112,7 +112,7 @@ What a user actually has after `python3 main.py`:
 | Confirm Paper Trade | **Enrolls the real paper trade (T3).** Ticket → scan row → fresh server gate → APPROVED (desk path) → paper-runner position in the bottom panel → live R/MAE/MFE → Close records the outcome → journal drawer opens. Market tickets fill at entry; limit/conditional wait for the level. Still paper-only. |
 | AI Copilot | Drawer + 9 quick actions + `/api/ask` with symbol/timeframe context. Answers render as titled sections with a Sources footer (v2.51.0); Prepare-ticket pre-fills the ticket (advisory). AI cannot approve. |
 | Other five nav areas | Existing panels **grouped**, not rewritten |
-| Edge validation (P13) | `python main.py edge-validate` — honest **EDGE CONFIRMED / NO EDGE / INSUFFICIENT_DATA** on the sealed OOS + recent windows, segmented by regime; `--execution slip|impact` for realistic fills. Read-only, 2026-08-22. |
+| Edge validation (P13) | `python main.py edge-validate` — honest **EDGE CONFIRMED / NO EDGE / INSUFFICIENT_DATA** on the sealed OOS + recent windows, segmented by regime; `--execution slip|impact` for realistic fills; `--monte` stability floor (P13.5); `--ladder` pairs the verdict with the canonical paper book in one report (P13.6). Read-only, 2026-08-22. |
 | Risk gate / graduation / `/api/v1` / jobs / PWA / auth | Untouched by v2.50.0 (T3 calls the existing desk approval + paper runner; no threshold, no order path) |
 | Visual QA | **Not done.** No browser in the sandbox that shipped T1–T6. The single open item on the product lane. |
 | Graduation bar | **Closed.** First real-data grind: +0.348R gross / 36.8% WR / PF 1.55 — below the NET bar. |
@@ -596,6 +596,7 @@ XAU dossier is neither condition.
 | P11 | Paper evidence and graduation loop | 🔄 Operational; bar closed on real data |
 | P12 | Locked validation, scorecards, costs, provenance, source isolation | ✅ Tooling shipped (P12.1–P12.18). Real-host XAU evidence open |
 | P13–P14 | Teaching coach, daily loop-health ritual | ✅ Shipped |
+| P13 edge validation | Realistic execution, walk-forward OOS verdict, regime segmentation, O(N²) elimination, MC floor, compare ladder | ✅ Shipped v2.56.0–v2.58.0 (P13.1–P13.6) |
 | P15–P16 | Market sentiment colour and measured outcomes | ✅ Shipped |
 | P17 | Clickable Trading Workstation + read-only real-world connections | ✅ Foundation shipped |
 | W1 | Guided evidence build (fail-closed, honest projection, no-edge) | ✅ Shipped v2.32.0 |
@@ -743,10 +744,14 @@ conditions; then say EDGE CONFIRMED or NO EDGE. Never tune to green.*
 - **P13.4 — NEXT (O(N²) backtest performance).** Profile the walk on a fixed
   multi-year frame (baseline bars/s), precompute indicators + incremental
   structure, prove **behaviour-identical** grading and ≥ 3–10× speed-up.
-- **P13.5 — Monte-Carlo floor** on the decisive windows (5th-pct net exp > 0).
-- **P13.6 — compare ladder** (backtest → OOS → paper) in one report.
-- Then refactor the two largest maintainability debts: `web/app.py` (10,083
-  lines) and `main.py` (3,334) — one domain at a time, `tests → behaviour
+- **P13.5 — ✅ shipped v2.57.0.** Monte-Carlo floor on the decisive windows
+  (5th-pct net exp > 0); `edge-validate --monte`.
+- **P13.6 — ✅ shipped v2.58.0.** Compare ladder — `edge-validate --ladder`
+  pairs the verdict with the canonical live paper book in one report
+  (Backtest → OOS → Paper), net of costs, empty rungs render n/a. Read-only;
+  no new endpoint (composes `db.live_book_rows()`).
+- **Then refactor the two largest maintainability debts:** `web/app.py` (10,083
+  lines) and `main.py` (3,437) — one domain at a time, `tests → behaviour
   compare → CI → commit` per step.
 
 Keep the suite green. Bump `config.VERSION` / `pyproject.toml` /

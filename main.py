@@ -480,13 +480,26 @@ def cmd_edge_validate(args) -> int:
     without tuning anything to look green.  It never moves a threshold and
     never places an order.  ``--execution`` selects the fill model
     (``none`` default; ``slip`` / ``impact`` for realistic fills).
+    ``--ladder`` (P13.6) pairs the verdict with the canonical live paper book
+    in one Backtest → OOS → Paper comparison.
     """
-    from engine.edge_validation import edge_validate_report, format_edge_verdict
+    from engine.edge_validation import (edge_validate_report,
+                                        format_compare_ladder,
+                                        format_edge_verdict)
 
     horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
     decisive = tuple(x.strip() for x in args.decisive_windows.split(",")
                      if x.strip())
     symbol = _sym(args.symbol)
+
+    # P13.6 — the canonical live paper book (decided, non-simulator,
+    # canonical-live).  Missing DB / empty book → empty rows → the paper rung
+    # renders as n/a instead of an invented number.
+    paper_rows = None
+    if getattr(args, "ladder", False):
+        from data.database import SignalDB
+        with SignalDB() as db:
+            paper_rows = db.live_book_rows()
 
     # Honest EXECUTION_MODEL control: default 'none' keeps the verdict
     # comparable to the gate; 'slip'/'impact' apply the realistic fill model.
@@ -514,6 +527,7 @@ def cmd_edge_validate(args) -> int:
             monte_samples=getattr(args, "monte_samples", 2000),
             monte_risk_pct=getattr(args, "monte_risk_pct", 1.0),
             monte_seed=getattr(args, "monte_seed", None),
+            paper_rows=paper_rows,
         )
     finally:
         _bt_mod.EXECUTION_MODEL = prev
@@ -523,6 +537,8 @@ def cmd_edge_validate(args) -> int:
         return 0 if result.get("ok") else 1
 
     print(format_edge_verdict(result))
+    if paper_rows is not None:
+        print(format_compare_ladder(result))
     return 0 if result.get("ok") else 1
 
 
@@ -2728,6 +2744,10 @@ def main(argv: list[str] | None = None) -> int:
                              "equity simulation (default 1.0)")
     p_edge.add_argument("--monte-seed", type=int, default=None,
                         help="P13.5: RNG seed for reproducible MC output")
+    p_edge.add_argument("--ladder", action="store_true",
+                        help="P13.6: pair the verdict with the canonical live "
+                             "paper book in one backtest -> OOS -> paper "
+                             "comparison")
     p_edge.add_argument("--json", action="store_true", help="machine-readable result")
     p_edge.set_defaults(func=cmd_edge_validate)
 

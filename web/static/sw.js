@@ -3,7 +3,7 @@
  * Shell-only precache (HTML shell, JS, icons, chart lib, offline page).
  * Version it so an update invalidates the old shell.
  */
-const CACHE_NAME = 'sky-shell-v2.57.0';
+const CACHE_NAME = 'sky-shell-v2.58.0';
 const OFFLINE_URL = '/offline.html';
 const SHELL_URLS = [
   '/',

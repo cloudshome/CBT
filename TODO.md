@@ -6,7 +6,19 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-22 (**v2.56.0 — P13.4 shipped: O(N²) backtest walk
+**Last updated:** 2026-08-22 (**v2.58.0 — P13.6 shipped: Paper + compare
+ladder** — `edge-validate --ladder` pairs the decisive-window verdict with the
+canonical live paper book in one report (Backtest → OOS → Paper), net of
+costs, empty rungs render n/a, read-only, no new endpoint (composes
+`db.live_book_rows()`). Contract: `docs/HANDOVER_2026-08-22_P13_6.md`. The
+P13 code lane (P13.1–P13.6) is complete. Next sandbox **code**: **refactor
+the two largest maintainability debts** — `web/app.py` (10,083 lines) and
+`main.py` (3,437) — one domain at a time, tests → behaviour compare → CI →
+commit per step; no PR until the whole queue is done (owner instruction).
+Lane A stays **P11 real paper proof on the real-data Hub** — the bar does not
+move. No threshold moved. No order path.)
+
+**Previous:** 2026-08-22 (**v2.56.0 — P13.4 shipped: O(N²) backtest walk
 eliminated** — indicators precomputed once + windowed per-bar analysis
 (`analyze_frame_at`), vectorized structure detectors, cached funding lookup;
 behaviour-identical (16,575 graded rows byte-identical), 5.7× on 500 bars /
