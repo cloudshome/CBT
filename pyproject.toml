@@ -36,5 +36,9 @@ Issues = "https://github.com/Azimshawon/SKY/issues"
 py-modules = ["main", "config", "mcp_server"]
 
 [tool.setuptools.packages.find]
-include = ["cryptobrain*", "brain*", "engine*", "data*", "ai*", "output*", "web*", "sky_agent*"]
+include = ["cryptobrain*", "brain*", "engine*", "data*", "ai*", "output*", "web*", "cli*", "sky_agent*"]
 exclude = ["tests*", "ops*", "docs*", "ci*"]
+
+# Non-.py assets the installed app needs at runtime (terminal template).
+[tool.setuptools.package-data]
+web = ["static/*.html", "static/*.js", "static/*.json", "static/*.png", "static/*.svg", "static/*.ico", "static/*.webmanifest"]

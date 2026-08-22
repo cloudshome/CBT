@@ -34,8 +34,9 @@ jobs:
         run: |
           python - <<'PY'
           import re
-          src = open('web/app.py').read()
-          html = re.search(r'HTML = """(.*?)"""', src, re.S).group(1)
+          # Terminal template lives in web/static/terminal.html since the
+          # maintainability refactor (was inline in web/app.py).
+          html = open('web/static/terminal.html').read()
           js = re.search(r'<script>(.*?)</script>', html, re.S).group(1)
           open('/tmp/dash.js', 'w').write(js)
           PY
