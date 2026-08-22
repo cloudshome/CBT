@@ -330,8 +330,8 @@ def test_api_practice_post_validation_fail_closed(client):
 
 
 def test_api_practice_post_happy_path(client, monkeypatch):
-    import web.app as wapp
-    monkeypatch.setattr(wapp, "compute_payload",
+    import web.routes_system as _rsys
+    monkeypatch.setattr(_rsys, "compute_payload",
                         lambda *a, **k: _payload())
     r = client.post("/api/practice", json=_read_raw())
     assert r.status_code == 200
@@ -343,11 +343,11 @@ def test_api_practice_post_happy_path(client, monkeypatch):
 
 
 def test_api_practice_post_engine_failure_records_nothing(client, monkeypatch):
-    import web.app as wapp
+    import web.routes_system as _rsys
 
     def _boom(*a, **k):
         raise ConnectionError("no feed")
-    monkeypatch.setattr(wapp, "compute_payload", _boom)
+    monkeypatch.setattr(_rsys, "compute_payload", _boom)
     r = client.post("/api/practice", json=_read_raw())
     assert r.status_code == 502
     assert "not recorded" in r.get_json()["error"]
@@ -356,8 +356,8 @@ def test_api_practice_post_engine_failure_records_nothing(client, monkeypatch):
 
 def test_api_practice_post_never_creates_a_scan(client, monkeypatch):
     """save=False: a practice read must not enter the review queue."""
-    import web.app as wapp
-    monkeypatch.setattr(wapp, "compute_payload",
+    import web.routes_system as _rsys
+    monkeypatch.setattr(_rsys, "compute_payload",
                         lambda *a, **k: _payload())
     r = client.post("/api/practice", json=_read_raw())
     assert r.status_code == 200
