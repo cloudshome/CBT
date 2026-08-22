@@ -753,6 +753,24 @@ conditions; then say EDGE CONFIRMED or NO EDGE. Never tune to green.*
 - **Then refactor the two largest maintainability debts:** `web/app.py` (10,083
   lines) and `main.py` (3,437) — one domain at a time, `tests → behaviour
   compare → CI → commit` per step.
+  - **✅ Done 2026-08-22:** `main.py` fully extracted → **992 lines** (helpers
+    + `run_scan` → `cli/common.py`; P12/P13 validation cmds → `cli/validation.py`;
+    all 56 remaining cmds → `cli/daily|paper|analytics|market|system.py`; main
+    keeps launcher + argparse + re-exports). `web/app.py` → **2,675 lines**
+    (payload pipeline → `web/payload.py`; 7k-line terminal template →
+    `web/static/terminal.html`; test helpers updated to read the file).
+    Suite 1393/1 green after every step; all moves byte-identical.
+  - **Remaining (documented plan, do not force):** the ~2,200 lines of route
+    handlers inside `make_app` (100 routes) close over ~15 shared locals
+    (auth, `_client_ip/_client_ua/_current_user/_csrf_ok/_audit/_auth_state`,
+    v1-envelope helpers, `job_manager`). Extracting them requires converting
+    every closure into a context-object call (e.g. `ctx.auth`, `ctx.me()`)
+    — a behavior-risk rewrite of the auth/CSRF/v1 security surface. Recipe
+    when attempted: per-domain blueprints (`web/routes_auth.py`,
+    `web/routes_trade.py`, `web/routes_v1.py`, …) each exporting
+    `register(app, ctx)`; move one domain per commit; keep
+    `tests/test_web_api.py` + `test_api_v1.py` + `test_terminal_t3.py` green
+    per step. Do not attempt it as a single giant diff.
 
 Keep the suite green. Bump `config.VERSION` / `pyproject.toml` /
 `sky-shell-v…` together. Parse the *served* dashboard script, not the
