@@ -36,7 +36,7 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="node not installed")
 
 
 def _extract_js() -> str:
-    html = re.search(r'HTML = r?"""(.*?)"""', APP.read_text(), re.S).group(1)
+    html = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
     return re.findall(r"<script>(.*?)</script>", html, re.S)[-1]
 
 
@@ -366,7 +366,7 @@ def test_home_markup_is_served_in_the_page():
     # python-side guard: the Home view, its nav button and the primary CTA
     # are part of the served template (JS validity is covered by
     # test_served_script_is_valid_javascript in test_dashboard_js.py).
-    txt = APP.read_text()
+    txt = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
     assert 'id="view-home"' in txt
     assert 'data-nav="home"' in txt
     assert "Open Trading Terminal" in txt

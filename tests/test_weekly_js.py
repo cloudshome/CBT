@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="node not installed")
 
 
 def _extract_js() -> str:
-    html = re.search(r'HTML = r?"""(.*?)"""', APP.read_text(), re.S).group(1)
+    html = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
     return re.findall(r"<script>(.*?)</script>", html, re.S)[-1]
 
 

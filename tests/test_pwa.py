@@ -111,11 +111,9 @@ def test_offline_html_exists_and_safe():
 
 
 def test_app_html_has_pwa_links():
-    src = APP.read_text()
-    # Extract HTML template (plain triple-quoted, not raw)
-    m = re.search(r'HTML = r?"""(.*?)"""', src, re.S)
-    assert m, "HTML template not found"
-    html = m.group(1)
+    # The terminal template lives in web/static/terminal.html (moved out of
+    # app.py during the maintainability refactor).
+    html = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
     assert '<link rel="manifest" href="/static/manifest.json">' in html, "manifest link missing"
     assert '<meta name="theme-color" content="#070b14">' in html, "theme-color missing"
     assert 'apple-mobile-web-app-capable' in html, "apple-mobile-web-app-capable missing"

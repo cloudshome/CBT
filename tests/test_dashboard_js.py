@@ -39,10 +39,9 @@ CARDS = ["LIVE SIGNAL", "CANDLESTICK", "MULTI-TIMEFRAME", "WHAT THE MARKET OFFER
 
 
 def _extract_js() -> str:
-    src = APP.read_text()
-    m = re.search(r'HTML = r?"""(.*?)"""', src, re.S)
-    assert m, "HTML template not found"
-    html = m.group(1)
+    # The terminal template moved out of app.py into web/static/terminal.html
+    # (maintainability refactor); the served script is byte-identical.
+    html = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
     sm = re.search(r"<script>(.*?)</script>", html, re.S)
     assert sm, "script block not found"
     return sm.group(1)
