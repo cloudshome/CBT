@@ -155,7 +155,7 @@ def _probe_llm() -> dict:
         if not _env("GEMINI_API_KEY"):
             return {"configured": False, "live": False, "detail": "GEMINI_API_KEY not set"}
         return {"configured": True, "live": True, "detail": "Gemini key present"}
-    if not _env("OPENAI_API_KEY"):
+    if provider in ("openai", "auto") and not _env("OPENAI_API_KEY"):
         return {"configured": False, "live": False, "detail": "OPENAI_API_KEY not set"}
     return {"configured": True, "live": True,
             "detail": f"{provider} key present ({_env('OPENAI_BASE_URL') or 'default host'})"}
