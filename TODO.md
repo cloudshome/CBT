@@ -6,20 +6,21 @@
 > per session** — top items unlock the most user-visible capability
 > for the smallest change.
 
-**Last updated:** 2026-08-22 (**v2.58.0 — refactor lane substantially done**).
-`main.py` fully extracted → **992 lines** (helpers/run_scan → `cli/common.py`;
-validation cmds → `cli/validation.py`; all 56 remaining cmds →
-`cli/daily|paper|analytics|market|system.py`; main keeps launcher + argparse +
-re-exports). `web/app.py` → **2,675 lines** (payload pipeline →
-`web/payload.py`; 7k-line terminal template → `web/static/terminal.html`; the
-JS/pwa test helpers now read the file — byte-identical served output). Suite
-1393/1 green after every step. **Remaining (documented plan, do not force):**
-the ~2,200 lines of route handlers inside `make_app` (100 routes) close over
-~15 shared locals — per-domain blueprint extraction requires a context-object
-rewrite of the auth/CSRF/v1 surface; recipe in ROADMAP §19. No PR until the
-whole queue is done (owner instruction). Lane A stays **P11 real paper proof
-on the real-data Hub** — the bar does not move. No threshold moved. No order
-path.
+**Last updated:** 2026-08-22 (**v2.58.0 — refactor lane COMPLETE**).
+`main.py` → **992 lines** (helpers/run_scan → `cli/common.py`; validation cmds
+→ `cli/validation.py`; all 56 remaining cmds →
+`cli/daily|paper|analytics|market|system.py`). `web/app.py` → **347 lines**:
+payload pipeline → `web/payload.py`; 7k-line terminal template →
+`web/static/terminal.html`; all 100 make_app route handlers → per-domain
+`web/routes_auth|scan|paper|chart|system|v1.py` via `register(app, ctx)`
+closure-capture (handler bodies identical, verified per domain; the
+before-request auth gate stays in make_app; `_jobs` returned by
+`register_system`). Suite **1393/1 green after every step**; wheel gate OK
+(`cryptobrain-2.58.0`). **Remaining pipeline:** only real-host items — Lane A
+**P11 real paper proof on the real-data Hub**, XAU sealed evidence, P22
+trusted-signer drills on real Windows/Android/Ubuntu, visual QA of the
+terminal on a real browser. No PR until the whole queue is done (owner
+instruction). No threshold moved. No order path.
 
 **Previous:** 2026-08-22 (**v2.56.0 — P13.4 shipped: O(N²) backtest walk
 eliminated** — indicators precomputed once + windowed per-bar analysis

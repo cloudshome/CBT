@@ -760,17 +760,23 @@ conditions; then say EDGE CONFIRMED or NO EDGE. Never tune to green.*
     (payload pipeline → `web/payload.py`; 7k-line terminal template →
     `web/static/terminal.html`; test helpers updated to read the file).
     Suite 1393/1 green after every step; all moves byte-identical.
-  - **Remaining (documented plan, do not force):** the ~2,200 lines of route
-    handlers inside `make_app` (100 routes) close over ~15 shared locals
-    (auth, `_client_ip/_client_ua/_current_user/_csrf_ok/_audit/_auth_state`,
-    v1-envelope helpers, `job_manager`). Extracting them requires converting
-    every closure into a context-object call (e.g. `ctx.auth`, `ctx.me()`)
-    — a behavior-risk rewrite of the auth/CSRF/v1 security surface. Recipe
-    when attempted: per-domain blueprints (`web/routes_auth.py`,
-    `web/routes_trade.py`, `web/routes_v1.py`, …) each exporting
-    `register(app, ctx)`; move one domain per commit; keep
-    `tests/test_web_api.py` + `test_api_v1.py` + `test_terminal_t3.py` green
-    per step. Do not attempt it as a single giant diff.
+  - **✅ Done 2026-08-22 (make_app route extraction, 5 domains):** all 100
+    route handlers moved out of `make_app` into per-domain
+    `web/routes_*.py` modules, each exporting `register(app, ctx)` that
+    unpacks the shared closures as locals — **handler bodies stay
+    semantically identical** (verified by exact string match per domain).
+    Domains: `routes_auth.py` (push+auth, 15 routes), `routes_scan.py`
+    (scan/sentiment/intelligence/pending), `routes_paper.py` (paper/review/
+    risk/monte/trader-state/history/signal/learning/coach), `routes_chart.py`
+    (candles/chart/stream/commands/position-size/ticket/trades/terminal/
+    journal), `routes_system.py` (connections/…/glossary + the v1 proxy
+    machinery), `routes_v1.py` (v1-native + sky-agent/hub). `make_app` now
+    holds only the auth/CSRF closures, the before-request gate, the shell
+    pages and the register calls. **`web/app.py`: 10,083 → 347 lines.**
+    Suite 1393/1 green after every domain; one cross-closure surfaced and
+    fixed (`_jobs` now returned by `register()`); test monkeypatch target
+    updated (`web.routes_system.compute_payload`).
+  - **Refactor lane complete** — both maintainability debts are closed.
 
 Keep the suite green. Bump `config.VERSION` / `pyproject.toml` /
 `sky-shell-v…` together. Parse the *served* dashboard script, not the
