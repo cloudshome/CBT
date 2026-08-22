@@ -164,7 +164,8 @@ def normalise_klines(
 # Store
 # --------------------------------------------------------------------------- #
 
-DEFAULT_ROOT = Path(__file__).resolve().parent.parent / "data" / "store"
+import os
+DEFAULT_ROOT = Path(os.getenv("SKY_STORE_ROOT", Path(__file__).resolve().parent.parent / "data" / "store"))
 
 
 class CandleStore:

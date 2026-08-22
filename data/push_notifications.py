@@ -18,7 +18,9 @@ import requests
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
-VAPID_KEY_FILE = Path(__file__).parent / "store" / "vapid_keys.json"
+import os
+
+VAPID_KEY_FILE = Path(os.getenv("SKY_STORE_ROOT", Path(__file__).parent / "store")) / "vapid_keys.json"
 
 
 def _b64url(data: bytes | str) -> str:
