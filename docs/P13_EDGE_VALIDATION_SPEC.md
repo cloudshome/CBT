@@ -133,21 +133,30 @@ validation.
       reproducible benchmark.
 - [ ] Full suite stays green; graduation numbers unchanged.
 
-### P13.5 — Edge stability / Monte Carlo on decisive windows · ⏳ NEXT
+### P13.5 — Edge stability / Monte Carlo on decisive windows · ✅ SHIPPED (v2.57.0)
 
 **Goal:** report expectancy stability and risk-adjusted performance (drawdown,
 ruin probability, longest losing streak) on the decisive windows, not just on
 the pooled paper book.
 
-**What exists:** `brain/analytics.monte_carlo_ruin_table()` /
-`monte_carlo_equity()` / `mae_mfe_summary()` already resample the NET realised
-paper book.
+**What this session shipped:**
+- `engine/edge_validation.py::monte_carlo_decisive()` — bootstrap resampling
+  of the decisive-window net R series. Reports expectancy p5/p50/p95,
+  drawdown median/p95, ruin probability, equity range, longest loss streak.
+- `edge_verdict()` gains `monte` (optional) and `monte_floor` (default True).
+  The 5th-percentile net expectancy must be > 0 as a confirm condition.
+- `edge_validate_report()` gains `monte`, `monte_samples`, `monte_risk_pct`,
+  `monte_seed`.
+- `format_edge_verdict()` prints the full MC table.
+- CLI: `python main.py edge-validate --monte [--monte-samples N]
+  [--monte-risk-pct P] [--monte-seed S]`.
+- `tests/test_edge_validation_monte.py` (16 tests).
 
 **Acceptance criteria (P13.5):**
-- [ ] A `edge-validate --monte` (or `--json` block) resamples the decisive-window
+- [x] A `edge-validate --monte` (or `--json` block) resamples the decisive-window
       R series and reports 5%/50%/95% expectancy, expected max DD, and ruin
       probability at the current risk %.
-- [ ] The EDGE verdict incorporates a Monte-Carlo floor (e.g. 5th-percentile
+- [x] The EDGE verdict incorporates a Monte-Carlo floor (e.g. 5th-percentile
       net expectancy > 0) as a confirm condition.
 
 ### P13.6 — Paper + compare ladder surface · PARTLY (P11)
@@ -188,8 +197,8 @@ finished. AI sits **around** the deterministic core, never replaces it.
 - [ ] P13.1 monotonicity + `--execution slip` proven by test.
 - [ ] P13.3 verdict surfaced via `python main.py edge-validate` (done) and
       reviewed on real data.
-- [ ] P13.4 benchmarked speed-up, behaviour-identical grading, suite green.
-- [ ] P13.5 Monte-Carlo floor wired into the verdict.
+- [x] P13.4 benchmarked speed-up, behaviour-identical grading, suite green.
+- [x] P13.5 Monte-Carlo floor wired into the verdict.
 - [ ] ROADMAP/TODO updated to mark P13 shipped; next milestone chosen
       (expected: return to Lane A paper grind or P13.4 continuation).
 

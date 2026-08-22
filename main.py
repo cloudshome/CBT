@@ -510,6 +510,10 @@ def cmd_edge_validate(args) -> int:
             decisive_windows=decisive,
             train_frac=args.train, val_frac=args.val,
             oos_frac=args.oos, recent_frac=args.recent,
+            monte=getattr(args, "monte", False),
+            monte_samples=getattr(args, "monte_samples", 2000),
+            monte_risk_pct=getattr(args, "monte_risk_pct", 1.0),
+            monte_seed=getattr(args, "monte_seed", None),
         )
     finally:
         _bt_mod.EXECUTION_MODEL = prev
@@ -2713,6 +2717,17 @@ def main(argv: list[str] | None = None) -> int:
     p_edge.add_argument("--val", type=float, default=0.15)
     p_edge.add_argument("--oos", type=float, default=0.15)
     p_edge.add_argument("--recent", type=float, default=0.10)
+    p_edge.add_argument("--monte", action="store_true",
+                        help="P13.5: run Monte-Carlo resampling of the "
+                             "decisive-window R series and apply a stability "
+                             "floor (p5 net expectancy > 0)")
+    p_edge.add_argument("--monte-samples", type=int, default=2000,
+                        help="P13.5: number of MC bootstrap samples (default 2000)")
+    p_edge.add_argument("--monte-risk-pct", type=float, default=1.0,
+                        help="P13.5: position size %% per trade for the MC "
+                             "equity simulation (default 1.0)")
+    p_edge.add_argument("--monte-seed", type=int, default=None,
+                        help="P13.5: RNG seed for reproducible MC output")
     p_edge.add_argument("--json", action="store_true", help="machine-readable result")
     p_edge.set_defaults(func=cmd_edge_validate)
 

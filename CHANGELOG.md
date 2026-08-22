@@ -1,5 +1,45 @@
 # Changelog
 
+## [2.57.0] — 2026-08-22 · P13.5 — Monte-Carlo stability floor on decisive windows
+
+MAJOR (research/validation): the edge verdict now resamples the decisive-window
+net R series and applies a **Monte-Carlo stability floor** as a confirm
+condition. The 5th-percentile bootstrap expectancy must be > 0 or the edge is
+rejected — a book that is net-positive in the mean but has a fat left tail
+(one bad streak from negative) no longer gets EDGE_CONFIRMED. Read-only, no
+threshold moved, no order path, no graduation change.
+
+- **`engine/edge_validation.py::monte_carlo_decisive()`** — resamples the
+  decisive-window decided plans' net R series (bootstrap with replacement,
+  configurable samples / risk_pct / ruin_threshold / seed). Reports:
+  expectancy p5/p50/p95, drawdown median/p95, ruin probability, probability
+  terminal equity below start, terminal equity p5/p50/p95, longest loss streak
+  p50/p95.
+- **`edge_verdict()` — Monte-Carlo floor.** When MC data is available and
+  `monte_floor=True` (default), the 5th-percentile net expectancy must be > 0.
+  A failing MC floor produces NO EDGE with a clear reason string. `monte_floor=
+  False` disables the floor for review/exploration. MC unavailable (< 2
+  decided trades) falls through to the basic rules.
+- **`edge_validate_report()` — `monte` / `monte_samples` / `monte_risk_pct` /
+  `monte_seed`** parameters. When `monte=True`, runs the MC and passes the
+  block into the verdict. The MC result is available in the `monte` key of the
+  returned report and in `edge["monte"]`.
+- **`format_edge_verdict()` — MONTE CARLO block.** Prints the full MC table
+  (trades, samples, risk, expectancy p5/p50/p95, drawdown, ruin prob, equity
+  range, loss streak, MC floor pass/fail) when MC is available.
+- **CLI: `python main.py edge-validate --monte`** — enables MC. Plus
+  `--monte-samples`, `--monte-risk-pct`, `--monte-seed` knobs. Default is
+  `--monte` off (same as pre-P13.5 behaviour) so existing invocations and the
+  graduation gate are unaffected.
+- **Tests:** 16 new regressions (`tests/test_edge_validation_monte.py`) —
+  minimum-trades guard, structure, seed determinism, strong/losing book p5,
+  undecided exclusion, risk-scales-drawdown, net R drives equity, MC confirms
+  strong book, MC floor rejects fragile book, no-MC backward compatible,
+  monte_floor=False opt-out, unavailable MC falls through, end-to-end with/
+  without --monte, format with/without MC block.
+- **Verification:** full suite **1375 passed / 1 skipped**; wheel gate green
+  (`cryptobrain-2.57.0-py3-none-any.whl`, no duplicate entries).
+
 ## [2.56.0] — 2026-08-22 · P13.4 — backtest walk O(N²) eliminated
 
 MAJOR: the backtester and simulator no longer re-run the full indicator suite
