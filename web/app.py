@@ -322,78 +322,8 @@ def make_app(job_manager=None) -> Flask:
                             _client_ip=_client_ip,
                             _client_ua=_client_ua,
                             _audit=_audit))
-    @app.get("/api/scan")
-    def api_scan():
-        symbol = _sym(request.args.get("symbol", SYMBOL))
-        tf = request.args.get("tf", TIMEFRAME)
-        force = request.args.get("force") == "1"
-        try:
-            if force:
-                _CACHE.update(payload=None, ts=0, ttl=_CACHE.get("ttl", 40))
-            return jsonify(_sanitize_for_json(
-                compute_payload(symbol, tf, save=True, use_cache=not force)))
-        except ConnectionError as exc:
-            return jsonify({"error": str(exc)}), 502
-        except Exception as exc:  # pragma: no cover
-            return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
-
-    @app.get("/api/sentiment")
-    def api_sentiment():
-        """Market-sentiment colour reading for one asset/timeframe.
-
-        Returns the composite score, direction, how long the same sentiment
-        has held (duration_min), colour depth (intensity) and the CSS colour.
-        Reuses the cached scan; ``force=1`` triggers a fresh scan."""
-        symbol = _sym(request.args.get("symbol", SYMBOL))
-        tf = request.args.get("tf", TIMEFRAME)
-        force = request.args.get("force") == "1"
-        try:
-            payload = compute_payload(symbol, tf, save=False, use_cache=not force)
-            sent = payload.get("sentiment") or {
-                "available": False, "score": 0.0, "direction": "neutral",
-                "label": "NO DATA", "color": "#5f6d84", "intensity": 0.0,
-                "duration_min": 0.0, "duration_text": "—", "history": []}
-            return jsonify(_sanitize_for_json({
-                "symbol": symbol, "timeframe": tf, "sentiment": sent}))
-        except Exception as exc:
-            return jsonify({"symbol": symbol, "timeframe": tf,
-                            "sentiment": {"available": False, "score": 0.0,
-                                          "direction": "neutral", "label": "NO DATA",
-                                          "color": "#5f6d84", "intensity": 0.0,
-                                          "error": f"{type(exc).__name__}: {exc}"}}), 200
-
-    @app.get("/api/intelligence")
-    def api_intelligence():
-        """JSON-only professional desk report for an asset/timeframe."""
-        symbol = _sym(request.args.get("symbol", SYMBOL))
-        tf = request.args.get("tf", TIMEFRAME)
-        force = request.args.get("force") == "1"
-        try:
-            payload = compute_payload(symbol, tf, save=False, use_cache=not force)
-            return jsonify(_sanitize_for_json(payload.get("intelligence", {})))
-        except Exception as exc:
-            return jsonify({
-                "asset": symbol,
-                "signal": "NO TRADE",
-                "confidence": 0,
-                "reason": [f"Insufficient market data: {type(exc).__name__}: {exc}"],
-            }), 200
-
-    @app.get("/api/pending")
-    def api_pending():
-        from data.database import SignalDB
-        from brain.coach import management_checklist
-        with SignalDB() as db:
-            pending = db.pending_reviews()
-        for item in pending:
-            tp = item.get("take_profit")
-            item["management"] = management_checklist({
-                "entry": item.get("entry"),
-                "stop_loss": item.get("stop_loss"),
-                "take_profits": [tp] if tp is not None else [],
-            })
-        return jsonify({"pending": pending})
-
+    from web.routes_scan import register as _register_scan
+    _register_scan(app, None)
     @app.get("/api/paper")
     def api_paper():
         """Paper-monitor dashboard state. Read-only; does not start a runner."""
