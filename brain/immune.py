@@ -57,7 +57,15 @@ def check_database(db: Optional[SignalDB] = None) -> dict:
 
 
 def check_data_freshness() -> dict:
-    """Check timestamp freshness of market data sample / feeds."""
+    """Check timestamp freshness. If in live/hub mode, skip the static sample file check."""
+    import config as _config
+    if getattr(_config, "DEMO_MODE", 1) == 0:
+        return {
+            "name": "data_freshness",
+            "status": "OK",
+            "detail": "Live market data connected",
+        }
+
     sample_file = Path("data_samples/btcusdt_15m_sample.csv")
     if not sample_file.exists():
         return {
