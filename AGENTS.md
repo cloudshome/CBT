@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This file is the canonical instruction set for AI agents (Jules, Antigravity, AI Studio) that work on this repository. Jules, Antigravity, and other agentic tools should read this file first and follow the rules and conventions below.
+This file is the canonical instruction set for AI agents (Jules, Antigravity, AI Studio, Copilot, arena.ai) that work on this repository. Jules, Antigravity, and other agentic tools should read this file first and follow the rules and conventions below.
 
 > NOTE: Treat GitHub as the single source of truth. Agents should never treat their local or cloud copies as authoritative — make changes by creating branches and PRs that go through CI and human review.
 
@@ -60,6 +60,16 @@ Deployment: [k8s / cloud provider / serverless]
   - Tasks: write unit tests, run and triage failing tests, update docs, dependency upgrades, small bug fixes, PR suggestions.
   - Jules always follows the repository rules below and must create a PR for any code change.
   - Provide clear, bounded jobs (see Examples section).
+
+- Copilot (GitHub Copilot) — Interactive coding assistant:
+  - Provide code suggestions, generate small code snippets, refactorings and assistance inside the editor.
+  - Help write tests, examples, and documentation.
+  - Always ensure suggestions conform to repository rules; do not commit on behalf of humans without creating a branch and PR.
+
+- arena.ai agent — External agentic assistant:
+  - Assist with planning, code generation, and integration tasks as configured in the repository's automation.
+  - When making changes, follow the same branch/PR workflow and include a clear PR description and test evidence.
+  - Do NOT bypass CI or human review.
 
 - Humans (YOU) — Product owner & final decision maker:
   - Decide WHAT, WHY, PRIORITY, and approve merges to main.
@@ -238,5 +248,6 @@ If an agent proposes a change that affects security, production configuration, o
 ## Change log for this file
 
 - 2026-08-23 — Initial AGENTS.md created by automation based on provided agent workflow guidance. Replace placeholders with repository-specific details.
+- 2026-08-23 — Added Copilot and arena.ai agent entries to Agent Roles & Responsibilities per maintainer request.
 
 
