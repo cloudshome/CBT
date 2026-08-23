@@ -32,6 +32,7 @@ app.get(['/offline.html', '/offline'], (req: Request, res: Response) => {
 });
 
 // Lazy Gemini AI initialization
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 let aiClient: GoogleGenAI | null = null;
 function getAI(): GoogleGenAI | null {
   if (!aiClient && process.env.GEMINI_API_KEY) {
@@ -1177,7 +1178,7 @@ Structure your output into:
 3. 3-Bullet Tactical Session Playbook (Strict R:R, entries, invalidations).`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
       });
       briefText = response.text || '';
@@ -1547,7 +1548,7 @@ Current market context: Asset=${sym}, Timeframe=${tf || '15m'}, Current Price=${
 Be concise, analytical, clear, and professional like an institutional desk trader. Refer to ICT/SMC concepts (Order Blocks, FVGs, Liquidity Sweeps) when relevant.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODEL,
         contents: userQuery,
         config: { systemInstruction },
       });
@@ -1612,6 +1613,7 @@ app.get('/api/health', (req: Request, res: Response) => {
     },
     risk_engine: 'ACTIVE',
     gemini_ai: Boolean(process.env.GEMINI_API_KEY) ? 'AUTHENTICATED' : 'RULE_BASED_FALLBACK',
+    gemini_model: GEMINI_MODEL,
     timestamp: new Date().toISOString(),
   });
 });
