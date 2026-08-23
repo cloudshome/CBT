@@ -1,0 +1,6 @@
+{
+  "name": "SKY — AI Trading Terminal",
+  "description": "Multi-source, multi-indicator conditional signal engine and professional trading terminal for BTC, ETH, and global markets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,5 +1,8 @@
 # secrets
 .env
+node_modules/
+.aistudio/
+dist/
 
 # python
 __pycache__/
