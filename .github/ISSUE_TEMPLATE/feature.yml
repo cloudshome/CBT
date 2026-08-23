@@ -1,0 +1,30 @@
+name: Feature or design
+description: Propose a focused, reviewable change
+title: ""
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep one concern per issue. Read AGENTS.md before assigning work to an AI tool.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and success criteria
+      description: What user problem are we solving, and how will we know it is done?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and constraints
+      description: Files or modules in scope, out of scope, and safety constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: Tests, offline fixtures, docs, or browser checks required.
+    validations:
+      required: true
