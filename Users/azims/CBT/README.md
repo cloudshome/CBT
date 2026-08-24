@@ -1,6 +1,6 @@
 # Crypto Brain Terminal (CTB) Backend
 
-Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, and market intelligence.
+Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, and Gemini desk intelligence.
 
 ## Features
 
@@ -25,6 +25,9 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
     - **Max Risk Per Trade**: Caps loss per trade to 2% ($2,000 on a $100k account) calculated as $| \text{entry} - \text{sl} | \times \text{size}$ (rejects with 403 Forbidden).
     - **Directional Level Verification**: Ensures proper alignment between Entry, Stop Loss, and Take Profit.
   - **Position Tracking**: Monitor live open simulated positions.
+- **Gemini Desk Intelligence (`/api/desk`)**:
+  - **Automated AI Brief (`/api/desk/ai-brief`)**: Multi-modal fusion of live market candles, MTF indicators, and SMC structures into structured executive summaries, bias, and key levels.
+  - **Quantitative Desk Q&A (`/api/desk/ask`)**: Grounded AI assistant answering quantitative questions on supplied telemetry context.
 - **Rate Limiting**: Server-side IP rate limiter (60 requests per minute per IP) with standard `RateLimit-*` and `Retry-After` headers.
 - **Strict Input Validation**: Symbol normalization (e.g. `BTC` -> `BTCUSDT`), supported timeframe verification, and limit boundaries.
 
@@ -140,53 +143,6 @@ Runs quantitative Smart Money Concepts (SMC) analysis on candle data, identifyin
 curl -i "http://localhost:3000/api/scan?symbol=BTCUSDT&timeframe=15m&limit=100"
 ```
 
-#### Example Response (`200 OK`)
-
-```json
-{
-  "symbol": "BTCUSDT",
-  "timeframe": "15m",
-  "fvg": [
-    {
-      "type": "bullish",
-      "price_zone": [77050.0, 77200.0],
-      "mitigated": false
-    }
-  ],
-  "order_blocks": [
-    {
-      "type": "bullish",
-      "price_zone": [76900.0, 77100.0],
-      "timestamp": 1787550300000
-    }
-  ],
-  "setup_suggestions": [
-    {
-      "type": "LONG",
-      "bias": "Bullish Order Flow & Expansion",
-      "trigger": "Unmitigated Bullish Order Block at [76900, 77100]",
-      "entry": 77100.0,
-      "stopLoss": 76746.2,
-      "takeProfit": 77800.0,
-      "riskRewardRatio": 1.98
-    }
-  ],
-  "stats": {
-    "totalCandles": 100,
-    "bullishFVGs": 4,
-    "bearishFVGs": 1,
-    "unmitigatedFVGs": 2,
-    "mitigatedFVGs": 3,
-    "bullishOBs": 3,
-    "bearishOBs": 1,
-    "lastPrice": 77350.0,
-    "highPrice": 77800.0,
-    "lowPrice": 76500.0,
-    "trend": "Bullish Order Flow & Expansion"
-  }
-}
-```
-
 ---
 
 ### 4. `POST /api/paper/trade`
@@ -206,25 +162,6 @@ Routes a simulated trade through the pre-execution Risk Gate.
 }
 ```
 
-#### Example Response (`201 Created`)
-
-```json
-{
-  "message": "Paper trade executed successfully.",
-  "trade": {
-    "id": 1,
-    "symbol": "BTCUSDT",
-    "side": "BUY",
-    "entryPrice": 65000.0,
-    "sl": 64000.0,
-    "tp": 68000.0,
-    "size": 1.0,
-    "status": "OPEN",
-    "createdAt": "2026-08-24T15:10:00.000Z"
-  }
-}
-```
-
 ---
 
 ### 5. `GET /api/paper/positions`
@@ -235,4 +172,62 @@ Retrieves all currently active open paper trading positions.
 
 ```bash
 curl -i "http://localhost:3000/api/paper/positions"
+```
+
+---
+
+### 6. `POST /api/desk/ai-brief`
+
+Generates an executive AI intelligence brief for a market asset.
+
+#### Request Body
+
+```json
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "15m"
+}
+```
+
+#### Example Response (`200 OK`)
+
+```json
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "15m",
+  "executiveSummary": "BTC is in a strong bullish expansion phase following displacement above the 77k level. Order flow remains supportive with multiple unmitigated FVGs below current market price.",
+  "bias": "BULLISH",
+  "keyLevels": {
+    "support": [77050.0, 76900.0],
+    "resistance": [77800.0, 78200.0],
+    "invalidation": 76746.0
+  },
+  "riskAssessment": "Beware of potential liquidity run on session highs before continuation.",
+  "metrics": {
+    "lastPrice": 77350.0,
+    "ema": 77210.5,
+    "rsi": 62.4,
+    "trend": "Bullish Order Flow & Expansion"
+  },
+  "timestamp": 1787550300000
+}
+```
+
+---
+
+### 7. `POST /api/desk/ask`
+
+Answers ad-hoc quantitative market queries grounded in contextual telemetry.
+
+#### Request Body
+
+```json
+{
+  "query": "What are the key resistance levels for BTC right now?",
+  "context": {
+    "symbol": "BTCUSDT",
+    "lastPrice": 77350.0,
+    "highPrice": 77800.0
+  }
+}
 ```
