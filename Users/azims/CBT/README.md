@@ -140,6 +140,53 @@ Runs quantitative Smart Money Concepts (SMC) analysis on candle data, identifyin
 curl -i "http://localhost:3000/api/scan?symbol=BTCUSDT&timeframe=15m&limit=100"
 ```
 
+#### Example Response (`200 OK`)
+
+```json
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "15m",
+  "fvg": [
+    {
+      "type": "bullish",
+      "price_zone": [77050.0, 77200.0],
+      "mitigated": false
+    }
+  ],
+  "order_blocks": [
+    {
+      "type": "bullish",
+      "price_zone": [76900.0, 77100.0],
+      "timestamp": 1787550300000
+    }
+  ],
+  "setup_suggestions": [
+    {
+      "type": "LONG",
+      "bias": "Bullish Order Flow & Expansion",
+      "trigger": "Unmitigated Bullish Order Block at [76900, 77100]",
+      "entry": 77100.0,
+      "stopLoss": 76746.2,
+      "takeProfit": 77800.0,
+      "riskRewardRatio": 1.98
+    }
+  ],
+  "stats": {
+    "totalCandles": 100,
+    "bullishFVGs": 4,
+    "bearishFVGs": 1,
+    "unmitigatedFVGs": 2,
+    "mitigatedFVGs": 3,
+    "bullishOBs": 3,
+    "bearishOBs": 1,
+    "lastPrice": 77350.0,
+    "highPrice": 77800.0,
+    "lowPrice": 76500.0,
+    "trend": "Bullish Order Flow & Expansion"
+  }
+}
+```
+
 ---
 
 ### 4. `POST /api/paper/trade`
