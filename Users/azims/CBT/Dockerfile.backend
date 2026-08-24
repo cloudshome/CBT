@@ -3,6 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache openssl
+
 COPY package*.json ./
 COPY prisma ./prisma/
 
@@ -19,6 +21,8 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+RUN apk add --no-cache openssl
+
 ENV NODE_ENV=production
 ENV PORT=3000
 
@@ -29,8 +33,8 @@ RUN npm ci --omit=dev && npx prisma generate
 
 COPY --from=builder /app/dist ./dist
 
-# Create persistent storage directory for SQLite database
-RUN mkdir -p /app/data && chown -R node:node /app/data
+# Create persistent storage directory for SQLite database and grant permissions to node user
+RUN mkdir -p /app/data && chown -R node:node /app
 ENV DATABASE_URL="file:/app/data/dev.db"
 
 USER node
@@ -38,3 +42,4 @@ USER node
 EXPOSE 3000
 
 CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]
+
