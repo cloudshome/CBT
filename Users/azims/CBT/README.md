@@ -15,6 +15,10 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
 - **Multi-Timeframe Technical Indicators (`/api/mtf`)**:
   - Computes Exponential Moving Average (EMA) and Wilder's Relative Strength Index (RSI) across supported timeframes.
   - Automatically fetches underlying market data using the unified fallback pipeline.
+- **Smart Money Concepts (SMC) Scanner (`/api/scan`)**:
+  - Detects Fair Value Gaps (FVGs) and Order Blocks (OBs) with mitigation status.
+  - Detects Swing Highs/Lows and Break of Structure (BOS).
+  - Generates actionable trade setup suggestions (entry, stop loss, take profit, R:R).
 - **Rate Limiting**: Server-side IP rate limiter (60 requests per minute per IP) with standard `RateLimit-*` and `Retry-After` headers.
 - **Strict Input Validation**: Symbol normalization (e.g. `BTC` -> `BTCUSDT`), supported timeframe verification, and limit boundaries.
 
@@ -110,21 +114,69 @@ Computes technical indicators (EMA, RSI) on market data close prices for a given
 curl -i "http://localhost:3000/api/mtf?symbol=BTCUSDT&timeframe=15m&indicators=ema,rsi"
 ```
 
+---
+
+### 3. `GET /api/scan`
+
+Runs quantitative Smart Money Concepts (SMC) analysis on candle data, identifying Fair Value Gaps (FVG), Order Blocks (OB), structural shifts (BOS), and actionable trade setups.
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `symbol` | `string` | **Yes** | — | Uppercase alphanumeric ticker (e.g., `BTCUSDT`, `BTC`, `ETHUSDT`). |
+| `timeframe` | `string` | No | `15m` | Candle interval. Supported: `5m`, `15m`, `1h`, `4h`, `1d`. |
+| `limit` | `integer`| No | `100` | Number of candles to scan (between `1` and `1000`). |
+
+#### Example Request
+
+```bash
+curl -i "http://localhost:3000/api/scan?symbol=BTCUSDT&timeframe=15m&limit=100"
+```
+
 #### Example Response (`200 OK`)
 
 ```json
 {
   "symbol": "BTCUSDT",
   "timeframe": "15m",
-  "indicators": {
-    "ema": [
-      { "ts": 1787550300000, "value": 77120.45 },
-      { "ts": 1787551200000, "value": 77180.12 }
-    ],
-    "rsi": [
-      { "ts": 1787550300000, "value": 62.45 },
-      { "ts": 1787551200000, "value": 65.80 }
-    ]
+  "fvg": [
+    {
+      "type": "bullish",
+      "price_zone": [77050.0, 77200.0],
+      "mitigated": false
+    }
+  ],
+  "order_blocks": [
+    {
+      "type": "bullish",
+      "price_zone": [76900.0, 77100.0],
+      "timestamp": 1787550300000
+    }
+  ],
+  "setup_suggestions": [
+    {
+      "type": "LONG",
+      "bias": "Bullish Order Flow & Expansion",
+      "trigger": "Unmitigated Bullish Order Block at [76900, 77100]",
+      "entry": 77100.0,
+      "stopLoss": 76746.2,
+      "takeProfit": 77800.0,
+      "riskRewardRatio": 1.98
+    }
+  ],
+  "stats": {
+    "totalCandles": 100,
+    "bullishFVGs": 4,
+    "bearishFVGs": 1,
+    "unmitigatedFVGs": 2,
+    "mitigatedFVGs": 3,
+    "bullishOBs": 3,
+    "bearishOBs": 1,
+    "lastPrice": 77350.0,
+    "highPrice": 77800.0,
+    "lowPrice": 76500.0,
+    "trend": "Bullish Order Flow & Expansion"
   }
 }
 ```

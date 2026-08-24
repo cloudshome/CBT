@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import candlesRouter from './routes/candles';
 import mtfRouter from './routes/mtf';
+import scanRouter from './routes/scan';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ export function createApp(): Express {
   // API Endpoints
   app.use('/api/candles', candlesRouter);
   app.use('/api/mtf', mtfRouter);
+  app.use('/api/scan', scanRouter);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {
