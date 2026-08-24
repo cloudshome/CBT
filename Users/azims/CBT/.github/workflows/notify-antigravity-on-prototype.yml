@@ -1,0 +1,16 @@
+﻿name: 'Notify Antigravity on Prototype PR'
+
+on:
+  pull_request:
+    types: [opened, labeled]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check labels
+        run: |
+          echo "labels=${{ toJSON(github.event.pull_request.labels) }}"
+      - name: Notify
+        run: |
+          echo "Prototype PR opened or labeled — notify Antigravity agent / maintainers. Configure notification step to integrate with Antigravity or Slack."
