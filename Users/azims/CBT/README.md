@@ -1,35 +1,58 @@
-# Crypto Brain Terminal (CTB) Backend
+# Crypto Brain Terminal (CTB)
 
-Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, and Gemini desk intelligence.
+Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, Gemini desk intelligence, and a dark quantitative Trading Desk UI.
+
+---
+
+## Architecture Overview
+
+```
++-----------------------------------------------------------------------------------------------+
+| CTB QUANT TERMINAL | [Symbol: BTCUSDT v] [TF: 15m v] | Price: $77,350 (+2.4%) | Latency: 18ms |
++-------------------------------------------------------------+---------------------------------+
+|                                                             | GEMINI DESK COPILOT             |
+| CANDLESTICK CHART & SMC OVERLAYS                            | - Bias: [BULLISH]               |
+| - Interactive OHLCV Candles                                 | - Exec Summary: "BTC expansion" |
+| - Toggles: [x] FVG Zones  [x] Order Blocks  [x] Swings/BOS  | - Key Levels: Sup/Res/Inval     |
+| - Volume Sub-panel                                          | - Risk Assessment               |
+|                                                             | - Q&A Interactive Chat Box      |
++-------------------------------------------------------------+---------------------------------+
+| MTF INDICATORS & CONFLUENCE                                 | PAPER TRADING DESK              |
+| - EMA(14) Trend | RSI(14) Momentum Gauge | Setups Card      | - Order Entry (Buy/Sell, SL, TP)|
+|                                                             | - Live Dollar Risk Calculator   |
+|                                                             | - Active Open Positions Table   |
++-------------------------------------------------------------+---------------------------------+
+```
+
+- **Frontend**: React 18 + Vite + Tailwind CSS + Lucide Icons
+- **Backend**: Node.js + Express + TypeScript
+- **Database**: SQLite via Prisma ORM for paper trading and candle caching
+- **AI / ML**: Gemini (`@google/genai`) for desk intelligence and quantitative Q&A
+
+---
 
 ## Features
 
+- **Trading Desk Terminal UI (`frontend/`)**:
+  - **Candlestick Chart**: Interactive SVG candlestick chart with volume histogram, hover crosshair, and toggleable visual overlays for Fair Value Gaps (FVGs), Order Blocks (OBs), and EMA(14) lines.
+  - **MTF Confluence Panel**: Live EMA trend direction and Wilder's RSI(14) momentum gauge.
+  - **SMC Scanner Panel**: Real-time structure detector with 1-click trade setup populate buttons.
+  - **Paper Trading Desk**: Simulated order placement with pre-execution dollar risk calculator and live open positions table.
+  - **Gemini Desk Copilot**: Real-time executive AI brief with institutional bias badge, key support/resistance levels, and grounded Q&A prompt terminal.
+  - **Toast Notifications**: Interactive toasts for Risk Gate rejections (403), rate limits (429), and order execution confirmations (201).
 - **Market Candles Endpoint (`/api/candles`)**:
-  - **Multi-Source Fallback Hierarchy**:
-    1. **Primary**: Binance Public REST API (`https://api.binance.com/api/v3/klines`).
-    2. **Secondary Fallback**: Bybit V5 Public REST API (`https://api.bybit.com/v5/market/kline`).
-    3. **Tertiary Fallback**: Local SQLite Cache (`candles_cache` table via Prisma).
-    4. **Final Failure**: HTTP 502 Bad Gateway if all sources are unreachable.
-  - **Multi-Source Normalization**: Formats data from all sources into consistent `[timestamp, open, high, low, close, volume]` arrays sorted chronologically (ascending).
-  - **Automatic Caching**: Any successful fetch (Binance or Bybit) automatically upserts candles to SQLite.
-- **Multi-Timeframe Technical Indicators (`/api/mtf`)**:
-  - Computes Exponential Moving Average (EMA) and Wilder's Relative Strength Index (RSI) across supported timeframes.
-  - Automatically fetches underlying market data using the unified fallback pipeline.
+  - Multi-source fallback: `Binance -> Bybit -> SQLite Cache -> 502 Bad Gateway`.
+  - Chronological normalization `[timestamp, open, high, low, close, volume]`.
+- **Multi-Timeframe Indicators (`/api/mtf`)**:
+  - Pure mathematical calculation of EMA and Wilder's Smoothed RSI.
 - **Smart Money Concepts (SMC) Scanner (`/api/scan`)**:
-  - Detects Fair Value Gaps (FVGs) and Order Blocks (OBs) with mitigation status.
-  - Detects Swing Highs/Lows and Break of Structure (BOS).
-  - Generates actionable trade setup suggestions (entry, stop loss, take profit, R:R).
+  - Algorithmic detection of Fair Value Gaps, Order Blocks, and Break of Structure.
 - **Risk Gate & Paper Trading (`/api/paper`)**:
-  - **Pre-Execution Risk Gate Middleware**:
-    - **Max Open Trades**: Caps concurrent active positions to 3 (rejects with 403 Forbidden).
-    - **Max Risk Per Trade**: Caps loss per trade to 2% ($2,000 on a $100k account) calculated as $| \text{entry} - \text{sl} | \times \text{size}$ (rejects with 403 Forbidden).
-    - **Directional Level Verification**: Ensures proper alignment between Entry, Stop Loss, and Take Profit.
-  - **Position Tracking**: Monitor live open simulated positions.
+  - Enforces max 3 open positions and max 2% account risk ($2,000 on $100k account).
 - **Gemini Desk Intelligence (`/api/desk`)**:
-  - **Automated AI Brief (`/api/desk/ai-brief`)**: Multi-modal fusion of live market candles, MTF indicators, and SMC structures into structured executive summaries, bias, and key levels.
-  - **Quantitative Desk Q&A (`/api/desk/ask`)**: Grounded AI assistant answering quantitative questions on supplied telemetry context.
-- **Rate Limiting**: Server-side IP rate limiter (60 requests per minute per IP) with standard `RateLimit-*` and `Retry-After` headers.
-- **Strict Input Validation**: Symbol normalization (e.g. `BTC` -> `BTCUSDT`), supported timeframe verification, and limit boundaries.
+  - Automated market briefs (`/api/desk/ai-brief`) and ad-hoc Q&A (`/api/desk/ask`).
+
+---
 
 ## Getting Started
 
@@ -40,42 +63,44 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
 
 ### Installation
 
-1. Install dependencies:
+1. Install backend dependencies and sync database:
    ```bash
    npm install
-   ```
-
-2. Push Prisma database schema to SQLite:
-   ```bash
    npx prisma db push
    ```
 
-3. (Optional) Generate Prisma Client:
+2. Install frontend dependencies:
    ```bash
-   npx prisma generate
+   npm run frontend:install
    ```
 
-### Development & Scripts
+### Running the Platform
 
-- **Run in development mode**:
+1. **Start Backend Server** (Port 3000):
+   ```bash
+   npm run dev
+   ```
+
+2. **Start Frontend Terminal UI** (Port 5173):
+   ```bash
+   npm run frontend:dev
+   ```
+
+3. Open your browser at `http://localhost:5173`.
+
+### Testing & Verification
+
+- **Run complete test suite**:
   ```bash
-  npm run dev
-  ```
-- **Build TypeScript**:
-  ```bash
-  npm run build
-  ```
-- **Start production server**:
-  ```bash
-  npm start
+  npm test
   ```
 - **Run linter**:
   ```bash
   npm run lint
   ```
-- **Run automated test suite**:
+- **Build both backend and frontend**:
   ```bash
-  npm test
+  npm run build
   ```
 
 ---
@@ -83,151 +108,22 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
 ## API Reference
 
 ### 1. `GET /api/candles`
-
-Fetches candlestick data for a given cryptocurrency trading pair.
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `symbol` | `string` | **Yes** | — | Uppercase alphanumeric ticker (e.g., `BTCUSDT`, `BTC`, `ETHUSDT`). If USDT suffix is omitted, it is automatically appended. |
-| `timeframe` | `string` | No | `15m` | Candle interval. Supported: `5m`, `15m`, `1h`, `4h`, `1d`. |
-| `limit` | `integer`| No | `100` | Number of candles to return (between `1` and `1000`). |
-
-#### Example Request
-
-```bash
-curl -i "http://localhost:3000/api/candles?symbol=BTCUSDT&timeframe=15m&limit=100"
-```
-
----
+`GET /api/candles?symbol=BTCUSDT&timeframe=15m&limit=100`
 
 ### 2. `GET /api/mtf`
-
-Computes technical indicators (EMA, RSI) on market data close prices for a given symbol and timeframe.
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `symbol` | `string` | **Yes** | — | Uppercase alphanumeric ticker (e.g. `BTCUSDT`, `BTC`). |
-| `indicators` | `string` | **Yes** | — | Comma-separated list of indicators to compute: `ema`, `rsi`, or `ema,rsi`. |
-| `timeframe` | `string` | No | `15m` | Candle interval. Supported: `5m`, `15m`, `1h`, `4h`, `1d`. |
-| `limit` | `integer`| No | `100` | Number of underlying candles to fetch (between `1` and `1000`). |
-| `emaPeriod` | `integer`| No | `14` | Lookback period for EMA. |
-| `rsiPeriod` | `integer`| No | `14` | Lookback period for RSI. |
-
-#### Example Request
-
-```bash
-curl -i "http://localhost:3000/api/mtf?symbol=BTCUSDT&timeframe=15m&indicators=ema,rsi"
-```
-
----
+`GET /api/mtf?symbol=BTCUSDT&timeframe=15m&indicators=ema,rsi`
 
 ### 3. `GET /api/scan`
-
-Runs quantitative Smart Money Concepts (SMC) analysis on candle data, identifying Fair Value Gaps (FVG), Order Blocks (OB), structural shifts (BOS), and actionable trade setups.
-
-#### Query Parameters
-
-| Parameter | Type | Required | Default | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `symbol` | `string` | **Yes** | — | Uppercase alphanumeric ticker (e.g., `BTCUSDT`, `BTC`, `ETHUSDT`). |
-| `timeframe` | `string` | No | `15m` | Candle interval. Supported: `5m`, `15m`, `1h`, `4h`, `1d`. |
-| `limit` | `integer`| No | `100` | Number of candles to scan (between `1` and `1000`). |
-
-#### Example Request
-
-```bash
-curl -i "http://localhost:3000/api/scan?symbol=BTCUSDT&timeframe=15m&limit=100"
-```
-
----
+`GET /api/scan?symbol=BTCUSDT&timeframe=15m&limit=100`
 
 ### 4. `POST /api/paper/trade`
-
-Routes a simulated trade through the pre-execution Risk Gate.
-
-#### Request Body
-
-```json
-{
-  "symbol": "BTCUSDT",
-  "side": "BUY",
-  "entryPrice": 65000.0,
-  "sl": 64000.0,
-  "tp": 68000.0,
-  "size": 1.0
-}
-```
-
----
+`POST /api/paper/trade` (Body: `{ symbol, side, entryPrice, sl, tp, size }`)
 
 ### 5. `GET /api/paper/positions`
-
-Retrieves all currently active open paper trading positions.
-
-#### Example Request
-
-```bash
-curl -i "http://localhost:3000/api/paper/positions"
-```
-
----
+`GET /api/paper/positions`
 
 ### 6. `POST /api/desk/ai-brief`
-
-Generates an executive AI intelligence brief for a market asset.
-
-#### Request Body
-
-```json
-{
-  "symbol": "BTCUSDT",
-  "timeframe": "15m"
-}
-```
-
-#### Example Response (`200 OK`)
-
-```json
-{
-  "symbol": "BTCUSDT",
-  "timeframe": "15m",
-  "executiveSummary": "BTC is in a strong bullish expansion phase following displacement above the 77k level. Order flow remains supportive with multiple unmitigated FVGs below current market price.",
-  "bias": "BULLISH",
-  "keyLevels": {
-    "support": [77050.0, 76900.0],
-    "resistance": [77800.0, 78200.0],
-    "invalidation": 76746.0
-  },
-  "riskAssessment": "Beware of potential liquidity run on session highs before continuation.",
-  "metrics": {
-    "lastPrice": 77350.0,
-    "ema": 77210.5,
-    "rsi": 62.4,
-    "trend": "Bullish Order Flow & Expansion"
-  },
-  "timestamp": 1787550300000
-}
-```
-
----
+`POST /api/desk/ai-brief` (Body: `{ symbol, timeframe }`)
 
 ### 7. `POST /api/desk/ask`
-
-Answers ad-hoc quantitative market queries grounded in contextual telemetry.
-
-#### Request Body
-
-```json
-{
-  "query": "What are the key resistance levels for BTC right now?",
-  "context": {
-    "symbol": "BTCUSDT",
-    "lastPrice": 77350.0,
-    "highPrice": 77800.0
-  }
-}
-```
+`POST /api/desk/ask` (Body: `{ query, context }`)
