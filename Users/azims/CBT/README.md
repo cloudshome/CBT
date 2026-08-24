@@ -5,10 +5,15 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
 ## Features
 
 - **Market Candles Endpoint (`/api/candles`)**:
-  - Fetches normalized OHLCV candlestick arrays (`[timestamp, open, high, low, close, volume]`) directly from Binance public REST API.
-  - Automatically caches responses in local SQLite (`candles_cache` table) via Prisma.
-  - Provides instant fallback serving cached candles when Binance API is offline, rate-limited, or unreachable.
-  - Strict input validation for symbols, supported timeframes, and limits.
+  - **Multi-Source Fallback Hierarchy**:
+    1. **Primary**: Binance Public REST API (`https://api.binance.com/api/v3/klines`).
+    2. **Secondary Fallback**: Bybit V5 Public REST API (`https://api.bybit.com/v5/market/kline`).
+    3. **Tertiary Fallback**: Local SQLite Cache (`candles_cache` table via Prisma).
+    4. **Final Failure**: HTTP 502 Bad Gateway if all sources are unreachable.
+  - **Multi-Source Normalization**: Formats data from all sources into consistent `[timestamp, open, high, low, close, volume]` arrays sorted chronologically (ascending).
+  - **Rate Limiting**: Server-side IP rate limiter (60 requests per minute per IP) with standard `RateLimit-*` and `Retry-After` headers.
+  - **Automatic Caching**: Any successful fetch (Binance or Bybit) automatically upserts candles to SQLite.
+  - **Strict Input Validation**: Symbol normalization (e.g. `BTC` -> `BTCUSDT`), supported timeframe verification, and limit boundaries.
 
 ## Getting Started
 
@@ -73,10 +78,18 @@ Fetches candlestick data for a given cryptocurrency trading pair.
 | `timeframe` | `string` | No | `15m` | Candle interval. Supported: `5m`, `15m`, `1h`, `4h`, `1d`. |
 | `limit` | `integer`| No | `100` | Number of candles to return (between `1` and `1000`). |
 
+#### Response Headers
+
+- `X-Data-Source`: `BINANCE` | `BYBIT` | `SQLITE_CACHE`
+- `X-Cache`: `BYBIT-FALLBACK` (when served by Bybit) | `HIT-FALLBACK` (when served from local cache)
+- `RateLimit-Limit`: Maximum requests permitted per window (`60`)
+- `RateLimit-Remaining`: Remaining request quota in current window
+- `RateLimit-Reset`: Seconds until rate limit quota resets
+
 #### Example Request
 
 ```bash
-curl "http://localhost:3000/api/candles?symbol=BTCUSDT&timeframe=15m&limit=100"
+curl -i "http://localhost:3000/api/candles?symbol=BTCUSDT&timeframe=15m&limit=100"
 ```
 
 #### Example Response (`200 OK`)
@@ -91,9 +104,3 @@ curl "http://localhost:3000/api/candles?symbol=BTCUSDT&timeframe=15m&limit=100"
   ]
 }
 ```
-
-#### Caching & Fallback Behavior
-
-- When fresh data is fetched from Binance REST API, all returned candles are upserted into SQLite (`candles_cache`).
-- If Binance REST fails (due to network timeout, HTTP error, or rate limiting), the service serves the latest stored candles from SQLite cache and sets the response header `X-Cache: HIT-FALLBACK`.
-- If Binance fails and no cached candles exist for the requested pair, the endpoint returns `502 Bad Gateway`.
