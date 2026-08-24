@@ -1,87 +1,78 @@
 # Crypto Brain Terminal (CTB)
 
-Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, Gemini desk intelligence, a dark quantitative Trading Desk UI, Progressive Web App (PWA) offline capabilities, and a continuous integration (CI) pipeline.
-
----
-
-## CI / CD Pipeline
-
-Continuous Integration is automated via GitHub Actions on all pull requests and pushes to `main`:
-- **Workflow**: `.github/workflows/ci.yml`
-- **Matrix**: Ubuntu Latest / Node.js 20.x
-- **Stages**:
-  1. `npm ci` & `npm --prefix frontend ci` (Dependency installation with caching)
-  2. `npx prisma generate` & `npx prisma db push` (Prisma SQLite schema sync)
-  3. `npm run lint` (ESLint static analysis)
-  4. `npm test -- --coverage` (Jest unit and integration tests)
-  5. `npm run build` (TypeScript backend compiler + Vite frontend PWA compilation)
+Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, Gemini desk intelligence, a dark quantitative Trading Desk UI, Progressive Web App (PWA) offline capabilities, a continuous integration (CI) pipeline, and Docker Compose containerization.
 
 ---
 
 ## Architecture Overview
 
 ```
-+-----------------------------------------------------------------------------------------------+
-| CTB QUANT TERMINAL | [Symbol: BTCUSDT v] [TF: 15m v] | Price: $77,350 (+2.4%) | Latency: 18ms |
-+-------------------------------------------------------------+---------------------------------+
-|                                                             | GEMINI DESK COPILOT             |
-| CANDLESTICK CHART & SMC OVERLAYS                            | - Bias: [BULLISH]               |
-| - Interactive OHLCV Candles                                 | - Exec Summary: "BTC expansion" |
-| - Toggles: [x] FVG Zones  [x] Order Blocks  [x] Swings/BOS  | - Key Levels: Sup/Res/Inval     |
-| - Volume Sub-panel                                          | - Risk Assessment               |
-|                                                             | - Q&A Interactive Chat Box      |
-+-------------------------------------------------------------+---------------------------------+
-| MTF INDICATORS & CONFLUENCE                                 | PAPER TRADING DESK              |
-| - EMA(14) Trend | RSI(14) Momentum Gauge | Setups Card      | - Order Entry (Buy/Sell, SL, TP)|
-|                                                             | - Live Dollar Risk Calculator   |
-|                                                             | - Active Open Positions Table   |
-+-------------------------------------------------------------+---------------------------------+
+                      +-----------------------------+
+                      |         HOST BROWSER        |
+                      +--------------+--------------+
+                                     |
+                                Port 80 (HTTP)
+                                     v
+                 +---------------------------------------+
+                 |          CTB FRONTEND (NGINX)         |
+                 |  - Serves static PWA (HTML/CSS/JS)    |
+                 |  - Proxies /api/* -> backend:3000     |
+                 +-------------------+-------------------+
+                                     |
+                          Docker Bridge Network
+                                     |
+                                     v
+                 +---------------------------------------+
+                 |          CTB BACKEND (EXPRESS)        |
+                 |  - Port 3000                          |
+                 |  - Quant Engine, Risk Gate, Gemini    |
+                 +-------------------+-------------------+
+                                     |
+                              /app/data/dev.db
+                                     v
+                        +-------------------------+
+                        |  NAMED VOLUME: ctb-data |
+                        +-------------------------+
 ```
 
 - **Frontend**: React 18 + Vite + Tailwind CSS + Lucide Icons + PWA (Service Worker & Web Push)
 - **Backend**: Node.js + Express + TypeScript
 - **Database**: SQLite via Prisma ORM for paper trading and candle caching
 - **AI / ML**: Gemini (`@google/genai`) for desk intelligence and quantitative Q&A
+- **Containerization**: Multi-stage Dockerfiles + Nginx Reverse Proxy + Docker Compose
 - **CI / CD**: GitHub Actions (`.github/workflows/ci.yml`)
 
 ---
 
-## Progressive Web App (PWA) & Web Push Notifications
+## Docker & Docker Compose Deployment
 
-- **PWA Capabilities**:
-  - Full `manifest.json` configured for standalone installation on desktop and mobile.
-  - Custom Service Worker (`sw.js`) with cache-first static shell strategy and offline resilience.
-- **Web Push Alerts**:
-  - **Risk Gate Rejection Alerts**: Immediate browser push alerts if simulated trades violate risk rules (e.g. max 3 open positions, 2% account risk limit).
-  - **Gemini Desk Intelligence Summaries**: Push notifications for newly generated AI market briefs and FVG/OB structural detections.
-  - **In-App Toggle**: 1-click notification enable/disable switcher in the terminal header.
+### 1. Prerequisites
+- Docker Engine & Docker Compose installed.
 
----
+### 2. Configure Environment
+Create or verify `.env` in the project root:
+```bash
+GEMINI_API_KEY=your_gemini_api_key_here
+```
 
-## Features
+### 3. Build & Start Containers
+```bash
+# Build images and start services in the background
+docker compose up --build -d
+```
 
-- **Trading Desk Terminal UI (`frontend/`)**:
-  - **Candlestick Chart**: Interactive SVG candlestick chart with volume histogram, hover crosshair, and toggleable visual overlays for Fair Value Gaps (FVGs), Order Blocks (OBs), and EMA(14) lines.
-  - **MTF Confluence Panel**: Live EMA trend direction and Wilder's RSI(14) momentum gauge.
-  - **SMC Scanner Panel**: Real-time structure detector with 1-click trade setup populate buttons.
-  - **Paper Trading Desk**: Simulated order placement with pre-execution dollar risk calculator and live open positions table.
-  - **Gemini Desk Copilot**: Real-time executive AI brief with institutional bias badge, key support/resistance levels, and grounded Q&A prompt terminal.
-  - **Toast Notifications**: Interactive toasts for Risk Gate rejections (403), rate limits (429), and order execution confirmations (201).
-- **Market Candles Endpoint (`/api/candles`)**:
-  - Multi-source fallback: `Binance -> Bybit -> SQLite Cache -> 502 Bad Gateway`.
-  - Chronological normalization `[timestamp, open, high, low, close, volume]`.
-- **Multi-Timeframe Indicators (`/api/mtf`)**:
-  - Pure mathematical calculation of EMA and Wilder's Smoothed RSI.
-- **Smart Money Concepts (SMC) Scanner (`/api/scan`)**:
-  - Algorithmic detection of Fair Value Gaps, Order Blocks, and Break of Structure.
-- **Risk Gate & Paper Trading (`/api/paper`)**:
-  - Enforces max 3 open positions and max 2% account risk ($2,000 on $100k account).
-- **Gemini Desk Intelligence (`/api/desk`)**:
-  - Automated market briefs (`/api/desk/ai-brief`) and ad-hoc Q&A (`/api/desk/ask`).
+- **Frontend UI & API Proxy**: `http://localhost` (Port 80)
+- **Direct Backend API**: `http://localhost:3000` (Port 3000)
+- **Persistent Data**: SQLite database state is persisted in named volume `ctb-sqlite-data`.
+
+### 4. Stop Containers
+```bash
+docker compose down
+```
 
 ---
 
-## Getting Started
+## Local Development (Without Docker)
 
 ### Prerequisites
 
