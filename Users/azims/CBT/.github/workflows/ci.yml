@@ -1,0 +1,50 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-and-build:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: "file:./dev.db"
+      GEMINI_API_KEY: "ci-mock-gemini-api-key"
+      PORT: "3000"
+      NODE_ENV: "test"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Backend & Tooling Dependencies
+        run: npm ci
+
+      - name: Install Frontend PWA Dependencies
+        run: npm --prefix frontend ci
+
+      - name: Initialize Prisma Schema & Database
+        run: |
+          npx prisma generate
+          npx prisma db push
+
+      - name: Run Linter (ESLint)
+        run: npm run lint
+
+      - name: Run Automated Test Suite (Jest)
+        run: npm test -- --coverage
+
+      - name: Build Full Production Bundle (Backend & Frontend)
+        run: npm run build

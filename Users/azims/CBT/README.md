@@ -1,6 +1,20 @@
 # Crypto Brain Terminal (CTB)
 
-Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, Gemini desk intelligence, a dark quantitative Trading Desk UI, and Progressive Web App (PWA) offline and Web Push notification capabilities.
+Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, Gemini desk intelligence, a dark quantitative Trading Desk UI, Progressive Web App (PWA) offline capabilities, and a continuous integration (CI) pipeline.
+
+---
+
+## CI / CD Pipeline
+
+Continuous Integration is automated via GitHub Actions on all pull requests and pushes to `main`:
+- **Workflow**: `.github/workflows/ci.yml`
+- **Matrix**: Ubuntu Latest / Node.js 20.x
+- **Stages**:
+  1. `npm ci` & `npm --prefix frontend ci` (Dependency installation with caching)
+  2. `npx prisma generate` & `npx prisma db push` (Prisma SQLite schema sync)
+  3. `npm run lint` (ESLint static analysis)
+  4. `npm test -- --coverage` (Jest unit and integration tests)
+  5. `npm run build` (TypeScript backend compiler + Vite frontend PWA compilation)
 
 ---
 
@@ -28,6 +42,7 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
 - **Backend**: Node.js + Express + TypeScript
 - **Database**: SQLite via Prisma ORM for paper trading and candle caching
 - **AI / ML**: Gemini (`@google/genai`) for desk intelligence and quantitative Q&A
+- **CI / CD**: GitHub Actions (`.github/workflows/ci.yml`)
 
 ---
 
