@@ -19,6 +19,7 @@ import {
   ToastMessage,
 } from './types';
 import { api, ApiError } from './services/api';
+import { notificationService } from './services/notificationService';
 
 export const App: React.FC = () => {
   // Navigation & Market Context State
@@ -48,6 +49,11 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
+  // Notifications State
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(
+    notificationService.isEnabled()
+  );
+
   // General Loading & UI State
   const [loadingMarket, setLoadingMarket] = useState<boolean>(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -66,6 +72,28 @@ export const App: React.FC = () => {
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  // Toggle Push Notifications
+  const handleToggleNotifications = async () => {
+    if (notificationsEnabled) {
+      notificationService.setEnabled(false);
+      setNotificationsEnabled(false);
+      addToast('info', 'Push Notifications Muted', 'Alerts disabled for this session.');
+    } else {
+      const granted = await notificationService.requestPermission();
+      if (granted) {
+        setNotificationsEnabled(true);
+        addToast('success', 'Push Notifications Enabled', 'Instant alerts active for Risk Gate & AI Briefs.');
+      } else {
+        setNotificationsEnabled(false);
+        addToast(
+          'warning',
+          'Notification Permission Required',
+          'Please enable browser notifications in your site permissions.'
+        );
+      }
+    }
+  };
 
   // 1. Fetch Market Data & Indicators
   const fetchMarketData = useCallback(async () => {
@@ -124,9 +152,13 @@ export const App: React.FC = () => {
     try {
       const res = await api.getDeskBrief(symbol, timeframe);
       setBrief(res);
+
+      // Trigger Web Push Notification for fresh AI Brief
+      if (res && res.executiveSummary) {
+        notificationService.notifyMarketBriefAlert(symbol, res.bias, res.executiveSummary);
+      }
     } catch (err: unknown) {
       console.warn('AI Brief error:', err);
-      // We don't spam error toast on first load if key is not configured
     } finally {
       setLoadingBrief(false);
     }
@@ -153,6 +185,11 @@ export const App: React.FC = () => {
       if (err instanceof ApiError) {
         if (err.statusCode === 403) {
           addToast('error', 'Risk Gate Rejection (403)', err.message);
+          // Trigger Web Push notification for Risk Gate rejection alert
+          notificationService.notifyRiskGateAlert(
+            `Simulated ${trade.side} trade rejected`,
+            err.message
+          );
         } else if (err.statusCode === 429) {
           addToast('warning', 'Rate Limit Exceeded (429)', 'Please wait before placing another order.');
         } else {
@@ -226,6 +263,8 @@ export const App: React.FC = () => {
           fetchPositions();
           fetchDeskBrief();
         }}
+        notificationsEnabled={notificationsEnabled}
+        onToggleNotifications={handleToggleNotifications}
       />
 
       {/* Main Terminal Body */}

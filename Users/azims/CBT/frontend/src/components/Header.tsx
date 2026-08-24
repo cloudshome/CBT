@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 
 interface HeaderProps {
@@ -13,6 +13,8 @@ interface HeaderProps {
   trend: string;
   loading: boolean;
   onRefresh: () => void;
+  notificationsEnabled: boolean;
+  onToggleNotifications: () => void;
 }
 
 const POPULAR_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'AVAXUSDT'];
@@ -29,6 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
   trend,
   loading,
   onRefresh,
+  notificationsEnabled,
+  onToggleNotifications,
 }) => {
   const isBullish = trend.toLowerCase().includes('bullish');
   const isBearish = trend.toLowerCase().includes('bearish');
@@ -48,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
                   CRYPTO BRAIN TERMINAL
                 </h1>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700">
-                  v0.1.0-PRO
+                  PWA-ACTIVE
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-mono">
@@ -101,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right: Telemetry Metrics & Actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* Real-time Telemetry */}
           <div className="flex items-center gap-4 bg-background-card border border-border px-3 py-1.5 rounded">
             <div>
@@ -144,6 +148,29 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Web Push Notification Toggle */}
+          <button
+            onClick={onToggleNotifications}
+            title={notificationsEnabled ? 'Push Notifications Enabled (Click to disable)' : 'Enable Push Notifications'}
+            className={`p-2 rounded border transition-all flex items-center gap-1 text-xs font-mono ${
+              notificationsEnabled
+                ? 'bg-terminal-cyan/10 border-terminal-cyan/40 text-terminal-cyan shadow-sm glow-cyan'
+                : 'bg-background-card border-border text-slate-400 hover:text-slate-200 hover:border-border-active'
+            }`}
+          >
+            {notificationsEnabled ? (
+              <>
+                <BellRing className="w-4 h-4 text-terminal-cyan" />
+                <span className="hidden sm:inline text-[11px]">ALERTS ON</span>
+              </>
+            ) : (
+              <>
+                <BellOff className="w-4 h-4" />
+                <span className="hidden sm:inline text-[11px]">ALERTS OFF</span>
+              </>
+            )}
+          </button>
 
           {/* Refresh Button */}
           <button

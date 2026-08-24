@@ -1,6 +1,6 @@
 # Crypto Brain Terminal (CTB)
 
-Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, Gemini desk intelligence, and a dark quantitative Trading Desk UI.
+Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research platform for quantitative crypto markets, integrating multi-timeframe confluence, Smart Money Concepts (SMC) scanning, Gemini desk intelligence, a dark quantitative Trading Desk UI, and Progressive Web App (PWA) offline and Web Push notification capabilities.
 
 ---
 
@@ -24,10 +24,22 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
 +-------------------------------------------------------------+---------------------------------+
 ```
 
-- **Frontend**: React 18 + Vite + Tailwind CSS + Lucide Icons
+- **Frontend**: React 18 + Vite + Tailwind CSS + Lucide Icons + PWA (Service Worker & Web Push)
 - **Backend**: Node.js + Express + TypeScript
 - **Database**: SQLite via Prisma ORM for paper trading and candle caching
 - **AI / ML**: Gemini (`@google/genai`) for desk intelligence and quantitative Q&A
+
+---
+
+## Progressive Web App (PWA) & Web Push Notifications
+
+- **PWA Capabilities**:
+  - Full `manifest.json` configured for standalone installation on desktop and mobile.
+  - Custom Service Worker (`sw.js`) with cache-first static shell strategy and offline resilience.
+- **Web Push Alerts**:
+  - **Risk Gate Rejection Alerts**: Immediate browser push alerts if simulated trades violate risk rules (e.g. max 3 open positions, 2% account risk limit).
+  - **Gemini Desk Intelligence Summaries**: Push notifications for newly generated AI market briefs and FVG/OB structural detections.
+  - **In-App Toggle**: 1-click notification enable/disable switcher in the terminal header.
 
 ---
 
@@ -90,7 +102,7 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
 
 ### Testing & Verification
 
-- **Run complete test suite**:
+- **Run complete backend test suite**:
   ```bash
   npm test
   ```
@@ -98,7 +110,7 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
   ```bash
   npm run lint
   ```
-- **Build both backend and frontend**:
+- **Build both backend and frontend (PWA bundle)**:
   ```bash
   npm run build
   ```
