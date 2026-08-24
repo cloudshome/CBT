@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import candlesRouter from './routes/candles';
 import mtfRouter from './routes/mtf';
 import scanRouter from './routes/scan';
+import paperRouter from './routes/paper';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ export function createApp(): Express {
   app.use('/api/candles', candlesRouter);
   app.use('/api/mtf', mtfRouter);
   app.use('/api/scan', scanRouter);
+  app.use('/api/paper', paperRouter);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {

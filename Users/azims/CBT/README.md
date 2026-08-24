@@ -19,6 +19,12 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
   - Detects Fair Value Gaps (FVGs) and Order Blocks (OBs) with mitigation status.
   - Detects Swing Highs/Lows and Break of Structure (BOS).
   - Generates actionable trade setup suggestions (entry, stop loss, take profit, R:R).
+- **Risk Gate & Paper Trading (`/api/paper`)**:
+  - **Pre-Execution Risk Gate Middleware**:
+    - **Max Open Trades**: Caps concurrent active positions to 3 (rejects with 403 Forbidden).
+    - **Max Risk Per Trade**: Caps loss per trade to 2% ($2,000 on a $100k account) calculated as $| \text{entry} - \text{sl} | \times \text{size}$ (rejects with 403 Forbidden).
+    - **Directional Level Verification**: Ensures proper alignment between Entry, Stop Loss, and Take Profit.
+  - **Position Tracking**: Monitor live open simulated positions.
 - **Rate Limiting**: Server-side IP rate limiter (60 requests per minute per IP) with standard `RateLimit-*` and `Retry-After` headers.
 - **Strict Input Validation**: Symbol normalization (e.g. `BTC` -> `BTCUSDT`), supported timeframe verification, and limit boundaries.
 
@@ -179,4 +185,54 @@ curl -i "http://localhost:3000/api/scan?symbol=BTCUSDT&timeframe=15m&limit=100"
     "trend": "Bullish Order Flow & Expansion"
   }
 }
+```
+
+---
+
+### 4. `POST /api/paper/trade`
+
+Routes a simulated trade through the pre-execution Risk Gate.
+
+#### Request Body
+
+```json
+{
+  "symbol": "BTCUSDT",
+  "side": "BUY",
+  "entryPrice": 65000.0,
+  "sl": 64000.0,
+  "tp": 68000.0,
+  "size": 1.0
+}
+```
+
+#### Example Response (`201 Created`)
+
+```json
+{
+  "message": "Paper trade executed successfully.",
+  "trade": {
+    "id": 1,
+    "symbol": "BTCUSDT",
+    "side": "BUY",
+    "entryPrice": 65000.0,
+    "sl": 64000.0,
+    "tp": 68000.0,
+    "size": 1.0,
+    "status": "OPEN",
+    "createdAt": "2026-08-24T15:10:00.000Z"
+  }
+}
+```
+
+---
+
+### 5. `GET /api/paper/positions`
+
+Retrieves all currently active open paper trading positions.
+
+#### Example Request
+
+```bash
+curl -i "http://localhost:3000/api/paper/positions"
 ```

@@ -23,3 +23,33 @@ model CandlesCache {
   @@index([symbol, timeframe, ts])
   @@map("candles_cache")
 }
+
+model PaperTrade {
+  id         Int       @id @default(autoincrement())
+  symbol     String
+  side       String    // "BUY" | "SELL" | "LONG" | "SHORT"
+  entryPrice Float
+  sl         Float
+  tp         Float
+  size       Float     @default(1.0)
+  status     String    @default("OPEN") // "OPEN" | "CLOSED" | "CANCELLED"
+  pnl        Float?
+  exitPrice  Float?
+  createdAt  DateTime  @default(now())
+  closedAt   DateTime?
+
+  @@index([status])
+  @@map("paper_trades")
+}
+
+model RiskConfig {
+  id              Int      @id @default(autoincrement())
+  accountBalance  Float    @default(100000.0)
+  maxDrawdown     Float    @default(0.10)
+  maxOpenTrades   Int      @default(3)
+  dailyLossLimit  Float    @default(0.05)
+  maxRiskPerTrade Float    @default(0.02)
+  updatedAt       DateTime @updatedAt
+
+  @@map("risk_configs")
+}
