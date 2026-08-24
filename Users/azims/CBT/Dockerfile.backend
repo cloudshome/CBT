@@ -1,0 +1,40 @@
+# Build Stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY prisma ./prisma/
+
+RUN npm ci
+RUN npx prisma generate
+
+COPY tsconfig.json ./
+COPY src ./src/
+
+RUN npm run build:backend
+
+# Production Runner Stage
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+COPY package*.json ./
+COPY prisma ./prisma/
+
+RUN npm ci --omit=dev && npx prisma generate
+
+COPY --from=builder /app/dist ./dist
+
+# Create persistent storage directory for SQLite database
+RUN mkdir -p /app/data && chown -R node:node /app/data
+ENV DATABASE_URL="file:/app/data/dev.db"
+
+USER node
+
+EXPOSE 3000
+
+CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]
