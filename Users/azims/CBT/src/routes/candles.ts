@@ -1,10 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { validateCandlesQuery, ValidationError } from '../utils/validation';
-import { fetchBinanceCandles } from '../services/binanceService';
-import { fetchBybitCandles } from '../services/bybitService';
-import { saveCandles, getCachedCandles } from '../services/candlesCacheService';
+import { fetchCandlesWithFallback, MarketDataFetchError } from '../services/marketDataService';
 import { defaultRateLimiter } from '../middleware/rateLimit';
-import { CandlesResponse, OHLCVCandle } from '../types/candles';
+import { CandlesResponse } from '../types/candles';
 
 const router = Router();
 
@@ -13,12 +11,6 @@ router.use(defaultRateLimiter);
 
 /**
  * GET /api/candles?symbol=BTCUSDT&timeframe=15m&limit=100
- *
- * Fallback Hierarchy:
- * 1. Binance Public REST API
- * 2. Bybit V5 Public REST API
- * 3. SQLite Cache (`candles_cache`)
- * 4. 502 Bad Gateway
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   let validatedQuery;
@@ -34,79 +26,33 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 
   const { symbol, timeframe, limit } = validatedQuery;
-  const errorLogs: string[] = [];
 
-  // Tier 1: Try Binance REST
   try {
-    const candles: OHLCVCandle[] = await fetchBinanceCandles(symbol, timeframe, limit);
+    const result = await fetchCandlesWithFallback(symbol, timeframe, limit);
 
-    saveCandles(symbol, timeframe, candles).catch((cacheErr) => {
-      console.error('Failed to write Binance candles to SQLite cache:', cacheErr);
-    });
+    res.setHeader('X-Data-Source', result.source);
+    if (result.isFallback) {
+      res.setHeader('X-Cache', result.source === 'BYBIT' ? 'BYBIT-FALLBACK' : 'HIT-FALLBACK');
+    }
 
-    res.setHeader('X-Data-Source', 'BINANCE');
     const response: CandlesResponse = {
       symbol,
       timeframe,
-      candles,
+      candles: result.candles,
     };
     res.json(response);
-    return;
-  } catch (binanceErr: unknown) {
-    const msg = binanceErr instanceof Error ? binanceErr.message : String(binanceErr);
-    errorLogs.push(`Binance: ${msg}`);
-    console.warn(`Binance fetch failed for ${symbol} (${timeframe}): ${msg}. Falling back to Bybit...`);
-  }
-
-  // Tier 2: Try Bybit V5 REST
-  try {
-    const candles: OHLCVCandle[] = await fetchBybitCandles(symbol, timeframe, limit);
-
-    saveCandles(symbol, timeframe, candles).catch((cacheErr) => {
-      console.error('Failed to write Bybit candles to SQLite cache:', cacheErr);
-    });
-
-    res.setHeader('X-Data-Source', 'BYBIT');
-    res.setHeader('X-Cache', 'BYBIT-FALLBACK');
-    const response: CandlesResponse = {
-      symbol,
-      timeframe,
-      candles,
-    };
-    res.json(response);
-    return;
-  } catch (bybitErr: unknown) {
-    const msg = bybitErr instanceof Error ? bybitErr.message : String(bybitErr);
-    errorLogs.push(`Bybit: ${msg}`);
-    console.warn(`Bybit fetch failed for ${symbol} (${timeframe}): ${msg}. Falling back to SQLite cache...`);
-  }
-
-  // Tier 3: Try SQLite Cache
-  try {
-    const cachedCandles = await getCachedCandles(symbol, timeframe, limit);
-
-    if (cachedCandles.length > 0) {
-      res.setHeader('X-Data-Source', 'SQLITE_CACHE');
-      res.setHeader('X-Cache', 'HIT-FALLBACK');
-      const response: CandlesResponse = {
-        symbol,
-        timeframe,
-        candles: cachedCandles,
-      };
-      res.json(response);
+  } catch (err: unknown) {
+    if (err instanceof MarketDataFetchError) {
+      res.status(err.statusCode).json({
+        error: err.message,
+        details: err.details,
+      });
       return;
     }
 
-    // Tier 4: All sources failed and no cache available
-    res.status(502).json({
-      error: 'Failed to fetch market data from all sources (Binance, Bybit) and no cached data available',
-      details: errorLogs,
-    });
-  } catch (dbErr: unknown) {
-    const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
-    console.error('Database error during cache fallback:', dbErr);
+    const msg = err instanceof Error ? err.message : String(err);
     res.status(500).json({
-      error: 'Internal server error while accessing cache',
+      error: 'Internal server error processing market data',
       details: msg,
     });
   }

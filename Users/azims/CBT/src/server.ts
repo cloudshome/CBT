@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import candlesRouter from './routes/candles';
+import mtfRouter from './routes/mtf';
 
 dotenv.config();
 
@@ -16,8 +17,9 @@ export function createApp(): Express {
     res.json({ status: 'ok', service: 'CTB-Backend' });
   });
 
-  // Candles endpoint
+  // API Endpoints
   app.use('/api/candles', candlesRouter);
+  app.use('/api/mtf', mtfRouter);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {
