@@ -11,9 +11,16 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
     3. **Tertiary Fallback**: Local SQLite Cache (`candles_cache` table via Prisma).
     4. **Final Failure**: HTTP 502 Bad Gateway if all sources are unreachable.
   - **Multi-Source Normalization**: Formats data from all sources into consistent `[timestamp, open, high, low, close, volume]` arrays sorted chronologically (ascending).
-  - **Rate Limiting**: Server-side IP rate limiter (60 requests per minute per IP) with standard `RateLimit-*` and `Retry-After` headers.
   - **Automatic Caching**: Any successful fetch (Binance or Bybit) automatically upserts candles to SQLite.
-  - **Strict Input Validation**: Symbol normalization (e.g. `BTC` -> `BTCUSDT`), supported timeframe verification, and limit boundaries.
+- **Multi-Timeframe Technical Indicators (`/api/mtf`)**:
+  - Computes Exponential Moving Average (EMA) and Wilder's Relative Strength Index (RSI) across supported timeframes.
+  - Automatically fetches underlying market data using the unified fallback pipeline.
+- **Smart Money Concepts (SMC) Scanner (`/api/scan`)**:
+  - Detects Fair Value Gaps (FVGs) and Order Blocks (OBs) with mitigation status.
+  - Detects Swing Highs/Lows and Break of Structure (BOS).
+  - Generates actionable trade setup suggestions (entry, stop loss, take profit, R:R).
+- **Rate Limiting**: Server-side IP rate limiter (60 requests per minute per IP) with standard `RateLimit-*` and `Retry-After` headers.
+- **Strict Input Validation**: Symbol normalization (e.g. `BTC` -> `BTCUSDT`), supported timeframe verification, and limit boundaries.
 
 ## Getting Started
 
@@ -66,7 +73,7 @@ Crypto Brain Terminal (CTB) is an institutional-grade paper trading and research
 
 ## API Reference
 
-### `GET /api/candles`
+### 1. `GET /api/candles`
 
 Fetches candlestick data for a given cryptocurrency trading pair.
 
@@ -78,18 +85,53 @@ Fetches candlestick data for a given cryptocurrency trading pair.
 | `timeframe` | `string` | No | `15m` | Candle interval. Supported: `5m`, `15m`, `1h`, `4h`, `1d`. |
 | `limit` | `integer`| No | `100` | Number of candles to return (between `1` and `1000`). |
 
-#### Response Headers
-
-- `X-Data-Source`: `BINANCE` | `BYBIT` | `SQLITE_CACHE`
-- `X-Cache`: `BYBIT-FALLBACK` (when served by Bybit) | `HIT-FALLBACK` (when served from local cache)
-- `RateLimit-Limit`: Maximum requests permitted per window (`60`)
-- `RateLimit-Remaining`: Remaining request quota in current window
-- `RateLimit-Reset`: Seconds until rate limit quota resets
-
 #### Example Request
 
 ```bash
 curl -i "http://localhost:3000/api/candles?symbol=BTCUSDT&timeframe=15m&limit=100"
+```
+
+---
+
+### 2. `GET /api/mtf`
+
+Computes technical indicators (EMA, RSI) on market data close prices for a given symbol and timeframe.
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `symbol` | `string` | **Yes** | — | Uppercase alphanumeric ticker (e.g. `BTCUSDT`, `BTC`). |
+| `indicators` | `string` | **Yes** | — | Comma-separated list of indicators to compute: `ema`, `rsi`, or `ema,rsi`. |
+| `timeframe` | `string` | No | `15m` | Candle interval. Supported: `5m`, `15m`, `1h`, `4h`, `1d`. |
+| `limit` | `integer`| No | `100` | Number of underlying candles to fetch (between `1` and `1000`). |
+| `emaPeriod` | `integer`| No | `14` | Lookback period for EMA. |
+| `rsiPeriod` | `integer`| No | `14` | Lookback period for RSI. |
+
+#### Example Request
+
+```bash
+curl -i "http://localhost:3000/api/mtf?symbol=BTCUSDT&timeframe=15m&indicators=ema,rsi"
+```
+
+---
+
+### 3. `GET /api/scan`
+
+Runs quantitative Smart Money Concepts (SMC) analysis on candle data, identifying Fair Value Gaps (FVG), Order Blocks (OB), structural shifts (BOS), and actionable trade setups.
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `symbol` | `string` | **Yes** | — | Uppercase alphanumeric ticker (e.g., `BTCUSDT`, `BTC`, `ETHUSDT`). |
+| `timeframe` | `string` | No | `15m` | Candle interval. Supported: `5m`, `15m`, `1h`, `4h`, `1d`. |
+| `limit` | `integer`| No | `100` | Number of candles to scan (between `1` and `1000`). |
+
+#### Example Request
+
+```bash
+curl -i "http://localhost:3000/api/scan?symbol=BTCUSDT&timeframe=15m&limit=100"
 ```
 
 #### Example Response (`200 OK`)
@@ -98,9 +140,43 @@ curl -i "http://localhost:3000/api/candles?symbol=BTCUSDT&timeframe=15m&limit=10
 {
   "symbol": "BTCUSDT",
   "timeframe": "15m",
-  "candles": [
-    [1700000000000, 65120.5, 65400.0, 65050.0, 65350.2, 145.892],
-    [1700000900000, 65350.2, 65600.0, 65300.0, 65520.0, 198.341]
-  ]
+  "fvg": [
+    {
+      "type": "bullish",
+      "price_zone": [77050.0, 77200.0],
+      "mitigated": false
+    }
+  ],
+  "order_blocks": [
+    {
+      "type": "bullish",
+      "price_zone": [76900.0, 77100.0],
+      "timestamp": 1787550300000
+    }
+  ],
+  "setup_suggestions": [
+    {
+      "type": "LONG",
+      "bias": "Bullish Order Flow & Expansion",
+      "trigger": "Unmitigated Bullish Order Block at [76900, 77100]",
+      "entry": 77100.0,
+      "stopLoss": 76746.2,
+      "takeProfit": 77800.0,
+      "riskRewardRatio": 1.98
+    }
+  ],
+  "stats": {
+    "totalCandles": 100,
+    "bullishFVGs": 4,
+    "bearishFVGs": 1,
+    "unmitigatedFVGs": 2,
+    "mitigatedFVGs": 3,
+    "bullishOBs": 3,
+    "bearishOBs": 1,
+    "lastPrice": 77350.0,
+    "highPrice": 77800.0,
+    "lowPrice": 76500.0,
+    "trend": "Bullish Order Flow & Expansion"
+  }
 }
 ```
