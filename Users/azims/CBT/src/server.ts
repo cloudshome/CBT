@@ -15,9 +15,27 @@ export function createApp(): Express {
   app.use(cors());
   app.use(express.json());
 
+  // Default root status endpoint
+  app.get('/', (_req: Request, res: Response) => {
+    res.json({
+      name: 'Crypto Brain Terminal (CTB) API',
+      status: 'online',
+      version: '0.1.0',
+    });
+  });
+
   // Health check endpoint
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', service: 'CTB-Backend' });
+  });
+
+  // Readiness check endpoint
+  app.get('/api/readiness', (_req: Request, res: Response) => {
+    res.json({
+      status: 'ok',
+      ready: true,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // API Endpoints
