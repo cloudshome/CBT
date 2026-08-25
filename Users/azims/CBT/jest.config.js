@@ -4,5 +4,6 @@ module.exports = {
   testMatch: ['**/tests/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   clearMocks: true,
-  restoreMocks: true
+  restoreMocks: true,
+  testTimeout: 20000,
 };

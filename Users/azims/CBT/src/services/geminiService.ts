@@ -129,14 +129,25 @@ Provide an institutional-grade market brief formatted as strict valid JSON (no m
     throw new GeminiServiceError(`Failed to generate market brief from Gemini: ${msg}`, 503);
   }
 
+  interface ParsedGeminiBrief {
+    executiveSummary?: string;
+    bias?: string;
+    keyLevels?: {
+      support?: number[];
+      resistance?: number[];
+      invalidation?: number;
+    };
+    riskAssessment?: string;
+  }
+
   // Parse JSON response safely
-  let parsed: any = {};
+  let parsed: ParsedGeminiBrief = {};
   try {
     const cleanJson = responseText
       .replace(/```json/gi, '')
       .replace(/```/g, '')
       .trim();
-    parsed = JSON.parse(cleanJson);
+    parsed = JSON.parse(cleanJson) as ParsedGeminiBrief;
   } catch {
     // Fallback parsing if LLM returned non-JSON text
     parsed = {
@@ -155,7 +166,10 @@ Provide an institutional-grade market brief formatted as strict valid JSON (no m
     symbol: data.symbol,
     timeframe: data.timeframe,
     executiveSummary: parsed.executiveSummary || `Market structure indicates ${data.trend}.`,
-    bias: ['BULLISH', 'BEARISH', 'NEUTRAL'].includes(parsed.bias) ? parsed.bias : 'NEUTRAL',
+    bias:
+      parsed.bias === 'BULLISH' || parsed.bias === 'BEARISH' || parsed.bias === 'NEUTRAL'
+        ? parsed.bias
+        : 'NEUTRAL',
     keyLevels: {
       support: Array.isArray(parsed.keyLevels?.support) ? parsed.keyLevels.support : [data.lowPrice],
       resistance: Array.isArray(parsed.keyLevels?.resistance) ? parsed.keyLevels.resistance : [data.highPrice],
