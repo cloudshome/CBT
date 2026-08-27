@@ -230,9 +230,8 @@ async def get_system_health():
 
 @app.get("/api/market/ticker")
 async def get_market_ticker(symbol: str = Query("BTC/USDT")):
-    import time
-    price = await data_streamer.get_live_ticker(symbol)
-    return {"symbol": symbol, "price": price, "timestamp": int(time.time() * 1000)}
+    ticker_data = await market_gateway.get_ticker(symbol)
+    return ticker_data
 
 
 @app.get("/api/market/candles")

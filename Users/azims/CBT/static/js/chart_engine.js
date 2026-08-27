@@ -66,6 +66,8 @@ class ChartEngine {
         borderColor: "#273142",
         timeVisible: true,
         secondsVisible: false,
+        rightOffset: 8,
+        barSpacing: 10,
       },
       rightPriceScale: {
         borderColor: "#273142",
@@ -98,10 +100,14 @@ class ChartEngine {
     });
 
     this.volumeSeries = this.chart.addHistogramSeries({
-      color: "rgba(59, 130, 246, 0.3)",
+      color: "rgba(59, 130, 246, 0.25)",
       priceFormat: { type: "volume" },
-      priceScaleId: "",
+      priceScaleId: "vol_scale",
+    });
+
+    this.chart.priceScale("vol_scale").applyOptions({
       scaleMargins: { top: 0.82, bottom: 0 },
+      visible: false,
     });
 
     // Re-render drawings on pan/zoom
@@ -738,6 +744,11 @@ class ChartEngine {
       this.volumeSeries.setData(uniqueVols);
     }
 
+    // Auto-fit chart content to perfectly fill the canvas
+    try {
+      this.chart.timeScale().fitContent();
+    } catch (e) {}
+
     this.renderDrawings();
   }
 
@@ -778,15 +789,19 @@ class ChartEngine {
       return true;
     });
 
-    filtered.slice(0, 5).forEach((p) => {
+    // Take the 3 most RECENT patterns closest to active price action
+    const recentPatterns = [...filtered].reverse().slice(0, 3);
+
+    recentPatterns.forEach((p) => {
       const isBull = p.pattern_type.includes("BULLISH");
+      const cleanType = p.pattern_type.replace(/_/g, " ");
       const line = activeSeries.createPriceLine({
         price: p.mid_price,
         color: isBull ? "#10b981" : "#ef4444",
-        lineWidth: 2,
+        lineWidth: 1.5,
         lineStyle: LightweightCharts.LineStyle.Dashed,
         axisLabelVisible: true,
-        title: `${p.pattern_type} (${p.conditional_expectancy_r > 0 ? "+" : ""}${p.conditional_expectancy_r}R)`,
+        title: `${cleanType} (${p.conditional_expectancy_r > 0 ? "+" : ""}${p.conditional_expectancy_r}R)`,
       });
       this.overlayLines.push(line);
     });
