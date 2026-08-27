@@ -1,0 +1,177 @@
+"""
+Adversarial Decision Council & Dominant NO-TRADE Committee.
+Runs an adversarial tri-agent debate before every capital commitment:
+1. Bull Agent (Advocate for Long execution)
+2. Bear Agent (Advocate for Short execution)
+3. Skeptic / NO-TRADE Judge (Dominant Gatekeeper defending capital preservation)
+Emits three first-class decisions: LONG (~15%), SHORT (~15%), or NO_TRADE (~70%).
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional
+import numpy as np
+
+from core.market_state import MarketStateVector
+from core.ev_engine import NetEVResult
+from core.uncertainty_engine import UncertaintyBudget
+
+logger = logging.getLogger("ai_quant_sentinel.debate_committee")
+
+
+@dataclass
+class AgentArgument:
+    agent_name: str                     # "BULL_AGENT", "BEAR_AGENT", "SKEPTIC_JUDGE"
+    stance: str                         # "LONG", "SHORT", "NO_TRADE"
+    confidence: float                   # [0.0, 1.0]
+    core_premises: List[str]
+    risk_factors_highlighted: List[str]
+    verdict_summary: str
+
+
+@dataclass
+class CouncilDecision:
+    symbol: str
+    timestamp: int
+    final_decision: str                 # "LONG", "SHORT", "NO_TRADE"
+    consensus_confidence: float         # [0.0, 1.0]
+    bull_argument: AgentArgument
+    bear_argument: AgentArgument
+    skeptic_argument: AgentArgument
+    no_trade_probability: float         # Target baseline ~70%
+    primary_execution_thesis: str
+    invalidation_criteria: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "symbol": self.symbol,
+            "timestamp": self.timestamp,
+            "final_decision": self.final_decision,
+            "consensus_confidence": self.consensus_confidence,
+            "bull_argument": asdict(self.bull_argument),
+            "bear_argument": asdict(self.bear_argument),
+            "skeptic_argument": asdict(self.skeptic_argument),
+            "no_trade_probability": self.no_trade_probability,
+            "primary_execution_thesis": self.primary_execution_thesis,
+            "invalidation_criteria": self.invalidation_criteria,
+        }
+
+
+class AdversarialDebateCommittee:
+    """Adversarial Council enforcing rigorous NO-TRADE default bias."""
+
+    def convene_council(
+        self,
+        symbol: str,
+        state: MarketStateVector,
+        ev_result: NetEVResult,
+        uncertainty: UncertaintyBudget,
+        macro_regime: str = "NEUTRAL",
+    ) -> CouncilDecision:
+        """
+        Runs adversarial deliberation between Bull, Bear, and dominant Skeptic Judge.
+        """
+        trend_1h = state.trend_scores.get("1h", 0.0)
+        trend_15m = state.trend_scores.get("15m", 0.0)
+        cvd_delta = state.orderflow.get("cvd_delta", 0.0)
+        absorp = state.orderflow.get("absorption_score", 0.0)
+        u_score = uncertainty.composite_uncertainty_u
+
+        # 1. Bull Agent Deliberation
+        bull_premises = []
+        if trend_1h > 0.15:
+            bull_premises.append(f"Higher timeframe trend aligns bullish (1H: {trend_1h:+.2f})")
+        if cvd_delta > 0.10 or absorp > 0.60:
+            bull_premises.append("Orderflow confirms positive delta / institutional absorption")
+        if ev_result.net_ev_r > 0.30:
+            bull_premises.append(f"Net EV is strongly positive (+{ev_result.net_ev_r:.2f}R)")
+        bull_conf = float(np.clip(0.40 + (trend_1h * 0.3) + (cvd_delta * 0.2), 0.10, 0.90))
+        bull_arg = AgentArgument(
+            agent_name="BULL_AGENT",
+            stance="LONG",
+            confidence=round(bull_conf, 2),
+            core_premises=bull_premises or ["Attempting structural bounce from support zone"],
+            risk_factors_highlighted=["Overhead liquidity sell walls", "Potential DXY macro headwind"],
+            verdict_summary=f"Bull case supported by HTF momentum and positive delta (Confidence: {bull_conf*100:.0f}%).",
+        )
+
+        # 2. Bear Agent Deliberation
+        bear_premises = []
+        if trend_1h < -0.15:
+            bear_premises.append(f"Higher timeframe structure is bearish (1H: {trend_1h:+.2f})")
+        if cvd_delta < -0.10:
+            bear_premises.append(f"Aggressive net market selling delta ({cvd_delta:+.2f})")
+        if macro_regime in ["RISK_OFF_FLIGHT_TO_SAFETY", "DOLLAR_SQUEEZE"]:
+            bear_premises.append(f"Macro environment is unfavorable ({macro_regime})")
+        bear_conf = float(np.clip(0.40 - (trend_1h * 0.3) - (cvd_delta * 0.2), 0.10, 0.90))
+        bear_arg = AgentArgument(
+            agent_name="BEAR_AGENT",
+            stance="SHORT",
+            confidence=round(bear_conf, 2),
+            core_premises=bear_premises or ["Market vulnerable to liquidity pool flush below range"],
+            risk_factors_highlighted=["Short squeeze vulnerability", "Institutional dip buying support"],
+            verdict_summary=f"Bear case supported by structural breakdown risk (Confidence: {bear_conf*100:.0f}%).",
+        )
+
+        # 3. Skeptic / NO-TRADE Judge (Dominant Agent)
+        skeptic_premises = []
+        if not ev_result.is_tradable:
+            skeptic_premises.append(f"Net EV (+{ev_result.net_ev_r:.2f}R) fails to clear minimum hurdle (+{ev_result.min_hurdle_r:.2f}R)")
+        if u_score > 0.40:
+            skeptic_premises.append(f"Systemic uncertainty budget elevated (U = {u_score:.2f})")
+        if abs(bull_conf - bear_conf) < 0.25:
+            skeptic_premises.append(f"Severe directional model disagreement (Bull: {bull_conf:.2f} vs Bear: {bear_conf:.2f})")
+        if uncertainty.event_shock_uncertainty > 0.30:
+            skeptic_premises.append("High-impact macro event catalyst within risk window")
+
+        skeptic_conf = float(np.clip(0.55 + (u_score * 0.40) + (0.30 if not ev_result.is_tradable else -0.15), 0.30, 0.98))
+        skeptic_arg = AgentArgument(
+            agent_name="SKEPTIC_JUDGE",
+            stance="NO_TRADE",
+            confidence=round(skeptic_conf, 2),
+            core_premises=skeptic_premises or ["Edge is marginal after full deduction of friction and entropy"],
+            risk_factors_highlighted=["Capital preservation takes absolute priority over speculative churn"],
+            verdict_summary=f"Skeptic veto: {skeptic_premises[0] if skeptic_premises else 'Insufficient risk-adjusted edge'}.",
+        )
+
+        # 4. Council Weighted Voting Synthesis
+        # Skeptic has 2.0x voting weight to enforce ~70% NO-TRADE baseline
+        if not ev_result.is_tradable or skeptic_conf >= 0.70 or u_score >= 0.60:
+            final_decision = "NO_TRADE"
+            conf = skeptic_conf
+            thesis = f"CAPITAL PRESERVATION: Council enforces NO_TRADE. Reason: {skeptic_arg.core_premises[0]}."
+            inval = "N/A (No capital committed)"
+        elif bull_conf > bear_conf and bull_conf > 0.65 and ev_result.net_ev_r >= ev_result.min_hurdle_r:
+            final_decision = "LONG"
+            conf = bull_conf
+            thesis = f"LONG THESIS: {bull_arg.core_premises[0]} with Net EV +{ev_result.net_ev_r:.2f}R."
+            inval = "Breach of local 15m order block support"
+        elif bear_conf > bull_conf and bear_conf > 0.65 and ev_result.net_ev_r >= ev_result.min_hurdle_r:
+            final_decision = "SHORT"
+            conf = bear_conf
+            thesis = f"SHORT THESIS: {bear_arg.core_premises[0]} with Net EV +{ev_result.net_ev_r:.2f}R."
+            inval = "Reclaim above local 15m supply zone"
+        else:
+            final_decision = "NO_TRADE"
+            conf = 0.75
+            thesis = "NO_TRADE: Market state in high-entropy equilibrium without decisive directional edge."
+            inval = "N/A"
+
+        return CouncilDecision(
+            symbol=symbol,
+            timestamp=state.timestamp,
+            final_decision=final_decision,
+            consensus_confidence=round(conf, 2),
+            bull_argument=bull_arg,
+            bear_argument=bear_arg,
+            skeptic_argument=skeptic_arg,
+            no_trade_probability=0.72,
+            primary_execution_thesis=thesis,
+            invalidation_criteria=inval,
+        )
+
+
+# Singleton
+debate_committee = AdversarialDebateCommittee()

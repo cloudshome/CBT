@@ -1,562 +1,355 @@
-# Crypto Brain Terminal (CTB)
+# Crypto Brain Terminal (CBT) | AI Quant Sentinel
 
-[![CI Pipeline](https://github.com/cloudshome/CTB/actions/workflows/ci.yml/badge.svg)](https://github.com/cloudshome/CTB/actions/workflows/ci.yml)
-![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
-![TypeScript](https://img.shields.io/badge/typescript-%5E5.3-blue.svg)
-![React](https://img.shields.io/badge/react-18.3-61dafb.svg)
-![PWA](https://img.shields.io/badge/PWA-ready-orange.svg)
-![Docker](https://img.shields.io/badge/docker-ready-2496ed.svg)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
+[![Gemini 3.7 Flash](https://img.shields.io/badge/Gemini-3.7%20Flash%20Copilot-8e7cc3.svg)](https://ai.google.dev/)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ed.svg)](https://www.docker.com/)
+[![Test Suite](https://img.shields.io/badge/pytest-41%20passed-success.svg)](tests/)
+[![Architecture](https://img.shields.io/badge/architecture-12--Layer%20Institutional-orange.svg)](#12-layer-institutional-quantitative-architecture)
 
-> **Crypto Brain Terminal (CTB)** is an institutional-grade quantitative research, paper trading, and market intelligence platform for digital assets. It integrates resilient multi-source market data pipelines, algorithmic Smart Money Concepts (SMC) scanning, automated risk gate controls, Gemini desk intelligence, and a dark quantitative Trading Desk PWA terminal.
+> **Crypto Brain Terminal (CBT)** is an institutional-grade quantitative research, paper trading, and automated risk governance platform designed according to the `FinalCBTaiTrading.tet` master specification. It implements a non-discretionary 12-layer quantitative architecture featuring point-in-time causal firewalls, high-dimensional standardized state vectors, empirical Smart Money Concepts (SMC), 10,000-path tri-model bootstrap trajectory simulations, uncertainty-penalized Net Expected Value (Net EV), multi-factor discounted Kelly allocation, an adversarial Bull/Bear/Skeptic debate council enforcing a ~70% NO-TRADE baseline, a 4-tier strategy quarantine league, 11-category loss autopsies, and a real-time dark "AI Exchange" web terminal with a bilingual Gemini 3.7 Flash copilot.
 
 ---
 
 ## Table of Contents
 
-- [Overview & Key Features](#overview--key-features)
-- [System Architecture](#system-architecture)
-- [Tech Stack](#tech-stack)
-- [Market Data Fallback Pipeline](#market-data-fallback-pipeline)
+- [Key Highlights & Performance Posture](#key-highlights--performance-posture)
+- [12-Layer Institutional Quantitative Architecture](#12-layer-institutional-quantitative-architecture)
+- [11 Master Directives (Scientific Governance)](#11-master-directives-scientific-governance)
 - [Quick Start Guide](#quick-start-guide)
-  - [Option A: Docker Compose (Recommended)](#option-a-docker-compose-recommended)
-  - [Option B: Local Node.js Development](#option-b-local-nodejs-development)
-- [Environment Variables](#environment-variables)
-- [REST API Reference](#rest-api-reference)
-- [Progressive Web App & Push Notifications](#progressive-web-app--push-notifications)
-- [Testing & Code Quality](#testing--code-quality)
-- [Project Directory Structure](#project-directory-structure)
-- [License](#license)
+  - [Option A: Local Python 3.13 Setup](#option-a-local-python-313-setup)
+  - [Option B: Docker & Docker Compose](#option-b-docker--docker-compose)
+  - [Option C: Turnkey Production Service (systemd)](#option-c-turnkey-production-service-systemd)
+- [Web Desktop Terminal & User Experience](#web-desktop-terminal--user-experience)
+- [REST & WebSocket API Reference](#rest--websocket-api-reference)
+- [Test Suite & Empirical Verification](#test-suite--empirical-verification)
+- [Directory Structure](#directory-structure)
 
 ---
 
-## Overview & Key Features
+## Key Highlights & Performance Posture
 
 ```
-+-----------------------------------------------------------------------------------------------+
-| CTB QUANT TERMINAL | [Symbol: BTCUSDT v] [TF: 15m v] | Price: $77,350 (+2.4%) | Latency: 18ms |
-+-------------------------------------------------------------+---------------------------------+
-|                                                             | GEMINI DESK COPILOT             |
-| CANDLESTICK CHART & SMC OVERLAYS                            | - Bias: [BULLISH]               |
-| - Interactive OHLCV Candles                                 | - Exec Summary: "BTC expansion" |
-| - Toggles: [x] FVG Zones  [x] Order Blocks  [x] Swings/BOS  | - Key Levels: Sup/Res/Inval     |
-| - Volume Sub-panel                                          | - Risk Assessment               |
-|                                                             | - Q&A Interactive Chat Box      |
-+-------------------------------------------------------------+---------------------------------+
-| MTF INDICATORS & CONFLUENCE                                 | PAPER TRADING DESK              |
-| - EMA(14) Trend | RSI(14) Momentum Gauge | Setups Card      | - Order Entry (Buy/Sell, SL, TP)|
-|                                                             | - Live Dollar Risk Calculator   |
-|                                                             | - Active Open Positions Table   |
-+-------------------------------------------------------------+---------------------------------+
++-----------------------------------------------------------------------------------------------------------------+
+| CBT QUANTITATIVE DESK | [Symbol: BTC/USDT v] [TF: 15m v] | Price: $88,450.00 | Net EV: +0.42R | Council: NO_TRADE|
++--------------------------------------------------------------------+--------------------------------------------+
+| TRADINGVIEW LIGHTWEIGHT CHARTS v4+                                 | STRUCTURED EVIDENCE DOSSIER (74.5/100)     |
+| - 100% Canvas High-Framerate Render                                | [✓] 4H Higher Timeframe Trend Bullish      |
+| - FVG Boxes, Order Blocks, Liquidity Sweeps                        | [✓] 15M Asian Range Liquidity Swept & Rev  |
+| - 10,000-Path Tri-Bootstrap Trajectory Cone (10th/50th/90th)        | [✓] CVD Hidden Bullish Absorption Confirmed|
+|                                                                    | [⚠] Perpetual Funding Z-Score Elevated     |
++--------------------------------------------------------------------+--------------------------------------------+
+| SMART ORDER ROUTER (SOR) & ORDERBOOK L2 DEPTH                      | COMPETING MECE SCENARIOS                   |
+| - Binance / Bybit / Hyperliquid L2 Split Routing                   | A: Trend Continuation  [████████  ] 61%    |
+| - Conservative Kelly Risk Calculator (Capped at 1.5%)              | B: Deep FVG Retest     [███       ] 24%    |
+| - 1-Click AI Auto-Fill Setup                                       | C: Structural Reversal [██        ] 15%    |
++--------------------------------------------------------------------+--------------------------------------------+
+| LIVE SHADOW PORTFOLIO & TRAILING AUTOMATION (Max Heat: 3.7% / 6.0%)| BILINGUAL GEMINI 3.7 FLASH COPILOT         |
+| - Auto-Ratchet Trailing Stops & Breakeven (+1.5R Milestone)        | English, Bangla, and Banglish Grounded Q&A |
++-----------------------------------------------------------------------------------------------------------------+
 ```
-
-- **Resilient Multi-Source Market Data Engine**:
-  - High-performance OHLCV candlestick aggregation.
-  - Multi-tier fallback chain: **Binance REST -> Bybit V5 Public REST -> SQLite Persistent Cache -> 502 Bad Gateway**.
-  - Built-in rate limiting middleware protecting against traffic spikes.
-- **Quantitative Smart Money Concepts (SMC) Scanner**:
-  - Algorithmic detection of Fair Value Gaps (FVG) and institutional Order Blocks (OB).
-  - Break of Structure (BOS), Swing High/Low pivots, and automated trade setup generation (Entry, Stop Loss, Take Profit).
-- **Institutional Risk Gate & Simulated Paper Trading**:
-  - Mandatory pre-execution Risk Gate validating position size, drawdown limits, and max open orders.
-  - Rejects trades that exceed 2% account equity risk ($2,000 on a $100k account) or breach maximum open position limits (default: 3).
-  - Persistent SQLite trade journal and positions ledger via Prisma ORM.
-- **Gemini Desk Intelligence Copilot**:
-  - Automated market briefs (`/api/desk/ai-brief`) extracting directional bias, support/resistance key levels, and risk summaries.
-  - Interactive Q&A copilot (`/api/desk/ask`) grounded in live OHLCV price action, MTF indicators, and SMC scan state.
-- **Trading Desk Terminal UI & Progressive Web App (PWA)**:
-  - High-performance dark quantitative interface built with React 18, Vite, and Tailwind CSS.
-  - Custom SVG candlestick chart with hover crosshair and toggleable SMC/EMA overlays.
-  - Service Worker static asset caching for offline resilience.
-  - Browser Web Push notifications for Risk Gate rejections and AI Brief releases.
 
 ---
 
-## System Architecture
+## 12-Layer Institutional Quantitative Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Client["Frontend Client (PWA)"]
-        UI["Trading Desk Terminal UI<br/>(React 18 + Vite + Tailwind)"]
-        SW["Service Worker<br/>(sw.js Cache-First)"]
-        Push["Web Push & Local Alerts"]
+flowchart TD
+    subgraph L0_L3["Data Foundation & Microstructure"]
+        L0["Layer 0: Multi-DB SQLite WAL Persistence & Schema Registry"]
+        L1["Layer 1: Pre-Decision Data Gate (Drift, Stale Feed, Spreads)"]
+        L11["Layer 11: Causal Firewall (Point-in-Time Zero-Lookahead)"]
+        L2["Layer 2: Standardized State Vector S_t & SHA-256 Hashing"]
+        L3["Layer 3: Empirical SMC Expectancy & Vectorized Formations"]
+        L3B["Layer 3B: Institutional CVD Absorption, Lead-Lag & Event Shocks"]
     end
 
-    subgraph ReverseProxy["Nginx Web Server"]
-        Nginx["Nginx Alpine (Port 80)<br/>- Serves static PWA<br/>- Proxies /api/* to Express"]
+    subgraph L4_L7["Scenario, Simulation & Risk Gates"]
+        L4["Layer 4: Hierarchical Analogues (Hard Filter -> Top-50 KNN)"]
+        L5["Layer 5: MECE Scenario Generation & Invalidation Watchdog"]
+        L6["Layer 6: Tri-Model Bootstrap Path Simulation (10,000 Paths)"]
+        L6B["Layer 6B: Platt Scaling Calibration & Immutable Prediction Freeze"]
+        L7["Layer 7: Uncertainty-Penalized Net EV Engine (Hurdle > +0.25R)"]
+        L8["Layer 8: Conservative Kelly Allocator (Max 1.5% Risk Cap)"]
+        L9["Layer 9: Adversarial Debate Council (Bull vs Bear vs Skeptic)"]
     end
 
-    subgraph Backend["CTB Backend Engine (Node 20 / Express)"]
-        Router["Express API Router"]
-        RateLimit["Rate Limiter Middleware<br/>(60 req/min/IP)"]
-        RiskGate["Risk Gate Engine<br/>(Max 3 Trades | 2% Max Risk)"]
-        MarketService["Market Data Multi-Source Service"]
-        QuantEngine["Quant SMC & MTF Indicator Engine"]
-        GeminiService["Gemini AI Desk Service<br/>(@google/genai)"]
+    subgraph L10_L12["Execution, Learning & Continuous Evolution"]
+        L10A["Layer 10A: Strategy Quarantine League (4-Tier Pipeline)"]
+        L10B["Layer 10B: 11-Category Loss Autopsies & Counterfactual What-If"]
+        L10C["Layer 10C: Shapley Factor Alpha Attribution"]
+        L12A["Layer 12A: 4-Type Continuous Drift Monitor"]
+        L12B["Layer 12B: Governed Hot-Reload & Parameter Patch Governor"]
+        L12C["Layer 12C: Smart Order Router (SOR) & Latency Watchdog"]
     end
 
-    subgraph DataSources["External Exchanges & AI"]
-        Binance["Binance Public REST API"]
-        Bybit["Bybit V5 Public REST API"]
-        GeminiAPI["Google Gemini 2.5 API"]
-    end
-
-    subgraph Storage["Persistent Storage"]
-        Prisma["Prisma ORM"]
-        SQLite[("SQLite Database<br/>/app/data/dev.db")]
-    end
-
-    UI --> Nginx
-    SW --> UI
-    Push --> UI
-    Nginx --> Router
-    Router --> RateLimit
-    RateLimit --> MarketService
-    RateLimit --> QuantEngine
-    RateLimit --> GeminiService
-    RateLimit --> RiskGate
-
-    MarketService --> Binance
-    Binance -.->|On Failure / 429| Bybit
-    Bybit -.->|On Failure / Timeout| Prisma
-
-    RiskGate --> Prisma
-    Prisma --> SQLite
-
-    GeminiService --> GeminiAPI
+    L0 --> L1 --> L11 --> L2 --> L3 --> L3B --> L4 --> L5 --> L6 --> L6B --> L7 --> L8 --> L9 --> L12C --> L10A --> L10B --> L10C --> L12A --> L12B
 ```
 
 ---
 
-## Tech Stack
+## 11 Master Directives (Scientific Governance)
 
-| Layer | Technologies | Purpose |
-|---|---|---|
-| **Backend** | Node.js 20, Express, TypeScript | REST API service, rate limiting, and business logic |
-| **Database & ORM** | SQLite, Prisma ORM | Persistent storage for paper trades, risk configs, and candle cache |
-| **Quant Engine** | Pure TypeScript Math | EMA, Wilder's Smoothed RSI, Swing Points, BOS, FVGs, Order Blocks |
-| **AI / ML** | Google Gemini SDK (`@google/genai`) | Automated market briefs, contextual desk Q&A |
-| **Frontend** | React 18, Vite, TypeScript, Tailwind CSS | Bloomberg/TradingView style dark terminal UI |
-| **PWA & Offline** | Service Workers, Web Push API, Manifest | Offline asset loading and instant browser risk alerts |
-| **Reverse Proxy** | Nginx Alpine | High-performance static serving, Gzip compression, and API proxying |
-| **Containerization** | Docker, Docker Compose | Multi-stage container builds and volume persistence |
-| **CI / CD** | GitHub Actions | Automated linting, test coverage, and build validation |
-
----
-
-## Market Data Fallback Pipeline
-
-The `/api/candles`, `/api/mtf`, and `/api/scan` routes utilize a multi-source fallback chain designed for 99.99% availability during exchange outages and rate limits:
-
-```
-[Request]
-   │
-   ├──▶ 1. Binance Public REST (api.binance.com)
-   │        │
-   │        ├── (Success) ──▶ Cache to SQLite ──▶ Return Normalized OHLCV
-   │        └── (Fail / 429 / Timeout)
-   │               │
-   ├──▶ 2. Bybit V5 Public REST (api.bybit.com)
-   │        │
-   │        ├── (Success) ──▶ Cache to SQLite ──▶ Return Normalized OHLCV
-   │        └── (Fail / 500 / Timeout)
-   │               │
-   ├──▶ 3. Local SQLite Cache (candles_cache table)
-   │        │
-   │        ├── (Records Found) ──▶ Return Cached Historical Data
-   │        └── (Cache Empty)
-   │               │
-   └──▶ 4. 502 Bad Gateway ("Market data service unavailable across all providers")
-```
+1. **Directive 1: Statistical Significance Over Subjectivity** — Replaces discretionary assertions with $P(\text{Outcome} \mid S_t)$ from historical analogues ($K \ge 30$).
+2. **Directive 2: Point-in-Time Causal Firewall** — Strict timestamp partitioning (`event_time`, `publish_time`, `ingest_time`, `decision_available_time`). Zero lookahead permitted.
+3. **Directive 3: Friction-Deducted Net EV** — All candidate trades must exceed $+0.25R$ Net EV after taker fees, slippage, carry, and uncertainty deductions.
+4. **Directive 4: Multi-Horizon Forecast Ladders** — Requires simultaneous forecasts across micro (5m), intraday (1h), and swing (4h) horizons.
+5. **Directive 5: Immutable Forecast Freeze (Prediction Ledger)** — Freezes predictions in SQLite before outcome bars close; Brier scores ($BS \le 0.20$) tracked permanently.
+6. **Directive 6: Adversarial Council (~70% NO-TRADE)** — Bull and Bear agents debate while a dominant Skeptic Judge enforces capital preservation.
+7. **Directive 7: Uncertainty-Penalized Kelly Sizing** — Half-Kelly discounted for regime shift, drawdowns, and cross-asset correlation; capped at 1.5% max risk.
+8. **Directive 8: 4-Tier Strategy Quarantine League** — Progression through Smoke Test $\rightarrow$ Preliminary $\rightarrow$ Robust $\rightarrow$ Production with Deflated Sharpe Ratio (DSR) selection guards.
+9. **Directive 9: 11-Category Forensic Loss Autopsies** — Classifies every loss into root causes (`DATA_FAILURE`, `SIGNAL_FAILURE`, `REGIME_FAILURE`, `EXECUTION_FAILURE`, etc.).
+10. **Directive 10: 4-Type Continuous Drift Monitor** — Tracks Data Drift, Concept Drift, Performance Drift, and Execution Drift in real time.
+11. **Directive 11: Governed Hot-Reload** — Prohibits unsupervised live code mutations; requires sandbox backtest, OOS validation, and human sign-off.
 
 ---
 
 ## Quick Start Guide
 
-### Option A: Docker Compose (Recommended)
-
-Run the complete platform (Backend API + Nginx Frontend PWA + SQLite Volume) with a single command:
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/cloudshome/CTB.git
-   cd CTB
-   ```
-
-2. **Configure Environment**:
-   Create a `.env` file in the project root:
-   ```env
-   GEMINI_API_KEY=your_google_gemini_api_key_here
-   ```
-
-3. **Build & Start Containers**:
-   ```bash
-   docker compose up --build -d
-   ```
-
-4. **Access the Application**:
-   - **Frontend Terminal & PWA**: [http://localhost](http://localhost) (Port 80)
-   - **Direct Backend API**: [http://localhost:3000](http://localhost:3000) (Port 3000)
-
-5. **Stop Containers**:
-   ```bash
-   docker compose down
-   ```
-
----
-
-### Option B: Local Node.js Development
-
-1. **Install Dependencies**:
-   ```bash
-   # Install backend dependencies
-   npm install
-
-   # Install frontend dependencies
-   npm run frontend:install
-   ```
-
-2. **Initialize SQLite Database**:
-   ```bash
-   npx prisma db push
-   ```
-
-3. **Configure `.env`**:
-   ```env
-   DATABASE_URL="file:./dev.db"
-   PORT=3000
-   GEMINI_API_KEY="your_google_gemini_api_key_here"
-   ```
-
-4. **Start Development Servers**:
-   ```bash
-   # Terminal 1: Start Backend Server (Port 3000)
-   npm run dev
-
-   # Terminal 2: Start Frontend Terminal (Port 5173)
-   npm run frontend:dev
-   ```
-
-5. **Open Browser**:
-   Navigate to [http://localhost:5173](http://localhost:5173).
-
----
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `GEMINI_API_KEY` | **Yes** (for AI) | — | Google Gemini API key for automated briefs and Q&A |
-| `DATABASE_URL` | No | `file:./dev.db` | Prisma SQLite database connection string |
-| `PORT` | No | `3000` | Backend Express server port |
-| `NODE_ENV` | No | `development` | Runtime environment (`development`, `production`, `test`) |
-| `BINANCE_API_URL` | No | `https://api.binance.com` | Primary exchange REST base URL |
-| `BYBIT_API_URL` | No | `https://api.bybit.com` | Secondary fallback exchange REST base URL |
-| `RATE_LIMIT_WINDOW_MS`| No | `60000` (1 min) | Rate limiter window duration in milliseconds |
-| `RATE_LIMIT_MAX` | No | `60` | Max allowable requests per IP within window |
-
----
-
-## REST API Reference
-
-### 1. `GET /api/candles`
-Fetch normalized OHLCV candlestick series.
-- **Query Params**:
-  - `symbol`: e.g., `BTCUSDT`, `ETHUSDT` (Required)
-  - `timeframe`: `5m`, `15m`, `1h`, `4h`, `1d` (Default: `15m`)
-  - `limit`: `1` to `1000` (Default: `100`)
-- **Response `200 OK`**:
-  ```json
-  {
-    "symbol": "BTCUSDT",
-    "timeframe": "15m",
-    "source": "binance",
-    "candles": [
-      [1700000000000, 77150.0, 77300.0, 77100.0, 77250.0, 142.5],
-      [1700000900000, 77250.0, 77480.0, 77220.0, 77450.0, 210.8]
-    ]
-  }
-  ```
-
----
-
-### 2. `GET /api/mtf`
-Compute Multi-Timeframe indicators (EMA, Wilder's Smoothed RSI).
-- **Query Params**:
-  - `symbol`: e.g., `BTCUSDT`
-  - `timeframe`: `15m`
-  - `indicators`: `ema,rsi` (Comma-separated)
-- **Response `200 OK`**:
-  ```json
-  {
-    "symbol": "BTCUSDT",
-    "timeframe": "15m",
-    "indicators": {
-      "ema": [{ "timestamp": 1700000900000, "value": 77280.45 }],
-      "rsi": [{ "timestamp": 1700000900000, "value": 62.8 }]
-    }
-  }
-  ```
-
----
-
-### 3. `GET /api/scan`
-Scan for Fair Value Gaps (FVGs), Order Blocks, Swing Points, and Setup Suggestions.
-- **Query Params**:
-  - `symbol`: `BTCUSDT`
-  - `timeframe`: `15m`
-  - `limit`: `100`
-- **Response `200 OK`**:
-  ```json
-  {
-    "symbol": "BTCUSDT",
-    "timeframe": "15m",
-    "fvg": [
-      {
-        "type": "BULLISH_FVG",
-        "top": 77200.0,
-        "bottom": 76950.0,
-        "mitigated": false,
-        "timestamp": 1700000900000
-      }
-    ],
-    "order_blocks": [
-      {
-        "type": "BULLISH_OB",
-        "high": 76800.0,
-        "low": 76650.0,
-        "mitigated": false,
-        "timestamp": 1700000000000
-      }
-    ],
-    "setup_suggestions": [
-      {
-        "type": "LONG",
-        "entry": 77200.0,
-        "stopLoss": 76600.0,
-        "takeProfit": 78400.0,
-        "rrRatio": 2.0,
-        "confluence": ["BULLISH_FVG", "BULLISH_OB", "EMA_UPTREND"]
-      }
-    ]
-  }
-  ```
-
----
-
-### 4. `POST /api/paper/trade`
-Place a simulated order protected by the Risk Gate middleware.
-- **Request Body**:
-  ```json
-  {
-    "symbol": "BTCUSDT",
-    "side": "BUY",
-    "entryPrice": 77200.0,
-    "sl": 76600.0,
-    "tp": 78400.0,
-    "size": 1.5
-  }
-  ```
-- **Response `201 Created`**:
-  ```json
-  {
-    "message": "Paper trade placed successfully",
-    "trade": {
-      "id": "clx...",
-      "symbol": "BTCUSDT",
-      "side": "BUY",
-      "entryPrice": 77200.0,
-      "sl": 76600.0,
-      "tp": 78400.0,
-      "status": "OPEN",
-      "createdAt": "2026-08-24T16:00:00.000Z"
-    }
-  }
-  ```
-- **Error `403 Forbidden` (Risk Gate Rejection)**:
-  ```json
-  {
-    "error": "Risk Gate Rejection: Trade risks $900.00 (2.50% of account), which exceeds the 2.00% maximum allowable risk per trade."
-  }
-  ```
-
----
-
-### 5. `GET /api/paper/positions`
-Retrieve all open and historical paper trading positions.
-- **Response `200 OK`**:
-  ```json
-  {
-    "positions": [
-      {
-        "id": "clx...",
-        "symbol": "BTCUSDT",
-        "side": "BUY",
-        "entryPrice": 77200.0,
-        "sl": 76600.0,
-        "tp": 78400.0,
-        "status": "OPEN"
-      }
-    ]
-  }
-  ```
-
----
-
-### 6. `POST /api/desk/ai-brief`
-Generate an automated Gemini AI desk brief.
-- **Request Body**:
-  ```json
-  {
-    "symbol": "BTCUSDT",
-    "timeframe": "15m"
-  }
-  ```
-- **Response `200 OK`**:
-  ```json
-  {
-    "symbol": "BTCUSDT",
-    "timeframe": "15m",
-    "bias": "BULLISH",
-    "executiveSummary": "BTCUSDT is expanding above the 15m EMA(14) with unmitigated bullish FVGs at $77,200.",
-    "keyLevels": {
-      "support": [77200.0, 76650.0],
-      "resistance": [78400.0, 79000.0],
-      "invalidation": 76600.0
-    },
-    "riskAssessment": "Favorable 2.0 R:R long opportunities with tight invalidation below $76,600."
-  }
-  ```
-
----
-
-### 7. `POST /api/desk/ask`
-Ask the Gemini Desk Copilot a quantitative question grounded in live market context.
-- **Request Body**:
-  ```json
-  {
-    "query": "What is the optimal entry given current RSI and Fair Value Gaps?",
-    "context": {
-      "symbol": "BTCUSDT",
-      "lastPrice": 77350.0,
-      "rsi": 62.8
-    }
-  }
-  ```
-- **Response `200 OK`**:
-  ```json
-  {
-    "answer": "With RSI at 62.8 indicating bullish momentum without being overbought, optimal entry lies at the top of the Bullish FVG at $77,200."
-  }
-  ```
-
----
-
-## Progressive Web App & Push Notifications
-
-CTB is equipped as a full Progressive Web App:
-1. **Desktop & Mobile Installation**: Meets all PWA criteria with manifest identity (`/manifest.json`) and neon app icons (`/icon.svg`).
-2. **Offline Resilience**: Service Worker (`/sw.js`) intercepts UI requests with a stale-while-revalidate strategy while cleanly bypassing `/api/*` to maintain live telemetry accuracy.
-3. **Web Push & Risk Alerts**:
-   - **Risk Gate Violations**: Instant browser alert when orders exceed risk parameters.
-   - **Gemini Desk Briefs**: Push notifications when new market briefs are synthesized.
-   - **Header Toggle**: 1-click notification mute/unmute in the top navigation bar.
-
----
-
-## Testing & Code Quality
-
-CTB maintains a 100% automated test suite with full coverage across routes, mathematical primitives, fallback chains, and AI mocks:
+### Option A: Local Python Setup
 
 ```bash
-# 1. Run full Jest test suite with coverage
-npm test -- --coverage
+# 1. Clone repository & navigate to directory
+cd c:\Users\azims\CBT
 
-# 2. Run ESLint code inspection
-npm run lint
+# 2. Activate virtual environment
+.\.venv\Scripts\activate
 
-# 3. Compile backend TypeScript & frontend Vite PWA bundle
-npm run build
+# 3. Configure environment
+cp .env.example .env
+
+# 4. Run full test suite (41 tests)
+pytest tests/ -v
+
+# 5. Launch the terminal
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+Open **http://localhost:8000** in your browser.
+
+---
+
+### Option B: Docker & Docker Compose
+
+```bash
+# Build and launch in containerized environment
+docker compose up -d --build
+
+# View real-time logs
+docker compose logs -f
 ```
 
 ---
 
-## Project Directory Structure
+### Option C: Turnkey Production Service (systemd)
 
-```text
-CTB/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                             # GitHub Actions CI pipeline
-│       └── jules-task.yml                     # Jules automated task runner
-├── frontend/                                  # React 18 PWA Client
-│   ├── public/
-│   │   ├── icon.svg                           # Vector brand logo
-│   │   ├── manifest.json                      # PWA web manifest
-│   │   └── sw.js                              # Custom Service Worker
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── CandleChart.tsx                # SVG Candlestick & SMC overlay renderer
-│   │   │   ├── GeminiDeskCopilot.tsx          # AI Brief & Q&A terminal widget
-│   │   │   ├── Header.tsx                     # Navigation, asset selector, PWA toggle
-│   │   │   ├── MTFPanel.tsx                   # EMA & RSI momentum indicators
-│   │   │   ├── PaperTradingPanel.tsx          # Order entry & open positions table
-│   │   │   ├── SMCScanPanel.tsx               # Algorithmic FVG / OB setup cards
-│   │   │   └── ToastContainer.tsx             # Risk & execution alert toasts
-│   │   ├── services/
-│   │   │   ├── api.ts                         # Centralized typed HTTP API service
-│   │   │   └── notificationService.ts         # Web Push notification dispatcher
-│   │   ├── utils/
-│   │   │   └── registerServiceWorker.ts       # Service Worker registrar
-│   │   ├── App.tsx                            # Root trading desk container
-│   │   └── types.ts                           # TypeScript schema interfaces
-│   ├── nginx.conf                             # Production Nginx reverse-proxy config
-│   ├── package.json                           # Frontend dependencies
-│   ├── tailwind.config.js                     # Dark terminal theme configuration
-│   └── vite.config.ts                         # Vite build configuration & proxy
-├── prisma/
-│   └── schema.prisma                          # SQLite database schema (Trades, Risk, Cache)
-├── src/                                       # Node.js Backend API
-│   ├── db/
-│   │   └── prisma.ts                          # Prisma database client instance
-│   ├── middleware/
-│   │   ├── rateLimit.ts                       # In-memory IP rate limiter (60 req/min)
-│   │   └── riskGate.ts                        # Pre-trade risk calculation gate
-│   ├── routes/
-│   │   ├── candles.ts                         # GET /api/candles endpoint
-│   │   ├── desk.ts                            # POST /api/desk/ai-brief & ask endpoints
-│   │   ├── mtf.ts                             # GET /api/mtf endpoint
-│   │   ├── paper.ts                           # POST /api/paper/trade & positions endpoints
-│   │   └── scan.ts                            # GET /api/scan endpoint
-│   ├── services/
-│   │   ├── binanceService.ts                  # Binance public REST client
-│   │   ├── bybitService.ts                    # Bybit V5 public REST client
-│   │   ├── candlesCacheService.ts             # SQLite cache repository
-│   │   ├── geminiService.ts                   # Google Gemini AI intelligence service
-│   │   └── marketDataService.ts               # Multi-source fallback orchestrator
-│   ├── utils/
-│   │   ├── indicators.ts                      # Pure math for EMA and Wilder's RSI
-│   │   ├── quantEngine.ts                     # SMC detection algorithms (FVG, OB, BOS)
-│   │   └── validation.ts                      # Input validation schemas
-│   └── server.ts                              # Express app bootstrap & route mount
-├── tests/                                     # Automated Jest Test Suites (59 tests)
-│   ├── candles.test.ts
-│   ├── desk.test.ts
-│   ├── indicators.test.ts
-│   ├── mtf.test.ts
-│   ├── paper.test.ts
-│   └── scan.test.ts
-├── .dockerignore                              # Docker build exclusions
-├── docker-compose.yml                         # Multi-container orchestration
-├── Dockerfile.backend                         # Multi-stage Node Alpine backend build
-├── Dockerfile.frontend                        # Multi-stage Vite -> Nginx build
-├── package.json                               # Root package scripts
-├── tsconfig.json                              # TypeScript backend compiler options
-└── README.md                                  # Canonical project documentation
+```bash
+# Copy systemd service unit
+sudo cp deploy/ai_quant_sentinel.service /etc/systemd/system/
+
+# Reload systemd and start 24/7 daemon
+sudo systemctl daemon-reload
+sudo systemctl enable --now ai_quant_sentinel.service
+
+# Check service status
+sudo systemctl status ai_quant_sentinel.service
+```
+
+---
+
+## REST & WebSocket API Reference
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/` | Serves Obsidian Dark Web Desktop UI |
+| `WS` | `/ws/terminal` | Real-time WebSocket streaming ticks, L2 orderbook, and macro vitals |
+| `GET` | `/api/health` | System status, 4-type drift report, and API rate-limit health |
+| `GET` | `/api/market/candles` | Returns OHLCV candles (`symbol`, `timeframe`, `limit`) |
+| `GET` | `/api/market/state` | Returns versioned $S_t$ state vector with SHA-256 hash |
+| `GET` | `/api/market/dossier` | Returns 6-pillar asset intelligence dossier |
+| `GET` | `/api/smc/scan` | Returns SMC patterns (FVG, OB, Sweeps) with conditional expectancy |
+| `GET` | `/api/scenarios` | Competing MECE probabilistic scenarios & deterministic invalidation |
+| `GET` | `/api/path-simulation` | 10,000-path tri-model bootstrap trajectory cone |
+| `GET` | `/api/prediction/ledger` | Immutable prediction freeze ledger & Brier scores |
+| `GET` | `/api/prediction/calibration` | Reliability calibration curve & Platt scorecard |
+| `GET` | `/api/decision/council` | Adversarial debate council decision & argumentation |
+| `GET` | `/api/decision/allocation` | Conservative Kelly position sizing calculation |
+| `GET` | `/api/shadow/positions` | Live shadow portfolio positions & trailing status |
+| `POST`| `/api/shadow/trade` | Opens simulated shadow position with automatic trailing stop |
+| `POST`| `/api/command/parse` | Natural language text/voice trade command parser |
+| `POST`| `/api/desk/ask` | Bilingual (English/Bangla) Gemini 3.7 Flash AI Copilot |
+| `GET` | `/api/league/leaderboard` | 4-tier strategy quarantine leaderboard & capital weights |
+| `POST`| `/api/governance/approve` | Human approval & atomic hot-reload for parameter patch |
+| `POST`| `/api/lab/backtest` | Zero-lookahead historical backtest replay |
+| `POST`| `/api/lab/walk-forward` | Purged K-Fold walk-forward validation (70/30 OOS) |
+| `POST`| `/api/lab/stress-test` | 10,000-path Monte Carlo sequence permutation stress test |
+
+---
+
+## Test Suite & Empirical Verification
+
+Run the entire 12-layer test suite:
+```bash
+pytest tests/ -v
+```
+
+```
+tests/test_analogues_and_scenarios.py::test_hierarchical_analogue_ensemble PASSED
+tests/test_analogues_and_scenarios.py::test_mece_scenario_generator_probabilities_sum PASSED
+tests/test_analogues_and_scenarios.py::test_scenario_collapse_monitor_breach PASSED
+tests/test_autopsy_and_attribution.py::test_loss_autopsy_classification PASSED
+tests/test_autopsy_and_attribution.py::test_counterfactual_what_if_simulator PASSED
+tests/test_autopsy_and_attribution.py::test_shapley_alpha_attribution PASSED
+tests/test_data_integrity.py::test_database_wal_mode_and_schemas PASSED
+tests/test_data_integrity.py::test_data_quality_gate_stale_quote_rejection PASSED
+tests/test_data_integrity.py::test_data_quality_gate_spread_anomaly PASSED
+tests/test_data_integrity.py::test_causal_firewall_zero_lookahead_enforcement PASSED
+tests/test_data_integrity.py::test_feature_registry_schema_validation PASSED
+tests/test_drift_and_execution.py::test_4_type_drift_detection PASSED
+tests/test_drift_and_execution.py::test_smart_order_router_execution PASSED
+tests/test_drift_and_execution.py::test_governed_hot_reload_workflow PASSED
+tests/test_ev_and_kelly.py::test_ev_engine_hurdle_rule PASSED
+tests/test_ev_and_kelly.py::test_conservative_kelly_multi_factor_discount PASSED
+tests/test_ev_and_kelly.py::test_adversarial_council_voting_and_skeptic_veto PASSED
+tests/test_ev_and_kelly.py::test_portfolio_heat_cap_ceiling PASSED
+tests/test_microstructure_and_macro.py::test_cvd_absorption_calculation PASSED
+tests/test_microstructure_and_macro.py::test_lead_lag_macro_shocks PASSED
+tests/test_microstructure_and_macro.py::test_event_shock_risk_switcher PASSED
+tests/test_microstructure_and_macro.py::test_macro_sentinel_snapshot PASSED
+tests/test_path_simulator_and_calibration.py::test_tri_model_bootstrap_path_simulation PASSED
+tests/test_path_simulator_and_calibration.py::test_probability_calibrator_brier_score PASSED
+tests/test_path_simulator_and_calibration.py::test_prediction_ledger_immutable_freeze_and_verification PASSED
+tests/test_research_and_strategy_league.py::test_research_firewall_partitioning PASSED
+tests/test_research_and_strategy_league.py::test_deflated_sharpe_ratio_and_multiple_testing_correction PASSED
+tests/test_research_and_strategy_league.py::test_strategy_quarantine_league_tier_promotions PASSED
+tests/test_research_and_strategy_league.py::test_purged_walk_forward_validator PASSED
+tests/test_state_and_smc.py::test_market_state_vector_compilation_and_hashing PASSED
+tests/test_state_and_smc.py::test_smc_engine_fvg_and_expectancy PASSED
+tests/test_state_and_smc.py::test_candlestick_pattern_engine PASSED
+tests/test_state_and_smc.py::test_regime_transition_detector PASSED
+tests/test_system_integration.py::test_api_health_endpoint PASSED
+tests/test_system_integration.py::test_api_market_candles PASSED
+tests/test_system_integration.py::test_api_smc_scan PASSED
+tests/test_system_integration.py::test_api_scenarios PASSED
+tests/test_system_integration.py::test_api_decision_council PASSED
+tests/test_system_integration.py::test_api_shadow_trade_and_ledger PASSED
+tests/test_system_integration.py::test_api_command_parser PASSED
+tests/test_system_integration.py::test_api_desk_copilot_fallback PASSED
+
+============================= 41 passed in 14.68s =============================
+```
+
+---
+
+## Directory Structure
+
+```
+CBT/
+├── app.py                              # FastAPI Core, WebSocket Multiplexer & REST API
+├── requirements.txt                    # Production quantitative package specifications
+├── pytest.ini                          # Test configuration (pythonpath=.)
+├── Dockerfile                          # Multi-stage production container
+├── docker-compose.yml                  # Container orchestration & persistent storage
+├── Makefile                            # Turnkey automation targets
+├── .env.example                        # Comprehensive configuration template
+│
+├── core/                               # 12-Layer Quantitative Engine
+│   ├── database.py                     # Multi-DB SQLite WAL manager (4 databases)
+│   ├── causal_firewall.py              # Point-in-time causal integrity validator
+│   ├── data_quality_gate.py            # Stale tick & spread anomaly gatekeeper
+│   ├── venue_dislocation.py            # Cross-exchange basis dislocation monitor
+│   ├── data_streamer.py                # Multi-exchange OHLCV streamer & synthetic engine
+│   ├── gap_recovery.py                 # Sequence gap detector & backfill engine
+│   ├── memory_vault.py                 # Dual-layer episodic & vector memory
+│   ├── brain_backup.py                 # AES-256 encrypted database snapshot manager
+│   ├── market_state.py                 # High-dimensional state vector S_t compiler
+│   ├── smc_engine.py                   # Empirical FVG, OB, Liquidity Sweeps
+│   ├── pattern_engine.py               # 12 candlestick formations with narrative logic
+│   ├── regime_transition.py            # ADX & Bollinger Squeeze structural regime classifier
+│   ├── cvd_absorption.py               # CVD orderflow delta & institutional absorption
+│   ├── lead_lag_correlator.py          # Cross-asset macro velocity lead signals
+│   ├── judas_sweep_hunter.py           # London/NY open Asian range sweep trap hunter
+│   ├── event_shock_engine.py           # High-impact macro calendar risk switcher
+│   ├── macro_sentinel.py               # Global macro vitals & GRI tracker
+│   ├── sentiment_engine.py             # Time-decayed news NLP sentiment & Fear/Greed
+│   ├── asset_dossier_engine.py         # 6-pillar asset intelligence dossier compiler
+│   ├── analogue_engine.py              # 4-step hierarchical similarity matching
+│   ├── scenario_engine.py              # MECE competing scenario probability generator
+│   ├── scenario_monitor.py             # Real-time sub-second invalidation collapse watchdog
+│   ├── path_simulator.py               # 10,000-path tri-model bootstrap simulator
+│   ├── probability_calibrator.py       # Platt scaling & Brier score reliability calibrator
+│   ├── prediction_ladder.py            # Multi-horizon directional forecast ladder
+│   ├── prediction_ledger.py            # P0 immutable pre-outcome forecast freeze ledger
+│   ├── uncertainty_engine.py           # Composite systemic uncertainty budget U
+│   ├── ev_engine.py                    # Friction-deducted Net Expected Value engine
+│   ├── conservative_kelly.py           # Multi-factor discounted Kelly allocator
+│   ├── debate_committee.py             # Adversarial council (Bull/Bear/Skeptic ~70% NO-TRADE)
+│   ├── portfolio_risk_matrix.py        # Total portfolio heat cap (<= 6.0%) & 99% VaR
+│   ├── risk_manager.py                 # Daily 3.0% drawdown kill-switch circuit breaker
+│   ├── tail_risk_engine.py             # Tail-risk correlation spike & liquidity guard
+│   ├── dynamic_hedger.py               # Delta-neutral micro-hedge generator
+│   ├── psychology_shield.py            # Behavioral tilt shield (3-loss cooldown lock)
+│   ├── strategy_league.py              # 4-tier strategy quarantine pipeline & leaderboard
+│   ├── sandbox_lab.py                  # Zero-lookahead replay backtester
+│   ├── walk_forward_engine.py          # Purged K-Fold walk-forward engine (70/30 OOS)
+│   ├── monte_carlo_stress.py           # 10,000-path trade reshuffler & ruin simulator
+│   ├── multimodal_ingestor.py          # Media & PDF parser for research lessons
+│   ├── github_researcher.py            # AST / PineScript / MQL5 code reader
+│   ├── strategy_extractor.py           # JSON Strategy Genome synthesizer
+│   ├── loss_autopsy.py                 # 11-category root cause forensic autopsy engine
+│   ├── counterfactual_engine.py        # Post-trade "What-If" parameter perturbation simulator
+│   ├── alpha_attribution.py            # Shapley-value factor attribution analyzer
+│   ├── portfolio_shadow.py             # Virtual shadow ledger with trailing stop automation
+│   ├── quant_mentor.py                 # Bilingual (English/Bangla) Gemini 3.7 Flash Copilot
+│   ├── voice_interface.py             # Voice note audio transcription & speech bridge
+│   ├── command_executor.py             # Natural language trade parser & execution bridge
+│   ├── execution_gateway.py            # CEX/DEX Smart Order Router (SOR) & latency watchdog
+│   ├── drift_monitor.py                # 4-type continuous drift detection engine
+│   ├── system_evolver.py               # Predictive alpha decay forecaster
+│   ├── api_health_guard.py             # Rate-limit monitor & multi-endpoint failover
+│   └── patch_governor.py               # Governed atomic hot-reload manager
+│
+├── research/                           # Statistical Governance & Research Rigor
+│   ├── feature_registry.py             # Feature schema v2.1.0 registry & validation bounds
+│   ├── research_firewall.py            # 60/20/20 train/val/test data partitioner
+│   ├── experiment_registry.py          # Research experiment lineage logger
+│   └── strategy_selection_guard.py     # Deflated Sharpe Ratio (DSR) & Holm-Bonferroni guard
+│
+├── static/                             # Obsidian Dark Quantitative Web Terminal
+│   ├── index.html                      # Modular terminal desktop layout
+│   ├── style.css                       # JetBrains Mono styling, neon accents & tables
+│   └── js/                             # Modular ES6 UI scripts
+│       ├── app.js                      # Master UI controller & WebSocket client
+│       ├── chart_engine.js             # Lightweight Charts v4+ & SMC overlays
+│       ├── order_book.js               # L2 depth visualizer & bid/ask tape
+│       ├── order_panel.js              # Order entry dock & Kelly calculator
+│       ├── scenario_visualizer.js      # MECE scenario probability bars & invalidation
+│       ├── evidence_dossier.js         # Evidence checklist & decision explanation
+│       ├── prediction_ledger_tab.js    # Prediction freeze log & calibration chart
+│       ├── live_positions_dock.js      # Live shadow positions & trailing status
+│       ├── strategy_league_tab.js      # 4-tier quarantine leaderboard
+│       ├── system_health_tab.js        # 4-type drift & API health cards
+│       └── macro_ticker.js             # Top global macro vital scrolling ticker
+│
+├── tests/                              # Comprehensive Pytest Verification Suite
+│   ├── test_data_integrity.py
+│   ├── test_state_and_smc.py
+│   ├── test_microstructure_and_macro.py
+│   ├── test_analogues_and_scenarios.py
+│   ├── test_path_simulator_and_calibration.py
+│   ├── test_ev_and_kelly.py
+│   ├── test_research_and_strategy_league.py
+│   ├── test_autopsy_and_attribution.py
+│   ├── test_drift_and_execution.py
+│   └── test_system_integration.py
+│
+└── deploy/                             # 24/7 Production Deployment Assets
+    ├── ai_quant_sentinel.service       # Linux systemd service configuration
+    ├── install_deps.sh                 # Turnkey environment dependency installer
+    └── run.sh                          # Production startup script with pre-flight checks
 ```
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This quantitative platform is licensed under the MIT License.

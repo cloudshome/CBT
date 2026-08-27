@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Brain Terminal (CBT) | AI Quant Sentinel</title>
+  <!-- Google Fonts: JetBrains Mono & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- Lightweight Charts v4 -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <!-- Chart.js for Calibration & Distribution Graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Global Macro Vital Ticker -->
+  <header id="macro-ticker" class="macro-ticker-bar">
+    <div class="ticker-brand">
+      <span class="pulse-dot active"></span>
+      <strong>CBT QUANT SENTINEL</strong>
+      <span class="badge-v">v2.1.0 (12-LAYER)</span>
+    </div>
+    <div class="ticker-scroll" id="macro-ticker-items">
+      <div class="ticker-item"><span class="label">DXY:</span> <span class="val" id="val-dxy">104.18 (-0.22%)</span></div>
+      <div class="ticker-item"><span class="label">US10Y:</span> <span class="val" id="val-us10y">4.26% (-0.04)</span></div>
+      <div class="ticker-item"><span class="label">GOLD:</span> <span class="val" id="val-gold">$2,678.50 (+0.68%)</span></div>
+      <div class="ticker-item"><span class="label">WTI:</span> <span class="val" id="val-wti">$73.80 (+0.45%)</span></div>
+      <div class="ticker-item"><span class="label">GRI:</span> <span class="val badge-tag tag-green" id="val-gri">72.4/100 (Risk-On)</span></div>
+      <div class="ticker-item"><span class="label">EVENT RISK:</span> <span class="val badge-tag tag-blue" id="val-event">NORMAL (FOMC 18h)</span></div>
+    </div>
+    <div class="ticker-right">
+      <span id="system-clock">12:00:00 UTC</span>
+      <span class="latency-badge" id="live-latency">18ms RTT</span>
+    </div>
+  </header>
+
+  <!-- Main Application Container -->
+  <div class="app-layout">
+    <!-- Navigation Sidebar / Selector -->
+    <nav class="side-nav">
+      <div class="nav-section">
+        <label>ASSET SELECTOR</label>
+        <select id="asset-selector" class="select-box">
+          <option value="BTC/USDT" selected>BTC/USDT Perpetual</option>
+          <option value="ETH/USDT">ETH/USDT Perpetual</option>
+          <option value="XAU/USD">XAU/USD Gold</option>
+        </select>
+      </div>
+
+      <div class="nav-section">
+        <label>TIMEFRAME</label>
+        <div class="tf-btn-group" id="tf-buttons">
+          <button class="tf-btn" data-tf="1m">1m</button>
+          <button class="tf-btn" data-tf="5m">5m</button>
+          <button class="tf-btn active" data-tf="15m">15m</button>
+          <button class="tf-btn" data-tf="1h">1h</button>
+          <button class="tf-btn" data-tf="4h">4h</button>
+          <button class="tf-btn" data-tf="1d">1d</button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="nav-tabs">
+        <button class="tab-btn active" data-tab="tab-terminal">🖥️ Trading Desk</button>
+        <button class="tab-btn" data-tab="tab-ledger">📜 Prediction Ledger</button>
+        <button class="tab-btn" data-tab="tab-league">🏆 Strategy League</button>
+        <button class="tab-btn" data-tab="tab-lab">🧪 Research Sandbox</button>
+        <button class="tab-btn" data-tab="tab-health">🛡️ System Drift & Health</button>
+      </div>
+
+      <!-- Active Council Quick Badge -->
+      <div class="council-card" id="side-council-card">
+        <div class="card-header">ADVERSARIAL COUNCIL</div>
+        <div class="decision-display" id="council-decision-badge">NO_TRADE</div>
+        <div class="decision-meta">
+          <span>Net EV: <strong id="council-net-ev">+0.42R</strong></span>
+          <span>Uncertainty: <strong id="council-u-score">0.24 (Low)</strong></span>
+        </div>
+      </div>
+
+      <!-- Quick Copilot Audio/Text Status -->
+      <div class="copilot-mini-dock">
+        <div class="copilot-header">
+          <span>🤖 DESK COPILOT</span>
+          <span class="ai-status">Gemini 3.7 Flash</span>
+        </div>
+        <div class="copilot-chat-box" id="mini-chat-history">
+          <div class="chat-msg bot-msg">Desk intelligence standing by. Ask in English, Bangla, or Banglish.</div>
+        </div>
+        <div class="copilot-input-bar">
+          <input type="text" id="copilot-input" placeholder="Type market query or trade..." />
+          <button id="copilot-send-btn">Send</button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Center & Right Workspace -->
+    <main class="main-content">
+      <!-- TAB 1: TRADING DESK (Terminal) -->
+      <section id="tab-terminal" class="tab-view active">
+        <div class="terminal-grid">
+          <!-- Column 1: Chart Engine, Drawing Toolbar & SMC Overlays -->
+          <div class="chart-panel panel-card" id="trading-chart-panel">
+            <div class="panel-header">
+              <div class="chart-title">
+                <span id="chart-symbol-label">BTC/USDT</span>
+                <span class="badge-tag tag-blue" id="chart-price-live">$88,450.00</span>
+                <span class="chart-regime-tag" id="chart-regime-label">TRENDING_BULL</span>
+                <span id="chart-memory-badge" class="badge-tag tag-green" title="Drawing & Indicator state synced">💾 Synced</span>
+              </div>
+              <div class="chart-controls">
+                <label><input type="checkbox" id="toggle-fvg" checked> FVG</label>
+                <label><input type="checkbox" id="toggle-ob" checked> OB</label>
+                <label><input type="checkbox" id="toggle-sweeps" checked> Sweeps</label>
+                <label><input type="checkbox" id="toggle-cvd" checked> CVD</label>
+                <button id="btn-chart-fullscreen" class="btn-chart-action" title="Toggle Fullscreen (F)">⛶ Fullscreen</button>
+              </div>
+            </div>
+
+            <!-- Chart Canvas Wrapper with Left Toolbar & SVG Overlay -->
+            <div class="chart-canvas-wrapper" id="chart-canvas-wrapper">
+              <!-- Left Drawing Toolbar -->
+              <div class="chart-drawing-toolbar" id="chart-drawing-toolbar">
+                <button class="tool-btn active" data-tool="cursor" title="Cursor / Pan (Esc)">👆</button>
+                <div class="tool-divider"></div>
+                <button class="tool-btn" data-tool="trendline" title="Trendline / Ray">📈</button>
+                <button class="tool-btn" data-tool="hline" title="Horizontal Key Level">➖</button>
+                <button class="tool-btn" data-tool="box" title="FVG & Order Block Zone">🔲</button>
+                <button class="tool-btn" data-tool="fib" title="Fibonacci Retracement">🔢</button>
+                <div class="tool-divider"></div>
+                <button class="tool-btn" data-tool="long_pos" title="Long Position (Risk/Reward)">🟢</button>
+                <button class="tool-btn" data-tool="short_pos" title="Short Position (Risk/Reward)">🔴</button>
+                <button class="tool-btn" data-tool="ruler" title="Measure / Ruler">📏</button>
+                <button class="tool-btn" data-tool="text" title="Text Annotation">🏷️</button>
+                <div class="tool-divider"></div>
+                <button class="tool-btn" data-tool="eraser" title="Eraser (Click drawing to delete)">🧹</button>
+                <button class="tool-btn" id="btn-clear-drawings" title="Clear All Drawings">🗑️</button>
+              </div>
+
+              <!-- Main Interactive Chart Area -->
+              <div class="chart-main-area" id="chart-main-area">
+                <!-- Floating Drawing Settings Bar (Active when drawing tool selected) -->
+                <div class="drawing-settings-bar" id="drawing-settings-bar" style="display: none;">
+                  <span class="tool-hint-text" id="tool-hint-text">Tool: Trendline (Click 2 points)</span>
+                  <div class="palette-dots">
+                    <div class="color-dot active" data-color="#38bdf8" style="background:#38bdf8;" title="Cyan"></div>
+                    <div class="color-dot" data-color="#10b981" style="background:#10b981;" title="Emerald"></div>
+                    <div class="color-dot" data-color="#ef4444" style="background:#ef4444;" title="Rose"></div>
+                    <div class="color-dot" data-color="#f59e0b" style="background:#f59e0b;" title="Amber"></div>
+                    <div class="color-dot" data-color="#a855f7" style="background:#a855f7;" title="Purple"></div>
+                    <div class="color-dot" data-color="#ffffff" style="background:#ffffff;" title="White"></div>
+                  </div>
+                  <select class="width-selector" id="drawing-width-select" title="Line Width">
+                    <option value="1">1px</option>
+                    <option value="2" selected>2px</option>
+                    <option value="3">3px</option>
+                  </select>
+                </div>
+
+                <div id="lightweight-chart-container" class="chart-canvas"></div>
+                <svg id="chart-drawing-overlay" class="chart-drawing-overlay"></svg>
+              </div>
+            </div>
+
+            <!-- Path Simulation Cone Sub-plot / Sparkline -->
+            <div class="simulation-spark-bar">
+              <span class="sim-label">10k Tri-Bootstrap Consensus:</span>
+              <span class="sim-metric">P(TP before SL): <strong id="sim-consensus-p">58.4%</strong></span>
+              <span class="sim-metric">Model Disagreement: <strong id="sim-uncertainty-spread">&plusmn;3.2%</strong></span>
+              <span class="sim-metric">Bootstrap Median: <strong id="sim-median-target">$90,400</strong></span>
+            </div>
+          </div>
+
+          <!-- Column 2: Evidence Checklist & Decision Explanation -->
+          <div class="evidence-panel panel-card">
+            <div class="panel-header">
+              <span>STRUCTURED EVIDENCE DOSSIER</span>
+              <span class="badge-tag tag-green" id="confluence-badge">74.5/100 Confluence</span>
+            </div>
+            <div class="evidence-body">
+              <div class="evidence-checklist" id="evidence-checklist-container">
+                <div class="check-item check-pass">✓ 4H Higher Timeframe Trend Bullish (+0.72)</div>
+                <div class="check-item check-pass">✓ 15M Asian Range Liquidity Swept & Rejected</div>
+                <div class="check-item check-pass">✓ CVD Hidden Bullish Absorption Confirmed</div>
+                <div class="check-item check-pass">✓ DXY Negative Correlation (-0.68) Aligned</div>
+                <div class="check-item check-warn">⚠ Perpetual Funding Rate Z-score Elevated (+1.8)</div>
+              </div>
+
+              <!-- Competing MECE Scenarios Visualizer -->
+              <div class="scenario-visualizer" id="scenario-container">
+                <div class="scenario-title">COMPETING PROBABILISTIC SCENARIOS (MECE)</div>
+                <div class="scenario-bars">
+                  <div class="scenario-row">
+                    <span class="scen-name">A: Trend Continuation</span>
+                    <div class="progress-bar"><div class="bar-fill bar-green" style="width: 61%"></div></div>
+                    <span class="scen-pct">61% ($90,450)</span>
+                  </div>
+                  <div class="scenario-row">
+                    <span class="scen-name">B: Deep FVG Retest</span>
+                    <div class="progress-bar"><div class="bar-fill bar-blue" style="width: 24%"></div></div>
+                    <span class="scen-pct">24% ($87,200)</span>
+                  </div>
+                  <div class="scenario-row">
+                    <span class="scen-name">C: Structural Reversal</span>
+                    <div class="progress-bar"><div class="bar-fill bar-red" style="width: 15%"></div></div>
+                    <span class="scen-pct">15% ($85,800)</span>
+                  </div>
+                </div>
+                <div class="invalidation-box">
+                  <span>Deterministic Invalidation:</span>
+                  <strong id="inval-condition-text">15m candle close below $86,450.00</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Order Book, Execution Dock & Kelly Sizing -->
+          <div class="execution-panel panel-card">
+            <div class="panel-header">
+              <span>SMART ORDER ROUTER (SOR)</span>
+              <span class="badge-tag tag-purple">Conservative Kelly</span>
+            </div>
+            <!-- L2 Order Book Depth Preview -->
+            <div class="orderbook-preview" id="orderbook-depth">
+              <div class="ob-row ask"><span class="price">88,480.0</span><span class="size">4.28 BTC</span></div>
+              <div class="ob-row ask"><span class="price">88,465.0</span><span class="size">2.15 BTC</span></div>
+              <div class="ob-mid"><span class="mid-p">88,450.0</span><span class="spread-bps">Spread: 1.2 bps</span></div>
+              <div class="ob-row bid"><span class="price">88,440.0</span><span class="size">3.85 BTC</span></div>
+              <div class="ob-row bid"><span class="price">88,425.0</span><span class="size">6.12 BTC</span></div>
+            </div>
+
+            <!-- Execution Form -->
+            <div class="order-dock">
+              <div class="dock-row">
+                <label>Account Equity:</label>
+                <input type="number" id="dock-equity" value="100000" />
+              </div>
+              <div class="dock-row">
+                <label>Kelly Suggested Risk:</label>
+                <span class="highlight-val" id="dock-kelly-risk">0.75% ($750.00)</span>
+              </div>
+              <div class="dock-row">
+                <label>Calculated Position:</label>
+                <span class="highlight-val" id="dock-units">0.854 BTC ($75,536)</span>
+              </div>
+              <div class="dock-inputs">
+                <div class="input-field-wrap">
+                  <label>Entry</label>
+                  <input type="number" step="any" id="order-entry" placeholder="Entry" />
+                </div>
+                <div class="input-field-wrap">
+                  <label>Stop Loss</label>
+                  <input type="number" step="any" id="order-sl" placeholder="SL" />
+                </div>
+                <div class="input-field-wrap">
+                  <label>Take Profit</label>
+                  <input type="number" step="any" id="order-tp" placeholder="TP" />
+                </div>
+              </div>
+              <div class="dock-action-btns">
+                <button class="btn-buy" id="btn-dock-buy">BUY / LONG</button>
+                <button class="btn-sell" id="btn-dock-sell">SELL / SHORT</button>
+              </div>
+              <button class="btn-autofill" id="btn-ai-autofill">⚡ Auto-Fill AI Setup</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Positions & Shadow Ledger Dock -->
+        <div class="positions-dock panel-card">
+          <div class="panel-header">
+            <span>LIVE SHADOW PORTFOLIO & TRAILING AUTOMATION</span>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span id="portfolio-heat-label" class="badge-tag tag-purple">Total Heat: 0.00% / 6.0% Max</span>
+              <button class="btn-small" style="background:rgba(239,68,68,0.15); color:var(--accent-red); border:1px solid rgba(239,68,68,0.3); font-weight:600; cursor:pointer;" id="btn-reset-positions">Reset Ledger</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table" id="shadow-positions-table">
+              <thead>
+                <tr>
+                  <th>Position ID</th>
+                  <th>Symbol</th>
+                  <th>Side</th>
+                  <th>Size</th>
+                  <th>Entry Price</th>
+                  <th>Current Price</th>
+                  <th>Stop Loss</th>
+                  <th>Take Profit</th>
+                  <th>Unrealized PnL</th>
+                  <th>Trailing & Breakeven</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="shadow-positions-body">
+                <tr><td colspan="11" class="text-center">Loading shadow positions...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: PREDICTION LEDGER & CALIBRATION -->
+      <section id="tab-ledger" class="tab-view">
+        <div class="ledger-layout">
+          <div class="panel-card calibration-card">
+            <div class="panel-header">
+              <span>PROBABILITY CALIBRATION CURVE & BRIER SCORE</span>
+              <span class="badge-tag tag-green" id="brier-score-badge">Brier Score: 0.165 (Well-Calibrated)</span>
+            </div>
+            <div class="calibration-chart-container">
+              <canvas id="calibration-canvas"></canvas>
+            </div>
+          </div>
+
+          <div class="panel-card ledger-table-card">
+            <div class="panel-header">
+              <span>IMMUTABLE PRE-OUTCOME PREDICTION FREEZE LOG</span>
+              <button class="btn-small" id="btn-refresh-ledger">Verify Outcomes</button>
+            </div>
+            <div class="table-container">
+              <table class="data-table" id="prediction-ledger-table">
+                <thead>
+                  <tr>
+                    <th>Prediction ID</th>
+                    <th>Timestamp</th>
+                    <th>Symbol</th>
+                    <th>Confidence</th>
+                    <th>5M Forecast</th>
+                    <th>1H Outcome</th>
+                    <th>4H Outcome</th>
+                    <th>Brier Score</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="prediction-ledger-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: STRATEGY LEAGUE -->
+      <section id="tab-league" class="tab-view">
+        <div class="panel-card">
+          <div class="panel-header">
+            <span>4-TIER STRATEGY QUARANTINE LEAGUE & DYNAMIC CAPITAL WEIGHTS</span>
+            <span class="badge-tag tag-purple">Anti-Selection-Bias Active</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table" id="strategy-league-table">
+              <thead>
+                <tr>
+                  <th>DNA ID</th>
+                  <th>Strategy Name</th>
+                  <th>Quarantine Tier</th>
+                  <th>Forward Trades</th>
+                  <th>Win Rate</th>
+                  <th>30D Sharpe</th>
+                  <th>Net EV (R)</th>
+                  <th>OOS Stability</th>
+                  <th>Monte Carlo Ruin</th>
+                  <th>Capital Weight</th>
+                </tr>
+              </thead>
+              <tbody id="strategy-league-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: RESEARCH SANDBOX LAB -->
+      <section id="tab-lab" class="tab-view">
+        <div class="lab-controls panel-card">
+          <div class="panel-header">
+            <span>ZERO-LOOKAHEAD RESEARCH LAB & WALK-FORWARD STRESS SUITE</span>
+          </div>
+          <div class="lab-btn-bar">
+            <button class="btn-primary" id="btn-run-backtest">▶ Run Chronological Replay</button>
+            <button class="btn-primary" id="btn-run-walk-forward">📊 Run Purged Walk-Forward (70/30)</button>
+            <button class="btn-primary" id="btn-run-stress-test">🎲 Run 10k Monte Carlo Stress</button>
+          </div>
+          <div class="lab-results-box" id="lab-results-output">
+            <p>Click any test button above to execute statistical validation.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: SYSTEM DRIFT & HEALTH -->
+      <section id="tab-health" class="tab-view">
+        <div class="health-grid">
+          <div class="panel-card">
+            <div class="panel-header"><span>4-TYPE CONTINUOUS DRIFT STATUS</span></div>
+            <div class="drift-status-container" id="drift-status-container"></div>
+          </div>
+          <div class="panel-card">
+            <div class="panel-header"><span>API RATE-LIMIT & ENDPOINT VITALS</span></div>
+            <div class="api-vitals-container" id="api-vitals-container"></div>
+          </div>
+          <div class="panel-card">
+            <div class="panel-header"><span>GOVERNED PARAMETER HOT-RELOAD PROPOSALS</span></div>
+            <div class="proposals-container" id="proposals-container"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modular Frontend Scripts -->
+  <script src="/static/js/chart_engine.js"></script>
+  <script src="/static/js/order_book.js"></script>
+  <script src="/static/js/order_panel.js"></script>
+  <script src="/static/js/scenario_visualizer.js"></script>
+  <script src="/static/js/evidence_dossier.js"></script>
+  <script src="/static/js/prediction_ledger_tab.js"></script>
+  <script src="/static/js/live_positions_dock.js"></script>
+  <script src="/static/js/strategy_league_tab.js"></script>
+  <script src="/static/js/system_health_tab.js"></script>
+  <script src="/static/js/macro_ticker.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
