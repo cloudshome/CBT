@@ -1,3 +1,8 @@
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+process.env.NODE_ENV = 'test';
+process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'ci-mock-gemini-api-key';
+process.env.PORT = process.env.PORT || '3000';
+
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
@@ -7,3 +12,4 @@ module.exports = {
   restoreMocks: true,
   testTimeout: 20000,
 };
+
