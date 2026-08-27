@@ -73,12 +73,28 @@ class ChartEngine {
       },
     });
 
+    this.chartType = "candles";
+
     this.candleSeries = this.chart.addCandlestickSeries({
       upColor: "#10b981",
       downColor: "#ef4444",
       borderVisible: false,
       wickUpColor: "#10b981",
       wickDownColor: "#ef4444",
+    });
+
+    this.lineSeries = this.chart.addLineSeries({
+      color: "#38bdf8",
+      lineWidth: 2,
+      visible: false,
+    });
+
+    this.areaSeries = this.chart.addAreaSeries({
+      topColor: "rgba(56, 189, 248, 0.38)",
+      bottomColor: "rgba(56, 189, 248, 0.02)",
+      lineColor: "#38bdf8",
+      lineWidth: 2,
+      visible: false,
     });
 
     this.volumeSeries = this.chart.addHistogramSeries({
@@ -100,13 +116,14 @@ class ChartEngine {
 
   handleResize() {
     if (!this.chart || !this.container) return;
-    const w = this.container.clientWidth;
-    const h = this.isFullscreen ? window.innerHeight - 85 : 420;
+    const w = this.container.clientWidth || 700;
+    const h = this.isFullscreen ? window.innerHeight - 125 : 440;
     this.chart.applyOptions({ width: w, height: h });
     this.renderDrawings();
   }
 
   initFullscreen() {
+    this.fullscreenBtn = document.getElementById("btn-chart-fullscreen");
     if (this.fullscreenBtn) {
       this.fullscreenBtn.addEventListener("click", () => this.toggleFullscreen());
     }
@@ -117,6 +134,7 @@ class ChartEngine {
         (e.key === "f" || e.key === "F") &&
         !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)
       ) {
+        e.preventDefault();
         this.toggleFullscreen();
       }
       // Exit fullscreen or reset drawing tool on Escape
@@ -137,13 +155,36 @@ class ChartEngine {
     if (this.chartPanel) {
       if (this.isFullscreen) {
         this.chartPanel.classList.add("fullscreen-mode");
-        if (this.fullscreenBtn) this.fullscreenBtn.innerHTML = "🗗 Exit Fullscreen";
+        if (this.fullscreenBtn) {
+          this.fullscreenBtn.innerHTML = '<span class="fs-icon">🗗</span><span class="fs-text">Exit Fullscreen</span>';
+          this.fullscreenBtn.title = "Exit Fullscreen (Esc or F)";
+        }
       } else {
         this.chartPanel.classList.remove("fullscreen-mode");
-        if (this.fullscreenBtn) this.fullscreenBtn.innerHTML = "⛶ Fullscreen";
+        if (this.fullscreenBtn) {
+          this.fullscreenBtn.innerHTML = '<span class="fs-icon">⛶</span><span class="fs-text">Fullscreen</span>';
+          this.fullscreenBtn.title = "Toggle Fullscreen (F)";
+        }
       }
     }
-    setTimeout(() => this.handleResize(), 50);
+    setTimeout(() => this.handleResize(), 60);
+  }
+
+  getActiveSeries() {
+    if (this.chartType === "line" && this.lineSeries) return this.lineSeries;
+    if (this.chartType === "area" && this.areaSeries) return this.areaSeries;
+    return this.candleSeries;
+  }
+
+  setChartType(type) {
+    this.chartType = type;
+    if (this.candleSeries) this.candleSeries.applyOptions({ visible: type === "candles" });
+    if (this.lineSeries) this.lineSeries.applyOptions({ visible: type === "line" });
+    if (this.areaSeries) this.areaSeries.applyOptions({ visible: type === "area" });
+    this.renderDrawings();
+    if (this.lastSmcPatterns) {
+      this.drawSMCOverlays(this.lastSmcPatterns);
+    }
   }
 
   initToolbar() {
@@ -682,6 +723,10 @@ class ChartEngine {
     this.candlesData = uniqueCandles;
 
     this.candleSeries.setData(uniqueCandles);
+    const lineData = uniqueCandles.map((c) => ({ time: c.time, value: c.close }));
+    if (this.lineSeries) this.lineSeries.setData(lineData);
+    if (this.areaSeries) this.areaSeries.setData(lineData);
+
     this.lastCandle = uniqueCandles.length > 0 ? { ...uniqueCandles[uniqueCandles.length - 1] } : null;
 
     if (this.volumeSeries) {
@@ -704,12 +749,20 @@ class ChartEngine {
       this.lastCandle.close = tickPrice;
       try {
         this.candleSeries.update(this.lastCandle);
+        if (this.lineSeries) this.lineSeries.update({ time: this.lastCandle.time, value: tickPrice });
+        if (this.areaSeries) this.areaSeries.update({ time: this.lastCandle.time, value: tickPrice });
       } catch (e) {}
     }
   }
 
   drawSMCOverlays(patterns) {
-    this.overlayLines.forEach((l) => this.candleSeries.removePriceLine(l));
+    this.lastSmcPatterns = patterns;
+    const activeSeries = this.getActiveSeries();
+    this.overlayLines.forEach((l) => {
+      try { this.candleSeries?.removePriceLine(l); } catch (e) {}
+      try { this.lineSeries?.removePriceLine(l); } catch (e) {}
+      try { this.areaSeries?.removePriceLine(l); } catch (e) {}
+    });
     this.overlayLines = [];
 
     if (!patterns) return;
@@ -727,7 +780,7 @@ class ChartEngine {
 
     filtered.slice(0, 5).forEach((p) => {
       const isBull = p.pattern_type.includes("BULLISH");
-      const line = this.candleSeries.createPriceLine({
+      const line = activeSeries.createPriceLine({
         price: p.mid_price,
         color: isBull ? "#10b981" : "#ef4444",
         lineWidth: 2,

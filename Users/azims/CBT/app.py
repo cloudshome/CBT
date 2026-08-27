@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 # Core Quantitative Engines
 from core.database import db_manager
+from core.market_providers import market_gateway
 from core.data_streamer import data_streamer
 from core.data_quality_gate import data_quality_gate
 from core.venue_dislocation import venue_dislocation_monitor
@@ -242,6 +243,20 @@ async def get_market_candles(
 ):
     candles = await data_streamer.fetch_external_ohlcv(symbol, timeframe, limit=limit)
     return {"symbol": symbol, "timeframe": timeframe, "count": len(candles), "candles": candles}
+
+
+@app.get("/api/market/orderbook")
+async def get_market_orderbook(
+    symbol: str = Query("BTC/USDT"),
+    limit: int = Query(10),
+):
+    ob = await data_streamer.get_order_book(symbol, limit=limit)
+    return ob
+
+
+@app.get("/api/market/providers")
+async def get_market_providers():
+    return market_gateway.get_provider_health()
 
 
 @app.get("/api/chart/memory")

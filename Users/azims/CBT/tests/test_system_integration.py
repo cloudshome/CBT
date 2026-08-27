@@ -26,6 +26,28 @@ def test_api_market_candles():
     assert len(data["candles"]) == 50
 
 
+def test_api_market_orderbook():
+    response = client.get("/api/market/orderbook?symbol=BTC/USDT&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["symbol"] == "BTC/USDT"
+    assert "asks" in data
+    assert "bids" in data
+    assert len(data["asks"]) > 0
+    assert len(data["bids"]) > 0
+
+
+def test_api_market_providers():
+    response = client.get("/api/market/providers")
+    assert response.status_code == 200
+    data = response.json()
+    assert "active_provider" in data
+    assert "providers" in data
+    assert "BINANCE_REST" in data["providers"]
+    assert "BYBIT_V5" in data["providers"]
+    assert "SQLITE_LOCAL_CACHE" in data["providers"]
+
+
 def test_api_smc_scan():
     response = client.get("/api/smc/scan?symbol=BTC/USDT&timeframe=15m")
     assert response.status_code == 200

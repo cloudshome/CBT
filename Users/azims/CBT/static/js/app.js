@@ -41,22 +41,59 @@ class AppController {
       });
     }
 
-    // Timeframe change
-    this.tfButtons.forEach((btn) => {
+    // Timeframe change handlers (both sidebar .tf-btn and top-bar .tv-tf-btn)
+    const handleTimeframeChange = (tf) => {
+      this.currentTimeframe = tf;
+      document.querySelectorAll(".tf-btn, .tv-tf-btn").forEach((b) => {
+        const btnTf = b.getAttribute("data-tf");
+        b.classList.toggle("active", btnTf === tf);
+      });
+      if (window.chartEngine) window.chartEngine.loadMemory(this.currentSymbol, this.currentTimeframe);
+      this.refreshActiveView();
+    };
+
+    document.querySelectorAll(".tf-btn, .tv-tf-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        this.tfButtons.forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        this.currentTimeframe = btn.getAttribute("data-tf") || "15m";
-        if (window.chartEngine) window.chartEngine.loadMemory(this.currentSymbol, this.currentTimeframe);
-        this.refreshActiveView();
+        const tf = btn.getAttribute("data-tf") || "15m";
+        handleTimeframeChange(tf);
       });
     });
 
-    // SMC Indicator Toggles & Memory Persistence
+    // Chart Type (Candles, Line, Area)
+    document.querySelectorAll(".tv-type-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tv-type-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        const type = btn.getAttribute("data-type") || "candles";
+        if (window.chartEngine) window.chartEngine.setChartType(type);
+      });
+    });
+
+    // SMC Indicator Pills (1-click toggles)
+    document.querySelectorAll(".tv-indicator-pill").forEach((pill) => {
+      pill.addEventListener("click", () => {
+        const targetId = pill.getAttribute("data-target");
+        const checkbox = document.getElementById(targetId);
+        if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+          pill.classList.toggle("active", checkbox.checked);
+          if (this.lastSmcPatterns && window.chartEngine) {
+            window.chartEngine.drawSMCOverlays(this.lastSmcPatterns);
+          }
+          if (window.chartEngine) {
+            window.chartEngine.saveMemory();
+          }
+        }
+      });
+    });
+
+    // Underlying Checkboxes fallback listener
     ["toggle-fvg", "toggle-ob", "toggle-sweeps", "toggle-cvd"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener("change", () => {
+          const pill = document.querySelector(`.tv-indicator-pill[data-target="${id}"]`);
+          if (pill) pill.classList.toggle("active", el.checked);
           if (this.lastSmcPatterns && window.chartEngine) {
             window.chartEngine.drawSMCOverlays(this.lastSmcPatterns);
           }
@@ -140,7 +177,7 @@ class AppController {
       console.warn("WebSocket fallback:", e);
     }
 
-    // High-Reliability Live Ticker Poller (Every 2s)
+    // High-Reliability Live Ticker & Order Book Poller (Every 2s)
     setInterval(async () => {
       try {
         const res = await fetch(`/api/market/ticker?symbol=${encodeURIComponent(this.currentSymbol)}`);
@@ -149,7 +186,13 @@ class AppController {
           const priceEl = document.getElementById("chart-price-live");
           if (priceEl) priceEl.innerText = `$${data.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
           if (window.chartEngine) window.chartEngine.updateTick(data.price, data.timestamp);
-          if (window.orderBookVisualizer) window.orderBookVisualizer.update(data.price);
+        }
+        const obRes = await fetch(`/api/market/orderbook?symbol=${encodeURIComponent(this.currentSymbol)}&limit=10`);
+        const obData = await obRes.json();
+        if (window.orderBookVisualizer && obData && obData.asks && obData.asks.length > 0) {
+          window.orderBookVisualizer.updateWithDepth(obData);
+        } else if (window.orderBookVisualizer && data && data.price) {
+          window.orderBookVisualizer.update(data.price);
         }
       } catch (e) {
         // Fallback quiet
@@ -169,13 +212,74 @@ class AppController {
       const cData = await cRes.json();
       if (window.chartEngine) window.chartEngine.setCandles(cData.candles);
 
+      // 1.1 Fetch Real L2 Order Book Depth & Provider Health
+      try {
+        const obRes = await fetch(`/api/market/orderbook?symbol=${encodeURIComponent(this.currentSymbol)}&limit=10`);
+        const obData = await obRes.json();
+        if (window.orderBookVisualizer && obData && obData.asks && obData.asks.length > 0) {
+          window.orderBookVisualizer.updateWithDepth(obData);
+        }
+        const provRes = await fetch("/api/market/providers");
+        const provData = await provRes.json();
+        const obTag = document.getElementById("ob-exchange-tag");
+        if (obTag && provData.active_provider) {
+          obTag.innerText = `${provData.active_provider} 0.1`;
+        }
+      } catch (e) {}
+
+      // Compute 24h Market Stats (Binance Pro Header)
+      if (cData.candles && cData.candles.length > 0) {
+        const candles = cData.candles;
+        const last = candles[candles.length - 1];
+        const first = candles[0];
+        
+        let high24 = -Infinity;
+        let low24 = Infinity;
+        let vol24 = 0;
+        
+        candles.forEach((c) => {
+          if (c.high > high24) high24 = c.high;
+          if (c.low < low24) low24 = c.low;
+          vol24 += (c.volume || 0);
+        });
+        
+        const changePct = first.open ? ((last.close - first.open) / first.open) * 100 : 0;
+        const isUp = changePct >= 0;
+        
+        const chgEl = document.getElementById("chart-24h-change");
+        if (chgEl) {
+          chgEl.innerText = `${isUp ? "+" : ""}${changePct.toFixed(2)}%`;
+          chgEl.className = `price-change-pill ${isUp ? "tag-green" : "tag-red"}`;
+        }
+        
+        const hEl = document.getElementById("stat-24h-high");
+        if (hEl && high24 !== -Infinity) hEl.innerText = `$${high24.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        
+        const lEl = document.getElementById("stat-24h-low");
+        if (lEl && low24 !== Infinity) lEl.innerText = `$${low24.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        
+        const vEl = document.getElementById("stat-24h-vol");
+        if (vEl) {
+          const symBase = this.currentSymbol.split("/")[0] || "BTC";
+          vEl.innerText = `${vol24.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${symBase}`;
+        }
+
+        const priceEl = document.getElementById("chart-price-live");
+        if (priceEl && last.close) {
+          priceEl.innerText = `$${last.close.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+      }
+
       // 2. Fetch SMC Scans & Formations
       const smcRes = await fetch(`/api/smc/scan?symbol=${encodeURIComponent(this.currentSymbol)}&timeframe=${this.currentTimeframe}`);
       const smcData = await smcRes.json();
       this.lastSmcPatterns = smcData.smc_patterns;
       if (window.chartEngine) window.chartEngine.drawSMCOverlays(smcData.smc_patterns);
       const regLabel = document.getElementById("chart-regime-label");
-      if (regLabel) regLabel.innerText = smcData.regime || "TRENDING_BULL";
+      if (regLabel) {
+        regLabel.innerText = smcData.regime || "TRENDING_BULL";
+        regLabel.title = `Regime: ${smcData.regime || "TRENDING_BULL"}`;
+      }
 
       // 3. Fetch Dossier & Council Decision
       const dosRes = await fetch(`/api/market/dossier?symbol=${encodeURIComponent(this.currentSymbol)}`);
