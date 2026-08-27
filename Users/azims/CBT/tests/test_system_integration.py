@@ -165,3 +165,40 @@ def test_api_chart_memory_save_and_retrieve():
     assert get_cleared.status_code == 200
     assert len(get_cleared.json()["drawings"]) == 0
 
+
+def test_api_sky_decision_and_modules():
+    # 1. Test /api/sky/decision
+    res_dec = client.get("/api/sky/decision?symbol=BTC/USDT&timeframe=15m")
+    assert res_dec.status_code == 200
+    data_dec = res_dec.json()
+    assert "decision" in data_dec
+    assert "explanation_dossier" in data_dec
+
+    # 2. Test /api/sky/structure
+    res_struct = client.get("/api/sky/structure?symbol=BTC/USDT&timeframe=15m")
+    assert res_struct.status_code == 200
+    data_struct = res_struct.json()
+    assert "swings" in data_struct
+    assert "structure_events" in data_struct
+
+    # 3. Test /api/sky/liquidity
+    res_liq = client.get("/api/sky/liquidity?symbol=BTC/USDT&timeframe=15m")
+    assert res_liq.status_code == 200
+    data_liq = res_liq.json()
+    assert "active_pools" in data_liq
+    assert "sweeps" in data_liq
+
+    # 4. Test /api/sky/setups
+    res_setups = client.get("/api/sky/setups?symbol=BTC/USDT&timeframe=15m")
+    assert res_setups.status_code == 200
+    data_setups = res_setups.json()
+    assert "setups" in data_setups
+    assert "qualified_count" in data_setups
+
+    # 5. Test /api/sky/statistics
+    res_stats = client.get("/api/sky/statistics?concept=SETUP_A_SWEEP_MSS&regime=TRENDING_BULL")
+    assert res_stats.status_code == 200
+    data_stats = res_stats.json()
+    assert data_stats["concept_name"] == "SETUP_A_SWEEP_MSS"
+    assert data_stats["expectancy_r"] > 0
+

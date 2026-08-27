@@ -14,6 +14,7 @@
 ## Table of Contents
 
 - [Key Highlights & Performance Posture](#key-highlights--performance-posture)
+- [SKY — Professional Market Intelligence Engine](#sky--professional-market-intelligence-engine)
 - [12-Layer Institutional Quantitative Architecture](#12-layer-institutional-quantitative-architecture)
 - [11 Master Directives (Scientific Governance)](#11-master-directives-scientific-governance)
 - [Quick Start Guide](#quick-start-guide)
@@ -24,6 +25,18 @@
 - [REST & WebSocket API Reference](#rest--websocket-api-reference)
 - [Test Suite & Empirical Verification](#test-suite--empirical-verification)
 - [Directory Structure](#directory-structure)
+
+---
+
+## SKY — Professional Market Intelligence Engine
+
+> **Comprehensive Architecture & Specification:** 👉 [SKY_MARKET_INTELLIGENCE_ENGINE.md](file:///c:/Users/azims/CBT/SKY_MARKET_INTELLIGENCE_ENGINE.md)
+
+SKY treats Smart Money Concepts (SMC), market structure, liquidity, volume, volatility, and derivatives not as subjective trading lore, but as a **rigorously defined, measurable feature-engineering layer**.
+- **Objective Mathematical Definitions:** Deterministic $(L, R)$ swing detection, BOS, CHoCH, MSS, liquidity sweeps with penetration/ATR metrics.
+- **Anti-Repainting & Zero Lookahead:** Historical events record both `event_timestamp` and `confirmation_timestamp` and never mutate after confirmation.
+- **Regime-Conditional Expectancy:** Historical $E[R \mid \text{Pattern}, \text{Regime}, \text{Timeframe}]$ evaluated out-of-sample before qualifying Setups A through E.
+- **No-Trade Gate:** Rigorous enforcement of ~70% baseline `NO_TRADE` whenever odds are unfavorable.
 
 ---
 

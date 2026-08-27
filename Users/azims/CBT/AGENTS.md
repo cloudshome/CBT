@@ -1,4 +1,4 @@
-﻿# AGENTS.md
+# AGENTS.md
 
 ## Purpose
 This file is the canonical instruction set for AI agents (Jules, Antigravity, AI Studio, Copilot, arena.ai) that work on this repository. Jules, Antigravity, and other agentic tools should read this file first and follow the rules and conventions below.
@@ -133,6 +133,18 @@ See .github/workflows for workflow stubs.
 See .github/ISSUE_TEMPLATE/* and .github/PULL_REQUEST_TEMPLATE.md for ready-to-use templates.
 
 ---
+## SKY — Professional Market Intelligence Engine Directives
+For all quantitative, market intelligence, SMC, and signal development tasks, all agents (Jules, Antigravity, AI Studio, Copilot, Arena) MUST adhere strictly to:
+👉 [SKY_MARKET_INTELLIGENCE_ENGINE.md](file:///c:/Users/azims/CBT/SKY_MARKET_INTELLIGENCE_ENGINE.md)
+
+### Key Rules:
+1. **SMC is a measurable feature-engineering layer, NOT subjective trading buzzwords.**
+2. **Zero Lookahead / Anti-Repainting:** Every structural event must separate `event_timestamp` from `confirmation_timestamp`. Historical events must never change post-confirmation.
+3. **No-Trade is a First-Class Output:** Never force trades when confluence, Net EV, or risk constraints fail.
+4. **Follow the 17-Phase Roadmap:** Deliver modular, independently tested features in sequence.
+
+---
 ## Change log for this file
 - 2026-08-23 — Initial AGENTS.md created.
 - 2026-08-24 — Added orchestration loop, branch/PR handoff conventions, and assigned Copilot as Head AI.
+- 2026-08-27 — Added SKY Market Intelligence Engine directives and 17-phase quantitative roadmap.
