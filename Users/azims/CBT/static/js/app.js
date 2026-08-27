@@ -207,8 +207,9 @@ class AppController {
 
   async refreshActiveView() {
     try {
-      // 1. Fetch Candles
-      const cRes = await fetch(`/api/market/candles?symbol=${encodeURIComponent(this.currentSymbol)}&timeframe=${this.currentTimeframe}&limit=100`);
+      // 1. Fetch Deep Historical Candles (up to 500 bars)
+      const candleLimit = ["1d", "4h", "1h"].includes(this.currentTimeframe) ? 500 : 300;
+      const cRes = await fetch(`/api/market/candles?symbol=${encodeURIComponent(this.currentSymbol)}&timeframe=${this.currentTimeframe}&limit=${candleLimit}`);
       const cData = await cRes.json();
       if (window.chartEngine) window.chartEngine.setCandles(cData.candles);
 

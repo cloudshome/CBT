@@ -239,7 +239,7 @@ async def get_market_ticker(symbol: str = Query("BTC/USDT")):
 async def get_market_candles(
     symbol: str = Query("BTC/USDT"),
     timeframe: str = Query("15m"),
-    limit: int = Query(100),
+    limit: int = Query(300, ge=1, le=1000),
 ):
     candles = await data_streamer.fetch_external_ohlcv(symbol, timeframe, limit=limit)
     return {"symbol": symbol, "timeframe": timeframe, "count": len(candles), "candles": candles}
