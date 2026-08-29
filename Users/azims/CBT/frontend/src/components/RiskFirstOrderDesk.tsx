@@ -180,7 +180,7 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
               <input
                 type="number"
                 step="any"
-                value={entryPrice || lastPrice || ''}
+                value={entryPrice > 0 ? Number(entryPrice.toFixed(2)) : lastPrice > 0 ? Number(lastPrice.toFixed(2)) : ''}
                 onChange={(e) => setEntryPrice(parseFloat(e.target.value) || 0)}
                 disabled={orderType === 'MARKET'}
                 className="w-full bg-slate-900 border border-border rounded px-2 py-1 text-slate-200 text-xs mt-0.5 disabled:opacity-50"
@@ -192,7 +192,7 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
               <input
                 type="number"
                 step="any"
-                value={stopLoss || ''}
+                value={stopLoss > 0 ? Number(stopLoss.toFixed(2)) : ''}
                 onChange={(e) => setStopLoss(parseFloat(e.target.value) || 0)}
                 className="w-full bg-slate-900 border border-terminal-red/50 rounded px-2 py-1 text-terminal-red font-bold text-xs mt-0.5"
               />
@@ -206,7 +206,7 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
               <input
                 type="number"
                 step="any"
-                value={takeProfit || ''}
+                value={takeProfit > 0 ? Number(takeProfit.toFixed(2)) : ''}
                 onChange={(e) => setTakeProfit(parseFloat(e.target.value) || 0)}
                 className="w-full bg-slate-900 border border-terminal-green/50 rounded px-2 py-1 text-terminal-green font-bold text-xs mt-0.5"
               />

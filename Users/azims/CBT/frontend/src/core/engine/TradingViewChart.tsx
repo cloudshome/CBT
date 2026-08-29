@@ -99,7 +99,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     changePct: number;
   } | null>(null);
 
-  // Available Timeframes
   const timeframes: SupportedTimeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1d'];
 
   // Handle True Browser Fullscreen Toggle
@@ -116,42 +115,43 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         setIsFullscreen(false);
       }
     } catch {
-      // Fallback state toggle
       setIsFullscreen((prev) => !prev);
     }
   }, []);
 
-  // Listen for fullscreen change event (e.g. user presses ESC)
+  // Listen for fullscreen change event
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFull = !!document.fullscreenElement;
       setIsFullscreen(isFull);
-      if (chartRef.current && chartContainerRef.current) {
-        setTimeout(() => {
-          if (chartContainerRef.current && chartRef.current) {
-            chartRef.current.resize(
-              chartContainerRef.current.clientWidth,
-              chartContainerRef.current.clientHeight || (isFull ? window.innerHeight - 50 : 540)
-            );
-          }
-        }, 100);
-      }
+      setTimeout(() => {
+        if (chartContainerRef.current && chartRef.current) {
+          const w = chartContainerRef.current.clientWidth;
+          const h = chartContainerRef.current.clientHeight || (isFull ? window.innerHeight - 80 : 440);
+          chartRef.current.resize(w, h);
+          updateCanvasDimensions();
+          drawCanvasOverlays();
+        }
+      }, 50);
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // 1. Initialize Lightweight Charts v5 Instance with Institutional Theme
+  // 1. Initialize Lightweight Charts v5 Instance
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
     const container = chartContainerRef.current;
     container.innerHTML = '';
 
+    const initialHeight = isFullscreen ? window.innerHeight - 80 : 440;
+    const initialWidth = container.clientWidth || 800;
+
     const chart = createChart(container, {
-      width: container.clientWidth,
-      height: container.clientHeight || 540,
+      width: initialWidth,
+      height: initialHeight,
       layout: {
         background: { type: ColorType.Solid, color: '#080b11' },
         textColor: '#94a3b8',
@@ -195,7 +195,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       },
     });
 
-    // Neon Institutional Candlestick Colors
+    // Neon Candlestick Series
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#00f0a8',
       downColor: '#ff3b69',
@@ -227,7 +227,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       priceLineVisible: false,
     });
 
-    // VWAP Core Line Series
+    // VWAP Line Series
     const vwapSeries = chart.addSeries(LineSeries, {
       color: '#c084fc',
       lineWidth: 2,
@@ -240,7 +240,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     const upper1s = chart.addSeries(LineSeries, {
       color: 'rgba(129, 140, 248, 0.65)',
       lineWidth: 1,
-      lineStyle: 2, // Dashed
+      lineStyle: 2,
       crosshairMarkerVisible: false,
       lastValueVisible: false,
       priceLineVisible: false,
@@ -253,7 +253,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       lastValueVisible: false,
       priceLineVisible: false,
     });
-
     const upper2s = chart.addSeries(LineSeries, {
       color: 'rgba(244, 63, 94, 0.65)',
       lineWidth: 1,
@@ -281,7 +280,43 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     upper2sRef.current = upper2s;
     lower2sRef.current = lower2s;
 
-    // Crosshair move handler for real-time HUD
+    // Load initial candles if available
+    if (candles && candles.length > 0) {
+      const formattedCandles: CandlestickData[] = [];
+      const formattedVolume: HistogramData[] = [];
+      let prevTime = -1;
+
+      const sorted = [...candles]
+        .filter((c) => Array.isArray(c) && c.length >= 5 && !isNaN(c[0]) && !isNaN(c[4]) && c[4] > 0)
+        .sort((a, b) => a[0] - b[0]);
+
+      for (const c of sorted) {
+        const t = Math.floor(c[0] / 1000);
+        if (t > prevTime) {
+          formattedCandles.push({
+            time: t as Time,
+            open: c[1],
+            high: c[2],
+            low: c[3],
+            close: c[4],
+          });
+          formattedVolume.push({
+            time: t as Time,
+            value: c[5] || 0,
+            color: c[4] >= c[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
+          });
+          prevTime = t;
+        }
+      }
+
+      if (formattedCandles.length > 0) {
+        candleSeries.setData(formattedCandles);
+        volumeSeries.setData(formattedVolume);
+        chart.timeScale().fitContent();
+      }
+    }
+
+    // Crosshair move handler
     chart.subscribeCrosshairMove((param) => {
       if (!param || !param.time || !param.seriesData) {
         setCrosshairData(null);
@@ -330,10 +365,9 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     // Resize observer
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.resize(
-          chartContainerRef.current.clientWidth,
-          chartContainerRef.current.clientHeight || (isFullscreen ? window.innerHeight - 50 : 540)
-        );
+        const w = chartContainerRef.current.clientWidth;
+        const h = chartContainerRef.current.clientHeight || (isFullscreen ? window.innerHeight - 80 : 440);
+        chartRef.current.resize(w, h);
         updateCanvasDimensions();
         drawCanvasOverlays();
       }
@@ -342,6 +376,9 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     window.addEventListener('resize', handleResize);
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
+
+    // Initial resize trigger
+    setTimeout(handleResize, 100);
 
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -364,22 +401,37 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   useEffect(() => {
     if (!candleSeriesRef.current || !candles || candles.length === 0) return;
 
-    const formattedCandles: CandlestickData[] = candles.map((c) => ({
-      time: Math.floor(c[0] / 1000) as Time,
-      open: c[1],
-      high: c[2],
-      low: c[3],
-      close: c[4],
-    }));
+    const formattedCandles: CandlestickData[] = [];
+    const formattedVolume: HistogramData[] = [];
+    let prevTime = -1;
 
-    const formattedVolume: HistogramData[] = candles.map((c) => ({
-      time: Math.floor(c[0] / 1000) as Time,
-      value: c[5],
-      color: c[4] >= c[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
-    }));
+    const sorted = [...candles]
+      .filter((c) => Array.isArray(c) && c.length >= 5 && !isNaN(c[0]) && !isNaN(c[4]) && c[4] > 0)
+      .sort((a, b) => a[0] - b[0]);
 
-    candleSeriesRef.current.setData(formattedCandles);
-    volumeSeriesRef.current?.setData(formattedVolume);
+    for (const c of sorted) {
+      const t = Math.floor(c[0] / 1000);
+      if (t > prevTime) {
+        formattedCandles.push({
+          time: t as Time,
+          open: c[1],
+          high: c[2],
+          low: c[3],
+          close: c[4],
+        });
+        formattedVolume.push({
+          time: t as Time,
+          value: c[5] || 0,
+          color: c[4] >= c[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
+        });
+        prevTime = t;
+      }
+    }
+
+    if (formattedCandles.length > 0) {
+      candleSeriesRef.current.setData(formattedCandles);
+      volumeSeriesRef.current?.setData(formattedVolume);
+    }
 
     const workerCandles = candles.map((c) => ({
       timestamp: c[0],
@@ -390,7 +442,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       volume: c[5],
     }));
 
-    // Offload mathematical indicators to Web Worker thread
+    // Offload indicators to Web Worker
     indicatorClient.calculateIndicators(workerCandles, {
       emaPeriods: [20],
       vwap: true,
@@ -487,7 +539,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Draw Judas Swing Session Killzones (London 07:00-09:00 UTC & NY 13:00-15:00 UTC)
+    // 1. Draw Judas Swing Session Killzones
     if (showJudasZones && candles.length > 0) {
       const sessionRanges: Array<{ name: string; startH: number; endH: number; color: string; fill: string }> = [
         { name: 'LONDON KILLZONE (07:00-09:00 UTC)', startH: 7, endH: 9, color: '#38bdf8', fill: 'rgba(56, 189, 248, 0.05)' },
@@ -541,7 +593,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       });
     }
 
-    // 3. Draw User Mathematical Drawings Anchored to [Timestamp, Price]
+    // 3. Draw User Drawings
     drawings.forEach((drawing) => {
       if (drawing.points.length < 2 && drawing.type !== 'HORIZONTAL_RAY') return;
 
@@ -594,11 +646,9 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         const riskH = Math.abs(slY - entryY);
         const tpY = isLong ? entryY - (2.5 * riskH) : entryY + (2.5 * riskH);
 
-        // Stop Loss Box
         ctx.fillStyle = 'rgba(255, 59, 105, 0.2)';
         ctx.fillRect(x1, Math.min(entryY, slY), Math.abs(x2 - x1) || 120, Math.abs(slY - entryY));
 
-        // Target Box
         ctx.fillStyle = 'rgba(0, 240, 168, 0.2)';
         ctx.fillRect(x1, Math.min(entryY, tpY), Math.abs(x2 - x1) || 120, Math.abs(tpY - entryY));
       }
@@ -619,14 +669,12 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         ctx.strokeStyle = isBull ? '#00f0a8' : '#ff3b69';
         ctx.lineWidth = 2;
 
-        // Draw Arrow
         const arrowY = isBull ? y + 25 : y - 25;
         ctx.beginPath();
         ctx.moveTo(x, arrowY);
         ctx.lineTo(x, y + (isBull ? 8 : -8));
         ctx.stroke();
 
-        // Arrowhead
         ctx.beginPath();
         if (isBull) {
           ctx.moveTo(x, y + 6);
@@ -640,7 +688,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         ctx.closePath();
         ctx.fill();
 
-        // Signal Label Box
         const label = `${setup.setup_type.replace(/SETUP_/g, '')} ${setup.risk_reward_ratio}R`;
         ctx.font = 'bold 10px monospace';
         const textWidth = ctx.measureText(label).width;
@@ -659,13 +706,11 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     }
   }, [candles, showSMCZones, showJudasZones, drawings, skySetups]);
 
-  // Sync canvas overlay on timeframe or drawing changes
   useEffect(() => {
     updateCanvasDimensions();
     drawCanvasOverlays();
   }, [drawings, drawCanvasOverlays]);
 
-  // Canvas Mouse Interaction for Drawings
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (activeTool === 'CURSOR' || !chartRef.current || !candleSeriesRef.current) return;
 
@@ -708,8 +753,8 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   return (
     <div
       ref={chartWrapperRef}
-      className={`relative flex flex-col bg-[#080b11] border border-[#1e293b] rounded-lg overflow-hidden select-none transition-all duration-300 ${
-        isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : 'h-[580px]'
+      className={`relative flex flex-col bg-[#080b11] border border-[#1e293b] rounded-t-lg overflow-hidden select-none transition-all duration-300 ${
+        isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : 'w-full'
       }`}
     >
       {/* Top Header & Chart Toolbar */}
@@ -756,7 +801,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
         {/* Right: Technical Toggles, Fullscreen & Controls */}
         <div className="flex items-center gap-2">
-          {/* Layer Visibility Toggles */}
           <div className="flex items-center gap-1 bg-[#080b11] border border-slate-800 rounded p-0.5">
             <button
               onClick={() => setShowEMA(!showEMA)}
@@ -781,7 +825,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
               className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
                 showMultiSigma ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-500'
               }`}
-              title="VWAP Multi-Sigma Bands (±1σ, ±2σ)"
+              title="VWAP Multi-Sigma Bands"
             >
               ±σ
             </button>
@@ -805,7 +849,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
             </button>
           </div>
 
-          {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
             className={`p-1.5 rounded transition-all flex items-center gap-1 font-mono text-[11px] ${
@@ -822,11 +865,9 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       </div>
 
       {/* Main Chart Canvas & Overlay Container */}
-      <div className="relative flex-1 w-full h-full overflow-hidden">
-        {/* Lightweight Charts Render Target */}
+      <div className={`relative w-full ${isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[440px] min-h-[440px]'}`}>
         <div ref={chartContainerRef} className="absolute inset-0 w-full h-full" />
 
-        {/* Double-Buffered Mathematical Overlay Canvas */}
         <canvas
           ref={drawingCanvasRef}
           onMouseDown={handleCanvasMouseDown}
@@ -835,7 +876,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           }`}
         />
 
-        {/* Floating "Go to Latest" Button when User Pans Backward */}
         {isHistoricalPan && (
           <button
             onClick={() => {
@@ -855,7 +895,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           </button>
         )}
 
-        {/* Active Drawing Tool Floating Banner */}
         {activeTool !== 'CURSOR' && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-sky-950/90 border border-sky-500/50 rounded-full text-xs font-mono text-sky-300 shadow-xl backdrop-blur-md">
             <Sparkles size={13} className="animate-spin text-sky-400" />

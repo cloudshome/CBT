@@ -22,9 +22,9 @@ export const OrderBookVisualizer: React.FC<OrderBookVisualizerProps> = ({
     return () => unsub();
   }, [symbol]);
 
-  // Aggregate with precision
-  const bids = depth?.bids.slice(0, 8) || [];
-  const asks = depth?.asks.slice(0, 8).reverse() || [];
+  // Aggregate with precision (5 asks, 5 bids for clean compact footprint)
+  const bids = depth?.bids.slice(0, 5) || [];
+  const asks = depth?.asks.slice(0, 5).reverse() || [];
 
   const maxTotal = Math.max(
     bids[bids.length - 1]?.total || 1,
@@ -33,7 +33,7 @@ export const OrderBookVisualizer: React.FC<OrderBookVisualizerProps> = ({
   );
 
   return (
-    <div className="bg-panel border border-border rounded-lg p-3 flex flex-col h-full font-mono select-none">
+    <div className="bg-[#0b0f19] border border-[#1e293b] rounded-lg p-2.5 flex flex-col font-mono select-none overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between pb-2 border-b border-border/80 text-xs">
         <div className="flex items-center gap-1.5 text-slate-300 font-bold">

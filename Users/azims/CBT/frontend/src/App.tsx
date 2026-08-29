@@ -33,6 +33,12 @@ import {
 } from './types';
 import { api, ApiError } from './services/api';
 import { notificationService } from './services/notificationService';
+import {
+  Layers,
+  ShieldCheck,
+  Cpu,
+  BarChart2,
+} from 'lucide-react';
 
 export const App: React.FC = () => {
   // Navigation & Market Context State
@@ -70,6 +76,11 @@ export const App: React.FC = () => {
   // Gemini Intelligence State
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
+
+  // Tab State for Single-Screen Compact Cockpit
+  const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
+  const [activeBottomTab, setActiveBottomTab] = useState<'QUANT' | 'MTF_SMC'>('QUANT');
+  const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
   // Notifications State
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(
@@ -182,18 +193,23 @@ export const App: React.FC = () => {
     try {
       const res = await api.getDeskBrief(symbol, timeframe);
       setBrief(res);
-
-      if (res && res.executiveSummary) {
+      if (notificationsEnabled) {
         notificationService.notifyMarketBriefAlert(symbol, res.bias, res.executiveSummary);
       }
     } catch (err: unknown) {
-      console.warn('AI Brief error:', err);
+      console.warn('Gemini brief fetch error:', err);
     } finally {
       setLoadingBrief(false);
     }
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, notificationsEnabled]);
 
-  // 4. Place Paper Trade
+  // 4. Handle Desk Copilot Question
+  const handleAskDesk = async (question: string) => {
+    const res = await api.askDesk(question, { symbol, timeframe });
+    return res.answer;
+  };
+
+  // 5. Handle Paper Trade Execution
   const handlePlaceTrade = async (trade: {
     symbol: string;
     side: 'BUY' | 'SELL';
@@ -201,74 +217,33 @@ export const App: React.FC = () => {
     sl: number;
     tp: number;
     size: number;
-  }) => {
+  }): Promise<void> => {
     try {
-      const res = await api.placePaperTrade(trade);
+      await api.placePaperTrade({
+        symbol: trade.symbol,
+        side: trade.side,
+        entryPrice: trade.entryPrice,
+        sl: trade.sl,
+        tp: trade.tp,
+        size: trade.size,
+      });
+
       addToast(
         'success',
-        'Order Executed (201)',
-        `Simulated ${res.trade.side} order for ${res.trade.symbol} placed at $${res.trade.entryPrice.toFixed(2)}.`
+        'Simulated Order Filled',
+        `Opened ${trade.side} ${trade.size} ${trade.symbol} @ $${trade.entryPrice.toFixed(2)}`
       );
-      await fetchPositions();
+      fetchPositions();
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        if (err.statusCode === 403) {
-          addToast('error', 'Risk Gate Rejection (403)', err.message);
-          notificationService.notifyRiskGateAlert(
-            `Simulated ${trade.side} trade rejected`,
-            err.message
-          );
-        } else if (err.statusCode === 429) {
-          addToast('warning', 'Rate Limit Exceeded (429)', 'Please wait before placing another order.');
-        } else {
-          addToast('error', `Order Error (${err.statusCode})`, err.message);
-        }
-      } else {
-        const msg = err instanceof Error ? err.message : 'Trade failed';
-        addToast('error', 'Order Placement Failed', msg);
+      const msg = err instanceof Error ? err.message : 'Trade execution failed';
+      addToast('error', 'Execution Error', msg);
+      if (notificationsEnabled) {
+        notificationService.notifyRiskGateAlert('Trade Execution Failed', msg);
       }
-      throw err;
     }
   };
 
-  // 5. Ask Desk Copilot
-  const handleAskDesk = async (query: string): Promise<string> => {
-    try {
-      const res = await api.askDesk(query, {
-        symbol,
-        timeframe,
-        lastPrice: stats.lastPrice,
-        trend: stats.trend,
-        rsi: rsi.length > 0 ? rsi[rsi.length - 1].value : undefined,
-        ema: ema.length > 0 ? ema[ema.length - 1].value : undefined,
-        setups,
-      });
-      return res.answer;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Query failed';
-      addToast('error', 'Copilot Query Error', msg);
-      throw err;
-    }
-  };
-
-  // Real-time WebSocket streaming subscription
-  useEffect(() => {
-    const unsub = marketProvider.subscribeRealtimeCandles(symbol, timeframe, (candle) => {
-      setLiveCandle(candle);
-      if (candle && candle[4]) {
-        setStats((prev) => ({
-          ...prev,
-          lastPrice: candle[4],
-          highPrice: Math.max(prev.highPrice, candle[2]),
-          lowPrice: prev.lowPrice > 0 ? Math.min(prev.lowPrice, candle[3]) : candle[3],
-        }));
-      }
-    });
-
-    return () => unsub();
-  }, [symbol, timeframe]);
-
-  // Risk-First Order Placement Handler
+  // 6. Handle Risk-First Order Desk Execution
   const handlePlaceRiskOrder = async (order: {
     symbol: string;
     side: 'BUY' | 'SELL';
@@ -279,64 +254,62 @@ export const App: React.FC = () => {
     takeProfit?: number;
   }) => {
     try {
-      const res = await api.placePaperTrade({
+      const entry = order.type === 'LIMIT' && order.price ? order.price : stats.lastPrice;
+      await api.placePaperTrade({
         symbol: order.symbol,
         side: order.side,
-        entryPrice: order.price || stats.lastPrice,
+        entryPrice: entry,
         sl: order.stopLoss || 0,
         tp: order.takeProfit || 0,
         size: order.amount,
       });
+
       addToast(
         'success',
-        'Order Executed (201)',
-        `Simulated ${res.trade.side} order placed for ${res.trade.size} ${res.trade.symbol} at $${res.trade.entryPrice.toFixed(2)}.`
+        `${order.type} Order Routed`,
+        `Executed ${order.side} ${order.amount.toFixed(4)} ${order.symbol} @ $${entry.toFixed(2)}`
       );
-      await fetchPositions();
+      fetchPositions();
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        addToast('error', `Order Rejection (${err.statusCode})`, err.message);
-      } else {
-        const msg = err instanceof Error ? err.message : String(err);
-        addToast('error', 'Execution Error', msg);
-      }
+      const msg = err instanceof Error ? err.message : 'Order placement failed';
+      addToast('error', 'Order Routing Error', msg);
     }
   };
 
-  // Initial and reactive data loader
+  // Initialize Data Ingestion on Mount & Parameter Change
   useEffect(() => {
     fetchMarketData();
     fetchPositions();
     fetchDeskBrief();
-  }, [fetchMarketData, fetchPositions, fetchDeskBrief]);
+  }, [symbol, timeframe]);
 
-  // 30s background telemetry polling (Decoupled, zero chart-canvas unmounting)
+  // High-Frequency Real-Time WebSocket Aggregation
+  useEffect(() => {
+    const unsub = marketProvider.subscribeRealtimeCandles(symbol, timeframe, (candle: OHLCVCandle) => {
+      setLiveCandle(candle);
+      setStats((prev) => ({
+        ...prev,
+        lastPrice: candle[4],
+        highPrice: Math.max(prev.highPrice, candle[2]),
+        lowPrice: prev.lowPrice === 0 ? candle[3] : Math.min(prev.lowPrice, candle[3]),
+      }));
+    });
+
+    return () => unsub();
+  }, [symbol, timeframe]);
+
+  // Periodic 30-second Telemetry Polling
   useEffect(() => {
     const interval = setInterval(() => {
-      api.getSKYIntelligence(symbol, timeframe, 100).then((res) => {
-        if (res) setSkyData(res);
-      }).catch(() => {});
-
-      api.getInstitutionalAlpha(symbol, timeframe, 100).then((res) => {
-        if (res) setInstitutionalAlpha(res);
-      }).catch(() => {});
-
-      api.getInstitutionalCVD(symbol, timeframe, 100).then((res) => {
-        if (res) setCvdData(res);
-      }).catch(() => {});
-
-      api.getOrderBookImbalance(symbol).then((res) => {
-        if (res) setObiData(res);
-      }).catch(() => {});
-
+      fetchMarketData();
       fetchPositions();
     }, 30000);
     return () => clearInterval(interval);
-  }, [symbol, timeframe, fetchPositions]);
+  }, [fetchMarketData, fetchPositions]);
 
   return (
-    <div className="min-h-screen bg-background text-slate-200 flex flex-col">
-      {/* Top Header Navigation */}
+    <div className="min-h-screen bg-[#05070c] text-slate-100 flex flex-col font-sans antialiased selection:bg-sky-500/30 selection:text-sky-200">
+      {/* Institutional Navigation Header */}
       <Header
         symbol={symbol}
         onSymbolChange={(newSym) => {
@@ -362,17 +335,60 @@ export const App: React.FC = () => {
         onToggleNotifications={handleToggleNotifications}
       />
 
-      {/* Floating HUDs: Institutional Alpha & SKY Intelligence */}
-      <div className="max-w-[1920px] w-full mx-auto px-4 pt-2 space-y-2">
-        <InstitutionalAlphaHUD
-          alphaData={institutionalAlpha}
-          loading={loadingMarket}
-        />
-        <SKYIntelligenceHUD
-          data={skyData}
-          loading={loadingMarket}
-          onRefresh={fetchMarketData}
-        />
+      {/* Institutional Quantitative HUD Control Bar */}
+      <div className="max-w-[1920px] w-full mx-auto px-4 pt-2 space-y-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
+            <button
+              onClick={() => setActiveHudMode('INSTITUTIONAL')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
+                activeHudMode === 'INSTITUTIONAL'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Cpu size={13} />
+              <span>Institutional Alpha HUD</span>
+            </button>
+            <button
+              onClick={() => setActiveHudMode('SKY')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
+                activeHudMode === 'SKY'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldCheck size={13} />
+              <span>SKY Quant Radar</span>
+            </button>
+            <button
+              onClick={() => setActiveHudMode('BOTH')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
+                activeHudMode === 'BOTH'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Layers size={13} />
+              <span>Expand Both</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Rendered HUD Based on Mode */}
+        {(activeHudMode === 'INSTITUTIONAL' || activeHudMode === 'BOTH') && (
+          <InstitutionalAlphaHUD
+            alphaData={institutionalAlpha}
+            loading={loadingMarket}
+          />
+        )}
+        {(activeHudMode === 'SKY' || activeHudMode === 'BOTH') && (
+          <SKYIntelligenceHUD
+            data={skyData}
+            loading={loadingMarket}
+            onRefresh={fetchMarketData}
+          />
+        )}
       </div>
 
       {/* Main Multi-Panel Terminal Layout */}
@@ -388,10 +404,10 @@ export const App: React.FC = () => {
           />
         </div>
 
-        {/* Center Column (7 cols): TradingView Chart, CVD Sub-Chart & Quant Panels */}
-        <div className="lg:col-span-7 xl:col-span-7 flex flex-col gap-4">
+        {/* Center Column (7 cols): TradingView Chart, CVD Sub-Chart & Lower Quant Tabs */}
+        <div className="lg:col-span-7 xl:col-span-7 flex flex-col gap-3">
           {/* Flagship TradingView Lightweight Charts Engine + CVD Sub-Chart */}
-          <div className="flex flex-col rounded-lg overflow-hidden border border-[#1e293b] shadow-2xl">
+          <div className="flex flex-col rounded-lg overflow-hidden border border-[#1e293b] shadow-2xl bg-[#080b11]">
             <TradingViewChart
               symbol={symbol}
               timeframe={timeframe}
@@ -411,89 +427,166 @@ export const App: React.FC = () => {
             />
           </div>
 
-          {/* SKY Professional Market Intelligence Panel */}
-          <SKYIntelligencePanel
-            data={skyData}
-            loading={loadingMarket}
-            onDeploySetup={(setup) => setSelectedSetup(setup)}
-          />
-
-          {/* Lower Grid: MTF Indicators & SMC Setups */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="min-h-[260px]">
-              <MTFPanel
-                symbol={symbol}
-                timeframe={timeframe}
-                lastPrice={stats.lastPrice}
-                ema={ema}
-                rsi={rsi}
-                trend={stats.trend}
-                loading={loadingMarket}
-              />
+          {/* Lower Center Intelligence Tabs */}
+          <div className="flex flex-col rounded-lg border border-[#1e293b] bg-[#080b11] overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-[#0d121d] border-b border-[#1e293b]">
+              <div className="flex items-center gap-1 text-xs font-mono">
+                <button
+                  onClick={() => setActiveBottomTab('QUANT')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'QUANT'
+                      ? 'bg-sky-500 text-white font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Cpu size={13} />
+                  <span>SKY 17-Phase Intelligence</span>
+                </button>
+                <button
+                  onClick={() => setActiveBottomTab('MTF_SMC')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'MTF_SMC'
+                      ? 'bg-sky-500 text-white font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <BarChart2 size={13} />
+                  <span>MTF Confluence & SMC Scans</span>
+                </button>
+              </div>
             </div>
-            <div className="min-h-[260px]">
-              <SMCScanPanel
-                fvgs={fvgs}
-                orderBlocks={orderBlocks}
-                setups={setups}
-                onSelectSetup={(setup) => setSelectedSetup(setup)}
-                loading={loadingMarket}
-              />
+
+            <div className="p-3">
+              {activeBottomTab === 'QUANT' ? (
+                <SKYIntelligencePanel
+                  data={skyData}
+                  loading={loadingMarket}
+                  onDeploySetup={(setup) => setSelectedSetup(setup)}
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <MTFPanel
+                    symbol={symbol}
+                    timeframe={timeframe}
+                    lastPrice={stats.lastPrice}
+                    ema={ema}
+                    rsi={rsi}
+                    trend={stats.trend}
+                    loading={loadingMarket}
+                  />
+                  <SMCScanPanel
+                    fvgs={fvgs}
+                    orderBlocks={orderBlocks}
+                    setups={setups}
+                    onSelectSetup={(setup) => setSelectedSetup(setup)}
+                    loading={loadingMarket}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column (3 cols): Order Book L2, OBI Flow Meter, Risk Desk, Positions & Copilot */}
-        <div className="lg:col-span-5 xl:col-span-3 flex flex-col gap-4">
+        {/* Right Column (3 cols): Tabbed Execution & Risk Terminal */}
+        <div className="lg:col-span-5 xl:col-span-3 flex flex-col gap-3">
           {/* Level-2 Order Book Imbalance & VPIN Flow Meter */}
           <OBIFlowMeter data={obiData} />
 
-          {/* Order Book L2 Depth Visualizer */}
-          <div className="h-[280px]">
-            <OrderBookVisualizer
-              symbol={symbol}
-              lastPrice={stats.lastPrice}
-            />
+          {/* Right Column Institutional Tab Selector */}
+          <div className="flex items-center justify-between p-1 bg-[#090d16] border border-[#1e293b] rounded-lg text-xs font-mono">
+            <button
+              onClick={() => setActiveRightTab('ORDER_DESK')}
+              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+                activeRightTab === 'ORDER_DESK'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Order Desk
+            </button>
+            <button
+              onClick={() => setActiveRightTab('ORDER_BOOK')}
+              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+                activeRightTab === 'ORDER_BOOK'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              L2 Book
+            </button>
+            <button
+              onClick={() => setActiveRightTab('PAPER')}
+              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+                activeRightTab === 'PAPER'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Positions
+            </button>
+            <button
+              onClick={() => setActiveRightTab('AI_DESK')}
+              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+                activeRightTab === 'AI_DESK'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              AI Copilot
+            </button>
           </div>
 
-          {/* Precision Risk-First Order Desk */}
-          <div className="min-h-[340px]">
-            <RiskFirstOrderDesk
-              symbol={symbol}
-              lastPrice={stats.lastPrice}
-              selectedSetup={selectedSetup}
-              onPlaceOrder={handlePlaceRiskOrder}
-            />
-          </div>
+          {/* Active Tabbed Panel Display */}
+          {activeRightTab === 'ORDER_DESK' && (
+            <div className="rounded-lg overflow-hidden border border-[#1e293b]">
+              <RiskFirstOrderDesk
+                symbol={symbol}
+                lastPrice={stats.lastPrice}
+                selectedSetup={selectedSetup}
+                onPlaceOrder={handlePlaceRiskOrder}
+              />
+            </div>
+          )}
 
-          {/* Active Paper Trading Positions */}
-          <div className="min-h-[300px]">
-            <PaperTradingPanel
-              symbol={symbol}
-              lastPrice={stats.lastPrice}
-              initialEntry={selectedSetup?.entry}
-              initialSL={selectedSetup?.stopLoss}
-              initialTP={selectedSetup?.takeProfit}
-              initialSide={selectedSetup?.type === 'LONG' ? 'BUY' : selectedSetup?.type === 'SHORT' ? 'SELL' : 'BUY'}
-              positions={positions}
-              riskConfig={riskConfig}
-              onSubmitTrade={handlePlaceTrade}
-              onRefreshPositions={fetchPositions}
-              loading={loadingMarket}
-            />
-          </div>
+          {activeRightTab === 'ORDER_BOOK' && (
+            <div className="rounded-lg overflow-hidden border border-[#1e293b]">
+              <OrderBookVisualizer
+                symbol={symbol}
+                lastPrice={stats.lastPrice}
+              />
+            </div>
+          )}
 
-          {/* Gemini Desk Intelligence Copilot */}
-          <div className="min-h-[320px]">
-            <GeminiDeskCopilot
-              symbol={symbol}
-              timeframe={timeframe}
-              brief={brief}
-              loadingBrief={loadingBrief}
-              onRefreshBrief={fetchDeskBrief}
-              onAskDesk={handleAskDesk}
-            />
-          </div>
+          {activeRightTab === 'PAPER' && (
+            <div className="rounded-lg overflow-hidden border border-[#1e293b]">
+              <PaperTradingPanel
+                symbol={symbol}
+                lastPrice={stats.lastPrice}
+                initialEntry={selectedSetup?.entry}
+                initialSL={selectedSetup?.stopLoss}
+                initialTP={selectedSetup?.takeProfit}
+                initialSide={selectedSetup?.type === 'LONG' ? 'BUY' : selectedSetup?.type === 'SHORT' ? 'SELL' : 'BUY'}
+                positions={positions}
+                riskConfig={riskConfig}
+                onSubmitTrade={handlePlaceTrade}
+                onRefreshPositions={fetchPositions}
+                loading={loadingMarket}
+              />
+            </div>
+          )}
+
+          {activeRightTab === 'AI_DESK' && (
+            <div className="rounded-lg overflow-hidden border border-[#1e293b]">
+              <GeminiDeskCopilot
+                symbol={symbol}
+                timeframe={timeframe}
+                brief={brief}
+                loadingBrief={loadingBrief}
+                onRefreshBrief={fetchDeskBrief}
+                onAskDesk={handleAskDesk}
+              />
+            </div>
+          )}
         </div>
       </main>
 
