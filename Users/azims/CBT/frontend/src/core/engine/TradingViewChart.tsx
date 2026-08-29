@@ -18,6 +18,16 @@ import {
   Minimize2,
   ArrowRight,
   Sparkles,
+  MousePointer,
+  TrendingUp,
+  Minus,
+  SeparatorVertical,
+  Square,
+  Hash,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Trash2,
+  LucideIcon,
 } from 'lucide-react';
 import { OHLCVCandle, FVGItem, OrderBlockItem, SKYSetupData, SupportedTimeframe } from '../../types';
 import { DrawingObject, WorkspacePersistence } from '../persistence/workspaceDB';
@@ -54,6 +64,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   orderBlocks = [],
   skySetups = [],
   liveCandle = null,
+  onDeploySetup,
   onTimeframeChange,
 }) => {
   const chartWrapperRef = useRef<HTMLDivElement>(null);
@@ -595,7 +606,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
     // 3. Draw User Drawings
     drawings.forEach((drawing) => {
-      if (drawing.points.length < 2 && drawing.type !== 'HORIZONTAL_RAY') return;
+      if (drawing.points.length < 2 && drawing.type !== 'HORIZONTAL_RAY' && drawing.type !== 'VERTICAL_LINE') return;
 
       const p1 = drawing.points[0];
       const p2 = drawing.points[1] || p1;
@@ -622,6 +633,15 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         ctx.moveTo(x1, y1);
         ctx.lineTo(canvas.width, y1);
         ctx.stroke();
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText(`$${p1.price.toFixed(2)}`, canvas.width - 70, y1 - 4);
+      } else if (drawing.type === 'VERTICAL_LINE') {
+        ctx.beginPath();
+        ctx.moveTo(x1, 0);
+        ctx.lineTo(x1, canvas.height);
+        ctx.stroke();
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText(new Date(p1.timestamp).toLocaleTimeString(), x1 + 4, 20);
       } else if (drawing.type === 'RECTANGLE' && x2 !== null && y2 !== null) {
         const w = x2 - x1;
         const h = y2 - y1;
@@ -633,11 +653,12 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         const dy = y2 - y1;
         levels.forEach((lvl) => {
           const yLvl = y1 + dy * lvl;
+          const priceLvl = p1.price + (p2.price - p1.price) * lvl;
           ctx.beginPath();
           ctx.moveTo(Math.min(x1, x2), yLvl);
           ctx.lineTo(canvas.width, yLvl);
           ctx.stroke();
-          ctx.fillText(`Fib ${(lvl * 100).toFixed(1)}%`, Math.min(x1, x2) + 5, yLvl - 3);
+          ctx.fillText(`Fib ${(lvl * 100).toFixed(1)}% ($${priceLvl.toFixed(2)})`, Math.min(x1, x2) + 5, yLvl - 3);
         });
       } else if ((drawing.type === 'LONG_POSITION' || drawing.type === 'SHORT_POSITION') && x2 !== null && y2 !== null) {
         const isLong = drawing.type === 'LONG_POSITION';
@@ -645,12 +666,27 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         const slY = y2;
         const riskH = Math.abs(slY - entryY);
         const tpY = isLong ? entryY - (2.5 * riskH) : entryY + (2.5 * riskH);
+        const width = Math.max(Math.abs(x2 - x1), 140);
 
-        ctx.fillStyle = 'rgba(255, 59, 105, 0.2)';
-        ctx.fillRect(x1, Math.min(entryY, slY), Math.abs(x2 - x1) || 120, Math.abs(slY - entryY));
+        // SL Zone (Red)
+        ctx.fillStyle = 'rgba(255, 59, 105, 0.25)';
+        ctx.strokeStyle = '#ff3b69';
+        ctx.fillRect(x1, Math.min(entryY, slY), width, Math.abs(slY - entryY));
+        ctx.strokeRect(x1, Math.min(entryY, slY), width, Math.abs(slY - entryY));
 
-        ctx.fillStyle = 'rgba(0, 240, 168, 0.2)';
-        ctx.fillRect(x1, Math.min(entryY, tpY), Math.abs(x2 - x1) || 120, Math.abs(tpY - entryY));
+        // TP Zone (Green)
+        ctx.fillStyle = 'rgba(0, 240, 168, 0.25)';
+        ctx.strokeStyle = '#00f0a8';
+        ctx.fillRect(x1, Math.min(entryY, tpY), width, Math.abs(tpY - entryY));
+        ctx.strokeRect(x1, Math.min(entryY, tpY), width, Math.abs(tpY - entryY));
+
+        // R:R Badge
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(x1 + 6, entryY - 10, 80, 20);
+        ctx.strokeRect(x1 + 6, entryY - 10, 80, 20);
+        ctx.fillStyle = isLong ? '#00f0a8' : '#ff3b69';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(`R:R 2.50`, x1 + 14, entryY + 4);
       }
 
       ctx.restore();
@@ -728,7 +764,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     const ts = typeof timeCoord === 'number' ? timeCoord * 1000 : Date.now();
     const newPoints = [...activeDrawingPoints, { timestamp: ts, price: priceCoord }];
 
-    if (activeTool === 'HORIZONTAL_RAY' || newPoints.length >= 2) {
+    if (activeTool === 'HORIZONTAL_RAY' || activeTool === 'VERTICAL_LINE' || newPoints.length >= 2) {
       const newDrawing: DrawingObject = {
         id: `draw_${Date.now()}`,
         symbol,
@@ -743,12 +779,48 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       const updated = [...drawings, newDrawing];
       setDrawings(updated);
       WorkspacePersistence.saveDrawing(newDrawing);
+
+      // Auto-deploy position tools into order desk if handler provided
+      if ((activeTool === 'LONG_POSITION' || activeTool === 'SHORT_POSITION') && onDeploySetup && newPoints.length >= 2) {
+        const entry = newPoints[0].price;
+        const sl = newPoints[1].price;
+        const isLong = activeTool === 'LONG_POSITION';
+        const risk = Math.abs(entry - sl);
+        const tp = isLong ? entry + 2.5 * risk : entry - 2.5 * risk;
+        onDeploySetup({
+          type: isLong ? 'LONG' : 'SHORT',
+          entry,
+          stopLoss: sl,
+          takeProfit: tp,
+          confidence: 85,
+        });
+      }
+
       setActiveDrawingPoints([]);
       setActiveTool('CURSOR');
     } else {
       setActiveDrawingPoints(newPoints);
     }
   };
+
+  const handleClearDrawings = () => {
+    drawings.forEach((d) => WorkspacePersistence.deleteDrawing(d.id));
+    setDrawings([]);
+    setActiveDrawingPoints([]);
+    setActiveTool('CURSOR');
+  };
+
+  // Drawing Tools Configuration for Vertical Toolbar
+  const drawingTools: Array<{ id: DrawingToolType; label: string; icon: LucideIcon }> = [
+    { id: 'CURSOR', label: 'Pointer / Crosshair', icon: MousePointer },
+    { id: 'TREND_LINE', label: 'Trend Line', icon: TrendingUp },
+    { id: 'HORIZONTAL_RAY', label: 'Horizontal Ray / Level', icon: Minus },
+    { id: 'VERTICAL_LINE', label: 'Vertical Line / Time', icon: SeparatorVertical },
+    { id: 'RECTANGLE', label: 'Order Block Box', icon: Square },
+    { id: 'FIB_RETRACEMENT', label: 'Fibonacci Retracement', icon: Hash },
+    { id: 'LONG_POSITION', label: 'Long Position R:R Tool', icon: ArrowUpCircle },
+    { id: 'SHORT_POSITION', label: 'Short Position R:R Tool', icon: ArrowDownCircle },
+  ];
 
   return (
     <div
@@ -868,97 +940,102 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         </div>
       </div>
 
-      {/* Main Chart Canvas & Overlay Container */}
-      <div className={`relative w-full ${isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[440px] min-h-[440px]'}`}>
-        <div ref={chartContainerRef} className="absolute inset-0 w-full h-full" />
-
-        <canvas
-          ref={drawingCanvasRef}
-          onMouseDown={handleCanvasMouseDown}
-          className={`absolute inset-0 w-full h-full ${
-            activeTool !== 'CURSOR' ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none cursor-default'
-          }`}
-        />
-
-        {isHistoricalPan && (
-          <button
-            onClick={() => {
-              chartRef.current?.timeScale().scrollToRealTime();
-              setIsHistoricalPan(false);
-              setUnreadTicks(0);
-            }}
-            className="absolute bottom-6 right-16 z-20 flex items-center gap-2 px-3 py-1.5 bg-sky-500/90 hover:bg-sky-500 text-white text-xs font-mono font-semibold rounded-full shadow-lg shadow-sky-500/25 border border-sky-400 backdrop-blur-sm transition-all transform hover:scale-105 animate-pulse"
-          >
-            <span>Go to Latest</span>
-            {unreadTicks > 0 && (
-              <span className="px-1.5 py-0.2 bg-black/40 text-[10px] rounded-full">
-                +{unreadTicks}
-              </span>
-            )}
-            <ArrowRight size={13} />
-          </button>
-        )}
-
-        {activeTool !== 'CURSOR' && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-sky-950/90 border border-sky-500/50 rounded-full text-xs font-mono text-sky-300 shadow-xl backdrop-blur-md">
-            <Sparkles size={13} className="animate-spin text-sky-400" />
-            <span>Click on chart to place {activeTool.replace(/_/g, ' ')}</span>
-            <button
-              onClick={() => {
-                setActiveTool('CURSOR');
-                setActiveDrawingPoints([]);
-              }}
-              className="ml-2 px-1.5 py-0.5 bg-rose-500/20 text-rose-400 rounded text-[10px] hover:bg-rose-500/40"
-            >
-              Cancel
-            </button>
+      {/* Main Chart Canvas Area with Left Vertical Drawing Toolbar */}
+      <div className="relative flex flex-row flex-1 w-full overflow-hidden">
+        {/* Left Vertical Drawing Toolbar (TradingView Dock) */}
+        <div className="flex flex-col items-center justify-between py-2 px-1 bg-[#090d16] border-r border-[#1e293b] z-20 gap-1 select-none">
+          <div className="flex flex-col items-center gap-1">
+            {drawingTools.map((tool) => {
+              const IconComponent = tool.icon;
+              const isSelected = activeTool === tool.id;
+              return (
+                <button
+                  key={tool.id}
+                  onClick={() => {
+                    setActiveTool(tool.id);
+                    setActiveDrawingPoints([]);
+                  }}
+                  className={`p-2 rounded transition-all group relative ${
+                    isSelected
+                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                  title={tool.label}
+                >
+                  <IconComponent size={15} />
+                  {/* Hover Tooltip */}
+                  <span className="absolute left-full ml-2 px-2 py-1 bg-slate-900 border border-slate-700 text-[10px] font-mono text-slate-200 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+                    {tool.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        )}
-      </div>
 
-      {/* Bottom Drawing Tools Bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#090d16] border-t border-[#1e293b] text-xs z-10">
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] font-mono text-slate-500 uppercase mr-1">Tools:</span>
-          {(
-            [
-              ['CURSOR', 'Pointer'],
-              ['TREND_LINE', 'Trend Line'],
-              ['HORIZONTAL_RAY', 'Ray'],
-              ['RECTANGLE', 'Box'],
-              ['FIB_RETRACEMENT', 'Fib'],
-              ['LONG_POSITION', 'Long R:R'],
-              ['SHORT_POSITION', 'Short R:R'],
-            ] as [DrawingToolType, string][]
-          ).map(([tool, label]) => (
-            <button
-              key={tool}
-              onClick={() => {
-                setActiveTool(tool);
-                setActiveDrawingPoints([]);
-              }}
-              className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium transition-colors ${
-                activeTool === tool
-                  ? 'bg-sky-500 text-white'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          {/* Delete All Drawings Button */}
+          {drawings.length > 0 && (
+            <div className="flex flex-col items-center border-t border-[#1e293b] pt-1">
+              <button
+                onClick={handleClearDrawings}
+                className="p-2 rounded text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-colors relative group"
+                title={`Clear drawings (${drawings.length})`}
+              >
+                <Trash2 size={15} />
+                <span className="absolute left-full ml-2 px-2 py-1 bg-slate-900 border border-rose-500/30 text-[10px] font-mono text-rose-300 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+                  Clear {drawings.length} Drawings
+                </span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {drawings.length > 0 && (
-          <button
-            onClick={() => {
-              drawings.forEach((d) => WorkspacePersistence.deleteDrawing(d.id));
-              setDrawings([]);
-            }}
-            className="text-[10px] font-mono text-rose-400 hover:text-rose-300 px-1.5 py-0.5 rounded hover:bg-rose-500/10"
-          >
-            Clear ({drawings.length})
-          </button>
-        )}
+        {/* Lightweight Charts Render Target + Overlay Canvas */}
+        <div className={`relative flex-1 ${isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[440px] min-h-[440px]'}`}>
+          <div ref={chartContainerRef} className="absolute inset-0 w-full h-full" />
+
+          <canvas
+            ref={drawingCanvasRef}
+            onMouseDown={handleCanvasMouseDown}
+            className={`absolute inset-0 w-full h-full ${
+              activeTool !== 'CURSOR' ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none cursor-default'
+            }`}
+          />
+
+          {isHistoricalPan && (
+            <button
+              onClick={() => {
+                chartRef.current?.timeScale().scrollToRealTime();
+                setIsHistoricalPan(false);
+                setUnreadTicks(0);
+              }}
+              className="absolute bottom-6 right-16 z-20 flex items-center gap-2 px-3 py-1.5 bg-sky-500/90 hover:bg-sky-500 text-white text-xs font-mono font-semibold rounded-full shadow-lg shadow-sky-500/25 border border-sky-400 backdrop-blur-sm transition-all transform hover:scale-105 animate-pulse"
+            >
+              <span>Go to Latest</span>
+              {unreadTicks > 0 && (
+                <span className="px-1.5 py-0.2 bg-black/40 text-[10px] rounded-full">
+                  +{unreadTicks}
+                </span>
+              )}
+              <ArrowRight size={13} />
+            </button>
+          )}
+
+          {activeTool !== 'CURSOR' && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-sky-950/90 border border-sky-500/50 rounded-full text-xs font-mono text-sky-300 shadow-xl backdrop-blur-md">
+              <Sparkles size={13} className="animate-spin text-sky-400" />
+              <span>Click on chart to place {activeTool.replace(/_/g, ' ')}</span>
+              <button
+                onClick={() => {
+                  setActiveTool('CURSOR');
+                  setActiveDrawingPoints([]);
+                }}
+                className="ml-2 px-1.5 py-0.5 bg-rose-500/20 text-rose-400 rounded text-[10px] hover:bg-rose-500/40"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
