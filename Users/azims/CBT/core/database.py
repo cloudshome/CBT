@@ -43,8 +43,11 @@ def get_db_connection(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+CURRENT_SCHEMA_VERSION = 2
+
+
 class DatabaseManager:
-    """Master database lifecycle and query coordinator."""
+    """Master database lifecycle, versioning, and query coordinator."""
 
     def __init__(self):
         self.market_db_path = MARKET_DB_PATH
@@ -65,13 +68,23 @@ class DatabaseManager:
     def get_experiment_conn(self) -> sqlite3.Connection:
         return get_db_connection(self.experiment_db_path)
 
+    def get_schema_version(self, conn: sqlite3.Connection) -> int:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA user_version;")
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+    def set_schema_version(self, conn: sqlite3.Connection, version: int) -> None:
+        conn.execute(f"PRAGMA user_version = {int(version)};")
+        conn.commit()
+
     def init_all_schemas(self) -> None:
-        """Initializes tables, indexes, and constraints across all 4 databases."""
+        """Initializes tables, indexes, and constraints across all 4 databases with version tracking."""
         self._init_market_db()
         self._init_brain_db()
         self._init_trading_db()
         self._init_experiment_db()
-        logger.info("All 4 database schemas initialized with WAL mode.")
+        logger.info(f"All 4 database schemas initialized and version-locked (v{CURRENT_SCHEMA_VERSION}) with WAL mode.")
 
     def _init_market_db(self) -> None:
         with self.get_market_conn() as conn:

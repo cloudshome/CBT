@@ -77,6 +77,7 @@ from core.monte_carlo_stress import monte_carlo_stress_tester
 from core.voice_interface import voice_interface
 from core.telegram_bot import telegram_bot
 from core.empirical_accumulator import empirical_accumulator
+from core.ttl_cache import sky_decision_cache, market_state_cache
 
 # SKY Professional Market Intelligence Layer
 from core.sky_intelligence import (
@@ -96,7 +97,19 @@ from core.sky_intelligence import (
     vwap_engine,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+from logging.handlers import RotatingFileHandler
+
+log_dir = Path(os.getenv("DATA_DIR", "data")) / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+log_file = log_dir / "cbt_terminal.log"
+
+file_handler = RotatingFileHandler(str(log_file), maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8")
+file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+
+logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 logger = logging.getLogger("ai_quant_sentinel.app")
 
 app = FastAPI(
@@ -180,28 +193,48 @@ class TelegramWebhookRequest(BaseModel):
     message: Optional[Dict[str, Any]] = None
 
 
-# WebSocket Connection Manager
+# WebSocket Connection Manager with 24/7 Heartbeat Guard
 class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
+    def __init__(self, timeout_sec: float = 60.0):
+        self.active_connections: Dict[WebSocket, float] = {}
+        self.timeout_sec = timeout_sec
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        import time
+        self.active_connections[websocket] = time.time()
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+            del self.active_connections[websocket]
+
+    def record_activity(self, websocket: WebSocket):
+        import time
+        if websocket in self.active_connections:
+            self.active_connections[websocket] = time.time()
 
     async def broadcast(self, message: Dict[str, Any]):
         dead = []
-        for connection in self.active_connections:
+        for connection in list(self.active_connections.keys()):
             try:
                 await connection.send_json(message)
             except Exception:
                 dead.append(connection)
         for d in dead:
             self.disconnect(d)
+
+    async def prune_stale_connections(self):
+        import time
+        now = time.time()
+        stale = [ws for ws, last_seen in self.active_connections.items() if (now - last_seen) > self.timeout_sec]
+        for ws in stale:
+            try:
+                await ws.close(code=1000)
+            except Exception:
+                pass
+            self.disconnect(ws)
+        if stale:
+            logger.info(f"Pruned {len(stale)} dead WebSocket connections.")
 
 
 ws_manager = ConnectionManager()
@@ -381,6 +414,11 @@ async def get_asset_dossier(symbol: str = Query("BTC/USDT")):
 
 @app.get("/api/market/state")
 async def get_market_state(symbol: str = Query("BTC/USDT")):
+    cache_key = f"market_state_{symbol}"
+    cached = market_state_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     c_map = {
         "1d": data_streamer.get_candles(symbol, "1d", limit=30),
         "4h": data_streamer.get_candles(symbol, "4h", limit=30),
@@ -389,7 +427,9 @@ async def get_market_state(symbol: str = Query("BTC/USDT")):
         "5m": data_streamer.get_candles(symbol, "5m", limit=30),
     }
     state = market_state_compiler.compile_state(symbol, candles_by_tf=c_map)
-    return state.to_dict()
+    result = state.to_dict()
+    market_state_cache.set(cache_key, result)
+    return result
 
 
 @app.get("/api/smc/scan")
@@ -417,6 +457,11 @@ async def get_sky_decision(symbol: str = Query("BTC/USDT"), timeframe: str = Que
     Executes the full 12-stage SKY Market Intelligence Decision Pipeline:
     DATA -> DATA QUALITY -> STRUCTURE -> LIQUIDITY -> VOLUME -> VOLATILITY -> DERIVATIVES -> REGIME -> SETUP -> EV -> DECISION.
     """
+    cache_key = f"sky_decision_{symbol}_{timeframe}"
+    cached = sky_decision_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     candles = data_streamer.get_candles(symbol, timeframe, limit=100)
     tf_map = {
         "1d": data_streamer.get_candles(symbol, "1d", limit=30),
@@ -427,7 +472,9 @@ async def get_sky_decision(symbol: str = Query("BTC/USDT"), timeframe: str = Que
         "1m": data_streamer.get_candles(symbol, "1m", limit=30),
     }
     decision_out = sky_orchestrator.analyze_market(symbol=symbol, timeframe=timeframe, candles=candles, candles_by_tf=tf_map)
-    return asdict(decision_out)
+    result = asdict(decision_out)
+    sky_decision_cache.set(cache_key, result)
+    return result
 
 
 @app.get("/api/sky/structure")
@@ -971,7 +1018,7 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            # Handle client ping or subscription
+            ws_manager.record_activity(websocket)
             msg = json.loads(data) if data else {}
             if msg.get("action") == "PING":
                 await websocket.send_json({"type": "PONG", "timestamp": int(asyncio.get_event_loop().time() * 1000)})
