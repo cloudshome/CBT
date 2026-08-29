@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
 import {
   createChart,
   CandlestickSeries,
@@ -27,6 +27,7 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   Trash2,
+  Activity,
   LucideIcon,
 } from 'lucide-react';
 import { OHLCVCandle, FVGItem, OrderBlockItem, SKYSetupData, SupportedTimeframe } from '../../types';
@@ -56,7 +57,7 @@ interface TradingViewChartProps {
   loading?: boolean;
 }
 
-export const TradingViewChart: React.FC<TradingViewChartProps> = ({
+const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   symbol,
   timeframe,
   candles,
@@ -71,7 +72,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Core Chart Instance References
+  // Core Chart Instance References (Long-Lived)
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
@@ -81,6 +82,21 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   const lower1sRef = useRef<ISeriesApi<'Line'> | null>(null);
   const upper2sRef = useRef<ISeriesApi<'Line'> | null>(null);
   const lower2sRef = useRef<ISeriesApi<'Line'> | null>(null);
+
+  // Track context for zero-shake data ingestion
+  const lastLoadedContextRef = useRef<{ symbol: string; timeframe: string; candleCount: number }>({
+    symbol: '',
+    timeframe: '',
+    candleCount: 0,
+  });
+
+  // Diagnostic / Performance Metrics
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  const [showDebugHUD, setShowDebugHUD] = useState(false);
+  const [fps, setFps] = useState(60);
+  const [updatesPerSec, setUpdatesPerSec] = useState(0);
+  const updateCounterRef = useRef(0);
 
   // Viewport Navigation & Autoscroll Lock State
   const [isHistoricalPan, setIsHistoricalPan] = useState(false);
@@ -112,52 +128,47 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
   const timeframes: SupportedTimeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1d'];
 
-  // Handle True Browser Fullscreen Toggle
-  const toggleFullscreen = useCallback(async () => {
-    const el = chartWrapperRef.current;
-    if (!el) return;
-
-    try {
-      if (!document.fullscreenElement) {
-        await el.requestFullscreen();
-        setIsFullscreen(true);
-      } else {
-        await document.exitFullscreen();
-        setIsFullscreen(false);
-      }
-    } catch {
-      setIsFullscreen((prev) => !prev);
-    }
-  }, []);
-
-  // Listen for fullscreen change event
+  // FPS & Telemetry Diagnostics Loop
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isFull = !!document.fullscreenElement;
-      setIsFullscreen(isFull);
-      setTimeout(() => {
-        if (chartContainerRef.current && chartRef.current) {
-          const w = chartContainerRef.current.clientWidth;
-          const h = chartContainerRef.current.clientHeight || (isFull ? window.innerHeight - 80 : 440);
-          chartRef.current.resize(w, h);
-          updateCanvasDimensions();
-          drawCanvasOverlays();
-        }
-      }, 50);
+    let frameId: number;
+    let lastTime = performance.now();
+    let frames = 0;
+
+    const measureLoop = (currentTime: number) => {
+      frames++;
+      if (currentTime - lastTime >= 1000) {
+        setFps(Math.round((frames * 1000) / (currentTime - lastTime)));
+        setUpdatesPerSec(updateCounterRef.current);
+        updateCounterRef.current = 0;
+        frames = 0;
+        lastTime = currentTime;
+      }
+      frameId = requestAnimationFrame(measureLoop);
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    frameId = requestAnimationFrame(measureLoop);
+    return () => cancelAnimationFrame(frameId);
   }, []);
 
-  // 1. Initialize Lightweight Charts v5 Instance
+  // Keyboard shortcut (D) to toggle Diagnostic HUD
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'd' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        setShowDebugHUD((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // 1. Initialize Long-Lived Lightweight Charts v5 Instance (MOUNT ONCE)
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
     const container = chartContainerRef.current;
     container.innerHTML = '';
 
-    const initialHeight = isFullscreen ? window.innerHeight - 80 : 440;
+    const initialHeight = container.clientHeight || 440;
     const initialWidth = container.clientWidth || 800;
 
     const chart = createChart(container, {
@@ -291,42 +302,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     upper2sRef.current = upper2s;
     lower2sRef.current = lower2s;
 
-    // Load initial candles if available
-    if (candles && candles.length > 0) {
-      const formattedCandles: CandlestickData[] = [];
-      const formattedVolume: HistogramData[] = [];
-      let prevTime = -1;
-
-      const sorted = [...candles]
-        .filter((c) => Array.isArray(c) && c.length >= 5 && !isNaN(c[0]) && !isNaN(c[4]) && c[4] > 0)
-        .sort((a, b) => a[0] - b[0]);
-
-      for (const c of sorted) {
-        const t = Math.floor(c[0] / 1000);
-        if (t > prevTime) {
-          formattedCandles.push({
-            time: t as Time,
-            open: c[1],
-            high: c[2],
-            low: c[3],
-            close: c[4],
-          });
-          formattedVolume.push({
-            time: t as Time,
-            value: c[5] || 0,
-            color: c[4] >= c[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
-          });
-          prevTime = t;
-        }
-      }
-
-      if (formattedCandles.length > 0) {
-        candleSeries.setData(formattedCandles);
-        volumeSeries.setData(formattedVolume);
-        chart.timeScale().fitContent();
-      }
-    }
-
     // Crosshair move handler
     chart.subscribeCrosshairMove((param) => {
       if (!param || !param.time || !param.seriesData) {
@@ -373,11 +348,11 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       }
     });
 
-    // Resize observer
+    // Resize observer (Resizes without destroying chart)
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
         const w = chartContainerRef.current.clientWidth;
-        const h = chartContainerRef.current.clientHeight || (isFullscreen ? window.innerHeight - 80 : 440);
+        const h = chartContainerRef.current.clientHeight || 440;
         chartRef.current.resize(w, h);
         updateCanvasDimensions();
         drawCanvasOverlays();
@@ -388,8 +363,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
 
-    // Initial resize trigger
-    setTimeout(handleResize, 100);
+    setTimeout(handleResize, 50);
 
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -397,7 +371,45 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       chart.remove();
       chartRef.current = null;
     };
-  }, [isFullscreen]);
+  }, []); // Mount Once — Never destroy on state or periodic updates!
+
+  // Handle Fullscreen Toggle (Smooth Zero-Destroy Resize)
+  const toggleFullscreen = useCallback(async () => {
+    const el = chartWrapperRef.current;
+    if (!el) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await el.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch {
+      setIsFullscreen((prev) => !prev);
+    }
+  }, []);
+
+  // Listen for fullscreen change event and trigger smooth resize
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+      setTimeout(() => {
+        if (chartContainerRef.current && chartRef.current) {
+          const w = chartContainerRef.current.clientWidth;
+          const h = chartContainerRef.current.clientHeight || (isFull ? window.innerHeight - 80 : 440);
+          chartRef.current.resize(w, h);
+          updateCanvasDimensions();
+          drawCanvasOverlays();
+        }
+      }, 50);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // 2. Load Persisted Drawings from IndexedDB
   useEffect(() => {
@@ -408,42 +420,52 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     return () => { isMounted = false; };
   }, [symbol]);
 
-  // 3. Ingest Candlestick Data & Offload Indicators to Web Worker
+  // 3. Zero-Shake Ingestion: Set Data ONLY when Symbol/Timeframe changes
   useEffect(() => {
     if (!candleSeriesRef.current || !candles || candles.length === 0) return;
 
-    const formattedCandles: CandlestickData[] = [];
-    const formattedVolume: HistogramData[] = [];
-    let prevTime = -1;
+    const isContextChanged =
+      lastLoadedContextRef.current.symbol !== symbol ||
+      lastLoadedContextRef.current.timeframe !== timeframe ||
+      lastLoadedContextRef.current.candleCount === 0;
 
-    const sorted = [...candles]
-      .filter((c) => Array.isArray(c) && c.length >= 5 && !isNaN(c[0]) && !isNaN(c[4]) && c[4] > 0)
-      .sort((a, b) => a[0] - b[0]);
+    if (isContextChanged) {
+      const formattedCandles: CandlestickData[] = [];
+      const formattedVolume: HistogramData[] = [];
+      let prevTime = -1;
 
-    for (const c of sorted) {
-      const t = Math.floor(c[0] / 1000);
-      if (t > prevTime) {
-        formattedCandles.push({
-          time: t as Time,
-          open: c[1],
-          high: c[2],
-          low: c[3],
-          close: c[4],
-        });
-        formattedVolume.push({
-          time: t as Time,
-          value: c[5] || 0,
-          color: c[4] >= c[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
-        });
-        prevTime = t;
+      const sorted = [...candles]
+        .filter((c) => Array.isArray(c) && c.length >= 5 && !isNaN(c[0]) && !isNaN(c[4]) && c[4] > 0)
+        .sort((a, b) => a[0] - b[0]);
+
+      for (const c of sorted) {
+        const t = Math.floor(c[0] / 1000);
+        if (t > prevTime) {
+          formattedCandles.push({
+            time: t as Time,
+            open: c[1],
+            high: c[2],
+            low: c[3],
+            close: c[4],
+          });
+          formattedVolume.push({
+            time: t as Time,
+            value: c[5] || 0,
+            color: c[4] >= c[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
+          });
+          prevTime = t;
+        }
+      }
+
+      if (formattedCandles.length > 0) {
+        candleSeriesRef.current.setData(formattedCandles);
+        volumeSeriesRef.current?.setData(formattedVolume);
+        chartRef.current?.timeScale().fitContent();
+        lastLoadedContextRef.current = { symbol, timeframe, candleCount: formattedCandles.length };
       }
     }
 
-    if (formattedCandles.length > 0) {
-      candleSeriesRef.current.setData(formattedCandles);
-      volumeSeriesRef.current?.setData(formattedVolume);
-    }
-
+    // Offload indicators to Web Worker asynchronously
     const workerCandles = candles.map((c) => ({
       timestamp: c[0],
       open: c[1],
@@ -453,7 +475,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       volume: c[5],
     }));
 
-    // Offload indicators to Web Worker
     indicatorClient.calculateIndicators(workerCandles, {
       emaPeriods: [20],
       vwap: true,
@@ -498,13 +519,9 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         }
       }
     });
+  }, [candles, symbol, timeframe, showEMA, showVWAP, showMultiSigma]);
 
-    if (!isHistoricalPan) {
-      chartRef.current?.timeScale().scrollToRealTime();
-    }
-  }, [candles, showEMA, showVWAP, showMultiSigma, isHistoricalPan]);
-
-  // 4. Live Tick Micro-Batching with RAF
+  // 4. Live Tick Micro-Batching with RAF (Incremental Update — ZERO Full Rerender)
   useEffect(() => {
     if (!liveCandle || !candleSeriesRef.current) return;
 
@@ -515,6 +532,8 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       low: liveCandle[3],
       close: liveCandle[4],
     };
+
+    updateCounterRef.current += 1;
 
     window.requestAnimationFrame(() => {
       candleSeriesRef.current?.update(bar);
@@ -875,7 +894,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           </div>
         </div>
 
-        {/* Right: Technical Toggles, Fullscreen & Controls */}
+        {/* Right: Technical Toggles, Fullscreen & Diagnostics */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-[#080b11] border border-slate-800 rounded p-0.5">
             <button
@@ -925,6 +944,20 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
             </button>
           </div>
 
+          {/* Dev Diagnostic Toggle */}
+          <button
+            onClick={() => setShowDebugHUD(!showDebugHUD)}
+            className={`p-1.5 rounded transition-all font-mono text-[10px] flex items-center gap-1 ${
+              showDebugHUD
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+            title="Toggle Dev Diagnostics (Hotkey: D)"
+          >
+            <Activity size={12} />
+            <span className="hidden sm:inline">HUD</span>
+          </button>
+
           <button
             onClick={toggleFullscreen}
             className={`p-1.5 rounded transition-all flex items-center gap-1 font-mono text-[11px] ${
@@ -939,6 +972,19 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Diagnostic Telemetry Bar */}
+      {showDebugHUD && (
+        <div className="flex items-center justify-between px-3 py-1 bg-[#050811] border-b border-purple-500/20 text-[10px] font-mono text-purple-300">
+          <div className="flex items-center gap-4">
+            <span>FPS: <strong className="text-emerald-400">{fps}</strong></span>
+            <span>Chart Updates/s: <strong className="text-cyan-400">{updatesPerSec}</strong></span>
+            <span>React Renders: <strong className="text-slate-200">{renderCountRef.current}</strong></span>
+            <span>WebSocket: <strong className="text-emerald-400">CONNECTED</strong></span>
+          </div>
+          <span className="text-slate-500 text-[9px]">Zero-Shake Realtime Engine Active</span>
+        </div>
+      )}
 
       {/* Main Chart Canvas Area with Left Vertical Drawing Toolbar */}
       <div className="relative flex flex-row flex-1 w-full overflow-hidden">
@@ -1040,3 +1086,5 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     </div>
   );
 };
+
+export const TradingViewChart = memo(TradingViewChartComponent);

@@ -130,8 +130,8 @@ export const App: React.FC = () => {
     }
   };
 
-  // 1. Fetch Market Data & Indicators
-  const fetchMarketData = useCallback(async () => {
+  // 1. Initial Market Data & Historical Candles Loading (Initial Mount / Symbol / TF Change)
+  const fetchInitialMarketData = useCallback(async () => {
     setLoadingMarket(true);
     try {
       const [candlesRes, mtfRes, scanRes, skyRes, alphaRes, cvdRes, obiRes] = await Promise.all([
@@ -174,6 +174,31 @@ export const App: React.FC = () => {
       setLoadingMarket(false);
     }
   }, [symbol, timeframe, addToast]);
+
+  // 1B. Silent Background Analytics Polling (Every 30s — Zero Chart Jitter / Zero Loading Flash)
+  const fetchBackgroundAnalytics = useCallback(async () => {
+    try {
+      const [scanRes, skyRes, alphaRes, cvdRes, obiRes] = await Promise.all([
+        api.getSMCScan(symbol, timeframe, 500).catch(() => null),
+        api.getSKYIntelligence(symbol, timeframe, 500).catch(() => null),
+        api.getInstitutionalAlpha(symbol, timeframe, 500).catch(() => null),
+        api.getInstitutionalCVD(symbol, timeframe, 1000).catch(() => null),
+        api.getOrderBookImbalance(symbol).catch(() => null),
+      ]);
+
+      if (scanRes) {
+        setFVGs(scanRes.fvg || []);
+        setOrderBlocks(scanRes.order_blocks || []);
+        setSetups(scanRes.setup_suggestions || []);
+      }
+      if (skyRes) setSkyData(skyRes);
+      if (alphaRes) setInstitutionalAlpha(alphaRes);
+      if (cvdRes) setCvdData(cvdRes);
+      if (obiRes) setObiData(obiRes);
+    } catch (err: unknown) {
+      console.warn('Silent background analytics update skipped:', err);
+    }
+  }, [symbol, timeframe]);
 
   // 2. Fetch Paper Trading Positions
   const fetchPositions = useCallback(async () => {
@@ -280,12 +305,12 @@ export const App: React.FC = () => {
 
   // Initialize Data Ingestion on Mount & Parameter Change
   useEffect(() => {
-    fetchMarketData();
+    fetchInitialMarketData();
     fetchPositions();
     fetchDeskBrief();
   }, [symbol, timeframe]);
 
-  // High-Frequency Real-Time WebSocket Aggregation
+  // High-Frequency Real-Time WebSocket Aggregation (Incremental Series Updates)
   useEffect(() => {
     const unsub = marketProvider.subscribeRealtimeCandles(symbol, timeframe, (candle: OHLCVCandle) => {
       setLiveCandle(candle);
@@ -300,14 +325,14 @@ export const App: React.FC = () => {
     return () => unsub();
   }, [symbol, timeframe]);
 
-  // Periodic 30-second Telemetry Polling
+  // Silent 30-Second Background Analytics Polling (Zero Chart Flickering / Zero Screen Jump)
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchMarketData();
+      fetchBackgroundAnalytics();
       fetchPositions();
     }, 30000);
     return () => clearInterval(interval);
-  }, [fetchMarketData, fetchPositions]);
+  }, [fetchBackgroundAnalytics, fetchPositions]);
 
   return (
     <div className="min-h-screen bg-[#05070c] text-slate-100 flex flex-col font-sans antialiased selection:bg-sky-500/30 selection:text-sky-200">
@@ -329,7 +354,7 @@ export const App: React.FC = () => {
         trend={stats.trend}
         loading={loadingMarket}
         onRefresh={() => {
-          fetchMarketData();
+          fetchInitialMarketData();
           fetchPositions();
           fetchDeskBrief();
         }}
@@ -388,7 +413,7 @@ export const App: React.FC = () => {
           <SKYIntelligenceHUD
             data={skyData}
             loading={loadingMarket}
-            onRefresh={fetchMarketData}
+            onRefresh={fetchBackgroundAnalytics}
           />
         )}
       </div>

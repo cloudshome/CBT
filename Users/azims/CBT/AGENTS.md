@@ -19,6 +19,8 @@ Your responsibility is not simply to execute the latest user command.
 
 Your responsibility is to help build the **best possible version of SKY while protecting its original mission, architecture, reliability, data integrity, and long-term direction.**
 
+> **UI Stability Principle:** The application screen is persistent. Data changes; the interface does not "refresh." Never solve a data-update problem by recreating UI components, chart instances, layouts, or application state.
+
 ---
 
 ## 1. CORE PROJECT MISSION
@@ -373,17 +375,43 @@ Account for:
 
 ---
 
-## 20. CHART RULE
+## 20. CHART RULE & ZERO-SHAKE REALTIME REFRESH ARCHITECTURE
 
-The chart is a realtime interface. Never allow background intelligence updates to reset:
-* zoom
-* pan
-* crosshair
-* user drawings
-* indicators
-* timeframe
-* symbol
-* panel layout
+The SKY trading interface must behave like a professional institutional trading terminal (e.g., TradingView).
+
+The user must NEVER experience:
+* Screen flicker / blinking
+* Chart remount / destruction
+* Page reload / full tree rerender
+* Layout jumps / scroll jumps
+* Zoom or pan resets
+* Candle / series wipes
+* Watchlist or panel resets
+* Visible "refreshing" artifact
+
+### 1. Architectural Model
+NEVER implement periodic refresh as `fetch() -> set entire state -> rerender entire page -> recreate chart`.
+Each subsystem updates independently:
+```
+USER INTERFACE
+│
+├── Chart Instance (Long-lived, single mount)
+├── Watchlist (Selective row patch)
+├── Order Book & Depth (Isolated high-velocity state)
+├── Positions & Risk Desk (Isolated ledger state)
+└── SKY Intelligence & Debate (30s background state)
+```
+
+### 2. Core Operational Directives
+* **Long-Lived Chart Instance**: Create the chart once upon mount. Realtime data updates incrementally via `series.update(bar)`. Never destroy or re-initialize chart options on periodic timers.
+* **Viewport Is User State**: Preserve visible time range, price range, zoom level, pan position, scroll position, and active drawings. Never auto-scroll or reset viewport unless user clicks "Go to Latest".
+* **Incremental Realtime Updates**: Incoming ticks update only the active candle. Candle close appends a single bar. Do not replace the 1000-candle dataset on tick updates.
+* **Independent Subsystem Velocity Tiers**: High-velocity (Ticks, Order Book) $\to$ Medium-velocity (Candle closes) $\to$ Low-velocity (SKY Intelligence & Regimes every 30s).
+* **Stable Identity & Keys**: Never place dynamic `key={timestamp}` or `key={marketData}` on chart wrappers.
+* **Persistent WebSocket Lifecycle**: WebSocket connects once and remains open with exponential backoff reconnects. Never disconnect on periodic refreshes.
+* **Loading States Without Jumps**: Never show full-screen blocking spinners for background refreshes. Use subtle inline status pills.
+* **User Interaction Priority**: Periodic updates must NEVER interrupt user drawing, dragging, zooming, typing, or table scrolling.
+* **Diagnostic Mode**: Optional dev diagnostic HUD displaying FPS, chart updates/sec, React renders/sec, WebSocket latency, and data freshness.
 
 ---
 
