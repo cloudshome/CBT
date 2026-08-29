@@ -26,6 +26,28 @@ def test_api_market_candles():
     assert len(data["candles"]) == 50
 
 
+def test_api_market_orderbook():
+    response = client.get("/api/market/orderbook?symbol=BTC/USDT&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["symbol"] == "BTC/USDT"
+    assert "asks" in data
+    assert "bids" in data
+    assert len(data["asks"]) > 0
+    assert len(data["bids"]) > 0
+
+
+def test_api_market_providers():
+    response = client.get("/api/market/providers")
+    assert response.status_code == 200
+    data = response.json()
+    assert "active_provider" in data
+    assert "providers" in data
+    assert "BINANCE_REST" in data["providers"]
+    assert "BYBIT_V5" in data["providers"]
+    assert "SQLITE_LOCAL_CACHE" in data["providers"]
+
+
 def test_api_smc_scan():
     response = client.get("/api/smc/scan?symbol=BTC/USDT&timeframe=15m")
     assert response.status_code == 200
@@ -142,4 +164,41 @@ def test_api_chart_memory_save_and_retrieve():
     get_cleared = client.get("/api/chart/memory?symbol=BTC/USDT&timeframe=15m")
     assert get_cleared.status_code == 200
     assert len(get_cleared.json()["drawings"]) == 0
+
+
+def test_api_sky_decision_and_modules():
+    # 1. Test /api/sky/decision
+    res_dec = client.get("/api/sky/decision?symbol=BTC/USDT&timeframe=15m")
+    assert res_dec.status_code == 200
+    data_dec = res_dec.json()
+    assert "decision" in data_dec
+    assert "explanation_dossier" in data_dec
+
+    # 2. Test /api/sky/structure
+    res_struct = client.get("/api/sky/structure?symbol=BTC/USDT&timeframe=15m")
+    assert res_struct.status_code == 200
+    data_struct = res_struct.json()
+    assert "swings" in data_struct
+    assert "structure_events" in data_struct
+
+    # 3. Test /api/sky/liquidity
+    res_liq = client.get("/api/sky/liquidity?symbol=BTC/USDT&timeframe=15m")
+    assert res_liq.status_code == 200
+    data_liq = res_liq.json()
+    assert "active_pools" in data_liq
+    assert "sweeps" in data_liq
+
+    # 4. Test /api/sky/setups
+    res_setups = client.get("/api/sky/setups?symbol=BTC/USDT&timeframe=15m")
+    assert res_setups.status_code == 200
+    data_setups = res_setups.json()
+    assert "setups" in data_setups
+    assert "qualified_count" in data_setups
+
+    # 5. Test /api/sky/statistics
+    res_stats = client.get("/api/sky/statistics?concept=SETUP_A_SWEEP_MSS&regime=TRENDING_BULL")
+    assert res_stats.status_code == 200
+    data_stats = res_stats.json()
+    assert data_stats["concept_name"] == "SETUP_A_SWEEP_MSS"
+    assert data_stats["expectancy_r"] > 0
 

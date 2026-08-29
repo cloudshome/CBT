@@ -102,20 +102,81 @@
       <section id="tab-terminal" class="tab-view active">
         <div class="terminal-grid">
           <!-- Column 1: Chart Engine, Drawing Toolbar & SMC Overlays -->
+          <!-- Column 1: TradingView & Binance Pro Chart Engine, Toolbar & SMC Overlays -->
           <div class="chart-panel panel-card" id="trading-chart-panel">
-            <div class="panel-header">
-              <div class="chart-title">
-                <span id="chart-symbol-label">BTC/USDT</span>
-                <span class="badge-tag tag-blue" id="chart-price-live">$88,450.00</span>
-                <span class="chart-regime-tag" id="chart-regime-label">TRENDING_BULL</span>
-                <span id="chart-memory-badge" class="badge-tag tag-green" title="Drawing & Indicator state synced">💾 Synced</span>
+            <!-- Row 1: Binance Pro Market Header Bar -->
+            <div class="chart-top-bar">
+              <div class="chart-symbol-info">
+                <div class="symbol-badge-box">
+                  <span id="chart-symbol-label" class="symbol-main-name">BTC/USDT</span>
+                  <span class="badge-tag tag-purple">PERP</span>
+                </div>
+                <div class="live-price-group">
+                  <span class="live-price-val" id="chart-price-live">$88,450.00</span>
+                  <span class="price-change-pill tag-green" id="chart-24h-change">+2.45%</span>
+                </div>
+                <div class="symbol-stat-item">
+                  <span class="stat-lbl">24h High</span>
+                  <span class="stat-val" id="stat-24h-high">$89,240.00</span>
+                </div>
+                <div class="symbol-stat-item">
+                  <span class="stat-lbl">24h Low</span>
+                  <span class="stat-val" id="stat-24h-low">$86,310.00</span>
+                </div>
+                <div class="symbol-stat-item">
+                  <span class="stat-lbl">24h Vol</span>
+                  <span class="stat-val" id="stat-24h-vol">48,210 BTC</span>
+                </div>
               </div>
-              <div class="chart-controls">
-                <label><input type="checkbox" id="toggle-fvg" checked> FVG</label>
-                <label><input type="checkbox" id="toggle-ob" checked> OB</label>
-                <label><input type="checkbox" id="toggle-sweeps" checked> Sweeps</label>
-                <label><input type="checkbox" id="toggle-cvd" checked> CVD</label>
-                <button id="btn-chart-fullscreen" class="btn-chart-action" title="Toggle Fullscreen (F)">⛶ Fullscreen</button>
+
+              <!-- Pinned Actions (Always visible across all timeframes & screens) -->
+              <div class="chart-header-actions">
+                <span class="chart-regime-tag" id="chart-regime-label" title="Current Market Regime">TRENDING_BULL</span>
+                <span id="chart-memory-badge" class="badge-tag tag-green" title="Auto-saved to Cloud & Local Storage">💾 Synced</span>
+                <button id="btn-chart-fullscreen" class="btn-fullscreen-pro" title="Toggle Fullscreen (Press F or Esc)">
+                  <span class="fs-icon">⛶</span>
+                  <span class="fs-text">Fullscreen</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Row 2: TradingView Style Sub-Bar (Timeframes, Chart Type & Indicators) -->
+            <div class="tradingview-sub-bar">
+              <!-- Timeframe Selector Pills -->
+              <div class="tv-tf-group" id="chart-tf-buttons">
+                <button class="tv-tf-btn" data-tf="1m">1m</button>
+                <button class="tv-tf-btn" data-tf="5m">5m</button>
+                <button class="tv-tf-btn active" data-tf="15m">15m</button>
+                <button class="tv-tf-btn" data-tf="1h">1H</button>
+                <button class="tv-tf-btn" data-tf="4h">4H</button>
+                <button class="tv-tf-btn" data-tf="1d">1D</button>
+              </div>
+
+              <div class="tv-sep"></div>
+
+              <!-- Chart Type (Candles / Line / Area) -->
+              <div class="tv-type-group">
+                <button class="tv-type-btn active" data-type="candles" title="Candlestick Chart">🕯️</button>
+                <button class="tv-type-btn" data-type="line" title="Line Chart">📈</button>
+                <button class="tv-type-btn" data-type="area" title="Area Chart">📊</button>
+              </div>
+
+              <div class="tv-sep"></div>
+
+              <!-- SMC & Indicator Pills -->
+              <div class="tv-indicator-toggles">
+                <button class="tv-indicator-pill active" id="pill-toggle-fvg" data-target="toggle-fvg" title="Fair Value Gaps">⚡ FVG</button>
+                <button class="tv-indicator-pill active" id="pill-toggle-ob" data-target="toggle-ob" title="Order Blocks">🧱 Order Blocks</button>
+                <button class="tv-indicator-pill active" id="pill-toggle-sweeps" data-target="toggle-sweeps" title="Liquidity Sweeps">🎯 Sweeps</button>
+                <button class="tv-indicator-pill active" id="pill-toggle-cvd" data-target="toggle-cvd" title="CVD Absorption Delta">🌊 CVD Delta</button>
+              </div>
+
+              <!-- Hidden Checkboxes for programmatic state sync -->
+              <div style="display:none;">
+                <input type="checkbox" id="toggle-fvg" checked>
+                <input type="checkbox" id="toggle-ob" checked>
+                <input type="checkbox" id="toggle-sweeps" checked>
+                <input type="checkbox" id="toggle-cvd" checked>
               </div>
             </div>
 
@@ -141,7 +202,7 @@
 
               <!-- Main Interactive Chart Area -->
               <div class="chart-main-area" id="chart-main-area">
-                <!-- Floating Drawing Settings Bar (Active when drawing tool selected) -->
+                <!-- Floating Drawing Settings Bar -->
                 <div class="drawing-settings-bar" id="drawing-settings-bar" style="display: none;">
                   <span class="tool-hint-text" id="tool-hint-text">Tool: Trendline (Click 2 points)</span>
                   <div class="palette-dots">
@@ -219,16 +280,17 @@
           <!-- Column 3: Order Book, Execution Dock & Kelly Sizing -->
           <div class="execution-panel panel-card">
             <div class="panel-header">
-              <span>SMART ORDER ROUTER (SOR)</span>
-              <span class="badge-tag tag-purple">Conservative Kelly</span>
+              <span>ORDER BOOK (L2 DEPTH)</span>
+              <span class="badge-tag tag-purple" id="ob-exchange-tag">Binance Linear 0.1</span>
             </div>
-            <!-- L2 Order Book Depth Preview -->
-            <div class="orderbook-preview" id="orderbook-depth">
-              <div class="ob-row ask"><span class="price">88,480.0</span><span class="size">4.28 BTC</span></div>
-              <div class="ob-row ask"><span class="price">88,465.0</span><span class="size">2.15 BTC</span></div>
-              <div class="ob-mid"><span class="mid-p">88,450.0</span><span class="spread-bps">Spread: 1.2 bps</span></div>
-              <div class="ob-row bid"><span class="price">88,440.0</span><span class="size">3.85 BTC</span></div>
-              <div class="ob-row bid"><span class="price">88,425.0</span><span class="size">6.12 BTC</span></div>
+            <!-- Binance Pro L2 Order Book Table -->
+            <div class="orderbook-pro-wrap">
+              <div class="ob-col-header">
+                <span>Price (USDT)</span>
+                <span>Size</span>
+                <span>Total</span>
+              </div>
+              <div class="orderbook-preview" id="orderbook-depth"></div>
             </div>
 
             <!-- Execution Form -->

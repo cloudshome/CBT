@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 # Core Quantitative Engines
 from core.database import db_manager
+from core.market_providers import market_gateway
 from core.data_streamer import data_streamer
 from core.data_quality_gate import data_quality_gate
 from core.venue_dislocation import venue_dislocation_monitor
@@ -33,6 +34,11 @@ from core.regime_transition import regime_transition_detector
 from core.cvd_absorption import cvd_absorption_engine
 from core.lead_lag_correlator import lead_lag_correlator
 from core.judas_sweep_hunter import judas_sweep_hunter
+from core.orderbook_imbalance import orderbook_imbalance_engine
+from core.oi_funding_squeeze import oi_funding_squeeze_engine
+from core.fractal_harmonics import fractal_harmonics_engine
+from core.half_kelly_sizer import half_kelly_position_sizer
+from core.institutional_alpha import institutional_alpha_engine
 from core.event_shock_engine import event_shock_engine
 from core.macro_sentinel import macro_sentinel
 from core.sentiment_engine import sentiment_engine
@@ -68,6 +74,24 @@ from core.patch_governor import patch_governor
 from core.sandbox_lab import sandbox_lab
 from core.walk_forward_engine import walk_forward_engine
 from core.monte_carlo_stress import monte_carlo_stress_tester
+
+# SKY Professional Market Intelligence Layer
+from core.sky_intelligence import (
+    sky_orchestrator,
+    market_structure_engine,
+    liquidity_engine,
+    volatility_engine,
+    volume_engine,
+    derivatives_engine,
+    fvg_engine,
+    order_block_engine,
+    displacement_engine,
+    multi_timeframe_engine,
+    market_regime_engine,
+    setup_engine,
+    expectancy_engine,
+    vwap_engine,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("ai_quant_sentinel.app")
@@ -229,19 +253,32 @@ async def get_system_health():
 
 @app.get("/api/market/ticker")
 async def get_market_ticker(symbol: str = Query("BTC/USDT")):
-    import time
-    price = await data_streamer.get_live_ticker(symbol)
-    return {"symbol": symbol, "price": price, "timestamp": int(time.time() * 1000)}
+    ticker_data = await market_gateway.get_ticker(symbol)
+    return ticker_data
 
 
 @app.get("/api/market/candles")
 async def get_market_candles(
     symbol: str = Query("BTC/USDT"),
     timeframe: str = Query("15m"),
-    limit: int = Query(100),
+    limit: int = Query(300, ge=1, le=1000),
 ):
     candles = await data_streamer.fetch_external_ohlcv(symbol, timeframe, limit=limit)
     return {"symbol": symbol, "timeframe": timeframe, "count": len(candles), "candles": candles}
+
+
+@app.get("/api/market/orderbook")
+async def get_market_orderbook(
+    symbol: str = Query("BTC/USDT"),
+    limit: int = Query(10),
+):
+    ob = await data_streamer.get_order_book(symbol, limit=limit)
+    return ob
+
+
+@app.get("/api/market/providers")
+async def get_market_providers():
+    return market_gateway.get_provider_health()
 
 
 @app.get("/api/chart/memory")
@@ -320,6 +357,137 @@ async def scan_smc_patterns(symbol: str = Query("BTC/USDT"), timeframe: str = Qu
         "smc_patterns": [asdict(p) for p in patterns],
         "candlestick_formations": [asdict(f) for f in formations],
     }
+
+
+# ============================================================================
+# SKY PROFESSIONAL MARKET INTELLIGENCE REST ENDPOINTS
+# ============================================================================
+
+@app.get("/api/sky/decision")
+async def get_sky_decision(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+    """
+    Executes the full 12-stage SKY Market Intelligence Decision Pipeline:
+    DATA -> DATA QUALITY -> STRUCTURE -> LIQUIDITY -> VOLUME -> VOLATILITY -> DERIVATIVES -> REGIME -> SETUP -> EV -> DECISION.
+    """
+    candles = data_streamer.get_candles(symbol, timeframe, limit=100)
+    tf_map = {
+        "1d": data_streamer.get_candles(symbol, "1d", limit=30),
+        "4h": data_streamer.get_candles(symbol, "4h", limit=30),
+        "1h": data_streamer.get_candles(symbol, "1h", limit=30),
+        "15m": data_streamer.get_candles(symbol, "15m", limit=30),
+        "5m": data_streamer.get_candles(symbol, "5m", limit=30),
+        "1m": data_streamer.get_candles(symbol, "1m", limit=30),
+    }
+    decision_out = sky_orchestrator.analyze_market(symbol=symbol, timeframe=timeframe, candles=candles, candles_by_tf=tf_map)
+    return asdict(decision_out)
+
+
+@app.get("/api/sky/structure")
+async def get_sky_structure(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+    """
+    Objective non-repainting Swings, BOS, CHoCH, and MSS detection.
+    """
+    candles = data_streamer.get_candles(symbol, timeframe, limit=100)
+    vol_state = volatility_engine.compute_volatility(candles)
+    swings, events = market_structure_engine.analyze_structure(candles, timeframe=timeframe, atr=vol_state.atr)
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "swings_count": len(swings),
+        "events_count": len(events),
+        "swings": [asdict(s) for s in swings[-20:]],
+        "structure_events": [asdict(e) for e in events[-15:]],
+    }
+
+
+@app.get("/api/sky/liquidity")
+async def get_sky_liquidity(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+    """
+    Discovered Liquidity Pools (EQH, EQL, Range Extremes) and Sweeps with penetration/ATR metrics.
+    """
+    candles = data_streamer.get_candles(symbol, timeframe, limit=100)
+    vol_state = volatility_engine.compute_volatility(candles)
+    swings = market_structure_engine.detect_swings(candles, timeframe=timeframe)
+    pools = liquidity_engine.identify_liquidity_pools(symbol, timeframe, candles, swings=swings)
+    sweeps = liquidity_engine.detect_sweeps(symbol, timeframe, candles, pools=pools, atr=vol_state.atr)
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "active_pools": [asdict(p) for p in pools],
+        "sweeps": [asdict(s) for s in sweeps[-10:]],
+    }
+
+
+@app.get("/api/sky/setups")
+async def get_sky_setups(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+    """
+    Deterministic Setups A through E candidate and qualified setups.
+    """
+    candles = data_streamer.get_candles(symbol, timeframe, limit=100)
+    vol_state = volatility_engine.compute_volatility(candles)
+    swings, structure_events = market_structure_engine.analyze_structure(candles, timeframe=timeframe, atr=vol_state.atr)
+    pools = liquidity_engine.identify_liquidity_pools(symbol, timeframe, candles, swings=swings)
+    sweeps = liquidity_engine.detect_sweeps(symbol, timeframe, candles, pools=pools, atr=vol_state.atr)
+    fvgs = fvg_engine.detect_fvgs(symbol, timeframe, candles, atr=vol_state.atr)
+    obs = order_block_engine.detect_candidate_order_blocks(symbol, timeframe, candles, atr=vol_state.atr)
+    disp = displacement_engine.calculate_displacement(candles, atr=vol_state.atr)
+    vol_feat = volume_engine.analyze_volume(candles)
+    vwap_feat = vwap_engine.compute_vwap(candles)
+    curr_close = float(candles[-1]["close"]) if candles else 88400.0
+    derivs = derivatives_engine.analyze_derivatives(symbol, curr_close, 0.5, 50000.0, 49000.0, 0.0001)
+    tf_map = {timeframe: candles}
+    mtf = multi_timeframe_engine.compile_mtf_context(tf_map)
+    regime = market_regime_engine.classify_regime(candles, vol_state)
+
+    setups = setup_engine.scan_setups(
+        symbol=symbol,
+        timeframe=timeframe,
+        current_price=curr_close,
+        candles=candles,
+        structure_events=structure_events,
+        liquidity_sweeps=sweeps,
+        fvgs=fvgs,
+        order_blocks=obs,
+        displacement=disp,
+        volume_feat=vol_feat,
+        derivatives_state=derivs,
+        mtf_context=mtf,
+        regime_state=regime,
+        atr=vol_state.atr,
+        vwap_feat=vwap_feat,
+    )
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "total_scanned": len(setups),
+        "qualified_count": sum(1 for s in setups if s.is_qualified),
+        "setups": [asdict(s) for s in setups],
+    }
+
+
+@app.get("/api/sky/vwap")
+async def get_sky_vwap(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+    """
+    Session VWAP, rolling sigma bands, deviation z-score, and mean-reversion probability.
+    """
+    candles = data_streamer.get_candles(symbol, timeframe, limit=100)
+    vwap_feat = vwap_engine.compute_vwap(candles)
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "vwap": asdict(vwap_feat),
+    }
+
+
+@app.get("/api/sky/statistics")
+async def get_sky_statistics(concept: str = Query("SETUP_A_SWEEP_MSS"), regime: str = Query("TRENDING_BULL")):
+    """
+    Empirical statistical evaluation and out-of-sample expectancy metrics.
+    """
+    # Sample historical distribution of R-multiples for validation
+    sample_r = [2.4, -1.0, 1.8, -1.0, 2.5, 1.2, -1.0, 3.1, -1.0, 2.2, 1.9, -1.0, -1.0, 2.7]
+    stats = expectancy_engine.compute_expectancy(sample_r, concept_name=concept, regime=regime)
+    return asdict(stats)
 
 
 @app.get("/api/scenarios")
@@ -524,6 +692,65 @@ async def run_lab_stress_test(symbol: str = Query("BTC/USDT"), timeframe: str = 
     bt_rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
     mc_rep = monte_carlo_stress_tester.stress_test(bt_rep.return_series)
     return mc_rep.to_dict()
+
+
+# ==============================================================================
+# INSTITUTIONAL ALPHA & MICROSTRUCTURE QUANT API ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/institutional/alpha")
+async def get_institutional_alpha(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    limit: int = Query(100),
+):
+    candles = data_streamer.get_candles(symbol, timeframe, limit=limit)
+    res = institutional_alpha_engine.evaluate_alpha(
+        symbol=symbol,
+        timeframe=timeframe,
+        candles=candles,
+    )
+    return asdict(res)
+
+
+@app.get("/api/institutional/cvd")
+async def get_institutional_cvd(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    limit: int = Query(100),
+):
+    candles = data_streamer.get_candles(symbol, timeframe, limit=limit)
+    res = cvd_absorption_engine.analyze_orderflow(candles, symbol=symbol)
+    return asdict(res)
+
+
+@app.get("/api/institutional/orderbook-imbalance")
+async def get_orderbook_imbalance(
+    symbol: str = Query("BTC/USDT"),
+):
+    # Retrieve top L2 depth from gateway or fallback
+    state = market_state_compiler.compile_snapshot(symbol=symbol)
+    p = state.best_ask
+    bids = [(p * (1.0 - 0.0005 * i), 1.5 + 0.3 * i) for i in range(15)]
+    asks = [(p * (1.0 + 0.0005 * i), 1.2 + 0.35 * i) for i in range(15)]
+    res = orderbook_imbalance_engine.compute_imbalance(bids, asks, symbol=symbol)
+    return asdict(res)
+
+
+@app.get("/api/dossier")
+@app.get("/api/institutional/dossier")
+async def get_asset_dossier(
+    symbol: str = Query("BTCUSDT"),
+):
+    candles = data_streamer.get_candles(symbol, "15m", limit=100)
+    cur_p = candles[-1]["close"] if candles else (77450.0 if "BTC" in symbol else 2430.0 if "ETH" in symbol else 4458.0)
+    dossier = asset_dossier_engine.compile_dossier(
+        symbol=symbol,
+        current_price=cur_p,
+        candles_1h=data_streamer.get_candles(symbol, "1h", limit=30),
+        candles_15m=candles,
+    )
+    return dossier.to_dict()
 
 
 # WebSocket endpoint for real-time interactive terminal

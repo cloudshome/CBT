@@ -8,6 +8,8 @@ import {
   DeskBriefResponse,
   DeskAskResponse,
   SupportedTimeframe,
+  SKYIntelligenceResponse,
+  VWAPData,
 } from '../types';
 
 const BASE_URL = '';
@@ -137,4 +139,185 @@ export const api = {
     });
     return handleResponse<DeskAskResponse>(res);
   },
+
+  /**
+   * GET /api/sky/intelligence
+   */
+  async getSKYIntelligence(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m',
+    limit = 100
+  ): Promise<SKYIntelligenceResponse> {
+    const res = await fetch(
+      `${BASE_URL}/api/sky/intelligence?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
+    );
+    return handleResponse<SKYIntelligenceResponse>(res);
+  },
+
+  /**
+   * GET /api/sky/vwap
+   */
+  async getSKYVWAP(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<{ symbol: string; timeframe: string; vwap: VWAPData }> {
+    const res = await fetch(
+      `${BASE_URL}/api/sky/vwap?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<{ symbol: string; timeframe: string; vwap: VWAPData }>(res);
+  },
+
+  /**
+   * GET /api/institutional/alpha
+   */
+  async getInstitutionalAlpha(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m',
+    limit = 100
+  ): Promise<import('../types').InstitutionalAlphaResponse> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/alpha?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
+    );
+    return handleResponse<import('../types').InstitutionalAlphaResponse>(res);
+  },
+
+  /**
+   * GET /api/institutional/cvd
+   */
+  async getInstitutionalCVD(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m',
+    limit = 100
+  ): Promise<import('../types').CVDSeriesData> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/cvd?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
+    );
+    return handleResponse<import('../types').CVDSeriesData>(res);
+  },
+
+  /**
+   * GET /api/institutional/orderbook-imbalance
+   */
+  async getOrderBookImbalance(
+    symbol: string
+  ): Promise<import('../types').OBIData> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/orderbook-imbalance?symbol=${encodeURIComponent(symbol)}`
+    );
+    return handleResponse<import('../types').OBIData>(res);
+  },
+
+  /**
+   * 1. GET /api/institutional/debate
+   */
+  async getDebateCouncil(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m',
+    limit = 100
+  ): Promise<import('../types').CouncilDecision> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/debate?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
+    );
+    return handleResponse<import('../types').CouncilDecision>(res);
+  },
+
+  /**
+   * 2. GET /api/institutional/whale-radar
+   */
+  async getWhaleRadar(
+    symbol: string
+  ): Promise<import('../types').WhaleRadarData> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/whale-radar?symbol=${encodeURIComponent(symbol)}`
+    );
+    return handleResponse<import('../types').WhaleRadarData>(res);
+  },
+
+  /**
+   * 3. GET /api/institutional/psychology
+   */
+  async getPsychologyStatus(): Promise<import('../types').TiltStatus> {
+    const res = await fetch(`${BASE_URL}/api/institutional/psychology`);
+    return handleResponse<import('../types').TiltStatus>(res);
+  },
+
+  /**
+   * 4. POST /api/institutional/monte-carlo
+   */
+  async runMonteCarloStressTest(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<import('../types').MonteCarloStressReport> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/monte-carlo?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
+      { method: 'POST' }
+    );
+    return handleResponse<import('../types').MonteCarloStressReport>(res);
+  },
+
+  /**
+   * 5. GET /api/institutional/lead-lag
+   */
+  async getCrossAssetLeadLag(
+    symbol: string
+  ): Promise<{ signals: import('../types').LeadSignal[]; dxy_price: number; us10y_yield: number; has_macro_shock: boolean }> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/lead-lag?symbol=${encodeURIComponent(symbol)}`
+    );
+    return handleResponse<{ signals: import('../types').LeadSignal[]; dxy_price: number; us10y_yield: number; has_macro_shock: boolean }>(res);
+  },
+
+  /**
+   * 6. GET /api/institutional/dynamic-hedge
+   */
+  async getDynamicHedge(
+    symbol: string
+  ): Promise<import('../types').HedgeRecommendation> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/dynamic-hedge?symbol=${encodeURIComponent(symbol)}`
+    );
+    return handleResponse<import('../types').HedgeRecommendation>(res);
+  },
+
+  /**
+   * GET /api/tickers
+   * Fetches live 24hr market ticker prices for BTC, ETH, and GOLD (PAXG / XAU)
+   */
+  async getLiveTickers(
+    symbols: string[] = ['BTCUSDT', 'ETHUSDT', 'PAXGUSDT', 'XAUUSDT']
+  ): Promise<{
+    tickers: Array<{
+      symbol: string;
+      name: string;
+      price: number;
+      change24h: number;
+      high24h: number;
+      low24h: number;
+      volume24h: string;
+      quoteVolume: number;
+      timestamp: number;
+      isGold?: boolean;
+    }>;
+    source: string;
+    timestamp: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/api/tickers?symbols=${symbols.join(',')}`);
+    return handleResponse(res);
+  },
+
+  /**
+   * 8-Pillar Universal Asset Intelligence Dossier
+   * GET /api/institutional/dossier
+   */
+  async getAssetDossier(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<import('../types').UniversalAssetDossier> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/dossier?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<import('../types').UniversalAssetDossier>(res);
+  },
 };
+
+

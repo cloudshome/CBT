@@ -60,7 +60,7 @@ class CouncilDecision:
 
 
 class AdversarialDebateCommittee:
-    """Adversarial Council enforcing rigorous NO-TRADE default bias."""
+    """Adversarial Council enforcing rigorous NO-TRADE default bias with 8-Pillar Dossier ingestion."""
 
     def convene_council(
         self,
@@ -69,9 +69,11 @@ class AdversarialDebateCommittee:
         ev_result: NetEVResult,
         uncertainty: UncertaintyBudget,
         macro_regime: str = "NEUTRAL",
+        dossier: Optional[Any] = None,
     ) -> CouncilDecision:
         """
         Runs adversarial deliberation between Bull, Bear, and dominant Skeptic Judge.
+        Ingests 8-Pillar Asset Dossier when available.
         """
         trend_1h = state.trend_scores.get("1h", 0.0)
         trend_15m = state.trend_scores.get("15m", 0.0)
@@ -87,14 +89,24 @@ class AdversarialDebateCommittee:
             bull_premises.append("Orderflow confirms positive delta / institutional absorption")
         if ev_result.net_ev_r > 0.30:
             bull_premises.append(f"Net EV is strongly positive (+{ev_result.net_ev_r:.2f}R)")
-        bull_conf = float(np.clip(0.40 + (trend_1h * 0.3) + (cvd_delta * 0.2), 0.10, 0.90))
+
+        # Ingest 8-Pillar Dossier Bull Factors
+        if dossier:
+            p1 = getattr(dossier, "pillar_1_institutional_flows", {})
+            p4 = getattr(dossier, "pillar_4_stablecoin_velocity", {})
+            if p1.get("etf_net_inflow_24h_usd", 0) > 50_000_000:
+                bull_premises.append(f"Spot ETF Inflow Surge (+${p1.get('etf_net_inflow_24h_usd')/1e6:.1f}M/24h)")
+            if p4.get("dry_powder_liquidity_state") == "HIGH_DRY_POWDER_EXPANSION":
+                bull_premises.append("Stablecoin SSR oscillator signals strong dry-powder buying reserve")
+
+        bull_conf = float(np.clip(0.40 + (trend_1h * 0.3) + (cvd_delta * 0.2) + (0.10 if dossier and dossier.composite_health_score >= 70 else 0), 0.10, 0.90))
         bull_arg = AgentArgument(
             agent_name="BULL_AGENT",
             stance="LONG",
             confidence=round(bull_conf, 2),
             core_premises=bull_premises or ["Attempting structural bounce from support zone"],
             risk_factors_highlighted=["Overhead liquidity sell walls", "Potential DXY macro headwind"],
-            verdict_summary=f"Bull case supported by HTF momentum and positive delta (Confidence: {bull_conf*100:.0f}%).",
+            verdict_summary=f"Bull case supported by HTF momentum, ETF inflows & positive delta (Confidence: {bull_conf*100:.0f}%).",
         )
 
         # 2. Bear Agent Deliberation
@@ -105,7 +117,17 @@ class AdversarialDebateCommittee:
             bear_premises.append(f"Aggressive net market selling delta ({cvd_delta:+.2f})")
         if macro_regime in ["RISK_OFF_FLIGHT_TO_SAFETY", "DOLLAR_SQUEEZE"]:
             bear_premises.append(f"Macro environment is unfavorable ({macro_regime})")
-        bear_conf = float(np.clip(0.40 - (trend_1h * 0.3) - (cvd_delta * 0.2), 0.10, 0.90))
+
+        # Ingest 8-Pillar Dossier Bear Factors
+        if dossier:
+            p2 = getattr(dossier, "pillar_2_derivatives_options", {})
+            p6 = getattr(dossier, "pillar_6_macro_liquidity_beta", {})
+            if p2.get("funding_state") == "OVERHEATED_LONG_RISK":
+                bear_premises.append("Derivatives funding rate severely overheated (Long squeeze imminent)")
+            if p6.get("geopolitical_risk_index_score", 0) > 75.0:
+                bear_premises.append("Geopolitical Risk Index (GRI) elevated above safe threshold")
+
+        bear_conf = float(np.clip(0.40 - (trend_1h * 0.3) - (cvd_delta * 0.2) + (0.10 if dossier and dossier.composite_health_score < 40 else 0), 0.10, 0.90))
         bear_arg = AgentArgument(
             agent_name="BEAR_AGENT",
             stance="SHORT",
@@ -125,6 +147,8 @@ class AdversarialDebateCommittee:
             skeptic_premises.append(f"Severe directional model disagreement (Bull: {bull_conf:.2f} vs Bear: {bear_conf:.2f})")
         if uncertainty.event_shock_uncertainty > 0.30:
             skeptic_premises.append("High-impact macro event catalyst within risk window")
+        if dossier and dossier.macro_bias in ["BEARISH_DISTRIBUTION", "MACRO_CAPITULATION_RISK"]:
+            skeptic_premises.append(f"Dossier macro regime veto ({dossier.macro_bias})")
 
         skeptic_conf = float(np.clip(0.55 + (u_score * 0.40) + (0.30 if not ev_result.is_tradable else -0.15), 0.30, 0.98))
         skeptic_arg = AgentArgument(

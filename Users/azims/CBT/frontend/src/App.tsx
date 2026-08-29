@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
-import { CandleChart } from './components/CandleChart';
+import { TradingViewChart } from './core/engine/TradingViewChart';
+import { CVDSubChart } from './components/CVDSubChart';
+import { InstitutionalAlphaHUD } from './components/InstitutionalAlphaHUD';
+import { OBIFlowMeter } from './components/OBIFlowMeter';
+import { SKYIntelligenceHUD } from './components/SKYIntelligenceHUD';
+import { WatchlistVirtualTracker } from './components/WatchlistVirtualTracker';
+import { OrderBookVisualizer } from './components/OrderBookVisualizer';
+import { RiskFirstOrderDesk } from './components/RiskFirstOrderDesk';
 import { MTFPanel } from './components/MTFPanel';
 import { SMCScanPanel } from './components/SMCScanPanel';
 import { PaperTradingPanel } from './components/PaperTradingPanel';
 import { GeminiDeskCopilot } from './components/GeminiDeskCopilot';
+import { SKYIntelligencePanel } from './components/SKYIntelligencePanel';
+import { HedgeFundBrainSuite } from './components/HedgeFundBrainSuite';
+import { AssetDossierDock } from './components/AssetDossierDock';
 import { ToastContainer } from './components/ToastContainer';
+import { marketProvider } from './data/providers/marketProvider';
 import {
   SupportedTimeframe,
   OHLCVCandle,
@@ -17,9 +28,21 @@ import {
   RiskConfig,
   DeskBriefResponse,
   ToastMessage,
+  SKYIntelligenceResponse,
+  InstitutionalAlphaResponse,
+  CVDSeriesData,
+  OBIData,
 } from './types';
 import { api, ApiError } from './services/api';
 import { notificationService } from './services/notificationService';
+import {
+  Layers,
+  ShieldCheck,
+  Cpu,
+  BarChart2,
+  Scale,
+  Sparkles,
+} from 'lucide-react';
 
 export const App: React.FC = () => {
   // Navigation & Market Context State
@@ -45,9 +68,23 @@ export const App: React.FC = () => {
   const [riskConfig, setRiskConfig] = useState<RiskConfig | undefined>();
   const [selectedSetup, setSelectedSetup] = useState<SetupSuggestion | null>(null);
 
+  // High-Velocity Real-time Ticks State
+  const [liveCandle, setLiveCandle] = useState<OHLCVCandle | null>(null);
+
+  // Quantitative Intelligence State (SKY & Institutional Alpha)
+  const [skyData, setSkyData] = useState<SKYIntelligenceResponse | null>(null);
+  const [institutionalAlpha, setInstitutionalAlpha] = useState<InstitutionalAlphaResponse | null>(null);
+  const [cvdData, setCvdData] = useState<CVDSeriesData | null>(null);
+  const [obiData, setObiData] = useState<OBIData | null>(null);
+
   // Gemini Intelligence State
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
+
+  // Tab State for Single-Screen Compact Cockpit
+  const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC'>('DOSSIER');
+  const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
   // Notifications State
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(
@@ -95,14 +132,18 @@ export const App: React.FC = () => {
     }
   };
 
-  // 1. Fetch Market Data & Indicators
-  const fetchMarketData = useCallback(async () => {
+  // 1. Initial Market Data & Historical Candles Loading (Initial Mount / Symbol / TF Change)
+  const fetchInitialMarketData = useCallback(async () => {
     setLoadingMarket(true);
     try {
-      const [candlesRes, mtfRes, scanRes] = await Promise.all([
-        api.getCandles(symbol, timeframe, 100),
+      const [candlesRes, mtfRes, scanRes, skyRes, alphaRes, cvdRes, obiRes] = await Promise.all([
+        api.getCandles(symbol, timeframe, 1000),
         api.getMTF(symbol, timeframe, 'ema,rsi'),
-        api.getSMCScan(symbol, timeframe, 100),
+        api.getSMCScan(symbol, timeframe, 500),
+        api.getSKYIntelligence(symbol, timeframe, 500).catch(() => null),
+        api.getInstitutionalAlpha(symbol, timeframe, 500).catch(() => null),
+        api.getInstitutionalCVD(symbol, timeframe, 1000).catch(() => null),
+        api.getOrderBookImbalance(symbol).catch(() => null),
       ]);
 
       setCandles(candlesRes.candles || []);
@@ -111,6 +152,10 @@ export const App: React.FC = () => {
       setFVGs(scanRes.fvg || []);
       setOrderBlocks(scanRes.order_blocks || []);
       setSetups(scanRes.setup_suggestions || []);
+      if (skyRes) setSkyData(skyRes);
+      if (alphaRes) setInstitutionalAlpha(alphaRes);
+      if (cvdRes) setCvdData(cvdRes);
+      if (obiRes) setObiData(obiRes);
 
       if (scanRes.stats) {
         setStats({
@@ -132,6 +177,31 @@ export const App: React.FC = () => {
     }
   }, [symbol, timeframe, addToast]);
 
+  // 1B. Silent Background Analytics Polling (Every 30s — Zero Chart Jitter / Zero Loading Flash)
+  const fetchBackgroundAnalytics = useCallback(async () => {
+    try {
+      const [scanRes, skyRes, alphaRes, cvdRes, obiRes] = await Promise.all([
+        api.getSMCScan(symbol, timeframe, 500).catch(() => null),
+        api.getSKYIntelligence(symbol, timeframe, 500).catch(() => null),
+        api.getInstitutionalAlpha(symbol, timeframe, 500).catch(() => null),
+        api.getInstitutionalCVD(symbol, timeframe, 1000).catch(() => null),
+        api.getOrderBookImbalance(symbol).catch(() => null),
+      ]);
+
+      if (scanRes) {
+        setFVGs(scanRes.fvg || []);
+        setOrderBlocks(scanRes.order_blocks || []);
+        setSetups(scanRes.setup_suggestions || []);
+      }
+      if (skyRes) setSkyData(skyRes);
+      if (alphaRes) setInstitutionalAlpha(alphaRes);
+      if (cvdRes) setCvdData(cvdRes);
+      if (obiRes) setObiData(obiRes);
+    } catch (err: unknown) {
+      console.warn('Silent background analytics update skipped:', err);
+    }
+  }, [symbol, timeframe]);
+
   // 2. Fetch Paper Trading Positions
   const fetchPositions = useCallback(async () => {
     try {
@@ -152,19 +222,23 @@ export const App: React.FC = () => {
     try {
       const res = await api.getDeskBrief(symbol, timeframe);
       setBrief(res);
-
-      // Trigger Web Push Notification for fresh AI Brief
-      if (res && res.executiveSummary) {
+      if (notificationsEnabled) {
         notificationService.notifyMarketBriefAlert(symbol, res.bias, res.executiveSummary);
       }
     } catch (err: unknown) {
-      console.warn('AI Brief error:', err);
+      console.warn('Gemini brief fetch error:', err);
     } finally {
       setLoadingBrief(false);
     }
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, notificationsEnabled]);
 
-  // 4. Place Paper Trade
+  // 4. Handle Desk Copilot Question
+  const handleAskDesk = async (question: string) => {
+    const res = await api.askDesk(question, { symbol, timeframe });
+    return res.answer;
+  };
+
+  // 5. Handle Paper Trade Execution
   const handlePlaceTrade = async (trade: {
     symbol: string;
     side: 'BUY' | 'SELL';
@@ -172,76 +246,99 @@ export const App: React.FC = () => {
     sl: number;
     tp: number;
     size: number;
-  }) => {
+  }): Promise<void> => {
     try {
-      const res = await api.placePaperTrade(trade);
+      await api.placePaperTrade({
+        symbol: trade.symbol,
+        side: trade.side,
+        entryPrice: trade.entryPrice,
+        sl: trade.sl,
+        tp: trade.tp,
+        size: trade.size,
+      });
+
       addToast(
         'success',
-        'Order Executed (201)',
-        `Simulated ${res.trade.side} order for ${res.trade.symbol} placed at $${res.trade.entryPrice.toFixed(2)}.`
+        'Simulated Order Filled',
+        `Opened ${trade.side} ${trade.size} ${trade.symbol} @ $${trade.entryPrice.toFixed(2)}`
       );
-      await fetchPositions();
+      fetchPositions();
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        if (err.statusCode === 403) {
-          addToast('error', 'Risk Gate Rejection (403)', err.message);
-          // Trigger Web Push notification for Risk Gate rejection alert
-          notificationService.notifyRiskGateAlert(
-            `Simulated ${trade.side} trade rejected`,
-            err.message
-          );
-        } else if (err.statusCode === 429) {
-          addToast('warning', 'Rate Limit Exceeded (429)', 'Please wait before placing another order.');
-        } else {
-          addToast('error', `Order Error (${err.statusCode})`, err.message);
-        }
-      } else {
-        const msg = err instanceof Error ? err.message : 'Trade failed';
-        addToast('error', 'Order Placement Failed', msg);
+      const msg = err instanceof Error ? err.message : 'Trade execution failed';
+      addToast('error', 'Execution Error', msg);
+      if (notificationsEnabled) {
+        notificationService.notifyRiskGateAlert('Trade Execution Failed', msg);
       }
-      throw err;
     }
   };
 
-  // 5. Ask Desk Copilot
-  const handleAskDesk = async (query: string): Promise<string> => {
+  // 6. Handle Risk-First Order Desk Execution
+  const handlePlaceRiskOrder = async (order: {
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    type: 'MARKET' | 'LIMIT';
+    price?: number;
+    amount: number;
+    stopLoss?: number;
+    takeProfit?: number;
+  }) => {
     try {
-      const res = await api.askDesk(query, {
-        symbol,
-        timeframe,
-        lastPrice: stats.lastPrice,
-        trend: stats.trend,
-        rsi: rsi.length > 0 ? rsi[rsi.length - 1].value : undefined,
-        ema: ema.length > 0 ? ema[ema.length - 1].value : undefined,
-        setups,
+      const entry = order.type === 'LIMIT' && order.price ? order.price : stats.lastPrice;
+      await api.placePaperTrade({
+        symbol: order.symbol,
+        side: order.side,
+        entryPrice: entry,
+        sl: order.stopLoss || 0,
+        tp: order.takeProfit || 0,
+        size: order.amount,
       });
-      return res.answer;
+
+      addToast(
+        'success',
+        `${order.type} Order Routed`,
+        `Executed ${order.side} ${order.amount.toFixed(4)} ${order.symbol} @ $${entry.toFixed(2)}`
+      );
+      fetchPositions();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Query failed';
-      addToast('error', 'Copilot Query Error', msg);
-      throw err;
+      const msg = err instanceof Error ? err.message : 'Order placement failed';
+      addToast('error', 'Order Routing Error', msg);
     }
   };
 
-  // Initial and reactive data loader
+  // Initialize Data Ingestion on Mount & Parameter Change
   useEffect(() => {
-    fetchMarketData();
+    fetchInitialMarketData();
     fetchPositions();
     fetchDeskBrief();
-  }, [fetchMarketData, fetchPositions, fetchDeskBrief]);
+  }, [symbol, timeframe]);
 
-  // 30s background telemetry polling
+  // High-Frequency Real-Time WebSocket Aggregation (Incremental Series Updates)
+  useEffect(() => {
+    const unsub = marketProvider.subscribeRealtimeCandles(symbol, timeframe, (candle: OHLCVCandle) => {
+      setLiveCandle(candle);
+      setStats((prev) => ({
+        ...prev,
+        lastPrice: candle[4],
+        highPrice: Math.max(prev.highPrice, candle[2]),
+        lowPrice: prev.lowPrice === 0 ? candle[3] : Math.min(prev.lowPrice, candle[3]),
+      }));
+    });
+
+    return () => unsub();
+  }, [symbol, timeframe]);
+
+  // Silent 30-Second Background Analytics Polling (Zero Chart Flickering / Zero Screen Jump)
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchMarketData();
+      fetchBackgroundAnalytics();
       fetchPositions();
     }, 30000);
     return () => clearInterval(interval);
-  }, [fetchMarketData, fetchPositions]);
+  }, [fetchBackgroundAnalytics, fetchPositions]);
 
   return (
-    <div className="min-h-screen bg-background text-slate-200 flex flex-col">
-      {/* Top Header Navigation */}
+    <div className="min-h-screen bg-[#05070c] text-slate-100 flex flex-col font-sans antialiased selection:bg-sky-500/30 selection:text-sky-200">
+      {/* Institutional Navigation Header */}
       <Header
         symbol={symbol}
         onSymbolChange={(newSym) => {
@@ -259,7 +356,7 @@ export const App: React.FC = () => {
         trend={stats.trend}
         loading={loadingMarket}
         onRefresh={() => {
-          fetchMarketData();
+          fetchInitialMarketData();
           fetchPositions();
           fetchDeskBrief();
         }}
@@ -267,77 +364,294 @@ export const App: React.FC = () => {
         onToggleNotifications={handleToggleNotifications}
       />
 
-      {/* Main Terminal Body */}
-      <main className="flex-1 p-4 max-w-[1800px] w-full mx-auto grid grid-cols-1 xl:grid-cols-12 gap-4">
-        {/* Left Column (8 cols): Chart + Indicators + Setups */}
-        <div className="xl:col-span-8 flex flex-col gap-4">
-          {/* Main Candlestick Chart */}
-          <div className="h-[460px]">
-            <CandleChart
+      {/* Institutional Quantitative HUD Control Bar */}
+      <div className="max-w-[1920px] w-full mx-auto px-4 pt-2 space-y-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
+            <button
+              onClick={() => setActiveHudMode('INSTITUTIONAL')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
+                activeHudMode === 'INSTITUTIONAL'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Cpu size={13} />
+              <span>Institutional Alpha HUD</span>
+            </button>
+            <button
+              onClick={() => setActiveHudMode('SKY')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
+                activeHudMode === 'SKY'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldCheck size={13} />
+              <span>SKY Quant Radar</span>
+            </button>
+            <button
+              onClick={() => setActiveHudMode('BOTH')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
+                activeHudMode === 'BOTH'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Layers size={13} />
+              <span>Expand Both</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Rendered HUD Based on Mode */}
+        {(activeHudMode === 'INSTITUTIONAL' || activeHudMode === 'BOTH') && (
+          <InstitutionalAlphaHUD
+            alphaData={institutionalAlpha}
+            loading={loadingMarket}
+          />
+        )}
+        {(activeHudMode === 'SKY' || activeHudMode === 'BOTH') && (
+          <SKYIntelligenceHUD
+            data={skyData}
+            loading={loadingMarket}
+            onRefresh={fetchBackgroundAnalytics}
+          />
+        )}
+      </div>
+
+      {/* Main Multi-Panel Terminal Layout */}
+      <main className="flex-1 p-4 max-w-[1920px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Left Column (2 cols): Multi-Symbol Watchlist Tracker */}
+        <div className="lg:col-span-2 hidden xl:flex flex-col gap-4 min-h-[500px]">
+          <WatchlistVirtualTracker
+            currentSymbol={symbol}
+            onSelectSymbol={(sym) => {
+              setSymbol(sym);
+              setSelectedSetup(null);
+            }}
+          />
+        </div>
+
+        {/* Center Column (7 cols): TradingView Chart, CVD Sub-Chart & Lower Quant Tabs */}
+        <div className="lg:col-span-7 xl:col-span-7 flex flex-col gap-3">
+          {/* Flagship TradingView Lightweight Charts Engine + CVD Sub-Chart */}
+          <div className="flex flex-col rounded-lg overflow-hidden border border-[#1e293b] shadow-2xl bg-[#080b11]">
+            <TradingViewChart
               symbol={symbol}
+              timeframe={timeframe}
               candles={candles}
               fvgs={fvgs}
               orderBlocks={orderBlocks}
-              ema={ema}
+              skySetups={skyData?.setups}
+              liveCandle={liveCandle}
+              onDeploySetup={(setup) => setSelectedSetup(setup)}
+              onTimeframeChange={(newTf) => setTimeframe(newTf)}
               loading={loadingMarket}
+            />
+            <CVDSubChart
+              candles={candles}
+              cvdData={cvdData}
+              height={120}
             />
           </div>
 
-          {/* Lower Grid: MTF Indicators & SMC Setups */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="min-h-[260px]">
-              <MTFPanel
-                symbol={symbol}
-                timeframe={timeframe}
-                lastPrice={stats.lastPrice}
-                ema={ema}
-                rsi={rsi}
-                trend={stats.trend}
-                loading={loadingMarket}
-              />
+          {/* Lower Center Intelligence Tabs */}
+          <div className="flex flex-col rounded-lg border border-[#1e293b] bg-[#080b11] overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-[#0d121d] border-b border-[#1e293b]">
+              <div className="flex flex-wrap items-center gap-1 text-xs font-mono">
+                <button
+                  onClick={() => setActiveBottomTab('DOSSIER')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'DOSSIER'
+                      ? 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Sparkles size={13} className={activeBottomTab === 'DOSSIER' ? 'text-black' : 'text-amber-400'} />
+                  <span>8-Pillar Asset Dossier (BTC/ETH/GOLD)</span>
+                </button>
+                <button
+                  onClick={() => setActiveBottomTab('HEDGE_FUND')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'HEDGE_FUND'
+                      ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-600/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Scale size={13} className="text-purple-300" />
+                  <span>Hedge-Fund Brain (6 Engines)</span>
+                </button>
+                <button
+                  onClick={() => setActiveBottomTab('QUANT')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'QUANT'
+                      ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Cpu size={13} />
+                  <span>SKY 17-Phase Intelligence</span>
+                </button>
+                <button
+                  onClick={() => setActiveBottomTab('MTF_SMC')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'MTF_SMC'
+                      ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <BarChart2 size={13} />
+                  <span>MTF Confluence & SMC Scans</span>
+                </button>
+              </div>
             </div>
-            <div className="min-h-[260px]">
-              <SMCScanPanel
-                fvgs={fvgs}
-                orderBlocks={orderBlocks}
-                setups={setups}
-                onSelectSetup={(setup) => setSelectedSetup(setup)}
-                loading={loadingMarket}
-              />
+
+            <div className="p-3">
+              {activeBottomTab === 'DOSSIER' ? (
+                <AssetDossierDock
+                  currentSymbol={symbol}
+                  onSelectSymbol={(sym) => {
+                    setSymbol(sym);
+                    setSelectedSetup(null);
+                  }}
+                />
+              ) : activeBottomTab === 'HEDGE_FUND' ? (
+                <HedgeFundBrainSuite
+                  symbol={symbol}
+                  timeframe={timeframe}
+                  onDeploySetup={(setup) => setSelectedSetup(setup)}
+                />
+              ) : activeBottomTab === 'QUANT' ? (
+                <SKYIntelligencePanel
+                  data={skyData}
+                  loading={loadingMarket}
+                  onDeploySetup={(setup) => setSelectedSetup(setup)}
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <MTFPanel
+                    symbol={symbol}
+                    timeframe={timeframe}
+                    lastPrice={stats.lastPrice}
+                    ema={ema}
+                    rsi={rsi}
+                    trend={stats.trend}
+                    loading={loadingMarket}
+                  />
+                  <SMCScanPanel
+                    fvgs={fvgs}
+                    orderBlocks={orderBlocks}
+                    setups={setups}
+                    onSelectSetup={(setup) => setSelectedSetup(setup)}
+                    loading={loadingMarket}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column (4 cols): Paper Trading Desk & Gemini Copilot */}
-        <div className="xl:col-span-4 flex flex-col gap-4">
-          {/* Gemini Desk Intelligence Copilot */}
-          <div className="flex-1 min-h-[380px]">
-            <GeminiDeskCopilot
-              symbol={symbol}
-              timeframe={timeframe}
-              brief={brief}
-              loadingBrief={loadingBrief}
-              onRefreshBrief={fetchDeskBrief}
-              onAskDesk={handleAskDesk}
-            />
+        {/* Right Column (3 cols): Tabbed Execution & Risk Terminal */}
+        <div className="lg:col-span-5 xl:col-span-3 flex flex-col gap-3">
+          {/* Level-2 Order Book Imbalance & VPIN Flow Meter */}
+          <OBIFlowMeter data={obiData} />
+
+          {/* Right Column Institutional Tab Selector */}
+          <div className="flex items-center justify-between p-1 bg-[#090d16] border border-[#1e293b] rounded-lg text-xs font-mono">
+            <button
+              onClick={() => setActiveRightTab('ORDER_DESK')}
+              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+                activeRightTab === 'ORDER_DESK'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Order Desk
+            </button>
+            <button
+              onClick={() => setActiveRightTab('ORDER_BOOK')}
+              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+                activeRightTab === 'ORDER_BOOK'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              L2 Book
+            </button>
+            <button
+              onClick={() => setActiveRightTab('PAPER')}
+              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+                activeRightTab === 'PAPER'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Positions
+            </button>
+            <button
+              onClick={() => setActiveRightTab('AI_DESK')}
+              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+                activeRightTab === 'AI_DESK'
+                  ? 'bg-sky-500 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              AI Copilot
+            </button>
           </div>
 
-          {/* Paper Trading Desk */}
-          <div className="min-h-[360px]">
-            <PaperTradingPanel
-              symbol={symbol}
-              lastPrice={stats.lastPrice}
-              initialEntry={selectedSetup?.entry}
-              initialSL={selectedSetup?.stopLoss}
-              initialTP={selectedSetup?.takeProfit}
-              initialSide={selectedSetup?.type === 'LONG' ? 'BUY' : selectedSetup?.type === 'SHORT' ? 'SELL' : 'BUY'}
-              positions={positions}
-              riskConfig={riskConfig}
-              onSubmitTrade={handlePlaceTrade}
-              onRefreshPositions={fetchPositions}
-              loading={loadingMarket}
-            />
-          </div>
+          {/* Active Tabbed Panel Display */}
+          {activeRightTab === 'ORDER_DESK' && (
+            <div className="rounded-lg overflow-hidden border border-[#1e293b]">
+              <RiskFirstOrderDesk
+                symbol={symbol}
+                lastPrice={stats.lastPrice}
+                selectedSetup={selectedSetup}
+                onPlaceOrder={handlePlaceRiskOrder}
+              />
+            </div>
+          )}
+
+          {activeRightTab === 'ORDER_BOOK' && (
+            <div className="rounded-lg overflow-hidden border border-[#1e293b]">
+              <OrderBookVisualizer
+                symbol={symbol}
+                lastPrice={stats.lastPrice}
+              />
+            </div>
+          )}
+
+          {activeRightTab === 'PAPER' && (
+            <div className="rounded-lg overflow-hidden border border-[#1e293b]">
+              <PaperTradingPanel
+                symbol={symbol}
+                lastPrice={stats.lastPrice}
+                initialEntry={selectedSetup?.entry}
+                initialSL={selectedSetup?.stopLoss}
+                initialTP={selectedSetup?.takeProfit}
+                initialSide={selectedSetup?.type === 'LONG' ? 'BUY' : selectedSetup?.type === 'SHORT' ? 'SELL' : 'BUY'}
+                positions={positions}
+                riskConfig={riskConfig}
+                onSubmitTrade={handlePlaceTrade}
+                onRefreshPositions={fetchPositions}
+                loading={loadingMarket}
+              />
+            </div>
+          )}
+
+          {activeRightTab === 'AI_DESK' && (
+            <div className="rounded-lg overflow-hidden border border-[#1e293b]">
+              <GeminiDeskCopilot
+                symbol={symbol}
+                timeframe={timeframe}
+                brief={brief}
+                loadingBrief={loadingBrief}
+                onRefreshBrief={fetchDeskBrief}
+                onAskDesk={handleAskDesk}
+              />
+            </div>
+          )}
         </div>
       </main>
 

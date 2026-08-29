@@ -379,50 +379,244 @@ body.dark-theme {
 .chart-panel {
   display: flex;
   flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.chart-title {
+/* Row 1: Binance Pro Market Header */
+.chart-top-bar {
+  background: #11141d;
+  border-bottom: 1px solid #1f2633;
+  padding: 8px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 48px;
+}
+
+.chart-symbol-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.symbol-badge-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.symbol-main-name {
   font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.live-price-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-price-val {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.price-change-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.symbol-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.symbol-stat-item .stat-lbl {
+  font-size: 9px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.symbol-stat-item .stat-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.chart-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .chart-regime-tag {
   font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--accent-blue);
-}
-
-.chart-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.btn-chart-action {
-  background: var(--bg-hover);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-weight: 600;
   padding: 3px 8px;
   border-radius: 4px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fullscreen Pro Button */
+.btn-fullscreen-pro {
+  background: #1c2230;
+  border: 1px solid #334155;
+  color: #f1f5f9;
+  padding: 5px 12px;
+  border-radius: 6px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-fullscreen-pro .fs-icon {
+  font-size: 13px;
+  color: #f59e0b;
+}
+
+.btn-fullscreen-pro:hover {
+  background: #f59e0b;
+  color: #0b0e14;
+  border-color: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+.btn-fullscreen-pro:hover .fs-icon {
+  color: #0b0e14;
+}
+
+/* Row 2: TradingView Sub-Bar */
+.tradingview-sub-bar {
+  background: #0d1017;
+  border-bottom: 1px solid #1f2633;
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  user-select: none;
+}
+
+.tv-tf-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tv-tf-btn {
+  background: transparent;
+  border: none;
+  color: #848e9c;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.btn-chart-action:hover {
-  background: var(--accent-blue);
-  color: #fff;
-  border-color: var(--accent-blue);
+.tv-tf-btn:hover {
+  color: #f1f5f9;
+  background: #1e2638;
+}
+
+.tv-tf-btn.active {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  font-weight: 700;
+}
+
+.tv-sep {
+  width: 1px;
+  height: 16px;
+  background: #242c3d;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.tv-type-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tv-type-btn {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.15s;
+}
+
+.tv-type-btn:hover, .tv-type-btn.active {
+  opacity: 1;
+  background: #1e2638;
+}
+
+.tv-indicator-toggles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tv-indicator-pill {
+  background: #151a24;
+  border: 1px solid #242c3d;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tv-indicator-pill:hover {
+  border-color: #38bdf8;
+  color: #f1f5f9;
+}
+
+.tv-indicator-pill.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.2);
 }
 
 /* Fullscreen mode for chart panel */
@@ -441,7 +635,7 @@ body.dark-theme {
 }
 
 .chart-panel.fullscreen-mode .chart-canvas-wrapper {
-  height: calc(100vh - 85px) !important;
+  height: calc(100vh - 125px) !important;
 }
 
 .chart-panel.fullscreen-mode .chart-canvas {
@@ -717,30 +911,104 @@ body.dark-theme {
   font-family: var(--font-mono);
 }
 
-/* Order Execution Panel */
-.orderbook-preview {
-  padding: 10px;
+/* Order Execution Panel (Binance Pro Style) */
+.orderbook-pro-wrap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  padding: 6px 0;
   font-family: var(--font-mono);
   font-size: 11px;
 }
 
-.ob-row {
-  display: flex;
-  justify-content: space-between;
+.ob-col-header {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  padding: 4px 12px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  border-bottom: 1px solid #1f2633;
 }
 
-.ob-row.ask .price { color: var(--accent-red); }
-.ob-row.bid .price { color: var(--accent-green); }
-.ob-mid {
+.ob-col-header span:nth-child(2),
+.ob-col-header span:nth-child(3) {
+  text-align: right;
+}
+
+.orderbook-preview {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.ob-table-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0;
+}
+
+.ob-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  padding: 2.5px 12px;
+  font-size: 10.5px;
+  align-items: center;
+  transition: background 0.1s ease;
+}
+
+.ob-row.ask .price {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.ob-row.bid .price {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.ob-row .size {
+  color: #cbd5e1;
+  text-align: right;
+}
+
+.ob-row .total {
+  color: #64748b;
+  text-align: right;
+}
+
+.ob-mid-bar {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
-  border-top: 1px dashed var(--border-color);
-  border-bottom: 1px dashed var(--border-color);
+  align-items: center;
+  padding: 6px 12px;
+  margin: 3px 0;
+  background: #111520;
+  border-top: 1px solid #1f2633;
+  border-bottom: 1px solid #1f2633;
+}
+
+.ob-mid-bar.price-up .mid-price-tag {
+  color: #10b981;
+}
+
+.ob-mid-bar.price-down .mid-price-tag {
+  color: #ef4444;
+}
+
+.mid-price-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
   font-weight: 700;
+}
+
+.mid-spread-tag {
+  font-size: 10px;
+  color: #64748b;
 }
 
 .order-dock {

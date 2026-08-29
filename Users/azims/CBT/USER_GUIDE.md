@@ -26,7 +26,8 @@ This guide explains everything you need to know: how to launch the platform, how
 8. [Tab 5: System Drift & Health Sentinel](#8-tab-5-system-drift--health-sentinel)
 9. [The 12 Quantitative Engines Explained Simply](#9-the-12-quantitative-engines-explained-simply)
 10. [Step-by-Step Daily Trading Workflow](#10-step-by-step-daily-trading-workflow)
-11. [Troubleshooting & FAQ](#11-troubleshooting--faq)
+11. [SKY Market Intelligence Engine (SMC as a Measurable Layer)](#11-sky-market-intelligence-engine-smc-as-a-measurable-layer)
+12. [Troubleshooting & FAQ](#12-troubleshooting--faq)
 
 ---
 
@@ -278,7 +279,20 @@ flowchart TD
 
 ---
 
-## 11. Troubleshooting & FAQ
+## 11. SKY Market Intelligence Engine (SMC as a Measurable Layer)
+
+For complete technical specifications, see 👉 [SKY_MARKET_INTELLIGENCE_ENGINE.md](file:///c:/Users/azims/CBT/SKY_MARKET_INTELLIGENCE_ENGINE.md).
+
+SKY models market structure, liquidity pools, order blocks, Fair Value Gaps (FVG), volume delta, volatility percentiles, and derivatives data as a **verifiable, reproducible intelligence layer**:
+- **Mathematical Structure Detection:** $(L, R)$ non-repainting swing detection, Breaks of Structure (BOS), Changes of Character (CHoCH), and Market Structure Shifts (MSS).
+- **Liquidity Sweeps & Grabs:** Continuous calculation of penetration distance, penetration/$ATR_{14}$, rejection distance, and wick-to-body ratios.
+- **Hypothesis-Driven Order Blocks:** Treated strictly as candidate zones until backed by measurable post-origin displacement and out-of-sample edge.
+- **Calibrated Displacement Score (0–100):** Multi-factor velocity and range scoring.
+- **Setups A through E:** Deterministic trade templates with explicit qualification conditions and strict NO_TRADE gatekeeping.
+
+---
+
+## 12. Troubleshooting & FAQ
 
 #### Q: How do I know the AI is not just hallucinating random numbers?
 **A:** Every probability is grounded in historical analogues ($K \ge 30$), 10,000-path bootstrap simulations, and Platt reliability calibration. All forecasts are frozen in the immutable SQLite prediction ledger before outcomes occur.

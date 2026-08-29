@@ -17,6 +17,7 @@ import numpy as np
 from core.database import db_manager
 from core.causal_firewall import causal_firewall
 from core.data_quality_gate import data_quality_gate
+from core.market_providers import market_gateway
 
 logger = logging.getLogger("ai_quant_sentinel.data_streamer")
 
@@ -146,113 +147,31 @@ class DataStreamer:
 
     async def get_live_ticker(self, symbol: str) -> float:
         """
-        Fetches sub-second live price tick from Binance or Bybit.
+        Fetches sub-second live price tick from Composite Market Gateway (Binance -> Bybit -> SQLite -> Synthetic).
         """
-        # 1. Binance Primary
-        binance_sym = symbol.replace("/", "").upper()
-        if "XAU" in symbol:
-            binance_sym = "PAXGUSDT"
-
-        try:
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol={binance_sym}"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.5)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        p = float(data["price"])
-                        self._last_known_prices[symbol] = p
-                        return p
-        except Exception:
-            pass
-
-        # 2. Bybit Failover
-        bybit_sym = "XAUUSDT" if "XAU" in symbol else symbol.replace("/", "").upper()
-        try:
-            url = f"https://api.bybit.com/v5/market/tickers?category=linear&symbol={bybit_sym}"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.5)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        p = float(data["result"]["list"][0]["lastPrice"])
-                        self._last_known_prices[symbol] = p
-                        return p
-        except Exception:
-            pass
-
-        # 3. Dynamic Stochastic Micro-Tick Fallback
-        base_p = self._last_known_prices.get(symbol, 79850.0)
-        micro_drift = float(np.random.normal(0.0, base_p * 0.0002))
-        new_p = round(base_p + micro_drift, 2)
-        self._last_known_prices[symbol] = new_p
-        return new_p
+        data = await market_gateway.get_ticker(symbol)
+        price = float(data.get("price", 79850.0))
+        self._last_known_prices[symbol] = price
+        return price
 
     async def fetch_external_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
-        Fetches live OHLCV candles from Binance or Bybit with fallback.
+        Fetches live OHLCV candles from Composite Market Gateway with automatic failover and persistence.
         """
-        # Try Binance
-        binance_sym = symbol.replace("/", "").upper()
-        if "XAU" in symbol:
-            binance_sym = "PAXGUSDT"
-
-        try:
-            url = f"https://api.binance.com/api/v3/klines?symbol={binance_sym}&interval={timeframe}&limit={limit}"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=3.5)) as resp:
-                    if resp.status == 200:
-                        raw = await resp.json()
-                        candles = [
-                            {
-                                "timestamp": int(k[0]),
-                                "symbol": symbol,
-                                "timeframe": timeframe,
-                                "open": float(k[1]),
-                                "high": float(k[2]),
-                                "low": float(k[3]),
-                                "close": float(k[4]),
-                                "volume": float(k[5]),
-                            }
-                            for k in raw
-                        ]
-                        if candles:
-                            self._last_known_prices[symbol] = candles[-1]["close"]
-                            self.save_candles(symbol, timeframe, candles)
-                            return candles
-        except Exception as e:
-            logger.debug(f"Binance fetch failed for {symbol}: {e}")
-
-        # Try Bybit
-        bybit_sym = "XAUUSDT" if "XAU" in symbol else symbol.replace("/", "").upper()
-        bybit_interval = TIMEFRAME_TO_BYBIT.get(timeframe, "15")
-        try:
-            url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={bybit_sym}&interval={bybit_interval}&limit={limit}"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=3.5)) as resp:
-                    if resp.status == 200:
-                        raw = await resp.json()
-                        raw_list = raw.get("result", {}).get("list", [])
-                        candles = [
-                            {
-                                "timestamp": int(k[0]),
-                                "symbol": symbol,
-                                "timeframe": timeframe,
-                                "open": float(k[1]),
-                                "high": float(k[2]),
-                                "low": float(k[3]),
-                                "close": float(k[4]),
-                                "volume": float(k[5]),
-                            }
-                            for k in reversed(raw_list)
-                        ]
-                        if candles:
-                            self._last_known_prices[symbol] = candles[-1]["close"]
-                            self.save_candles(symbol, timeframe, candles)
-                            return candles
-        except Exception as e:
-            logger.debug(f"Bybit fetch failed for {symbol}: {e}")
+        candles = await market_gateway.get_ohlcv(symbol, timeframe, limit=limit)
+        if candles:
+            self._last_known_prices[symbol] = candles[-1]["close"]
+            self.save_candles(symbol, timeframe, candles)
+            return candles
 
         # Local Persistent / Dynamic Fallback
         return self.get_candles(symbol, timeframe, limit=limit)
+
+    async def get_order_book(self, symbol: str, limit: int = 10) -> Dict[str, Any]:
+        """
+        Fetches L2 order book depth with composite failover across tier-1 venues.
+        """
+        return await market_gateway.get_order_book(symbol, limit=limit)
 
     def generate_synthetic_candles(
         self,
