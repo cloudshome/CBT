@@ -785,18 +785,22 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
             ))}
           </div>
 
-          {/* Real-time OHLC Readout */}
-          {crosshairData && (
-            <div className="hidden lg:flex items-center gap-2 font-mono text-[11px] text-slate-400">
-              <span>O <strong className="text-slate-200">${crosshairData.open.toFixed(2)}</strong></span>
-              <span>H <strong className="text-slate-200">${crosshairData.high.toFixed(2)}</strong></span>
-              <span>L <strong className="text-slate-200">${crosshairData.low.toFixed(2)}</strong></span>
-              <span>C <strong className="text-slate-200">${crosshairData.close.toFixed(2)}</strong></span>
-              <span className={crosshairData.changePct >= 0 ? 'text-[#00f0a8]' : 'text-[#ff3b69]'}>
-                {crosshairData.changePct >= 0 ? '+' : ''}{crosshairData.changePct.toFixed(2)}%
-              </span>
-            </div>
-          )}
+          {/* Real-time OHLC Readout with stable container */}
+          <div className="hidden lg:flex items-center gap-2 font-mono text-[11px] text-slate-400 min-w-[280px]">
+            {crosshairData ? (
+              <>
+                <span>O <strong className="text-slate-200">${crosshairData.open.toFixed(2)}</strong></span>
+                <span>H <strong className="text-slate-200">${crosshairData.high.toFixed(2)}</strong></span>
+                <span>L <strong className="text-slate-200">${crosshairData.low.toFixed(2)}</strong></span>
+                <span>C <strong className="text-slate-200">${crosshairData.close.toFixed(2)}</strong></span>
+                <span className={crosshairData.changePct >= 0 ? 'text-[#00f0a8]' : 'text-[#ff3b69]'}>
+                  {crosshairData.changePct >= 0 ? '+' : ''}{crosshairData.changePct.toFixed(2)}%
+                </span>
+              </>
+            ) : (
+              <span className="text-slate-600 text-[10px]">Hover chart for OHLC metrics</span>
+            )}
+          </div>
         </div>
 
         {/* Right: Technical Toggles, Fullscreen & Controls */}
@@ -871,8 +875,8 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         <canvas
           ref={drawingCanvasRef}
           onMouseDown={handleCanvasMouseDown}
-          className={`absolute inset-0 w-full h-full pointer-events-auto ${
-            activeTool !== 'CURSOR' ? 'cursor-crosshair' : 'cursor-default'
+          className={`absolute inset-0 w-full h-full ${
+            activeTool !== 'CURSOR' ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none cursor-default'
           }`}
         />
 

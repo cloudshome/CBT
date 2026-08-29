@@ -133,12 +133,12 @@ export const App: React.FC = () => {
     setLoadingMarket(true);
     try {
       const [candlesRes, mtfRes, scanRes, skyRes, alphaRes, cvdRes, obiRes] = await Promise.all([
-        api.getCandles(symbol, timeframe, 100),
+        api.getCandles(symbol, timeframe, 500),
         api.getMTF(symbol, timeframe, 'ema,rsi'),
-        api.getSMCScan(symbol, timeframe, 100),
-        api.getSKYIntelligence(symbol, timeframe, 100).catch(() => null),
-        api.getInstitutionalAlpha(symbol, timeframe, 100).catch(() => null),
-        api.getInstitutionalCVD(symbol, timeframe, 100).catch(() => null),
+        api.getSMCScan(symbol, timeframe, 500),
+        api.getSKYIntelligence(symbol, timeframe, 500).catch(() => null),
+        api.getInstitutionalAlpha(symbol, timeframe, 500).catch(() => null),
+        api.getInstitutionalCVD(symbol, timeframe, 500).catch(() => null),
         api.getOrderBookImbalance(symbol).catch(() => null),
       ]);
 
