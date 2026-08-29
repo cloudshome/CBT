@@ -4,11 +4,13 @@ import {
   CandlestickSeries,
   HistogramSeries,
   LineSeries,
+  AreaSeries,
   IChartApi,
   ISeriesApi,
   CandlestickData,
   HistogramData,
   LineData,
+  AreaData,
   ColorType,
   CrosshairMode,
   Time,
@@ -28,7 +30,12 @@ import {
   ArrowDownCircle,
   Trash2,
   Activity,
+  Magnet,
+  Camera,
+  CandlestickChart,
+  LineChart as LineChartIcon,
   LucideIcon,
+  Clock,
 } from 'lucide-react';
 import { OHLCVCandle, FVGItem, OrderBlockItem, SKYSetupData, SupportedTimeframe } from '../../types';
 import { DrawingObject, WorkspacePersistence } from '../persistence/workspaceDB';
@@ -44,6 +51,8 @@ export type DrawingToolType =
   | 'LONG_POSITION'
   | 'SHORT_POSITION';
 
+export type ChartTypeMode = 'CANDLES' | 'LINE' | 'AREA';
+
 interface TradingViewChartProps {
   symbol: string;
   timeframe: SupportedTimeframe;
@@ -56,6 +65,18 @@ interface TradingViewChartProps {
   onTimeframeChange?: (tf: SupportedTimeframe) => void;
   loading?: boolean;
 }
+
+const TIMEFRAMES_EXTENDED: SupportedTimeframe[] = [
+  '1m',
+  '3m',
+  '5m',
+  '15m',
+  '1h',
+  '4h',
+  '1d',
+];
+
+const TIME_RANGES = ['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'] as const;
 
 const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   symbol,
@@ -75,6 +96,8 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   // Core Chart Instance References (Long-Lived)
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const areaSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const emaSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const vwapSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
@@ -98,7 +121,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     count: 0,
   });
 
-  // Diagnostic / Performance Metrics
+  // Diagnostic & Performance Metrics
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
   const [showDebugHUD, setShowDebugHUD] = useState(false);
@@ -111,11 +134,15 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   const [unreadTicks, setUnreadTicks] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Chart Style Mode
+  const [chartType, setChartType] = useState<ChartTypeMode>('CANDLES');
+
   // Active Tool & Drawing State
   const [activeTool, setActiveTool] = useState<DrawingToolType>('CURSOR');
   const [drawings, setDrawings] = useState<DrawingObject[]>([]);
   const [activeDrawingPoints, setActiveDrawingPoints] = useState<Array<{ timestamp: number; price: number }>>([]);
   const [previewPoint, setPreviewPoint] = useState<{ timestamp: number; price: number; x: number; y: number } | null>(null);
+  const [magnetMode, setMagnetMode] = useState<boolean>(true);
 
   // Visibility Toggles
   const [showEMA, setShowEMA] = useState(true);
@@ -123,6 +150,9 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   const [showMultiSigma, setShowMultiSigma] = useState(true);
   const [showSMCZones, setShowSMCZones] = useState(true);
   const [showJudasZones, setShowJudasZones] = useState(true);
+
+  // Active Range Preset
+  const [activeRange, setActiveRange] = useState<string>('ALL');
 
   // Crosshair HUD
   const [crosshairData, setCrosshairData] = useState<{
@@ -135,9 +165,47 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     changePct: number;
   } | null>(null);
 
-  const timeframes: SupportedTimeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1d'];
+  // Candle Close Countdown
+  const [countdown, setCountdown] = useState<string>('');
+  const [currentTimeStr, setCurrentTimeStr] = useState<string>('');
 
-  // FPS & Telemetry Diagnostics Loop
+  // Clock & Countdown Timer Loop
+  useEffect(() => {
+    const getIntervalMs = (tf: string): number => {
+      switch (tf) {
+        case '1m': return 60 * 1000;
+        case '3m': return 3 * 60 * 1000;
+        case '5m': return 5 * 60 * 1000;
+        case '15m': return 15 * 60 * 1000;
+        case '1h': return 60 * 60 * 1000;
+        case '4h': return 4 * 60 * 60 * 1000;
+        case '1d': return 24 * 60 * 60 * 1000;
+        default: return 15 * 60 * 1000;
+      }
+    };
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const intervalMs = getIntervalMs(timeframe);
+      const msRemaining = intervalMs - (now % intervalMs);
+      const totalSec = Math.floor(msRemaining / 1000);
+      const hours = Math.floor(totalSec / 3600);
+      const mins = Math.floor((totalSec % 3600) / 60);
+      const secs = totalSec % 60;
+
+      if (hours > 0) {
+        setCountdown(`${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+      } else {
+        setCountdown(`${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+      }
+
+      setCurrentTimeStr(new Date().toLocaleTimeString());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeframe]);
+
+  // FPS Diagnostics Loop
   useEffect(() => {
     let frameId: number;
     let lastTime = performance.now();
@@ -170,75 +238,91 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // 1. Initialize Long-Lived Lightweight Charts v5 Instance (MOUNT ONCE)
+  // 1. Initialize Long-Lived Lightweight Charts Instance (MOUNT ONCE — Zero Shake)
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
     const container = chartContainerRef.current;
     container.innerHTML = '';
 
-    const initialHeight = container.clientHeight || 440;
+    const initialHeight = container.clientHeight || 460;
     const initialWidth = container.clientWidth || 800;
 
+    // TradingView Obsidian Theme Palette
     const chart = createChart(container, {
       width: initialWidth,
       height: initialHeight,
       layout: {
-        background: { type: ColorType.Solid, color: '#080b11' },
-        textColor: '#94a3b8',
+        background: { type: ColorType.Solid, color: '#131722' },
+        textColor: '#787b86',
         fontSize: 11,
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif",
       },
       grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+        vertLines: { color: '#1e222d', style: 1 },
+        horzLines: { color: '#1e222d', style: 1 },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: '#38bdf8',
+          color: '#758696',
           width: 1,
           style: 3,
-          labelBackgroundColor: '#0f172a',
+          labelBackgroundColor: '#2a2e39',
         },
         horzLine: {
-          color: '#38bdf8',
+          color: '#758696',
           width: 1,
           style: 3,
-          labelBackgroundColor: '#0f172a',
+          labelBackgroundColor: '#2a2e39',
         },
       },
       timeScale: {
-        borderColor: 'rgba(51, 65, 85, 0.5)',
+        borderColor: '#2a2e39',
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 12,
+        rightOffset: 15,
         barSpacing: 9,
         minBarSpacing: 2,
       },
       rightPriceScale: {
-        borderColor: 'rgba(51, 65, 85, 0.5)',
+        borderColor: '#2a2e39',
         scaleMargins: {
           top: 0.08,
-          bottom: 0.2,
+          bottom: 0.18,
         },
         autoScale: true,
       },
     });
 
-    // Neon Candlestick Series
+    // Institutional Candlestick Series (TradingView Emerald & Crimson)
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#00f0a8',
-      downColor: '#ff3b69',
-      borderUpColor: '#00f0a8',
-      borderDownColor: '#ff3b69',
-      wickUpColor: '#00f0a8',
-      wickDownColor: '#ff3b69',
+      upColor: '#089981',
+      downColor: '#f23645',
+      borderUpColor: '#089981',
+      borderDownColor: '#f23645',
+      wickUpColor: '#089981',
+      wickDownColor: '#f23645',
+    });
+
+    // Line & Area Series (for alternative chart views)
+    const lineSeries = chart.addSeries(LineSeries, {
+      color: '#2962ff',
+      lineWidth: 2,
+      visible: false,
+    });
+
+    const areaSeries = chart.addSeries(AreaSeries, {
+      topColor: 'rgba(41, 98, 255, 0.4)',
+      bottomColor: 'rgba(41, 98, 255, 0.0)',
+      lineColor: '#2962ff',
+      lineWidth: 2,
+      visible: false,
     });
 
     // Volume Histogram Series
     const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: 'rgba(56, 189, 248, 0.3)',
+      color: 'rgba(56, 189, 248, 0.35)',
       priceFormat: { type: 'volume' },
       priceScaleId: '',
     });
@@ -249,7 +333,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       },
     });
 
-    // EMA 20 Line Series
+    // EMA 20 Line Series (Sky Blue)
     const emaSeries = chart.addSeries(LineSeries, {
       color: '#38bdf8',
       lineWidth: 2,
@@ -258,7 +342,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       priceLineVisible: false,
     });
 
-    // VWAP Line Series
+    // VWAP Line Series (Violet)
     const vwapSeries = chart.addSeries(LineSeries, {
       color: '#c084fc',
       lineWidth: 2,
@@ -303,6 +387,8 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
 
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
+    lineSeriesRef.current = lineSeries;
+    areaSeriesRef.current = areaSeries;
     volumeSeriesRef.current = volumeSeries;
     emaSeriesRef.current = emaSeries;
     vwapSeriesRef.current = vwapSeries;
@@ -311,7 +397,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     upper2sRef.current = upper2s;
     lower2sRef.current = lower2s;
 
-    // Crosshair move handler
+    // Crosshair readout subscription
     chart.subscribeCrosshairMove((param) => {
       if (!param || !param.time || !param.seriesData) {
         setCrosshairData(null);
@@ -357,11 +443,11 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       }
     });
 
-    // Resize observer (Resizes without destroying chart)
+    // Resize observer (smooth resize without destroying chart)
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
         const w = chartContainerRef.current.clientWidth;
-        const h = chartContainerRef.current.clientHeight || 440;
+        const h = chartContainerRef.current.clientHeight || 460;
         chartRef.current.resize(w, h);
         updateCanvasDimensions();
         drawCanvasOverlays();
@@ -380,9 +466,17 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       chart.remove();
       chartRef.current = null;
     };
-  }, []); // Mount Once — Never destroy on state or periodic updates!
+  }, []);
 
-  // Handle Fullscreen Toggle (Smooth Zero-Destroy Resize)
+  // Update chart display series when chartType changes
+  useEffect(() => {
+    if (!candleSeriesRef.current || !lineSeriesRef.current || !areaSeriesRef.current) return;
+    candleSeriesRef.current.applyOptions({ visible: chartType === 'CANDLES' });
+    lineSeriesRef.current.applyOptions({ visible: chartType === 'LINE' });
+    areaSeriesRef.current.applyOptions({ visible: chartType === 'AREA' });
+  }, [chartType]);
+
+  // Handle Fullscreen Toggle
   const toggleFullscreen = useCallback(async () => {
     const el = chartWrapperRef.current;
     if (!el) return;
@@ -400,7 +494,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     }
   }, []);
 
-  // Listen for fullscreen change event and trigger smooth resize
+  // Listen for fullscreen change event
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFull = !!document.fullscreenElement;
@@ -408,7 +502,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       setTimeout(() => {
         if (chartContainerRef.current && chartRef.current) {
           const w = chartContainerRef.current.clientWidth;
-          const h = chartContainerRef.current.clientHeight || (isFull ? window.innerHeight - 80 : 440);
+          const h = chartContainerRef.current.clientHeight || (isFull ? window.innerHeight - 90 : 460);
           chartRef.current.resize(w, h);
           updateCanvasDimensions();
           drawCanvasOverlays();
@@ -420,7 +514,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // 2. Load Persisted Drawings from IndexedDB
+  // 2. Load Persisted Drawings from IndexedDB on Symbol Change
   useEffect(() => {
     let isMounted = true;
     WorkspacePersistence.loadDrawings(symbol).then((stored: DrawingObject[]) => {
@@ -444,6 +538,8 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
 
     if (isContextChanged) {
       const formattedCandles: CandlestickData[] = [];
+      const formattedLine: LineData[] = [];
+      const formattedArea: AreaData[] = [];
       const formattedVolume: HistogramData[] = [];
       let prevTime = -1;
 
@@ -461,10 +557,18 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             low: c[3],
             close: c[4],
           });
+          formattedLine.push({
+            time: t as Time,
+            value: c[4],
+          });
+          formattedArea.push({
+            time: t as Time,
+            value: c[4],
+          });
           formattedVolume.push({
             time: t as Time,
             value: c[5] || 0,
-            color: c[4] >= c[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
+            color: c[4] >= c[1] ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)',
           });
           prevTime = t;
         }
@@ -472,6 +576,8 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
 
       if (formattedCandles.length > 0) {
         candleSeriesRef.current.setData(formattedCandles);
+        lineSeriesRef.current?.setData(formattedLine);
+        areaSeriesRef.current?.setData(formattedArea);
         volumeSeriesRef.current?.setData(formattedVolume);
         chartRef.current?.timeScale().fitContent();
         lastLoadedContextRef.current = {
@@ -558,10 +664,12 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     window.requestAnimationFrame(() => {
       try {
         candleSeriesRef.current?.update(bar);
+        lineSeriesRef.current?.update({ time: barTime, value: liveCandle[4] });
+        areaSeriesRef.current?.update({ time: barTime, value: liveCandle[4] });
         volumeSeriesRef.current?.update({
           time: barTime,
           value: liveCandle[5] || 0,
-          color: liveCandle[4] >= liveCandle[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
+          color: liveCandle[4] >= liveCandle[1] ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)',
         });
 
         if (isHistoricalPan) {
@@ -572,6 +680,46 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       }
     });
   }, [liveCandle, isHistoricalPan]);
+
+  // Time Range Quick Jump Handler
+  const handleSetTimeRange = (range: typeof TIME_RANGES[number]) => {
+    setActiveRange(range);
+    if (!chartRef.current || !candles || candles.length === 0) return;
+    const now = Math.floor(Date.now() / 1000);
+    let from = now;
+    switch (range) {
+      case '1D': from = now - (24 * 3600); break;
+      case '5D': from = now - (5 * 24 * 3600); break;
+      case '1M': from = now - (30 * 24 * 3600); break;
+      case '3M': from = now - (90 * 24 * 3600); break;
+      case '6M': from = now - (180 * 24 * 3600); break;
+      case 'YTD': {
+        const startOfYear = new Date(new Date().getFullYear(), 0, 1).getTime() / 1000;
+        from = Math.floor(startOfYear);
+        break;
+      }
+      case '1Y': from = now - (365 * 24 * 3600); break;
+      case 'ALL':
+        chartRef.current.timeScale().fitContent();
+        return;
+    }
+    chartRef.current.timeScale().setVisibleRange({
+      from: from as Time,
+      to: now as Time,
+    });
+  };
+
+  // Snapshot Capture Feature
+  const handleTakeSnapshot = () => {
+    const chartContainer = chartContainerRef.current;
+    if (!chartContainer) return;
+    const canvas = chartContainer.querySelector('canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `${symbol.replace('/', '_')}_${timeframe}_${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
 
   // 5. Canvas Mathematical Drawing & Overlay Engine
   const updateCanvasDimensions = () => {
@@ -625,8 +773,8 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         const yBot = series.priceToCoordinate(ob.price_zone[0]);
         if (yTop !== null && yBot !== null) {
           const height = Math.abs(yBot - yTop);
-          ctx.fillStyle = ob.type === 'bullish' ? 'rgba(0, 240, 168, 0.12)' : 'rgba(255, 59, 105, 0.12)';
-          ctx.strokeStyle = ob.type === 'bullish' ? '#00f0a8' : '#ff3b69';
+          ctx.fillStyle = ob.type === 'bullish' ? 'rgba(8, 153, 129, 0.14)' : 'rgba(242, 54, 69, 0.14)';
+          ctx.strokeStyle = ob.type === 'bullish' ? '#089981' : '#f23645';
           ctx.lineWidth = 1;
           ctx.fillRect(0, Math.min(yTop, yBot), canvas.width, height);
           ctx.strokeRect(0, Math.min(yTop, yBot), canvas.width, height);
@@ -639,15 +787,15 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         const yBot = series.priceToCoordinate(fvg.price_zone[0]);
         if (yTop !== null && yBot !== null) {
           const height = Math.abs(yBot - yTop);
-          ctx.fillStyle = fvg.type === 'bullish' ? 'rgba(0, 240, 168, 0.08)' : 'rgba(255, 59, 105, 0.08)';
-          ctx.strokeStyle = fvg.type === 'bullish' ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)';
+          ctx.fillStyle = fvg.type === 'bullish' ? 'rgba(8, 153, 129, 0.08)' : 'rgba(242, 54, 69, 0.08)';
+          ctx.strokeStyle = fvg.type === 'bullish' ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)';
           ctx.fillRect(0, Math.min(yTop, yBot), canvas.width, height);
           ctx.strokeRect(0, Math.min(yTop, yBot), canvas.width, height);
         }
       });
     }
 
-    // 3. Draw User Drawings
+    // 3. Draw User Saved Drawings
     drawings.forEach((drawing) => {
       if (drawing.points.length < 2 && drawing.type !== 'HORIZONTAL_RAY' && drawing.type !== 'VERTICAL_LINE') return;
 
@@ -712,22 +860,22 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         const width = Math.max(Math.abs(x2 - x1), 140);
 
         // SL Zone (Red)
-        ctx.fillStyle = 'rgba(255, 59, 105, 0.25)';
-        ctx.strokeStyle = '#ff3b69';
+        ctx.fillStyle = 'rgba(242, 54, 69, 0.25)';
+        ctx.strokeStyle = '#f23645';
         ctx.fillRect(x1, Math.min(entryY, slY), width, Math.abs(slY - entryY));
         ctx.strokeRect(x1, Math.min(entryY, slY), width, Math.abs(slY - entryY));
 
         // TP Zone (Green)
-        ctx.fillStyle = 'rgba(0, 240, 168, 0.25)';
-        ctx.strokeStyle = '#00f0a8';
+        ctx.fillStyle = 'rgba(8, 153, 129, 0.25)';
+        ctx.strokeStyle = '#089981';
         ctx.fillRect(x1, Math.min(entryY, tpY), width, Math.abs(tpY - entryY));
         ctx.strokeRect(x1, Math.min(entryY, tpY), width, Math.abs(tpY - entryY));
 
         // R:R Badge
-        ctx.fillStyle = '#0f172a';
+        ctx.fillStyle = '#1e222d';
         ctx.fillRect(x1 + 6, entryY - 10, 80, 20);
         ctx.strokeRect(x1 + 6, entryY - 10, 80, 20);
-        ctx.fillStyle = isLong ? '#00f0a8' : '#ff3b69';
+        ctx.fillStyle = isLong ? '#089981' : '#f23645';
         ctx.font = 'bold 11px monospace';
         ctx.fillText(`R:R 2.50`, x1 + 14, entryY + 4);
       }
@@ -747,7 +895,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         const y1 = series.priceToCoordinate(p1.price) ?? currY;
 
         if (x1 !== null && y1 !== null) {
-          // Draw start anchor point (pulsing cyan circle)
+          // Draw start anchor point
           ctx.fillStyle = '#38bdf8';
           ctx.beginPath();
           ctx.arc(x1, y1, 4, 0, 2 * Math.PI);
@@ -756,7 +904,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
           ctx.lineWidth = 1.5;
           ctx.stroke();
 
-          ctx.strokeStyle = activeTool === 'LONG_POSITION' ? '#00f0a8' : activeTool === 'SHORT_POSITION' ? '#ff3b69' : '#38bdf8';
+          ctx.strokeStyle = activeTool === 'LONG_POSITION' ? '#089981' : activeTool === 'SHORT_POSITION' ? '#f23645' : '#38bdf8';
           ctx.fillStyle = ctx.strokeStyle;
           ctx.lineWidth = 2;
           ctx.setLineDash([4, 4]);
@@ -767,13 +915,11 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             ctx.lineTo(currX, currY);
             ctx.stroke();
 
-            // End anchor dot
             ctx.setLineDash([]);
             ctx.beginPath();
             ctx.arc(currX, currY, 3.5, 0, 2 * Math.PI);
             ctx.fill();
 
-            // Price change tag
             const deltaPct = ((previewPoint.price - p1.price) / p1.price) * 100;
             ctx.font = 'bold 10px monospace';
             ctx.fillText(`${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(2)}%`, currX + 8, currY - 6);
@@ -803,23 +949,20 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             const tpY = isLong ? entryY - (2.5 * riskH) : entryY + (2.5 * riskH);
             const width = Math.max(Math.abs(currX - x1), 140);
 
-            // SL Preview
-            ctx.fillStyle = 'rgba(255, 59, 105, 0.25)';
-            ctx.strokeStyle = '#ff3b69';
+            ctx.fillStyle = 'rgba(242, 54, 69, 0.25)';
+            ctx.strokeStyle = '#f23645';
             ctx.fillRect(x1, Math.min(entryY, slY), width, Math.abs(slY - entryY));
             ctx.strokeRect(x1, Math.min(entryY, slY), width, Math.abs(slY - entryY));
 
-            // TP Preview
-            ctx.fillStyle = 'rgba(0, 240, 168, 0.25)';
-            ctx.strokeStyle = '#00f0a8';
+            ctx.fillStyle = 'rgba(8, 153, 129, 0.25)';
+            ctx.strokeStyle = '#089981';
             ctx.fillRect(x1, Math.min(entryY, tpY), width, Math.abs(tpY - entryY));
             ctx.strokeRect(x1, Math.min(entryY, tpY), width, Math.abs(tpY - entryY));
 
-            // Badge
-            ctx.fillStyle = '#0f172a';
+            ctx.fillStyle = '#1e222d';
             ctx.fillRect(x1 + 6, entryY - 10, 80, 20);
             ctx.strokeRect(x1 + 6, entryY - 10, 80, 20);
-            ctx.fillStyle = isLong ? '#00f0a8' : '#ff3b69';
+            ctx.fillStyle = isLong ? '#089981' : '#f23645';
             ctx.font = 'bold 11px monospace';
             ctx.fillText(`R:R 2.50`, x1 + 14, entryY + 4);
           }
@@ -862,8 +1005,8 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         if (x === null || y === null) return;
 
         ctx.save();
-        ctx.fillStyle = isBull ? '#00f0a8' : '#ff3b69';
-        ctx.strokeStyle = isBull ? '#00f0a8' : '#ff3b69';
+        ctx.fillStyle = isBull ? '#089981' : '#f23645';
+        ctx.strokeStyle = isBull ? '#089981' : '#f23645';
         ctx.lineWidth = 2;
 
         const arrowY = isBull ? y + 25 : y - 25;
@@ -891,11 +1034,11 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         const boxX = x - textWidth / 2 - 4;
         const boxY = isBull ? arrowY + 4 : arrowY - 16;
 
-        ctx.fillStyle = '#0f172a';
+        ctx.fillStyle = '#1e222d';
         ctx.fillRect(boxX, boxY, textWidth + 8, 14);
         ctx.strokeRect(boxX, boxY, textWidth + 8, 14);
 
-        ctx.fillStyle = isBull ? '#00f0a8' : '#ff3b69';
+        ctx.fillStyle = isBull ? '#089981' : '#f23645';
         ctx.fillText(label, boxX + 4, boxY + 11);
 
         ctx.restore();
@@ -919,8 +1062,33 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const price = series.coordinateToPrice(y);
-    if (price === null) return null;
+    const rawPrice = series.coordinateToPrice(y);
+    let price: number = rawPrice !== null ? Number(rawPrice) : (candles[candles.length - 1]?.[4] || 100);
+
+    // Magnet snap to nearest candle High/Low/Open/Close if magnetMode enabled
+    if (magnetMode && candles.length > 0) {
+      const timeCoord = chart.timeScale().coordinateToTime(x);
+      if (timeCoord !== null) {
+        const tsMs = typeof timeCoord === 'number' ? timeCoord * 1000 : 0;
+        const nearestCandle = candles.find((c) => Math.abs(c[0] - tsMs) < 300000);
+        if (nearestCandle) {
+          const prices = [nearestCandle[1], nearestCandle[2], nearestCandle[3], nearestCandle[4]];
+          let closest = prices[0];
+          let minDiff = Math.abs(prices[0] - price);
+          prices.forEach((p) => {
+            const diff = Math.abs(p - price);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closest = p;
+            }
+          });
+          // Snap if within 1.5% distance
+          if (minDiff / price < 0.015) {
+            price = closest;
+          }
+        }
+      }
+    }
 
     let ts: number | null = null;
     const timeCoord = chart.timeScale().coordinateToTime(x);
@@ -996,7 +1164,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         timeframe,
         type: activeTool,
         points: newPoints,
-        color: activeTool === 'LONG_POSITION' ? '#00f0a8' : activeTool === 'SHORT_POSITION' ? '#ff3b69' : '#38bdf8',
+        color: activeTool === 'LONG_POSITION' ? '#089981' : activeTool === 'SHORT_POSITION' ? '#f23645' : '#38bdf8',
         lineWidth: 2,
         createdAt: Date.now(),
       };
@@ -1033,80 +1201,96 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     drawings.forEach((d) => WorkspacePersistence.deleteDrawing(d.id));
     setDrawings([]);
     setActiveDrawingPoints([]);
+    setPreviewPoint(null);
     setActiveTool('CURSOR');
   };
 
-  // Drawing Tools Configuration for Vertical Toolbar
+  // Drawing Tools Suite
   const drawingTools: Array<{ id: DrawingToolType; label: string; icon: LucideIcon }> = [
-    { id: 'CURSOR', label: 'Pointer / Crosshair', icon: MousePointer },
+    { id: 'CURSOR', label: 'Crosshair / Cursor', icon: MousePointer },
     { id: 'TREND_LINE', label: 'Trend Line', icon: TrendingUp },
     { id: 'HORIZONTAL_RAY', label: 'Horizontal Ray / Level', icon: Minus },
-    { id: 'VERTICAL_LINE', label: 'Vertical Line / Time', icon: SeparatorVertical },
-    { id: 'RECTANGLE', label: 'Order Block Box', icon: Square },
+    { id: 'VERTICAL_LINE', label: 'Vertical Line', icon: SeparatorVertical },
+    { id: 'RECTANGLE', label: 'Rectangle / Order Block Zone', icon: Square },
     { id: 'FIB_RETRACEMENT', label: 'Fibonacci Retracement', icon: Hash },
     { id: 'LONG_POSITION', label: 'Long Position R:R Tool', icon: ArrowUpCircle },
     { id: 'SHORT_POSITION', label: 'Short Position R:R Tool', icon: ArrowDownCircle },
   ];
 
+  const lastCandle = candles[candles.length - 1];
+  const lastPrice = liveCandle ? liveCandle[4] : (lastCandle ? lastCandle[4] : 0);
+  const openPrice = lastCandle ? lastCandle[1] : lastPrice;
+  const highPrice = lastCandle ? lastCandle[2] : lastPrice;
+  const lowPrice = lastCandle ? lastCandle[3] : lastPrice;
+  const priceChange = lastPrice - openPrice;
+  const priceChangePct = openPrice > 0 ? (priceChange / openPrice) * 100 : 0;
+  const isUp = priceChange >= 0;
+
   return (
     <div
       ref={chartWrapperRef}
-      className={`relative flex flex-col bg-[#080b11] border border-[#1e293b] rounded-t-lg overflow-hidden select-none transition-all duration-300 ${
+      className={`relative flex flex-col bg-[#131722] border border-[#2a2e39] rounded-t-lg overflow-hidden select-none transition-all duration-300 font-sans ${
         isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : 'w-full'
       }`}
     >
-      {/* Top Header & Chart Toolbar */}
-      <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-[#0d121d] border-b border-[#1e293b] text-xs z-10 gap-2">
-        {/* Left: Symbol, Price, Timeframes */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-100 text-sm">{symbol}</span>
-            <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded">
-              PERP
-            </span>
+      {/* 1. Top Professional Chart Header Toolbar (TradingView Style) */}
+      <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-[#181c27] border-b border-[#2a2e39] text-xs z-20 gap-2">
+        {/* Left Section: Symbol Badge + Search + Timeframes */}
+        <div className="flex items-center gap-2">
+          {/* Symbol Button */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#242936] hover:bg-[#2e3444] border border-[#363c4e] rounded cursor-pointer transition-colors text-slate-100 font-bold font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>{symbol}</span>
+            <span className="text-[10px] text-slate-400 font-normal px-1 rounded bg-[#131722]">PERP</span>
           </div>
 
-          {/* Timeframe Selector Buttons */}
-          <div className="flex items-center bg-[#080b11] border border-slate-800 rounded p-0.5">
-            {timeframes.map((tf) => (
+          <div className="h-4 w-[1px] bg-[#2a2e39]" />
+
+          {/* Granular Timeframe Strip */}
+          <div className="flex items-center gap-0.5">
+            {TIMEFRAMES_EXTENDED.map((tf) => (
               <button
                 key={tf}
                 onClick={() => onTimeframeChange && onTimeframeChange(tf)}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono font-medium transition-all ${
+                className={`px-2 py-1 rounded text-[11px] font-mono font-medium transition-colors ${
                   timeframe === tf
-                    ? 'bg-sky-500 text-white font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                    ? 'bg-[#2962ff] text-white font-bold shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-[#242936]'
                 }`}
               >
-                {tf.toUpperCase()}
+                {tf}
               </button>
             ))}
           </div>
 
-          {/* Real-time OHLC Readout with stable container */}
-          <div className="hidden lg:flex items-center gap-2 font-mono text-[11px] text-slate-400 min-w-[280px]">
-            {crosshairData ? (
-              <>
-                <span>O <strong className="text-slate-200">${crosshairData.open.toFixed(2)}</strong></span>
-                <span>H <strong className="text-slate-200">${crosshairData.high.toFixed(2)}</strong></span>
-                <span>L <strong className="text-slate-200">${crosshairData.low.toFixed(2)}</strong></span>
-                <span>C <strong className="text-slate-200">${crosshairData.close.toFixed(2)}</strong></span>
-                <span className={crosshairData.changePct >= 0 ? 'text-[#00f0a8]' : 'text-[#ff3b69]'}>
-                  {crosshairData.changePct >= 0 ? '+' : ''}{crosshairData.changePct.toFixed(2)}%
-                </span>
-              </>
-            ) : (
-              <span className="text-slate-600 text-[10px]">Hover chart for OHLC metrics</span>
-            )}
+          <div className="h-4 w-[1px] bg-[#2a2e39]" />
+
+          {/* Chart Type Selector */}
+          <div className="flex items-center bg-[#131722] border border-[#2a2e39] rounded p-0.5">
+            <button
+              onClick={() => setChartType('CANDLES')}
+              className={`p-1 rounded ${chartType === 'CANDLES' ? 'bg-[#242936] text-white' : 'text-slate-500 hover:text-slate-300'}`}
+              title="Candlesticks"
+            >
+              <CandlestickChart size={14} />
+            </button>
+            <button
+              onClick={() => setChartType('LINE')}
+              className={`p-1 rounded ${chartType === 'LINE' ? 'bg-[#242936] text-white' : 'text-slate-500 hover:text-slate-300'}`}
+              title="Line Chart"
+            >
+              <LineChartIcon size={14} />
+            </button>
           </div>
         </div>
 
-        {/* Right: Technical Toggles, Fullscreen & Diagnostics */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-[#080b11] border border-slate-800 rounded p-0.5">
+        {/* Right Section: Indicators, HUD, Camera, Fullscreen */}
+        <div className="flex items-center gap-1.5">
+          {/* Indicator Toggles */}
+          <div className="flex items-center bg-[#131722] border border-[#2a2e39] rounded p-0.5">
             <button
               onClick={() => setShowEMA(!showEMA)}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
                 showEMA ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-500'
               }`}
               title="EMA 20"
@@ -1115,7 +1299,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             </button>
             <button
               onClick={() => setShowVWAP(!showVWAP)}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
                 showVWAP ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'text-slate-500'
               }`}
               title="Session VWAP"
@@ -1124,79 +1308,84 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             </button>
             <button
               onClick={() => setShowMultiSigma(!showMultiSigma)}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
                 showMultiSigma ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-500'
               }`}
-              title="VWAP Multi-Sigma Bands"
+              title="VWAP ±σ Bands"
             >
               ±σ
             </button>
             <button
               onClick={() => setShowSMCZones(!showSMCZones)}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
                 showSMCZones ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-500'
               }`}
-              title="SMC Zones & FVGs"
+              title="SMC Order Blocks & FVGs"
             >
               SMC
             </button>
             <button
               onClick={() => setShowJudasZones(!showJudasZones)}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
                 showJudasZones ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'text-slate-500'
               }`}
-              title="Judas Swing Session Killzones"
+              title="Judas Trap Killzones"
             >
               JUDAS
             </button>
           </div>
 
-          {/* Dev Diagnostic Toggle */}
+          <div className="h-4 w-[1px] bg-[#2a2e39]" />
+
+          {/* Snapshot Button */}
           <button
-            onClick={() => setShowDebugHUD(!showDebugHUD)}
-            className={`p-1.5 rounded transition-all font-mono text-[10px] flex items-center gap-1 ${
-              showDebugHUD
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                : 'text-slate-500 hover:text-slate-300'
-            }`}
-            title="Toggle Dev Diagnostics (Hotkey: D)"
+            onClick={handleTakeSnapshot}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-[#242936] rounded transition-colors"
+            title="Take Chart Snapshot (PNG)"
           >
-            <Activity size={12} />
-            <span className="hidden sm:inline">HUD</span>
+            <Camera size={14} />
           </button>
 
+          {/* Dev HUD Toggle */}
+          <button
+            onClick={() => setShowDebugHUD(!showDebugHUD)}
+            className={`px-1.5 py-1 rounded font-mono text-[10px] flex items-center gap-1 transition-colors ${
+              showDebugHUD ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'text-slate-500 hover:text-slate-300'
+            }`}
+            title="Dev Diagnostic HUD (D)"
+          >
+            <Activity size={12} />
+            <span>HUD</span>
+          </button>
+
+          {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
-            className={`p-1.5 rounded transition-all flex items-center gap-1 font-mono text-[11px] ${
-              isFullscreen
-                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
-            }`}
-            title={isFullscreen ? 'Exit Full Screen (ESC)' : 'Full Screen'}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-[#242936] rounded transition-colors"
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
           >
-            {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-            <span className="hidden sm:inline">{isFullscreen ? 'EXIT' : 'FULLSCREEN'}</span>
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
       </div>
 
       {/* Diagnostic Telemetry Bar */}
       {showDebugHUD && (
-        <div className="flex items-center justify-between px-3 py-1 bg-[#050811] border-b border-purple-500/20 text-[10px] font-mono text-purple-300">
+        <div className="flex items-center justify-between px-3 py-1 bg-[#090d16] border-b border-purple-500/20 text-[10px] font-mono text-purple-300">
           <div className="flex items-center gap-4">
             <span>FPS: <strong className="text-emerald-400">{fps}</strong></span>
             <span>Chart Updates/s: <strong className="text-cyan-400">{updatesPerSec}</strong></span>
-            <span>React Renders: <strong className="text-slate-200">{renderCountRef.current}</strong></span>
+            <span>Renders: <strong className="text-slate-200">{renderCountRef.current}</strong></span>
             <span>WebSocket: <strong className="text-emerald-400">CONNECTED</strong></span>
           </div>
           <span className="text-slate-500 text-[9px]">Zero-Shake Realtime Engine Active</span>
         </div>
       )}
 
-      {/* Main Chart Canvas Area with Left Vertical Drawing Toolbar */}
+      {/* 2. Main Chart Area + Left Tool Rail */}
       <div className="relative flex flex-row flex-1 w-full overflow-hidden">
-        {/* Left Vertical Drawing Toolbar (TradingView Dock) */}
-        <div className="flex flex-col items-center justify-between py-2 px-1 bg-[#090d16] border-r border-[#1e293b] z-20 gap-1 select-none">
+        {/* Left Vertical Tool Rail (TradingView Style) */}
+        <div className="flex flex-col items-center justify-between py-2 px-1 bg-[#181c27] border-r border-[#2a2e39] z-20 gap-1 select-none">
           <div className="flex flex-col items-center gap-1">
             {drawingTools.map((tool) => {
               const IconComponent = tool.icon;
@@ -1207,34 +1396,52 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
                   onClick={() => {
                     setActiveTool(tool.id);
                     setActiveDrawingPoints([]);
+                    setPreviewPoint(null);
                   }}
                   className={`p-2 rounded transition-all group relative ${
                     isSelected
-                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      ? 'bg-[#2962ff] text-white shadow-md shadow-blue-500/30'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-[#242936]'
                   }`}
                   title={tool.label}
                 >
                   <IconComponent size={15} />
-                  {/* Hover Tooltip */}
-                  <span className="absolute left-full ml-2 px-2 py-1 bg-slate-900 border border-slate-700 text-[10px] font-mono text-slate-200 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+                  <span className="absolute left-full ml-2 px-2 py-1 bg-[#1e222d] border border-[#2a2e39] text-[10px] font-mono text-slate-200 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
                     {tool.label}
                   </span>
                 </button>
               );
             })}
+
+            <div className="w-4 h-[1px] bg-[#2a2e39] my-1" />
+
+            {/* Magnet Mode Toggle */}
+            <button
+              onClick={() => setMagnetMode(!magnetMode)}
+              className={`p-2 rounded transition-all group relative ${
+                magnetMode
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-[#242936]'
+              }`}
+              title={magnetMode ? 'Magnet Mode: ON (Snap to High/Low)' : 'Magnet Mode: OFF'}
+            >
+              <Magnet size={15} />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-[#1e222d] border border-[#2a2e39] text-[10px] font-mono text-slate-200 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+                {magnetMode ? 'Magnet Snap: Active' : 'Magnet Snap: Off'}
+              </span>
+            </button>
           </div>
 
           {/* Delete All Drawings Button */}
           {drawings.length > 0 && (
-            <div className="flex flex-col items-center border-t border-[#1e293b] pt-1">
+            <div className="flex flex-col items-center border-t border-[#2a2e39] pt-1">
               <button
                 onClick={handleClearDrawings}
                 className="p-2 rounded text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-colors relative group"
                 title={`Clear drawings (${drawings.length})`}
               >
                 <Trash2 size={15} />
-                <span className="absolute left-full ml-2 px-2 py-1 bg-slate-900 border border-rose-500/30 text-[10px] font-mono text-rose-300 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+                <span className="absolute left-full ml-2 px-2 py-1 bg-[#1e222d] border border-rose-500/30 text-[10px] font-mono text-rose-300 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
                   Clear {drawings.length} Drawings
                 </span>
               </button>
@@ -1242,10 +1449,52 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
           )}
         </div>
 
-        {/* Lightweight Charts Render Target + Overlay Canvas */}
-        <div className={`relative flex-1 ${isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[440px] min-h-[440px]'}`}>
+        {/* Chart Viewport Canvas & Legend Overlays */}
+        <div className={`relative flex-1 ${isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[460px] min-h-[460px]'}`}>
+          {/* Top-Left TradingView Dynamic Legend */}
+          <div className="absolute top-2 left-3 z-10 pointer-events-none font-sans text-xs select-none">
+            <div className="flex items-center gap-2 font-mono">
+              <span className="font-bold text-slate-100 text-sm">{symbol}</span>
+              <span className="text-slate-400 text-xs">· {timeframe.toUpperCase()} · INSTITUTIONAL PERP</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            </div>
+
+            {/* OHLC Values */}
+            <div className="flex items-center gap-3 font-mono text-[11px] mt-0.5">
+              {crosshairData ? (
+                <>
+                  <span className="text-slate-400">O <strong className="text-slate-200">${crosshairData.open.toFixed(2)}</strong></span>
+                  <span className="text-slate-400">H <strong className="text-slate-200">${crosshairData.high.toFixed(2)}</strong></span>
+                  <span className="text-slate-400">L <strong className="text-slate-200">${crosshairData.low.toFixed(2)}</strong></span>
+                  <span className="text-slate-400">C <strong className="text-slate-200">${crosshairData.close.toFixed(2)}</strong></span>
+                  <span className={crosshairData.changePct >= 0 ? 'text-[#089981] font-bold' : 'text-[#f23645] font-bold'}>
+                    {crosshairData.changePct >= 0 ? '+' : ''}{crosshairData.changePct.toFixed(2)}%
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-slate-400">O <strong className="text-slate-200">${openPrice.toFixed(2)}</strong></span>
+                  <span className="text-slate-400">H <strong className="text-slate-200">${highPrice.toFixed(2)}</strong></span>
+                  <span className="text-slate-400">L <strong className="text-slate-200">${lowPrice.toFixed(2)}</strong></span>
+                  <span className="text-slate-400">C <strong className="text-slate-200">${lastPrice.toFixed(2)}</strong></span>
+                  <span className={isUp ? 'text-[#089981] font-bold' : 'text-[#f23645] font-bold'}>
+                    {isUp ? '+' : ''}{priceChangePct.toFixed(2)}%
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Candle Close Countdown Badge (Top Right) */}
+          <div className="absolute top-2 right-16 z-10 flex items-center gap-1.5 px-2 py-0.5 bg-[#181c27]/90 border border-[#2a2e39] rounded text-[11px] font-mono text-slate-300 pointer-events-none">
+            <Clock size={12} className="text-sky-400" />
+            <span>Close: <strong className="text-emerald-400">{countdown}</strong></span>
+          </div>
+
+          {/* Chart Target */}
           <div ref={chartContainerRef} className="absolute inset-0 w-full h-full" />
 
+          {/* Mathematical Drawing Overlay Canvas */}
           <canvas
             ref={drawingCanvasRef}
             onMouseDown={handleCanvasMouseDown}
@@ -1256,6 +1505,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             }`}
           />
 
+          {/* "Go to Latest" Floating Button */}
           {isHistoricalPan && (
             <button
               onClick={() => {
@@ -1263,7 +1513,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
                 setIsHistoricalPan(false);
                 setUnreadTicks(0);
               }}
-              className="absolute bottom-6 right-16 z-20 flex items-center gap-2 px-3 py-1.5 bg-sky-500/90 hover:bg-sky-500 text-white text-xs font-mono font-semibold rounded-full shadow-lg shadow-sky-500/25 border border-sky-400 backdrop-blur-sm transition-all transform hover:scale-105 animate-pulse"
+              className="absolute bottom-6 right-16 z-20 flex items-center gap-2 px-3 py-1.5 bg-[#2962ff] hover:bg-[#1e4bd8] text-white text-xs font-mono font-semibold rounded-full shadow-lg shadow-blue-500/25 border border-blue-400 transition-all transform hover:scale-105 animate-pulse"
             >
               <span>Go to Latest</span>
               {unreadTicks > 0 && (
@@ -1275,8 +1525,9 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             </button>
           )}
 
+          {/* Active Drawing Tool Step Instruction Banner */}
           {activeTool !== 'CURSOR' && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-sky-950/90 border border-sky-500/50 rounded-full text-xs font-mono text-sky-300 shadow-xl backdrop-blur-md">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-[#181c27]/95 border border-[#2962ff]/50 rounded-full text-xs font-mono text-sky-300 shadow-xl backdrop-blur-md">
               <Sparkles size={13} className="animate-spin text-sky-400" />
               <span>
                 {activeDrawingPoints.length === 0
@@ -1295,6 +1546,38 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
               </button>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* 3. Bottom Time Range & Scale Bar (TradingView Style) */}
+      <div className="flex items-center justify-between px-3 py-1 bg-[#181c27] border-t border-[#2a2e39] text-[11px] font-mono text-slate-400 z-10 select-none">
+        {/* Left: Time Range Presets */}
+        <div className="flex items-center gap-1">
+          {TIME_RANGES.map((r) => (
+            <button
+              key={r}
+              onClick={() => handleSetTimeRange(r)}
+              className={`px-2 py-0.5 rounded transition-colors ${
+                activeRange === r
+                  ? 'text-white font-bold bg-[#242936]'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#242936]/50'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+
+        {/* Right: Timezone Clock + Auto/Log/Percent indicators */}
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500">{currentTimeStr} (UTC+6)</span>
+          <div className="flex items-center gap-1 bg-[#131722] border border-[#2a2e39] rounded px-1.5 py-0.5 text-[10px]">
+            <span className="text-emerald-400 font-bold">auto</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-400">log</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-400">%</span>
+          </div>
         </div>
       </div>
     </div>
