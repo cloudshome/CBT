@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
-import { CandleChart } from './components/CandleChart';
+import { TradingViewChart } from './core/engine/TradingViewChart';
+import { SKYIntelligenceHUD } from './components/SKYIntelligenceHUD';
+import { WatchlistVirtualTracker } from './components/WatchlistVirtualTracker';
+import { OrderBookVisualizer } from './components/OrderBookVisualizer';
+import { RiskFirstOrderDesk } from './components/RiskFirstOrderDesk';
 import { MTFPanel } from './components/MTFPanel';
 import { SMCScanPanel } from './components/SMCScanPanel';
 import { PaperTradingPanel } from './components/PaperTradingPanel';
 import { GeminiDeskCopilot } from './components/GeminiDeskCopilot';
 import { SKYIntelligencePanel } from './components/SKYIntelligencePanel';
 import { ToastContainer } from './components/ToastContainer';
+import { marketProvider } from './data/providers/marketProvider';
 import {
   SupportedTimeframe,
   OHLCVCandle,
@@ -46,6 +51,9 @@ export const App: React.FC = () => {
   const [positions, setPositions] = useState<PaperTrade[]>([]);
   const [riskConfig, setRiskConfig] = useState<RiskConfig | undefined>();
   const [selectedSetup, setSelectedSetup] = useState<SetupSuggestion | null>(null);
+
+  // High-Velocity Real-time Ticks State
+  const [liveCandle, setLiveCandle] = useState<OHLCVCandle | null>(null);
 
   // SKY Quantitative Intelligence State
   const [skyData, setSkyData] = useState<SKYIntelligenceResponse | null>(null);
@@ -232,6 +240,58 @@ export const App: React.FC = () => {
     }
   };
 
+  // Real-time WebSocket streaming subscription
+  useEffect(() => {
+    const unsub = marketProvider.subscribeRealtimeCandles(symbol, timeframe, (candle) => {
+      setLiveCandle(candle);
+      if (candle && candle[4]) {
+        setStats((prev) => ({
+          ...prev,
+          lastPrice: candle[4],
+          highPrice: Math.max(prev.highPrice, candle[2]),
+          lowPrice: prev.lowPrice > 0 ? Math.min(prev.lowPrice, candle[3]) : candle[3],
+        }));
+      }
+    });
+
+    return () => unsub();
+  }, [symbol, timeframe]);
+
+  // Risk-First Order Placement Handler
+  const handlePlaceRiskOrder = async (order: {
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    type: 'MARKET' | 'LIMIT';
+    price?: number;
+    amount: number;
+    stopLoss?: number;
+    takeProfit?: number;
+  }) => {
+    try {
+      const res = await api.placePaperTrade({
+        symbol: order.symbol,
+        side: order.side,
+        entryPrice: order.price || stats.lastPrice,
+        sl: order.stopLoss || 0,
+        tp: order.takeProfit || 0,
+        size: order.amount,
+      });
+      addToast(
+        'success',
+        'Order Executed (201)',
+        `Simulated ${res.trade.side} order placed for ${res.trade.size} ${res.trade.symbol} at $${res.trade.entryPrice.toFixed(2)}.`
+      );
+      await fetchPositions();
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        addToast('error', `Order Rejection (${err.statusCode})`, err.message);
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        addToast('error', 'Execution Error', msg);
+      }
+    }
+  };
+
   // Initial and reactive data loader
   useEffect(() => {
     fetchMarketData();
@@ -239,14 +299,16 @@ export const App: React.FC = () => {
     fetchDeskBrief();
   }, [fetchMarketData, fetchPositions, fetchDeskBrief]);
 
-  // 30s background telemetry polling
+  // 30s background telemetry polling (Decoupled, zero chart-canvas unmounting)
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchMarketData();
+      api.getSKYIntelligence(symbol, timeframe, 100).then((res) => {
+        if (res) setSkyData(res);
+      }).catch(() => {});
       fetchPositions();
     }, 30000);
     return () => clearInterval(interval);
-  }, [fetchMarketData, fetchPositions]);
+  }, [symbol, timeframe, fetchPositions]);
 
   return (
     <div className="min-h-screen bg-background text-slate-200 flex flex-col">
@@ -276,18 +338,41 @@ export const App: React.FC = () => {
         onToggleNotifications={handleToggleNotifications}
       />
 
-      {/* Main Terminal Body */}
-      <main className="flex-1 p-4 max-w-[1800px] w-full mx-auto grid grid-cols-1 xl:grid-cols-12 gap-4">
-        {/* Left Column (8 cols): Chart + Indicators + Setups */}
-        <div className="xl:col-span-8 flex flex-col gap-4">
-          {/* Main Candlestick Chart */}
-          <div className="h-[460px]">
-            <CandleChart
+      {/* Top Floating SKY Intelligence HUD */}
+      <div className="max-w-[1920px] w-full mx-auto px-4 pt-2">
+        <SKYIntelligenceHUD
+          data={skyData}
+          loading={loadingMarket}
+          onRefresh={fetchMarketData}
+        />
+      </div>
+
+      {/* Main Multi-Panel Terminal Layout */}
+      <main className="flex-1 p-4 max-w-[1920px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Left Column (2 cols): Multi-Symbol Watchlist Tracker */}
+        <div className="lg:col-span-2 hidden xl:flex flex-col gap-4 min-h-[500px]">
+          <WatchlistVirtualTracker
+            currentSymbol={symbol}
+            onSelectSymbol={(sym) => {
+              setSymbol(sym);
+              setSelectedSetup(null);
+            }}
+          />
+        </div>
+
+        {/* Center Column (7 cols): TradingView Chart & Quant Panels */}
+        <div className="lg:col-span-7 xl:col-span-7 flex flex-col gap-4">
+          {/* Flagship TradingView Lightweight Charts v4 Engine */}
+          <div className="h-[520px]">
+            <TradingViewChart
               symbol={symbol}
+              timeframe={timeframe}
               candles={candles}
               fvgs={fvgs}
               orderBlocks={orderBlocks}
-              ema={ema}
+              skySetups={skyData?.setups}
+              liveCandle={liveCandle}
+              onDeploySetup={(setup) => setSelectedSetup(setup)}
               loading={loadingMarket}
             />
           </div>
@@ -324,22 +409,28 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column (4 cols): Paper Trading Desk & Gemini Copilot */}
-        <div className="xl:col-span-4 flex flex-col gap-4">
-          {/* Gemini Desk Intelligence Copilot */}
-          <div className="flex-1 min-h-[380px]">
-            <GeminiDeskCopilot
+        {/* Right Column (3 cols): Order Book L2, Risk Desk, Paper Positions & Copilot */}
+        <div className="lg:col-span-5 xl:col-span-3 flex flex-col gap-4">
+          {/* Order Book L2 Depth Visualizer */}
+          <div className="h-[280px]">
+            <OrderBookVisualizer
               symbol={symbol}
-              timeframe={timeframe}
-              brief={brief}
-              loadingBrief={loadingBrief}
-              onRefreshBrief={fetchDeskBrief}
-              onAskDesk={handleAskDesk}
+              lastPrice={stats.lastPrice}
             />
           </div>
 
-          {/* Paper Trading Desk */}
-          <div className="min-h-[360px]">
+          {/* Precision Risk-First Order Desk */}
+          <div className="min-h-[340px]">
+            <RiskFirstOrderDesk
+              symbol={symbol}
+              lastPrice={stats.lastPrice}
+              selectedSetup={selectedSetup}
+              onPlaceOrder={handlePlaceRiskOrder}
+            />
+          </div>
+
+          {/* Active Paper Trading Positions */}
+          <div className="min-h-[300px]">
             <PaperTradingPanel
               symbol={symbol}
               lastPrice={stats.lastPrice}
@@ -352,6 +443,18 @@ export const App: React.FC = () => {
               onSubmitTrade={handlePlaceTrade}
               onRefreshPositions={fetchPositions}
               loading={loadingMarket}
+            />
+          </div>
+
+          {/* Gemini Desk Intelligence Copilot */}
+          <div className="min-h-[320px]">
+            <GeminiDeskCopilot
+              symbol={symbol}
+              timeframe={timeframe}
+              brief={brief}
+              loadingBrief={loadingBrief}
+              onRefreshBrief={fetchDeskBrief}
+              onAskDesk={handleAskDesk}
             />
           </div>
         </div>
