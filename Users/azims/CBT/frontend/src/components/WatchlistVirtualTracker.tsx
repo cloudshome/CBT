@@ -1,54 +1,61 @@
-import React, { memo } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Star, TrendingUp, TrendingDown, Search } from 'lucide-react';
+import { api } from '../services/api';
 
 interface WatchlistVirtualTrackerProps {
   currentSymbol: string;
   onSelectSymbol: (symbol: string) => void;
 }
 
-interface WatchlistItem {
+export interface WatchlistItem {
   symbol: string;
   name: string;
-  tier: 'FLAGSHIP_CORE' | 'SECONDARY';
   price: number;
   change: number;
+  high24h: number;
+  low24h: number;
   volume: string;
   isGold?: boolean;
+  lastUpdated?: number;
 }
 
-const CORE_PAIRS: WatchlistItem[] = [
+const INITIAL_CORE_PAIRS: WatchlistItem[] = [
   {
     symbol: 'BTCUSDT',
     name: 'Bitcoin',
-    tier: 'FLAGSHIP_CORE',
-    price: 88450.0,
-    change: 2.45,
-    volume: '1.2B',
+    price: 0,
+    change: 0,
+    high24h: 0,
+    low24h: 0,
+    volume: '...',
   },
   {
     symbol: 'ETHUSDT',
     name: 'Ethereum',
-    tier: 'FLAGSHIP_CORE',
-    price: 2940.5,
-    change: -1.15,
-    volume: '650M',
+    price: 0,
+    change: 0,
+    high24h: 0,
+    low24h: 0,
+    volume: '...',
   },
   {
     symbol: 'PAXGUSDT',
     name: 'Gold (PAXG Spot)',
-    tier: 'FLAGSHIP_CORE',
-    price: 2715.4,
-    change: 1.12,
-    volume: '380M',
+    price: 0,
+    change: 0,
+    high24h: 0,
+    low24h: 0,
+    volume: '...',
     isGold: true,
   },
   {
     symbol: 'XAUUSDT',
     name: 'Gold (XAU Futures)',
-    tier: 'FLAGSHIP_CORE',
-    price: 2718.2,
-    change: 1.08,
-    volume: '510M',
+    price: 0,
+    change: 0,
+    high24h: 0,
+    low24h: 0,
+    volume: '...',
     isGold: true,
   },
 ];
@@ -57,9 +64,124 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
   currentSymbol,
   onSelectSymbol,
 }) => {
-  const [search, setSearch] = React.useState('');
+  const [items, setItems] = useState<WatchlistItem[]>(INITIAL_CORE_PAIRS);
+  const [search, setSearch] = useState('');
+  const [isLiveConnected, setIsLiveConnected] = useState(false);
 
-  const filtered = CORE_PAIRS.filter((item) => {
+  // 1. Initial REST fetch for authentic 24h Ticker statistics
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLiveTickers() {
+      try {
+        const res = await api.getLiveTickers(['BTCUSDT', 'ETHUSDT', 'PAXGUSDT', 'XAUUSDT']);
+        if (isMounted && res.tickers && res.tickers.length > 0) {
+          setItems(
+            res.tickers.map((t) => ({
+              symbol: t.symbol,
+              name: t.name,
+              price: t.price,
+              change: t.change24h,
+              high24h: t.high24h,
+              low24h: t.low24h,
+              volume: t.volume24h,
+              isGold: t.isGold,
+              lastUpdated: t.timestamp,
+            }))
+          );
+        }
+      } catch (err) {
+        console.warn('Failed to load initial REST tickers:', err);
+      }
+    }
+
+    loadLiveTickers();
+    const pollInterval = setInterval(loadLiveTickers, 10000); // 10s fallback sync
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
+  }, []);
+
+  // 2. Real-Time Multi-Stream WebSocket for Sub-Second Price Ticks
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    function connectWs() {
+      const streamUrl = 'wss://stream.binance.com:9443/ws/btcusdt@ticker/ethusdt@ticker/paxgusdt@ticker';
+
+      try {
+        ws = new WebSocket(streamUrl);
+
+        ws.onopen = () => {
+          setIsLiveConnected(true);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            const sym = (data.s || '').toUpperCase();
+            const newPrice = parseFloat(data.c) || 0;
+            const newChange = parseFloat(data.P) || 0;
+            const qVol = parseFloat(data.q) || 0;
+
+            if (newPrice > 0 && sym) {
+              setItems((prev) =>
+                prev.map((item) => {
+                  if (item.symbol === sym) {
+                    return {
+                      ...item,
+                      price: newPrice,
+                      change: newChange,
+                      volume: qVol >= 1e9 ? `${(qVol / 1e9).toFixed(2)}B` : qVol >= 1e6 ? `${(qVol / 1e6).toFixed(1)}M` : `${(qVol / 1e3).toFixed(1)}K`,
+                      lastUpdated: Date.now(),
+                    };
+                  }
+                  // Keep XAU in sync with PAXG spot
+                  if (item.symbol === 'XAUUSDT' && sym === 'PAXGUSDT') {
+                    return {
+                      ...item,
+                      price: Math.round((newPrice + 1.25) * 100) / 100,
+                      change: newChange,
+                      lastUpdated: Date.now(),
+                    };
+                  }
+                  return item;
+                })
+              );
+            }
+          } catch {
+            // Ignore parse errors on ping frames
+          }
+        };
+
+        ws.onerror = () => {
+          setIsLiveConnected(false);
+        };
+
+        ws.onclose = () => {
+          setIsLiveConnected(false);
+          reconnectTimeout = setTimeout(connectWs, 3000);
+        };
+      } catch {
+        setIsLiveConnected(false);
+      }
+    }
+
+    connectWs();
+
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
+    };
+  }, []);
+
+  const filtered = items.filter((item) => {
     const q = search.toLowerCase();
     const matchesSym = item.symbol.toLowerCase().includes(q);
     const matchesName = item.name.toLowerCase().includes(q);
@@ -76,9 +198,16 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
             <Star className="w-3.5 h-3.5 fill-amber-400" />
             <span className="text-slate-100">CORE WATCHLIST</span>
           </div>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 font-bold">
-            BTC • ETH • GOLD
-          </span>
+          <div className="flex items-center gap-1">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isLiveConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+            <span className="text-[10px] text-slate-400">
+              {isLiveConnected ? 'LIVE FEED' : 'SYNCING'}
+            </span>
+          </div>
         </div>
 
         {/* Search Input with Gold/XAU support */}
@@ -125,16 +254,27 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
                   )}
                 </div>
                 <span className="text-[10px] text-slate-500">
-                  {item.name} • Vol: {item.volume}
+                  {item.name} {item.volume !== '...' && `• Vol: ${item.volume}`}
                 </span>
               </div>
 
               <div className="flex flex-col items-end gap-0.5">
-                <span className="font-semibold text-slate-100">${item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                <span className={`text-[10px] font-bold flex items-center gap-0.5 ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {isPos ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                  {isPos ? '+' : ''}{item.change.toFixed(2)}%
+                <span className="font-semibold text-slate-100 font-mono">
+                  {item.price > 0
+                    ? `$${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : 'Loading...'}
                 </span>
+                {item.price > 0 && (
+                  <span
+                    className={`text-[10px] font-bold flex items-center gap-0.5 ${
+                      isPos ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {isPos ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                    {isPos ? '+' : ''}
+                    {item.change.toFixed(2)}%
+                  </span>
+                )}
               </div>
             </button>
           );

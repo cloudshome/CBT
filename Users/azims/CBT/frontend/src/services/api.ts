@@ -278,6 +278,32 @@ export const api = {
     );
     return handleResponse<import('../types').HedgeRecommendation>(res);
   },
+
+  /**
+   * GET /api/tickers
+   * Fetches live 24hr market ticker prices for BTC, ETH, and GOLD (PAXG / XAU)
+   */
+  async getLiveTickers(
+    symbols: string[] = ['BTCUSDT', 'ETHUSDT', 'PAXGUSDT', 'XAUUSDT']
+  ): Promise<{
+    tickers: Array<{
+      symbol: string;
+      name: string;
+      price: number;
+      change24h: number;
+      high24h: number;
+      low24h: number;
+      volume24h: string;
+      quoteVolume: number;
+      timestamp: number;
+      isGold?: boolean;
+    }>;
+    source: string;
+    timestamp: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/api/tickers?symbols=${symbols.join(',')}`);
+    return handleResponse(res);
+  },
 };
 
 
