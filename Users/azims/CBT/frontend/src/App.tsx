@@ -13,6 +13,7 @@ import { SMCScanPanel } from './components/SMCScanPanel';
 import { PaperTradingPanel } from './components/PaperTradingPanel';
 import { GeminiDeskCopilot } from './components/GeminiDeskCopilot';
 import { SKYIntelligencePanel } from './components/SKYIntelligencePanel';
+import { HedgeFundBrainSuite } from './components/HedgeFundBrainSuite';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider } from './data/providers/marketProvider';
 import {
@@ -38,6 +39,7 @@ import {
   ShieldCheck,
   Cpu,
   BarChart2,
+  Scale,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -79,7 +81,7 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'QUANT' | 'MTF_SMC'>('QUANT');
+  const [activeBottomTab, setActiveBottomTab] = useState<'HEDGE_FUND' | 'QUANT' | 'MTF_SMC'>('HEDGE_FUND');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
   // Notifications State
@@ -430,13 +432,24 @@ export const App: React.FC = () => {
           {/* Lower Center Intelligence Tabs */}
           <div className="flex flex-col rounded-lg border border-[#1e293b] bg-[#080b11] overflow-hidden">
             <div className="flex items-center justify-between px-3 py-1.5 bg-[#0d121d] border-b border-[#1e293b]">
-              <div className="flex items-center gap-1 text-xs font-mono">
+              <div className="flex flex-wrap items-center gap-1 text-xs font-mono">
+                <button
+                  onClick={() => setActiveBottomTab('HEDGE_FUND')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'HEDGE_FUND'
+                      ? 'bg-purple-600 text-white font-bold shadow-md shadow-purple-600/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Scale size={13} className="text-purple-300" />
+                  <span>Hedge-Fund Brain (6 Engines)</span>
+                </button>
                 <button
                   onClick={() => setActiveBottomTab('QUANT')}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
                     activeBottomTab === 'QUANT'
-                      ? 'bg-sky-500 text-white font-bold'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                   }`}
                 >
                   <Cpu size={13} />
@@ -446,8 +459,8 @@ export const App: React.FC = () => {
                   onClick={() => setActiveBottomTab('MTF_SMC')}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
                     activeBottomTab === 'MTF_SMC'
-                      ? 'bg-sky-500 text-white font-bold'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                   }`}
                 >
                   <BarChart2 size={13} />
@@ -457,7 +470,13 @@ export const App: React.FC = () => {
             </div>
 
             <div className="p-3">
-              {activeBottomTab === 'QUANT' ? (
+              {activeBottomTab === 'HEDGE_FUND' ? (
+                <HedgeFundBrainSuite
+                  symbol={symbol}
+                  timeframe={timeframe}
+                  onDeploySetup={(setup) => setSelectedSetup(setup)}
+                />
+              ) : activeBottomTab === 'QUANT' ? (
                 <SKYIntelligencePanel
                   data={skyData}
                   loading={loadingMarket}

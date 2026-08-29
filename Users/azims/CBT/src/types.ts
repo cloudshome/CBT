@@ -321,3 +321,89 @@ export interface InstitutionalAlphaResponse {
   narrative: string;
 }
 
+export interface AgentArgument {
+  agent_name: string;
+  stance: 'LONG' | 'SHORT' | 'NO_TRADE';
+  confidence: number;
+  core_premises: string[];
+  risk_factors_highlighted: string[];
+  verdict_summary: string;
+}
+
+export interface CouncilDecision {
+  symbol: string;
+  timestamp: number;
+  final_decision: 'LONG' | 'SHORT' | 'NO_TRADE';
+  consensus_confidence: number;
+  bull_argument: AgentArgument;
+  bear_argument: AgentArgument;
+  skeptic_argument: AgentArgument;
+  no_trade_probability: number;
+  primary_execution_thesis: string;
+  invalidation_criteria: string;
+  net_ev_r?: number;
+  uncertainty_score?: number;
+}
+
+export interface WhaleRadarData {
+  symbol: string;
+  timestamp: number;
+  top_100_whale_flow_24h_usd: number;
+  exchange_net_inflow_btc: number;
+  exchange_flow_sentiment: 'HEAVY_ACCUMULATION' | 'MODERATE_INFLOW' | 'HEAVY_DISTRIBUTION' | 'NEUTRAL';
+  cold_storage_outflows_usd: number;
+  liquidation_clusters: Array<{
+    price_level: number;
+    estimated_volume_usd: number;
+    cluster_type: 'LONG_LIQUIDATION' | 'SHORT_LIQUIDATION';
+    distance_pct: number;
+  }>;
+  cvd_delta: number;
+  narrative: string;
+}
+
+export interface TiltStatus {
+  is_shield_locked: boolean;
+  consecutive_losses: number;
+  lockout_remaining_minutes: number;
+  tilt_triggers_detected: string[];
+  allowed_to_execute: boolean;
+  guidance_message: string;
+  emotional_state_score: number; // 0 (calm) to 100 (extreme tilt)
+}
+
+export interface MonteCarloStressReport {
+  num_simulations: number;
+  probability_of_ruin: number;
+  p50_max_drawdown_pct: number;
+  p95_max_drawdown_pct: number;
+  p99_max_drawdown_pct: number;
+  is_safe: boolean;
+  covid_shock_survival_score: number;
+  ftx_shock_survival_score: number;
+  summary: string;
+}
+
+export interface LeadSignal {
+  driver_asset: string;
+  target_asset: string;
+  shock_zscore: number;
+  direction: 'BULLISH_LEAD' | 'BEARISH_LEAD';
+  expected_lead_window_mins: string;
+  confidence: number;
+  timestamp: number;
+  rationale: string;
+}
+
+export interface HedgeRecommendation {
+  hedge_required: boolean;
+  target_symbol: string;
+  hedge_direction: 'SHORT' | 'LONG' | 'NONE';
+  hedge_size_units: number;
+  hedge_notional_usd: number;
+  trigger_shock: string;
+  target_net_delta_pct: number;
+  rationale: string;
+  current_portfolio_delta_usd: number;
+}
+
