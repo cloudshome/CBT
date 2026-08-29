@@ -528,6 +528,111 @@ export const api = {
     const res = await fetch(`${BASE_URL}/api/governance/proposals`);
     return handleResponse<{ proposals: unknown[] }>(res);
   },
+
+  // ============================================================================
+  // PHASE 16: VOICE & AUDIO TRANSLATION ENDPOINTS
+  // ============================================================================
+
+  /**
+   * POST /api/voice/transcribe
+   * Transcribes voice memo audio blob and automatically parses trade commands.
+   */
+  async transcribeVoiceAudio(
+    audioBase64: string,
+    filename = 'memo.webm'
+  ): Promise<{
+    transcript: string;
+    is_trade_command: boolean;
+    parsed_command: Record<string, unknown>;
+  }> {
+    const res = await fetch(`${BASE_URL}/api/voice/transcribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio_base64: audioBase64, filename }),
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /api/voice/synthesize
+   * Synthesizes text into spoken MP3 audio.
+   */
+  async synthesizeVoiceAudio(text: string, filename = 'desk_brief.mp3'): Promise<Blob> {
+    const res = await fetch(`${BASE_URL}/api/voice/synthesize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, filename }),
+    });
+    if (!res.ok) {
+      throw new Error(`Voice synthesis failed: ${res.statusText}`);
+    }
+    return res.blob();
+  },
+
+  // ============================================================================
+  // PHASE 17: TELEGRAM BOT INTEGRATION ENDPOINTS
+  // ============================================================================
+
+  /**
+   * GET /api/telegram/status
+   * Checks Telegram Bot configuration and active command handlers.
+   */
+  async getTelegramStatus(): Promise<{
+    configured: boolean;
+    bot_token_present: boolean;
+    chat_id_present: boolean;
+    registered_commands: string[];
+  }> {
+    const res = await fetch(`${BASE_URL}/api/telegram/status`);
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /api/telegram/broadcast
+   * Dispatches custom telemetry alert to Telegram channel.
+   */
+  async broadcastTelegramAlert(
+    text: string,
+    parseMode: 'Markdown' | 'HTML' = 'Markdown'
+  ): Promise<{ status: string; configured: boolean }> {
+    const res = await fetch(`${BASE_URL}/api/telegram/broadcast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, parse_mode: parseMode }),
+    });
+    return handleResponse(res);
+  },
+
+  // ============================================================================
+  // CONTINUOUS EMPIRICAL VALIDATION ACCUMULATOR
+  // ============================================================================
+
+  /**
+   * GET /api/lab/empirical-status
+   * Returns sample accumulation metrics across all market regimes.
+   */
+  async getEmpiricalValidationStatus(
+    concept = 'SETUP_A_SWEEP_MSS'
+  ): Promise<{
+    total_samples_collected: number;
+    validation_target_per_regime: number;
+    regimes: Record<string, {
+      regime: string;
+      total_samples: number;
+      target_samples: number;
+      win_rate: number;
+      expectancy_r: number;
+      is_statistically_validated: boolean;
+      status_label: string;
+    }>;
+    last_run_timestamp: number;
+    active_symbols: string[];
+  }> {
+    const res = await fetch(
+      `${BASE_URL}/api/lab/empirical-status?concept=${encodeURIComponent(concept)}`
+    );
+    return handleResponse(res);
+  },
 };
 
 

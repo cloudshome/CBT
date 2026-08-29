@@ -37,6 +37,8 @@ const PYTHON_PREFIXES = [
   '/api/market',
   '/api/dossier',
   '/api/smc',
+  '/api/voice',
+  '/api/telegram',
   '/ws',
 ];
 

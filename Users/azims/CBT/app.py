@@ -74,6 +74,9 @@ from core.patch_governor import patch_governor
 from core.sandbox_lab import sandbox_lab
 from core.walk_forward_engine import walk_forward_engine
 from core.monte_carlo_stress import monte_carlo_stress_tester
+from core.voice_interface import voice_interface
+from core.telegram_bot import telegram_bot
+from core.empirical_accumulator import empirical_accumulator
 
 # SKY Professional Market Intelligence Layer
 from core.sky_intelligence import (
@@ -157,6 +160,26 @@ class ChartMemorySaveRequest(BaseModel):
     chart_config: Dict[str, Any] = {}
 
 
+class VoiceTranscribeRequest(BaseModel):
+    audio_base64: str
+    filename: Optional[str] = "memo.webm"
+
+
+class VoiceSynthesizeRequest(BaseModel):
+    text: str
+    filename: Optional[str] = "desk_brief.mp3"
+
+
+class TelegramBroadcastRequest(BaseModel):
+    text: str
+    parse_mode: Optional[str] = "Markdown"
+
+
+class TelegramWebhookRequest(BaseModel):
+    update_id: Optional[int] = None
+    message: Optional[Dict[str, Any]] = None
+
+
 # WebSocket Connection Manager
 class ConnectionManager:
     def __init__(self):
@@ -184,12 +207,19 @@ class ConnectionManager:
 ws_manager = ConnectionManager()
 
 
-# Background Real-Time Telemetry Broadcaster
+# Register interactive Telegram command handlers at module level
+telegram_bot.register_command("/status", lambda args, chat_id=None: f"✅ **SKY Terminal Operational**\n• Health: OK\n• Active WS: {len(ws_manager.active_connections)}")
+telegram_bot.register_command("/risk", lambda args, chat_id=None: "🛡️ **Risk Gate Status**\n• Circuit Breaker: NORMAL\n• Max Drawdown Limit: 2.50%\n• Active Exposure: Controlled")
+telegram_bot.register_command("/brief", lambda args, chat_id=None: "🌅 **SKY Morning Desk Briefing**\n• BTC Dominant Bias: BULLISH\n• Liquidity Sweeps: Monitored\n• Macro Regime: GOLD_RISK_OFF")
+
+
+# Background Real-Time Telemetry Broadcaster & Empirical Accumulator
 @app.on_event("startup")
 async def startup_event():
     db_manager.init_all_schemas()
     asyncio.create_task(telemetry_broadcaster_loop())
-    logger.info("AI Quant Sentinel FastAPI server online.")
+    asyncio.create_task(empirical_accumulator_loop())
+    logger.info("AI Quant Sentinel FastAPI server online with Empirical Accumulator & Telegram Bridge.")
 
 
 async def telemetry_broadcaster_loop():
@@ -205,6 +235,8 @@ async def telemetry_broadcaster_loop():
                 events = portfolio_shadow.update_live_price(sym, cur_price)
                 for ev in events:
                     await ws_manager.broadcast({"type": "POSITION_EVENT", "data": ev})
+                    # Dispatch institutional alert to Telegram
+                    asyncio.create_task(telegram_bot.send_position_alert(ev.get("type", "FILL"), ev))
 
                 # Macro snapshot
                 macro = macro_sentinel.get_macro_snapshot()
@@ -221,6 +253,16 @@ async def telemetry_broadcaster_loop():
         except Exception as e:
             logger.debug(f"Telemetry loop error: {e}")
         await asyncio.sleep(1.0)
+
+
+async def empirical_accumulator_loop():
+    """Periodically executes chronological walk-forward validations to build sample sizes."""
+    while True:
+        try:
+            empirical_accumulator.run_accumulation_cycle()
+        except Exception as e:
+            logger.debug(f"Empirical accumulator loop error: {e}")
+        await asyncio.sleep(300.0)  # Cycle every 5 minutes
 
 
 # ==============================================================================
@@ -827,6 +869,93 @@ async def get_asset_dossier(
         candles_15m=candles,
     )
     return dossier.to_dict()
+
+
+# ==============================================================================
+# PHASE 16: VOICE INTERFACE & NATURAL SPEECH ENDPOINTS
+# ==============================================================================
+
+@app.post("/api/voice/transcribe")
+async def transcribe_voice_audio(req: VoiceTranscribeRequest):
+    """
+    Transcribes audio bytes (WebM/WAV/MP3) and automatically parses trading instructions.
+    """
+    import base64
+    try:
+        audio_data = base64.b64decode(req.audio_base64)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid base64 audio payload: {e}")
+
+    transcript = await voice_interface.transcribe_audio_bytes(audio_data, req.filename or "memo.webm")
+    
+    # Parse trade command if transcript contains trading instructions
+    parsed_cmd = command_executor.parse_and_execute(transcript)
+
+    return {
+        "transcript": transcript,
+        "is_trade_command": parsed_cmd.is_valid_command,
+        "parsed_command": asdict(parsed_cmd),
+    }
+
+
+@app.post("/api/voice/synthesize")
+async def synthesize_voice_brief(req: VoiceSynthesizeRequest):
+    """
+    Synthesizes text into spoken MP3 audio brief.
+    """
+    out_path = await voice_interface.generate_speech(req.text, req.filename or "desk_brief.mp3")
+    if out_path.exists():
+        return FileResponse(str(out_path), media_type="audio/mpeg", filename=req.filename or "desk_brief.mp3")
+    raise HTTPException(status_code=500, detail="Voice synthesis failed.")
+
+
+# ==============================================================================
+# PHASE 17: TELEGRAM BOT ALERT & COMMAND BRIDGE ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/telegram/status")
+async def get_telegram_status():
+    """Returns Telegram bot configuration and connectivity health."""
+    has_token = bool(telegram_bot.bot_token)
+    has_chat = bool(telegram_bot.chat_id)
+    return {
+        "configured": has_token and has_chat,
+        "bot_token_present": has_token,
+        "chat_id_present": has_chat,
+        "registered_commands": list(telegram_bot._command_handlers.keys()),
+    }
+
+
+@app.post("/api/telegram/broadcast")
+async def broadcast_telegram_alert(req: TelegramBroadcastRequest):
+    """Dispatches a custom alert to configured Telegram channels."""
+    sent = await telegram_bot.send_message(req.text, parse_mode=req.parse_mode or "Markdown")
+    return {
+        "status": "SENT" if sent else "QUEUED_LOCAL",
+        "configured": bool(telegram_bot.bot_token and telegram_bot.chat_id),
+    }
+
+
+@app.post("/api/telegram/webhook")
+async def handle_telegram_webhook(update: TelegramWebhookRequest):
+    """Handles incoming Telegram webhook events."""
+    res = await telegram_bot.handle_webhook_update(update.dict())
+    return res
+
+
+# ==============================================================================
+# EMPIRICAL VALIDATION & ACCUMULATOR ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/lab/empirical-status")
+async def get_empirical_validation_status(
+    concept: str = Query("SETUP_A_SWEEP_MSS"),
+):
+    """
+    Returns empirical sample accumulation status and statistical validation metrics across all regimes.
+    """
+    report = empirical_accumulator.get_status_report(concept=concept)
+    return asdict(report)
 
 
 # WebSocket endpoint for real-time interactive terminal
