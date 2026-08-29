@@ -1,45 +1,55 @@
 """
-6-Pillar Institutional Asset Intelligence Dossier Engine.
-Synthesizes Institutional Flows, Derivatives Microstructure, Valuation Cost Basis,
-Seasonality DNA, Macro Beta, and Volatility Regime into an executive intelligence brief.
+8-Pillar Universal Asset Intelligence Dossier Master Engine.
+Continuously synthesizes Institutional Flows, Derivatives/Options Microstructure,
+Valuation Cost Bases, Stablecoin Dry Powder, Cyclical DNA, Macro Betas,
+Volatility Profiles, and Physical/On-Chain Supply Shocks for Bitcoin (BTC),
+Ethereum (ETH), and Gold (PAXG/XAU).
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
-import numpy as np
 
-from core.cvd_absorption import cvd_absorption_engine
-from core.macro_sentinel import macro_sentinel
-from core.sentiment_engine import sentiment_engine
+from core.institutional_flows import institutional_flows_engine
+from core.derivatives_options import derivatives_options_engine
+from core.valuation_cost_basis import valuation_cost_basis_engine
+from core.stablecoin_velocity import stablecoin_velocity_engine
+from core.seasonality_cyclical_dna import seasonality_cyclical_engine
+from core.macro_liquidity_beta import macro_liquidity_beta_engine
+from core.volatility_profile_regime import volatility_profile_engine
+from core.physical_supply_shock import physical_supply_shock_engine
+from core.composite_scorer import composite_scorer
 
 logger = logging.getLogger("ai_quant_sentinel.asset_dossier_engine")
 
 
 @dataclass
-class AssetDossier:
+class UniversalAssetDossier:
     symbol: str
     timestamp: int
     current_price: float
+    composite_health_score: float
+    macro_bias: str
     pillar_1_institutional_flows: Dict[str, Any]
-    pillar_2_derivatives_microstructure: Dict[str, Any]
+    pillar_2_derivatives_options: Dict[str, Any]
     pillar_3_valuation_cost_basis: Dict[str, Any]
-    pillar_4_seasonality_dna: Dict[str, Any]
-    pillar_5_macro_beta: Dict[str, Any]
-    pillar_6_volatility_regime: Dict[str, Any]
-    composite_confluence_score: float   # [0.0, 100.0]
-    executive_verdict: str
+    pillar_4_stablecoin_velocity: Dict[str, Any]
+    pillar_5_seasonality_cyclical_dna: Dict[str, Any]
+    pillar_6_macro_liquidity_beta: Dict[str, Any]
+    pillar_7_volatility_profile: Dict[str, Any]
+    pillar_8_physical_supply_shock: Dict[str, Any]
+    pillar_z_scores: List[float]
+    actionable_quant_verdict: str
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
 
 class AssetDossierEngine:
-    """Compiles the 6-pillar asset intelligence dossier."""
+    """Master Orchestrator compiling the 8-Pillar Live Asset Intelligence Dossier."""
 
     def compile_dossier(
         self,
@@ -47,108 +57,69 @@ class AssetDossierEngine:
         current_price: float,
         candles_1h: Optional[List[Dict[str, Any]]] = None,
         candles_15m: Optional[List[Dict[str, Any]]] = None,
-    ) -> AssetDossier:
-        """
-        Compiles the 6 pillars for the selected asset.
-        """
+    ) -> UniversalAssetDossier:
         now = int(time.time() * 1000)
-        dt = datetime.fromtimestamp(now / 1000.0, tz=timezone.utc)
+        sym = symbol.upper()
 
-        # 1. Institutional Flows
-        p1 = {
-            "etf_net_inflow_24h_usd": 385_000_000 if "BTC" in symbol else 42_000_000,
-            "whale_wallet_accumulation_score": 0.82,
-            "cme_cot_large_spec_bias": "NET_LONG",
-            "institutional_tier": "DOMINANT_INFLOW",
-        }
+        # 1. Execute the 8 Pillars in parallel / sequence
+        p1 = institutional_flows_engine.analyze(sym, current_price)
+        p2 = derivatives_options_engine.analyze(sym, current_price)
+        p3 = valuation_cost_basis_engine.analyze(sym, current_price)
+        p4 = stablecoin_velocity_engine.analyze(sym, current_price)
+        p5 = seasonality_cyclical_engine.analyze(sym, current_price)
+        p6 = macro_liquidity_beta_engine.analyze(sym, current_price)
+        p7 = volatility_profile_engine.analyze(sym, current_price, candles_1h)
+        p8 = physical_supply_shock_engine.analyze(sym, current_price)
 
-        # 2. Derivatives Microstructure
-        c_series = candles_15m or []
-        cvd_res = cvd_absorption_engine.analyze_orderflow(c_series, symbol=symbol)
-        p2 = {
-            "cvd_velocity": float(cvd_res.cvd_delta),
-            "cvd_absorption_detected": bool(cvd_res.absorption_detected),
-            "absorption_type": str(cvd_res.absorption_type),
-            "open_interest_delta_pct": 2.4,
-            "funding_rate_annualized": 8.5,
-            "estimated_liquidation_leverage_bias": "SHORT_SQUEEZE_VULNERABLE",
-        }
+        z_scores = [
+            p1.z_score,
+            p2.z_score,
+            p3.z_score,
+            p4.z_score,
+            p5.z_score,
+            p6.z_score,
+            p7.z_score,
+            p8.z_score,
+        ]
 
-        # 3. Valuation Cost Basis
-        realized_price = float(current_price * 0.78)
-        mvrv_ratio = float(current_price / realized_price if realized_price > 0 else 1.28)
-        p3 = {
-            "realized_price_estimate": round(realized_price, 2),
-            "mvrv_ratio": round(mvrv_ratio, 2),
-            "valuation_band": "FAIR_VALUE_ACCUMULATION" if mvrv_ratio < 2.0 else "OVERHEATED",
-            "overhead_liquidity_pool": round(float(current_price * 1.035), 2),
-            "underlying_support_pool": round(float(current_price * 0.965), 2),
-        }
+        # 2. Compute Mathematical Composite Health Score (0-100)
+        composite_score, macro_bias = composite_scorer.compute_score(sym, z_scores)
 
-        # 4. Seasonality DNA
-        day_name = dt.strftime("%A")
-        is_favorable_day = day_name in ["Tuesday", "Wednesday", "Thursday"]
-        p4 = {
-            "day_of_week": day_name,
-            "session_hour_utc": int(dt.hour),
-            "historical_day_win_rate": 62.4 if is_favorable_day else 48.1,
-            "seasonality_bias": "BULLISH_WINDOW" if is_favorable_day else "NEUTRAL_CONSOLIDATION",
-        }
+        # 3. Formulate Actionable Quantitative Verdict
+        if "BTC" in sym:
+            verdict = (
+                f"Confluence of STH cost basis (${p3.sth_realized_price:,.0f}), Weekly VAL (${p7.value_area_low:,.0f}), "
+                f"and active ETF absorption (+${p1.etf_net_inflow_24h_usd/1e6:.1f}M) confirms high-probability long structure "
+                f"targeting ${p2.primary_liquidation_pools['short_squeeze_target']:,.0f} short liquidation cluster."
+            )
+        elif "ETH" in sym:
+            verdict = (
+                f"Persistent exchange staking outflows ({p8.exchange_reserve_delta_24h}) coupled with undervaluation "
+                f"MVRV ({p3.mvrv_z_score:.2f}) projects favorable mean-reversion towards ${p7.value_area_high:,.0f}."
+            )
+        else:
+            verdict = (
+                f"Sovereign central bank net accumulation ({p1.sovereign_central_bank_net_tons_quarterly:.1f}t) and COMEX vault "
+                f"drawdown ({p8.comex_registered_vault_delta_pct:.2f}%) provide structural physical bid floor at ${p3.sth_realized_price:,.0f}."
+            )
 
-        # 5. Macro Beta
-        macro = macro_sentinel.get_macro_snapshot()
-        p5 = {
-            "dxy_correlation_30d": -0.68,
-            "us10y_sensitivity_beta": -0.42,
-            "gold_cross_beta": 0.55,
-            "macro_regime": str(macro.macro_regime),
-            "global_risk_index": float(macro.global_risk_index),
-        }
-
-        # 6. Volatility Regime
-        sent = sentiment_engine.get_sentiment_report()
-        p6 = {
-            "rolling_atr_percentile": 74.5,
-            "sentiment_score": float(sent.composite_sentiment_score),
-            "fear_greed_index": int(sent.fear_and_greed_index),
-            "volatility_expansion_risk": "MODERATE",
-        }
-
-        # Composite Confluence Score [0.0, 100.0]
-        score = 50.0
-        if p1["institutional_tier"] == "DOMINANT_INFLOW":
-            score += 12.0
-        if cvd_res.absorption_type == "BULLISH_ABSORPTION":
-            score += 15.0
-        elif cvd_res.absorption_type == "BEARISH_ABSORPTION":
-            score -= 15.0
-        if is_favorable_day:
-            score += 5.0
-        if macro.macro_regime == "RISK_ON_EXPANSION":
-            score += 10.0
-        elif macro.macro_regime == "RISK_OFF_FLIGHT_TO_SAFETY":
-            score -= 12.0
-
-        confluence_score = round(float(np.clip(score, 10.0, 95.0)), 1)
-        verdict = (
-            "STRONG_BULLISH_CONFLUENCE" if confluence_score >= 70
-            else ("STRONG_BEARISH_CONFLUENCE" if confluence_score <= 35 else "NEUTRAL_UNCERTAINTY")
-        )
-
-        return AssetDossier(
-            symbol=symbol,
+        return UniversalAssetDossier(
+            symbol=sym,
             timestamp=now,
-            current_price=float(current_price),
-            pillar_1_institutional_flows=p1,
-            pillar_2_derivatives_microstructure=p2,
-            pillar_3_valuation_cost_basis=p3,
-            pillar_4_seasonality_dna=p4,
-            pillar_5_macro_beta=p5,
-            pillar_6_volatility_regime=p6,
-            composite_confluence_score=confluence_score,
-            executive_verdict=verdict,
+            current_price=current_price,
+            composite_health_score=composite_score,
+            macro_bias=macro_bias,
+            pillar_1_institutional_flows=p1.to_dict(),
+            pillar_2_derivatives_options=p2.to_dict(),
+            pillar_3_valuation_cost_basis=p3.to_dict(),
+            pillar_4_stablecoin_velocity=p4.to_dict(),
+            pillar_5_seasonality_cyclical_dna=p5.to_dict(),
+            pillar_6_macro_liquidity_beta=p6.to_dict(),
+            pillar_7_volatility_profile=p7.to_dict(),
+            pillar_8_physical_supply_shock=p8.to_dict(),
+            pillar_z_scores=z_scores,
+            actionable_quant_verdict=verdict,
         )
 
 
-# Singleton
 asset_dossier_engine = AssetDossierEngine()

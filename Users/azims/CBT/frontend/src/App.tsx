@@ -14,6 +14,7 @@ import { PaperTradingPanel } from './components/PaperTradingPanel';
 import { GeminiDeskCopilot } from './components/GeminiDeskCopilot';
 import { SKYIntelligencePanel } from './components/SKYIntelligencePanel';
 import { HedgeFundBrainSuite } from './components/HedgeFundBrainSuite';
+import { AssetDossierDock } from './components/AssetDossierDock';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider } from './data/providers/marketProvider';
 import {
@@ -40,6 +41,7 @@ import {
   Cpu,
   BarChart2,
   Scale,
+  Sparkles,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -81,7 +83,7 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'HEDGE_FUND' | 'QUANT' | 'MTF_SMC'>('HEDGE_FUND');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC'>('DOSSIER');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
   // Notifications State
@@ -459,6 +461,17 @@ export const App: React.FC = () => {
             <div className="flex items-center justify-between px-3 py-1.5 bg-[#0d121d] border-b border-[#1e293b]">
               <div className="flex flex-wrap items-center gap-1 text-xs font-mono">
                 <button
+                  onClick={() => setActiveBottomTab('DOSSIER')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'DOSSIER'
+                      ? 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Sparkles size={13} className={activeBottomTab === 'DOSSIER' ? 'text-black' : 'text-amber-400'} />
+                  <span>8-Pillar Asset Dossier (BTC/ETH/GOLD)</span>
+                </button>
+                <button
                   onClick={() => setActiveBottomTab('HEDGE_FUND')}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
                     activeBottomTab === 'HEDGE_FUND'
@@ -495,7 +508,15 @@ export const App: React.FC = () => {
             </div>
 
             <div className="p-3">
-              {activeBottomTab === 'HEDGE_FUND' ? (
+              {activeBottomTab === 'DOSSIER' ? (
+                <AssetDossierDock
+                  currentSymbol={symbol}
+                  onSelectSymbol={(sym) => {
+                    setSymbol(sym);
+                    setSelectedSetup(null);
+                  }}
+                />
+              ) : activeBottomTab === 'HEDGE_FUND' ? (
                 <HedgeFundBrainSuite
                   symbol={symbol}
                   timeframe={timeframe}

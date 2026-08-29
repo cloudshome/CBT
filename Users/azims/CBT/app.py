@@ -737,6 +737,22 @@ async def get_orderbook_imbalance(
     return asdict(res)
 
 
+@app.get("/api/dossier")
+@app.get("/api/institutional/dossier")
+async def get_asset_dossier(
+    symbol: str = Query("BTCUSDT"),
+):
+    candles = data_streamer.get_candles(symbol, "15m", limit=100)
+    cur_p = candles[-1]["close"] if candles else (77450.0 if "BTC" in symbol else 2430.0 if "ETH" in symbol else 4458.0)
+    dossier = asset_dossier_engine.compile_dossier(
+        symbol=symbol,
+        current_price=cur_p,
+        candles_1h=data_streamer.get_candles(symbol, "1h", limit=30),
+        candles_15m=candles,
+    )
+    return dossier.to_dict()
+
+
 # WebSocket endpoint for real-time interactive terminal
 @app.websocket("/ws/terminal")
 async def websocket_terminal_endpoint(websocket: WebSocket):

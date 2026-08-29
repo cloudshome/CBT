@@ -304,6 +304,20 @@ export const api = {
     const res = await fetch(`${BASE_URL}/api/tickers?symbols=${symbols.join(',')}`);
     return handleResponse(res);
   },
+
+  /**
+   * 8-Pillar Universal Asset Intelligence Dossier
+   * GET /api/institutional/dossier
+   */
+  async getAssetDossier(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<import('../types').UniversalAssetDossier> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/dossier?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<import('../types').UniversalAssetDossier>(res);
+  },
 };
 
 

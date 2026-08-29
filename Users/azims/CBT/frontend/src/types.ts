@@ -415,3 +415,94 @@ export interface HedgeRecommendation {
   current_portfolio_delta_usd: number;
 }
 
+export interface UniversalAssetDossier {
+  symbol: string;
+  timestamp: number;
+  current_price: number;
+  composite_health_score: number;
+  macro_bias: string;
+  pillar_1_institutional_flows: {
+    etf_net_inflow_24h_usd: number;
+    etf_net_inflow_7d_usd: number;
+    corporate_treasury_bias: string;
+    sovereign_central_bank_net_tons_quarterly: number;
+    sentiment_tier: string;
+    flow_momentum_score: number;
+    z_score: number;
+  };
+  pillar_2_derivatives_options: {
+    funding_rate_annualized_pct: number;
+    funding_state: string;
+    open_interest_delta_24h_pct: number;
+    options_max_pain_strike: number;
+    net_dealer_gex: string;
+    twenty_five_delta_skew_pct: number;
+    primary_liquidation_pools: {
+      long_liquidation_cluster: number;
+      short_squeeze_target: number;
+    };
+    derivatives_bias: string;
+    z_score: number;
+  };
+  pillar_3_valuation_cost_basis: {
+    sth_realized_price: number;
+    lth_realized_price: number;
+    mvrv_z_score: number;
+    production_cost_floor: number;
+    cost_basis_health: string;
+    valuation_regime: string;
+    z_score: number;
+  };
+  pillar_4_stablecoin_velocity: {
+    ssr_ratio: number;
+    ssr_oscillator_bias: string;
+    net_minting_velocity_24h_usd: number;
+    usdt_market_cap_usd: number;
+    usdc_market_cap_usd: number;
+    dry_powder_liquidity_state: string;
+    z_score: number;
+  };
+  pillar_5_seasonality_cyclical_dna: {
+    day_of_week: string;
+    month_name: string;
+    historical_day_win_rate_pct: number;
+    current_month_historical_return: string;
+    halving_cycle_phase: string;
+    days_post_halving: number;
+    real_yield_pct: number;
+    cyclical_bias: string;
+    z_score: number;
+  };
+  pillar_6_macro_liquidity_beta: {
+    dxy_correlation_30d: number;
+    us10y_yield_pct: number;
+    us10y_yield_delta_24h_bps: number;
+    global_m2_status: string;
+    global_m2_expansion_rate_pct: number;
+    geopolitical_risk_index_score: number;
+    macro_regime: string;
+    z_score: number;
+  };
+  pillar_7_volatility_profile: {
+    squeeze_state: string;
+    squeeze_intensity_score: number;
+    daily_vpoc: number;
+    weekly_vpoc: number;
+    value_area_high: number;
+    value_area_low: number;
+    volatility_regime: string;
+    z_score: number;
+  };
+  pillar_8_physical_supply_shock: {
+    exchange_reserve_delta_24h: string;
+    exchange_net_flow_units: number;
+    comex_registered_vault_delta_pct: number;
+    shanghai_gold_exchange_premium_usd: number;
+    supply_illiquidity_trend: string;
+    supply_shock_state: string;
+    z_score: number;
+  };
+  pillar_z_scores: number[];
+  actionable_quant_verdict: string;
+}
+
