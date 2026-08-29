@@ -17,7 +17,7 @@ jest.mock('../src/services/marketDataService', () => {
         candles.push([now - (50 - i) * 900000, o, o + 50, o - 30, c, 500]);
         p = c;
       }
-      return candles;
+      return { candles, source: 'binance' };
     }),
   };
 });

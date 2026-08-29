@@ -93,8 +93,8 @@ function computeOBI(symbol: string, currentPrice: number): OBIData {
 institutionalRouter.get('/alpha', async (req: Request, res: Response): Promise<void> => {
   try {
     const { symbol, timeframe, limit } = validateCandlesQuery(req.query);
-    const rawCandles = await fetchCandlesWithFallback(symbol, timeframe, limit);
-    const candles = parseAndNormalizeCandles(rawCandles);
+    const marketData = await fetchCandlesWithFallback(symbol, timeframe, limit);
+    const candles = parseAndNormalizeCandles(marketData.candles);
     const quant = runQuantDetection(candles);
 
     const currentPrice = candles[candles.length - 1]?.close || 88500.0;
@@ -230,8 +230,8 @@ institutionalRouter.get('/alpha', async (req: Request, res: Response): Promise<v
 institutionalRouter.get('/cvd', async (req: Request, res: Response): Promise<void> => {
   try {
     const { symbol, timeframe, limit } = validateCandlesQuery(req.query);
-    const rawCandles = await fetchCandlesWithFallback(symbol, timeframe, limit);
-    const candles = parseAndNormalizeCandles(rawCandles);
+    const marketData = await fetchCandlesWithFallback(symbol, timeframe, limit);
+    const candles = parseAndNormalizeCandles(marketData.candles);
     const cvd = computeCVD(candles, symbol);
     res.json(cvd);
   } catch (err: unknown) {
