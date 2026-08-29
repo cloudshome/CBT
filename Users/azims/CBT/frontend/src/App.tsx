@@ -5,6 +5,7 @@ import { MTFPanel } from './components/MTFPanel';
 import { SMCScanPanel } from './components/SMCScanPanel';
 import { PaperTradingPanel } from './components/PaperTradingPanel';
 import { GeminiDeskCopilot } from './components/GeminiDeskCopilot';
+import { SKYIntelligencePanel } from './components/SKYIntelligencePanel';
 import { ToastContainer } from './components/ToastContainer';
 import {
   SupportedTimeframe,
@@ -17,6 +18,7 @@ import {
   RiskConfig,
   DeskBriefResponse,
   ToastMessage,
+  SKYIntelligenceResponse,
 } from './types';
 import { api, ApiError } from './services/api';
 import { notificationService } from './services/notificationService';
@@ -44,6 +46,9 @@ export const App: React.FC = () => {
   const [positions, setPositions] = useState<PaperTrade[]>([]);
   const [riskConfig, setRiskConfig] = useState<RiskConfig | undefined>();
   const [selectedSetup, setSelectedSetup] = useState<SetupSuggestion | null>(null);
+
+  // SKY Quantitative Intelligence State
+  const [skyData, setSkyData] = useState<SKYIntelligenceResponse | null>(null);
 
   // Gemini Intelligence State
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
@@ -99,10 +104,11 @@ export const App: React.FC = () => {
   const fetchMarketData = useCallback(async () => {
     setLoadingMarket(true);
     try {
-      const [candlesRes, mtfRes, scanRes] = await Promise.all([
+      const [candlesRes, mtfRes, scanRes, skyRes] = await Promise.all([
         api.getCandles(symbol, timeframe, 100),
         api.getMTF(symbol, timeframe, 'ema,rsi'),
         api.getSMCScan(symbol, timeframe, 100),
+        api.getSKYIntelligence(symbol, timeframe, 100).catch(() => null),
       ]);
 
       setCandles(candlesRes.candles || []);
@@ -111,6 +117,9 @@ export const App: React.FC = () => {
       setFVGs(scanRes.fvg || []);
       setOrderBlocks(scanRes.order_blocks || []);
       setSetups(scanRes.setup_suggestions || []);
+      if (skyRes) {
+        setSkyData(skyRes);
+      }
 
       if (scanRes.stats) {
         setStats({
@@ -282,6 +291,13 @@ export const App: React.FC = () => {
               loading={loadingMarket}
             />
           </div>
+
+          {/* SKY Professional Market Intelligence Panel */}
+          <SKYIntelligencePanel
+            data={skyData}
+            loading={loadingMarket}
+            onDeploySetup={(setup) => setSelectedSetup(setup)}
+          />
 
           {/* Lower Grid: MTF Indicators & SMC Setups */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

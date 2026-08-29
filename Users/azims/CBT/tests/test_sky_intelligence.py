@@ -38,6 +38,7 @@ from core.sky_intelligence import (
     StructureEventType,
     SwingType,
     VolatilityRegime,
+    VWAPFeature,
     ablation_framework,
     derivatives_engine,
     displacement_engine,
@@ -52,6 +53,7 @@ from core.sky_intelligence import (
     sky_orchestrator,
     volatility_engine,
     volume_engine,
+    vwap_engine,
 )
 
 
@@ -298,3 +300,73 @@ def test_sky_end_to_end_decision_orchestrator():
     ]
     assert 0.0 <= decision_out.kelly_fraction <= 0.015
     assert isinstance(decision_out.explanation_dossier, dict)
+    assert "vwap" in decision_out.explanation_dossier
+
+
+def test_vwap_engine_computation_and_bands():
+    """Verify Session VWAP, rolling sigma bands, and mean-reversion scoring."""
+    candles = [
+        {"timestamp": 1000 + (i * 60), "open": 88000 + (i * 10), "high": 88100 + (i * 10), "low": 87900 + (i * 10), "close": 88050 + (i * 10), "volume": 500 + (i * 20)}
+        for i in range(30)
+    ]
+    vwap_feat = vwap_engine.compute_vwap(candles)
+
+    assert isinstance(vwap_feat, VWAPFeature)
+    assert vwap_feat.vwap > 87000.0
+    assert vwap_feat.upper_band_1sigma > vwap_feat.vwap
+    assert vwap_feat.lower_band_1sigma < vwap_feat.vwap
+    assert vwap_feat.upper_band_2sigma > vwap_feat.upper_band_1sigma
+    assert vwap_feat.lower_band_2sigma < vwap_feat.lower_band_1sigma
+    assert 0.0 <= vwap_feat.mean_reversion_prob <= 1.0
+
+    # Test anchored VWAP from index 10
+    anchored = vwap_engine.compute_anchored_vwap(candles, anchor_index=10)
+    assert anchored > 0.0
+
+
+def test_setup_e_vwap_reclaim_qualification():
+    """Verify Setup E deterministic qualification with VWAP and displacement."""
+    # Synthetic candles extending below VWAP then displacing upwards
+    candles = [
+        {"timestamp": 1000 + (i * 60), "open": 88000 - (i * 30), "high": 88050 - (i * 30), "low": 87900 - (i * 30), "close": 87950 - (i * 30), "volume": 100}
+        for i in range(25)
+    ]
+    # Strong reclaim candle closing back above mean
+    candles.append({
+        "timestamp": 2600,
+        "open": 87200,
+        "high": 88500,
+        "low": 87150,
+        "close": 88450,
+        "volume": 800,
+    })
+
+    vol_state = volatility_engine.compute_volatility(candles)
+    disp = displacement_engine.calculate_displacement(candles, atr=vol_state.atr)
+    vwap_feat = vwap_engine.compute_vwap(candles)
+    regime = market_regime_engine.classify_regime(candles, vol_state)
+
+    setups = setup_engine.scan_setups(
+        symbol="BTC/USDT",
+        timeframe="15m",
+        current_price=88450.0,
+        candles=candles,
+        structure_events=[],
+        liquidity_sweeps=[],
+        fvgs=[],
+        order_blocks=[],
+        displacement=disp,
+        volume_feat=volume_engine.analyze_volume(candles),
+        derivatives_state=derivatives_engine.analyze_derivatives("BTC/USDT", 88450.0, 1.0, 50000.0, 49000.0, 0.0001),
+        mtf_context=multi_timeframe_engine.compile_mtf_context({"15m": candles}),
+        regime_state=regime,
+        atr=vol_state.atr,
+        vwap_feat=vwap_feat,
+    )
+
+    setup_e = next((s for s in setups if s.setup_type == SetupType.SETUP_E_VWAP_RECLAIM), None)
+    assert setup_e is not None
+    assert setup_e.direction == DecisionAction.LONG
+    assert setup_e.risk_reward_ratio >= 1.8
+    assert setup_e.historical_expectancy_r > 0.25
+

@@ -52,6 +52,18 @@ from core.sky_intelligence.setup_engine import (
     SetupEngine,
     setup_engine,
 )
+from core.sky_intelligence.volatility_engine import (
+    VolatilityEngine,
+    volatility_engine,
+)
+from core.sky_intelligence.volume_engine import (
+    VolumeEngine,
+    volume_engine,
+)
+from core.sky_intelligence.vwap_engine import (
+    VWAPEngine,
+    vwap_engine,
+)
 from core.sky_intelligence.types import (
     AblationResult,
     CandidateOrderBlock,
@@ -79,14 +91,7 @@ from core.sky_intelligence.types import (
     VolatilityRegime,
     VolatilityState,
     VolumeFeature,
-)
-from core.sky_intelligence.volatility_engine import (
-    VolatilityEngine,
-    volatility_engine,
-)
-from core.sky_intelligence.volume_engine import (
-    VolumeEngine,
-    volume_engine,
+    VWAPFeature,
 )
 
 __all__ = [
@@ -130,6 +135,8 @@ __all__ = [
     "VolatilityState",
     "VolumeEngine",
     "VolumeFeature",
+    "VWAPEngine",
+    "VWAPFeature",
     "ablation_framework",
     "derivatives_engine",
     "displacement_engine",
@@ -144,4 +151,5 @@ __all__ = [
     "sky_orchestrator",
     "volatility_engine",
     "volume_engine",
+    "vwap_engine",
 ]

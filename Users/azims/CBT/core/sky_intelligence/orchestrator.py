@@ -24,14 +24,16 @@ from core.sky_intelligence.market_structure import market_structure_engine
 from core.sky_intelligence.multi_timeframe import multi_timeframe_engine
 from core.sky_intelligence.order_block_engine import order_block_engine
 from core.sky_intelligence.setup_engine import setup_engine
+from core.sky_intelligence.volume_engine import volume_engine
+from core.sky_intelligence.volatility_engine import volatility_engine
+from core.sky_intelligence.vwap_engine import vwap_engine
 from core.sky_intelligence.types import (
     DecisionAction,
     DecisionOutput,
     MarketRegimeType,
     SKYSetup,
+    VWAPFeature,
 )
-from core.sky_intelligence.volume_engine import volume_engine
-from core.sky_intelligence.volatility_engine import volatility_engine
 
 logger = logging.getLogger("sky_intelligence.orchestrator")
 
@@ -79,8 +81,8 @@ class SKYIntelligenceOrchestrator:
             )
 
         curr_close = float(candles[-1]["close"])
-        bid = bid_price or (curr_close * 0.9999)
-        ask = ask_price or (curr_close * 1.0001)
+        bid = bid_price or (curr_close * 0.99999)
+        ask = ask_price or (curr_close * 1.00001)
 
         # ----------------------------------------------------
         # STAGE 1: DATA QUALITY GATE
@@ -161,18 +163,23 @@ class SKYIntelligenceOrchestrator:
         )
 
         # ----------------------------------------------------
-        # STAGE 8: MULTI-TIMEFRAME CONTEXT (Phase 11)
+        # STAGE 8: VWAP ENGINE & BANDS (Phase 8)
+        # ----------------------------------------------------
+        vwap_feat = vwap_engine.compute_vwap(candles)
+
+        # ----------------------------------------------------
+        # STAGE 9: MULTI-TIMEFRAME CONTEXT (Phase 11)
         # ----------------------------------------------------
         tf_map = candles_by_tf or {timeframe: candles}
         mtf_context = multi_timeframe_engine.compile_mtf_context(tf_map)
 
         # ----------------------------------------------------
-        # STAGE 9: MARKET REGIME (Phase 12)
+        # STAGE 10: MARKET REGIME (Phase 12)
         # ----------------------------------------------------
         regime_state = market_regime_engine.classify_regime(candles, vol_state)
 
         # ----------------------------------------------------
-        # STAGE 10: SETUP DETECTION & QUALIFICATION (Phase 13)
+        # STAGE 11: SETUP DETECTION & QUALIFICATION (Phase 13)
         # ----------------------------------------------------
         candidate_setups = setup_engine.scan_setups(
             symbol=symbol,
@@ -189,12 +196,13 @@ class SKYIntelligenceOrchestrator:
             mtf_context=mtf_context,
             regime_state=regime_state,
             atr=atr_val,
+            vwap_feat=vwap_feat,
         )
 
         qualified_setups = [s for s in candidate_setups if s.is_qualified]
 
         # ----------------------------------------------------
-        # STAGE 11: STATISTICAL EDGE, NET EV & RISK GATE
+        # STAGE 12: STATISTICAL EDGE, NET EV & RISK GATE
         # ----------------------------------------------------
         if not qualified_setups:
             # Check if there are unqualified candidate setups for WATCH status
@@ -223,6 +231,11 @@ class SKYIntelligenceOrchestrator:
                     "active_pools": len(pools),
                     "active_fvgs": len(fvgs),
                     "candidate_obs": len(order_blocks),
+                    "vwap": {
+                        "vwap": vwap_feat.vwap,
+                        "deviation_sigmas": vwap_feat.deviation_sigmas,
+                        "mean_reversion_prob": vwap_feat.mean_reversion_prob,
+                    },
                 },
                 no_trade_reason=reason,
             )
@@ -266,6 +279,11 @@ class SKYIntelligenceOrchestrator:
             "confluence_score": best_setup.confluence_score,
             "net_ev_r": round(net_ev, 3),
             "kelly_fraction": round(half_kelly, 4),
+            "vwap": {
+                "vwap": vwap_feat.vwap,
+                "deviation_sigmas": vwap_feat.deviation_sigmas,
+                "mean_reversion_prob": vwap_feat.mean_reversion_prob,
+            },
             "explanation": best_setup.explanation_text,
         }
 

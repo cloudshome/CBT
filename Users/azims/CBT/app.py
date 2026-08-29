@@ -85,6 +85,7 @@ from core.sky_intelligence import (
     market_regime_engine,
     setup_engine,
     expectancy_engine,
+    vwap_engine,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -426,6 +427,7 @@ async def get_sky_setups(symbol: str = Query("BTC/USDT"), timeframe: str = Query
     obs = order_block_engine.detect_candidate_order_blocks(symbol, timeframe, candles, atr=vol_state.atr)
     disp = displacement_engine.calculate_displacement(candles, atr=vol_state.atr)
     vol_feat = volume_engine.analyze_volume(candles)
+    vwap_feat = vwap_engine.compute_vwap(candles)
     curr_close = float(candles[-1]["close"]) if candles else 88400.0
     derivs = derivatives_engine.analyze_derivatives(symbol, curr_close, 0.5, 50000.0, 49000.0, 0.0001)
     tf_map = {timeframe: candles}
@@ -447,6 +449,7 @@ async def get_sky_setups(symbol: str = Query("BTC/USDT"), timeframe: str = Query
         mtf_context=mtf,
         regime_state=regime,
         atr=vol_state.atr,
+        vwap_feat=vwap_feat,
     )
     return {
         "symbol": symbol,
@@ -454,6 +457,20 @@ async def get_sky_setups(symbol: str = Query("BTC/USDT"), timeframe: str = Query
         "total_scanned": len(setups),
         "qualified_count": sum(1 for s in setups if s.is_qualified),
         "setups": [asdict(s) for s in setups],
+    }
+
+
+@app.get("/api/sky/vwap")
+async def get_sky_vwap(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+    """
+    Session VWAP, rolling sigma bands, deviation z-score, and mean-reversion probability.
+    """
+    candles = data_streamer.get_candles(symbol, timeframe, limit=100)
+    vwap_feat = vwap_engine.compute_vwap(candles)
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "vwap": asdict(vwap_feat),
     }
 
 

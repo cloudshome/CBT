@@ -127,3 +127,73 @@ export interface PresetDataset {
   description: string;
   candles: CandleRaw[];
 }
+
+export interface VWAPData {
+  timestamp: number;
+  vwap: number;
+  upper_band_1sigma: number;
+  lower_band_1sigma: number;
+  upper_band_2sigma: number;
+  lower_band_2sigma: number;
+  std_dev: number;
+  deviation_sigmas: number;
+  is_above_vwap: boolean;
+  is_extended_overbought: boolean;
+  is_extended_oversold: boolean;
+  is_reclaiming: boolean;
+  mean_reversion_prob: number;
+  anchored_vwap?: number | null;
+}
+
+export interface SKYSetupData {
+  setup_type: string;
+  direction: 'LONG' | 'SHORT' | 'WATCH' | 'NO_TRADE';
+  symbol: string;
+  trigger_timeframe: string;
+  timestamp: number;
+  entry_price: number;
+  invalidation_sl: number;
+  target_tp: number;
+  risk_reward_ratio: number;
+  displacement_score: number;
+  regime: string;
+  historical_expectancy_r: number;
+  historical_win_rate: number;
+  historical_sample_size: number;
+  confluence_score: number;
+  is_qualified: boolean;
+  rejection_reasons: string[];
+  explanation_text: string;
+}
+
+export interface SKYIntelligenceResponse {
+  decision: 'LONG' | 'SHORT' | 'WATCH' | 'NO_TRADE';
+  symbol: string;
+  timeframe: string;
+  timestamp: number;
+  setup_qualified?: SKYSetupData | null;
+  net_ev_r: number;
+  kelly_fraction: number;
+  suggested_position_size_usd: number;
+  risk_gate_passed: boolean;
+  explanation_dossier: {
+    regime: string;
+    mtf_alignment?: string;
+    volatility?: string;
+    displacement_score?: number;
+    active_pools?: number;
+    active_fvgs?: number;
+    candidate_obs?: number;
+    vwap?: {
+      vwap: number;
+      deviation_sigmas: number;
+      mean_reversion_prob: number;
+    };
+    explanation?: string;
+    [key: string]: unknown;
+  };
+  no_trade_reason?: string | null;
+  vwap: VWAPData;
+  setups: SKYSetupData[];
+}
+

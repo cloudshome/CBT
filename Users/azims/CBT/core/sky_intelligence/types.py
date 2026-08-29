@@ -230,6 +230,25 @@ class VolatilityState:
 
 
 @dataclass(frozen=True)
+class VWAPFeature:
+    timestamp: int
+    vwap: float
+    upper_band_1sigma: float
+    lower_band_1sigma: float
+    upper_band_2sigma: float
+    lower_band_2sigma: float
+    std_dev: float
+    deviation_sigmas: float              # (price - vwap) / std_dev
+    is_above_vwap: bool
+    is_extended_overbought: bool         # deviation > +2.0 sigma
+    is_extended_oversold: bool           # deviation < -2.0 sigma
+    is_reclaiming: bool
+    mean_reversion_prob: float           # [0.0, 1.0]
+    anchored_vwap: Optional[float] = None
+
+
+
+@dataclass(frozen=True)
 class DerivativesState:
     timestamp: int
     open_interest: float

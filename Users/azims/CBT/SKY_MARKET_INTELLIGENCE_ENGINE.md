@@ -286,7 +286,7 @@ $$\begin{aligned}
 | **Phase 5** | Fair Value Gap Engine | FVG detection, size/ATR, mitigation, empirical $E[R]$. | ✅ Implemented |
 | **Phase 6** | Candidate Order Blocks | Candidate OB origin, ATR displacement, zone retests. | ✅ Implemented |
 | **Phase 7** | Displacement Engine | Body/ATR, Range/ATR, calibrated score (0–100). | ✅ Implemented |
-| **Phase 8** | VWAP Engine | Session VWAP, Anchored VWAP, $\sigma$-bands, mean reversion. | 🔄 Next Phase |
+| **Phase 8** | VWAP Engine | Session VWAP, Anchored VWAP, $\sigma$-bands, mean reversion. | ✅ Implemented |
 | **Phase 9** | Derivatives Intelligence | Open Interest, Funding z-score, Liquidations, Basis. | ✅ Implemented |
 | **Phase 10** | Order Flow Engine | L2 Imbalance, Aggressive trades, Absorption, Exhaustion. | ✅ Implemented |
 | **Phase 11** | Multi-Timeframe Context | Hierarchical Stack: 1D $\to$ 4H $\to$ 1H $\to$ 15m $\to$ 5m $\to$ 1m. | ✅ Implemented |

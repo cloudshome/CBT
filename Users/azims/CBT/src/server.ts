@@ -6,6 +6,7 @@ import mtfRouter from './routes/mtf';
 import scanRouter from './routes/scan';
 import paperRouter from './routes/paper';
 import deskRouter from './routes/desk';
+import skyRouter from './routes/sky';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ export function createApp(): Express {
   app.use('/api/scan', scanRouter);
   app.use('/api/paper', paperRouter);
   app.use('/api/desk', deskRouter);
+  app.use('/api/sky', skyRouter);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {

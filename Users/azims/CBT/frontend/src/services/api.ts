@@ -8,6 +8,8 @@ import {
   DeskBriefResponse,
   DeskAskResponse,
   SupportedTimeframe,
+  SKYIntelligenceResponse,
+  VWAPData,
 } from '../types';
 
 const BASE_URL = '';
@@ -137,4 +139,32 @@ export const api = {
     });
     return handleResponse<DeskAskResponse>(res);
   },
+
+  /**
+   * GET /api/sky/intelligence
+   */
+  async getSKYIntelligence(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m',
+    limit = 100
+  ): Promise<SKYIntelligenceResponse> {
+    const res = await fetch(
+      `${BASE_URL}/api/sky/intelligence?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
+    );
+    return handleResponse<SKYIntelligenceResponse>(res);
+  },
+
+  /**
+   * GET /api/sky/vwap
+   */
+  async getSKYVWAP(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<{ symbol: string; timeframe: string; vwap: VWAPData }> {
+    const res = await fetch(
+      `${BASE_URL}/api/sky/vwap?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<{ symbol: string; timeframe: string; vwap: VWAPData }>(res);
+  },
 };
+
