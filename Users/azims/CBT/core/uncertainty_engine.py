@@ -6,14 +6,14 @@ Aggregates multi-source uncertainty dimensions:
 - Bootstrap Model Disagreement Entropy
 - Regime Transition Ambiguity
 - Macro Event Shock Uncertainty
-Computes composite systemic uncertainty U in [0.0, 1.0] used to discount Net EV and Kelly sizing.
+Computes composite systemic uncertainty U in [0.0, 1.0] and honest probability confidence ranges [P_low, P_high].
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from core.data_quality_gate import QualityCheckResult
@@ -35,6 +35,8 @@ class UncertaintyBudget:
     event_shock_uncertainty: float      # [0.0, 1.0]
     penalty_factor: float               # Multiplier applied to Net EV
     uncertainty_level: str              # "LOW", "MODERATE", "ELEVATED", "PROHIBITIVE"
+    confidence_spread: float = 0.10     # Interval half-width (+/- delta)
+    p_range_string: str = "52% - 62%"   # Honest human-readable probability range
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -50,6 +52,7 @@ class UncertaintyEngine:
         sim_cone: SimulationCone,
         regime_res: RegimeClassificationResult,
         event_state: EventRiskState,
+        base_p_win: float = 0.58,
     ) -> UncertaintyBudget:
         """
         Synthesizes all uncertainty vectors into a unified uncertainty score U.
@@ -75,7 +78,6 @@ class UncertaintyEngine:
             u_event = 1.0
 
         # Weighted Composite Score U in [0.0, 1.0]
-        # Weights: Data (0.25), Analogue (0.20), Models (0.25), Regime (0.15), Event (0.15)
         u_composite = (
             0.25 * u_data
             + 0.20 * u_analogue
@@ -89,12 +91,20 @@ class UncertaintyEngine:
 
         if u_composite <= 0.25:
             level = "LOW"
+            spread = 0.05
         elif u_composite <= 0.50:
             level = "MODERATE"
+            spread = 0.09
         elif u_composite <= 0.75:
             level = "ELEVATED"
+            spread = 0.14
         else:
             level = "PROHIBITIVE"
+            spread = 0.22
+
+        p_low = max(0.05, base_p_win - spread)
+        p_high = min(0.95, base_p_win + spread)
+        range_str = f"{p_low*100:.0f}% - {p_high*100:.0f}%"
 
         return UncertaintyBudget(
             composite_uncertainty_u=round(u_composite, 3),
@@ -105,6 +115,8 @@ class UncertaintyEngine:
             event_shock_uncertainty=round(u_event, 3),
             penalty_factor=round(penalty_factor, 3),
             uncertainty_level=level,
+            confidence_spread=round(spread, 3),
+            p_range_string=range_str,
         )
 
 

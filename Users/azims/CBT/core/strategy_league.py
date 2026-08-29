@@ -145,6 +145,13 @@ class StrategyLeagueManager:
                 strat.quarantine_tier = QuarantineTier.TIER_3_ROBUST
                 return True, f"Promoted {strat.name} to Tier 3 (Robust Evaluation)."
         elif current_tier == QuarantineTier.TIER_3_ROBUST:
+            # Enforce Selection-Bias Guard (Deflated Sharpe Ratio DSR >= 0.95)
+            from core.strategy_selection_guard import strategy_selection_guard
+            guard_rep = strategy_selection_guard.evaluate_strategy(strat.dna_id, [], strat.rolling_sharpe_30d)
+
+            if not guard_rep.is_statistically_significant:
+                return False, f"Promotion blocked by Selection-Bias Guard: {guard_rep.rationale}"
+
             if (
                 strat.forward_trades_count >= 250
                 and strat.distinct_regimes_tested >= 2
@@ -153,7 +160,7 @@ class StrategyLeagueManager:
             ):
                 strat.quarantine_tier = QuarantineTier.TIER_4_PRODUCTION
                 self.rebalance_capital_weights()
-                return True, f"GRADUATED {strat.name} to Tier 4 Production League!"
+                return True, f"GRADUATED {strat.name} to Tier 4 Production League! (DSR = {guard_rep.deflated_sharpe_ratio:.3f})"
 
         return False, f"Strategy {strat.name} remains in Tier {int(current_tier)}."
 

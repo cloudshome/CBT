@@ -525,8 +525,9 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   useEffect(() => {
     if (!liveCandle || !candleSeriesRef.current) return;
 
+    const barTime = Math.floor(liveCandle[0] / 1000) as Time;
     const bar: CandlestickData = {
-      time: Math.floor(liveCandle[0] / 1000) as Time,
+      time: barTime,
       open: liveCandle[1],
       high: liveCandle[2],
       low: liveCandle[3],
@@ -536,15 +537,19 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     updateCounterRef.current += 1;
 
     window.requestAnimationFrame(() => {
-      candleSeriesRef.current?.update(bar);
-      volumeSeriesRef.current?.update({
-        time: Math.floor(liveCandle[0] / 1000) as Time,
-        value: liveCandle[5],
-        color: liveCandle[4] >= liveCandle[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
-      });
+      try {
+        candleSeriesRef.current?.update(bar);
+        volumeSeriesRef.current?.update({
+          time: barTime,
+          value: liveCandle[5] || 0,
+          color: liveCandle[4] >= liveCandle[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
+        });
 
-      if (isHistoricalPan) {
-        setUnreadTicks((prev) => prev + 1);
+        if (isHistoricalPan) {
+          setUnreadTicks((prev) => prev + 1);
+        }
+      } catch (err) {
+        // Silently skip out-of-order ticks during timeframe/symbol transition
       }
     });
   }, [liveCandle, isHistoricalPan]);
