@@ -21,8 +21,9 @@ export async function fetchBinanceCandles(
   limit: number,
   baseUrl = process.env.BINANCE_API_URL || DEFAULT_BINANCE_API_URL
 ): Promise<OHLCVCandle[]> {
+  const apiSymbol = symbol.toUpperCase() === 'XAUUSDT' ? 'PAXGUSDT' : symbol;
   const url = new URL(`${baseUrl}/klines`);
-  url.searchParams.set('symbol', symbol);
+  url.searchParams.set('symbol', apiSymbol);
   url.searchParams.set('interval', interval);
   url.searchParams.set('limit', String(limit));
 

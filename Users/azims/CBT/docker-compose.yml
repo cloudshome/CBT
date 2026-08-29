@@ -1,11 +1,27 @@
 version: '3.8'
 
+# =============================================================================
+# SKY / Crypto Brain Terminal — Full Stack Docker Compose
+#
+# Services:
+#   python-backend  → FastAPI + uvicorn (port 8000) — Core intelligence engine
+#   backend         → Node/Express + Prisma (port 3000) — Paper trading + candles
+#   frontend        → Nginx + React build (port 80) — Terminal UI
+#
+# Nginx routes /api/sky/*, /api/decision/*, /api/market/*, /ws/* → python-backend:8000
+# Nginx routes /api/candles, /api/paper, /api/desk, etc → backend:3000
+# =============================================================================
+
 services:
-  ai_quant_sentinel:
+
+  # ---------------------------------------------------------------------------
+  # Python FastAPI — Market Intelligence Engine (12-stage SKY pipeline)
+  # ---------------------------------------------------------------------------
+  python-backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cbt_quant_sentinel
+    container_name: sky_python_backend
     restart: always
     ports:
       - "8000:8000"
@@ -21,4 +37,49 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Node/Express — Paper Trading, Candles, Desk, Tickers (Prisma + SQLite)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: sky_node_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=file:/app/data/dev.db
+    depends_on:
+      python-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
       start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Nginx — React terminal UI + reverse proxy to both backends
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: sky_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      python-backend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy

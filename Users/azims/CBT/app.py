@@ -480,14 +480,36 @@ async def get_sky_vwap(symbol: str = Query("BTC/USDT"), timeframe: str = Query("
 
 
 @app.get("/api/sky/statistics")
-async def get_sky_statistics(concept: str = Query("SETUP_A_SWEEP_MSS"), regime: str = Query("TRENDING_BULL")):
+async def get_sky_statistics(
+    concept: str = Query("SETUP_A_SWEEP_MSS"),
+    regime: str = Query("TRENDING_BULL"),
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+):
     """
     Empirical statistical evaluation and out-of-sample expectancy metrics.
+    Runs a live sandbox_lab backtest on cached candles and feeds the real
+    R-multiple return series into the expectancy engine.
+    Falls back to a placeholder series if insufficient candle history is cached.
     """
-    # Sample historical distribution of R-multiples for validation
-    sample_r = [2.4, -1.0, 1.8, -1.0, 2.5, 1.2, -1.0, 3.1, -1.0, 2.2, 1.9, -1.0, -1.0, 2.7]
+    candles = data_streamer.get_candles(symbol, timeframe, limit=300)
+    if len(candles) >= 20:
+        bt_rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
+        sample_r = bt_rep.return_series if bt_rep.return_series else []
+    else:
+        # Insufficient history — use placeholder until candle cache is warm
+        sample_r = []
+
+    if not sample_r:
+        logger.warning("statistics endpoint: no real return series available, using placeholder.")
+        sample_r = [2.4, -1.0, 1.8, -1.0, 2.5, 1.2, -1.0, 3.1, -1.0, 2.2, 1.9, -1.0, -1.0, 2.7]
+
     stats = expectancy_engine.compute_expectancy(sample_r, concept_name=concept, regime=regime)
-    return asdict(stats)
+    result = asdict(stats)
+    result["data_source"] = "LIVE_BACKTEST" if len(candles) >= 20 else "PLACEHOLDER"
+    result["sample_count"] = len(sample_r)
+    return result
+
 
 
 @app.get("/api/scenarios")
@@ -636,20 +658,50 @@ async def parse_trade_command(req: CommandParseRequest):
 
 @app.post("/api/desk/ask")
 async def ask_desk_copilot(req: AskDeskRequest):
-    candles = data_streamer.get_candles(req.symbol or "BTC/USDT", req.timeframe or "15m", limit=30)
+    sym = req.symbol or "BTC/USDT"
+    tf = req.timeframe or "15m"
+    candles = data_streamer.get_candles(sym, tf, limit=60)
     cur_p = candles[-1]["close"] if candles else 88450.0
 
+    # --- Live council decision from the debate committee ---
+    try:
+        c_map = {tf: candles, "1h": data_streamer.get_candles(sym, "1h", limit=30)}
+        state = market_state_compiler.compile_state(sym, candles_by_tf=c_map)
+        analogues = analogue_engine.find_analogues(state)
+        dq = data_quality_gate.validate_feed(sym, candles[-1]["timestamp"] if candles else 0)
+        cone = path_simulator.simulate_paths(cur_p, candles, cur_p * 1.025, cur_p * 0.988)
+        reg_res = regime_transition_detector.classify_regime(candles)
+        event_st = event_shock_engine.evaluate_risk_state()
+        u_budget = uncertainty_engine.compute_budget(dq, analogues, cone, reg_res, event_st)
+        ev_res = ev_engine.calculate_net_ev(cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget)
+        macro = macro_sentinel.get_macro_snapshot()
+        council = debate_committee.convene_council(sym, state, ev_res, u_budget, macro.macro_regime)
+        council_decision = council.final_decision
+        net_ev_r = round(float(ev_res.net_ev_r), 2)
+        confluence_score = round(float(getattr(council, "confluence_score", 0.0)), 1)
+        regime_label = reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "UNKNOWN"
+    except Exception as e:
+        logger.warning(f"Desk ask: live council failed ({e}), using quick estimate")
+        council_decision = "NO_TRADE"
+        net_ev_r = 0.0
+        confluence_score = 0.0
+        regime_label = "UNKNOWN"
+
+    dominant_bias = "BULLISH" if cur_p > (candles[0]["close"] if candles else 0) else "BEARISH"
+
     telemetry = {
-        "symbol": req.symbol,
+        "symbol": sym,
         "current_price": cur_p,
-        "dominant_bias": "BULLISH" if cur_p > (candles[0]["close"] if candles else 0) else "BEARISH",
-        "council_decision": "NO_TRADE",
-        "net_ev_r": 0.42,
-        "confluence_score": 74.0,
+        "dominant_bias": dominant_bias,
+        "council_decision": council_decision,
+        "net_ev_r": net_ev_r,
+        "confluence_score": confluence_score,
+        "regime": regime_label,
     }
 
     reply = await quant_mentor.generate_response(req.message, telemetry, req.language or "auto")
     return {"reply": reply, "telemetry": telemetry}
+
 
 
 @app.get("/api/league/leaderboard")
@@ -728,13 +780,37 @@ async def get_institutional_cvd(
 async def get_orderbook_imbalance(
     symbol: str = Query("BTC/USDT"),
 ):
-    # Retrieve top L2 depth from gateway or fallback
-    state = market_state_compiler.compile_snapshot(symbol=symbol)
-    p = state.best_ask
-    bids = [(p * (1.0 - 0.0005 * i), 1.5 + 0.3 * i) for i in range(15)]
-    asks = [(p * (1.0 + 0.0005 * i), 1.2 + 0.35 * i) for i in range(15)]
+    """
+    Real-time L2 Order Book Imbalance (OBI) + VPIN flow toxicity.
+    Fetches live depth from Binance/Bybit via market_gateway with SQLite fallback.
+    """
+    try:
+        ob = await data_streamer.get_order_book(symbol, limit=15)
+        raw_bids = ob.get("bids", [])
+        raw_asks = ob.get("asks", [])
+        # Normalize to list of (price, size) tuples
+        bids = [(float(b[0]), float(b[1])) for b in raw_bids[:15]] if raw_bids else []
+        asks = [(float(a[0]), float(a[1])) for a in raw_asks[:15]] if raw_asks else []
+        data_source = "LIVE"
+    except Exception as e:
+        logger.warning(f"OBI: live order book fetch failed ({e}), using synthetic depth")
+        bids = []
+        asks = []
+        data_source = "SYNTHETIC"
+
+    if not bids or not asks:
+        # Synthetic fallback anchored to last known price
+        state = market_state_compiler.compile_snapshot(symbol=symbol)
+        p = state.best_ask
+        bids = [(p * (1.0 - 0.0005 * i), 1.5 + 0.3 * i) for i in range(15)]
+        asks = [(p * (1.0 + 0.0005 * i), 1.2 + 0.35 * i) for i in range(15)]
+        data_source = "SYNTHETIC"
+
     res = orderbook_imbalance_engine.compute_imbalance(bids, asks, symbol=symbol)
-    return asdict(res)
+    result = asdict(res)
+    result["data_source"] = data_source
+    return result
+
 
 
 @app.get("/api/dossier")
