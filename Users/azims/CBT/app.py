@@ -236,7 +236,13 @@ async def telemetry_broadcaster_loop():
                 for ev in events:
                     await ws_manager.broadcast({"type": "POSITION_EVENT", "data": ev})
                     # Dispatch institutional alert to Telegram
-                    asyncio.create_task(telegram_bot.send_position_alert(ev.get("type", "FILL"), ev))
+                    alert_details = {
+                        "symbol": sym,
+                        "price": cur_price,
+                        "pnl_usd": ev.get("realized_pnl", 0.0),
+                        "message": ev.get("message", ""),
+                    }
+                    asyncio.create_task(telegram_bot.send_position_alert(ev.get("event", "FILL"), alert_details))
 
                 # Macro snapshot
                 macro = macro_sentinel.get_macro_snapshot()

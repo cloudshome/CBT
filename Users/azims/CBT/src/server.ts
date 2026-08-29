@@ -61,7 +61,7 @@ export function createApp(): Express {
 
 export const app = createApp();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.NODE_PORT || 3000;
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
