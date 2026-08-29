@@ -166,5 +166,45 @@ export const api = {
     );
     return handleResponse<{ symbol: string; timeframe: string; vwap: VWAPData }>(res);
   },
+
+  /**
+   * GET /api/institutional/alpha
+   */
+  async getInstitutionalAlpha(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m',
+    limit = 100
+  ): Promise<import('../types').InstitutionalAlphaResponse> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/alpha?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
+    );
+    return handleResponse<import('../types').InstitutionalAlphaResponse>(res);
+  },
+
+  /**
+   * GET /api/institutional/cvd
+   */
+  async getInstitutionalCVD(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m',
+    limit = 100
+  ): Promise<import('../types').CVDSeriesData> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/cvd?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
+    );
+    return handleResponse<import('../types').CVDSeriesData>(res);
+  },
+
+  /**
+   * GET /api/institutional/orderbook-imbalance
+   */
+  async getOrderBookImbalance(
+    symbol: string
+  ): Promise<import('../types').OBIData> {
+    const res = await fetch(
+      `${BASE_URL}/api/institutional/orderbook-imbalance?symbol=${encodeURIComponent(symbol)}`
+    );
+    return handleResponse<import('../types').OBIData>(res);
+  },
 };
 

@@ -19,7 +19,7 @@ import {
   ArrowRight,
   Sparkles,
 } from 'lucide-react';
-import { OHLCVCandle, FVGItem, OrderBlockItem, SKYSetupData } from '../../types';
+import { OHLCVCandle, FVGItem, OrderBlockItem, SKYSetupData, SupportedTimeframe } from '../../types';
 import { DrawingObject, WorkspacePersistence } from '../persistence/workspaceDB';
 import { indicatorClient } from '../workers/indicatorClient';
 
@@ -35,13 +35,14 @@ export type DrawingToolType =
 
 interface TradingViewChartProps {
   symbol: string;
-  timeframe: string;
+  timeframe: SupportedTimeframe;
   candles: OHLCVCandle[];
   fvgs?: FVGItem[];
   orderBlocks?: OrderBlockItem[];
   skySetups?: SKYSetupData[];
   liveCandle?: OHLCVCandle | null;
   onDeploySetup?: (setup: any) => void;
+  onTimeframeChange?: (tf: SupportedTimeframe) => void;
   loading?: boolean;
 }
 
@@ -53,7 +54,9 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   orderBlocks = [],
   skySetups = [],
   liveCandle = null,
+  onTimeframeChange,
 }) => {
+  const chartWrapperRef = useRef<HTMLDivElement>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -63,6 +66,10 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const emaSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const vwapSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const upper1sRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const lower1sRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const upper2sRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const lower2sRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   // Viewport Navigation & Autoscroll Lock State
   const [isHistoricalPan, setIsHistoricalPan] = useState(false);
@@ -77,7 +84,9 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
   // Visibility Toggles
   const [showEMA, setShowEMA] = useState(true);
   const [showVWAP, setShowVWAP] = useState(true);
+  const [showMultiSigma, setShowMultiSigma] = useState(true);
   const [showSMCZones, setShowSMCZones] = useState(true);
+  const [showJudasZones, setShowJudasZones] = useState(true);
 
   // Crosshair HUD
   const [crosshairData, setCrosshairData] = useState<{
@@ -90,7 +99,50 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     changePct: number;
   } | null>(null);
 
-  // 1. Initialize Lightweight Charts v5 Instance
+  // Available Timeframes
+  const timeframes: SupportedTimeframe[] = ['1m', '3m', '5m', '15m', '1h', '4h', '1d'];
+
+  // Handle True Browser Fullscreen Toggle
+  const toggleFullscreen = useCallback(async () => {
+    const el = chartWrapperRef.current;
+    if (!el) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await el.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch {
+      // Fallback state toggle
+      setIsFullscreen((prev) => !prev);
+    }
+  }, []);
+
+  // Listen for fullscreen change event (e.g. user presses ESC)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+      if (chartRef.current && chartContainerRef.current) {
+        setTimeout(() => {
+          if (chartContainerRef.current && chartRef.current) {
+            chartRef.current.resize(
+              chartContainerRef.current.clientWidth,
+              chartContainerRef.current.clientHeight || (isFull ? window.innerHeight - 50 : 540)
+            );
+          }
+        }, 100);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // 1. Initialize Lightweight Charts v5 Instance with Institutional Theme
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -99,16 +151,16 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
     const chart = createChart(container, {
       width: container.clientWidth,
-      height: container.clientHeight || 480,
+      height: container.clientHeight || 540,
       layout: {
-        background: { type: ColorType.Solid, color: '#090d16' },
+        background: { type: ColorType.Solid, color: '#080b11' },
         textColor: '#94a3b8',
         fontSize: 11,
         fontFamily: "'JetBrains Mono', monospace",
       },
       grid: {
-        vertLines: { color: 'rgba(30, 41, 59, 0.4)' },
-        horzLines: { color: 'rgba(30, 41, 59, 0.4)' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
@@ -126,42 +178,42 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         },
       },
       timeScale: {
-        borderColor: 'rgba(51, 65, 85, 0.6)',
+        borderColor: 'rgba(51, 65, 85, 0.5)',
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 12,
-        barSpacing: 8,
+        barSpacing: 9,
         minBarSpacing: 2,
       },
       rightPriceScale: {
-        borderColor: 'rgba(51, 65, 85, 0.6)',
+        borderColor: 'rgba(51, 65, 85, 0.5)',
         scaleMargins: {
-          top: 0.1,
-          bottom: 0.22,
+          top: 0.08,
+          bottom: 0.2,
         },
         autoScale: true,
       },
     });
 
-    // Candlestick Series
+    // Neon Institutional Candlestick Colors
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#10b981',
-      downColor: '#ef4444',
-      borderUpColor: '#10b981',
-      borderDownColor: '#ef4444',
-      wickUpColor: '#10b981',
-      wickDownColor: '#ef4444',
+      upColor: '#00f0a8',
+      downColor: '#ff3b69',
+      borderUpColor: '#00f0a8',
+      borderDownColor: '#ff3b69',
+      wickUpColor: '#00f0a8',
+      wickDownColor: '#ff3b69',
     });
 
     // Volume Histogram Series
     const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: 'rgba(56, 189, 248, 0.35)',
+      color: 'rgba(56, 189, 248, 0.3)',
       priceFormat: { type: 'volume' },
-      priceScaleId: '', // Overlay on bottom
+      priceScaleId: '',
     });
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
-        top: 0.8,
+        top: 0.82,
         bottom: 0,
       },
     });
@@ -175,10 +227,45 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       priceLineVisible: false,
     });
 
-    // VWAP Line Series
+    // VWAP Core Line Series
     const vwapSeries = chart.addSeries(LineSeries, {
-      color: '#a855f7',
+      color: '#c084fc',
       lineWidth: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+
+    // Multi-Sigma VWAP Bands
+    const upper1s = chart.addSeries(LineSeries, {
+      color: 'rgba(129, 140, 248, 0.65)',
+      lineWidth: 1,
+      lineStyle: 2, // Dashed
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    const lower1s = chart.addSeries(LineSeries, {
+      color: 'rgba(129, 140, 248, 0.65)',
+      lineWidth: 1,
+      lineStyle: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+
+    const upper2s = chart.addSeries(LineSeries, {
+      color: 'rgba(244, 63, 94, 0.65)',
+      lineWidth: 1,
+      lineStyle: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    const lower2s = chart.addSeries(LineSeries, {
+      color: 'rgba(244, 63, 94, 0.65)',
+      lineWidth: 1,
+      lineStyle: 2,
       crosshairMarkerVisible: false,
       lastValueVisible: false,
       priceLineVisible: false,
@@ -189,6 +276,10 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     volumeSeriesRef.current = volumeSeries;
     emaSeriesRef.current = emaSeries;
     vwapSeriesRef.current = vwapSeries;
+    upper1sRef.current = upper1s;
+    lower1sRef.current = lower1s;
+    upper2sRef.current = upper2s;
+    lower2sRef.current = lower2s;
 
     // Crosshair move handler for real-time HUD
     chart.subscribeCrosshairMove((param) => {
@@ -198,16 +289,17 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
       }
 
       const cData = param.seriesData.get(candleSeries) as CandlestickData;
+      const vData = param.seriesData.get(volumeSeries) as HistogramData;
+
       if (cData) {
         const o = cData.open;
+        const c = cData.close;
         const h = cData.high;
         const l = cData.low;
-        const c = cData.close;
-        const chg = o > 0 ? ((c - o) / o) * 100 : 0;
-        const timeStr = new Date((param.time as number) * 1000).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+        const change = ((c - o) / o) * 100;
+        const timeStr = typeof param.time === 'number'
+          ? new Date(param.time * 1000).toLocaleString()
+          : String(param.time);
 
         setCrosshairData({
           time: timeStr,
@@ -215,118 +307,158 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           high: h,
           low: l,
           close: c,
-          volume: 0,
-          changePct: chg,
+          volume: vData?.value || 0,
+          changePct: change,
         });
       }
     });
 
-    // Detect user historical panning vs live autoscroll edge
-    chart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
-      if (!logicalRange) return;
-      const isPast = logicalRange.to < (candles.length - 3);
-      setIsHistoricalPan(isPast);
-      if (!isPast) setUnreadTicks(0);
-      drawCanvasOverlays();
+    // Detect user historical pan to lock edge following
+    chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (!range) return;
+      const barsInfo = candleSeries.barsInLogicalRange(range);
+      if (barsInfo && barsInfo.barsAfter !== undefined) {
+        if (barsInfo.barsAfter > 2) {
+          setIsHistoricalPan(true);
+        } else {
+          setIsHistoricalPan(false);
+          setUnreadTicks(0);
+        }
+      }
     });
 
     // Resize observer
     const handleResize = () => {
-      if (container && chart) {
-        chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
-        resizeDrawingCanvas();
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.resize(
+          chartContainerRef.current.clientWidth,
+          chartContainerRef.current.clientHeight || (isFullscreen ? window.innerHeight - 50 : 540)
+        );
+        updateCanvasDimensions();
         drawCanvasOverlays();
       }
     };
+
     window.addEventListener('resize', handleResize);
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       chart.remove();
+      chartRef.current = null;
     };
-  }, []);
+  }, [isFullscreen]);
 
-  // 2. Ingest Historical Candles without Viewport Mutability
+  // 2. Load Persisted Drawings from IndexedDB
   useEffect(() => {
-    if (!candleSeriesRef.current || !volumeSeriesRef.current || !candles || candles.length === 0) return;
-
-    // Convert to Lightweight Charts format
-    const formattedCandles: CandlestickData[] = [];
-    const formattedVolume: HistogramData[] = [];
-
-    const sorted = [...candles].sort((a, b) => a[0] - b[0]);
-
-    sorted.forEach(([ts, o, h, l, c, v]) => {
-      const time = Math.floor(ts / 1000) as Time;
-      formattedCandles.push({
-        time,
-        open: o,
-        high: h,
-        low: l,
-        close: c,
-      });
-      formattedVolume.push({
-        time,
-        value: v,
-        color: c >= o ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)',
-      });
+    let isMounted = true;
+    WorkspacePersistence.loadDrawings(symbol).then((stored: DrawingObject[]) => {
+      if (isMounted) setDrawings(stored);
     });
+    return () => { isMounted = false; };
+  }, [symbol]);
 
-    candleSeriesRef.current.setData(formattedCandles);
-    volumeSeriesRef.current.setData(formattedVolume);
+  // 3. Ingest Candlestick Data & Offload Indicators to Web Worker
+  useEffect(() => {
+    if (!candleSeriesRef.current || !candles || candles.length === 0) return;
 
-    // Compute Web Worker Indicators off main thread
-    const workerCandles = sorted.map(([ts, o, h, l, c, v]) => ({
-      timestamp: ts, open: o, high: h, low: l, close: c, volume: v,
+    const formattedCandles: CandlestickData[] = candles.map((c) => ({
+      time: Math.floor(c[0] / 1000) as Time,
+      open: c[1],
+      high: c[2],
+      low: c[3],
+      close: c[4],
     }));
 
+    const formattedVolume: HistogramData[] = candles.map((c) => ({
+      time: Math.floor(c[0] / 1000) as Time,
+      value: c[5],
+      color: c[4] >= c[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
+    }));
+
+    candleSeriesRef.current.setData(formattedCandles);
+    volumeSeriesRef.current?.setData(formattedVolume);
+
+    const workerCandles = candles.map((c) => ({
+      timestamp: c[0],
+      open: c[1],
+      high: c[2],
+      low: c[3],
+      close: c[4],
+      volume: c[5],
+    }));
+
+    // Offload mathematical indicators to Web Worker thread
     indicatorClient.calculateIndicators(workerCandles, {
       emaPeriods: [20],
       vwap: true,
     }).then((res) => {
-      if (emaSeriesRef.current && showEMA && res.ema[20]) {
-        const lineData: LineData[] = res.ema[20].map((pt) => ({
-          time: pt.time as Time,
-          value: pt.value,
+      if (emaSeriesRef.current && showEMA && res.ema && res.ema[20]) {
+        const emaData: LineData[] = res.ema[20].map((p: { time: number; value: number }) => ({
+          time: p.time as Time,
+          value: p.value,
         }));
-        emaSeriesRef.current.setData(lineData);
+        emaSeriesRef.current.setData(emaData);
       }
-      if (vwapSeriesRef.current && showVWAP && res.vwap.vwap) {
-        const vData: LineData[] = res.vwap.vwap.map((pt) => ({
-          time: pt.time as Time,
-          value: pt.value,
+
+      if (vwapSeriesRef.current && showVWAP && res.vwap) {
+        const vwapData: LineData[] = res.vwap.vwap.map((p: { time: number; value: number }) => ({
+          time: p.time as Time,
+          value: p.value,
         }));
-        vwapSeriesRef.current.setData(vData);
+        vwapSeriesRef.current.setData(vwapData);
+
+        if (showMultiSigma) {
+          const u1Data: LineData[] = res.vwap.upper1s.map((p: { time: number; value: number }) => ({
+            time: p.time as Time,
+            value: p.value,
+          }));
+          const l1Data: LineData[] = res.vwap.lower1s.map((p: { time: number; value: number }) => ({
+            time: p.time as Time,
+            value: p.value,
+          }));
+          const u2Data: LineData[] = res.vwap.upper2s.map((p: { time: number; value: number }) => ({
+            time: p.time as Time,
+            value: p.value,
+          }));
+          const l2Data: LineData[] = res.vwap.lower2s.map((p: { time: number; value: number }) => ({
+            time: p.time as Time,
+            value: p.value,
+          }));
+
+          upper1sRef.current?.setData(u1Data);
+          lower1sRef.current?.setData(l1Data);
+          upper2sRef.current?.setData(u2Data);
+          lower2sRef.current?.setData(l2Data);
+        }
       }
     });
 
-    // Load drawings from IndexedDB
-    WorkspacePersistence.loadDrawings(symbol).then((stored) => {
-      setDrawings(stored);
-      drawCanvasOverlays();
-    });
-  }, [candles, symbol, showEMA, showVWAP, skySetups]);
+    if (!isHistoricalPan) {
+      chartRef.current?.timeScale().scrollToRealTime();
+    }
+  }, [candles, showEMA, showVWAP, showMultiSigma, isHistoricalPan]);
 
-  // 3. Real-time Tick Micro-batching via requestAnimationFrame (Zero React Re-render)
+  // 4. Live Tick Micro-Batching with RAF
   useEffect(() => {
-    if (!liveCandle || !candleSeriesRef.current || !volumeSeriesRef.current) return;
+    if (!liveCandle || !candleSeriesRef.current) return;
 
-    const [ts, o, h, l, c, v] = liveCandle;
-    const time = Math.floor(ts / 1000) as Time;
+    const bar: CandlestickData = {
+      time: Math.floor(liveCandle[0] / 1000) as Time,
+      open: liveCandle[1],
+      high: liveCandle[2],
+      low: liveCandle[3],
+      close: liveCandle[4],
+    };
 
     window.requestAnimationFrame(() => {
-      candleSeriesRef.current?.update({
-        time,
-        open: o,
-        high: h,
-        low: l,
-        close: c,
-      });
-
+      candleSeriesRef.current?.update(bar);
       volumeSeriesRef.current?.update({
-        time,
-        value: v,
-        color: c >= o ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)',
+        time: Math.floor(liveCandle[0] / 1000) as Time,
+        value: liveCandle[5],
+        color: liveCandle[4] >= liveCandle[1] ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)',
       });
 
       if (isHistoricalPan) {
@@ -335,17 +467,8 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
     });
   }, [liveCandle, isHistoricalPan]);
 
-  // 4. Reset Viewport to Latest Edge
-  const handleScrollToLatest = () => {
-    if (chartRef.current) {
-      chartRef.current.timeScale().scrollToRealTime();
-      setIsHistoricalPan(false);
-      setUnreadTicks(0);
-    }
-  };
-
-  // 5. Canvas Drawing Engine Overlay & Coordinate Math
-  const resizeDrawingCanvas = () => {
+  // 5. Canvas Mathematical Drawing & Overlay Engine
+  const updateCanvasDimensions = () => {
     const canvas = drawingCanvasRef.current;
     const container = chartContainerRef.current;
     if (!canvas || !container) return;
@@ -364,38 +487,61 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Draw SMC Order Blocks & FVGs
+    // 1. Draw Judas Swing Session Killzones (London 07:00-09:00 UTC & NY 13:00-15:00 UTC)
+    if (showJudasZones && candles.length > 0) {
+      const sessionRanges: Array<{ name: string; startH: number; endH: number; color: string; fill: string }> = [
+        { name: 'LONDON KILLZONE (07:00-09:00 UTC)', startH: 7, endH: 9, color: '#38bdf8', fill: 'rgba(56, 189, 248, 0.05)' },
+        { name: 'NY KILLZONE (13:00-15:00 UTC)', startH: 13, endH: 15, color: '#f59e0b', fill: 'rgba(245, 158, 11, 0.05)' },
+      ];
+
+      candles.forEach((c) => {
+        const dt = new Date(c[0]);
+        const utcHour = dt.getUTCHours();
+        const utcMin = dt.getUTCMinutes();
+        const timeDec = utcHour + utcMin / 60;
+
+        sessionRanges.forEach((s) => {
+          if (timeDec >= s.startH && timeDec < s.endH) {
+            const x = chart.timeScale().timeToCoordinate(Math.floor(c[0] / 1000) as Time);
+            if (x !== null && x > 0 && x < canvas.width) {
+              ctx.fillStyle = s.fill;
+              ctx.fillRect(x - 5, 0, 10, canvas.height);
+            }
+          }
+        });
+      });
+    }
+
+    // 2. Draw SMC Order Blocks & FVGs
     if (showSMCZones) {
-      // Order Blocks
       orderBlocks.forEach((ob) => {
         const yTop = series.priceToCoordinate(ob.price_zone[1]);
         const yBot = series.priceToCoordinate(ob.price_zone[0]);
         if (yTop !== null && yBot !== null) {
           const height = Math.abs(yBot - yTop);
-          ctx.fillStyle = ob.type === 'bullish' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(168, 85, 247, 0.15)';
-          ctx.strokeStyle = ob.type === 'bullish' ? '#38bdf8' : '#a855f7';
+          ctx.fillStyle = ob.type === 'bullish' ? 'rgba(0, 240, 168, 0.12)' : 'rgba(255, 59, 105, 0.12)';
+          ctx.strokeStyle = ob.type === 'bullish' ? '#00f0a8' : '#ff3b69';
           ctx.lineWidth = 1;
           ctx.fillRect(0, Math.min(yTop, yBot), canvas.width, height);
           ctx.strokeRect(0, Math.min(yTop, yBot), canvas.width, height);
         }
       });
 
-      // FVGs
       fvgs.forEach((fvg) => {
         if (fvg.mitigated) return;
         const yTop = series.priceToCoordinate(fvg.price_zone[1]);
         const yBot = series.priceToCoordinate(fvg.price_zone[0]);
         if (yTop !== null && yBot !== null) {
           const height = Math.abs(yBot - yTop);
-          ctx.fillStyle = fvg.type === 'bullish' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)';
-          ctx.strokeStyle = fvg.type === 'bullish' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)';
+          ctx.fillStyle = fvg.type === 'bullish' ? 'rgba(0, 240, 168, 0.08)' : 'rgba(255, 59, 105, 0.08)';
+          ctx.strokeStyle = fvg.type === 'bullish' ? 'rgba(0, 240, 168, 0.4)' : 'rgba(255, 59, 105, 0.4)';
           ctx.fillRect(0, Math.min(yTop, yBot), canvas.width, height);
           ctx.strokeRect(0, Math.min(yTop, yBot), canvas.width, height);
         }
       });
     }
 
-    // 2. Draw User Mathematical Drawings Anchored to [Timestamp, Price]
+    // 3. Draw User Mathematical Drawings Anchored to [Timestamp, Price]
     drawings.forEach((drawing) => {
       if (drawing.points.length < 2 && drawing.type !== 'HORIZONTAL_RAY') return;
 
@@ -442,7 +588,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
           ctx.fillText(`Fib ${(lvl * 100).toFixed(1)}%`, Math.min(x1, x2) + 5, yLvl - 3);
         });
       } else if ((drawing.type === 'LONG_POSITION' || drawing.type === 'SHORT_POSITION') && x2 !== null && y2 !== null) {
-        // Risk/Reward Position Tool
         const isLong = drawing.type === 'LONG_POSITION';
         const entryY = y1;
         const slY = y2;
@@ -450,18 +595,18 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         const tpY = isLong ? entryY - (2.5 * riskH) : entryY + (2.5 * riskH);
 
         // Stop Loss Box
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+        ctx.fillStyle = 'rgba(255, 59, 105, 0.2)';
         ctx.fillRect(x1, Math.min(entryY, slY), Math.abs(x2 - x1) || 120, Math.abs(slY - entryY));
 
         // Target Box
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+        ctx.fillStyle = 'rgba(0, 240, 168, 0.2)';
         ctx.fillRect(x1, Math.min(entryY, tpY), Math.abs(x2 - x1) || 120, Math.abs(tpY - entryY));
       }
 
       ctx.restore();
     });
 
-    // 3. Draw SKY Quantitative Signal Markers
+    // 4. Draw SKY Signal Markers
     if (skySetups && skySetups.length > 0) {
       skySetups.forEach((setup) => {
         const isBull = setup.direction === 'LONG';
@@ -470,8 +615,8 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         if (x === null || y === null) return;
 
         ctx.save();
-        ctx.fillStyle = isBull ? '#10b981' : '#ef4444';
-        ctx.strokeStyle = isBull ? '#10b981' : '#ef4444';
+        ctx.fillStyle = isBull ? '#00f0a8' : '#ff3b69';
+        ctx.strokeStyle = isBull ? '#00f0a8' : '#ff3b69';
         ctx.lineWidth = 2;
 
         // Draw Arrow
@@ -498,187 +643,277 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         // Signal Label Box
         const label = `${setup.setup_type.replace(/SETUP_/g, '')} ${setup.risk_reward_ratio}R`;
         ctx.font = 'bold 10px monospace';
-        const textW = ctx.measureText(label).width;
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-        ctx.fillRect(x - textW / 2 - 4, arrowY + (isBull ? 4 : -16), textW + 8, 14);
-        ctx.strokeRect(x - textW / 2 - 4, arrowY + (isBull ? 4 : -16), textW + 8, 14);
+        const textWidth = ctx.measureText(label).width;
+        const boxX = x - textWidth / 2 - 4;
+        const boxY = isBull ? arrowY + 4 : arrowY - 16;
 
-        ctx.fillStyle = isBull ? '#10b981' : '#ef4444';
-        ctx.fillText(label, x - textW / 2, arrowY + (isBull ? 15 : -5));
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(boxX, boxY, textWidth + 8, 14);
+        ctx.strokeRect(boxX, boxY, textWidth + 8, 14);
+
+        ctx.fillStyle = isBull ? '#00f0a8' : '#ff3b69';
+        ctx.fillText(label, boxX + 4, boxY + 11);
+
         ctx.restore();
       });
     }
-  }, [drawings, orderBlocks, fvgs, showSMCZones, skySetups]);
+  }, [candles, showSMCZones, showJudasZones, drawings, skySetups]);
 
-  // 6. Interactive Canvas Click Handler for Drawing Creation
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool === 'CURSOR') return;
+  // Sync canvas overlay on timeframe or drawing changes
+  useEffect(() => {
+    updateCanvasDimensions();
+    drawCanvasOverlays();
+  }, [drawings, drawCanvasOverlays]);
 
-    const canvas = drawingCanvasRef.current;
-    const chart = chartRef.current;
-    const series = candleSeriesRef.current;
-    if (!canvas || !chart || !series) return;
+  // Canvas Mouse Interaction for Drawings
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (activeTool === 'CURSOR' || !chartRef.current || !candleSeriesRef.current) return;
 
-    const rect = canvas.getBoundingClientRect();
+    const rect = drawingCanvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const timeCoord = chart.timeScale().coordinateToTime(x);
-    const priceCoord = series.coordinateToPrice(y);
+    const timeCoord = chartRef.current.timeScale().coordinateToTime(x);
+    const priceCoord = candleSeriesRef.current.coordinateToPrice(y);
 
-    if (!timeCoord || !priceCoord) return;
+    if (timeCoord === null || priceCoord === null) return;
 
-    const timestamp = (timeCoord as number) * 1000;
-    const point = { timestamp, price: priceCoord };
+    const ts = typeof timeCoord === 'number' ? timeCoord * 1000 : Date.now();
+    const newPoints = [...activeDrawingPoints, { timestamp: ts, price: priceCoord }];
 
-    if (activeTool === 'HORIZONTAL_RAY' || activeTool === 'VERTICAL_LINE') {
+    if (activeTool === 'HORIZONTAL_RAY' || newPoints.length >= 2) {
       const newDrawing: DrawingObject = {
-        id: Math.random().toString(36).substring(2, 9),
-        type: activeTool,
+        id: `draw_${Date.now()}`,
         symbol,
         timeframe,
-        points: [point],
+        type: activeTool,
+        points: newPoints,
+        color: activeTool === 'LONG_POSITION' ? '#00f0a8' : activeTool === 'SHORT_POSITION' ? '#ff3b69' : '#38bdf8',
+        lineWidth: 2,
         createdAt: Date.now(),
       };
-      setDrawings((prev) => [...prev, newDrawing]);
+
+      const updated = [...drawings, newDrawing];
+      setDrawings(updated);
       WorkspacePersistence.saveDrawing(newDrawing);
+      setActiveDrawingPoints([]);
       setActiveTool('CURSOR');
     } else {
-      if (activeDrawingPoints.length === 0) {
-        setActiveDrawingPoints([point]);
-      } else {
-        const newDrawing: DrawingObject = {
-          id: Math.random().toString(36).substring(2, 9),
-          type: activeTool,
-          symbol,
-          timeframe,
-          points: [activeDrawingPoints[0], point],
-          createdAt: Date.now(),
-        };
-        setDrawings((prev) => [...prev, newDrawing]);
-        WorkspacePersistence.saveDrawing(newDrawing);
-        setActiveDrawingPoints([]);
-        setActiveTool('CURSOR');
-      }
+      setActiveDrawingPoints(newPoints);
     }
   };
 
   return (
     <div
-      className={`bg-[#090d16] border border-border rounded-lg shadow-xl flex flex-col relative overflow-hidden ${
-        isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'h-full'
+      ref={chartWrapperRef}
+      className={`relative flex flex-col bg-[#080b11] border border-[#1e293b] rounded-lg overflow-hidden select-none transition-all duration-300 ${
+        isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen' : 'h-[580px]'
       }`}
     >
-      {/* Top TradingView Control Bar */}
-      <div className="h-10 border-b border-border/80 px-3 bg-[#0d1322] flex items-center justify-between z-10 select-none">
-        {/* Left: Active Tool, Symbol, OHLC HUD */}
+      {/* Top Header & Chart Toolbar */}
+      <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-[#0d121d] border-b border-[#1e293b] text-xs z-10 gap-2">
+        {/* Left: Symbol, Price, Timeframes */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-200">
-            <span className="text-terminal-cyan">{symbol}</span>
-            <span className="px-1 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">{timeframe}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-slate-100 text-sm">{symbol}</span>
+            <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded">
+              PERP
+            </span>
           </div>
 
-          {/* Real-time OHLC Crosshair Readout */}
-          {crosshairData ? (
-            <div className="hidden lg:flex items-center gap-3 text-[11px] font-mono text-slate-400">
-              <span>O: <strong className="text-slate-200">${crosshairData.open.toFixed(2)}</strong></span>
-              <span>H: <strong className="text-slate-200">${crosshairData.high.toFixed(2)}</strong></span>
-              <span>L: <strong className="text-slate-200">${crosshairData.low.toFixed(2)}</strong></span>
-              <span>C: <strong className="text-slate-200">${crosshairData.close.toFixed(2)}</strong></span>
-              <span className={crosshairData.changePct >= 0 ? 'text-terminal-green' : 'text-terminal-red'}>
+          {/* Timeframe Selector Buttons */}
+          <div className="flex items-center bg-[#080b11] border border-slate-800 rounded p-0.5">
+            {timeframes.map((tf) => (
+              <button
+                key={tf}
+                onClick={() => onTimeframeChange && onTimeframeChange(tf)}
+                className={`px-2 py-0.5 rounded text-[11px] font-mono font-medium transition-all ${
+                  timeframe === tf
+                    ? 'bg-sky-500 text-white font-bold shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                {tf.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* Real-time OHLC Readout */}
+          {crosshairData && (
+            <div className="hidden lg:flex items-center gap-2 font-mono text-[11px] text-slate-400">
+              <span>O <strong className="text-slate-200">${crosshairData.open.toFixed(2)}</strong></span>
+              <span>H <strong className="text-slate-200">${crosshairData.high.toFixed(2)}</strong></span>
+              <span>L <strong className="text-slate-200">${crosshairData.low.toFixed(2)}</strong></span>
+              <span>C <strong className="text-slate-200">${crosshairData.close.toFixed(2)}</strong></span>
+              <span className={crosshairData.changePct >= 0 ? 'text-[#00f0a8]' : 'text-[#ff3b69]'}>
                 {crosshairData.changePct >= 0 ? '+' : ''}{crosshairData.changePct.toFixed(2)}%
               </span>
-            </div>
-          ) : (
-            <div className="hidden lg:flex items-center gap-2 text-[10px] font-mono text-slate-500">
-              <Sparkles className="w-3 h-3 text-terminal-cyan animate-pulse" />
-              <span>TRADINGVIEW 60 FPS ENGINE ONLINE</span>
             </div>
           )}
         </div>
 
-        {/* Right: Indicators, SMC Layer, Tool Selectors, Fullscreen */}
-        <div className="flex items-center gap-1.5">
-          {/* Drawing Tools Dropdown / Quick Buttons */}
-          <div className="flex items-center bg-slate-900 rounded p-0.5 border border-border">
+        {/* Right: Technical Toggles, Fullscreen & Controls */}
+        <div className="flex items-center gap-2">
+          {/* Layer Visibility Toggles */}
+          <div className="flex items-center gap-1 bg-[#080b11] border border-slate-800 rounded p-0.5">
             <button
-              onClick={() => setActiveTool(activeTool === 'TREND_LINE' ? 'CURSOR' : 'TREND_LINE')}
-              className={`px-2 py-0.5 text-[10px] font-mono rounded ${activeTool === 'TREND_LINE' ? 'bg-terminal-cyan text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-              title="Trend Line"
+              onClick={() => setShowEMA(!showEMA)}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                showEMA ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-500'
+              }`}
+              title="EMA 20"
             >
-              Trend
+              EMA
             </button>
             <button
-              onClick={() => setActiveTool(activeTool === 'FIB_RETRACEMENT' ? 'CURSOR' : 'FIB_RETRACEMENT')}
-              className={`px-2 py-0.5 text-[10px] font-mono rounded ${activeTool === 'FIB_RETRACEMENT' ? 'bg-terminal-cyan text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-              title="Fibonacci Retracement"
+              onClick={() => setShowVWAP(!showVWAP)}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                showVWAP ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'text-slate-500'
+              }`}
+              title="Session VWAP"
             >
-              Fib
+              VWAP
             </button>
             <button
-              onClick={() => setActiveTool(activeTool === 'LONG_POSITION' ? 'CURSOR' : 'LONG_POSITION')}
-              className={`px-2 py-0.5 text-[10px] font-mono rounded ${activeTool === 'LONG_POSITION' ? 'bg-terminal-green text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
-              title="Long Position Tool"
+              onClick={() => setShowMultiSigma(!showMultiSigma)}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                showMultiSigma ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-500'
+              }`}
+              title="VWAP Multi-Sigma Bands (±1σ, ±2σ)"
             >
-              Long Tool
+              ±σ
+            </button>
+            <button
+              onClick={() => setShowSMCZones(!showSMCZones)}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                showSMCZones ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-500'
+              }`}
+              title="SMC Zones & FVGs"
+            >
+              SMC
+            </button>
+            <button
+              onClick={() => setShowJudasZones(!showJudasZones)}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                showJudasZones ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'text-slate-500'
+              }`}
+              title="Judas Swing Session Killzones"
+            >
+              JUDAS
             </button>
           </div>
 
-          {/* Indicator Toggles */}
+          {/* Fullscreen Button */}
           <button
-            onClick={() => setShowEMA(!showEMA)}
-            className={`px-2 py-0.5 text-[10px] font-mono rounded border transition ${showEMA ? 'bg-terminal-cyan/15 text-terminal-cyan border-terminal-cyan/40' : 'bg-slate-900 text-slate-500 border-border'}`}
+            onClick={toggleFullscreen}
+            className={`p-1.5 rounded transition-all flex items-center gap-1 font-mono text-[11px] ${
+              isFullscreen
+                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30'
+                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
+            }`}
+            title={isFullscreen ? 'Exit Full Screen (ESC)' : 'Full Screen'}
           >
-            EMA(20)
-          </button>
-          <button
-            onClick={() => setShowVWAP(!showVWAP)}
-            className={`px-2 py-0.5 text-[10px] font-mono rounded border transition ${showVWAP ? 'bg-terminal-purple/15 text-terminal-purple border-terminal-purple/40' : 'bg-slate-900 text-slate-500 border-border'}`}
-          >
-            VWAP
-          </button>
-          <button
-            onClick={() => setShowSMCZones(!showSMCZones)}
-            className={`px-2 py-0.5 text-[10px] font-mono rounded border transition ${showSMCZones ? 'bg-amber-500/15 text-amber-400 border-amber-500/40' : 'bg-slate-900 text-slate-500 border-border'}`}
-          >
-            SMC Zones
-          </button>
-
-          {/* Fullscreen Toggle */}
-          <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-border ml-1"
-          >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            <span className="hidden sm:inline">{isFullscreen ? 'EXIT' : 'FULLSCREEN'}</span>
           </button>
         </div>
       </div>
 
-      {/* Main Chart Body Container */}
-      <div className="flex-1 relative w-full h-full min-h-[440px]">
-        {/* Lightweight Charts Core Canvas */}
+      {/* Main Chart Canvas & Overlay Container */}
+      <div className="relative flex-1 w-full h-full overflow-hidden">
+        {/* Lightweight Charts Render Target */}
         <div ref={chartContainerRef} className="absolute inset-0 w-full h-full" />
 
         {/* Double-Buffered Mathematical Overlay Canvas */}
         <canvas
           ref={drawingCanvasRef}
-          onClick={handleCanvasClick}
-          className={`absolute inset-0 w-full h-full ${activeTool !== 'CURSOR' ? 'cursor-crosshair z-20' : 'pointer-events-none z-10'}`}
+          onMouseDown={handleCanvasMouseDown}
+          className={`absolute inset-0 w-full h-full pointer-events-auto ${
+            activeTool !== 'CURSOR' ? 'cursor-crosshair' : 'cursor-default'
+          }`}
         />
 
-        {/* Floating "Go to Latest" Button with Unread Tick Counter */}
+        {/* Floating "Go to Latest" Button when User Pans Backward */}
         {isHistoricalPan && (
           <button
-            onClick={handleScrollToLatest}
-            className="absolute bottom-6 right-16 z-30 px-3 py-1.5 rounded-full bg-terminal-cyan text-slate-950 font-mono font-bold text-xs shadow-2xl hover:scale-105 transition flex items-center gap-1.5"
+            onClick={() => {
+              chartRef.current?.timeScale().scrollToRealTime();
+              setIsHistoricalPan(false);
+              setUnreadTicks(0);
+            }}
+            className="absolute bottom-6 right-16 z-20 flex items-center gap-2 px-3 py-1.5 bg-sky-500/90 hover:bg-sky-500 text-white text-xs font-mono font-semibold rounded-full shadow-lg shadow-sky-500/25 border border-sky-400 backdrop-blur-sm transition-all transform hover:scale-105 animate-pulse"
           >
             <span>Go to Latest</span>
             {unreadTicks > 0 && (
-              <span className="px-1.5 py-0.2 bg-slate-950 text-terminal-cyan rounded-full text-[10px]">
+              <span className="px-1.5 py-0.2 bg-black/40 text-[10px] rounded-full">
                 +{unreadTicks}
               </span>
             )}
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight size={13} />
+          </button>
+        )}
+
+        {/* Active Drawing Tool Floating Banner */}
+        {activeTool !== 'CURSOR' && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-sky-950/90 border border-sky-500/50 rounded-full text-xs font-mono text-sky-300 shadow-xl backdrop-blur-md">
+            <Sparkles size={13} className="animate-spin text-sky-400" />
+            <span>Click on chart to place {activeTool.replace(/_/g, ' ')}</span>
+            <button
+              onClick={() => {
+                setActiveTool('CURSOR');
+                setActiveDrawingPoints([]);
+              }}
+              className="ml-2 px-1.5 py-0.5 bg-rose-500/20 text-rose-400 rounded text-[10px] hover:bg-rose-500/40"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Drawing Tools Bar */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#090d16] border-t border-[#1e293b] text-xs z-10">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] font-mono text-slate-500 uppercase mr-1">Tools:</span>
+          {(
+            [
+              ['CURSOR', 'Pointer'],
+              ['TREND_LINE', 'Trend Line'],
+              ['HORIZONTAL_RAY', 'Ray'],
+              ['RECTANGLE', 'Box'],
+              ['FIB_RETRACEMENT', 'Fib'],
+              ['LONG_POSITION', 'Long R:R'],
+              ['SHORT_POSITION', 'Short R:R'],
+            ] as [DrawingToolType, string][]
+          ).map(([tool, label]) => (
+            <button
+              key={tool}
+              onClick={() => {
+                setActiveTool(tool);
+                setActiveDrawingPoints([]);
+              }}
+              className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium transition-colors ${
+                activeTool === tool
+                  ? 'bg-sky-500 text-white'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {drawings.length > 0 && (
+          <button
+            onClick={() => {
+              drawings.forEach((d) => WorkspacePersistence.deleteDrawing(d.id));
+              setDrawings([]);
+            }}
+            className="text-[10px] font-mono text-rose-400 hover:text-rose-300 px-1.5 py-0.5 rounded hover:bg-rose-500/10"
+          >
+            Clear ({drawings.length})
           </button>
         )}
       </div>

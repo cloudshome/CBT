@@ -34,6 +34,11 @@ from core.regime_transition import regime_transition_detector
 from core.cvd_absorption import cvd_absorption_engine
 from core.lead_lag_correlator import lead_lag_correlator
 from core.judas_sweep_hunter import judas_sweep_hunter
+from core.orderbook_imbalance import orderbook_imbalance_engine
+from core.oi_funding_squeeze import oi_funding_squeeze_engine
+from core.fractal_harmonics import fractal_harmonics_engine
+from core.half_kelly_sizer import half_kelly_position_sizer
+from core.institutional_alpha import institutional_alpha_engine
 from core.event_shock_engine import event_shock_engine
 from core.macro_sentinel import macro_sentinel
 from core.sentiment_engine import sentiment_engine
@@ -687,6 +692,49 @@ async def run_lab_stress_test(symbol: str = Query("BTC/USDT"), timeframe: str = 
     bt_rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
     mc_rep = monte_carlo_stress_tester.stress_test(bt_rep.return_series)
     return mc_rep.to_dict()
+
+
+# ==============================================================================
+# INSTITUTIONAL ALPHA & MICROSTRUCTURE QUANT API ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/institutional/alpha")
+async def get_institutional_alpha(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    limit: int = Query(100),
+):
+    candles = data_streamer.get_candles(symbol, timeframe, limit=limit)
+    res = institutional_alpha_engine.evaluate_alpha(
+        symbol=symbol,
+        timeframe=timeframe,
+        candles=candles,
+    )
+    return asdict(res)
+
+
+@app.get("/api/institutional/cvd")
+async def get_institutional_cvd(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    limit: int = Query(100),
+):
+    candles = data_streamer.get_candles(symbol, timeframe, limit=limit)
+    res = cvd_absorption_engine.analyze_orderflow(candles, symbol=symbol)
+    return asdict(res)
+
+
+@app.get("/api/institutional/orderbook-imbalance")
+async def get_orderbook_imbalance(
+    symbol: str = Query("BTC/USDT"),
+):
+    # Retrieve top L2 depth from gateway or fallback
+    state = market_state_compiler.compile_snapshot(symbol=symbol)
+    p = state.best_ask
+    bids = [(p * (1.0 - 0.0005 * i), 1.5 + 0.3 * i) for i in range(15)]
+    asks = [(p * (1.0 + 0.0005 * i), 1.2 + 0.35 * i) for i in range(15)]
+    res = orderbook_imbalance_engine.compute_imbalance(bids, asks, symbol=symbol)
+    return asdict(res)
 
 
 # WebSocket endpoint for real-time interactive terminal

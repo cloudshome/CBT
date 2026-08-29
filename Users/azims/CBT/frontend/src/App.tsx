@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { TradingViewChart } from './core/engine/TradingViewChart';
+import { CVDSubChart } from './components/CVDSubChart';
+import { InstitutionalAlphaHUD } from './components/InstitutionalAlphaHUD';
+import { OBIFlowMeter } from './components/OBIFlowMeter';
 import { SKYIntelligenceHUD } from './components/SKYIntelligenceHUD';
 import { WatchlistVirtualTracker } from './components/WatchlistVirtualTracker';
 import { OrderBookVisualizer } from './components/OrderBookVisualizer';
@@ -24,6 +27,9 @@ import {
   DeskBriefResponse,
   ToastMessage,
   SKYIntelligenceResponse,
+  InstitutionalAlphaResponse,
+  CVDSeriesData,
+  OBIData,
 } from './types';
 import { api, ApiError } from './services/api';
 import { notificationService } from './services/notificationService';
@@ -55,8 +61,11 @@ export const App: React.FC = () => {
   // High-Velocity Real-time Ticks State
   const [liveCandle, setLiveCandle] = useState<OHLCVCandle | null>(null);
 
-  // SKY Quantitative Intelligence State
+  // Quantitative Intelligence State (SKY & Institutional Alpha)
   const [skyData, setSkyData] = useState<SKYIntelligenceResponse | null>(null);
+  const [institutionalAlpha, setInstitutionalAlpha] = useState<InstitutionalAlphaResponse | null>(null);
+  const [cvdData, setCvdData] = useState<CVDSeriesData | null>(null);
+  const [obiData, setObiData] = useState<OBIData | null>(null);
 
   // Gemini Intelligence State
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
@@ -112,11 +121,14 @@ export const App: React.FC = () => {
   const fetchMarketData = useCallback(async () => {
     setLoadingMarket(true);
     try {
-      const [candlesRes, mtfRes, scanRes, skyRes] = await Promise.all([
+      const [candlesRes, mtfRes, scanRes, skyRes, alphaRes, cvdRes, obiRes] = await Promise.all([
         api.getCandles(symbol, timeframe, 100),
         api.getMTF(symbol, timeframe, 'ema,rsi'),
         api.getSMCScan(symbol, timeframe, 100),
         api.getSKYIntelligence(symbol, timeframe, 100).catch(() => null),
+        api.getInstitutionalAlpha(symbol, timeframe, 100).catch(() => null),
+        api.getInstitutionalCVD(symbol, timeframe, 100).catch(() => null),
+        api.getOrderBookImbalance(symbol).catch(() => null),
       ]);
 
       setCandles(candlesRes.candles || []);
@@ -125,9 +137,10 @@ export const App: React.FC = () => {
       setFVGs(scanRes.fvg || []);
       setOrderBlocks(scanRes.order_blocks || []);
       setSetups(scanRes.setup_suggestions || []);
-      if (skyRes) {
-        setSkyData(skyRes);
-      }
+      if (skyRes) setSkyData(skyRes);
+      if (alphaRes) setInstitutionalAlpha(alphaRes);
+      if (cvdRes) setCvdData(cvdRes);
+      if (obiRes) setObiData(obiRes);
 
       if (scanRes.stats) {
         setStats({
@@ -170,7 +183,6 @@ export const App: React.FC = () => {
       const res = await api.getDeskBrief(symbol, timeframe);
       setBrief(res);
 
-      // Trigger Web Push Notification for fresh AI Brief
       if (res && res.executiveSummary) {
         notificationService.notifyMarketBriefAlert(symbol, res.bias, res.executiveSummary);
       }
@@ -202,7 +214,6 @@ export const App: React.FC = () => {
       if (err instanceof ApiError) {
         if (err.statusCode === 403) {
           addToast('error', 'Risk Gate Rejection (403)', err.message);
-          // Trigger Web Push notification for Risk Gate rejection alert
           notificationService.notifyRiskGateAlert(
             `Simulated ${trade.side} trade rejected`,
             err.message
@@ -305,6 +316,19 @@ export const App: React.FC = () => {
       api.getSKYIntelligence(symbol, timeframe, 100).then((res) => {
         if (res) setSkyData(res);
       }).catch(() => {});
+
+      api.getInstitutionalAlpha(symbol, timeframe, 100).then((res) => {
+        if (res) setInstitutionalAlpha(res);
+      }).catch(() => {});
+
+      api.getInstitutionalCVD(symbol, timeframe, 100).then((res) => {
+        if (res) setCvdData(res);
+      }).catch(() => {});
+
+      api.getOrderBookImbalance(symbol).then((res) => {
+        if (res) setObiData(res);
+      }).catch(() => {});
+
       fetchPositions();
     }, 30000);
     return () => clearInterval(interval);
@@ -338,8 +362,12 @@ export const App: React.FC = () => {
         onToggleNotifications={handleToggleNotifications}
       />
 
-      {/* Top Floating SKY Intelligence HUD */}
-      <div className="max-w-[1920px] w-full mx-auto px-4 pt-2">
+      {/* Floating HUDs: Institutional Alpha & SKY Intelligence */}
+      <div className="max-w-[1920px] w-full mx-auto px-4 pt-2 space-y-2">
+        <InstitutionalAlphaHUD
+          alphaData={institutionalAlpha}
+          loading={loadingMarket}
+        />
         <SKYIntelligenceHUD
           data={skyData}
           loading={loadingMarket}
@@ -360,10 +388,10 @@ export const App: React.FC = () => {
           />
         </div>
 
-        {/* Center Column (7 cols): TradingView Chart & Quant Panels */}
+        {/* Center Column (7 cols): TradingView Chart, CVD Sub-Chart & Quant Panels */}
         <div className="lg:col-span-7 xl:col-span-7 flex flex-col gap-4">
-          {/* Flagship TradingView Lightweight Charts v4 Engine */}
-          <div className="h-[520px]">
+          {/* Flagship TradingView Lightweight Charts Engine + CVD Sub-Chart */}
+          <div className="flex flex-col rounded-lg overflow-hidden border border-[#1e293b] shadow-2xl">
             <TradingViewChart
               symbol={symbol}
               timeframe={timeframe}
@@ -373,7 +401,13 @@ export const App: React.FC = () => {
               skySetups={skyData?.setups}
               liveCandle={liveCandle}
               onDeploySetup={(setup) => setSelectedSetup(setup)}
+              onTimeframeChange={(newTf) => setTimeframe(newTf)}
               loading={loadingMarket}
+            />
+            <CVDSubChart
+              candles={candles}
+              cvdData={cvdData}
+              height={120}
             />
           </div>
 
@@ -409,8 +443,11 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column (3 cols): Order Book L2, Risk Desk, Paper Positions & Copilot */}
+        {/* Right Column (3 cols): Order Book L2, OBI Flow Meter, Risk Desk, Positions & Copilot */}
         <div className="lg:col-span-5 xl:col-span-3 flex flex-col gap-4">
+          {/* Level-2 Order Book Imbalance & VPIN Flow Meter */}
+          <OBIFlowMeter data={obiData} />
+
           {/* Order Book L2 Depth Visualizer */}
           <div className="h-[280px]">
             <OrderBookVisualizer
