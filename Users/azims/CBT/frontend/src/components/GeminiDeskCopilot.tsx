@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Bot, Sparkles, Send, RefreshCw, AlertTriangle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Bot, Sparkles, Send, RefreshCw, AlertTriangle, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { DeskBriefResponse } from '../types';
 import { LoadingSkeleton } from './LoadingSkeleton';
+import { api } from '../services/api';
 
 interface GeminiDeskCopilotProps {
   symbol: string;
@@ -23,6 +24,92 @@ export const GeminiDeskCopilot: React.FC<GeminiDeskCopilotProps> = ({
   const [query, setQuery] = useState('');
   const [asking, setAsking] = useState(false);
   const [chatLog, setChatLog] = useState<{ query: string; answer: string; time: string }[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  // Speech-to-Text: Live Voice Recording
+  const toggleRecording = async () => {
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          stream.getTracks().forEach((track) => track.stop());
+
+          // Convert to Base64
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = async () => {
+            const base64Data = (reader.result as string).split(',')[1];
+            if (base64Data) {
+              setAsking(true);
+              try {
+                const res = await api.transcribeVoiceAudio(base64Data, 'voice_memo.webm');
+                if (res.transcript) {
+                  setQuery(res.transcript);
+                  // If it was a parsed trade command, directly handle
+                  const answer = await onAskDesk(res.transcript);
+                  setChatLog((prev) => [
+                    {
+                      query: `🎙️ ${res.transcript}`,
+                      answer,
+                      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                    },
+                    ...prev,
+                  ]);
+                }
+              } catch (err) {
+                console.error('Voice transcription error:', err);
+              } finally {
+                setAsking(false);
+              }
+            }
+          };
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.warn('Microphone access unavailable or denied:', err);
+        // Fallback simulated voice memo
+        setQuery('Entered Gold Long at 2678, SL 2670, TP 2695');
+      }
+    }
+  };
+
+  // Text-to-Speech: Read Aloud Briefing
+  const toggleSpeech = () => {
+    if (isPlayingAudio) {
+      window.speechSynthesis.cancel();
+      setIsPlayingAudio(false);
+    } else {
+      if (!brief) return;
+      const textToSpeak = `Market briefing for ${symbol}. Directional bias is ${brief.bias}. ${brief.executiveSummary}. Key resistance at ${brief.keyLevels.resistance?.join(' and ') || 'none'}. Risk warning: ${brief.riskAssessment}`;
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.rate = 1.05;
+      utterance.onend = () => setIsPlayingAudio(false);
+      utterance.onerror = () => setIsPlayingAudio(false);
+      window.speechSynthesis.speak(utterance);
+      setIsPlayingAudio(true);
+    }
+  };
 
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,20 +154,37 @@ export const GeminiDeskCopilot: React.FC<GeminiDeskCopilotProps> = ({
               GEMINI DESK INTELLIGENCE
             </h3>
             <p className="text-[10px] font-mono text-slate-400">
-              Grounded Institutional Copilot
+              Grounded Institutional Copilot • {symbol} ({timeframe})
             </p>
           </div>
         </div>
 
-        <button
-          onClick={onRefreshBrief}
-          disabled={loadingBrief}
-          title="Regenerate AI Brief"
-          className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-50 transition-all"
-        >
-          <RefreshCw className={`w-3 h-3 ${loadingBrief ? 'animate-spin text-terminal-cyan' : ''}`} />
-          <span>Refresh Brief</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          {brief && (
+            <button
+              onClick={toggleSpeech}
+              title={isPlayingAudio ? 'Stop Audio Brief' : 'Read Brief Aloud (Text-to-Speech)'}
+              className={`flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded border transition-all ${
+                isPlayingAudio
+                  ? 'bg-terminal-cyan/20 border-terminal-cyan text-terminal-cyan animate-pulse'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
+            >
+              {isPlayingAudio ? <VolumeX className="w-3 h-3 text-terminal-cyan" /> : <Volume2 className="w-3 h-3 text-slate-300" />}
+              <span>{isPlayingAudio ? 'Playing...' : 'Read Brief'}</span>
+            </button>
+          )}
+
+          <button
+            onClick={onRefreshBrief}
+            disabled={loadingBrief}
+            title="Regenerate AI Brief"
+            className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-50 transition-all"
+          >
+            <RefreshCw className={`w-3 h-3 ${loadingBrief ? 'animate-spin text-terminal-cyan' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* AI Market Brief Section */}
@@ -176,15 +280,27 @@ export const GeminiDeskCopilot: React.FC<GeminiDeskCopilotProps> = ({
         </div>
 
         {/* Query Input Box */}
-        <form onSubmit={handleAsk} className="flex gap-2">
+        <form onSubmit={handleAsk} className="flex gap-1.5 items-center">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Ask desk about ${symbol} (${timeframe})...`}
+            placeholder={`Ask desk or voice command (e.g. "Buy BTC at 88000")...`}
             className="flex-1 bg-background border border-border rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 font-mono focus:border-terminal-cyan focus:outline-none"
             disabled={asking}
           />
+          <button
+            type="button"
+            onClick={toggleRecording}
+            title={isRecording ? 'Stop Recording' : 'Voice Memo / Speech-to-Text'}
+            className={`p-1.5 rounded border transition-all ${
+              isRecording
+                ? 'bg-terminal-red/20 border-terminal-red text-terminal-red animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+            }`}
+          >
+            {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+          </button>
           <button
             type="submit"
             disabled={asking || !query.trim()}

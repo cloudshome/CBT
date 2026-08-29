@@ -41,10 +41,11 @@ export async function fetchBybitCandles(
   limit: number,
   baseUrl = process.env.BYBIT_API_URL || DEFAULT_BYBIT_API_URL
 ): Promise<OHLCVCandle[]> {
+  const apiSymbol = symbol.toUpperCase() === 'XAUUSDT' ? 'PAXGUSDT' : symbol;
   const bybitInterval = mapTimeframeToBybitInterval(interval);
   const url = new URL(`${baseUrl}/market/kline`);
   url.searchParams.set('category', 'spot');
-  url.searchParams.set('symbol', symbol);
+  url.searchParams.set('symbol', apiSymbol);
   url.searchParams.set('interval', bybitInterval);
   url.searchParams.set('limit', String(limit));
 

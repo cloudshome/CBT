@@ -318,6 +318,321 @@ export const api = {
     );
     return handleResponse<import('../types').UniversalAssetDossier>(res);
   },
+
+  // ============================================================================
+  // PYTHON FASTAPI — SKY INTELLIGENCE PIPELINE ENDPOINTS
+  // Routed via Vite proxy → localhost:8000 (dev)
+  //          via nginx  → python-backend:8000 (production)
+  // ============================================================================
+
+  /**
+   * GET /api/sky/decision
+   * Full 12-stage SKY Market Intelligence decision pipeline output.
+   */
+  async getSKYDecision(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<import('../types').SKYIntelligenceResponse> {
+    const res = await fetch(
+      `${BASE_URL}/api/sky/decision?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<import('../types').SKYIntelligenceResponse>(res);
+  },
+
+  /**
+   * GET /api/sky/statistics
+   * Empirical expectancy metrics from live sandbox_lab backtest.
+   */
+  async getSKYStatistics(
+    concept = 'SETUP_A_SWEEP_MSS',
+    regime = 'TRENDING_BULL',
+    symbol = 'BTC/USDT',
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<Record<string, unknown>> {
+    const res = await fetch(
+      `${BASE_URL}/api/sky/statistics?concept=${encodeURIComponent(concept)}&regime=${encodeURIComponent(regime)}&symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<Record<string, unknown>>(res);
+  },
+
+  /**
+   * GET /api/decision/council
+   * Adversarial debate committee decision with EV and uncertainty budget.
+   */
+  async getDecisionCouncil(
+    symbol: string
+  ): Promise<import('../types').CouncilDecision> {
+    const res = await fetch(
+      `${BASE_URL}/api/decision/council?symbol=${encodeURIComponent(symbol)}`
+    );
+    return handleResponse<import('../types').CouncilDecision>(res);
+  },
+
+  /**
+   * GET /api/decision/allocation
+   * Conservative Kelly position sizing with uncertainty discounting.
+   */
+  async getAllocationSizing(
+    symbol: string,
+    equity = 100000
+  ): Promise<Record<string, unknown>> {
+    const res = await fetch(
+      `${BASE_URL}/api/decision/allocation?symbol=${encodeURIComponent(symbol)}&equity=${equity}`
+    );
+    return handleResponse<Record<string, unknown>>(res);
+  },
+
+  /**
+   * GET /api/prediction/ladder
+   * Multi-horizon probability ladder for price targets.
+   */
+  async getPredictionLadder(
+    symbol: string
+  ): Promise<Record<string, unknown>> {
+    const res = await fetch(
+      `${BASE_URL}/api/prediction/ladder?symbol=${encodeURIComponent(symbol)}`
+    );
+    return handleResponse<Record<string, unknown>>(res);
+  },
+
+  /**
+   * GET /api/prediction/ledger
+   * Verified prediction ledger with resolution history.
+   */
+  async getPredictionLedger(
+    limit = 50
+  ): Promise<{ count: number; records: unknown[] }> {
+    const res = await fetch(
+      `${BASE_URL}/api/prediction/ledger?limit=${limit}`
+    );
+    return handleResponse<{ count: number; records: unknown[] }>(res);
+  },
+
+  /**
+   * GET /api/scenarios
+   * Analogue-based multi-scenario distribution.
+   */
+  async getScenarios(
+    symbol: string
+  ): Promise<Record<string, unknown>> {
+    const res = await fetch(
+      `${BASE_URL}/api/scenarios?symbol=${encodeURIComponent(symbol)}`
+    );
+    return handleResponse<Record<string, unknown>>(res);
+  },
+
+  /**
+   * GET /api/path-simulation
+   * Monte Carlo path cone (GBM) to TP/SL levels.
+   */
+  async getPathSimulation(
+    symbol: string,
+    tp?: number,
+    sl?: number
+  ): Promise<Record<string, unknown>> {
+    let url = `${BASE_URL}/api/path-simulation?symbol=${encodeURIComponent(symbol)}`;
+    if (tp !== undefined) url += `&tp=${tp}`;
+    if (sl !== undefined) url += `&sl=${sl}`;
+    const res = await fetch(url);
+    return handleResponse<Record<string, unknown>>(res);
+  },
+
+  /**
+   * GET /api/shadow/positions
+   * Shadow paper positions with live P&L (Python portfolio_shadow).
+   */
+  async getShadowPositions(): Promise<{ open_positions: unknown[]; history: unknown[] }> {
+    const res = await fetch(`${BASE_URL}/api/shadow/positions`);
+    return handleResponse<{ open_positions: unknown[]; history: unknown[] }>(res);
+  },
+
+  /**
+   * POST /api/shadow/trade
+   * Open a shadow paper trade (Python portfolio_shadow).
+   */
+  async openShadowTrade(order: {
+    symbol: string;
+    direction: 'LONG' | 'SHORT';
+    size: number;
+    entry_price: number;
+    stop_loss: number;
+    take_profit: number;
+  }): Promise<{ status: string; position_id: string }> {
+    const res = await fetch(`${BASE_URL}/api/shadow/trade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order),
+    });
+    return handleResponse<{ status: string; position_id: string }>(res);
+  },
+
+  /**
+   * POST /api/lab/backtest
+   * In-sample backtest via sandbox_lab.
+   */
+  async runBacktest(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<Record<string, unknown>> {
+    const res = await fetch(
+      `${BASE_URL}/api/lab/backtest?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
+      { method: 'POST' }
+    );
+    return handleResponse<Record<string, unknown>>(res);
+  },
+
+  /**
+   * POST /api/lab/walk-forward
+   * Purged walk-forward validation.
+   */
+  async runWalkForward(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<Record<string, unknown>> {
+    const res = await fetch(
+      `${BASE_URL}/api/lab/walk-forward?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
+      { method: 'POST' }
+    );
+    return handleResponse<Record<string, unknown>>(res);
+  },
+
+  /**
+   * POST /api/lab/stress-test
+   * Monte Carlo 10k path stress test on backtest return series.
+   */
+  async runStressTest(
+    symbol: string,
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<Record<string, unknown>> {
+    const res = await fetch(
+      `${BASE_URL}/api/lab/stress-test?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
+      { method: 'POST' }
+    );
+    return handleResponse<Record<string, unknown>>(res);
+  },
+
+  /**
+   * GET /api/league/leaderboard
+   * Strategy league rankings.
+   */
+  async getStrategyLeaderboard(): Promise<{ leaderboard: unknown[] }> {
+    const res = await fetch(`${BASE_URL}/api/league/leaderboard`);
+    return handleResponse<{ leaderboard: unknown[] }>(res);
+  },
+
+  /**
+   * GET /api/governance/proposals
+   * Pending parameter governance proposals.
+   */
+  async getGovernanceProposals(): Promise<{ proposals: unknown[] }> {
+    const res = await fetch(`${BASE_URL}/api/governance/proposals`);
+    return handleResponse<{ proposals: unknown[] }>(res);
+  },
+
+  // ============================================================================
+  // PHASE 16: VOICE & AUDIO TRANSLATION ENDPOINTS
+  // ============================================================================
+
+  /**
+   * POST /api/voice/transcribe
+   * Transcribes voice memo audio blob and automatically parses trade commands.
+   */
+  async transcribeVoiceAudio(
+    audioBase64: string,
+    filename = 'memo.webm'
+  ): Promise<{
+    transcript: string;
+    is_trade_command: boolean;
+    parsed_command: Record<string, unknown>;
+  }> {
+    const res = await fetch(`${BASE_URL}/api/voice/transcribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio_base64: audioBase64, filename }),
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /api/voice/synthesize
+   * Synthesizes text into spoken MP3 audio.
+   */
+  async synthesizeVoiceAudio(text: string, filename = 'desk_brief.mp3'): Promise<Blob> {
+    const res = await fetch(`${BASE_URL}/api/voice/synthesize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, filename }),
+    });
+    if (!res.ok) {
+      throw new Error(`Voice synthesis failed: ${res.statusText}`);
+    }
+    return res.blob();
+  },
+
+  // ============================================================================
+  // PHASE 17: TELEGRAM BOT INTEGRATION ENDPOINTS
+  // ============================================================================
+
+  /**
+   * GET /api/telegram/status
+   * Checks Telegram Bot configuration and active command handlers.
+   */
+  async getTelegramStatus(): Promise<{
+    configured: boolean;
+    bot_token_present: boolean;
+    chat_id_present: boolean;
+    registered_commands: string[];
+  }> {
+    const res = await fetch(`${BASE_URL}/api/telegram/status`);
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /api/telegram/broadcast
+   * Dispatches custom telemetry alert to Telegram channel.
+   */
+  async broadcastTelegramAlert(
+    text: string,
+    parseMode: 'Markdown' | 'HTML' = 'Markdown'
+  ): Promise<{ status: string; configured: boolean }> {
+    const res = await fetch(`${BASE_URL}/api/telegram/broadcast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, parse_mode: parseMode }),
+    });
+    return handleResponse(res);
+  },
+
+  // ============================================================================
+  // CONTINUOUS EMPIRICAL VALIDATION ACCUMULATOR
+  // ============================================================================
+
+  /**
+   * GET /api/lab/empirical-status
+   * Returns sample accumulation metrics across all market regimes.
+   */
+  async getEmpiricalValidationStatus(
+    concept = 'SETUP_A_SWEEP_MSS'
+  ): Promise<{
+    total_samples_collected: number;
+    validation_target_per_regime: number;
+    regimes: Record<string, {
+      regime: string;
+      total_samples: number;
+      target_samples: number;
+      win_rate: number;
+      expectancy_r: number;
+      is_statistically_validated: boolean;
+      status_label: string;
+    }>;
+    last_run_timestamp: number;
+    active_symbols: string[];
+  }> {
+    const res = await fetch(
+      `${BASE_URL}/api/lab/empirical-status?concept=${encodeURIComponent(concept)}`
+    );
+    return handleResponse(res);
+  },
 };
 
 

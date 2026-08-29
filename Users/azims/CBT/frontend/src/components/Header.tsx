@@ -1,6 +1,7 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
+import { api } from '../services/api';
 
 interface HeaderProps {
   symbol: string;
@@ -155,6 +156,24 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Telegram Alert Broadcast Trigger */}
+          <button
+            onClick={async () => {
+              try {
+                await api.broadcastTelegramAlert(
+                  `⚡ **SKY DESK PUSH**\n• Asset: \`${symbol}\` (${timeframe})\n• Price: \`$${lastPrice.toLocaleString()}\`\n• Trend: \`${trend}\``
+                );
+              } catch (err) {
+                console.error('Telegram broadcast error:', err);
+              }
+            }}
+            title="Dispatch Manual Telemetry Alert to Telegram"
+            className="p-2 rounded bg-background-card border border-border hover:border-sky-500/40 text-slate-400 hover:text-sky-400 transition-all flex items-center gap-1 text-xs font-mono"
+          >
+            <Send className="w-4 h-4 text-sky-400" />
+            <span className="hidden sm:inline text-[11px]">TELEGRAM</span>
+          </button>
 
           {/* Web Push Notification Toggle */}
           <button
