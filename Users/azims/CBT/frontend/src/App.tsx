@@ -157,13 +157,22 @@ export const App: React.FC = () => {
       if (cvdRes) setCvdData(cvdRes);
       if (obiRes) setObiData(obiRes);
 
-      if (scanRes.stats) {
+      if (scanRes?.stats) {
         setStats({
           lastPrice: scanRes.stats.lastPrice,
           highPrice: scanRes.stats.highPrice,
           lowPrice: scanRes.stats.lowPrice,
           trend: scanRes.stats.trend,
         });
+      } else if (candlesRes.candles && candlesRes.candles.length > 0) {
+        const lastBar = candlesRes.candles[candlesRes.candles.length - 1];
+        const recentCandles = candlesRes.candles.slice(-50);
+        setStats((prev) => ({
+          ...prev,
+          lastPrice: lastBar[4],
+          highPrice: Math.max(...recentCandles.map((c) => c[2])),
+          lowPrice: Math.min(...recentCandles.map((c) => c[3])),
+        }));
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch market data';

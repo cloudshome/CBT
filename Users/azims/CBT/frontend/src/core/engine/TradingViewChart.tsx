@@ -84,10 +84,18 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   const lower2sRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   // Track context for zero-shake data ingestion
-  const lastLoadedContextRef = useRef<{ symbol: string; timeframe: string; candleCount: number }>({
+  const lastLoadedContextRef = useRef<{
+    symbol: string;
+    timeframe: string;
+    firstTs: number;
+    lastTs: number;
+    count: number;
+  }>({
     symbol: '',
     timeframe: '',
-    candleCount: 0,
+    firstTs: 0,
+    lastTs: 0,
+    count: 0,
   });
 
   // Diagnostic / Performance Metrics
@@ -107,6 +115,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   const [activeTool, setActiveTool] = useState<DrawingToolType>('CURSOR');
   const [drawings, setDrawings] = useState<DrawingObject[]>([]);
   const [activeDrawingPoints, setActiveDrawingPoints] = useState<Array<{ timestamp: number; price: number }>>([]);
+  const [previewPoint, setPreviewPoint] = useState<{ timestamp: number; price: number; x: number; y: number } | null>(null);
 
   // Visibility Toggles
   const [showEMA, setShowEMA] = useState(true);
@@ -420,14 +429,18 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     return () => { isMounted = false; };
   }, [symbol]);
 
-  // 3. Zero-Shake Ingestion: Set Data ONLY when Symbol/Timeframe changes
+  // 3. Zero-Shake Ingestion: Set Data on Symbol/Timeframe/Dataset Change
   useEffect(() => {
     if (!candleSeriesRef.current || !candles || candles.length === 0) return;
 
+    const firstTs = candles[0]?.[0] || 0;
+    const lastTs = candles[candles.length - 1]?.[0] || 0;
     const isContextChanged =
       lastLoadedContextRef.current.symbol !== symbol ||
       lastLoadedContextRef.current.timeframe !== timeframe ||
-      lastLoadedContextRef.current.candleCount === 0;
+      lastLoadedContextRef.current.firstTs !== firstTs ||
+      lastLoadedContextRef.current.lastTs !== lastTs ||
+      lastLoadedContextRef.current.count !== candles.length;
 
     if (isContextChanged) {
       const formattedCandles: CandlestickData[] = [];
@@ -461,7 +474,13 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         candleSeriesRef.current.setData(formattedCandles);
         volumeSeriesRef.current?.setData(formattedVolume);
         chartRef.current?.timeScale().fitContent();
-        lastLoadedContextRef.current = { symbol, timeframe, candleCount: formattedCandles.length };
+        lastLoadedContextRef.current = {
+          symbol,
+          timeframe,
+          firstTs,
+          lastTs,
+          count: formattedCandles.length,
+        };
       }
     }
 
@@ -716,7 +735,125 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       ctx.restore();
     });
 
-    // 4. Draw SKY Signal Markers
+    // 4. Draw Real-Time Live Rubber-Band Drawing Previews
+    if (activeTool !== 'CURSOR' && previewPoint) {
+      ctx.save();
+      const currX = previewPoint.x;
+      const currY = previewPoint.y;
+
+      if (activeDrawingPoints.length === 1) {
+        const p1 = activeDrawingPoints[0];
+        const x1 = chart.timeScale().timeToCoordinate(Math.floor(p1.timestamp / 1000) as Time) ?? p1.price;
+        const y1 = series.priceToCoordinate(p1.price) ?? currY;
+
+        if (x1 !== null && y1 !== null) {
+          // Draw start anchor point (pulsing cyan circle)
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.arc(x1, y1, 4, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.strokeStyle = activeTool === 'LONG_POSITION' ? '#00f0a8' : activeTool === 'SHORT_POSITION' ? '#ff3b69' : '#38bdf8';
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+
+          if (activeTool === 'TREND_LINE') {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(currX, currY);
+            ctx.stroke();
+
+            // End anchor dot
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.arc(currX, currY, 3.5, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Price change tag
+            const deltaPct = ((previewPoint.price - p1.price) / p1.price) * 100;
+            ctx.font = 'bold 10px monospace';
+            ctx.fillText(`${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(2)}%`, currX + 8, currY - 6);
+          } else if (activeTool === 'RECTANGLE') {
+            const w = currX - x1;
+            const h = currY - y1;
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+            ctx.fillRect(x1, y1, w, h);
+            ctx.strokeRect(x1, y1, w, h);
+          } else if (activeTool === 'FIB_RETRACEMENT') {
+            const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+            const dy = currY - y1;
+            levels.forEach((lvl) => {
+              const yLvl = y1 + dy * lvl;
+              const priceLvl = p1.price + (previewPoint.price - p1.price) * lvl;
+              ctx.beginPath();
+              ctx.moveTo(Math.min(x1, currX), yLvl);
+              ctx.lineTo(canvas.width, yLvl);
+              ctx.stroke();
+              ctx.fillText(`Fib ${(lvl * 100).toFixed(1)}% ($${priceLvl.toFixed(2)})`, Math.min(x1, currX) + 5, yLvl - 3);
+            });
+          } else if (activeTool === 'LONG_POSITION' || activeTool === 'SHORT_POSITION') {
+            const isLong = activeTool === 'LONG_POSITION';
+            const entryY = y1;
+            const slY = currY;
+            const riskH = Math.abs(slY - entryY);
+            const tpY = isLong ? entryY - (2.5 * riskH) : entryY + (2.5 * riskH);
+            const width = Math.max(Math.abs(currX - x1), 140);
+
+            // SL Preview
+            ctx.fillStyle = 'rgba(255, 59, 105, 0.25)';
+            ctx.strokeStyle = '#ff3b69';
+            ctx.fillRect(x1, Math.min(entryY, slY), width, Math.abs(slY - entryY));
+            ctx.strokeRect(x1, Math.min(entryY, slY), width, Math.abs(slY - entryY));
+
+            // TP Preview
+            ctx.fillStyle = 'rgba(0, 240, 168, 0.25)';
+            ctx.strokeStyle = '#00f0a8';
+            ctx.fillRect(x1, Math.min(entryY, tpY), width, Math.abs(tpY - entryY));
+            ctx.strokeRect(x1, Math.min(entryY, tpY), width, Math.abs(tpY - entryY));
+
+            // Badge
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(x1 + 6, entryY - 10, 80, 20);
+            ctx.strokeRect(x1 + 6, entryY - 10, 80, 20);
+            ctx.fillStyle = isLong ? '#00f0a8' : '#ff3b69';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(`R:R 2.50`, x1 + 14, entryY + 4);
+          }
+        }
+      } else if (activeDrawingPoints.length === 0) {
+        if (activeTool === 'HORIZONTAL_RAY') {
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(0, currY);
+          ctx.lineTo(canvas.width, currY);
+          ctx.stroke();
+          ctx.font = 'bold 10px monospace';
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillText(`$${previewPoint.price.toFixed(2)}`, canvas.width - 70, currY - 4);
+        } else if (activeTool === 'VERTICAL_LINE') {
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(currX, 0);
+          ctx.lineTo(currX, canvas.height);
+          ctx.stroke();
+          ctx.font = 'bold 10px monospace';
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillText(new Date(previewPoint.timestamp).toLocaleTimeString(), currX + 4, 20);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // 5. Draw SKY Signal Markers
     if (skySetups && skySetups.length > 0) {
       skySetups.forEach((setup) => {
         const isBull = setup.direction === 'LONG';
@@ -764,33 +901,97 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         ctx.restore();
       });
     }
-  }, [candles, showSMCZones, showJudasZones, drawings, skySetups]);
+  }, [candles, showSMCZones, showJudasZones, drawings, skySetups, activeTool, activeDrawingPoints, previewPoint]);
 
   useEffect(() => {
     updateCanvasDimensions();
     drawCanvasOverlays();
-  }, [drawings, drawCanvasOverlays]);
+  }, [drawings, drawCanvasOverlays, previewPoint]);
 
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool === 'CURSOR' || !chartRef.current || !candleSeriesRef.current) return;
+  // Coordinate Extrapolation Helper
+  const getPointFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = drawingCanvasRef.current;
+    const chart = chartRef.current;
+    const series = candleSeriesRef.current;
+    if (!canvas || !chart || !series) return null;
 
-    const rect = drawingCanvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
+    const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const timeCoord = chartRef.current.timeScale().coordinateToTime(x);
-    const priceCoord = candleSeriesRef.current.coordinateToPrice(y);
+    const price = series.coordinateToPrice(y);
+    if (price === null) return null;
 
-    if (timeCoord === null || priceCoord === null) return;
+    let ts: number | null = null;
+    const timeCoord = chart.timeScale().coordinateToTime(x);
+    if (timeCoord !== null) {
+      if (typeof timeCoord === 'number') {
+        ts = timeCoord * 1000;
+      } else if (typeof timeCoord === 'string') {
+        ts = new Date(timeCoord).getTime();
+      } else if (typeof timeCoord === 'object' && timeCoord !== null && 'year' in timeCoord) {
+        ts = new Date(Date.UTC((timeCoord as any).year, (timeCoord as any).month - 1, (timeCoord as any).day)).getTime();
+      }
+    } else if (candles && candles.length > 0) {
+      const logical = chart.timeScale().coordinateToLogical(x);
+      if (logical !== null) {
+        const step = candles.length > 1 ? (candles[1][0] - candles[0][0]) : 900000;
+        const barDiff = logical - (candles.length - 1);
+        ts = candles[candles.length - 1][0] + (barDiff * step);
+      }
+    }
 
-    const ts = typeof timeCoord === 'number' ? timeCoord * 1000 : Date.now();
-    const newPoints = [...activeDrawingPoints, { timestamp: ts, price: priceCoord }];
+    if (ts === null) ts = Date.now();
+    return { x, y, timestamp: ts, price };
+  };
 
-    if (activeTool === 'HORIZONTAL_RAY' || activeTool === 'VERTICAL_LINE' || newPoints.length >= 2) {
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (activeTool === 'CURSOR') {
+      if (previewPoint) setPreviewPoint(null);
+      return;
+    }
+    const pt = getPointFromEvent(e);
+    if (pt) {
+      setPreviewPoint(pt);
+    }
+  };
+
+  const handleCanvasMouseLeave = () => {
+    if (previewPoint) setPreviewPoint(null);
+  };
+
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (activeTool === 'CURSOR') return;
+
+    const pt = getPointFromEvent(e);
+    if (!pt) return;
+
+    const newPoints = [...activeDrawingPoints, { timestamp: pt.timestamp, price: pt.price }];
+
+    if (activeTool === 'HORIZONTAL_RAY' || activeTool === 'VERTICAL_LINE') {
       const newDrawing: DrawingObject = {
-        id: `draw_${Date.now()}`,
+        id: `draw_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        symbol,
+        timeframe,
+        type: activeTool,
+        points: [newPoints[0], newPoints[0]],
+        color: '#38bdf8',
+        lineWidth: 2,
+        createdAt: Date.now(),
+      };
+
+      const updated = [...drawings, newDrawing];
+      setDrawings(updated);
+      WorkspacePersistence.saveDrawing(newDrawing);
+      setActiveDrawingPoints([]);
+      setPreviewPoint(null);
+      setActiveTool('CURSOR');
+      return;
+    }
+
+    if (newPoints.length >= 2) {
+      const newDrawing: DrawingObject = {
+        id: `draw_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         symbol,
         timeframe,
         type: activeTool,
@@ -805,7 +1006,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       WorkspacePersistence.saveDrawing(newDrawing);
 
       // Auto-deploy position tools into order desk if handler provided
-      if ((activeTool === 'LONG_POSITION' || activeTool === 'SHORT_POSITION') && onDeploySetup && newPoints.length >= 2) {
+      if ((activeTool === 'LONG_POSITION' || activeTool === 'SHORT_POSITION') && onDeploySetup) {
         const entry = newPoints[0].price;
         const sl = newPoints[1].price;
         const isLong = activeTool === 'LONG_POSITION';
@@ -821,6 +1022,7 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       }
 
       setActiveDrawingPoints([]);
+      setPreviewPoint(null);
       setActiveTool('CURSOR');
     } else {
       setActiveDrawingPoints(newPoints);
@@ -1047,6 +1249,8 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
           <canvas
             ref={drawingCanvasRef}
             onMouseDown={handleCanvasMouseDown}
+            onMouseMove={handleCanvasMouseMove}
+            onMouseLeave={handleCanvasMouseLeave}
             className={`absolute inset-0 w-full h-full ${
               activeTool !== 'CURSOR' ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none cursor-default'
             }`}
@@ -1074,11 +1278,16 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
           {activeTool !== 'CURSOR' && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 bg-sky-950/90 border border-sky-500/50 rounded-full text-xs font-mono text-sky-300 shadow-xl backdrop-blur-md">
               <Sparkles size={13} className="animate-spin text-sky-400" />
-              <span>Click on chart to place {activeTool.replace(/_/g, ' ')}</span>
+              <span>
+                {activeDrawingPoints.length === 0
+                  ? `Click on chart to set START point for ${activeTool.replace(/_/g, ' ')}`
+                  : `Move cursor & click to set END point for ${activeTool.replace(/_/g, ' ')}`}
+              </span>
               <button
                 onClick={() => {
                   setActiveTool('CURSOR');
                   setActiveDrawingPoints([]);
+                  setPreviewPoint(null);
                 }}
                 className="ml-2 px-1.5 py-0.5 bg-rose-500/20 text-rose-400 rounded text-[10px] hover:bg-rose-500/40"
               >
