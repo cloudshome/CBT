@@ -626,13 +626,150 @@ export const api = {
       status_label: string;
     }>;
     last_run_timestamp: number;
-    active_symbols: string[];
   }> {
     const res = await fetch(
       `${BASE_URL}/api/lab/empirical-status?concept=${encodeURIComponent(concept)}`
     );
     return handleResponse(res);
   },
+
+  /**
+   * GET /api/memory/similarity
+   * Returns top matching historical episodes, empirical win probability, and expected R:R.
+   */
+  async getMemorySimilarity(symbol: string, timeframe: SupportedTimeframe = '15m') {
+    const res = await fetch(
+      `${BASE_URL}/api/memory/similarity?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<{
+      symbol: string;
+      timeframe: string;
+      active_regime: string;
+      k_samples_found: number;
+      sample_adequacy_score: number;
+      p_tp_hit: number;
+      p_sl_hit: number;
+      expected_r_multiple: number;
+      median_mae_pct: number;
+      median_mfe_pct: number;
+      uncertainty_penalty: number;
+      top_matches: Array<{
+        state_id: string;
+        timestamp: number;
+        similarity_score: number;
+        realized_return_1h: number;
+        tp_hit: boolean;
+        sl_hit: boolean;
+        mae: number;
+        mfe: number;
+      }>;
+    }>(res);
+  },
+
+  /**
+   * GET /api/macro/gold
+   */
+  async getGoldMacroTelemetry(goldPrice?: number, paxgPrice?: number, dxy?: number, realYield?: number) {
+    const params = new URLSearchParams();
+    if (goldPrice !== undefined) params.append('gold_price', goldPrice.toString());
+    if (paxgPrice !== undefined) params.append('paxg_price', paxgPrice.toString());
+    if (dxy !== undefined) params.append('dxy', dxy.toString());
+    if (realYield !== undefined) params.append('real_yield', realYield.toString());
+
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${BASE_URL}/api/macro/gold${qs}`);
+    return handleResponse<{
+      symbol: string;
+      timestamp: number;
+      current_gold_price: number;
+      dxy_index: number;
+      dxy_rolling_correlation_30d: number;
+      us_10y_real_yield_pct: number;
+      real_yield_beta: number;
+      central_bank_net_flow_metric: number;
+      active_fixing_session: string;
+      is_in_prime_fixing_window: boolean;
+      synthetic_paxg_basis_bps: number;
+      macro_regime: string;
+      macro_bias: string;
+      macro_confidence: number;
+      catalysts: string[];
+    }>(res);
+  },
+
+  /**
+   * GET /api/audit/events
+   */
+  async getAuditEvents(limit = 50, eventType?: string) {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (eventType) params.append('event_type', eventType);
+    const res = await fetch(`${BASE_URL}/api/audit/events?${params.toString()}`);
+    return handleResponse<{
+      events: Array<{
+        event_id: string;
+        timestamp: number;
+        event_type: string;
+        symbol: string;
+        severity: string;
+        reason: string;
+        details: Record<string, any>;
+        software_version: string;
+      }>;
+    }>(res);
+  },
+
+  /**
+   * POST /api/ingest/source
+   */
+  async ingestSource(payload: {
+    source_type: string;
+    content: string;
+    title?: string;
+    source_url?: string;
+    confidence?: number;
+  }) {
+    const res = await fetch(`${BASE_URL}/api/ingest/source`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<{
+      source_id: string;
+      source_type: string;
+      source_url?: string;
+      retrieved_at: number;
+      content_hash: string;
+      title: string;
+      confidence: number;
+    }>(res);
+  },
+
+  /**
+   * POST /api/strategy/compile
+   */
+  async compileStrategy(payload: {
+    name: string;
+    description: string;
+    assets?: string[];
+    timeframes?: Record<string, string>;
+    entry_rules?: Array<Record<string, any>>;
+    invalidation_rules?: Array<Record<string, any>>;
+    exit_rules?: Array<Record<string, any>>;
+  }) {
+    const res = await fetch(`${BASE_URL}/api/strategy/compile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<{
+      strategy_id: string;
+      name: string;
+      status: string;
+      confidence: number;
+      missing_requirements: string[];
+    }>(res);
+  },
 };
+
 
 

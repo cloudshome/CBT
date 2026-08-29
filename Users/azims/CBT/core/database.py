@@ -68,6 +68,10 @@ class DatabaseManager:
     def get_experiment_conn(self) -> sqlite3.Connection:
         return get_db_connection(self.experiment_db_path)
 
+    def get_connection(self) -> sqlite3.Connection:
+        return self.get_brain_conn()
+
+
     def get_schema_version(self, conn: sqlite3.Connection) -> int:
         cursor = conn.cursor()
         cursor.execute("PRAGMA user_version;")
@@ -318,5 +322,31 @@ class DatabaseManager:
             conn.execute("DELETE FROM chart_memory WHERE symbol = ? AND timeframe = ?", (symbol, timeframe))
             conn.commit()
 
+    def get_engine_info(self) -> Dict[str, Any]:
+        """Returns active database engine telemetry, paths, dialect, and storage metrics."""
+        database_url = os.getenv("DATABASE_URL", "")
+        is_postgres = database_url.startswith("postgres://") or database_url.startswith("postgresql://")
+        
+        db_files = [
+            ("market_db", self.market_db_path),
+            ("brain_db", self.brain_db_path),
+            ("trading_db", self.trading_db_path),
+            ("experiment_db", self.experiment_db_path),
+        ]
+        
+        sizes = {}
+        for name, path in db_files:
+            sizes[name] = path.stat().st_size if path.exists() else 0
+
+        return {
+            "primary_dialect": "POSTGRESQL" if is_postgres else "SQLITE_WAL",
+            "is_postgres_configured": is_postgres,
+            "sqlite_wal_enabled": True,
+            "storage_sizes_bytes": sizes,
+            "total_storage_mb": round(sum(sizes.values()) / (1024 * 1024), 2),
+            "schema_version": CURRENT_SCHEMA_VERSION,
+        }
+
 # Singleton instance
 db_manager = DatabaseManager()
+

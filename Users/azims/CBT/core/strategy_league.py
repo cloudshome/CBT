@@ -210,6 +210,9 @@ class StrategyLeagueManager:
             )
             conn.commit()
 
+    register_genome = register_strategy
+
 
 # Singleton
 strategy_league_manager = StrategyLeagueManager()
+

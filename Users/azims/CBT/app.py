@@ -78,6 +78,12 @@ from core.voice_interface import voice_interface
 from core.telegram_bot import telegram_bot
 from core.empirical_accumulator import empirical_accumulator
 from core.ttl_cache import sky_decision_cache, market_state_cache
+from core.provenance_engine import provenance_engine
+from core.strategy_compiler import strategy_compiler
+from core.audit_bus import audit_bus
+from core.macro_gold_engine import macro_gold_engine
+
+
 
 # SKY Professional Market Intelligence Layer
 from core.sky_intelligence import (
@@ -191,6 +197,31 @@ class TelegramBroadcastRequest(BaseModel):
 class TelegramWebhookRequest(BaseModel):
     update_id: Optional[int] = None
     message: Optional[Dict[str, Any]] = None
+
+
+class IngestSourceRequest(BaseModel):
+    source_type: str  # "URL", "PDF", "AUDIO", "IMAGE", "TEXT", "YOUTUBE"
+    content: str
+    title: Optional[str] = "Untitled Research Source"
+    source_url: Optional[str] = None
+    parser: Optional[str] = "api_ingestor"
+    confidence: Optional[float] = 0.90
+    language: Optional[str] = "en"
+    extracted_facts: Optional[List[Dict[str, Any]]] = None
+    extracted_hypotheses: Optional[List[Dict[str, Any]]] = None
+
+
+class CompileStrategyRequest(BaseModel):
+    name: str
+    description: str
+    assets: Optional[List[str]] = None
+    timeframes: Optional[Dict[str, str]] = None
+    entry_rules: Optional[List[Dict[str, Any]]] = None
+    invalidation_rules: Optional[List[Dict[str, Any]]] = None
+    exit_rules: Optional[List[Dict[str, Any]]] = None
+    risk_model: Optional[Dict[str, Any]] = None
+    source_id: Optional[str] = None
+
 
 
 # WebSocket Connection Manager with 24/7 Heartbeat Guard
@@ -320,16 +351,25 @@ async def root_view():
 # REST API ENDPOINTS
 # ==============================================================================
 
+@app.get("/health")
 @app.get("/api/health")
 async def get_system_health():
     vitals = api_health_guard.get_all_vitals()
     drift = drift_monitor.evaluate_system_drift()
+    db_info = db_manager.get_engine_info()
     return {
         "status": "OPERATIONAL",
         "version": "2.1.0",
         "api_vitals": vitals,
         "drift_report": drift.to_dict(),
+        "database": db_info,
     }
+
+
+@app.get("/ready")
+async def get_system_readiness():
+    return {"status": "READY", "timestamp": time.time()}
+
 
 
 @app.get("/api/market/ticker")
@@ -803,6 +843,83 @@ async def ask_desk_copilot(req: AskDeskRequest):
     return {"reply": reply, "telemetry": telemetry}
 
 
+@app.get("/api/memory/similarity")
+async def get_memory_similarity(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+):
+    """
+    Episodic Memory Recall: Recalls historical market episodes matching current market state,
+    calculates empirical win probability P(TP_hit), expected R:R multiple, and similarity scores.
+    """
+    sym = _canonical_symbol(symbol)
+    candles = data_streamer.get_candles(sym, timeframe, 100)
+    c_map = {timeframe: candles}
+    state = market_state_compiler.compile_state(sym, candles_by_tf=c_map)
+    reg_res = regime_transition_detector.classify_regime(candles)
+    active_reg = reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "TRENDING_BULL"
+
+    analogues = analogue_engine.find_analogues(state, active_regime=active_reg)
+    return {
+        "symbol": sym,
+        "timeframe": timeframe,
+        "active_regime": active_reg,
+        "k_samples_found": analogues.k_samples_found,
+        "sample_adequacy_score": round(analogues.sample_adequacy_score, 2),
+        "p_tp_hit": round(analogues.p_tp_hit, 3),
+        "p_sl_hit": round(analogues.p_sl_hit, 3),
+        "expected_r_multiple": round(analogues.expected_r_multiple, 2),
+        "median_mae_pct": round(analogues.median_mae_pct, 2),
+        "median_mfe_pct": round(analogues.median_mfe_pct, 2),
+        "uncertainty_penalty": round(analogues.uncertainty_penalty, 3),
+        "top_matches": [
+            {
+                "state_id": m.state_id,
+                "timestamp": m.timestamp,
+                "similarity_score": m.similarity_score,
+                "realized_return_1h": m.realized_forward_return_1h,
+                "tp_hit": m.tp_hit,
+                "sl_hit": m.sl_hit,
+                "mae": m.max_adverse_excursion,
+                "mfe": m.max_favorable_excursion,
+            }
+            for m in analogues.top_matches[:5]
+        ],
+    }
+
+
+@app.get("/api/ai/live-narrative")
+async def get_live_ai_narrative(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    language: str = Query("auto"),
+):
+    """
+    Generates live market context, structural setup storytelling, and risk guidance from QuantMentor.
+    """
+    sym = _canonical_symbol(symbol)
+    cur_p = await data_streamer.get_live_ticker(sym)
+    candles = data_streamer.get_candles(sym, timeframe, 50)
+    c_map = {timeframe: candles}
+    state = market_state_compiler.compile_state(sym, candles_by_tf=c_map)
+    reg_res = regime_transition_detector.classify_regime(candles)
+    regime_label = reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "UNKNOWN"
+
+    telemetry = {
+        "symbol": sym,
+        "timeframe": timeframe,
+        "current_price": cur_p,
+        "regime": regime_label,
+    }
+
+    narrative = await quant_mentor.generate_response(
+        f"Provide a 2-sentence institutional market context and structural outlook for {sym} on {timeframe}.",
+        telemetry,
+        language,
+    )
+    return {"symbol": sym, "narrative": narrative, "telemetry": telemetry}
+
+
 
 @app.get("/api/league/leaderboard")
 async def get_strategy_leaderboard():
@@ -1016,7 +1133,121 @@ async def get_empirical_validation_status(
     return asdict(report)
 
 
+# ==============================================================================
+# PROVENANCE INGESTION & STRATEGY GENOME COMPILER ENDPOINTS
+# ==============================================================================
+
+
+@app.post("/api/ingest/source")
+async def ingest_research_source(req: IngestSourceRequest):
+    """
+    Cryptographically registers and indexes research source (URL, PDF, Audio, Video text)
+    with SHA-256 content hashing and immutable provenance metadata.
+    """
+    rec = provenance_engine.register_source(
+        source_type=req.source_type,
+        raw_content=req.content,
+        title=req.title or "Untitled Source",
+        source_url=req.source_url,
+        parser=req.parser or "api_ingestor",
+        confidence=req.confidence or 0.90,
+        language=req.language or "en",
+        extracted_facts=req.extracted_facts,
+        extracted_hypotheses=req.extracted_hypotheses,
+    )
+    return rec.to_dict()
+
+
+@app.get("/api/ingest/provenance")
+async def list_provenance_records(limit: int = Query(50)):
+    """Lists recent cryptographic provenance records."""
+    records = provenance_engine.list_records(limit=limit)
+    return {"records": [r.to_dict() for r in records]}
+
+
+@app.get("/api/ingest/provenance/{source_id}")
+async def get_provenance_record(source_id: str):
+    """Retrieves a single provenance record by its ID."""
+    rec = provenance_engine.get_by_id(source_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Provenance record not found.")
+    return rec.to_dict()
+
+
+@app.post("/api/strategy/compile")
+async def compile_strategy_specification(req: CompileStrategyRequest):
+    """
+    Formally compiles natural language or extracted trading hypotheses into a deterministic
+    machine-testable Strategy Genome. Rejects underspecified rules with NOT_BACKTESTABLE.
+    """
+    compiled = strategy_compiler.compile_hypothesis(
+        name=req.name,
+        raw_description=req.description,
+        assets=req.assets,
+        timeframes=req.timeframes,
+        entry_rules=req.entry_rules,
+        invalidation_rules=req.invalidation_rules,
+        exit_rules=req.exit_rules,
+        risk_model=req.risk_model,
+        source_id=req.source_id,
+    )
+    return compiled.to_dict()
+
+
+@app.get("/api/strategy/genomes")
+async def get_strategy_genomes():
+    """Returns all registered strategy genomes in the Strategy Quarantine League."""
+    leaderboard = strategy_league_manager.get_leaderboard()
+    return {"genomes": leaderboard}
+
+
+# ==============================================================================
+# AUDIT BUS & DEDICATED XAUUSD MACRO INTELLIGENCE ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/audit/events")
+async def get_system_audit_events(
+    limit: int = Query(50),
+    event_type: Optional[str] = Query(None),
+):
+    """
+    Retrieves immutable structured audit log events (trade closures, loss autopsies, risk gate events).
+    """
+    events = audit_bus.get_recent_events(limit=limit, event_type=event_type)
+    return {"events": [e.to_dict() for e in events]}
+
+
+@app.get("/api/macro/gold")
+async def get_gold_macro_telemetry(
+    gold_price: Optional[float] = Query(None),
+    paxg_price: Optional[float] = Query(None),
+    dxy: Optional[float] = Query(None),
+    real_yield: Optional[float] = Query(None),
+):
+    """
+    Returns dedicated institutional macro telemetry for Gold (XAUUSD / PAXGUSDT)
+    including US Real Yield beta, DXY rolling correlation, and London Fixings liquidity status.
+    """
+    # Fetch live gold ticker if not supplied
+    if gold_price is None:
+        paxg_price_live = await data_streamer.get_live_ticker("PAXG/USDT")
+        gp = paxg_price_live if paxg_price_live > 0 else 2650.0
+    else:
+        gp = gold_price
+
+    paxg_p = paxg_price or gp
+    telemetry = macro_gold_engine.evaluate_macro_state(
+        gold_price=gp,
+        paxg_price=paxg_p,
+        dxy=dxy,
+        real_yield_10y=real_yield,
+    )
+    return telemetry.to_dict()
+
+
 # WebSocket endpoint for real-time interactive terminal
+
+
 @app.websocket("/ws/terminal")
 async def websocket_terminal_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)

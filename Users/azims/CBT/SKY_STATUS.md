@@ -158,9 +158,17 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
    - Created `core/empirical_accumulator.py` to continuously replay historical setups across market regimes into SQLite `experiments.db`.
    - Started background accumulator loop in `app.py` startup event.
    - Added `GET /api/lab/empirical-status` endpoint for real-time statistical sample tracking ($N \ge 100$).
-4. **Testing & Verification**:
-   - Added `tests/test_voice_and_telegram.py` (95 passing tests in pytest).
-   - Verified `tsc && vite build` builds with 0 errors across 1,610 modules.
+4. **Phase 18 — Universal Provenance Engine & Immutable Research Store**:
+   - Implemented `core/provenance_engine.py` with SHA-256 cryptographic content hashing and duplicate detection.
+   - Added `POST /api/ingest/source`, `GET /api/ingest/provenance`, and `GET /api/ingest/provenance/{source_id}` in `app.py`.
+5. **Phase 19 — Formal Strategy Compiler & Genome Validator**:
+   - Implemented `core/strategy_compiler.py` with fail-closed validation (`STATUS = NOT_BACKTESTABLE` for underspecified rules).
+   - Added `POST /api/strategy/compile` and `GET /api/strategy/genomes` in `app.py`.
+   - Wired newly compiled valid strategies into Tier 1 of `core/strategy_league.py`.
+6. **Task Board & Test Suite**:
+   - Created `TODO.md` as the master single source of truth for ongoing and upcoming prioritized tasks.
+   - Added `tests/test_provenance_and_compiler.py` (107 passing tests in pytest).
+
 
 ---
 
