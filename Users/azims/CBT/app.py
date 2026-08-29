@@ -452,7 +452,12 @@ async def scan_smc_patterns(symbol: str = Query("BTC/USDT"), timeframe: str = Qu
 # ============================================================================
 
 @app.get("/api/sky/decision")
-async def get_sky_decision(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+@app.get("/api/sky/intelligence")
+async def get_sky_decision(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    limit: Optional[int] = Query(100),
+):
     """
     Executes the full 12-stage SKY Market Intelligence Decision Pipeline:
     DATA -> DATA QUALITY -> STRUCTURE -> LIQUIDITY -> VOLUME -> VOLATILITY -> DERIVATIVES -> REGIME -> SETUP -> EV -> DECISION.
