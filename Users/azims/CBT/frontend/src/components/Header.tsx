@@ -17,7 +17,12 @@ interface HeaderProps {
   onToggleNotifications: () => void;
 }
 
-const POPULAR_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'AVAXUSDT'];
+const POPULAR_SYMBOLS = [
+  { symbol: 'BTCUSDT', label: 'BTC' },
+  { symbol: 'ETHUSDT', label: 'ETH' },
+  { symbol: 'PAXGUSDT', label: 'GOLD (PAXG)' },
+  { symbol: 'XAUUSDT', label: 'GOLD (XAU)' },
+];
 const TIMEFRAMES: SupportedTimeframe[] = ['5m', '15m', '1h', '4h', '1d'];
 
 export const Header: React.FC<HeaderProps> = ({
@@ -71,17 +76,19 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex flex-wrap items-center gap-3">
           {/* Symbol Selector */}
           <div className="flex items-center bg-background-card border border-border rounded p-0.5">
-            {POPULAR_SYMBOLS.map((sym) => (
+            {POPULAR_SYMBOLS.map((item) => (
               <button
-                key={sym}
-                onClick={() => onSymbolChange(sym)}
+                key={item.symbol}
+                onClick={() => onSymbolChange(item.symbol)}
                 className={`px-2.5 py-1 text-xs font-mono font-medium rounded transition-all ${
-                  symbol === sym
-                    ? 'bg-terminal-cyan/20 text-terminal-cyan border border-terminal-cyan/40 shadow-sm'
+                  symbol === item.symbol
+                    ? item.symbol.includes('PAXG') || item.symbol.includes('XAU')
+                      ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm font-bold'
+                      : 'bg-terminal-cyan/20 text-terminal-cyan border border-terminal-cyan/40 shadow-sm font-bold'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-background-hover'
                 }`}
               >
-                {sym.replace('USDT', '')}
+                {item.label}
               </button>
             ))}
           </div>
