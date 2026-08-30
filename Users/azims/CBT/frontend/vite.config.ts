@@ -39,6 +39,13 @@ const PYTHON_PREFIXES = [
   '/api/smc',
   '/api/voice',
   '/api/telegram',
+  '/api/ingest',
+  '/api/strategy',
+  '/api/macro',
+  '/api/audit',
+  '/api/chart',
+  '/api/memory',
+  '/api/ai',
   '/ws',
 ];
 
