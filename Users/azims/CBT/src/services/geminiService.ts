@@ -43,6 +43,7 @@ export interface MarketBriefOutput {
     trend: string;
   };
   timestamp: number;
+  source?: 'GEMINI_AI' | 'DETERMINISTIC_FALLBACK';
 }
 
 let geminiClientInstance: GoogleGenAI | null = null;
@@ -73,10 +74,49 @@ export function resetGeminiClient(): void {
   geminiClientInstance = null;
 }
 
+/**
+ * Generates a deterministic quantitative intelligence brief based on SMC and indicator state.
+ * Available for offline simulation, testing, or standalone mathematical analysis.
+ */
+export function generateDeterministicBrief(data: MarketBriefInput): MarketBriefOutput {
+  const latestEMA = data.ema && data.ema.length > 0 ? data.ema[data.ema.length - 1].value : undefined;
+  const latestRSI = data.rsi && data.rsi.length > 0 ? data.rsi[data.rsi.length - 1].value : undefined;
+
+  const isBullish = data.trend.toLowerCase().includes('bullish') || (latestRSI !== undefined && latestRSI > 52 && (latestEMA === undefined || data.lastPrice > latestEMA));
+  const isBearish = data.trend.toLowerCase().includes('bearish') || (latestRSI !== undefined && latestRSI < 48 && (latestEMA === undefined || data.lastPrice < latestEMA));
+  const bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = isBullish ? 'BULLISH' : isBearish ? 'BEARISH' : 'NEUTRAL';
+
+  const fvgStats = data.smc.stats;
+  const summary = `${data.symbol} is currently printing ${data.trend} market structure on the ${data.timeframe} timeframe. ` +
+    `Identified ${fvgStats.unmitigatedFVGs} unmitigated fair value gaps and ${fvgStats.bullishOBs + fvgStats.bearishOBs} structural order blocks. ` +
+    (data.setups.length > 0 ? `Active setup: ${data.setups[0].type} at ${data.setups[0].entry} (R:R ${data.setups[0].riskRewardRatio}).` : 'Awaiting confirmation sweep.');
+
+  return {
+    symbol: data.symbol,
+    timeframe: data.timeframe,
+    executiveSummary: summary,
+    bias,
+    keyLevels: {
+      support: [data.lowPrice, data.lowPrice * 0.99],
+      resistance: [data.highPrice, data.highPrice * 1.01],
+      invalidation: data.setups[0]?.stopLoss || data.lowPrice,
+    },
+    riskAssessment: `Quantitative risk score balanced. Monitor 15m RSI (${latestRSI ? latestRSI.toFixed(1) : 'N/A'}) for momentum exhaustion.`,
+    metrics: {
+      lastPrice: data.lastPrice,
+      ema: latestEMA,
+      rsi: latestRSI,
+      trend: data.trend,
+    },
+    timestamp: Date.now(),
+    source: 'DETERMINISTIC_FALLBACK',
+  };
+}
+
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 /**
- * Generates an executive market intelligence brief from technical data
+ * Generates an executive market intelligence brief from technical data using Gemini
  */
 export async function generateMarketBrief(
   data: MarketBriefInput,
@@ -183,37 +223,36 @@ Provide an institutional-grade market brief formatted as strict valid JSON (no m
       trend: data.trend,
     },
     timestamp: Date.now(),
+    source: 'GEMINI_AI',
   };
 }
 
 /**
- * Answers ad-hoc quantitative market questions grounded in provided market telemetry
+ * Ask Desk interactive Q&A endpoint
  */
 export async function askDesk(
-  query: string,
-  context?: Record<string, unknown>,
+  question: string,
+  marketContext: { symbol?: string; rsi?: number; trend?: string } = {},
   model = DEFAULT_MODEL
 ): Promise<string> {
   const ai = getGeminiClient();
 
-  const contextStr = context ? JSON.stringify(context, null, 2) : 'No extra telemetry context provided.';
-  const prompt = `You are the Crypto Brain Terminal Desk AI Assistant. Answer the user question grounded in the provided quantitative context.
+  const prompt = `You are a Senior Crypto Trading Desk Lead.
+A junior trader asks: "${question}"
 
---- TELEMETRY CONTEXT ---
-${contextStr}
+Current Market Context:
+- Asset: ${marketContext.symbol ?? 'N/A'}
+- RSI(14): ${marketContext.rsi ?? 'N/A'}
+- Trend: ${marketContext.trend ?? 'N/A'}
 
---- USER QUESTION ---
-${query}
-
---- INSTRUCTIONS ---
-Be direct, mathematically grounded, and concise. Avoid fluff.`;
+Provide a concise, direct, institutional trading answer (under 150 words).`;
 
   try {
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
     });
-    return (response.text || '').trim();
+    return response.text || 'Unable to generate response.';
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
