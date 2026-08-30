@@ -59,6 +59,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `6fa6bac` | Implement P6.4 Monte Carlo 10k-path stress tester and P7.3 deterministic intelligence fallback (223 passing tests) |
 | `0a6eea4` | Implement P6.1 Empirical Evidence Accumulator and P7.1 Production Operations Runbook (220 passing tests) |
 | `8df7839` | Implement P5.2 WebSocket lifecycle state machine and P5.3 SQLite database VACUUM maintenance (218 passing tests) |
 | `86da62f` | Implement P4.4 Prometheus metrics, P4.5 CI/CD enhancement, and P5.1 Exchange circuit breakers (216 passing tests) |
