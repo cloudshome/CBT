@@ -13,6 +13,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.database import db_manager
+from core.audit_bus import audit_bus
+from core.loss_autopsy import loss_autopsy_engine
+
 
 logger = logging.getLogger("ai_quant_sentinel.portfolio_shadow")
 
@@ -169,10 +172,41 @@ class PortfolioShadowManager:
                         """,
                         (now, current_price, final_pnl, pos_id),
                     )
+                    conn.commit()
+
+                    # Audit Event & Loss Autopsy Integration
+                    autopsy_report = None
+                    if final_pnl < 0:
+                        autopsy = loss_autopsy_engine.conduct_autopsy(
+                            trade_id=pos_id,
+                            symbol=symbol,
+                            entry_price=entry_p,
+                            exit_price=current_price,
+                            direction=direction,
+                            pnl_usd=final_pnl,
+                        )
+                        autopsy_report = autopsy.to_dict()
+                        audit_bus.emit_event(
+                            event_type="LOSS_AUTOPSY",
+                            symbol=symbol,
+                            reason=f"Position {pos_id} closed at loss (${final_pnl:+,.2f}): {autopsy.primary_root_cause}",
+                            severity="WARNING",
+                            details={"autopsy": autopsy_report, "position_id": pos_id, "close_reason": close_reason},
+                        )
+
+                    audit_bus.emit_event(
+                        event_type="TRADE_CLOSED",
+                        symbol=symbol,
+                        reason=f"Position {pos_id} closed via {close_reason} with Realized PnL ${final_pnl:+,.2f}",
+                        severity="INFO" if final_pnl >= 0 else "WARNING",
+                        details={"position_id": pos_id, "pnl_usd": final_pnl, "close_reason": close_reason, "autopsy": autopsy_report},
+                    )
+
                     events.append({
                         "event": close_reason,
                         "position_id": pos_id,
                         "realized_pnl": final_pnl,
+                        "autopsy": autopsy_report,
                         "message": f"🏁 {symbol} position closed by {close_reason}! Realized PnL: ${final_pnl:+,.2f}.",
                     })
                 else:
@@ -188,7 +222,7 @@ class PortfolioShadowManager:
                         """,
                         (current_price, pnl_usd, sl_p, trailing_stop, 1 if be_trig else 0, pos_id),
                     )
-                conn.commit()
+                    conn.commit()
 
         return events
 
@@ -218,6 +252,35 @@ class PortfolioShadowManager:
                 (now, p_price, pnl, position_id),
             )
             conn.commit()
+
+            # Trigger Autopsy on Manual/API Loss Close
+            autopsy_report = None
+            if pnl < 0:
+                autopsy = loss_autopsy_engine.conduct_autopsy(
+                    trade_id=position_id,
+                    symbol=row["symbol"],
+                    entry_price=row["entry_price"],
+                    exit_price=p_price,
+                    direction=row["direction"],
+                    pnl_usd=pnl,
+                )
+                autopsy_report = autopsy.to_dict()
+                audit_bus.emit_event(
+                    event_type="LOSS_AUTOPSY",
+                    symbol=row["symbol"],
+                    reason=f"Position {position_id} closed at loss (${pnl:+,.2f}): {autopsy.primary_root_cause}",
+                    severity="WARNING",
+                    details={"autopsy": autopsy_report, "position_id": position_id},
+                )
+
+            audit_bus.emit_event(
+                event_type="TRADE_CLOSED",
+                symbol=row["symbol"],
+                reason=f"Manual position close for {position_id} with PnL ${pnl:+,.2f}",
+                severity="INFO" if pnl >= 0 else "WARNING",
+                details={"position_id": position_id, "pnl_usd": pnl, "autopsy": autopsy_report},
+            )
+
             logger.info(f"Closed shadow position {position_id} with PnL ${pnl:+,.2f}")
             return True
 

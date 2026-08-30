@@ -61,4 +61,23 @@ describe('Institutional Alpha & Microstructure Routes (/api/institutional)', () 
     expect(res.body).toHaveProperty('flow_toxicity_vpin');
     expect(res.body).toHaveProperty('regime');
   });
+
+  it('GET /api/institutional/whale-radar dynamically calculates liquidation clusters relative to current price', async () => {
+    const testPrice = 78120.0;
+    const res = await request(app).get(`/api/institutional/whale-radar?symbol=BTCUSDT&price=${testPrice}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('reference_price', testPrice);
+    expect(res.body).toHaveProperty('liquidation_clusters');
+    expect(res.body.liquidation_clusters.length).toBe(4);
+
+    for (const cluster of res.body.liquidation_clusters) {
+      if (cluster.cluster_type === 'SHORT_LIQUIDATION') {
+        expect(cluster.price_level).toBeGreaterThan(testPrice);
+        expect(cluster.distance_pct).toBeGreaterThan(0);
+      } else if (cluster.cluster_type === 'LONG_LIQUIDATION') {
+        expect(cluster.price_level).toBeLessThan(testPrice);
+        expect(cluster.distance_pct).toBeLessThan(0);
+      }
+    }
+  });
 });

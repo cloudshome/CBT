@@ -14,9 +14,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import numpy as np
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -77,6 +77,16 @@ from core.monte_carlo_stress import monte_carlo_stress_tester
 from core.voice_interface import voice_interface
 from core.telegram_bot import telegram_bot
 from core.empirical_accumulator import empirical_accumulator
+from core.ttl_cache import sky_decision_cache, market_state_cache
+from core.provenance_engine import provenance_engine
+from core.strategy_compiler import strategy_compiler
+from core.audit_bus import audit_bus
+from core.macro_gold_engine import macro_gold_engine
+from core.auth import require_api_key
+from core.rate_limiter import RateLimitMiddleware, fastapi_rate_limiter
+from core.metrics import generate_prometheus_metrics
+
+
 
 # SKY Professional Market Intelligence Layer
 from core.sky_intelligence import (
@@ -96,7 +106,19 @@ from core.sky_intelligence import (
     vwap_engine,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+from logging.handlers import RotatingFileHandler
+
+log_dir = Path(os.getenv("DATA_DIR", "data")) / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+log_file = log_dir / "cbt_terminal.log"
+
+file_handler = RotatingFileHandler(str(log_file), maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8")
+file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+
+logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 logger = logging.getLogger("ai_quant_sentinel.app")
 
 app = FastAPI(
@@ -105,14 +127,17 @@ app = FastAPI(
     version="2.1.0",
 )
 
-# CORS
+# CORS — restrict origins in production via CORS_ORIGIN env var
+_cors_origin = os.getenv("CORS_ORIGIN", "")
+_allowed_origins = [o.strip() for o in _cors_origin.split(",") if o.strip()] if _cors_origin else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_credentials=bool(_cors_origin),
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
+app.add_middleware(RateLimitMiddleware)
 
 # Static files setup
 STATIC_DIR = Path(__file__).parent / "static"
@@ -180,28 +205,73 @@ class TelegramWebhookRequest(BaseModel):
     message: Optional[Dict[str, Any]] = None
 
 
-# WebSocket Connection Manager
+class IngestSourceRequest(BaseModel):
+    source_type: str  # "URL", "PDF", "AUDIO", "IMAGE", "TEXT", "YOUTUBE"
+    content: str
+    title: Optional[str] = "Untitled Research Source"
+    source_url: Optional[str] = None
+    parser: Optional[str] = "api_ingestor"
+    confidence: Optional[float] = 0.90
+    language: Optional[str] = "en"
+    extracted_facts: Optional[List[Dict[str, Any]]] = None
+    extracted_hypotheses: Optional[List[Dict[str, Any]]] = None
+
+
+class CompileStrategyRequest(BaseModel):
+    name: str
+    description: str
+    assets: Optional[List[str]] = None
+    timeframes: Optional[Dict[str, str]] = None
+    entry_rules: Optional[List[Dict[str, Any]]] = None
+    invalidation_rules: Optional[List[Dict[str, Any]]] = None
+    exit_rules: Optional[List[Dict[str, Any]]] = None
+    risk_model: Optional[Dict[str, Any]] = None
+    source_id: Optional[str] = None
+
+
+
+# WebSocket Connection Manager with 24/7 Heartbeat Guard
 class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
+    def __init__(self, timeout_sec: float = 60.0):
+        self.active_connections: Dict[WebSocket, float] = {}
+        self.timeout_sec = timeout_sec
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        import time
+        self.active_connections[websocket] = time.time()
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+            del self.active_connections[websocket]
+
+    def record_activity(self, websocket: WebSocket):
+        import time
+        if websocket in self.active_connections:
+            self.active_connections[websocket] = time.time()
 
     async def broadcast(self, message: Dict[str, Any]):
         dead = []
-        for connection in self.active_connections:
+        for connection in list(self.active_connections.keys()):
             try:
                 await connection.send_json(message)
             except Exception:
                 dead.append(connection)
         for d in dead:
             self.disconnect(d)
+
+    async def prune_stale_connections(self):
+        import time
+        now = time.time()
+        stale = [ws for ws, last_seen in self.active_connections.items() if (now - last_seen) > self.timeout_sec]
+        for ws in stale:
+            try:
+                await ws.close(code=1000)
+            except Exception:
+                pass
+            self.disconnect(ws)
+        if stale:
+            logger.info(f"Pruned {len(stale)} dead WebSocket connections.")
 
 
 ws_manager = ConnectionManager()
@@ -287,16 +357,31 @@ async def root_view():
 # REST API ENDPOINTS
 # ==============================================================================
 
+@app.get("/health")
 @app.get("/api/health")
 async def get_system_health():
     vitals = api_health_guard.get_all_vitals()
     drift = drift_monitor.evaluate_system_drift()
+    db_info = db_manager.get_engine_info()
     return {
         "status": "OPERATIONAL",
         "version": "2.1.0",
         "api_vitals": vitals,
         "drift_report": drift.to_dict(),
+        "database": db_info,
     }
+
+
+@app.get("/ready")
+async def get_system_readiness():
+    return {"status": "READY", "timestamp": int(time.time() * 1000)}
+
+
+@app.get("/metrics")
+@app.get("/api/metrics")
+async def get_prometheus_metrics():
+    metrics_text = generate_prometheus_metrics()
+    return Response(content=metrics_text, media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 @app.get("/api/market/ticker")
@@ -344,7 +429,7 @@ async def get_chart_memory(symbol: str = Query("BTC/USDT"), timeframe: str = Que
     return mem
 
 
-@app.post("/api/chart/memory")
+@app.post("/api/chart/memory", dependencies=[Depends(require_api_key)])
 async def save_chart_memory(req: ChartMemorySaveRequest):
     drawings_json = json.dumps(req.drawings)
     indicators_json = json.dumps(req.indicators)
@@ -353,7 +438,7 @@ async def save_chart_memory(req: ChartMemorySaveRequest):
     return {"status": "SUCCESS", "message": f"Chart memory saved for {req.symbol} [{req.timeframe}]"}
 
 
-@app.delete("/api/chart/memory")
+@app.delete("/api/chart/memory", dependencies=[Depends(require_api_key)])
 async def clear_chart_memory(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     db_manager.clear_chart_memory(symbol, timeframe)
     return {"status": "SUCCESS", "message": f"Chart memory cleared for {symbol} [{timeframe}]"}
@@ -381,6 +466,11 @@ async def get_asset_dossier(symbol: str = Query("BTC/USDT")):
 
 @app.get("/api/market/state")
 async def get_market_state(symbol: str = Query("BTC/USDT")):
+    cache_key = f"market_state_{symbol}"
+    cached = market_state_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     c_map = {
         "1d": data_streamer.get_candles(symbol, "1d", limit=30),
         "4h": data_streamer.get_candles(symbol, "4h", limit=30),
@@ -389,7 +479,9 @@ async def get_market_state(symbol: str = Query("BTC/USDT")):
         "5m": data_streamer.get_candles(symbol, "5m", limit=30),
     }
     state = market_state_compiler.compile_state(symbol, candles_by_tf=c_map)
-    return state.to_dict()
+    result = state.to_dict()
+    market_state_cache.set(cache_key, result)
+    return result
 
 
 @app.get("/api/smc/scan")
@@ -412,11 +504,21 @@ async def scan_smc_patterns(symbol: str = Query("BTC/USDT"), timeframe: str = Qu
 # ============================================================================
 
 @app.get("/api/sky/decision")
-async def get_sky_decision(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+@app.get("/api/sky/intelligence")
+async def get_sky_decision(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    limit: Optional[int] = Query(100),
+):
     """
     Executes the full 12-stage SKY Market Intelligence Decision Pipeline:
     DATA -> DATA QUALITY -> STRUCTURE -> LIQUIDITY -> VOLUME -> VOLATILITY -> DERIVATIVES -> REGIME -> SETUP -> EV -> DECISION.
     """
+    cache_key = f"sky_decision_{symbol}_{timeframe}"
+    cached = sky_decision_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     candles = data_streamer.get_candles(symbol, timeframe, limit=100)
     tf_map = {
         "1d": data_streamer.get_candles(symbol, "1d", limit=30),
@@ -427,7 +529,9 @@ async def get_sky_decision(symbol: str = Query("BTC/USDT"), timeframe: str = Que
         "1m": data_streamer.get_candles(symbol, "1m", limit=30),
     }
     decision_out = sky_orchestrator.analyze_market(symbol=symbol, timeframe=timeframe, candles=candles, candles_by_tf=tf_map)
-    return asdict(decision_out)
+    result = asdict(decision_out)
+    sky_decision_cache.set(cache_key, result)
+    return result
 
 
 @app.get("/api/sky/structure")
@@ -671,7 +775,7 @@ async def get_shadow_positions():
     return {"open_positions": open_pos, "history": all_pos}
 
 
-@app.post("/api/shadow/trade")
+@app.post("/api/shadow/trade", dependencies=[Depends(require_api_key)])
 async def open_shadow_trade(order: TradeOrderRequest):
     pos_id = portfolio_shadow.open_position(
         symbol=order.symbol,
@@ -684,7 +788,7 @@ async def open_shadow_trade(order: TradeOrderRequest):
     return {"status": "SUCCESS", "position_id": pos_id}
 
 
-@app.post("/api/shadow/close")
+@app.post("/api/shadow/close", dependencies=[Depends(require_api_key)])
 async def close_shadow_position(req: PositionCloseRequest):
     success = portfolio_shadow.close_position(req.position_id, req.exit_price)
     if not success:
@@ -692,19 +796,19 @@ async def close_shadow_position(req: PositionCloseRequest):
     return {"status": "SUCCESS", "message": f"Position {req.position_id} closed."}
 
 
-@app.post("/api/shadow/reset")
+@app.post("/api/shadow/reset", dependencies=[Depends(require_api_key)])
 async def reset_shadow_positions():
     portfolio_shadow.reset_all_positions()
     return {"status": "SUCCESS", "message": "All shadow positions reset."}
 
 
-@app.post("/api/command/parse")
+@app.post("/api/command/parse", dependencies=[Depends(require_api_key)])
 async def parse_trade_command(req: CommandParseRequest):
     result = command_executor.parse_and_execute(req.command_text)
     return asdict(result)
 
 
-@app.post("/api/desk/ask")
+@app.post("/api/desk/ask", dependencies=[Depends(require_api_key)])
 async def ask_desk_copilot(req: AskDeskRequest):
     sym = req.symbol or "BTC/USDT"
     tf = req.timeframe or "15m"
@@ -751,6 +855,83 @@ async def ask_desk_copilot(req: AskDeskRequest):
     return {"reply": reply, "telemetry": telemetry}
 
 
+@app.get("/api/memory/similarity")
+async def get_memory_similarity(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+):
+    """
+    Episodic Memory Recall: Recalls historical market episodes matching current market state,
+    calculates empirical win probability P(TP_hit), expected R:R multiple, and similarity scores.
+    """
+    sym = _canonical_symbol(symbol)
+    candles = data_streamer.get_candles(sym, timeframe, 100)
+    c_map = {timeframe: candles}
+    state = market_state_compiler.compile_state(sym, candles_by_tf=c_map)
+    reg_res = regime_transition_detector.classify_regime(candles)
+    active_reg = reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "TRENDING_BULL"
+
+    analogues = analogue_engine.find_analogues(state, active_regime=active_reg)
+    return {
+        "symbol": sym,
+        "timeframe": timeframe,
+        "active_regime": active_reg,
+        "k_samples_found": analogues.k_samples_found,
+        "sample_adequacy_score": round(analogues.sample_adequacy_score, 2),
+        "p_tp_hit": round(analogues.p_tp_hit, 3),
+        "p_sl_hit": round(analogues.p_sl_hit, 3),
+        "expected_r_multiple": round(analogues.expected_r_multiple, 2),
+        "median_mae_pct": round(analogues.median_mae_pct, 2),
+        "median_mfe_pct": round(analogues.median_mfe_pct, 2),
+        "uncertainty_penalty": round(analogues.uncertainty_penalty, 3),
+        "top_matches": [
+            {
+                "state_id": m.state_id,
+                "timestamp": m.timestamp,
+                "similarity_score": m.similarity_score,
+                "realized_return_1h": m.realized_forward_return_1h,
+                "tp_hit": m.tp_hit,
+                "sl_hit": m.sl_hit,
+                "mae": m.max_adverse_excursion,
+                "mfe": m.max_favorable_excursion,
+            }
+            for m in analogues.top_matches[:5]
+        ],
+    }
+
+
+@app.get("/api/ai/live-narrative")
+async def get_live_ai_narrative(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    language: str = Query("auto"),
+):
+    """
+    Generates live market context, structural setup storytelling, and risk guidance from QuantMentor.
+    """
+    sym = _canonical_symbol(symbol)
+    cur_p = await data_streamer.get_live_ticker(sym)
+    candles = data_streamer.get_candles(sym, timeframe, 50)
+    c_map = {timeframe: candles}
+    state = market_state_compiler.compile_state(sym, candles_by_tf=c_map)
+    reg_res = regime_transition_detector.classify_regime(candles)
+    regime_label = reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "UNKNOWN"
+
+    telemetry = {
+        "symbol": sym,
+        "timeframe": timeframe,
+        "current_price": cur_p,
+        "regime": regime_label,
+    }
+
+    narrative = await quant_mentor.generate_response(
+        f"Provide a 2-sentence institutional market context and structural outlook for {sym} on {timeframe}.",
+        telemetry,
+        language,
+    )
+    return {"symbol": sym, "narrative": narrative, "telemetry": telemetry}
+
+
 
 @app.get("/api/league/leaderboard")
 async def get_strategy_leaderboard():
@@ -764,7 +945,7 @@ async def get_governance_proposals():
     return {"proposals": proposals}
 
 
-@app.post("/api/governance/approve")
+@app.post("/api/governance/approve", dependencies=[Depends(require_api_key)])
 async def approve_parameter_patch(req: ParameterApprovalRequest):
     success = patch_governor.execute_hot_reload(req.proposal_id, req.operator_name or "HUMAN_OPERATOR")
     if not success:
@@ -772,21 +953,21 @@ async def approve_parameter_patch(req: ParameterApprovalRequest):
     return {"status": "SUCCESS", "message": f"Proposal {req.proposal_id} approved and hot-reloaded."}
 
 
-@app.post("/api/lab/backtest")
+@app.post("/api/lab/backtest", dependencies=[Depends(require_api_key)])
 async def run_lab_backtest(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     candles = data_streamer.get_candles(symbol, timeframe, limit=300)
     rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
     return rep.to_dict()
 
 
-@app.post("/api/lab/walk-forward")
+@app.post("/api/lab/walk-forward", dependencies=[Depends(require_api_key)])
 async def run_lab_walk_forward(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     candles = data_streamer.get_candles(symbol, timeframe, limit=300)
     rep = walk_forward_engine.validate(symbol, timeframe, candles)
     return rep.to_dict()
 
 
-@app.post("/api/lab/stress-test")
+@app.post("/api/lab/stress-test", dependencies=[Depends(require_api_key)])
 async def run_lab_stress_test(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     candles = data_streamer.get_candles(symbol, timeframe, limit=300)
     bt_rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
@@ -881,7 +1062,7 @@ async def get_asset_dossier(
 # PHASE 16: VOICE INTERFACE & NATURAL SPEECH ENDPOINTS
 # ==============================================================================
 
-@app.post("/api/voice/transcribe")
+@app.post("/api/voice/transcribe", dependencies=[Depends(require_api_key)])
 async def transcribe_voice_audio(req: VoiceTranscribeRequest):
     """
     Transcribes audio bytes (WebM/WAV/MP3) and automatically parses trading instructions.
@@ -904,7 +1085,7 @@ async def transcribe_voice_audio(req: VoiceTranscribeRequest):
     }
 
 
-@app.post("/api/voice/synthesize")
+@app.post("/api/voice/synthesize", dependencies=[Depends(require_api_key)])
 async def synthesize_voice_brief(req: VoiceSynthesizeRequest):
     """
     Synthesizes text into spoken MP3 audio brief.
@@ -932,7 +1113,7 @@ async def get_telegram_status():
     }
 
 
-@app.post("/api/telegram/broadcast")
+@app.post("/api/telegram/broadcast", dependencies=[Depends(require_api_key)])
 async def broadcast_telegram_alert(req: TelegramBroadcastRequest):
     """Dispatches a custom alert to configured Telegram channels."""
     sent = await telegram_bot.send_message(req.text, parse_mode=req.parse_mode or "Markdown")
@@ -964,14 +1145,128 @@ async def get_empirical_validation_status(
     return asdict(report)
 
 
+# ==============================================================================
+# PROVENANCE INGESTION & STRATEGY GENOME COMPILER ENDPOINTS
+# ==============================================================================
+
+
+@app.post("/api/ingest/source", dependencies=[Depends(require_api_key)])
+async def ingest_research_source(req: IngestSourceRequest):
+    """
+    Cryptographically registers and indexes research source (URL, PDF, Audio, Video text)
+    with SHA-256 content hashing and immutable provenance metadata.
+    """
+    rec = provenance_engine.register_source(
+        source_type=req.source_type,
+        raw_content=req.content,
+        title=req.title or "Untitled Source",
+        source_url=req.source_url,
+        parser=req.parser or "api_ingestor",
+        confidence=req.confidence or 0.90,
+        language=req.language or "en",
+        extracted_facts=req.extracted_facts,
+        extracted_hypotheses=req.extracted_hypotheses,
+    )
+    return rec.to_dict()
+
+
+@app.get("/api/ingest/provenance")
+async def list_provenance_records(limit: int = Query(50)):
+    """Lists recent cryptographic provenance records."""
+    records = provenance_engine.list_records(limit=limit)
+    return {"records": [r.to_dict() for r in records]}
+
+
+@app.get("/api/ingest/provenance/{source_id}")
+async def get_provenance_record(source_id: str):
+    """Retrieves a single provenance record by its ID."""
+    rec = provenance_engine.get_by_id(source_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Provenance record not found.")
+    return rec.to_dict()
+
+
+@app.post("/api/strategy/compile", dependencies=[Depends(require_api_key)])
+async def compile_strategy_specification(req: CompileStrategyRequest):
+    """
+    Formally compiles natural language or extracted trading hypotheses into a deterministic
+    machine-testable Strategy Genome. Rejects underspecified rules with NOT_BACKTESTABLE.
+    """
+    compiled = strategy_compiler.compile_hypothesis(
+        name=req.name,
+        raw_description=req.description,
+        assets=req.assets,
+        timeframes=req.timeframes,
+        entry_rules=req.entry_rules,
+        invalidation_rules=req.invalidation_rules,
+        exit_rules=req.exit_rules,
+        risk_model=req.risk_model,
+        source_id=req.source_id,
+    )
+    return compiled.to_dict()
+
+
+@app.get("/api/strategy/genomes")
+async def get_strategy_genomes():
+    """Returns all registered strategy genomes in the Strategy Quarantine League."""
+    leaderboard = strategy_league_manager.get_leaderboard()
+    return {"genomes": leaderboard}
+
+
+# ==============================================================================
+# AUDIT BUS & DEDICATED XAUUSD MACRO INTELLIGENCE ENDPOINTS
+# ==============================================================================
+
+@app.get("/api/audit/events")
+async def get_system_audit_events(
+    limit: int = Query(50),
+    event_type: Optional[str] = Query(None),
+):
+    """
+    Retrieves immutable structured audit log events (trade closures, loss autopsies, risk gate events).
+    """
+    events = audit_bus.get_recent_events(limit=limit, event_type=event_type)
+    return {"events": [e.to_dict() for e in events]}
+
+
+@app.get("/api/macro/gold")
+async def get_gold_macro_telemetry(
+    gold_price: Optional[float] = Query(None),
+    paxg_price: Optional[float] = Query(None),
+    dxy: Optional[float] = Query(None),
+    real_yield: Optional[float] = Query(None),
+):
+    """
+    Returns dedicated institutional macro telemetry for Gold (XAUUSD / PAXGUSDT)
+    including US Real Yield beta, DXY rolling correlation, and London Fixings liquidity status.
+    """
+    # Fetch live gold ticker if not supplied
+    if gold_price is None:
+        paxg_price_live = await data_streamer.get_live_ticker("PAXG/USDT")
+        gp = paxg_price_live if paxg_price_live > 0 else 2650.0
+    else:
+        gp = gold_price
+
+    paxg_p = paxg_price or gp
+    telemetry = macro_gold_engine.evaluate_macro_state(
+        gold_price=gp,
+        paxg_price=paxg_p,
+        dxy=dxy,
+        real_yield_10y=real_yield,
+    )
+    return telemetry.to_dict()
+
+
 # WebSocket endpoint for real-time interactive terminal
+
+
 @app.websocket("/ws/terminal")
 async def websocket_terminal_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     try:
         while True:
             data = await websocket.receive_text()
-            # Handle client ping or subscription
+            ws_manager.record_activity(websocket)
             msg = json.loads(data) if data else {}
             if msg.get("action") == "PING":
                 await websocket.send_json({"type": "PONG", "timestamp": int(asyncio.get_event_loop().time() * 1000)})

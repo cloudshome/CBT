@@ -2,6 +2,7 @@ import { fetchBinanceCandles } from './binanceService';
 import { fetchBybitCandles } from './bybitService';
 import { saveCandles, getCachedCandles } from './candlesCacheService';
 import { OHLCVCandle, SupportedTimeframe } from '../types/candles';
+import { binanceCircuitBreaker, bybitCircuitBreaker } from '../utils/circuitBreaker';
 
 export interface MarketDataResult {
   candles: OHLCVCandle[];
@@ -22,8 +23,8 @@ export class MarketDataFetchError extends Error {
 }
 
 /**
- * Fetches market candles using the unified fallback chain:
- * 1. Binance REST -> 2. Bybit REST -> 3. SQLite Cache
+ * Fetches market candles using the resilient unified fallback chain with circuit breakers:
+ * 1. Binance REST (Circuit Protected) -> 2. Bybit REST (Circuit Protected) -> 3. SQLite Cache
  */
 export async function fetchCandlesWithFallback(
   symbol: string,
@@ -32,40 +33,56 @@ export async function fetchCandlesWithFallback(
 ): Promise<MarketDataResult> {
   const errorLogs: string[] = [];
 
-  // Tier 1: Try Binance Public REST
-  try {
-    const candles = await fetchBinanceCandles(symbol, timeframe, limit);
-    saveCandles(symbol, timeframe, candles).catch((err) => {
-      console.error('Failed to cache Binance candles to SQLite:', err);
-    });
+  // Tier 1: Try Binance Public REST (Fast-fails if Circuit is OPEN)
+  if (!binanceCircuitBreaker.isOpen()) {
+    try {
+      const candles = await binanceCircuitBreaker.execute(() =>
+        fetchBinanceCandles(symbol, timeframe, limit)
+      );
 
-    return {
-      candles,
-      source: 'BINANCE',
-      isFallback: false,
-    };
-  } catch (binanceErr: unknown) {
-    const msg = binanceErr instanceof Error ? binanceErr.message : String(binanceErr);
-    errorLogs.push(`Binance: ${msg}`);
-    console.warn(`Binance fetch failed for ${symbol} (${timeframe}): ${msg}. Falling back to Bybit...`);
+      saveCandles(symbol, timeframe, candles).catch((err) => {
+        console.error('Failed to cache Binance candles to SQLite:', err);
+      });
+
+      return {
+        candles,
+        source: 'BINANCE',
+        isFallback: false,
+      };
+    } catch (binanceErr: unknown) {
+      const msg = binanceErr instanceof Error ? binanceErr.message : String(binanceErr);
+      errorLogs.push(`Binance: ${msg}`);
+      console.warn(`Binance fetch failed for ${symbol} (${timeframe}): ${msg}. Falling back to Bybit...`);
+    }
+  } else {
+    errorLogs.push('Binance: Circuit breaker is OPEN (fast-failing)');
+    console.warn(`Binance circuit is OPEN for ${symbol}. Skipping directly to Bybit...`);
   }
 
-  // Tier 2: Try Bybit V5 Public REST
-  try {
-    const candles = await fetchBybitCandles(symbol, timeframe, limit);
-    saveCandles(symbol, timeframe, candles).catch((err) => {
-      console.error('Failed to cache Bybit candles to SQLite:', err);
-    });
+  // Tier 2: Try Bybit V5 Public REST (Fast-fails if Circuit is OPEN)
+  if (!bybitCircuitBreaker.isOpen()) {
+    try {
+      const candles = await bybitCircuitBreaker.execute(() =>
+        fetchBybitCandles(symbol, timeframe, limit)
+      );
 
-    return {
-      candles,
-      source: 'BYBIT',
-      isFallback: true,
-    };
-  } catch (bybitErr: unknown) {
-    const msg = bybitErr instanceof Error ? bybitErr.message : String(bybitErr);
-    errorLogs.push(`Bybit: ${msg}`);
-    console.warn(`Bybit fetch failed for ${symbol} (${timeframe}): ${msg}. Falling back to SQLite cache...`);
+      saveCandles(symbol, timeframe, candles).catch((err) => {
+        console.error('Failed to cache Bybit candles to SQLite:', err);
+      });
+
+      return {
+        candles,
+        source: 'BYBIT',
+        isFallback: true,
+      };
+    } catch (bybitErr: unknown) {
+      const msg = bybitErr instanceof Error ? bybitErr.message : String(bybitErr);
+      errorLogs.push(`Bybit: ${msg}`);
+      console.warn(`Bybit fetch failed for ${symbol} (${timeframe}): ${msg}. Falling back to SQLite cache...`);
+    }
+  } else {
+    errorLogs.push('Bybit: Circuit breaker is OPEN (fast-failing)');
+    console.warn(`Bybit circuit is OPEN for ${symbol}. Skipping directly to SQLite cache...`);
   }
 
   // Tier 3: Try Local SQLite Cache

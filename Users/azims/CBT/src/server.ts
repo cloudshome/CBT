@@ -9,16 +9,30 @@ import deskRouter from './routes/desk';
 import skyRouter from './routes/sky';
 import tickersRouter from './routes/tickers';
 import { institutionalRouter } from './routes/institutional';
+import { metricsRouter } from './routes/metrics';
+import { apiKeyAuth } from './middleware/apiKeyAuth';
 
 dotenv.config();
 
 export function createApp(): Express {
   const app = express();
 
-  app.use(cors());
+  // --- CORS Configuration ---
+  // In production, restrict to specific origin(s) via CORS_ORIGIN env var.
+  // In development (or when unset), allow all origins for convenience.
+  const corsOrigin = process.env.CORS_ORIGIN;
+  app.use(cors({
+    origin: corsOrigin ? corsOrigin.split(',').map(o => o.trim()) : '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    credentials: !!corsOrigin,
+  }));
   app.use(express.json());
 
-  // Default root status endpoint
+  // Metrics endpoints (Prometheus /metrics and /api/metrics/json)
+  app.use(metricsRouter);
+
+  // Default root status endpoint (public)
   app.get('/', (_req: Request, res: Response) => {
     res.json({
       name: 'Crypto Brain Terminal (CTB) API',
@@ -27,12 +41,12 @@ export function createApp(): Express {
     });
   });
 
-  // Health check endpoint
+  // Health check endpoint (public)
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', service: 'CTB-Backend' });
   });
 
-  // Readiness check endpoint
+  // Readiness check endpoint (public)
   app.get('/api/readiness', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
@@ -41,15 +55,17 @@ export function createApp(): Express {
     });
   });
 
-  // API Endpoints
+  // --- Public Read-Only Routes (no auth required) ---
   app.use('/api/candles', candlesRouter);
   app.use('/api/mtf', mtfRouter);
   app.use('/api/scan', scanRouter);
-  app.use('/api/paper', paperRouter);
-  app.use('/api/desk', deskRouter);
   app.use('/api/sky', skyRouter);
   app.use('/api/tickers', tickersRouter);
-  app.use('/api/institutional', institutionalRouter);
+
+  // --- Sensitive Routes (auth required when API_KEY is set) ---
+  app.use('/api/paper', apiKeyAuth, paperRouter);
+  app.use('/api/desk', apiKeyAuth, deskRouter);
+  app.use('/api/institutional', apiKeyAuth, institutionalRouter);
 
   // 404 handler
   app.use((_req: Request, res: Response) => {
@@ -58,6 +74,7 @@ export function createApp(): Express {
 
   return app;
 }
+
 
 export const app = createApp();
 

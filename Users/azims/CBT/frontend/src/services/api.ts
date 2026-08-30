@@ -14,6 +14,38 @@ import {
 
 const BASE_URL = '';
 
+let _apiKey: string =
+  (typeof window !== 'undefined' ? localStorage.getItem('cbt_api_key') || '' : '') ||
+  (((import.meta as unknown as { env?: Record<string, string> })?.env?.VITE_API_KEY) || '');
+
+export function setApiKey(key: string): void {
+  _apiKey = key;
+  if (typeof window !== 'undefined') {
+    if (key) {
+      localStorage.setItem('cbt_api_key', key);
+    } else {
+      localStorage.removeItem('cbt_api_key');
+    }
+  }
+}
+
+export function getApiKey(): string {
+  return _apiKey;
+}
+
+function authHeaders(extraHeaders?: HeadersInit): HeadersInit {
+  const headers = new Headers(extraHeaders || {});
+  if (_apiKey && !headers.has('X-API-Key') && !headers.has('Authorization')) {
+    headers.set('X-API-Key', _apiKey);
+  }
+  return headers;
+}
+
+async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const headers = authHeaders(init?.headers);
+  return fetch(input, { ...init, headers });
+}
+
 export class ApiError extends Error {
   public statusCode: number;
   public details?: unknown;
@@ -47,7 +79,7 @@ export const api = {
     timeframe: SupportedTimeframe = '15m',
     limit = 100
   ): Promise<CandlesApiResponse> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
     );
     return handleResponse<CandlesApiResponse>(res);
@@ -61,7 +93,7 @@ export const api = {
     timeframe: SupportedTimeframe = '15m',
     indicators = 'ema,rsi'
   ): Promise<MTFApiResponse> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/mtf?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&indicators=${indicators}`
     );
     return handleResponse<MTFApiResponse>(res);
@@ -75,7 +107,7 @@ export const api = {
     timeframe: SupportedTimeframe = '15m',
     limit = 100
   ): Promise<ScanApiResponse> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/scan?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
     );
     return handleResponse<ScanApiResponse>(res);
@@ -92,7 +124,7 @@ export const api = {
     tp: number;
     size?: number;
   }): Promise<{ message: string; trade: PaperTrade }> {
-    const res = await fetch(`${BASE_URL}/api/paper/trade`, {
+    const res = await authFetch(`${BASE_URL}/api/paper/trade`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(trade),
@@ -104,7 +136,7 @@ export const api = {
    * GET /api/paper/positions
    */
   async getPositions(): Promise<PaperPositionsResponse> {
-    const res = await fetch(`${BASE_URL}/api/paper/positions`);
+    const res = await authFetch(`${BASE_URL}/api/paper/positions`);
     return handleResponse<PaperPositionsResponse>(res);
   },
 
@@ -112,7 +144,7 @@ export const api = {
    * GET /api/paper/config
    */
   async getRiskConfig(): Promise<{ config: RiskConfig }> {
-    const res = await fetch(`${BASE_URL}/api/paper/config`);
+    const res = await authFetch(`${BASE_URL}/api/paper/config`);
     return handleResponse<{ config: RiskConfig }>(res);
   },
 
@@ -120,7 +152,7 @@ export const api = {
    * POST /api/desk/ai-brief
    */
   async getDeskBrief(symbol: string, timeframe: SupportedTimeframe = '15m'): Promise<DeskBriefResponse> {
-    const res = await fetch(`${BASE_URL}/api/desk/ai-brief`, {
+    const res = await authFetch(`${BASE_URL}/api/desk/ai-brief`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol, timeframe }),
@@ -132,7 +164,7 @@ export const api = {
    * POST /api/desk/ask
    */
   async askDesk(query: string, context?: Record<string, unknown>): Promise<DeskAskResponse> {
-    const res = await fetch(`${BASE_URL}/api/desk/ask`, {
+    const res = await authFetch(`${BASE_URL}/api/desk/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, context }),
@@ -148,7 +180,7 @@ export const api = {
     timeframe: SupportedTimeframe = '15m',
     limit = 100
   ): Promise<SKYIntelligenceResponse> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/sky/intelligence?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
     );
     return handleResponse<SKYIntelligenceResponse>(res);
@@ -161,7 +193,7 @@ export const api = {
     symbol: string,
     timeframe: SupportedTimeframe = '15m'
   ): Promise<{ symbol: string; timeframe: string; vwap: VWAPData }> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/sky/vwap?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
     );
     return handleResponse<{ symbol: string; timeframe: string; vwap: VWAPData }>(res);
@@ -175,7 +207,7 @@ export const api = {
     timeframe: SupportedTimeframe = '15m',
     limit = 100
   ): Promise<import('../types').InstitutionalAlphaResponse> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/institutional/alpha?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
     );
     return handleResponse<import('../types').InstitutionalAlphaResponse>(res);
@@ -189,7 +221,7 @@ export const api = {
     timeframe: SupportedTimeframe = '15m',
     limit = 100
   ): Promise<import('../types').CVDSeriesData> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/institutional/cvd?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
     );
     return handleResponse<import('../types').CVDSeriesData>(res);
@@ -201,7 +233,7 @@ export const api = {
   async getOrderBookImbalance(
     symbol: string
   ): Promise<import('../types').OBIData> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/institutional/orderbook-imbalance?symbol=${encodeURIComponent(symbol)}`
     );
     return handleResponse<import('../types').OBIData>(res);
@@ -215,7 +247,7 @@ export const api = {
     timeframe: SupportedTimeframe = '15m',
     limit = 100
   ): Promise<import('../types').CouncilDecision> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/institutional/debate?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
     );
     return handleResponse<import('../types').CouncilDecision>(res);
@@ -225,10 +257,12 @@ export const api = {
    * 2. GET /api/institutional/whale-radar
    */
   async getWhaleRadar(
-    symbol: string
+    symbol: string,
+    currentPrice?: number
   ): Promise<import('../types').WhaleRadarData> {
-    const res = await fetch(
-      `${BASE_URL}/api/institutional/whale-radar?symbol=${encodeURIComponent(symbol)}`
+    const priceParam = currentPrice && currentPrice > 0 ? `&price=${encodeURIComponent(currentPrice)}` : '';
+    const res = await authFetch(
+      `${BASE_URL}/api/institutional/whale-radar?symbol=${encodeURIComponent(symbol)}${priceParam}`
     );
     return handleResponse<import('../types').WhaleRadarData>(res);
   },
@@ -237,7 +271,7 @@ export const api = {
    * 3. GET /api/institutional/psychology
    */
   async getPsychologyStatus(): Promise<import('../types').TiltStatus> {
-    const res = await fetch(`${BASE_URL}/api/institutional/psychology`);
+    const res = await authFetch(`${BASE_URL}/api/institutional/psychology`);
     return handleResponse<import('../types').TiltStatus>(res);
   },
 
@@ -248,7 +282,7 @@ export const api = {
     symbol: string,
     timeframe: SupportedTimeframe = '15m'
   ): Promise<import('../types').MonteCarloStressReport> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/institutional/monte-carlo?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
       { method: 'POST' }
     );
@@ -261,7 +295,7 @@ export const api = {
   async getCrossAssetLeadLag(
     symbol: string
   ): Promise<{ signals: import('../types').LeadSignal[]; dxy_price: number; us10y_yield: number; has_macro_shock: boolean }> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/institutional/lead-lag?symbol=${encodeURIComponent(symbol)}`
     );
     return handleResponse<{ signals: import('../types').LeadSignal[]; dxy_price: number; us10y_yield: number; has_macro_shock: boolean }>(res);
@@ -273,7 +307,7 @@ export const api = {
   async getDynamicHedge(
     symbol: string
   ): Promise<import('../types').HedgeRecommendation> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/institutional/dynamic-hedge?symbol=${encodeURIComponent(symbol)}`
     );
     return handleResponse<import('../types').HedgeRecommendation>(res);
@@ -301,7 +335,7 @@ export const api = {
     source: string;
     timestamp: string;
   }> {
-    const res = await fetch(`${BASE_URL}/api/tickers?symbols=${symbols.join(',')}`);
+    const res = await authFetch(`${BASE_URL}/api/tickers?symbols=${symbols.join(',')}`);
     return handleResponse(res);
   },
 
@@ -313,7 +347,7 @@ export const api = {
     symbol: string,
     timeframe: SupportedTimeframe = '15m'
   ): Promise<import('../types').UniversalAssetDossier> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/institutional/dossier?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
     );
     return handleResponse<import('../types').UniversalAssetDossier>(res);
@@ -333,7 +367,7 @@ export const api = {
     symbol: string,
     timeframe: SupportedTimeframe = '15m'
   ): Promise<import('../types').SKYIntelligenceResponse> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/sky/decision?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
     );
     return handleResponse<import('../types').SKYIntelligenceResponse>(res);
@@ -349,7 +383,7 @@ export const api = {
     symbol = 'BTC/USDT',
     timeframe: SupportedTimeframe = '15m'
   ): Promise<Record<string, unknown>> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/sky/statistics?concept=${encodeURIComponent(concept)}&regime=${encodeURIComponent(regime)}&symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
     );
     return handleResponse<Record<string, unknown>>(res);
@@ -362,7 +396,7 @@ export const api = {
   async getDecisionCouncil(
     symbol: string
   ): Promise<import('../types').CouncilDecision> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/decision/council?symbol=${encodeURIComponent(symbol)}`
     );
     return handleResponse<import('../types').CouncilDecision>(res);
@@ -376,7 +410,7 @@ export const api = {
     symbol: string,
     equity = 100000
   ): Promise<Record<string, unknown>> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/decision/allocation?symbol=${encodeURIComponent(symbol)}&equity=${equity}`
     );
     return handleResponse<Record<string, unknown>>(res);
@@ -389,7 +423,7 @@ export const api = {
   async getPredictionLadder(
     symbol: string
   ): Promise<Record<string, unknown>> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/prediction/ladder?symbol=${encodeURIComponent(symbol)}`
     );
     return handleResponse<Record<string, unknown>>(res);
@@ -402,7 +436,7 @@ export const api = {
   async getPredictionLedger(
     limit = 50
   ): Promise<{ count: number; records: unknown[] }> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/prediction/ledger?limit=${limit}`
     );
     return handleResponse<{ count: number; records: unknown[] }>(res);
@@ -415,7 +449,7 @@ export const api = {
   async getScenarios(
     symbol: string
   ): Promise<Record<string, unknown>> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/scenarios?symbol=${encodeURIComponent(symbol)}`
     );
     return handleResponse<Record<string, unknown>>(res);
@@ -433,7 +467,7 @@ export const api = {
     let url = `${BASE_URL}/api/path-simulation?symbol=${encodeURIComponent(symbol)}`;
     if (tp !== undefined) url += `&tp=${tp}`;
     if (sl !== undefined) url += `&sl=${sl}`;
-    const res = await fetch(url);
+    const res = await authFetch(url);
     return handleResponse<Record<string, unknown>>(res);
   },
 
@@ -442,7 +476,7 @@ export const api = {
    * Shadow paper positions with live P&L (Python portfolio_shadow).
    */
   async getShadowPositions(): Promise<{ open_positions: unknown[]; history: unknown[] }> {
-    const res = await fetch(`${BASE_URL}/api/shadow/positions`);
+    const res = await authFetch(`${BASE_URL}/api/shadow/positions`);
     return handleResponse<{ open_positions: unknown[]; history: unknown[] }>(res);
   },
 
@@ -458,7 +492,7 @@ export const api = {
     stop_loss: number;
     take_profit: number;
   }): Promise<{ status: string; position_id: string }> {
-    const res = await fetch(`${BASE_URL}/api/shadow/trade`, {
+    const res = await authFetch(`${BASE_URL}/api/shadow/trade`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(order),
@@ -474,7 +508,7 @@ export const api = {
     symbol: string,
     timeframe: SupportedTimeframe = '15m'
   ): Promise<Record<string, unknown>> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/lab/backtest?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
       { method: 'POST' }
     );
@@ -489,7 +523,7 @@ export const api = {
     symbol: string,
     timeframe: SupportedTimeframe = '15m'
   ): Promise<Record<string, unknown>> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/lab/walk-forward?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
       { method: 'POST' }
     );
@@ -504,7 +538,7 @@ export const api = {
     symbol: string,
     timeframe: SupportedTimeframe = '15m'
   ): Promise<Record<string, unknown>> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/lab/stress-test?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`,
       { method: 'POST' }
     );
@@ -516,7 +550,7 @@ export const api = {
    * Strategy league rankings.
    */
   async getStrategyLeaderboard(): Promise<{ leaderboard: unknown[] }> {
-    const res = await fetch(`${BASE_URL}/api/league/leaderboard`);
+    const res = await authFetch(`${BASE_URL}/api/league/leaderboard`);
     return handleResponse<{ leaderboard: unknown[] }>(res);
   },
 
@@ -525,7 +559,7 @@ export const api = {
    * Pending parameter governance proposals.
    */
   async getGovernanceProposals(): Promise<{ proposals: unknown[] }> {
-    const res = await fetch(`${BASE_URL}/api/governance/proposals`);
+    const res = await authFetch(`${BASE_URL}/api/governance/proposals`);
     return handleResponse<{ proposals: unknown[] }>(res);
   },
 
@@ -545,7 +579,7 @@ export const api = {
     is_trade_command: boolean;
     parsed_command: Record<string, unknown>;
   }> {
-    const res = await fetch(`${BASE_URL}/api/voice/transcribe`, {
+    const res = await authFetch(`${BASE_URL}/api/voice/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ audio_base64: audioBase64, filename }),
@@ -558,7 +592,7 @@ export const api = {
    * Synthesizes text into spoken MP3 audio.
    */
   async synthesizeVoiceAudio(text: string, filename = 'desk_brief.mp3'): Promise<Blob> {
-    const res = await fetch(`${BASE_URL}/api/voice/synthesize`, {
+    const res = await authFetch(`${BASE_URL}/api/voice/synthesize`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, filename }),
@@ -583,7 +617,7 @@ export const api = {
     chat_id_present: boolean;
     registered_commands: string[];
   }> {
-    const res = await fetch(`${BASE_URL}/api/telegram/status`);
+    const res = await authFetch(`${BASE_URL}/api/telegram/status`);
     return handleResponse(res);
   },
 
@@ -595,7 +629,7 @@ export const api = {
     text: string,
     parseMode: 'Markdown' | 'HTML' = 'Markdown'
   ): Promise<{ status: string; configured: boolean }> {
-    const res = await fetch(`${BASE_URL}/api/telegram/broadcast`, {
+    const res = await authFetch(`${BASE_URL}/api/telegram/broadcast`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, parse_mode: parseMode }),
@@ -626,13 +660,150 @@ export const api = {
       status_label: string;
     }>;
     last_run_timestamp: number;
-    active_symbols: string[];
   }> {
-    const res = await fetch(
+    const res = await authFetch(
       `${BASE_URL}/api/lab/empirical-status?concept=${encodeURIComponent(concept)}`
     );
     return handleResponse(res);
   },
+
+  /**
+   * GET /api/memory/similarity
+   * Returns top matching historical episodes, empirical win probability, and expected R:R.
+   */
+  async getMemorySimilarity(symbol: string, timeframe: SupportedTimeframe = '15m') {
+    const res = await authFetch(
+      `${BASE_URL}/api/memory/similarity?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<{
+      symbol: string;
+      timeframe: string;
+      active_regime: string;
+      k_samples_found: number;
+      sample_adequacy_score: number;
+      p_tp_hit: number;
+      p_sl_hit: number;
+      expected_r_multiple: number;
+      median_mae_pct: number;
+      median_mfe_pct: number;
+      uncertainty_penalty: number;
+      top_matches: Array<{
+        state_id: string;
+        timestamp: number;
+        similarity_score: number;
+        realized_return_1h: number;
+        tp_hit: boolean;
+        sl_hit: boolean;
+        mae: number;
+        mfe: number;
+      }>;
+    }>(res);
+  },
+
+  /**
+   * GET /api/macro/gold
+   */
+  async getGoldMacroTelemetry(goldPrice?: number, paxgPrice?: number, dxy?: number, realYield?: number) {
+    const params = new URLSearchParams();
+    if (goldPrice !== undefined) params.append('gold_price', goldPrice.toString());
+    if (paxgPrice !== undefined) params.append('paxg_price', paxgPrice.toString());
+    if (dxy !== undefined) params.append('dxy', dxy.toString());
+    if (realYield !== undefined) params.append('real_yield', realYield.toString());
+
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await authFetch(`${BASE_URL}/api/macro/gold${qs}`);
+    return handleResponse<{
+      symbol: string;
+      timestamp: number;
+      current_gold_price: number;
+      dxy_index: number;
+      dxy_rolling_correlation_30d: number;
+      us_10y_real_yield_pct: number;
+      real_yield_beta: number;
+      central_bank_net_flow_metric: number;
+      active_fixing_session: string;
+      is_in_prime_fixing_window: boolean;
+      synthetic_paxg_basis_bps: number;
+      macro_regime: string;
+      macro_bias: string;
+      macro_confidence: number;
+      catalysts: string[];
+    }>(res);
+  },
+
+  /**
+   * GET /api/audit/events
+   */
+  async getAuditEvents(limit = 50, eventType?: string) {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (eventType) params.append('event_type', eventType);
+    const res = await authFetch(`${BASE_URL}/api/audit/events?${params.toString()}`);
+    return handleResponse<{
+      events: Array<{
+        event_id: string;
+        timestamp: number;
+        event_type: string;
+        symbol: string;
+        severity: string;
+        reason: string;
+        details: Record<string, any>;
+        software_version: string;
+      }>;
+    }>(res);
+  },
+
+  /**
+   * POST /api/ingest/source
+   */
+  async ingestSource(payload: {
+    source_type: string;
+    content: string;
+    title?: string;
+    source_url?: string;
+    confidence?: number;
+  }) {
+    const res = await authFetch(`${BASE_URL}/api/ingest/source`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<{
+      source_id: string;
+      source_type: string;
+      source_url?: string;
+      retrieved_at: number;
+      content_hash: string;
+      title: string;
+      confidence: number;
+    }>(res);
+  },
+
+  /**
+   * POST /api/strategy/compile
+   */
+  async compileStrategy(payload: {
+    name: string;
+    description: string;
+    assets?: string[];
+    timeframes?: Record<string, string>;
+    entry_rules?: Array<Record<string, any>>;
+    invalidation_rules?: Array<Record<string, any>>;
+    exit_rules?: Array<Record<string, any>>;
+  }) {
+    const res = await authFetch(`${BASE_URL}/api/strategy/compile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<{
+      strategy_id: string;
+      name: string;
+      status: string;
+      confidence: number;
+      missing_requirements: string[];
+    }>(res);
+  },
 };
+
 
 

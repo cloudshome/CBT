@@ -1,6 +1,7 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-08-29  
+> **Last Updated:** 2026-08-30  
+> **Release Tag:** `v2.2.1-liquidation-model-fix` (LOCKED 🔒)  
 > **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
@@ -59,6 +60,18 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `e3a9519` | Fix dynamic live price liquidation clusters strictly relative to current price (228 passing tests) |
+| `dfadbf6` | Implement P7.2 Performance Profiler, P8.1 Staging Burn-In, and P8.2 Production Overrides (227 passing tests) |
+| `2e283df` | Implement P6.2 Strategy League Evaluator and P7.4 API & Environment docs (224 passing tests) |
+| `6fa6bac` | Implement P6.4 Monte Carlo 10k-path stress tester and P7.3 deterministic intelligence fallback (223 passing tests) |
+| `0a6eea4` | Implement P6.1 Empirical Evidence Accumulator and P7.1 Production Operations Runbook (220 passing tests) |
+| `8df7839` | Implement P5.2 WebSocket lifecycle state machine and P5.3 SQLite database VACUUM maintenance (218 passing tests) |
+| `86da62f` | Implement P4.4 Prometheus metrics, P4.5 CI/CD enhancement, and P5.1 Exchange circuit breakers (216 passing tests) |
+| `6e51d7b` | Implement P3.3 dual-tier rate limiter, P4.1 Docker hardening, P4.2 online SQLite backups, and P4.3 Nginx OWASP headers (209 passing tests) |
+| `8e905e6` | Implement P3.1 API key auth and P3.2 CORS hardening across Express, FastAPI, and frontend client (198 passing tests) |
+| `c2ac396` | Fix flaky expectancy_r test assertion, bump @google/genai to 2.19.0, add P3-P8 production roadmap to TODO.md (187 passing tests) |
+| `e6b396b` | Implement universal provenance engine, strategy genome compiler, gold macro layer, loss autopsy hook, and 24/7 deployment healthchecks (115 passing tests) |
+| `129c337` | Complete TradingView obsidian terminal theme with granular timeframes, dynamic legend, countdown timer, magnet snap, time range bar, snapshot tool |
 | `354c517` | Wire Python FastAPI to frontend; fix XAUUSDT→PAXGUSDT; fix OBI port; expand api.ts with 15 Python endpoints |
 | `e9be8ef` | Implement 4 Cross-Cutting Governance Control Planes; fix 4H/1D candle multi-timeframe streams |
 | `c347505` | Implement 8-Pillar Live Asset Intelligence Dossier Matrix |
@@ -158,9 +171,17 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
    - Created `core/empirical_accumulator.py` to continuously replay historical setups across market regimes into SQLite `experiments.db`.
    - Started background accumulator loop in `app.py` startup event.
    - Added `GET /api/lab/empirical-status` endpoint for real-time statistical sample tracking ($N \ge 100$).
-4. **Testing & Verification**:
-   - Added `tests/test_voice_and_telegram.py` (95 passing tests in pytest).
-   - Verified `tsc && vite build` builds with 0 errors across 1,610 modules.
+4. **Phase 18 — Universal Provenance Engine & Immutable Research Store**:
+   - Implemented `core/provenance_engine.py` with SHA-256 cryptographic content hashing and duplicate detection.
+   - Added `POST /api/ingest/source`, `GET /api/ingest/provenance`, and `GET /api/ingest/provenance/{source_id}` in `app.py`.
+5. **Phase 19 — Formal Strategy Compiler & Genome Validator**:
+   - Implemented `core/strategy_compiler.py` with fail-closed validation (`STATUS = NOT_BACKTESTABLE` for underspecified rules).
+   - Added `POST /api/strategy/compile` and `GET /api/strategy/genomes` in `app.py`.
+   - Wired newly compiled valid strategies into Tier 1 of `core/strategy_league.py`.
+6. **Task Board & Test Suite**:
+   - Created `TODO.md` as the master single source of truth for ongoing and upcoming prioritized tasks.
+   - Added `tests/test_provenance_and_compiler.py` (107 passing tests in pytest).
+
 
 ---
 
