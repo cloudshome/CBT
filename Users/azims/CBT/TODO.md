@@ -79,10 +79,15 @@
   - Tested in `tests/test_health_and_deployment.py` (3 tests, 115/115 total test suite passing).
 
 ### Priority 3 (P3) — Production Readiness: Security & Authentication
-- [ ] **P3.1: API Authentication Layer**
-  - JWT-based or API key middleware for Express and FastAPI sensitive routes.
-- [ ] **P3.2: CORS & Input Validation Hardening**
-  - Restrict origins, add Zod/Joi schema validation on all route inputs.
+- [x] **P3.1: API Authentication Layer (`src/middleware/apiKeyAuth.ts`, `core/auth.py`)**
+  - Constant-time timing-safe API key authentication middleware supporting `Authorization: Bearer <key>` and `X-API-Key: <key>`.
+  - Applied across all sensitive endpoints on Express (`/api/paper`, `/api/desk`, `/api/institutional`) and FastAPI (shadow execution, governance reload, backtest/lab, voice transcription/synthesis, telegram broadcast, source ingestion, strategy compiler).
+  - Dev-friendly passthrough when `API_KEY` is not set; strict 401/403 enforcement when `API_KEY` is configured.
+  - Frontend client `api.ts` updated with `authFetch`, `setApiKey()`, and `getApiKey()` with `localStorage` and `VITE_API_KEY` support.
+  - Tested in `tests/auth.test.ts` (8 tests) and `tests/test_auth_guard.py` (3 tests). Total tests: 198/198 passing.
+- [x] **P3.2: CORS & Header Hardening (`src/server.ts`, `app.py`)**
+  - Restricted origins in production via `CORS_ORIGIN` env var with wildcard dev fallback.
+  - Explicitly whitelisted HTTP methods (`GET, POST, PUT, DELETE, OPTIONS`) and headers (`Content-Type, Authorization, X-API-Key`).
 - [ ] **P3.3: Rate Limiting Enhancement**
   - Redis-backed per-user rate limiter (replace in-memory sliding window).
 

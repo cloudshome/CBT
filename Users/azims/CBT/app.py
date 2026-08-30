@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import numpy as np
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -82,6 +82,7 @@ from core.provenance_engine import provenance_engine
 from core.strategy_compiler import strategy_compiler
 from core.audit_bus import audit_bus
 from core.macro_gold_engine import macro_gold_engine
+from core.auth import require_api_key
 
 
 
@@ -124,13 +125,15 @@ app = FastAPI(
     version="2.1.0",
 )
 
-# CORS
+# CORS — restrict origins in production via CORS_ORIGIN env var
+_cors_origin = os.getenv("CORS_ORIGIN", "")
+_allowed_origins = [o.strip() for o in _cors_origin.split(",") if o.strip()] if _cors_origin else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_credentials=bool(_cors_origin),
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 
 # Static files setup
@@ -417,7 +420,7 @@ async def get_chart_memory(symbol: str = Query("BTC/USDT"), timeframe: str = Que
     return mem
 
 
-@app.post("/api/chart/memory")
+@app.post("/api/chart/memory", dependencies=[Depends(require_api_key)])
 async def save_chart_memory(req: ChartMemorySaveRequest):
     drawings_json = json.dumps(req.drawings)
     indicators_json = json.dumps(req.indicators)
@@ -426,7 +429,7 @@ async def save_chart_memory(req: ChartMemorySaveRequest):
     return {"status": "SUCCESS", "message": f"Chart memory saved for {req.symbol} [{req.timeframe}]"}
 
 
-@app.delete("/api/chart/memory")
+@app.delete("/api/chart/memory", dependencies=[Depends(require_api_key)])
 async def clear_chart_memory(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     db_manager.clear_chart_memory(symbol, timeframe)
     return {"status": "SUCCESS", "message": f"Chart memory cleared for {symbol} [{timeframe}]"}
@@ -763,7 +766,7 @@ async def get_shadow_positions():
     return {"open_positions": open_pos, "history": all_pos}
 
 
-@app.post("/api/shadow/trade")
+@app.post("/api/shadow/trade", dependencies=[Depends(require_api_key)])
 async def open_shadow_trade(order: TradeOrderRequest):
     pos_id = portfolio_shadow.open_position(
         symbol=order.symbol,
@@ -776,7 +779,7 @@ async def open_shadow_trade(order: TradeOrderRequest):
     return {"status": "SUCCESS", "position_id": pos_id}
 
 
-@app.post("/api/shadow/close")
+@app.post("/api/shadow/close", dependencies=[Depends(require_api_key)])
 async def close_shadow_position(req: PositionCloseRequest):
     success = portfolio_shadow.close_position(req.position_id, req.exit_price)
     if not success:
@@ -784,19 +787,19 @@ async def close_shadow_position(req: PositionCloseRequest):
     return {"status": "SUCCESS", "message": f"Position {req.position_id} closed."}
 
 
-@app.post("/api/shadow/reset")
+@app.post("/api/shadow/reset", dependencies=[Depends(require_api_key)])
 async def reset_shadow_positions():
     portfolio_shadow.reset_all_positions()
     return {"status": "SUCCESS", "message": "All shadow positions reset."}
 
 
-@app.post("/api/command/parse")
+@app.post("/api/command/parse", dependencies=[Depends(require_api_key)])
 async def parse_trade_command(req: CommandParseRequest):
     result = command_executor.parse_and_execute(req.command_text)
     return asdict(result)
 
 
-@app.post("/api/desk/ask")
+@app.post("/api/desk/ask", dependencies=[Depends(require_api_key)])
 async def ask_desk_copilot(req: AskDeskRequest):
     sym = req.symbol or "BTC/USDT"
     tf = req.timeframe or "15m"
@@ -933,7 +936,7 @@ async def get_governance_proposals():
     return {"proposals": proposals}
 
 
-@app.post("/api/governance/approve")
+@app.post("/api/governance/approve", dependencies=[Depends(require_api_key)])
 async def approve_parameter_patch(req: ParameterApprovalRequest):
     success = patch_governor.execute_hot_reload(req.proposal_id, req.operator_name or "HUMAN_OPERATOR")
     if not success:
@@ -941,21 +944,21 @@ async def approve_parameter_patch(req: ParameterApprovalRequest):
     return {"status": "SUCCESS", "message": f"Proposal {req.proposal_id} approved and hot-reloaded."}
 
 
-@app.post("/api/lab/backtest")
+@app.post("/api/lab/backtest", dependencies=[Depends(require_api_key)])
 async def run_lab_backtest(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     candles = data_streamer.get_candles(symbol, timeframe, limit=300)
     rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
     return rep.to_dict()
 
 
-@app.post("/api/lab/walk-forward")
+@app.post("/api/lab/walk-forward", dependencies=[Depends(require_api_key)])
 async def run_lab_walk_forward(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     candles = data_streamer.get_candles(symbol, timeframe, limit=300)
     rep = walk_forward_engine.validate(symbol, timeframe, candles)
     return rep.to_dict()
 
 
-@app.post("/api/lab/stress-test")
+@app.post("/api/lab/stress-test", dependencies=[Depends(require_api_key)])
 async def run_lab_stress_test(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     candles = data_streamer.get_candles(symbol, timeframe, limit=300)
     bt_rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
@@ -1050,7 +1053,7 @@ async def get_asset_dossier(
 # PHASE 16: VOICE INTERFACE & NATURAL SPEECH ENDPOINTS
 # ==============================================================================
 
-@app.post("/api/voice/transcribe")
+@app.post("/api/voice/transcribe", dependencies=[Depends(require_api_key)])
 async def transcribe_voice_audio(req: VoiceTranscribeRequest):
     """
     Transcribes audio bytes (WebM/WAV/MP3) and automatically parses trading instructions.
@@ -1073,7 +1076,7 @@ async def transcribe_voice_audio(req: VoiceTranscribeRequest):
     }
 
 
-@app.post("/api/voice/synthesize")
+@app.post("/api/voice/synthesize", dependencies=[Depends(require_api_key)])
 async def synthesize_voice_brief(req: VoiceSynthesizeRequest):
     """
     Synthesizes text into spoken MP3 audio brief.
@@ -1101,7 +1104,7 @@ async def get_telegram_status():
     }
 
 
-@app.post("/api/telegram/broadcast")
+@app.post("/api/telegram/broadcast", dependencies=[Depends(require_api_key)])
 async def broadcast_telegram_alert(req: TelegramBroadcastRequest):
     """Dispatches a custom alert to configured Telegram channels."""
     sent = await telegram_bot.send_message(req.text, parse_mode=req.parse_mode or "Markdown")
@@ -1138,7 +1141,7 @@ async def get_empirical_validation_status(
 # ==============================================================================
 
 
-@app.post("/api/ingest/source")
+@app.post("/api/ingest/source", dependencies=[Depends(require_api_key)])
 async def ingest_research_source(req: IngestSourceRequest):
     """
     Cryptographically registers and indexes research source (URL, PDF, Audio, Video text)
@@ -1174,7 +1177,7 @@ async def get_provenance_record(source_id: str):
     return rec.to_dict()
 
 
-@app.post("/api/strategy/compile")
+@app.post("/api/strategy/compile", dependencies=[Depends(require_api_key)])
 async def compile_strategy_specification(req: CompileStrategyRequest):
     """
     Formally compiles natural language or extracted trading hypotheses into a deterministic
