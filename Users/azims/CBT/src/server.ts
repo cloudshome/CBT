@@ -9,6 +9,7 @@ import deskRouter from './routes/desk';
 import skyRouter from './routes/sky';
 import tickersRouter from './routes/tickers';
 import { institutionalRouter } from './routes/institutional';
+import { metricsRouter } from './routes/metrics';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 
 dotenv.config();
@@ -27,6 +28,9 @@ export function createApp(): Express {
     credentials: !!corsOrigin,
   }));
   app.use(express.json());
+
+  // Metrics endpoints (Prometheus /metrics and /api/metrics/json)
+  app.use(metricsRouter);
 
   // Default root status endpoint (public)
   app.get('/', (_req: Request, res: Response) => {

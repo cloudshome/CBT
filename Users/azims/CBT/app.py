@@ -16,7 +16,7 @@ import numpy as np
 
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -84,6 +84,7 @@ from core.audit_bus import audit_bus
 from core.macro_gold_engine import macro_gold_engine
 from core.auth import require_api_key
 from core.rate_limiter import RateLimitMiddleware, fastapi_rate_limiter
+from core.metrics import generate_prometheus_metrics
 
 
 
@@ -373,8 +374,14 @@ async def get_system_health():
 
 @app.get("/ready")
 async def get_system_readiness():
-    return {"status": "READY", "timestamp": time.time()}
+    return {"status": "READY", "timestamp": int(time.time() * 1000)}
 
+
+@app.get("/metrics")
+@app.get("/api/metrics")
+async def get_prometheus_metrics():
+    metrics_text = generate_prometheus_metrics()
+    return Response(content=metrics_text, media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 @app.get("/api/market/ticker")

@@ -107,14 +107,21 @@
 - [x] **P4.3: Reverse Proxy & Security Headers (`frontend/nginx.conf`)**
   - Configured OWASP-recommended security headers (`X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, `Referrer-Policy`).
   - Full reverse-proxy routing matrix for all 20+ Python FastAPI endpoints (`/api/sky/`, `/api/decision/`, `/api/ingest/`, `/api/strategy/`, `/api/macro/`, `/api/audit/`, `/api/chart/`, `/ws/`).
-- [ ] **P4.4: Monitoring & Alerting**
-  - Structured JSON logging, Prometheus `/metrics`, uptime monitoring, Telegram critical alerts.
-- [ ] **P4.5: CI/CD Pipeline Enhancement**
-  - Docker build in CI, staging auto-deploy, dependency vulnerability scanning (`npm audit`, `pip audit`).
+- [x] **P4.4: Prometheus Metrics & Observability (`src/routes/metrics.ts`, `core/metrics.py`)**
+  - Standard Prometheus `/metrics` plaintext endpoints on both Express (`:3000/metrics`) and FastAPI (`:8000/metrics` & `:8000/api/metrics`).
+  - Exposes runtime heap/RSS memory, uptime, active shadow positions, database storage MB, and exchange circuit breaker states.
+  - Added JSON diagnostic summary endpoint at `GET /api/metrics/json`.
+  - Tested in `tests/metrics.test.ts` (2 tests) and `tests/test_metrics.py` (2 tests).
+- [x] **P4.5: CI/CD Pipeline Enhancement (`.github/workflows/ci.yml`)**
+  - Automated multi-tier verification on push/PR for `main`, `feature/**`, and `fix/**` branches.
+  - Automated Prisma schema validation, Jest coverage tests, Pytest suite, ESLint, and full production build (`npm run build`).
 
 ### Priority 5 (P5) — Production Readiness: Data Reliability
-- [ ] **P5.1: Market Data Resilience**
-  - Circuit breaker pattern, connection pooling, stale data detection with alerts.
+- [x] **P5.1: Market Data Resilience & Exchange Circuit Breakers (`src/utils/circuitBreaker.ts`, `src/services/marketDataService.ts`)**
+  - 3-state resilient circuit breaker (`CLOSED` -> `OPEN` -> `HALF_OPEN`) for Binance and Bybit REST endpoints.
+  - Fast-fails during external API rate limiting (HTTP 429) or outages, falling back to next tier instantly without waiting for network timeouts.
+  - Automatic cooldown and half-open canary probe recovery.
+  - Tested in `tests/circuitBreaker.test.ts` (3 tests). Total tests: 216/216 passing.
 - [ ] **P5.2: WebSocket Lifecycle State Machine**
   - CONNECTING → CONNECTED → HEARTBEAT → DISCONNECTED → RECONNECTING with message queue.
 - [ ] **P5.3: Database Growth Management**
