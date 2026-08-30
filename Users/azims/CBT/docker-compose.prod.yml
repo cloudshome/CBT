@@ -1,0 +1,75 @@
+# SKY / CTB — Production Docker Compose Overrides
+version: '3.8'
+
+services:
+  python-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    restart: always
+    environment:
+      - PORT=8000
+      - ENVIRONMENT=production
+      - DATA_DIR=/app/data
+      - API_KEY=${API_KEY}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 4096M
+        reservations:
+          cpus: '1.0'
+          memory: 1024M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/dev.db
+      - API_KEY=${API_KEY}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
