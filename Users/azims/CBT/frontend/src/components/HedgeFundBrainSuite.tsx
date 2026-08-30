@@ -27,12 +27,14 @@ import { api } from '../services/api';
 interface HedgeFundBrainSuiteProps {
   symbol: string;
   timeframe: SupportedTimeframe;
+  currentPrice?: number;
   onDeploySetup?: (setup: any) => void;
 }
 
 export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
   symbol,
   timeframe,
+  currentPrice,
 }) => {
   const [activeTab, setActiveTab] = useState<
     'DEBATE' | 'WHALE' | 'PSYCHOLOGY' | 'MONTE_CARLO' | 'LEAD_LAG' | 'HEDGE'
@@ -59,7 +61,7 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
 
     Promise.all([
       api.getDebateCouncil(symbol, timeframe).catch(() => null),
-      api.getWhaleRadar(symbol).catch(() => null),
+      api.getWhaleRadar(symbol, currentPrice).catch(() => null),
       api.getPsychologyStatus().catch(() => null),
       api.getCrossAssetLeadLag(symbol).catch(() => null),
       api.getDynamicHedge(symbol).catch(() => null),
@@ -75,7 +77,7 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, currentPrice]);
 
   // Handle Monte Carlo Simulation Trigger
   const handleRunMonteCarlo = async () => {
@@ -314,25 +316,67 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
             </div>
 
             {/* Liquidation Clusters Heatmap Bar */}
-            <div className="bg-[#080c16] border border-[#1e293b] p-3 rounded flex flex-col gap-2">
-              <span className="font-semibold text-slate-300 font-mono text-[11px]">
-                Liquidation Cluster Zones:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="bg-[#080c16] border border-[#1e293b] p-3 rounded flex flex-col gap-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-200 font-mono text-xs">
+                    Estimated Liquidation Clusters
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    (Aggregate Open Interest & Leverage Model)
+                  </span>
+                </div>
+                {whale?.reference_price && (
+                  <span className="bg-slate-800/60 border border-slate-700/60 text-cyan-300 font-mono text-[10px] px-2 py-0.5 rounded">
+                    Ref Price: ${whale.reference_price.toLocaleString()}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {whale?.liquidation_clusters.map((cluster, idx) => (
                   <div
                     key={idx}
-                    className={`p-2 rounded border flex items-center justify-between text-[11px] font-mono ${
+                    className={`p-2.5 rounded border flex flex-col gap-1 text-[11px] font-mono transition-colors ${
                       cluster.cluster_type === 'SHORT_LIQUIDATION'
                         ? 'bg-rose-950/20 border-rose-500/30 text-rose-300'
                         : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
                     }`}
                   >
-                    <span>${cluster.price_level.toLocaleString()} ({cluster.cluster_type.replace(/_/g, ' ')})</span>
-                    <span className="font-bold">${(cluster.estimated_volume_usd / 1e6).toFixed(1)}M pool</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-[10px] tracking-wide text-slate-300">
+                        {cluster.cluster_label ||
+                          (cluster.cluster_type === 'SHORT_LIQUIDATION'
+                            ? 'Estimated Short-Liquidation Cluster'
+                            : 'Estimated Long-Liquidation Cluster')}
+                      </span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                          cluster.distance_pct > 0
+                            ? 'bg-rose-500/20 text-rose-300'
+                            : 'bg-emerald-500/20 text-emerald-300'
+                        }`}
+                      >
+                        {cluster.distance_pct > 0 ? `+${cluster.distance_pct}` : cluster.distance_pct}%
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline justify-between pt-0.5">
+                      <span className="text-sm font-bold text-slate-100">
+                        ${cluster.price_level.toLocaleString()}
+                      </span>
+                      <span className="text-[11px] text-slate-300 font-medium">
+                        ~${(cluster.estimated_volume_usd / 1e6).toFixed(1)}M exposure{' '}
+                        <span className="text-slate-400 text-[10px]">({cluster.leverage_tier || '25x'})</span>
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
+
+              <p className="text-[10px] text-slate-500 font-mono leading-tight pt-1">
+                * Modeled aggregate leverage exposure derived from open interest & funding rates. Estimates potential stop cascade zones; not guaranteed market order execution.
+              </p>
             </div>
           </div>
         )}

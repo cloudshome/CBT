@@ -529,6 +529,7 @@ export const App: React.FC = () => {
                 <HedgeFundBrainSuite
                   symbol={symbol}
                   timeframe={timeframe}
+                  currentPrice={stats.lastPrice}
                   onDeploySetup={(setup) => setSelectedSetup(setup)}
                 />
               ) : activeBottomTab === 'QUANT' ? (

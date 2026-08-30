@@ -353,19 +353,26 @@ export interface CouncilDecision {
   uncertainty_score?: number;
 }
 
+export interface LiquidationCluster {
+  price_level: number;
+  estimated_volume_usd: number;
+  cluster_type: 'LONG_LIQUIDATION' | 'SHORT_LIQUIDATION';
+  cluster_label?: string;
+  distance_pct: number;
+  leverage_tier?: string;
+  confidence_score?: number;
+}
+
 export interface WhaleRadarData {
   symbol: string;
   timestamp: number;
+  reference_price?: number;
+  model_source?: string;
   top_100_whale_flow_24h_usd: number;
   exchange_net_inflow_btc: number;
   exchange_flow_sentiment: 'HEAVY_ACCUMULATION' | 'MODERATE_INFLOW' | 'HEAVY_DISTRIBUTION' | 'NEUTRAL';
   cold_storage_outflows_usd: number;
-  liquidation_clusters: Array<{
-    price_level: number;
-    estimated_volume_usd: number;
-    cluster_type: 'LONG_LIQUIDATION' | 'SHORT_LIQUIDATION';
-    distance_pct: number;
-  }>;
+  liquidation_clusters: LiquidationCluster[];
   cvd_delta: number;
   narrative: string;
 }

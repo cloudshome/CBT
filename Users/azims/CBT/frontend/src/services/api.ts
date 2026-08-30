@@ -257,10 +257,12 @@ export const api = {
    * 2. GET /api/institutional/whale-radar
    */
   async getWhaleRadar(
-    symbol: string
+    symbol: string,
+    currentPrice?: number
   ): Promise<import('../types').WhaleRadarData> {
+    const priceParam = currentPrice && currentPrice > 0 ? `&price=${encodeURIComponent(currentPrice)}` : '';
     const res = await authFetch(
-      `${BASE_URL}/api/institutional/whale-radar?symbol=${encodeURIComponent(symbol)}`
+      `${BASE_URL}/api/institutional/whale-radar?symbol=${encodeURIComponent(symbol)}${priceParam}`
     );
     return handleResponse<import('../types').WhaleRadarData>(res);
   },
