@@ -59,6 +59,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `dfadbf6` | Implement P7.2 Performance Profiler, P8.1 Staging Burn-In, and P8.2 Production Overrides (227 passing tests) |
 | `2e283df` | Implement P6.2 Strategy League Evaluator and P7.4 API & Environment docs (224 passing tests) |
 | `6fa6bac` | Implement P6.4 Monte Carlo 10k-path stress tester and P7.3 deterministic intelligence fallback (223 passing tests) |
 | `0a6eea4` | Implement P6.1 Empirical Evidence Accumulator and P7.1 Production Operations Runbook (220 passing tests) |
