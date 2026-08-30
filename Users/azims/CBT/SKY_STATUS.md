@@ -1,7 +1,7 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-08-30  
-> **Release Tag:** `v2.2.0-production-upgrade` (LOCKED 🔒)  
+> **Release Tag:** `v2.2.1-liquidation-model-fix` (LOCKED 🔒)  
 > **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
@@ -60,6 +60,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `e3a9519` | Fix dynamic live price liquidation clusters strictly relative to current price (228 passing tests) |
 | `dfadbf6` | Implement P7.2 Performance Profiler, P8.1 Staging Burn-In, and P8.2 Production Overrides (227 passing tests) |
 | `2e283df` | Implement P6.2 Strategy League Evaluator and P7.4 API & Environment docs (224 passing tests) |
 | `6fa6bac` | Implement P6.4 Monte Carlo 10k-path stress tester and P7.3 deterministic intelligence fallback (223 passing tests) |
