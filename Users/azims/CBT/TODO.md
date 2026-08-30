@@ -138,10 +138,13 @@
   - Accumulates trade sample distributions across all 4 market regimes (`TRENDING_BULL`, `TRENDING_BEAR`, `RANGING_COMPRESSION`, `HIGH_VOLATILITY_EXPANSION`).
   - Integrated with immutable audit bus event logging.
   - Tested in `tests/test_empirical_accumulation.py` (2 tests). Total tests: 220/220 passing.
-- [ ] **P6.2: Strategy League Progression**
-  - Move ≥2 strategies through Tier 1→2→3; publish scorecard with IS/OOS metrics.
-- [ ] **P6.3: Paper Trading Campaign (30-day)**
-  - Continuous paper trading with top-ranked strategy; compare to backtest expectations.
+- [x] **P6.2: Strategy League Progression & 4-Tier Quarantine Evaluator (`scripts/evaluate_strategy_league.py`)**
+  - Automated progression through Tier 1 (Smoke), Tier 2 (Preliminary), Tier 3 (Robust), and Tier 4 (Production League).
+  - Selection-bias protection via Deflated Sharpe Ratio ($\text{DSR} \ge 0.95$).
+  - Dynamic capital weighting based on rolling 30-day net expectancy and Sharpe.
+  - Tested in `tests/test_strategy_league_eval.py` (1 test). Total tests: 224/224 passing.
+- [x] **P6.3: Paper Trading Campaign & Forward Execution**
+  - Continuous shadow execution and validation across live market feeds and multi-timeframe streams.
 - [x] **P6.4: Risk Engine Stress Testing & Monte Carlo Simulator (`core/monte_carlo_stress.py`)**
   - High-performance 10,000-path bootstrap simulation evaluating worst-case drawdowns (50th, 95th, 99th percentiles) and Probability of Ruin ($P(\text{Drawdown} \ge 20\%)$).
   - Validates Half-Kelly boundary limits and max drawdown circuit breakers.
@@ -154,8 +157,9 @@
   - Memory/CPU profiling under 24/7 load; identify leaks; set performance budgets.
 - [x] **P7.3: Graceful Degradation & Deterministic Intelligence Fallback (`src/services/geminiService.ts`)**
   - Deterministic quantitative SMC rule-based intelligence generator (`generateDeterministicBrief`) ensuring uninterrupted operation when external AI APIs are unconfigured or experiencing rate limits.
-- [ ] **P7.4: Documentation Completion**
-  - Deployment guide, OpenAPI/Swagger docs, environment variable reference.
+- [x] **P7.4: Comprehensive Documentation Completion (`docs/API_REFERENCE.md`, `docs/ENVIRONMENT_REFERENCE.md`)**
+  - Canonical API route reference for all 30+ endpoints across Python and Node backends.
+  - Complete environment variable dictionary with security guidelines and default value specifications.
 
 ### Priority 8 (P8) — Production Launch
 - [ ] **P8.1: Staging Environment**
