@@ -59,6 +59,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `86da62f` | Implement P4.4 Prometheus metrics, P4.5 CI/CD enhancement, and P5.1 Exchange circuit breakers (216 passing tests) |
 | `6e51d7b` | Implement P3.3 dual-tier rate limiter, P4.1 Docker hardening, P4.2 online SQLite backups, and P4.3 Nginx OWASP headers (209 passing tests) |
 | `8e905e6` | Implement P3.1 API key auth and P3.2 CORS hardening across Express, FastAPI, and frontend client (198 passing tests) |
 | `c2ac396` | Fix flaky expectancy_r test assertion, bump @google/genai to 2.19.0, add P3-P8 production roadmap to TODO.md (187 passing tests) |
