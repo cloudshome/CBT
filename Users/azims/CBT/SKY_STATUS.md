@@ -59,6 +59,10 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `8e905e6` | Implement P3.1 API key auth and P3.2 CORS hardening across Express, FastAPI, and frontend client (198 passing tests) |
+| `c2ac396` | Fix flaky expectancy_r test assertion, bump @google/genai to 2.19.0, add P3-P8 production roadmap to TODO.md (187 passing tests) |
+| `e6b396b` | Implement universal provenance engine, strategy genome compiler, gold macro layer, loss autopsy hook, and 24/7 deployment healthchecks (115 passing tests) |
+| `129c337` | Complete TradingView obsidian terminal theme with granular timeframes, dynamic legend, countdown timer, magnet snap, time range bar, snapshot tool |
 | `354c517` | Wire Python FastAPI to frontend; fix XAUUSDT→PAXGUSDT; fix OBI port; expand api.ts with 15 Python endpoints |
 | `e9be8ef` | Implement 4 Cross-Cutting Governance Control Planes; fix 4H/1D candle multi-timeframe streams |
 | `c347505` | Implement 8-Pillar Live Asset Intelligence Dossier Matrix |
