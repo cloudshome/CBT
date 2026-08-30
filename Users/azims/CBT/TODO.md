@@ -122,10 +122,15 @@
   - Fast-fails during external API rate limiting (HTTP 429) or outages, falling back to next tier instantly without waiting for network timeouts.
   - Automatic cooldown and half-open canary probe recovery.
   - Tested in `tests/circuitBreaker.test.ts` (3 tests). Total tests: 216/216 passing.
-- [ ] **P5.2: WebSocket Lifecycle State Machine**
-  - CONNECTING → CONNECTED → HEARTBEAT → DISCONNECTED → RECONNECTING with message queue.
-- [ ] **P5.3: Database Growth Management**
-  - Data retention policies, size monitoring, vacuum scheduling, index optimization.
+- [x] **P5.2: WebSocket Lifecycle State Machine (`frontend/src/data/providers/wsStateMachine.ts`, `frontend/src/data/providers/marketProvider.ts`)**
+  - Formalized connection state machine (`IDLE` -> `CONNECTING` -> `CONNECTED` -> `RECONNECTING` -> `DISCONNECTED` -> `ERROR`).
+  - Exponential backoff with randomized jitter avoiding thundering herd reconnect storms.
+  - Heartbeat staleness watchdog detecting silent TCP connection drops.
+  - State listeners enabling observable UI status HUDs.
+- [x] **P5.3: Database Growth Management & VACUUM Maintenance (`deploy/db_maintenance.py`)**
+  - Automated SQLite `PRAGMA optimize`, `REINDEX`, integrity checking, and `VACUUM` disk space reclamation across all production databases (`market.db`, `dev.db`, `experiments.db`, `brain.db`, `trading_logs.db`, `system_audit.db`).
+  - Storage footprint reporting and unused space reclamation.
+  - Tested in `tests/test_db_maintenance.py` (2 tests). Total tests: 218/218 passing.
 
 ### Priority 6 (P6) — Quantitative Engine Validation
 - [ ] **P6.1: Empirical Evidence Collection**

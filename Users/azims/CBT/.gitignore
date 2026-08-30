@@ -4,11 +4,10 @@ dist/
 *.db-journal
 *.db-wal
 *.db-shm
-data/
+/data/
 .venv/
 .env
 .DS_Store
 coverage/
 __pycache__/
 .pytest_cache/
-
