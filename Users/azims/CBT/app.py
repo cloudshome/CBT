@@ -83,6 +83,7 @@ from core.strategy_compiler import strategy_compiler
 from core.audit_bus import audit_bus
 from core.macro_gold_engine import macro_gold_engine
 from core.auth import require_api_key
+from core.rate_limiter import RateLimitMiddleware, fastapi_rate_limiter
 
 
 
@@ -135,6 +136,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
+app.add_middleware(RateLimitMiddleware)
 
 # Static files setup
 STATIC_DIR = Path(__file__).parent / "static"

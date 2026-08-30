@@ -1,7 +1,7 @@
 version: '3.8'
 
 # =============================================================================
-# SKY / Crypto Brain Terminal — Full Stack Docker Compose
+# SKY / Crypto Brain Terminal — Production-Hardened Docker Compose
 #
 # Services:
 #   python-backend  → FastAPI + uvicorn (port 8000) — Core intelligence engine
@@ -22,7 +22,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: sky_python_backend
-    restart: always
+    restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
@@ -32,12 +32,23 @@ services:
       - APP_ENV=production
       - HOST=0.0.0.0
       - PORT=8000
+      - DATA_DIR=/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
+      interval: 20s
       timeout: 5s
       retries: 3
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3000M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   # ---------------------------------------------------------------------------
   # Node/Express — Paper Trading, Candles, Desk, Tickers (Prisma + SQLite)
@@ -47,7 +58,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: sky_node_backend
-    restart: always
+    restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
@@ -62,10 +73,20 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
-      interval: 30s
+      interval: 20s
       timeout: 5s
       retries: 3
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1500M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   # ---------------------------------------------------------------------------
   # Nginx — React terminal UI + reverse proxy to both backends
@@ -75,7 +96,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: sky_frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
@@ -83,3 +104,19 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

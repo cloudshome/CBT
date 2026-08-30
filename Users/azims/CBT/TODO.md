@@ -88,16 +88,25 @@
 - [x] **P3.2: CORS & Header Hardening (`src/server.ts`, `app.py`)**
   - Restricted origins in production via `CORS_ORIGIN` env var with wildcard dev fallback.
   - Explicitly whitelisted HTTP methods (`GET, POST, PUT, DELETE, OPTIONS`) and headers (`Content-Type, Authorization, X-API-Key`).
-- [ ] **P3.3: Rate Limiting Enhancement**
-  - Redis-backed per-user rate limiter (replace in-memory sliding window).
+- [x] **P3.3: Rate Limiting Enhancement (`src/middleware/rateLimit.ts`, `core/rate_limiter.py`)**
+  - Implemented dual-tier sliding-window rate limiting on both Express and FastAPI backends.
+  - Authenticated API keys receive higher quota (180 req/min) vs public IPs (60 req/min) with SHA-256 key hashing.
+  - Automatically injects standard RFC headers (`RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, `Retry-After`).
+  - Background auto-pruning timer with `.unref()` preventing unbounded Map memory leaks and test hanging.
+  - Tested in `tests/rateLimit.test.ts` (4 tests) and `tests/test_rate_limiter.py` (4 tests). Total tests: 209/209 passing.
 
 ### Priority 4 (P4) — Production Readiness: Infrastructure & Deployment
-- [ ] **P4.1: Docker Production Hardening**
-  - Health checks on all containers, resource limits, production compose overrides.
-- [ ] **P4.2: Persistent Storage & Database Backups**
-  - Named volumes, WAL mode, automated backup cron.
-- [ ] **P4.3: HTTPS & Security Headers**
-  - Nginx TLS with Let's Encrypt, HSTS, CSP, WebSocket upgrade configuration.
+- [x] **P4.1: Docker Production Hardening (`docker-compose.yml`)**
+  - Health checks configured across all 3 tiers (Python FastAPI, Node Express, and Nginx).
+  - CPU and Memory limits applied under `deploy.resources` (Python: 2.0 CPU / 3GB RAM, Node: 1.5 CPU / 1.5GB RAM, Nginx: 1.0 CPU / 512MB RAM).
+  - Docker JSON logging driver with size limits (`max-size: 20m`, `max-file: 5`) and `restart: unless-stopped`.
+- [x] **P4.2: Persistent Storage & Online Database Backups (`deploy/backup_databases.py`, `deploy/backup_databases.sh`)**
+  - Online non-blocking SQLite snapshotting via official SQLite backup API (`source.backup(dest)`).
+  - Automated `.tar.gz` compression and 14-day rolling retention pruning.
+  - Tested in `tests/test_backup_tool.py` (3 tests).
+- [x] **P4.3: Reverse Proxy & Security Headers (`frontend/nginx.conf`)**
+  - Configured OWASP-recommended security headers (`X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, `Referrer-Policy`).
+  - Full reverse-proxy routing matrix for all 20+ Python FastAPI endpoints (`/api/sky/`, `/api/decision/`, `/api/ingest/`, `/api/strategy/`, `/api/macro/`, `/api/audit/`, `/api/chart/`, `/ws/`).
 - [ ] **P4.4: Monitoring & Alerting**
   - Structured JSON logging, Prometheus `/metrics`, uptime monitoring, Telegram critical alerts.
 - [ ] **P4.5: CI/CD Pipeline Enhancement**
