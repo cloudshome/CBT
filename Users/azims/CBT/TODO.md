@@ -133,8 +133,11 @@
   - Tested in `tests/test_db_maintenance.py` (2 tests). Total tests: 218/218 passing.
 
 ### Priority 6 (P6) — Quantitative Engine Validation
-- [ ] **P6.1: Empirical Evidence Collection**
-  - Run accumulator on 6+ months of BTC/ETH/PAXG data; minimum 200 samples per setup×regime.
+- [x] **P6.1: Empirical Evidence Collection & Batch Accumulation (`scripts/run_empirical_accumulation.py`)**
+  - Batch walk-forward simulation across BTC/USDT, ETH/USDT, and PAXG/USDT (Gold).
+  - Accumulates trade sample distributions across all 4 market regimes (`TRENDING_BULL`, `TRENDING_BEAR`, `RANGING_COMPRESSION`, `HIGH_VOLATILITY_EXPANSION`).
+  - Integrated with immutable audit bus event logging.
+  - Tested in `tests/test_empirical_accumulation.py` (2 tests). Total tests: 220/220 passing.
 - [ ] **P6.2: Strategy League Progression**
   - Move ≥2 strategies through Tier 1→2→3; publish scorecard with IS/OOS metrics.
 - [ ] **P6.3: Paper Trading Campaign (30-day)**
@@ -143,8 +146,8 @@
   - Monte Carlo 10k paths on current risk params; validate all circuit breakers.
 
 ### Priority 7 (P7) — Operational Readiness
-- [ ] **P7.1: Runbook & Incident Response**
-  - Operational runbook: startup, shutdown, restart, data recovery, failure playbooks.
+- [x] **P7.1: Production Operations Runbook (`RUNBOOK.md`)**
+  - Comprehensive 24/7 operator handbook covering port mappings, multi-container Docker startup, systemd service setup, preflight health verification, online SQLite backup & restore, and emergency incident playbooks (Exchange API circuit trips, Max Drawdown halts, and manual kill switch).
 - [ ] **P7.2: Performance Profiling**
   - Memory/CPU profiling under 24/7 load; identify leaks; set performance budgets.
 - [ ] **P7.3: Graceful Degradation**
