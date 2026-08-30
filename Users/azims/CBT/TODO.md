@@ -68,6 +68,7 @@
   - Exposed `GET /api/audit/events`.
   - Tested in `tests/test_gold_macro_and_autopsy_bus.py` (5 tests, 112/112 total test suite passing).
 
+
 ### Priority 2 (P2) — System Hardening & Production Deployment (COMPLETED)
 - [x] **P2.1: Database Engine Telemetry & Dual Dialect Support (`core/database.py`)**
   - Added `get_engine_info()` reporting active database dialect (`SQLITE_WAL` vs `POSTGRESQL`), file sizes, and schema version.
@@ -77,6 +78,62 @@
   - Added `/health` and `/ready` route aliases in `app.py`.
   - Tested in `tests/test_health_and_deployment.py` (3 tests, 115/115 total test suite passing).
 
+### Priority 3 (P3) — Production Readiness: Security & Authentication
+- [ ] **P3.1: API Authentication Layer**
+  - JWT-based or API key middleware for Express and FastAPI sensitive routes.
+- [ ] **P3.2: CORS & Input Validation Hardening**
+  - Restrict origins, add Zod/Joi schema validation on all route inputs.
+- [ ] **P3.3: Rate Limiting Enhancement**
+  - Redis-backed per-user rate limiter (replace in-memory sliding window).
+
+### Priority 4 (P4) — Production Readiness: Infrastructure & Deployment
+- [ ] **P4.1: Docker Production Hardening**
+  - Health checks on all containers, resource limits, production compose overrides.
+- [ ] **P4.2: Persistent Storage & Database Backups**
+  - Named volumes, WAL mode, automated backup cron.
+- [ ] **P4.3: HTTPS & Security Headers**
+  - Nginx TLS with Let's Encrypt, HSTS, CSP, WebSocket upgrade configuration.
+- [ ] **P4.4: Monitoring & Alerting**
+  - Structured JSON logging, Prometheus `/metrics`, uptime monitoring, Telegram critical alerts.
+- [ ] **P4.5: CI/CD Pipeline Enhancement**
+  - Docker build in CI, staging auto-deploy, dependency vulnerability scanning (`npm audit`, `pip audit`).
+
+### Priority 5 (P5) — Production Readiness: Data Reliability
+- [ ] **P5.1: Market Data Resilience**
+  - Circuit breaker pattern, connection pooling, stale data detection with alerts.
+- [ ] **P5.2: WebSocket Lifecycle State Machine**
+  - CONNECTING → CONNECTED → HEARTBEAT → DISCONNECTED → RECONNECTING with message queue.
+- [ ] **P5.3: Database Growth Management**
+  - Data retention policies, size monitoring, vacuum scheduling, index optimization.
+
+### Priority 6 (P6) — Quantitative Engine Validation
+- [ ] **P6.1: Empirical Evidence Collection**
+  - Run accumulator on 6+ months of BTC/ETH/PAXG data; minimum 200 samples per setup×regime.
+- [ ] **P6.2: Strategy League Progression**
+  - Move ≥2 strategies through Tier 1→2→3; publish scorecard with IS/OOS metrics.
+- [ ] **P6.3: Paper Trading Campaign (30-day)**
+  - Continuous paper trading with top-ranked strategy; compare to backtest expectations.
+- [ ] **P6.4: Risk Engine Stress Testing**
+  - Monte Carlo 10k paths on current risk params; validate all circuit breakers.
+
+### Priority 7 (P7) — Operational Readiness
+- [ ] **P7.1: Runbook & Incident Response**
+  - Operational runbook: startup, shutdown, restart, data recovery, failure playbooks.
+- [ ] **P7.2: Performance Profiling**
+  - Memory/CPU profiling under 24/7 load; identify leaks; set performance budgets.
+- [ ] **P7.3: Graceful Degradation**
+  - Feature flags for non-critical subsystems; circuit breaker for Gemini API; data-only fallback mode.
+- [ ] **P7.4: Documentation Completion**
+  - Deployment guide, OpenAPI/Swagger docs, environment variable reference.
+
+### Priority 8 (P8) — Production Launch
+- [ ] **P8.1: Staging Environment**
+  - Deploy full stack to staging VPS; 72-hour burn-in test.
+- [ ] **P8.2: Production Deployment**
+  - Provision production VPS; Docker Compose with production overrides; systemd; automated backups; TLS.
+- [ ] **P8.3: Post-Launch Monitoring (7-day)**
+  - Elevated alerting thresholds; track memory growth, CPU, disk; verify data freshness.
+
 
 ---
 
@@ -84,3 +141,4 @@
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.
 3. If new requirements arise, evaluate them against `AGENTS.md` before adding to the Todo list.
+
