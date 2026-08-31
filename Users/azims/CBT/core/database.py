@@ -102,10 +102,18 @@ class DatabaseManager:
                     low REAL NOT NULL,
                     close REAL NOT NULL,
                     volume REAL NOT NULL,
+                    is_synthetic INTEGER DEFAULT 0,
                     PRIMARY KEY (symbol, timeframe, timestamp)
                 );
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_candles_ts ON candles (symbol, timeframe, timestamp DESC);")
+
+            # Check if is_synthetic column exists for backwards-compatibility migrations
+            cursor = conn.execute("PRAGMA table_info(candles);")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "is_synthetic" not in cols:
+                conn.execute("ALTER TABLE candles ADD COLUMN is_synthetic INTEGER DEFAULT 0;")
+
             conn.commit()
 
     def _init_brain_db(self) -> None:
@@ -283,6 +291,34 @@ class DatabaseManager:
                 );
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_exp_status ON experiments (status, deflated_sharpe DESC);")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS kronos_forecast_ledger (
+                    forecast_id TEXT PRIMARY KEY,
+                    timestamp BIGINT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    model_name TEXT NOT NULL,
+                    lookback_bars INTEGER NOT NULL,
+                    horizon_bars INTEGER NOT NULL,
+                    sample_count INTEGER NOT NULL,
+                    current_price REAL NOT NULL,
+                    expected_return_pct REAL NOT NULL,
+                    median_return_pct REAL NOT NULL,
+                    predicted_close_mean REAL NOT NULL,
+                    path_dispersion_pct REAL NOT NULL,
+                    directional_consensus REAL NOT NULL,
+                    model_uncertainty REAL NOT NULL,
+                    directional_bias TEXT NOT NULL,
+                    paths_json TEXT NOT NULL,
+                    latency_ms REAL NOT NULL,
+                    status TEXT NOT NULL,
+                    is_verified INTEGER DEFAULT 0,
+                    realized_outcome_5m TEXT,
+                    realized_pnl_usd REAL
+                );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_kronos_sym_tf ON kronos_forecast_ledger (symbol, timeframe, timestamp DESC);")
             conn.commit()
 
     def save_chart_memory(self, symbol: str, timeframe: str, drawings_json: str, indicators_json: str, chart_config_json: str) -> None:

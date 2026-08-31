@@ -43,8 +43,9 @@ class InstitutionalFlowsEngine:
     """Computes Pillar 1: Institutional Capital Flows."""
 
     def analyze(self, symbol: str, current_price: float) -> InstitutionalFlowsSnapshot:
+        import time
         sym = symbol.upper()
-        now = int(1787985843000)
+        now = int(time.time() * 1000)
 
         if "BTC" in sym:
             # Bitcoin Spot ETF momentum (IBIT, FBTC, ARKB, BITB)

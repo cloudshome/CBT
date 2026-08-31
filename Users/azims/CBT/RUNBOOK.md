@@ -100,9 +100,8 @@ python3 deploy/db_maintenance.py
 # 1. Stop trading services
 docker compose stop
 
-# 2. Extract timestamped snapshot archive
-cd /opt/cbt/data
-tar -xzf backups/cbt_backup_YYYYMMDD_HHMMSSZ.tar.gz
+# 2. Restore using the non-blocking verified restore tool
+python3 deploy/restore_databases.py --archive data/backups/cbt_backup_YYYYMMDD_HHMMSSZ.tar.gz
 
 # 3. Restart services
 docker compose start
@@ -147,3 +146,21 @@ docker compose logs -f backend
 # Direct disk log files
 tail -f data/logs/cbt_terminal.log
 ```
+
+---
+
+## 7. Production SSL / TLS Reverse-Proxy Setup (Certbot)
+
+To secure the public endpoint with Let's Encrypt TLS:
+
+```bash
+# 1. Install Certbot and Nginx plugin
+sudo apt-get update && sudo apt-get install -y certbot python3-certbot-nginx
+
+# 2. Issue TLS certificate for your domain
+sudo certbot --nginx -d cbt.yourdomain.com
+
+# 3. Verify automatic certificate renewal cron
+sudo certbot renew --dry-run
+```
+

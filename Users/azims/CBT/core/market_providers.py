@@ -1,4 +1,4 @@
-﻿"""
+"""
 Institutional Market Data Provider Abstraction Layer.
 Decouples exchange-specific API logic from charting and intelligence engines.
 Supports Binance REST, Bybit V5 Linear, Persistent SQLite Cache, and Synthetic Fallback.
@@ -82,6 +82,24 @@ class BaseMarketDataProvider(abc.ABC):
         pass
 
 
+class HttpSessionManager:
+    """Manages persistent pooled aiohttp ClientSession with TCP keep-alive."""
+    _session: Optional[aiohttp.ClientSession] = None
+
+    @classmethod
+    async def get_session(cls) -> aiohttp.ClientSession:
+        if cls._session is None or cls._session.closed:
+            connector = aiohttp.TCPConnector(limit=50, keepalive_timeout=30.0)
+            cls._session = aiohttp.ClientSession(connector=connector)
+        return cls._session
+
+    @classmethod
+    async def close_session(cls) -> None:
+        if cls._session is not None and not cls._session.closed:
+            await cls._session.close()
+            cls._session = None
+
+
 class BinanceMarketDataProvider(BaseMarketDataProvider):
     """
     Binance Spot & USD-M Futures Public REST Client.
@@ -107,23 +125,23 @@ class BinanceMarketDataProvider(BaseMarketDataProvider):
         sym = self._normalize_symbol(symbol)
         url = f"https://api.binance.com/api/v3/klines?symbol={sym}&interval={binance_interval}&limit={limit}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=3.0)) as resp:
-                    if resp.status == 200:
-                        raw = await resp.json()
-                        return [
-                            {
-                                "timestamp": int(k[0]),
-                                "symbol": symbol,
-                                "timeframe": timeframe,
-                                "open": float(k[1]),
-                                "high": float(k[2]),
-                                "low": float(k[3]),
-                                "close": float(k[4]),
-                                "volume": float(k[5]),
-                            }
-                            for k in raw
-                        ]
+            session = await HttpSessionManager.get_session()
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=3.0)) as resp:
+                if resp.status == 200:
+                    raw = await resp.json()
+                    return [
+                        {
+                            "timestamp": int(k[0]),
+                            "symbol": symbol,
+                            "timeframe": timeframe,
+                            "open": float(k[1]),
+                            "high": float(k[2]),
+                            "low": float(k[3]),
+                            "close": float(k[4]),
+                            "volume": float(k[5]),
+                        }
+                        for k in raw
+                    ]
         except Exception as e:
             logger.debug(f"Binance OHLCV failed for {symbol} ({timeframe}): {e}")
         return None
@@ -132,20 +150,20 @@ class BinanceMarketDataProvider(BaseMarketDataProvider):
         sym = self._normalize_symbol(symbol)
         url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.5)) as resp:
-                    if resp.status == 200:
-                        d = await resp.json()
-                        return {
-                            "symbol": symbol,
-                            "price": float(d["lastPrice"]),
-                            "change_24h_pct": float(d["priceChangePercent"]),
-                            "high_24h": float(d["highPrice"]),
-                            "low_24h": float(d["lowPrice"]),
-                            "volume_24h": float(d["volume"]),
-                            "timestamp": int(d["closeTime"]),
-                            "source": self.provider_name,
-                        }
+            session = await HttpSessionManager.get_session()
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.5)) as resp:
+                if resp.status == 200:
+                    d = await resp.json()
+                    return {
+                        "symbol": symbol,
+                        "price": float(d["lastPrice"]),
+                        "change_24h_pct": float(d["priceChangePercent"]),
+                        "high_24h": float(d["highPrice"]),
+                        "low_24h": float(d["lowPrice"]),
+                        "volume_24h": float(d["volume"]),
+                        "timestamp": int(d["closeTime"]),
+                        "source": self.provider_name,
+                    }
         except Exception as e:
             logger.debug(f"Binance Ticker failed for {symbol}: {e}")
         return None
@@ -154,13 +172,13 @@ class BinanceMarketDataProvider(BaseMarketDataProvider):
         sym = self._normalize_symbol(symbol)
         url = f"https://api.binance.com/api/v3/depth?symbol={sym}&limit={limit}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.0)) as resp:
-                    if resp.status == 200:
-                        d = await resp.json()
-                        asks = [{"price": float(a[0]), "size": float(a[1])} for a in d.get("asks", [])]
-                        bids = [{"price": float(b[0]), "size": float(b[1])} for b in d.get("bids", [])]
-                        return {"symbol": symbol, "asks": asks, "bids": bids, "timestamp": int(time.time() * 1000)}
+            session = await HttpSessionManager.get_session()
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.0)) as resp:
+                if resp.status == 200:
+                    d = await resp.json()
+                    asks = [{"price": float(a[0]), "size": float(a[1])} for a in d.get("asks", [])]
+                    bids = [{"price": float(b[0]), "size": float(b[1])} for b in d.get("bids", [])]
+                    return {"symbol": symbol, "asks": asks, "bids": bids, "timestamp": int(time.time() * 1000)}
         except Exception as e:
             logger.debug(f"Binance Depth failed for {symbol}: {e}")
         return None
@@ -188,25 +206,25 @@ class BybitMarketDataProvider(BaseMarketDataProvider):
         sym = self._normalize_symbol(symbol)
         url = f"https://api.bybit.com/v5/market/kline?category=linear&symbol={sym}&interval={bybit_interval}&limit={limit}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=3.0)) as resp:
-                    if resp.status == 200:
-                        raw = await resp.json()
-                        raw_list = raw.get("result", {}).get("list", [])
-                        candles = [
-                            {
-                                "timestamp": int(k[0]),
-                                "symbol": symbol,
-                                "timeframe": timeframe,
-                                "open": float(k[1]),
-                                "high": float(k[2]),
-                                "low": float(k[3]),
-                                "close": float(k[4]),
-                                "volume": float(k[5]),
-                            }
-                            for k in reversed(raw_list)
-                        ]
-                        return candles if candles else None
+            session = await HttpSessionManager.get_session()
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=3.0)) as resp:
+                if resp.status == 200:
+                    raw = await resp.json()
+                    raw_list = raw.get("result", {}).get("list", [])
+                    candles = [
+                        {
+                            "timestamp": int(k[0]),
+                            "symbol": symbol,
+                            "timeframe": timeframe,
+                            "open": float(k[1]),
+                            "high": float(k[2]),
+                            "low": float(k[3]),
+                            "close": float(k[4]),
+                            "volume": float(k[5]),
+                        }
+                        for k in reversed(raw_list)
+                    ]
+                    return candles if candles else None
         except Exception as e:
             logger.debug(f"Bybit OHLCV failed for {symbol} ({timeframe}): {e}")
         return None
@@ -215,22 +233,22 @@ class BybitMarketDataProvider(BaseMarketDataProvider):
         sym = self._normalize_symbol(symbol)
         url = f"https://api.bybit.com/v5/market/tickers?category=linear&symbol={sym}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.5)) as resp:
-                    if resp.status == 200:
-                        raw = await resp.json()
-                        item = raw.get("result", {}).get("list", [{}])[0]
-                        if item:
-                            return {
-                                "symbol": symbol,
-                                "price": float(item["lastPrice"]),
-                                "change_24h_pct": float(item.get("price24hPcnt", "0")) * 100,
-                                "high_24h": float(item.get("highPrice24h", "0")),
-                                "low_24h": float(item.get("lowPrice24h", "0")),
-                                "volume_24h": float(item.get("volume24h", "0")),
-                                "timestamp": int(time.time() * 1000),
-                                "source": self.provider_name,
-                            }
+            session = await HttpSessionManager.get_session()
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.5)) as resp:
+                if resp.status == 200:
+                    raw = await resp.json()
+                    item = raw.get("result", {}).get("list", [{}])[0]
+                    if item:
+                        return {
+                            "symbol": symbol,
+                            "price": float(item["lastPrice"]),
+                            "change_24h_pct": float(item.get("price24hPcnt", "0")) * 100,
+                            "high_24h": float(item.get("highPrice24h", "0")),
+                            "low_24h": float(item.get("lowPrice24h", "0")),
+                            "volume_24h": float(item.get("volume24h", "0")),
+                            "timestamp": int(time.time() * 1000),
+                            "source": self.provider_name,
+                        }
         except Exception as e:
             logger.debug(f"Bybit Ticker failed for {symbol}: {e}")
         return None
@@ -239,14 +257,14 @@ class BybitMarketDataProvider(BaseMarketDataProvider):
         sym = self._normalize_symbol(symbol)
         url = f"https://api.bybit.com/v5/market/orderbook?category=linear&symbol={sym}&limit={limit}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.0)) as resp:
-                    if resp.status == 200:
-                        d = await resp.json()
-                        res = d.get("result", {})
-                        asks = [{"price": float(a[0]), "size": float(a[1])} for a in res.get("a", [])]
-                        bids = [{"price": float(b[0]), "size": float(b[1])} for b in res.get("b", [])]
-                        return {"symbol": symbol, "asks": asks, "bids": bids, "timestamp": int(time.time() * 1000)}
+            session = await HttpSessionManager.get_session()
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.0)) as resp:
+                if resp.status == 200:
+                    d = await resp.json()
+                    res = d.get("result", {})
+                    asks = [{"price": float(a[0]), "size": float(a[1])} for a in res.get("a", [])]
+                    bids = [{"price": float(b[0]), "size": float(b[1])} for b in res.get("b", [])]
+                    return {"symbol": symbol, "asks": asks, "bids": bids, "timestamp": int(time.time() * 1000)}
         except Exception as e:
             logger.debug(f"Bybit Depth failed for {symbol}: {e}")
         return None

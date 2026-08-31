@@ -45,8 +45,9 @@ class MacroLiquidityBetaEngine:
     """Computes Pillar 6: Macro Betas & Global M2 Liquidity Diffusion."""
 
     def analyze(self, symbol: str, current_price: float) -> MacroLiquiditySnapshot:
+        import time
         sym = symbol.upper()
-        now = int(1787985843000)
+        now = int(time.time() * 1000)
 
         # Baseline Macro Telemetry
         us10y = 4.22

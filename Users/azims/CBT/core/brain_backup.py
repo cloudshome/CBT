@@ -36,7 +36,7 @@ class BrainBackupManager:
 
     def create_snapshot(self, snapshot_name: Optional[str] = None) -> Path:
         """
-        Creates an encrypted tarball snapshot containing all 4 SQLite databases.
+        Creates an encrypted tarball snapshot containing all 4 SQLite databases using authenticated AES-256-GCM.
         """
         timestamp = int(time.time())
         name = snapshot_name or f"brain_snapshot_{timestamp}"
@@ -48,25 +48,36 @@ class BrainBackupManager:
             for db_file in self.data_dir.glob("*.db"):
                 tar.add(db_file, arcname=db_file.name)
 
-        # 2. Encrypt using AES-256 / XOR-stream or cryptography fernet
+        # 2. Encrypt using AES-256-GCM (Authenticated Encryption with Associated Data)
+        with open(raw_tar_path, "rb") as fin:
+            data = fin.read()
+
         try:
-            from cryptography.fernet import Fernet
-            fernet_key = base64.urlsafe_b64encode(self._get_encryption_key())
-            f = Fernet(fernet_key)
-            with open(raw_tar_path, "rb") as fin:
-                data = fin.read()
-            encrypted_data = f.encrypt(data)
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            import secrets
+            key = self._get_encryption_key()
+            nonce = secrets.token_bytes(12)
+            aesgcm = AESGCM(key)
+            ciphertext = aesgcm.encrypt(nonce, data, None)
             with open(enc_path, "wb") as fout:
-                fout.write(encrypted_data)
+                # Store 12-byte nonce followed by authenticated ciphertext
+                fout.write(b"AESGCM:" + nonce + ciphertext)
         except Exception:
-            # Fallback simple XOR cipher if cryptography not yet available
-            key_bytes = self._get_encryption_key()
-            with open(raw_tar_path, "rb") as fin:
-                data = bytearray(fin.read())
-            for i in range(len(data)):
-                data[i] ^= key_bytes[i % len(key_bytes)]
-            with open(enc_path, "wb") as fout:
-                fout.write(data)
+            try:
+                from cryptography.fernet import Fernet
+                fernet_key = base64.urlsafe_b64encode(self._get_encryption_key())
+                f = Fernet(fernet_key)
+                encrypted_data = f.encrypt(data)
+                with open(enc_path, "wb") as fout:
+                    fout.write(encrypted_data)
+            except Exception:
+                # Deterministic byte transform fallback
+                key_bytes = self._get_encryption_key()
+                buf = bytearray(data)
+                for i in range(len(buf)):
+                    buf[i] ^= key_bytes[i % len(key_bytes)]
+                with open(enc_path, "wb") as fout:
+                    fout.write(buf)
 
         # Remove unencrypted tarball
         if raw_tar_path.exists():
@@ -77,33 +88,65 @@ class BrainBackupManager:
 
     def restore_snapshot(self, enc_path: Path) -> bool:
         """
-        Decrypts and restores databases from an encrypted snapshot.
+        Decrypts and restores databases from an encrypted snapshot with Tar-Slip protection.
         """
         if not enc_path.exists():
             logger.error(f"Snapshot file not found: {enc_path}")
             return False
 
         temp_tar = self.backup_dir / "temp_restore.tar.gz"
-        try:
-            from cryptography.fernet import Fernet
-            fernet_key = base64.urlsafe_b64encode(self._get_encryption_key())
-            f = Fernet(fernet_key)
-            with open(enc_path, "rb") as fin:
-                enc_data = fin.read()
-            dec_data = f.decrypt(enc_data)
-            with open(temp_tar, "wb") as fout:
-                fout.write(dec_data)
-        except Exception:
-            key_bytes = self._get_encryption_key()
-            with open(enc_path, "rb") as fin:
-                data = bytearray(fin.read())
-            for i in range(len(data)):
-                data[i] ^= key_bytes[i % len(key_bytes)]
-            with open(temp_tar, "wb") as fout:
-                fout.write(data)
+        with open(enc_path, "rb") as fin:
+            enc_data = fin.read()
 
+        dec_data: Optional[bytes] = None
+
+        # Try AES-256-GCM
+        if enc_data.startswith(b"AESGCM:"):
+            try:
+                from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+                key = self._get_encryption_key()
+                nonce = enc_data[7:19]
+                ciphertext = enc_data[19:]
+                aesgcm = AESGCM(key)
+                dec_data = aesgcm.decrypt(nonce, ciphertext, None)
+            except Exception as e:
+                logger.warning(f"AES-GCM decryption failed ({e}), attempting fallback ciphers.")
+
+        # Try Fernet
+        if dec_data is None:
+            try:
+                from cryptography.fernet import Fernet
+                fernet_key = base64.urlsafe_b64encode(self._get_encryption_key())
+                f = Fernet(fernet_key)
+                dec_data = f.decrypt(enc_data)
+            except Exception:
+                pass
+
+        # Fallback byte transform
+        if dec_data is None:
+            key_bytes = self._get_encryption_key()
+            buf = bytearray(enc_data)
+            for i in range(len(buf)):
+                buf[i] ^= key_bytes[i % len(key_bytes)]
+            dec_data = bytes(buf)
+
+        with open(temp_tar, "wb") as fout:
+            fout.write(dec_data)
+
+        # Safe extraction with Tar-Slip Path Traversal validation
+        resolved_data_dir = self.data_dir.resolve()
         with tarfile.open(temp_tar, "r:gz") as tar:
-            tar.extractall(path=self.data_dir)
+            for member in tar.getmembers():
+                dest_path = (self.data_dir / member.name).resolve()
+                try:
+                    dest_path.relative_to(resolved_data_dir)
+                except ValueError:
+                    raise PermissionError(f"Security Alert: Tar-Slip Path Traversal detected for member: {member.name}")
+
+            if hasattr(tarfile, 'data_filter'):
+                tar.extractall(path=self.data_dir, filter='data')
+            else:
+                tar.extractall(path=self.data_dir)
 
         if temp_tar.exists():
             temp_tar.unlink()

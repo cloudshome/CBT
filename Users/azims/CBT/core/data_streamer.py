@@ -73,14 +73,15 @@ class DataStreamer:
             for c in candles:
                 conn.execute(
                     """
-                    INSERT INTO candles (timestamp, symbol, timeframe, open, high, low, close, volume)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO candles (timestamp, symbol, timeframe, open, high, low, close, volume, is_synthetic)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(symbol, timeframe, timestamp) DO UPDATE SET
                         open=excluded.open,
                         high=excluded.high,
                         low=excluded.low,
                         close=excluded.close,
-                        volume=excluded.volume;
+                        volume=excluded.volume,
+                        is_synthetic=excluded.is_synthetic;
                     """,
                     (
                         int(c["timestamp"]),
@@ -91,6 +92,7 @@ class DataStreamer:
                         float(c["low"]),
                         float(c["close"]),
                         float(c.get("volume", 0.0)),
+                        int(c.get("is_synthetic", 0)),
                     ),
                 )
                 inserted += 1
@@ -103,19 +105,21 @@ class DataStreamer:
         timeframe: str,
         limit: int = 200,
         end_time: Optional[int] = None,
+        exclude_synthetic: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         Retrieves point-in-time historical candles from data/market_data.db.
         Strictly enforces causal firewall point-in-time isolation.
         """
         max_time = end_time if end_time is not None else causal_firewall.get_current_time_ms()
+        synthetic_clause = "AND (is_synthetic = 0 OR is_synthetic IS NULL)" if exclude_synthetic else ""
 
         with db_manager.get_market_conn() as conn:
             cursor = conn.execute(
-                """
-                SELECT timestamp, symbol, timeframe, open, high, low, close, volume
+                f"""
+                SELECT timestamp, symbol, timeframe, open, high, low, close, volume, is_synthetic
                 FROM candles
-                WHERE symbol = ? AND timeframe = ? AND timestamp <= ?
+                WHERE symbol = ? AND timeframe = ? AND timestamp <= ? {synthetic_clause}
                 ORDER BY timestamp DESC
                 LIMIT ?;
                 """,
@@ -133,12 +137,13 @@ class DataStreamer:
                 "low": row["low"],
                 "close": row["close"],
                 "volume": row["volume"],
+                "is_synthetic": int(row["is_synthetic"]) if "is_synthetic" in row.keys() and row["is_synthetic"] is not None else 0,
             }
             for row in reversed(rows)
         ]
 
-        # If database is empty or sparse, bootstrap realistic live series
-        if len(results) < min(30, limit):
+        # If database is empty or sparse, bootstrap realistic live series with synthetic marker
+        if len(results) < min(30, limit) and not exclude_synthetic:
             synthetic = self.generate_synthetic_candles(symbol, timeframe, count=limit, end_time=max_time)
             self.save_candles(symbol, timeframe, synthetic)
             results = synthetic
@@ -161,6 +166,8 @@ class DataStreamer:
         candles = await market_gateway.get_ohlcv(symbol, timeframe, limit=limit)
         if candles:
             self._last_known_prices[symbol] = candles[-1]["close"]
+            for c in candles:
+                c["is_synthetic"] = 0
             self.save_candles(symbol, timeframe, candles)
             return candles
 
@@ -181,7 +188,7 @@ class DataStreamer:
         end_time: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Generates realistic time-continuous candles with dynamic price drift.
+        Generates realistic time-continuous candles with dynamic price drift and explicit is_synthetic=1 tag.
         """
         tf_ms = TIMEFRAME_TO_MS.get(timeframe, 60000)
         t_now = end_time if end_time is not None else int(time.time() * 1000)
@@ -211,8 +218,12 @@ class DataStreamer:
                 "low": round(low_p, 2),
                 "close": round(close_p, 2),
                 "volume": round(vol_p, 2),
+                "is_synthetic": 1,
             })
             current_price = close_p
+
+        self._last_known_prices[symbol] = current_price
+        return candles
 
         self._last_known_prices[symbol] = current_price
         return candles

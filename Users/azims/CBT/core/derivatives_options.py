@@ -47,8 +47,9 @@ class DerivativesOptionsEngine:
     """Computes Pillar 2: Derivatives Microstructure & Options Gamma."""
 
     def analyze(self, symbol: str, current_price: float) -> DerivativesOptionsSnapshot:
+        import time
         sym = symbol.upper()
-        now = int(1787985843000)
+        now = int(time.time() * 1000)
 
         if "BTC" in sym:
             funding_pct = 7.42  # ~0.008% per 8h

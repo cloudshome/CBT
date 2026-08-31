@@ -97,3 +97,75 @@ def test_feature_registry_schema_validation():
     is_valid, errors = feature_registry.validate_state_vector(valid_state, "v2.1.0")
     assert is_valid
     assert len(errors) == 0
+
+
+def test_candles_table_synthetic_column_and_isolation():
+    """Verify is_synthetic column exists in market_data.db and filters synthetic bars when requested."""
+    from core.data_streamer import data_streamer
+    
+    with db_manager.get_market_conn() as conn:
+        cursor = conn.execute("PRAGMA table_info(candles);")
+        cols = {row[1]: row[2] for row in cursor.fetchall()}
+        assert "is_synthetic" in cols
+        
+    # Test saving real and synthetic candles
+    sym = "TEST/USDT"
+    tf = "1m"
+    real_c = [{"timestamp": 1700000000000, "symbol": sym, "timeframe": tf, "open": 100.0, "high": 105.0, "low": 99.0, "close": 104.0, "volume": 50.0, "is_synthetic": 0}]
+    synth_c = [{"timestamp": 1700000060000, "symbol": sym, "timeframe": tf, "open": 104.0, "high": 106.0, "low": 103.0, "close": 105.0, "volume": 10.0, "is_synthetic": 1}]
+    
+    data_streamer.save_candles(sym, tf, real_c + synth_c)
+    
+    # Retrieve all
+    all_res = data_streamer.get_candles(sym, tf, limit=2, end_time=1700000100000)
+    assert len(all_res) == 2
+    assert any(c["is_synthetic"] == 1 for c in all_res)
+    
+    # Retrieve strictly non-synthetic
+    pure_res = data_streamer.get_candles(sym, tf, limit=2, end_time=1700000100000, exclude_synthetic=True)
+    assert len(pure_res) == 1
+    assert pure_res[0]["is_synthetic"] == 0
+    assert pure_res[0]["timestamp"] == 1700000000000
+
+
+def test_concurrent_sqlite_wal_write_stress():
+    """Verify SQLite WAL concurrency under concurrent multi-threaded write/read stress (P12.5)."""
+    import threading
+    import random
+
+    errors = []
+    num_threads = 10
+    writes_per_thread = 15
+
+    def worker(worker_id: int):
+        try:
+            for i in range(writes_per_thread):
+                with db_manager.get_market_conn() as conn:
+                    ts = 1800000000000 + (worker_id * 1000) + i
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO candles (timestamp, symbol, timeframe, open, high, low, close, volume, is_synthetic)
+                        VALUES (?, 'STRESS/USDT', '1m', ?, ?, ?, ?, ?, 0)
+                        """,
+                        (ts, 100.0 + i, 105.0 + i, 99.0 + i, 104.0 + i, 10.0),
+                    )
+                    conn.commit()
+                # Interleaved read
+                with db_manager.get_market_conn() as conn:
+                    cur = conn.execute("SELECT COUNT(*) FROM candles WHERE symbol = 'STRESS/USDT'")
+                    _ = cur.fetchone()
+        except Exception as e:
+            errors.append(f"Thread {worker_id} error: {e}")
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in range(num_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(errors) == 0, f"Encountered WAL write contention errors: {errors}"
+    with db_manager.get_market_conn() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM candles WHERE symbol = 'STRESS/USDT'").fetchone()[0]
+        assert count == num_threads * writes_per_thread
+
+

@@ -95,4 +95,32 @@ router.get('/config', async (_req: Request, res: Response): Promise<void> => {
   }
 });
 
+/**
+ * POST /api/paper/reconcile
+ *
+ * Reconciles open positions against provided current prices, auto-closing triggered TP/SL.
+ */
+router.post('/reconcile', async (req: Request, res: Response): Promise<void> => {
+  const { prices } = req.body;
+  if (!prices || typeof prices !== 'object') {
+    res.status(400).json({ error: 'Missing or invalid prices object in request body.' });
+    return;
+  }
+
+  try {
+    const { reconcileOpenPositions } = await import('../services/reconciliationService');
+    const result = await reconcileOpenPositions(prices);
+    res.json({
+      message: `Reconciliation complete. Closed ${result.closedCount} positions.`,
+      result,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({
+      error: 'Failed to reconcile paper positions.',
+      details: msg,
+    });
+  }
+});
+
 export default router;

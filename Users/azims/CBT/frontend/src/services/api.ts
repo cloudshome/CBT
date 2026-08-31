@@ -803,6 +803,93 @@ export const api = {
       missing_requirements: string[];
     }>(res);
   },
+
+  /**
+   * GET /api/kronos/forecast
+   */
+  async getKronosForecast(params?: {
+    symbol?: string;
+    timeframe?: string;
+    lookback?: number;
+    horizon?: number;
+    samples?: number;
+    freeze?: boolean;
+  }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.lookback) q.set('lookback', params.lookback.toString());
+    if (params?.horizon) q.set('horizon', params.horizon.toString());
+    if (params?.samples) q.set('samples', params.samples.toString());
+    if (params?.freeze !== undefined) q.set('freeze', params.freeze.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/forecast?${q.toString()}`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/kronos/health
+   */
+  async getKronosHealth() {
+    const res = await authFetch(`${BASE_URL}/api/kronos/health`);
+    return handleResponse<{
+      status: string;
+      total_inferences: number;
+      failed_inferences: number;
+      consecutive_errors: number;
+      p50_latency_ms: number;
+      p95_latency_ms: number;
+      last_error?: string;
+    }>(res);
+  },
+
+  /**
+   * GET /api/kronos/history
+   */
+  async getKronosHistory(params?: { symbol?: string; timeframe?: string; limit?: number }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.limit) q.set('limit', params.limit.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/history?${q.toString()}`);
+    return handleResponse<{ records: any[]; count: number }>(res);
+  },
+
+  /**
+   * POST /api/kronos/ablation
+   */
+  async runKronosAblation(params?: { symbol?: string; timeframe?: string; bars?: number }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.bars) q.set('bars', params.bars.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/ablation?${q.toString()}`, {
+      method: 'POST',
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/kronos/calibration
+   */
+  async getKronosCalibration(params?: { symbol?: string; timeframe?: string }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    const res = await authFetch(`${BASE_URL}/api/kronos/calibration?${q.toString()}`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/kronos/advisory
+   */
+  async getKronosAdvisory(params?: { symbol?: string; timeframe?: string; sky_decision?: string }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.sky_decision) q.set('sky_decision', params.sky_decision);
+    const res = await authFetch(`${BASE_URL}/api/kronos/advisory?${q.toString()}`);
+    return handleResponse<any>(res);
+  },
 };
 
 

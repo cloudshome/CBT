@@ -5,7 +5,7 @@ services:
   python-backend:
     build:
       context: .
-      dockerfile: Dockerfile.python
+      dockerfile: Dockerfile
     restart: always
     environment:
       - PORT=8000
@@ -32,7 +32,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.backend
     restart: always
     environment:
       - PORT=3000
@@ -57,8 +57,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile.frontend
     restart: always
     ports:
       - "80:80"
