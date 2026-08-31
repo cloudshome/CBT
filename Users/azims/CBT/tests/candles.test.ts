@@ -3,6 +3,7 @@ import { app } from '../src/server';
 import { prisma } from '../src/db/prisma';
 import * as binanceService from '../src/services/binanceService';
 import * as bybitService from '../src/services/bybitService';
+import * as marketDataService from '../src/services/marketDataService';
 import * as candlesCacheService from '../src/services/candlesCacheService';
 import { defaultRateLimiter, createRateLimiter } from '../src/middleware/rateLimit';
 import { OHLCVCandle } from '../src/types/candles';
@@ -199,8 +200,12 @@ describe('GET /api/candles Endpoint', () => {
   describe('Rate Limiting Middleware', () => {
     it('should include rate limiting headers on responses', async () => {
       jest
-        .spyOn(binanceService, 'fetchBinanceCandles')
-        .mockResolvedValueOnce([[1700000000000, 100, 105, 95, 102, 10]]);
+        .spyOn(marketDataService, 'fetchCandlesWithFallback')
+        .mockResolvedValueOnce({
+          candles: [[1700000000000, 100, 105, 95, 102, 10]],
+          source: 'BINANCE',
+          isFallback: false,
+        });
 
       const res = await request(app).get('/api/candles?symbol=BTCUSDT');
 

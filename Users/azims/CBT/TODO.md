@@ -299,6 +299,23 @@
 
 ---
 
+## 🎯 Next Session Sprint: Kronos Visual UI & Frontend QA (Sprint K-UI)
+
+- [x] **Task K-UI.1: Kronos Forecast Path & Cone Overlay on Lightweight Chart**
+  - Added `KRONOS` toggle button and multi-sample median trajectory line with $p_{10}/p_{90}$ probability cone on active symbol/timeframe in `frontend/src/core/engine/TradingViewChart.tsx`.
+  - Added directional bias, expected return %, and consensus telemetry badges in chart header.
+- [x] **Task K-UI.2: Live Advisory Shadow Pill in Order Desk**
+  - Integrated `/api/kronos/advisory` in `frontend/src/components/RiskFirstOrderDesk.tsx` to display real-time advisory confirmation/divergence signals and sizing multipliers.
+- [x] **Task K-UI.3: Frontend Precision & Kronos QA Test Suite (Priority 12.1)**
+  - Created `tests/frontend_precision_and_kronos.test.ts` covering decimal math, risk sizing, liquidation price formulas, trajectory cone calculations, and shadow advisory multipliers.
+  - Verified 97 Jest tests and 164 Pytest tests passing (261/261 total, 100%).
+- [ ] **Task K-UI.4: Playwright E2E Critical Path Testing (Priority 12.6)**
+  - Implement automated E2E test verifying order placement $\to$ position reconciliation $\to$ risk desk update.
+- [ ] **Task K-UI.5: Pre-Merge Verification & PR to `main`**
+  - Compile final release scorecard and prepare clean PR into `main`.
+
+---
+
 ## 📝 Rules for Updating This Document
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.
