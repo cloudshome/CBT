@@ -48,8 +48,9 @@ class SeasonalityCyclicalEngine:
     """Computes Pillar 5: Seasonality & Cyclical DNA."""
 
     def analyze(self, symbol: str, current_price: float) -> SeasonalityCyclicalSnapshot:
+        import time
         sym = symbol.upper()
-        now = int(1787985843000)
+        now = int(time.time() * 1000)
         dt = datetime.fromtimestamp(now / 1000.0, tz=timezone.utc)
 
         day_name = dt.strftime("%A")

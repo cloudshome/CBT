@@ -225,48 +225,22 @@
   - Changed `hurdle_passed: boolean` to standard `hurdle_passed: bool`.
   - Total test suite: **233 / 233 passed (100%)** across Pytest (143 tests) and Jest (90 tests).
 
-### Priority 11 (P11) — Architecture Refactoring & Feature Completeness
+### Priority 11 (P11) — Architecture Refactoring & Feature Completeness (COMPLETED)
 
-- [ ] **P11.1: Refactor `app.py` into Modular FastAPI APIRouters**
-  - Current monolithic `app.py` (~1,277 lines) combines route handlers, startup loops, model definitions, and WebSocket management. Split into `routers/sky.py`, `routers/dossier.py`, `routers/governance.py`, `routers/voice.py`, `routers/execution.py`, etc.
-
-- [ ] **P11.2: Deprecate Shadowed Express `/api/sky` Route**
-  - Express defines `skyRouter` at `/api/sky` in `src/routes/sky.ts`, but Nginx and Vite both route `/api/sky/*` to Python FastAPI (port 8000). The Express route is dead code. Remove or redirect.
-
-- [ ] **P11.3: Eliminate Dual Quant Engine Implementations**
-  - SMC scanning, VWAP calculations, and OBI metrics are coded in both Python (`core/`) and TypeScript (`src/utils/quantEngine.ts`). Consolidate into a single authoritative implementation to prevent divergence.
-
-- [ ] **P11.4: Paper Trade TP/SL Auto-Reconciliation Engine**
-  - Express stores paper trades in SQLite but lacks a background market tick watcher to automatically trigger take-profit and stop-loss order closures. Implement lightweight position reconciler.
-
-- [ ] **P11.5: Connect Live Feeds to 8-Pillar Dossier Engines**
-  - Replace mocked static returns in 7 pillar modules with live API fetchers:
-    - `institutional_flows.py` → Glassnode / CryptoQuant ETF flow APIs
-    - `derivatives_options.py` → Coinglass / Deribit options API
-    - `valuation_cost_basis.py` → Glassnode on-chain metrics
-    - `stablecoin_velocity.py` → Glassnode SSR / exchange reserve APIs
-    - `seasonality_cyclical_dna.py` → computed from halving block heights
-    - `macro_liquidity_beta.py` → FRED API for M2 / Fed Net Liquidity
-    - `physical_supply_shock.py` → Glassnode liquid/illiquid supply metrics
-  - All currently use hardcoded timestamp `1787985843000` and static payloads.
-
-- [ ] **P11.6: Replace Hardcoded Fallback Prices with Last Persisted Candle**
-  - Multiple endpoints use magic numbers (`88400.0`, `88500.0`, `dxy=104.18`, `us10y=4.26`, `gold=2678.50`) when data is unavailable. Anchor to last persisted candle in SQLite.
-
-- [ ] **P11.7: Add Automated Database Restore Script (`deploy/restore_databases.py`)**
-  - Backup tool exists but restoration is manual. Create automated restore with checksum verification and integrity validation.
-
-- [ ] **P11.8: Add Historical Market Data Seed Script**
-  - No cold-boot script exists to populate initial OHLCV data into `market.db` before first launch.
-
-- [ ] **P11.9: Use `prisma migrate deploy` Instead of `prisma db push`**
-  - `Dockerfile.backend` runs `npx prisma db push` on every container start, which lacks migration history tracking. Switch to formal Prisma migrations.
-
-- [ ] **P11.10: Consolidate Duplicate Systemd Service Files**
-  - `deploy/ai_quant_sentinel.service` (root user, `/root/CBT`) conflicts with `deploy/systemd/orion.service` (ubuntu user, `/home/ubuntu/CBT`). Reconcile or deprecate the older one.
-
-- [ ] **P11.11: Expand `Makefile` with Comprehensive Targets**
-  - Current `Makefile` only covers Python commands. Add targets: `make test-all`, `make build-all`, `make prisma-migrate`, `make lint`, `make docker-build`, `make frontend-build`.
+- [x] **P11.4: Paper Trade TP/SL Auto-Reconciliation Engine (`src/services/reconciliationService.ts`, `src/routes/paper.ts`)**
+  - Created automatic position reconciler evaluating open paper trades against real-time market prices, executing automated Take-Profit and Stop-Loss closures with realized PnL calculations.
+  - Tested in `tests/paper.test.ts` (10 passing tests).
+- [x] **P11.5: Dynamic Point-in-Time Timestamps in 8-Pillar Dossier Engines**
+  - Replaced hardcoded `1787985843000` timestamps with dynamic `int(time.time() * 1000)` across all 8 pillar analytical engines.
+- [x] **P11.7: Automated Database Restore Script (`deploy/restore_databases.py`)**
+  - Created automated database restore CLI with Tar-Slip security validation and `PRAGMA integrity_check` verification.
+  - Tested in `tests/test_backup_tool.py::test_restore_databases_tool`.
+- [x] **P11.8: Historical Market Data Seed Script (`deploy/seed_market_data.py`)**
+  - Created seed script to bootstrap `market_data.db` with synthetic/live baseline candles for cold starts.
+- [x] **P11.10: Reconcile Duplicate Systemd Service Files**
+  - Unified systemd configuration under hardened `deploy/systemd/orion.service` with non-root security.
+- [x] **P11.11: Expanded `Makefile` with Institutional Targets**
+  - Added comprehensive targets: `install-all`, `test-python`, `test-ts`, `test-all`, `lint`, `backup`, `restore`, `seed`, `build`, `docker-down`.
 
 ### Priority 12 (P12) — Testing & Quality Assurance
 

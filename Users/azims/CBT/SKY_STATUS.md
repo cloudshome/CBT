@@ -1,12 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-08-31  
-> **Release Tag:** `v2.3.0-p9-data-integrity-complete` (LOCKED 🔒)  
+> **Release Tag:** `v2.4.0-p10-p11-complete` (LOCKED 🔒)  
 > **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 232 / 232 (142 Pytest, 90 Jest — 100% passing)
+> **Tests Passing:** 235 / 235 (144 Pytest, 91 Jest — 100% passing)
 
 ---
 

@@ -43,8 +43,9 @@ class StablecoinVelocityEngine:
     """Computes Pillar 4: Stablecoin Dry-Powder & Liquidity Velocity."""
 
     def analyze(self, symbol: str, current_price: float) -> StablecoinVelocitySnapshot:
+        import time
         sym = symbol.upper()
-        now = int(1787985843000)
+        now = int(time.time() * 1000)
 
         # Global Stablecoin aggregates
         usdt_cap = 132_400_000_000.0

@@ -51,8 +51,9 @@ class VolatilityProfileEngine:
         current_price: float,
         candles_1h: Optional[List[Dict[str, Any]]] = None,
     ) -> VolatilityProfileSnapshot:
+        import time
         sym = symbol.upper()
-        now = int(1787985843000)
+        now = int(time.time() * 1000)
 
         # Mathematical Value Area bounds (70% Volume distribution)
         vah = round(current_price * 1.028, 2)

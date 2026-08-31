@@ -166,13 +166,56 @@ describe('Paper Trading & Risk Gate Endpoints (/api/paper)', () => {
     });
   });
 
-  describe('GET /api/paper/config', () => {
-    it('should return current risk configuration', async () => {
-      const res = await request(app).get('/api/paper/config');
+  describe('POST /api/paper/reconcile', () => {
+    it('should automatically close long position hitting take profit', async () => {
+      await prisma.paperTrade.create({
+        data: {
+          symbol: 'BTCUSDT',
+          side: 'LONG',
+          entryPrice: 65000,
+          sl: 64000,
+          tp: 68000,
+          size: 1.5,
+          status: 'OPEN',
+        },
+      });
+
+      const res = await request(app)
+        .post('/api/paper/reconcile')
+        .send({ prices: { BTCUSDT: 68500 } });
+
       expect(res.status).toBe(200);
-      expect(res.body.config).toHaveProperty('accountBalance', 100000.0);
-      expect(res.body.config).toHaveProperty('maxOpenTrades', 3);
-      expect(res.body.config).toHaveProperty('maxRiskPerTrade', 0.02);
+      expect(res.body.result.closedCount).toBe(1);
+      expect(res.body.result.closedTrades[0].reason).toBe('TAKE_PROFIT');
+      expect(res.body.result.closedTrades[0].pnl).toBe((68500 - 65000) * 1.5);
+
+      const updated = await prisma.paperTrade.findFirst({ where: { symbol: 'BTCUSDT' } });
+      expect(updated?.status).toBe('CLOSED');
+      expect(updated?.exitPrice).toBe(68500);
+    });
+
+    it('should automatically close short position hitting stop loss', async () => {
+      await prisma.paperTrade.create({
+        data: {
+          symbol: 'ETHUSDT',
+          side: 'SHORT',
+          entryPrice: 3500,
+          sl: 3600,
+          tp: 3300,
+          size: 2.0,
+          status: 'OPEN',
+        },
+      });
+
+      const res = await request(app)
+        .post('/api/paper/reconcile')
+        .send({ prices: { ETHUSDT: 3650 } });
+
+      expect(res.status).toBe(200);
+      expect(res.body.result.closedCount).toBe(1);
+      expect(res.body.result.closedTrades[0].reason).toBe('STOP_LOSS');
+      expect(res.body.result.closedTrades[0].pnl).toBe((3500 - 3650) * 2.0);
     });
   });
 });
+

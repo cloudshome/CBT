@@ -115,3 +115,29 @@ def test_brain_backup_manager_aes_gcm_and_tarslip(tmp_path):
     assert row[0] == "42"
     conn.close()
 
+
+def test_restore_databases_tool(temp_db_env, tmp_path):
+    """Test deploy/restore_databases.py restores databases and runs PRAGMA integrity check."""
+    from deploy.restore_databases import run_restore
+
+    # 1. Run backup
+    res_backup = run_backup(temp_db_env["data_dir"], temp_db_env["backup_dir"])
+    archive_path = Path(res_backup["archive_file"])
+    assert archive_path.exists()
+
+    # 2. Restore to new target dir
+    restore_dir = tmp_path / "restored_data"
+    res_restore = run_restore(archive_path, restore_dir)
+    assert res_restore["status"] == "SUCCESS"
+    assert "market.db" in res_restore["restored_databases"]
+    assert "dev.db" in res_restore["restored_databases"]
+
+    # 3. Verify restored data
+    conn = sqlite3.connect(str(restore_dir / "market.db"))
+    cur = conn.cursor()
+    cur.execute("SELECT close FROM candles WHERE timestamp = 1000")
+    row = cur.fetchone()
+    assert row[0] == 50500.0
+    conn.close()
+
+

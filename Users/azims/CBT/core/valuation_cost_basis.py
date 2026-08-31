@@ -43,8 +43,9 @@ class ValuationCostBasisEngine:
     """Computes Pillar 3: Valuation Cost Bases & Realized Price."""
 
     def analyze(self, symbol: str, current_price: float) -> ValuationCostBasisSnapshot:
+        import time
         sym = symbol.upper()
-        now = int(1787985843000)
+        now = int(time.time() * 1000)
 
         if "BTC" in sym:
             # Bitcoin On-Chain Valuation
