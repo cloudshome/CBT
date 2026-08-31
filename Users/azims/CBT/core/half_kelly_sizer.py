@@ -30,7 +30,7 @@ class HalfKellySizingResult:
     position_size_base: float
     max_dollar_loss: float
     invalidation_distance_pct: float
-    hurdle_passed: boolean = True
+    hurdle_passed: bool = True
     narrative: str = ""
 
 

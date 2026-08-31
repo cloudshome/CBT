@@ -72,3 +72,46 @@ def test_run_backup_creates_compressed_archive(temp_db_env):
         members = tar.getnames()
         assert "market.db" in members
         assert "dev.db" in members
+
+
+def test_brain_backup_manager_aes_gcm_and_tarslip(tmp_path):
+    """Verify BrainBackupManager creates AES-GCM encrypted snapshot and restores safely."""
+    from core.brain_backup import BrainBackupManager
+    
+    data_dir = tmp_path / "brain_data"
+    data_dir.mkdir()
+    
+    # Create test SQLite db
+    db = data_dir / "test_brain.db"
+    conn = sqlite3.connect(str(db))
+    conn.execute("CREATE TABLE memory (key TEXT, val TEXT);")
+    conn.execute("INSERT INTO memory VALUES ('alpha', '42');")
+    conn.commit()
+    conn.close()
+    
+    mgr = BrainBackupManager(data_dir=data_dir)
+    snapshot = mgr.create_snapshot("test_vault")
+    assert snapshot.exists()
+    assert snapshot.name.endswith(".enc")
+    
+    # Read snapshot header
+    with open(snapshot, "rb") as f:
+        header = f.read(7)
+        assert header == b"AESGCM:"
+        
+    # Delete original db to test restore
+    db.unlink()
+    assert not db.exists()
+    
+    restored = mgr.restore_snapshot(snapshot)
+    assert restored is True
+    assert db.exists()
+    
+    # Verify content
+    conn = sqlite3.connect(str(db))
+    cur = conn.cursor()
+    cur.execute("SELECT val FROM memory WHERE key = 'alpha'")
+    row = cur.fetchone()
+    assert row[0] == "42"
+    conn.close()
+

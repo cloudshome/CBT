@@ -54,8 +54,14 @@ function timingSafeEqual(a: string, b: string): boolean {
 export function apiKeyAuth(req: Request, res: Response, next: NextFunction): void {
   const configuredKey = process.env.API_KEY || '';
 
-  // If no API_KEY is configured, pass through (backward compatible / dev mode)
+  // If no API_KEY is configured
   if (!configuredKey) {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(500).json({
+        error: 'Production Security Misconfiguration: API_KEY must be configured in production.',
+      });
+      return;
+    }
     next();
     return;
   }

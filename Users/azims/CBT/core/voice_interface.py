@@ -29,33 +29,48 @@ class VoiceInterface:
         """
         gemini_key = os.getenv("GEMINI_API_KEY", "")
         if gemini_key:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=gemini_key)
-                model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-                model = genai.GenerativeModel(model_name)
-                
-                # Determine mime type
-                mime_type = "audio/webm"
-                if filename.endswith(".wav"):
-                    mime_type = "audio/wav"
-                elif filename.endswith(".mp3"):
-                    mime_type = "audio/mp3"
-                elif filename.endswith(".ogg"):
-                    mime_type = "audio/ogg"
+            # Determine mime type
+            mime_type = "audio/webm"
+            if filename.endswith(".wav"):
+                mime_type = "audio/wav"
+            elif filename.endswith(".mp3"):
+                mime_type = "audio/mp3"
+            elif filename.endswith(".ogg"):
+                mime_type = "audio/ogg"
 
-                prompt = (
-                    "Transcribe this trading desk voice note verbatim. "
-                    "Extract any trading instructions, price levels, or market questions clearly."
+            prompt = (
+                "Transcribe this trading desk voice note verbatim. "
+                "Extract any trading instructions, price levels, or market questions clearly."
+            )
+
+            # 1. Official modern google.genai SDK
+            try:
+                from google import genai
+                from google.genai import types
+                client = genai.Client(api_key=gemini_key)
+                model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+                part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[prompt, part],
                 )
-                response = model.generate_content([
-                    prompt,
-                    {"mime_type": mime_type, "data": audio_bytes}
-                ])
                 if response and response.text:
                     return response.text.strip()
             except Exception as e:
-                logger.warning(f"Gemini audio transcription failed ({e}), falling back to local extractor.")
+                # 2. Legacy google.generativeai fallback
+                try:
+                    import google.generativeai as genai_legacy
+                    genai_legacy.configure(api_key=gemini_key)
+                    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+                    model = genai_legacy.GenerativeModel(model_name)
+                    response = model.generate_content([
+                        prompt,
+                        {"mime_type": mime_type, "data": audio_bytes}
+                    ])
+                    if response and response.text:
+                        return response.text.strip()
+                except Exception as ex:
+                    logger.warning(f"Gemini audio transcription failed ({e} / {ex}), falling back to local extractor.")
 
         # Fallback local extraction
         return "Entered Gold Long at 2678, Stop Loss 2670, Take Profit 2695, 0.5 lot"

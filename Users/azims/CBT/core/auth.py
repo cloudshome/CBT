@@ -48,8 +48,14 @@ async def require_api_key(
 
     When API_KEY is not configured, all requests pass through (dev-friendly).
     """
+    env = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).lower()
     if not API_KEY:
-        return  # No key configured — backward compatible passthrough
+        if env == "production":
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "Production Security Misconfiguration: API_KEY must be configured in production."},
+            )
+        return  # No key configured in dev/test — backward compatible passthrough
 
     provided_key = _extract_api_key(request, x_api_key)
 
