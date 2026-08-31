@@ -144,6 +144,38 @@ describe('Paper Trading & Risk Gate Endpoints (/api/paper)', () => {
     });
   });
 
+  describe('Risk Gate Enforcement (Rule 3: Daily Loss Limit)', () => {
+    it('should reject trade with 403 when daily realized losses hit 5% ($5,000)', async () => {
+      // Seed a closed loss of -$5,500 today
+      await prisma.paperTrade.create({
+        data: {
+          symbol: 'BTCUSDT',
+          side: 'BUY',
+          entryPrice: 65000,
+          sl: 64000,
+          tp: 68000,
+          size: 5.5,
+          status: 'CLOSED',
+          exitPrice: 64000,
+          pnl: -5500.0,
+          closedAt: new Date(),
+        },
+      });
+
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'ETHUSDT',
+        side: 'BUY',
+        entryPrice: 3500,
+        sl: 3450,
+        tp: 3700,
+        size: 1.0,
+      });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Daily loss limit reached');
+    });
+  });
+
   describe('GET /api/paper/positions', () => {
     it('should return list of all active open positions', async () => {
       await prisma.paperTrade.create({

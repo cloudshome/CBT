@@ -126,6 +126,27 @@ export async function riskGate(
       return;
     }
 
+    // 6. Rule 3: Daily realized loss limit check (5% of account balance)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const closedToday = await prisma.paperTrade.findMany({
+      where: {
+        status: 'CLOSED',
+        closedAt: { gte: today },
+      },
+    });
+    const dailyPnL = closedToday.reduce((acc, t) => acc + (t.pnl || 0), 0);
+    const maxDailyLoss = config.accountBalance * (config.dailyLossLimit || 0.05);
+
+    if (dailyPnL <= -maxDailyLoss) {
+      res.status(403).json({
+        error: `Risk Gate Rejection: Daily loss limit reached ($${Math.abs(dailyPnL).toFixed(2)} lost today >= max allowed $${maxDailyLoss.toFixed(2)}). All new entries locked until 00:00 UTC.`,
+        dailyPnL,
+        maxDailyLoss,
+      });
+      return;
+    }
+
     // Pass sanitized and validated data
     req.body = {
       symbol: normalizedSymbol,

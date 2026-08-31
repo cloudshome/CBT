@@ -127,3 +127,45 @@ def test_candles_table_synthetic_column_and_isolation():
     assert pure_res[0]["is_synthetic"] == 0
     assert pure_res[0]["timestamp"] == 1700000000000
 
+
+def test_concurrent_sqlite_wal_write_stress():
+    """Verify SQLite WAL concurrency under concurrent multi-threaded write/read stress (P12.5)."""
+    import threading
+    import random
+
+    errors = []
+    num_threads = 10
+    writes_per_thread = 15
+
+    def worker(worker_id: int):
+        try:
+            for i in range(writes_per_thread):
+                with db_manager.get_market_conn() as conn:
+                    ts = 1800000000000 + (worker_id * 1000) + i
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO candles (timestamp, symbol, timeframe, open, high, low, close, volume, is_synthetic)
+                        VALUES (?, 'STRESS/USDT', '1m', ?, ?, ?, ?, ?, 0)
+                        """,
+                        (ts, 100.0 + i, 105.0 + i, 99.0 + i, 104.0 + i, 10.0),
+                    )
+                    conn.commit()
+                # Interleaved read
+                with db_manager.get_market_conn() as conn:
+                    cur = conn.execute("SELECT COUNT(*) FROM candles WHERE symbol = 'STRESS/USDT'")
+                    _ = cur.fetchone()
+        except Exception as e:
+            errors.append(f"Thread {worker_id} error: {e}")
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in range(num_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(errors) == 0, f"Encountered WAL write contention errors: {errors}"
+    with db_manager.get_market_conn() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM candles WHERE symbol = 'STRESS/USDT'").fetchone()[0]
+        assert count == num_threads * writes_per_thread
+
+
