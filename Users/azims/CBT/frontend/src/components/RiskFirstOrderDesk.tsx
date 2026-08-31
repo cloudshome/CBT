@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Calculator, ArrowRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calculator, ArrowRight, Sparkles } from 'lucide-react';
 import { PrecisionMath } from '../core/precision/decimalMath';
 import { SetupSuggestion } from '../types';
+import { api } from '../services/api';
 
 interface RiskFirstOrderDeskProps {
   symbol: string;
@@ -33,6 +34,21 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
   const [takeProfit, setTakeProfit] = useState<number>(0);
   const [leverage, setLeverage] = useState<number>(10);
   const [submitting, setSubmitting] = useState(false);
+  const [kronosAdvisory, setKronosAdvisory] = useState<any>(null);
+
+  // Kronos Advisory Shadow Ingestion
+  useEffect(() => {
+    let isMounted = true;
+    const cleanSym = symbol.replace('/', '').toUpperCase();
+    api.getKronosAdvisory({
+      symbol: cleanSym,
+      timeframe: '15m',
+      sky_decision: side === 'BUY' ? 'LONG' : 'SHORT',
+    }).then((res) => {
+      if (isMounted && res) setKronosAdvisory(res);
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [symbol, side]);
 
   // Sync with selected setup if provided
   useEffect(() => {
@@ -141,6 +157,26 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
           <span>SHORT / SELL</span>
         </button>
       </div>
+
+      {/* Kronos Advisory Shadow Pill */}
+      {kronosAdvisory && (
+        <div className={`px-2 py-1 rounded text-[10px] flex items-center justify-between border mb-2 transition-all ${
+          kronosAdvisory.advisory_recommendation === 'CONFIRM_TRADE'
+            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+            : (kronosAdvisory.advisory_recommendation === 'DIVERGENCE_CAUTION'
+                ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+                : 'bg-indigo-950/30 border-indigo-500/30 text-indigo-300')
+        }`}>
+          <div className="flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-indigo-400" />
+            <span className="font-bold">KRONOS ADVISORY:</span>
+            <span>{kronosAdvisory.advisory_recommendation.replace('_', ' ')}</span>
+          </div>
+          <span className="text-[9px] font-mono text-slate-400">
+            {kronosAdvisory.sizing_multiplier > 0 ? `${kronosAdvisory.sizing_multiplier}x size` : 'standby'}
+          </span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-2 flex-1 justify-between">
         <div className="flex flex-col gap-2">

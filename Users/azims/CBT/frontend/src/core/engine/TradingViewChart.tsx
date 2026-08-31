@@ -40,6 +40,7 @@ import {
 import { OHLCVCandle, FVGItem, OrderBlockItem, SKYSetupData, SupportedTimeframe } from '../../types';
 import { DrawingObject, WorkspacePersistence } from '../persistence/workspaceDB';
 import { indicatorClient } from '../workers/indicatorClient';
+import { api } from '../../services/api';
 
 export type DrawingToolType =
   | 'CURSOR'
@@ -105,6 +106,9 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   const lower1sRef = useRef<ISeriesApi<'Line'> | null>(null);
   const upper2sRef = useRef<ISeriesApi<'Line'> | null>(null);
   const lower2sRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const kronosMedianRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const kronosUpperConeRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const kronosLowerConeRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   // Track context for zero-shake data ingestion
   const lastLoadedContextRef = useRef<{
@@ -150,6 +154,8 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
   const [showMultiSigma, setShowMultiSigma] = useState(true);
   const [showSMCZones, setShowSMCZones] = useState(true);
   const [showJudasZones, setShowJudasZones] = useState(true);
+  const [showKronos, setShowKronos] = useState(false);
+  const [kronosData, setKronosData] = useState<any>(null);
 
   // Active Range Preset
   const [activeRange, setActiveRange] = useState<string>('ALL');
@@ -385,6 +391,35 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       priceLineVisible: false,
     });
 
+    // Kronos Neural Trajectory & Forecast Cone Series
+    const kronosMedian = chart.addSeries(LineSeries, {
+      color: '#818cf8',
+      lineWidth: 2,
+      lineStyle: 1,
+      crosshairMarkerVisible: true,
+      lastValueVisible: true,
+      priceLineVisible: false,
+      visible: false,
+    });
+    const kronosUpperCone = chart.addSeries(LineSeries, {
+      color: 'rgba(99, 102, 241, 0.5)',
+      lineWidth: 1,
+      lineStyle: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      visible: false,
+    });
+    const kronosLowerCone = chart.addSeries(LineSeries, {
+      color: 'rgba(99, 102, 241, 0.5)',
+      lineWidth: 1,
+      lineStyle: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      visible: false,
+    });
+
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
     lineSeriesRef.current = lineSeries;
@@ -396,6 +431,9 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     lower1sRef.current = lower1s;
     upper2sRef.current = upper2s;
     lower2sRef.current = lower2s;
+    kronosMedianRef.current = kronosMedian;
+    kronosUpperConeRef.current = kronosUpperCone;
+    kronosLowerConeRef.current = kronosLowerCone;
 
     // Crosshair readout subscription
     chart.subscribeCrosshairMove((param) => {
@@ -645,6 +683,67 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       }
     });
   }, [candles, symbol, timeframe, showEMA, showVWAP, showMultiSigma]);
+
+  // 3b. Kronos Probabilistic Trajectory Path & Cone Overlay Ingestion
+  useEffect(() => {
+    if (!showKronos) {
+      kronosMedianRef.current?.applyOptions({ visible: false });
+      kronosUpperConeRef.current?.applyOptions({ visible: false });
+      kronosLowerConeRef.current?.applyOptions({ visible: false });
+      setKronosData(null);
+      return;
+    }
+
+    let isMounted = true;
+    const cleanSym = symbol.replace('/', '').toUpperCase();
+    api.getKronosForecast({ symbol: cleanSym, timeframe, samples: 5, horizon: 12 })
+      .then((res) => {
+        if (!isMounted || !res || !res.paths || res.paths.length === 0) return;
+        setKronosData(res);
+
+        const sampleCount = res.paths.length;
+        const horizon = res.paths[0].predicted_timestamps.length;
+
+        const medianPoints: LineData[] = [];
+        const upperPoints: LineData[] = [];
+        const lowerPoints: LineData[] = [];
+
+        // Anchor on current last candle
+        const lastBar = candles && candles.length > 0 ? candles[candles.length - 1] : null;
+        if (lastBar) {
+          const t0 = Math.floor(lastBar[0] / 1000) as Time;
+          const c0 = lastBar[4];
+          medianPoints.push({ time: t0, value: c0 });
+          upperPoints.push({ time: t0, value: c0 });
+          lowerPoints.push({ time: t0, value: c0 });
+        }
+
+        for (let step = 0; step < horizon; step++) {
+          const t = Math.floor(res.paths[0].predicted_timestamps[step] / 1000) as Time;
+          const stepCloses = res.paths.map((p: any) => p.predicted_closes[step]).sort((a: number, b: number) => a - b);
+          const medianVal = stepCloses[Math.floor(sampleCount / 2)];
+          const lowerVal = stepCloses[0];
+          const upperVal = stepCloses[sampleCount - 1];
+
+          medianPoints.push({ time: t, value: medianVal });
+          upperPoints.push({ time: t, value: upperVal });
+          lowerPoints.push({ time: t, value: lowerVal });
+        }
+
+        kronosMedianRef.current?.setData(medianPoints);
+        kronosUpperConeRef.current?.setData(upperPoints);
+        kronosLowerConeRef.current?.setData(lowerPoints);
+
+        kronosMedianRef.current?.applyOptions({ visible: true });
+        kronosUpperConeRef.current?.applyOptions({ visible: true });
+        kronosLowerConeRef.current?.applyOptions({ visible: true });
+      })
+      .catch((err) => {
+        console.warn('Kronos forecast fetch failed:', err);
+      });
+
+    return () => { isMounted = false; };
+  }, [showKronos, symbol, timeframe, candles]);
 
   // 4. Live Tick Micro-Batching with RAF (Incremental Update — ZERO Full Rerender)
   useEffect(() => {
@@ -1333,7 +1432,27 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             >
               JUDAS
             </button>
+            <button
+              onClick={() => setShowKronos(!showKronos)}
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors flex items-center gap-1 ${
+                showKronos
+                  ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 shadow-sm shadow-indigo-500/20'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+              title="Kronos Neural Probabilistic Forecast Cone"
+            >
+              <Sparkles size={11} className={showKronos ? 'text-indigo-400 animate-pulse' : ''} />
+              <span>KRONOS</span>
+            </button>
           </div>
+
+          {showKronos && kronosData && (
+            <div className="hidden lg:flex items-center gap-2 px-2 py-0.5 bg-indigo-950/40 border border-indigo-500/30 rounded text-[10px] font-mono text-indigo-300 animate-in fade-in duration-200">
+              <span>Bias: <strong className={kronosData.sky_derived_metrics.directional_bias === 'BULLISH' ? 'text-emerald-400' : (kronosData.sky_derived_metrics.directional_bias === 'BEARISH' ? 'text-rose-400' : 'text-slate-300')}>{kronosData.sky_derived_metrics.directional_bias}</strong></span>
+              <span>Exp: <strong>{(kronosData.sky_derived_metrics.expected_return_pct * 100).toFixed(2)}%</strong></span>
+              <span>Consensus: <strong>{(kronosData.sky_derived_metrics.directional_consensus * 100).toFixed(0)}%</strong></span>
+            </div>
+          )}
 
           <div className="h-4 w-[1px] bg-[#2a2e39]" />
 
