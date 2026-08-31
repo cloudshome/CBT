@@ -201,13 +201,26 @@ cd frontend && npm install && cd ..
 pip install -r requirements.txt
 
 # 4a. Dev mode (3 terminals)
-npm run dev             # Node backend :3001
-cd frontend && npm run dev  # Vite :5173 (with split proxy)
-python app.py           # Python FastAPI :8000
+npm run dev             # Node backend :3000
+npm --prefix frontend run dev  # Vite :5173
+.venv\Scripts\uvicorn app:app --host 0.0.0.0 --port 8000  # Python FastAPI :8000
 
 # 4b. Production (Docker)
 docker-compose up --build
 ```
+
+---
+
+## Next Session Plan & Objectives
+
+Detailed step-by-step tasks and acceptance criteria are documented in [`docs/NEXT_SESSION_PLAN.md`](file:///c:/Users/azims/CBT/docs/NEXT_SESSION_PLAN.md).
+
+### Sprint K-UI Immediate Objectives:
+1. **Task K-UI.1:** Add `KRONOS` forecast trajectory path & probability cone overlay to `frontend/src/components/TradingViewChart.tsx`.
+2. **Task K-UI.2:** Add live advisory shadow confirmation/divergence pill to `frontend/src/components/RiskFirstOrderDesk.tsx`.
+3. **Task K-UI.3:** Setup Vitest + `@testing-library/react` and write frontend component tests in `frontend/src/components/__tests__/`.
+4. **Task K-UI.4:** Implement Playwright E2E critical path tests (place trade $\to$ reconcile $\to$ verify risk).
+5. **Task K-UI.5:** Compile release scorecard and submit PR to `main`.
 
 ---
 
@@ -230,3 +243,4 @@ docker-compose up --build
 - **Never** call a strategy "VALIDATED" without N≥100 trades per regime with out-of-sample confirmation.
 - **Never** expose API keys in committed code.
 - The UI follows Zero-Shake Realtime Architecture — do NOT recreate chart instances on data refresh. See `AGENTS.md` §20.
+- All research features must follow the **Spec First — Evidence First — Code Second** protocol in `AGENTS.md` §35.
