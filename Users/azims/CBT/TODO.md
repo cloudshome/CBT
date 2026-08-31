@@ -283,12 +283,19 @@
   - Implemented `core/models/kronos/ablation_benchmark.py` running chronological walk-forward comparisons between Mode A (SKY Baseline), Mode B (Kronos Standalone), and Mode C (SKY + Kronos Fusion).
   - Evaluated delta expectancy, profit factor, win rate, and max drawdown.
   - Tested in `tests/test_kronos_research.py`.
-- [ ] **Milestone K5 — Walk-Forward Chronological Validation**
-  - Run sealed out-of-sample testing via `core/walk_forward_engine.py`.
-- [ ] **Milestone K6 — Advisory Paper Trading**
-  - Track hypothetical entries and exits in shadow ledger without capital exposure.
-- [ ] **Milestone K7 — Reliability Calibration & Brier Scoring**
-  - Calibrate forecast dispersion with Platt / Isotonic scaling.
+- [x] **Milestone K5 — Walk-Forward Chronological Validation**
+  - Implemented `core/models/kronos/walk_forward.py` running expanding-window folds with Deflated Sharpe Ratio calculation.
+  - Tested in `tests/test_kronos_pipeline.py`.
+- [x] **Milestone K6 — Advisory Paper Trading**
+  - Implemented `core/models/kronos/advisory_engine.py` integrating advisory shadow verdicts with sizing multipliers.
+  - Added REST API endpoints in `app.py` (`/api/kronos/forecast`, `/api/kronos/advisory`, `/api/kronos/health`, `/api/kronos/history`, `/api/kronos/ablation`, `/api/kronos/calibration`).
+  - Added frontend TypeScript API client methods in `frontend/src/services/api.ts`.
+  - Tested in `tests/test_kronos_pipeline.py`.
+- [x] **Milestone K7 — Reliability Calibration & Brier Scoring**
+  - Implemented `core/models/kronos/calibration.py` with Platt logistic scaling, uncertainty attenuation, and 10-decile Brier reliability curve scoring.
+  - Tested in `tests/test_kronos_pipeline.py`.
+- [ ] **Milestone K8 — Optional Domain Adaptation Fine-Tuning**
+  - Dedicated training protocol for fine-tuning on high-frequency crypto order flow (deferred for live telemetry dataset collection).
 
 ---
 

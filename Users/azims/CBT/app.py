@@ -83,6 +83,18 @@ from core.strategy_compiler import strategy_compiler
 from core.audit_bus import audit_bus
 from core.macro_gold_engine import macro_gold_engine
 from core.auth import require_api_key
+from core.models.kronos import (
+    kronos_adapter,
+    kronos_health_monitor,
+)
+from core.models.kronos.persistence import (
+    freeze_kronos_forecast,
+    get_kronos_forecasts,
+)
+from core.models.kronos.ablation_benchmark import kronos_ablation_benchmark
+from core.models.kronos.walk_forward import kronos_walk_forward_engine
+from core.models.kronos.calibration import kronos_probability_calibrator
+from core.models.kronos.advisory_engine import kronos_advisory_engine
 from core.rate_limiter import RateLimitMiddleware, fastapi_rate_limiter
 from core.metrics import generate_prometheus_metrics
 
@@ -1255,6 +1267,98 @@ async def get_gold_macro_telemetry(
         real_yield_10y=real_yield,
     )
     return telemetry.to_dict()
+
+
+# ---------------------------------------------------------
+# Kronos Probabilistic Foundation Forecasting Endpoints
+# ---------------------------------------------------------
+
+
+@app.get("/api/kronos/forecast")
+async def get_kronos_forecast(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    lookback: int = Query(128),
+    horizon: int = Query(12),
+    samples: int = Query(5),
+    freeze: bool = Query(False),
+):
+    """
+    Generates multi-sample probabilistic path forecasts using the Kronos Foundation Model.
+    Includes expected return, path dispersion, directional consensus, and model uncertainty.
+    """
+    candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
+    forecast = kronos_adapter.predict(
+        symbol=symbol,
+        timeframe=timeframe,
+        candles=candles,
+        horizon=horizon,
+        lookback=lookback,
+        sample_count=samples,
+    )
+    if freeze and forecast.status.value == "HEALTHY":
+        freeze_kronos_forecast(forecast)
+    return forecast.to_dict()
+
+
+@app.get("/api/kronos/health")
+async def get_kronos_health():
+    """Returns real-time health telemetry and latency percentiles for Kronos."""
+    return kronos_health_monitor.get_metrics()
+
+
+@app.get("/api/kronos/history")
+async def get_kronos_history(
+    symbol: Optional[str] = Query(None),
+    timeframe: Optional[str] = Query(None),
+    limit: int = Query(20),
+):
+    """Retrieves immutable frozen forecast records from SQLite experiment_store.db."""
+    records = get_kronos_forecasts(symbol=symbol, timeframe=timeframe, limit=limit)
+    return {"records": records, "count": len(records)}
+
+
+@app.post("/api/kronos/ablation")
+async def run_kronos_ablation(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    bars: int = Query(200),
+):
+    """Executes 3-way ablation benchmark (SKY Baseline vs Kronos Standalone vs Fusion)."""
+    candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=bars)
+    result = kronos_ablation_benchmark.run_benchmark(
+        symbol=symbol,
+        timeframe=timeframe,
+        candles=candles,
+    )
+    return result.to_dict()
+
+
+@app.get("/api/kronos/calibration")
+async def get_kronos_calibration(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+):
+    """Returns Platt calibration curve and Brier reliability deciles for Kronos."""
+    scorecard = kronos_probability_calibrator.evaluate_scorecard([], [], symbol=symbol, timeframe=timeframe)
+    return scorecard.to_dict()
+
+
+@app.get("/api/kronos/advisory")
+async def get_kronos_advisory(
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+    sky_decision: str = Query("LONG"),
+):
+    """Evaluates Kronos advisory verdict against incoming SKY setup."""
+    candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=60)
+    verdict = kronos_advisory_engine.evaluate_advisory(
+        symbol=symbol,
+        timeframe=timeframe,
+        candles=candles,
+        sky_decision=sky_decision,
+    )
+    return verdict.to_dict()
 
 
 # WebSocket endpoint for real-time interactive terminal
