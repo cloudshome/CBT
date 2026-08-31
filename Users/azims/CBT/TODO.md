@@ -301,11 +301,11 @@
 
 ## 🎯 Next Session Sprint: Kronos Visual UI & Frontend QA (Sprint K-UI)
 
-- [ ] **Task K-UI.1: Kronos Forecast Path & Cone Overlay on Lightweight Chart**
-  - Add `KRONOS` toggle button to `frontend/src/components/TradingViewChart.tsx`.
-  - Plot multi-sample median trajectory line and $p_{10}/p_{90}$ probability cone on active symbol/timeframe.
-- [ ] **Task K-UI.2: Live Advisory Shadow Pill in Order Desk**
-  - Integrate `/api/kronos/advisory` in `frontend/src/components/RiskFirstOrderDesk.tsx` to display real-time advisory confirmation/divergence signals and sizing multipliers.
+- [x] **Task K-UI.1: Kronos Forecast Path & Cone Overlay on Lightweight Chart**
+  - Added `KRONOS` toggle button and multi-sample median trajectory line with $p_{10}/p_{90}$ probability cone on active symbol/timeframe in `frontend/src/core/engine/TradingViewChart.tsx`.
+  - Added directional bias, expected return %, and consensus telemetry badges in chart header.
+- [x] **Task K-UI.2: Live Advisory Shadow Pill in Order Desk**
+  - Integrated `/api/kronos/advisory` in `frontend/src/components/RiskFirstOrderDesk.tsx` to display real-time advisory confirmation/divergence signals and sizing multipliers.
 - [ ] **Task K-UI.3: Frontend Component Test Suite (Priority 12.1)**
   - Configure Vitest + `@testing-library/react` in `frontend/package.json`.
   - Add unit tests for `TradingViewChart.tsx`, `RiskFirstOrderDesk.tsx`, and `PaperTradingPanel.tsx`.
