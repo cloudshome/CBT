@@ -1,12 +1,13 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-08-31  
-> **Release Tag:** `v2.8.0-kronos-complete` (LOCKED 🔒)  
+> **Release Tag:** `v3.0.0-institutional-platform-ready` (LOCKED 🔒)  
 > **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 255 / 255 (164 Pytest, 91 Jest — 100% passing)
+> **Tests Passing:** 263 / 263 (165 Pytest, 98 Jest — 100% passing)  
+> **Preflight Status:** ALL 4 QUALITY GATES PASSED (100% GREEN)
 
 ---
 
