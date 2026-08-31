@@ -1,12 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-08-31  
-> **Release Tag:** `v2.6.0-kronos-k1-k2-complete` (LOCKED 🔒)  
+> **Release Tag:** `v2.7.0-kronos-k3-k4-complete` (LOCKED 🔒)  
 > **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 246 / 246 (155 Pytest, 91 Jest — 100% passing)
+> **Tests Passing:** 249 / 249 (158 Pytest, 91 Jest — 100% passing)
 
 ---
 

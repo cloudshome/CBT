@@ -275,10 +275,14 @@
 - [x] **Milestone K2 — Causal Data Integration & Input Preprocessing**
   - Enforced strict geometric OHLC validation, no-NaN checks, point-in-time standardization, and chronological sequencing.
   - Tested in `tests/test_kronos_adapter.py`.
-- [ ] **Milestone K3 — Research CLI & Forecast Freeze Ledger**
-  - Implement `scripts/kronos_eval.py` and SQLite `kronos_forecast_ledger` table in `experiment_store.db`.
-- [ ] **Milestone K4 — 3-Way Ablation Benchmark**
-  - Compare **Mode A (SKY Baseline)** vs. **Mode B (Kronos Standalone)** vs. **Mode C (SKY + Kronos Fusion)**.
+- [x] **Milestone K3 — Research CLI & Forecast Freeze Ledger**
+  - Implemented `scripts/kronos_eval.py` (predict, history, benchmark subcommands) and SQLite `kronos_forecast_ledger` in `experiment_store.db`.
+  - Implemented `core/models/kronos/persistence.py` with counterfactual post-hoc resolution.
+  - Tested in `tests/test_kronos_research.py`.
+- [x] **Milestone K4 — 3-Way Ablation Benchmark**
+  - Implemented `core/models/kronos/ablation_benchmark.py` running chronological walk-forward comparisons between Mode A (SKY Baseline), Mode B (Kronos Standalone), and Mode C (SKY + Kronos Fusion).
+  - Evaluated delta expectancy, profit factor, win rate, and max drawdown.
+  - Tested in `tests/test_kronos_research.py`.
 - [ ] **Milestone K5 — Walk-Forward Chronological Validation**
   - Run sealed out-of-sample testing via `core/walk_forward_engine.py`.
 - [ ] **Milestone K6 — Advisory Paper Trading**
