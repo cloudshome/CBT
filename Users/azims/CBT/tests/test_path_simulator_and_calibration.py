@@ -32,7 +32,7 @@ def test_probability_calibrator_brier_score():
     card = probability_calibrator.generate_scorecard("BTC/USDT")
     assert 0.0 <= card.brier_score <= 1.0
     assert card.sample_size >= 20
-    assert len(card.reliability_bins) == 5
+    assert len(card.reliability_bins) == 10
 
 
 def test_prediction_ledger_immutable_freeze_and_verification():

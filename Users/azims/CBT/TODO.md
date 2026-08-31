@@ -269,10 +269,12 @@
 
 - [x] **Milestone K0 — Discovery & Architecture Review**
   - Created [`docs/KRONOS_ARCHITECTURE_REVIEW.md`](file:///c:/Users/azims/CBT/docs/KRONOS_ARCHITECTURE_REVIEW.md) and [`docs/KRONOS_RESEARCH_PROTOCOL.md`](file:///c:/Users/azims/CBT/docs/KRONOS_RESEARCH_PROTOCOL.md).
-- [ ] **Milestone K1 — Model Adapter & Schemas (`core/models/kronos/`)**
-  - Implement `adapter.py`, `schemas.py`, `health.py` with `KRONOS_UNAVAILABLE` safe fallback.
-- [ ] **Milestone K2 — Causal Data Integration & Input Preprocessing**
-  - Connect strictly through `core/causal_firewall.py` and `core/data_streamer.py`.
+- [x] **Milestone K1 — Model Adapter & Schemas (`core/models/kronos/`)**
+  - Implemented `schemas.py`, `adapter.py`, `preprocessing.py`, `interpretation.py`, `health.py` with multi-sample trajectory forecasting and safe degradation.
+  - Tested in `tests/test_kronos_adapter.py` (10 passing tests).
+- [x] **Milestone K2 — Causal Data Integration & Input Preprocessing**
+  - Enforced strict geometric OHLC validation, no-NaN checks, point-in-time standardization, and chronological sequencing.
+  - Tested in `tests/test_kronos_adapter.py`.
 - [ ] **Milestone K3 — Research CLI & Forecast Freeze Ledger**
   - Implement `scripts/kronos_eval.py` and SQLite `kronos_forecast_ledger` table in `experiment_store.db`.
 - [ ] **Milestone K4 — 3-Way Ablation Benchmark**
