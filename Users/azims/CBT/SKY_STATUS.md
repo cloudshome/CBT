@@ -1,12 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-08-31  
-> **Release Tag:** `v2.4.0-p10-p11-complete` (LOCKED 🔒)  
+> **Release Tag:** `v2.5.0-phase-k-initialized` (LOCKED 🔒)  
 > **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 235 / 235 (144 Pytest, 91 Jest — 100% passing)
+> **Tests Passing:** 236 / 236 (145 Pytest, 91 Jest — 100% passing)
 
 ---
 
@@ -49,7 +49,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 │  /api/decision/* ───  │→                           backtesting,    │
 │  /api/league/* ─────  │→                           risk engine,    │
 │  /api/governance/* ── │→                           paper trading)  │
-│  /ws/* ────────────── │→ Node/Express :3001 (WebSocket passthrough)│
+│  /ws/* ────────────── │→ Node/Express :3000 (WebSocket passthrough)│
 └───────────────────────┴──────────────────────────────────────────┘
 ```
 

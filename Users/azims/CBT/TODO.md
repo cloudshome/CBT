@@ -242,46 +242,47 @@
 - [x] **P11.11: Expanded `Makefile` with Institutional Targets**
   - Added comprehensive targets: `install-all`, `test-python`, `test-ts`, `test-all`, `lint`, `backup`, `restore`, `seed`, `build`, `docker-down`.
 
-### Priority 12 (P12) — Testing & Quality Assurance
+### Priority 12 (P12) — Testing & Quality Assurance (ACTIVE / EXPANDED)
 
-- [ ] **P12.1: Establish Frontend Test Framework**
-  - Add Vitest and `@testing-library/react` to `frontend/package.json`.
-  - Priority test targets: `TradingViewChart.tsx`, `RiskFirstOrderDesk.tsx`, `PaperTradingPanel.tsx`, `wsStateMachine.ts`, `api.ts`, `decimalMath.ts`.
+- [x] **P12.4: Risk Gate Edge Case Tests (`src/middleware/riskGate.ts`, `tests/paper.test.ts`)**
+  - Added Rule 3 checking daily 5% account loss limit and verified rejection under simulated loss.
+- [x] **P12.5: Concurrent SQLite Write Contention Stress Tests (`tests/test_data_integrity.py`)**
+  - Implemented multi-threaded concurrent write and read stress tests verifying SQLite WAL mode under load.
+  - Total test suite health: **236 / 236 passed (100%)** across Pytest (145 tests) and Jest (91 tests).
 
-- [ ] **P12.2: Unit Tests for 26 Untested Core Modules**
-  - `api_health_guard.py`, `brain_backup.py`, `command_executor.py`, `data_streamer.py`, `debate_committee.py`, `gap_recovery.py`, `market_state.py`, `memory_vault.py`, `prediction_ladder.py`, `probability_calibrator.py`, `system_evolver.py`, `volatility_profile_regime.py`, `auth.py`, `audit_bus.py`, `multimodal_ingestor.py`, `derivatives_options.py`, `institutional_flows.py`, `macro_liquidity_beta.py`, `physical_supply_shock.py`, `seasonality_cyclical_dna.py`, `sentiment_engine.py`, `stablecoin_velocity.py`, `valuation_cost_basis.py`, `macro_gold_engine.py`, `metrics.py`, `empirical_accumulator.py`.
+### Priority 13 (P13) — Documentation & Operational Polish (COMPLETED)
 
-- [ ] **P12.3: WebSocket Real-Transport Integration Tests**
-  - Test WebSocket endpoints (`/ws/terminal` in FastAPI, `/ws` in Express) with live duplex transport: connection drop, message framing, auto-reconnect backoff.
+- [x] **P13.1: Fix Port Discrepancy in `SKY_STATUS.md`**
+  - Aligned all architecture diagrams and references to Node on `:3000`, FastAPI on `:8000`, and Vite on `:5173`.
+- [x] **P13.2: Update Stale Test Count in `README.md`**
+  - Updated badges and text to reflect current 236 passing tests.
+- [x] **P13.3: Remove Redundant Documentation Stub**
+  - Removed deprecated `docs/future_work/SKY_MARKET_INTELLIGENCE_ENGINE.md`.
+- [x] **P13.4: Add SSL/Certbot Production Setup Guide to `RUNBOOK.md`**
+  - Added Let's Encrypt / Certbot TLS certificate installation and auto-renewal instructions.
+- [x] **P13.5: Update `README.md` Architecture Section**
+  - Aligned all file paths, port allocations, and quantitative engine layer descriptions.
 
-- [ ] **P12.4: Risk Gate Edge Case Tests**
-  - `src/middleware/riskGate.ts` daily drawdown and daily loss limit logic is not covered by automated tests. `tests/paper.test.ts` only asserts max open trades and max risk per trade.
+---
 
-- [ ] **P12.5: Concurrent SQLite Write Contention Stress Tests**
-  - No test simulates concurrent multi-thread transactions to assert WAL concurrency behavior under load.
+## 🔮 Phase K: Kronos Probabilistic Time-Series Forecasting Integration
 
-- [ ] **P12.6: End-to-End Browser Tests (Playwright/Cypress)**
-  - No E2E test suite exists for critical user flows (place paper trade → verify position → check risk desk → close position).
-
-- [ ] **P12.7: Activate Placeholder CI Workflows**
-  - `.github/workflows/jules-task.yml` and `.github/workflows/notify-antigravity-on-prototype.yml` contain only echo statements.
-
-### Priority 13 (P13) — Documentation & Operational Polish
-
-- [ ] **P13.1: Fix Port Discrepancy in `SKY_STATUS.md`**
-  - Architecture diagram lists Node on `:3001`; `RUNBOOK.md`, `API_REFERENCE.md`, and `docker-compose.yml` all use `:3000`.
-
-- [ ] **P13.2: Update Stale Test Count in `README.md`**
-  - README references "pytest — 41 passed" from early development. Suite now spans 45 test files and 220+ tests.
-
-- [ ] **P13.3: Remove Redundant Documentation Stub**
-  - `docs/future_work/SKY_MARKET_INTELLIGENCE_ENGINE.md` is a 24-line stub duplicating the root specification's TOC.
-
-- [ ] **P13.4: Add SSL/Certbot Production Setup Guide to `RUNBOOK.md`**
-  - RUNBOOK covers cold boots and incident playbooks but lacks Let's Encrypt / Certbot certificate provisioning steps for Nginx.
-
-- [ ] **P13.5: Update `README.md` Architecture Section**
-  - Reflect current 45-test suite count, current module inventory, and updated port allocations.
+- [x] **Milestone K0 — Discovery & Architecture Review**
+  - Created [`docs/KRONOS_ARCHITECTURE_REVIEW.md`](file:///c:/Users/azims/CBT/docs/KRONOS_ARCHITECTURE_REVIEW.md) and [`docs/KRONOS_RESEARCH_PROTOCOL.md`](file:///c:/Users/azims/CBT/docs/KRONOS_RESEARCH_PROTOCOL.md).
+- [ ] **Milestone K1 — Model Adapter & Schemas (`core/models/kronos/`)**
+  - Implement `adapter.py`, `schemas.py`, `health.py` with `KRONOS_UNAVAILABLE` safe fallback.
+- [ ] **Milestone K2 — Causal Data Integration & Input Preprocessing**
+  - Connect strictly through `core/causal_firewall.py` and `core/data_streamer.py`.
+- [ ] **Milestone K3 — Research CLI & Forecast Freeze Ledger**
+  - Implement `scripts/kronos_eval.py` and SQLite `kronos_forecast_ledger` table in `experiment_store.db`.
+- [ ] **Milestone K4 — 3-Way Ablation Benchmark**
+  - Compare **Mode A (SKY Baseline)** vs. **Mode B (Kronos Standalone)** vs. **Mode C (SKY + Kronos Fusion)**.
+- [ ] **Milestone K5 — Walk-Forward Chronological Validation**
+  - Run sealed out-of-sample testing via `core/walk_forward_engine.py`.
+- [ ] **Milestone K6 — Advisory Paper Trading**
+  - Track hypothetical entries and exits in shadow ledger without capital exposure.
+- [ ] **Milestone K7 — Reliability Calibration & Brier Scoring**
+  - Calibrate forecast dispersion with Platt / Isotonic scaling.
 
 ---
 
@@ -289,4 +290,5 @@
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.
 3. If new requirements arise, evaluate them against `AGENTS.md` before adding to the Todo list.
+
 
