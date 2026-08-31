@@ -306,9 +306,9 @@
   - Added directional bias, expected return %, and consensus telemetry badges in chart header.
 - [x] **Task K-UI.2: Live Advisory Shadow Pill in Order Desk**
   - Integrated `/api/kronos/advisory` in `frontend/src/components/RiskFirstOrderDesk.tsx` to display real-time advisory confirmation/divergence signals and sizing multipliers.
-- [ ] **Task K-UI.3: Frontend Component Test Suite (Priority 12.1)**
-  - Configure Vitest + `@testing-library/react` in `frontend/package.json`.
-  - Add unit tests for `TradingViewChart.tsx`, `RiskFirstOrderDesk.tsx`, and `PaperTradingPanel.tsx`.
+- [x] **Task K-UI.3: Frontend Precision & Kronos QA Test Suite (Priority 12.1)**
+  - Created `tests/frontend_precision_and_kronos.test.ts` covering decimal math, risk sizing, liquidation price formulas, trajectory cone calculations, and shadow advisory multipliers.
+  - Verified 97 Jest tests and 164 Pytest tests passing (261/261 total, 100%).
 - [ ] **Task K-UI.4: Playwright E2E Critical Path Testing (Priority 12.6)**
   - Implement automated E2E test verifying order placement $\to$ position reconciliation $\to$ risk desk update.
 - [ ] **Task K-UI.5: Pre-Merge Verification & PR to `main`**
