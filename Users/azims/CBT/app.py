@@ -987,6 +987,23 @@ async def run_lab_stress_test(symbol: str = Query("BTC/USDT"), timeframe: str = 
     return mc_rep.to_dict()
 
 
+def sanitize_numpy(obj: Any) -> Any:
+    """Recursively converts numpy scalars, arrays, and types to native Python types for clean FastAPI JSON serialization."""
+    if isinstance(obj, (bool, np.bool_)):
+        return bool(obj)
+    if isinstance(obj, (int, np.integer, np.int64, np.int32)):
+        return int(obj)
+    if isinstance(obj, (float, np.floating, np.float64, np.float32)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return [sanitize_numpy(x) for x in obj.tolist()]
+    if isinstance(obj, dict):
+        return {str(k): sanitize_numpy(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [sanitize_numpy(x) for x in obj]
+    return obj
+
+
 # ==============================================================================
 # INSTITUTIONAL ALPHA & MICROSTRUCTURE QUANT API ENDPOINTS
 # ==============================================================================
@@ -1003,7 +1020,7 @@ async def get_institutional_alpha(
         timeframe=timeframe,
         candles=candles,
     )
-    return asdict(res)
+    return sanitize_numpy(asdict(res))
 
 
 @app.get("/api/institutional/cvd")
@@ -1014,7 +1031,7 @@ async def get_institutional_cvd(
 ):
     candles = data_streamer.get_candles(symbol, timeframe, limit=limit)
     res = cvd_absorption_engine.analyze_orderflow(candles, symbol=symbol)
-    return asdict(res)
+    return sanitize_numpy(asdict(res))
 
 
 @app.get("/api/institutional/orderbook-imbalance")
