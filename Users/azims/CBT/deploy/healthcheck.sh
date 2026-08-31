@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # 24/7 Ubuntu Production Healthcheck Probe for SKY / ORION Terminal
-# Validates Python API (:8000), Node Market Streamer (:3001), Database & Data Freshness
+# Validates Python API (:8000), Node Market Streamer (:3000), Database & Data Freshness
 # ==============================================================================
 
 set -euo pipefail
 
 PYTHON_PORT=${PYTHON_PORT:-8000}
-NODE_PORT=${NODE_PORT:-3001}
+NODE_PORT=${NODE_PORT:-3000}
 STATUS=0
 
 echo "[HEALTHCHECK] Initiating system health probe..."

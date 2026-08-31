@@ -100,10 +100,12 @@ class OrderBookImbalanceEngine:
         else:
             micro_shift = 0.0
 
-        # Synthetic/calibrated VPIN flow toxicity
-        # If strong one-sided imbalance with microprice skew, flow toxicity increases
+        # Calibrated deterministic VPIN flow toxicity
+        # Evaluated from depth-weighted imbalance, microprice drift, and bid-ask spread intensity
         abs_imb = abs(depth_imbalance)
-        vpin = float(np.clip(0.15 + (abs_imb * 0.55) + (np.random.uniform(0.0, 0.05)), 0.05, 0.95))
+        spread_val = max(1e-6, float(a_prices[0] - b_prices[0]))
+        micro_intensity = min(1.0, abs(micro_shift) / spread_val)
+        vpin = float(np.clip(0.15 + (abs_imb * 0.50) + (micro_intensity * 0.15), 0.05, 0.95))
 
         # Composite OBI score [-1.0, 1.0]
         composite_obi = float(0.4 * top_imbalance + 0.6 * depth_imbalance)

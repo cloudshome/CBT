@@ -36,6 +36,19 @@ def test_orderbook_imbalance_and_vpin():
     assert res.bid_depth_total_usd > res.ask_depth_total_usd
 
 
+def test_deterministic_vpin_reproducibility():
+    """Verify VPIN calculation is 100% deterministic with zero random noise."""
+    bids = [(88500.0 - i * 5, 2.0) for i in range(10)]
+    asks = [(88505.0 + i * 5, 1.0) for i in range(10)]
+
+    res1 = orderbook_imbalance_engine.compute_imbalance(bids, asks, symbol="BTC/USDT")
+    res2 = orderbook_imbalance_engine.compute_imbalance(bids, asks, symbol="BTC/USDT")
+
+    assert res1.flow_toxicity_vpin == res2.flow_toxicity_vpin
+    assert res1.obi_score == res2.obi_score
+
+
+
 def test_oi_funding_squeeze_detection():
     # Test short squeeze scenario: Negative funding + expanding OI
     res = oi_funding_squeeze_engine.analyze_positioning(

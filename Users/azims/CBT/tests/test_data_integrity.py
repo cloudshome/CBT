@@ -97,3 +97,33 @@ def test_feature_registry_schema_validation():
     is_valid, errors = feature_registry.validate_state_vector(valid_state, "v2.1.0")
     assert is_valid
     assert len(errors) == 0
+
+
+def test_candles_table_synthetic_column_and_isolation():
+    """Verify is_synthetic column exists in market_data.db and filters synthetic bars when requested."""
+    from core.data_streamer import data_streamer
+    
+    with db_manager.get_market_conn() as conn:
+        cursor = conn.execute("PRAGMA table_info(candles);")
+        cols = {row[1]: row[2] for row in cursor.fetchall()}
+        assert "is_synthetic" in cols
+        
+    # Test saving real and synthetic candles
+    sym = "TEST/USDT"
+    tf = "1m"
+    real_c = [{"timestamp": 1700000000000, "symbol": sym, "timeframe": tf, "open": 100.0, "high": 105.0, "low": 99.0, "close": 104.0, "volume": 50.0, "is_synthetic": 0}]
+    synth_c = [{"timestamp": 1700000060000, "symbol": sym, "timeframe": tf, "open": 104.0, "high": 106.0, "low": 103.0, "close": 105.0, "volume": 10.0, "is_synthetic": 1}]
+    
+    data_streamer.save_candles(sym, tf, real_c + synth_c)
+    
+    # Retrieve all
+    all_res = data_streamer.get_candles(sym, tf, limit=2, end_time=1700000100000)
+    assert len(all_res) == 2
+    assert any(c["is_synthetic"] == 1 for c in all_res)
+    
+    # Retrieve strictly non-synthetic
+    pure_res = data_streamer.get_candles(sym, tf, limit=2, end_time=1700000100000, exclude_synthetic=True)
+    assert len(pure_res) == 1
+    assert pure_res[0]["is_synthetic"] == 0
+    assert pure_res[0]["timestamp"] == 1700000000000
+

@@ -51,5 +51,27 @@ def test_shapley_alpha_attribution():
     )
     assert len(attr.attributions) >= 6
     total_dollar = sum(a.dollar_impact for a in attr.attributions)
-    assert total_dollar > 2000.0
+    assert abs(total_dollar - 2500.0) < 0.05
     assert attr.top_alpha_driver in ["HTF_Trend", "Liquidity_Sweep", "CVD_Absorption"]
+
+
+def test_dynamic_shapley_efficiency_and_sensitivity():
+    """Verify Shapley efficiency axiom (sum of attributions equals total PnL) and dynamic sensitivity."""
+    # Test with custom state features
+    features = {
+        "htf_alignment": 0.1,
+        "sweep_detected": 0.95,
+        "cvd_absorption": 0.90,
+        "macro_aligned": 0.2,
+    }
+    attr = alpha_attribution_engine.attribute_trade_return(
+        trade_id="TR_1004",
+        symbol="ETH/USDT",
+        pnl_usd=-1500.0,
+        state_features=features,
+    )
+    total_impact = sum(a.dollar_impact for a in attr.attributions)
+    assert abs(total_impact - (-1500.0)) < 0.05
+    # Sweep and CVD should be top drivers given high activations
+    assert attr.top_alpha_driver in ["Liquidity_Sweep", "CVD_Absorption"]
+

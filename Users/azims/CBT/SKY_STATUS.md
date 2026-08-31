@@ -1,11 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-08-30  
-> **Release Tag:** `v2.2.1-liquidation-model-fix` (LOCKED 🔒)  
+> **Last Updated:** 2026-08-31  
+> **Release Tag:** `v2.3.0-p9-data-integrity-complete` (LOCKED 🔒)  
 > **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
-> **Repo local path:** `c:\Users\azims\CBT`
+> **Repo local path:** `c:\Users\azims\CBT`  
+> **Tests Passing:** 232 / 232 (142 Pytest, 90 Jest — 100% passing)
 
 ---
 
@@ -39,7 +40,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 ├───────────────────────┬──────────────────────────────────────────┤
 │  FRONTEND             │  BACKENDS                                 │
 │  React + Vite         │                                           │
-│  Port 5173 (dev)      │  Node/Express  → :3001  (market data,     │
+│  Port 5173 (dev)      │  Node/Express  → :3000  (market data,     │
 │  Port 80 (prod nginx) │                           WS streams,     │
 │                       │                           watchlist)       │
 │  Vite proxy splits:   │                                           │

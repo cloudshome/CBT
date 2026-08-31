@@ -102,10 +102,18 @@ class DatabaseManager:
                     low REAL NOT NULL,
                     close REAL NOT NULL,
                     volume REAL NOT NULL,
+                    is_synthetic INTEGER DEFAULT 0,
                     PRIMARY KEY (symbol, timeframe, timestamp)
                 );
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_candles_ts ON candles (symbol, timeframe, timestamp DESC);")
+
+            # Check if is_synthetic column exists for backwards-compatibility migrations
+            cursor = conn.execute("PRAGMA table_info(candles);")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "is_synthetic" not in cols:
+                conn.execute("ALTER TABLE candles ADD COLUMN is_synthetic INTEGER DEFAULT 0;")
+
             conn.commit()
 
     def _init_brain_db(self) -> None:

@@ -81,6 +81,7 @@ class GapRecoveryManager:
                         "low": round(p_fill * 0.9995, 2),
                         "close": round(p_fill, 2),
                         "volume": 10.0,
+                        "is_synthetic": 1,
                     })
                     repaired_count += 1
 

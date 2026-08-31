@@ -139,6 +139,7 @@ class PredictionLedger:
 
             # Determine outcomes
             is_long = tp1 > inval_p
+            outcome_5m = "CHOP"
             outcome_1h = "CHOP"
             outcome_4h = "CHOP"
 
@@ -146,22 +147,30 @@ class PredictionLedger:
                 dt_mins = (c["timestamp"] - p_time) / 60000.0
                 if is_long:
                     if c["high"] >= tp1:
+                        if dt_mins <= 5:
+                            outcome_5m = "WIN"
                         if dt_mins <= 60:
                             outcome_1h = "WIN"
                         outcome_4h = "WIN"
                         break
                     elif c["low"] <= inval_p:
+                        if dt_mins <= 5:
+                            outcome_5m = "LOSS"
                         if dt_mins <= 60:
                             outcome_1h = "LOSS"
                         outcome_4h = "LOSS"
                         break
                 else:
                     if c["low"] <= tp1:
+                        if dt_mins <= 5:
+                            outcome_5m = "WIN"
                         if dt_mins <= 60:
                             outcome_1h = "WIN"
                         outcome_4h = "WIN"
                         break
                     elif c["high"] >= inval_p:
+                        if dt_mins <= 5:
+                            outcome_5m = "LOSS"
                         if dt_mins <= 60:
                             outcome_1h = "LOSS"
                         outcome_4h = "LOSS"
@@ -175,14 +184,14 @@ class PredictionLedger:
                 conn.execute(
                     """
                     UPDATE prediction_ledger SET
-                        outcome_5m = 'WIN',
+                        outcome_5m = ?,
                         outcome_1h = ?,
                         outcome_4h = ?,
                         is_verified = 1,
                         brier_score = ?
                     WHERE prediction_id = ?;
                     """,
-                    (outcome_1h, outcome_4h, brier, pred_id),
+                    (outcome_5m, outcome_1h, outcome_4h, brier, pred_id),
                 )
                 conn.commit()
             verified_count += 1
