@@ -175,6 +175,156 @@
 
 ---
 
+## 🔮 Future Pipeline Work (Discovered via 2026-08-31 Full Codebase Audit)
+
+> These items were identified by a comprehensive 3-agent parallel review of all 99 core Python modules, 30+ TypeScript/React modules, 45 test suites, CI/CD pipelines, Docker infrastructure, and documentation. Items are ordered by AGENTS.md Decision Hierarchy: Safety → Security → Data Integrity → Risk → Mission → Architecture → Reproducibility → Statistical Validity → Reliability → Performance → Maintainability → UX.
+
+### Priority 9 (P9) — Critical Data Integrity & Correctness Fixes
+
+> ⚠️ **These violate AGENTS.md Rules 12, 13, and 14. Must be resolved before any new feature work.**
+
+- [ ] **P9.1: Fix Hardcoded Prediction Win (`core/prediction_ledger.py:178`)**
+  - `outcome_5m = 'WIN'` is hardcoded regardless of actual realized price movement.
+  - Replace with actual forward price comparison against prediction direction and realized candle high/low/close.
+  - Corrupts Brier score tracking and empirical reliability ledger.
+
+- [ ] **P9.2: Prevent Synthetic Candle DB Contamination (`core/gap_recovery.py`, `core/data_streamer.py`)**
+  - `gap_recovery.py` interpolates missing candles with hardcoded `volume = 10.0` and inserts into SQLite with no `is_synthetic` flag.
+  - `data_streamer.py` generates synthetic candles when count < 30 and persists them as real market data.
+  - **Fix:** Add mandatory `is_synthetic BOOLEAN DEFAULT 0` column to SQLite `candles` schema. Tag all generated candles. Exclude synthetic candles from backtests and volume indicators (rVol, CVD, OBV) unless explicitly opted in.
+
+- [ ] **P9.3: Fix Fake Shapley Attribution (`core/alpha_attribution.py:86`)**
+  - Currently multiplies `pnl_usd × constant_weight_dict` with static factors (`HTF_Trend: 0.24`, `Liquidity_Sweep: 0.20`, etc.).
+  - Replace with empirical marginal feature difference calculations (true Shapley decomposition).
+
+- [ ] **P9.4: Fix VPIN Random Noise Injection (`core/orderbook_imbalance.py:118-122`)**
+  - VPIN calculation adds `np.random.uniform(-0.05, 0.05)` instead of computing genuine Volume-Synchronized Probability of Toxicity from trade volume buckets.
+  - Implement proper VPIN bucketing algorithm per Easley, López de Prado & O'Hara (2012).
+
+- [ ] **P9.5: Fix Broken `docker-compose.prod.yml` Dockerfile References**
+  - `python-backend` → change `Dockerfile.python` to `Dockerfile`.
+  - `backend` → change `Dockerfile` to `Dockerfile.backend`.
+  - `frontend` → change `./frontend/Dockerfile` to root-level `Dockerfile.frontend` with correct context.
+
+- [ ] **P9.6: Fix Port Mismatch in `deploy/healthcheck.sh`**
+  - Change default `NODE_PORT=${NODE_PORT:-3001}` to `NODE_PORT=${NODE_PORT:-3000}` to match Docker, server, and RUNBOOK.
+
+### Priority 10 (P10) — Security & Infrastructure Hardening
+
+- [ ] **P10.1: Tar-Slip Path Traversal Protection (`core/brain_backup.py`)**
+  - `tar.extractall()` lacks `filter='data'`, exposing to path traversal attacks on untrusted archives.
+  - Add `filter='data'` parameter or implement safe path validation before extraction.
+
+- [ ] **P10.2: Replace XOR Cipher with AES-GCM (`core/brain_backup.py`)**
+  - Fallback XOR cipher is cryptographically meaningless. Replace with AES-GCM encryption using the `cryptography` library (already in `requirements.txt`).
+
+- [ ] **P10.3: Remove Default Auth Secret Key Fallback (`core/auth.py`)**
+  - Currently falls back to `"cbt_institutional_alpha_secret_key_2026"` if `AUTH_SECRET_KEY` env var is unset. Production must require explicit secret configuration.
+
+- [ ] **P10.4: Enforce Mandatory `API_KEY` in Production**
+  - Both Express and FastAPI backends silently allow unauthenticated access when `API_KEY` is not configured. Add a startup check that refuses to start in production mode without `API_KEY`.
+
+- [ ] **P10.5: HTTP Session Pooling (`core/market_providers.py`)**
+  - Creates a new `aiohttp.ClientSession()` per request. Refactor to use a persistent shared session with connection pooling.
+
+- [ ] **P10.6: Upgrade `core/voice_interface.py` to `google.genai` SDK**
+  - Currently uses deprecated `google.generativeai` import. Align with `quant_mentor.py` which already uses the new SDK.
+
+- [ ] **P10.7: Add Python Linting & Type Checking to CI (`.github/workflows/ci.yml`)**
+  - Add `ruff check .` and/or `mypy core/` steps to the CI pipeline. Currently only TypeScript is linted.
+
+- [ ] **P10.8: Add Docker Build Verification to CI**
+  - Add `docker compose build` step to CI to detect container build regressions early.
+
+- [ ] **P10.9: Fix Type Annotation Bug (`core/half_kelly_sizer.py:33`)**
+  - Change `boolean` to `bool` in type annotation.
+
+### Priority 11 (P11) — Architecture Refactoring & Feature Completeness
+
+- [ ] **P11.1: Refactor `app.py` into Modular FastAPI APIRouters**
+  - Current monolithic `app.py` (~1,277 lines) combines route handlers, startup loops, model definitions, and WebSocket management. Split into `routers/sky.py`, `routers/dossier.py`, `routers/governance.py`, `routers/voice.py`, `routers/execution.py`, etc.
+
+- [ ] **P11.2: Deprecate Shadowed Express `/api/sky` Route**
+  - Express defines `skyRouter` at `/api/sky` in `src/routes/sky.ts`, but Nginx and Vite both route `/api/sky/*` to Python FastAPI (port 8000). The Express route is dead code. Remove or redirect.
+
+- [ ] **P11.3: Eliminate Dual Quant Engine Implementations**
+  - SMC scanning, VWAP calculations, and OBI metrics are coded in both Python (`core/`) and TypeScript (`src/utils/quantEngine.ts`). Consolidate into a single authoritative implementation to prevent divergence.
+
+- [ ] **P11.4: Paper Trade TP/SL Auto-Reconciliation Engine**
+  - Express stores paper trades in SQLite but lacks a background market tick watcher to automatically trigger take-profit and stop-loss order closures. Implement lightweight position reconciler.
+
+- [ ] **P11.5: Connect Live Feeds to 8-Pillar Dossier Engines**
+  - Replace mocked static returns in 7 pillar modules with live API fetchers:
+    - `institutional_flows.py` → Glassnode / CryptoQuant ETF flow APIs
+    - `derivatives_options.py` → Coinglass / Deribit options API
+    - `valuation_cost_basis.py` → Glassnode on-chain metrics
+    - `stablecoin_velocity.py` → Glassnode SSR / exchange reserve APIs
+    - `seasonality_cyclical_dna.py` → computed from halving block heights
+    - `macro_liquidity_beta.py` → FRED API for M2 / Fed Net Liquidity
+    - `physical_supply_shock.py` → Glassnode liquid/illiquid supply metrics
+  - All currently use hardcoded timestamp `1787985843000` and static payloads.
+
+- [ ] **P11.6: Replace Hardcoded Fallback Prices with Last Persisted Candle**
+  - Multiple endpoints use magic numbers (`88400.0`, `88500.0`, `dxy=104.18`, `us10y=4.26`, `gold=2678.50`) when data is unavailable. Anchor to last persisted candle in SQLite.
+
+- [ ] **P11.7: Add Automated Database Restore Script (`deploy/restore_databases.py`)**
+  - Backup tool exists but restoration is manual. Create automated restore with checksum verification and integrity validation.
+
+- [ ] **P11.8: Add Historical Market Data Seed Script**
+  - No cold-boot script exists to populate initial OHLCV data into `market.db` before first launch.
+
+- [ ] **P11.9: Use `prisma migrate deploy` Instead of `prisma db push`**
+  - `Dockerfile.backend` runs `npx prisma db push` on every container start, which lacks migration history tracking. Switch to formal Prisma migrations.
+
+- [ ] **P11.10: Consolidate Duplicate Systemd Service Files**
+  - `deploy/ai_quant_sentinel.service` (root user, `/root/CBT`) conflicts with `deploy/systemd/orion.service` (ubuntu user, `/home/ubuntu/CBT`). Reconcile or deprecate the older one.
+
+- [ ] **P11.11: Expand `Makefile` with Comprehensive Targets**
+  - Current `Makefile` only covers Python commands. Add targets: `make test-all`, `make build-all`, `make prisma-migrate`, `make lint`, `make docker-build`, `make frontend-build`.
+
+### Priority 12 (P12) — Testing & Quality Assurance
+
+- [ ] **P12.1: Establish Frontend Test Framework**
+  - Add Vitest and `@testing-library/react` to `frontend/package.json`.
+  - Priority test targets: `TradingViewChart.tsx`, `RiskFirstOrderDesk.tsx`, `PaperTradingPanel.tsx`, `wsStateMachine.ts`, `api.ts`, `decimalMath.ts`.
+
+- [ ] **P12.2: Unit Tests for 26 Untested Core Modules**
+  - `api_health_guard.py`, `brain_backup.py`, `command_executor.py`, `data_streamer.py`, `debate_committee.py`, `gap_recovery.py`, `market_state.py`, `memory_vault.py`, `prediction_ladder.py`, `probability_calibrator.py`, `system_evolver.py`, `volatility_profile_regime.py`, `auth.py`, `audit_bus.py`, `multimodal_ingestor.py`, `derivatives_options.py`, `institutional_flows.py`, `macro_liquidity_beta.py`, `physical_supply_shock.py`, `seasonality_cyclical_dna.py`, `sentiment_engine.py`, `stablecoin_velocity.py`, `valuation_cost_basis.py`, `macro_gold_engine.py`, `metrics.py`, `empirical_accumulator.py`.
+
+- [ ] **P12.3: WebSocket Real-Transport Integration Tests**
+  - Test WebSocket endpoints (`/ws/terminal` in FastAPI, `/ws` in Express) with live duplex transport: connection drop, message framing, auto-reconnect backoff.
+
+- [ ] **P12.4: Risk Gate Edge Case Tests**
+  - `src/middleware/riskGate.ts` daily drawdown and daily loss limit logic is not covered by automated tests. `tests/paper.test.ts` only asserts max open trades and max risk per trade.
+
+- [ ] **P12.5: Concurrent SQLite Write Contention Stress Tests**
+  - No test simulates concurrent multi-thread transactions to assert WAL concurrency behavior under load.
+
+- [ ] **P12.6: End-to-End Browser Tests (Playwright/Cypress)**
+  - No E2E test suite exists for critical user flows (place paper trade → verify position → check risk desk → close position).
+
+- [ ] **P12.7: Activate Placeholder CI Workflows**
+  - `.github/workflows/jules-task.yml` and `.github/workflows/notify-antigravity-on-prototype.yml` contain only echo statements.
+
+### Priority 13 (P13) — Documentation & Operational Polish
+
+- [ ] **P13.1: Fix Port Discrepancy in `SKY_STATUS.md`**
+  - Architecture diagram lists Node on `:3001`; `RUNBOOK.md`, `API_REFERENCE.md`, and `docker-compose.yml` all use `:3000`.
+
+- [ ] **P13.2: Update Stale Test Count in `README.md`**
+  - README references "pytest — 41 passed" from early development. Suite now spans 45 test files and 220+ tests.
+
+- [ ] **P13.3: Remove Redundant Documentation Stub**
+  - `docs/future_work/SKY_MARKET_INTELLIGENCE_ENGINE.md` is a 24-line stub duplicating the root specification's TOC.
+
+- [ ] **P13.4: Add SSL/Certbot Production Setup Guide to `RUNBOOK.md`**
+  - RUNBOOK covers cold boots and incident playbooks but lacks Let's Encrypt / Certbot certificate provisioning steps for Nginx.
+
+- [ ] **P13.5: Update `README.md` Architecture Section**
+  - Reflect current 45-test suite count, current module inventory, and updated port allocations.
+
+---
+
 ## 📝 Rules for Updating This Document
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.
