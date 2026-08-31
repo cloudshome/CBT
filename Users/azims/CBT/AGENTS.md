@@ -563,7 +563,59 @@ If a requested implementation is suboptimal, propose the superior alternative:
 
 ---
 
-## 34. FINAL PRINCIPLE
+---
+
+## 35. GITHUB SPEC KIT ENGINEERING & RESEARCH GOVERNANCE PROTOCOL
+
+Spec Kit ([`github/spec-kit`](https://github.com/github/spec-kit)) is SKY's official **development-governance layer**. SKY remains the **quantitative trading and research system**.
+
+### 1. The Prime Governance Directive: SPEC FIRST — EVIDENCE FIRST — CODE SECOND
+Never immediately start coding a complex feature merely because it was requested.
+For every substantial initiative, follow the Spec Kit governance loop:
+```
+CONSTITUTION
+    ↓
+SPECIFY (spec.md)
+    ↓
+CLARIFY
+    ↓
+PLAN (plan.md)
+    ↓
+ANALYZE / CHECKLIST
+    ↓
+TASKS (tasks.md)
+    ↓
+IMPLEMENT
+    ↓
+TEST (Unit + Integration)
+    ↓
+BACKTEST & OOS VALIDATE
+    ↓
+CONVERGE
+    ↓
+REPORT EVIDENCE
+```
+
+### 2. Trading Research Evidence Classification Hierarchy
+Passing unit tests proves code correctness; it does NOT prove trading alpha. All claims must be classified strictly by evidence level:
+```
+HYPOTHESIS → IMPLEMENTED → UNIT TESTED → BACKTESTED → OUT-OF-SAMPLE VALIDATED → ROBUSTNESS TESTED → PAPER VALIDATED → LIVE OBSERVED
+```
+
+### 3. Research Quality Gate (Mandatory Pre-Merge Verification)
+* [ ] Formal specification exists with unambiguous requirements
+* [ ] Data provenance and canonical timestamp conventions documented
+* [ ] Zero lookahead bias verified (causal firewall enforced)
+* [ ] Realistic frictions modeled (configurable fees + slippage + spread)
+* [ ] Deterministic risk engine separation preserved (cannot bypass Risk Gate)
+* [ ] Reproducibility verified (random seeds, git commit, dataset hash recorded)
+* [ ] Chronological walk-forward out-of-sample testing performed
+* [ ] Regime decomposition evaluated (Bull, Bear, High Vol, Low Vol)
+* [ ] All unit and integration test suites green (100% passing)
+
+---
+
+## 36. FINAL PRINCIPLE
 
 Think like the owner of SKY.
 
@@ -606,3 +658,5 @@ Think like the owner of SKY.
 - 2026-08-24 — Added orchestration loop, branch/PR handoff conventions.
 - 2026-08-27 — Added SKY Market Intelligence Engine directives and 17-phase quantitative roadmap.
 - 2026-08-29 — Adopted 34-point permanent project operating manual & technical guardian mandate.
+- 2026-08-31 — Integrated GitHub Spec Kit governance protocol (Spec-First, Evidence-First, 8-tier Evidence Hierarchy).
+
