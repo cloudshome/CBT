@@ -10,6 +10,10 @@ import {
   SupportedTimeframe,
   SKYIntelligenceResponse,
   VWAPData,
+  ResearchIngestMode,
+  ResearchIngestResult,
+  ResearchVaultsResponse,
+  ResearchProvenanceItem,
 } from '../types';
 
 const BASE_URL = '';
@@ -1047,6 +1051,80 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
+    return handleResponse<any>(res);
+  },
+
+  // ============================================================================
+  // UNIVERSAL RESEARCH & KNOWLEDGE LAB APIS
+  // ============================================================================
+
+  /**
+   * POST /api/research/ingest (Raw text, YouTube/Reel URL, GitHub repo, PineScript)
+   */
+  async ingestResearchText(params: {
+    content: string;
+    mode: ResearchIngestMode;
+    source_uri?: string;
+    author_creator?: string;
+    title?: string;
+  }): Promise<ResearchIngestResult> {
+    const res = await authFetch(`${BASE_URL}/api/research/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<ResearchIngestResult>(res);
+  },
+
+  /**
+   * POST /api/research/ingest-file (Upload PDF, Code, Dataset, Notes)
+   */
+  async ingestResearchFile(params: {
+    file: File;
+    mode: ResearchIngestMode;
+    author_creator?: string;
+    title?: string;
+  }): Promise<ResearchIngestResult> {
+    const formData = new FormData();
+    formData.append('file', params.file);
+    formData.append('mode', params.mode);
+    if (params.author_creator) formData.append('author_creator', params.author_creator);
+    if (params.title) formData.append('title', params.title);
+
+    const headers = authHeaders();
+    // Do NOT set Content-Type header manually for FormData, let browser set boundary
+    const res = await fetch(`${BASE_URL}/api/research/ingest-file`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return handleResponse<ResearchIngestResult>(res);
+  },
+
+  /**
+   * GET /api/research/inbox (Recent ingested items in provenance ledger)
+   */
+  async getResearchInbox(limit: number = 25): Promise<{ items: ResearchProvenanceItem[]; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/research/inbox?limit=${limit}`);
+    return handleResponse<{ items: ResearchProvenanceItem[]; count: number }>(res);
+  },
+
+  /**
+   * GET /api/research/vaults (Overview and items across all 4 vaults)
+   */
+  async getResearchVaults(): Promise<ResearchVaultsResponse> {
+    const res = await authFetch(`${BASE_URL}/api/research/vaults`);
+    return handleResponse<ResearchVaultsResponse>(res);
+  },
+
+  /**
+   * POST /api/research/candidates/:id/backtest (Run quantitative backtest verification)
+   */
+  async backtestResearchCandidate(candidateId: string, symbol: string = 'BTC/USDT', timeframe: string = '15m'): Promise<any> {
+    const res = await authFetch(
+      `${BASE_URL}/api/research/candidates/${encodeURIComponent(candidateId)}/backtest?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`,
+      { method: 'POST' }
+    );
     return handleResponse<any>(res);
   },
 };

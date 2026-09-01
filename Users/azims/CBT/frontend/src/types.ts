@@ -513,3 +513,102 @@ export interface UniversalAssetDossier {
   actionable_quant_verdict: string;
 }
 
+// ==============================================================================
+// UNIVERSAL RESEARCH INGESTION & 4-VAULT TYPES
+// ==============================================================================
+
+export type ResearchSourceType = 'YOUTUBE' | 'GITHUB' | 'PDF' | 'REEL' | 'ARTICLE' | 'NOTES' | 'CODE' | 'DATASET' | 'TRADINGVIEW';
+export type ResearchIngestMode = 'ANALYZE' | 'RESEARCH' | 'SAVE_KNOWLEDGE';
+
+export interface ResearchProvenanceItem {
+  knowledge_id: string;
+  source_type: ResearchSourceType;
+  source_uri: string;
+  title: string;
+  author_creator: string;
+  ingested_at: number;
+  raw_content_preview: string;
+  confidence_score: number;
+  status: 'PROCESSING' | 'ANALYZED' | 'CANDIDATE' | 'VALIDATED' | 'REJECTED';
+}
+
+export interface KnowledgeItem {
+  id: string;
+  knowledge_id: string;
+  category: string;
+  concept_title: string;
+  structured_explanation: string;
+  tags: string[];
+  created_at: number;
+}
+
+export interface StrategyCandidateItem {
+  candidate_id: string;
+  knowledge_id: string;
+  strategy_name: string;
+  hypothesis: string;
+  entry_rules: Record<string, any>;
+  exit_rules: Record<string, any>;
+  parameter_bounds: Record<string, any>;
+  timeframe: string;
+  required_indicators: string[];
+  validation_stage: 'UNTESTED' | 'BACKTESTING' | 'WALK_FORWARD' | 'PAPER_TEST' | 'REJECTED' | 'PROMOTED';
+  backtest_expectancy?: number;
+  backtest_sharpe?: number;
+  backtest_win_rate?: number;
+  created_at: number;
+}
+
+export interface EvidenceItem {
+  evidence_id: string;
+  knowledge_id: string;
+  claim_statement: string;
+  verdict: 'SUPPORTED' | 'MIXED' | 'REJECTED';
+  sample_size: number;
+  statistical_p_value: number;
+  evidence_details: Record<string, any>;
+  created_at: number;
+}
+
+export interface RejectedClaimItem {
+  rejected_id: string;
+  knowledge_id: string;
+  rejected_claim: string;
+  failure_reason: string;
+  historical_occurrences_tested: number;
+  rejection_autopsy: string;
+  created_at: number;
+}
+
+export interface ResearchVaultsResponse {
+  counts: {
+    knowledge_count: number;
+    candidates_count: number;
+    evidence_count: number;
+    rejected_count: number;
+    inbox_total: number;
+  };
+  knowledge: KnowledgeItem[];
+  candidates: StrategyCandidateItem[];
+  evidence: EvidenceItem[];
+  rejected: RejectedClaimItem[];
+}
+
+export interface ResearchIngestResult {
+  knowledge_id: string;
+  mode: ResearchIngestMode;
+  provenance: ResearchProvenanceItem;
+  summary: {
+    concepts_saved: number;
+    candidates_queued: number;
+    evidence_saved: number;
+    rejected_archived: number;
+    comprehension_score: number;
+  };
+  concepts: KnowledgeItem[];
+  strategy_candidates: StrategyCandidateItem[];
+  evidence: EvidenceItem[];
+  rejected: RejectedClaimItem[];
+  verdict_message: string;
+}
+
