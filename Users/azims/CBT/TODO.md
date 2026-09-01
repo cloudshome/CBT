@@ -319,9 +319,87 @@
 
 ---
 
+## 🚀 Phase 14: Institutional Frontier Systems (COMPLETED ✅)
+
+- [x] **Task 14.1: Microstructure & Order Flow Alpha Engine (`core/microstructure_engine.py`)**
+  - Level 2/3 depth imbalance dynamics ($L_1, L_5, L_{10}, L_{20}, L_{50}$), order book slope elasticity ($\frac{\Delta Q}{\Delta P}$).
+  - Flow toxicity (continuous VPIN, Kyle's Lambda price impact regression, Hasbrouck lambda).
+  - Institutional iceberg footprint detection and aggressive sweep absorption scoring.
+  - Exposed `GET /api/microstructure/analytics` and `GET /api/microstructure/toxicity`.
+  - Tested in `tests/test_microstructure_engine.py` (5 tests passing).
+
+- [x] **Task 14.2: Multi-Asset Macro Cross-Correlation & Regime Network (`core/macro_network.py`)**
+  - Dynamic covariance & Pearson/Spearman correlation matrix across BTC, ETH, SOL, PAXG/Gold, DXY proxy, US 10Y Real Yield proxy.
+  - PCA systemic absorption ratio.
+  - Directional Lead-Lag Granger causality and transfer entropy VAR modeling.
+  - Systemic Macro Fragility Index (risk-off contagion & liquidity dry-up risk).
+  - Exposed `GET /api/macro/network` and `GET /api/macro/spillover`.
+  - Tested in `tests/test_macro_network.py` (4 tests passing).
+
+- [x] **Task 14.3: Walk-Forward Out-Of-Sample Genetic Strategy Optimization (`core/genetic_optimizer.py`)**
+  - Genetic Algorithm (GA) genome representation for SMC and regime parameters.
+  - Multi-objective fitness function with Deflated Sharpe Ratio (DSR), Calmar ratio, and complexity/turnover penalties.
+  - Combinatorial Purged Cross-Validation (CPCV) with causal firewalls and trade holding period embargoes.
+  - White's Reality Check (WRC) & Monte Carlo permutation test for data snooping p-values.
+  - Exposed `POST /api/strategy/optimize/genetic` and `GET /api/strategy/optimize/results`.
+  - Tested in `tests/test_genetic_optimizer.py` (3 tests passing).
+
+- [x] **Task 14.4: Execution Algorithm & Smart Router Sandbox (`core/smart_execution.py`)**
+  - TWAP & VWAP trajectory slicers with randomized evasion intervals.
+  - Almgren-Chriss optimal liquidation curve balancing inventory risk ($\lambda \sigma^2$) vs market impact ($\eta, \gamma$).
+  - Smart Order Routing (SOR) decision tree (passive limit queue vs aggressive taker sweep).
+  - Square-root market impact modeling ($I = Y \cdot \sigma \cdot \sqrt{\frac{V}{\text{ADV}}}$).
+  - Exposed `POST /api/execution/slice`, `POST /api/execution/simulate_impact`, and `GET /api/execution/routes`.
+  - Tested in `tests/test_smart_execution.py` (5 tests passing).
+
+- [x] **Task 14.5: Live Simulation Burn-In & Autonomous Risk Auditor (`core/autonomous_auditor.py`)**
+  - Continuous 24/7 shadow execution telemetry daemon (slippage, latency, fill queue metrics).
+  - Event-driven real-time loss autopsy dispatcher hook (`core/loss_autopsy.py`).
+  - Regime-conditional CUSUM expectancy drift monitor with automatic Strategy League demotion / quarantine.
+  - Exposed `GET /api/auditor/telemetry`, `GET /api/auditor/drift`, and `POST /api/auditor/record_trade`.
+  - Tested in `tests/test_autonomous_auditor.py` (3 tests passing).
+
+- [x] **Task 14.6: Master API Registration & E2E Verification**
+  - Registered all 12 new endpoints in `app.py`.
+  - Implemented frontend TypeScript client helpers in `frontend/src/services/api.ts`.
+  - Comprehensive integration test suite `tests/test_frontier_api_integration.py` (6 tests passing).
+  - Verified 191 Pytest tests and 98 Jest tests passing (289 total tests, 100% green).
+
+---
+
+## 🎯 Phase 15: Visual Frontier HUDs & Autonomous Live Terminal Integration (UPCOMING SPRINT)
+
+- [ ] **Task 15.1: Microstructure & L2/L3 Depth Elasticity HUD (`frontend/src/components/MicrostructurePanel.tsx`)**
+  - Connect to `/api/microstructure/analytics` and `/api/microstructure/toxicity`.
+  - Render depth tier imbalance bars ($L_1, L_5, L_{10}, L_{20}, L_{50}$), slope elasticity gauge, and VPIN toxicity meter.
+  - Zero-Shake realtime updates.
+
+- [ ] **Task 15.2: Multi-Asset Macro Lead-Lag Spillover Radar (`frontend/src/components/MacroNetworkRadar.tsx`)**
+  - Connect to `/api/macro/network` and `/api/macro/spillover`.
+  - Render $N \times N$ cross-asset correlation heatmap, PCA systemic absorption gauge, and Granger causality direction arrows.
+
+- [ ] **Task 15.3: Genetic Strategy Optimizer & WRC Permutation Lab UI (`frontend/src/components/GeneticStrategyLab.tsx`)**
+  - Connect to `/api/strategy/optimize/genetic` and `/api/strategy/optimize/results`.
+  - Interactive parameter evolution controls, fitness convergence charts, and White's Reality Check $p$-value display.
+
+- [ ] **Task 15.4: Smart Order Routing (SOR) & Almgren-Chriss Slicer in Order Desk (`frontend/src/components/RiskFirstOrderDesk.tsx`)**
+  - Connect to `/api/execution/slice` and `/api/execution/simulate_impact`.
+  - Add execution algo selector (`PASSIVE_LIMIT`, `TWAP`, `VWAP`, `ALMGREN_CHRISS`, `IOC_SWEEP`) with impact preview.
+
+- [ ] **Task 15.5: 24/7 Autonomous Risk Auditor & CUSUM Expectancy Drift HUD (`frontend/src/components/AutonomousAuditorHUD.tsx`)**
+  - Connect to `/api/auditor/telemetry` and `/api/auditor/drift`.
+  - Display live telemetry metrics, regime-conditional expectancy breakdown, and forensic loss autopsy feeds.
+
+- [ ] **Task 15.6: Pre-Merge Quality Gate & System Preflight Suite Expansion (300+ Tests)**
+  - Add frontend component test suites with Vitest / React Testing Library.
+  - Verify 100% green preflight quality gates.
+
+---
+
 ## 📝 Rules for Updating This Document
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.
 3. If new requirements arise, evaluate them against `AGENTS.md` before adding to the Todo list.
+
 
 

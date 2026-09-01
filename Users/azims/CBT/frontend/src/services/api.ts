@@ -890,6 +890,165 @@ export const api = {
     const res = await authFetch(`${BASE_URL}/api/kronos/advisory?${q.toString()}`);
     return handleResponse<any>(res);
   },
+
+  /**
+   * GET /api/microstructure/analytics
+   */
+  async getMicrostructureAnalytics(symbol = 'BTC/USDT') {
+    const res = await authFetch(`${BASE_URL}/api/microstructure/analytics?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/microstructure/toxicity
+   */
+  async getMicrostructureToxicity(symbol = 'BTC/USDT') {
+    const res = await authFetch(`${BASE_URL}/api/microstructure/toxicity?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/macro/network
+   */
+  async getMacroNetwork() {
+    const res = await authFetch(`${BASE_URL}/api/macro/network`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/macro/spillover
+   */
+  async getMacroSpillover() {
+    const res = await authFetch(`${BASE_URL}/api/macro/spillover`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/strategy/optimize/genetic
+   */
+  async runGeneticOptimization(params: {
+    symbol?: string;
+    timeframe?: string;
+    bars?: number;
+    generations?: number;
+    population_size?: number;
+  }) {
+    const res = await authFetch(`${BASE_URL}/api/strategy/optimize/genetic`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: params.symbol || 'BTC/USDT',
+        timeframe: params.timeframe || '15m',
+        bars: params.bars || 120,
+        generations: params.generations || 4,
+        population_size: params.population_size || 15,
+      }),
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/strategy/optimize/results
+   */
+  async getGeneticOptimizationResults(symbol = 'BTC/USDT') {
+    const res = await authFetch(`${BASE_URL}/api/strategy/optimize/results?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/execution/slice
+   */
+  async generateExecutionSlice(params: {
+    qty: number;
+    algo_type?: string;
+    duration_sec?: number;
+    num_slices?: number;
+    mid_price?: number;
+  }) {
+    const res = await authFetch(`${BASE_URL}/api/execution/slice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        qty: params.qty,
+        algo_type: params.algo_type || 'TWAP',
+        duration_sec: params.duration_sec || 300,
+        num_slices: params.num_slices || 5,
+        mid_price: params.mid_price || 65000.0,
+      }),
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/execution/simulate_impact
+   */
+  async simulateMarketImpact(params: {
+    order_size: number;
+    order_side?: string;
+    symbol?: string;
+    mid_price?: number;
+    urgency?: string;
+  }) {
+    const res = await authFetch(`${BASE_URL}/api/execution/simulate_impact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        order_size: params.order_size,
+        order_side: params.order_side || 'BUY',
+        symbol: params.symbol || 'BTC/USDT',
+        mid_price: params.mid_price || 65000.0,
+        urgency: params.urgency || 'MEDIUM',
+      }),
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/execution/routes
+   */
+  async getExecutionRoutes() {
+    const res = await authFetch(`${BASE_URL}/api/execution/routes`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/auditor/telemetry
+   */
+  async getAuditorTelemetry() {
+    const res = await authFetch(`${BASE_URL}/api/auditor/telemetry`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * GET /api/auditor/drift
+   */
+  async getAuditorDrift() {
+    const res = await authFetch(`${BASE_URL}/api/auditor/drift`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/auditor/record_trade
+   */
+  async recordAuditorTrade(params: {
+    trade_id: string;
+    symbol: string;
+    side: string;
+    entry_price: number;
+    exit_price: number;
+    qty: number;
+    entry_time_ms: number;
+    exit_time_ms: number;
+    market_regime?: string;
+    risk_per_trade_usd?: number;
+  }) {
+    const res = await authFetch(`${BASE_URL}/api/auditor/record_trade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<any>(res);
+  },
 };
 
 

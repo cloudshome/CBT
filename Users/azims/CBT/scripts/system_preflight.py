@@ -50,7 +50,7 @@ def main():
 
     checks = [
         ("Database Schema Integrity", check_db_integrity),
-        ("Pytest Quantitative Test Suite (165 tests)", check_pytest),
+        ("Pytest Quantitative Test Suite (191 tests)", check_pytest),
         ("Jest Desk & Backend Test Suite (98 tests)", check_jest),
         ("Frontend Vite Production Build", check_frontend_build),
     ]

@@ -98,9 +98,13 @@ from core.models.kronos.advisory_engine import kronos_advisory_engine
 from core.rate_limiter import RateLimitMiddleware, fastapi_rate_limiter
 from core.metrics import generate_prometheus_metrics
 
+# Frontier Quantitative Engines (Phase 14)
+from core.microstructure_engine import microstructure_engine
+from core.macro_network import macro_network_engine
+from core.genetic_optimizer import genetic_strategy_optimizer
+from core.smart_execution import smart_execution_engine
+from core.autonomous_auditor import autonomous_risk_auditor
 
-
-# SKY Professional Market Intelligence Layer
 from core.sky_intelligence import (
     sky_orchestrator,
     market_structure_engine,
@@ -1376,6 +1380,240 @@ async def get_kronos_advisory(
         sky_decision=sky_decision,
     )
     return verdict.to_dict()
+
+
+# =====================================================================
+# Phase 14: Institutional Frontier Endpoints
+# =====================================================================
+
+
+class GeneticOptimizationRequest(BaseModel):
+    symbol: str = "BTC/USDT"
+    timeframe: str = "15m"
+    bars: int = 120
+    generations: int = 4
+    population_size: int = 15
+
+
+class ExecutionSliceRequest(BaseModel):
+    qty: float
+    algo_type: str = "TWAP"  # "TWAP", "VWAP", "ALMGREN_CHRISS"
+    duration_sec: int = 300
+    num_slices: int = 5
+    mid_price: float = 65000.0
+
+
+class SimulateImpactRequest(BaseModel):
+    order_size: float
+    order_side: str = "BUY"
+    symbol: str = "BTC/USDT"
+    mid_price: float = 65000.0
+    urgency: str = "MEDIUM"
+
+
+class RecordTradeRequest(BaseModel):
+    trade_id: str
+    symbol: str
+    side: str
+    entry_price: float
+    exit_price: float
+    qty: float
+    entry_time_ms: int
+    exit_time_ms: int
+    market_regime: str = "TRENDING_BULL"
+    risk_per_trade_usd: float = 100.0
+
+
+@app.get("/api/microstructure/analytics")
+async def get_microstructure_analytics(
+    symbol: str = Query("BTC/USDT"),
+):
+    """Returns deep L2/L3 order book dynamics, slope elasticity, VPIN toxicity, and iceberg footprints."""
+    # Obtain depth from market gateway or generate authentic synthetic book
+    pair = symbol.replace("/", "").upper()
+    try:
+        book = await market_gateway.fetch_order_book(pair, limit=50)
+        bids = [(float(p), float(q)) for p, q in book.get("bids", [])]
+        asks = [(float(p), float(q)) for p, q in book.get("asks", [])]
+    except Exception:
+        bids, asks = [], []
+
+    if not bids or not asks:
+        mid = 65000.0 if "BTC" in symbol else (3000.0 if "ETH" in symbol else 150.0)
+        bids = [(mid - (i + 1) * 2.0, 5.0 + i * 0.5) for i in range(50)]
+        asks = [(mid + (i + 1) * 2.0, 4.0 + i * 0.4) for i in range(50)]
+
+    analysis = microstructure_engine.analyze(bids=bids, asks=asks, symbol=symbol)
+    return analysis.to_dict()
+
+
+@app.get("/api/microstructure/toxicity")
+async def get_microstructure_toxicity(
+    symbol: str = Query("BTC/USDT"),
+):
+    """Returns real-time VPIN and Kyle's Lambda flow toxicity metrics."""
+    res = await get_microstructure_analytics(symbol=symbol)
+    return {
+        "symbol": symbol,
+        "timestamp_ms": res["timestamp_ms"],
+        "flow_toxicity": res["flow_toxicity"],
+        "slope_elasticity": res["slope_elasticity"],
+        "sweep_absorption_score": res["sweep_absorption_score"],
+        "institutional_bias": res["institutional_bias"],
+    }
+
+
+@app.get("/api/macro/network")
+async def get_macro_network():
+    """Returns multi-asset cross-correlation matrix, PCA systemic absorption ratio, and Granger causality."""
+    universe = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "PAXG/USDT"]
+    returns_data: Dict[str, List[float]] = {}
+    for sym in universe:
+        candles = data_streamer.generate_synthetic_candles(sym, "1h", count=80)
+        closes = np.array([float(c.get("close", 100.0)) for c in candles])
+        if len(closes) > 1:
+            returns_data[sym] = list(np.diff(closes) / closes[:-1])
+
+    analysis = macro_network_engine.analyze(asset_returns=returns_data)
+    return analysis.to_dict()
+
+
+@app.get("/api/macro/spillover")
+async def get_macro_spillover():
+    """Returns lead-lag transfer entropy and systemic fragility index."""
+    res = await get_macro_network()
+    return {
+        "timestamp_ms": res["timestamp_ms"],
+        "systemic_fragility_index": res["systemic_fragility_index"],
+        "macro_transmission_regime": res["macro_transmission_regime"],
+        "primary_driver_asset": res["primary_driver_asset"],
+        "lead_lag_links": res["lead_lag_links"],
+        "pca_absorption": res["pca_absorption"],
+    }
+
+
+@app.post("/api/strategy/optimize/genetic")
+async def run_genetic_optimization(
+    req: GeneticOptimizationRequest,
+    _auth: None = Depends(require_api_key),
+):
+    """Executes walk-forward genetic algorithm strategy optimization with CPCV and White's Reality Check."""
+    candles = data_streamer.generate_synthetic_candles(req.symbol, req.timeframe, count=req.bars)
+    optimizer = genetic_strategy_optimizer
+    optimizer.num_generations = req.generations
+    optimizer.population_size = req.population_size
+    res = optimizer.optimize(candles=candles, symbol=req.symbol)
+    return res.to_dict()
+
+
+@app.get("/api/strategy/optimize/results")
+async def get_genetic_optimization_results(
+    symbol: str = Query("BTC/USDT"),
+):
+    """Fetches baseline genetic optimization results."""
+    candles = data_streamer.generate_synthetic_candles(symbol, "15m", count=80)
+    res = genetic_strategy_optimizer.optimize(candles=candles, symbol=symbol)
+    return res.to_dict()
+
+
+@app.post("/api/execution/slice")
+async def generate_execution_slice(
+    req: ExecutionSliceRequest,
+    _auth: None = Depends(require_api_key),
+):
+    """Generates algorithmic execution schedule (TWAP, VWAP, or Almgren-Chriss)."""
+    if req.algo_type.upper() == "TWAP":
+        slices = smart_execution_engine.generate_twap_schedule(
+            qty=req.qty,
+            duration_sec=req.duration_sec,
+            num_slices=req.num_slices,
+            mid_price=req.mid_price,
+        )
+    elif req.algo_type.upper() == "VWAP":
+        slices = smart_execution_engine.generate_vwap_schedule(
+            qty=req.qty,
+            duration_sec=req.duration_sec,
+            num_slices=req.num_slices,
+            mid_price=req.mid_price,
+        )
+    else:
+        traj = smart_execution_engine.solve_almgren_chriss(
+            total_qty=req.qty,
+            duration_sec=req.duration_sec,
+            num_intervals=req.num_slices,
+            mid_price=req.mid_price,
+        )
+        return asdict(traj)
+
+    return {"algo_type": req.algo_type, "total_qty": req.qty, "schedule": [asdict(s) for s in slices]}
+
+
+@app.post("/api/execution/simulate_impact")
+async def simulate_market_impact(
+    req: SimulateImpactRequest,
+):
+    """Simulates market impact, slippage, and optimal SOR route."""
+    decision = smart_execution_engine.route_order(
+        order_size=req.order_size,
+        mid_price=req.mid_price,
+        order_side=req.order_side,
+        symbol=req.symbol,
+        urgency=req.urgency,
+    )
+    return decision.to_dict()
+
+
+@app.get("/api/execution/routes")
+async def get_execution_routes():
+    """Returns available execution algorithms and fee structure."""
+    return {
+        "supported_algos": ["PASSIVE_LIMIT_QUEUE", "TWAP_ALGORITHMIC", "VWAP_ALGORITHMIC", "ALMGREN_CHRISS_OPTIMAL", "AGGRESSIVE_IOC_SWEEP"],
+        "taker_fee_bps": smart_execution_engine.taker_fee_bps,
+        "maker_fee_bps": smart_execution_engine.maker_fee_bps,
+        "adv_default_usd": smart_execution_engine.adv_default_usd,
+    }
+
+
+@app.get("/api/auditor/telemetry")
+async def get_auditor_telemetry():
+    """Returns 24/7 continuous paper execution telemetry, equity metrics, and recent autopsies."""
+    report = autonomous_risk_auditor.audit_system_health()
+    return report.to_dict()
+
+
+@app.get("/api/auditor/drift")
+async def get_auditor_drift():
+    """Returns regime-conditional expectancy drift metrics and quarantine status."""
+    report = autonomous_risk_auditor.audit_system_health()
+    return {
+        "timestamp_ms": report.timestamp_ms,
+        "cusum_drift_score": report.cusum_drift_score,
+        "quarantine_circuit_tripped": report.quarantine_circuit_tripped,
+        "governance_status": report.governance_status,
+        "regime_expectancy_breakdown": report.regime_expectancy_breakdown,
+        "narrative": report.narrative,
+    }
+
+
+@app.post("/api/auditor/record_trade")
+async def record_auditor_trade(
+    req: RecordTradeRequest,
+    _auth: None = Depends(require_api_key),
+):
+    """Logs completed paper trade into the continuous risk auditor."""
+    rec = autonomous_risk_auditor.record_trade(
+        trade_id=req.trade_id,
+        symbol=req.symbol,
+        side=req.side,
+        entry_price=req.entry_price,
+        exit_price=req.exit_price,
+        qty=req.qty,
+        entry_time_ms=req.entry_time_ms,
+        exit_time_ms=req.exit_time_ms,
+        market_regime=req.market_regime,
+        risk_per_trade_usd=req.risk_per_trade_usd,
+    )
+    return asdict(rec)
 
 
 # WebSocket endpoint for real-time interactive terminal
