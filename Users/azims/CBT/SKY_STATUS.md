@@ -1,12 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-09-01  
-> **Release Tag:** `v3.1.0-frontier-systems-ready` (ACTIVE 🚀)  
+> **Release Tag:** `v3.2.0-phase15-frontiers-integrated` (ACTIVE 🚀)  
 > **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 289 / 289 (191 Pytest, 98 Jest — 100% passing)  
+> **Tests Passing:** 313 / 313 (191 Pytest, 122 Jest — 100% passing)  
 > **Preflight Status:** ALL 4 QUALITY GATES PASSED (100% GREEN)
 
 ---
