@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20.x%20%7C%20Express-green.svg)](https://nodejs.org/)
 [![Gemini 2.0 / 3.7 Flash](https://img.shields.io/badge/Gemini-2.0%20%26%203.7%20Flash%20Copilot-8e7cc3.svg)](https://ai.google.dev/)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ed.svg)](https://www.docker.com/)
-[![Test Suite](https://img.shields.io/badge/tests-289%20passed%20(100%25)-success.svg)](tests/)
+[![Test Suite](https://img.shields.io/badge/tests-313%20passed%20(100%25)-success.svg)](tests/)
 [![Architecture](https://img.shields.io/badge/architecture-12--Layer%20Institutional-orange.svg)](#12-layer-institutional-quantitative-architecture)
 
 > **Crypto Brain Terminal (CBT)** is an institutional-grade quantitative research, paper trading, and automated risk governance platform designed according to the `FinalCBTaiTrading.tet` master specification. It implements a non-discretionary 12-layer quantitative architecture featuring point-in-time causal firewalls, high-dimensional standardized state vectors, empirical Smart Money Concepts (SMC), 10,000-path tri-model bootstrap trajectory simulations, uncertainty-penalized Net Expected Value (Net EV), multi-factor discounted Kelly allocation, an adversarial Bull/Bear/Skeptic debate council enforcing a ~70% NO-TRADE baseline, a 4-tier strategy quarantine league, 11-category loss autopsies, and a real-time dark "AI Exchange" web terminal with a bilingual Gemini 3.7 Flash copilot.

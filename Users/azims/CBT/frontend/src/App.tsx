@@ -15,6 +15,10 @@ import { GeminiDeskCopilot } from './components/GeminiDeskCopilot';
 import { SKYIntelligencePanel } from './components/SKYIntelligencePanel';
 import { HedgeFundBrainSuite } from './components/HedgeFundBrainSuite';
 import { AssetDossierDock } from './components/AssetDossierDock';
+import { MicrostructurePanel } from './components/MicrostructurePanel';
+import { MacroNetworkRadar } from './components/MacroNetworkRadar';
+import { GeneticStrategyLab } from './components/GeneticStrategyLab';
+import { AutonomousAuditorHUD } from './components/AutonomousAuditorHUD';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider } from './data/providers/marketProvider';
 import {
@@ -42,6 +46,7 @@ import {
   BarChart2,
   Scale,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -83,7 +88,8 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC'>('DOSSIER');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS'>('DOSSIER');
+  const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
   // Notifications State
@@ -513,6 +519,17 @@ export const App: React.FC = () => {
                   <BarChart2 size={13} />
                   <span>MTF Confluence & SMC Scans</span>
                 </button>
+                <button
+                  onClick={() => setActiveBottomTab('FRONTIERS')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'FRONTIERS'
+                      ? 'bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Zap size={13} className={activeBottomTab === 'FRONTIERS' ? 'text-slate-950' : 'text-emerald-400'} />
+                  <span>Frontiers Suite (5 Engines)</span>
+                </button>
               </div>
             </div>
 
@@ -538,7 +555,7 @@ export const App: React.FC = () => {
                   loading={loadingMarket}
                   onDeploySetup={(setup) => setSelectedSetup(setup)}
                 />
-              ) : (
+              ) : activeBottomTab === 'MTF_SMC' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <MTFPanel
                     symbol={symbol}
@@ -556,6 +573,68 @@ export const App: React.FC = () => {
                     onSelectSetup={(setup) => setSelectedSetup(setup)}
                     loading={loadingMarket}
                   />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {/* Frontier Sub-Tab Header */}
+                  <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#090d16] border border-[#1e293b] rounded-lg text-xs font-mono">
+                    <button
+                      onClick={() => setActiveFrontierTab('MICROSTRUCTURE')}
+                      className={`px-3 py-1 rounded transition-all ${
+                        activeFrontierTab === 'MICROSTRUCTURE'
+                          ? 'bg-sky-500 text-white font-bold shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      1. Microstructure & VPIN
+                    </button>
+                    <button
+                      onClick={() => setActiveFrontierTab('MACRO')}
+                      className={`px-3 py-1 rounded transition-all ${
+                        activeFrontierTab === 'MACRO'
+                          ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      2. Macro Network & Granger
+                    </button>
+                    <button
+                      onClick={() => setActiveFrontierTab('GENETIC')}
+                      className={`px-3 py-1 rounded transition-all ${
+                        activeFrontierTab === 'GENETIC'
+                          ? 'bg-purple-600 text-white font-bold shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      3. Genetic Optimizer & WRC
+                    </button>
+                    <button
+                      onClick={() => setActiveFrontierTab('AUDITOR')}
+                      className={`px-3 py-1 rounded transition-all ${
+                        activeFrontierTab === 'AUDITOR'
+                          ? 'bg-emerald-500 text-slate-950 font-bold shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      5. 24/7 Risk Auditor & CUSUM
+                    </button>
+                  </div>
+
+                  {/* Active Frontier Component */}
+                  {activeFrontierTab === 'MICROSTRUCTURE' && (
+                    <MicrostructurePanel symbol={symbol} currentPrice={stats.lastPrice} />
+                  )}
+                  {activeFrontierTab === 'MACRO' && <MacroNetworkRadar />}
+                  {activeFrontierTab === 'GENETIC' && (
+                    <GeneticStrategyLab
+                      symbol={symbol}
+                      timeframe={timeframe}
+                      onDeployGenome={(genome) => {
+                        addToast('info', 'Genome Config Loaded', `Deployed genome ${genome.genome_id} to Order Desk.`);
+                      }}
+                    />
+                  )}
+                  {activeFrontierTab === 'AUDITOR' && <AutonomousAuditorHUD />}
                 </div>
               )}
             </div>

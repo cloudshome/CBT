@@ -1,13 +1,33 @@
+# Secrets & Environment Files
+.env
+.env.*
+*.pem
+*.key
+*.token
+*.crt
+
+# SQLite & Data Stores
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+experiment_store.db
+data/*.db
+
+# Dependencies & Build Artifacts
 node_modules
 frontend/node_modules
 dist
 frontend/dist
+coverage
+.venv
+__pycache__
+.pytest_cache
+
+# Git & Tooling Metadata
 .git
 .gitignore
-.env
-*.db
-*.db-journal
-*.log
-coverage
 .vscode
 .gemini
+artifacts/
+*.log

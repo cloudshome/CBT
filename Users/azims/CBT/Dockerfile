@@ -1,5 +1,5 @@
 # Multi-stage production container for AI Quant Sentinel
-FROM python:3.11-slim AS builder
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Final runtime image
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
