@@ -18,6 +18,10 @@ import {
   Play,
   RotateCcw,
   Tag,
+  Compass,
+  Layers,
+  GitBranch,
+  TrendingUp,
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -25,6 +29,8 @@ import {
   ResearchVaultsResponse,
   ResearchIngestMode,
   ResearchIngestResult,
+  DiscoveryGraphResponse,
+  CrossDomainDiscoveryItem,
 } from '../types';
 
 interface ResearchIngestLabProps {
@@ -49,26 +55,34 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   // Ingestion Result State
   const [lastResult, setLastResult] = useState<ResearchIngestResult | null>(null);
 
-  // Vaults & Inbox State
-  const [vaultData, setVaultData] = useState<ResearchVaultsResponse | null>(null);
-  const [inboxItems, setInboxItems] = useState<ResearchProvenanceItem[]>([]);
-  const [activeVaultTab, setActiveVaultTab] = useState<'KNOWLEDGE' | 'CANDIDATES' | 'EVIDENCE' | 'REJECTED'>('KNOWLEDGE');
+  // 5 Vault Tabs: KNOWLEDGE, DISCOVERY, CANDIDATES, EVIDENCE, REJECTED
+  const [activeVaultTab, setActiveVaultTab] = useState<'KNOWLEDGE' | 'DISCOVERY' | 'CANDIDATES' | 'EVIDENCE' | 'REJECTED'>('DISCOVERY');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [loadingVaults, setLoadingVaults] = useState<boolean>(false);
+
+  // Vault & Graph State
+  const [vaultData, setVaultData] = useState<ResearchVaultsResponse | null>(null);
+  const [inboxItems, setInboxItems] = useState<ResearchProvenanceItem[]>([]);
+  const [graphData, setGraphData] = useState<DiscoveryGraphResponse | null>(null);
+
+  // Action States
   const [backtestingCandidateId, setBacktestingCandidateId] = useState<string | null>(null);
+  const [testingHypothesisId, setTestingHypothesisId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch Vaults & Inbox Data
-  const fetchVaultData = useCallback(async () => {
+  // Fetch Vaults, Inbox & Discovery Graph
+  const fetchAllData = useCallback(async () => {
     try {
       setLoadingVaults(true);
-      const [vData, inData] = await Promise.all([
+      const [vData, inData, gData] = await Promise.all([
         api.getResearchVaults(),
         api.getResearchInbox(15),
+        api.getDiscoveryGraph(),
       ]);
       setVaultData(vData);
       setInboxItems(inData.items || []);
+      setGraphData(gData);
     } catch (err: any) {
       console.error('Failed to load research vault data:', err);
     } finally {
@@ -77,8 +91,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   }, []);
 
   useEffect(() => {
-    fetchVaultData();
-  }, [fetchVaultData]);
+    fetchAllData();
+  }, [fetchAllData]);
 
   // Handle Drag & Drop
   const handleDragOver = (e: React.DragEvent) => {
@@ -146,7 +160,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         );
       }
 
-      await fetchVaultData();
+      await fetchAllData();
     } catch (err: any) {
       console.error('Ingestion error:', err);
       if (onNotify) onNotify('error', 'Ingestion Failed', err?.message || 'Failed to parse research input.');
@@ -168,11 +182,56 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           `Backtest result for ${candidateId}: ${res.verdict}`
         );
       }
-      await fetchVaultData();
+      await fetchAllData();
     } catch (err: any) {
       if (onNotify) onNotify('error', 'Backtest Failed', err?.message || 'Backtest error');
     } finally {
       setBacktestingCandidateId(null);
+    }
+  };
+
+  // Run Empirical Test on Hypothesis
+  const handleRunEmpiricalTest = async (hypothesisId: string) => {
+    try {
+      setTestingHypothesisId(hypothesisId);
+      const res = await api.runHypothesisEmpiricalTest(hypothesisId);
+      if (onNotify) {
+        const isSupported = res.verdict === 'SUPPORTED';
+        onNotify(
+          isSupported ? 'success' : 'info',
+          `Hypothesis Tested (${hypothesisId})`,
+          `Verdict: ${res.verdict} (p-value: ${res.p_value}, Effect: ${res.effect_size})`
+        );
+      }
+      await fetchAllData();
+    } catch (err: any) {
+      if (onNotify) onNotify('error', 'Empirical Test Failed', err?.message || 'Test error');
+    } finally {
+      setTestingHypothesisId(null);
+    }
+  };
+
+  // Create Hypothesis from Cross-Domain Discovery
+  const handleCreateHypothesisFromDiscovery = async (discovery: CrossDomainDiscoveryItem) => {
+    try {
+      await api.createHypothesis({
+        title: `Hypothesis: ${discovery.cross_domain_candidate}`,
+        null_hypothesis: `H0: ${discovery.target_variable} exhibits zero statistically significant variance relative to baseline.`,
+        alt_hypothesis: discovery.proposed_hypothesis,
+        independent_variable: discovery.source_worldview + '_PHASE',
+        dependent_variable: discovery.target_variable,
+        claim_id: discovery.source_claim_id,
+        target_symbol: discovery.target_symbol,
+        test_method: 'VOLATILITY_EVENT_STUDY',
+        control_variables: ['HALVING_CYCLE', 'FUNDING_RATE', 'DXY'],
+      });
+
+      if (onNotify) {
+        onNotify('success', 'Hypothesis Formulated', `Queued formal hypothesis for ${discovery.target_symbol}`);
+      }
+      await fetchAllData();
+    } catch (err: any) {
+      if (onNotify) onNotify('error', 'Failed to Create Hypothesis', err?.message || 'Error');
     }
   };
 
@@ -200,27 +259,42 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     inbox_total: 0,
   };
 
+  const graphCounts = graphData?.counts || {
+    sources_count: 0,
+    claims_count: 0,
+    concepts_count: 0,
+    variables_count: 0,
+    observations_count: 0,
+    edges_count: 0,
+    hypotheses_count: 0,
+  };
+
   return (
     <div className="flex flex-col gap-5 p-4 bg-slate-950 text-slate-100 rounded-xl border border-slate-800 shadow-2xl font-mono">
-      {/* Header & Philosophical Doctrine */}
+      {/* Header & Constitutional Doctrine */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-slate-800">
         <div>
           <div className="flex items-center gap-2">
             <Brain className="w-6 h-6 text-indigo-400 animate-pulse" />
             <h2 className="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400">
-              SKY RESEARCH & KNOWLEDGE LAB
+              SKY KNOWLEDGE & DISCOVERY LAB
             </h2>
             <span className="px-2 py-0.5 text-xs font-semibold bg-indigo-950/80 text-indigo-300 border border-indigo-700/50 rounded-full">
-              Universal Front Door
+              10/10 Discovery Architecture
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            <span className="text-amber-400 font-semibold">Doctrine:</span> "Everything can enter as knowledge. Nothing becomes a trading strategy until the evidence earns it."
+            <span className="text-amber-400 font-semibold">Constitutional Invariant:</span> "Source provides provenance; does not define ontology. Believe nothing without evidence $\to$ Empirically test the interesting hypotheses."
           </p>
         </div>
 
         {/* Global Vault Metric Counters */}
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs">
+            <Compass className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="text-slate-400">Discovery Graph:</span>
+            <span className="font-bold text-indigo-300">{graphCounts.edges_count} Edges</span>
+          </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs">
             <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
             <span className="text-slate-400">Knowledge:</span>
@@ -228,24 +302,19 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs">
             <FlaskConical className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-slate-400">Candidates:</span>
-            <span className="font-bold text-purple-300">{counts.candidates_count}</span>
+            <span className="text-slate-400">Hypotheses:</span>
+            <span className="font-bold text-purple-300">{graphCounts.hypotheses_count}</span>
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span className="text-slate-400">Evidence:</span>
             <span className="font-bold text-emerald-300">{counts.evidence_count}</span>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs">
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span className="text-slate-400">Rejected:</span>
-            <span className="font-bold text-rose-300">{counts.rejected_count}</span>
-          </div>
           <button
-            onClick={fetchVaultData}
+            onClick={fetchAllData}
             disabled={loadingVaults}
             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
-            title="Refresh Vaults"
+            title="Refresh All Vaults & Graph"
           >
             <RotateCcw className={`w-4 h-4 ${loadingVaults ? 'animate-spin' : ''}`} />
           </button>
@@ -291,9 +360,9 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               <>
                 <UploadCloud className="w-10 h-10 text-indigo-400/80" />
                 <p className="text-sm font-medium text-slate-200">
-                  Drop files here ( <span className="text-cyan-400">PDF</span> • <span className="text-purple-400">Code (.py, .pine, .mq5)</span> • <span className="text-amber-400">Notes (.txt, .md)</span> • <span className="text-pink-400">Images</span> )
+                  Drop anything here ( <span className="text-cyan-400">PDFs / Books</span> • <span className="text-purple-400">Code / PineScript</span> • <span className="text-amber-400">Notes / Articles</span> • <span className="text-pink-400">Images</span> )
                 </p>
-                <p className="text-xs text-slate-400">or click to browse your computer</p>
+                <p className="text-xs text-slate-400">or click to browse your system</p>
               </>
             )}
           </div>
@@ -304,17 +373,17 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           <div className="flex items-center justify-between">
             <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
               <Link className="w-3.5 h-3.5 text-cyan-400" />
-              OR Paste Any URL, YouTube Lesson, Reel, GitHub Repo, PineScript, or Strategy Notes:
+              OR Paste ANY URL, YouTube Lesson, Reel, GitHub Repo, PineScript, or Research Notes:
             </label>
             <span className="text-[10px] text-slate-400">
-              YouTube • Instagram Reel • GitHub • TradingView • Web Article • Raw Transcript
+              YouTube • Instagram Reel • GitHub • Web Articles • Trading Books • Raw Transcripts
             </span>
           </div>
 
           <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Paste YouTube link, GitHub repo URL, PineScript code snippet, or trading lesson notes here..."
+            placeholder="Paste YouTube link, GitHub repo URL, PineScript code snippet, astrology cycle text, or trading lesson notes here..."
             rows={3}
             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors resize-y"
           />
@@ -325,14 +394,14 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               type="text"
               value={inputTitle}
               onChange={(e) => setInputTitle(e.target.value)}
-              placeholder="Optional: Resource Title / Topic (e.g. ICT Silver Bullet Strategy)"
+              placeholder="Optional: Resource Title (e.g. Planetary Cycles and Historical Market Volatility)"
               className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
             />
             <input
               type="text"
               value={inputAuthor}
               onChange={(e) => setInputAuthor(e.target.value)}
-              placeholder="Optional: Author / Creator / Channel (e.g. ICT, Photon Trading, GitHub User)"
+              placeholder="Optional: Author / Creator (e.g. Ray Dalio, ICT, Quantitative Researcher)"
               className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
             />
           </div>
@@ -342,41 +411,38 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
           <div className="text-xs text-slate-400 flex items-center gap-2">
             <Shield className="w-4 h-4 text-emerald-400" />
-            <span>Multi-Stage Separation: Understanding ≠ Strategy Promotion</span>
+            <span>Epistemic Separation: Source Worldview Preserved • Claims Unverified by Default</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Button 1: ANALYZE */}
             <button
               onClick={() => handleIngest('ANALYZE')}
               disabled={isSubmitting}
               className="px-3.5 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
-              title="Extract concepts and understand content without creating strategy candidates"
+              title="Extract claims & concepts without queueing a strategy"
             >
               <Sparkles className="w-4 h-4 text-blue-400" />
               <span>🔬 ANALYZE</span>
             </button>
 
-            {/* Button 2: SAVE KNOWLEDGE ONLY */}
             <button
               onClick={() => handleIngest('SAVE_KNOWLEDGE')}
               disabled={isSubmitting}
               className="px-3.5 py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
-              title="Store purely as conceptual knowledge in the Knowledge Vault"
+              title="Store conceptual knowledge directly into the Knowledge Vault"
             >
               <BookOpen className="w-4 h-4 text-cyan-400" />
               <span>📚 SAVE KNOWLEDGE</span>
             </button>
 
-            {/* Button 3: RESEARCH */}
             <button
               onClick={() => handleIngest('RESEARCH')}
               disabled={isSubmitting}
               className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-purple-900/30 transition-all disabled:opacity-50"
-              title="Extract hypotheses and automatically queue Strategy Candidates for backtesting"
+              title="Deconstruct into atomic atoms and trigger Cross-Domain Discovery Graph"
             >
-              <FlaskConical className="w-4 h-4" />
-              <span>{isSubmitting ? 'PROCESSING...' : '🧪 RESEARCH & QUEUE'}</span>
+              <Compass className="w-4 h-4" />
+              <span>{isSubmitting ? 'DECOMPOSING...' : '🔭 RESEARCH & DISCOVER'}</span>
             </button>
           </div>
         </div>
@@ -389,14 +455,14 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               <span className="font-bold text-emerald-300 text-sm">
-                Ingested Successfully — Knowledge ID: {lastResult.knowledge_id}
+                Decomposed Successfully — Source ID: {lastResult.knowledge_id}
               </span>
               <span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] rounded uppercase font-semibold">
                 Mode: {lastResult.mode}
               </span>
             </div>
             <span className="text-xs text-slate-400">
-              Confidence Score: <strong className="text-emerald-400">{lastResult.summary.comprehension_score}%</strong>
+              Confidence: <strong className="text-emerald-400">{lastResult.summary.comprehension_score}%</strong>
             </span>
           </div>
 
@@ -404,7 +470,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
             <div className="p-2 bg-slate-950 rounded border border-slate-800">
-              <span className="text-slate-400">Knowledge Nodes:</span>
+              <span className="text-slate-400">Atomic Claims:</span>
               <p className="font-bold text-cyan-400 text-base">{lastResult.summary.concepts_saved}</p>
             </div>
             <div className="p-2 bg-slate-950 rounded border border-slate-800">
@@ -412,11 +478,11 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               <p className="font-bold text-purple-400 text-base">{lastResult.summary.candidates_queued}</p>
             </div>
             <div className="p-2 bg-slate-950 rounded border border-slate-800">
-              <span className="text-slate-400">Evidence Claims:</span>
+              <span className="text-slate-400">Observations:</span>
               <p className="font-bold text-emerald-400 text-base">{lastResult.summary.evidence_saved}</p>
             </div>
             <div className="p-2 bg-slate-950 rounded border border-slate-800">
-              <span className="text-slate-400">Rejected / Contradicted:</span>
+              <span className="text-slate-400">Rejected / Autopsies:</span>
               <p className="font-bold text-rose-400 text-base">{lastResult.summary.rejected_archived}</p>
             </div>
           </div>
@@ -475,11 +541,23 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         </div>
       </div>
 
-      {/* THE 4 VAULT DESTINATIONS TABS */}
+      {/* THE 5 VAULT DESTINATIONS TABS */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-800 pb-2">
           {/* Vault Navigation Tabs */}
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setActiveVaultTab('DISCOVERY')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                activeVaultTab === 'DISCOVERY'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-950/60'
+                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>🔭 Discovery Graph ({graphCounts.hypotheses_count} Hypotheses)</span>
+            </button>
+
             <button
               onClick={() => setActiveVaultTab('KNOWLEDGE')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
@@ -525,7 +603,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               }`}
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              <span>🗑️ Rejected & Refuted ({counts.rejected_count})</span>
+              <span>🗑️ Autopsy Vault ({counts.rejected_count})</span>
             </button>
           </div>
 
@@ -536,11 +614,191 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter vault items..."
+              placeholder="Filter nodes / claims..."
               className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
             />
           </div>
         </div>
+
+        {/* VAULT 5: DISCOVERY GRAPH & HYPOTHESIS TESTING LAB */}
+        {activeVaultTab === 'DISCOVERY' && (
+          <div className="flex flex-col gap-4 animate-fadeIn">
+            {/* Cross-Domain Discovery Stream */}
+            <div className="bg-slate-900/90 border border-indigo-900/60 rounded-xl p-4 flex flex-col gap-3 shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Compass className="w-4 h-4 text-indigo-400 animate-spin" style={{ animationDuration: '10s' }} />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+                    🔭 CROSS-DOMAIN DISCOVERY CANDIDATES
+                  </h3>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  Detected Multi-Hop Relationships (Status: 🔵 UNTESTED)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(graphData?.discoveries || []).map((disc) => (
+                  <div
+                    key={disc.discovery_id}
+                    className="p-3 bg-slate-950 rounded-xl border border-indigo-900/50 flex flex-col justify-between gap-2.5 hover:border-indigo-600 transition-all shadow-sm"
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-700/60 rounded font-bold">
+                          ORIGIN: {disc.source_worldview}
+                        </span>
+                        <span className="px-2 py-0.5 text-[10px] bg-blue-950 text-blue-300 border border-blue-800 rounded font-bold">
+                          🔵 {disc.status}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-slate-100 text-xs flex items-center gap-1.5">
+                        <GitBranch className="w-3.5 h-3.5 text-cyan-400" />
+                        {disc.cross_domain_candidate}
+                      </h4>
+
+                      <p className="text-[11px] text-slate-400 leading-relaxed bg-slate-900/70 p-2 rounded border border-slate-800">
+                        {disc.proposed_hypothesis}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                      <span className="text-[10px] text-slate-500">Target Symbol: {disc.target_symbol}</span>
+                      <button
+                        onClick={() => handleCreateHypothesisFromDiscovery(disc)}
+                        className="px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded text-xs font-semibold flex items-center gap-1 transition-all"
+                      >
+                        <FlaskConical className="w-3 h-3" />
+                        <span>FORMULATE HYPOTHESIS</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Formal Hypothesis Queue & Empirical Testing Desk */}
+            <div className="bg-slate-900/90 border border-purple-900/60 rounded-xl p-4 flex flex-col gap-3 shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300">
+                    🧪 FORMAL HYPOTHESIS QUEUE & STATISTICAL TESTING LAB
+                  </h3>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  Evaluates H0 vs H1 on Historical Market Candles
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(graphData?.hypotheses || []).map((hypo) => (
+                  <div
+                    key={hypo.hypothesis_id}
+                    className="p-3 bg-slate-950 rounded-xl border border-purple-900/40 flex flex-col justify-between gap-2.5 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`px-2 py-0.5 text-[10px] rounded font-bold ${
+                            hypo.validation_status === 'SUPPORTED'
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                              : hypo.validation_status === 'REJECTED'
+                              ? 'bg-rose-950 text-rose-300 border border-rose-700'
+                              : hypo.validation_status === 'INCONCLUSIVE'
+                              ? 'bg-amber-950 text-amber-300 border border-amber-700'
+                              : 'bg-purple-950 text-purple-300 border border-purple-700'
+                          }`}
+                        >
+                          STATUS: {hypo.validation_status}
+                        </span>
+                        <span className="text-[10px] text-slate-500">ID: {hypo.hypothesis_id}</span>
+                      </div>
+
+                      <h4 className="font-bold text-slate-200 text-xs">{hypo.title}</h4>
+
+                      <div className="bg-slate-900 p-2 rounded text-[11px] text-slate-300 flex flex-col gap-1 border border-slate-800">
+                        <p><strong className="text-slate-400">H0 (Null):</strong> {hypo.null_hypothesis}</p>
+                        <p><strong className="text-purple-300">H1 (Alt):</strong> {hypo.alt_hypothesis}</p>
+                      </div>
+
+                      {hypo.test_result_summary && (
+                        <p className="text-[10px] text-emerald-300 bg-emerald-950/40 p-2 rounded border border-emerald-800/60 leading-relaxed">
+                          {hypo.test_result_summary}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                      <span className="text-[10px] text-slate-500">Symbol: {hypo.target_symbol}</span>
+                      <button
+                        onClick={() => handleRunEmpiricalTest(hypo.hypothesis_id)}
+                        disabled={testingHypothesisId === hypo.hypothesis_id}
+                        className="px-3 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 rounded text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                      >
+                        <TrendingUp className={`w-3 h-3 ${testingHypothesisId === hypo.hypothesis_id ? 'animate-spin' : ''}`} />
+                        <span>{testingHypothesisId === hypo.hypothesis_id ? 'TESTING...' : 'RUN EMPIRICAL TEST'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Atomic Claim Inspector (Preserving Verbatim Source Framing) */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    🧩 ATOMIC CLAIMS INSPECTOR (PRESERVING SOURCE WORLDVIEW)
+                  </h3>
+                </div>
+                <span className="text-[10px] text-slate-400">All claims are UNVERIFIED until empirically tested</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {(graphData?.nodes?.claims || [])
+                  .filter((cl) =>
+                    cl.original_claim_verbatim.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    cl.source_worldview.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map((cl) => (
+                    <div
+                      key={cl.claim_id}
+                      className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-between gap-2 shadow-sm"
+                    >
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded font-bold uppercase">
+                            {cl.source_worldview}
+                          </span>
+                          <span className="px-2 py-0.5 text-[10px] bg-amber-950 text-amber-300 border border-amber-800 rounded font-bold">
+                            [{cl.epistemic_status}]
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-200 italic font-sans leading-relaxed">
+                          "{cl.original_claim_verbatim}"
+                        </p>
+
+                        <div className="text-[10px] text-slate-400 bg-slate-900 p-2 rounded border border-slate-800/80 flex flex-col gap-0.5">
+                          <span><strong>Direction:</strong> {cl.relationship_direction}</span>
+                          <span><strong>Target Domain:</strong> {cl.object_domain}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
+                        <span>ID: {cl.claim_id}</span>
+                        <span>Evidence Type: {cl.evidence_type}</span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* VAULT 1: KNOWLEDGE VAULT */}
         {activeVaultTab === 'KNOWLEDGE' && (
@@ -618,7 +876,6 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
                       <strong className="text-purple-300">Hypothesis:</strong> {c.hypothesis}
                     </p>
 
-                    {/* Backtest Statistics if available */}
                     {c.backtest_expectancy !== null && c.backtest_expectancy !== undefined && (
                       <div className="grid grid-cols-3 gap-1.5 p-2 bg-slate-950 rounded-lg text-[10px] border border-slate-800">
                         <div>
@@ -639,7 +896,6 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
                     )}
                   </div>
 
-                  {/* Actions & Verification Trigger */}
                   <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
                     <span className="text-[10px] text-slate-500">Timeframe: {c.timeframe}</span>
                     <button
@@ -688,7 +944,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           </div>
         )}
 
-        {/* VAULT 4: REJECTED CLAIMS VAULT */}
+        {/* VAULT 4: AUTOPSY / REJECTED CLAIMS VAULT */}
         {activeVaultTab === 'REJECTED' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {(vaultData?.rejected || [])

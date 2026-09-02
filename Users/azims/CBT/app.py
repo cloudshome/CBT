@@ -80,6 +80,7 @@ from core.empirical_accumulator import empirical_accumulator
 from core.ttl_cache import sky_decision_cache, market_state_cache
 from core.provenance_engine import provenance_engine
 from core.universal_ingestor import universal_ingestor
+from core.knowledge_graph_engine import knowledge_graph_engine
 from core.strategy_compiler import strategy_compiler
 from core.audit_bus import audit_bus
 from core.macro_gold_engine import macro_gold_engine
@@ -1118,6 +1119,69 @@ async def run_candidate_backtest(candidate_id: str, symbol: str = Query("BTC/USD
         "backtest_report": rep.to_dict(),
         "verdict": "PROMOTED_TO_WALK_FORWARD" if new_stage == "WALK_FORWARD" else "ARCHIVED_AS_REJECTED",
     })
+
+
+# ==============================================================================
+# SKY KNOWLEDGE & DISCOVERY GRAPH REST APIS
+# ==============================================================================
+
+class CreateHypothesisRequest(BaseModel):
+    title: str
+    null_hypothesis: str
+    alt_hypothesis: str
+    independent_variable: str
+    dependent_variable: str
+    claim_id: Optional[str] = None
+    target_symbol: str = "BTC/USDT"
+    test_method: str = "VOLATILITY_EVENT_STUDY"
+    control_variables: Optional[List[str]] = None
+
+
+@app.get("/api/research/graph")
+async def get_discovery_graph():
+    """
+    Returns the full Knowledge & Discovery Graph containing:
+    - 6 Node Types: Sources, Claims, Concepts, Variables, Observations
+    - Edges: Same-Domain, Cross-Domain, Contradictions
+    - Discoveries: Cross-domain multi-hop links awaiting empirical testing
+    - Hypotheses: Queue of formal testable propositions
+    """
+    graph_data = knowledge_graph_engine.get_full_graph_payload()
+    return sanitize_numpy(graph_data)
+
+
+@app.post("/api/research/discover")
+async def trigger_cross_domain_discovery():
+    """Scans all known knowledge atoms and derives novel cross-domain candidate hypotheses."""
+    discoveries = knowledge_graph_engine.discover_cross_domain_links()
+    return sanitize_numpy({"discoveries": discoveries, "count": len(discoveries)})
+
+
+@app.post("/api/research/hypotheses/create")
+async def create_new_hypothesis(req: CreateHypothesisRequest):
+    """Manually or autonomously formulates a testable research hypothesis from a graph link."""
+    hypo = knowledge_graph_engine.create_hypothesis(
+        title=req.title,
+        null_hypothesis=req.null_hypothesis,
+        alt_hypothesis=req.alt_hypothesis,
+        independent_variable=req.independent_variable,
+        dependent_variable=req.dependent_variable,
+        claim_id=req.claim_id,
+        target_symbol=req.target_symbol,
+        test_method=req.test_method,
+        control_variables=req.control_variables,
+    )
+    return sanitize_numpy(hypo.to_dict())
+
+
+@app.post("/api/research/hypotheses/{hypothesis_id}/run-test")
+async def run_hypothesis_empirical_test(hypothesis_id: str):
+    """
+    Executes empirical statistical verification on a Hypothesis.
+    Evaluates H0 (Null) vs H1 (Alternative) against historical market candles (BTC/ETH/GOLD).
+    """
+    result = knowledge_graph_engine.run_empirical_test(hypothesis_id)
+    return sanitize_numpy(result)
 
 
 def sanitize_numpy(obj: Any) -> Any:
