@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import numpy as np
 
-from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -79,6 +79,8 @@ from core.telegram_bot import telegram_bot
 from core.empirical_accumulator import empirical_accumulator
 from core.ttl_cache import sky_decision_cache, market_state_cache
 from core.provenance_engine import provenance_engine
+from core.universal_ingestor import universal_ingestor
+from core.knowledge_graph_engine import knowledge_graph_engine
 from core.strategy_compiler import strategy_compiler
 from core.audit_bus import audit_bus
 from core.macro_gold_engine import macro_gold_engine
@@ -991,6 +993,197 @@ async def run_lab_stress_test(symbol: str = Query("BTC/USDT"), timeframe: str = 
     return mc_rep.to_dict()
 
 
+# ==============================================================================
+# UNIVERSAL RESEARCH & KNOWLEDGE LAB REST ENDPOINTS
+# ==============================================================================
+
+class ResearchIngestRequest(BaseModel):
+    content: str
+    mode: str = "RESEARCH"               # ANALYZE, RESEARCH, SAVE_KNOWLEDGE
+    source_uri: Optional[str] = None
+    author_creator: Optional[str] = None
+    title: Optional[str] = None
+
+
+@app.post("/api/research/ingest")
+async def ingest_research_text(req: ResearchIngestRequest):
+    """
+    Ingests raw text, YouTube link, Reel URL, GitHub repo, or strategy note.
+    Modes:
+      - ANALYZE: Extracts concepts & claims without creating strategy candidates
+      - RESEARCH: Formulates hypotheses and queues candidate strategies
+      - SAVE_KNOWLEDGE: Commits conceptual lessons directly to Knowledge Vault
+    """
+    if not req.content or not req.content.strip():
+        raise HTTPException(status_code=400, detail="Content cannot be empty.")
+    
+    result = await universal_ingestor.ingest(
+        content=req.content,
+        mode=req.mode.upper(),
+        source_uri=req.source_uri,
+        author_creator=req.author_creator,
+        title=req.title,
+    )
+    return sanitize_numpy(result)
+
+
+@app.post("/api/research/ingest-file")
+async def ingest_research_file(
+    file: UploadFile = File(...),
+    mode: str = Form("RESEARCH"),
+    author_creator: Optional[str] = Form(None),
+    title: Optional[str] = Form(None),
+):
+    """
+    Uploads and parses a physical document (.pdf, .py, .pine, .mq5, .json, .csv, .txt, .md).
+    """
+    try:
+        content_bytes = await file.read()
+        filename = file.filename or "uploaded_file.txt"
+        dest_path = Path(os.getenv("DATA_DIR", "data")) / "uploads" / filename
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(dest_path, "wb") as f:
+            f.write(content_bytes)
+
+        text_content, metadata = universal_ingestor.extract_text_from_file(dest_path)
+        
+        result = await universal_ingestor.ingest(
+            content=text_content,
+            mode=mode.upper(),
+            file_name=filename,
+            source_uri=str(dest_path),
+            author_creator=author_creator or "File Upload",
+            title=title or filename,
+        )
+        result["file_metadata"] = metadata
+        return sanitize_numpy(result)
+    except Exception as e:
+        logger.error(f"File ingestion error: {e}")
+        raise HTTPException(status_code=500, detail=f"File ingestion failed: {str(e)}")
+
+
+@app.get("/api/research/inbox")
+async def get_research_inbox(limit: int = Query(25)):
+    """Fetches recent items in the Research Provenance Inbox."""
+    items = provenance_engine.get_inbox_items(limit=limit)
+    return sanitize_numpy({"items": items, "count": len(items)})
+
+
+@app.get("/api/research/vaults")
+async def get_all_research_vaults():
+    """Returns all data and counts across the 4 Research Vaults (Knowledge, Candidates, Evidence, Rejected)."""
+    vault_data = provenance_engine.get_all_vault_data()
+    return sanitize_numpy(vault_data)
+
+
+@app.post("/api/research/candidates/{candidate_id}/backtest")
+async def run_candidate_backtest(candidate_id: str, symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+    """
+    Executes a formal backtest and walk-forward verification on a Strategy Candidate.
+    Updates candidate validation_stage to WALK_FORWARD or REJECTED based on statistical expectancy.
+    """
+    candles = data_streamer.get_candles(symbol, timeframe, limit=500)
+    if not candles:
+        raise HTTPException(status_code=404, detail=f"No candles found for {symbol} ({timeframe})")
+
+    # Run backtest via sandbox lab
+    rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
+    
+    # Statistical criteria for progression
+    is_positive_ev = rep.expectancy_r > 0.15
+    is_stable = rep.win_rate >= 0.45 and rep.sharpe_ratio >= 1.0
+
+    new_stage = "WALK_FORWARD" if (is_positive_ev and is_stable) else "REJECTED"
+
+    provenance_engine.update_candidate_backtest_result(
+        candidate_id=candidate_id,
+        expectancy=rep.expectancy_r,
+        sharpe=rep.sharpe_ratio,
+        win_rate=rep.win_rate,
+        validation_stage=new_stage,
+    )
+
+    # If rejected, record failure autopsy into Rejected Claims Vault
+    if new_stage == "REJECTED":
+        provenance_engine.save_rejected_claim(
+            knowledge_id=candidate_id,
+            rejected_claim=f"Strategy Candidate {candidate_id} on {symbol} {timeframe}",
+            failure_reason="INSUFFICIENT_EXPECTANCY" if not is_positive_ev else "HIGH_VOLATILITY",
+            historical_occurrences_tested=rep.total_trades,
+            rejection_autopsy=f"Backtest failed hurdle: Win Rate={rep.win_rate*100:.1f}%, Sharpe={rep.sharpe_ratio:.2f}, EV={rep.expectancy_r:.2f}R.",
+        )
+
+    return sanitize_numpy({
+        "candidate_id": candidate_id,
+        "validation_stage": new_stage,
+        "backtest_report": rep.to_dict(),
+        "verdict": "PROMOTED_TO_WALK_FORWARD" if new_stage == "WALK_FORWARD" else "ARCHIVED_AS_REJECTED",
+    })
+
+
+# ==============================================================================
+# SKY KNOWLEDGE & DISCOVERY GRAPH REST APIS
+# ==============================================================================
+
+class CreateHypothesisRequest(BaseModel):
+    title: str
+    null_hypothesis: str
+    alt_hypothesis: str
+    independent_variable: str
+    dependent_variable: str
+    claim_id: Optional[str] = None
+    target_symbol: str = "BTC/USDT"
+    test_method: str = "VOLATILITY_EVENT_STUDY"
+    control_variables: Optional[List[str]] = None
+
+
+@app.get("/api/research/graph")
+async def get_discovery_graph():
+    """
+    Returns the full Knowledge & Discovery Graph containing:
+    - 6 Node Types: Sources, Claims, Concepts, Variables, Observations
+    - Edges: Same-Domain, Cross-Domain, Contradictions
+    - Discoveries: Cross-domain multi-hop links awaiting empirical testing
+    - Hypotheses: Queue of formal testable propositions
+    """
+    graph_data = knowledge_graph_engine.get_full_graph_payload()
+    return sanitize_numpy(graph_data)
+
+
+@app.post("/api/research/discover")
+async def trigger_cross_domain_discovery():
+    """Scans all known knowledge atoms and derives novel cross-domain candidate hypotheses."""
+    discoveries = knowledge_graph_engine.discover_cross_domain_links()
+    return sanitize_numpy({"discoveries": discoveries, "count": len(discoveries)})
+
+
+@app.post("/api/research/hypotheses/create")
+async def create_new_hypothesis(req: CreateHypothesisRequest):
+    """Manually or autonomously formulates a testable research hypothesis from a graph link."""
+    hypo = knowledge_graph_engine.create_hypothesis(
+        title=req.title,
+        null_hypothesis=req.null_hypothesis,
+        alt_hypothesis=req.alt_hypothesis,
+        independent_variable=req.independent_variable,
+        dependent_variable=req.dependent_variable,
+        claim_id=req.claim_id,
+        target_symbol=req.target_symbol,
+        test_method=req.test_method,
+        control_variables=req.control_variables,
+    )
+    return sanitize_numpy(hypo.to_dict())
+
+
+@app.post("/api/research/hypotheses/{hypothesis_id}/run-test")
+async def run_hypothesis_empirical_test(hypothesis_id: str):
+    """
+    Executes empirical statistical verification on a Hypothesis.
+    Evaluates H0 (Null) vs H1 (Alternative) against historical market candles (BTC/ETH/GOLD).
+    """
+    result = knowledge_graph_engine.run_empirical_test(hypothesis_id)
+    return sanitize_numpy(result)
+
+
 def sanitize_numpy(obj: Any) -> Any:
     """Recursively converts numpy scalars, arrays, and types to native Python types for clean FastAPI JSON serialization."""
     if isinstance(obj, (bool, np.bool_)):
@@ -1207,7 +1400,7 @@ async def ingest_research_source(req: IngestSourceRequest):
 async def list_provenance_records(limit: int = Query(50)):
     """Lists recent cryptographic provenance records."""
     records = provenance_engine.list_records(limit=limit)
-    return {"records": [r.to_dict() for r in records]}
+    return {"records": [r.to_dict() if hasattr(r, "to_dict") else r for r in records]}
 
 
 @app.get("/api/ingest/provenance/{source_id}")
@@ -1633,3 +1826,9 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
     except Exception:
         ws_manager.disconnect(websocket)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
+

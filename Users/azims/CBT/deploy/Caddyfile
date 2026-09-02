@@ -1,0 +1,108 @@
+# =============================================================================
+# Caddyfile — CBT / SKY Crypto Brain Terminal Reverse Proxy
+#
+# Handles:
+#   - HTTPS with automatic Let's Encrypt TLS (if CBT_DOMAIN is set)
+#   - Routes /api/sky/*, /ws/* → python-backend:8000
+#   - Routes /api/candles, /api/paper, /api/desk → backend:3000
+#   - Serves React terminal UI → frontend:80
+#   - Accessible from Windows PC, Android, any browser
+#
+# Usage:
+#   Set CBT_DOMAIN in .env (e.g. cbt.yourdomain.com)
+#   If no domain, use your Ubuntu PC's local IP (e.g. 192.168.1.x)
+#   Caddy auto-provisions Let's Encrypt certs — no certbot needed.
+# =============================================================================
+
+{$CBT_DOMAIN:localhost} {
+
+    # ------------------------------------------------------------------
+    # Python FastAPI routes (intelligence engine, signals, websockets)
+    # ------------------------------------------------------------------
+    handle /api/sky/* {
+        reverse_proxy python-backend:8000
+    }
+    handle /api/health* {
+        reverse_proxy python-backend:8000
+    }
+    handle /api/decision/* {
+        reverse_proxy python-backend:8000
+    }
+    handle /api/market/* {
+        reverse_proxy python-backend:8000
+    }
+    handle /api/shadow/* {
+        reverse_proxy python-backend:8000
+    }
+    handle /api/audit/* {
+        reverse_proxy python-backend:8000
+    }
+    handle /api/lab/* {
+        reverse_proxy python-backend:8000
+    }
+    handle /api/telegram/* {
+        reverse_proxy python-backend:8000
+    }
+    handle /metrics {
+        reverse_proxy python-backend:8000
+    }
+    handle /ws/* {
+        reverse_proxy python-backend:8000 {
+            # WebSocket upgrade support
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+        }
+    }
+
+    # ------------------------------------------------------------------
+    # Node/Express routes (paper trading, candles, desk, tickers)
+    # ------------------------------------------------------------------
+    handle /api/candles* {
+        reverse_proxy backend:3000
+    }
+    handle /api/paper/* {
+        reverse_proxy backend:3000
+    }
+    handle /api/desk/* {
+        reverse_proxy backend:3000
+    }
+    handle /api/tickers* {
+        reverse_proxy backend:3000
+    }
+    handle /api/readiness* {
+        reverse_proxy backend:3000
+    }
+    handle /api/metrics/* {
+        reverse_proxy backend:3000
+    }
+    handle /health {
+        reverse_proxy backend:3000
+    }
+
+    # ------------------------------------------------------------------
+    # React Terminal UI (everything else → frontend nginx)
+    # ------------------------------------------------------------------
+    handle /* {
+        reverse_proxy frontend:80
+    }
+
+    # ------------------------------------------------------------------
+    # Security Headers
+    # ------------------------------------------------------------------
+    header {
+        X-Frame-Options SAMEORIGIN
+        X-Content-Type-Options nosniff
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        # Remove Caddy server banner
+        -Server
+    }
+
+    # Log access
+    log {
+        output file /data/logs/caddy_access.log {
+            roll_size 20mb
+            roll_keep 5
+        }
+    }
+}

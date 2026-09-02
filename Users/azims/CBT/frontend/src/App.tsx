@@ -19,6 +19,7 @@ import { MicrostructurePanel } from './components/MicrostructurePanel';
 import { MacroNetworkRadar } from './components/MacroNetworkRadar';
 import { GeneticStrategyLab } from './components/GeneticStrategyLab';
 import { AutonomousAuditorHUD } from './components/AutonomousAuditorHUD';
+import { ResearchIngestLab } from './components/ResearchIngestLab';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider } from './data/providers/marketProvider';
 import {
@@ -47,6 +48,7 @@ import {
   Scale,
   Sparkles,
   Zap,
+  Brain,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -88,7 +90,7 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS'>('DOSSIER');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB'>('DOSSIER');
   const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
@@ -528,7 +530,18 @@ export const App: React.FC = () => {
                   }`}
                 >
                   <Zap size={13} className={activeBottomTab === 'FRONTIERS' ? 'text-slate-950' : 'text-emerald-400'} />
-                  <span>Frontiers Suite (5 Engines)</span>
+                  <span>Frontiers Suite</span>
+                </button>
+                <button
+                  onClick={() => setActiveBottomTab('RESEARCH_LAB')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'RESEARCH_LAB'
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold shadow-md shadow-indigo-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Brain size={13} className={activeBottomTab === 'RESEARCH_LAB' ? 'text-white animate-pulse' : 'text-indigo-400'} />
+                  <span>🧠 Research Lab</span>
                 </button>
               </div>
             </div>
@@ -574,7 +587,7 @@ export const App: React.FC = () => {
                     loading={loadingMarket}
                   />
                 </div>
-              ) : (
+              ) : activeBottomTab === 'FRONTIERS' ? (
                 <div className="flex flex-col gap-3">
                   {/* Frontier Sub-Tab Header */}
                   <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#090d16] border border-[#1e293b] rounded-lg text-xs font-mono">
@@ -636,6 +649,12 @@ export const App: React.FC = () => {
                   )}
                   {activeFrontierTab === 'AUDITOR' && <AutonomousAuditorHUD />}
                 </div>
+              ) : (
+                <ResearchIngestLab
+                  onNotify={(type, title, msg) => addToast(type, title, msg)}
+                  selectedSymbol={symbol}
+                  selectedTimeframe={timeframe}
+                />
               )}
             </div>
           </div>

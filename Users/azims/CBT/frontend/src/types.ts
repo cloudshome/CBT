@@ -513,3 +513,221 @@ export interface UniversalAssetDossier {
   actionable_quant_verdict: string;
 }
 
+// ==============================================================================
+// UNIVERSAL RESEARCH INGESTION & 4-VAULT TYPES
+// ==============================================================================
+
+export type ResearchSourceType = 'YOUTUBE' | 'GITHUB' | 'PDF' | 'REEL' | 'ARTICLE' | 'NOTES' | 'CODE' | 'DATASET' | 'TRADINGVIEW';
+export type ResearchIngestMode = 'ANALYZE' | 'RESEARCH' | 'SAVE_KNOWLEDGE';
+
+export interface ResearchProvenanceItem {
+  knowledge_id: string;
+  source_type: ResearchSourceType;
+  source_uri: string;
+  title: string;
+  author_creator: string;
+  ingested_at: number;
+  raw_content_preview: string;
+  confidence_score: number;
+  status: 'PROCESSING' | 'ANALYZED' | 'CANDIDATE' | 'VALIDATED' | 'REJECTED';
+}
+
+export interface KnowledgeItem {
+  id: string;
+  knowledge_id: string;
+  category: string;
+  concept_title: string;
+  structured_explanation: string;
+  tags: string[];
+  created_at: number;
+}
+
+export interface StrategyCandidateItem {
+  candidate_id: string;
+  knowledge_id: string;
+  strategy_name: string;
+  hypothesis: string;
+  entry_rules: Record<string, any>;
+  exit_rules: Record<string, any>;
+  parameter_bounds: Record<string, any>;
+  timeframe: string;
+  required_indicators: string[];
+  validation_stage: 'UNTESTED' | 'BACKTESTING' | 'WALK_FORWARD' | 'PAPER_TEST' | 'REJECTED' | 'PROMOTED';
+  backtest_expectancy?: number;
+  backtest_sharpe?: number;
+  backtest_win_rate?: number;
+  created_at: number;
+}
+
+export interface EvidenceItem {
+  evidence_id: string;
+  knowledge_id: string;
+  claim_statement: string;
+  verdict: 'SUPPORTED' | 'MIXED' | 'REJECTED';
+  sample_size: number;
+  statistical_p_value: number;
+  evidence_details: Record<string, any>;
+  created_at: number;
+}
+
+export interface RejectedClaimItem {
+  rejected_id: string;
+  knowledge_id: string;
+  rejected_claim: string;
+  failure_reason: string;
+  historical_occurrences_tested: number;
+  rejection_autopsy: string;
+  created_at: number;
+}
+
+export interface ResearchVaultsResponse {
+  counts: {
+    knowledge_count: number;
+    candidates_count: number;
+    evidence_count: number;
+    rejected_count: number;
+    inbox_total: number;
+  };
+  knowledge: KnowledgeItem[];
+  candidates: StrategyCandidateItem[];
+  evidence: EvidenceItem[];
+  rejected: RejectedClaimItem[];
+}
+
+export interface ResearchIngestResult {
+  knowledge_id: string;
+  mode: ResearchIngestMode;
+  provenance: ResearchProvenanceItem;
+  summary: {
+    concepts_saved: number;
+    candidates_queued: number;
+    evidence_saved: number;
+    rejected_archived: number;
+    comprehension_score: number;
+  };
+  concepts: KnowledgeItem[];
+  strategy_candidates: StrategyCandidateItem[];
+  evidence: EvidenceItem[];
+  rejected: RejectedClaimItem[];
+  verdict_message: string;
+}
+
+// ==============================================================================
+// 6-NODE KNOWLEDGE GRAPH & HYPOTHESIS TYPES (10/10 ARCHITECTURE)
+// ==============================================================================
+
+export interface SourceNodeItem {
+  source_id: string;
+  source_type: string;
+  source_uri: string;
+  title: string;
+  author_creator: string;
+  original_worldview: string;
+  ingested_at: number;
+  raw_content_preview: string;
+}
+
+export interface ClaimNodeItem {
+  claim_id: string;
+  source_id: string;
+  original_claim_verbatim: string;
+  source_worldview: string;
+  subject_concept: string;
+  relationship_direction: string;
+  object_domain: string;
+  evidence_type: string;
+  epistemic_status: 'UNVERIFIED' | 'HYPOTHESIZED' | 'EMPIRICALLY_TESTED' | 'REFUTED';
+  confidence_score: number;
+  created_at: number;
+}
+
+export interface ConceptNodeItem {
+  concept_id: string;
+  title: string;
+  domain: string;
+  normalized_description: string;
+  tags: string[];
+  created_at: number;
+}
+
+export interface VariableNodeItem {
+  variable_id: string;
+  name: string;
+  category: string;
+  observable_symbol: string;
+  timeframe: string;
+}
+
+export interface ObservationNodeItem {
+  observation_id: string;
+  source_id: string;
+  observation_text: string;
+  period_context: string;
+  observed_variables: string[];
+  created_at: number;
+}
+
+export interface GraphEdgeItem {
+  edge_id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relationship_type: string;
+  edge_nature: 'SAME_DOMAIN' | 'CROSS_DOMAIN' | 'CONTRADICTION';
+  strength_weight: number;
+  empirical_status: 'UNTESTED' | 'TESTING' | 'SUPPORTED' | 'REFUTED';
+  created_at: number;
+}
+
+export interface HypothesisNodeItem {
+  hypothesis_id: string;
+  claim_id?: string;
+  title: string;
+  null_hypothesis: string;
+  alt_hypothesis: string;
+  independent_variable: string;
+  dependent_variable: string;
+  target_symbol: string;
+  test_method: string;
+  control_variables: string[];
+  validation_status: 'QUEUED' | 'TESTING' | 'SUPPORTED' | 'REJECTED' | 'INCONCLUSIVE';
+  p_value?: number;
+  effect_size?: number;
+  test_result_summary?: string;
+  created_at: number;
+}
+
+export interface CrossDomainDiscoveryItem {
+  discovery_id: string;
+  source_claim_id: string;
+  source_worldview: string;
+  premise: string;
+  cross_domain_candidate: string;
+  target_variable: string;
+  target_symbol: string;
+  status: 'UNTESTED' | 'HYPOTHESIS_FORMULATED';
+  proposed_hypothesis: string;
+}
+
+export interface DiscoveryGraphResponse {
+  nodes: {
+    sources: SourceNodeItem[];
+    claims: ClaimNodeItem[];
+    concepts: ConceptNodeItem[];
+    variables: VariableNodeItem[];
+    observations: ObservationNodeItem[];
+  };
+  edges: GraphEdgeItem[];
+  hypotheses: HypothesisNodeItem[];
+  discoveries: CrossDomainDiscoveryItem[];
+  counts: {
+    sources_count: number;
+    claims_count: number;
+    concepts_count: number;
+    variables_count: number;
+    observations_count: number;
+    edges_count: number;
+    hypotheses_count: number;
+  };
+}
+
+
