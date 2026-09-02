@@ -42,6 +42,25 @@ class ProvenanceItem:
 
 
 @dataclass
+class ProvenanceRecord:
+    source_id: str
+    source_type: str
+    raw_content: str
+    title: str
+    content_hash: str
+    confidence: float
+    ingested_at: int
+    source_url: Optional[str] = None
+    parser: str = "default"
+    language: str = "en"
+    extracted_facts: List[Any] = field(default_factory=list)
+    extracted_hypotheses: List[Any] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class KnowledgeNode:
     id: str
     knowledge_id: str
@@ -511,6 +530,132 @@ class ProvenanceEngine:
                 "evidence": evidence_items,
                 "rejected": rejected_items,
             }
+
+    # =========================================================================
+    # BACKWARD COMPATIBILITY BRIDGE (For Telemetry Metrics & Compiler Tests)
+    # =========================================================================
+
+    def compute_sha256(self, content: str) -> str:
+        """Deterministic SHA-256 hash of raw content."""
+        import hashlib
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def register_source(
+        self,
+        source_type: str,
+        raw_content: str,
+        title: str,
+        source_url: Optional[str] = None,
+        parser: str = "default",
+        confidence: float = 0.90,
+        language: str = "en",
+        extracted_facts: Optional[List[Any]] = None,
+        extracted_hypotheses: Optional[List[Any]] = None,
+    ) -> ProvenanceRecord:
+        """Legacy source registration returning a ProvenanceRecord instance with deduplication."""
+        chash = self.compute_sha256(raw_content)
+        existing = self.get_by_hash(chash)
+        if existing:
+            if extracted_facts:
+                existing.extracted_facts = extracted_facts
+            if extracted_hypotheses:
+                existing.extracted_hypotheses = extracted_hypotheses
+            return existing
+
+        prov = self.register_provenance(
+            source_type=source_type,
+            source_uri=source_url or "direct_input",
+            title=title,
+            author_creator="Legacy Ingestor",
+            raw_content_preview=raw_content,
+            confidence_score=confidence * 100.0 if confidence <= 1.0 else confidence,
+            status="ANALYZED",
+        )
+        src_id = f"SRC-{prov.knowledge_id[2:]}"
+        return ProvenanceRecord(
+            source_id=src_id,
+            source_type=source_type,
+            raw_content=raw_content,
+            title=title,
+            source_url=source_url,
+            content_hash=chash,
+            confidence=confidence,
+            ingested_at=prov.ingested_at,
+            parser=parser,
+            language=language,
+            extracted_facts=extracted_facts or [],
+            extracted_hypotheses=extracted_hypotheses or [],
+        )
+
+    def get_by_id(self, source_id: str) -> Optional[ProvenanceRecord]:
+        """Fetches a ProvenanceRecord by source ID."""
+        with db_manager.get_brain_conn() as conn:
+            # Check by source_id or knowledge_id
+            k_id = f"K-{source_id[4:]}" if source_id.startswith("SRC-") else source_id
+            row = conn.execute(
+                "SELECT * FROM research_provenance_ledger WHERE knowledge_id = ?;",
+                (k_id,),
+            ).fetchone()
+            if row:
+                d = dict(row)
+                content = d.get("raw_content_preview", "")
+                return ProvenanceRecord(
+                    source_id=source_id if source_id.startswith("SRC-") else f"SRC-{d['knowledge_id'][2:]}",
+                    source_type=d["source_type"],
+                    raw_content=content,
+                    title=d["title"],
+                    source_url=d.get("source_uri"),
+                    content_hash=self.compute_sha256(content),
+                    confidence=float(d.get("confidence_score", 90.0)) / 100.0,
+                    ingested_at=d["ingested_at"],
+                    parser="default",
+                    language="en",
+                )
+            return None
+
+    def get_by_hash(self, content_hash: str) -> Optional[ProvenanceRecord]:
+        """Fetches a ProvenanceRecord by content hash."""
+        with db_manager.get_brain_conn() as conn:
+            rows = conn.execute("SELECT * FROM research_provenance_ledger ORDER BY ingested_at DESC;").fetchall()
+            for r in rows:
+                d = dict(r)
+                content = d.get("raw_content_preview", "")
+                if self.compute_sha256(content) == content_hash:
+                    return ProvenanceRecord(
+                        source_id=f"SRC-{d['knowledge_id'][2:]}",
+                        source_type=d["source_type"],
+                        raw_content=content,
+                        title=d["title"],
+                        source_url=d.get("source_uri"),
+                        content_hash=content_hash,
+                        confidence=float(d.get("confidence_score", 90.0)) / 100.0,
+                        ingested_at=d["ingested_at"],
+                        parser="default",
+                        language="en",
+                    )
+            return None
+
+    def list_records(self, limit: int = 1000) -> List[Dict[str, Any]]:
+        """Lists records from the provenance ledger."""
+        items = self.get_inbox_items(limit=limit)
+        for item in items:
+            item["source_id"] = f"SRC-{item['knowledge_id'][2:]}" if item.get("knowledge_id") else "SRC-0000"
+            item["record_id"] = item.get("knowledge_id")
+        return items
+
+    def get_record(self, record_id: str) -> Optional[Dict[str, Any]]:
+        """Fetches a specific provenance record by ID."""
+        with db_manager.get_brain_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM research_provenance_ledger WHERE knowledge_id = ?;",
+                (record_id,),
+            ).fetchone()
+            if row:
+                d = dict(row)
+                d["record_id"] = d["knowledge_id"]
+                d["content_hash"] = self.compute_sha256(d.get("raw_content_preview", ""))
+                return d
+            return None
 
 
 # Master Singleton

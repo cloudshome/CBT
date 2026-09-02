@@ -1400,7 +1400,7 @@ async def ingest_research_source(req: IngestSourceRequest):
 async def list_provenance_records(limit: int = Query(50)):
     """Lists recent cryptographic provenance records."""
     records = provenance_engine.list_records(limit=limit)
-    return {"records": [r.to_dict() for r in records]}
+    return {"records": [r.to_dict() if hasattr(r, "to_dict") else r for r in records]}
 
 
 @app.get("/api/ingest/provenance/{source_id}")
