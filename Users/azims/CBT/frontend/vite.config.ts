@@ -23,7 +23,14 @@ import react from '@vitejs/plugin-react';
  */
 
 // Python FastAPI endpoint prefixes (port 8000)
-const PYTHON_PREFIXES = [
+  '/api/candles',
+  '/api/tickers',
+  '/api/mtf',
+  '/api/scan',
+  '/api/research',
+  '/api/desk',
+  '/api/paper',
+  '/api/institutional',
   '/api/sky',
   '/api/decision',
   '/api/prediction',
