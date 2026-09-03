@@ -57,6 +57,7 @@ const PYTHON_PREFIXES = [
   '/api/chart',
   '/api/memory',
   '/api/ai',
+  '/api/kronos',
   '/ws',
 ];
 
