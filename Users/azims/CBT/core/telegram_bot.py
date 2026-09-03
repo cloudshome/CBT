@@ -312,15 +312,25 @@ class DeskStateMind:
         from core.event_shock_engine import event_shock_engine
 
         try:
+            from core.market_providers import market_gateway
+
             query_u = query.upper()
             target_sym = "ETH/USDT" if ("ETH" in query_u or "ETHEREUM" in query_u) else \
                          "SOL/USDT" if ("SOL" in query_u or "SOLANA" in query_u) else \
                          "XAU/USD" if ("GOLD" in query_u or "XAU" in query_u or "PAXG" in query_u) else \
                          "BTC/USDT"
 
-            btc_p = await data_streamer.get_live_ticker("BTC/USDT")
-            eth_p = await data_streamer.get_live_ticker("ETH/USDT")
-            cur_p = await data_streamer.get_live_ticker(target_sym)
+            btc_ticker = await market_gateway.get_ticker("BTC/USDT")
+            eth_ticker = await market_gateway.get_ticker("ETH/USDT")
+            target_ticker = await market_gateway.get_ticker(target_sym)
+
+            cur_p = float(target_ticker.get("price", 0.0))
+            change_24h = float(target_ticker.get("change_24h_pct", 0.0))
+            high_24h = float(target_ticker.get("high_24h", cur_p))
+            low_24h = float(target_ticker.get("low_24h", cur_p))
+            volume_24h = float(target_ticker.get("volume_24h", 0.0))
+            source = str(target_ticker.get("source", "BINANCE_REST"))
+
             open_pos = portfolio_shadow.get_open_positions()
             macro = macro_sentinel.get_macro_snapshot()
             event_st = event_shock_engine.evaluate_risk_state()
@@ -328,9 +338,14 @@ class DeskStateMind:
             telemetry = {
                 "symbol": target_sym,
                 "current_price": cur_p,
-                "btc_price": btc_p,
-                "eth_price": eth_p,
-                "change_24h": 2.45,
+                "price": cur_p,
+                "btc_price": float(btc_ticker.get("price", 77900.0)),
+                "eth_price": float(eth_ticker.get("price", 2410.0)),
+                "change_24h": change_24h,
+                "high_24h": high_24h,
+                "low_24h": low_24h,
+                "volume_24h": volume_24h,
+                "data_source": source,
                 "open_paper_positions_count": len(open_pos),
                 "open_paper_positions": open_pos,
                 "macro_regime": macro.macro_regime,
@@ -342,21 +357,23 @@ class DeskStateMind:
             }
 
             if "XAU" in target_sym or "GOLD" in target_sym:
+                telemetry["gold_price"] = cur_p
+                telemetry["gold_change_pct"] = change_24h
+                telemetry["gold_high_24h"] = high_24h
+                telemetry["gold_low_24h"] = low_24h
                 try:
                     from core.macro_gold_engine import macro_gold_engine
                     from core.physical_supply_shock import physical_supply_shock_engine
                     gold_telemetry = macro_gold_engine.evaluate_macro_state(gold_price=cur_p)
-                    shock = physical_supply_shock_engine.detect_supply_shock(gold_price=cur_p)
-                    telemetry["gold_price"] = cur_p
-                    telemetry["gold_change_pct"] = 0.68
+                    shock = physical_supply_shock_engine.analyze("XAU/USD", current_price=cur_p)
                     telemetry["us_10y_real_yield_pct"] = gold_telemetry.us_10y_real_yield_pct
                     telemetry["central_bank_net_flow"] = gold_telemetry.central_bank_net_flow_metric
                     telemetry["shanghai_gold_premium"] = shock.shanghai_gold_exchange_premium_usd
                     telemetry["active_fixing_session"] = gold_telemetry.active_fixing_session
                     telemetry["gold_macro_regime"] = gold_telemetry.macro_regime.value
                     telemetry["gold_macro_bias"] = gold_telemetry.macro_bias
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error enriching gold telemetry: {e}")
 
             ai_response = await quant_mentor.generate_response(
                 user_message=query,
