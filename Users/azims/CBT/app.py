@@ -223,6 +223,20 @@ class TelegramWebhookRequest(BaseModel):
     message: Optional[Dict[str, Any]] = None
 
 
+class PaperTradeRequest(BaseModel):
+    symbol: str
+    side: str
+    entryPrice: float
+    sl: float
+    tp: float
+    size: Optional[float] = 1.0
+
+
+class PaperCloseRequest(BaseModel):
+    positionId: str
+    exitPrice: Optional[float] = None
+
+
 class IngestSourceRequest(BaseModel):
     source_type: str  # "URL", "PDF", "AUDIO", "IMAGE", "TEXT", "YOUTUBE"
     content: str
@@ -1093,6 +1107,95 @@ async def close_shadow_position(req: PositionCloseRequest):
 async def reset_shadow_positions():
     portfolio_shadow.reset_all_positions()
     return {"status": "SUCCESS", "message": "All shadow positions reset."}
+
+
+# ------------------------------------------------------------------------------
+# UI PAPER TRADING ADAPTER (Bridges Web UI to Python portfolio_shadow)
+# ------------------------------------------------------------------------------
+
+@app.get("/api/paper/positions")
+async def get_paper_positions():
+    """
+    Returns active shadow portfolio positions mapped to the PaperPositionsResponse schema for the Web UI.
+    """
+    open_pos = portfolio_shadow.get_open_positions()
+    mapped = []
+    for p in open_pos:
+        side = "BUY" if p.get("direction") == "LONG" else "SELL"
+        pnl = float(p.get("unrealized_pnl", 0.0))
+        mapped.append({
+            "id": p.get("position_id", ""),
+            "symbol": p.get("symbol", ""),
+            "side": side,
+            "entryPrice": p.get("entry_price", 0.0),
+            "currentPrice": p.get("current_price", p.get("entry_price", 0.0)),
+            "sl": p.get("stop_loss", 0.0),
+            "tp": p.get("take_profit", 0.0),
+            "size": p.get("size", 1.0),
+            "status": p.get("status", "OPEN"),
+            "pnl": round(pnl, 2),
+            "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
+            "createdAt": str(p.get("opened_at", "")),
+        })
+    return {"positions": mapped, "count": len(mapped)}
+
+
+@app.get("/api/paper/config")
+async def get_paper_risk_config():
+    """
+    Returns the active paper desk risk configuration for the Web UI.
+    """
+    return {
+        "config": {
+            "accountBalance": 100000.0,
+            "maxDrawdown": 0.025,
+            "maxOpenTrades": 3,
+            "dailyLossLimit": 2500.0,
+            "maxRiskPerTrade": 0.02,
+        }
+    }
+
+
+@app.post("/api/paper/trade")
+async def place_paper_trade(order: PaperTradeRequest):
+    """
+    Places a simulated paper trade into the shadow portfolio from the Web UI.
+    """
+    direction = "LONG" if order.side.upper() in ["BUY", "LONG"] else "SHORT"
+    pos_id = portfolio_shadow.open_position(
+        symbol=order.symbol,
+        direction=direction,
+        size=order.size or 1.0,
+        entry_price=order.entryPrice,
+        stop_loss=order.sl,
+        take_profit=order.tp,
+    )
+    return {
+        "message": "Simulated order filled successfully",
+        "trade": {
+            "id": pos_id,
+            "symbol": order.symbol,
+            "side": order.side.upper(),
+            "entryPrice": order.entryPrice,
+            "sl": order.sl,
+            "tp": order.tp,
+            "size": order.size or 1.0,
+            "status": "OPEN",
+            "pnl": 0.0,
+            "createdAt": str(int(time.time() * 1000)),
+        },
+    }
+
+
+@app.post("/api/paper/close")
+async def close_paper_trade(req: PaperCloseRequest):
+    """
+    Closes an active paper position directly from the Web UI.
+    """
+    success = portfolio_shadow.close_position(req.positionId, req.exitPrice)
+    if not success:
+        raise HTTPException(status_code=404, detail="Position not found or already closed.")
+    return {"status": "SUCCESS", "message": f"Position {req.positionId} closed."}
 
 
 @app.post("/api/command/parse", dependencies=[Depends(require_api_key)])

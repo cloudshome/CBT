@@ -289,6 +289,18 @@ export const App: React.FC = () => {
     }
   };
 
+  // 5.1 Handle Close Paper Practice Position
+  const handleClosePosition = async (positionId: string): Promise<void> => {
+    try {
+      await api.closePaperPosition(positionId);
+      addToast('info', 'Position Closed', `Closed paper position #${positionId}`);
+      fetchPositions();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to close position';
+      addToast('error', 'Closure Error', msg);
+    }
+  };
+
   // 6. Handle Risk-First Order Desk Execution
   const handlePlaceRiskOrder = async (order: {
     symbol: string;
@@ -689,13 +701,18 @@ export const App: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveRightTab('PAPER')}
-              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+              className={`flex-1 py-1 px-2 rounded text-center transition-all flex items-center justify-center gap-1.5 ${
                 activeRightTab === 'PAPER'
                   ? 'bg-sky-500 text-white font-bold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Positions
+              <span>Positions</span>
+              {positions.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-emerald-500 text-[#0B0E14] text-[10px] rounded-full font-bold leading-none">
+                  {positions.length}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveRightTab('AI_DESK')}
@@ -743,6 +760,7 @@ export const App: React.FC = () => {
                 riskConfig={riskConfig}
                 onSubmitTrade={handlePlaceTrade}
                 onRefreshPositions={fetchPositions}
+                onClosePosition={handleClosePosition}
                 loading={loadingMarket}
               />
             </div>

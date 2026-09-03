@@ -76,7 +76,7 @@ export interface ScanApiResponse {
 }
 
 export interface PaperTrade {
-  id: number;
+  id: number | string;
   symbol: string;
   side: 'BUY' | 'SELL';
   entryPrice: number;
@@ -84,8 +84,10 @@ export interface PaperTrade {
   tp: number;
   size: number;
   status: 'OPEN' | 'CLOSED' | 'CANCELLED';
+  currentPrice?: number;
   pnl?: number;
   exitPrice?: number;
+  breakevenTriggered?: boolean;
   createdAt: string;
   closedAt?: string;
 }

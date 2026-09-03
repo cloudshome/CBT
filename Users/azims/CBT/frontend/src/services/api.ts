@@ -215,6 +215,18 @@ export const api = {
   },
 
   /**
+   * POST /api/paper/close
+   */
+  async closePaperPosition(positionId: string, exitPrice?: number): Promise<{ status: string; message: string }> {
+    const res = await authFetch(`${BASE_URL}/api/paper/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ positionId, exitPrice }),
+    });
+    return handleResponse<{ status: string; message: string }>(res);
+  },
+
+  /**
    * POST /api/desk/ai-brief
    */
   async getDeskBrief(symbol: string, timeframe: SupportedTimeframe = '15m'): Promise<DeskBriefResponse> {
