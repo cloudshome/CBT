@@ -46,6 +46,10 @@ export function createApp(): Express {
     res.json({ status: 'ok', service: 'CTB-Backend' });
   });
 
+  app.get('/api/health', (_req: Request, res: Response) => {
+    res.json({ status: 'ok', service: 'CTB-Backend' });
+  });
+
   // Readiness check endpoint (public)
   app.get('/api/readiness', (_req: Request, res: Response) => {
     res.json({

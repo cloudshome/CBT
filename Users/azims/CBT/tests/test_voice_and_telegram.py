@@ -205,6 +205,29 @@ def test_api_telegram_broadcast_endpoint(client):
     assert "status" in data
 
 
+@pytest.mark.asyncio
+async def test_smart_brain_notification_engine():
+    from core.telegram_bot import telegram_bot
+    notifier = telegram_bot.smart_notifier
+
+    # 1. Deduplication suppression check
+    test_headline = "Whale accumulation reaches multi-year peak"
+    assert not notifier.is_suppressed("test_alert", test_headline, cooldown_seconds=3600)
+    # Immediate repeat of same content must be suppressed
+    assert notifier.is_suppressed("test_alert", test_headline, cooldown_seconds=3600)
+
+    # 2. Distant macro events (>60m away) must never produce unsolicited alerts
+    initial_milestones = set(notifier._notified_milestones)
+    await notifier.check_macro_milestones()
+    # FOMC is >1000m away, so no new milestone should be added
+    assert notifier._notified_milestones == initial_milestones
+
+    # 3. Position alerts format correctly
+    assert await telegram_bot.send_position_alert("BREAKEVEN_TRIGGERED", {"symbol": "BTC/USDT", "price": 89500.0})
+    assert await telegram_bot.send_position_alert("TAKE_PROFIT_HIT", {"symbol": "BTC/USDT", "price": 91000.0, "pnl_usd": 150.0})
+
+
+
 
 # ==============================================================================
 # EMPIRICAL ACCUMULATOR TESTS

@@ -128,5 +128,29 @@ Before declaring any substantial feature complete or ready for release:
 - [ ] 3-Tier cost modeling evaluated (Base, Conservative, Stress) where trading expectancy is claimed
 - [ ] Risk Gate separation preserved (cannot bypass deterministic Half-Kelly and daily loss limits)
 - [ ] Git status and diff reviewed; zero secrets/credentials committed
+- [ ] Database isolation verified: Tests run strictly against test sandboxes (`tests/conftest.py`), never touching production SQLite ledgers
 - [ ] 100% test suite passing (Python Pytest + Jest suites green)
 - [ ] Preflight verification script (`scripts/system_preflight.py`) executed and passed
+
+---
+
+## 9. SURGICAL ENGINEERING DISCIPLINE & TEST ISOLATION
+
+To ensure robust autonomous operation without regressions or data destruction:
+
+1. **Inspect Before Modifying:**
+   - Never assume a file exists or guess its API signature.
+   - Always locate relevant files, read their current implementation (`view_file`), understand active dependencies, and check existing tests before editing.
+2. **Minimal Surgical Changes:**
+   - Make the smallest safe change necessary to satisfy the objective.
+   - Never rewrite entire multi-hundred-line modules when a targeted block edit suffices. Preserve surrounding architecture, state management, and docstrings.
+3. **Exact Line Grounding:**
+   - Use precise, character-exact contiguous edits targeting code that was explicitly inspected.
+   - Do not use brittle XML scratchpad gimmicks (such as fake `<thought_process>` tags in prompt streams); leverage native reasoning and transparent Implementation Plans (`implementation_plan.md`).
+4. **Sandboxed Verification & Self-Correction Loop:**
+   - Always run automated test suites after making code changes.
+   - When a test fails: capture traceback $\to$ inspect failing code $\to$ fix root cause $\to$ verify green.
+   - **Production Isolation Guarantee:** Automated tests MUST execute in temporary sandbox environments (`tests/conftest.py`). Tests are strictly forbidden from wiping or mutating production databases (`data/trading_logs.db`).
+5. **No Silent Architectural Shifts:**
+   - Never silently change system architecture or dilute risk primacy (e.g. routing forecasting models directly to execution without Half-Kelly clearance).
+   - If a prompt conflicts with quantitative rules or causal firewalls, stop and trigger **The Golden Conflict Protocol** immediately.
