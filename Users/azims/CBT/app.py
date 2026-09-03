@@ -387,14 +387,22 @@ async def _telegram_market_cmd(args: str, chat_id=None) -> str:
 
 async def _telegram_events_cmd(args: str, chat_id=None) -> str:
     ev = telegram_bot.generate_event_shock_status()
+    mins = ev['minutes_until']
+    hours = mins / 60.0
+    time_display = f"{mins:.0f} mins ({hours:.1f} hours away)" if mins > 90 else f"{mins:.0f} mins away"
+    is_active = ev.get('is_risk_active', False)
+    lockout = ev.get('trading_lockout', False)
+    status = "🛑 EXECUTION LOCKOUT (Trading Halted)" if lockout else "⚠️ RISK GATE ACTIVE (+50% hurdle, 50% size cut)" if is_active else "🟢 NORMAL TRADING (No active macro lockout)"
+
     return (
-        f"📅 **HIGH-IMPACT MACRO CALENDAR**\n"
+        f"📅 **MACROECONOMIC SENTINEL RADAR**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"🚨 **Next Event:** `{ev['title']}`\n"
         f"💥 **Impact Tier:** `[{ev['impact']}]`\n"
-        f"⏳ **Time Until Release:** `{ev['minutes_until']:.0f} mins`\n"
-        f"🛡️ **Net EV Hurdle Multiplier:** `{ev['hurdle_mult']:.2f}x`\n"
-        f"🛡️ **Position Sizing Multiplier:** `{ev['size_mult']:.2f}x`"
+        f"⏳ **Countdown:** `{time_display}`\n"
+        f"🛡️ **Desk Status:** `{status}`\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Dynamic rules engage automatically at T-15m & T-5m."
     )
 
 def _telegram_news_cmd(args: str, chat_id=None) -> str:
@@ -510,6 +518,7 @@ async def telemetry_broadcaster_loop():
                         "symbol": sym,
                         "price": cur_price,
                         "pnl_usd": ev.get("realized_pnl", 0.0),
+                        "autopsy": ev.get("autopsy"),
                         "message": ev.get("message", ""),
                     }
                     asyncio.create_task(telegram_bot.send_position_alert(ev.get("event", "FILL"), alert_details))
