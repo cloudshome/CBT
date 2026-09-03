@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
 
@@ -16,6 +16,9 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
+  activeView?: 'TERMINAL' | 'PAPER_DESK';
+  onViewChange?: (view: 'TERMINAL' | 'PAPER_DESK') => void;
+  openPositionsCount?: number;
 }
 
 const POPULAR_SYMBOLS = [
@@ -39,6 +42,9 @@ export const Header: React.FC<HeaderProps> = ({
   onRefresh,
   notificationsEnabled,
   onToggleNotifications,
+  activeView = 'TERMINAL',
+  onViewChange,
+  openPositionsCount = 0,
 }) => {
   const safeTrend = String(trend || 'Consolidation');
   const isBullish = safeTrend.toLowerCase().includes('bullish');
@@ -72,6 +78,37 @@ export const Header: React.FC<HeaderProps> = ({
             <Activity className="w-3.5 h-3.5 animate-pulse text-terminal-cyan" />
             <span>DESK ENGINE ACTIVE</span>
           </div>
+        </div>
+
+        {/* Primary Screen View Switcher: Terminal vs Shadow Paper Desk */}
+        <div className="flex items-center bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
+          <button
+            onClick={() => onViewChange?.('TERMINAL')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'TERMINAL'
+                ? 'bg-sky-500 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Activity size={14} />
+            <span>Terminal</span>
+          </button>
+          <button
+            onClick={() => onViewChange?.('PAPER_DESK')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'PAPER_DESK'
+                ? 'bg-sky-500 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Layers size={14} />
+            <span>Paper Desk</span>
+            {openPositionsCount > 0 && (
+              <span className="px-1.5 py-0.5 bg-emerald-500 text-[#0B0E14] text-[10px] rounded-full font-bold leading-none">
+                {openPositionsCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Center: Symbol & Timeframe Selectors */}

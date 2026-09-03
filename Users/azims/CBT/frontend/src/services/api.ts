@@ -4,6 +4,7 @@ import {
   MTFApiResponse,
   ScanApiResponse,
   PaperPositionsResponse,
+  PaperDeskOverviewResponse,
   PaperTrade,
   RiskConfig,
   DeskBriefResponse,
@@ -196,6 +197,15 @@ export const api = {
       body: JSON.stringify(trade),
     });
     return handleResponse<{ message: string; trade: PaperTrade }>(res);
+  },
+
+  /**
+   * GET /api/paper/desk-overview
+   * Complete institutional Paper Trading Desk Overview (Past, Current, Future Queue).
+   */
+  async getPaperDeskOverview(): Promise<PaperDeskOverviewResponse> {
+    const res = await authFetch(`${BASE_URL}/api/paper/desk-overview`);
+    return handleResponse<PaperDeskOverviewResponse>(res);
   },
 
   /**

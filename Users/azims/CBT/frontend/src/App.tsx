@@ -11,6 +11,7 @@ import { RiskFirstOrderDesk } from './components/RiskFirstOrderDesk';
 import { MTFPanel } from './components/MTFPanel';
 import { SMCScanPanel } from './components/SMCScanPanel';
 import { PaperTradingPanel } from './components/PaperTradingPanel';
+import { DedicatedPaperTradingDesk } from './components/DedicatedPaperTradingDesk';
 import { GeminiDeskCopilot } from './components/GeminiDeskCopilot';
 import { SKYIntelligencePanel } from './components/SKYIntelligencePanel';
 import { HedgeFundBrainSuite } from './components/HedgeFundBrainSuite';
@@ -87,6 +88,9 @@ export const App: React.FC = () => {
   // Gemini Intelligence State
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
+
+  // Main Screen View Switcher: Terminal Cockpit vs Dedicated Shadow Paper Trading Desk
+  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'PAPER_DESK'>('TERMINAL');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -391,9 +395,19 @@ export const App: React.FC = () => {
         }}
         notificationsEnabled={notificationsEnabled}
         onToggleNotifications={handleToggleNotifications}
+        activeView={activeMainView}
+        onViewChange={setActiveMainView}
+        openPositionsCount={positions.length}
       />
 
-      {/* Institutional Quantitative HUD Control Bar */}
+      {/* Primary View Routing: Dedicated Shadow Paper Desk vs Full Terminal Cockpit */}
+      {activeMainView === 'PAPER_DESK' ? (
+        <DedicatedPaperTradingDesk
+          onClosePosition={handleClosePosition}
+        />
+      ) : (
+        <>
+          {/* Institutional Quantitative HUD Control Bar */}
       <div className="max-w-[1920px] w-full mx-auto px-4 pt-2 space-y-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
@@ -780,6 +794,8 @@ export const App: React.FC = () => {
           )}
         </div>
       </main>
+        </>
+      )}
 
       {/* Floating Global Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
