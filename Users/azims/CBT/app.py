@@ -2112,7 +2112,12 @@ async def get_kronos_forecast(
     Generates multi-sample probabilistic path forecasts using the Kronos Foundation Model.
     Includes expected return, path dispersion, directional consensus, and model uncertainty.
     """
-    candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
+    try:
+        candles = await data_streamer.fetch_external_ohlcv(symbol, timeframe, limit=lookback + 20)
+        if not candles or len(candles) < 20:
+            candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
+    except Exception:
+        candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
     forecast = kronos_adapter.predict(
         symbol=symbol,
         timeframe=timeframe,
