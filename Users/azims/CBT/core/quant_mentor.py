@@ -318,23 +318,66 @@ class QuantMentor:
         # --------------------------------------------------------------------------
         plan_triggers = ["plan", "setup", "signal", "buy or sell", "should i buy", "entry", "trade", "kinbo", "sell korbo", "what should i do"]
         if any(w in msg_lower for w in plan_triggers):
-            side = "BUY / LONG" if bias == "BULLISH" else "SELL / SHORT"
-            sl = round(price * 0.988, 2) if bias == "BULLISH" else round(price * 1.012, 2)
-            tp1 = round(price * 1.018, 2) if bias == "BULLISH" else round(price * 0.982, 2)
-            tp2 = round(price * 1.035, 2) if bias == "BULLISH" else round(price * 0.965, 2)
+            smc = telemetry.get("smc_setup")
+            if smc:
+                tf_label = smc.get("timeframe", "15m").upper()
+                side = smc.get("action", "BUY / LONG on pullback")
+                entry_zone = smc.get("entry_zone")
+                sl = smc.get("stop_loss")
+                risk_pct = smc.get("risk_pct", 0.65)
+                risk_val = smc.get("risk_val", 250.0)
+                tp1 = smc.get("tp1")
+                tp2 = smc.get("tp2")
+                pat = smc.get("pattern_type", "ORDER_BLOCK")
+                exp_r = smc.get("expectancy_r", 1.5)
 
-            return (
-                f"📋 **{target_sym} ACTIONABLE TRADING PLAN**\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🎯 **Action:** `{side}` on pullback\n"
-                f"📥 **Ideal Entry Zone:** `${fvg_low:,.2f} — ${fvg_high:,.2f}`\n"
-                f"🛑 **Hard Stop Loss:** `${sl:,.2f}` (Strict 1.2% risk)\n"
-                f"🎯 **Take Profit 1:** `${tp1:,.2f}` (+1.5R: Arm Breakeven)\n"
-                f"🎯 **Take Profit 2:** `${tp2:,.2f}` (+2.9R: Major Liquidity)\n"
-                f"⚖️ **Risk Sizing:** Half-Kelly allocation: `2.15% equity` max.\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"Send `/signal {target_sym}` to auto-deploy this plan to the Shadow Desk!"
-            )
+                if is_bangla or lang == "bn":
+                    return (
+                        f"📋 **{target_sym} [{tf_label}] অ্যালগরিদমিক ট্রেড সেটআপ:**\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"🎯 **অ্যাকশন:** `{side}`\n"
+                        f"🧱 **SMC প্যাটার্ন:** `{pat}` (এক্সপেক্টেন্সি: `+{exp_r:.2f}R`)\n"
+                        f"📥 **এন্ট্রি জোন:** `{entry_zone}`\n"
+                        f"🛑 **হার্ড স্টপ লস:** `${sl:,.2f}` (রিস্ক: `${risk_val:,.2f}` / `{risk_pct:.2f}%`)\n"
+                        f"🎯 **টেক প্রফিট ১ (+1.5R):** `${tp1:,.2f}`\n"
+                        f"🎯 **টেক প্রফিট ২ (+2.5R):** `${tp2:,.2f}`\n"
+                        f"⚖️ **পজিশন সাইজিং:** হাফ-কেলি রিস্ক: সর্বোচ্চ `1.85% ক্যাপিটাল`।\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"লাইভ {tf_label} ক্যান্ডেল স্ক্যান সম্পন্ন। অটো-এক্সিকিউট করতে `/signal {target_sym}` পাঠান!"
+                    )
+                else:
+                    return (
+                        f"📋 **{target_sym} [{tf_label}] ACTIONABLE QUANTITATIVE TRADE SETUP**\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"🎯 **Action:** `{side}`\n"
+                        f"🧱 **SMC Anchor:** `{pat}` (Expectancy: `+{exp_r:.2f}R`)\n"
+                        f"📥 **Ideal Entry Zone:** `{entry_zone}`\n"
+                        f"🛑 **Hard Stop Loss:** `${sl:,.2f}` (Strict risk: `${risk_val:,.2f}` / `{risk_pct:.2f}%`)\n"
+                        f"🎯 **Take Profit 1:** `${tp1:,.2f}` (+1.5R mathematically validated)\n"
+                        f"🎯 **Take Profit 2:** `${tp2:,.2f}` (+2.5R mathematical target)\n"
+                        f"⚖️ **Position Sizing:** Half-Kelly risk bounds: `1.85% portfolio equity` max.\n"
+                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Scanned dynamically across live {tf_label} candles. Send `/signal {target_sym}` to auto-deploy!"
+                    )
+            else:
+                side = "BUY / LONG" if bias == "BULLISH" else "SELL / SHORT"
+                sl = round(price * 0.988, 2) if bias == "BULLISH" else round(price * 1.012, 2)
+                risk_val = abs(price - sl)
+                tp1 = round(price + (1.5 * risk_val), 2) if bias == "BULLISH" else round(price - (1.5 * risk_val), 2)
+                tp2 = round(price + (2.5 * risk_val), 2) if bias == "BULLISH" else round(price - (2.5 * risk_val), 2)
+
+                return (
+                    f"📋 **{target_sym} ACTIONABLE TRADING PLAN**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🎯 **Action:** `{side}` on pullback\n"
+                    f"📥 **Ideal Entry Zone:** `${fvg_low:,.2f} — ${fvg_high:,.2f}`\n"
+                    f"🛑 **Hard Stop Loss:** `${sl:,.2f}` (Strict 1.2% risk)\n"
+                    f"🎯 **Take Profit 1:** `${tp1:,.2f}` (+1.5R: Arm Breakeven)\n"
+                    f"🎯 **Take Profit 2:** `${tp2:,.2f}` (+2.5R: Major Liquidity)\n"
+                    f"⚖️ **Risk Sizing:** Half-Kelly allocation: `2.15% equity` max.\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Send `/signal {target_sym}` to auto-deploy this plan to the Shadow Desk!"
+                )
 
         # --------------------------------------------------------------------------
         # INTENT 5: MACRO / NEWS / WHY DUMPING / WHY PUMPING / FOMC

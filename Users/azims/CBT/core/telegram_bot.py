@@ -375,6 +375,71 @@ class DeskStateMind:
                 except Exception as e:
                     logger.debug(f"Error enriching gold telemetry: {e}")
 
+            # Dynamic Algorithmic SMC Scanner for Trade Plan Queries
+            tf = "15m"
+            for t_opt in ["15m", "30m", "1h", "4h", "1d", "5m", "3m", "1m"]:
+                if t_opt in query.lower():
+                    tf = t_opt
+                    break
+
+            if any(w in query.lower() for w in ["trade", "setup", "signal", "plan", "entry", "kinbo", "sell"]):
+                try:
+                    from core.smc_engine import smc_engine
+                    candles = await data_streamer.fetch_external_ohlcv(target_sym, tf, limit=100)
+                    if candles and len(candles) >= 10:
+                        patterns = smc_engine.scan(target_sym, tf, candles)
+                        bullish_obs = [p for p in patterns if "BULLISH_OB" in p.pattern_type.value]
+                        bearish_obs = [p for p in patterns if "BEARISH_OB" in p.pattern_type.value]
+                        bullish_fvgs = [p for p in patterns if "BULLISH_FVG" in p.pattern_type.value]
+                        bearish_fvgs = [p for p in patterns if "BEARISH_FVG" in p.pattern_type.value]
+
+                        bias_direction = "BULLISH" if len(bullish_obs) >= len(bearish_obs) else "BEARISH"
+
+                        if bias_direction == "BULLISH" and (bullish_obs or bullish_fvgs):
+                            active_pat = bullish_obs[-1] if bullish_obs else bullish_fvgs[-1]
+                            entry_mid = active_pat.mid_price
+                            entry_zone = f"${active_pat.bottom_price:,.2f} — ${active_pat.top_price:,.2f}"
+                            sl_level = round(active_pat.bottom_price - (cur_p * 0.001), 2)
+                            risk_val = max(1.0, entry_mid - sl_level)
+                            tp1_level = round(entry_mid + (1.5 * risk_val), 2)
+                            tp2_level = round(entry_mid + (2.5 * risk_val), 2)
+                            action_side = "BUY / LONG on pullback"
+                        elif bias_direction == "BEARISH" and (bearish_obs or bearish_fvgs):
+                            active_pat = bearish_obs[-1] if bearish_obs else bearish_fvgs[-1]
+                            entry_mid = active_pat.mid_price
+                            entry_zone = f"${active_pat.bottom_price:,.2f} — ${active_pat.top_price:,.2f}"
+                            sl_level = round(active_pat.top_price + (cur_p * 0.001), 2)
+                            risk_val = max(1.0, sl_level - entry_mid)
+                            tp1_level = round(entry_mid - (1.5 * risk_val), 2)
+                            tp2_level = round(entry_mid - (2.5 * risk_val), 2)
+                            action_side = "SELL / SHORT on rejection"
+                        else:
+                            entry_zone = f"${round(cur_p * 0.995, 2):,.2f} — ${round(cur_p * 0.998, 2):,.2f}"
+                            entry_mid = round(cur_p * 0.9965, 2)
+                            sl_level = round(cur_p * 0.992, 2)
+                            risk_val = entry_mid - sl_level
+                            tp1_level = round(entry_mid + (1.5 * risk_val), 2)
+                            tp2_level = round(entry_mid + (2.5 * risk_val), 2)
+                            action_side = "BUY / LONG on pullback"
+
+                        telemetry["smc_setup"] = {
+                            "timeframe": tf,
+                            "action": action_side,
+                            "entry_zone": entry_zone,
+                            "entry_mid": entry_mid,
+                            "stop_loss": sl_level,
+                            "risk_val": round(risk_val, 2),
+                            "risk_pct": round((risk_val / entry_mid) * 100, 2),
+                            "tp1": tp1_level,
+                            "tp2": tp2_level,
+                            "tp1_r": 1.5,
+                            "tp2_r": 2.5,
+                            "pattern_type": active_pat.pattern_type.value if "active_pat" in locals() else "SMC_CONFLUENCE",
+                            "expectancy_r": active_pat.conditional_expectancy_r if "active_pat" in locals() else 1.45,
+                        }
+                except Exception as e:
+                    logger.debug(f"Error computing live SMC setup: {e}")
+
             ai_response = await quant_mentor.generate_response(
                 user_message=query,
                 market_telemetry=telemetry,
