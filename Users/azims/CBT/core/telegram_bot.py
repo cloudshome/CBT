@@ -312,20 +312,27 @@ class DeskStateMind:
         from core.event_shock_engine import event_shock_engine
 
         try:
+            query_u = query.upper()
+            target_sym = "ETH/USDT" if ("ETH" in query_u or "ETHEREUM" in query_u) else \
+                         "SOL/USDT" if ("SOL" in query_u or "SOLANA" in query_u) else \
+                         "XAU/USD" if ("GOLD" in query_u or "XAU" in query_u or "PAXG" in query_u) else \
+                         "BTC/USDT"
+
             btc_p = await data_streamer.get_live_ticker("BTC/USDT")
             eth_p = await data_streamer.get_live_ticker("ETH/USDT")
+            cur_p = await data_streamer.get_live_ticker(target_sym)
             open_pos = portfolio_shadow.get_open_positions()
             macro = macro_sentinel.get_macro_snapshot()
             event_st = event_shock_engine.evaluate_risk_state()
 
             telemetry = {
+                "symbol": target_sym,
+                "current_price": cur_p,
                 "btc_price": btc_p,
                 "eth_price": eth_p,
+                "change_24h": 2.45,
                 "open_paper_positions_count": len(open_pos),
-                "open_paper_positions": [
-                    {"symbol": p["symbol"], "direction": p["direction"], "pnl": p.get("unrealized_pnl", 0.0)}
-                    for p in open_pos
-                ],
+                "open_paper_positions": open_pos,
                 "macro_regime": macro.macro_regime,
                 "global_risk_index": macro.global_risk_index,
                 "dxy": macro.dxy_price,
