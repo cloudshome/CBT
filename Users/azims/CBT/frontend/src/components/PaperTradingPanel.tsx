@@ -20,6 +20,7 @@ interface PaperTradingPanelProps {
     size: number;
   }) => Promise<void>;
   onRefreshPositions: () => void;
+  onClosePosition?: (positionId: string) => Promise<void>;
   loading?: boolean;
 }
 
@@ -34,8 +35,10 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
   riskConfig,
   onSubmitTrade,
   onRefreshPositions,
+  onClosePosition,
   loading = false,
 }) => {
+  const [closingId, setClosingId] = useState<string | null>(null);
   const [side, setSide] = useState<'BUY' | 'SELL'>(initialSide);
   const [entryPrice, setEntryPrice] = useState<string>(
     initialEntry ? String(initialEntry) : lastPrice > 0 ? String(lastPrice) : '65000'
@@ -101,7 +104,7 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-            BAL: ${accountBalance.toLocaleString()}
+            BAL: ${Number(accountBalance || 0).toLocaleString()}
           </span>
           <button
             onClick={onRefreshPositions}
@@ -272,25 +275,31 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
                 No active open paper trades.
               </div>
             ) : (
-              <div className="overflow-x-auto max-h-[220px] overflow-y-auto">
+              <div className="overflow-x-auto max-h-[260px] overflow-y-auto">
                 <table className="w-full text-left text-[11px] font-mono">
                   <thead className="bg-background text-slate-400 border-b border-border sticky top-0">
                     <tr>
                       <th className="py-1.5 px-2">ID</th>
                       <th className="py-1.5 px-2">SYMBOL</th>
                       <th className="py-1.5 px-2">SIDE</th>
-                      <th className="py-1.5 px-2">ENTRY</th>
-                      <th className="py-1.5 px-2">SL</th>
-                      <th className="py-1.5 px-2">TP</th>
+                      <th className="py-1.5 px-2">ENTRY / LIVE</th>
+                      <th className="py-1.5 px-2">SL / TP</th>
+                      <th className="py-1.5 px-2 text-right">UNREALIZED P&amp;L</th>
                       <th className="py-1.5 px-2">STATUS</th>
+                      {onClosePosition && <th className="py-1.5 px-2 text-right">ACTION</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
                     {positions.map((pos) => {
                       const isLong = pos.side === 'BUY';
+                      const pnl = pos.pnl ?? 0;
+                      const sign = pnl >= 0 ? '+' : '';
+                      const idStr = String(pos.id);
                       return (
-                        <tr key={pos.id} className="hover:bg-background-hover transition-colors">
-                          <td className="py-1.5 px-2 text-slate-400">#{pos.id}</td>
+                        <tr key={idStr} className="hover:bg-background-hover transition-colors">
+                          <td className="py-1.5 px-2 text-slate-400 font-mono text-[10px]">
+                            {idStr.length > 14 ? `#${idStr.slice(-8)}` : `#${idStr}`}
+                          </td>
                           <td className="py-1.5 px-2 font-bold text-white">{pos.symbol}</td>
                           <td className="py-1.5 px-2">
                             <span
@@ -303,14 +312,54 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
                               {pos.side}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2 text-slate-200">${pos.entryPrice.toFixed(2)}</td>
-                          <td className="py-1.5 px-2 text-terminal-red">${pos.sl.toFixed(2)}</td>
-                          <td className="py-1.5 px-2 text-terminal-green">${pos.tp.toFixed(2)}</td>
-                          <td className="py-1.5 px-2">
-                            <span className="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-300">
-                              {pos.status}
+                          <td className="py-1.5 px-2 text-slate-200">
+                            <div>${Number(pos.entryPrice || 0).toFixed(2)}</div>
+                            {pos.currentPrice ? (
+                              <div className="text-[10px] text-slate-400">
+                                Live: ${Number(pos.currentPrice).toFixed(2)}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="py-1.5 px-2 text-[10px]">
+                            <div className="text-terminal-red">SL: ${Number(pos.sl || 0).toFixed(2)}</div>
+                            <div className="text-terminal-green">TP: ${Number(pos.tp || 0).toFixed(2)}</div>
+                          </td>
+                          <td className="py-1.5 px-2 text-right font-bold">
+                            <span className={pnl >= 0 ? 'text-terminal-green' : 'text-terminal-red'}>
+                              {sign}${pnl.toFixed(2)}
                             </span>
                           </td>
+                          <td className="py-1.5 px-2">
+                            {pos.breakevenTriggered ? (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-900/60 text-sky-300 border border-sky-500/40">
+                                🛡️ BE ACTIVE
+                              </span>
+                            ) : (
+                              <span className="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-300">
+                                {pos.status}
+                              </span>
+                            )}
+                          </td>
+                          {onClosePosition && (
+                            <td className="py-1.5 px-2 text-right">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (closingId) return;
+                                  setClosingId(idStr);
+                                  try {
+                                    await onClosePosition(idStr);
+                                  } finally {
+                                    setClosingId(null);
+                                  }
+                                }}
+                                disabled={closingId === idStr}
+                                className="px-2 py-0.5 rounded text-[10px] bg-terminal-red/20 text-terminal-red border border-terminal-red/30 hover:bg-terminal-red/30 transition-all disabled:opacity-50 font-bold"
+                              >
+                                {closingId === idStr ? '...' : 'CLOSE'}
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}

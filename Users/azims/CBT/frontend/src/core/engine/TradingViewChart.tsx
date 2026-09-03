@@ -1316,12 +1316,20 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     { id: 'SHORT_POSITION', label: 'Short Position R:R Tool', icon: ArrowDownCircle },
   ];
 
-  const lastCandle = candles[candles.length - 1];
-  const lastPrice = liveCandle ? liveCandle[4] : (lastCandle ? lastCandle[4] : 0);
-  const openPrice = lastCandle ? lastCandle[1] : lastPrice;
-  const highPrice = lastCandle ? lastCandle[2] : lastPrice;
-  const lowPrice = lastCandle ? lastCandle[3] : lastPrice;
-  const priceChange = lastPrice - openPrice;
+  const lastCandle = candles && candles.length > 0 ? candles[candles.length - 1] : null;
+  const getCandleField = (c: unknown, idx: number, fallback = 0): number => {
+    if (!c) return fallback;
+    if (Array.isArray(c)) return Number(c[idx]) || fallback;
+    const keys = ['timestamp', 'open', 'high', 'low', 'close', 'volume'];
+    const key = keys[idx];
+    return Number((c as Record<string, unknown>)[key]) || fallback;
+  };
+
+  const lastPrice = liveCandle ? getCandleField(liveCandle, 4) : (lastCandle ? getCandleField(lastCandle, 4) : 0);
+  const openPrice = lastCandle ? getCandleField(lastCandle, 1, lastPrice) : lastPrice;
+  const highPrice = lastCandle ? getCandleField(lastCandle, 2, lastPrice) : lastPrice;
+  const lowPrice = lastCandle ? getCandleField(lastCandle, 3, lastPrice) : lastPrice;
+  const priceChange = (lastPrice || 0) - (openPrice || 0);
   const priceChangePct = openPrice > 0 ? (priceChange / openPrice) * 100 : 0;
   const isUp = priceChange >= 0;
 
@@ -1446,11 +1454,11 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             </button>
           </div>
 
-          {showKronos && kronosData && (
+          {showKronos && kronosData?.sky_derived_metrics && (
             <div className="hidden lg:flex items-center gap-2 px-2 py-0.5 bg-indigo-950/40 border border-indigo-500/30 rounded text-[10px] font-mono text-indigo-300 animate-in fade-in duration-200">
-              <span>Bias: <strong className={kronosData.sky_derived_metrics.directional_bias === 'BULLISH' ? 'text-emerald-400' : (kronosData.sky_derived_metrics.directional_bias === 'BEARISH' ? 'text-rose-400' : 'text-slate-300')}>{kronosData.sky_derived_metrics.directional_bias}</strong></span>
-              <span>Exp: <strong>{(kronosData.sky_derived_metrics.expected_return_pct * 100).toFixed(2)}%</strong></span>
-              <span>Consensus: <strong>{(kronosData.sky_derived_metrics.directional_consensus * 100).toFixed(0)}%</strong></span>
+              <span>Bias: <strong className={kronosData.sky_derived_metrics.directional_bias === 'BULLISH' ? 'text-emerald-400' : (kronosData.sky_derived_metrics.directional_bias === 'BEARISH' ? 'text-rose-400' : 'text-slate-300')}>{kronosData.sky_derived_metrics.directional_bias || 'NEUTRAL'}</strong></span>
+              <span>Exp: <strong>{((Number(kronosData.sky_derived_metrics.expected_return_pct) || 0) * 100).toFixed(2)}%</strong></span>
+              <span>Consensus: <strong>{((Number(kronosData.sky_derived_metrics.directional_consensus) || 0) * 100).toFixed(0)}%</strong></span>
             </div>
           )}
 
@@ -1582,22 +1590,22 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
             <div className="flex items-center gap-3 font-mono text-[11px] mt-0.5">
               {crosshairData ? (
                 <>
-                  <span className="text-slate-400">O <strong className="text-slate-200">${crosshairData.open.toFixed(2)}</strong></span>
-                  <span className="text-slate-400">H <strong className="text-slate-200">${crosshairData.high.toFixed(2)}</strong></span>
-                  <span className="text-slate-400">L <strong className="text-slate-200">${crosshairData.low.toFixed(2)}</strong></span>
-                  <span className="text-slate-400">C <strong className="text-slate-200">${crosshairData.close.toFixed(2)}</strong></span>
-                  <span className={crosshairData.changePct >= 0 ? 'text-[#089981] font-bold' : 'text-[#f23645] font-bold'}>
-                    {crosshairData.changePct >= 0 ? '+' : ''}{crosshairData.changePct.toFixed(2)}%
+                  <span className="text-slate-400">O <strong className="text-slate-200">${Number(crosshairData.open || 0).toFixed(2)}</strong></span>
+                  <span className="text-slate-400">H <strong className="text-slate-200">${Number(crosshairData.high || 0).toFixed(2)}</strong></span>
+                  <span className="text-slate-400">L <strong className="text-slate-200">${Number(crosshairData.low || 0).toFixed(2)}</strong></span>
+                  <span className="text-slate-400">C <strong className="text-slate-200">${Number(crosshairData.close || 0).toFixed(2)}</strong></span>
+                  <span className={(crosshairData.changePct || 0) >= 0 ? 'text-[#089981] font-bold' : 'text-[#f23645] font-bold'}>
+                    {(crosshairData.changePct || 0) >= 0 ? '+' : ''}{Number(crosshairData.changePct || 0).toFixed(2)}%
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="text-slate-400">O <strong className="text-slate-200">${openPrice.toFixed(2)}</strong></span>
-                  <span className="text-slate-400">H <strong className="text-slate-200">${highPrice.toFixed(2)}</strong></span>
-                  <span className="text-slate-400">L <strong className="text-slate-200">${lowPrice.toFixed(2)}</strong></span>
-                  <span className="text-slate-400">C <strong className="text-slate-200">${lastPrice.toFixed(2)}</strong></span>
+                  <span className="text-slate-400">O <strong className="text-slate-200">${Number(openPrice || 0).toFixed(2)}</strong></span>
+                  <span className="text-slate-400">H <strong className="text-slate-200">${Number(highPrice || 0).toFixed(2)}</strong></span>
+                  <span className="text-slate-400">L <strong className="text-slate-200">${Number(lowPrice || 0).toFixed(2)}</strong></span>
+                  <span className="text-slate-400">C <strong className="text-slate-200">${Number(lastPrice || 0).toFixed(2)}</strong></span>
                   <span className={isUp ? 'text-[#089981] font-bold' : 'text-[#f23645] font-bold'}>
-                    {isUp ? '+' : ''}{priceChangePct.toFixed(2)}%
+                    {isUp ? '+' : ''}{Number(priceChangePct || 0).toFixed(2)}%
                   </span>
                 </>
               )}

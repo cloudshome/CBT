@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
 
@@ -16,6 +16,9 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
+  activeView?: 'TERMINAL' | 'PAPER_DESK';
+  onViewChange?: (view: 'TERMINAL' | 'PAPER_DESK') => void;
+  openPositionsCount?: number;
 }
 
 const POPULAR_SYMBOLS = [
@@ -39,9 +42,13 @@ export const Header: React.FC<HeaderProps> = ({
   onRefresh,
   notificationsEnabled,
   onToggleNotifications,
+  activeView = 'TERMINAL',
+  onViewChange,
+  openPositionsCount = 0,
 }) => {
-  const isBullish = trend.toLowerCase().includes('bullish');
-  const isBearish = trend.toLowerCase().includes('bearish');
+  const safeTrend = String(trend || 'Consolidation');
+  const isBullish = safeTrend.toLowerCase().includes('bullish');
+  const isBearish = safeTrend.toLowerCase().includes('bearish');
 
   return (
     <header className="border-b border-border bg-background-subtle/80 backdrop-blur sticky top-0 z-40 px-4 py-3">
@@ -71,6 +78,37 @@ export const Header: React.FC<HeaderProps> = ({
             <Activity className="w-3.5 h-3.5 animate-pulse text-terminal-cyan" />
             <span>DESK ENGINE ACTIVE</span>
           </div>
+        </div>
+
+        {/* Primary Screen View Switcher: Terminal vs Shadow Paper Desk */}
+        <div className="flex items-center bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
+          <button
+            onClick={() => onViewChange?.('TERMINAL')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'TERMINAL'
+                ? 'bg-sky-500 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Activity size={14} />
+            <span>Terminal</span>
+          </button>
+          <button
+            onClick={() => onViewChange?.('PAPER_DESK')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'PAPER_DESK'
+                ? 'bg-sky-500 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Layers size={14} />
+            <span>Paper Desk</span>
+            {openPositionsCount > 0 && (
+              <span className="px-1.5 py-0.5 bg-emerald-500 text-[#0B0E14] text-[10px] rounded-full font-bold leading-none">
+                {openPositionsCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Center: Symbol & Timeframe Selectors */}
@@ -119,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="text-[10px] text-slate-500 font-mono uppercase">MARK PRICE</div>
               <div className="text-sm font-mono font-bold text-white">
-                ${lastPrice > 0 ? lastPrice.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '---'}
+                {Number(lastPrice || 0) > 0 ? Number(lastPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '---'}
               </div>
             </div>
 
@@ -128,8 +166,8 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="hidden sm:block">
               <div className="text-[10px] text-slate-500 font-mono uppercase">SESSION HIGH / LOW</div>
               <div className="text-xs font-mono text-slate-300">
-                <span className="text-terminal-green">${highPrice.toLocaleString()}</span> /{' '}
-                <span className="text-terminal-red">${lowPrice.toLocaleString()}</span>
+                <span className="text-terminal-green">${Number(highPrice || 0).toLocaleString()}</span> /{' '}
+                <span className="text-terminal-red">${Number(lowPrice || 0).toLocaleString()}</span>
               </div>
             </div>
 
@@ -152,7 +190,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-terminal-amber'
                 }`}
               >
-                {trend.split(' ')[0] || 'NEUTRAL'}
+                {safeTrend.split(' ')[0] || 'NEUTRAL'}
               </span>
             </div>
           </div>
@@ -162,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={async () => {
               try {
                 await api.broadcastTelegramAlert(
-                  `⚡ **SKY DESK PUSH**\n• Asset: \`${symbol}\` (${timeframe})\n• Price: \`$${lastPrice.toLocaleString()}\`\n• Trend: \`${trend}\``
+                  `⚡ **SKY DESK PUSH**\n• Asset: \`${symbol}\` (${timeframe})\n• Price: \`$${Number(lastPrice || 0).toLocaleString()}\`\n• Trend: \`${safeTrend}\``
                 );
               } catch (err) {
                 console.error('Telegram broadcast error:', err);

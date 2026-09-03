@@ -228,11 +228,11 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
                     <TrendingUp size={13} /> BULL AGENT (Advocate)
                   </span>
                   <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded">
-                    {debate ? (debate.bull_argument.confidence * 100).toFixed(0) : '82'}% Conf
+                    {debate ? ((Number(debate.bull_argument?.confidence) || 0) * 100).toFixed(0) : '82'}% Conf
                   </span>
                 </div>
                 <div className="flex flex-col gap-1 text-[11px] text-slate-300 flex-1">
-                  {debate?.bull_argument.core_premises.map((p, idx) => (
+                  {(debate?.bull_argument?.core_premises || ['Strong liquidity absorption at demand block']).map((p, idx) => (
                     <div key={idx} className="flex items-start gap-1.5">
                       <span className="text-emerald-400 font-bold">•</span>
                       <span>{p}</span>
@@ -248,11 +248,11 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
                     <TrendingDown size={13} /> BEAR AGENT (Adversary)
                   </span>
                   <span className="text-[10px] font-mono bg-rose-500/20 text-rose-300 px-1.5 py-0.2 rounded">
-                    {debate ? (debate.bear_argument.confidence * 100).toFixed(0) : '38'}% Conf
+                    {debate ? ((Number(debate.bear_argument?.confidence) || 0) * 100).toFixed(0) : '38'}% Conf
                   </span>
                 </div>
                 <div className="flex flex-col gap-1 text-[11px] text-slate-300 flex-1">
-                  {debate?.bear_argument.core_premises.map((p, idx) => (
+                  {(debate?.bear_argument?.core_premises || ['Overhead resistance cluster near previous weekly high']).map((p, idx) => (
                     <div key={idx} className="flex items-start gap-1.5">
                       <span className="text-rose-400 font-bold">•</span>
                       <span>{p}</span>
@@ -273,7 +273,7 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
                 </div>
                 <div className="flex flex-col gap-1 text-[11px] text-slate-300 flex-1">
                   <p className="text-[11px] italic text-purple-200 mb-1">
-                    "{debate?.skeptic_argument.verdict_summary || 'Consensus decision vetted.'}"
+                    "{debate?.skeptic_argument?.verdict_summary || 'Consensus decision vetted through risk hurdles.'}"
                   </p>
                   <span className="text-[10px] text-slate-400">
                     Invalidation: {debate?.invalidation_criteria || 'Session level breach'}
@@ -291,26 +291,26 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
               <div className="bg-[#080c16] border border-[#1e293b] p-2.5 rounded flex flex-col">
                 <span className="text-slate-400 text-[10px]">Top 100 Whale 24h Flow</span>
                 <span className="text-emerald-400 font-bold text-sm">
-                  +${whale ? (whale.top_100_whale_flow_24h_usd / 1e6).toFixed(1) : '142.5'}M
+                  +${whale ? ((Number(whale.top_100_whale_flow_24h_usd) || 0) / 1e6).toFixed(1) : '142.5'}M
                 </span>
               </div>
               <div className="bg-[#080c16] border border-[#1e293b] p-2.5 rounded flex flex-col">
                 <span className="text-slate-400 text-[10px]">Exchange Net Inflow (BTC)</span>
                 <span className="text-cyan-400 font-bold text-sm">
-                  {whale ? whale.exchange_net_inflow_btc.toLocaleString() : '-1,850.5'} BTC
+                  {whale ? Number(whale.exchange_net_inflow_btc || 0).toLocaleString() : '-1,850.5'} BTC
                 </span>
                 <span className="text-[9px] text-emerald-400">Outflow to Cold Storage</span>
               </div>
               <div className="bg-[#080c16] border border-[#1e293b] p-2.5 rounded flex flex-col">
                 <span className="text-slate-400 text-[10px]">Cold Storage Outflows</span>
                 <span className="text-purple-400 font-bold text-sm">
-                  ${whale ? (whale.cold_storage_outflows_usd / 1e6).toFixed(1) : '163.7'}M
+                  ${whale ? ((Number(whale.cold_storage_outflows_usd) || 0) / 1e6).toFixed(1) : '163.7'}M
                 </span>
               </div>
               <div className="bg-[#080c16] border border-[#1e293b] p-2.5 rounded flex flex-col">
                 <span className="text-slate-400 text-[10px]">Whale Sentiment</span>
                 <span className="text-emerald-300 font-bold text-sm">
-                  {whale?.exchange_flow_sentiment.replace(/_/g, ' ') || 'HEAVY ACCUMULATION'}
+                  {String(whale?.exchange_flow_sentiment || 'HEAVY_ACCUMULATION').replace(/_/g, ' ')}
                 </span>
               </div>
             </div>
@@ -328,13 +328,13 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
                 </div>
                 {whale?.reference_price && (
                   <span className="bg-slate-800/60 border border-slate-700/60 text-cyan-300 font-mono text-[10px] px-2 py-0.5 rounded">
-                    Ref Price: ${whale.reference_price.toLocaleString()}
+                    Ref Price: ${Number(whale.reference_price || 0).toLocaleString()}
                   </span>
                 )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {whale?.liquidation_clusters.map((cluster, idx) => (
+                {(whale?.liquidation_clusters || []).map((cluster, idx) => (
                   <div
                     key={idx}
                     className={`p-2.5 rounded border flex flex-col gap-1 text-[11px] font-mono transition-colors ${
@@ -363,10 +363,10 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
 
                     <div className="flex items-baseline justify-between pt-0.5">
                       <span className="text-sm font-bold text-slate-100">
-                        ${cluster.price_level.toLocaleString()}
+                        ${Number(cluster.price_level || 0).toLocaleString()}
                       </span>
                       <span className="text-[11px] text-slate-300 font-medium">
-                        ~${(cluster.estimated_volume_usd / 1e6).toFixed(1)}M exposure{' '}
+                        ~${((Number(cluster.estimated_volume_usd) || 0) / 1e6).toFixed(1)}M exposure{' '}
                         <span className="text-slate-400 text-[10px]">({cluster.leverage_tier || '25x'})</span>
                       </span>
                     </div>
@@ -511,7 +511,7 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
               <span className="font-semibold text-slate-300 text-[11px] font-mono">
                 Active Predictive Lead-Lag Signals:
               </span>
-              {leadLag?.signals.map((sig, idx) => (
+              {(leadLag?.signals || []).map((sig, idx) => (
                 <div
                   key={idx}
                   className="bg-[#090f1d] border border-sky-500/30 p-2.5 rounded flex flex-col gap-1 font-mono text-[11px]"
@@ -521,7 +521,7 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
                       {sig.driver_asset} &rarr; {sig.target_asset}
                     </span>
                     <span className="text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded font-bold">
-                      {sig.direction.replace(/_/g, ' ')} ({sig.expected_lead_window_mins} lead)
+                      {String(sig.direction || 'NEUTRAL').replace(/_/g, ' ')} ({sig.expected_lead_window_mins || '3m'} lead)
                     </span>
                   </div>
                   <p className="text-slate-400 text-[10px]">{sig.rationale}</p>
@@ -544,7 +544,7 @@ export const HedgeFundBrainSuite: React.FC<HedgeFundBrainSuiteProps> = ({
               </div>
 
               <span className="font-mono text-slate-400 text-[11px]">
-                Net Portfolio Delta: <strong className="text-slate-200">${hedge?.current_portfolio_delta_usd.toLocaleString() || '4,250'}</strong>
+                Net Portfolio Delta: <strong className="text-slate-200">${Number(hedge?.current_portfolio_delta_usd || 4250).toLocaleString()}</strong>
               </span>
             </div>
 

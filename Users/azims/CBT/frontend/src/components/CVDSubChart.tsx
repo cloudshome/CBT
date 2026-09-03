@@ -128,8 +128,8 @@ export const CVDSubChart: React.FC<CVDSubChartProps> = ({
           <span className="font-bold text-slate-300">CVD (Orderflow Delta & Absorption)</span>
           {cvdData && (
             <span className="text-slate-500">
-              Delta: <strong className={cvdData.current_cvd >= 0 ? 'text-[#00f0a8]' : 'text-[#ff3b69]'}>
-                {cvdData.current_cvd > 0 ? '+' : ''}{cvdData.current_cvd.toLocaleString()}
+              Delta: <strong className={(Number(cvdData.current_cvd) || 0) >= 0 ? 'text-[#00f0a8]' : 'text-[#ff3b69]'}>
+                {(Number(cvdData.current_cvd) || 0) > 0 ? '+' : ''}{Number(cvdData.current_cvd || 0).toLocaleString()}
               </strong>
             </span>
           )}
@@ -138,7 +138,7 @@ export const CVDSubChart: React.FC<CVDSubChartProps> = ({
         {cvdData?.absorption_detected && (
           <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded text-[10px] animate-pulse">
             <Zap size={11} className="text-amber-400" />
-            <span>{cvdData.absorption_type.replace(/_/g, ' ')} ({Math.round(cvdData.absorption_score * 100)}%)</span>
+            <span>{String(cvdData.absorption_type || 'ABSORPTION').replace(/_/g, ' ')} ({Math.round((Number(cvdData.absorption_score) || 0) * 100)}%)</span>
           </div>
         )}
       </div>

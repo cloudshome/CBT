@@ -108,7 +108,7 @@ export const SMCScanPanel: React.FC<SMCScanPanelProps> = ({
                             </span>
                           )}
                           <span className="text-[10px] font-normal text-slate-400">
-                            R:R {setup.riskRewardRatio.toFixed(2)}
+                            R:R {Number(setup.riskRewardRatio || 0).toFixed(2)}
                           </span>
                         </div>
 
@@ -126,15 +126,15 @@ export const SMCScanPanel: React.FC<SMCScanPanelProps> = ({
                       <div className="grid grid-cols-3 gap-1 mt-2 text-[11px] font-mono">
                         <div>
                           <span className="text-slate-500 text-[9px] block">ENTRY</span>
-                          <span className="text-white font-semibold">${setup.entry.toFixed(2)}</span>
+                          <span className="text-white font-semibold">${Number(setup.entry || 0).toFixed(2)}</span>
                         </div>
                         <div>
                           <span className="text-slate-500 text-[9px] block">STOP LOSS</span>
-                          <span className="text-terminal-red font-semibold">${setup.stopLoss.toFixed(2)}</span>
+                          <span className="text-terminal-red font-semibold">${Number(setup.stopLoss || 0).toFixed(2)}</span>
                         </div>
                         <div>
                           <span className="text-slate-500 text-[9px] block">TARGET (TP)</span>
-                          <span className="text-terminal-green font-semibold">${setup.takeProfit.toFixed(2)}</span>
+                          <span className="text-terminal-green font-semibold">${Number(setup.takeProfit || 0).toFixed(2)}</span>
                         </div>
                       </div>
 

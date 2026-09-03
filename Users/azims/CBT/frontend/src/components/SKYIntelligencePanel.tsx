@@ -109,19 +109,19 @@ export const SKYIntelligencePanel: React.FC<SKYIntelligencePanelProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs font-mono pt-1">
             <div className="bg-background-card p-1.5 rounded border border-border/60">
               <div className="text-[9px] text-slate-400">SESSION VWAP</div>
-              <div className="font-bold text-slate-200">${vwap.vwap.toLocaleString()}</div>
+              <div className="font-bold text-slate-200">${Number(vwap.vwap || 0).toLocaleString()}</div>
             </div>
             <div className="bg-background-card p-1.5 rounded border border-border/60">
               <div className="text-[9px] text-slate-400">+2.0σ UPPER</div>
-              <div className="font-bold text-terminal-red">${vwap.upper_band_2sigma.toLocaleString()}</div>
+              <div className="font-bold text-terminal-red">${Number(vwap.upper_band_2sigma || 0).toLocaleString()}</div>
             </div>
             <div className="bg-background-card p-1.5 rounded border border-border/60">
               <div className="text-[9px] text-slate-400">-2.0σ LOWER</div>
-              <div className="font-bold text-terminal-green">${vwap.lower_band_2sigma.toLocaleString()}</div>
+              <div className="font-bold text-terminal-green">${Number(vwap.lower_band_2sigma || 0).toLocaleString()}</div>
             </div>
             <div className="bg-background-card p-1.5 rounded border border-border/60">
               <div className="text-[9px] text-slate-400">MEAN REV PROB</div>
-              <div className="font-bold text-terminal-cyan">{(vwap.mean_reversion_prob * 100).toFixed(0)}%</div>
+              <div className="font-bold text-terminal-cyan">{((Number(vwap.mean_reversion_prob) || 0) * 100).toFixed(0)}%</div>
             </div>
           </div>
         </div>
@@ -156,7 +156,7 @@ export const SKYIntelligencePanel: React.FC<SKYIntelligencePanelProps> = ({
                         {setup.direction}
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-200">
-                        {setup.setup_type.replace(/_/g, ' ')}
+                        {String(setup.setup_type || 'SMC_SETUP').replace(/_/g, ' ')}
                       </span>
                       {setup.is_qualified && (
                         <span className="text-[9px] font-mono text-terminal-cyan border border-terminal-cyan/30 px-1 rounded">
@@ -173,7 +173,7 @@ export const SKYIntelligencePanel: React.FC<SKYIntelligencePanelProps> = ({
                         R:R <strong className="text-slate-200">{setup.risk_reward_ratio}R</strong>
                       </span>
                       <span className="text-slate-500">
-                        Win Rate {(setup.historical_win_rate * 100).toFixed(0)}%
+                        Win Rate {((Number(setup.historical_win_rate) || 0) * 100).toFixed(0)}%
                       </span>
                     </div>
 

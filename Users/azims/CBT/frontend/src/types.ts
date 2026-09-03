@@ -76,7 +76,7 @@ export interface ScanApiResponse {
 }
 
 export interface PaperTrade {
-  id: number;
+  id: number | string;
   symbol: string;
   side: 'BUY' | 'SELL';
   entryPrice: number;
@@ -84,8 +84,10 @@ export interface PaperTrade {
   tp: number;
   size: number;
   status: 'OPEN' | 'CLOSED' | 'CANCELLED';
+  currentPrice?: number;
   pnl?: number;
   exitPrice?: number;
+  breakevenTriggered?: boolean;
   createdAt: string;
   closedAt?: string;
 }
@@ -93,6 +95,82 @@ export interface PaperTrade {
 export interface PaperPositionsResponse {
   positions: PaperTrade[];
   count: number;
+}
+
+export interface PaperDeskOverviewResponse {
+  summary: {
+    accountBalance: number;
+    totalRealizedPnl: number;
+    totalUnrealizedPnl: number;
+    winRatePct: number;
+    profitFactor: number;
+    openPositionsCount: number;
+    closedPositionsCount: number;
+    maxRiskCapPct: number;
+    circuitBreakerStatus: string;
+  };
+  current: Array<{
+    id: string;
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    size: number;
+    entryPrice: number;
+    currentPrice: number;
+    sl: number;
+    tp: number;
+    pnlUsd: number;
+    pnlPct: number;
+    status: string;
+    breakevenTriggered: boolean;
+    trailingStop?: number | null;
+    openedAt?: number | string;
+  }>;
+  past: Array<{
+    id: string;
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    size: number;
+    entryPrice: number;
+    exitPrice: number;
+    sl: number;
+    tp: number;
+    realizedPnlUsd: number;
+    realizedPnlPct: number;
+    openedAt?: number | string;
+    closedAt?: number | string;
+    autopsyCategory: string;
+    autopsyCause: string;
+    autopsyRecommendation: string;
+  }>;
+  futureQueue: Array<{
+    queueId: string;
+    symbol: string;
+    direction: 'LONG' | 'SHORT';
+    setupName: string;
+    archetype: string;
+    triggerCondition: string;
+    plannedEntry: number;
+    stopLoss: number;
+    tp1: number;
+    tp2: number;
+    tp3: number;
+    riskReward: string;
+    confluenceScore: number;
+    kellyPct: number;
+    queueStatus: string;
+    statusNote: string;
+  }>;
+  tradingPlans: Array<{
+    symbol: string;
+    bias: string;
+    pdh: number;
+    pdl: number;
+    fvgZone: string;
+    orderBlock: string;
+    bullPath: string;
+    bearPath: string;
+    note: string;
+  }>;
 }
 
 export interface RiskConfig {

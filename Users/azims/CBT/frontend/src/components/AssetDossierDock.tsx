@@ -60,7 +60,7 @@ const AssetDossierDockComponent: React.FC<AssetDossierDockProps> = ({
 
   if (!dossier) return null;
 
-  const score = dossier.composite_health_score;
+  const score = Number(dossier?.composite_health_score) || 50;
   const scoreColor =
     score >= 80
       ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
@@ -70,114 +70,123 @@ const AssetDossierDockComponent: React.FC<AssetDossierDockProps> = ({
       ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
       : 'text-rose-400 border-rose-500/30 bg-rose-500/10';
 
+  const p1 = dossier?.pillar_1_institutional_flows || {} as any;
+  const p2 = dossier?.pillar_2_derivatives_options || {} as any;
+  const p3 = dossier?.pillar_3_valuation_cost_basis || {} as any;
+  const p4 = dossier?.pillar_4_stablecoin_velocity || {} as any;
+  const p5 = dossier?.pillar_5_seasonality_cyclical_dna || {} as any;
+  const p6 = dossier?.pillar_6_macro_liquidity_beta || {} as any;
+  const p7 = dossier?.pillar_7_volatility_profile || {} as any;
+  const p8 = dossier?.pillar_8_physical_supply_shock || {} as any;
+
   const pillars = [
     {
       id: 1,
       name: 'Institutional Flows',
       icon: Layers,
-      z: dossier.pillar_1_institutional_flows.z_score,
-      summary: `${dossier.pillar_1_institutional_flows.sentiment_tier} • 24h ETF: $${(
-        dossier.pillar_1_institutional_flows.etf_net_inflow_24h_usd / 1e6
+      z: Number(p1.z_score) || 0,
+      summary: `${p1.sentiment_tier || 'Equilibrium'} • 24h ETF: $${(
+        (Number(p1.etf_net_inflow_24h_usd) || 0) / 1e6
       ).toFixed(1)}M`,
       details: [
-        { label: '24h ETF Net Flow', val: `$${(dossier.pillar_1_institutional_flows.etf_net_inflow_24h_usd / 1e6).toFixed(1)}M` },
-        { label: '7d ETF Net Flow', val: `$${(dossier.pillar_1_institutional_flows.etf_net_inflow_7d_usd / 1e6).toFixed(1)}M` },
-        { label: 'Treasury Strategy', val: dossier.pillar_1_institutional_flows.corporate_treasury_bias },
-        { label: 'Central Bank Quarterly', val: `${dossier.pillar_1_institutional_flows.sovereign_central_bank_net_tons_quarterly} tons` },
+        { label: '24h ETF Net Flow', val: `$${((Number(p1.etf_net_inflow_24h_usd) || 0) / 1e6).toFixed(1)}M` },
+        { label: '7d ETF Net Flow', val: `$${((Number(p1.etf_net_inflow_7d_usd) || 0) / 1e6).toFixed(1)}M` },
+        { label: 'Treasury Strategy', val: p1.corporate_treasury_bias || 'NEUTRAL' },
+        { label: 'Central Bank Quarterly', val: `${Number(p1.sovereign_central_bank_net_tons_quarterly || 0)} tons` },
       ],
     },
     {
       id: 2,
       name: 'Derivatives & Options GEX',
       icon: Activity,
-      z: dossier.pillar_2_derivatives_options.z_score,
-      summary: `Dealer GEX: ${dossier.pillar_2_derivatives_options.net_dealer_gex} • Max Pain: $${dossier.pillar_2_derivatives_options.options_max_pain_strike.toLocaleString()}`,
+      z: Number(p2.z_score) || 0,
+      summary: `Dealer GEX: ${p2.net_dealer_gex || 'BALANCED'} • Max Pain: $${Number(p2.options_max_pain_strike || 0).toLocaleString()}`,
       details: [
-        { label: 'Funding Rate (Ann.)', val: `${dossier.pillar_2_derivatives_options.funding_rate_annualized_pct.toFixed(2)}%` },
-        { label: '24h OI Delta', val: `${dossier.pillar_2_derivatives_options.open_interest_delta_24h_pct > 0 ? '+' : ''}${dossier.pillar_2_derivatives_options.open_interest_delta_24h_pct}%` },
-        { label: '25-Delta Skew', val: `${dossier.pillar_2_derivatives_options.twenty_five_delta_skew_pct}%` },
-        { label: 'Short Squeeze Target', val: `$${dossier.pillar_2_derivatives_options.primary_liquidation_pools.short_squeeze_target.toLocaleString()}` },
-        { label: 'Long Risk Pool', val: `$${dossier.pillar_2_derivatives_options.primary_liquidation_pools.long_liquidation_cluster.toLocaleString()}` },
+        { label: 'Funding Rate (Ann.)', val: `${(Number(p2.funding_rate_annualized_pct) || 0).toFixed(2)}%` },
+        { label: '24h OI Delta', val: `${(Number(p2.open_interest_delta_24h_pct) || 0) > 0 ? '+' : ''}${Number(p2.open_interest_delta_24h_pct || 0)}%` },
+        { label: '25-Delta Skew', val: `${Number(p2.twenty_five_delta_skew_pct || 0)}%` },
+        { label: 'Short Squeeze Target', val: `$${Number(p2.primary_liquidation_pools?.short_squeeze_target || 0).toLocaleString()}` },
+        { label: 'Long Risk Pool', val: `$${Number(p2.primary_liquidation_pools?.long_liquidation_cluster || 0).toLocaleString()}` },
       ],
     },
     {
       id: 3,
       name: 'On-Chain Valuation & Realized Cost',
       icon: Coins,
-      z: dossier.pillar_3_valuation_cost_basis.z_score,
-      summary: `STH Realized Price: $${dossier.pillar_3_valuation_cost_basis.sth_realized_price.toLocaleString()} • MVRV Z: ${dossier.pillar_3_valuation_cost_basis.mvrv_z_score}`,
+      z: Number(p3.z_score) || 0,
+      summary: `STH Realized Price: $${Number(p3.sth_realized_price || 0).toLocaleString()} • MVRV Z: ${Number(p3.mvrv_z_score || 0)}`,
       details: [
-        { label: 'STH Cost Basis', val: `$${dossier.pillar_3_valuation_cost_basis.sth_realized_price.toLocaleString()}` },
-        { label: 'LTH Cost Basis', val: `$${dossier.pillar_3_valuation_cost_basis.lth_realized_price.toLocaleString()}` },
-        { label: 'MVRV Z-Score', val: `${dossier.pillar_3_valuation_cost_basis.mvrv_z_score}` },
-        { label: 'Production Cost Floor', val: `$${dossier.pillar_3_valuation_cost_basis.production_cost_floor.toLocaleString()}` },
-        { label: 'Cost Basis Health', val: dossier.pillar_3_valuation_cost_basis.cost_basis_health },
+        { label: 'STH Cost Basis', val: `$${Number(p3.sth_realized_price || 0).toLocaleString()}` },
+        { label: 'LTH Cost Basis', val: `$${Number(p3.lth_realized_price || 0).toLocaleString()}` },
+        { label: 'MVRV Z-Score', val: `${Number(p3.mvrv_z_score || 0)}` },
+        { label: 'Production Cost Floor', val: `$${Number(p3.production_cost_floor || 0).toLocaleString()}` },
+        { label: 'Cost Basis Health', val: p3.cost_basis_health || 'NORMAL' },
       ],
     },
     {
       id: 4,
       name: 'Stablecoin Dry-Powder Velocity',
       icon: Coins,
-      z: dossier.pillar_4_stablecoin_velocity.z_score,
-      summary: `SSR: ${dossier.pillar_4_stablecoin_velocity.ssr_ratio} • 24h Net Minting: +$${(dossier.pillar_4_stablecoin_velocity.net_minting_velocity_24h_usd / 1e6).toFixed(0)}M`,
+      z: Number(p4.z_score) || 0,
+      summary: `SSR: ${p4.ssr_ratio ?? 0} • 24h Net Minting: +$${((Number(p4.net_minting_velocity_24h_usd) || 0) / 1e6).toFixed(0)}M`,
       details: [
-        { label: 'SSR Ratio', val: `${dossier.pillar_4_stablecoin_velocity.ssr_ratio}` },
-        { label: 'SSR Bias', val: dossier.pillar_4_stablecoin_velocity.ssr_oscillator_bias },
-        { label: '24h Minting Delta', val: `+$${(dossier.pillar_4_stablecoin_velocity.net_minting_velocity_24h_usd / 1e6).toFixed(0)}M` },
-        { label: 'Dry Powder State', val: dossier.pillar_4_stablecoin_velocity.dry_powder_liquidity_state },
+        { label: 'SSR Ratio', val: `${p4.ssr_ratio ?? 0}` },
+        { label: 'SSR Bias', val: p4.ssr_oscillator_bias || 'NEUTRAL' },
+        { label: '24h Minting Delta', val: `+$${((Number(p4.net_minting_velocity_24h_usd) || 0) / 1e6).toFixed(0)}M` },
+        { label: 'Dry Powder State', val: p4.dry_powder_liquidity_state || 'STABLE' },
       ],
     },
     {
       id: 5,
       name: 'Seasonality & Cyclical DNA',
       icon: Calendar,
-      z: dossier.pillar_5_seasonality_cyclical_dna.z_score,
-      summary: `${dossier.pillar_5_seasonality_cyclical_dna.month_name} Historical: ${dossier.pillar_5_seasonality_cyclical_dna.current_month_historical_return} • Real Yield: ${dossier.pillar_5_seasonality_cyclical_dna.real_yield_pct}%`,
+      z: Number(p5.z_score) || 0,
+      summary: `${p5.month_name || 'Monthly'} Historical: ${p5.current_month_historical_return || '+0.0%'} • Real Yield: ${Number(p5.real_yield_pct || 0)}%`,
       details: [
-        { label: 'Day Win Rate', val: `${dossier.pillar_5_seasonality_cyclical_dna.historical_day_win_rate_pct}% (${dossier.pillar_5_seasonality_cyclical_dna.day_of_week})` },
-        { label: 'Cycle Phase', val: dossier.pillar_5_seasonality_cyclical_dna.halving_cycle_phase },
-        { label: 'Days Post-Halving', val: `${dossier.pillar_5_seasonality_cyclical_dna.days_post_halving} days` },
-        { label: 'US Real Yield', val: `${dossier.pillar_5_seasonality_cyclical_dna.real_yield_pct}%` },
+        { label: 'Day Win Rate', val: `${Number(p5.historical_day_win_rate_pct || 0)}% (${p5.day_of_week || 'Today'})` },
+        { label: 'Cycle Phase', val: p5.halving_cycle_phase || 'EXPANSION' },
+        { label: 'Days Post-Halving', val: `${p5.days_post_halving ?? 0} days` },
+        { label: 'US Real Yield', val: `${Number(p5.real_yield_pct || 0)}%` },
       ],
     },
     {
       id: 6,
       name: 'Macro & Global M2 Liquidity Beta',
       icon: Globe,
-      z: dossier.pillar_6_macro_liquidity_beta.z_score,
-      summary: `DXY Corr: ${dossier.pillar_6_macro_liquidity_beta.dxy_correlation_30d} • M2 YoY: +${dossier.pillar_6_macro_liquidity_beta.global_m2_expansion_rate_pct}%`,
+      z: Number(p6.z_score) || 0,
+      summary: `DXY Corr: ${p6.dxy_correlation_30d ?? 0} • M2 YoY: +${Number(p6.global_m2_expansion_rate_pct || 0)}%`,
       details: [
-        { label: 'DXY 30d Correlation', val: `${dossier.pillar_6_macro_liquidity_beta.dxy_correlation_30d}` },
-        { label: 'US 10Y Yield', val: `${dossier.pillar_6_macro_liquidity_beta.us10y_yield_pct}% (${dossier.pillar_6_macro_liquidity_beta.us10y_yield_delta_24h_bps} bps)` },
-        { label: 'Global M2 Status', val: dossier.pillar_6_macro_liquidity_beta.global_m2_status },
-        { label: 'Geopolitical Risk (GRI)', val: `${dossier.pillar_6_macro_liquidity_beta.geopolitical_risk_index_score}/100` },
+        { label: 'DXY 30d Correlation', val: `${p6.dxy_correlation_30d ?? 0}` },
+        { label: 'US 10Y Yield', val: `${Number(p6.us10y_yield_pct || 0)}% (${Number(p6.us10y_yield_delta_24h_bps || 0)} bps)` },
+        { label: 'Global M2 Status', val: p6.global_m2_status || 'NOMINAL' },
+        { label: 'Geopolitical Risk (GRI)', val: `${Number(p6.geopolitical_risk_index_score || 0)}/100` },
       ],
     },
     {
       id: 7,
       name: 'Volatility Profile & VPOC Range',
       icon: BarChart3,
-      z: dossier.pillar_7_volatility_profile.z_score,
-      summary: `Weekly VPOC: $${dossier.pillar_7_volatility_profile.weekly_vpoc.toLocaleString()} • VAH/VAL: $${dossier.pillar_7_volatility_profile.value_area_high.toLocaleString()} / $${dossier.pillar_7_volatility_profile.value_area_low.toLocaleString()}`,
+      z: Number(p7.z_score) || 0,
+      summary: `Weekly VPOC: $${Number(p7.weekly_vpoc || 0).toLocaleString()} • VAH/VAL: $${Number(p7.value_area_high || 0).toLocaleString()} / $${Number(p7.value_area_low || 0).toLocaleString()}`,
       details: [
-        { label: 'Squeeze State', val: dossier.pillar_7_volatility_profile.squeeze_state },
-        { label: 'Squeeze Intensity', val: `${dossier.pillar_7_volatility_profile.squeeze_intensity_score}/10` },
-        { label: 'Weekly VPOC', val: `$${dossier.pillar_7_volatility_profile.weekly_vpoc.toLocaleString()}` },
-        { label: 'Value Area High (VAH)', val: `$${dossier.pillar_7_volatility_profile.value_area_high.toLocaleString()}` },
-        { label: 'Value Area Low (VAL)', val: `$${dossier.pillar_7_volatility_profile.value_area_low.toLocaleString()}` },
+        { label: 'Squeeze State', val: p7.squeeze_state || 'NORMAL' },
+        { label: 'Squeeze Intensity', val: `${Number(p7.squeeze_intensity_score || 0)}/10` },
+        { label: 'Weekly VPOC', val: `$${Number(p7.weekly_vpoc || 0).toLocaleString()}` },
+        { label: 'Value Area High (VAH)', val: `$${Number(p7.value_area_high || 0).toLocaleString()}` },
+        { label: 'Value Area Low (VAL)', val: `$${Number(p7.value_area_low || 0).toLocaleString()}` },
       ],
     },
     {
       id: 8,
       name: 'Physical & Exchange Supply Shock',
       icon: Vault,
-      z: dossier.pillar_8_physical_supply_shock.z_score,
-      summary: `24h Net Reserves: ${dossier.pillar_8_physical_supply_shock.exchange_reserve_delta_24h} • Trend: ${dossier.pillar_8_physical_supply_shock.supply_illiquidity_trend}`,
+      z: Number(p8.z_score) || 0,
+      summary: `24h Net Reserves: ${p8.exchange_reserve_delta_24h || '0'} • Trend: ${p8.supply_illiquidity_trend || 'STABLE'}`,
       details: [
-        { label: 'Exchange Net Delta', val: dossier.pillar_8_physical_supply_shock.exchange_reserve_delta_24h },
-        { label: 'COMEX Vault Drawdown', val: `${dossier.pillar_8_physical_supply_shock.comex_registered_vault_delta_pct}%` },
-        { label: 'Shanghai Gold Premium', val: `+$${dossier.pillar_8_physical_supply_shock.shanghai_gold_exchange_premium_usd}/oz` },
-        { label: 'Supply Shock State', val: dossier.pillar_8_physical_supply_shock.supply_shock_state },
+        { label: 'Exchange Net Delta', val: p8.exchange_reserve_delta_24h || '0' },
+        { label: 'COMEX Vault Drawdown', val: `${Number(p8.comex_registered_vault_delta_pct || 0)}%` },
+        { label: 'Shanghai Gold Premium', val: `+$${Number(p8.shanghai_gold_exchange_premium_usd || 0)}/oz` },
+        { label: 'Supply Shock State', val: p8.supply_shock_state || 'NOMINAL' },
       ],
     },
   ];

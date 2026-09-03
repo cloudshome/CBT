@@ -556,6 +556,15 @@ class ProvenanceEngine:
         chash = self.compute_sha256(raw_content)
         existing = self.get_by_hash(chash)
         if existing:
+            now = int(time.time() * 1000)
+            kid = f"K-{existing.source_id[4:]}"
+            with db_manager.get_brain_conn() as conn:
+                conn.execute(
+                    "UPDATE research_provenance_ledger SET ingested_at = ? WHERE knowledge_id = ?;",
+                    (now, kid),
+                )
+                conn.commit()
+            existing.ingested_at = now
             if extracted_facts:
                 existing.extracted_facts = extracted_facts
             if extracted_hypotheses:

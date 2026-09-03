@@ -11,6 +11,7 @@ import { RiskFirstOrderDesk } from './components/RiskFirstOrderDesk';
 import { MTFPanel } from './components/MTFPanel';
 import { SMCScanPanel } from './components/SMCScanPanel';
 import { PaperTradingPanel } from './components/PaperTradingPanel';
+import { DedicatedPaperTradingDesk } from './components/DedicatedPaperTradingDesk';
 import { GeminiDeskCopilot } from './components/GeminiDeskCopilot';
 import { SKYIntelligencePanel } from './components/SKYIntelligencePanel';
 import { HedgeFundBrainSuite } from './components/HedgeFundBrainSuite';
@@ -88,6 +89,9 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
+  // Main Screen View Switcher: Terminal Cockpit vs Dedicated Shadow Paper Trading Desk
+  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'PAPER_DESK'>('TERMINAL');
+
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
   const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB'>('DOSSIER');
@@ -154,12 +158,12 @@ export const App: React.FC = () => {
         api.getOrderBookImbalance(symbol).catch(() => null),
       ]);
 
-      setCandles(candlesRes.candles || []);
-      setEMA(mtfRes.indicators.ema || []);
-      setRSI(mtfRes.indicators.rsi || []);
-      setFVGs(scanRes.fvg || []);
-      setOrderBlocks(scanRes.order_blocks || []);
-      setSetups(scanRes.setup_suggestions || []);
+      setCandles(candlesRes?.candles || []);
+      setEMA(mtfRes?.indicators?.ema || []);
+      setRSI(mtfRes?.indicators?.rsi || []);
+      setFVGs(scanRes?.fvg || []);
+      setOrderBlocks(scanRes?.order_blocks || []);
+      setSetups(scanRes?.setup_suggestions || []);
       if (skyRes) setSkyData(skyRes);
       if (alphaRes) setInstitutionalAlpha(alphaRes);
       if (cvdRes) setCvdData(cvdRes);
@@ -289,6 +293,18 @@ export const App: React.FC = () => {
     }
   };
 
+  // 5.1 Handle Close Paper Practice Position
+  const handleClosePosition = async (positionId: string): Promise<void> => {
+    try {
+      await api.closePaperPosition(positionId);
+      addToast('info', 'Position Closed', `Closed paper position #${positionId}`);
+      fetchPositions();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to close position';
+      addToast('error', 'Closure Error', msg);
+    }
+  };
+
   // 6. Handle Risk-First Order Desk Execution
   const handlePlaceRiskOrder = async (order: {
     symbol: string;
@@ -379,9 +395,19 @@ export const App: React.FC = () => {
         }}
         notificationsEnabled={notificationsEnabled}
         onToggleNotifications={handleToggleNotifications}
+        activeView={activeMainView}
+        onViewChange={setActiveMainView}
+        openPositionsCount={positions.length}
       />
 
-      {/* Institutional Quantitative HUD Control Bar */}
+      {/* Primary View Routing: Dedicated Shadow Paper Desk vs Full Terminal Cockpit */}
+      {activeMainView === 'PAPER_DESK' ? (
+        <DedicatedPaperTradingDesk
+          onClosePosition={handleClosePosition}
+        />
+      ) : (
+        <>
+          {/* Institutional Quantitative HUD Control Bar */}
       <div className="max-w-[1920px] w-full mx-auto px-4 pt-2 space-y-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
@@ -689,13 +715,18 @@ export const App: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveRightTab('PAPER')}
-              className={`flex-1 py-1 px-2 rounded text-center transition-all ${
+              className={`flex-1 py-1 px-2 rounded text-center transition-all flex items-center justify-center gap-1.5 ${
                 activeRightTab === 'PAPER'
                   ? 'bg-sky-500 text-white font-bold shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Positions
+              <span>Positions</span>
+              {positions.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-emerald-500 text-[#0B0E14] text-[10px] rounded-full font-bold leading-none">
+                  {positions.length}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveRightTab('AI_DESK')}
@@ -743,6 +774,7 @@ export const App: React.FC = () => {
                 riskConfig={riskConfig}
                 onSubmitTrade={handlePlaceTrade}
                 onRefreshPositions={fetchPositions}
+                onClosePosition={handleClosePosition}
                 loading={loadingMarket}
               />
             </div>
@@ -762,6 +794,8 @@ export const App: React.FC = () => {
           )}
         </div>
       </main>
+        </>
+      )}
 
       {/* Floating Global Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
