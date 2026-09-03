@@ -641,9 +641,17 @@ class TelegramBotDispatcher:
         self._is_polling = False
         self._is_broadcasting = False
         self._last_update_id = 0
-        self._broadcast_index = 0
         self.state_mind = DeskStateMind()
         self.smart_notifier = SmartBrainNotificationEngine(self)
+
+    def is_configured(self) -> bool:
+        """Returns True if both bot token and chat ID are present."""
+        return bool(self.bot_token and self.chat_id)
+
+    @property
+    def registered_commands(self) -> List[str]:
+        """Returns list of registered command trigger strings."""
+        return list(self._command_handlers.keys())
 
     def register_command(self, command: str, handler: Callable[..., Any]) -> None:
         """Registers an interactive command handler (e.g. '/signal', '/status', '/plan')."""

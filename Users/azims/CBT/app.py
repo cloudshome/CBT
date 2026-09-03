@@ -761,6 +761,7 @@ async def clear_chart_memory(symbol: str = Query("BTC/USDT"), timeframe: str = Q
 
 
 @app.get("/api/market/macro")
+@app.get("/api/macro/current")
 async def get_macro_vitals():
     snapshot = macro_sentinel.get_macro_snapshot()
     return snapshot.__dict__
