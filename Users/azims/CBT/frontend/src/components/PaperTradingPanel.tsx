@@ -101,7 +101,7 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-            BAL: ${accountBalance.toLocaleString()}
+            BAL: ${Number(accountBalance || 0).toLocaleString()}
           </span>
           <button
             onClick={onRefreshPositions}
@@ -303,9 +303,9 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
                               {pos.side}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2 text-slate-200">${pos.entryPrice.toFixed(2)}</td>
-                          <td className="py-1.5 px-2 text-terminal-red">${pos.sl.toFixed(2)}</td>
-                          <td className="py-1.5 px-2 text-terminal-green">${pos.tp.toFixed(2)}</td>
+                          <td className="py-1.5 px-2 text-slate-200">${Number(pos.entryPrice || 0).toFixed(2)}</td>
+                          <td className="py-1.5 px-2 text-terminal-red">${Number(pos.sl || 0).toFixed(2)}</td>
+                          <td className="py-1.5 px-2 text-terminal-green">${Number(pos.tp || 0).toFixed(2)}</td>
                           <td className="py-1.5 px-2">
                             <span className="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-300">
                               {pos.status}

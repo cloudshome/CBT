@@ -40,8 +40,9 @@ export const Header: React.FC<HeaderProps> = ({
   notificationsEnabled,
   onToggleNotifications,
 }) => {
-  const isBullish = trend.toLowerCase().includes('bullish');
-  const isBearish = trend.toLowerCase().includes('bearish');
+  const safeTrend = String(trend || 'Consolidation');
+  const isBullish = safeTrend.toLowerCase().includes('bullish');
+  const isBearish = safeTrend.toLowerCase().includes('bearish');
 
   return (
     <header className="border-b border-border bg-background-subtle/80 backdrop-blur sticky top-0 z-40 px-4 py-3">
@@ -119,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="text-[10px] text-slate-500 font-mono uppercase">MARK PRICE</div>
               <div className="text-sm font-mono font-bold text-white">
-                ${lastPrice > 0 ? lastPrice.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '---'}
+                {Number(lastPrice || 0) > 0 ? Number(lastPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '---'}
               </div>
             </div>
 
@@ -128,8 +129,8 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="hidden sm:block">
               <div className="text-[10px] text-slate-500 font-mono uppercase">SESSION HIGH / LOW</div>
               <div className="text-xs font-mono text-slate-300">
-                <span className="text-terminal-green">${highPrice.toLocaleString()}</span> /{' '}
-                <span className="text-terminal-red">${lowPrice.toLocaleString()}</span>
+                <span className="text-terminal-green">${Number(highPrice || 0).toLocaleString()}</span> /{' '}
+                <span className="text-terminal-red">${Number(lowPrice || 0).toLocaleString()}</span>
               </div>
             </div>
 
@@ -152,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-terminal-amber'
                 }`}
               >
-                {trend.split(' ')[0] || 'NEUTRAL'}
+                {safeTrend.split(' ')[0] || 'NEUTRAL'}
               </span>
             </div>
           </div>
@@ -162,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={async () => {
               try {
                 await api.broadcastTelegramAlert(
-                  `⚡ **SKY DESK PUSH**\n• Asset: \`${symbol}\` (${timeframe})\n• Price: \`$${lastPrice.toLocaleString()}\`\n• Trend: \`${trend}\``
+                  `⚡ **SKY DESK PUSH**\n• Asset: \`${symbol}\` (${timeframe})\n• Price: \`$${Number(lastPrice || 0).toLocaleString()}\`\n• Trend: \`${safeTrend}\``
                 );
               } catch (err) {
                 console.error('Telegram broadcast error:', err);

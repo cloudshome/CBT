@@ -154,12 +154,12 @@ export const App: React.FC = () => {
         api.getOrderBookImbalance(symbol).catch(() => null),
       ]);
 
-      setCandles(candlesRes.candles || []);
-      setEMA(mtfRes.indicators.ema || []);
-      setRSI(mtfRes.indicators.rsi || []);
-      setFVGs(scanRes.fvg || []);
-      setOrderBlocks(scanRes.order_blocks || []);
-      setSetups(scanRes.setup_suggestions || []);
+      setCandles(candlesRes?.candles || []);
+      setEMA(mtfRes?.indicators?.ema || []);
+      setRSI(mtfRes?.indicators?.rsi || []);
+      setFVGs(scanRes?.fvg || []);
+      setOrderBlocks(scanRes?.order_blocks || []);
+      setSetups(scanRes?.setup_suggestions || []);
       if (skyRes) setSkyData(skyRes);
       if (alphaRes) setInstitutionalAlpha(alphaRes);
       if (cvdRes) setCvdData(cvdRes);

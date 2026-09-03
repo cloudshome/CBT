@@ -61,19 +61,48 @@ def test_api_voice_synthesize_endpoint(client, tmp_path):
 # ==============================================================================
 
 @pytest.mark.asyncio
-async def test_telegram_bot_local_logging():
+async def test_telegram_bot_local_logging(monkeypatch):
     # Without credentials, logs locally and returns False
+    monkeypatch.setattr(telegram_bot, "bot_token", "")
+    monkeypatch.setattr(telegram_bot, "chat_id", "")
     sent = await telegram_bot.send_message("Test message")
     assert sent is False
 
 
 @pytest.mark.asyncio
-async def test_telegram_position_alert():
+async def test_telegram_position_alert(monkeypatch):
+    monkeypatch.setattr(telegram_bot, "bot_token", "")
+    monkeypatch.setattr(telegram_bot, "chat_id", "")
     alert_sent = await telegram_bot.send_position_alert(
         "TAKE_PROFIT_TRIGGERED",
         {"symbol": "BTC/USDT", "price": 89500.0, "pnl_usd": 1420.50}
     )
     assert alert_sent is False  # Safe offline fallback
+
+
+@pytest.mark.asyncio
+async def test_telegram_intelligence_generators():
+    sig = await telegram_bot.generate_live_signal("BTC/USDT")
+    assert sig["symbol"] == "BTC/USDT"
+    assert "entry_price" in sig
+    assert "stop_loss" in sig
+    assert "tp1" in sig
+
+    m = await telegram_bot.generate_market_update()
+    assert "btc_price" in m
+    assert "gri" in m
+
+    plan = await telegram_bot.generate_trading_plan("BTC/USDT")
+    assert "pdh" in plan
+    assert "bull_scenario" in plan
+
+    ev = telegram_bot.generate_event_shock_status()
+    assert "title" in ev
+    assert "impact" in ev
+
+    news = telegram_bot.generate_news_digest()
+    assert len(news) > 0
+    assert "headline" in news[0]
 
 
 @pytest.mark.asyncio
@@ -90,6 +119,19 @@ async def test_telegram_webhook_command_routing():
     assert "SKY Terminal Operational" in res["response"]
 
 
+@pytest.mark.asyncio
+async def test_telegram_signal_command_routing():
+    update = {
+        "message": {
+            "text": "/signal BTC",
+            "chat": {"id": 12345678}
+        }
+    }
+    res = await telegram_bot.handle_webhook_update(update)
+    assert res["status"] == "EXECUTED"
+    assert "QUANTITATIVE TRADE SIGNAL" in res["response"]
+
+
 def test_api_telegram_status_endpoint(client):
     resp = client.get("/api/telegram/status")
     assert resp.status_code == 200
@@ -97,6 +139,7 @@ def test_api_telegram_status_endpoint(client):
     assert "configured" in data
     assert "registered_commands" in data
     assert "/status" in data["registered_commands"]
+    assert "/signal" in data["registered_commands"]
 
 
 def test_api_telegram_broadcast_endpoint(client):
@@ -104,6 +147,7 @@ def test_api_telegram_broadcast_endpoint(client):
     assert resp.status_code == 200
     data = resp.json()
     assert "status" in data
+
 
 
 # ==============================================================================

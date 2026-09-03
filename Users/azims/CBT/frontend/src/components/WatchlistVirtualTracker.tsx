@@ -77,17 +77,37 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
         const res = await api.getLiveTickers(['BTCUSDT', 'ETHUSDT', 'PAXGUSDT', 'XAUUSDT']);
         if (isMounted && res.tickers && res.tickers.length > 0) {
           setItems(
-            res.tickers.map((t) => ({
-              symbol: t.symbol,
-              name: t.name,
-              price: t.price,
-              change: t.change24h,
-              high24h: t.high24h,
-              low24h: t.low24h,
-              volume: t.volume24h,
-              isGold: t.isGold,
-              lastUpdated: t.timestamp,
-            }))
+            res.tickers.map((t) => {
+              const sym = String(t.symbol || '').toUpperCase();
+              const defaultName =
+                sym === 'BTCUSDT'
+                  ? 'Bitcoin'
+                  : sym === 'ETHUSDT'
+                  ? 'Ethereum'
+                  : sym.includes('PAXG')
+                  ? 'Gold (PAXG Spot)'
+                  : sym.includes('XAU')
+                  ? 'Gold (XAU Futures)'
+                  : sym;
+              const rawVol = Number(t.volume24h) || 0;
+              const vol =
+                rawVol >= 1e6
+                  ? `${(rawVol / 1e6).toFixed(1)}M`
+                  : rawVol > 0
+                  ? `${rawVol.toLocaleString()}`
+                  : String(t.volume24h || '...');
+              return {
+                symbol: sym,
+                name: String(t.name || defaultName),
+                price: Number(t.price) || 0,
+                change: Number(t.change24h) || 0,
+                high24h: Number(t.high24h) || 0,
+                low24h: Number(t.low24h) || 0,
+                volume: vol,
+                isGold: Boolean(t.isGold || sym.includes('PAXG') || sym.includes('XAU')),
+                lastUpdated: Number(t.timestamp) || Date.now(),
+              };
+            })
           );
         }
       } catch (err) {
@@ -182,10 +202,14 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
   }, []);
 
   const filtered = items.filter((item) => {
-    const q = search.toLowerCase();
-    const matchesSym = item.symbol.toLowerCase().includes(q);
-    const matchesName = item.name.toLowerCase().includes(q);
-    const matchesGold = (q === 'gold' || q === 'xau') && (item.isGold || item.symbol.includes('PAXG'));
+    if (!item) return false;
+    const q = (search || '').trim().toLowerCase();
+    if (!q) return true;
+    const sym = (item.symbol || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+    const matchesSym = sym.includes(q);
+    const matchesName = name.includes(q);
+    const matchesGold = (q === 'gold' || q === 'xau') && (item.isGold || sym.includes('paxg') || sym.includes('xau'));
     return matchesSym || matchesName || matchesGold;
   });
 
@@ -227,7 +251,8 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
       <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 py-1 mt-1">
         {filtered.map((item) => {
           const isSelected = item.symbol === currentSymbol;
-          const isPos = item.change >= 0;
+          const isPos = (item.change || 0) >= 0;
+          const price = Number(item.price || 0);
           return (
             <button
               key={item.symbol}
@@ -254,17 +279,17 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
                   )}
                 </div>
                 <span className="text-[10px] text-slate-500">
-                  {item.name} {item.volume !== '...' && `• Vol: ${item.volume}`}
+                  {item.name || item.symbol} {item.volume !== '...' && `• Vol: ${item.volume}`}
                 </span>
               </div>
 
               <div className="flex flex-col items-end gap-0.5">
                 <span className="font-semibold text-slate-100 font-mono">
-                  {item.price > 0
-                    ? `$${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  {price > 0
+                    ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     : 'Loading...'}
                 </span>
-                {item.price > 0 && (
+                {price > 0 && (
                   <span
                     className={`text-[10px] font-bold flex items-center gap-0.5 ${
                       isPos ? 'text-emerald-400' : 'text-rose-400'
@@ -272,7 +297,7 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
                   >
                     {isPos ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
                     {isPos ? '+' : ''}
-                    {item.change.toFixed(2)}%
+                    {Number(item.change || 0).toFixed(2)}%
                   </span>
                 )}
               </div>

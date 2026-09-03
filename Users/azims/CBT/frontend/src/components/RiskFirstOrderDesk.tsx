@@ -309,12 +309,12 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
           <div className="flex justify-between">
             <span className="text-slate-400">Calculated Size:</span>
             <span className="text-slate-200 font-bold">
-              {positionSizeBase.toFixed(4)} {symbol.replace(/USDT|USD/g, '')} (${positionSizeQuote.toFixed(2)})
+              {Number(positionSizeBase || 0).toFixed(4)} {symbol.replace(/USDT|USD/g, '')} (${Number(positionSizeQuote || 0).toFixed(2)})
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Risk Amount:</span>
-            <span className="text-terminal-red font-bold">${riskAmountUsd.toFixed(2)} ({stopDistancePct}%)</span>
+            <span className="text-terminal-red font-bold">${Number(riskAmountUsd || 0).toFixed(2)} ({stopDistancePct || '0.0'}%)</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Expected R:R:</span>
@@ -322,13 +322,13 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Est. Liquidation:</span>
-            <span className="text-amber-400 font-semibold">${liquidationPrice.toFixed(2)}</span>
+            <span className="text-amber-400 font-semibold">${Number(liquidationPrice || 0).toFixed(2)}</span>
           </div>
           {impactEstimate && (
             <div className="flex justify-between border-t border-slate-800 pt-1 text-[10px]">
               <span className="text-slate-400">Est. Market Impact:</span>
               <span className="text-amber-300 font-mono">
-                {impactEstimate.expected_slippage_bps.toFixed(1)} bps (${impactEstimate.total_impact_usd.toFixed(2)})
+                {Number(impactEstimate.expected_slippage_bps || 0).toFixed(1)} bps (${Number(impactEstimate.total_impact_usd || 0).toFixed(2)})
               </span>
             </div>
           )}

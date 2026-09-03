@@ -1,4 +1,5 @@
 import {
+  OHLCVCandle,
   CandlesApiResponse,
   MTFApiResponse,
   ScanApiResponse,
@@ -77,6 +78,28 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return data as T;
 }
 
+export function normalizeCandle(c: unknown): OHLCVCandle {
+  if (Array.isArray(c)) {
+    return [
+      Number(c[0]) || 0,
+      Number(c[1]) || 0,
+      Number(c[2]) || 0,
+      Number(c[3]) || 0,
+      Number(c[4]) || 0,
+      Number(c[5]) || 0,
+    ];
+  }
+  const obj = c as Record<string, unknown> | null | undefined;
+  return [
+    Number(obj?.timestamp ?? obj?.time ?? 0),
+    Number(obj?.open ?? 0),
+    Number(obj?.high ?? 0),
+    Number(obj?.low ?? 0),
+    Number(obj?.close ?? 0),
+    Number(obj?.volume ?? 0),
+  ];
+}
+
 export const api = {
   /**
    * GET /api/candles
@@ -89,7 +112,15 @@ export const api = {
     const res = await authFetch(
       `${BASE_URL}/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
     );
-    return handleResponse<CandlesApiResponse>(res);
+    const data = await handleResponse<Record<string, unknown>>(res);
+    const rawCandles = Array.isArray(data?.candles) ? data.candles : [];
+    const normalizedCandles: OHLCVCandle[] = rawCandles.map(normalizeCandle);
+    return {
+      symbol: (data?.symbol as string) || symbol,
+      timeframe: (data?.timeframe as SupportedTimeframe) || timeframe,
+      limit: (data?.limit as number) || limit,
+      candles: normalizedCandles,
+    };
   },
 
   /**
@@ -103,7 +134,15 @@ export const api = {
     const res = await authFetch(
       `${BASE_URL}/api/mtf?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&indicators=${indicators}`
     );
-    return handleResponse<MTFApiResponse>(res);
+    const data = await handleResponse<any>(res);
+    return {
+      symbol: data?.symbol || symbol,
+      timeframe: (data?.timeframe || timeframe) as SupportedTimeframe,
+      indicators: {
+        ema: data?.indicators?.ema || (Array.isArray(data?.ema) ? data.ema : []),
+        rsi: data?.indicators?.rsi || (Array.isArray(data?.rsi) ? data.rsi : []),
+      },
+    };
   },
 
   /**
@@ -117,7 +156,27 @@ export const api = {
     const res = await authFetch(
       `${BASE_URL}/api/scan?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`
     );
-    return handleResponse<ScanApiResponse>(res);
+    const data = await handleResponse<any>(res);
+    return {
+      symbol: data?.symbol || symbol,
+      timeframe: (data?.timeframe || timeframe) as SupportedTimeframe,
+      fvg: data?.fvg || data?.fvgs || [],
+      order_blocks: data?.order_blocks || data?.orderBlocks || [],
+      setup_suggestions: data?.setup_suggestions || data?.setups || [],
+      stats: data?.stats || {
+        totalCandles: 100,
+        bullishFVGs: 0,
+        bearishFVGs: 0,
+        unmitigatedFVGs: 0,
+        mitigatedFVGs: 0,
+        bullishOBs: 0,
+        bearishOBs: 0,
+        lastPrice: data?.lastPrice || 0,
+        highPrice: data?.highPrice || 0,
+        lowPrice: data?.lowPrice || 0,
+        trend: data?.trend || 'CONSOLIDATION',
+      },
+    };
   },
 
   /**
