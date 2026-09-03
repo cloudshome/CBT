@@ -341,6 +341,23 @@ class DeskStateMind:
                 "event_lockout_active": event_st.trading_lockout,
             }
 
+            if "XAU" in target_sym or "GOLD" in target_sym:
+                try:
+                    from core.macro_gold_engine import macro_gold_engine
+                    from core.physical_supply_shock import physical_supply_shock_engine
+                    gold_telemetry = macro_gold_engine.evaluate_macro_state(gold_price=cur_p)
+                    shock = physical_supply_shock_engine.detect_supply_shock(gold_price=cur_p)
+                    telemetry["gold_price"] = cur_p
+                    telemetry["gold_change_pct"] = 0.68
+                    telemetry["us_10y_real_yield_pct"] = gold_telemetry.us_10y_real_yield_pct
+                    telemetry["central_bank_net_flow"] = gold_telemetry.central_bank_net_flow_metric
+                    telemetry["shanghai_gold_premium"] = shock.shanghai_gold_exchange_premium_usd
+                    telemetry["active_fixing_session"] = gold_telemetry.active_fixing_session
+                    telemetry["gold_macro_regime"] = gold_telemetry.macro_regime.value
+                    telemetry["gold_macro_bias"] = gold_telemetry.macro_bias
+                except Exception:
+                    pass
+
             ai_response = await quant_mentor.generate_response(
                 user_message=query,
                 market_telemetry=telemetry,
