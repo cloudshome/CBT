@@ -22,7 +22,7 @@ import { GeneticStrategyLab } from './components/GeneticStrategyLab';
 import { AutonomousAuditorHUD } from './components/AutonomousAuditorHUD';
 import { ResearchIngestLab } from './components/ResearchIngestLab';
 import { ToastContainer } from './components/ToastContainer';
-import { marketProvider } from './data/providers/marketProvider';
+import { marketProvider, TickerData } from './data/providers/marketProvider';
 import {
   SupportedTimeframe,
   OHLCVCandle,
@@ -345,6 +345,36 @@ export const App: React.FC = () => {
     fetchDeskBrief();
   }, [symbol, timeframe]);
 
+  // Synchronize Live Watchlist Ticks directly into Header and Stats
+  const handleWatchlistPriceTick = useCallback((tickSymbol: string, price: number, high?: number, low?: number) => {
+    const cleanActive = symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const cleanTick = tickSymbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (cleanActive === cleanTick && price > 0) {
+      setStats((prev) => ({
+        ...prev,
+        lastPrice: price,
+        highPrice: high && high > 0 ? Math.max(prev.highPrice, high) : prev.highPrice,
+        lowPrice: low && low > 0 ? (prev.lowPrice === 0 ? low : Math.min(prev.lowPrice, low)) : prev.lowPrice,
+      }));
+    }
+  }, [symbol]);
+
+  // Sub-Second Real-Time Ticker Stream Synchronization
+  useEffect(() => {
+    const unsubTicker = marketProvider.subscribeTicker(symbol, (ticker: TickerData) => {
+      if (ticker.lastPrice > 0) {
+        setStats((prev) => ({
+          ...prev,
+          lastPrice: ticker.lastPrice,
+          highPrice: ticker.high24h > 0 ? ticker.high24h : prev.highPrice,
+          lowPrice: ticker.low24h > 0 ? ticker.low24h : prev.lowPrice,
+        }));
+      }
+    });
+
+    return () => unsubTicker();
+  }, [symbol]);
+
   // High-Frequency Real-Time WebSocket Aggregation (Incremental Series Updates)
   useEffect(() => {
     const unsub = marketProvider.subscribeRealtimeCandles(symbol, timeframe, (candle: OHLCVCandle) => {
@@ -473,6 +503,7 @@ export const App: React.FC = () => {
               setSymbol(sym);
               setSelectedSetup(null);
             }}
+            onPriceTick={handleWatchlistPriceTick}
           />
         </div>
 
@@ -677,7 +708,7 @@ export const App: React.FC = () => {
                 </div>
               ) : (
                 <ResearchIngestLab
-                  onNotify={(type, title, msg) => addToast(type, title, msg)}
+                  onNotify={(type: 'success' | 'error' | 'info' | 'warning', title: string, msg: string) => addToast(type, title, msg)}
                   selectedSymbol={symbol}
                   selectedTimeframe={timeframe}
                 />

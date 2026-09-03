@@ -5,6 +5,7 @@ import { api } from '../services/api';
 interface WatchlistVirtualTrackerProps {
   currentSymbol: string;
   onSelectSymbol: (symbol: string) => void;
+  onPriceTick?: (symbol: string, price: number, high?: number, low?: number) => void;
 }
 
 export interface WatchlistItem {
@@ -63,6 +64,7 @@ const INITIAL_CORE_PAIRS: WatchlistItem[] = [
 const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> = ({
   currentSymbol,
   onSelectSymbol,
+  onPriceTick,
 }) => {
   const [items, setItems] = useState<WatchlistItem[]>(INITIAL_CORE_PAIRS);
   const [search, setSearch] = useState('');
@@ -76,6 +78,12 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
       try {
         const res = await api.getLiveTickers(['BTCUSDT', 'ETHUSDT', 'PAXGUSDT', 'XAUUSDT']);
         if (isMounted && res.tickers && res.tickers.length > 0) {
+          const cleanCur = currentSymbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          const curMatch = res.tickers.find((t) => String(t.symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '') === cleanCur);
+          if (curMatch && onPriceTick && Number(curMatch.price) > 0) {
+            onPriceTick(String(curMatch.symbol), Number(curMatch.price), Number(curMatch.high24h) || 0, Number(curMatch.low24h) || 0);
+          }
+
           setItems(
             res.tickers.map((t) => {
               const sym = String(t.symbol || '').toUpperCase();
@@ -122,7 +130,7 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
       isMounted = false;
       clearInterval(pollInterval);
     };
-  }, []);
+  }, [currentSymbol, onPriceTick]);
 
   // 2. Real-Time Multi-Stream WebSocket for Sub-Second Price Ticks
   useEffect(() => {
@@ -148,6 +156,12 @@ const WatchlistVirtualTrackerComponent: React.FC<WatchlistVirtualTrackerProps> =
             const qVol = parseFloat(data.q) || 0;
 
             if (newPrice > 0 && sym) {
+              const cleanCur = currentSymbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
+              const cleanSym = sym.replace(/[^A-Z0-9]/g, '');
+              if (cleanCur === cleanSym && onPriceTick) {
+                onPriceTick(sym, newPrice, parseFloat(data.h) || 0, parseFloat(data.l) || 0);
+              }
+
               setItems((prev) =>
                 prev.map((item) => {
                   if (item.symbol === sym) {
