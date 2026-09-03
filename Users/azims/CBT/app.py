@@ -301,6 +301,28 @@ async def _telegram_signal_cmd(args: str, chat_id=None) -> str:
     if "/" not in sym and sym:
         sym = f"{sym}/USDT"
     sig = await telegram_bot.generate_live_signal(sym)
+    exec_res = telegram_bot.state_mind.auto_execute_paper_trade(sig)
+
+    if exec_res.get("status") == "EXECUTED":
+        paper_badge = (
+            f"\n📝 **Paper Practice Desk:** `AUTO-ENTERED ✅`\n"
+            f"• **Position ID:** `{exec_res['position_id']}`\n"
+            f"• **Virtual Size:** `{exec_res['size']} contracts` (${exec_res['target_value_usd']:,.0f})\n"
+            f"• **Breakeven Guard:** `Auto-Shifts SL to Entry at +1.5R`\n"
+            f"• **Live Tracking:** `Localhost:5173 / Paper Trading Panel`\n"
+        )
+    elif exec_res.get("status") == "SKIPPED":
+        paper_badge = (
+            f"\n📝 **Paper Practice Desk:** `ACTIVE IN SHADOW DESK ⏳`\n"
+            f"• **Status:** Trade already open (`{exec_res.get('position_id')}`)\n"
+            f"• **State Mind:** Duplicate entry prevented for risk management.\n"
+        )
+    else:
+        paper_badge = (
+            f"\n🛡️ **Paper Practice Desk:** `BLOCKED BY RISK GATE 🛑`\n"
+            f"• **Reason:** `{exec_res.get('reason', 'Risk Hurdle')}`\n"
+        )
+
     return (
         f"⚡ **QUANTITATIVE TRADE SIGNAL** | `{sig['symbol']}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -313,7 +335,10 @@ async def _telegram_signal_cmd(args: str, chat_id=None) -> str:
         f"🎯 **TP1:** `${sig['tp1']:,.2f}`\n"
         f"🎯 **TP2:** `${sig['tp2']:,.2f}`\n"
         f"🚀 **TP3 (Runner):** `${sig['tp3']:,.2f}`\n"
-        f"⚖️ **R:R Ratio:** `{sig['risk_reward']}`"
+        f"⚖️ **R:R Ratio:** `{sig['risk_reward']}`\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━"
+        f"{paper_badge}"
+        f"━━━━━━━━━━━━━━━━━━━━━━"
     )
 
 async def _telegram_plan_cmd(args: str, chat_id=None) -> str:
@@ -380,21 +405,44 @@ async def _telegram_decision_cmd(args: str, chat_id=None) -> str:
         f"• **Reason:** `{out.no_trade_reason or 'Qualified High-EV Setup'}`"
     )
 
+def _telegram_positions_cmd(args: str, chat_id=None) -> str:
+    return telegram_bot.state_mind.get_positions_report()
+
+def _telegram_close_cmd(args: str, chat_id=None) -> str:
+    sym = args.strip() if args.strip() else "BTC/USDT"
+    return telegram_bot.state_mind.close_position_by_symbol(sym)
+
+async def _telegram_debate_cmd(args: str, chat_id=None) -> str:
+    sym = args.strip() if args.strip() else "BTC/USDT"
+    return await telegram_bot.state_mind.run_debate_council(sym)
+
+def _telegram_autopsy_cmd(args: str, chat_id=None) -> str:
+    return telegram_bot.state_mind.get_latest_autopsy()
+
 telegram_bot.register_command("/start", lambda args, chat_id=None: (
     "🤖 **SKY Institutional Quantitative Terminal Bot**\n\n"
     "Available Commands:\n"
-    "• `/signal` — Live high-conviction trade signals\n"
+    "• `/signal [sym]` — Live signal + Auto Paper Practice\n"
+    "• `/positions` — Active shadow practice positions & PnL\n"
+    "• `/close <sym>` — Close open practice position from Telegram\n"
+    "• `/debate <sym>` — Tri-Agent Adversarial Debate Council\n"
+    "• `/autopsy` — Forensic post-trade loss diagnosis\n"
     "• `/market` — Real-time market state & CVD pulse\n"
-    "• `/plan` — Multi-timeframe structural trading plan\n"
+    "• `/plan [sym]` — Multi-timeframe structural trading plan\n"
     "• `/events` — High-impact macro events & countdown\n"
     "• `/news` — Breaking crypto alpha wire & ETF flows\n"
     "• `/decision <sym>` — Live 12-stage SKY decision matrix\n"
     "• `/risk` — Risk desk status & daily loss limits\n"
-    "• `/status` — Terminal health & live telemetry"
+    "• `/status` — Terminal health & live telemetry\n\n"
+    "💬 _Or send ANY message in natural language to chat with QuantMentor AI!_"
 ))
 telegram_bot.register_command("/help", lambda args, chat_id=None: (
     "💡 **SKY Bot Command Guide**\n\n"
     "• `/signal [symbol]` — e.g. `/signal BTC` or `/signal ETH`\n"
+    "• `/positions` — View active practice positions & PnL\n"
+    "• `/close [symbol]` — e.g. `/close BTC`\n"
+    "• `/debate [symbol]` — e.g. `/debate BTC`\n"
+    "• `/autopsy` — Review root cause of recent stop-outs\n"
     "• `/plan [symbol]` — e.g. `/plan BTC`\n"
     "• `/decision [symbol]` — e.g. `/decision SOL`\n"
     "• `/market` or `/brief` — Instant desk overview\n"
@@ -408,6 +456,11 @@ telegram_bot.register_command("/brief", _telegram_market_cmd)
 telegram_bot.register_command("/market", _telegram_market_cmd)
 telegram_bot.register_command("/signal", _telegram_signal_cmd)
 telegram_bot.register_command("/signals", _telegram_signal_cmd)
+telegram_bot.register_command("/positions", _telegram_positions_cmd)
+telegram_bot.register_command("/desk", _telegram_positions_cmd)
+telegram_bot.register_command("/close", _telegram_close_cmd)
+telegram_bot.register_command("/debate", _telegram_debate_cmd)
+telegram_bot.register_command("/autopsy", _telegram_autopsy_cmd)
 telegram_bot.register_command("/plan", _telegram_plan_cmd)
 telegram_bot.register_command("/events", _telegram_events_cmd)
 telegram_bot.register_command("/news", _telegram_news_cmd)

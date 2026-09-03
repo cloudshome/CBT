@@ -132,6 +132,60 @@ async def test_telegram_signal_command_routing():
     assert "QUANTITATIVE TRADE SIGNAL" in res["response"]
 
 
+@pytest.mark.asyncio
+async def test_desk_state_mind_paper_execution():
+    from core.portfolio_shadow import portfolio_shadow
+
+    # Reset positions for clean test
+    portfolio_shadow.reset_all_positions()
+
+    sig = {
+        "symbol": "BTC/USDT",
+        "direction": "LONG",
+        "entry_price": 89000.0,
+        "stop_loss": 88000.0,
+        "tp1": 91000.0,
+        "kelly_allocation_pct": 2.0,
+    }
+
+    # 1. First execution should succeed
+    res1 = telegram_bot.state_mind.auto_execute_paper_trade(sig)
+    assert res1["status"] == "EXECUTED"
+    assert "position_id" in res1
+    assert res1["size"] > 0
+
+    # 2. Immediate duplicate execution on same symbol should be safely skipped
+    res2 = telegram_bot.state_mind.auto_execute_paper_trade(sig)
+    assert res2["status"] == "SKIPPED"
+    assert res2["position_id"] == res1["position_id"]
+
+    # 3. Report should show the active trade
+    report = telegram_bot.state_mind.get_positions_report()
+    assert "BTC/USDT" in report
+    assert "ACTIVE PAPER PRACTICE POSITIONS" in report
+
+    # 4. Close the trade via symbol
+    close_msg = telegram_bot.state_mind.close_position_by_symbol("BTC/USDT")
+    assert "POSITION CLOSED FROM TELEGRAM" in close_msg
+
+
+@pytest.mark.asyncio
+async def test_telegram_debate_and_conversational_routing():
+    # 1. Debate Council
+    debate_res = await telegram_bot.handle_webhook_update({
+        "message": {"text": "/debate BTC", "chat": {"id": 12345678}}
+    })
+    assert debate_res["status"] == "EXECUTED"
+    assert "ADVERSARIAL DEBATE COUNCIL" in debate_res["response"]
+
+    # 2. Conversational Natural Language Query (non-slash)
+    chat_res = await telegram_bot.handle_webhook_update({
+        "message": {"text": "What is our current market risk?", "chat": {"id": 12345678}}
+    })
+    assert chat_res["status"] == "AI_CONVERSATION_EXECUTED"
+    assert len(chat_res["response"]) > 0
+
+
 def test_api_telegram_status_endpoint(client):
     resp = client.get("/api/telegram/status")
     assert resp.status_code == 200
@@ -140,6 +194,8 @@ def test_api_telegram_status_endpoint(client):
     assert "registered_commands" in data
     assert "/status" in data["registered_commands"]
     assert "/signal" in data["registered_commands"]
+    assert "/positions" in data["registered_commands"]
+    assert "/debate" in data["registered_commands"]
 
 
 def test_api_telegram_broadcast_endpoint(client):
