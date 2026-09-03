@@ -57,16 +57,20 @@ class DatabaseManager:
         self.init_all_schemas()
 
     def get_market_conn(self) -> sqlite3.Connection:
-        return get_db_connection(self.market_db_path)
+        path = Path(os.getenv("MARKET_DB_PATH", str(self.market_db_path)))
+        return get_db_connection(path)
 
     def get_brain_conn(self) -> sqlite3.Connection:
-        return get_db_connection(self.brain_db_path)
+        path = Path(os.getenv("BRAIN_DB_PATH", str(self.brain_db_path)))
+        return get_db_connection(path)
 
     def get_trading_conn(self) -> sqlite3.Connection:
-        return get_db_connection(self.trading_db_path)
+        path = Path(os.getenv("TRADING_LOGS_DB_PATH", str(self.trading_db_path)))
+        return get_db_connection(path)
 
     def get_experiment_conn(self) -> sqlite3.Connection:
-        return get_db_connection(self.experiment_db_path)
+        path = Path(os.getenv("EXPERIMENT_DB_PATH", str(self.experiment_db_path)))
+        return get_db_connection(path)
 
     def get_connection(self) -> sqlite3.Connection:
         return self.get_brain_conn()
