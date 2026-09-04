@@ -547,8 +547,18 @@ institutionalRouter.get('/dossier', async (req: Request, res: Response): Promise
       limit: 100,
     });
 
-    const marketData = await fetchCandlesWithFallback(symbol, timeframe, 100);
-    const candles = parseAndNormalizeCandles(marketData.candles);
+    // Attempt to hydrate reference prices from live market data, but degrade
+    // gracefully if the feeds are unreachable (e.g. geo-restricted region or an
+    // empty cache). The dossier is a deterministic 8-pillar model that already
+    // carries built-in reference prices, so it should still be served rather than
+    // returning a 5xx whenever a live exchange call fails.
+    let candles: Candle[] = [];
+    try {
+      const marketData = await fetchCandlesWithFallback(symbol, timeframe, 100);
+      candles = parseAndNormalizeCandles(marketData.candles);
+    } catch {
+      candles = [];
+    }
     const curP = candles.length > 0 ? candles[candles.length - 1].close : (symbol.includes('BTC') ? 77450.0 : symbol.includes('ETH') ? 2430.0 : 4458.0);
 
     const isBtc = symbol.includes('BTC');
