@@ -540,8 +540,12 @@ institutionalRouter.get('/dynamic-hedge', async (req: Request, res: Response): P
  */
 institutionalRouter.get('/dossier', async (req: Request, res: Response): Promise<void> => {
   try {
-    const symbol = ((req.query.symbol as string) || 'BTCUSDT').toUpperCase();
-    const timeframe = (req.query.timeframe as string) || '15m';
+    const requestedSymbol = ((req.query.symbol as string) || 'BTCUSDT').toUpperCase();
+    const { symbol, timeframe } = validateCandlesQuery({
+      symbol: requestedSymbol,
+      timeframe: req.query.timeframe,
+      limit: 100,
+    });
 
     const marketData = await fetchCandlesWithFallback(symbol, timeframe, 100);
     const candles = parseAndNormalizeCandles(marketData.candles);
@@ -666,7 +670,11 @@ institutionalRouter.get('/dossier', async (req: Request, res: Response): Promise
       pillar_z_scores: zScores,
       actionable_quant_verdict: verdict,
     });
-  } catch {
+  } catch (err: unknown) {
+    if (err instanceof ValidationError) {
+      res.status(err.statusCode).json({ error: err.message });
+      return;
+    }
     res.status(500).json({ error: 'Failed to generate 8-pillar asset dossier' });
   }
 });
