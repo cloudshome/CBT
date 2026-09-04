@@ -8,7 +8,7 @@ describe('Server Root & Readiness Endpoints', () => {
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('name', 'Crypto Brain Terminal (CTB) API');
       expect(res.body).toHaveProperty('status', 'online');
-      expect(res.body).toHaveProperty('version', '0.1.0');
+      expect(res.body).toHaveProperty('version', '3.0.0');
     });
   });
 
