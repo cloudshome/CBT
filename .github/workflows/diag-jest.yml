@@ -39,6 +39,9 @@ jobs:
       - name: Install backend deps
         run: npm ci
 
+      - name: Install Frontend PWA deps
+        run: npm --prefix frontend ci
+
       - name: Prisma init
         run: |
           npx prisma generate
