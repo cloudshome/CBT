@@ -172,13 +172,20 @@ app = FastAPI(
     lifespan=lifespan_ctx,
 )
 
-# CORS — restrict origins in production via CORS_ORIGIN env var
-_cors_origin = os.getenv("CORS_ORIGIN", "")
-_allowed_origins = [o.strip() for o in _cors_origin.split(",") if o.strip()] if _cors_origin else ["*"]
+# CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
+_cors_origin = os.getenv("CORS_ORIGIN", "").strip()
+_is_production = os.getenv("ENV", os.getenv("NODE_ENV", "")).lower() in ("production", "prod")
+if _is_production and (not _cors_origin or _cors_origin == "*"):
+    raise RuntimeError(
+        "Security misconfiguration: CORS_ORIGIN must be set to an explicit "
+        'comma-separated origin allowlist (not "*") in production.'
+    )
+_explicit_origins = [o.strip() for o in _cors_origin.split(",") if o.strip() and o.strip() != "*"]
+_allowed_origins = _explicit_origins or ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
-    allow_credentials=bool(_cors_origin),
+    allow_credentials=bool(_explicit_origins),
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )

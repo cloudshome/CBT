@@ -12,7 +12,7 @@ services:
       - ENVIRONMENT=production
       - DATA_DIR=/app/data
       - API_KEY=${API_KEY}
-      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - CORS_ORIGIN=${CORS_ORIGIN:?CORS_ORIGIN must be an explicit origin allowlist in production}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
@@ -44,7 +44,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=file:/app/data/dev.db
       - API_KEY=${API_KEY}
-      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - CORS_ORIGIN=${CORS_ORIGIN:?CORS_ORIGIN must be an explicit origin allowlist in production}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - TRUST_PROXY_XFF=true
     deploy:
