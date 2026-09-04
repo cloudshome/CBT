@@ -71,7 +71,10 @@ chmod +x "${SCRIPT_DIR}"/*.py 2>/dev/null || true
 
 # 5. Install Systemd Service Unit
 echo "[5/8] Installing and enabling systemd boot supervisor..."
-sudo cp "${SCRIPT_DIR}/systemd/cbt-stack@.service" /etc/systemd/system/cbt-stack@.service
+# Substitute the actual project root so `docker compose` resolves the correct
+# docker-compose.yml (the repo layout nests the project under Users/azims/CBT).
+sed "s|__CBT_WORKDIR__|${ROOT_DIR}|g" "${SCRIPT_DIR}/systemd/cbt-stack@.service" \
+    | sudo tee /etc/systemd/system/cbt-stack@.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable "cbt-stack@${CURRENT_USER}.service"
 echo "✓ Systemd unit cbt-stack@${CURRENT_USER}.service enabled."

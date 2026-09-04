@@ -1,6 +1,6 @@
 [Unit]
 Description=CBT / SKY 24/7 Crypto Brain Terminal Stack
-Documentation=https://github.com/CBT
+Documentation=https://github.com/cloudshome/CTB
 After=docker.service network-online.target
 Requires=docker.service
 Wants=network-online.target
@@ -12,7 +12,8 @@ RemainAfterExit=yes
 # Auto-detected from the user who runs the install script
 User=%i
 Group=%i
-WorkingDirectory=%h/CBT
+# Replaced with the resolved project root by deploy/ubuntu_install.sh
+WorkingDirectory=__CBT_WORKDIR__
 
 # Start the full 3-tier + Caddy stack in background
 ExecStartPre=-/usr/bin/docker compose down --remove-orphans
