@@ -1103,7 +1103,9 @@ async def get_decision_council(symbol: str = Query("BTC/USDT")):
     ev_res = ev_engine.calculate_net_ev(cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget)
 
     macro = macro_sentinel.get_macro_snapshot()
-    decision = debate_committee.convene_council(symbol, state, ev_res, u_budget, macro.macro_regime)
+    decision = debate_committee.convene_council(
+        symbol, state, ev_res, u_budget, macro.macro_regime, analogues=analogues
+    )
     res_dict = decision.to_dict()
     res_dict["net_ev_r"] = round(float(ev_res.net_ev_r), 2)
     res_dict["uncertainty_score"] = round(float(u_budget.composite_uncertainty_u), 2)
@@ -1131,8 +1133,18 @@ async def get_allocation_sizing(
     u_budget = uncertainty_engine.compute_budget(dq, analogues, cone, reg_res, event_st)
     ev_res = ev_engine.calculate_net_ev(cur_p, tp_p, sl_p, analogues.p_tp_hit, u_budget)
 
-    alloc = conservative_kelly.calculate_allocation(equity, cur_p, sl_p, ev_res, u_budget)
-    return alloc.to_dict()
+    alloc = conservative_kelly.calculate_allocation(
+        equity,
+        cur_p,
+        sl_p,
+        ev_res,
+        u_budget,
+        evidence_grade=getattr(analogues, "evidence_grade", "EMPIRICAL"),
+    )
+    result = alloc.to_dict()
+    result["evidence_grade"] = getattr(analogues, "evidence_grade", "EMPIRICAL")
+    result["real_analogue_samples"] = getattr(analogues, "real_sample_count", 0)
+    return result
 
 
 @app.get("/api/shadow/positions")
@@ -1507,7 +1519,9 @@ async def ask_desk_copilot(req: AskDeskRequest):
         u_budget = uncertainty_engine.compute_budget(dq, analogues, cone, reg_res, event_st)
         ev_res = ev_engine.calculate_net_ev(cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget)
         macro = macro_sentinel.get_macro_snapshot()
-        council = debate_committee.convene_council(sym, state, ev_res, u_budget, macro.macro_regime)
+        council = debate_committee.convene_council(
+            sym, state, ev_res, u_budget, macro.macro_regime, analogues=analogues
+        )
         council_decision = council.final_decision
         net_ev_r = round(float(ev_res.net_ev_r), 2)
         confluence_score = round(float(getattr(council, "confluence_score", 0.0)), 1)

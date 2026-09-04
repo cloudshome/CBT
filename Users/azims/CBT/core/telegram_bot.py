@@ -243,7 +243,9 @@ class DeskStateMind:
             macro = macro_sentinel.get_macro_snapshot()
 
             council = AdversarialDebateCommittee()
-            decision = council.convene_council(sym, state, ev_res, u_budget, macro.macro_regime)
+            decision = council.convene_council(
+                sym, state, ev_res, u_budget, macro.macro_regime, analogues=analogues
+            )
 
             dec_emoji = (
                 "🟢 LONG"

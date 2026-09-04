@@ -44,6 +44,9 @@ class CouncilDecision:
     no_trade_probability: float  # Target baseline ~70%
     primary_execution_thesis: str
     invalidation_criteria: str
+    evidence_grade: str = "EMPIRICAL"
+    """Provenance of the evidence behind this verdict. Anything other than
+    EMPIRICAL forces NO_TRADE — see core/evidence_integrity.py."""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -57,6 +60,7 @@ class CouncilDecision:
             "no_trade_probability": self.no_trade_probability,
             "primary_execution_thesis": self.primary_execution_thesis,
             "invalidation_criteria": self.invalidation_criteria,
+            "evidence_grade": self.evidence_grade,
         }
 
 
@@ -71,6 +75,7 @@ class AdversarialDebateCommittee:
         uncertainty: UncertaintyBudget,
         macro_regime: str = "NEUTRAL",
         dossier: Any | None = None,
+        analogues: Any | None = None,
     ) -> CouncilDecision:
         """
         Runs adversarial deliberation between Bull, Bear, and dominant Skeptic Judge.
@@ -204,6 +209,34 @@ class AdversarialDebateCommittee:
         )
 
         # 4. Council Weighted Voting Synthesis
+        # RULE 0 — EVIDENCE INTEGRITY (highest precedence, non-overridable).
+        # If the analogue distribution was fabricated (cold brain memory seeded
+        # with np.random states), no amount of downstream "confidence" is real.
+        # The council must refuse before any directional branch is considered.
+        evidence_grade = str(getattr(analogues, "evidence_grade", "EMPIRICAL"))
+        if evidence_grade != "EMPIRICAL":
+            return CouncilDecision(
+                symbol=symbol,
+                timestamp=state.timestamp,
+                final_decision="NO_TRADE",
+                consensus_confidence=0.99,
+                bull_argument=bull_arg,
+                bear_argument=bear_arg,
+                skeptic_argument=skeptic_arg,
+                no_trade_probability=1.0,
+                primary_execution_thesis=(
+                    "EVIDENCE INTEGRITY HALT: analogue distribution is "
+                    f"{evidence_grade}, not empirically observed "
+                    f"(real samples: {getattr(analogues, 'real_sample_count', 0)}). "
+                    "No capital may be committed on fabricated evidence."
+                ),
+                invalidation_criteria=(
+                    "Resolves automatically once sufficient real historical "
+                    "states accumulate in brain_memory.db."
+                ),
+                evidence_grade=evidence_grade,
+            )
+
         # Skeptic has 2.0x voting weight to enforce ~70% NO-TRADE baseline
         if not ev_result.is_tradable or skeptic_conf >= 0.70 or u_score >= 0.60:
             final_decision = "NO_TRADE"
