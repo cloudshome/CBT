@@ -7,7 +7,8 @@ and classifies volatility into dynamic non-arbitrary regimes (LOW, NORMAL, HIGH,
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import VolatilityRegime, VolatilityState
@@ -26,7 +27,7 @@ class VolatilityEngine:
 
     def compute_volatility(
         self,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
     ) -> VolatilityState:
         """
         Computes ATR, rolling percentiles, realized volatility, and assigns VolatilityRegime.
@@ -44,21 +45,23 @@ class VolatilityEngine:
             )
 
         # Compute True Range series
-        tr_series: List[float] = []
-        close_prices: List[float] = [float(c["close"]) for c in candles]
+        tr_series: list[float] = []
+        close_prices: list[float] = [float(c["close"]) for c in candles]
         for i in range(1, n):
             h = float(candles[i]["high"])
-            l = float(candles[i]["low"])
+            lo = float(candles[i]["low"])
             c_prev = close_prices[i - 1]
-            tr = max(h - l, abs(h - c_prev), abs(l - c_prev))
+            tr = max(h - lo, abs(h - c_prev), abs(lo - c_prev))
             tr_series.append(tr)
 
         # 14-period Wilder / Simple ATR
-        atr_window = tr_series[-self.atr_period:] if len(tr_series) >= self.atr_period else tr_series
+        atr_window = (
+            tr_series[-self.atr_period :] if len(tr_series) >= self.atr_period else tr_series
+        )
         current_atr = float(np.mean(atr_window)) if atr_window else 1.0
 
         # Rolling ATR distribution for percentile computation
-        atr_history: List[float] = []
+        atr_history: list[float] = []
         if len(tr_series) >= self.atr_period:
             for k in range(self.atr_period, len(tr_series) + 1):
                 sub_tr = tr_series[k - self.atr_period : k]
@@ -80,7 +83,11 @@ class VolatilityEngine:
                 ret = np.log(close_prices[i] / close_prices[i - 1])
                 log_returns.append(ret)
 
-        realized_vol = float(np.std(log_returns[-self.atr_period :])) if len(log_returns) >= self.atr_period else 0.01
+        realized_vol = (
+            float(np.std(log_returns[-self.atr_period :]))
+            if len(log_returns) >= self.atr_period
+            else 0.01
+        )
 
         # Classify regime based on rolling percentile
         if atr_percentile >= 0.85:
@@ -93,9 +100,7 @@ class VolatilityEngine:
             regime = VolatilityRegime.NORMAL_VOLATILITY
 
         # Expansion / Contraction flags
-        is_expanding = (
-            len(atr_history) >= 3 and atr_history[-1] > atr_history[-2] > atr_history[-3]
-        )
+        is_expanding = len(atr_history) >= 3 and atr_history[-1] > atr_history[-2] > atr_history[-3]
         is_contracting = (
             len(atr_history) >= 3 and atr_history[-1] < atr_history[-2] < atr_history[-3]
         )

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.api_health_guard")
 
@@ -17,7 +17,7 @@ logger = logging.getLogger("ai_quant_sentinel.api_health_guard")
 @dataclass
 class EndpointVitals:
     endpoint_name: str
-    status: str                         # "HEALTHY", "DEGRADED", "FAILOVER_STANDBY", "OFFLINE"
+    status: str  # "HEALTHY", "DEGRADED", "FAILOVER_STANDBY", "OFFLINE"
     current_latency_ms: float
     rate_limit_usage_pct: float
     consecutive_errors: int
@@ -28,15 +28,23 @@ class APIHealthGuard:
     """Monitors live exchange endpoint health and coordinates automatic failovers."""
 
     def __init__(self):
-        self._endpoints: Dict[str, EndpointVitals] = {
-            "Binance_REST": EndpointVitals("Binance_REST", "HEALTHY", 18.2, 14.5, 0, int(time.time() * 1000)),
-            "Bybit_V5": EndpointVitals("Bybit_V5", "HEALTHY", 24.5, 8.0, 0, int(time.time() * 1000)),
-            "Coinbase_Advanced": EndpointVitals("Coinbase_Advanced", "HEALTHY", 38.0, 5.2, 0, int(time.time() * 1000)),
-            "Hyperliquid_L2": EndpointVitals("Hyperliquid_L2", "HEALTHY", 21.0, 12.0, 0, int(time.time() * 1000)),
+        self._endpoints: dict[str, EndpointVitals] = {
+            "Binance_REST": EndpointVitals(
+                "Binance_REST", "HEALTHY", 18.2, 14.5, 0, int(time.time() * 1000)
+            ),
+            "Bybit_V5": EndpointVitals(
+                "Bybit_V5", "HEALTHY", 24.5, 8.0, 0, int(time.time() * 1000)
+            ),
+            "Coinbase_Advanced": EndpointVitals(
+                "Coinbase_Advanced", "HEALTHY", 38.0, 5.2, 0, int(time.time() * 1000)
+            ),
+            "Hyperliquid_L2": EndpointVitals(
+                "Hyperliquid_L2", "HEALTHY", 21.0, 12.0, 0, int(time.time() * 1000)
+            ),
         }
         self.primary_endpoint = "Binance_REST"
 
-    def get_all_vitals(self) -> List[Dict[str, Any]]:
+    def get_all_vitals(self) -> list[dict[str, Any]]:
         return [asdict(v) for v in self._endpoints.values()]
 
     def report_request(self, endpoint: str, latency_ms: float, is_error: bool = False) -> None:
@@ -58,7 +66,9 @@ class APIHealthGuard:
         if failed_endpoint == self.primary_endpoint:
             # Switch to Bybit
             self.primary_endpoint = "Bybit_V5"
-            logger.warning(f"API FAILOVER: Switched primary endpoint from {failed_endpoint} to {self.primary_endpoint}")
+            logger.warning(
+                f"API FAILOVER: Switched primary endpoint from {failed_endpoint} to {self.primary_endpoint}"
+            )
 
 
 # Singleton

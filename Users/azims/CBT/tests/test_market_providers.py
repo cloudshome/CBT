@@ -4,15 +4,13 @@ Validates Binance, Bybit, SQLite Cache, Synthetic stochastic simulation, and Com
 """
 
 import pytest
-import asyncio
+
 from core.market_providers import (
+    TIMEFRAME_TO_MS,
     BinanceMarketDataProvider,
     BybitMarketDataProvider,
-    SQLiteCacheProvider,
-    SyntheticMarketProvider,
     CompositeMarketDataGateway,
-    market_gateway,
-    TIMEFRAME_TO_MS,
+    SyntheticMarketProvider,
 )
 
 
@@ -82,22 +80,22 @@ async def test_synthetic_provider_order_book():
 @pytest.mark.asyncio
 async def test_composite_market_gateway():
     gateway = CompositeMarketDataGateway()
-    
+
     # 1. Fetch OHLCV
     ohlcv = await gateway.get_ohlcv("BTC/USDT", "15m", limit=20)
     assert len(ohlcv) >= 20
-    
+
     # 2. Fetch Ticker
     ticker = await gateway.get_ticker("BTC/USDT")
     assert "price" in ticker
     assert ticker["price"] > 0
-    
+
     # 3. Fetch Order Book
     ob = await gateway.get_order_book("BTC/USDT", limit=6)
     assert "asks" in ob
     assert "bids" in ob
     assert len(ob["asks"]) > 0
-    
+
     # 4. Check Health
     health = gateway.get_provider_health()
     assert "active_provider" in health

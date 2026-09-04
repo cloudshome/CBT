@@ -4,12 +4,9 @@ Verifies trade telemetry logging, automated loss autopsy dispatch,
 regime-conditional expectancy drift audits, and strategy quarantine circuit breakers.
 """
 
-import pytest
 from core.autonomous_auditor import (
     AutonomousRiskAuditor,
-    autonomous_risk_auditor,
     SystemAuditHealthReport,
-    TradeTelemetryRecord,
 )
 
 

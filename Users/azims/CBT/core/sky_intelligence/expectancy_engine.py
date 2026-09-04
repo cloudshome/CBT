@@ -7,7 +7,7 @@ Sharpe, Sortino, MAE, MFE, and generates Regime-Conditional breakdown matrices.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+
 import numpy as np
 
 from core.sky_intelligence.types import ExpectancyRecord
@@ -22,12 +22,12 @@ class ExpectancyEngine:
 
     def compute_expectancy(
         self,
-        r_multiples: List[float],
+        r_multiples: list[float],
         concept_name: str = "SETUP_A_SWEEP_MSS",
         regime: str = "TRENDING_BULL",
         timeframe: str = "15m",
-        mae_list: Optional[List[float]] = None,
-        mfe_list: Optional[List[float]] = None,
+        mae_list: list[float] | None = None,
+        mfe_list: list[float] | None = None,
     ) -> ExpectancyRecord:
         """
         Calculates full quantitative statistics from an empirical list of realized R-multiples.

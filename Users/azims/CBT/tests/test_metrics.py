@@ -4,6 +4,7 @@ Unit tests for FastAPI Prometheus Metrics Endpoint.
 
 import pytest
 from fastapi.testclient import TestClient
+
 from app import app
 
 

@@ -7,7 +7,7 @@ Funding Rate z-scores/percentiles, Liquidations cascades, and Spot/Perp Basis pr
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+
 import numpy as np
 
 from core.sky_intelligence.types import DerivativesState
@@ -31,10 +31,10 @@ class DerivativesIntelligenceEngine:
         open_interest: float,
         prev_open_interest: float,
         current_funding_rate: float,
-        historical_funding_rates: Optional[List[float]] = None,
+        historical_funding_rates: list[float] | None = None,
         long_liquidations: float = 0.0,
         short_liquidations: float = 0.0,
-        spot_price: Optional[float] = None,
+        spot_price: float | None = None,
     ) -> DerivativesState:
         """
         Synthesizes perpetual futures Open Interest, Funding, Liquidations, and Basis.
@@ -48,13 +48,13 @@ class DerivativesIntelligenceEngine:
 
         # Price vs OI Microstructure Matrix
         if price_change_pct >= 0 and oi_delta_pct >= 0:
-            matrix_state = "LONG_EXPANSION"       # Aggressive new buyers entering
+            matrix_state = "LONG_EXPANSION"  # Aggressive new buyers entering
         elif price_change_pct >= 0 and oi_delta_pct < 0:
-            matrix_state = "SHORT_SQUEEZE"        # Bears forced to buy back
+            matrix_state = "SHORT_SQUEEZE"  # Bears forced to buy back
         elif price_change_pct < 0 and oi_delta_pct >= 0:
-            matrix_state = "SHORT_EXPANSION"      # Aggressive new sellers entering
+            matrix_state = "SHORT_EXPANSION"  # Aggressive new sellers entering
         else:
-            matrix_state = "LONG_LIQUIDATION"     # Longs capitulating / flushing
+            matrix_state = "LONG_LIQUIDATION"  # Longs capitulating / flushing
 
         # 2. Funding Rate Percentile and Z-Score
         hist_f = historical_funding_rates or [0.0001]
@@ -67,7 +67,11 @@ class DerivativesIntelligenceEngine:
             funding_z = 0.0
             funding_pct = 0.50
 
-        is_funding_extreme = abs(funding_z) >= 2.0 or current_funding_rate >= 0.0005 or current_funding_rate <= -0.0005
+        is_funding_extreme = (
+            abs(funding_z) >= 2.0
+            or current_funding_rate >= 0.0005
+            or current_funding_rate <= -0.0005
+        )
 
         # 3. Liquidations Cascade Detection
         total_liqs = long_liquidations + short_liquidations
@@ -78,9 +82,12 @@ class DerivativesIntelligenceEngine:
             basis_spread = (current_price - spot_price) / spot_price
             annualized_basis_pct = basis_spread * (365.0 / 1.0) * 100.0
         else:
-            annualized_basis_pct = current_funding_rate * 3.0 * 365.0 * 100.0  # Implied annualized basis from 8h funding
+            annualized_basis_pct = (
+                current_funding_rate * 3.0 * 365.0 * 100.0
+            )  # Implied annualized basis from 8h funding
 
         import time
+
         now_ts = int(time.time() * 1000)
 
         return DerivativesState(

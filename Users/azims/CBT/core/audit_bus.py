@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.database import db_manager
 
@@ -22,14 +21,14 @@ logger = logging.getLogger("ai_quant_sentinel.audit_bus")
 class AuditEvent:
     event_id: str
     timestamp: float
-    event_type: str         # "SIGNAL_GENERATED", "SIGNAL_REJECTED", "RISK_ENFORCED", "TRADE_CLOSED", "LOSS_AUTOPSY", "KILL_SWITCH"
+    event_type: str  # "SIGNAL_GENERATED", "SIGNAL_REJECTED", "RISK_ENFORCED", "TRADE_CLOSED", "LOSS_AUTOPSY", "KILL_SWITCH"
     symbol: str
-    severity: str           # "INFO", "WARNING", "CRITICAL"
+    severity: str  # "INFO", "WARNING", "CRITICAL"
     reason: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     software_version: str = "2.0.0"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -38,7 +37,7 @@ class AuditBus:
 
     def __init__(self, memory_buffer_size: int = 200):
         self._memory_buffer_size = memory_buffer_size
-        self._memory_ring: List[AuditEvent] = []
+        self._memory_ring: list[AuditEvent] = []
         self._ensure_table_exists()
 
     def _ensure_table_exists(self) -> None:
@@ -59,10 +58,14 @@ class AuditBus:
                     )
                     """
                 )
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_type ON system_audit_events(event_type)")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_sym ON system_audit_events(symbol)")
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_audit_type ON system_audit_events(event_type)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_audit_sym ON system_audit_events(symbol)"
+                )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.warning(f"Could not initialize system_audit_events table: {e}")
 
     def emit_event(
@@ -71,7 +74,7 @@ class AuditBus:
         symbol: str,
         reason: str,
         severity: str = "INFO",
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> AuditEvent:
         """Emits and records an immutable audit event."""
         now = time.time()
@@ -112,13 +115,13 @@ class AuditBus:
                     ),
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Failed to record audit event {event_id}: {e}")
 
         logger.info(f"Audit [{ev.severity}] {ev.event_type} on {ev.symbol}: {ev.reason}")
         return ev
 
-    def get_recent_events(self, limit: int = 50, event_type: Optional[str] = None) -> List[AuditEvent]:
+    def get_recent_events(self, limit: int = 50, event_type: str | None = None) -> list[AuditEvent]:
         """Retrieves recent audit events."""
         events = []
         try:
@@ -147,11 +150,13 @@ class AuditBus:
                             software_version=r["software_version"],
                         )
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Error fetching audit events: {e}")
             # Fallback to memory ring
             if event_type:
-                return [e for e in reversed(self._memory_ring) if e.event_type == event_type][:limit]
+                return [e for e in reversed(self._memory_ring) if e.event_type == event_type][
+                    :limit
+                ]
             return list(reversed(self._memory_ring))[:limit]
 
         return events

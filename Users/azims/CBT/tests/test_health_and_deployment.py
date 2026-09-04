@@ -3,6 +3,7 @@ Unit tests for Production Health Probes, Database Engine Info, and Deployment Co
 """
 
 from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -35,10 +36,10 @@ def test_systemd_and_healthcheck_files_exist():
     root = Path(__file__).parent.parent
     healthcheck_script = root / "deploy" / "healthcheck.sh"
     service_file = root / "deploy" / "systemd" / "orion.service"
-    
+
     assert healthcheck_script.exists()
     assert service_file.exists()
-    
+
     content = service_file.read_text(encoding="utf-8")
     assert "ExecStart" in content
     assert "Restart=always" in content

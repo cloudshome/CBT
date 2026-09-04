@@ -7,10 +7,8 @@ and generates sandbox parameter adaptation proposals.
 from __future__ import annotations
 
 import logging
-import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
-import numpy as np
+from dataclasses import asdict, dataclass
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.system_evolver")
 
@@ -24,10 +22,10 @@ class ParameterAdaptationProposal:
     proposed_value: Any
     expected_sharpe_improvement: float
     simulated_oos_stability: float
-    status: str                         # "PENDING_APPROVAL", "APPROVED", "REJECTED"
+    status: str  # "PENDING_APPROVAL", "APPROVED", "REJECTED"
     rationale: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -35,7 +33,7 @@ class SystemEvolver:
     """Monitors alpha life cycles and formulates adaptation proposals."""
 
     def __init__(self):
-        self._pending_proposals: Dict[str, ParameterAdaptationProposal] = {}
+        self._pending_proposals: dict[str, ParameterAdaptationProposal] = {}
         self._seed_default_proposal()
 
     def _seed_default_proposal(self) -> None:
@@ -52,8 +50,10 @@ class SystemEvolver:
         )
         self._pending_proposals[p.proposal_id] = p
 
-    def get_pending_proposals(self) -> List[Dict[str, Any]]:
-        return [p.to_dict() for p in self._pending_proposals.values() if p.status == "PENDING_APPROVAL"]
+    def get_pending_proposals(self) -> list[dict[str, Any]]:
+        return [
+            p.to_dict() for p in self._pending_proposals.values() if p.status == "PENDING_APPROVAL"
+        ]
 
     def approve_proposal(self, proposal_id: str) -> bool:
         if proposal_id in self._pending_proposals:

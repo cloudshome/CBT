@@ -132,8 +132,10 @@ cd c:\Users\azims\CBT
 # 3. Configure environment
 cp .env.example .env
 
-# 4. Run full test suite (41 tests)
+# 4. Run full test suite
 pytest tests/ -v
+# Lint gate (must pass before merging)
+ruff check core/ tests/
 
 # 5. Launch the terminal
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload

@@ -5,9 +5,9 @@ Prevents redundant multi-layer calculations on identical market state ticks.
 
 from __future__ import annotations
 
-import time
 import threading
-from typing import Any, Callable, Dict, Optional, Tuple
+import time
+from typing import Any
 
 
 class TTLCache:
@@ -15,12 +15,12 @@ class TTLCache:
 
     def __init__(self, default_ttl_sec: float = 5.0):
         self.default_ttl = default_ttl_sec
-        self._cache: Dict[str, Tuple[float, Any]] = {}
+        self._cache: dict[str, tuple[float, Any]] = {}
         self._lock = threading.Lock()
         self.hits = 0
         self.misses = 0
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         with self._lock:
             if key in self._cache:
                 expiry, val = self._cache[key]
@@ -32,7 +32,7 @@ class TTLCache:
             self.misses += 1
             return None
 
-    def set(self, key: str, value: Any, ttl_sec: Optional[float] = None) -> None:
+    def set(self, key: str, value: Any, ttl_sec: float | None = None) -> None:
         ttl = ttl_sec if ttl_sec is not None else self.default_ttl
         expiry = time.time() + ttl
         with self._lock:
@@ -44,7 +44,7 @@ class TTLCache:
             self.hits = 0
             self.misses = 0
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             total = self.hits + self.misses
             ratio = (self.hits / total * 100.0) if total > 0 else 0.0

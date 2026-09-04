@@ -10,8 +10,9 @@ Generates honest percentile trajectory cones (10th, 25th, 50th, 75th, 90th) and 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.path_simulator")
@@ -19,14 +20,14 @@ logger = logging.getLogger("ai_quant_sentinel.path_simulator")
 
 @dataclass
 class SimulationCone:
-    steps: List[int]
-    p10_path: List[float]
-    p25_path: List[float]
-    p50_median_path: List[float]
-    p75_path: List[float]
-    p90_path: List[float]
-    p_tp_before_sl: float               # [0.0, 1.0] consensus probability
-    tp_sl_uncertainty_spread: float     # Disagreement between the 3 models
+    steps: list[int]
+    p10_path: list[float]
+    p25_path: list[float]
+    p50_median_path: list[float]
+    p75_path: list[float]
+    p90_path: list[float]
+    p_tp_before_sl: float  # [0.0, 1.0] consensus probability
+    tp_sl_uncertainty_spread: float  # Disagreement between the 3 models
     model_a_p_win: float
     model_b_p_win: float
     model_c_p_win: float
@@ -45,7 +46,7 @@ class TriModelPathSimulator:
     def simulate_paths(
         self,
         current_price: float,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         take_profit_price: float,
         stop_loss_price: float,
         current_regime: str = "TRENDING_BULL",
@@ -63,14 +64,24 @@ class TriModelPathSimulator:
         n_per_model = self.num_paths // 3
 
         # Model A: Historical Single-Step Innovation Bootstrap
-        paths_a, win_a = self._run_historical_bootstrap(current_price, returns, n_per_model, take_profit_price, stop_loss_price)
+        paths_a, win_a = self._run_historical_bootstrap(
+            current_price, returns, n_per_model, take_profit_price, stop_loss_price
+        )
 
         # Model B: Moving Block Bootstrap (block size = 4 candles)
-        paths_b, win_b = self._run_block_bootstrap(current_price, returns, n_per_model, 4, take_profit_price, stop_loss_price)
+        paths_b, win_b = self._run_block_bootstrap(
+            current_price, returns, n_per_model, 4, take_profit_price, stop_loss_price
+        )
 
         # Model C: Regime-Conditioned Bootstrap (asymmetric drift bias)
-        regime_drift = 0.0003 if current_regime == "TRENDING_BULL" else (-0.0003 if current_regime == "TRENDING_BEAR" else 0.0)
-        paths_c, win_c = self._run_regime_bootstrap(current_price, returns, n_per_model, regime_drift, take_profit_price, stop_loss_price)
+        regime_drift = (
+            0.0003
+            if current_regime == "TRENDING_BULL"
+            else (-0.0003 if current_regime == "TRENDING_BEAR" else 0.0)
+        )
+        paths_c, win_c = self._run_regime_bootstrap(
+            current_price, returns, n_per_model, regime_drift, take_profit_price, stop_loss_price
+        )
 
         # Combine all 10,000 paths
         all_paths = np.vstack([paths_a, paths_b, paths_c])
@@ -106,16 +117,24 @@ class TriModelPathSimulator:
 
     def _run_historical_bootstrap(
         self, start_price: float, returns: np.ndarray, n_paths: int, tp: float, sl: float
-    ) -> Tuple[np.ndarray, float]:
-        sampled_returns = np.random.choice(returns, size=(n_paths, self.horizon_steps), replace=True)
+    ) -> tuple[np.ndarray, float]:
+        sampled_returns = np.random.choice(
+            returns, size=(n_paths, self.horizon_steps), replace=True
+        )
         cumulative_returns = np.cumprod(1.0 + sampled_returns, axis=1)
         paths = np.hstack([np.full((n_paths, 1), start_price), start_price * cumulative_returns])
         win_rate = self._evaluate_tp_sl_rate(paths, tp, sl)
         return paths, win_rate
 
     def _run_block_bootstrap(
-        self, start_price: float, returns: np.ndarray, n_paths: int, block_size: int, tp: float, sl: float
-    ) -> Tuple[np.ndarray, float]:
+        self,
+        start_price: float,
+        returns: np.ndarray,
+        n_paths: int,
+        block_size: int,
+        tp: float,
+        sl: float,
+    ) -> tuple[np.ndarray, float]:
         n_ret = len(returns)
         if n_ret <= block_size:
             return self._run_historical_bootstrap(start_price, returns, n_paths, tp, sl)
@@ -135,9 +154,17 @@ class TriModelPathSimulator:
         return paths, win_rate
 
     def _run_regime_bootstrap(
-        self, start_price: float, returns: np.ndarray, n_paths: int, drift: float, tp: float, sl: float
-    ) -> Tuple[np.ndarray, float]:
-        sampled_returns = np.random.choice(returns, size=(n_paths, self.horizon_steps), replace=True) + drift
+        self,
+        start_price: float,
+        returns: np.ndarray,
+        n_paths: int,
+        drift: float,
+        tp: float,
+        sl: float,
+    ) -> tuple[np.ndarray, float]:
+        sampled_returns = (
+            np.random.choice(returns, size=(n_paths, self.horizon_steps), replace=True) + drift
+        )
         cumulative_returns = np.cumprod(1.0 + sampled_returns, axis=1)
         paths = np.hstack([np.full((n_paths, 1), start_price), start_price * cumulative_returns])
         win_rate = self._evaluate_tp_sl_rate(paths, tp, sl)

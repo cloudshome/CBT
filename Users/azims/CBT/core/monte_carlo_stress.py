@@ -7,8 +7,9 @@ to compute worst-case drawdown distributions (95th, 99th percentile) and Probabi
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.monte_carlo_stress")
@@ -17,14 +18,14 @@ logger = logging.getLogger("ai_quant_sentinel.monte_carlo_stress")
 @dataclass
 class MonteCarloStressReport:
     num_simulations: int
-    probability_of_ruin: float          # Fraction of paths hitting >= 20% drawdown
-    p50_max_drawdown_pct: float         # Median max drawdown
-    p95_max_drawdown_pct: float         # 95th percentile worst-case drawdown
-    p99_max_drawdown_pct: float         # 99th percentile worst-case drawdown
-    is_safe: bool                       # True if P(Ruin) < 1.0%
+    probability_of_ruin: float  # Fraction of paths hitting >= 20% drawdown
+    p50_max_drawdown_pct: float  # Median max drawdown
+    p95_max_drawdown_pct: float  # 95th percentile worst-case drawdown
+    p99_max_drawdown_pct: float  # 99th percentile worst-case drawdown
+    is_safe: bool  # True if P(Ruin) < 1.0%
     summary: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -35,7 +36,7 @@ class MonteCarloStressTester:
         self.num_paths = num_paths
         self.ruin_threshold = ruin_drawdown_pct
 
-    def stress_test(self, return_series: List[float]) -> MonteCarloStressReport:
+    def stress_test(self, return_series: list[float]) -> MonteCarloStressReport:
         """
         Executes 10,000 Monte Carlo bootstrap reshuffles of the return sequence.
         """
@@ -78,7 +79,7 @@ class MonteCarloStressTester:
         is_safe = p_ruin < 0.010 and p95_dd < 18.0
 
         summary = (
-            f"Monte Carlo 10k Run: P(Ruin >= 20%) = {p_ruin*100:.2f}%. "
+            f"Monte Carlo 10k Run: P(Ruin >= 20%) = {p_ruin * 100:.2f}%. "
             f"Median DD: {p50_dd:.1f}%, 95th Percentile DD: {p95_dd:.1f}%, 99th Percentile DD: {p99_dd:.1f}%. "
             f"Safety Status: {'PASSED' if is_safe else 'FAILED'}."
         )

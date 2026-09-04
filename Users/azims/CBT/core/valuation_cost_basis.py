@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.valuation_cost_basis")
 
@@ -20,12 +20,12 @@ class ValuationCostBasisSnapshot:
     sth_realized_price: float
     lth_realized_price: float
     mvrv_z_score: float
-    production_cost_floor: float   # Miner Cost (BTC) or AISC (Gold)
+    production_cost_floor: float  # Miner Cost (BTC) or AISC (Gold)
     cost_basis_health: str
     valuation_regime: str
-    z_score: float                 # Standardized [-3.0, +3.0]
+    z_score: float  # Standardized [-3.0, +3.0]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -44,14 +44,15 @@ class ValuationCostBasisEngine:
 
     def analyze(self, symbol: str, current_price: float) -> ValuationCostBasisSnapshot:
         import time
+
         sym = symbol.upper()
         now = int(time.time() * 1000)
 
         if "BTC" in sym:
             # Bitcoin On-Chain Valuation
-            sth_rp = round(current_price * 0.88, 2)    # Short-term holder cost basis
-            lth_rp = round(current_price * 0.42, 2)    # Long-term holder cost basis
-            miner_cost = round(current_price * 0.68, 2) # Average mining breakeven floor
+            sth_rp = round(current_price * 0.88, 2)  # Short-term holder cost basis
+            lth_rp = round(current_price * 0.42, 2)  # Long-term holder cost basis
+            miner_cost = round(current_price * 0.68, 2)  # Average mining breakeven floor
             mvrv_z = 2.15  # Normal expansion band (Mania > 5.0, Capitulation < 0.1)
             z = min(3.0, max(-3.0, (2.5 - mvrv_z)))
             regime = "FAIR_VALUE_ACCUMULATION" if mvrv_z < 3.0 else "OVERHEATED_DISTRIBUTION"
@@ -61,7 +62,7 @@ class ValuationCostBasisEngine:
             # Ethereum On-Chain Valuation
             sth_rp = round(current_price * 0.84, 2)
             lth_rp = round(current_price * 0.48, 2)
-            miner_cost = round(current_price * 0.60, 2) # Staking yield baseline floor
+            miner_cost = round(current_price * 0.60, 2)  # Staking yield baseline floor
             mvrv_z = 1.35
             z = min(3.0, max(-3.0, (2.0 - mvrv_z)))
             regime = "UNDERVALUED_ACCUMULATION"
@@ -69,10 +70,10 @@ class ValuationCostBasisEngine:
 
         else:
             # Gold / XAU Macro Cost Basis
-            sth_rp = round(current_price * 0.94, 2)    # 1-Year Rolling Average Cost
-            lth_rp = round(current_price * 0.72, 2)    # 5-Year Institutional Vault Cost
-            miner_cost = 1450.0                        # Industry All-In Sustaining Cost (AISC)
-            mvrv_z = 1.80                              # Historical Real-Price Z-score
+            sth_rp = round(current_price * 0.94, 2)  # 1-Year Rolling Average Cost
+            lth_rp = round(current_price * 0.72, 2)  # 5-Year Institutional Vault Cost
+            miner_cost = 1450.0  # Industry All-In Sustaining Cost (AISC)
+            mvrv_z = 1.80  # Historical Real-Price Z-score
             z = 1.20
             regime = "STRUCTURAL_SOVEREIGN_BULL_CYCLE"
             health = "AISC_SUPPORT_ANCHORED"

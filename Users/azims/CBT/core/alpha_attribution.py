@@ -14,9 +14,8 @@ Tracks rolling feature utility to detect alpha decay and prune obsolete indicato
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
-import numpy as np
+from dataclasses import asdict, dataclass
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.alpha_attribution")
 
@@ -24,7 +23,7 @@ logger = logging.getLogger("ai_quant_sentinel.alpha_attribution")
 @dataclass
 class FeatureAttributionItem:
     feature_name: str
-    contribution_pct: float             # Percentage of PnL attributed to this feature
+    contribution_pct: float  # Percentage of PnL attributed to this feature
     dollar_impact: float
     is_positive_contributor: bool
 
@@ -34,11 +33,11 @@ class AlphaAttributionReport:
     trade_id: str
     symbol: str
     total_pnl_usd: float
-    attributions: List[FeatureAttributionItem]
+    attributions: list[FeatureAttributionItem]
     top_alpha_driver: str
-    rolling_feature_utility_30d: Dict[str, float]
+    rolling_feature_utility_30d: dict[str, float]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["attributions"] = [asdict(a) for a in self.attributions]
         return d
@@ -48,7 +47,7 @@ class AlphaAttributionEngine:
     """Computes exact Shapley-style factor return attribution."""
 
     def __init__(self):
-        self._feature_utility_30d: Dict[str, float] = {
+        self._feature_utility_30d: dict[str, float] = {
             "HTF_Trend": 0.23,
             "Liquidity_Sweep": 0.19,
             "CVD_Absorption": 0.17,
@@ -63,7 +62,7 @@ class AlphaAttributionEngine:
         trade_id: str,
         symbol: str,
         pnl_usd: float,
-        state_features: Optional[Dict[str, Any]] = None,
+        state_features: dict[str, Any] | None = None,
     ) -> AlphaAttributionReport:
         """
         Decomposes realized trade returns into dynamic Shapley factor contributions
@@ -81,20 +80,34 @@ class AlphaAttributionEngine:
         }
 
         # Extract or calibrate dynamic feature activation factors [0.1, 1.0]
-        activations: Dict[str, float] = {}
+        activations: dict[str, float] = {}
         if state_features:
-            activations["HTF_Trend"] = float(state_features.get("htf_alignment", state_features.get("htf_trend_score", 0.8)))
-            activations["Liquidity_Sweep"] = float(state_features.get("sweep_detected", state_features.get("liquidity_sweep_score", 0.75)))
-            activations["CVD_Absorption"] = float(state_features.get("cvd_absorption", state_features.get("cvd_absorption_score", 0.70)))
-            activations["Macro_Alignment"] = float(state_features.get("macro_aligned", state_features.get("macro_score", 0.50)))
-            activations["Volatility_Squeeze"] = float(state_features.get("vol_squeeze", state_features.get("volatility_score", 0.40)))
+            activations["HTF_Trend"] = float(
+                state_features.get("htf_alignment", state_features.get("htf_trend_score", 0.8))
+            )
+            activations["Liquidity_Sweep"] = float(
+                state_features.get(
+                    "sweep_detected", state_features.get("liquidity_sweep_score", 0.75)
+                )
+            )
+            activations["CVD_Absorption"] = float(
+                state_features.get(
+                    "cvd_absorption", state_features.get("cvd_absorption_score", 0.70)
+                )
+            )
+            activations["Macro_Alignment"] = float(
+                state_features.get("macro_aligned", state_features.get("macro_score", 0.50))
+            )
+            activations["Volatility_Squeeze"] = float(
+                state_features.get("vol_squeeze", state_features.get("volatility_score", 0.40))
+            )
             activations["Sentiment_NLP"] = float(state_features.get("sentiment_score", 0.30))
             activations["Residual_Alpha"] = 0.50
         else:
             activations = {k: 0.75 for k in base_weights}
 
         # Calculate marginal coalition weights
-        effective_weights: Dict[str, float] = {}
+        effective_weights: dict[str, float] = {}
         for feat, w_prior in base_weights.items():
             act = max(0.05, min(1.0, abs(activations.get(feat, 0.5))))
             effective_weights[feat] = w_prior * (0.4 + 0.6 * act)
@@ -105,7 +118,7 @@ class AlphaAttributionEngine:
 
         normalized_shapley_weights = {k: v / total_weight for k, v in effective_weights.items()}
 
-        items: List[FeatureAttributionItem] = []
+        items: list[FeatureAttributionItem] = []
         allocated_dollar = 0.0
         keys = list(normalized_shapley_weights.keys())
 
@@ -133,8 +146,14 @@ class AlphaAttributionEngine:
         # Update 30d rolling utility with decay
         for item in items:
             prev_u = self._feature_utility_30d.get(item.feature_name, 0.1)
-            delta = 0.02 if (pnl_usd > 0 and item.dollar_impact > 0) else (-0.01 if pnl_usd < 0 else 0.0)
-            self._feature_utility_30d[item.feature_name] = round(max(0.02, min(0.40, prev_u + delta)), 3)
+            delta = (
+                0.02
+                if (pnl_usd > 0 and item.dollar_impact > 0)
+                else (-0.01 if pnl_usd < 0 else 0.0)
+            )
+            self._feature_utility_30d[item.feature_name] = round(
+                max(0.02, min(0.40, prev_u + delta)), 3
+            )
 
         return AlphaAttributionReport(
             trade_id=trade_id,
@@ -148,4 +167,3 @@ class AlphaAttributionEngine:
 
 # Singleton
 alpha_attribution_engine = AlphaAttributionEngine()
-

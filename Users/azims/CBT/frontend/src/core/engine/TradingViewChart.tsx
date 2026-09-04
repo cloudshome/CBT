@@ -710,16 +710,25 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
 
         // Anchor on current last candle
         const lastBar = candles && candles.length > 0 ? candles[candles.length - 1] : null;
+        let lastT = 0;
         if (lastBar) {
-          const t0 = Math.floor(lastBar[0] / 1000) as Time;
+          lastT = Math.floor(lastBar[0] / 1000);
           const c0 = lastBar[4];
-          medianPoints.push({ time: t0, value: c0 });
-          upperPoints.push({ time: t0, value: c0 });
-          lowerPoints.push({ time: t0, value: c0 });
+          medianPoints.push({ time: lastT as Time, value: c0 });
+          upperPoints.push({ time: lastT as Time, value: c0 });
+          lowerPoints.push({ time: lastT as Time, value: c0 });
         }
 
+        const tfSeconds: Record<string, number> = {
+          '1m': 60, '3m': 180, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400
+        };
+        const stepSec = tfSeconds[timeframe] || 900;
+
         for (let step = 0; step < horizon; step++) {
-          const t = Math.floor(res.paths[0].predicted_timestamps[step] / 1000) as Time;
+          const rawT = Math.floor(res.paths[0].predicted_timestamps[step] / 1000);
+          const t = (rawT > lastT ? rawT : lastT + stepSec) as Time;
+          lastT = t as number;
+
           const stepCloses = res.paths.map((p: any) => p.predicted_closes[step]).sort((a: number, b: number) => a - b);
           const medianVal = stepCloses[Math.floor(sampleCount / 2)];
           const lowerVal = stepCloses[0];

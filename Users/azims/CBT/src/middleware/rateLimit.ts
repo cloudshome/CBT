@@ -60,8 +60,10 @@ export function createRateLimiter(options: RateLimitOptions = {}) {
       return { key: `auth:${keyHash}`, isAuth: true };
     }
 
-    // 2. Fall back to IP address
-    const forwarded = req.headers['x-forwarded-for'];
+    // 2. Fall back to IP address. X-Forwarded-For is only trusted behind a proxy
+    // that overwrites it (TRUST_PROXY_XFF=true); otherwise we use the socket peer.
+    const trustProxy = process.env.TRUST_PROXY_XFF === 'true' || process.env.TRUST_PROXY_XFF === '1';
+    const forwarded = trustProxy ? req.headers['x-forwarded-for'] : undefined;
     const ip =
       (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.socket.remoteAddress) ||
       '127.0.0.1';

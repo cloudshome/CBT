@@ -6,19 +6,24 @@ Multiplexes real-time WebSocket streams and comprehensive REST APIs across all 1
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass
+import hmac
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+import uuid
+
 import numpy as np
 
-from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, File, UploadFile, Form
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 # Core Quantitative Engines
 from core.database import db_manager
@@ -139,10 +144,32 @@ stream_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(nam
 logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 logger = logging.getLogger("ai_quant_sentinel.app")
 
+# Background Real-Time Telemetry Broadcaster, Poller & Empirical Accumulator
+@asynccontextmanager
+async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
+    """Startup/shutdown lifecycle (replaces deprecated @app.on_event)."""
+    db_manager.init_all_schemas()
+    tasks = [
+        asyncio.create_task(telemetry_broadcaster_loop()),
+        asyncio.create_task(empirical_accumulator_loop()),
+        asyncio.create_task(telegram_bot.start_polling()),
+        asyncio.create_task(telegram_bot.start_continuous_broadcaster(interval_seconds=180)),
+    ]
+    logger.info("AI Quant Sentinel FastAPI online with Telegram Poller & Continuous Broadcaster.")
+    try:
+        yield
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info("AI Quant Sentinel FastAPI shutdown complete.")
+
+
 app = FastAPI(
     title="AI Quant Sentinel / Crypto Brain Terminal (CBT)",
     description="Institutional-Grade Quantitative Research, Paper Trading & Scientific Governance Platform",
-    version="2.1.0",
+    version="3.0.0",
+    lifespan=lifespan_ctx,
 )
 
 # CORS — restrict origins in production via CORS_ORIGIN env var
@@ -224,17 +251,43 @@ class TelegramWebhookRequest(BaseModel):
 
 
 class PaperTradeRequest(BaseModel):
-    symbol: str
+    symbol: str = Field(min_length=3, max_length=24)
     side: str
-    entryPrice: float
-    sl: float
-    tp: float
-    size: Optional[float] = 1.0
+    entryPrice: float = Field(gt=0)
+    sl: float = Field(gt=0)
+    tp: float = Field(gt=0)
+    size: Optional[float] = Field(default=1.0, gt=0, le=1_000_000)
+
+    @field_validator("symbol")
+    @classmethod
+    def _normalize_symbol(cls, v: str) -> str:
+        return v.strip().upper()
+
+    @field_validator("side")
+    @classmethod
+    def _normalize_side(cls, v: str) -> str:
+        side = v.strip().upper()
+        if side not in ("BUY", "SELL", "LONG", "SHORT"):
+            raise ValueError("side must be one of BUY, SELL, LONG, SHORT")
+        return side
+
+    @field_validator("sl")
+    @classmethod
+    def _require_invalidation(cls, v: float, info: Any) -> float:
+        entry = info.data.get("entryPrice")
+        side = info.data.get("side")
+        if entry is None or side is None:
+            return v
+        if side in ("BUY", "LONG") and v >= entry:
+            raise ValueError("stop_loss must be BELOW entry for long positions")
+        if side in ("SELL", "SHORT") and v <= entry:
+            raise ValueError("stop_loss must be ABOVE entry for short positions")
+        return v
 
 
 class PaperCloseRequest(BaseModel):
-    positionId: str
-    exitPrice: Optional[float] = None
+    positionId: str = Field(min_length=1, max_length=128)
+    exitPrice: Optional[float] = Field(default=None, gt=0)
 
 
 class IngestSourceRequest(BaseModel):
@@ -490,16 +543,6 @@ telegram_bot.register_command("/decision", _telegram_decision_cmd)
 
 
 # Background Real-Time Telemetry Broadcaster, Poller & Empirical Accumulator
-@app.on_event("startup")
-async def startup_event():
-    db_manager.init_all_schemas()
-    asyncio.create_task(telemetry_broadcaster_loop())
-    asyncio.create_task(empirical_accumulator_loop())
-    asyncio.create_task(telegram_bot.start_polling())
-    asyncio.create_task(telegram_bot.start_continuous_broadcaster(interval_seconds=180))
-    logger.info("AI Quant Sentinel FastAPI online with Telegram Poller & Continuous Broadcaster.")
-
-
 async def telemetry_broadcaster_loop():
     """Continuously broadcasts live market snapshots and updates shadow positions."""
     while True:
@@ -1389,11 +1432,12 @@ async def get_paper_risk_config():
     }
 
 
-@app.post("/api/paper/trade")
+@app.post("/api/paper/trade", dependencies=[Depends(require_api_key)])
 async def place_paper_trade(order: PaperTradeRequest):
     """
     Places a simulated paper trade into the shadow portfolio from the Web UI.
     """
+    enforce_paper_risk_gate(order)
     direction = "LONG" if order.side.upper() in ["BUY", "LONG"] else "SHORT"
     pos_id = portfolio_shadow.open_position(
         symbol=order.symbol,
@@ -1420,7 +1464,7 @@ async def place_paper_trade(order: PaperTradeRequest):
     }
 
 
-@app.post("/api/paper/close")
+@app.post("/api/paper/close", dependencies=[Depends(require_api_key)])
 async def close_paper_trade(req: PaperCloseRequest):
     """
     Closes an active paper position directly from the Web UI.
@@ -1616,7 +1660,7 @@ class ResearchIngestRequest(BaseModel):
     title: Optional[str] = None
 
 
-@app.post("/api/research/ingest")
+@app.post("/api/research/ingest", dependencies=[Depends(require_api_key)])
 async def ingest_research_text(req: ResearchIngestRequest):
     """
     Ingests raw text, YouTube link, Reel URL, GitHub repo, or strategy note.
@@ -1627,6 +1671,8 @@ async def ingest_research_text(req: ResearchIngestRequest):
     """
     if not req.content or not req.content.strip():
         raise HTTPException(status_code=400, detail="Content cannot be empty.")
+    if len(req.content) > 2_000_000:
+        raise HTTPException(status_code=413, detail="Content too large (max 2 MB).")
     
     result = await universal_ingestor.ingest(
         content=req.content,
@@ -1638,7 +1684,7 @@ async def ingest_research_text(req: ResearchIngestRequest):
     return sanitize_numpy(result)
 
 
-@app.post("/api/research/ingest-file")
+@app.post("/api/research/ingest-file", dependencies=[Depends(require_api_key)])
 async def ingest_research_file(
     file: UploadFile = File(...),
     mode: str = Form("RESEARCH"),
@@ -1650,8 +1696,13 @@ async def ingest_research_file(
     """
     try:
         content_bytes = await file.read()
-        filename = file.filename or "uploaded_file.txt"
-        dest_path = Path(os.getenv("DATA_DIR", "data")) / "uploads" / filename
+        if len(content_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).",
+            )
+        safe_name, original_name = safe_upload_filename(file.filename)
+        dest_path = Path(os.getenv("DATA_DIR", "data")) / "uploads" / safe_name
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         with open(dest_path, "wb") as f:
             f.write(content_bytes)
@@ -1661,13 +1712,15 @@ async def ingest_research_file(
         result = await universal_ingestor.ingest(
             content=text_content,
             mode=mode.upper(),
-            file_name=filename,
+            file_name=original_name,
             source_uri=str(dest_path),
             author_creator=author_creator or "File Upload",
-            title=title or filename,
+            title=title or original_name,
         )
         result["file_metadata"] = metadata
         return sanitize_numpy(result)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"File ingestion error: {e}")
         raise HTTPException(status_code=500, detail=f"File ingestion failed: {str(e)}")
@@ -1687,7 +1740,7 @@ async def get_all_research_vaults():
     return sanitize_numpy(vault_data)
 
 
-@app.post("/api/research/candidates/{candidate_id}/backtest")
+@app.post("/api/research/candidates/{candidate_id}/backtest", dependencies=[Depends(require_api_key)])
 async def run_candidate_backtest(candidate_id: str, symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     """
     Executes a formal backtest and walk-forward verification on a Strategy Candidate.
@@ -1761,14 +1814,14 @@ async def get_discovery_graph():
     return sanitize_numpy(graph_data)
 
 
-@app.post("/api/research/discover")
+@app.post("/api/research/discover", dependencies=[Depends(require_api_key)])
 async def trigger_cross_domain_discovery():
     """Scans all known knowledge atoms and derives novel cross-domain candidate hypotheses."""
     discoveries = knowledge_graph_engine.discover_cross_domain_links()
     return sanitize_numpy({"discoveries": discoveries, "count": len(discoveries)})
 
 
-@app.post("/api/research/hypotheses/create")
+@app.post("/api/research/hypotheses/create", dependencies=[Depends(require_api_key)])
 async def create_new_hypothesis(req: CreateHypothesisRequest):
     """Manually or autonomously formulates a testable research hypothesis from a graph link."""
     hypo = knowledge_graph_engine.create_hypothesis(
@@ -1785,7 +1838,7 @@ async def create_new_hypothesis(req: CreateHypothesisRequest):
     return sanitize_numpy(hypo.to_dict())
 
 
-@app.post("/api/research/hypotheses/{hypothesis_id}/run-test")
+@app.post("/api/research/hypotheses/{hypothesis_id}/run-test", dependencies=[Depends(require_api_key)])
 async def run_hypothesis_empirical_test(hypothesis_id: str):
     """
     Executes empirical statistical verification on a Hypothesis.
@@ -1810,6 +1863,78 @@ def sanitize_numpy(obj: Any) -> Any:
     if isinstance(obj, (list, tuple)):
         return [sanitize_numpy(x) for x in obj]
     return obj
+
+
+# ==============================================================================
+# SECURITY GUARD HELPERS
+# ==============================================================================
+
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
+MAX_VOICE_BYTES = 15 * 1024 * 1024  # 15 MB base64-decoded
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".pdf", ".py", ".pine", ".mq4", ".mq5", ".json", ".csv", ".txt", ".md",
+}
+
+
+def safe_upload_filename(filename: Optional[str]) -> Tuple[str, str]:
+    """
+    Returns (safe_storage_name, original_name) for an uploaded file.
+
+    Never trusts the client-supplied name: the stored name is a server-generated
+    UUID with a validated extension, which eliminates path traversal (../) and
+    arbitrary write risks. The original name is kept only for metadata.
+    """
+    original = (filename or "uploaded_file.txt").replace("\\", "/").split("/")[-1]
+    ext = Path(original).suffix.lower()
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"File type '{ext or 'unknown'}' is not allowed.")
+    safe_name = f"{uuid.uuid4().hex}{ext}"
+    return safe_name, original
+
+
+def verify_telegram_secret(request: Request) -> None:
+    """Validates Telegram's X-Telegram-Bot-Api-Secret-Token when configured."""
+    expected = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    if not expected:
+        return  # Not configured — legacy open mode (documented: configure for production)
+    provided = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail="Invalid Telegram webhook secret token.")
+
+
+def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
+    """
+    Deterministic institutional Risk Gate for FastAPI paper trading.
+
+    Mirrors the Express riskGate so behavior is identical in dev and prod:
+      1. Max 3 concurrent open positions.
+      2. Risk per trade <= maxRiskPerTrade (default 2.0%) of account balance.
+    All limits come from environment variables; in production they MUST be set.
+    """
+    open_count = len(portfolio_shadow.get_open_positions())
+    max_open = int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3"))
+    if open_count >= max_open:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Risk Gate Rejection: {open_count} open positions — maximum {max_open} reached.",
+        )
+
+    balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "100000"))
+    max_risk_pct = float(os.getenv("MAX_PAPER_RISK_PCT", "0.02"))
+    entry = float(order.entryPrice)
+    stop = float(order.sl)
+    if entry <= 0 or stop <= 0:
+        raise HTTPException(status_code=422, detail="Risk Gate Rejection: invalid entry/stop prices.")
+    dollar_risk = float(order.size or 1.0) * abs(entry - stop)
+    max_risk = balance * max_risk_pct
+    if dollar_risk > max_risk:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Risk Gate Rejection: trade risk ${dollar_risk:,.2f} exceeds maximum allowable "
+                f"risk of {max_risk_pct * 100:.1f}% (${max_risk:,.2f}) of account balance ${balance:,.2f}."
+            ),
+        )
 
 
 # ==============================================================================
@@ -1909,6 +2034,11 @@ async def transcribe_voice_audio(req: VoiceTranscribeRequest):
         audio_data = base64.b64decode(req.audio_base64)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid base64 audio payload: {e}")
+    if len(audio_data) > MAX_VOICE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Audio payload too large (max {MAX_VOICE_BYTES // (1024 * 1024)} MB decoded).",
+        )
 
     transcript = await voice_interface.transcribe_audio_bytes(audio_data, req.filename or "memo.webm")
     
@@ -1961,8 +2091,9 @@ async def broadcast_telegram_alert(req: TelegramBroadcastRequest):
 
 
 @app.post("/api/telegram/webhook")
-async def handle_telegram_webhook(update: TelegramWebhookRequest):
+async def handle_telegram_webhook(request: Request, update: TelegramWebhookRequest):
     """Handles incoming Telegram webhook events."""
+    verify_telegram_secret(request)
     res = await telegram_bot.handle_webhook_update(update.dict())
     return res
 
@@ -2112,7 +2243,12 @@ async def get_kronos_forecast(
     Generates multi-sample probabilistic path forecasts using the Kronos Foundation Model.
     Includes expected return, path dispersion, directional consensus, and model uncertainty.
     """
-    candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
+    try:
+        candles = await data_streamer.fetch_external_ohlcv(symbol, timeframe, limit=lookback + 20)
+        if not candles or len(candles) < 20:
+            candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
+    except Exception:
+        candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
     forecast = kronos_adapter.predict(
         symbol=symbol,
         timeframe=timeframe,

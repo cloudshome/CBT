@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger("ai_quant_sentinel.psychology_shield")
 
@@ -19,7 +18,7 @@ class TiltStatus:
     is_shield_locked: bool
     consecutive_losses: int
     lockout_remaining_minutes: float
-    tilt_triggers_detected: List[str]
+    tilt_triggers_detected: list[str]
     allowed_to_execute: bool
     guidance_message: str
 
@@ -30,14 +29,14 @@ class PsychologyShield:
     def __init__(
         self,
         consecutive_loss_limit: int = 3,
-        cooldown_duration_minutes: float = 120.0, # 2 hours
+        cooldown_duration_minutes: float = 120.0,  # 2 hours
     ):
         self.consecutive_loss_limit = consecutive_loss_limit
         self.cooldown_duration_minutes = cooldown_duration_minutes
-        self._cooldown_until_ms: Optional[int] = None
-        self._recent_trade_results: List[str] = [] # "WIN" or "LOSS"
+        self._cooldown_until_ms: int | None = None
+        self._recent_trade_results: list[str] = []  # "WIN" or "LOSS"
 
-    def record_trade_outcome(self, outcome: str, timestamp_ms: Optional[int] = None) -> None:
+    def record_trade_outcome(self, outcome: str, timestamp_ms: int | None = None) -> None:
         """Records trade outcome ('WIN' or 'LOSS') and checks consecutive loss count."""
         self._recent_trade_results.append(outcome.upper())
         if len(self._recent_trade_results) > 20:
@@ -63,7 +62,7 @@ class PsychologyShield:
         self,
         requested_risk_pct: float,
         recommended_risk_pct: float,
-        timestamp_ms: Optional[int] = None,
+        timestamp_ms: int | None = None,
     ) -> TiltStatus:
         """
         Validates whether a manual order violates behavioral tilt rules.
@@ -86,7 +85,7 @@ class PsychologyShield:
         if recommended_risk_pct > 0 and requested_risk_pct > (2.0 * recommended_risk_pct):
             is_locked = True
             triggers.append(
-                f"Oversized risk attempt ({requested_risk_pct*100:.2f}% > 2x recommended {recommended_risk_pct*100:.2f}%)"
+                f"Oversized risk attempt ({requested_risk_pct * 100:.2f}% > 2x recommended {recommended_risk_pct * 100:.2f}%)"
             )
 
         # Consecutive Losses
@@ -98,7 +97,9 @@ class PsychologyShield:
                 break
 
         if is_locked:
-            msg = f"ORDER_BLOCKED by Psychology Shield: {'; '.join(triggers)}. Take a break to reset."
+            msg = (
+                f"ORDER_BLOCKED by Psychology Shield: {'; '.join(triggers)}. Take a break to reset."
+            )
         else:
             msg = "Psychological shield nominal: Operator in disciplined baseline state."
 

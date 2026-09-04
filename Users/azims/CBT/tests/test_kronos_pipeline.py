@@ -1,4 +1,4 @@
-﻿"""
+"""
 Unit tests for Kronos Walk-Forward Validation, Calibration, Advisory Shadow Engine, and FastAPI API routes.
 """
 
@@ -6,10 +6,10 @@ import pytest
 from starlette.testclient import TestClient
 
 from app import app
-from core.models.kronos.walk_forward import kronos_walk_forward_engine, WalkForwardSummary
-from core.models.kronos.calibration import kronos_probability_calibrator, KronosCalibrationScorecard
-from core.models.kronos.advisory_engine import kronos_advisory_engine, KronosAdvisoryVerdict
 from core.data_streamer import data_streamer
+from core.models.kronos.advisory_engine import KronosAdvisoryVerdict, kronos_advisory_engine
+from core.models.kronos.calibration import KronosCalibrationScorecard, kronos_probability_calibrator
+from core.models.kronos.walk_forward import WalkForwardSummary, kronos_walk_forward_engine
 
 
 @pytest.fixture
@@ -69,14 +69,21 @@ def test_kronos_advisory_engine():
     )
 
     assert isinstance(verdict, KronosAdvisoryVerdict)
-    assert verdict.advisory_recommendation in {"CONFIRM_TRADE", "DIVERGENCE_CAUTION", "VETO_TRADE", "NEUTRAL"}
+    assert verdict.advisory_recommendation in {
+        "CONFIRM_TRADE",
+        "DIVERGENCE_CAUTION",
+        "VETO_TRADE",
+        "NEUTRAL",
+    }
     assert verdict.sizing_multiplier >= 0.0
     assert len(verdict.narrative) > 0
 
 
 def test_fastapi_kronos_forecast_endpoint(client):
     """Verify GET /api/kronos/forecast returns structured forecast response."""
-    resp = client.get("/api/kronos/forecast?symbol=BTC/USDT&timeframe=15m&lookback=40&horizon=6&samples=3")
+    resp = client.get(
+        "/api/kronos/forecast?symbol=BTC/USDT&timeframe=15m&lookback=40&horizon=6&samples=3"
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["symbol"] == "BTC/USDT"

@@ -11,18 +11,13 @@ Tests all 8 high-conviction quantitative mechanics:
   8. Bayesian Half-Kelly Position Sizer
 """
 
-import pytest
 import time
-import numpy as np
 
-from core.orderbook_imbalance import orderbook_imbalance_engine
-from core.oi_funding_squeeze import oi_funding_squeeze_engine
 from core.fractal_harmonics import fractal_harmonics_engine
 from core.half_kelly_sizer import half_kelly_position_sizer
 from core.institutional_alpha import institutional_alpha_engine
-from core.lead_lag_correlator import lead_lag_correlator
-from core.cvd_absorption import cvd_absorption_engine
-from core.judas_sweep_hunter import judas_sweep_hunter
+from core.oi_funding_squeeze import oi_funding_squeeze_engine
+from core.orderbook_imbalance import orderbook_imbalance_engine
 
 
 def test_orderbook_imbalance_and_vpin():
@@ -48,7 +43,6 @@ def test_deterministic_vpin_reproducibility():
     assert res1.obi_score == res2.obi_score
 
 
-
 def test_oi_funding_squeeze_detection():
     # Test short squeeze scenario: Negative funding + expanding OI
     res = oi_funding_squeeze_engine.analyze_positioning(
@@ -64,9 +58,16 @@ def test_oi_funding_squeeze_detection():
 
 def test_fractal_harmonics_alignment():
     # Test 3-tier bullish alignment
-    macro = [{"close": 88000 + i * 100, "high": 88100 + i * 100, "low": 87900 + i * 100} for i in range(10)]
-    context = [{"close": 88500 + i * 50, "high": 88550 + i * 50, "low": 88450 + i * 50} for i in range(10)]
-    micro = [{"close": 88900 + i * 10, "high": 88920 + i * 10, "low": 88890 + i * 10} for i in range(10)]
+    macro = [
+        {"close": 88000 + i * 100, "high": 88100 + i * 100, "low": 87900 + i * 100}
+        for i in range(10)
+    ]
+    context = [
+        {"close": 88500 + i * 50, "high": 88550 + i * 50, "low": 88450 + i * 50} for i in range(10)
+    ]
+    micro = [
+        {"close": 88900 + i * 10, "high": 88920 + i * 10, "low": 88890 + i * 10} for i in range(10)
+    ]
 
     res = fractal_harmonics_engine.evaluate_harmonics("BTC/USDT", macro, context, micro)
     assert res.is_aligned is True
@@ -79,7 +80,7 @@ def test_bayesian_half_kelly_position_sizer():
         account_equity=10000.0,
         entry_price=88500.0,
         stop_loss=87500.0,  # 1000 risk distance (~1.13%)
-        take_profit=90900.0, # 2400 reward distance (2.4 R:R)
+        take_profit=90900.0,  # 2400 reward distance (2.4 R:R)
         win_probability=0.55,
         historical_sample_size=60,
     )
@@ -95,7 +96,16 @@ def test_master_institutional_alpha_composite():
     p = 88000.0
     for i in range(40):
         t = now - (40 - i) * 900_000
-        candles.append({"timestamp": t, "open": p, "high": p + 50, "low": p - 40, "close": p + 20, "volume": 300.0})
+        candles.append(
+            {
+                "timestamp": t,
+                "open": p,
+                "high": p + 50,
+                "low": p - 40,
+                "close": p + 20,
+                "volume": 300.0,
+            }
+        )
         p += 20
 
     res = institutional_alpha_engine.evaluate_alpha(

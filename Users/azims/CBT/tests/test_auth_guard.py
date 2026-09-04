@@ -4,6 +4,7 @@ Unit tests for API Key Authentication and Endpoint Protection in FastAPI.
 
 import pytest
 from fastapi.testclient import TestClient
+
 import core.auth as auth_mod
 from app import app
 
@@ -16,7 +17,7 @@ def client():
 def test_auth_passthrough_when_key_unset(client, monkeypatch):
     """When API_KEY is empty/unset, sensitive endpoints allow access without auth (dev mode)."""
     monkeypatch.setattr(auth_mod, "API_KEY", "")
-    
+
     # Public endpoint works
     res_pub = client.get("/api/telegram/status")
     assert res_pub.status_code == 200

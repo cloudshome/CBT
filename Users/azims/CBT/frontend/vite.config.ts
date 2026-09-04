@@ -6,19 +6,23 @@ import react from '@vitejs/plugin-react';
  * =============================================================================
  * Two backends run simultaneously:
  *
- *   Node/Express  → http://localhost:3000
- *     Handles: /api/candles, /api/mtf, /api/scan, /api/paper,
- *              /api/desk, /api/tickers, /api/institutional
- *
- *   FastAPI/Python → http://localhost:8000
- *     Handles: /api/sky, /api/decision, /api/prediction,
- *              /api/scenarios, /api/path-simulation, /api/shadow,
- *              /api/lab, /api/governance, /api/league, /api/command,
- *              /api/market, /api/dossier, /api/smc
+ *   FastAPI/Python → http://localhost:8000  (AUTHORITATIVE terminal surface)
+ *     Handles: /api/candles, /api/tickers, /api/mtf, /api/scan, /api/paper,
+ *              /api/desk, /api/institutional, /api/research, /api/kronos,
+ *              /api/sky, /api/decision, /api/prediction, /api/scenarios,
+ *              /api/path-simulation, /api/shadow, /api/lab, /api/governance,
+ *              /api/league, /api/command, /api/market, /api/dossier, /api/smc,
+ *              /api/voice, /api/telegram, /api/ingest, /api/strategy,
+ *              /api/macro, /api/audit, /api/chart, /api/memory, /api/ai,
+ *              /api/microstructure, /api/execution, /api/auditor
  *              WS: /ws
  *
- * The proxy order matters — more-specific prefixes must appear BEFORE
- * the catch-all '/api' rule that falls back to Node.
+ *   Node/Express → http://localhost:3000  (readiness/metrics/legacy fallback)
+ *     Handles: /api/readiness, /api/metrics/*, and the '/api' catch-all
+ *
+ * PARITY CONTRACT: this list MUST stay identical to the Python locations in
+ * frontend/nginx.conf and the Caddyfile — dev and prod must route the same
+ * prefixes to the same backend.
  * =============================================================================
  */
 
@@ -57,6 +61,7 @@ const PYTHON_PREFIXES = [
   '/api/chart',
   '/api/memory',
   '/api/ai',
+  '/api/kronos',
   '/ws',
 ];
 

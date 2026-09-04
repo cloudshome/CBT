@@ -11,10 +11,10 @@ from __future__ import annotations
 import copy
 import logging
 import math
-import random
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("sky.genetic_optimizer")
@@ -24,39 +24,39 @@ logger = logging.getLogger("sky.genetic_optimizer")
 class StrategyGenome:
     genome_id: str
     generation: int
-    smc_fvg_threshold: float           # [0.1, 2.5] % gap size
-    order_block_atr_mult: float        # [0.5, 3.5]
-    min_rr_ratio: float                # [1.2, 4.0]
-    regime_weight_trend: float         # [0.2, 1.8]
-    regime_weight_reversion: float     # [0.2, 1.8]
-    stop_loss_atr_mult: float          # [0.8, 3.0]
-    half_kelly_fraction: float         # [0.1, 0.5]
+    smc_fvg_threshold: float  # [0.1, 2.5] % gap size
+    order_block_atr_mult: float  # [0.5, 3.5]
+    min_rr_ratio: float  # [1.2, 4.0]
+    regime_weight_trend: float  # [0.2, 1.8]
+    regime_weight_reversion: float  # [0.2, 1.8]
+    stop_loss_atr_mult: float  # [0.8, 3.0]
+    half_kelly_fraction: float  # [0.1, 0.5]
     in_sample_sharpe: float = 0.0
     oos_sharpe: float = 0.0
-    deflated_sharpe_ratio: float = 0.0 # DSR [0.0, 1.0]
+    deflated_sharpe_ratio: float = 0.0  # DSR [0.0, 1.0]
     profit_factor: float = 0.0
     max_drawdown_pct: float = 0.0
     win_rate_pct: float = 0.0
     trade_count: int = 0
     fitness_score: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 @dataclass
 class CPCVSplit:
     fold_index: int
-    train_indices: List[int]
-    test_indices: List[int]
-    purged_indices: List[int]
-    embargo_indices: List[int]
+    train_indices: list[int]
+    test_indices: list[int]
+    purged_indices: list[int]
+    embargo_indices: list[int]
 
 
 @dataclass
 class WhitesRealityCheckResult:
     best_strategy_sharpe: float
-    wrc_bootstrap_p_value: float       # < 0.05 indicates genuine alpha over data snooping
+    wrc_bootstrap_p_value: float  # < 0.05 indicates genuine alpha over data snooping
     is_alpha_statistically_significant: bool
     num_bootstrap_permutations: int
     null_distribution_mean: float
@@ -71,13 +71,13 @@ class GeneticOptimizationResult:
     num_generations: int
     population_size: int
     best_genome: StrategyGenome
-    top_performers: List[StrategyGenome]
+    top_performers: list[StrategyGenome]
     whites_reality_check: WhitesRealityCheckResult
-    convergence_history: List[Dict[str, float]]
-    governance_verdict: str            # "PROMOTED_TO_LEAGUE", "QUARANTINE_OVERFIT", "REJECTED_INSIGNIFICANT"
+    convergence_history: list[dict[str, float]]
+    governance_verdict: str  # "PROMOTED_TO_LEAGUE", "QUARANTINE_OVERFIT", "REJECTED_INSIGNIFICANT"
     narrative: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -95,7 +95,7 @@ class GeneticStrategyOptimizer:
         crossover_rate: float = 0.70,
         tournament_size: int = 3,
         embargo_pct: float = 0.02,
-        seed: Optional[int] = 42,
+        seed: int | None = 42,
     ):
         self.population_size = population_size
         self.num_generations = num_generations
@@ -107,9 +107,9 @@ class GeneticStrategyOptimizer:
 
     def optimize(
         self,
-        candles: List[Dict[str, Any]],  # List of OHLCV candles
+        candles: list[dict[str, Any]],  # List of OHLCV candles
         symbol: str = "BTC/USDT",
-        timestamp_ms: Optional[int] = None,
+        timestamp_ms: int | None = None,
     ) -> GeneticOptimizationResult:
         """
         Executes full genetic evolution with CPCV and White's Reality Check.
@@ -126,7 +126,7 @@ class GeneticStrategyOptimizer:
         # 1. Initialize Random Population
         population = self._initialize_population(rng)
 
-        convergence_history: List[Dict[str, float]] = []
+        convergence_history: list[dict[str, float]] = []
 
         # 2. Evolution Loop
         for gen in range(self.num_generations):
@@ -140,7 +140,13 @@ class GeneticStrategyOptimizer:
 
             best_fit = population[0].fitness_score
             avg_fit = float(np.mean([g.fitness_score for g in population]))
-            convergence_history.append({"generation": gen, "best_fitness": round(best_fit, 4), "avg_fitness": round(avg_fit, 4)})
+            convergence_history.append(
+                {
+                    "generation": gen,
+                    "best_fitness": round(best_fit, 4),
+                    "avg_fitness": round(avg_fit, 4),
+                }
+            )
 
             # If last generation, break
             if gen == self.num_generations - 1:
@@ -171,7 +177,10 @@ class GeneticStrategyOptimizer:
         wrc_result = self._run_whites_reality_check(best_genome, candles, rng)
 
         # 4. Governance Verdict
-        if best_genome.deflated_sharpe_ratio >= 0.85 and wrc_result.is_alpha_statistically_significant:
+        if (
+            best_genome.deflated_sharpe_ratio >= 0.85
+            and wrc_result.is_alpha_statistically_significant
+        ):
             verdict = "PROMOTED_TO_LEAGUE"
             narrative = (
                 f"Genome {best_genome.genome_id} validated: OOS Sharpe {best_genome.oos_sharpe:.2f}, "
@@ -198,8 +207,8 @@ class GeneticStrategyOptimizer:
             narrative=narrative,
         )
 
-    def _initialize_population(self, rng: np.random.Generator) -> List[StrategyGenome]:
-        pop: List[StrategyGenome] = []
+    def _initialize_population(self, rng: np.random.Generator) -> list[StrategyGenome]:
+        pop: list[StrategyGenome] = []
         for i in range(self.population_size):
             pop.append(
                 StrategyGenome(
@@ -216,8 +225,8 @@ class GeneticStrategyOptimizer:
             )
         return pop
 
-    def _generate_cpcv_splits(self, n_samples: int, n_folds: int = 4) -> List[CPCVSplit]:
-        splits: List[CPCVSplit] = []
+    def _generate_cpcv_splits(self, n_samples: int, n_folds: int = 4) -> list[CPCVSplit]:
+        splits: list[CPCVSplit] = []
         fold_size = n_samples // n_folds
         embargo_len = max(2, int(n_samples * self.embargo_pct))
 
@@ -247,8 +256,8 @@ class GeneticStrategyOptimizer:
     def _evaluate_genome(
         self,
         genome: StrategyGenome,
-        candles: List[Dict[str, Any]],
-        splits: List[CPCVSplit],
+        candles: list[dict[str, Any]],
+        splits: list[CPCVSplit],
         rng: np.random.Generator,
     ) -> None:
         """
@@ -260,11 +269,13 @@ class GeneticStrategyOptimizer:
 
         # Genome signal logic: Momentum adjusted by regime & ATR
         signal_threshold = 0.005 * (genome.smc_fvg_threshold / genome.order_block_atr_mult)
-        signals = np.where(returns > signal_threshold, 1.0, np.where(returns < -signal_threshold, -1.0, 0.0))
+        signals = np.where(
+            returns > signal_threshold, 1.0, np.where(returns < -signal_threshold, -1.0, 0.0)
+        )
 
         # Stratified evaluation across folds
-        is_pnl: List[float] = []
-        oos_pnl: List[float] = []
+        is_pnl: list[float] = []
+        oos_pnl: list[float] = []
 
         for split in splits:
             for idx in split.train_indices:
@@ -304,7 +315,12 @@ class GeneticStrategyOptimizer:
         max_dd = float(abs(np.min(dd))) * 100.0 if len(dd) > 0 else 0.0
 
         # Multi-objective fitness score
-        fitness = 0.4 * max(0.0, oos_sharpe) + 0.3 * dsr + 0.2 * min(3.0, profit_factor) - 0.1 * (max_dd / 100.0)
+        fitness = (
+            0.4 * max(0.0, oos_sharpe)
+            + 0.3 * dsr
+            + 0.2 * min(3.0, profit_factor)
+            - 0.1 * (max_dd / 100.0)
+        )
 
         genome.in_sample_sharpe = round(is_sharpe, 3)
         genome.oos_sharpe = round(oos_sharpe, 3)
@@ -315,35 +331,57 @@ class GeneticStrategyOptimizer:
         genome.trade_count = len(oos_pnl)
         genome.fitness_score = round(fitness, 4)
 
-    def _tournament_select(self, pop: List[StrategyGenome], rng: np.random.Generator) -> StrategyGenome:
+    def _tournament_select(
+        self, pop: list[StrategyGenome], rng: np.random.Generator
+    ) -> StrategyGenome:
         candidates = rng.choice(pop, size=min(self.tournament_size, len(pop)), replace=False)
         return max(candidates, key=lambda g: g.fitness_score)
 
-    def _crossover(self, p1: StrategyGenome, p2: StrategyGenome, rng: np.random.Generator) -> StrategyGenome:
+    def _crossover(
+        self, p1: StrategyGenome, p2: StrategyGenome, rng: np.random.Generator
+    ) -> StrategyGenome:
         alpha = rng.random()
         return StrategyGenome(
-            genome_id=f"g_{p1.generation+1}_{rng.integers(10, 99)}",
+            genome_id=f"g_{p1.generation + 1}_{rng.integers(10, 99)}",
             generation=p1.generation + 1,
-            smc_fvg_threshold=round(alpha * p1.smc_fvg_threshold + (1 - alpha) * p2.smc_fvg_threshold, 2),
-            order_block_atr_mult=round(alpha * p1.order_block_atr_mult + (1 - alpha) * p2.order_block_atr_mult, 2),
+            smc_fvg_threshold=round(
+                alpha * p1.smc_fvg_threshold + (1 - alpha) * p2.smc_fvg_threshold, 2
+            ),
+            order_block_atr_mult=round(
+                alpha * p1.order_block_atr_mult + (1 - alpha) * p2.order_block_atr_mult, 2
+            ),
             min_rr_ratio=round(alpha * p1.min_rr_ratio + (1 - alpha) * p2.min_rr_ratio, 2),
-            regime_weight_trend=round(alpha * p1.regime_weight_trend + (1 - alpha) * p2.regime_weight_trend, 2),
-            regime_weight_reversion=round(alpha * p1.regime_weight_reversion + (1 - alpha) * p2.regime_weight_reversion, 2),
-            stop_loss_atr_mult=round(alpha * p1.stop_loss_atr_mult + (1 - alpha) * p2.stop_loss_atr_mult, 2),
-            half_kelly_fraction=round(alpha * p1.half_kelly_fraction + (1 - alpha) * p2.half_kelly_fraction, 2),
+            regime_weight_trend=round(
+                alpha * p1.regime_weight_trend + (1 - alpha) * p2.regime_weight_trend, 2
+            ),
+            regime_weight_reversion=round(
+                alpha * p1.regime_weight_reversion + (1 - alpha) * p2.regime_weight_reversion, 2
+            ),
+            stop_loss_atr_mult=round(
+                alpha * p1.stop_loss_atr_mult + (1 - alpha) * p2.stop_loss_atr_mult, 2
+            ),
+            half_kelly_fraction=round(
+                alpha * p1.half_kelly_fraction + (1 - alpha) * p2.half_kelly_fraction, 2
+            ),
         )
 
     def _mutate(self, genome: StrategyGenome, rng: np.random.Generator) -> None:
         noise = float(rng.normal(0, 0.15))
-        genome.smc_fvg_threshold = float(np.clip(round(genome.smc_fvg_threshold + noise, 2), 0.1, 3.0))
-        genome.order_block_atr_mult = float(np.clip(round(genome.order_block_atr_mult + noise, 2), 0.5, 4.0))
+        genome.smc_fvg_threshold = float(
+            np.clip(round(genome.smc_fvg_threshold + noise, 2), 0.1, 3.0)
+        )
+        genome.order_block_atr_mult = float(
+            np.clip(round(genome.order_block_atr_mult + noise, 2), 0.5, 4.0)
+        )
         genome.min_rr_ratio = float(np.clip(round(genome.min_rr_ratio + noise, 2), 1.2, 4.5))
-        genome.half_kelly_fraction = float(np.clip(round(genome.half_kelly_fraction + noise * 0.1, 2), 0.1, 0.5))
+        genome.half_kelly_fraction = float(
+            np.clip(round(genome.half_kelly_fraction + noise * 0.1, 2), 0.1, 0.5)
+        )
 
     def _run_whites_reality_check(
         self,
         best_genome: StrategyGenome,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         rng: np.random.Generator,
         n_bootstraps: int = 300,
     ) -> WhitesRealityCheckResult:
@@ -351,12 +389,16 @@ class GeneticStrategyOptimizer:
         returns = np.diff(closes) / closes[:-1]
 
         # Calculate best benchmark returns
-        signal_threshold = 0.005 * (best_genome.smc_fvg_threshold / best_genome.order_block_atr_mult)
-        signals = np.where(returns > signal_threshold, 1.0, np.where(returns < -signal_threshold, -1.0, 0.0))
+        signal_threshold = 0.005 * (
+            best_genome.smc_fvg_threshold / best_genome.order_block_atr_mult
+        )
+        signals = np.where(
+            returns > signal_threshold, 1.0, np.where(returns < -signal_threshold, -1.0, 0.0)
+        )
         strat_returns = signals * returns
         best_sr = best_genome.oos_sharpe
 
-        null_sharpes: List[float] = []
+        null_sharpes: list[float] = []
         for _ in range(n_bootstraps):
             # Block stationary bootstrap permutation
             perm_returns = rng.permutation(strat_returns)

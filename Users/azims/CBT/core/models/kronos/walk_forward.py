@@ -1,4 +1,4 @@
-﻿"""
+"""
 Chronological Walk-Forward Validation Engine for Kronos.
 Evaluates out-of-sample stability, deflated Sharpe ratios, and regime consistency.
 """
@@ -6,8 +6,9 @@ Evaluates out-of-sample stability, deflated Sharpe ratios, and regime consistenc
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
 from core.models.kronos.adapter import KronosModelAdapter, kronos_adapter
@@ -39,9 +40,9 @@ class WalkForwardSummary:
     mean_oos_return_pct: float
     deflated_sharpe_ratio: float
     is_statistically_robust: bool
-    folds: List[WalkForwardFoldResult]
+    folds: list[WalkForwardFoldResult]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timeframe": self.timeframe,
@@ -58,14 +59,14 @@ class WalkForwardSummary:
 class KronosWalkForwardEngine:
     """Executes non-overlapping expanding window walk-forward validation."""
 
-    def __init__(self, adapter: Optional[KronosModelAdapter] = None):
+    def __init__(self, adapter: KronosModelAdapter | None = None):
         self.adapter = adapter or kronos_adapter
 
     def run_walk_forward(
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         n_splits: int = 4,
         train_ratio: float = 0.60,
         horizon: int = 12,
@@ -75,7 +76,7 @@ class KronosWalkForwardEngine:
 
         total_bars = len(candles)
         fold_size = total_bars // (n_splits + 1)
-        folds: List[WalkForwardFoldResult] = []
+        folds: list[WalkForwardFoldResult] = []
 
         for fold in range(n_splits):
             train_end_idx = fold_size * (fold + 1)
@@ -98,27 +99,43 @@ class KronosWalkForwardEngine:
                 fut_p = float(future_sub[-1]["close"])
                 real_dir = 1 if fut_p > cur_p else -1
 
-                pred = self.adapter.predict(symbol, timeframe, h_sub, horizon=horizon, sample_count=3)
-                pred_dir = 1 if pred.directional_bias == "BULLISH" else (-1 if pred.directional_bias == "BEARISH" else 0)
+                pred = self.adapter.predict(
+                    symbol, timeframe, h_sub, horizon=horizon, sample_count=3
+                )
+                pred_dir = (
+                    1
+                    if pred.directional_bias == "BULLISH"
+                    else (-1 if pred.directional_bias == "BEARISH" else 0)
+                )
                 if pred_dir == real_dir:
                     is_hits += 1
 
             is_acc = (is_hits / max(1, is_trials)) * 100.0
 
             # Out-of-Sample Evaluation
-            oos_trades: List[float] = []
+            oos_trades: list[float] = []
             oos_hits = 0
             step = max(1, horizon // 2)
 
             for idx in range(0, len(test_candles) - horizon, step):
                 eval_hist = candles[: train_end_idx + idx]
                 cur_p = float(eval_hist[-1]["close"])
-                fut_p = float(test_candles[idx + horizon]["close"]) if idx + horizon < len(test_candles) else cur_p
+                fut_p = (
+                    float(test_candles[idx + horizon]["close"])
+                    if idx + horizon < len(test_candles)
+                    else cur_p
+                )
                 real_dir = 1 if fut_p > cur_p else -1
                 real_ret = (fut_p - cur_p) / cur_p
 
-                pred = self.adapter.predict(symbol, timeframe, eval_hist, horizon=horizon, sample_count=3)
-                pred_dir = 1 if pred.directional_bias == "BULLISH" else (-1 if pred.directional_bias == "BEARISH" else 0)
+                pred = self.adapter.predict(
+                    symbol, timeframe, eval_hist, horizon=horizon, sample_count=3
+                )
+                pred_dir = (
+                    1
+                    if pred.directional_bias == "BULLISH"
+                    else (-1 if pred.directional_bias == "BEARISH" else 0)
+                )
 
                 if pred_dir != 0:
                     pnl = (real_ret * pred_dir) - 0.00055  # Deduct friction

@@ -3,8 +3,8 @@ Unit tests for the 10,000-Path Monte Carlo Stress Tester & Ruin Simulator.
 """
 
 import numpy as np
-import pytest
-from core.monte_carlo_stress import monte_carlo_stress_tester, MonteCarloStressReport
+
+from core.monte_carlo_stress import MonteCarloStressReport, monte_carlo_stress_tester
 
 
 def test_monte_carlo_baseline_fallback():

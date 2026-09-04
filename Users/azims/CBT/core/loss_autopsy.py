@@ -7,15 +7,14 @@ classifying failure mechanisms into 11 explicit taxonomic categories.
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
-import numpy as np
+from dataclasses import asdict, dataclass
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.loss_autopsy")
 
 
-class LossCategory(str, Enum):
+class LossCategory(StrEnum):
     DATA_FAILURE = "DATA_FAILURE"
     SIGNAL_FAILURE = "SIGNAL_FAILURE"
     REGIME_FAILURE = "REGIME_FAILURE"
@@ -35,12 +34,12 @@ class LossAutopsyReport:
     symbol: str
     pnl_usd: float
     loss_category: LossCategory
-    confidence: float                   # [0.0, 1.0]
+    confidence: float  # [0.0, 1.0]
     primary_root_cause: str
-    forensic_evidence: List[str]
+    forensic_evidence: list[str]
     preventative_recommendation: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["loss_category"] = self.loss_category.value
         return d
@@ -59,7 +58,7 @@ class LossAutopsyEngine:
         pnl_usd: float,
         slippage_bps: float = 2.0,
         latency_ms: float = 45.0,
-        preceding_candles: Optional[List[Dict[str, Any]]] = None,
+        preceding_candles: list[dict[str, Any]] | None = None,
         macro_shock_active: bool = False,
         regime_shifted_mid_trade: bool = False,
         data_quality_score: float = 1.0,
@@ -67,7 +66,6 @@ class LossAutopsyEngine:
         """
         Diagnoses root cause of a loss across the 11 taxonomic categories.
         """
-        evidence = []
 
         # 1. Data Failure Check
         if data_quality_score < 0.95:
@@ -125,7 +123,7 @@ class LossAutopsyEngine:
         candles = preceding_candles or []
         if len(candles) >= 10:
             lows = [c["low"] for c in candles[-10:]]
-            highs = [c["high"] for c in candles[-10:]]
+            [c["high"] for c in candles[-10:]]
             is_long = direction.upper() == "LONG"
 
             if is_long and exit_price == min(lows) and candles[-1]["close"] > entry_price:
@@ -136,7 +134,9 @@ class LossAutopsyEngine:
                     loss_category=LossCategory.TIMING_FAILURE,
                     confidence=0.82,
                     primary_root_cause="Premature entry: Stop loss hit by liquidity sweep before target was reached",
-                    forensic_evidence=["Price swept stop price then immediately reversed toward target"],
+                    forensic_evidence=[
+                        "Price swept stop price then immediately reversed toward target"
+                    ],
                     preventative_recommendation="Add 0.5 ATR buffer to structural stop loss placement.",
                 )
 

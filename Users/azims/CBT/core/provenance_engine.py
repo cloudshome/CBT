@@ -18,7 +18,7 @@ import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from core.database import db_manager
 
@@ -28,16 +28,16 @@ logger = logging.getLogger("ai_quant_sentinel.provenance_engine")
 @dataclass
 class ProvenanceItem:
     knowledge_id: str
-    source_type: str              # YOUTUBE, GITHUB, PDF, REEL, ARTICLE, NOTES, CODE
+    source_type: str  # YOUTUBE, GITHUB, PDF, REEL, ARTICLE, NOTES, CODE
     source_uri: str
     title: str
     author_creator: str
     ingested_at: int
     raw_content_preview: str
     confidence_score: float = 0.0
-    status: str = "ANALYZED"      # PROCESSING, ANALYZED, CANDIDATE, VALIDATED, REJECTED
+    status: str = "ANALYZED"  # PROCESSING, ANALYZED, CANDIDATE, VALIDATED, REJECTED
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -50,13 +50,13 @@ class ProvenanceRecord:
     content_hash: str
     confidence: float
     ingested_at: int
-    source_url: Optional[str] = None
+    source_url: str | None = None
     parser: str = "default"
     language: str = "en"
-    extracted_facts: List[Any] = field(default_factory=list)
-    extracted_hypotheses: List[Any] = field(default_factory=list)
+    extracted_facts: list[Any] = field(default_factory=list)
+    extracted_hypotheses: list[Any] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -64,13 +64,13 @@ class ProvenanceRecord:
 class KnowledgeNode:
     id: str
     knowledge_id: str
-    category: str                 # SMC, ORDERFLOW, MACRO, RISK, PSYCHOLOGY, OPTIONS
+    category: str  # SMC, ORDERFLOW, MACRO, RISK, PSYCHOLOGY, OPTIONS
     concept_title: str
     structured_explanation: str
-    tags: List[str]
+    tags: list[str]
     created_at: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -80,18 +80,20 @@ class StrategyCandidateNode:
     knowledge_id: str
     strategy_name: str
     hypothesis: str
-    entry_rules: Dict[str, Any]
-    exit_rules: Dict[str, Any]
-    parameter_bounds: Dict[str, Any]
+    entry_rules: dict[str, Any]
+    exit_rules: dict[str, Any]
+    parameter_bounds: dict[str, Any]
     timeframe: str = "15m"
-    required_indicators: List[str] = field(default_factory=list)
-    validation_stage: str = "UNTESTED"  # UNTESTED, BACKTESTING, WALK_FORWARD, PAPER_TEST, REJECTED, PROMOTED
-    backtest_expectancy: Optional[float] = None
-    backtest_sharpe: Optional[float] = None
-    backtest_win_rate: Optional[float] = None
+    required_indicators: list[str] = field(default_factory=list)
+    validation_stage: str = (
+        "UNTESTED"  # UNTESTED, BACKTESTING, WALK_FORWARD, PAPER_TEST, REJECTED, PROMOTED
+    )
+    backtest_expectancy: float | None = None
+    backtest_sharpe: float | None = None
+    backtest_win_rate: float | None = None
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -100,13 +102,13 @@ class EvidenceNode:
     evidence_id: str
     knowledge_id: str
     claim_statement: str
-    verdict: str                  # SUPPORTED, MIXED, REJECTED
+    verdict: str  # SUPPORTED, MIXED, REJECTED
     sample_size: int
     statistical_p_value: float
-    evidence_details: Dict[str, Any]
+    evidence_details: dict[str, Any]
     created_at: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -115,12 +117,12 @@ class RejectedClaimNode:
     rejected_id: str
     knowledge_id: str
     rejected_claim: str
-    failure_reason: str           # INSUFFICIENT_EXPECTANCY, HIGH_DRAWDOWN, OVERFITTED, REGIME_FRAGILITY
+    failure_reason: str  # INSUFFICIENT_EXPECTANCY, HIGH_DRAWDOWN, OVERFITTED, REGIME_FRAGILITY
     historical_occurrences_tested: int
     rejection_autopsy: str
     created_at: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -265,7 +267,7 @@ class ProvenanceEngine:
         category: str,
         concept_title: str,
         structured_explanation: str,
-        tags: List[str],
+        tags: list[str],
     ) -> KnowledgeNode:
         """Adds a concept or mental model to the Knowledge Vault."""
         nid = f"KN_{uuid.uuid4().hex[:8].upper()}"
@@ -305,11 +307,11 @@ class ProvenanceEngine:
         knowledge_id: str,
         strategy_name: str,
         hypothesis: str,
-        entry_rules: Dict[str, Any],
-        exit_rules: Dict[str, Any],
-        parameter_bounds: Dict[str, Any],
+        entry_rules: dict[str, Any],
+        exit_rules: dict[str, Any],
+        parameter_bounds: dict[str, Any],
         timeframe: str = "15m",
-        required_indicators: Optional[List[str]] = None,
+        required_indicators: list[str] | None = None,
     ) -> StrategyCandidateNode:
         """Saves an untested candidate strategy into the Strategy Candidates queue."""
         cid = f"CAND_{strategy_name.replace(' ', '_').upper()[:16]}_{uuid.uuid4().hex[:4].upper()}"
@@ -361,7 +363,7 @@ class ProvenanceEngine:
         verdict: str,
         sample_size: int,
         statistical_p_value: float,
-        evidence_details: Dict[str, Any],
+        evidence_details: dict[str, Any],
     ) -> EvidenceNode:
         """Stores verified empirical evidence in the Evidence Vault."""
         eid = f"EVID_{uuid.uuid4().hex[:8].upper()}"
@@ -460,12 +462,18 @@ class ProvenanceEngine:
                     validation_stage = ?
                 WHERE candidate_id = ?;
                 """,
-                (float(expectancy), float(sharpe), float(win_rate), validation_stage.upper(), candidate_id),
+                (
+                    float(expectancy),
+                    float(sharpe),
+                    float(win_rate),
+                    validation_stage.upper(),
+                    candidate_id,
+                ),
             )
             conn.commit()
             return cursor.rowcount > 0
 
-    def get_inbox_items(self, limit: int = 25) -> List[Dict[str, Any]]:
+    def get_inbox_items(self, limit: int = 25) -> list[dict[str, Any]]:
         """Retrieves recent research inbox items from the provenance ledger."""
         with db_manager.get_brain_conn() as conn:
             rows = conn.execute(
@@ -477,30 +485,43 @@ class ProvenanceEngine:
             ).fetchall()
             return [dict(r) for r in rows]
 
-    def get_all_vault_data(self) -> Dict[str, Any]:
+    def get_all_vault_data(self) -> dict[str, Any]:
         """Retrieves full overview, counts, and items for the 4 vaults."""
         with db_manager.get_brain_conn() as conn:
-            k_rows = conn.execute("SELECT * FROM knowledge_vault ORDER BY created_at DESC LIMIT 50;").fetchall()
-            c_rows = conn.execute("SELECT * FROM strategy_candidates ORDER BY created_at DESC LIMIT 50;").fetchall()
-            e_rows = conn.execute("SELECT * FROM evidence_vault ORDER BY created_at DESC LIMIT 50;").fetchall()
-            r_rows = conn.execute("SELECT * FROM rejected_claims_vault ORDER BY created_at DESC LIMIT 50;").fetchall()
+            k_rows = conn.execute(
+                "SELECT * FROM knowledge_vault ORDER BY created_at DESC LIMIT 50;"
+            ).fetchall()
+            c_rows = conn.execute(
+                "SELECT * FROM strategy_candidates ORDER BY created_at DESC LIMIT 50;"
+            ).fetchall()
+            e_rows = conn.execute(
+                "SELECT * FROM evidence_vault ORDER BY created_at DESC LIMIT 50;"
+            ).fetchall()
+            r_rows = conn.execute(
+                "SELECT * FROM rejected_claims_vault ORDER BY created_at DESC LIMIT 50;"
+            ).fetchall()
 
             knowledge_items = []
             for r in k_rows:
                 d = dict(r)
                 try:
                     d["tags"] = json.loads(d["tags"]) if d.get("tags") else []
-                except Exception:
+                except Exception:  # noqa: BLE001 — defensive fallback
                     d["tags"] = []
                 knowledge_items.append(d)
 
             candidate_items = []
             for r in c_rows:
                 d = dict(r)
-                for json_field in ["entry_rules", "exit_rules", "parameter_bounds", "required_indicators"]:
+                for json_field in [
+                    "entry_rules",
+                    "exit_rules",
+                    "parameter_bounds",
+                    "required_indicators",
+                ]:
                     try:
                         d[json_field] = json.loads(d[json_field]) if d.get(json_field) else {}
-                    except Exception:
+                    except Exception:  # noqa: BLE001 — defensive fallback
                         d[json_field] = {}
                 candidate_items.append(d)
 
@@ -508,19 +529,31 @@ class ProvenanceEngine:
             for r in e_rows:
                 d = dict(r)
                 try:
-                    d["evidence_details"] = json.loads(d["evidence_details"]) if d.get("evidence_details") else {}
-                except Exception:
+                    d["evidence_details"] = (
+                        json.loads(d["evidence_details"]) if d.get("evidence_details") else {}
+                    )
+                except Exception:  # noqa: BLE001 — defensive fallback
                     d["evidence_details"] = {}
                 evidence_items.append(d)
 
             rejected_items = [dict(r) for r in r_rows]
 
             counts = {
-                "knowledge_count": conn.execute("SELECT COUNT(*) FROM knowledge_vault;").fetchone()[0],
-                "candidates_count": conn.execute("SELECT COUNT(*) FROM strategy_candidates;").fetchone()[0],
-                "evidence_count": conn.execute("SELECT COUNT(*) FROM evidence_vault;").fetchone()[0],
-                "rejected_count": conn.execute("SELECT COUNT(*) FROM rejected_claims_vault;").fetchone()[0],
-                "inbox_total": conn.execute("SELECT COUNT(*) FROM research_provenance_ledger;").fetchone()[0],
+                "knowledge_count": conn.execute("SELECT COUNT(*) FROM knowledge_vault;").fetchone()[
+                    0
+                ],
+                "candidates_count": conn.execute(
+                    "SELECT COUNT(*) FROM strategy_candidates;"
+                ).fetchone()[0],
+                "evidence_count": conn.execute("SELECT COUNT(*) FROM evidence_vault;").fetchone()[
+                    0
+                ],
+                "rejected_count": conn.execute(
+                    "SELECT COUNT(*) FROM rejected_claims_vault;"
+                ).fetchone()[0],
+                "inbox_total": conn.execute(
+                    "SELECT COUNT(*) FROM research_provenance_ledger;"
+                ).fetchone()[0],
             }
 
             return {
@@ -538,6 +571,7 @@ class ProvenanceEngine:
     def compute_sha256(self, content: str) -> str:
         """Deterministic SHA-256 hash of raw content."""
         import hashlib
+
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
     def register_source(
@@ -545,12 +579,12 @@ class ProvenanceEngine:
         source_type: str,
         raw_content: str,
         title: str,
-        source_url: Optional[str] = None,
+        source_url: str | None = None,
         parser: str = "default",
         confidence: float = 0.90,
         language: str = "en",
-        extracted_facts: Optional[List[Any]] = None,
-        extracted_hypotheses: Optional[List[Any]] = None,
+        extracted_facts: list[Any] | None = None,
+        extracted_hypotheses: list[Any] | None = None,
     ) -> ProvenanceRecord:
         """Legacy source registration returning a ProvenanceRecord instance with deduplication."""
         chash = self.compute_sha256(raw_content)
@@ -596,7 +630,7 @@ class ProvenanceEngine:
             extracted_hypotheses=extracted_hypotheses or [],
         )
 
-    def get_by_id(self, source_id: str) -> Optional[ProvenanceRecord]:
+    def get_by_id(self, source_id: str) -> ProvenanceRecord | None:
         """Fetches a ProvenanceRecord by source ID."""
         with db_manager.get_brain_conn() as conn:
             # Check by source_id or knowledge_id
@@ -609,7 +643,9 @@ class ProvenanceEngine:
                 d = dict(row)
                 content = d.get("raw_content_preview", "")
                 return ProvenanceRecord(
-                    source_id=source_id if source_id.startswith("SRC-") else f"SRC-{d['knowledge_id'][2:]}",
+                    source_id=source_id
+                    if source_id.startswith("SRC-")
+                    else f"SRC-{d['knowledge_id'][2:]}",
                     source_type=d["source_type"],
                     raw_content=content,
                     title=d["title"],
@@ -622,10 +658,12 @@ class ProvenanceEngine:
                 )
             return None
 
-    def get_by_hash(self, content_hash: str) -> Optional[ProvenanceRecord]:
+    def get_by_hash(self, content_hash: str) -> ProvenanceRecord | None:
         """Fetches a ProvenanceRecord by content hash."""
         with db_manager.get_brain_conn() as conn:
-            rows = conn.execute("SELECT * FROM research_provenance_ledger ORDER BY ingested_at DESC;").fetchall()
+            rows = conn.execute(
+                "SELECT * FROM research_provenance_ledger ORDER BY ingested_at DESC;"
+            ).fetchall()
             for r in rows:
                 d = dict(r)
                 content = d.get("raw_content_preview", "")
@@ -644,15 +682,17 @@ class ProvenanceEngine:
                     )
             return None
 
-    def list_records(self, limit: int = 1000) -> List[Dict[str, Any]]:
+    def list_records(self, limit: int = 1000) -> list[dict[str, Any]]:
         """Lists records from the provenance ledger."""
         items = self.get_inbox_items(limit=limit)
         for item in items:
-            item["source_id"] = f"SRC-{item['knowledge_id'][2:]}" if item.get("knowledge_id") else "SRC-0000"
+            item["source_id"] = (
+                f"SRC-{item['knowledge_id'][2:]}" if item.get("knowledge_id") else "SRC-0000"
+            )
             item["record_id"] = item.get("knowledge_id")
         return items
 
-    def get_record(self, record_id: str) -> Optional[Dict[str, Any]]:
+    def get_record(self, record_id: str) -> dict[str, Any] | None:
         """Fetches a specific provenance record by ID."""
         with db_manager.get_brain_conn() as conn:
             row = conn.execute(

@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.volatility_profile_regime")
@@ -18,16 +19,16 @@ logger = logging.getLogger("ai_quant_sentinel.volatility_profile_regime")
 class VolatilityProfileSnapshot:
     symbol: str
     timestamp: int
-    squeeze_state: str            # "SQUEEZE_COILING_EXPANSION" vs "VOLATILITY_EXPANDED"
-    squeeze_intensity_score: float # [0.0, 10.0]
+    squeeze_state: str  # "SQUEEZE_COILING_EXPANSION" vs "VOLATILITY_EXPANDED"
+    squeeze_intensity_score: float  # [0.0, 10.0]
     daily_vpoc: float
     weekly_vpoc: float
     value_area_high: float
     value_area_low: float
     volatility_regime: str
-    z_score: float                 # Standardized [-3.0, +3.0]
+    z_score: float  # Standardized [-3.0, +3.0]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -49,9 +50,10 @@ class VolatilityProfileEngine:
         self,
         symbol: str,
         current_price: float,
-        candles_1h: Optional[List[Dict[str, Any]]] = None,
+        candles_1h: list[dict[str, Any]] | None = None,
     ) -> VolatilityProfileSnapshot:
         import time
+
         sym = symbol.upper()
         now = int(time.time() * 1000)
 

@@ -5,7 +5,7 @@ Unit tests for SKY Universal Research Ingestor and Provenance 4-Vault Engine.
 """
 
 import pytest
-import asyncio
+
 from core.provenance_engine import provenance_engine
 from core.universal_ingestor import universal_ingestor
 
@@ -29,7 +29,9 @@ async def test_universal_ingestor_analyze_mode():
     assert result["knowledge_id"].startswith("K-")
     assert result["mode"] == "ANALYZE"
     assert result["summary"]["concepts_saved"] >= 1
-    assert result["summary"]["candidates_queued"] == 0  # ANALYZE mode must NOT queue strategy candidates
+    assert (
+        result["summary"]["candidates_queued"] == 0
+    )  # ANALYZE mode must NOT queue strategy candidates
     assert len(result["concepts"]) >= 1
 
 

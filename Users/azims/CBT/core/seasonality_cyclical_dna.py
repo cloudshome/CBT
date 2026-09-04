@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.seasonality_cyclical_dna")
 
@@ -28,7 +28,7 @@ class SeasonalityCyclicalSnapshot:
     cyclical_bias: str
     z_score: float  # Standardized [-3.0, +3.0]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -49,9 +49,10 @@ class SeasonalityCyclicalEngine:
 
     def analyze(self, symbol: str, current_price: float) -> SeasonalityCyclicalSnapshot:
         import time
+
         sym = symbol.upper()
         now = int(time.time() * 1000)
-        dt = datetime.fromtimestamp(now / 1000.0, tz=timezone.utc)
+        dt = datetime.fromtimestamp(now / 1000.0, tz=UTC)
 
         day_name = dt.strftime("%A")
         month_name = dt.strftime("%B")

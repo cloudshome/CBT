@@ -1,4 +1,4 @@
-﻿"""
+"""
 Advisory Shadow Engine for Kronos Integration in Paper Trading.
 Logs hypothetical entries and counterfactual outcomes without bypassing the deterministic risk gate.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.models.kronos.adapter import KronosModelAdapter, kronos_adapter
 from core.models.kronos.calibration import kronos_probability_calibrator
@@ -28,10 +28,10 @@ class KronosAdvisoryVerdict:
     calibrated_win_probability: float
     model_uncertainty: float
     advisory_recommendation: str  # "CONFIRM_TRADE", "DIVERGENCE_CAUTION", "VETO_TRADE", "NEUTRAL"
-    sizing_multiplier: float       # [0.0, 1.25]
+    sizing_multiplier: float  # [0.0, 1.25]
     narrative: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timeframe": self.timeframe,
@@ -50,14 +50,14 @@ class KronosAdvisoryVerdict:
 class KronosAdvisoryEngine:
     """Evaluates Kronos forecasts as an advisory overlay on SKY setups."""
 
-    def __init__(self, adapter: Optional[KronosModelAdapter] = None):
+    def __init__(self, adapter: KronosModelAdapter | None = None):
         self.adapter = adapter or kronos_adapter
 
     def evaluate_advisory(
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         sky_decision: str,
         horizon: int = 12,
     ) -> KronosAdvisoryVerdict:
@@ -88,11 +88,11 @@ class KronosAdvisoryEngine:
             if bias == "BULLISH" and forecast.model_uncertainty < 0.40:
                 rec = "CONFIRM_TRADE"
                 multiplier = 1.15
-                narrative = f"Kronos neural paths strongly confirm LONG setup (consensus {forecast.directional_consensus*100:.0f}%, exp ret {forecast.expected_return_pct*100:+.2f}%)."
+                narrative = f"Kronos neural paths strongly confirm LONG setup (consensus {forecast.directional_consensus * 100:.0f}%, exp ret {forecast.expected_return_pct * 100:+.2f}%)."
             elif bias == "BEARISH":
                 rec = "DIVERGENCE_CAUTION"
                 multiplier = 0.50
-                narrative = f"DIVERGENCE: SKY suggests LONG, but Kronos neural paths project BEARISH trajectory ({forecast.expected_return_pct*100:+.2f}%)."
+                narrative = f"DIVERGENCE: SKY suggests LONG, but Kronos neural paths project BEARISH trajectory ({forecast.expected_return_pct * 100:+.2f}%)."
             else:
                 rec = "NEUTRAL"
                 narrative = "Kronos is neutral; proceeding with standard SKY risk parameters."
@@ -101,11 +101,11 @@ class KronosAdvisoryEngine:
             if bias == "BEARISH" and forecast.model_uncertainty < 0.40:
                 rec = "CONFIRM_TRADE"
                 multiplier = 1.15
-                narrative = f"Kronos neural paths strongly confirm SHORT setup (consensus {forecast.directional_consensus*100:.0f}%, exp ret {forecast.expected_return_pct*100:+.2f}%)."
+                narrative = f"Kronos neural paths strongly confirm SHORT setup (consensus {forecast.directional_consensus * 100:.0f}%, exp ret {forecast.expected_return_pct * 100:+.2f}%)."
             elif bias == "BULLISH":
                 rec = "DIVERGENCE_CAUTION"
                 multiplier = 0.50
-                narrative = f"DIVERGENCE: SKY suggests SHORT, but Kronos neural paths project BULLISH trajectory ({forecast.expected_return_pct*100:+.2f}%)."
+                narrative = f"DIVERGENCE: SKY suggests SHORT, but Kronos neural paths project BULLISH trajectory ({forecast.expected_return_pct * 100:+.2f}%)."
             else:
                 rec = "NEUTRAL"
                 narrative = "Kronos is neutral; proceeding with standard SKY risk parameters."

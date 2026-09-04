@@ -12,8 +12,9 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
 from core.database import db_manager
@@ -26,14 +27,14 @@ logger = logging.getLogger("ai_quant_sentinel.analogue_engine")
 class AnalogueMatch:
     state_id: str
     timestamp: int
-    similarity_score: float             # [0.0, 1.0]
+    similarity_score: float  # [0.0, 1.0]
     realized_forward_return_5m: float
     realized_forward_return_1h: float
     realized_forward_return_4h: float
     tp_hit: bool
     sl_hit: bool
-    max_adverse_excursion: float        # MAE (%)
-    max_favorable_excursion: float      # MFE (%)
+    max_adverse_excursion: float  # MAE (%)
+    max_favorable_excursion: float  # MFE (%)
     bars_to_resolution: int
 
 
@@ -41,15 +42,15 @@ class AnalogueMatch:
 class AnalogueDistribution:
     query_asset: str
     k_samples_found: int
-    sample_adequacy_score: float        # [0.0, 1.0] (penalizes K < 30)
-    p_tp_hit: float                     # Empirical win probability [0.0, 1.0]
-    p_sl_hit: float                     # Empirical loss probability [0.0, 1.0]
+    sample_adequacy_score: float  # [0.0, 1.0] (penalizes K < 30)
+    p_tp_hit: float  # Empirical win probability [0.0, 1.0]
+    p_sl_hit: float  # Empirical loss probability [0.0, 1.0]
     median_mae_pct: float
     median_mfe_pct: float
     expected_r_multiple: float
     avg_bars_to_target: float
-    top_matches: List[AnalogueMatch]
-    uncertainty_penalty: float          # Higher when K is small or distribution is bimodal
+    top_matches: list[AnalogueMatch]
+    uncertainty_penalty: float  # Higher when K is small or distribution is bimodal
 
 
 class HierarchicalAnalogueEngine:
@@ -82,7 +83,7 @@ class HierarchicalAnalogueEngine:
             )
 
         # Step 2: Compute Weighted Multi-Factor Similarity
-        scored_matches: List[Tuple[float, Dict[str, Any]]] = []
+        scored_matches: list[tuple[float, dict[str, Any]]] = []
         now_ms = current_state.timestamp
 
         for h in historical_states:
@@ -94,7 +95,7 @@ class HierarchicalAnalogueEngine:
         top_k_items = scored_matches[: self.top_k]
 
         # Step 4: Empirical Outcome Distribution Calculation
-        matches: List[AnalogueMatch] = []
+        matches: list[AnalogueMatch] = []
         tp_hits = 0
         sl_hits = 0
         mae_list = []
@@ -166,7 +167,7 @@ class HierarchicalAnalogueEngine:
     def _compute_weighted_similarity(
         self,
         current: MarketStateVector,
-        historical: Dict[str, Any],
+        historical: dict[str, Any],
         now_ms: int,
     ) -> float:
         """
@@ -187,8 +188,7 @@ class HierarchicalAnalogueEngine:
         t_cur = current.trend_scores
         t_hist = h_vec.get("trend_scores", {})
         trend_diffs = [
-            abs(t_cur.get(k, 0.0) - t_hist.get(k, 0.0))
-            for k in ["1d", "4h", "1h", "15m"]
+            abs(t_cur.get(k, 0.0) - t_hist.get(k, 0.0)) for k in ["1d", "4h", "1h", "15m"]
         ]
         regime_sim = 1.0 - (sum(trend_diffs) / (len(trend_diffs) * 2.0 + 1e-5))
 
@@ -208,10 +208,15 @@ class HierarchicalAnalogueEngine:
         # Macro similarity
         m_cur = current.macro_alignment
         m_hist = h_vec.get("macro_alignment", {})
-        macro_sim = 1.0 - abs(m_cur.get("dxy_correlation", -0.5) - m_hist.get("dxy_correlation", -0.5)) / 2.0
+        macro_sim = (
+            1.0
+            - abs(m_cur.get("dxy_correlation", -0.5) - m_hist.get("dxy_correlation", -0.5)) / 2.0
+        )
 
         # Liquidity similarity
-        liq_sim = 1.0 - abs(s_cur.get("liquidity_pool_pressure", 0.5) - s_hist.get("liquidity_pool_pressure", 0.5))
+        liq_sim = 1.0 - abs(
+            s_cur.get("liquidity_pool_pressure", 0.5) - s_hist.get("liquidity_pool_pressure", 0.5)
+        )
 
         # Recency decay weight (favors last 90 days slightly)
         h_time = historical.get("timestamp", now_ms)
@@ -231,7 +236,7 @@ class HierarchicalAnalogueEngine:
 
     def _fetch_historical_states(
         self, asset: str, timeframe: str, regime: str, event_risk: bool
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         with db_manager.get_brain_conn() as conn:
             cursor = conn.execute(
                 """
@@ -248,19 +253,21 @@ class HierarchicalAnalogueEngine:
         results = []
         for r in rows:
             try:
-                results.append({
-                    "state_id": r["state_id"],
-                    "timestamp": r["timestamp"],
-                    "state_vector": json.loads(r["state_vector_json"]),
-                    "forward_outcomes": json.loads(r["forward_outcomes_json"] or "{}"),
-                })
-            except Exception:
+                results.append(
+                    {
+                        "state_id": r["state_id"],
+                        "timestamp": r["timestamp"],
+                        "state_vector": json.loads(r["state_vector_json"]),
+                        "forward_outcomes": json.loads(r["forward_outcomes_json"] or "{}"),
+                    }
+                )
+            except Exception:  # noqa: BLE001 — defensive fallback
                 continue
         return results
 
     def _generate_synthetic_historical_states(
         self, current: MarketStateVector, regime: str, event_risk: bool, count: int = 60
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         states = []
         now = current.timestamp
         np.random.seed(1337)
@@ -270,23 +277,31 @@ class HierarchicalAnalogueEngine:
             # Create variations
             sv = current.to_dict()
             noise = np.random.normal(0, 0.15, 5)
-            sv["trend_scores"]["15m"] = float(np.clip(sv["trend_scores"]["15m"] + noise[0], -1.0, 1.0))
-            sv["orderflow"]["cvd_delta"] = float(np.clip(sv["orderflow"]["cvd_delta"] + noise[1], -1.0, 1.0))
+            sv["trend_scores"]["15m"] = float(
+                np.clip(sv["trend_scores"]["15m"] + noise[0], -1.0, 1.0)
+            )
+            sv["orderflow"]["cvd_delta"] = float(
+                np.clip(sv["orderflow"]["cvd_delta"] + noise[1], -1.0, 1.0)
+            )
 
             win = np.random.rand() > 0.38
-            ret_1h = float(np.random.uniform(0.005, 0.02) if win else np.random.uniform(-0.015, -0.004))
+            ret_1h = float(
+                np.random.uniform(0.005, 0.02) if win else np.random.uniform(-0.015, -0.004)
+            )
 
-            states.append({
-                "state_id": f"SYNTH_STATE_{i}_{t_hist}",
-                "timestamp": t_hist,
-                "state_vector": sv,
-                "forward_outcomes": {
-                    "ret_5m": round(ret_1h * 0.3, 4),
-                    "ret_1h": round(ret_1h, 4),
-                    "ret_4h": round(ret_1h * 1.5, 4),
-                    "bars_to_target": int(np.random.randint(4, 16)),
-                },
-            })
+            states.append(
+                {
+                    "state_id": f"SYNTH_STATE_{i}_{t_hist}",
+                    "timestamp": t_hist,
+                    "state_vector": sv,
+                    "forward_outcomes": {
+                        "ret_5m": round(ret_1h * 0.3, 4),
+                        "ret_1h": round(ret_1h, 4),
+                        "ret_4h": round(ret_1h * 1.5, 4),
+                        "bars_to_target": int(np.random.randint(4, 16)),
+                    },
+                }
+            )
         return states
 
 

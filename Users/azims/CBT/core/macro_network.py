@@ -11,8 +11,9 @@ from __future__ import annotations
 import logging
 import math
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("sky.macro_network")
@@ -20,19 +21,21 @@ logger = logging.getLogger("sky.macro_network")
 
 @dataclass
 class CrossAssetCorrelationMatrix:
-    assets: List[str]
-    correlation_matrix: List[List[float]]  # NxN matrix
-    covariance_matrix: List[List[float]]   # NxN matrix
+    assets: list[str]
+    correlation_matrix: list[list[float]]  # NxN matrix
+    covariance_matrix: list[list[float]]  # NxN matrix
     average_correlation: float
     dispersion: float
 
 
 @dataclass
 class PCASystemicAbsorption:
-    eigenvalues: List[float]
-    explained_variance_ratios: List[float]
-    absorption_ratio_top2: float           # Variance explained by top 2 components [0.0, 1.0]
-    market_synchronization_regime: str     # "DECOUPLED_IDIOSYNCRATIC", "MODERATE_CO-MOVEMENT", "HIGH_SYSTEMIC_SYNCHRONIZATION"
+    eigenvalues: list[float]
+    explained_variance_ratios: list[float]
+    absorption_ratio_top2: float  # Variance explained by top 2 components [0.0, 1.0]
+    market_synchronization_regime: (
+        str  # "DECOUPLED_IDIOSYNCRATIC", "MODERATE_CO-MOVEMENT", "HIGH_SYSTEMIC_SYNCHRONIZATION"
+    )
 
 
 @dataclass
@@ -49,16 +52,18 @@ class LeadLagCausalLink:
 @dataclass
 class MacroNetworkAnalysis:
     timestamp_ms: int
-    assets: List[str]
+    assets: list[str]
     correlation_network: CrossAssetCorrelationMatrix
     pca_absorption: PCASystemicAbsorption
-    lead_lag_links: List[LeadLagCausalLink]
-    systemic_fragility_index: float        # [0.0, 1.0]
-    macro_transmission_regime: str         # "RISK_ON_EXPANSION", "RISK_OFF_CONTAGION", "FLIGHT_TO_SAFETY", "NEUTRAL_BALANCED"
+    lead_lag_links: list[LeadLagCausalLink]
+    systemic_fragility_index: float  # [0.0, 1.0]
+    macro_transmission_regime: (
+        str  # "RISK_ON_EXPANSION", "RISK_OFF_CONTAGION", "FLIGHT_TO_SAFETY", "NEUTRAL_BALANCED"
+    )
     primary_driver_asset: str
     narrative: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -74,8 +79,10 @@ class MacroNetworkEngine:
 
     def analyze(
         self,
-        asset_returns: Dict[str, List[float]],  # Asset symbol -> chronological returns series (same length)
-        timestamp_ms: Optional[int] = None,
+        asset_returns: dict[
+            str, list[float]
+        ],  # Asset symbol -> chronological returns series (same length)
+        timestamp_ms: int | None = None,
     ) -> MacroNetworkAnalysis:
         """
         Conducts full multi-asset macro network and spillover analysis.
@@ -89,7 +96,9 @@ class MacroNetworkEngine:
 
         # Align series length
         min_len = min(len(asset_returns[k]) for k in valid_assets)
-        aligned_data = np.array([asset_returns[k][-min_len:] for k in valid_assets], dtype=np.float64)
+        aligned_data = np.array(
+            [asset_returns[k][-min_len:] for k in valid_assets], dtype=np.float64
+        )
 
         # 1. Correlation & Covariance Matrix
         corr_matrix, cov_matrix, avg_corr, dispersion = self._compute_matrix(aligned_data)
@@ -127,7 +136,7 @@ class MacroNetworkEngine:
     def _compute_matrix(
         self,
         data: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray, float, float]:
+    ) -> tuple[np.ndarray, np.ndarray, float, float]:
         cov = np.cov(data)
         std = np.std(data, axis=1, keepdims=True)
         std_outer = np.dot(std, std.T)
@@ -173,7 +182,7 @@ class MacroNetworkEngine:
                 absorption_ratio_top2=round(absorption_top2, 4),
                 market_synchronization_regime=regime,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.warning("PCA absorption calculation error: %s", e)
             return PCASystemicAbsorption(
                 eigenvalues=[1.0],
@@ -185,9 +194,9 @@ class MacroNetworkEngine:
     def _compute_lead_lag(
         self,
         data: np.ndarray,
-        assets: List[str],
-    ) -> List[LeadLagCausalLink]:
-        links: List[LeadLagCausalLink] = []
+        assets: list[str],
+    ) -> list[LeadLagCausalLink]:
+        links: list[LeadLagCausalLink] = []
         n_assets = len(assets)
 
         for i in range(n_assets):
@@ -220,8 +229,8 @@ class MacroNetworkEngine:
                     x_ur = np.column_stack([np.ones(len(y_target)), y_lagged, x_lagged])
 
                     try:
-                        beta_r, res_r, _, _ = np.linalg.lstsq(x_r, y_target, rcond=None)
-                        beta_ur, res_ur, _, _ = np.linalg.lstsq(x_ur, y_target, rcond=None)
+                        beta_r, _res_r, _, _ = np.linalg.lstsq(x_r, y_target, rcond=None)
+                        beta_ur, _res_ur, _, _ = np.linalg.lstsq(x_ur, y_target, rcond=None)
 
                         rss_r = float(np.sum((y_target - x_r @ beta_r) ** 2))
                         rss_ur = float(np.sum((y_target - x_ur @ beta_ur) ** 2))
@@ -240,7 +249,7 @@ class MacroNetworkEngine:
                                 best_f = f_stat
                                 best_lag = lag
                                 best_p = p_val
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
                         pass
 
                 is_sig = best_p < self.significance_alpha or best_f > 3.84
@@ -265,23 +274,33 @@ class MacroNetworkEngine:
         self,
         network: CrossAssetCorrelationMatrix,
         pca: PCASystemicAbsorption,
-        links: List[LeadLagCausalLink],
-        assets: List[str],
-    ) -> Tuple[float, str, str, str]:
+        links: list[LeadLagCausalLink],
+        assets: list[str],
+    ) -> tuple[float, str, str, str]:
         # Fragility Index: weighted composite of absorption ratio, average correlation, and spillover density
-        sig_links_ratio = (
-            sum(1 for l in links if l.is_statistically_significant) / max(1, len(assets) * (len(assets) - 1))
+        sig_links_ratio = sum(1 for link in links if link.is_statistically_significant) / max(
+            1, len(assets) * (len(assets) - 1)
         )
-        fragility = 0.5 * pca.absorption_ratio_top2 + 0.3 * max(0.0, network.average_correlation) + 0.2 * sig_links_ratio
+        fragility = (
+            0.5 * pca.absorption_ratio_top2
+            + 0.3 * max(0.0, network.average_correlation)
+            + 0.2 * sig_links_ratio
+        )
         fragility = float(np.clip(fragility, 0.05, 0.95))
 
         # Find primary driver (most frequent significant leader)
-        leader_counts: Dict[str, float] = {}
-        for l in links:
-            if l.is_statistically_significant:
-                leader_counts[l.leader] = leader_counts.get(l.leader, 0.0) + l.granger_f_stat
+        leader_counts: dict[str, float] = {}
+        for link in links:
+            if link.is_statistically_significant:
+                leader_counts[link.leader] = (
+                    leader_counts.get(link.leader, 0.0) + link.granger_f_stat
+                )
 
-        primary_driver = max(leader_counts.items(), key=lambda x: x[1])[0] if leader_counts else (assets[0] if assets else "BTC/USDT")
+        primary_driver = (
+            max(leader_counts.items(), key=lambda x: x[1])[0]
+            if leader_counts
+            else (assets[0] if assets else "BTC/USDT")
+        )
 
         # Macro regime determination
         has_gold = any("PAXG" in a or "XAU" in a or "GOLD" in a for a in assets)

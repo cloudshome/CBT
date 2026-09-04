@@ -7,8 +7,7 @@ or systemic dislocations to protect net portfolio delta.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger("ai_quant_sentinel.dynamic_hedger")
 
@@ -16,8 +15,8 @@ logger = logging.getLogger("ai_quant_sentinel.dynamic_hedger")
 @dataclass
 class HedgeRecommendation:
     hedge_required: bool
-    target_symbol: str                  # "BTC/USDT"
-    hedge_direction: str                # "SHORT", "LONG", "NONE"
+    target_symbol: str  # "BTC/USDT"
+    hedge_direction: str  # "SHORT", "LONG", "NONE"
     hedge_size_units: float
     hedge_notional_usd: float
     trigger_shock: str
@@ -37,7 +36,11 @@ class DynamicHedger:
         """
         If macro shock is > 2.5 sigma and portfolio is unhedged, generates delta-neutralizing hedge.
         """
-        if abs(macro_shock_zscore) < 2.5 or abs(net_portfolio_delta_usd) < 500.0 or current_btc_price <= 0:
+        if (
+            abs(macro_shock_zscore) < 2.5
+            or abs(net_portfolio_delta_usd) < 500.0
+            or current_btc_price <= 0
+        ):
             return HedgeRecommendation(
                 hedge_required=False,
                 target_symbol="BTC/USDT",

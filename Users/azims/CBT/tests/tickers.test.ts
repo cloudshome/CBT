@@ -8,9 +8,9 @@ describe('GET /api/tickers', () => {
     expect(res.body).toHaveProperty('tickers');
     expect(Array.isArray(res.body.tickers)).toBe(true);
 
-    const btc = res.body.tickers.find((t: any) => t.symbol === 'BTCUSDT');
-    const eth = res.body.tickers.find((t: any) => t.symbol === 'ETHUSDT');
-    const paxg = res.body.tickers.find((t: any) => t.symbol === 'PAXGUSDT');
+    const btc = res.body.tickers.find((t: { symbol: string }) => t.symbol === 'BTCUSDT');
+    const eth = res.body.tickers.find((t: { symbol: string }) => t.symbol === 'ETHUSDT');
+    const paxg = res.body.tickers.find((t: { symbol: string }) => t.symbol === 'PAXGUSDT');
 
     expect(btc).toBeDefined();
     expect(btc.price).toBeGreaterThan(0);

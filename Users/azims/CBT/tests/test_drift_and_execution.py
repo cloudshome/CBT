@@ -2,7 +2,6 @@
 Tests for Layer 10 & 11: 4-Type Continuous Drift Monitor, Smart Order Router & Hot-Reload.
 """
 
-import pytest
 from core.drift_monitor import drift_monitor
 from core.execution_gateway import execution_gateway
 from core.patch_governor import patch_governor
@@ -24,9 +23,9 @@ def test_4_type_drift_detection():
     # Test concept drift spike (Brier > 0.22)
     drifted_rep = drift_monitor.evaluate_system_drift(
         current_atr_percentile=0.55,
-        recent_brier_score=0.265, # Critical
+        recent_brier_score=0.265,  # Critical
         historical_sharpe=2.1,
-        rolling_sharpe_30d=1.2, # 40% decay
+        rolling_sharpe_30d=1.2,  # 40% decay
     )
     assert drifted_rep.is_system_drift_critical
     assert drifted_rep.recommended_capital_throttle_pct > 0.0

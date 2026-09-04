@@ -15,8 +15,8 @@ import math
 import os
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
-from fastapi import Request, Response
+
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -37,10 +37,10 @@ class RateLimiter:
         self.window_seconds = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", window_seconds))
         self.public_max = int(os.getenv("RATE_LIMIT_MAX", public_max))
         self.auth_max = int(os.getenv("RATE_LIMIT_AUTH_MAX", auth_max))
-        self._buckets: Dict[str, ClientBucket] = {}
+        self._buckets: dict[str, ClientBucket] = {}
         self._last_prune = time.time()
 
-    def _resolve_client(self, request: Request) -> Tuple[str, bool]:
+    def _resolve_client(self, request: Request) -> tuple[str, bool]:
         """Extracts client identity (hashed API key or client IP)."""
         auth_header = request.headers.get("authorization", "")
         x_api_key = request.headers.get("x-api-key", "")
@@ -55,8 +55,13 @@ class RateLimiter:
             key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
             return f"auth:{key_hash}", True
 
-        # Fall back to client IP
-        forwarded = request.headers.get("x-forwarded-for")
+        # Fall back to client IP.
+        # X-Forwarded-For is ONLY trusted when TRUST_PROXY_XFF=true (i.e. the service
+        # is reachable exclusively behind a reverse proxy that overwrites the header).
+        # Otherwise an attacker can spoof the header to rotate identities and bypass
+        # the per-IP limit.
+        trust_proxy = os.getenv("TRUST_PROXY_XFF", "").strip().lower() in ("1", "true", "yes")
+        forwarded = request.headers.get("x-forwarded-for") if trust_proxy else None
         if forwarded:
             ip = forwarded.split(",")[0].strip()
         elif request.client and request.client.host:
@@ -74,7 +79,7 @@ class RateLimiter:
                 self._buckets.pop(k, None)
             self._last_prune = now
 
-    def check_rate_limit(self, request: Request) -> Tuple[bool, int, int, int]:
+    def check_rate_limit(self, request: Request) -> tuple[bool, int, int, int]:
         """
         Evaluates rate limit for incoming request.
         Returns: (is_allowed, limit, remaining, reset_seconds)
@@ -112,7 +117,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Exclude websocket connections, health checks, and static files from strict HTTP rate limits
         path = request.url.path
-        if path.startswith("/ws") or path in ("/health", "/ready", "/", "/api/health") or path.startswith("/static"):
+        if (
+            path.startswith("/ws")
+            or path in ("/health", "/ready", "/", "/api/health")
+            or path.startswith("/static")
+        ):
             return await call_next(request)
 
         allowed, limit, remaining, reset_sec = fastapi_rate_limiter.check_rate_limit(request)

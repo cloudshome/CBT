@@ -11,20 +11,19 @@ Identifies the optimal parameter configuration to avoid isolated over-reactions.
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
-import numpy as np
+from dataclasses import asdict, dataclass
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.counterfactual_engine")
 
 
 @dataclass
 class CounterfactualScenarioResult:
-    scenario_name: str                  # e.g. "SL + 0.5 ATR Buffer", "Target 2.0R instead of 3.0R"
+    scenario_name: str  # e.g. "SL + 0.5 ATR Buffer", "Target 2.0R instead of 3.0R"
     simulated_pnl_usd: float
     simulated_pnl_percent: float
-    outcome: str                        # "WIN", "LOSS", "BREAKEVEN"
-    pnl_delta_relative_to_actual: float # Simulated PnL - Actual PnL
+    outcome: str  # "WIN", "LOSS", "BREAKEVEN"
+    pnl_delta_relative_to_actual: float  # Simulated PnL - Actual PnL
     is_better_than_actual: bool
 
 
@@ -34,11 +33,11 @@ class CounterfactualAnalysisReport:
     symbol: str
     actual_pnl_usd: float
     actual_outcome: str
-    counterfactual_scenarios: List[CounterfactualScenarioResult]
+    counterfactual_scenarios: list[CounterfactualScenarioResult]
     optimal_scenario: CounterfactualScenarioResult
     key_takeaway: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["counterfactual_scenarios"] = [asdict(s) for s in self.counterfactual_scenarios]
         d["optimal_scenario"] = asdict(self.optimal_scenario)
@@ -58,7 +57,7 @@ class CounterfactualEngine:
         take_profit: float,
         direction: str,
         actual_pnl_usd: float,
-        trade_candles: List[Dict[str, Any]],
+        trade_candles: list[dict[str, Any]],
     ) -> CounterfactualAnalysisReport:
         """
         Simulates 4 distinct counterfactual branches over the trade candle window.
@@ -72,10 +71,18 @@ class CounterfactualEngine:
         if not trade_candles:
             # Baseline synthetic perturbations
             scenarios = [
-                CounterfactualScenarioResult("Entry Delayed 5m", actual_pnl_usd + 350.0, 1.2, "WIN", 350.0, True),
-                CounterfactualScenarioResult("SL + 0.5 ATR Buffer", actual_pnl_usd + 850.0, 2.4, "WIN", 850.0, True),
-                CounterfactualScenarioResult("Target 2.0R vs 3.0R", actual_pnl_usd + 500.0, 1.8, "WIN", 500.0, True),
-                CounterfactualScenarioResult("Ignore Orderflow CVD", actual_pnl_usd - 200.0, -0.8, "LOSS", -200.0, False),
+                CounterfactualScenarioResult(
+                    "Entry Delayed 5m", actual_pnl_usd + 350.0, 1.2, "WIN", 350.0, True
+                ),
+                CounterfactualScenarioResult(
+                    "SL + 0.5 ATR Buffer", actual_pnl_usd + 850.0, 2.4, "WIN", 850.0, True
+                ),
+                CounterfactualScenarioResult(
+                    "Target 2.0R vs 3.0R", actual_pnl_usd + 500.0, 1.8, "WIN", 500.0, True
+                ),
+                CounterfactualScenarioResult(
+                    "Ignore Orderflow CVD", actual_pnl_usd - 200.0, -0.8, "LOSS", -200.0, False
+                ),
             ]
             optimal = max(scenarios, key=lambda s: s.simulated_pnl_usd)
             return CounterfactualAnalysisReport(
@@ -94,7 +101,9 @@ class CounterfactualEngine:
         min_low = min(lows)
 
         # Scenario 1: SL with 0.5 ATR Buffer
-        buffered_sl = stop_loss - (0.5 * atr_estimate) if is_long else stop_loss + (0.5 * atr_estimate)
+        buffered_sl = (
+            stop_loss - (0.5 * atr_estimate) if is_long else stop_loss + (0.5 * atr_estimate)
+        )
         survived_sweep = (min_low > buffered_sl) if is_long else (max_high < buffered_sl)
         hit_tp = (max_high >= take_profit) if is_long else (min_low <= take_profit)
 

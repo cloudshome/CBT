@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.sentiment_engine")
@@ -18,11 +19,11 @@ logger = logging.getLogger("ai_quant_sentinel.sentiment_engine")
 @dataclass
 class SentimentReport:
     timestamp: int
-    composite_sentiment_score: float    # [-1.0, 1.0]
-    fear_and_greed_index: int           # [0, 100]
-    fear_and_greed_label: str           # "Extreme Fear", "Fear", "Neutral", "Greed", "Extreme Greed"
-    recent_headlines: List[Dict[str, Any]]
-    sentiment_trend: str                # "IMPROVING", "DETERIORATING", "STABLE"
+    composite_sentiment_score: float  # [-1.0, 1.0]
+    fear_and_greed_index: int  # [0, 100]
+    fear_and_greed_label: str  # "Extreme Fear", "Fear", "Neutral", "Greed", "Extreme Greed"
+    recent_headlines: list[dict[str, Any]]
+    sentiment_trend: str  # "IMPROVING", "DETERIORATING", "STABLE"
 
 
 class SentimentEngine:
@@ -30,10 +31,25 @@ class SentimentEngine:
 
     def __init__(self, half_life_hours: float = 4.0):
         self.half_life_hours = half_life_hours
-        self._cached_headlines: List[Dict[str, Any]] = [
-            {"title": "Institutional Inflows into Digital Asset ETPs Surpass Monthly Record", "score": 0.75, "timestamp": int(time.time() * 1000) - 1800000, "source": "CryptoPanic"},
-            {"title": "Federal Reserve Signals Data-Dependent Neutral Rate Calibration", "score": 0.20, "timestamp": int(time.time() * 1000) - 7200000, "source": "FederalReserve"},
-            {"title": "Global Central Bank Gold Purchases Reach Highest Accumulation Since 1967", "score": 0.80, "timestamp": int(time.time() * 1000) - 14400000, "source": "Reuters"},
+        self._cached_headlines: list[dict[str, Any]] = [
+            {
+                "title": "Institutional Inflows into Digital Asset ETPs Surpass Monthly Record",
+                "score": 0.75,
+                "timestamp": int(time.time() * 1000) - 1800000,
+                "source": "CryptoPanic",
+            },
+            {
+                "title": "Federal Reserve Signals Data-Dependent Neutral Rate Calibration",
+                "score": 0.20,
+                "timestamp": int(time.time() * 1000) - 7200000,
+                "source": "FederalReserve",
+            },
+            {
+                "title": "Global Central Bank Gold Purchases Reach Highest Accumulation Since 1967",
+                "score": 0.80,
+                "timestamp": int(time.time() * 1000) - 14400000,
+                "source": "Reuters",
+            },
         ]
 
     def get_sentiment_report(self) -> SentimentReport:
@@ -52,7 +68,9 @@ class SentimentEngine:
             weighted_scores.append(h["score"] * weight)
             weights.append(weight)
 
-        composite_score = float(np.sum(weighted_scores) / (np.sum(weights) + 1e-5)) if weights else 0.15
+        composite_score = (
+            float(np.sum(weighted_scores) / (np.sum(weights) + 1e-5)) if weights else 0.15
+        )
         composite_score = float(np.clip(composite_score, -1.0, 1.0))
 
         # Fear & Greed Index mapped to 0-100 scale
@@ -68,7 +86,11 @@ class SentimentEngine:
         else:
             fg_label = "Extreme Greed"
 
-        trend = "IMPROVING" if composite_score > 0.10 else ("DETERIORATING" if composite_score < -0.10 else "STABLE")
+        trend = (
+            "IMPROVING"
+            if composite_score > 0.10
+            else ("DETERIORATING" if composite_score < -0.10 else "STABLE")
+        )
 
         return SentimentReport(
             timestamp=now,

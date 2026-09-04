@@ -7,8 +7,10 @@ strictly enforcing causal timestamps, realistic fee structures, and orderbook sl
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 from core.causal_firewall import causal_firewall
@@ -27,7 +29,7 @@ class BacktestTrade:
     pnl_usd: float
     pnl_percent: float
     rr_ratio: float
-    exit_reason: str                    # "TAKE_PROFIT", "STOP_LOSS", "TIME_STOP"
+    exit_reason: str  # "TAKE_PROFIT", "STOP_LOSS", "TIME_STOP"
 
 
 @dataclass
@@ -40,10 +42,10 @@ class BacktestReport:
     sharpe_ratio: float
     max_drawdown_pct: float
     net_pnl_usd: float
-    trades: List[BacktestTrade]
-    return_series: List[float]
+    trades: list[BacktestTrade]
+    return_series: list[float]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["trades"] = [asdict(t) for t in self.trades]
         return d
@@ -56,8 +58,8 @@ class SandboxLab:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
-        strategy_logic_fn: Optional[Callable[[Dict[str, Any], int], Optional[Dict[str, Any]]]] = None,
+        candles: list[dict[str, Any]],
+        strategy_logic_fn: Callable[[dict[str, Any], int], dict[str, Any] | None] | None = None,
         starting_capital: float = 100000.0,
         risk_per_trade_pct: float = 0.01,
         taker_fee_bps: float = 5.0,
@@ -83,8 +85,8 @@ class SandboxLab:
         capital = starting_capital
         equity_peak = starting_capital
         max_dd = 0.0
-        trades: List[BacktestTrade] = []
-        returns: List[float] = []
+        trades: list[BacktestTrade] = []
+        returns: list[float] = []
 
         active_pos = None
 
@@ -124,13 +126,21 @@ class SandboxLab:
                         reason = "STOP_LOSS"
 
                 if exit_trade or (i - active_pos["entry_bar"] >= 20):
-                    pnl_pct = (exit_price - entry_p) / entry_p if is_long else (entry_p - exit_price) / entry_p
+                    pnl_pct = (
+                        (exit_price - entry_p) / entry_p
+                        if is_long
+                        else (entry_p - exit_price) / entry_p
+                    )
                     # Deduct roundtrip fees
                     pnl_pct -= (2.0 * taker_fee_bps) / 10000.0
                     pnl_usd = active_pos["size_units"] * entry_p * pnl_pct
                     capital += pnl_usd
 
-                    rr = abs(exit_price - entry_p) / abs(entry_p - sl_p) if abs(entry_p - sl_p) > 0 else 1.0
+                    rr = (
+                        abs(exit_price - entry_p) / abs(entry_p - sl_p)
+                        if abs(entry_p - sl_p) > 0
+                        else 1.0
+                    )
 
                     trades.append(
                         BacktestTrade(
@@ -161,8 +171,16 @@ class SandboxLab:
                 # Built-in baseline momentum & FVG strategy trigger if no custom function provided
                 c_prev = candles[i - 1]
                 c_prev2 = candles[i - 2]
-                bull_signal = c["close"] > c["open"] and c["low"] > c_prev2["high"] and c["close"] > c_prev["high"]
-                bear_signal = c["close"] < c["open"] and c["high"] < c_prev2["low"] and c["close"] < c_prev["low"]
+                bull_signal = (
+                    c["close"] > c["open"]
+                    and c["low"] > c_prev2["high"]
+                    and c["close"] > c_prev["high"]
+                )
+                bear_signal = (
+                    c["close"] < c["open"]
+                    and c["high"] < c_prev2["low"]
+                    and c["close"] < c_prev["low"]
+                )
 
                 if bull_signal:
                     entry = c["close"] * (1.0 + slippage_bps / 10000.0)
@@ -208,7 +226,11 @@ class SandboxLab:
         profit_factor = gross_profit / max(0.01, gross_loss)
 
         ret_arr = np.array(returns) if returns else np.zeros(1)
-        sr = (np.mean(ret_arr) / (np.std(ret_arr) + 1e-6)) * np.sqrt(252) if len(ret_arr) > 1 else 0.0
+        sr = (
+            (np.mean(ret_arr) / (np.std(ret_arr) + 1e-6)) * np.sqrt(252)
+            if len(ret_arr) > 1
+            else 0.0
+        )
 
         return BacktestReport(
             symbol=symbol,

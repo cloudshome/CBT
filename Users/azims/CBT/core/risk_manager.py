@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger("ai_quant_sentinel.risk_manager")
 
@@ -17,10 +16,10 @@ logger = logging.getLogger("ai_quant_sentinel.risk_manager")
 @dataclass
 class RiskGateStatus:
     is_trading_allowed: bool
-    daily_drawdown_pct: float           # [0.0, 1.0]
-    max_daily_drawdown_pct: float       # 0.03 (3.0%)
+    daily_drawdown_pct: float  # [0.0, 1.0]
+    max_daily_drawdown_pct: float  # 0.03 (3.0%)
     lockout_active: bool
-    lockout_expiry_timestamp_ms: Optional[int]
+    lockout_expiry_timestamp_ms: int | None
     reason: str
 
 
@@ -29,11 +28,13 @@ class RiskManager:
 
     def __init__(self, max_daily_drawdown_pct: float = 0.03):
         self.max_daily_drawdown_pct = max_daily_drawdown_pct
-        self._lockout_until_ms: Optional[int] = None
-        self._daily_starting_equity: Optional[float] = None
+        self._lockout_until_ms: int | None = None
+        self._daily_starting_equity: float | None = None
         self._last_day_timestamp: int = 0
 
-    def reset_daily_equity_if_needed(self, current_equity: float, now_ms: Optional[int] = None) -> None:
+    def reset_daily_equity_if_needed(
+        self, current_equity: float, now_ms: int | None = None
+    ) -> None:
         now = now_ms or int(time.time() * 1000)
         day_epoch = now // (86400 * 1000)
         if day_epoch != self._last_day_timestamp or self._daily_starting_equity is None:
@@ -46,7 +47,7 @@ class RiskManager:
         current_equity: float,
         daily_realized_pnl: float,
         daily_unrealized_pnl: float,
-        now_ms: Optional[int] = None,
+        now_ms: int | None = None,
     ) -> RiskGateStatus:
         """
         Evaluates current daily loss against the 3.0% drawdown circuit breaker.
@@ -81,7 +82,7 @@ class RiskManager:
             # Trigger 24-hour lockout
             self._lockout_until_ms = now + (24 * 3600 * 1000)
             reason = (
-                f"KILL_SWITCH_ENGAGED: Daily drawdown ({drawdown_pct*100:.2f}%) reached 3.0% threshold. "
+                f"KILL_SWITCH_ENGAGED: Daily drawdown ({drawdown_pct * 100:.2f}%) reached 3.0% threshold. "
                 "All new trading locked for 24 hours."
             )
             logger.critical(reason)

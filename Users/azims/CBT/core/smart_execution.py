@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import logging
 import math
-import random
-import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("sky.smart_execution")
@@ -25,8 +24,8 @@ class ExecutionSlice:
     target_time_offset_sec: int
     slice_qty: float
     slice_notional_usd: float
-    order_type: str                   # "LIMIT_PASSIVE", "MARKET_IOC", "TWAP_CHILD"
-    limit_price: Optional[float]
+    order_type: str  # "LIMIT_PASSIVE", "MARKET_IOC", "TWAP_CHILD"
+    limit_price: float | None
     expected_slippage_bps: float
 
 
@@ -39,21 +38,21 @@ class AlmgrenChrissTrajectory:
     risk_aversion_lambda: float
     expected_total_impact_cost_usd: float
     variance_risk_usd: float
-    schedule: List[ExecutionSlice]
+    schedule: list[ExecutionSlice]
 
 
 @dataclass
 class MarketImpactSimulation:
     symbol: str
     order_size: float
-    order_side: str                    # "BUY" or "SELL"
+    order_side: str  # "BUY" or "SELL"
     mid_price: float
     spread_bps: float
     adv_24h_usd: float
     temporary_impact_bps: float
     permanent_impact_bps: float
     total_expected_slippage_usd: float
-    adverse_selection_risk: str        # "LOW", "MODERATE", "SEVERE"
+    adverse_selection_risk: str  # "LOW", "MODERATE", "SEVERE"
 
 
 @dataclass
@@ -62,15 +61,15 @@ class SmartRouterDecision:
     order_side: str
     order_size: float
     mid_price: float
-    recommended_route: str             # "PASSIVE_LIMIT_QUEUE", "TWAP_ALGORITHMIC", "ALMGREN_CHRISS_OPTIMAL", "AGGRESSIVE_IOC_SWEEP"
+    recommended_route: str  # "PASSIVE_LIMIT_QUEUE", "TWAP_ALGORITHMIC", "ALMGREN_CHRISS_OPTIMAL", "AGGRESSIVE_IOC_SWEEP"
     estimated_effective_price: float
     expected_fees_usd: float
     expected_slippage_usd: float
     total_execution_cost_usd: float
-    execution_slices: List[ExecutionSlice]
+    execution_slices: list[ExecutionSlice]
     rationale: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -82,8 +81,8 @@ class SmartExecutionEngine:
 
     def __init__(
         self,
-        taker_fee_bps: float = 4.0,     # 0.04%
-        maker_fee_bps: float = 1.0,     # 0.01%
+        taker_fee_bps: float = 4.0,  # 0.04%
+        maker_fee_bps: float = 1.0,  # 0.01%
         adv_default_usd: float = 500_000_000.0,
     ):
         self.taker_fee_bps = taker_fee_bps
@@ -97,8 +96,8 @@ class SmartExecutionEngine:
         num_slices: int = 5,
         mid_price: float = 65000.0,
         randomize_jitter: bool = True,
-        seed: Optional[int] = 42,
-    ) -> List[ExecutionSlice]:
+        seed: int | None = 42,
+    ) -> list[ExecutionSlice]:
         """
         Generates Time-Weighted Average Price child order schedule.
         """
@@ -109,7 +108,7 @@ class SmartExecutionEngine:
         base_slice_qty = qty / num_slices
 
         rng = np.random.default_rng(seed) if randomize_jitter else None
-        slices: List[ExecutionSlice] = []
+        slices: list[ExecutionSlice] = []
 
         current_time = 0
         remaining_qty = qty
@@ -130,7 +129,9 @@ class SmartExecutionEngine:
                     slice_notional_usd=round(slice_qty * mid_price, 2),
                     order_type="TWAP_CHILD",
                     limit_price=round(mid_price, 2),
-                    expected_slippage_bps=round(0.5 + 0.2 * (slice_qty / max(1.0, base_slice_qty)), 2),
+                    expected_slippage_bps=round(
+                        0.5 + 0.2 * (slice_qty / max(1.0, base_slice_qty)), 2
+                    ),
                 )
             )
             interval_jitter = rng.uniform(-0.1, 0.1) * base_interval if rng else 0.0
@@ -144,8 +145,8 @@ class SmartExecutionEngine:
         duration_sec: int = 600,
         num_slices: int = 6,
         mid_price: float = 65000.0,
-        volume_curve: Optional[List[float]] = None,
-    ) -> List[ExecutionSlice]:
+        volume_curve: list[float] | None = None,
+    ) -> list[ExecutionSlice]:
         """
         Generates Volume-Weighted Average Price schedule matching expected intraday profile.
         """
@@ -155,10 +156,10 @@ class SmartExecutionEngine:
         if not volume_curve or len(volume_curve) != num_slices:
             # Standard U-shaped intraday volume profile approximation
             t = np.linspace(-1, 1, num_slices)
-            weights = 1.0 + 0.8 * (t ** 2)
+            weights = 1.0 + 0.8 * (t**2)
             volume_curve = list(weights / np.sum(weights))
 
-        slices: List[ExecutionSlice] = []
+        slices: list[ExecutionSlice] = []
         interval = duration_sec // num_slices
         current_time = 0
 
@@ -199,13 +200,15 @@ class SmartExecutionEngine:
         sigma_horizon_usd = (volatility_annual * math.sqrt(horizon_years)) * mid_price
 
         # Dimensionless urgency parameter xi = sqrt(lambda * sigma^2 / eta)
-        raw_xi = math.sqrt(max(1e-6, (risk_aversion_lambda * (sigma_horizon_usd ** 2)) / max(1e-6, temp_impact_eta)))
+        raw_xi = math.sqrt(
+            max(1e-6, (risk_aversion_lambda * (sigma_horizon_usd**2)) / max(1e-6, temp_impact_eta))
+        )
         xi = float(np.clip(raw_xi, 0.2, 6.0))
         half_life_sec = (math.log(2.0) / xi) * duration_sec if xi > 0 else duration_sec
 
         sinh_xi = math.sinh(xi)
         holdings = [total_qty]
-        trade_schedule: List[ExecutionSlice] = []
+        trade_schedule: list[ExecutionSlice] = []
         expected_impact_cost = 0.0
 
         for j in range(1, num_intervals + 1):
@@ -220,12 +223,18 @@ class SmartExecutionEngine:
             holdings.append(x_j)
 
             # Impact cost per slice ($): eta * (n_j / dt) * n_j + 0.5 * gamma * n_j^2
-            slice_impact_usd = (temp_impact_eta * (trade_qty / dt) + 0.5 * perm_impact_gamma * trade_qty) * mid_price * 0.001
+            slice_impact_usd = (
+                (temp_impact_eta * (trade_qty / dt) + 0.5 * perm_impact_gamma * trade_qty)
+                * mid_price
+                * 0.001
+            )
             slice_impact_usd = max(0.1, slice_impact_usd)
             expected_impact_cost += slice_impact_usd
 
             notional = trade_qty * mid_price
-            slippage_bps = (slice_impact_usd / max(1.0, notional)) * 10000.0 if notional > 0 else 0.5
+            slippage_bps = (
+                (slice_impact_usd / max(1.0, notional)) * 10000.0 if notional > 0 else 0.5
+            )
 
             trade_schedule.append(
                 ExecutionSlice(
@@ -239,7 +248,9 @@ class SmartExecutionEngine:
                 )
             )
 
-        variance_risk = 0.5 * risk_aversion_lambda * (sigma_horizon_usd ** 2) * sum((h ** 2) for h in holdings)
+        variance_risk = (
+            0.5 * risk_aversion_lambda * (sigma_horizon_usd**2) * sum((h**2) for h in holdings)
+        )
 
         return AlmgrenChrissTrajectory(
             total_qty=total_qty,
@@ -258,7 +269,7 @@ class SmartExecutionEngine:
         mid_price: float = 65000.0,
         order_side: str = "BUY",
         symbol: str = "BTC/USDT",
-        adv_usd: Optional[float] = None,
+        adv_usd: float | None = None,
         spread_bps: float = 1.5,
         volatility_annual: float = 0.65,
     ) -> MarketImpactSimulation:
@@ -307,21 +318,25 @@ class SmartExecutionEngine:
         mid_price: float = 65000.0,
         order_side: str = "BUY",
         symbol: str = "BTC/USDT",
-        urgency: str = "MEDIUM",        # "LOW", "MEDIUM", "HIGH"
+        urgency: str = "MEDIUM",  # "LOW", "MEDIUM", "HIGH"
         spread_bps: float = 1.5,
     ) -> SmartRouterDecision:
         """
         Optimal Smart Order Router selecting between Passive Limit Queue, TWAP, Almgren-Chriss, or IOC Sweep.
         """
         order_notional = order_size * mid_price
-        impact = self.simulate_market_impact(order_size, mid_price, order_side, symbol, spread_bps=spread_bps)
+        impact = self.simulate_market_impact(
+            order_size, mid_price, order_side, symbol, spread_bps=spread_bps
+        )
 
         if urgency == "HIGH" or order_notional < 5000.0:
             # Immediate aggressive sweep
             fee_usd = (self.taker_fee_bps / 10000.0) * order_notional
             slippage_usd = impact.total_expected_slippage_usd
             route = "AGGRESSIVE_IOC_SWEEP"
-            eff_price = mid_price * (1.0 + (slippage_usd / order_notional) * (1 if order_side == "BUY" else -1))
+            eff_price = mid_price * (
+                1.0 + (slippage_usd / order_notional) * (1 if order_side == "BUY" else -1)
+            )
             slices = [
                 ExecutionSlice(
                     slice_index=1,
@@ -337,11 +352,15 @@ class SmartExecutionEngine:
 
         elif order_notional > 250_000.0:
             # Large institutional order -> Almgren-Chriss optimal trajectory
-            ac_res = self.solve_almgren_chriss(order_size, duration_sec=900, num_intervals=6, mid_price=mid_price)
+            ac_res = self.solve_almgren_chriss(
+                order_size, duration_sec=900, num_intervals=6, mid_price=mid_price
+            )
             fee_usd = (self.maker_fee_bps / 10000.0) * order_notional
             slippage_usd = ac_res.expected_total_impact_cost_usd
             route = "ALMGREN_CHRISS_OPTIMAL"
-            eff_price = mid_price * (1.0 + (slippage_usd / order_notional) * (1 if order_side == "BUY" else -1))
+            eff_price = mid_price * (
+                1.0 + (slippage_usd / order_notional) * (1 if order_side == "BUY" else -1)
+            )
             slices = ac_res.schedule
             rationale = f"Institutional size (${order_notional:,.0f}): Almgren-Chriss optimal liquidation minimizing temporary impact."
 
@@ -350,7 +369,11 @@ class SmartExecutionEngine:
             fee_usd = (self.maker_fee_bps / 10000.0) * order_notional
             slippage_usd = 0.0  # Maker earns half-spread or avoids adverse sweep
             route = "PASSIVE_LIMIT_QUEUE"
-            eff_price = mid_price - (spread_bps / 20000.0 * mid_price if order_side == "BUY" else -spread_bps / 20000.0 * mid_price)
+            eff_price = mid_price - (
+                spread_bps / 20000.0 * mid_price
+                if order_side == "BUY"
+                else -spread_bps / 20000.0 * mid_price
+            )
             slices = [
                 ExecutionSlice(
                     slice_index=1,
@@ -366,11 +389,17 @@ class SmartExecutionEngine:
 
         else:
             # Standard algorithmic TWAP
-            twap_slices = self.generate_twap_schedule(order_size, duration_sec=300, num_slices=5, mid_price=mid_price)
+            twap_slices = self.generate_twap_schedule(
+                order_size, duration_sec=300, num_slices=5, mid_price=mid_price
+            )
             fee_usd = (0.5 * (self.maker_fee_bps + self.taker_fee_bps) / 10000.0) * order_notional
-            slippage_usd = sum((s.expected_slippage_bps / 10000.0) * s.slice_notional_usd for s in twap_slices)
+            slippage_usd = sum(
+                (s.expected_slippage_bps / 10000.0) * s.slice_notional_usd for s in twap_slices
+            )
             route = "TWAP_ALGORITHMIC"
-            eff_price = mid_price * (1.0 + (slippage_usd / order_notional) * (1 if order_side == "BUY" else -1))
+            eff_price = mid_price * (
+                1.0 + (slippage_usd / order_notional) * (1 if order_side == "BUY" else -1)
+            )
             slices = twap_slices
             rationale = "Medium urgency: TWAP slicing across 5 randomized sub-intervals to prevent front-running."
 

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from core.database import db_manager
 
@@ -20,7 +20,7 @@ logger = logging.getLogger("ai_quant_sentinel.execution_gateway")
 
 @dataclass
 class OrderRoute:
-    venue: str                          # "BINANCE_FUTURES", "BYBIT_V5", "HYPERLIQUID_L2", "PAPER_SIMULATOR"
+    venue: str  # "BINANCE_FUTURES", "BYBIT_V5", "HYPERLIQUID_L2", "PAPER_SIMULATOR"
     allocated_units: float
     allocated_pct: float
     expected_slippage_bps: float
@@ -37,12 +37,12 @@ class ExecutionResult:
     executed_units: float
     slippage_bps: float
     latency_ms: float
-    status: str                         # "FILLED", "PARTIALLY_FILLED", "REJECTED_LATENCY", "REJECTED_SLIPPAGE"
-    routes: List[OrderRoute]
+    status: str  # "FILLED", "PARTIALLY_FILLED", "REJECTED_LATENCY", "REJECTED_SLIPPAGE"
+    routes: list[OrderRoute]
     audit_id: str
     message: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["routes"] = [asdict(r) for r in self.routes]
         return d
@@ -55,7 +55,7 @@ class ExecutionGateway:
         self,
         max_latency_ms: float = 1500.0,
         max_slippage_bps: float = 12.0,
-        mode: str = "PAPER_TRADING",     # "PAPER_TRADING" or "LIVE_BROKER"
+        mode: str = "PAPER_TRADING",  # "PAPER_TRADING" or "LIVE_BROKER"
     ):
         self.max_latency_ms = max_latency_ms
         self.max_slippage_bps = max_slippage_bps
@@ -86,7 +86,7 @@ class ExecutionGateway:
 
         # 2. Simulated Latency & Slippage calculation
         t_end = time.perf_counter()
-        simulated_latency_ms = round((t_end - t_start) * 1000.0 + 24.5, 1) # ~25ms baseline
+        simulated_latency_ms = round((t_end - t_start) * 1000.0 + 24.5, 1)  # ~25ms baseline
         is_long = direction.upper() == "LONG"
 
         realized_slippage_bps = 2.4

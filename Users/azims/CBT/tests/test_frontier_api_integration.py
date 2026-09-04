@@ -5,6 +5,7 @@ Verifies microstructure, macro network, genetic optimization, smart execution, a
 
 import pytest
 from fastapi.testclient import TestClient
+
 from app import app
 
 

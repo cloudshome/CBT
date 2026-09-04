@@ -12,7 +12,8 @@ Enforces explicit entry, invalidation (SL), take profit (TP), and risk:reward hu
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import (
@@ -27,8 +28,8 @@ from core.sky_intelligence.types import (
     MarketRegimeState,
     MarketRegimeType,
     MultiTimeframeContext,
-    SKYSetup,
     SetupType,
+    SKYSetup,
     StructureEvent,
     StructureEventType,
     VolumeFeature,
@@ -51,29 +52,37 @@ class SetupEngine:
         symbol: str,
         timeframe: str,
         current_price: float,
-        candles: List[Dict[str, Any]],
-        structure_events: List[StructureEvent],
-        liquidity_sweeps: List[LiquiditySweep],
-        fvgs: List[FVGFeature],
-        order_blocks: List[CandidateOrderBlock],
+        candles: list[dict[str, Any]],
+        structure_events: list[StructureEvent],
+        liquidity_sweeps: list[LiquiditySweep],
+        fvgs: list[FVGFeature],
+        order_blocks: list[CandidateOrderBlock],
         displacement: DisplacementFeature,
         volume_feat: VolumeFeature,
         derivatives_state: DerivativesState,
         mtf_context: MultiTimeframeContext,
         regime_state: MarketRegimeState,
         atr: float,
-        vwap_feat: Optional[VWAPFeature] = None,
-    ) -> List[SKYSetup]:
+        vwap_feat: VWAPFeature | None = None,
+    ) -> list[SKYSetup]:
         """
         Evaluates Setups A through E against current quantifiable features.
         """
-        setups: List[SKYSetup] = []
+        setups: list[SKYSetup] = []
 
         # ----------------------------------------------------
         # SETUP A: Liquidity Sweep + MSS + Displacement
         # ----------------------------------------------------
         setup_a = self._evaluate_setup_a(
-            symbol, timeframe, current_price, liquidity_sweeps, structure_events, displacement, volume_feat, regime_state, atr
+            symbol,
+            timeframe,
+            current_price,
+            liquidity_sweeps,
+            structure_events,
+            displacement,
+            volume_feat,
+            regime_state,
+            atr,
         )
         if setup_a:
             setups.append(setup_a)
@@ -91,7 +100,15 @@ class SetupEngine:
         # SETUP C: Breakout + Volume Expansion + OI Confirmation
         # ----------------------------------------------------
         setup_c = self._evaluate_setup_c(
-            symbol, timeframe, current_price, structure_events, volume_feat, derivatives_state, displacement, regime_state, atr
+            symbol,
+            timeframe,
+            current_price,
+            structure_events,
+            volume_feat,
+            derivatives_state,
+            displacement,
+            regime_state,
+            atr,
         )
         if setup_c:
             setups.append(setup_c)
@@ -109,7 +126,15 @@ class SetupEngine:
         # SETUP E: Mean-Reversion VWAP / EMA Reclaim + Structure
         # ----------------------------------------------------
         setup_e = self._evaluate_setup_e(
-            symbol, timeframe, current_price, candles, structure_events, displacement, regime_state, atr, vwap_feat
+            symbol,
+            timeframe,
+            current_price,
+            candles,
+            structure_events,
+            displacement,
+            regime_state,
+            atr,
+            vwap_feat,
         )
         if setup_e:
             setups.append(setup_e)
@@ -121,25 +146,33 @@ class SetupEngine:
         symbol: str,
         timeframe: str,
         price: float,
-        sweeps: List[LiquiditySweep],
-        events: List[StructureEvent],
+        sweeps: list[LiquiditySweep],
+        events: list[StructureEvent],
         disp: DisplacementFeature,
         vol: VolumeFeature,
         regime: MarketRegimeState,
         atr: float,
-    ) -> Optional[SKYSetup]:
+    ) -> SKYSetup | None:
         recent_sweeps = [s for s in sweeps if s.is_valid_reclaim]
         if not recent_sweeps:
             return None
 
         latest_sweep = recent_sweeps[-1]
-        reasons: List[str] = []
+        reasons: list[str] = []
 
         is_bull_sweep = "BULLISH" in latest_sweep.meta.get("direction", "")
-        matching_mss = any(
-            (e.event_type == StructureEventType.MSS_BULLISH if is_bull_sweep else e.event_type == StructureEventType.MSS_BEARISH)
-            for e in events[-3:]
-        ) if events else False
+        matching_mss = (
+            any(
+                (
+                    e.event_type == StructureEventType.MSS_BULLISH
+                    if is_bull_sweep
+                    else e.event_type == StructureEventType.MSS_BEARISH
+                )
+                for e in events[-3:]
+            )
+            if events
+            else False
+        )
 
         direction = DecisionAction.LONG if is_bull_sweep else DecisionAction.SHORT
 
@@ -164,7 +197,9 @@ class SetupEngine:
             reasons.append("Missing confirmed Market Structure Shift (MSS)")
             is_qualified = False
         if disp.displacement_score < 60.0:
-            reasons.append(f"Displacement score ({disp.displacement_score}/100) below threshold (60.0)")
+            reasons.append(
+                f"Displacement score ({disp.displacement_score}/100) below threshold (60.0)"
+            )
             is_qualified = False
         if rr < self.min_rr:
             reasons.append(f"Risk:Reward {rr:.2f}R below minimum {self.min_rr:.2f}R")
@@ -204,24 +239,28 @@ class SetupEngine:
         symbol: str,
         timeframe: str,
         price: float,
-        fvgs: List[FVGFeature],
+        fvgs: list[FVGFeature],
         mtf: MultiTimeframeContext,
         disp: DisplacementFeature,
         regime: MarketRegimeState,
         atr: float,
-    ) -> Optional[SKYSetup]:
-        active_fvgs = [f for f in fvgs if f.status in [FVGStatus.ACTIVE, FVGStatus.PARTIALLY_FILLED]]
+    ) -> SKYSetup | None:
+        active_fvgs = [
+            f for f in fvgs if f.status in [FVGStatus.ACTIVE, FVGStatus.PARTIALLY_FILLED]
+        ]
         if not active_fvgs:
             return None
 
         latest_fvg = active_fvgs[-1]
-        reasons: List[str] = []
+        reasons: list[str] = []
 
         is_bull = latest_fvg.fvg_type == FVGType.BULLISH
         direction = DecisionAction.LONG if is_bull else DecisionAction.SHORT
 
         # Check alignment with HTF
-        htf_aligned = ("BULL" in mtf.htf_4h_trend and is_bull) or ("BEAR" in mtf.htf_4h_trend and not is_bull)
+        htf_aligned = ("BULL" in mtf.htf_4h_trend and is_bull) or (
+            "BEAR" in mtf.htf_4h_trend and not is_bull
+        )
 
         if direction == DecisionAction.LONG:
             entry = price
@@ -273,26 +312,32 @@ class SetupEngine:
         symbol: str,
         timeframe: str,
         price: float,
-        events: List[StructureEvent],
+        events: list[StructureEvent],
         vol: VolumeFeature,
         derivs: DerivativesState,
         disp: DisplacementFeature,
         regime: MarketRegimeState,
         atr: float,
-    ) -> Optional[SKYSetup]:
-        bos_events = [e for e in events if e.event_type in [StructureEventType.BOS_BULLISH, StructureEventType.BOS_BEARISH]]
+    ) -> SKYSetup | None:
+        bos_events = [
+            e
+            for e in events
+            if e.event_type in [StructureEventType.BOS_BULLISH, StructureEventType.BOS_BEARISH]
+        ]
         if not bos_events:
             return None
 
         latest_bos = bos_events[-1]
-        reasons: List[str] = []
+        reasons: list[str] = []
 
         is_bull = latest_bos.event_type == StructureEventType.BOS_BULLISH
         direction = DecisionAction.LONG if is_bull else DecisionAction.SHORT
 
         # Confirmation metrics: Volume expansion >= 1.5x and OI confirmation (LONG_EXPANSION or SHORT_EXPANSION)
         vol_confirmed = vol.relative_volume >= 1.5
-        oi_confirmed = (is_bull and derivs.price_vs_oi_state == "LONG_EXPANSION") or (not is_bull and derivs.price_vs_oi_state == "SHORT_EXPANSION")
+        oi_confirmed = (is_bull and derivs.price_vs_oi_state == "LONG_EXPANSION") or (
+            not is_bull and derivs.price_vs_oi_state == "SHORT_EXPANSION"
+        )
 
         if direction == DecisionAction.LONG:
             entry = price
@@ -314,7 +359,9 @@ class SetupEngine:
             reasons.append(f"Volume rVol ({vol.relative_volume:.2f}x) insufficient for breakout")
             is_qualified = False
         if not oi_confirmed:
-            reasons.append(f"Derivatives state '{derivs.price_vs_oi_state}' lacks aggressive expansion confirmation")
+            reasons.append(
+                f"Derivatives state '{derivs.price_vs_oi_state}' lacks aggressive expansion confirmation"
+            )
             is_qualified = False
         if rr < self.min_rr:
             reasons.append(f"Risk:Reward {rr:.2f}R below minimum {self.min_rr:.2f}R")
@@ -347,11 +394,14 @@ class SetupEngine:
         symbol: str,
         timeframe: str,
         price: float,
-        sweeps: List[LiquiditySweep],
+        sweeps: list[LiquiditySweep],
         regime: MarketRegimeState,
         atr: float,
-    ) -> Optional[SKYSetup]:
-        if regime.regime_type != MarketRegimeType.RANGING_CONSOLIDATION and not regime.is_mean_reverting:
+    ) -> SKYSetup | None:
+        if (
+            regime.regime_type != MarketRegimeType.RANGING_CONSOLIDATION
+            and not regime.is_mean_reverting
+        ):
             return None
 
         range_sweeps = [s for s in sweeps if "RANGE" in s.pool_type.value]
@@ -398,28 +448,44 @@ class SetupEngine:
         symbol: str,
         timeframe: str,
         price: float,
-        candles: List[Dict[str, Any]],
-        events: List[StructureEvent],
+        candles: list[dict[str, Any]],
+        events: list[StructureEvent],
         disp: DisplacementFeature,
         regime: MarketRegimeState,
         atr: float,
-        vwap_feat: Optional[VWAPFeature] = None,
-    ) -> Optional[SKYSetup]:
+        vwap_feat: VWAPFeature | None = None,
+    ) -> SKYSetup | None:
         if len(candles) < 20:
             return None
 
         closes = [float(c["close"]) for c in candles]
-        
+
         # Use vwap_feat if available, else calculate rolling mean
         if vwap_feat is not None and vwap_feat.vwap > 0:
             vwap_price = vwap_feat.vwap
-            is_reclaim_bull = (vwap_feat.is_reclaiming and vwap_feat.deviation_sigmas > -1.0 and closes[-2] < vwap_price) or (price > vwap_price and closes[-2] <= vwap_price and disp.displacement_score >= 60.0)
-            is_reclaim_bear = (vwap_feat.is_reclaiming and vwap_feat.deviation_sigmas < 1.0 and closes[-2] > vwap_price) or (price < vwap_price and closes[-2] >= vwap_price and disp.displacement_score >= 60.0)
+            is_reclaim_bull = (
+                vwap_feat.is_reclaiming
+                and vwap_feat.deviation_sigmas > -1.0
+                and closes[-2] < vwap_price
+            ) or (
+                price > vwap_price and closes[-2] <= vwap_price and disp.displacement_score >= 60.0
+            )
+            is_reclaim_bear = (
+                vwap_feat.is_reclaiming
+                and vwap_feat.deviation_sigmas < 1.0
+                and closes[-2] > vwap_price
+            ) or (
+                price < vwap_price and closes[-2] >= vwap_price and disp.displacement_score >= 60.0
+            )
             mean_rev_prob = vwap_feat.mean_reversion_prob
         else:
             vwap_price = float(np.mean(closes[-20:]))
-            is_reclaim_bull = price > vwap_price and closes[-2] < vwap_price and disp.displacement_score >= 65.0
-            is_reclaim_bear = price < vwap_price and closes[-2] > vwap_price and disp.displacement_score >= 65.0
+            is_reclaim_bull = (
+                price > vwap_price and closes[-2] < vwap_price and disp.displacement_score >= 65.0
+            )
+            is_reclaim_bear = (
+                price < vwap_price and closes[-2] > vwap_price and disp.displacement_score >= 65.0
+            )
             mean_rev_prob = 0.55
 
         if is_reclaim_bull:

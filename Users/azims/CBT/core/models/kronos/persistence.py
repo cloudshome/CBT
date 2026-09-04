@@ -9,7 +9,7 @@ import json
 import logging
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.database import db_manager
 from core.models.kronos.schemas import KronosForecast
@@ -60,19 +60,21 @@ def freeze_kronos_forecast(forecast: KronosForecast) -> str:
         )
         conn.commit()
 
-    logger.info(f"Frozen Kronos forecast {forecast_id} for {forecast.symbol} ({forecast.timeframe})")
+    logger.info(
+        f"Frozen Kronos forecast {forecast_id} for {forecast.symbol} ({forecast.timeframe})"
+    )
     return forecast_id
 
 
 def get_kronos_forecasts(
-    symbol: Optional[str] = None,
-    timeframe: Optional[str] = None,
+    symbol: str | None = None,
+    timeframe: str | None = None,
     limit: int = 50,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Retrieves frozen forecast history from experiment_store.db."""
     with db_manager.get_experiment_conn() as conn:
         query = "SELECT * FROM kronos_forecast_ledger"
-        params: List[Any] = []
+        params: list[Any] = []
         conditions = []
 
         if symbol:
@@ -93,7 +95,7 @@ def get_kronos_forecasts(
         return [dict(r) for r in rows]
 
 
-def verify_pending_kronos_forecasts(candles_lookup: Dict[str, List[Dict[str, Any]]]) -> int:
+def verify_pending_kronos_forecasts(candles_lookup: dict[str, list[dict[str, Any]]]) -> int:
     """
     Evaluates pending frozen Kronos forecasts against realized future candles.
     Updates directional accuracy and realized return metrics.

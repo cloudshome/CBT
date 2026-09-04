@@ -4,13 +4,11 @@ Verifies evolutionary algorithm operators, CPCV purged splits,
 Deflated Sharpe Ratio (DSR), and White's Reality Check (WRC).
 """
 
-import pytest
-import numpy as np
 from core.genetic_optimizer import (
-    GeneticStrategyOptimizer,
-    genetic_strategy_optimizer,
     GeneticOptimizationResult,
+    GeneticStrategyOptimizer,
     StrategyGenome,
+    genetic_strategy_optimizer,
 )
 
 
@@ -32,15 +30,17 @@ def test_genetic_optimizer_cpcv_splits_and_evolution():
     base_price = 50000.0
     for i in range(120):
         ret = 0.002 * (i % 5 - 2) + 0.001
-        base_price *= (1.0 + ret)
-        candles.append({
-            "timestamp": 1000 + i * 60000,
-            "open": base_price * 0.999,
-            "high": base_price * 1.002,
-            "low": base_price * 0.998,
-            "close": base_price,
-            "volume": 150.0,
-        })
+        base_price *= 1.0 + ret
+        candles.append(
+            {
+                "timestamp": 1000 + i * 60000,
+                "open": base_price * 0.999,
+                "high": base_price * 1.002,
+                "low": base_price * 0.998,
+                "close": base_price,
+                "volume": 150.0,
+            }
+        )
 
     res = optimizer.optimize(candles=candles, symbol="BTC/USDT")
 

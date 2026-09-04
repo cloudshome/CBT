@@ -5,12 +5,11 @@ Exposes real-time quantitative, memory, and operational system metrics.
 
 from __future__ import annotations
 
-import os
 import time
-from typing import Dict, Any
+
+from core.audit_bus import audit_bus
 from core.database import db_manager
 from core.portfolio_shadow import portfolio_shadow
-from core.audit_bus import audit_bus
 from core.provenance_engine import provenance_engine
 
 
@@ -44,5 +43,6 @@ def generate_prometheus_metrics() -> str:
         "",
     ]
     return "\n".join(lines)
+
 
 generate_prometheus_metrics._start_time = time.time()

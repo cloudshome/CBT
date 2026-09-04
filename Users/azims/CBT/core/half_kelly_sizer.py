@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
 
 logger = logging.getLogger("ai_quant_sentinel.half_kelly_sizer")
 
@@ -127,12 +126,14 @@ class HalfKellyPositionSizer:
 
         # Bayesian shrinkage: Shrink towards baseline (0.01) based on sample size
         # Uncertainty factor = 1 / sqrt(N)
-        uncertainty = 1.0 / (historical_sample_size ** 0.5) if historical_sample_size > 0 else 1.0
+        uncertainty = 1.0 / (historical_sample_size**0.5) if historical_sample_size > 0 else 1.0
         shrunk_kelly = half_kelly * (1.0 - 0.5 * uncertainty)
 
         # Drawdown penalty throttling: if current drawdown > 1.5%, throttle risk
         dd_factor = max(0.3, 1.0 - (current_drawdown_pct * 10.0))
-        final_risk_pct = max(0.002, min(0.025, shrunk_kelly * dd_factor))  # Cap between 0.2% and 2.5%
+        final_risk_pct = max(
+            0.002, min(0.025, shrunk_kelly * dd_factor)
+        )  # Cap between 0.2% and 2.5%
 
         # Sizing calculations
         risk_dollar_cap = account_equity * final_risk_pct

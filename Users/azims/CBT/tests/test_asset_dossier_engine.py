@@ -4,21 +4,21 @@ Tests all 8 pillars, mathematical composite scoring bounds [0, 100], and adversa
 """
 
 import time
-import pytest
-from core.institutional_flows import institutional_flows_engine
-from core.derivatives_options import derivatives_options_engine
-from core.valuation_cost_basis import valuation_cost_basis_engine
-from core.stablecoin_velocity import stablecoin_velocity_engine
-from core.seasonality_cyclical_dna import seasonality_cyclical_engine
-from core.macro_liquidity_beta import macro_liquidity_beta_engine
-from core.volatility_profile_regime import volatility_profile_engine
-from core.physical_supply_shock import physical_supply_shock_engine
-from core.composite_scorer import composite_scorer
+
 from core.asset_dossier_engine import asset_dossier_engine
+from core.composite_scorer import composite_scorer
 from core.debate_committee import debate_committee
-from core.market_state import MarketStateVector
+from core.derivatives_options import derivatives_options_engine
 from core.ev_engine import NetEVResult
+from core.institutional_flows import institutional_flows_engine
+from core.macro_liquidity_beta import macro_liquidity_beta_engine
+from core.market_state import MarketStateVector
+from core.physical_supply_shock import physical_supply_shock_engine
+from core.seasonality_cyclical_dna import seasonality_cyclical_engine
+from core.stablecoin_velocity import stablecoin_velocity_engine
 from core.uncertainty_engine import UncertaintyBudget
+from core.valuation_cost_basis import valuation_cost_basis_engine
+from core.volatility_profile_regime import volatility_profile_engine
 
 
 def test_pillar_1_institutional_flows():
@@ -126,7 +126,10 @@ def test_asset_dossier_engine_execution_speed_and_schema():
     assert dossier.symbol == "BTCUSDT"
     assert 0.0 <= dossier.composite_health_score <= 100.0
     assert len(dossier.pillar_z_scores) == 8
-    assert "confluence" in dossier.actionable_quant_verdict.lower() or "sth" in dossier.actionable_quant_verdict.lower()
+    assert (
+        "confluence" in dossier.actionable_quant_verdict.lower()
+        or "sth" in dossier.actionable_quant_verdict.lower()
+    )
 
     # Dictionary representation completeness
     d_dict = dossier.to_dict()
@@ -185,4 +188,6 @@ def test_debate_committee_dossier_ingestion():
     )
 
     assert decision.final_decision in ["LONG", "SHORT", "NO_TRADE"]
-    assert any("etf" in p.lower() or "inflow" in p.lower() for p in decision.bull_argument.core_premises)
+    assert any(
+        "etf" in p.lower() or "inflow" in p.lower() for p in decision.bull_argument.core_premises
+    )

@@ -120,7 +120,7 @@ export class BinanceMarketDataProvider implements IMarketDataProvider {
   private buildStreamUrl(cleanSymbol: string, binanceTF: string): string {
     const isGold = cleanSymbol.includes('paxg') || cleanSymbol.includes('xau');
     const streamSymbol = isGold ? 'paxgusdt' : cleanSymbol;
-    const host = isGold ? 'stream.binance.com:9443' : 'fstream.binance.com';
+    const host = 'stream.binance.com:9443';
     const streamName = `${streamSymbol}@kline_${binanceTF}/${streamSymbol}@depth20@100ms/${streamSymbol}@ticker`;
     return `wss://${host}/stream?streams=${streamName}`;
   }

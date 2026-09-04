@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, Optional
-import aiohttp
 
 logger = logging.getLogger("ai_quant_sentinel.whatsapp_bot")
 

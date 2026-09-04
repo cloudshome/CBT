@@ -8,8 +8,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.oi_funding_squeeze")
 
@@ -19,12 +17,12 @@ class OIFundingAnalysisResult:
     symbol: str
     timestamp: int
     open_interest_usd: float
-    oi_change_1h_pct: float             # Rate of OI expansion/contraction
+    oi_change_1h_pct: float  # Rate of OI expansion/contraction
     funding_rate_annualized_pct: float  # Current funding rate scaled to APR
-    funding_zscore: float               # Deviation relative to 30-day baseline
-    perpetual_basis_bps: float          # Perps vs Spot basis difference
-    squeeze_risk: str                   # "SHORT_SQUEEZE_PROBABLE", "LONG_SQUEEZE_PROBABLE", "NEUTRAL"
-    squeeze_velocity_score: float       # [0.0, 1.0] intensity
+    funding_zscore: float  # Deviation relative to 30-day baseline
+    perpetual_basis_bps: float  # Perps vs Spot basis difference
+    squeeze_risk: str  # "SHORT_SQUEEZE_PROBABLE", "LONG_SQUEEZE_PROBABLE", "NEUTRAL"
+    squeeze_velocity_score: float  # [0.0, 1.0] intensity
     narrative: str
 
 
@@ -41,7 +39,7 @@ class OIFundingSqueezeEngine:
         funding_rate_8h: float = 0.0001,  # 0.01% per 8h
         spot_price: float = 88400.0,
         perp_price: float = 88435.0,
-        timestamp_ms: Optional[int] = None,
+        timestamp_ms: int | None = None,
     ) -> OIFundingAnalysisResult:
         """
         Computes rate of change in Open Interest, funding z-score, and squeeze probability.
@@ -49,7 +47,11 @@ class OIFundingSqueezeEngine:
         now = timestamp_ms or int(time.time() * 1000)
 
         # OI rate of change
-        oi_change_pct = ((current_oi_usd - historical_oi_1h_ago) / historical_oi_1h_ago) * 100.0 if historical_oi_1h_ago > 0 else 0.0
+        oi_change_pct = (
+            ((current_oi_usd - historical_oi_1h_ago) / historical_oi_1h_ago) * 100.0
+            if historical_oi_1h_ago > 0
+            else 0.0
+        )
 
         # Annualized funding rate (3 funding intervals per day * 365 days = 1095 * rate)
         funding_annualized = funding_rate_8h * 3.0 * 365.0 * 100.0
@@ -58,7 +60,9 @@ class OIFundingSqueezeEngine:
         funding_zscore = float((funding_rate_8h - 0.0001) / 0.0002)
 
         # Basis in basis points (bps)
-        basis_bps = float(((perp_price - spot_price) / spot_price) * 10000.0) if spot_price > 0 else 0.0
+        basis_bps = (
+            float(((perp_price - spot_price) / spot_price) * 10000.0) if spot_price > 0 else 0.0
+        )
 
         # Squeeze Detection Logic
         # 1. Short Squeeze: Negative funding (zscore < -1.8) + Expanding OI (+2% 1h) + Perp Premium

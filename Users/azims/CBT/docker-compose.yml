@@ -39,6 +39,13 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - DATA_DIR=/app/data
+      # Behind the Caddy proxy → allow trusted X-Forwarded-For for rate limiting
+      - TRUST_PROXY_XFF=true
+      # Paper-trading risk gate (FastAPI) — deterministic limits
+      - MAX_PAPER_OPEN_POSITIONS=3
+      - MAX_PAPER_ACCOUNT_BALANCE=100000
+      - MAX_PAPER_RISK_PCT=0.02
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 20s
@@ -78,6 +85,8 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=file:/app/data/dev.db
+      # Behind the Caddy proxy → allow trusted X-Forwarded-For for rate limiting
+      - TRUST_PROXY_XFF=true
     depends_on:
       python-backend:
         condition: service_healthy
@@ -172,7 +181,9 @@ services:
       frontend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/health"]
+      # Probe through nginx → Python backend so the check actually verifies the
+      # full API path (SPA fallback would otherwise always answer 200 on /health).
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

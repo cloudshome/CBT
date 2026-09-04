@@ -11,17 +11,17 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from core.institutional_flows import institutional_flows_engine
-from core.derivatives_options import derivatives_options_engine
-from core.valuation_cost_basis import valuation_cost_basis_engine
-from core.stablecoin_velocity import stablecoin_velocity_engine
-from core.seasonality_cyclical_dna import seasonality_cyclical_engine
-from core.macro_liquidity_beta import macro_liquidity_beta_engine
-from core.volatility_profile_regime import volatility_profile_engine
-from core.physical_supply_shock import physical_supply_shock_engine
 from core.composite_scorer import composite_scorer
+from core.derivatives_options import derivatives_options_engine
+from core.institutional_flows import institutional_flows_engine
+from core.macro_liquidity_beta import macro_liquidity_beta_engine
+from core.physical_supply_shock import physical_supply_shock_engine
+from core.seasonality_cyclical_dna import seasonality_cyclical_engine
+from core.stablecoin_velocity import stablecoin_velocity_engine
+from core.valuation_cost_basis import valuation_cost_basis_engine
+from core.volatility_profile_regime import volatility_profile_engine
 
 logger = logging.getLogger("ai_quant_sentinel.asset_dossier_engine")
 
@@ -33,18 +33,18 @@ class UniversalAssetDossier:
     current_price: float
     composite_health_score: float
     macro_bias: str
-    pillar_1_institutional_flows: Dict[str, Any]
-    pillar_2_derivatives_options: Dict[str, Any]
-    pillar_3_valuation_cost_basis: Dict[str, Any]
-    pillar_4_stablecoin_velocity: Dict[str, Any]
-    pillar_5_seasonality_cyclical_dna: Dict[str, Any]
-    pillar_6_macro_liquidity_beta: Dict[str, Any]
-    pillar_7_volatility_profile: Dict[str, Any]
-    pillar_8_physical_supply_shock: Dict[str, Any]
-    pillar_z_scores: List[float]
+    pillar_1_institutional_flows: dict[str, Any]
+    pillar_2_derivatives_options: dict[str, Any]
+    pillar_3_valuation_cost_basis: dict[str, Any]
+    pillar_4_stablecoin_velocity: dict[str, Any]
+    pillar_5_seasonality_cyclical_dna: dict[str, Any]
+    pillar_6_macro_liquidity_beta: dict[str, Any]
+    pillar_7_volatility_profile: dict[str, Any]
+    pillar_8_physical_supply_shock: dict[str, Any]
+    pillar_z_scores: list[float]
     actionable_quant_verdict: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -55,8 +55,8 @@ class AssetDossierEngine:
         self,
         symbol: str,
         current_price: float,
-        candles_1h: Optional[List[Dict[str, Any]]] = None,
-        candles_15m: Optional[List[Dict[str, Any]]] = None,
+        candles_1h: list[dict[str, Any]] | None = None,
+        candles_15m: list[dict[str, Any]] | None = None,
     ) -> UniversalAssetDossier:
         now = int(time.time() * 1000)
         sym = symbol.upper()
@@ -89,7 +89,7 @@ class AssetDossierEngine:
         if "BTC" in sym:
             verdict = (
                 f"Confluence of STH cost basis (${p3.sth_realized_price:,.0f}), Weekly VAL (${p7.value_area_low:,.0f}), "
-                f"and active ETF absorption (+${p1.etf_net_inflow_24h_usd/1e6:.1f}M) confirms high-probability long structure "
+                f"and active ETF absorption (+${p1.etf_net_inflow_24h_usd / 1e6:.1f}M) confirms high-probability long structure "
                 f"targeting ${p2.primary_liquidation_pools['short_squeeze_target']:,.0f} short liquidation cluster."
             )
         elif "ETH" in sym:

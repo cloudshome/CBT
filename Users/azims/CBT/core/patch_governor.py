@@ -12,8 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
 from core.database import db_manager
 from core.system_evolver import ParameterAdaptationProposal, system_evolver
@@ -25,7 +24,7 @@ logger = logging.getLogger("ai_quant_sentinel.patch_governor")
 class PatchApplicationResult:
     proposal_id: str
     is_applied: bool
-    status: str                         # "APPLIED_SUCCESS", "FAILED_VALIDATION", "AWAITING_HUMAN_APPROVAL"
+    status: str  # "APPLIED_SUCCESS", "FAILED_VALIDATION", "AWAITING_HUMAN_APPROVAL"
     walk_forward_stability: float
     backtest_sharpe: float
     message: str
@@ -34,7 +33,9 @@ class PatchApplicationResult:
 class PatchGovernor:
     """Oversees parameter mutation and safe atomic hot-reloads."""
 
-    def evaluate_and_stage_patch(self, proposal: ParameterAdaptationProposal) -> PatchApplicationResult:
+    def evaluate_and_stage_patch(
+        self, proposal: ParameterAdaptationProposal
+    ) -> PatchApplicationResult:
         """
         Step 1 & 2: Runs sandbox backtest and walk-forward verification.
         """

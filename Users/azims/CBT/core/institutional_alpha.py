@@ -15,17 +15,19 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any
 
-from core.lead_lag_correlator import lead_lag_correlator, LeadSignal
-from core.cvd_absorption import cvd_absorption_engine, CVDAnalysisResult
-from core.orderbook_imbalance import orderbook_imbalance_engine, OBIAnalysisResult
-from core.oi_funding_squeeze import oi_funding_squeeze_engine, OIFundingAnalysisResult
-from core.judas_sweep_hunter import judas_sweep_hunter, JudasSweepSignal
-from core.sky_intelligence.vwap_engine import vwap_engine, VWAPFeature
-from core.fractal_harmonics import fractal_harmonics_engine, FractalHarmonicsResult
-from core.half_kelly_sizer import half_kelly_position_sizer, HalfKellySizingResult
+import numpy as np
+
+from core.cvd_absorption import cvd_absorption_engine
+from core.fractal_harmonics import fractal_harmonics_engine
+from core.half_kelly_sizer import half_kelly_position_sizer
+from core.judas_sweep_hunter import judas_sweep_hunter
+from core.lead_lag_correlator import lead_lag_correlator
+from core.oi_funding_squeeze import oi_funding_squeeze_engine
+from core.orderbook_imbalance import orderbook_imbalance_engine
+from core.sky_intelligence.vwap_engine import vwap_engine
 
 logger = logging.getLogger("ai_quant_sentinel.institutional_alpha")
 
@@ -35,17 +37,17 @@ class InstitutionalAlphaComposite:
     symbol: str
     timeframe: str
     timestamp: int
-    decision: str                      # "LONG", "SHORT", "WATCH", "NO_TRADE"
+    decision: str  # "LONG", "SHORT", "WATCH", "NO_TRADE"
     institutional_composite_score: float  # [0.0, 100.0]
-    lead_lag: Dict[str, Any]
-    cvd_absorption: Dict[str, Any]
-    orderbook_imbalance: Dict[str, Any]
-    oi_funding_squeeze: Dict[str, Any]
-    judas_sweep: Dict[str, Any]
-    vwap_multisigma: Dict[str, Any]
-    fractal_harmonics: Dict[str, Any]
-    half_kelly_sizing: Dict[str, Any]
-    execution_dossier: Dict[str, Any]
+    lead_lag: dict[str, Any]
+    cvd_absorption: dict[str, Any]
+    orderbook_imbalance: dict[str, Any]
+    oi_funding_squeeze: dict[str, Any]
+    judas_sweep: dict[str, Any]
+    vwap_multisigma: dict[str, Any]
+    fractal_harmonics: dict[str, Any]
+    half_kelly_sizing: dict[str, Any]
+    execution_dossier: dict[str, Any]
     hurdle_passed: bool
     narrative: str
 
@@ -59,14 +61,14 @@ class InstitutionalAlphaEngine:
         self,
         symbol: str = "BTC/USDT",
         timeframe: str = "15m",
-        candles: Optional[List[Dict[str, Any]]] = None,
-        orderbook: Optional[Dict[str, List[Tuple[float, float]]]] = None,
+        candles: list[dict[str, Any]] | None = None,
+        orderbook: dict[str, list[tuple[float, float]]] | None = None,
         macro_dxy: float = 104.5,
         macro_us10y: float = 4.25,
         funding_rate_8h: float = 0.0001,
         open_interest_usd: float = 2_500_000_000.0,
         account_equity: float = 10000.0,
-        timestamp_ms: Optional[int] = None,
+        timestamp_ms: int | None = None,
     ) -> InstitutionalAlphaComposite:
         """
         Runs the 8 institutional mechanics in a single deterministic, anti-repainting pipeline.
@@ -97,9 +99,19 @@ class InstitutionalAlphaEngine:
         cvd_data = cvd_res.__dict__
 
         # 3. L2 Order Book Imbalance (OBI) & VPIN
-        bids = orderbook.get("bids", []) if orderbook else [(current_price * 0.999, 1.5), (current_price * 0.998, 3.2)]
-        asks = orderbook.get("asks", []) if orderbook else [(current_price * 1.001, 1.2), (current_price * 1.002, 2.8)]
-        obi_res = orderbook_imbalance_engine.compute_imbalance(bids, asks, symbol=symbol, timestamp_ms=now)
+        bids = (
+            orderbook.get("bids", [])
+            if orderbook
+            else [(current_price * 0.999, 1.5), (current_price * 0.998, 3.2)]
+        )
+        asks = (
+            orderbook.get("asks", [])
+            if orderbook
+            else [(current_price * 1.001, 1.2), (current_price * 1.002, 2.8)]
+        )
+        obi_res = orderbook_imbalance_engine.compute_imbalance(
+            bids, asks, symbol=symbol, timestamp_ms=now
+        )
         obi_data = obi_res.__dict__
 
         # 4. Open Interest & Funding Squeeze Velocity
@@ -116,20 +128,24 @@ class InstitutionalAlphaEngine:
 
         # 5. Session Open Liquidity Sweep (Judas Swing)
         judas_res = judas_sweep_hunter.check_session_judas_sweep(symbol, candles)
-        judas_data = judas_res.__dict__ if judas_res else {
-            "symbol": symbol,
-            "session_name": "OUTSIDE_KILLZONE",
-            "timestamp": now,
-            "sweep_direction": "NONE",
-            "asian_high": 0.0,
-            "asian_low": 0.0,
-            "swept_level": 0.0,
-            "rejection_wick_pct": 0.0,
-            "confidence": 0.0,
-            "invalidation_level": 0.0,
-            "target_level": 0.0,
-            "narrative": "No active Judas liquidity sweep in session window.",
-        }
+        judas_data = (
+            judas_res.__dict__
+            if judas_res
+            else {
+                "symbol": symbol,
+                "session_name": "OUTSIDE_KILLZONE",
+                "timestamp": now,
+                "sweep_direction": "NONE",
+                "asian_high": 0.0,
+                "asian_low": 0.0,
+                "swept_level": 0.0,
+                "rejection_wick_pct": 0.0,
+                "confidence": 0.0,
+                "invalidation_level": 0.0,
+                "target_level": 0.0,
+                "narrative": "No active Judas liquidity sweep in session window.",
+            }
+        )
 
         # 6. Session-Anchored VWAP Multi-Sigma Bands
         vwap_feat = vwap_engine.compute_vwap(candles)
@@ -256,7 +272,7 @@ class InstitutionalAlphaEngine:
             narrative=narrative,
         )
 
-    def _generate_baseline_candles(self, now: int) -> List[Dict[str, Any]]:
+    def _generate_baseline_candles(self, now: int) -> list[dict[str, Any]]:
         candles = []
         p = 88000.0
         for i in range(50):
@@ -264,10 +280,12 @@ class InstitutionalAlphaEngine:
             drift = np.random.normal(10.0, 45.0)
             o = p
             h = o + abs(np.random.normal(30.0, 15.0))
-            l = o - abs(np.random.normal(30.0, 15.0))
+            lo = o - abs(np.random.normal(30.0, 15.0))
             c = o + drift
             v = max(50.0, np.random.normal(250.0, 80.0))
-            candles.append({"timestamp": t, "open": o, "high": h, "low": l, "close": c, "volume": v})
+            candles.append(
+                {"timestamp": t, "open": o, "high": h, "low": lo, "close": c, "volume": v}
+            )
             p = c
         return candles
 

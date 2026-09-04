@@ -7,8 +7,9 @@ Detects Bullish & Bearish Hidden Absorption where aggressive market orders are a
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.cvd_absorption")
@@ -19,12 +20,12 @@ class CVDAnalysisResult:
     symbol: str
     timestamp: int
     current_cvd: float
-    cvd_delta: float                    # [-1.0, 1.0] normalized velocity
+    cvd_delta: float  # [-1.0, 1.0] normalized velocity
     absorption_detected: bool
-    absorption_type: str                # "BULLISH_ABSORPTION", "BEARISH_ABSORPTION", "NONE"
-    absorption_score: float             # [0.0, 1.0] intensity
-    volume_ratio: float                 # current vol / 20-period mean
-    divergence_score: float             # [-1.0, 1.0]
+    absorption_type: str  # "BULLISH_ABSORPTION", "BEARISH_ABSORPTION", "NONE"
+    absorption_score: float  # [0.0, 1.0] intensity
+    volume_ratio: float  # current vol / 20-period mean
+    divergence_score: float  # [-1.0, 1.0]
     narrative: str
 
 
@@ -35,7 +36,7 @@ class CVDAbsorptionEngine:
 
     def analyze_orderflow(
         self,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         symbol: str = "BTC/USDT",
     ) -> CVDAnalysisResult:
         """
@@ -58,7 +59,7 @@ class CVDAbsorptionEngine:
         n = len(candles)
         closes = np.array([c["close"] for c in candles], dtype=np.float64)
         volumes = np.array([c.get("volume", 100.0) for c in candles], dtype=np.float64)
-        opens = np.array([c["open"] for c in candles], dtype=np.float64)
+        np.array([c["open"] for c in candles], dtype=np.float64)
         highs = np.array([c["high"] for c in candles], dtype=np.float64)
         lows = np.array([c["low"] for c in candles], dtype=np.float64)
 
@@ -95,8 +96,14 @@ class CVDAbsorptionEngine:
         cvd_p5_high = np.max(cvd_series[-10:-5]) if n >= 10 else cvd_series[0]
         cvd_curr_high = np.max(cvd_series[-5:])
 
-        is_bull_absorp = (price_curr_low < price_p5_low) and (cvd_curr_low >= cvd_p5_low) and (vol_ratio >= 1.5)
-        is_bear_absorp = (price_curr_high > price_p5_high) and (cvd_curr_high <= cvd_p5_high) and (vol_ratio >= 1.5)
+        is_bull_absorp = (
+            (price_curr_low < price_p5_low) and (cvd_curr_low >= cvd_p5_low) and (vol_ratio >= 1.5)
+        )
+        is_bear_absorp = (
+            (price_curr_high > price_p5_high)
+            and (cvd_curr_high <= cvd_p5_high)
+            and (vol_ratio >= 1.5)
+        )
 
         absorption_type = "NONE"
         absorption_score = 0.0

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.macro_sentinel")
@@ -26,8 +26,10 @@ class MacroVitalSnapshot:
     wti_change_pct: float
     gold_price: float
     gold_change_pct: float
-    global_risk_index: float            # [0.0, 100.0] (0 = Extreme Panic, 100 = Max Euphoria)
-    macro_regime: str                   # "RISK_ON_EXPANSION", "RISK_OFF_FLIGHT_TO_SAFETY", "DOLLAR_SQUEEZE", "NEUTRAL"
+    global_risk_index: float  # [0.0, 100.0] (0 = Extreme Panic, 100 = Max Euphoria)
+    macro_regime: (
+        str  # "RISK_ON_EXPANSION", "RISK_OFF_FLIGHT_TO_SAFETY", "DOLLAR_SQUEEZE", "NEUTRAL"
+    )
     summary_banner: str
 
 

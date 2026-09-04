@@ -12,20 +12,21 @@ import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.research_firewall")
 
 
-class DatasetPartition(str, Enum):
-    IN_SAMPLE_TRAIN = "IN_SAMPLE_TRAIN"           # Historical training data (<= 2023-12-31)
-    VALIDATION_TUNING = "VALIDATION_TUNING"       # Hyperparameter tuning (2024-01-01 -> 2024-12-31)
-    UNTOUCHED_OOS_TEST = "UNTOUCHED_OOS_TEST"     # Strictly locked OOS test data (>= 2025-01-01)
+class DatasetPartition(StrEnum):
+    IN_SAMPLE_TRAIN = "IN_SAMPLE_TRAIN"  # Historical training data (<= 2023-12-31)
+    VALIDATION_TUNING = "VALIDATION_TUNING"  # Hyperparameter tuning (2024-01-01 -> 2024-12-31)
+    UNTOUCHED_OOS_TEST = "UNTOUCHED_OOS_TEST"  # Strictly locked OOS test data (>= 2025-01-01)
 
 
 class ResearchFirewallViolation(Exception):
     """Raised when an unauthorized or repeated test set access is attempted."""
+
     pass
 
 
@@ -34,19 +35,19 @@ class ExperimentRecord:
     experiment_id: str
     hypothesis_name: str
     asset: str
-    parameters: Dict[str, Any]
-    feature_set: List[str]
+    parameters: dict[str, Any]
+    feature_set: list[str]
     is_parameters_locked: bool
     is_features_locked: bool
     oos_evaluations_count: int
     max_allowed_oos_evaluations: int
     train_sharpe: float
     validation_sharpe: float
-    oos_sharpe: Optional[float] = None
+    oos_sharpe: float | None = None
     created_at_ms: int = field(default_factory=lambda: int(time.time() * 1000))
-    locked_at_ms: Optional[int] = None
+    locked_at_ms: int | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -57,14 +58,14 @@ class ResearchFirewall:
 
     def __init__(self, max_oos_evaluations_per_hypothesis: int = 3):
         self.max_oos_evaluations = max_oos_evaluations_per_hypothesis
-        self._experiments: Dict[str, ExperimentRecord] = {}
+        self._experiments: dict[str, ExperimentRecord] = {}
 
     def register_experiment(
         self,
         hypothesis_name: str,
         asset: str,
-        parameters: Dict[str, Any],
-        feature_set: List[str],
+        parameters: dict[str, Any],
+        feature_set: list[str],
         train_sharpe: float,
         validation_sharpe: float,
     ) -> ExperimentRecord:
@@ -110,7 +111,9 @@ class ResearchFirewall:
         """
         exp = self._experiments.get(experiment_id)
         if not exp:
-            raise ResearchFirewallViolation(f"Experiment {experiment_id} does not exist in registry.")
+            raise ResearchFirewallViolation(
+                f"Experiment {experiment_id} does not exist in registry."
+            )
 
         if not (exp.is_parameters_locked and exp.is_features_locked):
             raise ResearchFirewallViolation(

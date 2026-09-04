@@ -11,8 +11,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Dict, List, Optional
-import numpy as np
+from typing import Any
 
 from core.sky_intelligence.types import VWAPFeature
 
@@ -30,8 +29,8 @@ class VWAPEngine:
 
     def compute_vwap(
         self,
-        candles: List[Dict[str, Any]],
-        anchor_index: Optional[int] = None,
+        candles: list[dict[str, Any]],
+        anchor_index: int | None = None,
     ) -> VWAPFeature:
         """
         Computes VWAP, standard deviation bands, and mean-reversion metrics.
@@ -71,21 +70,21 @@ class VWAPEngine:
 
         for c in sub_candles:
             h = float(c["high"])
-            l = float(c["low"])
+            lo = float(c["low"])
             cl = float(c["close"])
             v = max(float(c.get("volume", 1.0)), 1e-6)
-            tp = (h + l + cl) / 3.0
+            tp = (h + lo + cl) / 3.0
 
             cum_vol += v
             cum_tp_vol += tp * v
-            cum_tp_sq_vol += (tp ** 2) * v
+            cum_tp_sq_vol += (tp**2) * v
 
         if cum_vol <= 0:
             vwap = float(candles[-1]["close"])
             std_dev = 0.0
         else:
             vwap = cum_tp_vol / cum_vol
-            variance = max(0.0, (cum_tp_sq_vol / cum_vol) - (vwap ** 2))
+            variance = max(0.0, (cum_tp_sq_vol / cum_vol) - (vwap**2))
             std_dev = math.sqrt(variance)
 
         curr_price = float(candles[-1]["close"])
@@ -143,7 +142,7 @@ class VWAPEngine:
 
     def compute_anchored_vwap(
         self,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         anchor_index: int,
     ) -> float:
         """
@@ -152,16 +151,16 @@ class VWAPEngine:
         if not candles or anchor_index >= len(candles):
             return 0.0
 
-        sub = candles[max(0, anchor_index):]
+        sub = candles[max(0, anchor_index) :]
         cum_vol = 0.0
         cum_tp_vol = 0.0
 
         for c in sub:
             h = float(c["high"])
-            l = float(c["low"])
+            lo = float(c["low"])
             cl = float(c["close"])
             v = max(float(c.get("volume", 1.0)), 1e-6)
-            tp = (h + l + cl) / 3.0
+            tp = (h + lo + cl) / 3.0
             cum_vol += v
             cum_tp_vol += tp * v
 

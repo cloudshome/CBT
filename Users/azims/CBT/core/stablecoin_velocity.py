@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.stablecoin_velocity")
 
@@ -25,7 +25,7 @@ class StablecoinVelocitySnapshot:
     dry_powder_liquidity_state: str
     z_score: float  # Standardized [-3.0, +3.0]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -44,6 +44,7 @@ class StablecoinVelocityEngine:
 
     def analyze(self, symbol: str, current_price: float) -> StablecoinVelocitySnapshot:
         import time
+
         sym = symbol.upper()
         now = int(time.time() * 1000)
 

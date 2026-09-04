@@ -3,12 +3,13 @@ Unit tests for Audit Bus, Macro Gold Engine, and Automated Post-Trade Autopsy Pi
 """
 
 import datetime
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import app
 from core.audit_bus import AuditBus, audit_bus
-from core.macro_gold_engine import GoldMacroRegime, MacroGoldEngine, macro_gold_engine
+from core.macro_gold_engine import GoldMacroRegime, MacroGoldEngine
 from core.portfolio_shadow import portfolio_shadow
 
 
@@ -39,7 +40,7 @@ def test_audit_bus_event_emission_and_retrieval():
 def test_macro_gold_engine_telemetry():
     engine = MacroGoldEngine()
     # Test during London AM Fix (10:30 UTC)
-    dt_london_am = datetime.datetime(2026, 8, 29, 10, 30, tzinfo=datetime.timezone.utc)
+    dt_london_am = datetime.datetime(2026, 8, 29, 10, 30, tzinfo=datetime.UTC)
     telem = engine.evaluate_macro_state(
         gold_price=2650.0,
         paxg_price=2652.5,
@@ -88,7 +89,6 @@ def test_portfolio_shadow_loss_autopsy_integration():
         take_profit=68000.0,
     )
     assert pos_id.startswith("POS_")
-
 
     # 2. Close position at a loss
     closed = portfolio_shadow.close_position(pos_id, exit_price=63800.0)

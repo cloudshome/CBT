@@ -541,7 +541,7 @@ institutionalRouter.get('/dynamic-hedge', async (req: Request, res: Response): P
 institutionalRouter.get('/dossier', async (req: Request, res: Response): Promise<void> => {
   try {
     const symbol = ((req.query.symbol as string) || 'BTCUSDT').toUpperCase();
-    const timeframe = (req.query.timeframe as any) || '15m';
+    const timeframe = (req.query.timeframe as string) || '15m';
 
     const marketData = await fetchCandlesWithFallback(symbol, timeframe, 100);
     const candles = parseAndNormalizeCandles(marketData.candles);

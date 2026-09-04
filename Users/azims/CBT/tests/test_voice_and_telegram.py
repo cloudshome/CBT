@@ -4,14 +4,14 @@ and Continuous Empirical Accumulator.
 """
 
 import base64
+
 import pytest
-from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app import app
-from core.voice_interface import voice_interface
-from core.telegram_bot import telegram_bot
 from core.empirical_accumulator import empirical_accumulator
+from core.telegram_bot import telegram_bot
+from core.voice_interface import voice_interface
 
 
 @pytest.fixture
@@ -22,6 +22,7 @@ def client():
 # ==============================================================================
 # PHASE 16: VOICE INTERFACE TESTS
 # ==============================================================================
+
 
 @pytest.mark.asyncio
 async def test_voice_interface_transcription_bytes():
@@ -41,7 +42,9 @@ async def test_voice_interface_speech_synthesis(tmp_path):
 
 def test_api_voice_transcribe_endpoint(client):
     audio_base64 = base64.b64encode(b"RIFFdummydata").decode("utf-8")
-    resp = client.post("/api/voice/transcribe", json={"audio_base64": audio_base64, "filename": "memo.webm"})
+    resp = client.post(
+        "/api/voice/transcribe", json={"audio_base64": audio_base64, "filename": "memo.webm"}
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert "transcript" in data
@@ -51,7 +54,10 @@ def test_api_voice_transcribe_endpoint(client):
 
 def test_api_voice_synthesize_endpoint(client, tmp_path):
     voice_interface.audio_dir = tmp_path
-    resp = client.post("/api/voice/synthesize", json={"text": "Market briefing for BTC", "filename": "test_brief.mp3"})
+    resp = client.post(
+        "/api/voice/synthesize",
+        json={"text": "Market briefing for BTC", "filename": "test_brief.mp3"},
+    )
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "audio/mpeg"
 
@@ -59,6 +65,7 @@ def test_api_voice_synthesize_endpoint(client, tmp_path):
 # ==============================================================================
 # PHASE 17: TELEGRAM BOT TESTS
 # ==============================================================================
+
 
 @pytest.mark.asyncio
 async def test_telegram_bot_local_logging(monkeypatch):
@@ -74,8 +81,7 @@ async def test_telegram_position_alert(monkeypatch):
     monkeypatch.setattr(telegram_bot, "bot_token", "")
     monkeypatch.setattr(telegram_bot, "chat_id", "")
     alert_sent = await telegram_bot.send_position_alert(
-        "TAKE_PROFIT_TRIGGERED",
-        {"symbol": "BTC/USDT", "price": 89500.0, "pnl_usd": 1420.50}
+        "TAKE_PROFIT_TRIGGERED", {"symbol": "BTC/USDT", "price": 89500.0, "pnl_usd": 1420.50}
     )
     assert alert_sent is False  # Safe offline fallback
 
@@ -107,12 +113,7 @@ async def test_telegram_intelligence_generators():
 
 @pytest.mark.asyncio
 async def test_telegram_webhook_command_routing():
-    update = {
-        "message": {
-            "text": "/status",
-            "chat": {"id": 12345678}
-        }
-    }
+    update = {"message": {"text": "/status", "chat": {"id": 12345678}}}
     res = await telegram_bot.handle_webhook_update(update)
     assert res["status"] == "EXECUTED"
     assert res["command"] == "/status"
@@ -121,12 +122,7 @@ async def test_telegram_webhook_command_routing():
 
 @pytest.mark.asyncio
 async def test_telegram_signal_command_routing():
-    update = {
-        "message": {
-            "text": "/signal BTC",
-            "chat": {"id": 12345678}
-        }
-    }
+    update = {"message": {"text": "/signal BTC", "chat": {"id": 12345678}}}
     res = await telegram_bot.handle_webhook_update(update)
     assert res["status"] == "EXECUTED"
     assert "QUANTITATIVE TRADE SIGNAL" in res["response"]
@@ -172,16 +168,16 @@ async def test_desk_state_mind_paper_execution():
 @pytest.mark.asyncio
 async def test_telegram_debate_and_conversational_routing():
     # 1. Debate Council
-    debate_res = await telegram_bot.handle_webhook_update({
-        "message": {"text": "/debate BTC", "chat": {"id": 12345678}}
-    })
+    debate_res = await telegram_bot.handle_webhook_update(
+        {"message": {"text": "/debate BTC", "chat": {"id": 12345678}}}
+    )
     assert debate_res["status"] == "EXECUTED"
     assert "ADVERSARIAL DEBATE COUNCIL" in debate_res["response"]
 
     # 2. Conversational Natural Language Query (non-slash)
-    chat_res = await telegram_bot.handle_webhook_update({
-        "message": {"text": "What is our current market risk?", "chat": {"id": 12345678}}
-    })
+    chat_res = await telegram_bot.handle_webhook_update(
+        {"message": {"text": "What is our current market risk?", "chat": {"id": 12345678}}}
+    )
     assert chat_res["status"] == "AI_CONVERSATION_EXECUTED"
     assert len(chat_res["response"]) > 0
 
@@ -206,9 +202,13 @@ def test_api_telegram_broadcast_endpoint(client):
 
 
 @pytest.mark.asyncio
-async def test_smart_brain_notification_engine():
+async def test_smart_brain_notification_engine(monkeypatch):
     from core.telegram_bot import telegram_bot
+
     notifier = telegram_bot.smart_notifier
+    # Deterministic offline mode: no credentials, no network
+    monkeypatch.setattr(telegram_bot, "bot_token", "")
+    monkeypatch.setattr(telegram_bot, "chat_id", "")
 
     # 1. Deduplication suppression check
     test_headline = "Whale accumulation reaches multi-year peak"
@@ -222,25 +222,48 @@ async def test_smart_brain_notification_engine():
     # FOMC is >1000m away, so no new milestone should be added
     assert notifier._notified_milestones == initial_milestones
 
-    # 3. Position alerts format correctly
-    assert await telegram_bot.send_position_alert("BREAKEVEN_TRIGGERED", {"symbol": "BTC/USDT", "price": 89500.0})
-    assert await telegram_bot.send_position_alert("TAKE_PROFIT_HIT", {"symbol": "BTC/USDT", "price": 91000.0, "pnl_usd": 150.0})
-
-
+    # 3. Position alerts are built and dispatched; without credentials they fall
+    #    back to local logging (False = not delivered to Telegram, no network)
+    assert (
+        await telegram_bot.send_position_alert(
+            "BREAKEVEN_TRIGGERED", {"symbol": "BTC/USDT", "price": 89500.0}
+        )
+        is False
+    )
+    assert (
+        await telegram_bot.send_position_alert(
+            "TAKE_PROFIT_HIT", {"symbol": "BTC/USDT", "price": 91000.0, "pnl_usd": 150.0}
+        )
+        is False
+    )
 
 
 # ==============================================================================
 # EMPIRICAL ACCUMULATOR TESTS
 # ==============================================================================
 
+
 def test_empirical_accumulator_store_and_retrieve(tmp_path):
     db_file = tmp_path / "test_experiments.db"
     acc = type(empirical_accumulator)(db_path=db_file, target_samples=5)
-    
+
     # Store test samples
-    acc.store_sample("BTC/USDT", "15m", "TRENDING_BULL", "SETUP_A_SWEEP_MSS", 2.5, 88000, 89500, 1000, 2000, 1500)
-    acc.store_sample("BTC/USDT", "15m", "TRENDING_BULL", "SETUP_A_SWEEP_MSS", -1.0, 88000, 87500, 2000, 3000, -500)
-    
+    acc.store_sample(
+        "BTC/USDT", "15m", "TRENDING_BULL", "SETUP_A_SWEEP_MSS", 2.5, 88000, 89500, 1000, 2000, 1500
+    )
+    acc.store_sample(
+        "BTC/USDT",
+        "15m",
+        "TRENDING_BULL",
+        "SETUP_A_SWEEP_MSS",
+        -1.0,
+        88000,
+        87500,
+        2000,
+        3000,
+        -500,
+    )
+
     samples = acc.get_samples_for_regime("TRENDING_BULL", "SETUP_A_SWEEP_MSS")
     assert len(samples) == 2
     assert samples == [2.5, -1.0]

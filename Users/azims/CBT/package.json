@@ -1,6 +1,6 @@
 {
   "name": "ctb-terminal",
-  "version": "0.1.0",
+  "version": "3.0.0",
   "description": "Crypto Brain Terminal quantitative paper trading & desk platform",
   "main": "dist/server.js",
   "scripts": {

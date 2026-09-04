@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.strategy_selection_guard")
@@ -18,16 +19,16 @@ logger = logging.getLogger("ai_quant_sentinel.strategy_selection_guard")
 @dataclass
 class SelectionGuardReport:
     strategy_id: str
-    total_trials_tested: int            # N total mutation combinations
+    total_trials_tested: int  # N total mutation combinations
     observed_sharpe: float
-    expected_max_null_sharpe: float     # SR* threshold expected purely by luck
-    deflated_sharpe_ratio: float        # DSR in [0.0, 1.0] (P-value equivalent)
+    expected_max_null_sharpe: float  # SR* threshold expected purely by luck
+    deflated_sharpe_ratio: float  # DSR in [0.0, 1.0] (P-value equivalent)
     p_value: float
     is_statistically_significant: bool  # True if DSR >= 0.95 (p <= 0.05)
-    verdict: str                        # "PROMOTION_AUTHORIZED" vs "SELECTION_BIAS_REJECTED"
+    verdict: str  # "PROMOTION_AUTHORIZED" vs "SELECTION_BIAS_REJECTED"
     rationale: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -47,9 +48,9 @@ class StrategySelectionGuard:
     def evaluate_strategy(
         self,
         strategy_id: str,
-        observed_returns: List[float],
+        observed_returns: list[float],
         annualized_sharpe: float,
-        trials_count: Optional[int] = None,
+        trials_count: int | None = None,
     ) -> SelectionGuardReport:
         """
         Computes the Deflated Sharpe Ratio (DSR) accounting for multiple testing.
@@ -58,7 +59,11 @@ class StrategySelectionGuard:
         N = max(1, N)
 
         T = max(30, len(observed_returns))
-        returns_arr = np.array(observed_returns) if len(observed_returns) >= 30 else np.random.normal(0.0005, 0.01, 100)
+        returns_arr = (
+            np.array(observed_returns)
+            if len(observed_returns) >= 30
+            else np.random.normal(0.0005, 0.01, 100)
+        )
 
         # Higher statistical moments: Skewness & Kurtosis
         mean = float(np.mean(returns_arr))
@@ -73,12 +78,18 @@ class StrategySelectionGuard:
         euler_mascheroni = 0.5772156649
         if N > 1:
             z_term = math.sqrt(2.0 * math.log(N))
-            expected_max_sr = (1.0 - euler_mascheroni / z_term + (math.pi**2 / 12.0) / (2.0 * math.log(N))) * z_term * 0.40
+            expected_max_sr = (
+                (1.0 - euler_mascheroni / z_term + (math.pi**2 / 12.0) / (2.0 * math.log(N)))
+                * z_term
+                * 0.40
+            )
         else:
             expected_max_sr = 0.0
 
         # Variance of Sharpe Estimator with non-normal skewness & kurtosis
-        sr_var = (1.0 - skewness * annualized_sharpe + ((kurtosis - 1.0) / 4.0) * (annualized_sharpe**2)) / float(T)
+        sr_var = (
+            1.0 - skewness * annualized_sharpe + ((kurtosis - 1.0) / 4.0) * (annualized_sharpe**2)
+        ) / float(T)
         sr_std = math.sqrt(max(1e-6, sr_var))
 
         # Test statistic Z = (SR - SR*) / std(SR)

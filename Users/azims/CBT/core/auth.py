@@ -9,11 +9,14 @@ When API_KEY env var is not set, all requests pass through (backward compatible)
 When API_KEY is set, sensitive endpoints require a matching key.
 """
 
-import os
 import hmac
-from fastapi import Request, HTTPException, Depends
+import os
+
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import APIKeyHeader
 
+# Read once at import so tests can monkeypatch `core.auth.API_KEY` and services
+# resolve the key from the environment before process start.
 API_KEY = os.getenv("API_KEY", "")
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -53,7 +56,9 @@ async def require_api_key(
         if env == "production":
             raise HTTPException(
                 status_code=500,
-                detail={"error": "Production Security Misconfiguration: API_KEY must be configured in production."},
+                detail={
+                    "error": "Production Security Misconfiguration: API_KEY must be configured in production."
+                },
             )
         return  # No key configured in dev/test — backward compatible passthrough
 

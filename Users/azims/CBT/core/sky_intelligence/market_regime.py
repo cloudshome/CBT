@@ -7,7 +7,8 @@ TRENDING_BULL, TRENDING_BEAR, RANGING_CONSOLIDATION, VOLATILE_EXPANSION, COMPRES
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import (
@@ -27,7 +28,7 @@ class MarketRegimeEngine:
 
     def classify_regime(
         self,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         volatility_state: VolatilityState,
     ) -> MarketRegimeState:
         """
@@ -76,13 +77,15 @@ class MarketRegimeEngine:
         bb_std = float(np.std(closes[-20:]))
         bb_width_pct = (2.0 * bb_std) / max(sma20, 1.0)
 
-        chars: List[str] = []
+        chars: list[str] = []
 
         # Decision Tree logic grounded in quantifiable metrics
         if volatility_state.regime == VolatilityRegime.EXTREME_VOLATILITY:
             regime = MarketRegimeType.VOLATILE_EXPANSION
             confidence = 0.85
-            chars.append(f"Extreme Volatility (ATR Percentile {volatility_state.atr_percentile * 100:.1f}%)")
+            chars.append(
+                f"Extreme Volatility (ATR Percentile {volatility_state.atr_percentile * 100:.1f}%)"
+            )
             is_mean_rev = False
 
         elif bb_width_pct <= 0.008 and volatility_state.regime == VolatilityRegime.LOW_VOLATILITY:
@@ -106,7 +109,9 @@ class MarketRegimeEngine:
         elif abs(curr_price - sma20) / sma20 > 0.025:
             regime = MarketRegimeType.MEAN_REVERTING
             confidence = 0.72
-            chars.append(f"Extended Deviation from Mean ({((curr_price - sma20)/sma20)*100:+.2f}%)")
+            chars.append(
+                f"Extended Deviation from Mean ({((curr_price - sma20) / sma20) * 100:+.2f}%)"
+            )
             is_mean_rev = True
 
         else:

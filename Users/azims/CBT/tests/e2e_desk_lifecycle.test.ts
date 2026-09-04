@@ -1,4 +1,4 @@
-﻿import request from 'supertest';
+import request from 'supertest';
 import { app } from '../src/server';
 import { prisma } from '../src/db/prisma';
 import { defaultRateLimiter } from '../src/middleware/rateLimit';
@@ -53,7 +53,7 @@ describe('E2E Desk Order Lifecycle Integration Test (Task K-UI.4)', () => {
     const openTradesRes = await request(app).get('/api/paper/positions');
     expect(openTradesRes.status).toBe(200);
     expect(openTradesRes.body.count).toBe(1);
-    expect(openTradesRes.body.positions.some((p: any) => p.id === tradeId)).toBe(true);
+    expect(openTradesRes.body.positions.some((p: { id: number }) => p.id === tradeId)).toBe(true);
 
     // 3. Trigger market tick reconciliation at target price ($68,500 hits take-profit)
     const reconcileRes = await request(app)

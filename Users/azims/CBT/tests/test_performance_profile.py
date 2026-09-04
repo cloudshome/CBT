@@ -2,7 +2,6 @@
 Unit tests for the Performance & Memory Profiler tool.
 """
 
-import pytest
 from deploy.performance_profile import run_latency_and_memory_profile
 
 

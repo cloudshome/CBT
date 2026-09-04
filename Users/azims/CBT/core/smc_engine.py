@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
-import numpy as np
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.smc_engine")
 
 
-class SMCPatternType(str, Enum):
+class SMCPatternType(StrEnum):
     BULLISH_FVG = "BULLISH_FVG"
     BEARISH_FVG = "BEARISH_FVG"
     BULLISH_OB = "BULLISH_OB"
@@ -36,11 +35,11 @@ class SMCPattern:
     bottom_price: float
     mid_price: float
     invalidation_level: float
-    strength: float                      # [0.0, 1.0]
-    conditional_expectancy_r: float      # E[R | Pattern, Regime, Asset]
+    strength: float  # [0.0, 1.0]
+    conditional_expectancy_r: float  # E[R | Pattern, Regime, Asset]
     is_favorable: bool
-    status: str                          # "ACTIVE", "MITIGATED", "INVALIDATED"
-    meta: Dict[str, Any] = field(default_factory=dict)
+    status: str  # "ACTIVE", "MITIGATED", "INVALIDATED"
+    meta: dict[str, Any] = field(default_factory=dict)
 
 
 class SMCEngine:
@@ -50,27 +49,22 @@ class SMCEngine:
 
     def __init__(self):
         # Historical empirical baseline expectancy tables: (Pattern, Regime) -> mean R-multiple
-        self._expectancy_table: Dict[Tuple[str, str], float] = {
+        self._expectancy_table: dict[tuple[str, str], float] = {
             (SMCPatternType.BULLISH_FVG.value, "TRENDING_BULL"): 1.42,
             (SMCPatternType.BULLISH_FVG.value, "RANGING_CONSOLIDATION"): 0.85,
             (SMCPatternType.BULLISH_FVG.value, "TRENDING_BEAR"): -0.35,
-
             (SMCPatternType.BEARISH_FVG.value, "TRENDING_BEAR"): 1.48,
             (SMCPatternType.BEARISH_FVG.value, "RANGING_CONSOLIDATION"): 0.78,
             (SMCPatternType.BEARISH_FVG.value, "TRENDING_BULL"): -0.40,
-
             (SMCPatternType.BULLISH_OB.value, "TRENDING_BULL"): 1.65,
             (SMCPatternType.BULLISH_OB.value, "RANGING_CONSOLIDATION"): 0.95,
             (SMCPatternType.BULLISH_OB.value, "TRENDING_BEAR"): -0.50,
-
             (SMCPatternType.BEARISH_OB.value, "TRENDING_BEAR"): 1.70,
             (SMCPatternType.BEARISH_OB.value, "RANGING_CONSOLIDATION"): 0.90,
             (SMCPatternType.BEARISH_OB.value, "TRENDING_BULL"): -0.55,
-
             (SMCPatternType.BULLISH_SWEEP.value, "RANGING_CONSOLIDATION"): 1.85,
             (SMCPatternType.BULLISH_SWEEP.value, "TRENDING_BULL"): 1.30,
             (SMCPatternType.BULLISH_SWEEP.value, "TRENDING_BEAR"): 0.20,
-
             (SMCPatternType.BEARISH_SWEEP.value, "RANGING_CONSOLIDATION"): 1.90,
             (SMCPatternType.BEARISH_SWEEP.value, "TRENDING_BEAR"): 1.35,
             (SMCPatternType.BEARISH_SWEEP.value, "TRENDING_BULL"): 0.15,
@@ -80,16 +74,16 @@ class SMCEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         current_regime: str = "TRENDING_BULL",
-    ) -> List[SMCPattern]:
+    ) -> list[SMCPattern]:
         """
         Scans a candlestick series for valid SMC patterns and attaches empirical expectancy.
         """
         if len(candles) < 5:
             return []
 
-        patterns: List[SMCPattern] = []
+        patterns: list[SMCPattern] = []
         patterns.extend(self._scan_fvgs(symbol, timeframe, candles, current_regime))
         patterns.extend(self._scan_order_blocks(symbol, timeframe, candles, current_regime))
         patterns.extend(self._scan_liquidity_sweeps(symbol, timeframe, candles, current_regime))
@@ -103,9 +97,9 @@ class SMCEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         regime: str,
-    ) -> List[SMCPattern]:
+    ) -> list[SMCPattern]:
         fvgs = []
         for i in range(2, len(candles)):
             c_prev2 = candles[i - 2]
@@ -127,7 +121,9 @@ class SMCEngine:
                             bottom_price=round(c_prev2["high"], 2),
                             mid_price=round((c_curr["low"] + c_prev2["high"]) / 2.0, 2),
                             invalidation_level=round(c_prev2["high"], 2),
-                            strength=round(min(1.0, gap_size / (c_mid["high"] - c_mid["low"] + 1e-5)), 2),
+                            strength=round(
+                                min(1.0, gap_size / (c_mid["high"] - c_mid["low"] + 1e-5)), 2
+                            ),
                             conditional_expectancy_r=round(exp_r, 2),
                             is_favorable=exp_r > 0.50,
                             status="ACTIVE",
@@ -150,7 +146,9 @@ class SMCEngine:
                             bottom_price=round(c_curr["high"], 2),
                             mid_price=round((c_prev2["low"] + c_curr["high"]) / 2.0, 2),
                             invalidation_level=round(c_prev2["low"], 2),
-                            strength=round(min(1.0, gap_size / (c_mid["high"] - c_mid["low"] + 1e-5)), 2),
+                            strength=round(
+                                min(1.0, gap_size / (c_mid["high"] - c_mid["low"] + 1e-5)), 2
+                            ),
                             conditional_expectancy_r=round(exp_r, 2),
                             is_favorable=exp_r > 0.50,
                             status="ACTIVE",
@@ -164,9 +162,9 @@ class SMCEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         regime: str,
-    ) -> List[SMCPattern]:
+    ) -> list[SMCPattern]:
         obs = []
         for i in range(3, len(candles)):
             ob_candle = candles[i - 2]
@@ -175,7 +173,9 @@ class SMCEngine:
 
             # Bullish OB: Down candle followed by 2 strong bullish candles breaking local high
             is_down = ob_candle["close"] < ob_candle["open"]
-            impulse_up = (impulse1["close"] > impulse1["open"]) and (impulse2["close"] > impulse2["open"])
+            impulse_up = (impulse1["close"] > impulse1["open"]) and (
+                impulse2["close"] > impulse2["open"]
+            )
             break_high = impulse2["close"] > ob_candle["high"]
 
             if is_down and impulse_up and break_high:
@@ -200,7 +200,9 @@ class SMCEngine:
 
             # Bearish OB: Up candle followed by 2 strong bearish candles breaking local low
             is_up = ob_candle["close"] > ob_candle["open"]
-            impulse_down = (impulse1["close"] < impulse1["open"]) and (impulse2["close"] < impulse2["open"])
+            impulse_down = (impulse1["close"] < impulse1["open"]) and (
+                impulse2["close"] < impulse2["open"]
+            )
             break_low = impulse2["close"] < ob_candle["low"]
 
             if is_up and impulse_down and break_low:
@@ -229,9 +231,9 @@ class SMCEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         regime: str,
-    ) -> List[SMCPattern]:
+    ) -> list[SMCPattern]:
         sweeps = []
         if len(candles) < 20:
             return sweeps

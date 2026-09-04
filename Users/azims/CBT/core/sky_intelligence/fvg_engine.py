@@ -7,7 +7,8 @@ fill percentages, and regime-conditional empirical expectancy tracking.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import FVGFeature, FVGStatus, FVGType
@@ -23,7 +24,7 @@ class FairValueGapEngine:
     def __init__(self, min_size_atr_ratio: float = 0.20):
         self.min_size_atr_ratio = min_size_atr_ratio
         # Historical baseline expectancy table: (FVG_Type, Regime) -> Mean R
-        self._regime_expectancy_table: Dict[Tuple[str, str], float] = {
+        self._regime_expectancy_table: dict[tuple[str, str], float] = {
             ("BULLISH", "TRENDING_BULL"): 1.42,
             ("BULLISH", "RANGING_CONSOLIDATION"): 0.85,
             ("BULLISH", "TRENDING_BEAR"): -0.35,
@@ -36,10 +37,10 @@ class FairValueGapEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         current_regime: str = "TRENDING_BULL",
-        atr: Optional[float] = None,
-    ) -> List[FVGFeature]:
+        atr: float | None = None,
+    ) -> list[FVGFeature]:
         """
         Detects Fair Value Gaps across the candlestick series and updates mitigation state based on subsequent price action.
         """
@@ -55,14 +56,18 @@ class FairValueGapEngine:
                 )
                 for i in range(1, len(candles))
             ]
-            atr = float(np.mean(tr_list[-14:])) if len(tr_list) >= 14 else (candles[-1]["close"] * 0.01)
+            atr = (
+                float(np.mean(tr_list[-14:]))
+                if len(tr_list) >= 14
+                else (candles[-1]["close"] * 0.01)
+            )
 
-        fvgs: List[FVGFeature] = []
+        fvgs: list[FVGFeature] = []
 
         # Iterate 3-bar rolling window
         for i in range(2, len(candles)):
             c_prev2 = candles[i - 2]
-            c_mid = candles[i - 1]
+            candles[i - 1]
             c_curr = candles[i]
 
             prev2_high = float(c_prev2["high"])
@@ -130,7 +135,9 @@ class FairValueGapEngine:
 
         return fvgs
 
-    def _evaluate_fvg_evolution(self, fvg: FVGFeature, future_candles: List[Dict[str, Any]]) -> None:
+    def _evaluate_fvg_evolution(
+        self, fvg: FVGFeature, future_candles: list[dict[str, Any]]
+    ) -> None:
         """
         Simulates post-creation price action to determine fill %, mitigation, and reaction strength without lookahead leak.
         """
@@ -152,7 +159,11 @@ class FairValueGapEngine:
                         penetration = fvg.top_price - low_p
                         fill_pct = penetration / (fvg.gap_size if fvg.gap_size > 0 else 1.0)
                         fvg.fill_percentage = max(fvg.fill_percentage, min(1.0, fill_pct))
-                        fvg.status = FVGStatus.PARTIALLY_FILLED if fvg.fill_percentage < 0.5 else FVGStatus.MITIGATED
+                        fvg.status = (
+                            FVGStatus.PARTIALLY_FILLED
+                            if fvg.fill_percentage < 0.5
+                            else FVGStatus.MITIGATED
+                        )
 
             elif fvg.fvg_type == FVGType.BEARISH:
                 # Price retraces upward into gap
@@ -165,7 +176,11 @@ class FairValueGapEngine:
                         penetration = high_p - fvg.bottom_price
                         fill_pct = penetration / (fvg.gap_size if fvg.gap_size > 0 else 1.0)
                         fvg.fill_percentage = max(fvg.fill_percentage, min(1.0, fill_pct))
-                        fvg.status = FVGStatus.PARTIALLY_FILLED if fvg.fill_percentage < 0.5 else FVGStatus.MITIGATED
+                        fvg.status = (
+                            FVGStatus.PARTIALLY_FILLED
+                            if fvg.fill_percentage < 0.5
+                            else FVGStatus.MITIGATED
+                        )
 
 
 # Global singleton instance

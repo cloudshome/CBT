@@ -2,7 +2,6 @@
 Unit tests for the Strategy Competition League Evaluator script.
 """
 
-import pytest
 from scripts.evaluate_strategy_league import run_strategy_league_evaluation
 
 

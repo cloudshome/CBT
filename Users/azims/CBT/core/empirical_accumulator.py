@@ -7,17 +7,16 @@ significance thresholds (N >= 100 trades per regime) are empirically satisfied.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import sqlite3
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import ClassVar
 
 from core.data_streamer import data_streamer
-from core.sky_intelligence.expectancy_engine import expectancy_engine
 from core.regime_transition import regime_transition_detector
 from core.sandbox_lab import sandbox_lab
+from core.sky_intelligence.expectancy_engine import expectancy_engine
 
 logger = logging.getLogger("ai_quant_sentinel.empirical_accumulator")
 
@@ -37,22 +36,22 @@ class RegimeValidationStatus:
 class EmpiricalAccumulatorReport:
     total_samples_collected: int
     validation_target_per_regime: int
-    regimes: Dict[str, RegimeValidationStatus]
+    regimes: dict[str, RegimeValidationStatus]
     last_run_timestamp: int
-    active_symbols: List[str]
+    active_symbols: list[str]
 
 
 class EmpiricalAccumulator:
     """Manages continuous statistical evidence accumulation for institutional strategies."""
 
-    SUPPORTED_REGIMES = [
+    SUPPORTED_REGIMES: ClassVar[list[str]] = [
         "TRENDING_BULL",
         "TRENDING_BEAR",
         "RANGING_COMPRESSION",
         "HIGH_VOLATILITY_EXPANSION",
     ]
 
-    def __init__(self, db_path: Optional[Path] = None, target_samples: int = 100):
+    def __init__(self, db_path: Path | None = None, target_samples: int = 100):
         self.db_path = db_path or Path("data/db/experiments.db")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.target_samples = target_samples
@@ -77,7 +76,9 @@ class EmpiricalAccumulator:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_regime_concept ON empirical_samples(regime, concept)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_regime_concept ON empirical_samples(regime, concept)"
+            )
             conn.commit()
 
     def store_sample(
@@ -101,11 +102,24 @@ class EmpiricalAccumulator:
                 (symbol, timeframe, regime, concept, r_multiple, entry_price, exit_price, entry_time, exit_time, pnl_usd)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (symbol, timeframe, regime, concept, r_multiple, entry_price, exit_price, entry_time, exit_time, pnl_usd),
+                (
+                    symbol,
+                    timeframe,
+                    regime,
+                    concept,
+                    r_multiple,
+                    entry_price,
+                    exit_price,
+                    entry_time,
+                    exit_time,
+                    pnl_usd,
+                ),
             )
             conn.commit()
 
-    def get_samples_for_regime(self, regime: str, concept: str = "SETUP_A_SWEEP_MSS") -> List[float]:
+    def get_samples_for_regime(
+        self, regime: str, concept: str = "SETUP_A_SWEEP_MSS"
+    ) -> list[float]:
         """Retrieves accumulated R-multiples for a specific regime and concept."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -116,7 +130,7 @@ class EmpiricalAccumulator:
             rows = cursor.fetchall()
             return [r[0] for r in rows]
 
-    def run_accumulation_cycle(self, symbols: Optional[List[str]] = None) -> int:
+    def run_accumulation_cycle(self, symbols: list[str] | None = None) -> int:
         """
         Executes one historical backtest accumulation cycle across symbols and timeframes.
         Returns the number of new samples recorded.
@@ -134,7 +148,11 @@ class EmpiricalAccumulator:
 
                     # Classify regime
                     reg_res = regime_transition_detector.classify_regime(candles)
-                    regime_str = reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "TRENDING_BULL"
+                    regime_str = (
+                        reg_res.current_regime.value
+                        if hasattr(reg_res, "current_regime")
+                        else "TRENDING_BULL"
+                    )
 
                     # Run walk-forward backtest
                     bt_report = sandbox_lab.run_backtest(sym, tf, candles)
@@ -152,15 +170,18 @@ class EmpiricalAccumulator:
                             pnl_usd=trade.pnl_usd,
                         )
                         new_samples += 1
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — defensive fallback
                     logger.debug(f"Accumulation cycle error on {sym} {tf}: {e}")
 
-        logger.info(f"Empirical accumulator cycle complete. {new_samples} new trade samples recorded.")
+        logger.info(
+            f"Empirical accumulator cycle complete. {new_samples} new trade samples recorded."
+        )
         return new_samples
 
     def get_status_report(self, concept: str = "SETUP_A_SWEEP_MSS") -> EmpiricalAccumulatorReport:
         """Returns the full statistical validation status across all market regimes."""
         import time
+
         regimes_status = {}
         total_all_samples = 0
 
@@ -170,7 +191,9 @@ class EmpiricalAccumulator:
             total_all_samples += count
 
             if count > 0:
-                stats = expectancy_engine.compute_expectancy(r_series, concept_name=concept, regime=r_name)
+                stats = expectancy_engine.compute_expectancy(
+                    r_series, concept_name=concept, regime=r_name
+                )
                 wr = round(float(stats.win_rate), 2)
                 exp = round(float(stats.expectancy_r), 2)
             else:

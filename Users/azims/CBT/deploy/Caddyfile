@@ -17,30 +17,25 @@
 {$CBT_DOMAIN:localhost} {
 
     # ------------------------------------------------------------------
-    # Python FastAPI routes (intelligence engine, signals, websockets)
+    # Node/Express routes (readiness, metrics, legacy health)
+    # NOTE: these MUST precede the /api/* Python catch-all below, because
+    # Caddy handle blocks are first-match-wins.
     # ------------------------------------------------------------------
-    handle /api/sky/* {
-        reverse_proxy python-backend:8000
+    handle /api/readiness* {
+        reverse_proxy backend:3000
     }
-    handle /api/health* {
-        reverse_proxy python-backend:8000
+    handle /api/metrics/* {
+        reverse_proxy backend:3000
     }
-    handle /api/decision/* {
-        reverse_proxy python-backend:8000
+    handle /health {
+        reverse_proxy backend:3000
     }
-    handle /api/market/* {
-        reverse_proxy python-backend:8000
-    }
-    handle /api/shadow/* {
-        reverse_proxy python-backend:8000
-    }
-    handle /api/audit/* {
-        reverse_proxy python-backend:8000
-    }
-    handle /api/lab/* {
-        reverse_proxy python-backend:8000
-    }
-    handle /api/telegram/* {
+
+    # ------------------------------------------------------------------
+    # Python FastAPI routes (authoritative terminal intelligence surface)
+    # Mirrored exactly with frontend/vite.config.ts PYTHON_PREFIXES.
+    # ------------------------------------------------------------------
+    handle /api/* {
         reverse_proxy python-backend:8000
     }
     handle /metrics {
@@ -52,31 +47,6 @@
             header_up Connection {>Connection}
             header_up Upgrade {>Upgrade}
         }
-    }
-
-    # ------------------------------------------------------------------
-    # Node/Express routes (paper trading, candles, desk, tickers)
-    # ------------------------------------------------------------------
-    handle /api/candles* {
-        reverse_proxy backend:3000
-    }
-    handle /api/paper/* {
-        reverse_proxy backend:3000
-    }
-    handle /api/desk/* {
-        reverse_proxy backend:3000
-    }
-    handle /api/tickers* {
-        reverse_proxy backend:3000
-    }
-    handle /api/readiness* {
-        reverse_proxy backend:3000
-    }
-    handle /api/metrics/* {
-        reverse_proxy backend:3000
-    }
-    handle /health {
-        reverse_proxy backend:3000
     }
 
     # ------------------------------------------------------------------

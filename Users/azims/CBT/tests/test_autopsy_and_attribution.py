@@ -2,10 +2,9 @@
 Tests for Layer 10: 11-Category Loss Autopsies, Counterfactuals & Shapley Alpha Attribution.
 """
 
-import pytest
-from core.loss_autopsy import loss_autopsy_engine, LossCategory
-from core.counterfactual_engine import counterfactual_engine
 from core.alpha_attribution import alpha_attribution_engine
+from core.counterfactual_engine import counterfactual_engine
+from core.loss_autopsy import LossCategory, loss_autopsy_engine
 
 
 def test_loss_autopsy_classification():
@@ -17,7 +16,7 @@ def test_loss_autopsy_classification():
         exit_price=87200.0,
         direction="LONG",
         pnl_usd=-1300.0,
-        data_quality_score=0.88, # Compromised
+        data_quality_score=0.88,  # Compromised
     )
     assert report.loss_category == LossCategory.DATA_FAILURE
     assert report.confidence > 0.85
@@ -74,4 +73,3 @@ def test_dynamic_shapley_efficiency_and_sensitivity():
     assert abs(total_impact - (-1500.0)) < 0.05
     # Sweep and CVD should be top drivers given high activations
     assert attr.top_alpha_driver in ["Liquidity_Sweep", "CVD_Absorption"]
-

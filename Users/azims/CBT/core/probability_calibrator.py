@@ -6,10 +6,9 @@ Tracks Brier Scores: BS = (1/N) * sum((p_t - o_t)^2) and generates reliability c
 
 from __future__ import annotations
 
-import json
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+
 import numpy as np
 
 from core.database import db_manager
@@ -19,8 +18,8 @@ logger = logging.getLogger("ai_quant_sentinel.probability_calibrator")
 
 @dataclass
 class ReliabilityBin:
-    bin_center: float                   # Expected prob (e.g. 0.70)
-    observed_frequency: float           # Realized win rate (e.g. 0.69)
+    bin_center: float  # Expected prob (e.g. 0.70)
+    observed_frequency: float  # Realized win rate (e.g. 0.69)
     sample_count: int
 
 
@@ -30,9 +29,9 @@ class CalibrationScorecard:
     timeframe: str
     regime: str
     sample_size: int
-    brier_score: float                  # [0.0, 1.0] (0.0 = perfect, 0.25 = random)
-    is_well_calibrated: bool            # True if Brier < 0.20
-    reliability_bins: List[ReliabilityBin]
+    brier_score: float  # [0.0, 1.0] (0.0 = perfect, 0.25 = random)
+    is_well_calibrated: bool  # True if Brier < 0.20
+    reliability_bins: list[ReliabilityBin]
     platt_slope_a: float
     platt_intercept_b: float
 
@@ -43,7 +42,7 @@ class ProbabilityCalibrator:
     """
 
     def __init__(self):
-        self._platt_params: Dict[str, Tuple[float, float]] = {}  # key: f"{asset}_{tf}_{regime}"
+        self._platt_params: dict[str, tuple[float, float]] = {}  # key: f"{asset}_{tf}_{regime}"
 
     def calibrate_probability(
         self,
@@ -101,7 +100,9 @@ class ProbabilityCalibrator:
             return self._generate_synthetic_scorecard(asset, timeframe, regime)
 
         confs = np.array([r["confidence"] for r in rows], dtype=np.float64)
-        outcomes = np.array([1.0 if r["outcome_1h"] == "WIN" else 0.0 for r in rows], dtype=np.float64)
+        outcomes = np.array(
+            [1.0 if r["outcome_1h"] == "WIN" else 0.0 for r in rows], dtype=np.float64
+        )
 
         brier = self.compute_brier_score(confs, outcomes)
 

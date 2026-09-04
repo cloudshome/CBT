@@ -11,12 +11,13 @@ from __future__ import annotations
 import logging
 import math
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
-from core.loss_autopsy import loss_autopsy_engine, LossAutopsyReport
 from core.audit_bus import audit_bus
+from core.loss_autopsy import LossAutopsyReport, loss_autopsy_engine
 
 logger = logging.getLogger("sky.autonomous_auditor")
 
@@ -25,7 +26,7 @@ logger = logging.getLogger("sky.autonomous_auditor")
 class TradeTelemetryRecord:
     trade_id: str
     symbol: str
-    side: str                          # "BUY" or "SELL"
+    side: str  # "BUY" or "SELL"
     entry_price: float
     exit_price: float
     qty: float
@@ -34,11 +35,13 @@ class TradeTelemetryRecord:
     entry_time_ms: int
     exit_time_ms: int
     duration_sec: int
-    market_regime_at_entry: str        # "TRENDING_BULL", "TRENDING_BEAR", "RANGING_COMPRESSION", "HIGH_VOLATILITY_EXPANSION"
+    market_regime_at_entry: (
+        str  # "TRENDING_BULL", "TRENDING_BEAR", "RANGING_COMPRESSION", "HIGH_VOLATILITY_EXPANSION"
+    )
     entry_slippage_bps: float
     exit_slippage_bps: float
     loss_autopsy_triggered: bool = False
-    autopsy_category: Optional[str] = None
+    autopsy_category: str | None = None
 
 
 @dataclass
@@ -64,14 +67,16 @@ class SystemAuditHealthReport:
     peak_drawdown_pct: float
     overall_win_rate_pct: float
     overall_profit_factor: float
-    regime_expectancy_breakdown: Dict[str, RegimeExpectancyMetrics]
+    regime_expectancy_breakdown: dict[str, RegimeExpectancyMetrics]
     cusum_drift_score: float
     quarantine_circuit_tripped: bool
-    governance_status: str             # "HEALTHY_OPTIMAL", "REGIME_DEGRADATION_WARNING", "CIRCUIT_BREAKER_QUARANTINED"
-    recent_autopsies: List[Dict[str, Any]]
+    governance_status: (
+        str  # "HEALTHY_OPTIMAL", "REGIME_DEGRADATION_WARNING", "CIRCUIT_BREAKER_QUARANTINED"
+    )
+    recent_autopsies: list[dict[str, Any]]
     narrative: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -85,13 +90,13 @@ class AutonomousRiskAuditor:
         self,
         drift_sigma_threshold: float = 2.5,
         min_trades_for_audit: int = 5,
-        burn_in_start_time_ms: Optional[int] = None,
+        burn_in_start_time_ms: int | None = None,
     ):
         self.drift_sigma_threshold = drift_sigma_threshold
         self.min_trades_for_audit = min_trades_for_audit
         self.burn_in_start_time_ms = burn_in_start_time_ms or int(time.time() * 1000)
-        self._trade_ledger: List[TradeTelemetryRecord] = []
-        self._recent_autopsies: List[Dict[str, Any]] = []
+        self._trade_ledger: list[TradeTelemetryRecord] = []
+        self._recent_autopsies: list[dict[str, Any]] = []
 
     def record_trade(
         self,
@@ -154,7 +159,7 @@ class AutonomousRiskAuditor:
         self._trade_ledger.append(rec)
         return rec
 
-    def audit_system_health(self, timestamp_ms: Optional[int] = None) -> SystemAuditHealthReport:
+    def audit_system_health(self, timestamp_ms: int | None = None) -> SystemAuditHealthReport:
         """
         Runs comprehensive regime-conditional expectancy drift audit and evaluates circuit breakers.
         """
@@ -177,7 +182,7 @@ class AutonomousRiskAuditor:
         profit_factor = float(gross_profit / gross_loss) if gross_loss > 0 else 1.0
 
         # Max Drawdown
-        equity = 10000.0 + np.cumsum([0.0] + pnls)
+        equity = 10000.0 + np.cumsum([0.0, *pnls])
         peak = np.maximum.accumulate(equity)
         dd = (equity - peak) / peak
         max_dd_pct = float(abs(np.min(dd))) * 100.0 if len(dd) > 0 else 0.0
@@ -219,15 +224,24 @@ class AutonomousRiskAuditor:
             narrative=narrative,
         )
 
-    def _compute_regime_expectancy(self) -> Dict[str, RegimeExpectancyMetrics]:
-        all_regimes = ["TRENDING_BULL", "TRENDING_BEAR", "RANGING_COMPRESSION", "HIGH_VOLATILITY_EXPANSION"]
-        regime_trades: Dict[str, List[TradeTelemetryRecord]] = {r: [] for r in all_regimes}
+    def _compute_regime_expectancy(self) -> dict[str, RegimeExpectancyMetrics]:
+        all_regimes = [
+            "TRENDING_BULL",
+            "TRENDING_BEAR",
+            "RANGING_COMPRESSION",
+            "HIGH_VOLATILITY_EXPANSION",
+        ]
+        regime_trades: dict[str, list[TradeTelemetryRecord]] = {r: [] for r in all_regimes}
 
         for t in self._trade_ledger:
-            reg = t.market_regime_at_entry if t.market_regime_at_entry in regime_trades else "TRENDING_BULL"
+            reg = (
+                t.market_regime_at_entry
+                if t.market_regime_at_entry in regime_trades
+                else "TRENDING_BULL"
+            )
             regime_trades[reg].append(t)
 
-        metrics: Dict[str, RegimeExpectancyMetrics] = {}
+        metrics: dict[str, RegimeExpectancyMetrics] = {}
         for reg, trades in regime_trades.items():
             if not trades:
                 metrics[reg] = RegimeExpectancyMetrics(
@@ -282,8 +296,14 @@ class AutonomousRiskAuditor:
 
         return metrics
 
-    def _evaluate_cusum_drift(self, regime_breakdown: Dict[str, RegimeExpectancyMetrics]) -> Tuple[float, bool]:
-        drifts = [m.drift_sigma for m in regime_breakdown.values() if m.trade_count >= self.min_trades_for_audit]
+    def _evaluate_cusum_drift(
+        self, regime_breakdown: dict[str, RegimeExpectancyMetrics]
+    ) -> tuple[float, bool]:
+        drifts = [
+            m.drift_sigma
+            for m in regime_breakdown.values()
+            if m.trade_count >= self.min_trades_for_audit
+        ]
         if not drifts:
             return 0.0, False
 
@@ -309,7 +329,11 @@ class AutonomousRiskAuditor:
             symbol=rec.symbol,
             reason=f"Automated forensic triage for trade {rec.trade_id} ({report.loss_category.value})",
             severity="WARNING",
-            details={"trade_id": rec.trade_id, "loss_category": str(report.loss_category.value), "pnl": rec.realized_pnl_usd},
+            details={
+                "trade_id": rec.trade_id,
+                "loss_category": str(report.loss_category.value),
+                "pnl": rec.realized_pnl_usd,
+            },
         )
         return report
 

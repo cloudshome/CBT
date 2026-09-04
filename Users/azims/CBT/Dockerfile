@@ -23,12 +23,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
     ffmpeg \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 1000 appuser \
+    && useradd -m -u 1000 -g appuser appuser
 
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder /root/.local /usr/local
+ENV PATH=/usr/local/bin:$PATH
 
 COPY . /app
+# Writable data directory owned by the unprivileged runtime user
+RUN mkdir -p /app/data /app/data/logs /app/data/uploads \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 

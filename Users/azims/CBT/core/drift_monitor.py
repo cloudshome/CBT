@@ -11,8 +11,9 @@ Automatically penalizes uncertainty budget and throttles capital allocation on d
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.drift_monitor")
@@ -20,9 +21,9 @@ logger = logging.getLogger("ai_quant_sentinel.drift_monitor")
 
 @dataclass
 class DriftDimensionStatus:
-    dimension_name: str                 # "DATA_DRIFT", "CONCEPT_DRIFT", "PERFORMANCE_DRIFT", "EXECUTION_DRIFT"
+    dimension_name: str  # "DATA_DRIFT", "CONCEPT_DRIFT", "PERFORMANCE_DRIFT", "EXECUTION_DRIFT"
     drift_detected: bool
-    drift_severity: float               # [0.0, 1.0] (0 = Nominal, 1 = Critical Shift)
+    drift_severity: float  # [0.0, 1.0] (0 = Nominal, 1 = Critical Shift)
     p_value_or_metric: float
     message: str
 
@@ -35,10 +36,10 @@ class SystemDriftReport:
     concept_drift: DriftDimensionStatus
     performance_drift: DriftDimensionStatus
     execution_drift: DriftDimensionStatus
-    recommended_capital_throttle_pct: float # 0.0 (normal) up to 0.75 (cut sizing by 75%)
+    recommended_capital_throttle_pct: float  # 0.0 (normal) up to 0.75 (cut sizing by 75%)
     overall_health_verdict: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "is_system_drift_critical": self.is_system_drift_critical,
@@ -67,6 +68,7 @@ class DriftMonitor:
         Evaluates the 4 drift vectors against baseline thresholds.
         """
         import time
+
         now = int(time.time() * 1000)
 
         # 1. Data Drift Check (ATR extreme percentile > 99.0% or < 1.0%)
@@ -77,18 +79,26 @@ class DriftMonitor:
             drift_detected=data_drift_active,
             drift_severity=data_severity,
             p_value_or_metric=round(current_atr_percentile, 3),
-            message="Input feature distributions within nominal range" if not data_drift_active else f"Extreme volatility shift detected (ATR Pct: {current_atr_percentile*100:.1f}%)",
+            message="Input feature distributions within nominal range"
+            if not data_drift_active
+            else f"Extreme volatility shift detected (ATR Pct: {current_atr_percentile * 100:.1f}%)",
         )
 
         # 2. Concept Drift Check (Brier score > 0.22 indicates predictive degradation)
         concept_drift_active = bool(recent_brier_score > 0.22)
-        concept_severity = float(np.clip((recent_brier_score - 0.20) / 0.10, 0.0, 1.0)) if concept_drift_active else 0.08
+        concept_severity = (
+            float(np.clip((recent_brier_score - 0.20) / 0.10, 0.0, 1.0))
+            if concept_drift_active
+            else 0.08
+        )
         d_concept = DriftDimensionStatus(
             dimension_name="CONCEPT_DRIFT",
             drift_detected=concept_drift_active,
             drift_severity=round(concept_severity, 2),
             p_value_or_metric=round(recent_brier_score, 4),
-            message="Predictive calibration well-anchored" if not concept_drift_active else f"Predictive accuracy decaying (Brier Score: {recent_brier_score:.3f} > 0.22)",
+            message="Predictive calibration well-anchored"
+            if not concept_drift_active
+            else f"Predictive accuracy decaying (Brier Score: {recent_brier_score:.3f} > 0.22)",
         )
 
         # 3. Performance Drift Check (Rolling Sharpe decaying > 30% from historical)
@@ -100,7 +110,9 @@ class DriftMonitor:
             drift_detected=perf_drift_active,
             drift_severity=round(perf_severity, 2),
             p_value_or_metric=round(rolling_sharpe_30d, 2),
-            message=f"Rolling Sharpe ({rolling_sharpe_30d:.2f}) nominal" if not perf_drift_active else f"Alpha decay detected: Sharpe down {sharpe_decay_pct*100:.1f}%",
+            message=f"Rolling Sharpe ({rolling_sharpe_30d:.2f}) nominal"
+            if not perf_drift_active
+            else f"Alpha decay detected: Sharpe down {sharpe_decay_pct * 100:.1f}%",
         )
 
         # 4. Execution Drift Check (Realized slippage > 2.0x baseline)
@@ -111,15 +123,32 @@ class DriftMonitor:
             drift_detected=exec_drift_active,
             drift_severity=exec_severity,
             p_value_or_metric=round(avg_recent_slippage_bps, 1),
-            message=f"Fill slippage ({avg_recent_slippage_bps:.1f}bps) nominal" if not exec_drift_active else f"Execution quality degrading: {avg_recent_slippage_bps:.1f}bps > 2x baseline",
+            message=f"Fill slippage ({avg_recent_slippage_bps:.1f}bps) nominal"
+            if not exec_drift_active
+            else f"Execution quality degrading: {avg_recent_slippage_bps:.1f}bps > 2x baseline",
         )
 
         # Calculate Capital Throttle Percentage
-        drift_count = sum([1 for d in [data_drift_active, concept_drift_active, perf_drift_active, exec_drift_active] if d])
+        drift_count = sum(
+            [
+                1
+                for d in [
+                    data_drift_active,
+                    concept_drift_active,
+                    perf_drift_active,
+                    exec_drift_active,
+                ]
+                if d
+            ]
+        )
         throttle = min(0.75, drift_count * 0.25)
         is_critical = drift_count >= 2 or concept_drift_active
 
-        verdict = "HEALTHY_CALIBRATED" if drift_count == 0 else ("WARNING_DRIFT_DETECTED" if not is_critical else "CRITICAL_DRIFT_ACTION_REQUIRED")
+        verdict = (
+            "HEALTHY_CALIBRATED"
+            if drift_count == 0
+            else ("WARNING_DRIFT_DETECTED" if not is_critical else "CRITICAL_DRIFT_ACTION_REQUIRED")
+        )
 
         return SystemDriftReport(
             timestamp=now,

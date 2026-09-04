@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.lead_lag_correlator")
@@ -17,10 +17,10 @@ logger = logging.getLogger("ai_quant_sentinel.lead_lag_correlator")
 
 @dataclass
 class LeadSignal:
-    driver_asset: str               # "DXY", "US10Y"
-    target_asset: str               # "XAU/USD", "BTC/USDT"
+    driver_asset: str  # "DXY", "US10Y"
+    target_asset: str  # "XAU/USD", "BTC/USDT"
     shock_zscore: float
-    direction: str                  # "BULLISH_LEAD", "BEARISH_LEAD"
+    direction: str  # "BULLISH_LEAD", "BEARISH_LEAD"
     expected_lead_window_mins: str  # "3-5m", "5-15m"
     confidence: float
     timestamp: int
@@ -34,20 +34,20 @@ class LeadLagCorrelator:
 
     def __init__(self, shock_zscore_threshold: float = 2.0):
         self.shock_threshold = shock_zscore_threshold
-        self._dxy_returns: List[float] = []
-        self._us10y_returns: List[float] = []
+        self._dxy_returns: list[float] = []
+        self._us10y_returns: list[float] = []
 
     def process_macro_ticks(
         self,
         dxy_price: float,
         us10y_yield: float,
-        timestamp_ms: Optional[int] = None,
-    ) -> List[LeadSignal]:
+        timestamp_ms: int | None = None,
+    ) -> list[LeadSignal]:
         """
         Ingests latest macro prices, updates return distributions, and evaluates lead signals.
         """
         now = timestamp_ms or int(time.time() * 1000)
-        signals: List[LeadSignal] = []
+        signals: list[LeadSignal] = []
 
         # Synthetic/fallback baseline variation if single tick
         if not self._dxy_returns:

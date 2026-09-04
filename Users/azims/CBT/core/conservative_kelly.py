@@ -9,12 +9,13 @@ Caps risk at 1.5% maximum with a continuous smooth scale down to 0.0%.
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
-from core.uncertainty_engine import UncertaintyBudget
 from core.ev_engine import NetEVResult
+from core.uncertainty_engine import UncertaintyBudget
 
 logger = logging.getLogger("ai_quant_sentinel.conservative_kelly")
 
@@ -22,12 +23,12 @@ logger = logging.getLogger("ai_quant_sentinel.conservative_kelly")
 @dataclass
 class KellyAllocationResult:
     account_equity: float
-    raw_kelly_fraction: float           # Theoretical unconstrained Kelly
-    conservative_fraction: float        # Final discounted risk fraction (e.g. 0.0075 = 0.75%)
-    max_risk_cap_fraction: float        # Hard ceiling (0.015 = 1.5%)
-    allocated_risk_usd: float           # Dollar risk = Equity * f_final
-    recommended_position_units: float   # Units = allocated_risk_usd / abs(entry - sl)
-    recommended_position_notional_usd: float # Units * entry_price
+    raw_kelly_fraction: float  # Theoretical unconstrained Kelly
+    conservative_fraction: float  # Final discounted risk fraction (e.g. 0.0075 = 0.75%)
+    max_risk_cap_fraction: float  # Hard ceiling (0.015 = 1.5%)
+    allocated_risk_usd: float  # Dollar risk = Equity * f_final
+    recommended_position_units: float  # Units = allocated_risk_usd / abs(entry - sl)
+    recommended_position_notional_usd: float  # Units * entry_price
     effective_leverage: float
     parameter_uncertainty_discount: float
     regime_uncertainty_discount: float
@@ -36,14 +37,14 @@ class KellyAllocationResult:
     is_allocated: bool
     summary: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 class ConservativeKellyAllocator:
     """Calculates dynamically discounted institutional position sizing."""
 
-    def __init__(self, max_risk_cap_pct: float = 0.015): # 1.5% max risk cap
+    def __init__(self, max_risk_cap_pct: float = 0.015):  # 1.5% max risk cap
         self.max_risk_cap_pct = max_risk_cap_pct
 
     def calculate_allocation(
@@ -60,7 +61,9 @@ class ConservativeKellyAllocator:
         Calculates fractional Kelly sizing adjusted for empirical parameter uncertainty.
         """
         if not ev_result.is_tradable or account_equity <= 0 or entry_price <= 0:
-            return self._zero_allocation(account_equity, "Trade not tradable or insufficient equity.")
+            return self._zero_allocation(
+                account_equity, "Trade not tradable or insufficient equity."
+            )
 
         p = ev_result.win_probability
         b = ev_result.reward_to_risk_ratio
@@ -71,7 +74,9 @@ class ConservativeKellyAllocator:
         # 1. Raw Kelly Fraction: f* = (p*(b+1) - 1) / b
         f_raw = (p * (b + 1.0) - 1.0) / b
         if f_raw <= 0:
-            return self._zero_allocation(account_equity, f"Negative raw Kelly fraction ({f_raw:.4f}).")
+            return self._zero_allocation(
+                account_equity, f"Negative raw Kelly fraction ({f_raw:.4f})."
+            )
 
         # 2. Multiplicative Uncertainty Discounts
         # Parameter uncertainty discount (derived from sample size & model disagreement)
@@ -89,13 +94,17 @@ class ConservativeKellyAllocator:
         # 3. Final Multiplicatively Discounted Kelly
         # Half-Kelly baseline multiplied by discount factors
         half_kelly = f_raw * 0.50
-        f_discounted = half_kelly * (1.0 - d_param) * (1.0 - d_regime) * (1.0 - d_corr) * (1.0 - d_dd)
+        f_discounted = (
+            half_kelly * (1.0 - d_param) * (1.0 - d_regime) * (1.0 - d_corr) * (1.0 - d_dd)
+        )
 
         # 4. Cap at Maximum Allowed Risk (1.5% equity) with zero minimum floor
         f_final = float(np.clip(f_discounted, 0.0, self.max_risk_cap_pct))
 
         if f_final <= 0.0005:  # Below 0.05% risk
-            return self._zero_allocation(account_equity, "Discounted risk fraction collapsed below minimum viable threshold.")
+            return self._zero_allocation(
+                account_equity, "Discounted risk fraction collapsed below minimum viable threshold."
+            )
 
         # 5. Position Sizing
         risk_per_unit = abs(entry_price - stop_loss_price)
@@ -105,9 +114,9 @@ class ConservativeKellyAllocator:
         effective_lev = notional_usd / account_equity if account_equity > 0 else 1.0
 
         summary = (
-            f"Kelly Allocated: {f_final*100:.2f}% equity (${allocated_risk_usd:,.2f} risk). "
+            f"Kelly Allocated: {f_final * 100:.2f}% equity (${allocated_risk_usd:,.2f} risk). "
             f"Units: {position_units:.4f} (${notional_usd:,.2f} Notional, {effective_lev:.1f}x Leverage). "
-            f"Raw Kelly: {f_raw*100:.1f}%, Total Discount: {(1.0 - f_final/half_kelly)*100:.1f}%."
+            f"Raw Kelly: {f_raw * 100:.1f}%, Total Discount: {(1.0 - f_final / half_kelly) * 100:.1f}%."
         )
 
         return KellyAllocationResult(

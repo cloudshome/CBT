@@ -1,11 +1,11 @@
-﻿"""
+"""
 End-to-End Critical Path Verification (Task K-UI.4 / Priority 12.6)
 Validates the complete execution loop:
 Market Telemetry -> Kronos Forecast -> Advisory Risk Sizing -> Order Placement -> Position Reconciliation -> Autopsy Attribution
 """
 
-import pytest
 from fastapi.testclient import TestClient
+
 from app import app
 
 client = TestClient(app)
@@ -33,20 +33,28 @@ def test_e2e_critical_trading_pipeline():
     assert alpha_data["decision"] in ["LONG", "SHORT", "WATCH", "NO_TRADE"]
 
     # 3. Query Kronos Probabilistic Trajectory Forecast
-    kronos_res = client.get(f"/api/kronos/forecast?symbol=BTCUSDT&timeframe={timeframe}&samples=5&horizon=12")
+    kronos_res = client.get(
+        f"/api/kronos/forecast?symbol=BTCUSDT&timeframe={timeframe}&samples=5&horizon=12"
+    )
     assert kronos_res.status_code == 200
     kronos_data = kronos_res.json()
     assert "paths" in kronos_data
     assert len(kronos_data["paths"]) == 5
     assert "sky_derived_metrics" in kronos_data
-    expected_return = kronos_data["sky_derived_metrics"]["expected_return_pct"]
-    consensus = kronos_data["sky_derived_metrics"]["directional_consensus"]
+    kronos_data["sky_derived_metrics"]["expected_return_pct"]
+    kronos_data["sky_derived_metrics"]["directional_consensus"]
 
     # 4. Query Kronos Shadow Advisory Gate
-    advisory_res = client.get(f"/api/kronos/advisory?symbol=BTCUSDT&timeframe={timeframe}&sky_decision=LONG")
+    advisory_res = client.get(
+        f"/api/kronos/advisory?symbol=BTCUSDT&timeframe={timeframe}&sky_decision=LONG"
+    )
     assert advisory_res.status_code == 200
     advisory_data = advisory_res.json()
-    assert advisory_data["advisory_recommendation"] in ["CONFIRM_TRADE", "DIVERGENCE_CAUTION", "NEUTRAL"]
+    assert advisory_data["advisory_recommendation"] in [
+        "CONFIRM_TRADE",
+        "DIVERGENCE_CAUTION",
+        "NEUTRAL",
+    ]
     assert advisory_data["sizing_multiplier"] > 0
 
     # 5. Submit Simulated Order to Risk Gate & Paper Trading Ledger

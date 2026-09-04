@@ -7,7 +7,8 @@ Generates a statistically calibrated Displacement Score in [0, 100].
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import DisplacementFeature
@@ -25,9 +26,9 @@ class DisplacementEngine:
 
     def calculate_displacement(
         self,
-        candles: List[Dict[str, Any]],
-        target_index: Optional[int] = None,
-        atr: Optional[float] = None,
+        candles: list[dict[str, Any]],
+        target_index: int | None = None,
+        atr: float | None = None,
     ) -> DisplacementFeature:
         """
         Calculates the multi-factor Displacement Score (0–100) for a given candle or the latest candle.
@@ -47,7 +48,11 @@ class DisplacementEngine:
                 displacement_score=0.0,
             )
 
-        idx = len(candles) - 1 if target_index is None else max(0, min(len(candles) - 1, target_index))
+        idx = (
+            len(candles) - 1
+            if target_index is None
+            else max(0, min(len(candles) - 1, target_index))
+        )
         curr = candles[idx]
 
         if atr is None or atr <= 0:
@@ -59,7 +64,11 @@ class DisplacementEngine:
                 )
                 for i in range(1, len(candles))
             ]
-            atr = float(np.mean(tr_list[-self.atr_period :])) if len(tr_list) >= self.atr_period else (curr["close"] * 0.01)
+            atr = (
+                float(np.mean(tr_list[-self.atr_period :]))
+                if len(tr_list) >= self.atr_period
+                else (curr["close"] * 0.01)
+            )
 
         safe_atr = max(atr, 0.0001)
 
@@ -72,7 +81,9 @@ class DisplacementEngine:
 
         body = abs(close_p - open_p)
         candle_range = max(high_p - low_p, 0.0001)
-        direction = "BULLISH" if close_p > open_p else ("BEARISH" if close_p < open_p else "NEUTRAL")
+        direction = (
+            "BULLISH" if close_p > open_p else ("BEARISH" if close_p < open_p else "NEUTRAL")
+        )
 
         body_atr = body / safe_atr
         range_atr = candle_range / safe_atr

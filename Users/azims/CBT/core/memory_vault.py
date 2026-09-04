@@ -10,7 +10,8 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 import numpy as np
 
 from core.database import db_manager
@@ -26,22 +27,22 @@ class SemanticVectorStore:
 
     def __init__(self, storage_path: Path):
         self.storage_path = storage_path
-        self.embeddings: List[np.ndarray] = []
-        self.documents: List[str] = []
-        self.metadatas: List[Dict[str, Any]] = []
+        self.embeddings: list[np.ndarray] = []
+        self.documents: list[str] = []
+        self.metadatas: list[dict[str, Any]] = []
         self._load()
 
     def _load(self) -> None:
         file_path = self.storage_path / "vectors.json"
         if file_path.exists():
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     data = json.load(f)
                     self.documents = data.get("documents", [])
                     self.metadatas = data.get("metadatas", [])
                     raw_embeds = data.get("embeddings", [])
                     self.embeddings = [np.array(e, dtype=np.float32) for e in raw_embeds]
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.error(f"Failed loading vector store: {e}")
 
     def save(self) -> None:
@@ -72,7 +73,7 @@ class SemanticVectorStore:
         norm = np.linalg.norm(vec)
         return vec / norm if norm > 0 else vec
 
-    def add_document(self, doc_id: str, text: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def add_document(self, doc_id: str, text: str, metadata: dict[str, Any] | None = None) -> None:
         meta = metadata or {}
         meta["id"] = doc_id
         vec = self._embed_text(text)
@@ -81,7 +82,7 @@ class SemanticVectorStore:
         self.embeddings.append(vec)
         self.save()
 
-    def query(self, query_text: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def query(self, query_text: str, top_k: int = 5) -> list[dict[str, Any]]:
         if not self.embeddings:
             return []
         q_vec = self._embed_text(query_text)
@@ -93,11 +94,13 @@ class SemanticVectorStore:
 
         results = []
         for sim, idx in scores[:top_k]:
-            results.append({
-                "score": sim,
-                "document": self.documents[idx],
-                "metadata": self.metadatas[idx],
-            })
+            results.append(
+                {
+                    "score": sim,
+                    "document": self.documents[idx],
+                    "metadata": self.metadatas[idx],
+                }
+            )
         return results
 
 
@@ -105,7 +108,9 @@ class MemoryVault:
     """Master dual-layer memory vault coordinating episodic records and semantic literature."""
 
     def __init__(self):
-        self.vector_store = SemanticVectorStore(Path(os.getenv("DATA_DIR", "data")) / "vector_store")
+        self.vector_store = SemanticVectorStore(
+            Path(os.getenv("DATA_DIR", "data")) / "vector_store"
+        )
 
     def store_market_state(
         self,
@@ -114,8 +119,8 @@ class MemoryVault:
         symbol: str,
         timeframe: str,
         schema_version: str,
-        state_vector: Dict[str, Any],
-        forward_outcomes: Optional[Dict[str, Any]] = None,
+        state_vector: dict[str, Any],
+        forward_outcomes: dict[str, Any] | None = None,
     ) -> None:
         with db_manager.get_brain_conn() as conn:
             conn.execute(
@@ -138,7 +143,7 @@ class MemoryVault:
             )
             conn.commit()
 
-    def store_trade_episode(self, episode: Dict[str, Any]) -> None:
+    def store_trade_episode(self, episode: dict[str, Any]) -> None:
         with db_manager.get_brain_conn() as conn:
             conn.execute(
                 """
@@ -170,7 +175,7 @@ class MemoryVault:
             )
             conn.commit()
 
-    def get_recent_episodes(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_recent_episodes(self, limit: int = 50) -> list[dict[str, Any]]:
         with db_manager.get_brain_conn() as conn:
             cursor = conn.execute(
                 "SELECT * FROM trade_episodes ORDER BY timestamp DESC LIMIT ?;", (limit,)

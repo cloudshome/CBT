@@ -7,9 +7,8 @@ and evaluates Cross-Asset Parametric Value at Risk (VaR 99%).
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-import numpy as np
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.portfolio_risk_matrix")
 
@@ -17,26 +16,26 @@ logger = logging.getLogger("ai_quant_sentinel.portfolio_risk_matrix")
 @dataclass
 class PortfolioHeatStatus:
     total_open_risk_usd: float
-    total_open_risk_pct: float          # [0.0, 1.0] (e.g. 0.035 = 3.5%)
-    max_heat_ceiling_pct: float         # 0.06 (6.0%)
+    total_open_risk_pct: float  # [0.0, 1.0] (e.g. 0.035 = 3.5%)
+    max_heat_ceiling_pct: float  # 0.06 (6.0%)
     remaining_risk_budget_pct: float
     portfolio_var_99_usd: float
     open_positions_count: int
     is_heat_exceeded: bool
     can_open_new_position: bool
-    warning_message: Optional[str] = None
+    warning_message: str | None = None
 
 
 class PortfolioRiskMatrix:
     """Manages total exposure, cross-asset correlations, and portfolio heat boundaries."""
 
-    def __init__(self, max_heat_ceiling_pct: float = 0.06): # 6.0% max total open risk
+    def __init__(self, max_heat_ceiling_pct: float = 0.06):  # 6.0% max total open risk
         self.max_heat_ceiling_pct = max_heat_ceiling_pct
 
     def evaluate_portfolio_heat(
         self,
         account_equity: float,
-        open_positions: List[Dict[str, Any]],
+        open_positions: list[dict[str, Any]],
         proposed_risk_usd: float = 0.0,
     ) -> PortfolioHeatStatus:
         """
@@ -76,8 +75,8 @@ class PortfolioRiskMatrix:
         warning = None
         if is_exceeded:
             warning = (
-                f"PORTFOLIO_HEAT_BREACH: Projected total open risk ({total_risk_pct*100:.2f}%) "
-                f"exceeds institutional ceiling ({self.max_heat_ceiling_pct*100:.1f}%)."
+                f"PORTFOLIO_HEAT_BREACH: Projected total open risk ({total_risk_pct * 100:.2f}%) "
+                f"exceeds institutional ceiling ({self.max_heat_ceiling_pct * 100:.1f}%)."
             )
             logger.warning(warning)
 

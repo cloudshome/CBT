@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.institutional_flows")
 
@@ -23,9 +23,9 @@ class InstitutionalFlowsSnapshot:
     sovereign_central_bank_net_tons_quarterly: float
     sentiment_tier: str
     flow_momentum_score: float  # Normalized scalar [-1.0, +1.0]
-    z_score: float              # Standardized [-3.0, +3.0]
+    z_score: float  # Standardized [-3.0, +3.0]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -44,6 +44,7 @@ class InstitutionalFlowsEngine:
 
     def analyze(self, symbol: str, current_price: float) -> InstitutionalFlowsSnapshot:
         import time
+
         sym = symbol.upper()
         now = int(time.time() * 1000)
 
