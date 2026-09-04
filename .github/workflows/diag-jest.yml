@@ -1,6 +1,6 @@
-# TEMPORARY diagnostic workflow — used to surface the real Jest failure text
-# because action logs are hosted on a host unreachable from the sandbox.
-# DELETE before final merge.
+# TEMPORARY diagnostic workflow — surfaces Jest failure text as ::error::
+# annotations (readable via API) because action logs live on a host the
+# sandbox cannot reach. DELETE before final merge.
 name: diag-jest
 
 on:
@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   diag:
@@ -42,33 +41,29 @@ jobs:
           npx prisma generate
           npx prisma db push
 
-      - name: Run Jest (capture output)
+      - name: Run Jest (capture, never fail job)
         id: jest
         continue-on-error: true
         run: |
           npx jest --runInBand --coverage=false > /tmp/jest.log 2>&1
-          echo "JEST_EXIT=$?" > /tmp/jest-meta.txt
-          # keep head (suites) + tail (failure details)
-          head -60 /tmp/jest.log > /tmp/jest-tail.txt
-          echo "..." >> /tmp/jest-tail.txt
-          tail -120 /tmp/jest.log >> /tmp/jest-tail.txt
+          echo "EXIT=$?" > /tmp/jest-meta.txt
 
-      - name: Post Jest diagnostics as PR comment
+      - name: Emit Jest diagnostics as annotations
         if: always()
-        working-directory: ./
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUM: ${{ github.event.pull_request.number }}
         run: |
-          META=$(cat /tmp/jest-meta.txt)
+          echo "===META==="; cat /tmp/jest-meta.txt
+          # Combine meta + head (suite summary) + tail (failure detail) into one file
           {
-            echo "**Diagnostic Jest run** (\`Lint, Test & Build\` reproduces the same cmd)."
-            echo ""
-            echo "\`\`\`text"
-            echo "$META"
-            cat /tmp/jest-tail.txt
-            echo "\`\`\`"
-          } > /tmp/jest-comment.md
-          python3 -c "import json;json.dump({'body': open('/tmp/jest-comment.md').read()}, open('/tmp/jest-comment.json','w'))"
-          gh api -X POST "repos/cloudshome/CTB/issues/$PR_NUM/comments" \
-            --input /tmp/jest-comment.json
+            echo "[meta] $(cat /tmp/jest-meta.txt)"
+            echo "[--- suite summary ---]"
+            grep -E "^(PASS|FAIL|Test Suites:|Tests:|Snapshot|Time:|Ran all)" /tmp/jest.log | head -60
+            echo "[--- failure tail ---]"
+            tail -60 /tmp/jest.log
+          } > /tmp/jest-diag.txt
+          n=0
+          while IFS= read -r line; do
+            n=$((n+1))
+            esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g' -e 's/::/%3A%3A/g')
+            echo "::error title=JD$n::$esc"
+          done < /tmp/jest-diag.txt
+          echo "::notice::emitted $n annotation lines"
