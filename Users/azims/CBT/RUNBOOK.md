@@ -33,16 +33,23 @@ docker compose ps
 ```
 
 ### Option B: Linux Native Systemd Service
+> ⚠️ **Mutually exclusive with Option A.** `orion.service` runs uvicorn directly on
+> port 8000, while the Docker stack (`cbt-stack@.service`) also serves that port.
+> Enable **exactly one** of the two deployment modes.
+
 ```bash
 # 1. Install systemd unit definition
 sudo cp deploy/systemd/orion.service /etc/systemd/system/
 sudo systemctl daemon-reload
 
-# 2. Enable on boot and start service
+# 2. Ensure the Docker stack is stopped (port conflict guard)
+sudo systemctl stop cbt-stack@$USER.service || true
+
+# 3. Enable on boot and start service
 sudo systemctl enable orion.service
 sudo systemctl start orion.service
 
-# 3. Inspect live status
+# 4. Inspect live status
 sudo systemctl status orion.service
 ```
 
