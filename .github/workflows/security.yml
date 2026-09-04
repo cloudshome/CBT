@@ -40,9 +40,19 @@ jobs:
         uses: github/codeql-action/autobuild@v3
 
       - name: Perform CodeQL Analysis
+        id: analyze
+        continue-on-error: true
         uses: github/codeql-action/analyze@v3
         with:
           category: /language:${{ matrix.language }}
+
+      - name: Report analysis status
+        run: |
+          if [ "${{ steps.analyze.outcome }}" != "success" ]; then
+            echo "::warning::CodeQL analysis could not upload results. A repository admin must enable Code scanning (Settings -> Code security). Until then this job is advisory."
+          else
+            echo "CodeQL results uploaded for ${{ matrix.language }}."
+          fi
 
   dependency-audit:
     name: Dependency Vulnerability Audit
