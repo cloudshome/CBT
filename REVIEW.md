@@ -7,6 +7,51 @@
 
 ---
 
+## 🔄 Addendum 2026-09-04 — First CI run enabled, diagnosed, and turned green (new HEAD `e3c59b9`)
+
+This section supersedes the "CI never ran / must be proven in CI" caveats above. GitHub Actions are now **enabled** and the pipeline is **fully green on `main`** for the first time.
+
+**What happened in sequence (this review's verification pass):**
+- PR #30 (`fix(ci): relocate .github to repository root…`, branch `arena/01a06bda-ctb`) merged — GitHub then discovered `.github/workflows/ci.yml` **CI Pipeline** and its first-ever run executed on `main` (run `33871777426`) and **failed at the Jest step** (Ruff + 224 pytest + ESLint passed; Docker-compose validation and the build had never run because the job aborted early).
+- The sandbox could not read the Actions log (hosted on an Azure blob that is egress-blocked) nor re-run `prisma generate` locally (engine host blocked), so a **temporary diagnostic workflow** mirrored `ci.yml`, ran Jest, and published the full log to a throwaway branch. This surfaced the *real* failures and disproved one false positive:
+  - ❌ **False positive** — `tests/frontend_precision_and_kronos` "TS2307 decimal.js": caused by the diagnostic initially omitting the `npm --prefix frontend ci` install step. With frontend deps installed it **passes**. Not a bug.
+  - ✅ **Real bug 1 — `tests/readiness.test.ts`** expected `version === '0.1.0'`, but `src/server.ts` reports **`3.0.0`** (test not updated during the v3.0.0 bump). *Fixed in PR #44.*
+  - ✅ **Real bug 2 — `GET /api/institutional/dossier` returned 500** whenever live exchange feeds are unreachable **and** the SQLite cache is empty. GitHub-hosted runners are geo-restricted by Binance (HTTP 451) / Bybit (HTTP 403), so `fetchCandlesWithFallback` threw and the handler 500'd before reaching the built-in fallback reference price. The 8-pillar dossier is a deterministic model with hardcoded fallbacks; the handler now catches the fetch failure, degrades to those, and still serves 200. *Fixed in PR #44.*
+
+**Fixes merged → CI green on `main`:** PR #44 (`fix(test): make Jest suite pass in CI…`) merged as `e3c59b9`. The subsequent `main` push run completed **success**: Ruff → **224 pytest** → ESLint → **Jest 20/20 suites, 122 tests** → `docker compose` (both files) validation → full production build. Docker-compose validation and the build are now proven in CI for the first time.
+
+**Branch protection on `main` (requires `Lint, Test & Build`) — NOT ENABLED.** The bot token is not a repo admin (`403 Resource not accessible by integration` for branch-protection endpoints); it *can* push/delete branches/PRs but **cannot** set protection. A human repo admin must run (recommended: require the status check, PRs, linear history):
+
+```bash
+gh api -X PUT repos/cloudshome/CTB/branches/main/protection \
+  --input - <<'JSON'
+{
+  "required_status_checks": { "strict": true, "contexts": ["Lint, Test & Build"] },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_linear_history": true,
+  "required_conversation_resolution": true
+}
+JSON
+```
+
+**Housekeeping done this pass:** deleted remote leftover branch `feature/agent-constitution` (its ARCHITECTURE/ROADMAP/SECURITY/AGENTS.md content was already adopted via PR #29).
+
+**Future matters (fresh, now that CI is real):**
+1. The single most important un-done step is the branch-protection above — make `Lint, Test & Build` a required check on `main` so the green pipeline is actually enforced.
+2. Tests that hit **live Binance/Bybit endpoints** (visible as `console.warn` in `candles`, `dossier`, `sky`, etc.) are inherently flaky/non-deterministic — GitHub runners are geo-restricted (451/403) and rate-limited. Recommend **mocking the market-data layer / seeding SQLite fixtures** in these suites (as `paper`/`paper_error_paths` already do) rather than relying on live feeds.
+3. Version drift risk remains: `version` is a hardcoded literal in `src/server.ts` and asserted as a literal in `readiness.test.ts`. Prefer reading `package.json` version at startup and asserting against it, so future bumps cannot silently break `/` again.
+4. **Actions deprecation:** Node.js 20 runner actions are deprecated and forced onto Node 24 (warnings on every run). Review and bump `actions/checkout`, `actions/setup-node`, `actions/setup-python` (dependabot PRs #31–#33) — but confirm the major-version targets are valid before merging.
+5. **13 open dependabot PRs** (major bumps: numpy 2.x, pandas 3.x, uvicorn, aiohttp, yfinance, pydantic, ruff, scipy, pytest-asyncio, python-multipart, actions). These are large Python dep jumps; CI now exists to gate them — merge carefully and watch the (now-green) pipeline.
+6. `main` push also triggers a **Dependabot `github_actions`/"Update" dynamic check** group that currently reports `failure` (npm_and_yarn in `/frontend` and `/`) — unrelated to the app pipeline, but worth reconciling so `main` shows a clean overall Actions surface.
+7. Prior-review P0–P3 items still stand where not yet done: tag `v3.0.0-institutional-platform-ready`, delete the remaining ~17 merged branches, create the AGENTS.md-mandated `type:*`/`scope:*` labels, and add `LICENSE`.
+8. Low priority now that CI is real: consider a scheduled nightly run (or cron on a `dev` branch) for the burn-in/`pytest` + Jest matrix, and add coverage thresholds as CI gates.
+
+---
+
 ## ✅ Implementation status (2026-09-04 — "complete all your findings")
 
 All actionable findings below have been implemented on branch `arena/01a06ba6-ctb`:
