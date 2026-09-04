@@ -3,10 +3,12 @@ Tests for Layer 0 & Layer 11: Persistence, Pre-Decision Data Gate, and Causal Fi
 """
 
 import time
+
 import pytest
-from core.database import db_manager
+
+from core.causal_firewall import CausalLeakageException, causal_firewall
 from core.data_quality_gate import data_quality_gate
-from core.causal_firewall import causal_firewall, CausalLeakageException
+from core.database import db_manager
 from research.feature_registry import feature_registry
 
 
@@ -88,8 +90,19 @@ def test_feature_registry_schema_validation():
     valid_state = {
         "schema_version": "v2.1.0",
         "trend_scores": {"1d": 0.5, "4h": 0.5, "1h": 0.5, "15m": 0.5, "5m": 0.5},
-        "structure": {"bos_state": 1, "choch_state": 0, "liquidity_pool_pressure": 0.5, "fvg_bias": 0.0, "order_block_proximity": 0.5},
-        "orderflow": {"cvd_delta": 0.0, "absorption_score": 0.5, "oi_delta": 0.0, "funding_zscore": 0.0},
+        "structure": {
+            "bos_state": 1,
+            "choch_state": 0,
+            "liquidity_pool_pressure": 0.5,
+            "fvg_bias": 0.0,
+            "order_block_proximity": 0.5,
+        },
+        "orderflow": {
+            "cvd_delta": 0.0,
+            "absorption_score": 0.5,
+            "oi_delta": 0.0,
+            "funding_zscore": 0.0,
+        },
         "volatility": {"atr_percentile": 0.5, "bb_width_percentile": 0.5, "squeeze_state": False},
         "macro_alignment": {"dxy_correlation": -0.5, "yield_beta": -0.2, "event_risk_mode": False},
         "sentiment": {"nlp_news_score": 0.1, "fear_greed_norm": 0.5},
@@ -102,27 +115,53 @@ def test_feature_registry_schema_validation():
 def test_candles_table_synthetic_column_and_isolation():
     """Verify is_synthetic column exists in market_data.db and filters synthetic bars when requested."""
     from core.data_streamer import data_streamer
-    
+
     with db_manager.get_market_conn() as conn:
         cursor = conn.execute("PRAGMA table_info(candles);")
         cols = {row[1]: row[2] for row in cursor.fetchall()}
         assert "is_synthetic" in cols
-        
+
     # Test saving real and synthetic candles
     sym = "TEST/USDT"
     tf = "1m"
-    real_c = [{"timestamp": 1700000000000, "symbol": sym, "timeframe": tf, "open": 100.0, "high": 105.0, "low": 99.0, "close": 104.0, "volume": 50.0, "is_synthetic": 0}]
-    synth_c = [{"timestamp": 1700000060000, "symbol": sym, "timeframe": tf, "open": 104.0, "high": 106.0, "low": 103.0, "close": 105.0, "volume": 10.0, "is_synthetic": 1}]
-    
+    real_c = [
+        {
+            "timestamp": 1700000000000,
+            "symbol": sym,
+            "timeframe": tf,
+            "open": 100.0,
+            "high": 105.0,
+            "low": 99.0,
+            "close": 104.0,
+            "volume": 50.0,
+            "is_synthetic": 0,
+        }
+    ]
+    synth_c = [
+        {
+            "timestamp": 1700000060000,
+            "symbol": sym,
+            "timeframe": tf,
+            "open": 104.0,
+            "high": 106.0,
+            "low": 103.0,
+            "close": 105.0,
+            "volume": 10.0,
+            "is_synthetic": 1,
+        }
+    ]
+
     data_streamer.save_candles(sym, tf, real_c + synth_c)
-    
+
     # Retrieve all
     all_res = data_streamer.get_candles(sym, tf, limit=2, end_time=1700000100000)
     assert len(all_res) == 2
     assert any(c["is_synthetic"] == 1 for c in all_res)
-    
+
     # Retrieve strictly non-synthetic
-    pure_res = data_streamer.get_candles(sym, tf, limit=2, end_time=1700000100000, exclude_synthetic=True)
+    pure_res = data_streamer.get_candles(
+        sym, tf, limit=2, end_time=1700000100000, exclude_synthetic=True
+    )
     assert len(pure_res) == 1
     assert pure_res[0]["is_synthetic"] == 0
     assert pure_res[0]["timestamp"] == 1700000000000
@@ -131,7 +170,6 @@ def test_candles_table_synthetic_column_and_isolation():
 def test_concurrent_sqlite_wal_write_stress():
     """Verify SQLite WAL concurrency under concurrent multi-threaded write/read stress (P12.5)."""
     import threading
-    import random
 
     errors = []
     num_threads = 10
@@ -154,7 +192,7 @@ def test_concurrent_sqlite_wal_write_stress():
                 with db_manager.get_market_conn() as conn:
                     cur = conn.execute("SELECT COUNT(*) FROM candles WHERE symbol = 'STRESS/USDT'")
                     _ = cur.fetchone()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             errors.append(f"Thread {worker_id} error: {e}")
 
     threads = [threading.Thread(target=worker, args=(t,)) for t in range(num_threads)]
@@ -165,7 +203,7 @@ def test_concurrent_sqlite_wal_write_stress():
 
     assert len(errors) == 0, f"Encountered WAL write contention errors: {errors}"
     with db_manager.get_market_conn() as conn:
-        count = conn.execute("SELECT COUNT(*) FROM candles WHERE symbol = 'STRESS/USDT'").fetchone()[0]
+        count = conn.execute(
+            "SELECT COUNT(*) FROM candles WHERE symbol = 'STRESS/USDT'"
+        ).fetchone()[0]
         assert count == num_threads * writes_per_thread
-
-

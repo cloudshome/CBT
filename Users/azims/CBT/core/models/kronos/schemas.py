@@ -1,4 +1,4 @@
-﻿"""
+"""
 Canonical schemas and dataclasses for Kronos Time-Series Foundation Model Integration.
 """
 
@@ -6,17 +6,17 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class KronosModelVariant(str, Enum):
+class KronosModelVariant(StrEnum):
     MINI = "kronos-mini"
     SMALL = "kronos-small"
     BASE = "kronos-base"
 
 
-class KronosStatus(str, Enum):
+class KronosStatus(StrEnum):
     HEALTHY = "HEALTHY"
     DEGRADED = "DEGRADED"
     UNAVAILABLE = "KRONOS_UNAVAILABLE"
@@ -25,7 +25,7 @@ class KronosStatus(str, Enum):
     RESOURCE_ERROR = "RESOURCE_ERROR"
 
 
-class KronosAblationMode(str, Enum):
+class KronosAblationMode(StrEnum):
     SKY_ONLY = "SKY_ONLY"
     KRONOS_ONLY = "KRONOS_ONLY"
     SKY_PLUS_KRONOS = "SKY_PLUS_KRONOS"
@@ -50,14 +50,14 @@ class KronosConfig:
 @dataclass
 class KronosForecastPath:
     sample_id: int
-    predicted_timestamps: List[int]
-    predicted_opens: List[float]
-    predicted_highs: List[float]
-    predicted_lows: List[float]
-    predicted_closes: List[float]
-    predicted_volumes: Optional[List[float]] = None
+    predicted_timestamps: list[int]
+    predicted_opens: list[float]
+    predicted_highs: list[float]
+    predicted_lows: list[float]
+    predicted_closes: list[float]
+    predicted_volumes: list[float] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "sample_id": self.sample_id,
             "predicted_timestamps": self.predicted_timestamps,
@@ -75,6 +75,7 @@ class KronosForecast:
     Contract returned by Kronos Model Adapter.
     Distinguishes raw neural output from SKY-derived mathematical interpretations.
     """
+
     symbol: str
     timeframe: str
     input_start_time: int
@@ -84,7 +85,7 @@ class KronosForecast:
     current_price: float
 
     # Raw Forecast Paths
-    paths: List[KronosForecastPath]
+    paths: list[KronosForecastPath]
 
     # SKY-Derived Metrics (Explicitly identified as SKY derivations)
     expected_return_pct: float
@@ -95,8 +96,8 @@ class KronosForecast:
     forecast_volatility_pct: float
     path_dispersion_pct: float
     directional_consensus: float  # [0.5, 1.0]
-    model_uncertainty: float     # [0.0, 1.0]
-    directional_bias: str        # "BULLISH", "BEARISH", "NEUTRAL"
+    model_uncertainty: float  # [0.0, 1.0]
+    directional_bias: str  # "BULLISH", "BEARISH", "NEUTRAL"
 
     # Metadata & Observability
     model_name: str
@@ -105,10 +106,10 @@ class KronosForecast:
     inference_latency_ms: float
     device_used: str
     status: KronosStatus
-    error_code: Optional[str] = None
+    error_code: str | None = None
     created_at_ms: int = field(default_factory=lambda: int(time.time() * 1000))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timeframe": self.timeframe,

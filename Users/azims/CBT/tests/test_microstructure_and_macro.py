@@ -3,12 +3,12 @@ Tests for Layer 3: CVD Absorption, Lead-Lag Correlator, Judas Swings & Event Sho
 """
 
 import time
-import pytest
+
 from core.cvd_absorption import cvd_absorption_engine
-from core.lead_lag_correlator import lead_lag_correlator
-from core.event_shock_engine import event_shock_engine, MacroEvent
-from core.macro_sentinel import macro_sentinel
 from core.data_streamer import data_streamer
+from core.event_shock_engine import MacroEvent, event_shock_engine
+from core.lead_lag_correlator import lead_lag_correlator
+from core.macro_sentinel import macro_sentinel
 
 
 def test_cvd_absorption_calculation():
@@ -52,4 +52,9 @@ def test_macro_sentinel_snapshot():
     """Verify global macro vital aggregator."""
     snap = macro_sentinel.get_macro_snapshot()
     assert 0.0 <= snap.global_risk_index <= 100.0
-    assert snap.macro_regime in ["RISK_ON_EXPANSION", "RISK_OFF_FLIGHT_TO_SAFETY", "DOLLAR_SQUEEZE", "NEUTRAL"]
+    assert snap.macro_regime in [
+        "RISK_ON_EXPANSION",
+        "RISK_OFF_FLIGHT_TO_SAFETY",
+        "DOLLAR_SQUEEZE",
+        "NEUTRAL",
+    ]

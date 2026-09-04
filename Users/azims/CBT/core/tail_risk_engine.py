@@ -10,8 +10,8 @@ Emits emergency defensive directives when tail risk triggers.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.tail_risk_engine")
@@ -20,12 +20,12 @@ logger = logging.getLogger("ai_quant_sentinel.tail_risk_engine")
 @dataclass
 class TailRiskStatus:
     is_tail_risk_active: bool
-    tail_risk_score: float              # [0.0, 1.0]
+    tail_risk_score: float  # [0.0, 1.0]
     correlation_spike_detected: bool
     liquidity_evaporation_detected: bool
     cross_asset_correlation: float
     orderbook_depth_decay_pct: float
-    recommended_action: str             # "NORMAL", "HALVE_EXPOSURES", "EMERGENCY_DELEVERAGE"
+    recommended_action: str  # "NORMAL", "HALVE_EXPOSURES", "EMERGENCY_DELEVERAGE"
     details: str
 
 
@@ -34,9 +34,9 @@ class TailRiskEngine:
 
     def evaluate_tail_risk(
         self,
-        btc_returns: List[float],
-        eth_returns: List[float],
-        gold_returns: List[float],
+        btc_returns: list[float],
+        eth_returns: list[float],
+        gold_returns: list[float],
         current_book_depth_usd: float,
         rolling_median_depth_usd: float,
     ) -> TailRiskStatus:
@@ -69,7 +69,12 @@ class TailRiskEngine:
         # Orderbook Depth Evaporation
         depth_decay = 0.0
         if rolling_median_depth_usd > 0:
-            depth_decay = max(0.0, (rolling_median_depth_usd - current_book_depth_usd) / rolling_median_depth_usd * 100.0)
+            depth_decay = max(
+                0.0,
+                (rolling_median_depth_usd - current_book_depth_usd)
+                / rolling_median_depth_usd
+                * 100.0,
+            )
 
         liq_evap = bool(depth_decay > 65.0)
 
@@ -87,7 +92,9 @@ class TailRiskEngine:
             details = f"CRITICAL TAIL RISK: Liquidity evaporated by {depth_decay:.1f}%, cross-correlation at {cross_corr:.2f}."
         elif is_active:
             action = "HALVE_EXPOSURES"
-            details = f"ELEVATED TAIL RISK: Systemic liquidity stress detected (Score: {tail_score:.2f})."
+            details = (
+                f"ELEVATED TAIL RISK: Systemic liquidity stress detected (Score: {tail_score:.2f})."
+            )
         else:
             action = "NORMAL"
             details = "Orderbook liquidity and asset correlations within safe historical bounds."

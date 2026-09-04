@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.macro_liquidity_beta")
 
@@ -26,7 +26,7 @@ class MacroLiquiditySnapshot:
     macro_regime: str
     z_score: float  # Standardized [-3.0, +3.0]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -46,14 +46,15 @@ class MacroLiquidityBetaEngine:
 
     def analyze(self, symbol: str, current_price: float) -> MacroLiquiditySnapshot:
         import time
+
         sym = symbol.upper()
         now = int(time.time() * 1000)
 
         # Baseline Macro Telemetry
         us10y = 4.22
         us10y_delta = -3.4  # -3.4 bps easing
-        m2_rate = 6.4       # +6.4% YoY Global M2 expansion
-        gri = 68.5          # Elevated Geopolitical Risk
+        m2_rate = 6.4  # +6.4% YoY Global M2 expansion
+        gri = 68.5  # Elevated Geopolitical Risk
 
         if "BTC" in sym:
             dxy_corr = -0.82

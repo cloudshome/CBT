@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.physical_supply_shock")
 
@@ -25,7 +25,7 @@ class PhysicalSupplyShockSnapshot:
     supply_shock_state: str
     z_score: float  # Standardized [-3.0, +3.0]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -44,6 +44,7 @@ class PhysicalSupplyShockEngine:
 
     def analyze(self, symbol: str, current_price: float) -> PhysicalSupplyShockSnapshot:
         import time
+
         sym = symbol.upper()
         now = int(time.time() * 1000)
 
@@ -68,11 +69,11 @@ class PhysicalSupplyShockEngine:
 
         else:
             # Gold COMEX Vault Drawdown & SGE Premium
-            net_units = -12500.0 # Ounces
+            net_units = -12500.0  # Ounces
             str_delta = "-12,500 oz"
             comex_delta = -1.85  # -1.85% Registered COMEX drawdown this week
-            sge_prem = 24.50     # +$24.50/oz Shanghai physical gold premium
-            z = 2.35             # Strong physical delivery demand
+            sge_prem = 24.50  # +$24.50/oz Shanghai physical gold premium
+            z = 2.35  # Strong physical delivery demand
             trend = "COMEX_VAULT_DEPLETION"
             state = "PHYSICAL_DELIVERY_SQUEEZE"
 

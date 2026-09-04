@@ -6,11 +6,9 @@ synthesizes desk intelligence audio briefs (Text-to-Speech).
 
 from __future__ import annotations
 
-import base64
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
 
 logger = logging.getLogger("ai_quant_sentinel.voice_interface")
 
@@ -18,7 +16,7 @@ logger = logging.getLogger("ai_quant_sentinel.voice_interface")
 class VoiceInterface:
     """Processes incoming audio memos and generates audio voice briefs."""
 
-    def __init__(self, audio_dir: Optional[Path] = None):
+    def __init__(self, audio_dir: Path | None = None):
         self.audio_dir = audio_dir or Path(os.getenv("DATA_DIR", "data")) / "uploads"
         self.audio_dir.mkdir(parents=True, exist_ok=True)
 
@@ -47,6 +45,7 @@ class VoiceInterface:
             try:
                 from google import genai
                 from google.genai import types
+
                 client = genai.Client(api_key=gemini_key)
                 model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
                 part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
@@ -56,21 +55,23 @@ class VoiceInterface:
                 )
                 if response and response.text:
                     return response.text.strip()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 # 2. Legacy google.generativeai fallback
                 try:
                     import google.generativeai as genai_legacy
+
                     genai_legacy.configure(api_key=gemini_key)
                     model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
                     model = genai_legacy.GenerativeModel(model_name)
-                    response = model.generate_content([
-                        prompt,
-                        {"mime_type": mime_type, "data": audio_bytes}
-                    ])
+                    response = model.generate_content(
+                        [prompt, {"mime_type": mime_type, "data": audio_bytes}]
+                    )
                     if response and response.text:
                         return response.text.strip()
-                except Exception as ex:
-                    logger.warning(f"Gemini audio transcription failed ({e} / {ex}), falling back to local extractor.")
+                except Exception as ex:  # noqa: BLE001 — defensive fallback
+                    logger.warning(
+                        f"Gemini audio transcription failed ({e} / {ex}), falling back to local extractor."
+                    )
 
         # Fallback local extraction
         return "Entered Gold Long at 2678, Stop Loss 2670, Take Profit 2695, 0.5 lot"

@@ -1,19 +1,21 @@
-﻿"""
+"""
 Mathematical interpretation and feature derivation layer for Kronos forecasts.
 Calculates expected return, dispersion, consensus, and uncertainty metrics.
 """
 
 from __future__ import annotations
 
-from typing import List, Dict, Any
+from typing import Any
+
 import numpy as np
+
 from core.models.kronos.schemas import KronosForecastPath
 
 
 def calculate_sky_derived_metrics(
-    paths: List[KronosForecastPath],
+    paths: list[KronosForecastPath],
     current_price: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Computes rigorous mathematical summary statistics from a collection
     of multi-sample forecast paths.

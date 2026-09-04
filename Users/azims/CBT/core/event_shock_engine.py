@@ -9,9 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
 logger = logging.getLogger("ai_quant_sentinel.event_shock_engine")
 
@@ -19,23 +17,23 @@ logger = logging.getLogger("ai_quant_sentinel.event_shock_engine")
 @dataclass
 class MacroEvent:
     event_id: str
-    title: str                      # "FOMC Rate Decision", "US CPI", "Non-Farm Payrolls"
-    impact: str                     # "HIGH", "CRITICAL", "MEDIUM"
+    title: str  # "FOMC Rate Decision", "US CPI", "Non-Farm Payrolls"
+    impact: str  # "HIGH", "CRITICAL", "MEDIUM"
     scheduled_timestamp_ms: int
     country: str = "US"
-    forecast: Optional[str] = None
-    previous: Optional[str] = None
+    forecast: str | None = None
+    previous: str | None = None
 
 
 @dataclass
 class EventRiskState:
     is_event_risk_active: bool
-    nearest_event: Optional[MacroEvent]
+    nearest_event: MacroEvent | None
     minutes_until_event: float
-    ev_hurdle_multiplier: float     # 1.0 normal, 1.50 in event risk
-    position_size_multiplier: float # 1.0 normal, 0.50 in event risk
-    slippage_multiplier: float      # 1.0 normal, 2.50 in event risk
-    mode_name: str                  # "NORMAL" or "EVENT_RISK_MODE"
+    ev_hurdle_multiplier: float  # 1.0 normal, 1.50 in event risk
+    position_size_multiplier: float  # 1.0 normal, 0.50 in event risk
+    slippage_multiplier: float  # 1.0 normal, 2.50 in event risk
+    mode_name: str  # "NORMAL" or "EVENT_RISK_MODE"
     trading_lockout: bool
 
 
@@ -47,7 +45,7 @@ class EventShockEngine:
     def __init__(self, risk_window_minutes: float = 60.0, lockout_window_minutes: float = 5.0):
         self.risk_window_minutes = risk_window_minutes
         self.lockout_window_minutes = lockout_window_minutes
-        self._events: List[MacroEvent] = []
+        self._events: list[MacroEvent] = []
         self._seed_default_calendar()
 
     def _seed_default_calendar(self) -> None:
@@ -55,23 +53,41 @@ class EventShockEngine:
         now = int(time.time() * 1000)
         # Seed an event every few days for continuous safety checks
         self._events = [
-            MacroEvent("EV_FOMC_01", "FOMC Interest Rate Decision", "CRITICAL", now + 3600 * 1000 * 18, "US"),
-            MacroEvent("EV_CPI_01", "US Consumer Price Index (CPI YoY)", "CRITICAL", now + 3600 * 1000 * 42, "US"),
-            MacroEvent("EV_NFP_01", "US Non-Farm Payrolls (NFP)", "HIGH", now + 3600 * 1000 * 70, "US"),
-            MacroEvent("EV_GDP_01", "US Gross Domestic Product (QoQ)", "HIGH", now + 3600 * 1000 * 95, "US"),
+            MacroEvent(
+                "EV_FOMC_01",
+                "FOMC Interest Rate Decision",
+                "CRITICAL",
+                now + 3600 * 1000 * 18,
+                "US",
+            ),
+            MacroEvent(
+                "EV_CPI_01",
+                "US Consumer Price Index (CPI YoY)",
+                "CRITICAL",
+                now + 3600 * 1000 * 42,
+                "US",
+            ),
+            MacroEvent(
+                "EV_NFP_01", "US Non-Farm Payrolls (NFP)", "HIGH", now + 3600 * 1000 * 70, "US"
+            ),
+            MacroEvent(
+                "EV_GDP_01", "US Gross Domestic Product (QoQ)", "HIGH", now + 3600 * 1000 * 95, "US"
+            ),
         ]
 
     def add_event(self, event: MacroEvent) -> None:
         self._events.append(event)
         self._events.sort(key=lambda x: x.scheduled_timestamp_ms)
 
-    def evaluate_risk_state(self, current_time_ms: Optional[int] = None) -> EventRiskState:
+    def evaluate_risk_state(self, current_time_ms: int | None = None) -> EventRiskState:
         """
         Calculates time distance to nearest upcoming high-impact event and determines risk modifiers.
         """
         now = current_time_ms if current_time_ms is not None else int(time.time() * 1000)
 
-        upcoming_events = [e for e in self._events if e.scheduled_timestamp_ms >= (now - 15 * 60 * 1000)]
+        upcoming_events = [
+            e for e in self._events if e.scheduled_timestamp_ms >= (now - 15 * 60 * 1000)
+        ]
         if not upcoming_events:
             return EventRiskState(
                 is_event_risk_active=False,

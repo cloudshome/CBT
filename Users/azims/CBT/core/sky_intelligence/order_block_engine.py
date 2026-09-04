@@ -7,7 +7,8 @@ Evaluates ATR-normalized displacement, retests, mitigation, and statistical vali
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import CandidateOrderBlock, OrderBlockType
@@ -28,9 +29,9 @@ class OrderBlockEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
-        atr: Optional[float] = None,
-    ) -> List[CandidateOrderBlock]:
+        candles: list[dict[str, Any]],
+        atr: float | None = None,
+    ) -> list[CandidateOrderBlock]:
         """
         Scans for candidate order blocks: origin down/up candle preceding an explosive directional move.
         """
@@ -46,9 +47,13 @@ class OrderBlockEngine:
                 )
                 for i in range(1, len(candles))
             ]
-            atr = float(np.mean(tr_list[-14:])) if len(tr_list) >= 14 else (candles[-1]["close"] * 0.01)
+            atr = (
+                float(np.mean(tr_list[-14:]))
+                if len(tr_list) >= 14
+                else (candles[-1]["close"] * 0.01)
+            )
 
-        candidate_obs: List[CandidateOrderBlock] = []
+        candidate_obs: list[CandidateOrderBlock] = []
 
         # Iterate looking for origin candle at i-2 or i-3 followed by strong displacement
         for i in range(3, len(candles)):
@@ -70,7 +75,9 @@ class OrderBlockEngine:
 
                 if disp_atr >= self.min_displacement_atr:
                     # Verified strong post-origin displacement
-                    vol_expansion = (float(c_disp1.get("volume", 1.0)) + float(c_disp2.get("volume", 1.0))) / (2.0 * max(vol_origin, 0.01))
+                    vol_expansion = (
+                        float(c_disp1.get("volume", 1.0)) + float(c_disp2.get("volume", 1.0))
+                    ) / (2.0 * max(vol_origin, 0.01))
 
                     ob = CandidateOrderBlock(
                         ob_type=OrderBlockType.CANDIDATE_BULLISH_OB,
@@ -104,7 +111,9 @@ class OrderBlockEngine:
                 disp_atr = expansion_move / (atr if atr > 0 else 1.0)
 
                 if disp_atr >= self.min_displacement_atr:
-                    vol_expansion = (float(c_disp1.get("volume", 1.0)) + float(c_disp2.get("volume", 1.0))) / (2.0 * max(vol_origin, 0.01))
+                    vol_expansion = (
+                        float(c_disp1.get("volume", 1.0)) + float(c_disp2.get("volume", 1.0))
+                    ) / (2.0 * max(vol_origin, 0.01))
 
                     ob = CandidateOrderBlock(
                         ob_type=OrderBlockType.CANDIDATE_BEARISH_OB,
@@ -134,7 +143,9 @@ class OrderBlockEngine:
 
         return candidate_obs
 
-    def _evaluate_ob_evolution(self, ob: CandidateOrderBlock, future_candles: List[Dict[str, Any]]) -> None:
+    def _evaluate_ob_evolution(
+        self, ob: CandidateOrderBlock, future_candles: list[dict[str, Any]]
+    ) -> None:
         """
         Evaluates retest counts, mitigation, and invalidation of the candidate order block.
         """

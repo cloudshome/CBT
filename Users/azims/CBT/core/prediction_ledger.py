@@ -9,9 +9,8 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
-import numpy as np
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from core.database import db_manager
 from core.market_state import MarketStateVector
@@ -26,18 +25,18 @@ class FrozenPrediction:
     symbol: str
     timeframe: str
     state_vector_hash: str
-    forecast_horizons: Dict[str, Any]
-    expected_path: Dict[str, Any]
+    forecast_horizons: dict[str, Any]
+    expected_path: dict[str, Any]
     invalidation_price: float
-    target_prices: Dict[str, float]
+    target_prices: dict[str, float]
     confidence: float
-    outcome_5m: Optional[str] = None
-    outcome_1h: Optional[str] = None
-    outcome_4h: Optional[str] = None
+    outcome_5m: str | None = None
+    outcome_1h: str | None = None
+    outcome_4h: str | None = None
     is_verified: bool = False
-    brier_score: Optional[float] = None
+    brier_score: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -49,10 +48,10 @@ class PredictionLedger:
         symbol: str,
         timeframe: str,
         state: MarketStateVector,
-        forecast_ladder: Dict[str, Any],
-        expected_path: Dict[str, Any],
+        forecast_ladder: dict[str, Any],
+        expected_path: dict[str, Any],
         invalidation_price: float,
-        target_prices: Dict[str, float],
+        target_prices: dict[str, float],
         confidence: float,
     ) -> str:
         """
@@ -91,7 +90,7 @@ class PredictionLedger:
         logger.info(f"Frozen prediction {pred_id} in ledger before future resolution.")
         return pred_id
 
-    def verify_pending_predictions(self, current_time_ms: Optional[int] = None) -> int:
+    def verify_pending_predictions(self, current_time_ms: int | None = None) -> int:
         """
         Scans unverified predictions in the ledger and verifies their outcomes
         against subsequent actual price action.
@@ -198,7 +197,7 @@ class PredictionLedger:
 
         return verified_count
 
-    def get_recent_ledger(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_recent_ledger(self, limit: int = 50) -> list[dict[str, Any]]:
         with db_manager.get_brain_conn() as conn:
             cursor = conn.execute(
                 """

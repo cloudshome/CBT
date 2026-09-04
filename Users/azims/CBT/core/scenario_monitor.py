@@ -7,10 +7,9 @@ Instantly emits SCENARIO_COLLAPSED_ALERT and aborts pending executions before ca
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
-from core.scenario_engine import MECEScenarioDistribution, Scenario
+from core.scenario_engine import MECEScenarioDistribution
 
 logger = logging.getLogger("ai_quant_sentinel.scenario_monitor")
 
@@ -23,14 +22,14 @@ class ScenarioCollapseAlert:
     invalidation_price: float
     current_price: float
     trigger_reason: str
-    action_required: str               # "ABORT_PENDING_ORDERS", "RECALCULATE_DISTRIBUTION", "NONE"
+    action_required: str  # "ABORT_PENDING_ORDERS", "RECALCULATE_DISTRIBUTION", "NONE"
 
 
 class ScenarioMonitor:
     """Watchdog continuously validating live market ticks against active scenario bounds."""
 
     def __init__(self):
-        self._active_scenarios: Dict[str, MECEScenarioDistribution] = {}
+        self._active_scenarios: dict[str, MECEScenarioDistribution] = {}
 
     def register_active_distribution(self, symbol: str, dist: MECEScenarioDistribution) -> None:
         self._active_scenarios[symbol] = dist
@@ -40,7 +39,7 @@ class ScenarioMonitor:
         symbol: str,
         current_tick_price: float,
         current_cvd_delta: float = 0.0,
-    ) -> Optional[ScenarioCollapseAlert]:
+    ) -> ScenarioCollapseAlert | None:
         """
         Evaluates current price against dominant scenario invalidation thresholds.
         """
@@ -48,7 +47,9 @@ class ScenarioMonitor:
         if not dist:
             return None
 
-        dom_scenario = next((s for s in dist.scenarios if s.scenario_id == dist.dominant_scenario_id), None)
+        dom_scenario = next(
+            (s for s in dist.scenarios if s.scenario_id == dist.dominant_scenario_id), None
+        )
         if not dom_scenario:
             return None
 
@@ -76,7 +77,9 @@ class ScenarioMonitor:
                 reason = f"Aggressive Contra-CVD Buying Spike detected (Delta = {current_cvd_delta:+.2f})"
 
         if breached:
-            logger.warning(f"SCENARIO_COLLAPSED_ALERT for {symbol}: {reason}. ABORTING PENDING ORDERS.")
+            logger.warning(
+                f"SCENARIO_COLLAPSED_ALERT for {symbol}: {reason}. ABORTING PENDING ORDERS."
+            )
             return ScenarioCollapseAlert(
                 collapsed=True,
                 symbol=symbol,

@@ -6,11 +6,10 @@ sweeping Asian Session (00:00-06:00 UTC) range extremes and snapping back with >
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
-import numpy as np
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.judas_sweep_hunter")
 
@@ -18,9 +17,9 @@ logger = logging.getLogger("ai_quant_sentinel.judas_sweep_hunter")
 @dataclass
 class JudasSweepSignal:
     symbol: str
-    session_name: str               # "LONDON_OPEN", "NY_OPEN"
+    session_name: str  # "LONDON_OPEN", "NY_OPEN"
     timestamp: int
-    sweep_direction: str            # "BULLISH_REVERSAL_SWEEP", "BEARISH_REVERSAL_SWEEP"
+    sweep_direction: str  # "BULLISH_REVERSAL_SWEEP", "BEARISH_REVERSAL_SWEEP"
     asian_high: float
     asian_low: float
     swept_level: float
@@ -39,8 +38,8 @@ class JudasSweepHunter:
     def check_session_judas_sweep(
         self,
         symbol: str,
-        candles_15m: List[Dict[str, Any]],
-    ) -> Optional[JudasSweepSignal]:
+        candles_15m: list[dict[str, Any]],
+    ) -> JudasSweepSignal | None:
         """
         Extracts Asian range (00:00 - 06:00 UTC) and checks if London/NY open candles
         sweep and reject Asian highs/lows.
@@ -50,7 +49,7 @@ class JudasSweepHunter:
 
         # Look at the most recent candle timestamp
         latest_c = candles_15m[-1]
-        dt = datetime.fromtimestamp(latest_c["timestamp"] / 1000.0, tz=timezone.utc)
+        dt = datetime.fromtimestamp(latest_c["timestamp"] / 1000.0, tz=UTC)
         hour = dt.hour
         minute = dt.minute
         time_dec = hour + minute / 60.0
@@ -67,7 +66,7 @@ class JudasSweepHunter:
         # Calculate Asian Session High & Low (00:00 to 06:00 UTC)
         asian_candles = []
         for c in candles_15m:
-            c_dt = datetime.fromtimestamp(c["timestamp"] / 1000.0, tz=timezone.utc)
+            c_dt = datetime.fromtimestamp(c["timestamp"] / 1000.0, tz=UTC)
             if c_dt.date() == dt.date() and 0 <= c_dt.hour < 6:
                 asian_candles.append(c)
 

@@ -7,7 +7,7 @@ Tests incremental feature combinations against a Baseline to evaluate genuine pr
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional
+
 import numpy as np
 
 from core.sky_intelligence.types import AblationResult
@@ -22,13 +22,13 @@ class FeatureAblationFramework:
 
     def run_ablation_study(
         self,
-        baseline_outcomes_r: List[float],
-        feature_test_outcomes_r: Dict[str, List[float]],
-    ) -> List[AblationResult]:
+        baseline_outcomes_r: list[float],
+        feature_test_outcomes_r: dict[str, list[float]],
+    ) -> list[AblationResult]:
         """
         Runs ablation comparisons between baseline and incremental feature combinations.
         """
-        results: List[AblationResult] = []
+        results: list[AblationResult] = []
 
         base_n = len(baseline_outcomes_r)
         if base_n == 0:
@@ -37,7 +37,9 @@ class FeatureAblationFramework:
         base_arr = np.array(baseline_outcomes_r)
         base_exp = float(np.mean(base_arr))
         base_wr = float(np.mean(base_arr > 0))
-        base_pf = float(np.sum(base_arr[base_arr > 0])) / abs(float(np.sum(base_arr[base_arr < 0])) or 0.001)
+        base_pf = float(np.sum(base_arr[base_arr > 0])) / abs(
+            float(np.sum(base_arr[base_arr < 0])) or 0.001
+        )
 
         # Record Baseline entry
         results.append(

@@ -11,8 +11,9 @@ Enforces Master Rule: Net EV <= +0.25R forces DECISION_NO_TRADE.
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 from core.uncertainty_engine import UncertaintyBudget
@@ -22,21 +23,21 @@ logger = logging.getLogger("ai_quant_sentinel.ev_engine")
 
 @dataclass
 class NetEVResult:
-    raw_ev_r: float                     # Raw expected value before frictions
-    net_ev_r: float                     # Net EV after all fees, slippage, funding & uncertainty
-    win_probability: float              # Calibrated win rate P(TP before SL)
-    loss_probability: float             # P(SL)
-    reward_to_risk_ratio: float         # b = (TP - Entry) / (Entry - SL)
+    raw_ev_r: float  # Raw expected value before frictions
+    net_ev_r: float  # Net EV after all fees, slippage, funding & uncertainty
+    win_probability: float  # Calibrated win rate P(TP before SL)
+    loss_probability: float  # P(SL)
+    reward_to_risk_ratio: float  # b = (TP - Entry) / (Entry - SL)
     taker_fee_penalty_r: float
     slippage_penalty_r: float
     funding_penalty_r: float
     uncertainty_deduction_r: float
-    is_tradable: bool                   # True only if Net EV > +0.25R
-    min_hurdle_r: float                 # 0.25R normal, 0.375R in event risk
-    decision_verdict: str               # "PROCEED_TO_ALLOCATION" or "DECISION_NO_TRADE"
+    is_tradable: bool  # True only if Net EV > +0.25R
+    min_hurdle_r: float  # 0.25R normal, 0.375R in event risk
+    decision_verdict: str  # "PROCEED_TO_ALLOCATION" or "DECISION_NO_TRADE"
     rationale: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -46,7 +47,7 @@ class ExpectedValueEngine:
     def __init__(
         self,
         default_hurdle_r: float = 0.25,
-        taker_fee_bps: float = 5.0,     # 0.05% per side (10 bps roundtrip)
+        taker_fee_bps: float = 5.0,  # 0.05% per side (10 bps roundtrip)
         base_slippage_bps: float = 3.0,  # 0.03% standard slippage
     ):
         self.default_hurdle_r = default_hurdle_r
@@ -122,7 +123,7 @@ class ExpectedValueEngine:
         if is_tradable:
             rationale = (
                 f"Positive edge verified: Net EV = +{net_ev:.2f}R (Hurdle: +{min_hurdle:.2f}R). "
-                f"Win Rate: {p_win*100:.1f}%, RR: {rr_ratio:.2f}:1, Uncertainty U: {uncertainty.composite_uncertainty_u:.2f}."
+                f"Win Rate: {p_win * 100:.1f}%, RR: {rr_ratio:.2f}:1, Uncertainty U: {uncertainty.composite_uncertainty_u:.2f}."
             )
         else:
             reasons = []
@@ -131,7 +132,9 @@ class ExpectedValueEngine:
             elif net_ev < min_hurdle:
                 reasons.append(f"Net EV {net_ev:.2f}R below required hurdle +{min_hurdle:.2f}R")
             if uncertainty.composite_uncertainty_u > 0.60:
-                reasons.append(f"High systemic entropy (U={uncertainty.composite_uncertainty_u:.2f})")
+                reasons.append(
+                    f"High systemic entropy (U={uncertainty.composite_uncertainty_u:.2f})"
+                )
             rationale = f"Trade rejected by Scientific Gate: {'; '.join(reasons)}. Enforcing DECISION_NO_TRADE."
 
         return NetEVResult(

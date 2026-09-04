@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-import numpy as np
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.fractal_harmonics")
 
@@ -19,9 +18,9 @@ logger = logging.getLogger("ai_quant_sentinel.fractal_harmonics")
 @dataclass
 class FractalTierStatus:
     timeframe: str
-    bias: str                   # "BULLISH", "BEARISH", "NEUTRAL"
-    structure_type: str         # "EXPANSION", "PULLBACK", "CONSOLIDATION", "SWEEP"
-    trend_strength: float       # [0.0, 1.0]
+    bias: str  # "BULLISH", "BEARISH", "NEUTRAL"
+    structure_type: str  # "EXPANSION", "PULLBACK", "CONSOLIDATION", "SWEEP"
+    trend_strength: float  # [0.0, 1.0]
 
 
 @dataclass
@@ -32,7 +31,7 @@ class FractalHarmonicsResult:
     micro_tier: FractalTierStatus
     harmonic_confluence_score: float  # [0.0, 1.0] (1.0 = Full 3-tier confluence)
     is_aligned: bool
-    dominant_direction: str           # "LONG", "SHORT", "NEUTRAL"
+    dominant_direction: str  # "LONG", "SHORT", "NEUTRAL"
     narrative: str
 
 
@@ -44,9 +43,9 @@ class FractalHarmonicsEngine:
     def evaluate_harmonics(
         self,
         symbol: str = "BTC/USDT",
-        macro_candles: Optional[List[Dict[str, Any]]] = None,
-        context_candles: Optional[List[Dict[str, Any]]] = None,
-        micro_candles: Optional[List[Dict[str, Any]]] = None,
+        macro_candles: list[dict[str, Any]] | None = None,
+        context_candles: list[dict[str, Any]] | None = None,
+        micro_candles: list[dict[str, Any]] | None = None,
     ) -> FractalHarmonicsResult:
         """
         Synthesizes structure across 1D/4H, 1H/15m, and 5m/1m.
@@ -74,12 +73,16 @@ class FractalHarmonicsEngine:
             confluence = 0.72
             aligned = True
             direction = "LONG"
-            narrative = "2-of-3 Fractal Alignment (Bullish). Micro pullback into context discount zone."
+            narrative = (
+                "2-of-3 Fractal Alignment (Bullish). Micro pullback into context discount zone."
+            )
         elif bear_count == 2:
             confluence = 0.72
             aligned = True
             direction = "SHORT"
-            narrative = "2-of-3 Fractal Alignment (Bearish). Micro relief rally into context premium zone."
+            narrative = (
+                "2-of-3 Fractal Alignment (Bearish). Micro relief rally into context premium zone."
+            )
         else:
             confluence = 0.35
             aligned = False
@@ -99,7 +102,7 @@ class FractalHarmonicsEngine:
 
     def _evaluate_tier(
         self,
-        candles: Optional[List[Dict[str, Any]]],
+        candles: list[dict[str, Any]] | None,
         tf_label: str,
         default_bias: str = "BULLISH",
     ) -> FractalTierStatus:

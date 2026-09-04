@@ -1,4 +1,4 @@
-﻿"""
+"""
 Observability, health tracking, and degradation management for Kronos model subsystem.
 """
 
@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from core.models.kronos.schemas import KronosStatus
 
 logger = logging.getLogger("ai_quant_sentinel.kronos.health")
@@ -19,9 +20,9 @@ class KronosHealthMonitor:
         self.total_inferences: int = 0
         self.failed_inferences: int = 0
         self.consecutive_errors: int = 0
-        self.latencies_ms: List[float] = []
-        self.last_inference_timestamp_ms: Optional[int] = None
-        self.last_error_message: Optional[str] = None
+        self.latencies_ms: list[float] = []
+        self.last_inference_timestamp_ms: int | None = None
+        self.last_error_message: str | None = None
         self._max_latency_history: int = 100
 
     def record_success(self, latency_ms: float) -> None:
@@ -46,7 +47,7 @@ class KronosHealthMonitor:
             return KronosStatus.DEGRADED
         return KronosStatus.HEALTHY
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         p50 = 0.0
         p95 = 0.0
         if self.latencies_ms:

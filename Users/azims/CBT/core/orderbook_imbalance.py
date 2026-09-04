@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.orderbook_imbalance")
@@ -20,14 +20,14 @@ logger = logging.getLogger("ai_quant_sentinel.orderbook_imbalance")
 class OBIAnalysisResult:
     symbol: str
     timestamp: int
-    obi_score: float                   # [-1.0, 1.0] (Positive = Bid Heavy, Negative = Ask Heavy)
-    top_level_imbalance: float         # [-1.0, 1.0] L1 imbalance
-    depth_weighted_imbalance: float    # [-1.0, 1.0] L5-L20 weighted imbalance
-    flow_toxicity_vpin: float          # [0.0, 1.0] (VPIN > 0.65 = Toxic informed flow)
+    obi_score: float  # [-1.0, 1.0] (Positive = Bid Heavy, Negative = Ask Heavy)
+    top_level_imbalance: float  # [-1.0, 1.0] L1 imbalance
+    depth_weighted_imbalance: float  # [-1.0, 1.0] L5-L20 weighted imbalance
+    flow_toxicity_vpin: float  # [0.0, 1.0] (VPIN > 0.65 = Toxic informed flow)
     bid_depth_total_usd: float
     ask_depth_total_usd: float
-    micro_price_shift: float           # Microprice - Midprice spread
-    regime: str                        # "ACCUMULATION_PRESSURE", "DISTRIBUTION_PRESSURE", "NEUTRAL_BALANCED", "TOXIC_CASCADE_RISK"
+    micro_price_shift: float  # Microprice - Midprice spread
+    regime: str  # "ACCUMULATION_PRESSURE", "DISTRIBUTION_PRESSURE", "NEUTRAL_BALANCED", "TOXIC_CASCADE_RISK"
     narrative: str
 
 
@@ -39,14 +39,14 @@ class OrderBookImbalanceEngine:
     def __init__(self, depth_levels: int = 15, vpin_bucket_size: int = 50):
         self.depth_levels = depth_levels
         self.vpin_bucket_size = vpin_bucket_size
-        self._trade_buckets: List[float] = []
+        self._trade_buckets: list[float] = []
 
     def compute_imbalance(
         self,
-        bids: List[Tuple[float, float]],  # List of (price, size)
-        asks: List[Tuple[float, float]],  # List of (price, size)
+        bids: list[tuple[float, float]],  # List of (price, size)
+        asks: list[tuple[float, float]],  # List of (price, size)
         symbol: str = "BTC/USDT",
-        timestamp_ms: Optional[int] = None,
+        timestamp_ms: int | None = None,
     ) -> OBIAnalysisResult:
         """
         Calculates weighted order book imbalance (OBI) and microprice delta.
@@ -69,8 +69,8 @@ class OrderBookImbalanceEngine:
             )
 
         # Truncate to depth levels
-        bids_arr = np.array(bids[:self.depth_levels], dtype=np.float64)
-        asks_arr = np.array(asks[:self.depth_levels], dtype=np.float64)
+        bids_arr = np.array(bids[: self.depth_levels], dtype=np.float64)
+        asks_arr = np.array(asks[: self.depth_levels], dtype=np.float64)
 
         b_prices, b_sizes = bids_arr[:, 0], bids_arr[:, 1]
         a_prices, a_sizes = asks_arr[:, 0], asks_arr[:, 1]
@@ -81,11 +81,13 @@ class OrderBookImbalanceEngine:
 
         # Exponential decay weights for depth levels (w_i = exp(-0.15 * i))
         weights = np.exp(-0.15 * np.arange(min(len(b_sizes), len(a_sizes))))
-        weighted_bids = np.sum(b_sizes[:len(weights)] * weights)
-        weighted_asks = np.sum(a_sizes[:len(weights)] * weights)
+        weighted_bids = np.sum(b_sizes[: len(weights)] * weights)
+        weighted_asks = np.sum(a_sizes[: len(weights)] * weights)
 
         total_weighted = weighted_bids + weighted_asks
-        depth_imbalance = float((weighted_bids - weighted_asks) / total_weighted) if total_weighted > 0 else 0.0
+        depth_imbalance = (
+            float((weighted_bids - weighted_asks) / total_weighted) if total_weighted > 0 else 0.0
+        )
 
         # Dollar depth
         bid_total_usd = float(np.sum(b_prices * b_sizes))
@@ -119,7 +121,9 @@ class OrderBookImbalanceEngine:
             narrative = f"Strong passive bid depth (+{composite_obi:.2f}). Buyers absorbing asks."
         elif composite_obi < -0.35:
             regime = "DISTRIBUTION_PRESSURE"
-            narrative = f"Heavy ask overhang ({composite_obi:.2f}). Selling pressure dominating orderbook."
+            narrative = (
+                f"Heavy ask overhang ({composite_obi:.2f}). Selling pressure dominating orderbook."
+            )
         else:
             regime = "NEUTRAL_BALANCED"
             narrative = f"Order book in dynamic equilibrium (OBI {composite_obi:+.2f})."

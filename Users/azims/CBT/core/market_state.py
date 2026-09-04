@@ -11,7 +11,8 @@ import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 import numpy as np
 
 from core.database import db_manager
@@ -25,19 +26,21 @@ class MarketStateVector:
     schema_version: str
     asset: str
     timestamp: int
-    trend_scores: Dict[str, float]      # {"1d", "4h", "1h", "15m", "5m"} [-1.0, 1.0]
-    structure: Dict[str, Any]           # {"bos_state", "choch_state", "liquidity_pool_pressure", "fvg_bias", "order_block_proximity"}
-    orderflow: Dict[str, float]         # {"cvd_delta", "absorption_score", "oi_delta", "funding_zscore"}
-    volatility: Dict[str, Any]          # {"atr_percentile", "bb_width_percentile", "squeeze_state"}
-    macro_alignment: Dict[str, Any]     # {"dxy_correlation", "yield_beta", "event_risk_mode"}
-    sentiment: Dict[str, float]         # {"nlp_news_score", "fear_greed_norm"}
+    trend_scores: dict[str, float]  # {"1d", "4h", "1h", "15m", "5m"} [-1.0, 1.0]
+    structure: dict[
+        str, Any
+    ]  # {"bos_state", "choch_state", "liquidity_pool_pressure", "fvg_bias", "order_block_proximity"}
+    orderflow: dict[str, float]  # {"cvd_delta", "absorption_score", "oi_delta", "funding_zscore"}
+    volatility: dict[str, Any]  # {"atr_percentile", "bb_width_percentile", "squeeze_state"}
+    macro_alignment: dict[str, Any]  # {"dxy_correlation", "yield_beta", "event_risk_mode"}
+    sentiment: dict[str, float]  # {"nlp_news_score", "fear_greed_norm"}
     state_hash: str = field(default="")
 
     def __post_init__(self):
         if not self.state_hash:
             self.state_hash = self.compute_hash()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         return d
 
@@ -95,11 +98,11 @@ class MarketStateCompiler:
     def compile_state(
         self,
         asset: str,
-        timestamp: Optional[int] = None,
-        candles_by_tf: Optional[Dict[str, List[Dict[str, Any]]]] = None,
-        orderflow_data: Optional[Dict[str, Any]] = None,
-        macro_data: Optional[Dict[str, Any]] = None,
-        sentiment_data: Optional[Dict[str, Any]] = None,
+        timestamp: int | None = None,
+        candles_by_tf: dict[str, list[dict[str, Any]]] | None = None,
+        orderflow_data: dict[str, Any] | None = None,
+        macro_data: dict[str, Any] | None = None,
+        sentiment_data: dict[str, Any] | None = None,
     ) -> MarketStateVector:
         """
         Compiles all current market observations into a standard state vector S_t.
@@ -157,13 +160,15 @@ class MarketStateCompiler:
         )
 
         # Validate against schema
-        is_valid, errors = feature_registry.validate_state_vector(state_vector.to_dict(), self.schema_version)
+        is_valid, errors = feature_registry.validate_state_vector(
+            state_vector.to_dict(), self.schema_version
+        )
         if not is_valid:
             logger.warning(f"State vector validation warnings for {asset}: {errors}")
 
         return state_vector
 
-    def _compute_trend_score(self, candles: List[Dict[str, Any]]) -> float:
+    def _compute_trend_score(self, candles: list[dict[str, Any]]) -> float:
         if len(candles) < 20:
             return 0.0
         closes = np.array([c["close"] for c in candles], dtype=np.float64)
@@ -172,7 +177,7 @@ class MarketStateCompiler:
         slope = (ema_fast - ema_slow) / ema_slow * 100.0
         return float(np.clip(np.tanh(slope * 2.0), -1.0, 1.0))
 
-    def _compute_structure_features(self, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _compute_structure_features(self, candles: list[dict[str, Any]]) -> dict[str, Any]:
         if len(candles) < 30:
             return {
                 "bos_state": 0,
@@ -213,11 +218,19 @@ class MarketStateCompiler:
             "bos_state": bos_state,
             "choch_state": choch_state,
             "liquidity_pool_pressure": round(liq_pressure, 3),
-            "fvg_bias": round(float(np.tanh((closes[-1] - np.mean(closes[-10:])) / (np.std(closes[-10:]) + 1e-5))), 3),
-            "order_block_proximity": round(float(np.clip(1.0 - abs(cur_price - np.mean(closes[-5:])) / range_span, 0.0, 1.0)), 3),
+            "fvg_bias": round(
+                float(
+                    np.tanh((closes[-1] - np.mean(closes[-10:])) / (np.std(closes[-10:]) + 1e-5))
+                ),
+                3,
+            ),
+            "order_block_proximity": round(
+                float(np.clip(1.0 - abs(cur_price - np.mean(closes[-5:])) / range_span, 0.0, 1.0)),
+                3,
+            ),
         }
 
-    def _compute_volatility_features(self, candles: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _compute_volatility_features(self, candles: list[dict[str, Any]]) -> dict[str, Any]:
         if len(candles) < 20:
             return {"atr_percentile": 0.5, "bb_width_percentile": 0.5, "squeeze_state": False}
 
@@ -226,7 +239,10 @@ class MarketStateCompiler:
         closes = np.array([c["close"] for c in candles], dtype=np.float64)
 
         # True Range
-        tr = np.maximum(highs[1:] - lows[1:], np.maximum(abs(highs[1:] - closes[:-1]), abs(lows[1:] - closes[:-1])))
+        tr = np.maximum(
+            highs[1:] - lows[1:],
+            np.maximum(abs(highs[1:] - closes[:-1]), abs(lows[1:] - closes[:-1])),
+        )
         rolling_atr = np.convolve(tr, np.ones(14) / 14, mode="valid")
         current_atr = rolling_atr[-1] if len(rolling_atr) > 0 else tr[-1]
         atr_rank = float(np.mean(rolling_atr <= current_atr)) if len(rolling_atr) > 1 else 0.5
@@ -245,7 +261,9 @@ class MarketStateCompiler:
             "squeeze_state": squeeze_state,
         }
 
-    def save_state_to_db(self, state: MarketStateVector, forward_outcomes: Optional[Dict[str, Any]] = None) -> None:
+    def save_state_to_db(
+        self, state: MarketStateVector, forward_outcomes: dict[str, Any] | None = None
+    ) -> None:
         state_id = f"STATE_{state.asset.replace('/', '_')}_{state.timestamp}"
         with db_manager.get_brain_conn() as conn:
             conn.execute(

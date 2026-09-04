@@ -10,27 +10,28 @@ Includes explicit, deterministic trigger and invalidation price criteria.
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
-from core.market_state import MarketStateVector
 from core.analogue_engine import AnalogueDistribution
+from core.market_state import MarketStateVector
 
 logger = logging.getLogger("ai_quant_sentinel.scenario_engine")
 
 
 @dataclass
 class Scenario:
-    scenario_id: str                    # "SCENARIO_A", "SCENARIO_B", "SCENARIO_C"
-    name: str                           # "Trend Continuation", "Deep Pullback / Retest", "Structural Reversal"
-    probability: float                  # [0.0, 1.0] (sum across all scenarios = 1.0)
+    scenario_id: str  # "SCENARIO_A", "SCENARIO_B", "SCENARIO_C"
+    name: str  # "Trend Continuation", "Deep Pullback / Retest", "Structural Reversal"
+    probability: float  # [0.0, 1.0] (sum across all scenarios = 1.0)
     target_price: float
     expected_r_multiple: float
-    time_horizon: str                   # "1h - 4h"
-    invalidation_condition: str         # "15m candle close below $86,450"
+    time_horizon: str  # "1h - 4h"
+    invalidation_condition: str  # "15m candle close below $86,450"
     invalidation_price: float
-    catalyst_triggers: List[str]
+    catalyst_triggers: list[str]
     description: str
 
 
@@ -39,12 +40,12 @@ class MECEScenarioDistribution:
     symbol: str
     timestamp: int
     current_price: float
-    scenarios: List[Scenario]
+    scenarios: list[Scenario]
     dominant_scenario_id: str
-    dominant_bias: str                  # "BULLISH", "BEARISH", "NEUTRAL"
-    entropy_uncertainty_score: float    # Shannon entropy of probability distribution
+    dominant_bias: str  # "BULLISH", "BEARISH", "NEUTRAL"
+    entropy_uncertainty_score: float  # Shannon entropy of probability distribution
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -124,7 +125,10 @@ class ScenarioEngine:
                 time_horizon="1h - 4h",
                 invalidation_condition=f"15m candle close breaches ${inval_a:,.2f}",
                 invalidation_price=inval_a,
-                catalyst_triggers=["CVD positive impulse confirmation", "BOS continuation through local swing extreme"],
+                catalyst_triggers=[
+                    "CVD positive impulse confirmation",
+                    "BOS continuation through local swing extreme",
+                ],
                 description=f"Direct expansion toward {target_a:,.2f} liquidity objective fueled by institutional continuation flows.",
             ),
             Scenario(
@@ -136,7 +140,10 @@ class ScenarioEngine:
                 time_horizon="30m - 2h",
                 invalidation_condition=f"Price breakdown below key FVG support at ${inval_b:,.2f}",
                 invalidation_price=inval_b,
-                catalyst_triggers=["Volume dry-up on pullback", "Re-accumulation inside 15M/1H FVG zone"],
+                catalyst_triggers=[
+                    "Volume dry-up on pullback",
+                    "Re-accumulation inside 15M/1H FVG zone",
+                ],
                 description=f"Healthy corrective retracement toward {target_b:,.2f} order block before directional resumption.",
             ),
             Scenario(
@@ -148,7 +155,10 @@ class ScenarioEngine:
                 time_horizon="2h - 8h",
                 invalidation_condition=f"Price reclaim above ${inval_c:,.2f}",
                 invalidation_price=inval_c,
-                catalyst_triggers=["Macro shock / DXY surge", "Heavy market liquidation cascade breaching swing invalidation"],
+                catalyst_triggers=[
+                    "Macro shock / DXY surge",
+                    "Heavy market liquidation cascade breaching swing invalidation",
+                ],
                 description=f"Failure of dominant regime resulting in adverse breakdown toward {target_c:,.2f}.",
             ),
         ]
@@ -157,7 +167,9 @@ class ScenarioEngine:
         probs = np.array([p_a, p_b, p_c])
         entropy = -np.sum(probs * np.log2(probs + 1e-9)) / np.log2(3.0)
 
-        dominant_id = "SCENARIO_A" if p_a >= max(p_b, p_c) else ("SCENARIO_B" if p_b >= p_c else "SCENARIO_C")
+        dominant_id = (
+            "SCENARIO_A" if p_a >= max(p_b, p_c) else ("SCENARIO_B" if p_b >= p_c else "SCENARIO_C")
+        )
 
         return MECEScenarioDistribution(
             symbol=symbol,

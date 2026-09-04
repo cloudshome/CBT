@@ -7,16 +7,16 @@ Liquidity, Volume, Volatility, Derivatives, Regimes, Setups, and Empirical Expec
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from enum import StrEnum
+from typing import Any
 
 
-class SwingType(str, Enum):
+class SwingType(StrEnum):
     SWING_HIGH = "SWING_HIGH"
     SWING_LOW = "SWING_LOW"
 
 
-class StructureEventType(str, Enum):
+class StructureEventType(StrEnum):
     BOS_BULLISH = "BOS_BULLISH"
     BOS_BEARISH = "BOS_BEARISH"
     CHOCH_BULLISH = "CHOCH_BULLISH"
@@ -29,7 +29,7 @@ class StructureEventType(str, Enum):
     STRUCTURE_FAILURE = "STRUCTURE_FAILURE"
 
 
-class LiquidityPoolType(str, Enum):
+class LiquidityPoolType(StrEnum):
     EQUAL_HIGHS = "EQUAL_HIGHS"
     EQUAL_LOWS = "EQUAL_LOWS"
     PREVIOUS_DAY_HIGH = "PREVIOUS_DAY_HIGH"
@@ -42,31 +42,31 @@ class LiquidityPoolType(str, Enum):
     RANGE_LOW = "RANGE_LOW"
 
 
-class FVGType(str, Enum):
+class FVGType(StrEnum):
     BULLISH = "BULLISH"
     BEARISH = "BEARISH"
 
 
-class FVGStatus(str, Enum):
+class FVGStatus(StrEnum):
     ACTIVE = "ACTIVE"
     PARTIALLY_FILLED = "PARTIALLY_FILLED"
     MITIGATED = "MITIGATED"
     INVALIDATED = "INVALIDATED"
 
 
-class OrderBlockType(str, Enum):
+class OrderBlockType(StrEnum):
     CANDIDATE_BULLISH_OB = "CANDIDATE_BULLISH_OB"
     CANDIDATE_BEARISH_OB = "CANDIDATE_BEARISH_OB"
 
 
-class VolatilityRegime(str, Enum):
+class VolatilityRegime(StrEnum):
     LOW_VOLATILITY = "LOW_VOLATILITY"
     NORMAL_VOLATILITY = "NORMAL_VOLATILITY"
     HIGH_VOLATILITY = "HIGH_VOLATILITY"
     EXTREME_VOLATILITY = "EXTREME_VOLATILITY"
 
 
-class MarketRegimeType(str, Enum):
+class MarketRegimeType(StrEnum):
     TRENDING_BULL = "TRENDING_BULL"
     TRENDING_BEAR = "TRENDING_BEAR"
     RANGING_CONSOLIDATION = "RANGING_CONSOLIDATION"
@@ -76,7 +76,7 @@ class MarketRegimeType(str, Enum):
     UNSTABLE = "UNSTABLE"
 
 
-class SetupType(str, Enum):
+class SetupType(StrEnum):
     SETUP_A_SWEEP_MSS = "SETUP_A_SWEEP_MSS"
     SETUP_B_PULLBACK_FVG = "SETUP_B_PULLBACK_FVG"
     SETUP_C_BREAKOUT_EXPANSION = "SETUP_C_BREAKOUT_EXPANSION"
@@ -84,7 +84,7 @@ class SetupType(str, Enum):
     SETUP_E_VWAP_RECLAIM = "SETUP_E_VWAP_RECLAIM"
 
 
-class DecisionAction(str, Enum):
+class DecisionAction(StrEnum):
     LONG = "LONG"
     SHORT = "SHORT"
     WATCH = "WATCH"
@@ -99,8 +99,8 @@ class SwingPoint:
     price: float
     timeframe: str
     is_confirmed: bool = True
-    confirmation_index: Optional[int] = None
-    confirmation_timestamp: Optional[int] = None
+    confirmation_index: int | None = None
+    confirmation_timestamp: int | None = None
 
 
 @dataclass(frozen=True)
@@ -112,9 +112,9 @@ class StructureEvent:
     price: float
     broken_level: float
     displacement_atr: float
-    strength_score: float                # [0.0, 1.0]
-    confirmation_status: str             # "CONFIRMED", "PENDING", "FAILED"
-    meta: Dict[str, Any] = field(default_factory=dict)
+    strength_score: float  # [0.0, 1.0]
+    confirmation_status: str  # "CONFIRMED", "PENDING", "FAILED"
+    meta: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -146,7 +146,7 @@ class LiquiditySweep:
     volume_delta: float
     subsequent_displacement_score: float
     is_valid_reclaim: bool
-    meta: Dict[str, Any] = field(default_factory=dict)
+    meta: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -178,7 +178,7 @@ class CandidateOrderBlock:
     origin_index: int
     zone_high: float
     zone_low: float
-    origin_candle: Dict[str, float]
+    origin_candle: dict[str, float]
     post_origin_displacement_atr: float
     volume_expansion_ratio: float
     distance_to_liquidity: float
@@ -192,22 +192,22 @@ class CandidateOrderBlock:
 class DisplacementFeature:
     candle_index: int
     timestamp: int
-    direction: str                       # "BULLISH", "BEARISH", "NEUTRAL"
+    direction: str  # "BULLISH", "BEARISH", "NEUTRAL"
     body_atr_ratio: float
     range_atr_ratio: float
     consecutive_directional_bars: int
     volume_expansion_ratio: float
     price_velocity: float
     breakout_distance: float
-    close_location_in_range: float       # [0.0, 1.0]
-    displacement_score: float            # [0.0, 100.0]
+    close_location_in_range: float  # [0.0, 1.0]
+    displacement_score: float  # [0.0, 100.0]
 
 
 @dataclass(frozen=True)
 class VolumeFeature:
     timestamp: int
     volume: float
-    relative_volume: float               # rVol = V / SMA(V, 20)
+    relative_volume: float  # rVol = V / SMA(V, 20)
     volume_ma: float
     is_expanding: bool
     is_contracting: bool
@@ -222,7 +222,7 @@ class VolumeFeature:
 class VolatilityState:
     timestamp: int
     atr: float
-    atr_percentile: float                # [0.0, 1.0] (rolling 100-bar)
+    atr_percentile: float  # [0.0, 1.0] (rolling 100-bar)
     realized_volatility: float
     regime: VolatilityRegime
     is_expanding: bool
@@ -238,14 +238,13 @@ class VWAPFeature:
     upper_band_2sigma: float
     lower_band_2sigma: float
     std_dev: float
-    deviation_sigmas: float              # (price - vwap) / std_dev
+    deviation_sigmas: float  # (price - vwap) / std_dev
     is_above_vwap: bool
-    is_extended_overbought: bool         # deviation > +2.0 sigma
-    is_extended_oversold: bool           # deviation < -2.0 sigma
+    is_extended_overbought: bool  # deviation > +2.0 sigma
+    is_extended_oversold: bool  # deviation < -2.0 sigma
     is_reclaiming: bool
-    mean_reversion_prob: float           # [0.0, 1.0]
-    anchored_vwap: Optional[float] = None
-
+    mean_reversion_prob: float  # [0.0, 1.0]
+    anchored_vwap: float | None = None
 
 
 @dataclass(frozen=True)
@@ -254,7 +253,9 @@ class DerivativesState:
     open_interest: float
     oi_change_pct: float
     oi_velocity: float
-    price_vs_oi_state: str               # "LONG_EXPANSION", "SHORT_SQUEEZE", "SHORT_EXPANSION", "LONG_LIQUIDATION"
+    price_vs_oi_state: (
+        str  # "LONG_EXPANSION", "SHORT_SQUEEZE", "SHORT_EXPANSION", "LONG_LIQUIDATION"
+    )
     funding_rate: float
     funding_percentile: float
     funding_zscore: float
@@ -274,19 +275,19 @@ class MultiTimeframeContext:
     mtf_15m_state: str
     ltf_5m_trigger: str
     ltf_1m_trigger: str
-    confluence_score: float              # [0.0, 100.0]
-    stack_alignment: str                 # "BULLISH_CONFLUENT", "BEARISH_CONFLUENT", "MIXED_CONFLICT"
+    confluence_score: float  # [0.0, 100.0]
+    stack_alignment: str  # "BULLISH_CONFLUENT", "BEARISH_CONFLUENT", "MIXED_CONFLICT"
 
 
 @dataclass(frozen=True)
 class MarketRegimeState:
     timestamp: int
     regime_type: MarketRegimeType
-    confidence: float                    # [0.0, 1.0]
+    confidence: float  # [0.0, 1.0]
     trend_strength_adx: float
     volatility_state: VolatilityRegime
     is_mean_reverting: bool
-    key_characteristics: List[str] = field(default_factory=list)
+    key_characteristics: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -307,8 +308,8 @@ class SKYSetup:
     historical_sample_size: int
     confluence_score: float
     is_qualified: bool
-    rejection_reasons: List[str] = field(default_factory=list)
-    feature_snapshot: Dict[str, Any] = field(default_factory=dict)
+    rejection_reasons: list[str] = field(default_factory=list)
+    feature_snapshot: dict[str, Any] = field(default_factory=dict)
     explanation_text: str = ""
 
 
@@ -347,10 +348,10 @@ class DecisionOutput:
     decision: DecisionAction
     symbol: str
     timestamp: int
-    setup_qualified: Optional[SKYSetup]
+    setup_qualified: SKYSetup | None
     net_ev_r: float
     kelly_fraction: float
     suggested_position_size_usd: float
     risk_gate_passed: bool
-    explanation_dossier: Dict[str, Any]
-    no_trade_reason: Optional[str] = None
+    explanation_dossier: dict[str, Any]
+    no_trade_reason: str | None = None

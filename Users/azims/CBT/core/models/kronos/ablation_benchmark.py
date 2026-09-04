@@ -10,14 +10,13 @@ Computes delta expectancy, profit factor, win rate, and drawdown.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
-from core.models.kronos.adapter import KronosModelAdapter, kronos_adapter
-from core.models.kronos.schemas import KronosAblationMode, KronosConfig
-from core.sky_intelligence.expectancy_engine import expectancy_engine
 from core.institutional_alpha import institutional_alpha_engine
+from core.models.kronos.adapter import KronosModelAdapter, kronos_adapter
 
 logger = logging.getLogger("ai_quant_sentinel.kronos.ablation")
 
@@ -48,7 +47,7 @@ class AblationBenchmarkResult:
     delta_drawdown_pct: float
     verdict: str  # "KRONOS_CREATES_ALPHA", "KRONOS_NEUTRAL", "KRONOS_DETRIMENTAL"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timeframe": self.timeframe,
@@ -71,24 +70,26 @@ class AblationBenchmarkResult:
 class KronosAblationBenchmark:
     """Executes chronological out-of-sample 3-way ablation testing."""
 
-    def __init__(self, adapter: Optional[KronosModelAdapter] = None):
+    def __init__(self, adapter: KronosModelAdapter | None = None):
         self.adapter = adapter or kronos_adapter
 
     def run_benchmark(
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         lookback_window: int = 64,
         forecast_horizon: int = 12,
         step_size: int = 12,
     ) -> AblationBenchmarkResult:
         if len(candles) < lookback_window + forecast_horizon + 20:
-            raise ValueError(f"Insufficient candles for ablation benchmark (min {lookback_window + forecast_horizon + 20}).")
+            raise ValueError(
+                f"Insufficient candles for ablation benchmark (min {lookback_window + forecast_horizon + 20})."
+            )
 
-        trades_a: List[float] = []
-        trades_b: List[float] = []
-        trades_c: List[float] = []
+        trades_a: list[float] = []
+        trades_b: list[float] = []
+        trades_c: list[float] = []
 
         da_hits_a: int = 0
         da_hits_b: int = 0
@@ -129,7 +130,11 @@ class KronosAblationBenchmark:
                 lookback=lookback_window,
                 sample_count=5,
             )
-            k_signal = 1 if k_forecast.directional_bias == "BULLISH" else (-1 if k_forecast.directional_bias == "BEARISH" else 0)
+            k_signal = (
+                1
+                if k_forecast.directional_bias == "BULLISH"
+                else (-1 if k_forecast.directional_bias == "BEARISH" else 0)
+            )
 
             # Mode C: Fusion Signal (SKY signal confirmed by Kronos consensus)
             fusion_signal = 0
@@ -193,7 +198,7 @@ class KronosAblationBenchmark:
         )
 
     def _compute_metrics(
-        self, mode_name: str, trades: List[float], da_hits: int, total_evals: int
+        self, mode_name: str, trades: list[float], da_hits: int, total_evals: int
     ) -> AblationMetrics:
         if not trades:
             return AblationMetrics(

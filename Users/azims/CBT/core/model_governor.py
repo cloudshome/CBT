@@ -9,14 +9,15 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.model_governor")
 
 # Dynamic Regime-Conditional Reliability Weights Matrix
-REGIME_RELIABILITY_WEIGHTS: Dict[str, Dict[str, float]] = {
+REGIME_RELIABILITY_WEIGHTS: dict[str, dict[str, float]] = {
     "TRENDING_BULL": {
         "orderflow_cvd": 0.28,
         "historical_analogue": 0.25,
@@ -50,17 +51,17 @@ REGIME_RELIABILITY_WEIGHTS: Dict[str, Dict[str, float]] = {
 
 @dataclass
 class EnsembleProbabilityForecast:
-    consensus_p_win: float             # Calibrated consensus probability [0.0, 1.0]
-    p_min_range: float                 # Lower probability bound
-    p_max_range: float                 # Upper probability bound
-    confidence_interval_95: Tuple[float, float]
-    disagreement_entropy: float        # [0.0, 1.0]
+    consensus_p_win: float  # Calibrated consensus probability [0.0, 1.0]
+    p_min_range: float  # Lower probability bound
+    p_max_range: float  # Upper probability bound
+    confidence_interval_95: tuple[float, float]
+    disagreement_entropy: float  # [0.0, 1.0]
     active_regime: str
-    model_contributions: Dict[str, float]
-    model_probabilities: Dict[str, float]
-    is_consensus_clear: bool           # False if disagreement_entropy > 0.40
+    model_contributions: dict[str, float]
+    model_probabilities: dict[str, float]
+    is_consensus_clear: bool  # False if disagreement_entropy > 0.40
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "consensus_p_win": round(self.consensus_p_win, 3),
             "p_min_range": round(self.p_min_range, 3),

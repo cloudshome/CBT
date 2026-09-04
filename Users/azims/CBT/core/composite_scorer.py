@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Dict, List, Tuple
 
 logger = logging.getLogger("ai_quant_sentinel.composite_scorer")
 
 # Asset-Specific Dynamic Weights for the 8 Pillars (Sum to 1.0)
-PILLAR_WEIGHTS: Dict[str, List[float]] = {
+PILLAR_WEIGHTS: dict[str, list[float]] = {
     "BTC": [
         0.18,  # P1: ETF & Institutional Flows
         0.15,  # P2: Derivatives & Options GEX
@@ -56,8 +55,8 @@ class CompositeScorer:
     def compute_score(
         self,
         symbol: str,
-        z_scores: List[float],
-    ) -> Tuple[float, str]:
+        z_scores: list[float],
+    ) -> tuple[float, str]:
         """
         Computes sigmoidal score S in [0.0, 100.0] and assigns quantitative regime.
         """
@@ -75,7 +74,7 @@ class CompositeScorer:
             clamped_z.append(0.0)
 
         # Weighted dot product
-        weighted_sum = sum(w * z for w, z in zip(weights, clamped_z))
+        weighted_sum = sum(w * z for w, z in zip(weights, clamped_z, strict=False))
 
         # Logistic Sigmoid S = 100 / (1 + exp(-k * weighted_sum))
         try:

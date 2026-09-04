@@ -6,25 +6,26 @@ and raises CAUSAL_LEAKAGE_EXCEPTION if future information is accessed in backtes
 
 from __future__ import annotations
 
-import time
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+import time
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.causal_firewall")
 
 
 class CausalLeakageException(Exception):
     """Raised when future lookahead data is leaked into a decision context."""
+
     pass
 
 
 @dataclass(frozen=True)
 class CausalTimestampRecord:
-    event_time: int              # Real-world event time (ms UTC)
-    publish_time: int            # Source publication time (ms UTC)
-    ingest_time: int             # Time packet received by server (ms UTC)
-    decision_available_time: int # Time feature computed & available to engine (ms UTC)
+    event_time: int  # Real-world event time (ms UTC)
+    publish_time: int  # Source publication time (ms UTC)
+    ingest_time: int  # Time packet received by server (ms UTC)
+    decision_available_time: int  # Time feature computed & available to engine (ms UTC)
 
     def validate_causal_ordering(self) -> bool:
         """Verifies event <= publish <= ingest <= decision_available."""
@@ -42,9 +43,9 @@ class CausalFirewall:
 
     def __init__(self, strict_mode: bool = True):
         self.strict_mode = strict_mode
-        self._simulation_time_ms: Optional[int] = None
+        self._simulation_time_ms: int | None = None
 
-    def set_simulation_time(self, sim_time_ms: Optional[int]) -> None:
+    def set_simulation_time(self, sim_time_ms: int | None) -> None:
         """Sets current simulation/replay clock. If None, operates in live mode."""
         self._simulation_time_ms = sim_time_ms
 
@@ -57,8 +58,8 @@ class CausalFirewall:
     def create_record(
         self,
         event_time: int,
-        publish_time: Optional[int] = None,
-        ingest_time: Optional[int] = None,
+        publish_time: int | None = None,
+        ingest_time: int | None = None,
         computation_latency_ms: int = 5,
     ) -> CausalTimestampRecord:
         """
@@ -85,7 +86,7 @@ class CausalFirewall:
 
     def assert_no_leakage(
         self,
-        record_or_timestamp: Union[CausalTimestampRecord, int],
+        record_or_timestamp: CausalTimestampRecord | int,
         context_name: str = "Feature Computation",
     ) -> None:
         """
@@ -112,7 +113,9 @@ class CausalFirewall:
             if self.strict_mode:
                 raise CausalLeakageException(msg)
 
-    def filter_point_in_time(self, records: List[Dict[str, Any]], timestamp_field: str = "timestamp") -> List[Dict[str, Any]]:
+    def filter_point_in_time(
+        self, records: list[dict[str, Any]], timestamp_field: str = "timestamp"
+    ) -> list[dict[str, Any]]:
         """
         Filters a list of records to strictly those available before or at current simulation time.
         """

@@ -2,14 +2,12 @@
 Tests for Layer 6: Tri-Model Path Simulator, Platt Calibration, and Prediction Ledger.
 """
 
-import time
-import pytest
-from core.path_simulator import path_simulator
-from core.probability_calibrator import probability_calibrator
-from core.prediction_ledger import prediction_ledger
-from core.market_state import market_state_compiler
 from core.data_streamer import data_streamer
 from core.database import db_manager
+from core.market_state import market_state_compiler
+from core.path_simulator import path_simulator
+from core.prediction_ledger import prediction_ledger
+from core.probability_calibrator import probability_calibrator
 
 
 def test_tri_model_bootstrap_path_simulation():
@@ -77,12 +75,25 @@ def test_prediction_ledger_dynamic_5m_outcome():
     )
     # Manually update timestamp to allow verification window
     with db_manager.get_brain_conn() as conn:
-        conn.execute("UPDATE prediction_ledger SET timestamp = ? WHERE prediction_id = ?;", (p_time, pred_win))
+        conn.execute(
+            "UPDATE prediction_ledger SET timestamp = ? WHERE prediction_id = ?;",
+            (p_time, pred_win),
+        )
         conn.commit()
 
     # Save forward candles where high hits TP1 within 5 minutes
     forward_candles = [
-        {"timestamp": p_time + 60000, "symbol": symbol, "timeframe": tf, "open": 50000.0, "high": 51200.0, "low": 49800.0, "close": 51100.0, "volume": 100.0, "is_synthetic": 0}
+        {
+            "timestamp": p_time + 60000,
+            "symbol": symbol,
+            "timeframe": tf,
+            "open": 50000.0,
+            "high": 51200.0,
+            "low": 49800.0,
+            "close": 51100.0,
+            "volume": 100.0,
+            "is_synthetic": 0,
+        }
     ]
     data_streamer.save_candles(symbol, tf, forward_candles)
 
@@ -90,7 +101,10 @@ def test_prediction_ledger_dynamic_5m_outcome():
     assert verified >= 1
 
     with db_manager.get_brain_conn() as conn:
-        cursor = conn.execute("SELECT outcome_5m, is_verified, brier_score FROM prediction_ledger WHERE prediction_id = ?;", (pred_win,))
+        cursor = conn.execute(
+            "SELECT outcome_5m, is_verified, brier_score FROM prediction_ledger WHERE prediction_id = ?;",
+            (pred_win,),
+        )
         row = cursor.fetchone()
         assert row["is_verified"] == 1
         assert row["outcome_5m"] == "WIN"

@@ -9,8 +9,11 @@ from fastapi.testclient import TestClient
 
 from app import app
 from core.provenance_engine import ProvenanceEngine, provenance_engine
-from core.strategy_compiler import CompilationStatus, RuleOrigin, StrategyCompiler, strategy_compiler
-from core.strategy_league import QuarantineTier, strategy_league_manager
+from core.strategy_compiler import (
+    CompilationStatus,
+    StrategyCompiler,
+)
+from core.strategy_league import strategy_league_manager
 
 
 @pytest.fixture
@@ -25,7 +28,7 @@ def test_compute_sha256_deterministic():
     h2 = engine.compute_sha256(content)
     assert h1 == h2
     assert len(h1) == 64
-    
+
     # Different content produces different hash
     h3 = engine.compute_sha256(content + " ")
     assert h1 != h3
@@ -34,7 +37,7 @@ def test_compute_sha256_deterministic():
 def test_provenance_registration_and_deduplication():
     content = "ICT Fair Value Gap and Asian Range Liquidity Sweep Rulebook 2026."
     title = "SMC Rulebook"
-    
+
     # Register source
     rec1 = provenance_engine.register_source(
         source_type="PDF",
@@ -66,7 +69,7 @@ def test_provenance_retrieval():
         raw_content=content,
         title="Order Flow Note",
     )
-    
+
     # Fetch by ID
     by_id = provenance_engine.get_by_id(rec.source_id)
     assert by_id is not None
@@ -87,16 +90,24 @@ def test_strategy_compiler_valid_hypothesis():
         assets=["BTCUSDT", "ETHUSDT"],
         timeframes={"bias": "4h", "setup": "1h", "entry": "15m"},
         entry_rules=[
-            {"condition": "LIQUIDITY_SWEEP_CONFIRMATION", "origin": "EXPLICIT", "parameters": {"wick_ratio": 0.5}}
+            {
+                "condition": "LIQUIDITY_SWEEP_CONFIRMATION",
+                "origin": "EXPLICIT",
+                "parameters": {"wick_ratio": 0.5},
+            }
         ],
         invalidation_rules=[
-            {"condition": "SWEEP_HIGH_BUFFER", "origin": "EXPLICIT", "parameters": {"buffer_atr": 0.5}}
+            {
+                "condition": "SWEEP_HIGH_BUFFER",
+                "origin": "EXPLICIT",
+                "parameters": {"buffer_atr": 0.5},
+            }
         ],
         exit_rules=[
             {"condition": "OPPOSITE_ASIAN_LOW", "origin": "EXPLICIT", "parameters": {"min_rr": 2.5}}
         ],
     )
-    
+
     assert compiled.status == CompilationStatus.READY_FOR_BACKTEST
     assert len(compiled.missing_requirements) == 0
     assert len(compiled.entry_conditions) == 1
@@ -122,7 +133,9 @@ def test_strategy_compiler_rejects_missing_invalidation():
     )
     # Must fail closed with NOT_BACKTESTABLE due to missing risk/stop-loss definition
     assert compiled.status == CompilationStatus.NOT_BACKTESTABLE
-    assert any("invalidation" in m.lower() or "stop" in m.lower() for m in compiled.missing_requirements)
+    assert any(
+        "invalidation" in m.lower() or "stop" in m.lower() for m in compiled.missing_requirements
+    )
 
 
 def test_strategy_compiler_rejects_invalid_timeframe():
@@ -176,7 +189,9 @@ def test_api_provenance_and_compiler_routes(client):
             "assets": ["BTCUSDT", "PAXGUSDT"],
             "timeframes": {"bias": "1d", "entry": "1h"},
             "entry_rules": [{"condition": "MACRO_IMPULSE", "origin": "EXPLICIT"}],
-            "invalidation_rules": [{"condition": "ATR_STOP", "origin": "EXPLICIT", "parameters": {"atr_mult": 1.5}}],
+            "invalidation_rules": [
+                {"condition": "ATR_STOP", "origin": "EXPLICIT", "parameters": {"atr_mult": 1.5}}
+            ],
             "source_id": source_id,
         },
     )

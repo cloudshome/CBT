@@ -9,8 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from core.portfolio_shadow import portfolio_shadow
 
@@ -22,12 +21,12 @@ class ParsedTradeCommand:
     raw_command: str
     is_valid_command: bool
     symbol: str
-    direction: str                      # "LONG", "SHORT"
+    direction: str  # "LONG", "SHORT"
     entry_price: float
     stop_loss: float
     take_profit: float
     size_units: float
-    action_taken: str                   # "SHADOW_POSITION_OPENED", "PARSING_FAILED"
+    action_taken: str  # "SHADOW_POSITION_OPENED", "PARSING_FAILED"
     message: str
 
 
@@ -42,9 +41,19 @@ class CommandExecutor:
         text_lower = text.lower()
 
         # 1. Extract Direction
-        if "long" in text_lower or "buy" in text_lower or "kinlam" in text_lower or "entry long" in text_lower:
+        if (
+            "long" in text_lower
+            or "buy" in text_lower
+            or "kinlam" in text_lower
+            or "entry long" in text_lower
+        ):
             direction = "LONG"
-        elif "short" in text_lower or "sell" in text_lower or "bechlam" in text_lower or "entry short" in text_lower:
+        elif (
+            "short" in text_lower
+            or "sell" in text_lower
+            or "bechlam" in text_lower
+            or "entry short" in text_lower
+        ):
             direction = "SHORT"
         else:
             return self._fail(text, "Could not determine trade direction (Long/Short).")
@@ -60,16 +69,25 @@ class CommandExecutor:
 
         # 3. Extract Numerical Levels (Entry, SL, TP, Size)
         # Entry pattern
-        entry_match = re.search(r'(?:at|entry|price|@)\s*([0-9]+(?:\.[0-9]+)?)', text_lower)
-        sl_match = re.search(r'(?:sl|stop|stoploss)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)', text_lower)
-        tp_match = re.search(r'(?:tp|target|takeprofit)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)', text_lower)
-        size_match = re.search(r'(?:size|lot|qty|quantity|units?)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)', text_lower)
+        entry_match = re.search(r"(?:at|entry|price|@)\s*([0-9]+(?:\.[0-9]+)?)", text_lower)
+        sl_match = re.search(r"(?:sl|stop|stoploss)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)", text_lower)
+        tp_match = re.search(
+            r"(?:tp|target|takeprofit)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)", text_lower
+        )
+        size_match = re.search(
+            r"(?:size|lot|qty|quantity|units?)\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)", text_lower
+        )
 
         # Also check for direct patterns like "buy 0.05 btc" or "0.5 lot"
         if not size_match:
-            size_match = re.search(r'(?:buy|sell|long|short|kinlam|bechlam)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:btc|eth|gold|xau|lot|units?)?', text_lower)
+            size_match = re.search(
+                r"(?:buy|sell|long|short|kinlam|bechlam)\s+([0-9]+(?:\.[0-9]+)?)\s*(?:btc|eth|gold|xau|lot|units?)?",
+                text_lower,
+            )
         if not size_match:
-            size_match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*(?:lot|lots|units?|contracts?)', text_lower)
+            size_match = re.search(
+                r"([0-9]+(?:\.[0-9]+)?)\s*(?:lot|lots|units?|contracts?)", text_lower
+            )
 
         entry = float(entry_match.group(1)) if entry_match else 0.0
         sl = float(sl_match.group(1)) if sl_match else 0.0
@@ -77,16 +95,24 @@ class CommandExecutor:
         size = float(size_match.group(1)) if size_match else 0.0
 
         # Fallback to positional parsing only if explicit matches missing
-        all_numbers = [float(n) for n in re.findall(r'[0-9]+(?:\.[0-9]+)?', text)]
+        all_numbers = [float(n) for n in re.findall(r"[0-9]+(?:\.[0-9]+)?", text)]
         used_numbers = {entry, sl, tp, size}
         remaining_numbers = [n for n in all_numbers if n not in used_numbers]
 
         if entry <= 0:
             entry = remaining_numbers.pop(0) if remaining_numbers else 0.0
         if sl <= 0:
-            sl = remaining_numbers.pop(0) if remaining_numbers else (entry * 0.99 if direction == "LONG" else entry * 1.01)
+            sl = (
+                remaining_numbers.pop(0)
+                if remaining_numbers
+                else (entry * 0.99 if direction == "LONG" else entry * 1.01)
+            )
         if tp <= 0:
-            tp = remaining_numbers.pop(0) if remaining_numbers else (entry * 1.02 if direction == "LONG" else entry * 0.98)
+            tp = (
+                remaining_numbers.pop(0)
+                if remaining_numbers
+                else (entry * 1.02 if direction == "LONG" else entry * 0.98)
+            )
         if size <= 0:
             size = remaining_numbers.pop(0) if remaining_numbers else 0.1
 

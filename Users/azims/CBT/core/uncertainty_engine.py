@@ -12,14 +12,15 @@ Computes composite systemic uncertainty U in [0.0, 1.0] and honest probability c
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
-from core.data_quality_gate import QualityCheckResult
 from core.analogue_engine import AnalogueDistribution
-from core.path_simulator import SimulationCone
+from core.data_quality_gate import QualityCheckResult
 from core.event_shock_engine import EventRiskState
+from core.path_simulator import SimulationCone
 from core.regime_transition import RegimeClassificationResult
 
 logger = logging.getLogger("ai_quant_sentinel.uncertainty_engine")
@@ -27,18 +28,18 @@ logger = logging.getLogger("ai_quant_sentinel.uncertainty_engine")
 
 @dataclass
 class UncertaintyBudget:
-    composite_uncertainty_u: float      # [0.0, 1.0] (0.0 = Absolute Confidence, 1.0 = Total Entropy)
-    data_quality_uncertainty: float     # [0.0, 1.0]
+    composite_uncertainty_u: float  # [0.0, 1.0] (0.0 = Absolute Confidence, 1.0 = Total Entropy)
+    data_quality_uncertainty: float  # [0.0, 1.0]
     analogue_sample_uncertainty: float  # [0.0, 1.0]
-    model_disagreement_entropy: float   # [0.0, 1.0]
-    regime_transition_uncertainty: float# [0.0, 1.0]
-    event_shock_uncertainty: float      # [0.0, 1.0]
-    penalty_factor: float               # Multiplier applied to Net EV
-    uncertainty_level: str              # "LOW", "MODERATE", "ELEVATED", "PROHIBITIVE"
-    confidence_spread: float = 0.10     # Interval half-width (+/- delta)
-    p_range_string: str = "52% - 62%"   # Honest human-readable probability range
+    model_disagreement_entropy: float  # [0.0, 1.0]
+    regime_transition_uncertainty: float  # [0.0, 1.0]
+    event_shock_uncertainty: float  # [0.0, 1.0]
+    penalty_factor: float  # Multiplier applied to Net EV
+    uncertainty_level: str  # "LOW", "MODERATE", "ELEVATED", "PROHIBITIVE"
+    confidence_spread: float = 0.10  # Interval half-width (+/- delta)
+    p_range_string: str = "52% - 62%"  # Honest human-readable probability range
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -79,11 +80,7 @@ class UncertaintyEngine:
 
         # Weighted Composite Score U in [0.0, 1.0]
         u_composite = (
-            0.25 * u_data
-            + 0.20 * u_analogue
-            + 0.25 * u_models
-            + 0.15 * u_regime
-            + 0.15 * u_event
+            0.25 * u_data + 0.20 * u_analogue + 0.25 * u_models + 0.15 * u_regime + 0.15 * u_event
         )
         u_composite = float(np.clip(u_composite, 0.0, 1.0))
 
@@ -104,7 +101,7 @@ class UncertaintyEngine:
 
         p_low = max(0.05, base_p_win - spread)
         p_high = min(0.95, base_p_win + spread)
-        range_str = f"{p_low*100:.0f}% - {p_high*100:.0f}%"
+        range_str = f"{p_low * 100:.0f}% - {p_high * 100:.0f}%"
 
         return UncertaintyBudget(
             composite_uncertainty_u=round(u_composite, 3),

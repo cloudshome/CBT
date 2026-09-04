@@ -6,13 +6,13 @@ and high-throughput connection pooling.
 
 from __future__ import annotations
 
-import os
-import sqlite3
 import json
 import logging
+import os
+import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.database")
 
@@ -75,7 +75,6 @@ class DatabaseManager:
     def get_connection(self) -> sqlite3.Connection:
         return self.get_brain_conn()
 
-
     def get_schema_version(self, conn: sqlite3.Connection) -> int:
         cursor = conn.cursor()
         cursor.execute("PRAGMA user_version;")
@@ -92,7 +91,9 @@ class DatabaseManager:
         self._init_brain_db()
         self._init_trading_db()
         self._init_experiment_db()
-        logger.info(f"All 4 database schemas initialized and version-locked (v{CURRENT_SCHEMA_VERSION}) with WAL mode.")
+        logger.info(
+            f"All 4 database schemas initialized and version-locked (v{CURRENT_SCHEMA_VERSION}) with WAL mode."
+        )
 
     def _init_market_db(self) -> None:
         with self.get_market_conn() as conn:
@@ -110,7 +111,9 @@ class DatabaseManager:
                     PRIMARY KEY (symbol, timeframe, timestamp)
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_candles_ts ON candles (symbol, timeframe, timestamp DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_candles_ts ON candles (symbol, timeframe, timestamp DESC);"
+            )
 
             # Check if is_synthetic column exists for backwards-compatibility migrations
             cursor = conn.execute("PRAGMA table_info(candles);")
@@ -133,7 +136,9 @@ class DatabaseManager:
                     forward_outcomes_json TEXT
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_states_sym_tf ON market_states (symbol, timeframe, timestamp DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_states_sym_tf ON market_states (symbol, timeframe, timestamp DESC);"
+            )
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS prediction_ledger (
@@ -154,7 +159,9 @@ class DatabaseManager:
                     brier_score REAL
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_verified ON prediction_ledger (is_verified, timestamp DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pred_verified ON prediction_ledger (is_verified, timestamp DESC);"
+            )
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS trade_episodes (
@@ -175,7 +182,9 @@ class DatabaseManager:
                     loss_category TEXT
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_episodes_strat ON trade_episodes (strategy_id, timestamp DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_episodes_strat ON trade_episodes (strategy_id, timestamp DESC);"
+            )
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS strategy_dna (
@@ -294,7 +303,9 @@ class DatabaseManager:
                     status TEXT NOT NULL
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_exp_status ON experiments (status, deflated_sharpe DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_exp_status ON experiments (status, deflated_sharpe DESC);"
+            )
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS kronos_forecast_ledger (
@@ -322,13 +333,23 @@ class DatabaseManager:
                     realized_pnl_usd REAL
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_kronos_sym_tf ON kronos_forecast_ledger (symbol, timeframe, timestamp DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_kronos_sym_tf ON kronos_forecast_ledger (symbol, timeframe, timestamp DESC);"
+            )
             conn.commit()
 
-    def save_chart_memory(self, symbol: str, timeframe: str, drawings_json: str, indicators_json: str, chart_config_json: str) -> None:
+    def save_chart_memory(
+        self,
+        symbol: str,
+        timeframe: str,
+        drawings_json: str,
+        indicators_json: str,
+        chart_config_json: str,
+    ) -> None:
         now_ts = int(time.time() * 1000)
         with self.get_brain_conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO chart_memory (symbol, timeframe, drawings_json, indicators_json, chart_config_json, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(symbol, timeframe) DO UPDATE SET
@@ -336,16 +357,21 @@ class DatabaseManager:
                     indicators_json=excluded.indicators_json,
                     chart_config_json=excluded.chart_config_json,
                     updated_at=excluded.updated_at
-            """, (symbol, timeframe, drawings_json, indicators_json, chart_config_json, now_ts))
+            """,
+                (symbol, timeframe, drawings_json, indicators_json, chart_config_json, now_ts),
+            )
             conn.commit()
 
-    def get_chart_memory(self, symbol: str, timeframe: str) -> Optional[Dict[str, Any]]:
+    def get_chart_memory(self, symbol: str, timeframe: str) -> dict[str, Any] | None:
         with self.get_brain_conn() as conn:
-            row = conn.execute("""
+            row = conn.execute(
+                """
                 SELECT drawings_json, indicators_json, chart_config_json, updated_at
                 FROM chart_memory
                 WHERE symbol = ? AND timeframe = ?
-            """, (symbol, timeframe)).fetchone()
+            """,
+                (symbol, timeframe),
+            ).fetchone()
             if not row:
                 return None
             return {
@@ -354,26 +380,30 @@ class DatabaseManager:
                 "drawings": json.loads(row[0]) if row[0] else [],
                 "indicators": json.loads(row[1]) if row[1] else {},
                 "chart_config": json.loads(row[2]) if row[2] else {},
-                "updated_at": row[3]
+                "updated_at": row[3],
             }
 
     def clear_chart_memory(self, symbol: str, timeframe: str) -> None:
         with self.get_brain_conn() as conn:
-            conn.execute("DELETE FROM chart_memory WHERE symbol = ? AND timeframe = ?", (symbol, timeframe))
+            conn.execute(
+                "DELETE FROM chart_memory WHERE symbol = ? AND timeframe = ?", (symbol, timeframe)
+            )
             conn.commit()
 
-    def get_engine_info(self) -> Dict[str, Any]:
+    def get_engine_info(self) -> dict[str, Any]:
         """Returns active database engine telemetry, paths, dialect, and storage metrics."""
         database_url = os.getenv("DATABASE_URL", "")
-        is_postgres = database_url.startswith("postgres://") or database_url.startswith("postgresql://")
-        
+        is_postgres = database_url.startswith("postgres://") or database_url.startswith(
+            "postgresql://"
+        )
+
         db_files = [
             ("market_db", self.market_db_path),
             ("brain_db", self.brain_db_path),
             ("trading_db", self.trading_db_path),
             ("experiment_db", self.experiment_db_path),
         ]
-        
+
         sizes = {}
         for name, path in db_files:
             sizes[name] = path.stat().st_size if path.exists() else 0
@@ -387,6 +417,6 @@ class DatabaseManager:
             "schema_version": CURRENT_SCHEMA_VERSION,
         }
 
+
 # Singleton instance
 db_manager = DatabaseManager()
-

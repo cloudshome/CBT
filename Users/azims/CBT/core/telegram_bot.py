@@ -17,7 +17,8 @@ import hashlib
 import logging
 import os
 import time
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import aiohttp
 from dotenv import load_dotenv
@@ -31,6 +32,7 @@ logger = logging.getLogger("ai_quant_sentinel.telegram_bot")
 # UNIFIED DESK STATE MIND COORDINATOR
 # ==============================================================================
 
+
 class DeskStateMind:
     """
     Central State Mind for the Quantitative Trading Terminal & Telegram Copilot.
@@ -42,13 +44,13 @@ class DeskStateMind:
         self.virtual_equity_usd = virtual_equity_usd
         self.max_portfolio_risk_pct = 2.50  # Hard circuit breaker limit
 
-    def auto_execute_paper_trade(self, signal: Dict[str, Any]) -> Dict[str, Any]:
+    def auto_execute_paper_trade(self, signal: dict[str, Any]) -> dict[str, Any]:
         """
         Executes a paper practice trade when a signal is emitted.
         Validates risk gate, avoids duplicate positions, and applies Half-Kelly sizing.
         """
-        from core.portfolio_shadow import portfolio_shadow
         from core.event_shock_engine import event_shock_engine
+        from core.portfolio_shadow import portfolio_shadow
 
         sym = signal.get("symbol", "BTC/USDT")
         direction = signal.get("direction", "LONG").upper()
@@ -95,7 +97,9 @@ class DeskStateMind:
             take_profit=tp,
         )
 
-        logger.info(f"DeskStateMind: Auto-executed paper trade {pos_id} on {sym} ({direction} {size})")
+        logger.info(
+            f"DeskStateMind: Auto-executed paper trade {pos_id} on {sym} ({direction} {size})"
+        )
 
         return {
             "status": "EXECUTED",
@@ -183,7 +187,11 @@ class DeskStateMind:
 
         if ok:
             is_long = target["direction"] == "LONG"
-            pnl = (cur_price - target["entry_price"]) * target["size"] if is_long else (target["entry_price"] - cur_price) * target["size"]
+            pnl = (
+                (cur_price - target["entry_price"]) * target["size"]
+                if is_long
+                else (target["entry_price"] - cur_price) * target["size"]
+            )
             sign = "+" if pnl >= 0 else ""
             emoji = "🎯" if pnl >= 0 else "🛑"
             return (
@@ -202,17 +210,17 @@ class DeskStateMind:
         Convenes the live Adversarial Tri-Agent Debate Council.
         """
         try:
-            from core.data_streamer import data_streamer
-            from core.market_state import market_state_compiler
             from core.analogue_engine import analogue_engine
             from core.data_quality_gate import data_quality_gate
+            from core.data_streamer import data_streamer
+            from core.debate_committee import AdversarialDebateCommittee
+            from core.ev_engine import ev_engine
+            from core.event_shock_engine import event_shock_engine
+            from core.macro_sentinel import macro_sentinel
+            from core.market_state import market_state_compiler
             from core.path_simulator import path_simulator
             from core.regime_transition import regime_transition_detector
-            from core.event_shock_engine import event_shock_engine
             from core.uncertainty_engine import uncertainty_engine
-            from core.ev_engine import ev_engine
-            from core.macro_sentinel import macro_sentinel
-            from core.debate_committee import AdversarialDebateCommittee
 
             sym = symbol.strip().upper()
             if "/" not in sym and sym:
@@ -229,20 +237,28 @@ class DeskStateMind:
             reg_res = regime_transition_detector.classify_regime(candles_15m)
             event_st = event_shock_engine.evaluate_risk_state()
             u_budget = uncertainty_engine.compute_budget(dq, analogues, cone, reg_res, event_st)
-            ev_res = ev_engine.calculate_net_ev(cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget)
+            ev_res = ev_engine.calculate_net_ev(
+                cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget
+            )
             macro = macro_sentinel.get_macro_snapshot()
 
             council = AdversarialDebateCommittee()
             decision = council.convene_council(sym, state, ev_res, u_budget, macro.macro_regime)
 
-            dec_emoji = "🟢 LONG" if decision.final_decision == "LONG" else "🔴 SHORT" if decision.final_decision == "SHORT" else "⚪ NO_TRADE (GATE PROTECTED)"
+            dec_emoji = (
+                "🟢 LONG"
+                if decision.final_decision == "LONG"
+                else "🔴 SHORT"
+                if decision.final_decision == "SHORT"
+                else "⚪ NO_TRADE (GATE PROTECTED)"
+            )
 
             return (
                 f"🏛️ **ADVERSARIAL DEBATE COUNCIL: `{sym}`**\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"⚖️ **Council Verdict:** `{dec_emoji}`\n"
-                f"📊 **Consensus Confidence:** `{decision.consensus_confidence*100:.0f}%`\n"
-                f"🛡️ **NO-TRADE Baseline Prob:** `{decision.no_trade_probability*100:.0f}%`\n\n"
+                f"📊 **Consensus Confidence:** `{decision.consensus_confidence * 100:.0f}%`\n"
+                f"🛡️ **NO-TRADE Baseline Prob:** `{decision.no_trade_probability * 100:.0f}%`\n\n"
                 f"🐂 **Bull Agent:**\n_{decision.bull_argument.verdict_summary}_\n\n"
                 f"🐻 **Bear Agent:**\n_{decision.bear_argument.verdict_summary}_\n\n"
                 f"⚖️ **Skeptic / Risk Gatekeeper:**\n_{decision.skeptic_argument.verdict_summary}_\n\n"
@@ -250,7 +266,7 @@ class DeskStateMind:
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"⏱️ _Adversarial Tri-Agent Consensus Engine_"
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Error running debate council: {e}")
             return (
                 f"🏛️ **ADVERSARIAL DEBATE COUNCIL: `{symbol}`**\n"
@@ -286,8 +302,16 @@ class DeskStateMind:
         pnl = row["realized_pnl"]
         sign = "+" if pnl >= 0 else ""
         outcome = "PROFITABLE EXIT ✅" if pnl >= 0 else "LOSS AUTOPSY DIAGNOSIS ⚠️"
-        root_cause = "Target liquidity cluster mitigated." if pnl >= 0 else "Liquidity sweep fakeout & volatility spike."
-        rec = "SMC model validated; take-profit executed cleanly." if pnl >= 0 else "Widen invalidation boundary to H4 swing low."
+        root_cause = (
+            "Target liquidity cluster mitigated."
+            if pnl >= 0
+            else "Liquidity sweep fakeout & volatility spike."
+        )
+        rec = (
+            "SMC model validated; take-profit executed cleanly."
+            if pnl >= 0
+            else "Widen invalidation boundary to H4 swing low."
+        )
 
         return (
             f"🔬 **TRADE AUTOPSY: `{sym}`**\n"
@@ -301,24 +325,29 @@ class DeskStateMind:
             f"Audit verified in SQLite Trading Ledger."
         )
 
-    async def handle_conversational_query(self, query: str, chat_id: Optional[int] = None) -> str:
+    async def handle_conversational_query(self, query: str, chat_id: int | None = None) -> str:
         """
         Processes natural language user messages using QuantMentor grounded in live telemetry.
         """
-        from core.quant_mentor import quant_mentor
         from core.data_streamer import data_streamer
-        from core.portfolio_shadow import portfolio_shadow
-        from core.macro_sentinel import macro_sentinel
         from core.event_shock_engine import event_shock_engine
+        from core.macro_sentinel import macro_sentinel
+        from core.portfolio_shadow import portfolio_shadow
+        from core.quant_mentor import quant_mentor
 
         try:
             from core.market_providers import market_gateway
 
             query_u = query.upper()
-            target_sym = "ETH/USDT" if ("ETH" in query_u or "ETHEREUM" in query_u) else \
-                         "SOL/USDT" if ("SOL" in query_u or "SOLANA" in query_u) else \
-                         "XAU/USD" if ("GOLD" in query_u or "XAU" in query_u or "PAXG" in query_u) else \
-                         "BTC/USDT"
+            target_sym = (
+                "ETH/USDT"
+                if ("ETH" in query_u or "ETHEREUM" in query_u)
+                else "SOL/USDT"
+                if ("SOL" in query_u or "SOLANA" in query_u)
+                else "XAU/USD"
+                if ("GOLD" in query_u or "XAU" in query_u or "PAXG" in query_u)
+                else "BTC/USDT"
+            )
 
             btc_ticker = await market_gateway.get_ticker("BTC/USDT")
             eth_ticker = await market_gateway.get_ticker("ETH/USDT")
@@ -351,8 +380,12 @@ class DeskStateMind:
                 "macro_regime": macro.macro_regime,
                 "global_risk_index": macro.global_risk_index,
                 "dxy": macro.dxy_price,
-                "nearest_macro_event": event_st.nearest_event.title if event_st.nearest_event else "None",
-                "minutes_until_event": event_st.minutes_until_event if event_st.nearest_event else 9999,
+                "nearest_macro_event": event_st.nearest_event.title
+                if event_st.nearest_event
+                else "None",
+                "minutes_until_event": event_st.minutes_until_event
+                if event_st.nearest_event
+                else 9999,
                 "event_lockout_active": event_st.trading_lockout,
             }
 
@@ -364,6 +397,7 @@ class DeskStateMind:
                 try:
                     from core.macro_gold_engine import macro_gold_engine
                     from core.physical_supply_shock import physical_supply_shock_engine
+
                     gold_telemetry = macro_gold_engine.evaluate_macro_state(gold_price=cur_p)
                     shock = physical_supply_shock_engine.analyze("XAU/USD", current_price=cur_p)
                     telemetry["us_10y_real_yield_pct"] = gold_telemetry.us_10y_real_yield_pct
@@ -372,7 +406,7 @@ class DeskStateMind:
                     telemetry["active_fixing_session"] = gold_telemetry.active_fixing_session
                     telemetry["gold_macro_regime"] = gold_telemetry.macro_regime.value
                     telemetry["gold_macro_bias"] = gold_telemetry.macro_bias
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — defensive fallback
                     logger.debug(f"Error enriching gold telemetry: {e}")
 
             # Dynamic Algorithmic SMC Scanner for Trade Plan Queries
@@ -382,23 +416,35 @@ class DeskStateMind:
                     tf = t_opt
                     break
 
-            if any(w in query.lower() for w in ["trade", "setup", "signal", "plan", "entry", "kinbo", "sell"]):
+            if any(
+                w in query.lower()
+                for w in ["trade", "setup", "signal", "plan", "entry", "kinbo", "sell"]
+            ):
                 try:
                     from core.smc_engine import smc_engine
+
                     candles = await data_streamer.fetch_external_ohlcv(target_sym, tf, limit=100)
                     if candles and len(candles) >= 10:
                         patterns = smc_engine.scan(target_sym, tf, candles)
                         bullish_obs = [p for p in patterns if "BULLISH_OB" in p.pattern_type.value]
                         bearish_obs = [p for p in patterns if "BEARISH_OB" in p.pattern_type.value]
-                        bullish_fvgs = [p for p in patterns if "BULLISH_FVG" in p.pattern_type.value]
-                        bearish_fvgs = [p for p in patterns if "BEARISH_FVG" in p.pattern_type.value]
+                        bullish_fvgs = [
+                            p for p in patterns if "BULLISH_FVG" in p.pattern_type.value
+                        ]
+                        bearish_fvgs = [
+                            p for p in patterns if "BEARISH_FVG" in p.pattern_type.value
+                        ]
 
-                        bias_direction = "BULLISH" if len(bullish_obs) >= len(bearish_obs) else "BEARISH"
+                        bias_direction = (
+                            "BULLISH" if len(bullish_obs) >= len(bearish_obs) else "BEARISH"
+                        )
 
                         if bias_direction == "BULLISH" and (bullish_obs or bullish_fvgs):
                             active_pat = bullish_obs[-1] if bullish_obs else bullish_fvgs[-1]
                             entry_mid = active_pat.mid_price
-                            entry_zone = f"${active_pat.bottom_price:,.2f} — ${active_pat.top_price:,.2f}"
+                            entry_zone = (
+                                f"${active_pat.bottom_price:,.2f} — ${active_pat.top_price:,.2f}"
+                            )
                             sl_level = round(active_pat.bottom_price - (cur_p * 0.001), 2)
                             risk_val = max(1.0, entry_mid - sl_level)
                             tp1_level = round(entry_mid + (1.5 * risk_val), 2)
@@ -407,14 +453,18 @@ class DeskStateMind:
                         elif bias_direction == "BEARISH" and (bearish_obs or bearish_fvgs):
                             active_pat = bearish_obs[-1] if bearish_obs else bearish_fvgs[-1]
                             entry_mid = active_pat.mid_price
-                            entry_zone = f"${active_pat.bottom_price:,.2f} — ${active_pat.top_price:,.2f}"
+                            entry_zone = (
+                                f"${active_pat.bottom_price:,.2f} — ${active_pat.top_price:,.2f}"
+                            )
                             sl_level = round(active_pat.top_price + (cur_p * 0.001), 2)
                             risk_val = max(1.0, sl_level - entry_mid)
                             tp1_level = round(entry_mid - (1.5 * risk_val), 2)
                             tp2_level = round(entry_mid - (2.5 * risk_val), 2)
                             action_side = "SELL / SHORT on rejection"
                         else:
-                            entry_zone = f"${round(cur_p * 0.995, 2):,.2f} — ${round(cur_p * 0.998, 2):,.2f}"
+                            entry_zone = (
+                                f"${round(cur_p * 0.995, 2):,.2f} — ${round(cur_p * 0.998, 2):,.2f}"
+                            )
                             entry_mid = round(cur_p * 0.9965, 2)
                             sl_level = round(cur_p * 0.992, 2)
                             risk_val = entry_mid - sl_level
@@ -434,10 +484,14 @@ class DeskStateMind:
                             "tp2": tp2_level,
                             "tp1_r": 1.5,
                             "tp2_r": 2.5,
-                            "pattern_type": active_pat.pattern_type.value if "active_pat" in locals() else "SMC_CONFLUENCE",
-                            "expectancy_r": active_pat.conditional_expectancy_r if "active_pat" in locals() else 1.45,
+                            "pattern_type": active_pat.pattern_type.value
+                            if "active_pat" in locals()
+                            else "SMC_CONFLUENCE",
+                            "expectancy_r": active_pat.conditional_expectancy_r
+                            if "active_pat" in locals()
+                            else 1.45,
                         }
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — defensive fallback
                     logger.debug(f"Error computing live SMC setup: {e}")
 
             ai_response = await quant_mentor.generate_response(
@@ -446,7 +500,7 @@ class DeskStateMind:
                 language_preference="auto",
             )
             return ai_response
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Error handling conversational AI query in Telegram: {e}")
             return (
                 "🤖 **QuantMentor AI Copilot**\n\n"
@@ -458,6 +512,7 @@ class DeskStateMind:
 # ==============================================================================
 # SMART AI BRAIN NOTIFICATION ENGINE
 # ==============================================================================
+
 
 class SmartBrainNotificationEngine:
     """
@@ -487,13 +542,13 @@ class SmartBrainNotificationEngine:
        - 22:00 UTC Evening Performance & Autopsy Review
     """
 
-    def __init__(self, bot: "TelegramBotDispatcher"):
+    def __init__(self, bot: TelegramBotDispatcher):
         self.bot = bot
-        self._sent_fingerprints: Set[str] = set()
-        self._cooldowns: Dict[str, float] = {}
-        self._notified_milestones: Set[str] = set()
-        self._notified_news_hashes: Set[str] = set()
-        self._last_price_tracker: Dict[str, float] = {}
+        self._sent_fingerprints: set[str] = set()
+        self._cooldowns: dict[str, float] = {}
+        self._notified_milestones: set[str] = set()
+        self._notified_news_hashes: set[str] = set()
+        self._last_price_tracker: dict[str, float] = {}
         self._last_morning_date: str = ""
         self._last_evening_date: str = ""
         self._is_monitoring: bool = False
@@ -510,7 +565,9 @@ class SmartBrainNotificationEngine:
         now = time.time()
         last_dispatched = self._cooldowns.get(key, 0.0)
         if now - last_dispatched < cooldown_seconds:
-            logger.info(f"SmartNotifier: Suppressing {key} due to active cooldown ({int(now - last_dispatched)}s < {cooldown_seconds}s).")
+            logger.info(
+                f"SmartNotifier: Suppressing {key} due to active cooldown ({int(now - last_dispatched)}s < {cooldown_seconds}s)."
+            )
             return True
 
         self._sent_fingerprints.add(content_hash)
@@ -523,6 +580,7 @@ class SmartBrainNotificationEngine:
         """
         try:
             from core.event_shock_engine import event_shock_engine
+
             state = event_shock_engine.evaluate_risk_state()
             if not state.nearest_event:
                 return
@@ -607,7 +665,7 @@ class SmartBrainNotificationEngine:
                     )
                     await self.bot.send_message(msg)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"SmartNotifier macro milestone error: {e}")
 
     async def check_volatility_expansion(self) -> None:
@@ -647,14 +705,14 @@ class SmartBrainNotificationEngine:
                 else:
                     # Slow exponential smoothing to update baseline reference price
                     self._last_price_tracker[sym] = last * 0.98 + cur * 0.02
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.debug(f"SmartNotifier volatility error: {e}")
 
     async def check_scheduled_briefings(self) -> None:
         """
         Dispatches morning desk briefing at 08:00 UTC and evening review at 22:00 UTC.
         """
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        now_utc = datetime.datetime.now(datetime.UTC)
         today_str = now_utc.strftime("%Y-%m-%d")
 
         if now_utc.hour == 8 and self._last_morning_date != today_str:
@@ -702,9 +760,10 @@ class SmartBrainNotificationEngine:
         # Seed initial prices
         try:
             from core.data_streamer import data_streamer
+
             self._last_price_tracker["BTC/USDT"] = await data_streamer.get_live_ticker("BTC/USDT")
             self._last_price_tracker["ETH/USDT"] = await data_streamer.get_live_ticker("ETH/USDT")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
             pass
 
         while self._is_monitoring:
@@ -720,7 +779,7 @@ class SmartBrainNotificationEngine:
 
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.error(f"Error in SmartBrainNotificationEngine: {e}")
 
             await asyncio.sleep(check_interval_seconds)
@@ -733,6 +792,7 @@ class SmartBrainNotificationEngine:
 # MASTER TELEGRAM DISPATCHER
 # ==============================================================================
 
+
 class TelegramBotDispatcher:
     """
     Dispatches quantitative market intelligence, signals, trading plans,
@@ -743,7 +803,7 @@ class TelegramBotDispatcher:
         load_dotenv()
         self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
-        self._command_handlers: Dict[str, Callable[..., Any]] = {}
+        self._command_handlers: dict[str, Callable[..., Any]] = {}
         self._is_polling = False
         self._is_broadcasting = False
         self._last_update_id = 0
@@ -755,7 +815,7 @@ class TelegramBotDispatcher:
         return bool(self.bot_token and self.chat_id)
 
     @property
-    def registered_commands(self) -> List[str]:
+    def registered_commands(self) -> list[str]:
         """Returns list of registered command trigger strings."""
         return list(self._command_handlers.keys())
 
@@ -782,18 +842,22 @@ class TelegramBotDispatcher:
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                async with session.post(
+                    url, json=payload, timeout=aiohttp.ClientTimeout(total=8)
+                ) as resp:
                     if resp.status != 200:
                         err_body = await resp.text()
                         logger.warning(f"Telegram API response {resp.status}: {err_body}")
                         # Fallback without parse_mode if markdown parsing failed
                         if "can't parse entities" in err_body:
                             payload.pop("parse_mode", None)
-                            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5)) as resp2:
+                            async with session.post(
+                                url, json=payload, timeout=aiohttp.ClientTimeout(total=5)
+                            ) as resp2:
                                 return resp2.status == 200
                         return False
                     return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Telegram dispatch failed: {e}")
             return False
 
@@ -801,14 +865,20 @@ class TelegramBotDispatcher:
     # INSTITUTIONAL FORMATTERS & DISPATCHERS
     # ==============================================================================
 
-    async def send_trade_signal(self, signal: Dict[str, Any]) -> bool:
+    async def send_trade_signal(self, signal: dict[str, Any]) -> bool:
         """
         Dispatches a high-conviction quantitative trade signal and automatically
         synchronizes paper practice execution through the DeskStateMind.
         """
         sym = signal.get("symbol", "BTC/USDT")
         direction = signal.get("direction", "LONG").upper()
-        emoji_dir = "🟢 *LONG SIGNAL*" if direction == "LONG" else "🔴 *SHORT SIGNAL*" if direction == "SHORT" else "⚪ *WATCHLIST ALERT*"
+        emoji_dir = (
+            "🟢 *LONG SIGNAL*"
+            if direction == "LONG"
+            else "🔴 *SHORT SIGNAL*"
+            if direction == "SHORT"
+            else "⚪ *WATCHLIST ALERT*"
+        )
         entry = signal.get("entry_price", 0.0)
         sl = signal.get("stop_loss", 0.0)
         tp1 = signal.get("tp1", 0.0)
@@ -819,7 +889,7 @@ class TelegramBotDispatcher:
         kelly = signal.get("kelly_allocation_pct", 2.15)
         confluence = signal.get("confluence_score", 88)
         regime = signal.get("regime", "TRENDING_BULL")
-        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
 
         # Automatically execute paper practice trade via DeskStateMind
         exec_res = self.state_mind.auto_execute_paper_trade(signal)
@@ -863,11 +933,11 @@ class TelegramBotDispatcher:
         )
         return await self.send_message(msg)
 
-    async def send_market_update(self, data: Dict[str, Any]) -> bool:
+    async def send_market_update(self, data: dict[str, Any]) -> bool:
         """
         Dispatches a comprehensive live market state and order flow snapshot.
         """
-        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
         btc_p = data.get("btc_price", 0.0)
         btc_chg = data.get("btc_change_24h", 0.0)
         eth_p = data.get("eth_price", 0.0)
@@ -903,21 +973,29 @@ class TelegramBotDispatcher:
         )
         return await self.send_message(msg)
 
-    async def send_trading_plan(self, plan: Dict[str, Any]) -> bool:
+    async def send_trading_plan(self, plan: dict[str, Any]) -> bool:
         """
         Dispatches an institutional multi-timeframe structural trading plan.
         """
         sym = plan.get("symbol", "BTC/USDT")
         bias = plan.get("bias", "BULLISH").upper()
-        emoji_bias = "🐂 BULLISH EXPANSION" if "BULL" in bias else "🐻 BEARISH LIQUIDATION" if "BEAR" in bias else "⚖️ RANGE BOUND ACCUMULATION"
-        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        emoji_bias = (
+            "🐂 BULLISH EXPANSION"
+            if "BULL" in bias
+            else "🐻 BEARISH LIQUIDATION"
+            if "BEAR" in bias
+            else "⚖️ RANGE BOUND ACCUMULATION"
+        )
+        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
 
         pdh = plan.get("pdh", 0.0)
         pdl = plan.get("pdl", 0.0)
         fvg_zone = plan.get("fvg_zone", "$88,200 - $88,650")
         ob_zone = plan.get("ob_zone", "$87,900 - $88,100")
         bull_scenario = plan.get("bull_scenario", "Sweep PDL -> MSS on 5m -> Target PDH")
-        bear_scenario = plan.get("bear_scenario", "Rejection at 4H FVG -> Break below 15m HL -> Target Lower Range")
+        bear_scenario = plan.get(
+            "bear_scenario", "Rejection at 4H FVG -> Break below 15m HL -> Target Lower Range"
+        )
         key_note = plan.get("key_note", "Maintain half-Kelly sizing ahead of NY session open.")
 
         msg = (
@@ -939,7 +1017,7 @@ class TelegramBotDispatcher:
         )
         return await self.send_message(msg)
 
-    async def send_event_alert(self, event: Dict[str, Any]) -> bool:
+    async def send_event_alert(self, event: dict[str, Any]) -> bool:
         """
         Dispatches a high-impact macroeconomic event shock warning.
         Only dispatches at genuine risk inflection milestones.
@@ -950,11 +1028,17 @@ class TelegramBotDispatcher:
         hurdle = event.get("hurdle_mult", 1.50)
         sizing = event.get("size_mult", 0.50)
         lockout = event.get("trading_lockout", False)
-        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
 
         hurdle_pct = int((hurdle - 1) * 100) if hurdle > 1.0 else 50
         sizing_pct = int((1 - sizing) * 100) if sizing < 1.0 else 50
-        status_badge = "🔴 LOCKOUT ACTIVE" if lockout else "⚠️ RISK GATE ACTIVE" if mins <= 15 else "📅 UPCOMING CATALYST"
+        status_badge = (
+            "🔴 LOCKOUT ACTIVE"
+            if lockout
+            else "⚠️ RISK GATE ACTIVE"
+            if mins <= 15
+            else "📅 UPCOMING CATALYST"
+        )
 
         msg = (
             f"🚨 **HIGH-IMPACT MACRO SHOCK ALERT**\n"
@@ -972,19 +1056,25 @@ class TelegramBotDispatcher:
         )
         return await self.send_message(msg)
 
-    async def send_news_digest(self, news_items: List[Dict[str, Any]]) -> bool:
+    async def send_news_digest(self, news_items: list[dict[str, Any]]) -> bool:
         """
         Dispatches a curated market news & crypto alpha catalyst digest.
         """
         if not news_items:
             return False
-        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
         formatted_items = []
         for i, item in enumerate(news_items[:5], 1):
             tag = item.get("tag", "NEWS")
             headline = item.get("headline", "")
             sentiment = item.get("sentiment", "BULLISH")
-            emoji = "🟢" if "BULL" in sentiment.upper() else "🔴" if "BEAR" in sentiment.upper() else "⚡"
+            emoji = (
+                "🟢"
+                if "BULL" in sentiment.upper()
+                else "🔴"
+                if "BEAR" in sentiment.upper()
+                else "⚡"
+            )
             formatted_items.append(f"{i}. {emoji} `[{tag}]` **{headline}**")
 
         body = "\n\n".join(formatted_items)
@@ -997,7 +1087,7 @@ class TelegramBotDispatcher:
         )
         return await self.send_message(msg)
 
-    async def send_position_alert(self, event_type: str, details: Dict[str, Any]) -> bool:
+    async def send_position_alert(self, event_type: str, details: dict[str, Any]) -> bool:
         """Dispatches an institutional position alert (Breakeven, TP, SL, or Auto-Fill)."""
         sym = details.get("symbol", "N/A")
         price = details.get("price", 0.0)
@@ -1005,7 +1095,7 @@ class TelegramBotDispatcher:
         pnl_sign = "+" if pnl >= 0 else ""
         msg_extra = details.get("message", "")
         autopsy = details.get("autopsy")
-        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        now_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
 
         if event_type == "BREAKEVEN_TRIGGERED":
             msg = (
@@ -1090,28 +1180,29 @@ class TelegramBotDispatcher:
                 f"3. Breakeven guard active at +1.5R target expansion.\n"
             )
             return briefing
-        except Exception:
+        except Exception:  # noqa: BLE001 — defensive fallback
             return "Global markets steady. Risk limits active."
 
     async def generate_evening_review_text(self) -> str:
         """Generates daily evening performance & loss autopsy summary."""
         try:
             return self.state_mind.get_latest_autopsy()
-        except Exception:
+        except Exception:  # noqa: BLE001 — defensive fallback
             return "Daily desk closed. All risk limits preserved."
 
     # ==============================================================================
     # QUANTITATIVE INTELLIGENCE GENERATORS
     # ==============================================================================
 
-    async def generate_live_signal(self, symbol: str = "BTC/USDT") -> Dict[str, Any]:
+    async def generate_live_signal(self, symbol: str = "BTC/USDT") -> dict[str, Any]:
         """
         Synthesizes live market price and SMC structural metrics to create a high-conviction signal.
         """
         try:
             from core.data_streamer import data_streamer
+
             price = await data_streamer.get_live_ticker(symbol)
-        except Exception:
+        except Exception:  # noqa: BLE001 — defensive fallback
             price = 89450.0 if "BTC" in symbol else 2720.0
 
         if "BTC" in symbol:
@@ -1157,7 +1248,7 @@ class TelegramBotDispatcher:
             "kelly_allocation_pct": 2.15,
         }
 
-    async def generate_market_update(self) -> Dict[str, Any]:
+    async def generate_market_update(self) -> dict[str, Any]:
         """
         Collects real-time telemetry from market providers and macro sentinel.
         """
@@ -1172,7 +1263,7 @@ class TelegramBotDispatcher:
 
             dxy = macro.dxy_price
             gri = macro.global_risk_index
-        except Exception:
+        except Exception:  # noqa: BLE001 — defensive fallback
             btc = 89450.0
             eth = 2720.0
             xau = 2678.5
@@ -1195,14 +1286,15 @@ class TelegramBotDispatcher:
             "sentiment": "Greed (74/100)",
         }
 
-    async def generate_trading_plan(self, symbol: str = "BTC/USDT") -> Dict[str, Any]:
+    async def generate_trading_plan(self, symbol: str = "BTC/USDT") -> dict[str, Any]:
         """
         Builds multi-timeframe structural trading roadmap with key levels.
         """
         try:
             from core.data_streamer import data_streamer
+
             cur_price = await data_streamer.get_live_ticker(symbol)
-        except Exception:
+        except Exception:  # noqa: BLE001 — defensive fallback
             cur_price = 89450.0 if "BTC" in symbol else 2720.0
 
         pdh = round(cur_price * 1.025, 2)
@@ -1224,16 +1316,17 @@ class TelegramBotDispatcher:
             "key_note": "Volume profile shows value area expansion. Risk gate enforces maximum 2.50% total portfolio risk.",
         }
 
-    def generate_event_shock_status(self) -> Dict[str, Any]:
+    def generate_event_shock_status(self) -> dict[str, Any]:
         """
         Returns nearest macroeconomic catalyst event with accurate risk status.
         """
         try:
             from core.event_shock_engine import event_shock_engine
+
             state = event_shock_engine.evaluate_risk_state()
             if state.nearest_event:
                 mins = state.minutes_until_event
-                is_active = (0 <= mins <= 60.0)
+                is_active = 0 <= mins <= 60.0
                 return {
                     "title": state.nearest_event.title,
                     "impact": state.nearest_event.impact,
@@ -1243,7 +1336,7 @@ class TelegramBotDispatcher:
                     "size_mult": 0.50 if is_active else 1.0,
                     "trading_lockout": state.trading_lockout,
                 }
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
             pass
 
         return {
@@ -1256,11 +1349,11 @@ class TelegramBotDispatcher:
             "trading_lockout": False,
         }
 
-    def generate_news_digest(self) -> List[Dict[str, Any]]:
+    def generate_news_digest(self) -> list[dict[str, Any]]:
         """
         Returns curated dynamic crypto and macro intelligence headlines with timestamps.
         """
-        now_time = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M UTC")
+        now_time = datetime.datetime.now(datetime.UTC).strftime("%H:%M UTC")
         return [
             {
                 "tag": "ETF FLOWS",
@@ -1293,7 +1386,7 @@ class TelegramBotDispatcher:
     # INTERACTIVE COMMAND & WEBHOOK ROUTER
     # ==============================================================================
 
-    async def handle_webhook_update(self, update: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_webhook_update(self, update: dict[str, Any]) -> dict[str, Any]:
         """
         Parses an incoming Telegram update object. Routes commands to registered handlers,
         and routes natural language conversational queries to QuantMentor AI.
@@ -1320,29 +1413,31 @@ class TelegramBotDispatcher:
                     else:
                         response_text = handler(args, chat_id=chat_id)
 
-                    if response_text and (not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id):
+                    if response_text and (
+                        not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id
+                    ):
                         await self.send_message(response_text)
                     return {"status": "EXECUTED", "command": cmd, "response": response_text}
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 — defensive fallback
                     logger.error(f"Error handling Telegram command '{cmd}': {e}")
                     return {"status": "ERROR", "command": cmd, "error": str(e)}
 
             default_reply = (
-                f"🤖 **SKY Institutional Quantitative Terminal Bot**\n\n"
-                f"Available Institutional Commands:\n"
-                f"• `/signal [sym]` — Live SMC signal + Auto Paper Practice\n"
-                f"• `/positions` — Active shadow practice positions & PnL\n"
-                f"• `/close <sym>` — Close open practice position from Telegram\n"
-                f"• `/debate <sym>` — Convene Tri-Agent Adversarial Debate Council\n"
-                f"• `/autopsy` — Forensic post-trade loss diagnosis\n"
-                f"• `/market` — Real-time market pulse & order flow\n"
-                f"• `/plan [sym]` — Multi-timeframe structural trading plan\n"
-                f"• `/events` — High-impact macro events & countdown\n"
-                f"• `/news` — Breaking crypto alpha wire & ETF flows\n"
-                f"• `/decision <sym>` — Full 12-stage SKY decision matrix\n"
-                f"• `/risk` — Risk desk status & circuit breakers\n"
-                f"• `/status` — Terminal health & live telemetry\n\n"
-                f"💬 _Or send ANY message in natural language to chat with QuantMentor!_"
+                "🤖 **SKY Institutional Quantitative Terminal Bot**\n\n"
+                "Available Institutional Commands:\n"
+                "• `/signal [sym]` — Live SMC signal + Auto Paper Practice\n"
+                "• `/positions` — Active shadow practice positions & PnL\n"
+                "• `/close <sym>` — Close open practice position from Telegram\n"
+                "• `/debate <sym>` — Convene Tri-Agent Adversarial Debate Council\n"
+                "• `/autopsy` — Forensic post-trade loss diagnosis\n"
+                "• `/market` — Real-time market pulse & order flow\n"
+                "• `/plan [sym]` — Multi-timeframe structural trading plan\n"
+                "• `/events` — High-impact macro events & countdown\n"
+                "• `/news` — Breaking crypto alpha wire & ETF flows\n"
+                "• `/decision <sym>` — Full 12-stage SKY decision matrix\n"
+                "• `/risk` — Risk desk status & circuit breakers\n"
+                "• `/status` — Terminal health & live telemetry\n\n"
+                "💬 _Or send ANY message in natural language to chat with QuantMentor!_"
             )
             if chat_id:
                 await self.send_message(default_reply)
@@ -1354,7 +1449,7 @@ class TelegramBotDispatcher:
             if ai_reply and (not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id):
                 await self.send_message(ai_reply)
             return {"status": "AI_CONVERSATION_EXECUTED", "query": text, "response": ai_reply}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Error processing conversational query: {e}")
             return {"status": "ERROR", "error": str(e)}
 
@@ -1385,7 +1480,9 @@ class TelegramBotDispatcher:
 
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=25)) as resp:
+                    async with session.get(
+                        url, params=params, timeout=aiohttp.ClientTimeout(total=25)
+                    ) as resp:
                         if resp.status == 200:
                             data = await resp.json()
                             updates = data.get("result", [])
@@ -1403,7 +1500,7 @@ class TelegramBotDispatcher:
                             await asyncio.sleep(5)
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.error(f"Error in Telegram polling loop: {e}")
                 await asyncio.sleep(5)
 

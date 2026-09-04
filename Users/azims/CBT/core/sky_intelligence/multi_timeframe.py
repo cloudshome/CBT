@@ -7,7 +7,8 @@ Derives HTF Trend Context, MTF Pullback/Liquidity State, and LTF Structural Trig
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import MultiTimeframeContext
@@ -22,7 +23,7 @@ class MultiTimeframeEngine:
 
     def compile_mtf_context(
         self,
-        candles_by_tf: Dict[str, List[Dict[str, Any]]],
+        candles_by_tf: dict[str, list[dict[str, Any]]],
     ) -> MultiTimeframeContext:
         """
         Builds the 6-timeframe context stack and computes composite alignment score.
@@ -53,10 +54,14 @@ class MultiTimeframeEngine:
 
         # Evaluate Confluence & Stack Alignment
         bull_votes = sum(
-            1 for s in [trend_1d, trend_4h, state_1h, state_15m, trigger_5m, trigger_1m] if "BULL" in s
+            1
+            for s in [trend_1d, trend_4h, state_1h, state_15m, trigger_5m, trigger_1m]
+            if "BULL" in s
         )
         bear_votes = sum(
-            1 for s in [trend_1d, trend_4h, state_1h, state_15m, trigger_5m, trigger_1m] if "BEAR" in s
+            1
+            for s in [trend_1d, trend_4h, state_1h, state_15m, trigger_5m, trigger_1m]
+            if "BEAR" in s
         )
 
         if bull_votes >= 4 and bear_votes <= 1:
@@ -70,6 +75,7 @@ class MultiTimeframeEngine:
             confluence = 40.0
 
         import time
+
         now_ts = int(time.time() * 1000)
 
         return MultiTimeframeContext(
@@ -84,7 +90,7 @@ class MultiTimeframeEngine:
             stack_alignment=stack,
         )
 
-    def _eval_tf_trend(self, candles: List[Dict[str, Any]]) -> str:
+    def _eval_tf_trend(self, candles: list[dict[str, Any]]) -> str:
         if len(candles) < 20:
             return "NEUTRAL_INSUFFICIENT_DATA"
         closes = [float(c["close"]) for c in candles]
@@ -102,7 +108,7 @@ class MultiTimeframeEngine:
             return "BEARISH_PULLBACK"
         return "RANGING_NEUTRAL"
 
-    def _eval_tf_trigger(self, candles: List[Dict[str, Any]]) -> str:
+    def _eval_tf_trigger(self, candles: list[dict[str, Any]]) -> str:
         if len(candles) < 5:
             return "NEUTRAL"
         last = candles[-1]

@@ -7,7 +7,8 @@ Enforces strict zero lookahead / anti-repainting rules: confirmation occurs at i
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import (
@@ -32,9 +33,9 @@ class MarketStructureEngine:
 
     def detect_swings(
         self,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         timeframe: str = "15m",
-    ) -> List[SwingPoint]:
+    ) -> list[SwingPoint]:
         """
         Detects swing highs and swing lows across the candle series.
         Anti-repainting guarantee: Swing at index i is confirmed only at index i + swing_right.
@@ -43,7 +44,7 @@ class MarketStructureEngine:
         if n < self.swing_left + self.swing_right + 1:
             return []
 
-        swings: List[SwingPoint] = []
+        swings: list[SwingPoint] = []
         highs = [float(c["high"]) for c in candles]
         lows = [float(c["low"]) for c in candles]
         timestamps = [int(c.get("timestamp", i)) for i, c in enumerate(candles)]
@@ -101,10 +102,10 @@ class MarketStructureEngine:
 
     def analyze_structure(
         self,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
         timeframe: str = "15m",
-        atr: Optional[float] = None,
-    ) -> Tuple[List[SwingPoint], List[StructureEvent]]:
+        atr: float | None = None,
+    ) -> tuple[list[SwingPoint], list[StructureEvent]]:
         """
         Analyzes the candlestick series, identifies swing points and structural events (BOS, CHoCH, MSS).
         Returns list of Swings and list of Confirmed Structure Events.
@@ -118,27 +119,31 @@ class MarketStructureEngine:
             tr_list = []
             for i in range(1, len(candles)):
                 h = candles[i]["high"]
-                l = candles[i]["low"]
+                lo = candles[i]["low"]
                 c_prev = candles[i - 1]["close"]
-                tr = max(h - l, abs(h - c_prev), abs(l - c_prev))
+                tr = max(h - lo, abs(h - c_prev), abs(lo - c_prev))
                 tr_list.append(tr)
-            atr = float(np.mean(tr_list[-14:])) if len(tr_list) >= 14 else (candles[-1]["close"] * 0.01)
+            atr = (
+                float(np.mean(tr_list[-14:]))
+                if len(tr_list) >= 14
+                else (candles[-1]["close"] * 0.01)
+            )
 
-        events: List[StructureEvent] = []
+        events: list[StructureEvent] = []
         high_swings = [s for s in swings if s.swing_type == SwingType.SWING_HIGH]
         low_swings = [s for s in swings if s.swing_type == SwingType.SWING_LOW]
 
         # Track trend state
         current_trend = "NEUTRAL"
-        last_high = high_swings[0] if high_swings else None
-        last_low = low_swings[0] if low_swings else None
+        high_swings[0] if high_swings else None
+        low_swings[0] if low_swings else None
 
         # Iterate forward through candles to catch breaks of confirmed swing levels
-        confirmed_swing_highs: List[SwingPoint] = []
-        confirmed_swing_lows: List[SwingPoint] = []
+        confirmed_swing_highs: list[SwingPoint] = []
+        confirmed_swing_lows: list[SwingPoint] = []
 
         # Map confirmation index
-        swings_by_conf_idx: Dict[int, List[SwingPoint]] = {}
+        swings_by_conf_idx: dict[int, list[SwingPoint]] = {}
         for s in swings:
             c_idx = s.confirmation_index or s.index
             swings_by_conf_idx.setdefault(c_idx, []).append(s)
@@ -153,8 +158,8 @@ class MarketStructureEngine:
                         confirmed_swing_lows.append(new_s)
 
             close_p = float(candle["close"])
-            high_p = float(candle["high"])
-            low_p = float(candle["low"])
+            float(candle["high"])
+            float(candle["low"])
             bar_ts = int(candle.get("timestamp", bar_idx))
 
             # Check for Bullish Break (BOS / CHoCH / MSS) above latest active confirmed swing high
@@ -168,7 +173,11 @@ class MarketStructureEngine:
 
                         # Determine if BOS (continuation) or CHoCH/MSS (trend shift)
                         if current_trend == "BEARISH":
-                            ev_type = StructureEventType.MSS_BULLISH if disp_atr >= 1.2 else StructureEventType.CHOCH_BULLISH
+                            ev_type = (
+                                StructureEventType.MSS_BULLISH
+                                if disp_atr >= 1.2
+                                else StructureEventType.CHOCH_BULLISH
+                            )
                             current_trend = "BULLISH"
                         else:
                             ev_type = StructureEventType.BOS_BULLISH
@@ -204,7 +213,11 @@ class MarketStructureEngine:
                         strength = min(1.0, max(0.4, disp_atr * 0.5))
 
                         if current_trend == "BULLISH":
-                            ev_type = StructureEventType.MSS_BEARISH if disp_atr >= 1.2 else StructureEventType.CHOCH_BEARISH
+                            ev_type = (
+                                StructureEventType.MSS_BEARISH
+                                if disp_atr >= 1.2
+                                else StructureEventType.CHOCH_BEARISH
+                            )
                             current_trend = "BEARISH"
                         else:
                             ev_type = StructureEventType.BOS_BEARISH

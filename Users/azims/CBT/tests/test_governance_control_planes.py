@@ -7,19 +7,19 @@ Unit Test Suite for the 4 Cross-Cutting Governance Control Planes:
 """
 
 import pytest
-from core.research_firewall import (
-    research_firewall,
-    ResearchFirewallViolation,
-    DatasetPartition,
-)
+
+from core.analogue_engine import AnalogueDistribution
+from core.data_quality_gate import QualityCheckResult
+from core.event_shock_engine import EventRiskState
 from core.model_governor import model_ensemble_governor
+from core.path_simulator import SimulationCone
+from core.regime_transition import MarketRegime, RegimeClassificationResult, StructuralTransition
+from core.research_firewall import (
+    ResearchFirewallViolation,
+    research_firewall,
+)
 from core.strategy_selection_guard import strategy_selection_guard
 from core.uncertainty_engine import uncertainty_engine
-from core.data_quality_gate import QualityCheckResult
-from core.analogue_engine import AnalogueDistribution
-from core.path_simulator import SimulationCone
-from core.event_shock_engine import EventRiskState
-from core.regime_transition import RegimeClassificationResult, MarketRegime, StructuralTransition
 
 
 def test_research_firewall_lifecycle():
@@ -70,7 +70,11 @@ def test_model_ensemble_governor_regime_weighting():
     assert forecast.p_min_range == 0.55
     assert forecast.p_max_range == 0.74
     assert forecast.is_consensus_clear is True
-    assert forecast.confidence_interval_95[0] < forecast.consensus_p_win < forecast.confidence_interval_95[1]
+    assert (
+        forecast.confidence_interval_95[0]
+        < forecast.consensus_p_win
+        < forecast.confidence_interval_95[1]
+    )
 
     # Scenario: Severe Model Disagreement in High Volatility
     disagree_forecast = model_ensemble_governor.synthesize_forecast(

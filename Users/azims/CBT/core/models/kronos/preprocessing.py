@@ -6,7 +6,8 @@ Enforces zero temporal leakage and strict OHLC validity.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.kronos.preprocessing")
@@ -14,11 +15,12 @@ logger = logging.getLogger("ai_quant_sentinel.kronos.preprocessing")
 
 class PreprocessingValidationError(ValueError):
     """Raised when market data violates causal or structural OHLC constraints."""
+
     pass
 
 
 def validate_ohlcv_sequence(
-    candles: List[Dict[str, Any]],
+    candles: list[dict[str, Any]],
     expected_symbol: str,
     expected_timeframe: str,
     min_required_bars: int = 30,
@@ -38,24 +40,25 @@ def validate_ohlcv_sequence(
         # 1. Field presence
         for field_name in ("timestamp", "open", "high", "low", "close"):
             if field_name not in bar:
-                raise PreprocessingValidationError(f"Bar at index {idx} missing required field '{field_name}'.")
+                raise PreprocessingValidationError(
+                    f"Bar at index {idx} missing required field '{field_name}'."
+                )
 
         ts = int(bar["timestamp"])
         o = float(bar["open"])
         h = float(bar["high"])
-        l = float(bar["low"])
+        lo = float(bar["low"])
         c = float(bar["close"])
 
         # 2. Number sanity
-        for name, val in [("open", o), ("high", h), ("low", l), ("close", c)]:
+        for name, val in [("open", o), ("high", h), ("low", lo), ("close", c)]:
             if np.isnan(val) or np.isinf(val) or val <= 0:
                 raise PreprocessingValidationError(f"Invalid {name} price at index {idx}: {val}")
 
         # 3. Geometric consistency
-        if h < o or h < c or l > o or l > c or l > h:
+        if h < o or h < c or lo > o or lo > c or lo > h:
             raise PreprocessingValidationError(
-                f"Geometric OHLC violation at index {idx} (ts: {ts}): "
-                f"O={o}, H={h}, L={l}, C={c}"
+                f"Geometric OHLC violation at index {idx} (ts: {ts}): O={o}, H={h}, L={lo}, C={c}"
             )
 
         # 4. Strict chronological ordering
@@ -67,10 +70,10 @@ def validate_ohlcv_sequence(
 
 
 def extract_normalized_features(
-    candles: List[Dict[str, Any]],
+    candles: list[dict[str, Any]],
     lookback: int,
     max_context: int = 512,
-) -> Tuple[np.ndarray, Dict[str, float]]:
+) -> tuple[np.ndarray, dict[str, float]]:
     """
     Extracts causal, point-in-time standardized feature arrays for Kronos inference.
     Normalization statistics are strictly derived from the provided lookback window only.

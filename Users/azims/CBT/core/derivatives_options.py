@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.derivatives_options")
 
@@ -21,13 +21,13 @@ class DerivativesOptionsSnapshot:
     funding_state: str
     open_interest_delta_24h_pct: float
     options_max_pain_strike: float
-    net_dealer_gex: str             # "POSITIVE_PINNING" vs "NEGATIVE_EXPLOSION"
+    net_dealer_gex: str  # "POSITIVE_PINNING" vs "NEGATIVE_EXPLOSION"
     twenty_five_delta_skew_pct: float
-    primary_liquidation_pools: Dict[str, float]
+    primary_liquidation_pools: dict[str, float]
     derivatives_bias: str
-    z_score: float                  # Standardized [-3.0, +3.0]
+    z_score: float  # Standardized [-3.0, +3.0]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timestamp": self.timestamp,
@@ -48,6 +48,7 @@ class DerivativesOptionsEngine:
 
     def analyze(self, symbol: str, current_price: float) -> DerivativesOptionsSnapshot:
         import time
+
         sym = symbol.upper()
         now = int(time.time() * 1000)
 

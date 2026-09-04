@@ -13,10 +13,9 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import IntEnum
-from typing import Any, Dict, List, Optional, Tuple
-import numpy as np
+from typing import Any
 
 from core.database import db_manager
 
@@ -34,10 +33,10 @@ class QuarantineTier(IntEnum):
 class StrategyGenome:
     dna_id: str
     name: str
-    source: str                         # "INTERNAL_QUANT", "GITHUB_REPO", "YOUTUBE_LESSON", "MUTATED_OFFSPRING"
-    entry_rules: Dict[str, Any]
-    exit_rules: Dict[str, Any]
-    parameter_bounds: Dict[str, Any]
+    source: str  # "INTERNAL_QUANT", "GITHUB_REPO", "YOUTUBE_LESSON", "MUTATED_OFFSPRING"
+    entry_rules: dict[str, Any]
+    exit_rules: dict[str, Any]
+    parameter_bounds: dict[str, Any]
     quarantine_tier: QuarantineTier = QuarantineTier.TIER_1_SMOKE
     forward_trades_count: int = 0
     historical_win_rate: float = 0.0
@@ -46,11 +45,11 @@ class StrategyGenome:
     walk_forward_stability: float = 0.0
     monte_carlo_ruin_prob: float = 0.0
     distinct_regimes_tested: int = 1
-    research_score: float = 0.0         # Statistical purity [0.0, 100.0]
-    allocation_weight: float = 0.0      # Live capital weight [0.0, 1.0]
+    research_score: float = 0.0  # Statistical purity [0.0, 100.0]
+    allocation_weight: float = 0.0  # Live capital weight [0.0, 1.0]
     is_active: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["quarantine_tier"] = int(self.quarantine_tier)
         return d
@@ -60,7 +59,7 @@ class StrategyLeagueManager:
     """Orchestrates strategy competition, quarantine promotions, and live capital weighting."""
 
     def __init__(self):
-        self._strategies: Dict[str, StrategyGenome] = {}
+        self._strategies: dict[str, StrategyGenome] = {}
         self._seed_default_strategies()
 
     def _seed_default_strategies(self) -> None:
@@ -88,7 +87,11 @@ class StrategyLeagueManager:
             dna_id="DNA_JUDAS_SWEEP_02",
             name="London/NY Judas Swing Hunter",
             source="INTERNAL_QUANT",
-            entry_rules={"session": ["LONDON_OPEN", "NY_OPEN"], "asian_sweep": True, "wick_rejection_pct": 50.0},
+            entry_rules={
+                "session": ["LONDON_OPEN", "NY_OPEN"],
+                "asian_sweep": True,
+                "wick_rejection_pct": 50.0,
+            },
             exit_rules={"tp_target": "OPPOSITE_ASIAN_EXTREME", "sl_rule": "SWEEP_WICK_EXTREME"},
             parameter_bounds={"min_asian_range_bps": 40.0},
             quarantine_tier=QuarantineTier.TIER_4_PRODUCTION,
@@ -127,7 +130,7 @@ class StrategyLeagueManager:
         self._strategies[s3.dna_id] = s3
         self.rebalance_capital_weights()
 
-    def evaluate_promotion(self, dna_id: str) -> Tuple[bool, str]:
+    def evaluate_promotion(self, dna_id: str) -> tuple[bool, str]:
         """
         Evaluates strict graduation criteria across quarantine tiers.
         """
@@ -141,13 +144,20 @@ class StrategyLeagueManager:
                 strat.quarantine_tier = QuarantineTier.TIER_2_PRELIMINARY
                 return True, f"Promoted {strat.name} to Tier 2 (Preliminary Validation)."
         elif current_tier == QuarantineTier.TIER_2_PRELIMINARY:
-            if strat.forward_trades_count >= 100 and strat.walk_forward_stability >= 0.65 and strat.rolling_sharpe_30d >= 1.5:
+            if (
+                strat.forward_trades_count >= 100
+                and strat.walk_forward_stability >= 0.65
+                and strat.rolling_sharpe_30d >= 1.5
+            ):
                 strat.quarantine_tier = QuarantineTier.TIER_3_ROBUST
                 return True, f"Promoted {strat.name} to Tier 3 (Robust Evaluation)."
         elif current_tier == QuarantineTier.TIER_3_ROBUST:
             # Enforce Selection-Bias Guard (Deflated Sharpe Ratio DSR >= 0.95)
             from core.strategy_selection_guard import strategy_selection_guard
-            guard_rep = strategy_selection_guard.evaluate_strategy(strat.dna_id, [], strat.rolling_sharpe_30d)
+
+            guard_rep = strategy_selection_guard.evaluate_strategy(
+                strat.dna_id, [], strat.rolling_sharpe_30d
+            )
 
             if not guard_rep.is_statistically_significant:
                 return False, f"Promotion blocked by Selection-Bias Guard: {guard_rep.rationale}"
@@ -160,7 +170,10 @@ class StrategyLeagueManager:
             ):
                 strat.quarantine_tier = QuarantineTier.TIER_4_PRODUCTION
                 self.rebalance_capital_weights()
-                return True, f"GRADUATED {strat.name} to Tier 4 Production League! (DSR = {guard_rep.deflated_sharpe_ratio:.3f})"
+                return (
+                    True,
+                    f"GRADUATED {strat.name} to Tier 4 Production League! (DSR = {guard_rep.deflated_sharpe_ratio:.3f})",
+                )
 
         return False, f"Strategy {strat.name} remains in Tier {int(current_tier)}."
 
@@ -168,17 +181,27 @@ class StrategyLeagueManager:
         """
         Weight_i = max(0, EV_30d) * Sharpe_30d / Sum(EV_all * Sharpe_all) for Tier 4 strategies.
         """
-        tier_4_strats = [s for s in self._strategies.values() if s.quarantine_tier == QuarantineTier.TIER_4_PRODUCTION and s.is_active]
+        tier_4_strats = [
+            s
+            for s in self._strategies.values()
+            if s.quarantine_tier == QuarantineTier.TIER_4_PRODUCTION and s.is_active
+        ]
         if not tier_4_strats:
             return
 
-        scores = [max(0.0, s.rolling_net_ev_30d) * max(0.1, s.rolling_sharpe_30d) for s in tier_4_strats]
+        scores = [
+            max(0.0, s.rolling_net_ev_30d) * max(0.1, s.rolling_sharpe_30d) for s in tier_4_strats
+        ]
         total_score = sum(scores)
 
-        for s, score in zip(tier_4_strats, scores):
-            s.allocation_weight = round(score / total_score, 3) if total_score > 0 else round(1.0 / len(tier_4_strats), 3)
+        for s, score in zip(tier_4_strats, scores, strict=False):
+            s.allocation_weight = (
+                round(score / total_score, 3)
+                if total_score > 0
+                else round(1.0 / len(tier_4_strats), 3)
+            )
 
-    def get_leaderboard(self) -> List[Dict[str, Any]]:
+    def get_leaderboard(self) -> list[dict[str, Any]]:
         strats = list(self._strategies.values())
         strats.sort(key=lambda s: (int(s.quarantine_tier), s.rolling_sharpe_30d), reverse=True)
         return [s.to_dict() for s in strats]
@@ -215,4 +238,3 @@ class StrategyLeagueManager:
 
 # Singleton
 strategy_league_manager = StrategyLeagueManager()
-

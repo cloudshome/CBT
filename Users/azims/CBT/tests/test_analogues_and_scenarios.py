@@ -2,12 +2,11 @@
 Tests for Layer 5: Hierarchical Analogues, MECE Scenarios, and Collapse Monitor.
 """
 
-import pytest
-from core.market_state import market_state_compiler
 from core.analogue_engine import analogue_engine
+from core.data_streamer import data_streamer
+from core.market_state import market_state_compiler
 from core.scenario_engine import scenario_engine
 from core.scenario_monitor import scenario_monitor
-from core.data_streamer import data_streamer
 
 
 def test_hierarchical_analogue_ensemble():

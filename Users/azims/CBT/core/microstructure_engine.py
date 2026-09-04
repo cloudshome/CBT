@@ -9,10 +9,10 @@ and institutional footprint/iceberg detection.
 from __future__ import annotations
 
 import logging
-import math
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("sky.microstructure_engine")
@@ -20,8 +20,8 @@ logger = logging.getLogger("sky.microstructure_engine")
 
 @dataclass
 class DepthTierMetrics:
-    tier: str                          # "L1", "L5", "L10", "L20", "L50"
-    imbalance: float                   # [-1.0, 1.0] (Positive = Bid Heavy)
+    tier: str  # "L1", "L5", "L10", "L20", "L50"
+    imbalance: float  # [-1.0, 1.0] (Positive = Bid Heavy)
     bid_volume: float
     ask_volume: float
     bid_notional_usd: float
@@ -30,29 +30,31 @@ class DepthTierMetrics:
 
 @dataclass
 class SlopeElasticityResult:
-    bid_slope: float                   # dQ/dP on bid side (liquidity density)
-    ask_slope: float                   # dQ/dP on ask side
-    elasticity_ratio: float            # bid_slope / ask_slope (>1.0 = Bids absorb harder)
-    book_stiffness: str                # "RIGID_BIDS", "RIGID_ASKS", "BALANCED_ELASTIC", "THIN_FRAGILE"
+    bid_slope: float  # dQ/dP on bid side (liquidity density)
+    ask_slope: float  # dQ/dP on ask side
+    elasticity_ratio: float  # bid_slope / ask_slope (>1.0 = Bids absorb harder)
+    book_stiffness: str  # "RIGID_BIDS", "RIGID_ASKS", "BALANCED_ELASTIC", "THIN_FRAGILE"
 
 
 @dataclass
 class FlowToxicityResult:
-    vpin: float                        # [0.0, 1.0] Volume-Synchronized Probability of Toxicity
-    kyles_lambda: float                # Price impact per unit of aggressive flow ($/unit)
-    hasbrouck_impact: float            # Cumulative permanent price impact estimate (bps)
-    informed_trader_ratio: float       # Estimate of informed vs noise flow
-    toxicity_regime: str               # "BENIGN_FLOW", "INFORMED_ACCUMULATION", "INFORMED_DISTRIBUTION", "CASCADE_TOXIC_RISK"
+    vpin: float  # [0.0, 1.0] Volume-Synchronized Probability of Toxicity
+    kyles_lambda: float  # Price impact per unit of aggressive flow ($/unit)
+    hasbrouck_impact: float  # Cumulative permanent price impact estimate (bps)
+    informed_trader_ratio: float  # Estimate of informed vs noise flow
+    toxicity_regime: (
+        str  # "BENIGN_FLOW", "INFORMED_ACCUMULATION", "INFORMED_DISTRIBUTION", "CASCADE_TOXIC_RISK"
+    )
 
 
 @dataclass
 class IcebergFootprint:
     price_level: float
-    side: str                          # "BID" or "ASK"
+    side: str  # "BID" or "ASK"
     visible_qty: float
     estimated_hidden_qty: float
-    absorption_ratio: float            # Executed / Visible
-    confidence: float                  # [0.0, 1.0]
+    absorption_ratio: float  # Executed / Visible
+    confidence: float  # [0.0, 1.0]
     timestamp_ms: int
 
 
@@ -64,15 +66,15 @@ class MicrostructureAnalysis:
     micro_price: float
     micro_price_delta_bps: float
     spread_bps: float
-    depth_tiers: Dict[str, DepthTierMetrics]
+    depth_tiers: dict[str, DepthTierMetrics]
     slope_elasticity: SlopeElasticityResult
     flow_toxicity: FlowToxicityResult
-    detected_icebergs: List[IcebergFootprint]
-    sweep_absorption_score: float      # [0.0, 1.0]
-    institutional_bias: str            # "BULLISH_ABSORPTION", "BEARISH_DISTRIBUTION", "SWEEP_TRAP", "NEUTRAL"
+    detected_icebergs: list[IcebergFootprint]
+    sweep_absorption_score: float  # [0.0, 1.0]
+    institutional_bias: str  # "BULLISH_ABSORPTION", "BEARISH_DISTRIBUTION", "SWEEP_TRAP", "NEUTRAL"
     narrative: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -89,15 +91,16 @@ class MicrostructureEngine:
     ):
         self.vpin_bucket_size = vpin_bucket_size
         self.vpin_num_buckets = vpin_num_buckets
-        self._trade_buckets: List[Tuple[float, float]] = []  # [(buy_vol, sell_vol)]
+        self._trade_buckets: list[tuple[float, float]] = []  # [(buy_vol, sell_vol)]
 
     def analyze(
         self,
-        bids: List[Tuple[float, float]],  # List of (price, qty)
-        asks: List[Tuple[float, float]],  # List of (price, qty)
-        recent_trades: Optional[List[Dict[str, Any]]] = None,  # List of {price, qty, is_buyer_maker, timestamp}
+        bids: list[tuple[float, float]],  # List of (price, qty)
+        asks: list[tuple[float, float]],  # List of (price, qty)
+        recent_trades: list[dict[str, Any]]
+        | None = None,  # List of {price, qty, is_buyer_maker, timestamp}
         symbol: str = "BTC/USDT",
-        timestamp_ms: Optional[int] = None,
+        timestamp_ms: int | None = None,
     ) -> MicrostructureAnalysis:
         """
         Conducts comprehensive institutional microstructure analysis.
@@ -133,14 +136,18 @@ class MicrostructureEngine:
         depth_tiers = self._compute_depth_tiers(b_prices, b_sizes, a_prices, a_sizes)
 
         # 2. Slope Elasticity (dQ/dP)
-        slope_result = self._compute_slope_elasticity(b_prices, b_sizes, a_prices, a_sizes, mid_price)
+        slope_result = self._compute_slope_elasticity(
+            b_prices, b_sizes, a_prices, a_sizes, mid_price
+        )
 
         # 3. Flow Toxicity & Kyle's Lambda
         toxicity_result = self._compute_flow_toxicity(recent_trades, mid_price, depth_tiers)
 
         # 4. Institutional Iceberg & Sweep Detection
         icebergs = self._detect_icebergs(b_prices, b_sizes, a_prices, a_sizes, recent_trades, now)
-        sweep_score = self._compute_sweep_absorption_score(depth_tiers, toxicity_result, slope_result)
+        sweep_score = self._compute_sweep_absorption_score(
+            depth_tiers, toxicity_result, slope_result
+        )
 
         # 5. Composite Institutional Bias & Narrative
         bias, narrative = self._synthesize_bias(
@@ -169,9 +176,9 @@ class MicrostructureEngine:
         b_sizes: np.ndarray,
         a_prices: np.ndarray,
         a_sizes: np.ndarray,
-    ) -> Dict[str, DepthTierMetrics]:
+    ) -> dict[str, DepthTierMetrics]:
         tiers_config = {"L1": 1, "L5": 5, "L10": 10, "L20": 20, "L50": 50}
-        results: Dict[str, DepthTierMetrics] = {}
+        results: dict[str, DepthTierMetrics] = {}
 
         for name, depth in tiers_config.items():
             b_sub_p = b_prices[:depth]
@@ -249,9 +256,9 @@ class MicrostructureEngine:
 
     def _compute_flow_toxicity(
         self,
-        recent_trades: Optional[List[Dict[str, Any]]],
+        recent_trades: list[dict[str, Any]] | None,
         mid_price: float,
-        depth_tiers: Dict[str, DepthTierMetrics],
+        depth_tiers: dict[str, DepthTierMetrics],
     ) -> FlowToxicityResult:
         """
         Calculates continuous VPIN and Kyle's Lambda.
@@ -262,7 +269,11 @@ class MicrostructureEngine:
             vpin_est = float(np.clip(0.35 + abs(l10_imb) * 0.3, 0.05, 0.95))
             kyles_lambda = float(round(0.00015 * (1.0 + abs(l10_imb)), 6))
             hasbrouck = float(round(kyles_lambda * 1000.0 * 10000.0 / max(1.0, mid_price), 2))
-            regime = "BENIGN_FLOW" if vpin_est < 0.55 else ("INFORMED_ACCUMULATION" if l10_imb > 0 else "INFORMED_DISTRIBUTION")
+            regime = (
+                "BENIGN_FLOW"
+                if vpin_est < 0.55
+                else ("INFORMED_ACCUMULATION" if l10_imb > 0 else "INFORMED_DISTRIBUTION")
+            )
             return FlowToxicityResult(
                 vpin=round(vpin_est, 3),
                 kyles_lambda=kyles_lambda,
@@ -272,10 +283,10 @@ class MicrostructureEngine:
             )
 
         # Parse trade flow
-        buy_vols: List[float] = []
-        sell_vols: List[float] = []
-        price_deltas: List[float] = []
-        net_flows: List[float] = []
+        buy_vols: list[float] = []
+        sell_vols: list[float] = []
+        price_deltas: list[float] = []
+        net_flows: list[float] = []
 
         prev_price = float(recent_trades[0].get("price", mid_price))
         for t in recent_trades:
@@ -333,25 +344,25 @@ class MicrostructureEngine:
         b_sizes: np.ndarray,
         a_prices: np.ndarray,
         a_sizes: np.ndarray,
-        recent_trades: Optional[List[Dict[str, Any]]],
+        recent_trades: list[dict[str, Any]] | None,
         now: int,
-    ) -> List[IcebergFootprint]:
+    ) -> list[IcebergFootprint]:
         """
         Detects hidden iceberg absorption where executed trade volume exceeds visible depth.
         """
-        icebergs: List[IcebergFootprint] = []
+        icebergs: list[IcebergFootprint] = []
         if not recent_trades:
             return icebergs
 
         # Aggregate executed volume per price level
-        trade_vol_by_price: Dict[float, float] = {}
+        trade_vol_by_price: dict[float, float] = {}
         for t in recent_trades:
             p = round(float(t.get("price", 0.0)), 2)
             q = float(t.get("qty", 0.0))
             trade_vol_by_price[p] = trade_vol_by_price.get(p, 0.0) + q
 
         # Check top 5 bid levels
-        for p, s in zip(b_prices[:5], b_sizes[:5]):
+        for p, s in zip(b_prices[:5], b_sizes[:5], strict=False):
             p_rounded = round(float(p), 2)
             traded_qty = trade_vol_by_price.get(p_rounded, 0.0)
             if s > 0 and traded_qty >= 2.5 * s:
@@ -368,7 +379,7 @@ class MicrostructureEngine:
                 )
 
         # Check top 5 ask levels
-        for p, s in zip(a_prices[:5], a_sizes[:5]):
+        for p, s in zip(a_prices[:5], a_sizes[:5], strict=False):
             p_rounded = round(float(p), 2)
             traded_qty = trade_vol_by_price.get(p_rounded, 0.0)
             if s > 0 and traded_qty >= 2.5 * s:
@@ -388,7 +399,7 @@ class MicrostructureEngine:
 
     def _compute_sweep_absorption_score(
         self,
-        depth_tiers: Dict[str, DepthTierMetrics],
+        depth_tiers: dict[str, DepthTierMetrics],
         toxicity: FlowToxicityResult,
         slope: SlopeElasticityResult,
     ) -> float:
@@ -397,18 +408,22 @@ class MicrostructureEngine:
 
         # Divergence between top of book and deep book indicates aggressive absorption
         divergence = abs(l1_imb - l20_imb)
-        score = 0.4 * divergence + 0.3 * toxicity.vpin + 0.3 * min(1.0, abs(slope.elasticity_ratio - 1.0))
+        score = (
+            0.4 * divergence
+            + 0.3 * toxicity.vpin
+            + 0.3 * min(1.0, abs(slope.elasticity_ratio - 1.0))
+        )
         return float(np.clip(score, 0.0, 1.0))
 
     def _synthesize_bias(
         self,
-        depth_tiers: Dict[str, DepthTierMetrics],
+        depth_tiers: dict[str, DepthTierMetrics],
         slope: SlopeElasticityResult,
         toxicity: FlowToxicityResult,
-        icebergs: List[IcebergFootprint],
+        icebergs: list[IcebergFootprint],
         sweep_score: float,
         micro_delta_bps: float,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         l10_imb = depth_tiers.get("L10", depth_tiers.get("L5")).imbalance
         bid_icebergs = sum(1 for ice in icebergs if ice.side == "BID")
         ask_icebergs = sum(1 for ice in icebergs if ice.side == "ASK")

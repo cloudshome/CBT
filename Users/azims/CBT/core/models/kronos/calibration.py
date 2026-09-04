@@ -1,4 +1,4 @@
-﻿"""
+"""
 Reliability Calibration and Uncertainty Scaling for Kronos Forecasts.
 Applies Platt scaling and isotonic regression to multi-sample trajectory consensus.
 """
@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.kronos.calibration")
@@ -22,9 +23,9 @@ class KronosCalibrationScorecard:
     is_well_calibrated: bool
     platt_a: float
     platt_b: float
-    reliability_bins: List[Dict[str, Any]]
+    reliability_bins: list[dict[str, Any]]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "symbol": self.symbol,
             "timeframe": self.timeframe,
@@ -42,7 +43,7 @@ class KronosProbabilityCalibrator:
 
     def __init__(self):
         # Default logistic parameters (A=1.0, B=0.0 means uncalibrated logit)
-        self._calibrations: Dict[str, Tuple[float, float]] = {}
+        self._calibrations: dict[str, tuple[float, float]] = {}
 
     def calibrate(
         self,
@@ -73,8 +74,8 @@ class KronosProbabilityCalibrator:
 
     def evaluate_scorecard(
         self,
-        predicted_probs: List[float],
-        realized_outcomes: List[int],
+        predicted_probs: list[float],
+        realized_outcomes: list[int],
         symbol: str = "BTC/USDT",
         timeframe: str = "15m",
     ) -> KronosCalibrationScorecard:
@@ -96,11 +97,13 @@ class KronosProbabilityCalibrator:
             mask = (p >= low) & (p < high)
             count = int(np.sum(mask))
             obs_freq = float(np.mean(y[mask])) if count > 0 else (low + high) / 2.0
-            rel_bins.append({
-                "bin_center": round((low + high) / 2.0, 2),
-                "observed_frequency": round(obs_freq, 3),
-                "sample_count": count,
-            })
+            rel_bins.append(
+                {
+                    "bin_center": round((low + high) / 2.0, 2),
+                    "observed_frequency": round(obs_freq, 3),
+                    "sample_count": count,
+                }
+            )
 
         is_calibrated = bool(brier < 0.22)
 
@@ -117,7 +120,11 @@ class KronosProbabilityCalibrator:
 
     def _default_scorecard(self, symbol: str, timeframe: str) -> KronosCalibrationScorecard:
         bins = [
-            {"bin_center": round(0.05 + (i * 0.10), 2), "observed_frequency": round(0.05 + (i * 0.10), 2), "sample_count": 0}
+            {
+                "bin_center": round(0.05 + (i * 0.10), 2),
+                "observed_frequency": round(0.05 + (i * 0.10), 2),
+                "sample_count": 0,
+            }
             for i in range(10)
         ]
         return KronosCalibrationScorecard(

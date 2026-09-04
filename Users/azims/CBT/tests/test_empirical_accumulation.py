@@ -2,9 +2,10 @@
 Unit tests for the Empirical Evidence Accumulator batch runner.
 """
 
-import pytest
-from scripts.run_empirical_accumulation import simulate_synthetic_trades_for_regime, run_batch_accumulation
-from core.empirical_accumulator import empirical_accumulator
+from scripts.run_empirical_accumulation import (
+    run_batch_accumulation,
+    simulate_synthetic_trades_for_regime,
+)
 
 
 def test_simulate_synthetic_trades():

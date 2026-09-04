@@ -9,10 +9,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from core.strategy_league import StrategyGenome, QuarantineTier
+from core.strategy_league import QuarantineTier, StrategyGenome
 
 logger = logging.getLogger("ai_quant_sentinel.strategy_extractor")
 
@@ -24,9 +23,9 @@ class StrategyExtractor:
         self,
         strategy_name: str,
         source: str,
-        entry_rules: Dict[str, Any],
-        exit_rules: Dict[str, Any],
-        parameter_bounds: Dict[str, Any],
+        entry_rules: dict[str, Any],
+        exit_rules: dict[str, Any],
+        parameter_bounds: dict[str, Any],
     ) -> StrategyGenome:
         """
         Creates a valid StrategyGenome with deterministic DNA hashing.

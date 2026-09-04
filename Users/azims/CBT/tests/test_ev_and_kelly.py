@@ -2,14 +2,13 @@
 Tests for Layer 7, 8, 9: Net EV Engine, Conservative Kelly, and Adversarial Debate Council.
 """
 
-import pytest
-from core.uncertainty_engine import UncertaintyBudget
-from core.ev_engine import ev_engine
 from core.conservative_kelly import conservative_kelly
-from core.debate_committee import debate_committee
-from core.portfolio_risk_matrix import portfolio_risk_matrix
-from core.market_state import market_state_compiler
 from core.data_streamer import data_streamer
+from core.debate_committee import debate_committee
+from core.ev_engine import ev_engine
+from core.market_state import market_state_compiler
+from core.portfolio_risk_matrix import portfolio_risk_matrix
+from core.uncertainty_engine import UncertaintyBudget
 
 
 def test_ev_engine_hurdle_rule():
@@ -30,7 +29,7 @@ def test_ev_engine_hurdle_rule():
         entry_price=88500.0,
         take_profit_price=89500.0,
         stop_loss_price=88000.0,
-        calibrated_win_prob=0.42, # Low probability
+        calibrated_win_prob=0.42,  # Low probability
         uncertainty=u_budget,
     )
 
@@ -99,9 +98,9 @@ def test_portfolio_heat_cap_ceiling():
     matrix = portfolio_risk_matrix.evaluate_portfolio_heat(
         account_equity=100000.0,
         open_positions=[
-            {"entry_price": 88000, "stop_loss": 86500, "size": 1.0}, # risk $1500
+            {"entry_price": 88000, "stop_loss": 86500, "size": 1.0},  # risk $1500
             {"entry_price": 3000, "stop_loss": 2880, "size": 10.0},  # risk $1200
-            {"entry_price": 2680, "stop_loss": 2670, "size": 100.0}, # risk $1000
+            {"entry_price": 2680, "stop_loss": 2670, "size": 100.0},  # risk $1000
         ],
     )
     assert round(matrix.total_open_risk_pct * 100, 1) == 3.7

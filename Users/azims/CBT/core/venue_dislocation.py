@@ -7,10 +7,9 @@ Triggers VENUE_DISLOCATION_ALERT when spread exceeds 2.5 sigma, suspending aggre
 
 from __future__ import annotations
 
-import time
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.venue_dislocation")
@@ -31,9 +30,9 @@ class DislocationStatus:
     has_dislocation: bool
     max_zscore: float
     max_spread_bps: float
-    pair_with_max_dislocation: Tuple[str, str]
+    pair_with_max_dislocation: tuple[str, str]
     action_recommended: str  # "NORMAL_EXECUTION" or "SUSPEND_AGGRESSIVE_MARKET_ORDERS"
-    metrics_by_venue: Dict[str, float]
+    metrics_by_venue: dict[str, float]
 
 
 class VenueDislocationMonitor:
@@ -45,12 +44,12 @@ class VenueDislocationMonitor:
     def __init__(self, zscore_threshold: float = 2.5, window_size: int = 120):
         self.zscore_threshold = zscore_threshold
         self.window_size = window_size
-        self._historical_basis_bps: Dict[str, List[float]] = {}  # key: symbol
+        self._historical_basis_bps: dict[str, list[float]] = {}  # key: symbol
 
     def update_and_check(
         self,
         symbol: str,
-        quotes: List[VenueQuote],
+        quotes: list[VenueQuote],
     ) -> DislocationStatus:
         """
         Evaluates current quotes across multiple venues for basis dislocation.

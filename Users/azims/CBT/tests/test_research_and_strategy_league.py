@@ -3,12 +3,12 @@ Tests for Layer 4: Research Lineage, Strategy Selection Guard, and 4-Tier Quaran
 """
 
 import numpy as np
-import pytest
+
+from core.data_streamer import data_streamer
+from core.strategy_league import strategy_league_manager
+from core.walk_forward_engine import walk_forward_engine
 from research.research_firewall import research_firewall
 from research.strategy_selection_guard import strategy_selection_guard
-from core.strategy_league import strategy_league_manager, QuarantineTier
-from core.walk_forward_engine import walk_forward_engine
-from core.data_streamer import data_streamer
 
 
 def test_research_firewall_partitioning():
@@ -17,8 +17,8 @@ def test_research_firewall_partitioning():
     split = research_firewall.partition_dataset(candles)
 
     assert len(split.train_data) == 300  # 60%
-    assert len(split.val_data) == 100    # 20%
-    assert len(split.test_data) == 100   # 20%
+    assert len(split.val_data) == 100  # 20%
+    assert len(split.test_data) == 100  # 20%
     assert split.test_hash != ""
 
 

@@ -3,12 +3,10 @@ Unit tests for core/microstructure_engine.py.
 Verifies L2/L3 depth dynamics, slope elasticity, VPIN toxicity, Kyle's Lambda, and iceberg detection.
 """
 
-import pytest
-import numpy as np
 from core.microstructure_engine import (
+    MicrostructureAnalysis,
     MicrostructureEngine,
     microstructure_engine,
-    MicrostructureAnalysis,
 )
 
 
@@ -55,7 +53,12 @@ def test_microstructure_flow_toxicity_and_kyles_lambda():
 
     # Simulated heavy aggressive buy flow driving prices up
     trades = [
-        {"price": 50005.0 + i * 2.0, "qty": 15.0, "is_buyer_maker": False, "timestamp": 1000 + i * 100}
+        {
+            "price": 50005.0 + i * 2.0,
+            "qty": 15.0,
+            "is_buyer_maker": False,
+            "timestamp": 1000 + i * 100,
+        }
         for i in range(10)
     ]
 
@@ -79,7 +82,7 @@ def test_microstructure_iceberg_detection():
 
     res = engine.analyze(bids=bids, asks=asks, recent_trades=trades, symbol="BTC/USDT")
     assert len(res.detected_icebergs) > 0
-    bid_ice = [ice for ice in res.detected_icebergs if ice.side == "BID"][0]
+    bid_ice = next(ice for ice in res.detected_icebergs if ice.side == "BID")
     assert bid_ice.price_level == 60000.0
     assert bid_ice.absorption_ratio >= 2.5
     assert bid_ice.confidence >= 0.7

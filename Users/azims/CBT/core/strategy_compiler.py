@@ -7,26 +7,24 @@ Enforces zero ambiguity: fails closed with STATUS = NOT_BACKTESTABLE if critical
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any, ClassVar
 
-from core.provenance_engine import provenance_engine
 from core.strategy_league import QuarantineTier, StrategyGenome, strategy_league_manager
 
 logger = logging.getLogger("ai_quant_sentinel.strategy_compiler")
 
 
-class RuleOrigin(str, Enum):
-    EXPLICIT = "EXPLICIT"       # Stated directly by source
-    INFERRED = "INFERRED"       # Derived by quantitative deduction
-    ASSUMPTION = "ASSUMPTION"   # Invented default parameter (must be declared)
+class RuleOrigin(StrEnum):
+    EXPLICIT = "EXPLICIT"  # Stated directly by source
+    INFERRED = "INFERRED"  # Derived by quantitative deduction
+    ASSUMPTION = "ASSUMPTION"  # Invented default parameter (must be declared)
 
 
-class CompilationStatus(str, Enum):
+class CompilationStatus(StrEnum):
     READY_FOR_BACKTEST = "READY_FOR_BACKTEST"
     NOT_BACKTESTABLE = "NOT_BACKTESTABLE"
     NEEDS_SPECIFICATION = "NEEDS_SPECIFICATION"
@@ -35,10 +33,12 @@ class CompilationStatus(str, Enum):
 @dataclass
 class StrategyRule:
     rule_id: str
-    rule_type: str              # "ENTRY", "CONFIRMATION", "INVALIDATION", "TARGET", "SESSION_FILTER", "REGIME_FILTER"
+    rule_type: (
+        str  # "ENTRY", "CONFIRMATION", "INVALIDATION", "TARGET", "SESSION_FILTER", "REGIME_FILTER"
+    )
     condition: str
     origin: RuleOrigin
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -46,23 +46,23 @@ class CompiledStrategy:
     strategy_id: str
     name: str
     version: int
-    assets: List[str]
-    timeframes: Dict[str, str]  # e.g., {"bias": "4h", "setup": "1h", "entry": "15m"}
-    market_conditions: List[StrategyRule]
-    entry_conditions: List[StrategyRule]
-    confirmation_conditions: List[StrategyRule]
-    invalidation_conditions: List[StrategyRule]
-    exit_conditions: List[StrategyRule]
-    risk_model: Dict[str, Any]
-    session_constraints: List[str]
-    excluded_regimes: List[str]
-    source_ids: List[str]
+    assets: list[str]
+    timeframes: dict[str, str]  # e.g., {"bias": "4h", "setup": "1h", "entry": "15m"}
+    market_conditions: list[StrategyRule]
+    entry_conditions: list[StrategyRule]
+    confirmation_conditions: list[StrategyRule]
+    invalidation_conditions: list[StrategyRule]
+    exit_conditions: list[StrategyRule]
+    risk_model: dict[str, Any]
+    session_constraints: list[str]
+    excluded_regimes: list[str]
+    source_ids: list[str]
     confidence: float
     status: CompilationStatus
-    missing_requirements: List[str] = field(default_factory=list)
+    missing_requirements: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["status"] = self.status.value
         return d
@@ -72,20 +72,28 @@ class StrategyCompiler:
     """Formal compiler transforming natural language & extracted trading concepts into executable genomes."""
 
     # Standard assets supported by core engine
-    SUPPORTED_ASSETS = {"BTCUSDT", "BTC/USDT", "ETHUSDT", "ETH/USDT", "XAUUSD", "PAXGUSDT", "PAXG/USDT"}
-    VALID_TIMEFRAMES = {"1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"}
+    SUPPORTED_ASSETS: ClassVar[set[str]] = {
+        "BTCUSDT",
+        "BTC/USDT",
+        "ETHUSDT",
+        "ETH/USDT",
+        "XAUUSD",
+        "PAXGUSDT",
+        "PAXG/USDT",
+    }
+    VALID_TIMEFRAMES: ClassVar[set[str]] = {"1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"}
 
     def compile_hypothesis(
         self,
         name: str,
         raw_description: str,
-        assets: Optional[List[str]] = None,
-        timeframes: Optional[Dict[str, str]] = None,
-        entry_rules: Optional[List[Dict[str, Any]]] = None,
-        invalidation_rules: Optional[List[Dict[str, Any]]] = None,
-        exit_rules: Optional[List[Dict[str, Any]]] = None,
-        risk_model: Optional[Dict[str, Any]] = None,
-        source_id: Optional[str] = None,
+        assets: list[str] | None = None,
+        timeframes: dict[str, str] | None = None,
+        entry_rules: list[dict[str, Any]] | None = None,
+        invalidation_rules: list[dict[str, Any]] | None = None,
+        exit_rules: list[dict[str, Any]] | None = None,
+        risk_model: dict[str, Any] | None = None,
+        source_id: str | None = None,
     ) -> CompiledStrategy:
         """
         Compiles and formally verifies a trading strategy specification.
@@ -97,25 +105,31 @@ class StrategyCompiler:
 
         target_assets = assets or ["BTCUSDT", "ETHUSDT"]
         tf_map = timeframes or {"bias": "4h", "setup": "1h", "entry": "15m"}
-        missing: List[str] = []
+        missing: list[str] = []
 
         # 1. Asset verification
-        invalid_assets = [a for a in target_assets if a.upper().replace("/", "") not in {s.replace("/", "") for s in self.SUPPORTED_ASSETS}]
+        invalid_assets = [
+            a
+            for a in target_assets
+            if a.upper().replace("/", "") not in {s.replace("/", "") for s in self.SUPPORTED_ASSETS}
+        ]
         if invalid_assets:
             missing.append(f"Unsupported assets requested: {invalid_assets}")
 
         # 2. Timeframe validation
         for role, tf in tf_map.items():
             if tf.lower() not in self.VALID_TIMEFRAMES:
-                missing.append(f"Invalid timeframe for {role}: '{tf}'. Must be one of {sorted(self.VALID_TIMEFRAMES)}")
+                missing.append(
+                    f"Invalid timeframe for {role}: '{tf}'. Must be one of {sorted(self.VALID_TIMEFRAMES)}"
+                )
 
         # 3. Parse Entry Rules
-        parsed_entries: List[StrategyRule] = []
+        parsed_entries: list[StrategyRule] = []
         if entry_rules:
             for idx, er in enumerate(entry_rules):
                 parsed_entries.append(
                     StrategyRule(
-                        rule_id=f"ER_{idx+1}",
+                        rule_id=f"ER_{idx + 1}",
                         rule_type="ENTRY",
                         condition=er.get("condition", "UNDEFINED"),
                         origin=RuleOrigin(er.get("origin", "EXPLICIT")),
@@ -146,15 +160,17 @@ class StrategyCompiler:
                     )
                 )
             if not parsed_entries:
-                missing.append("Missing explicit entry trigger condition (e.g. FVG_RETEST, SWEEP_CONFIRMATION, CVD_DIVERGENCE)")
+                missing.append(
+                    "Missing explicit entry trigger condition (e.g. FVG_RETEST, SWEEP_CONFIRMATION, CVD_DIVERGENCE)"
+                )
 
         # 4. Parse Invalidation / Stop Loss Rules (Mandatory)
-        parsed_invalidations: List[StrategyRule] = []
+        parsed_invalidations: list[StrategyRule] = []
         if invalidation_rules:
             for idx, ir in enumerate(invalidation_rules):
                 parsed_invalidations.append(
                     StrategyRule(
-                        rule_id=f"IR_{idx+1}",
+                        rule_id=f"IR_{idx + 1}",
                         rule_type="INVALIDATION",
                         condition=ir.get("condition", "UNDEFINED"),
                         origin=RuleOrigin(ir.get("origin", "EXPLICIT")),
@@ -174,15 +190,17 @@ class StrategyCompiler:
                     )
                 )
             else:
-                missing.append("CRITICAL: Missing deterministic invalidation level (stop-loss rule). Zero risk assumption allowed.")
+                missing.append(
+                    "CRITICAL: Missing deterministic invalidation level (stop-loss rule). Zero risk assumption allowed."
+                )
 
         # 5. Parse Exit / Take Profit Rules (Mandatory)
-        parsed_exits: List[StrategyRule] = []
+        parsed_exits: list[StrategyRule] = []
         if exit_rules:
             for idx, xr in enumerate(exit_rules):
                 parsed_exits.append(
                     StrategyRule(
-                        rule_id=f"XR_{idx+1}",
+                        rule_id=f"XR_{idx + 1}",
                         rule_type="TARGET",
                         condition=xr.get("condition", "UNDEFINED"),
                         origin=RuleOrigin(xr.get("origin", "EXPLICIT")),
@@ -249,7 +267,9 @@ class StrategyCompiler:
         entry_map = {r.rule_id: r.condition for r in compiled.entry_conditions}
         exit_map = {r.rule_id: r.condition for r in compiled.exit_conditions}
         param_bounds = {}
-        for r in compiled.entry_conditions + compiled.invalidation_conditions + compiled.exit_conditions:
+        for r in (
+            compiled.entry_conditions + compiled.invalidation_conditions + compiled.exit_conditions
+        ):
             param_bounds.update(r.parameters)
 
         genome = StrategyGenome(
@@ -272,7 +292,9 @@ class StrategyCompiler:
             is_active=True,
         )
         strategy_league_manager.register_genome(genome)
-        logger.info(f"Registered Compiled Strategy {compiled.strategy_id} ({compiled.name}) in Strategy League Tier 1.")
+        logger.info(
+            f"Registered Compiled Strategy {compiled.strategy_id} ({compiled.name}) in Strategy League Tier 1."
+        )
 
 
 # Singleton

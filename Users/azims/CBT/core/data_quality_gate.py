@@ -7,10 +7,11 @@ Forces NO_TRADE mode when quality score falls below 0.95.
 
 from __future__ import annotations
 
-import time
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+import time
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger("ai_quant_sentinel.data_quality_gate")
@@ -21,8 +22,8 @@ class QualityCheckResult:
     is_valid: bool
     quality_score: float  # [0.0, 1.0]
     reason: str
-    metrics: Dict[str, Any]
-    forced_action: Optional[str] = None  # None or "NO_TRADE"
+    metrics: dict[str, Any]
+    forced_action: str | None = None  # None or "NO_TRADE"
 
 
 class DataQualityGate:
@@ -43,18 +44,18 @@ class DataQualityGate:
         self.clock_drift_threshold_ms = clock_drift_threshold_ms
         self.max_spread_multiplier = max_spread_multiplier
         self.min_quality_score = min_quality_score
-        self._rolling_spreads: Dict[str, List[float]] = {}
-        self._last_tick_timestamps: Dict[str, float] = {}
+        self._rolling_spreads: dict[str, list[float]] = {}
+        self._last_tick_timestamps: dict[str, float] = {}
 
     def validate_feed(
         self,
         symbol: str,
         latest_tick_time_ms: float,
-        server_now_ms: Optional[float] = None,
-        bid_price: Optional[float] = None,
-        ask_price: Optional[float] = None,
-        candle_series: Optional[List[Dict[str, Any]]] = None,
-        timeframe_ms: Optional[float] = None,
+        server_now_ms: float | None = None,
+        bid_price: float | None = None,
+        ask_price: float | None = None,
+        candle_series: list[dict[str, Any]] | None = None,
+        timeframe_ms: float | None = None,
     ) -> QualityCheckResult:
         """
         Runs comprehensive multi-dimensional data verification.
@@ -62,14 +63,16 @@ class DataQualityGate:
         now = server_now_ms if server_now_ms is not None else (time.time() * 1000.0)
         score = 1.0
         failures = []
-        metrics: Dict[str, Any] = {}
+        metrics: dict[str, Any] = {}
 
         # 1. Stale Quote Detection
         tick_age_ms = now - latest_tick_time_ms
         metrics["tick_age_ms"] = tick_age_ms
         if tick_age_ms > self.stale_threshold_ms:
             score -= 0.35
-            failures.append(f"STALE_QUOTE: Age {tick_age_ms:.1f}ms exceeds threshold {self.stale_threshold_ms}ms")
+            failures.append(
+                f"STALE_QUOTE: Age {tick_age_ms:.1f}ms exceeds threshold {self.stale_threshold_ms}ms"
+            )
         elif tick_age_ms < -self.clock_drift_threshold_ms:
             # Future timestamp
             score -= 0.40
@@ -84,7 +87,12 @@ class DataQualityGate:
             score -= drift_penalty
 
         # 3. Spread & Liquidity Sanity Check
-        if bid_price is not None and ask_price is not None and bid_price > 0 and ask_price >= bid_price:
+        if (
+            bid_price is not None
+            and ask_price is not None
+            and bid_price > 0
+            and ask_price >= bid_price
+        ):
             spread = ask_price - bid_price
             spread_bps = (spread / bid_price) * 10000.0
             metrics["spread_bps"] = spread_bps
@@ -112,7 +120,11 @@ class DataQualityGate:
         if candle_series and len(candle_series) >= 2:
             discontinuities = 0
             zero_vol_freezes = 0
-            expected_step = timeframe_ms if timeframe_ms else (candle_series[1]["timestamp"] - candle_series[0]["timestamp"])
+            expected_step = (
+                timeframe_ms
+                if timeframe_ms
+                else (candle_series[1]["timestamp"] - candle_series[0]["timestamp"])
+            )
 
             for i in range(1, len(candle_series)):
                 prev = candle_series[i - 1]
@@ -122,11 +134,16 @@ class DataQualityGate:
                 if curr["timestamp"] <= prev["timestamp"]:
                     discontinuities += 1
                 # Gap check
-                elif expected_step > 0 and (curr["timestamp"] - prev["timestamp"]) > (1.5 * expected_step):
+                elif expected_step > 0 and (curr["timestamp"] - prev["timestamp"]) > (
+                    1.5 * expected_step
+                ):
                     discontinuities += 1
 
                 # Zero volume freeze
-                if curr.get("volume", 1.0) == 0.0 and curr["open"] == curr["close"] == curr["high"] == curr["low"]:
+                if (
+                    curr.get("volume", 1.0) == 0.0
+                    and curr["open"] == curr["close"] == curr["high"] == curr["low"]
+                ):
                     zero_vol_freezes += 1
 
             metrics["discontinuities"] = discontinuities
@@ -134,10 +151,14 @@ class DataQualityGate:
 
             if discontinuities > 0:
                 score -= min(0.30, discontinuities * 0.1)
-                failures.append(f"CANDLE_DISCONTINUITY: {discontinuities} gap(s) or disordered timestamps found")
+                failures.append(
+                    f"CANDLE_DISCONTINUITY: {discontinuities} gap(s) or disordered timestamps found"
+                )
             if zero_vol_freezes >= 3:
                 score -= 0.25
-                failures.append(f"ZERO_VOLUME_FREEZE: {zero_vol_freezes} consecutive frozen candles")
+                failures.append(
+                    f"ZERO_VOLUME_FREEZE: {zero_vol_freezes} consecutive frozen candles"
+                )
 
         final_score = max(0.0, min(1.0, score))
         is_valid = final_score >= self.min_quality_score
@@ -145,7 +166,9 @@ class DataQualityGate:
         reason = "DATA_QUALITY_OK" if is_valid else f"DATA_QUALITY_FAIL: {'; '.join(failures)}"
 
         if not is_valid:
-            logger.warning(f"Data Quality Failure for {symbol}: {reason} (Score: {final_score:.3f})")
+            logger.warning(
+                f"Data Quality Failure for {symbol}: {reason} (Score: {final_score:.3f})"
+            )
 
         return QualityCheckResult(
             is_valid=is_valid,

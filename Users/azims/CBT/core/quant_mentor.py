@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.quant_mentor")
 
@@ -27,17 +27,18 @@ class QuantMentor:
         if self.api_key:
             try:
                 from google import genai
+
                 self._client = genai.Client(api_key=self.api_key)
                 logger.info(f"Gemini GenAI client initialized with model '{self.model_name}'.")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.warning(f"Could not initialize google-genai client: {e}")
                 self._client = None
 
     async def generate_response(
         self,
         user_message: str,
-        market_telemetry: Optional[Dict[str, Any]] = None,
-        language_preference: str = "auto", # "en", "bn", "auto"
+        market_telemetry: dict[str, Any] | None = None,
+        language_preference: str = "auto",  # "en", "bn", "auto"
     ) -> str:
         """
         Generates grounded quantitative advice in English or Bangla.
@@ -62,8 +63,10 @@ class QuantMentor:
                 )
                 if response and response.text:
                     return response.text.strip()
-            except Exception as e:
-                logger.error(f"Gemini API generation error: {e}. Falling back to local heuristic response.")
+            except Exception as e:  # noqa: BLE001 — defensive fallback
+                logger.error(
+                    f"Gemini API generation error: {e}. Falling back to local heuristic response."
+                )
 
         # Local High-Precision Heuristic Fallback
         return self._generate_heuristic_response(user_message, telemetry_ctx, language_preference)
@@ -81,11 +84,26 @@ class QuantMentor:
         return default
 
     def _generate_heuristic_response(
-        self, user_message: str, telemetry: Dict[str, Any], lang: str
+        self, user_message: str, telemetry: dict[str, Any], lang: str
     ) -> str:
         msg_lower = user_message.lower().strip()
-        is_bangla = any(ord(char) >= 0x0980 and ord(char) <= 0x09FF for char in user_message) or \
-                    any(w in msg_lower for w in ["kemon", "bhai", "vai", "khobor", "dam", "koto", "dike", "jabe", "kinbo", "lagbe"])
+        is_bangla = any(
+            ord(char) >= 0x0980 and ord(char) <= 0x09FF for char in user_message
+        ) or any(
+            w in msg_lower
+            for w in [
+                "kemon",
+                "bhai",
+                "vai",
+                "khobor",
+                "dam",
+                "koto",
+                "dike",
+                "jabe",
+                "kinbo",
+                "lagbe",
+            ]
+        )
 
         target_sym = self._detect_symbol(user_message, default=telemetry.get("symbol", "BTC/USDT"))
 
@@ -127,9 +145,15 @@ class QuantMentor:
         # INTENT 0: STANDALONE ASSET NAME / ASSET DOSSIER REQUEST
         # (e.g. "gold", "btc", "eth", "sol", "tell me about gold", "gold analysis", "gold update")
         # --------------------------------------------------------------------------
-        is_standalone_asset = msg_lower in ["gold", "xau", "paxg", "btc", "bitcoin", "eth", "ethereum", "sol", "solana"] or \
-                              any(msg_lower.startswith(prefix) for prefix in ["tell me about ", "analysis of ", "update on ", "how is "]) or \
-                              any(w in msg_lower for w in ["dossier", "overview", "asset status", "full report"])
+        is_standalone_asset = (
+            msg_lower
+            in ["gold", "xau", "paxg", "btc", "bitcoin", "eth", "ethereum", "sol", "solana"]
+            or any(
+                msg_lower.startswith(prefix)
+                for prefix in ["tell me about ", "analysis of ", "update on ", "how is "]
+            )
+            or any(w in msg_lower for w in ["dossier", "overview", "asset status", "full report"])
+        )
 
         if is_standalone_asset:
             if "XAU" in target_sym or "GOLD" in target_sym:
@@ -139,7 +163,7 @@ class QuantMentor:
                 gold_low = float(telemetry.get("gold_low_24h", low_24h))
                 real_yield = float(telemetry.get("us_10y_real_yield_pct", 1.95))
                 cb_flow = float(telemetry.get("central_bank_net_flow", 74.5))
-                sge_prem = float(telemetry.get("shanghai_gold_premium", 24.50))
+                float(telemetry.get("shanghai_gold_premium", 24.50))
                 fixing = str(telemetry.get("active_fixing_session", "COMEX_OPEN"))
                 gold_regime = str(telemetry.get("gold_macro_regime", "MACRO_BULLISH_REAL_YIELDS"))
                 gold_bias = str(telemetry.get("gold_macro_bias", "LONG_CONVICTION"))
@@ -224,8 +248,24 @@ class QuantMentor:
         # --------------------------------------------------------------------------
         # INTENT 1: EXACT PRICE / QUOTE / TICKER
         # --------------------------------------------------------------------------
-        price_triggers = ["price", "cost", "how much", "rate", "quote", "worth", "trading at", "dam", "koto", "value", "current btc", "current eth", "current gold"]
-        if any(w in msg_lower for w in price_triggers) and not any(w in msg_lower for w in ["direction", "plan", "future"]):
+        price_triggers = [
+            "price",
+            "cost",
+            "how much",
+            "rate",
+            "quote",
+            "worth",
+            "trading at",
+            "dam",
+            "koto",
+            "value",
+            "current btc",
+            "current eth",
+            "current gold",
+        ]
+        if any(w in msg_lower for w in price_triggers) and not any(
+            w in msg_lower for w in ["direction", "plan", "future"]
+        ):
             if is_bangla or lang == "bn":
                 return (
                     f"💰 **{target_sym} লাইভ মার্কেট কোট:**\n"
@@ -252,9 +292,25 @@ class QuantMentor:
         # --------------------------------------------------------------------------
         # INTENT 2: DIRECTION / BIAS / TREND / REGIME / WHERE IS IT GOING
         # --------------------------------------------------------------------------
-        direction_triggers = ["direction", "trend", "bias", "where is it going", "up or down", "bull or bear", "movement", "prediction", "forecast", "kon dike", "up na down", "barbe", "kombe"]
+        direction_triggers = [
+            "direction",
+            "trend",
+            "bias",
+            "where is it going",
+            "up or down",
+            "bull or bear",
+            "movement",
+            "prediction",
+            "forecast",
+            "kon dike",
+            "up na down",
+            "barbe",
+            "kombe",
+        ]
         if any(w in msg_lower for w in direction_triggers):
-            target_str = "Buy-Side Liquidity (BSL)" if bias == "BULLISH" else "Sell-Side Liquidity (SSL)"
+            target_str = (
+                "Buy-Side Liquidity (BSL)" if bias == "BULLISH" else "Sell-Side Liquidity (SSL)"
+            )
             target_level = pdh if bias == "BULLISH" else pdl
             if is_bangla or lang == "bn":
                 return (
@@ -283,17 +339,28 @@ class QuantMentor:
         # --------------------------------------------------------------------------
         # INTENT 3: POSITIONS / PNL / OPEN TRADES
         # --------------------------------------------------------------------------
-        position_triggers = ["position", "positions", "open trade", "my trade", "pnl", "profit", "loss", "portfolio", "balance", "account"]
+        position_triggers = [
+            "position",
+            "positions",
+            "open trade",
+            "my trade",
+            "pnl",
+            "profit",
+            "loss",
+            "portfolio",
+            "balance",
+            "account",
+        ]
         if any(w in msg_lower for w in position_triggers):
             if not open_positions:
                 return (
-                    f"💼 **SHADOW PAPER TRADING DESK STATUS**\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"🟢 **Open Positions:** `0 Active Trades`\n"
-                    f"💰 **Virtual Equity:** `$100,000.00`\n"
-                    f"🛡️ **Active Risk Exposure:** `0.00%` (Risk Cap: 2.50%)\n"
-                    f"⚡ **Queue:** 3 high-probability setups queued awaiting trigger conditions.\n\n"
-                    f"Use `/signal` to scan for execution or check the Web UI Paper Desk tab!"
+                    "💼 **SHADOW PAPER TRADING DESK STATUS**\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━\n"
+                    "🟢 **Open Positions:** `0 Active Trades`\n"
+                    "💰 **Virtual Equity:** `$100,000.00`\n"
+                    "🛡️ **Active Risk Exposure:** `0.00%` (Risk Cap: 2.50%)\n"
+                    "⚡ **Queue:** 3 high-probability setups queued awaiting trigger conditions.\n\n"
+                    "Use `/signal` to scan for execution or check the Web UI Paper Desk tab!"
                 )
             else:
                 pos_lines = []
@@ -302,21 +369,35 @@ class QuantMentor:
                     side = p.get("direction", "LONG")
                     entry = p.get("entry_price", price)
                     unrealized = p.get("unrealized_pnl", p.get("pnl", 0.0))
-                    pos_lines.append(f"• `{sym}` **{side}** | Entry: `${entry:,.2f}` | PnL: `+${unrealized:,.2f}`")
+                    pos_lines.append(
+                        f"• `{sym}` **{side}** | Entry: `${entry:,.2f}` | PnL: `+${unrealized:,.2f}`"
+                    )
 
                 return (
                     f"💼 **SHADOW PAPER TRADING DESK STATUS**\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"🟢 **Active Positions ({len(open_positions)}):**\n" +
-                    "\n".join(pos_lines) + "\n"
-                    f"🛡️ **Capital Preservation:** Half-Kelly risk bounds active.\n"
-                    f"⚡ **Breakeven Shield:** Automatically engages at `+1.5R`."
+                    f"🟢 **Active Positions ({len(open_positions)}):**\n"
+                    + "\n".join(pos_lines)
+                    + "\n"
+                    "🛡️ **Capital Preservation:** Half-Kelly risk bounds active.\n"
+                    "⚡ **Breakeven Shield:** Automatically engages at `+1.5R`."
                 )
 
         # --------------------------------------------------------------------------
         # INTENT 4: TRADING PLAN / SETUPS / SIGNALS / SHOULD I BUY OR SELL
         # --------------------------------------------------------------------------
-        plan_triggers = ["plan", "setup", "signal", "buy or sell", "should i buy", "entry", "trade", "kinbo", "sell korbo", "what should i do"]
+        plan_triggers = [
+            "plan",
+            "setup",
+            "signal",
+            "buy or sell",
+            "should i buy",
+            "entry",
+            "trade",
+            "kinbo",
+            "sell korbo",
+            "what should i do",
+        ]
         if any(w in msg_lower for w in plan_triggers):
             smc = telemetry.get("smc_setup")
             if smc:
@@ -363,8 +444,16 @@ class QuantMentor:
                 side = "BUY / LONG" if bias == "BULLISH" else "SELL / SHORT"
                 sl = round(price * 0.988, 2) if bias == "BULLISH" else round(price * 1.012, 2)
                 risk_val = abs(price - sl)
-                tp1 = round(price + (1.5 * risk_val), 2) if bias == "BULLISH" else round(price - (1.5 * risk_val), 2)
-                tp2 = round(price + (2.5 * risk_val), 2) if bias == "BULLISH" else round(price - (2.5 * risk_val), 2)
+                tp1 = (
+                    round(price + (1.5 * risk_val), 2)
+                    if bias == "BULLISH"
+                    else round(price - (1.5 * risk_val), 2)
+                )
+                tp2 = (
+                    round(price + (2.5 * risk_val), 2)
+                    if bias == "BULLISH"
+                    else round(price - (2.5 * risk_val), 2)
+                )
 
                 return (
                     f"📋 **{target_sym} ACTIONABLE TRADING PLAN**\n"
@@ -382,10 +471,24 @@ class QuantMentor:
         # --------------------------------------------------------------------------
         # INTENT 5: MACRO / NEWS / WHY DUMPING / WHY PUMPING / FOMC
         # --------------------------------------------------------------------------
-        macro_triggers = ["macro", "news", "fomc", "cpi", "fed", "event", "why moving", "dump", "pump", "khobor", "inflation"]
+        macro_triggers = [
+            "macro",
+            "news",
+            "fomc",
+            "cpi",
+            "fed",
+            "event",
+            "why moving",
+            "dump",
+            "pump",
+            "khobor",
+            "inflation",
+        ]
         if any(w in msg_lower for w in macro_triggers):
             hours_away = event_mins / 60.0
-            time_txt = f"{hours_away:.1f} hours away" if event_mins > 90 else f"{event_mins:.0f} mins away"
+            time_txt = (
+                f"{hours_away:.1f} hours away" if event_mins > 90 else f"{event_mins:.0f} mins away"
+            )
             return (
                 f"📅 **MACRO & ALPHA CATALYST RADAR**\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -418,10 +521,10 @@ class QuantMentor:
                 f"• **Desk Posture:** `{bias} Expansion` | Net EV: `+{net_ev:.2f}R`\n"
                 f"• **Open Positions:** `{len(open_positions)} active shadow trade(s)`\n\n"
                 f"💬 **How can I assist you?** You can ask me:\n"
-                f"• *\"current BTC price?\"*\n"
-                f"• *\"clear me market direction please\"*\n"
-                f"• *\"what is our trading plan?\"*\n"
-                f"• *\"show open positions\"*\n"
+                f'• *"current BTC price?"*\n'
+                f'• *"clear me market direction please"*\n'
+                f'• *"what is our trading plan?"*\n'
+                f'• *"show open positions"*\n'
                 f"Or use quick commands like `/signal`, `/positions`, `/plan`, or `/debate`."
             )
 

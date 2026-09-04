@@ -14,15 +14,14 @@ from __future__ import annotations
 import datetime
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
-import numpy as np
+from dataclasses import asdict, dataclass
+from enum import StrEnum
+from typing import Any, ClassVar
 
 logger = logging.getLogger("ai_quant_sentinel.macro_gold")
 
 
-class GoldMacroRegime(str, Enum):
+class GoldMacroRegime(StrEnum):
     MACRO_BULLISH_INFLATION_HEDGE = "MACRO_BULLISH_INFLATION_HEDGE"
     MACRO_BEARISH_REAL_YIELDS = "MACRO_BEARISH_REAL_YIELDS"
     CENTRAL_BANK_ACCUMULATION = "CENTRAL_BANK_ACCUMULATION"
@@ -32,13 +31,13 @@ class GoldMacroRegime(str, Enum):
 
 @dataclass
 class GoldFixingWindow:
-    session_name: str           # "LONDON_AM_FIX", "LONDON_PM_FIX", "COMEX_OPEN", "ASIAN_PHYSICAL"
+    session_name: str  # "LONDON_AM_FIX", "LONDON_PM_FIX", "COMEX_OPEN", "ASIAN_PHYSICAL"
     start_utc_hour: int
     start_utc_minute: int
     end_utc_hour: int
     end_utc_minute: int
     volatility_multiplier: float
-    liquidity_rank: str         # "TIER_1_PRIME", "TIER_2_MODERATE", "TIER_3_OFF_HOURS"
+    liquidity_rank: str  # "TIER_1_PRIME", "TIER_2_MODERATE", "TIER_3_OFF_HOURS"
 
 
 @dataclass
@@ -47,19 +46,19 @@ class GoldMacroTelemetry:
     timestamp: float
     current_gold_price: float
     dxy_index: float
-    dxy_rolling_correlation_30d: float      # typically -0.75 to -0.88
-    us_10y_real_yield_pct: float            # TIPS 10Y yield
-    real_yield_beta: float                  # negative beta sensitivity
-    central_bank_net_flow_metric: float     # positive index [0.0 to 100.0]
+    dxy_rolling_correlation_30d: float  # typically -0.75 to -0.88
+    us_10y_real_yield_pct: float  # TIPS 10Y yield
+    real_yield_beta: float  # negative beta sensitivity
+    central_bank_net_flow_metric: float  # positive index [0.0 to 100.0]
     active_fixing_session: str
     is_in_prime_fixing_window: bool
-    synthetic_paxg_basis_bps: float         # Dislocation between spot XAU and PAXG
+    synthetic_paxg_basis_bps: float  # Dislocation between spot XAU and PAXG
     macro_regime: GoldMacroRegime
-    macro_bias: str                         # "LONG_CONVICTION", "SHORT_DEFENSE", "NEUTRAL_HARVEST"
-    macro_confidence: float                 # [0.0, 1.0]
-    catalysts: List[str]
+    macro_bias: str  # "LONG_CONVICTION", "SHORT_DEFENSE", "NEUTRAL_HARVEST"
+    macro_confidence: float  # [0.0, 1.0]
+    catalysts: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["macro_regime"] = self.macro_regime.value
         return d
@@ -68,7 +67,7 @@ class GoldMacroTelemetry:
 class MacroGoldEngine:
     """Specialized macro econometric engine for XAUUSD & PAXG/USDT."""
 
-    FIXING_SCHEDULE = [
+    FIXING_SCHEDULE: ClassVar[list[GoldFixingWindow]] = [
         GoldFixingWindow("LONDON_AM_FIX", 10, 15, 10, 45, 1.8, "TIER_1_PRIME"),
         GoldFixingWindow("COMEX_OPEN", 13, 20, 14, 0, 2.2, "TIER_1_PRIME"),
         GoldFixingWindow("LONDON_PM_FIX", 14, 45, 15, 15, 2.0, "TIER_1_PRIME"),
@@ -77,21 +76,21 @@ class MacroGoldEngine:
 
     def __init__(self):
         self.default_dxy = 104.20
-        self.default_real_yield = 1.95       # 1.95% TIPS 10Y
-        self.default_cb_flow = 74.5          # Structural net sovereign buying
+        self.default_real_yield = 1.95  # 1.95% TIPS 10Y
+        self.default_cb_flow = 74.5  # Structural net sovereign buying
 
     def evaluate_macro_state(
         self,
         gold_price: float,
-        paxg_price: Optional[float] = None,
-        dxy: Optional[float] = None,
-        real_yield_10y: Optional[float] = None,
-        utc_datetime: Optional[datetime.datetime] = None,
+        paxg_price: float | None = None,
+        dxy: float | None = None,
+        real_yield_10y: float | None = None,
+        utc_datetime: datetime.datetime | None = None,
     ) -> GoldMacroTelemetry:
         """
         Computes multi-factor macro metrics specifically calibrated for Gold assets.
         """
-        now_dt = utc_datetime or datetime.datetime.now(datetime.timezone.utc)
+        now_dt = utc_datetime or datetime.datetime.now(datetime.UTC)
         cur_dxy = dxy or self.default_dxy
         cur_yield = real_yield_10y if real_yield_10y is not None else self.default_real_yield
         paxg_p = paxg_price or gold_price
@@ -118,7 +117,7 @@ class MacroGoldEngine:
         # 3. Macro Regime Determination
         catalysts = []
         dxy_corr = -0.82
-        real_yield_beta = -1.35 # Gold drops ~1.35% for every 10bps real yield surge
+        real_yield_beta = -1.35  # Gold drops ~1.35% for every 10bps real yield surge
 
         if cur_yield < 1.50 and cur_dxy < 103.0:
             regime = GoldMacroRegime.DEBASEMENT_ACCELERATION
@@ -129,17 +128,23 @@ class MacroGoldEngine:
             regime = GoldMacroRegime.MACRO_BEARISH_REAL_YIELDS
             bias = "SHORT_DEFENSE"
             confidence = 0.82
-            catalysts.append("Elevated US Real Yields (>2.3%) and strong dollar create opportunity-cost headwind.")
+            catalysts.append(
+                "Elevated US Real Yields (>2.3%) and strong dollar create opportunity-cost headwind."
+            )
         elif self.default_cb_flow > 70.0:
             regime = GoldMacroRegime.CENTRAL_BANK_ACCUMULATION
             bias = "LONG_CONVICTION"
             confidence = 0.79
-            catalysts.append("Official Sector Central Bank purchases maintain structural floor on dips.")
+            catalysts.append(
+                "Official Sector Central Bank purchases maintain structural floor on dips."
+            )
         else:
             regime = GoldMacroRegime.RANGE_NEUTRAL
             bias = "NEUTRAL_HARVEST"
             confidence = 0.65
-            catalysts.append("Balanced macro variables favoring mean reversion between key institutional levels.")
+            catalysts.append(
+                "Balanced macro variables favoring mean reversion between key institutional levels."
+            )
 
         if is_prime:
             catalysts.append(f"Currently trading in {active_window_name} prime liquidity window.")

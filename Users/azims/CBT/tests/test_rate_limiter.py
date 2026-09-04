@@ -4,8 +4,9 @@ Unit tests for FastAPI In-Memory Sliding-Window Rate Limiter.
 
 import pytest
 from fastapi.testclient import TestClient
+
 from app import app
-from core.rate_limiter import fastapi_rate_limiter, RateLimiter
+from core.rate_limiter import fastapi_rate_limiter
 
 
 @pytest.fixture(autouse=True)
@@ -35,7 +36,7 @@ def test_rate_limit_blocking_on_public_quota_exhaustion(client, monkeypatch):
     fastapi_rate_limiter.reset()
 
     # 3 allowed requests
-    for i in range(3):
+    for _i in range(3):
         r = client.get("/api/telegram/status")
         assert r.status_code == 200
 
@@ -56,7 +57,7 @@ def test_authenticated_requests_receive_higher_quota(client, monkeypatch):
     headers = {"X-API-Key": "my-quant-key"}
 
     # Authenticated client can make 5 requests
-    for i in range(5):
+    for _i in range(5):
         r = client.get("/api/telegram/status", headers=headers)
         assert r.status_code == 200
         assert r.headers["ratelimit-limit"] == "5"

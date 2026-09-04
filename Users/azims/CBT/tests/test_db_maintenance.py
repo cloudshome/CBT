@@ -3,9 +3,10 @@ Unit tests for the SQLite Database Maintenance & Vacuum Tool.
 """
 
 import sqlite3
+
 import pytest
-from pathlib import Path
-from deploy.db_maintenance import optimize_database, run_maintenance, get_db_files
+
+from deploy.db_maintenance import optimize_database, run_maintenance
 
 
 @pytest.fixture
@@ -16,7 +17,9 @@ def temp_db_dir(tmp_path):
     # Create dummy database with records, then delete some to create fragmented pages for vacuum
     db_path = data_dir / "market.db"
     conn = sqlite3.connect(str(db_path))
-    conn.execute("CREATE TABLE ohlcv (timestamp INT, open REAL, high REAL, low REAL, close REAL, volume REAL);")
+    conn.execute(
+        "CREATE TABLE ohlcv (timestamp INT, open REAL, high REAL, low REAL, close REAL, volume REAL);"
+    )
     for i in range(100):
         conn.execute(f"INSERT INTO ohlcv VALUES ({1000 + i}, 100.0, 105.0, 95.0, 102.0, 50.0);")
     conn.commit()

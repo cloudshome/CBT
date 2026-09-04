@@ -6,17 +6,14 @@ Multi-exchange fallback chain: Binance REST -> Bybit V5 Linear -> SQLite Persist
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import math
 import time
-from typing import Any, Dict, List, Optional, Tuple
-import aiohttp
+from typing import Any
+
 import numpy as np
 
-from core.database import db_manager
 from core.causal_firewall import causal_firewall
-from core.data_quality_gate import data_quality_gate
+from core.database import db_manager
 from core.market_providers import market_gateway
 
 logger = logging.getLogger("ai_quant_sentinel.data_streamer")
@@ -54,13 +51,13 @@ class DataStreamer:
     def __init__(self):
         self.active_symbols = ["BTC/USDT", "ETH/USDT", "XAU/USD"]
         self.active_timeframes = ["1m", "5m", "15m", "1h", "4h", "1d"]
-        self._last_known_prices: Dict[str, float] = {
+        self._last_known_prices: dict[str, float] = {
             "BTC/USDT": 79850.0,
             "ETH/USDT": 2680.0,
             "XAU/USD": 2678.5,
         }
 
-    def save_candles(self, symbol: str, timeframe: str, candles: List[Dict[str, Any]]) -> int:
+    def save_candles(self, symbol: str, timeframe: str, candles: list[dict[str, Any]]) -> int:
         """
         Persists a list of candles to data/market_data.db with ON CONFLICT DO UPDATE.
         Each candle: {timestamp, open, high, low, close, volume}
@@ -104,15 +101,17 @@ class DataStreamer:
         symbol: str,
         timeframe: str,
         limit: int = 200,
-        end_time: Optional[int] = None,
+        end_time: int | None = None,
         exclude_synthetic: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Retrieves point-in-time historical candles from data/market_data.db.
         Strictly enforces causal firewall point-in-time isolation.
         """
         max_time = end_time if end_time is not None else causal_firewall.get_current_time_ms()
-        synthetic_clause = "AND (is_synthetic = 0 OR is_synthetic IS NULL)" if exclude_synthetic else ""
+        synthetic_clause = (
+            "AND (is_synthetic = 0 OR is_synthetic IS NULL)" if exclude_synthetic else ""
+        )
 
         with db_manager.get_market_conn() as conn:
             cursor = conn.execute(
@@ -137,14 +136,18 @@ class DataStreamer:
                 "low": row["low"],
                 "close": row["close"],
                 "volume": row["volume"],
-                "is_synthetic": int(row["is_synthetic"]) if "is_synthetic" in row.keys() and row["is_synthetic"] is not None else 0,
+                "is_synthetic": int(row["is_synthetic"])
+                if "is_synthetic" in row.keys() and row["is_synthetic"] is not None
+                else 0,
             }
             for row in reversed(rows)
         ]
 
         # If database is empty or sparse, bootstrap realistic live series with synthetic marker
         if len(results) < min(30, limit) and not exclude_synthetic:
-            synthetic = self.generate_synthetic_candles(symbol, timeframe, count=limit, end_time=max_time)
+            synthetic = self.generate_synthetic_candles(
+                symbol, timeframe, count=limit, end_time=max_time
+            )
             self.save_candles(symbol, timeframe, synthetic)
             results = synthetic
 
@@ -159,7 +162,9 @@ class DataStreamer:
         self._last_known_prices[symbol] = price
         return price
 
-    async def fetch_external_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> List[Dict[str, Any]]:
+    async def fetch_external_ohlcv(
+        self, symbol: str, timeframe: str, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """
         Fetches live OHLCV candles from Composite Market Gateway with automatic failover and persistence.
         """
@@ -174,7 +179,7 @@ class DataStreamer:
         # Local Persistent / Dynamic Fallback
         return self.get_candles(symbol, timeframe, limit=limit)
 
-    async def get_order_book(self, symbol: str, limit: int = 10) -> Dict[str, Any]:
+    async def get_order_book(self, symbol: str, limit: int = 10) -> dict[str, Any]:
         """
         Fetches L2 order book depth with composite failover across tier-1 venues.
         """
@@ -185,8 +190,8 @@ class DataStreamer:
         symbol: str,
         timeframe: str,
         count: int = 200,
-        end_time: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        end_time: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Generates realistic time-continuous candles with dynamic price drift and explicit is_synthetic=1 tag.
         """
@@ -194,8 +199,14 @@ class DataStreamer:
         t_now = end_time if end_time is not None else int(time.time() * 1000)
         t_start = t_now - (count * tf_ms)
 
-        base_price = self._last_known_prices.get(symbol, 79850.0 if "BTC" in symbol else (2680.0 if "ETH" in symbol else 2678.5))
-        vol = 0.0015 if timeframe in ["1m", "5m"] else (0.004 if timeframe in ["15m", "1h"] else 0.012)
+        base_price = self._last_known_prices.get(
+            symbol, 79850.0 if "BTC" in symbol else (2680.0 if "ETH" in symbol else 2678.5)
+        )
+        vol = (
+            0.0015
+            if timeframe in ["1m", "5m"]
+            else (0.004 if timeframe in ["15m", "1h"] else 0.012)
+        )
 
         candles = []
         current_price = base_price * 0.98
@@ -209,17 +220,19 @@ class DataStreamer:
             low_p = min(open_p, close_p) * (1.0 - abs(float(np.random.normal(0, vol * 0.7))))
             vol_p = float(np.random.uniform(50.0, 500.0) * (1.0 + abs(ret) * 10.0))
 
-            candles.append({
-                "timestamp": c_time,
-                "symbol": symbol,
-                "timeframe": timeframe,
-                "open": round(open_p, 2),
-                "high": round(high_p, 2),
-                "low": round(low_p, 2),
-                "close": round(close_p, 2),
-                "volume": round(vol_p, 2),
-                "is_synthetic": 1,
-            })
+            candles.append(
+                {
+                    "timestamp": c_time,
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "open": round(open_p, 2),
+                    "high": round(high_p, 2),
+                    "low": round(low_p, 2),
+                    "close": round(close_p, 2),
+                    "volume": round(vol_p, 2),
+                    "is_synthetic": 1,
+                }
+            )
             current_price = close_p
 
         self._last_known_prices[symbol] = current_price

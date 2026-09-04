@@ -8,15 +8,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import io
-import json
 import logging
 import os
-import shutil
 import tarfile
 import time
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger("ai_quant_sentinel.brain_backup")
 
@@ -24,7 +20,7 @@ logger = logging.getLogger("ai_quant_sentinel.brain_backup")
 class BrainBackupManager:
     """Handles snapshot generation, AES-256 encryption, and disaster recovery."""
 
-    def __init__(self, data_dir: Optional[Path] = None):
+    def __init__(self, data_dir: Path | None = None):
         self.data_dir = data_dir or Path(os.getenv("DATA_DIR", "data"))
         self.backup_dir = self.data_dir / "backups"
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -34,7 +30,7 @@ class BrainBackupManager:
         # Derive 32-byte key from SECRET_KEY
         return hashlib.sha256(self.secret_key.encode("utf-8")).digest()
 
-    def create_snapshot(self, snapshot_name: Optional[str] = None) -> Path:
+    def create_snapshot(self, snapshot_name: str | None = None) -> Path:
         """
         Creates an encrypted tarball snapshot containing all 4 SQLite databases using authenticated AES-256-GCM.
         """
@@ -53,8 +49,10 @@ class BrainBackupManager:
             data = fin.read()
 
         try:
-            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
             import secrets
+
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
             key = self._get_encryption_key()
             nonce = secrets.token_bytes(12)
             aesgcm = AESGCM(key)
@@ -62,15 +60,16 @@ class BrainBackupManager:
             with open(enc_path, "wb") as fout:
                 # Store 12-byte nonce followed by authenticated ciphertext
                 fout.write(b"AESGCM:" + nonce + ciphertext)
-        except Exception:
+        except Exception:  # noqa: BLE001 — defensive fallback
             try:
                 from cryptography.fernet import Fernet
+
                 fernet_key = base64.urlsafe_b64encode(self._get_encryption_key())
                 f = Fernet(fernet_key)
                 encrypted_data = f.encrypt(data)
                 with open(enc_path, "wb") as fout:
                     fout.write(encrypted_data)
-            except Exception:
+            except Exception:  # noqa: BLE001 — defensive fallback
                 # Deterministic byte transform fallback
                 key_bytes = self._get_encryption_key()
                 buf = bytearray(data)
@@ -98,28 +97,30 @@ class BrainBackupManager:
         with open(enc_path, "rb") as fin:
             enc_data = fin.read()
 
-        dec_data: Optional[bytes] = None
+        dec_data: bytes | None = None
 
         # Try AES-256-GCM
         if enc_data.startswith(b"AESGCM:"):
             try:
                 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
                 key = self._get_encryption_key()
                 nonce = enc_data[7:19]
                 ciphertext = enc_data[19:]
                 aesgcm = AESGCM(key)
                 dec_data = aesgcm.decrypt(nonce, ciphertext, None)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.warning(f"AES-GCM decryption failed ({e}), attempting fallback ciphers.")
 
         # Try Fernet
         if dec_data is None:
             try:
                 from cryptography.fernet import Fernet
+
                 fernet_key = base64.urlsafe_b64encode(self._get_encryption_key())
                 f = Fernet(fernet_key)
                 dec_data = f.decrypt(enc_data)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
                 pass
 
         # Fallback byte transform
@@ -140,11 +141,13 @@ class BrainBackupManager:
                 dest_path = (self.data_dir / member.name).resolve()
                 try:
                     dest_path.relative_to(resolved_data_dir)
-                except ValueError:
-                    raise PermissionError(f"Security Alert: Tar-Slip Path Traversal detected for member: {member.name}")
+                except ValueError as e:
+                    raise PermissionError(
+                        f"Security Alert: Tar-Slip Path Traversal detected for member: {member.name}"
+                    ) from e
 
-            if hasattr(tarfile, 'data_filter'):
-                tar.extractall(path=self.data_dir, filter='data')
+            if hasattr(tarfile, "data_filter"):
+                tar.extractall(path=self.data_dir, filter="data")
             else:
                 tar.extractall(path=self.data_dir)
 

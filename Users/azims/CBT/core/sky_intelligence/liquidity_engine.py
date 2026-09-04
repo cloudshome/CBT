@@ -7,7 +7,8 @@ and detects precision Liquidity Sweeps, Grabs, and Reclaims with ATR penetration
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import (
@@ -34,16 +35,16 @@ class LiquidityEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
-        swings: Optional[List[SwingPoint]] = None,
-    ) -> List[LiquidityPool]:
+        candles: list[dict[str, Any]],
+        swings: list[SwingPoint] | None = None,
+    ) -> list[LiquidityPool]:
         """
         Discovers resting liquidity pools: Equal Highs/Lows, Range Extremes, and Recent Peaks.
         """
         if len(candles) < 3:
             return []
 
-        pools: List[LiquidityPool] = []
+        pools: list[LiquidityPool] = []
         # 1. Range Extremes (Max High & Min Low over lookback preceding current bar)
         lookback = candles[:-1] if len(candles) >= 4 else candles
         highs = [float(c["high"]) for c in lookback]
@@ -141,10 +142,10 @@ class LiquidityEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
-        pools: List[LiquidityPool],
-        atr: Optional[float] = None,
-    ) -> List[LiquiditySweep]:
+        candles: list[dict[str, Any]],
+        pools: list[LiquidityPool],
+        atr: float | None = None,
+    ) -> list[LiquiditySweep]:
         """
         Detects liquidity sweeps where price wicks beyond a pool level but rejects and closes back within.
         Calculates penetration distance, penetration/ATR, rejection distance, and wick/body ratios.
@@ -161,9 +162,13 @@ class LiquidityEngine:
                 )
                 for i in range(1, len(candles))
             ]
-            atr = float(np.mean(tr_list[-14:])) if len(tr_list) >= 14 else (candles[-1]["close"] * 0.01)
+            atr = (
+                float(np.mean(tr_list[-14:]))
+                if len(tr_list) >= 14
+                else (candles[-1]["close"] * 0.01)
+            )
 
-        sweeps: List[LiquiditySweep] = []
+        sweeps: list[LiquiditySweep] = []
 
         for pool in pools:
             for bar_idx in range(1, len(candles)):
@@ -171,7 +176,7 @@ class LiquidityEngine:
                 bar_ts = int(candle.get("timestamp", bar_idx))
                 if bar_ts < pool.creation_timestamp:
                     continue
-                prev_c = candles[bar_idx - 1]
+                candles[bar_idx - 1]
                 high_p = float(candle["high"])
                 low_p = float(candle["low"])
                 open_p = float(candle["open"])
@@ -199,7 +204,9 @@ class LiquidityEngine:
 
                         if penetration_atr >= 0.15 and wick_ratio >= 1.0:
                             # Significant sweep
-                            disp_score = min(100.0, (rejection_dist / atr) * 45.0 + (wick_ratio * 15.0))
+                            disp_score = min(
+                                100.0, (rejection_dist / atr) * 45.0 + (wick_ratio * 15.0)
+                            )
                             sweeps.append(
                                 LiquiditySweep(
                                     pool_type=pool.pool_type,
@@ -238,7 +245,9 @@ class LiquidityEngine:
                         wick_ratio = lower_wick / safe_body
 
                         if penetration_atr >= 0.15 and wick_ratio >= 1.0:
-                            disp_score = min(100.0, (rejection_dist / atr) * 45.0 + (wick_ratio * 15.0))
+                            disp_score = min(
+                                100.0, (rejection_dist / atr) * 45.0 + (wick_ratio * 15.0)
+                            )
                             sweeps.append(
                                 LiquiditySweep(
                                     pool_type=pool.pool_type,

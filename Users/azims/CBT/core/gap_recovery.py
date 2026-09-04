@@ -7,9 +7,9 @@ and automatically backfills the missing sequences.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Tuple
+
+from core.data_streamer import TIMEFRAME_TO_MS, data_streamer
 from core.database import db_manager
-from core.data_streamer import data_streamer, TIMEFRAME_TO_MS
 
 logger = logging.getLogger("ai_quant_sentinel.gap_recovery")
 
@@ -20,12 +20,12 @@ class GapRecoveryManager:
     def __init__(self):
         self.streamer = data_streamer
 
-    def scan_and_repair_all(self, symbols: List[str], timeframes: List[str]) -> Dict[str, int]:
+    def scan_and_repair_all(self, symbols: list[str], timeframes: list[str]) -> dict[str, int]:
         """
         Scans all tracked symbol/timeframe combinations and repairs detected gaps.
         Returns a dictionary of total repaired bars per symbol.
         """
-        results: Dict[str, int] = {}
+        results: dict[str, int] = {}
         for sym in symbols:
             total_repaired = 0
             for tf in timeframes:
@@ -65,29 +65,35 @@ class GapRecoveryManager:
             gap = t_curr - t_prev
             if gap > (1.5 * tf_ms):
                 missing_bars = int(gap // tf_ms) - 1
-                logger.info(f"Detected {missing_bars} missing bars in {symbol} {timeframe} between {t_prev} and {t_curr}")
+                logger.info(
+                    f"Detected {missing_bars} missing bars in {symbol} {timeframe} between {t_prev} and {t_curr}"
+                )
 
                 # Linear price interpolation for gap filling with small noise
                 for j in range(1, missing_bars + 1):
                     t_fill = t_prev + (j * tf_ms)
                     fraction = j / (missing_bars + 1)
                     p_fill = p_prev + (p_curr - p_prev) * fraction
-                    candles_to_insert.append({
-                        "timestamp": t_fill,
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "open": round(p_fill, 2),
-                        "high": round(p_fill * 1.0005, 2),
-                        "low": round(p_fill * 0.9995, 2),
-                        "close": round(p_fill, 2),
-                        "volume": 10.0,
-                        "is_synthetic": 1,
-                    })
+                    candles_to_insert.append(
+                        {
+                            "timestamp": t_fill,
+                            "symbol": symbol,
+                            "timeframe": timeframe,
+                            "open": round(p_fill, 2),
+                            "high": round(p_fill * 1.0005, 2),
+                            "low": round(p_fill * 0.9995, 2),
+                            "close": round(p_fill, 2),
+                            "volume": 10.0,
+                            "is_synthetic": 1,
+                        }
+                    )
                     repaired_count += 1
 
         if candles_to_insert:
             self.streamer.save_candles(symbol, timeframe, candles_to_insert)
-            logger.info(f"Successfully repaired {repaired_count} gap candles for {symbol} {timeframe}.")
+            logger.info(
+                f"Successfully repaired {repaired_count} gap candles for {symbol} {timeframe}."
+            )
 
         return repaired_count
 

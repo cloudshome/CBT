@@ -7,11 +7,12 @@ with temporal purge buffers to prevent lookahead leakage and evaluate OOS Stabil
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
+
 import numpy as np
 
-from core.sandbox_lab import sandbox_lab, BacktestReport
+from core.sandbox_lab import sandbox_lab
 
 logger = logging.getLogger("ai_quant_sentinel.walk_forward_engine")
 
@@ -25,7 +26,7 @@ class WalkForwardFold:
     oos_end_time: int
     in_sample_sharpe: float
     out_of_sample_sharpe: float
-    stability_ratio: float              # OOS Sharpe / IS Sharpe
+    stability_ratio: float  # OOS Sharpe / IS Sharpe
     is_passed: bool
 
 
@@ -35,12 +36,12 @@ class WalkForwardReport:
     num_folds: int
     mean_is_sharpe: float
     mean_oos_sharpe: float
-    overall_stability_ratio: float      # Target >= 0.65 for promotion
-    consistency_pass_rate: float        # Fraction of folds that passed stability >= 0.60
+    overall_stability_ratio: float  # Target >= 0.65 for promotion
+    consistency_pass_rate: float  # Fraction of folds that passed stability >= 0.60
     is_robust: bool
-    folds: List[WalkForwardFold]
+    folds: list[WalkForwardFold]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["folds"] = [asdict(f) for f in self.folds]
         return d
@@ -57,7 +58,7 @@ class WalkForwardEngine:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
     ) -> WalkForwardReport:
         """
         Executes rolling walk-forward test across candles.
@@ -77,7 +78,7 @@ class WalkForwardEngine:
 
         window_size = int(n * 0.60)
         step = max(10, (n - window_size) // max(1, self.num_folds))
-        folds_res: List[WalkForwardFold] = []
+        folds_res: list[WalkForwardFold] = []
 
         is_sharpes = []
         oos_sharpes = []

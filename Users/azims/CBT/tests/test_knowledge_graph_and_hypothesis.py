@@ -11,7 +11,7 @@ Verifies:
 """
 
 import pytest
-import asyncio
+
 from core.knowledge_graph_engine import knowledge_graph_engine
 from core.universal_ingestor import universal_ingestor
 
@@ -41,11 +41,17 @@ async def test_astrology_cross_domain_decomposition():
     claim = result["claims"][0]
     assert claim["source_worldview"] == "ASTROLOGICAL"
     assert claim["epistemic_status"] == "UNVERIFIED"
-    assert "Retrograde" in claim["original_claim_verbatim"] or "Saturn" in claim["original_claim_verbatim"]
+    assert (
+        "Retrograde" in claim["original_claim_verbatim"]
+        or "Saturn" in claim["original_claim_verbatim"]
+    )
 
     # Observations must be separated from causal claims
     assert len(result["observations"]) >= 1
-    assert "Decade" in result["observations"][0]["period_context"] or "Historical" in result["observations"][0]["period_context"]
+    assert (
+        "Decade" in result["observations"][0]["period_context"]
+        or "Historical" in result["observations"][0]["period_context"]
+    )
 
 
 @pytest.mark.asyncio

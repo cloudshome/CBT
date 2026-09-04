@@ -7,7 +7,8 @@ Delta, Cumulative Volume Delta (CVD), and records explicit Exchange Source Attri
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import numpy as np
 
 from core.sky_intelligence.types import VolumeFeature
@@ -26,8 +27,8 @@ class VolumeEngine:
 
     def analyze_volume(
         self,
-        candles: List[Dict[str, Any]],
-        exchange_source: Optional[str] = None,
+        candles: list[dict[str, Any]],
+        exchange_source: str | None = None,
     ) -> VolumeFeature:
         """
         Calculates volume features from a candlestick series.
@@ -70,7 +71,7 @@ class VolumeEngine:
 
         for c in candles:
             v = float(c.get("volume", 0.0))
-            op = float(c.get("open", 0.0))
+            float(c.get("open", 0.0))
             cl = float(c.get("close", 0.0))
             hi = float(c.get("high", 0.0))
             lo = float(c.get("low", 0.0))

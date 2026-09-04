@@ -77,7 +77,7 @@ describe('QuantEngine Deep Unit Tests (P0 Branch & Edge Coverage)', () => {
 
       const detection = runQuantDetection(candles);
       expect(detection.detailedFVGs.length).toBeGreaterThanOrEqual(1);
-      const bullFvg = detection.detailedFVGs.find((f: any) => f.type === 'bullish');
+      const bullFvg = detection.detailedFVGs.find((f: { type: string }) => f.type === 'bullish');
       expect(bullFvg).toBeDefined();
       expect(bullFvg?.price_zone[0]).toBe(102);
       expect(bullFvg?.price_zone[1]).toBe(106);

@@ -10,13 +10,11 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.data_quality_gate import data_quality_gate
-from core.sky_intelligence.ablation_framework import ablation_framework
 from core.sky_intelligence.derivatives_intelligence import derivatives_engine
 from core.sky_intelligence.displacement_engine import displacement_engine
-from core.sky_intelligence.expectancy_engine import expectancy_engine
 from core.sky_intelligence.fvg_engine import fvg_engine
 from core.sky_intelligence.liquidity_engine import liquidity_engine
 from core.sky_intelligence.market_regime import market_regime_engine
@@ -24,16 +22,13 @@ from core.sky_intelligence.market_structure import market_structure_engine
 from core.sky_intelligence.multi_timeframe import multi_timeframe_engine
 from core.sky_intelligence.order_block_engine import order_block_engine
 from core.sky_intelligence.setup_engine import setup_engine
-from core.sky_intelligence.volume_engine import volume_engine
-from core.sky_intelligence.volatility_engine import volatility_engine
-from core.sky_intelligence.vwap_engine import vwap_engine
 from core.sky_intelligence.types import (
     DecisionAction,
     DecisionOutput,
-    MarketRegimeType,
-    SKYSetup,
-    VWAPFeature,
 )
+from core.sky_intelligence.volatility_engine import volatility_engine
+from core.sky_intelligence.volume_engine import volume_engine
+from core.sky_intelligence.vwap_engine import vwap_engine
 
 logger = logging.getLogger("sky_intelligence.orchestrator")
 
@@ -50,11 +45,11 @@ class SKYIntelligenceOrchestrator:
         self,
         symbol: str,
         timeframe: str,
-        candles: List[Dict[str, Any]],
-        candles_by_tf: Optional[Dict[str, List[Dict[str, Any]]]] = None,
-        bid_price: Optional[float] = None,
-        ask_price: Optional[float] = None,
-        latest_tick_time_ms: Optional[float] = None,
+        candles: list[dict[str, Any]],
+        candles_by_tf: dict[str, list[dict[str, Any]]] | None = None,
+        bid_price: float | None = None,
+        ask_price: float | None = None,
+        latest_tick_time_ms: float | None = None,
         open_interest: float = 50000.0,
         prev_open_interest: float = 49200.0,
         funding_rate: float = 0.0001,
@@ -104,7 +99,10 @@ class SKYIntelligenceOrchestrator:
                 kelly_fraction=0.0,
                 suggested_position_size_usd=0.0,
                 risk_gate_passed=False,
-                explanation_dossier={"gate_score": gate_res.quality_score, "reason": gate_res.reason},
+                explanation_dossier={
+                    "gate_score": gate_res.quality_score,
+                    "reason": gate_res.reason,
+                },
                 no_trade_reason=f"DATA_QUALITY_FAILURE: {gate_res.reason}",
             )
 
@@ -145,14 +143,16 @@ class SKYIntelligenceOrchestrator:
         # ----------------------------------------------------
         # STAGE 6: DISPLACEMENT ENGINE (Phase 7)
         # ----------------------------------------------------
-        disp_feat = displacement_engine.calculate_displacement(
-            candles=candles, atr=atr_val
-        )
+        disp_feat = displacement_engine.calculate_displacement(candles=candles, atr=atr_val)
 
         # ----------------------------------------------------
         # STAGE 7: DERIVATIVES INTELLIGENCE (Phase 9)
         # ----------------------------------------------------
-        price_chg = ((curr_close - float(candles[0]["close"])) / float(candles[0]["close"])) * 100.0 if len(candles) > 1 else 0.0
+        price_chg = (
+            ((curr_close - float(candles[0]["close"])) / float(candles[0]["close"])) * 100.0
+            if len(candles) > 1
+            else 0.0
+        )
         derivs_state = derivatives_engine.analyze_derivatives(
             symbol=symbol,
             current_price=curr_close,
@@ -256,7 +256,9 @@ class SKYIntelligenceOrchestrator:
         half_kelly = max(0.0, min(0.015, full_kelly * 0.5))  # Capped at 1.5% max account risk
 
         risk_budget_usd = account_equity_usd * half_kelly
-        stop_dist_pct = abs(best_setup.entry_price - best_setup.invalidation_sl) / best_setup.entry_price
+        stop_dist_pct = (
+            abs(best_setup.entry_price - best_setup.invalidation_sl) / best_setup.entry_price
+        )
         position_size_usd = risk_budget_usd / max(stop_dist_pct, 0.005)
 
         # Risk Gate hurdle: Net EV must exceed +0.25R

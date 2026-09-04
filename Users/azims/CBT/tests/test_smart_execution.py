@@ -4,20 +4,18 @@ Verifies TWAP, VWAP, Almgren-Chriss trajectories, Smart Order Routing (SOR),
 and square-root market impact modeling.
 """
 
-import pytest
-import numpy as np
 from core.smart_execution import (
-    SmartExecutionEngine,
-    smart_execution_engine,
-    SmartRouterDecision,
     AlmgrenChrissTrajectory,
     MarketImpactSimulation,
+    SmartExecutionEngine,
 )
 
 
 def test_smart_execution_twap_schedule():
     engine = SmartExecutionEngine()
-    slices = engine.generate_twap_schedule(qty=10.0, duration_sec=300, num_slices=5, mid_price=60000.0)
+    slices = engine.generate_twap_schedule(
+        qty=10.0, duration_sec=300, num_slices=5, mid_price=60000.0
+    )
 
     assert len(slices) == 5
     total_scheduled = sum(s.slice_qty for s in slices)
@@ -27,7 +25,9 @@ def test_smart_execution_twap_schedule():
 
 def test_smart_execution_vwap_schedule():
     engine = SmartExecutionEngine()
-    slices = engine.generate_vwap_schedule(qty=20.0, duration_sec=600, num_slices=4, mid_price=50000.0)
+    slices = engine.generate_vwap_schedule(
+        qty=20.0, duration_sec=600, num_slices=4, mid_price=50000.0
+    )
 
     assert len(slices) == 4
     total_scheduled = sum(s.slice_qty for s in slices)
@@ -77,5 +77,7 @@ def test_smart_execution_smart_order_router():
     assert len(decision_ac.execution_slices) > 1
 
     # Low urgency wide spread -> Passive limit queue
-    decision_passive = engine.route_order(order_size=1.0, mid_price=60000.0, urgency="LOW", spread_bps=3.0)
+    decision_passive = engine.route_order(
+        order_size=1.0, mid_price=60000.0, urgency="LOW", spread_bps=3.0
+    )
     assert decision_passive.recommended_route == "PASSIVE_LIMIT_QUEUE"

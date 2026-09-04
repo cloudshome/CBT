@@ -9,13 +9,12 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any
 
-from core.database import db_manager
 from core.audit_bus import audit_bus
+from core.database import db_manager
 from core.loss_autopsy import loss_autopsy_engine
-
 
 logger = logging.getLogger("ai_quant_sentinel.portfolio_shadow")
 
@@ -24,21 +23,21 @@ logger = logging.getLogger("ai_quant_sentinel.portfolio_shadow")
 class ShadowPosition:
     position_id: str
     opened_at: int
-    closed_at: Optional[int]
+    closed_at: int | None
     symbol: str
-    direction: str                      # "LONG", "SHORT"
-    size: float                         # Units/Contracts
+    direction: str  # "LONG", "SHORT"
+    size: float  # Units/Contracts
     entry_price: float
     current_price: float
     stop_loss: float
     take_profit: float
     unrealized_pnl: float = 0.0
     realized_pnl: float = 0.0
-    status: str = "OPEN"                # "OPEN", "CLOSED", "LIQUIDATED"
-    trailing_stop: Optional[float] = None
+    status: str = "OPEN"  # "OPEN", "CLOSED", "LIQUIDATED"
+    trailing_stop: float | None = None
     breakeven_triggered: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -84,7 +83,7 @@ class PortfolioShadowManager:
         logger.info(f"Opened shadow position {pos_id}: {direction} {size} {symbol} @ {entry_price}")
         return pos_id
 
-    def update_live_price(self, symbol: str, current_price: float) -> List[Dict[str, Any]]:
+    def update_live_price(self, symbol: str, current_price: float) -> list[dict[str, Any]]:
         """
         Updates live position PnL, triggers breakeven (+1.5R), and handles SL/TP hits.
         """
@@ -112,21 +111,31 @@ class PortfolioShadowManager:
             risk_dist = abs(entry_p - sl_p)
 
             # 1. Calculate Unrealized PnL
-            pnl_usd = (current_price - entry_p) * size if is_long else (entry_p - current_price) * size
+            pnl_usd = (
+                (current_price - entry_p) * size if is_long else (entry_p - current_price) * size
+            )
 
             # 2. Check Breakeven Trigger (+1.5R)
             if not be_trig and risk_dist > 0:
-                current_r = ((current_price - entry_p) / risk_dist) if is_long else ((entry_p - current_price) / risk_dist)
+                current_r = (
+                    ((current_price - entry_p) / risk_dist)
+                    if is_long
+                    else ((entry_p - current_price) / risk_dist)
+                )
                 if current_r >= 1.50:
                     be_trig = True
-                    sl_p = entry_p # Move SL to Breakeven
-                    trailing_stop = entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
-                    events.append({
-                        "event": "BREAKEVEN_TRIGGERED",
-                        "position_id": pos_id,
-                        "new_stop_loss": sl_p,
-                        "message": f"🎉 {symbol} reached +1.5R! Stop Loss automatically adjusted to Breakeven (${sl_p:,.2f}).",
-                    })
+                    sl_p = entry_p  # Move SL to Breakeven
+                    trailing_stop = (
+                        entry_p + (0.5 * risk_dist) if is_long else entry_p - (0.5 * risk_dist)
+                    )
+                    events.append(
+                        {
+                            "event": "BREAKEVEN_TRIGGERED",
+                            "position_id": pos_id,
+                            "new_stop_loss": sl_p,
+                            "message": f"🎉 {symbol} reached +1.5R! Stop Loss automatically adjusted to Breakeven (${sl_p:,.2f}).",
+                        }
+                    )
 
             # 3. Trailing Stop Ratchet
             if be_trig and trailing_stop is not None:
@@ -191,7 +200,11 @@ class PortfolioShadowManager:
                             symbol=symbol,
                             reason=f"Position {pos_id} closed at loss (${final_pnl:+,.2f}): {autopsy.primary_root_cause}",
                             severity="WARNING",
-                            details={"autopsy": autopsy_report, "position_id": pos_id, "close_reason": close_reason},
+                            details={
+                                "autopsy": autopsy_report,
+                                "position_id": pos_id,
+                                "close_reason": close_reason,
+                            },
                         )
 
                     audit_bus.emit_event(
@@ -199,16 +212,23 @@ class PortfolioShadowManager:
                         symbol=symbol,
                         reason=f"Position {pos_id} closed via {close_reason} with Realized PnL ${final_pnl:+,.2f}",
                         severity="INFO" if final_pnl >= 0 else "WARNING",
-                        details={"position_id": pos_id, "pnl_usd": final_pnl, "close_reason": close_reason, "autopsy": autopsy_report},
+                        details={
+                            "position_id": pos_id,
+                            "pnl_usd": final_pnl,
+                            "close_reason": close_reason,
+                            "autopsy": autopsy_report,
+                        },
                     )
 
-                    events.append({
-                        "event": close_reason,
-                        "position_id": pos_id,
-                        "realized_pnl": final_pnl,
-                        "autopsy": autopsy_report,
-                        "message": f"🏁 {symbol} position closed by {close_reason}! Realized PnL: ${final_pnl:+,.2f}.",
-                    })
+                    events.append(
+                        {
+                            "event": close_reason,
+                            "position_id": pos_id,
+                            "realized_pnl": final_pnl,
+                            "autopsy": autopsy_report,
+                            "message": f"🏁 {symbol} position closed by {close_reason}! Realized PnL: ${final_pnl:+,.2f}.",
+                        }
+                    )
                 else:
                     conn.execute(
                         """
@@ -226,19 +246,26 @@ class PortfolioShadowManager:
 
         return events
 
-    def close_position(self, position_id: str, exit_price: Optional[float] = None) -> bool:
+    def close_position(self, position_id: str, exit_price: float | None = None) -> bool:
         """Closes a specific open position immediately at the given or current price."""
         now = int(time.time() * 1000)
         with db_manager.get_trading_conn() as conn:
-            cursor = conn.execute("SELECT * FROM shadow_positions WHERE position_id = ? AND status = 'OPEN';", (position_id,))
+            cursor = conn.execute(
+                "SELECT * FROM shadow_positions WHERE position_id = ? AND status = 'OPEN';",
+                (position_id,),
+            )
             row = cursor.fetchone()
             if not row:
                 return False
-            
+
             p_price = exit_price or row["current_price"]
             is_long = row["direction"] == "LONG"
-            pnl = (p_price - row["entry_price"]) * row["size"] if is_long else (row["entry_price"] - p_price) * row["size"]
-            
+            pnl = (
+                (p_price - row["entry_price"]) * row["size"]
+                if is_long
+                else (row["entry_price"] - p_price) * row["size"]
+            )
+
             conn.execute(
                 """
                 UPDATE shadow_positions SET
@@ -291,15 +318,19 @@ class PortfolioShadowManager:
             conn.commit()
         logger.info("Reset all shadow positions in database.")
 
-    def get_open_positions(self) -> List[Dict[str, Any]]:
+    def get_open_positions(self) -> list[dict[str, Any]]:
         with db_manager.get_trading_conn() as conn:
-            cursor = conn.execute("SELECT * FROM shadow_positions WHERE status = 'OPEN' ORDER BY opened_at DESC;")
+            cursor = conn.execute(
+                "SELECT * FROM shadow_positions WHERE status = 'OPEN' ORDER BY opened_at DESC;"
+            )
             rows = cursor.fetchall()
         return [dict(r) for r in rows]
 
-    def get_all_positions(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_all_positions(self, limit: int = 50) -> list[dict[str, Any]]:
         with db_manager.get_trading_conn() as conn:
-            cursor = conn.execute("SELECT * FROM shadow_positions ORDER BY opened_at DESC LIMIT ?;", (limit,))
+            cursor = conn.execute(
+                "SELECT * FROM shadow_positions ORDER BY opened_at DESC LIMIT ?;", (limit,)
+            )
             rows = cursor.fetchall()
         return [dict(r) for r in rows]
 

@@ -4,12 +4,12 @@ Verifies multi-asset cross-correlation matrix, PCA absorption ratio,
 Lead-Lag Granger Causality, and Systemic Macro Fragility Index.
 """
 
-import pytest
 import numpy as np
+
 from core.macro_network import (
+    MacroNetworkAnalysis,
     MacroNetworkEngine,
     macro_network_engine,
-    MacroNetworkAnalysis,
 )
 
 
@@ -71,7 +71,11 @@ def test_macro_network_lead_lag_granger_causality():
     res = engine.analyze(asset_returns=data)
 
     # Check causal link from BTC to ALT
-    btc_to_alt = [l for l in res.lead_lag_links if l.leader == "BTC/USDT" and l.follower == "ALT/USDT"]
+    btc_to_alt = [
+        link
+        for link in res.lead_lag_links
+        if link.leader == "BTC/USDT" and link.follower == "ALT/USDT"
+    ]
     assert len(btc_to_alt) > 0
     assert btc_to_alt[0].optimal_lag_periods == 1
     assert btc_to_alt[0].is_statistically_significant is True
