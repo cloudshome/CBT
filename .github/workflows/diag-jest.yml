@@ -1,0 +1,74 @@
+# TEMPORARY diagnostic workflow — used to surface the real Jest failure text
+# because action logs are hosted on a host unreachable from the sandbox.
+# DELETE before final merge.
+name: diag-jest
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: Users/azims/CBT
+    env:
+      DATABASE_URL: "file:./dev.db"
+      GEMINI_API_KEY: "ci-mock-gemini-api-key"
+      PORT: "3000"
+      NODE_ENV: "test"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: Users/azims/CBT/package-lock.json
+
+      - name: Install backend deps
+        run: npm ci
+
+      - name: Prisma init
+        run: |
+          npx prisma generate
+          npx prisma db push
+
+      - name: Run Jest (capture output)
+        id: jest
+        continue-on-error: true
+        run: |
+          npx jest --runInBand --coverage=false > /tmp/jest.log 2>&1
+          echo "JEST_EXIT=$?" > /tmp/jest-meta.txt
+          # keep head (suites) + tail (failure details)
+          head -60 /tmp/jest.log > /tmp/jest-tail.txt
+          echo "..." >> /tmp/jest-tail.txt
+          tail -120 /tmp/jest.log >> /tmp/jest-tail.txt
+
+      - name: Post Jest diagnostics as PR comment
+        if: always()
+        working-directory: ./
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+        run: |
+          META=$(cat /tmp/jest-meta.txt)
+          {
+            echo "**Diagnostic Jest run** (\`Lint, Test & Build\` reproduces the same cmd)."
+            echo ""
+            echo "\`\`\`text"
+            echo "$META"
+            cat /tmp/jest-tail.txt
+            echo "\`\`\`"
+          } > /tmp/jest-comment.md
+          python3 -c "import json;json.dump({'body': open('/tmp/jest-comment.md').read()}, open('/tmp/jest-comment.json','w'))"
+          gh api -X POST "repos/cloudshome/CTB/issues/$PR_NUM/comments" \
+            --input /tmp/jest-comment.json
