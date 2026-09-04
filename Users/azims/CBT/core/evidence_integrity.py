@@ -47,11 +47,18 @@ from enum import IntEnum
 from typing import Any
 
 __all__ = [
+    "EVIDENCE_KEY",
     "EvidenceGrade",
     "EvidenceLedger",
     "EvidenceViolation",
+    "grade_of",
     "require_live_evidence",
+    "stamp_records",
+    "weakest_grade",
 ]
+
+EVIDENCE_KEY = "evidence_grade"
+"""Canonical key carrying provenance on every market-data record."""
 
 
 class EvidenceGrade(IntEnum):
@@ -196,3 +203,88 @@ def require_live_evidence(ledger: EvidenceLedger, action: str) -> None:
     """
     if not ledger.is_tradeable:
         raise EvidenceViolation(f"Refusing to {action}. {ledger.reason()}")
+
+
+# ---------------------------------------------------------------------------
+# Record-level provenance stamping
+# ---------------------------------------------------------------------------
+#
+# Architectural rule: PROVENANCE IS IMMUTABLE AT THE BOUNDARY.
+#
+# Downstream code must never be able to take a FABRICATED record and turn it
+# into an EMPIRICAL one. The laundering bug this guards against was exactly
+# that: ``SyntheticMarketProvider`` emitted untagged random candles and
+# ``data_streamer`` then stamped ``is_synthetic = 0`` over everything the
+# gateway returned, permanently persisting noise as observed market data.
+#
+# ``stamp_records`` therefore only ever *downgrades*. Attempting to raise a
+# record's grade is silently refused — the weaker grade wins, always.
+
+
+def _explicit_grade(record: dict[str, Any]) -> EvidenceGrade | None:
+    """Grade already recorded on this record, or ``None`` if never stamped."""
+    raw = record.get(EVIDENCE_KEY)
+    if isinstance(raw, EvidenceGrade):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return EvidenceGrade[raw]
+        except KeyError:
+            return EvidenceGrade.FABRICATED
+    legacy = record.get("is_synthetic")
+    if legacy is not None:
+        return EvidenceGrade.FABRICATED if int(legacy) == 1 else EvidenceGrade.EMPIRICAL
+    return None
+
+
+def grade_of(record: dict[str, Any]) -> EvidenceGrade:
+    """
+    Read the provenance grade off a single market-data record.
+
+    Records with no grade are treated as ``FABRICATED``, not as empirical.
+    Untagged data is untrusted data — the safe default is the strict one, so
+    that a provider which forgets to stamp its output cannot thereby produce
+    tradeable evidence.
+    """
+    # Legacy ``is_synthetic`` rows are honoured for backwards compatibility.
+    explicit = _explicit_grade(record)
+    return EvidenceGrade.FABRICATED if explicit is None else explicit
+
+
+def stamp_records(
+    records: list[dict[str, Any]],
+    grade: EvidenceGrade,
+) -> list[dict[str, Any]]:
+    """
+    Stamp provenance onto market-data records, in place, downgrade-only.
+
+    If a record already carries a *weaker* grade than ``grade``, the weaker
+    grade is preserved. This makes the laundering bug unrepresentable: no
+    call site can promote synthetic data to empirical, however it is written.
+
+    The legacy ``is_synthetic`` flag is kept in sync so existing SQL filters
+    and dashboards continue to work, but it is no longer the security
+    boundary — ``EVIDENCE_KEY`` is.
+    """
+    for rec in records:
+        prior = _explicit_grade(rec)
+        # An unstamped record is being labelled for the first time by the
+        # component that produced it, so it takes ``grade`` directly. An
+        # already-stamped record can only ever move downwards.
+        effective = grade if prior is None else min(grade, prior)
+        rec[EVIDENCE_KEY] = effective.label
+        rec["is_synthetic"] = 0 if effective is EvidenceGrade.EMPIRICAL else 1
+    return records
+
+
+def weakest_grade(records: list[dict[str, Any]]) -> EvidenceGrade:
+    """
+    Weakest-link grade across a series.
+
+    An empty series proves nothing and therefore grades ``FABRICATED``. One
+    fabricated bar in an otherwise clean series contaminates the whole series,
+    because an indicator computed over it is contaminated too.
+    """
+    if not records:
+        return EvidenceGrade.FABRICATED
+    return min(grade_of(r) for r in records)

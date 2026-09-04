@@ -14,6 +14,7 @@ import numpy as np
 
 from core.causal_firewall import causal_firewall
 from core.database import db_manager
+from core.evidence_integrity import EVIDENCE_KEY, EvidenceGrade, grade_of, stamp_records
 from core.market_providers import market_gateway
 
 logger = logging.getLogger("ai_quant_sentinel.data_streamer")
@@ -142,12 +143,20 @@ class DataStreamer:
             }
             for row in reversed(rows)
         ]
+        # Translate the stored legacy flag into an explicit evidence grade so
+        # consumers never have to interpret a bare boolean.
+        for rec in results:
+            rec[EVIDENCE_KEY] = grade_of(rec).label
 
         # If database is empty or sparse, bootstrap realistic live series with synthetic marker
         if len(results) < min(30, limit) and not exclude_synthetic:
             synthetic = self.generate_synthetic_candles(
                 symbol, timeframe, count=limit, end_time=max_time
             )
+            stamp_records(synthetic, EvidenceGrade.FABRICATED)
+            # Still persisted (tagged) so the chart has a continuous series on a
+            # cold start, but the FABRICATED grade travels with every bar and
+            # ``exclude_synthetic=True`` filters them from any empirical query.
             self.save_candles(symbol, timeframe, synthetic)
             results = synthetic
 
@@ -170,10 +179,29 @@ class DataStreamer:
         """
         candles = await market_gateway.get_ohlcv(symbol, timeframe, limit=limit)
         if candles:
-            self._last_known_prices[symbol] = candles[-1]["close"]
-            for c in candles:
-                c["is_synthetic"] = 0
-            self.save_candles(symbol, timeframe, candles)
+            # NEVER blanket-stamp provenance here. This line used to read
+            # ``c["is_synthetic"] = 0`` unconditionally, which relabelled
+            # fabricated candles as real and persisted them — the single worst
+            # defect in the data path. The gateway is now the authority on
+            # provenance and ``stamp_records`` is downgrade-only, so the worst
+            # this can do is preserve what the gateway already determined.
+            grade = min((grade_of(c) for c in candles), default=EvidenceGrade.FABRICATED)
+            stamp_records(candles, grade)
+
+            if grade is EvidenceGrade.EMPIRICAL:
+                self._last_known_prices[symbol] = candles[-1]["close"]
+                self.save_candles(symbol, timeframe, candles)
+            else:
+                # Non-empirical bars are never written to the market database;
+                # persisting them would contaminate the empirical corpus that
+                # the analogue engine treats as ground truth.
+                logger.warning(
+                    "Refusing to persist %s candles for %s %s (grade=%s).",
+                    len(candles),
+                    symbol,
+                    timeframe,
+                    grade.label,
+                )
             return candles
 
         # Local Persistent / Dynamic Fallback
@@ -231,6 +259,7 @@ class DataStreamer:
                     "close": round(close_p, 2),
                     "volume": round(vol_p, 2),
                     "is_synthetic": 1,
+                    EVIDENCE_KEY: EvidenceGrade.FABRICATED.label,
                 }
             )
             current_price = close_p

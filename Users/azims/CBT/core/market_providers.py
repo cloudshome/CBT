@@ -12,10 +12,10 @@ import time
 from typing import Any
 
 import aiohttp
-import numpy as np
 
 from core.causal_firewall import causal_firewall
 from core.database import db_manager
+from core.evidence_integrity import EvidenceGrade, stamp_records
 
 logger = logging.getLogger("ai_quant_sentinel.market_providers")
 
@@ -319,7 +319,8 @@ class SQLiteCacheProvider(BaseMarketDataProvider):
         with db_manager.get_market_conn() as conn:
             cursor = conn.execute(
                 """
-                SELECT timestamp, symbol, timeframe, open, high, low, close, volume
+                SELECT timestamp, symbol, timeframe, open, high, low, close, volume,
+                       is_synthetic
                 FROM candles
                 WHERE symbol = ? AND timeframe = ? AND timestamp <= ?
                 ORDER BY timestamp DESC
@@ -329,6 +330,10 @@ class SQLiteCacheProvider(BaseMarketDataProvider):
             )
             rows = cursor.fetchall()
             if len(rows) >= min(20, limit):
+                # Replay the provenance that was stored with each row. Dropping
+                # ``is_synthetic`` here would silently launder cached synthetic
+                # bars back into the pipeline as untagged (and therefore
+                # promotable) records.
                 return [
                     {
                         "timestamp": row["timestamp"],
@@ -339,6 +344,7 @@ class SQLiteCacheProvider(BaseMarketDataProvider):
                         "low": row["low"],
                         "close": row["close"],
                         "volume": row["volume"],
+                        "is_synthetic": int(row["is_synthetic"] or 0),
                     }
                     for row in reversed(rows)
                 ]
@@ -373,12 +379,24 @@ class SQLiteCacheProvider(BaseMarketDataProvider):
 
 class SyntheticMarketProvider(BaseMarketDataProvider):
     """
-    Stochastic High-Fidelity Market Simulation Fallback Provider.
+    Unavailability sentinel for the market-data chain.
+
+    This provider used to fabricate a stochastic OHLCV series when every real
+    venue failed, and it emitted those candles *untagged*. Downstream,
+    ``data_streamer.fetch_external_ohlcv()`` stamped ``is_synthetic = 0`` over
+    whatever the gateway returned and persisted it — so a transient outage
+    permanently wrote random walks into ``market_data.db`` labelled as observed
+    market data, which then fed ``market_states`` and the analogue engine.
+
+    It no longer invents price history. When the real providers are exhausted
+    the honest answer is "no data", and the evidence layer must be able to say
+    so. Everything this class still returns is explicitly stamped
+    ``EvidenceGrade.FABRICATED`` so it can never satisfy a live-decision gate.
     """
 
     @property
     def provider_name(self) -> str:
-        return "SYNTHETIC_STOCHASTIC"
+        return "UNAVAILABLE_SENTINEL"
 
     def __init__(self):
         self.base_prices: dict[str, float] = {
@@ -394,49 +412,35 @@ class SyntheticMarketProvider(BaseMarketDataProvider):
     async def fetch_historical_ohlcv(
         self, symbol: str, timeframe: str, limit: int = 100
     ) -> list[dict[str, Any]] | None:
-        tf_ms = TIMEFRAME_TO_MS.get(timeframe, 15 * 60 * 1000)
-        base_price = self.base_prices.get(symbol, 88450.0)
-        end_t = causal_firewall.get_current_time_ms()
-        candles = []
+        """
+        Return no candles. Ever.
 
-        np.random.seed(int(end_t % 100000) + int(base_price))
-        volatility = 0.0025 if "XAU" in symbol else 0.006
-        curr_price = base_price
-
-        for i in range(limit, 0, -1):
-            t = end_t - (i * tf_ms)
-            step = float(np.random.normal(0.0001, volatility * curr_price))
-            o = curr_price
-            c = round(o + step, 2)
-            wick_h = abs(float(np.random.exponential(volatility * 0.5 * curr_price)))
-            wick_l = abs(float(np.random.exponential(volatility * 0.5 * curr_price)))
-            h = round(max(o, c) + wick_h, 2)
-            lo = round(min(o, c) - wick_l, 2)
-            v = round(float(np.random.uniform(50.0, 500.0)), 2)
-
-            candles.append(
-                {
-                    "timestamp": t,
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "open": o,
-                    "high": h,
-                    "low": lo,
-                    "close": c,
-                    "volume": v,
-                }
-            )
-            curr_price = c
-
-        return candles
+        Fabricating OHLCV here is what allowed random data to be persisted as
+        empirical evidence. An empty series is the truthful representation of
+        "all real providers are unavailable", and it propagates as
+        ``EvidenceGrade.FABRICATED`` (see ``weakest_grade`` on empty input).
+        """
+        logger.warning(
+            "Market data unavailable for %s %s — all real providers exhausted. "
+            "Returning no candles; fabrication is disabled by policy.",
+            symbol,
+            timeframe,
+        )
+        return []
 
     async def fetch_live_ticker(self, symbol: str) -> dict[str, Any] | None:
-        base_p = self.base_prices.get(symbol, 88450.0)
-        drift = float(np.random.normal(0.0, base_p * 0.0002))
-        price = round(base_p + drift, 2)
+        """
+        Last-resort reference price so the terminal can still render a number
+        during an outage. Explicitly graded FABRICATED and jitter-free — a
+        random walk would imply live movement that is not happening.
+        """
+        price = self.base_prices.get(symbol, 88450.0)
         return {
             "symbol": symbol,
             "price": price,
+            "evidence_grade": EvidenceGrade.FABRICATED.label,
+            "is_synthetic": 1,
+            "data_unavailable": True,
             "change_24h_pct": 2.15,
             "high_24h": round(price * 1.018, 2),
             "low_24h": round(price * 0.982, 2),
@@ -446,17 +450,18 @@ class SyntheticMarketProvider(BaseMarketDataProvider):
         }
 
     async def fetch_order_book_depth(self, symbol: str, limit: int = 10) -> dict[str, Any] | None:
-        p = self.base_prices.get(symbol, 88450.0)
-        step = 12.0 if p > 5000 else 0.4
-        asks = [
-            {"price": round(p + step * i, 2), "size": round(np.random.uniform(1.0, 5.0), 3)}
-            for i in range(1, limit + 1)
-        ]
-        bids = [
-            {"price": round(p - step * i, 2), "size": round(np.random.uniform(1.0, 5.0), 3)}
-            for i in range(1, limit + 1)
-        ]
-        return {"symbol": symbol, "asks": asks, "bids": bids, "timestamp": int(time.time() * 1000)}
+        """
+        Return empty depth. Fabricated liquidity drove order-book imbalance and
+        VPIN toxicity signals, which fed directional scoring.
+        """
+        return {
+            "symbol": symbol,
+            "asks": [],
+            "bids": [],
+            "timestamp": int(time.time() * 1000),
+            "evidence_grade": EvidenceGrade.FABRICATED.label,
+            "data_unavailable": True,
+        }
 
 
 class CompositeMarketDataGateway:
@@ -480,6 +485,16 @@ class CompositeMarketDataGateway:
     async def get_ohlcv(
         self, symbol: str, timeframe: str, limit: int = 100
     ) -> list[dict[str, Any]]:
+        """
+        Fetch OHLCV from the first healthy real venue.
+
+        Provenance is stamped *here*, at the single chokepoint every consumer
+        goes through, rather than in each provider — a provider that forgets to
+        stamp cannot then leak untagged data into the pipeline.
+
+        Returns an empty list when no real venue can serve the request. Callers
+        must treat empty as "no evidence", never as "no signal".
+        """
         for p in self.providers:
             t0 = time.time()
             try:
@@ -489,14 +504,23 @@ class CompositeMarketDataGateway:
                     self._provider_health[p.provider_name]["latency_ms"] = round(rtt, 1)
                     self._provider_health[p.provider_name]["status"] = "HEALTHY"
                     self.active_provider_name = p.provider_name
-                    return data
+                    # EMPIRICAL is a *ceiling*, not an assignment: stamping is
+                    # downgrade-only, so cached rows that were stored as
+                    # synthetic keep their FABRICATED grade.
+                    return stamp_records(data, EvidenceGrade.EMPIRICAL)
             except Exception as e:  # noqa: BLE001 — defensive fallback
                 self._provider_health[p.provider_name]["errors"] += 1
                 self._provider_health[p.provider_name]["status"] = "DEGRADED"
                 logger.debug(f"Provider {p.provider_name} failed for {symbol}: {e}")
 
-        synthetic = await SyntheticMarketProvider().fetch_historical_ohlcv(symbol, timeframe, limit)
-        return synthetic or []
+        # All real venues exhausted. Do not fabricate — say so.
+        self.active_provider_name = "UNAVAILABLE"
+        logger.warning(
+            "No real market data available for %s %s; returning empty series.",
+            symbol,
+            timeframe,
+        )
+        return []
 
     async def get_ticker(self, symbol: str) -> dict[str, Any]:
         for p in self.providers:
@@ -509,6 +533,8 @@ class CompositeMarketDataGateway:
         return await SyntheticMarketProvider().fetch_live_ticker(symbol) or {
             "symbol": symbol,
             "price": 88450.0,
+            "evidence_grade": EvidenceGrade.FABRICATED.label,
+            "data_unavailable": True,
         }
 
     async def get_order_book(self, symbol: str, limit: int = 10) -> dict[str, Any]:

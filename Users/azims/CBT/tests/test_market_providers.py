@@ -1,10 +1,13 @@
 """
 Unit Tests for Institutional Market Data Provider Abstraction Layer.
-Validates Binance, Bybit, SQLite Cache, Synthetic stochastic simulation, and Composite Gateway.
+Validates Binance, Bybit, SQLite Cache, the unavailability sentinel, and the
+Composite Gateway — including the guarantee that no layer fabricates market
+data or launders synthetic data as empirical.
 """
 
 import pytest
 
+from core.evidence_integrity import EvidenceGrade, weakest_grade
 from core.market_providers import (
     TIMEFRAME_TO_MS,
     BinanceMarketDataProvider,
@@ -39,62 +42,66 @@ def test_bybit_provider_symbol_normalization():
 
 
 @pytest.mark.asyncio
-async def test_synthetic_provider_ohlcv():
+async def test_synthetic_provider_never_fabricates_ohlcv():
+    """
+    Regression: this provider used to emit a random OHLCV walk with no
+    provenance tag, which ``data_streamer`` then persisted as real market data.
+    It must now return nothing at all.
+    """
     provider = SyntheticMarketProvider()
-    assert provider.provider_name == "SYNTHETIC_STOCHASTIC"
+    assert provider.provider_name == "UNAVAILABLE_SENTINEL"
 
     candles = await provider.fetch_historical_ohlcv("BTC/USDT", "15m", limit=30)
-    assert candles is not None
-    assert len(candles) == 30
-    for c in candles:
-        assert "timestamp" in c
-        assert "open" in c
-        assert "high" in c
-        assert "low" in c
-        assert "close" in c
-        assert "volume" in c
-        assert c["high"] >= max(c["open"], c["close"])
-        assert c["low"] <= min(c["open"], c["close"])
+    assert candles == []
 
 
 @pytest.mark.asyncio
-async def test_synthetic_provider_live_ticker():
+async def test_synthetic_provider_ticker_is_graded_fabricated():
+    """A last-resort reference price may render, but must declare itself."""
     provider = SyntheticMarketProvider()
     ticker = await provider.fetch_live_ticker("ETH/USDT")
     assert ticker is not None
     assert ticker["symbol"] == "ETH/USDT"
     assert ticker["price"] > 1000.0
-    assert ticker["source"] == "SYNTHETIC_STOCHASTIC"
+    assert ticker["evidence_grade"] == "FABRICATED"
+    assert ticker["data_unavailable"] is True
 
 
 @pytest.mark.asyncio
-async def test_synthetic_provider_order_book():
+async def test_synthetic_provider_never_fabricates_depth():
+    """
+    Fabricated liquidity fed order-book imbalance and VPIN toxicity, which fed
+    directional scoring. Empty depth is the honest answer during an outage.
+    """
     provider = SyntheticMarketProvider()
     ob = await provider.fetch_order_book_depth("BTC/USDT", limit=8)
     assert ob is not None
-    assert len(ob["asks"]) == 8
-    assert len(ob["bids"]) == 8
-    assert ob["asks"][0]["price"] > ob["bids"][0]["price"]
+    assert ob["asks"] == []
+    assert ob["bids"] == []
+    assert ob["evidence_grade"] == "FABRICATED"
 
 
 @pytest.mark.asyncio
 async def test_composite_market_gateway():
     gateway = CompositeMarketDataGateway()
 
-    # 1. Fetch OHLCV
+    # 1. Fetch OHLCV. Offline (as in CI) every real venue fails, so the
+    #    gateway must return an empty series rather than inventing one.
+    #    Whatever it returns must be fully provenance-stamped.
     ohlcv = await gateway.get_ohlcv("BTC/USDT", "15m", limit=20)
-    assert len(ohlcv) >= 20
+    assert all("evidence_grade" in c for c in ohlcv)
+    if not ohlcv:
+        assert weakest_grade(ohlcv) is EvidenceGrade.FABRICATED
 
-    # 2. Fetch Ticker
+    # 2. Fetch Ticker — a price may be served, but never silently.
     ticker = await gateway.get_ticker("BTC/USDT")
     assert "price" in ticker
     assert ticker["price"] > 0
 
-    # 3. Fetch Order Book
+    # 3. Fetch Order Book — may legitimately be empty when offline.
     ob = await gateway.get_order_book("BTC/USDT", limit=6)
     assert "asks" in ob
     assert "bids" in ob
-    assert len(ob["asks"]) > 0
 
     # 4. Check Health
     health = gateway.get_provider_health()
