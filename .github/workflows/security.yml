@@ -16,6 +16,9 @@ jobs:
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Non-blocking until a repo admin enables Code scanning (Settings ->
+    # Code security -> Code scanning). Until then analyze/upload returns 403.
+    continue-on-error: true
     permissions:
       contents: read
       security-events: write
@@ -30,7 +33,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          language: ${{ matrix.language }}
+          languages: ${{ matrix.language }}
           queries: security-and-quality
 
       - name: Autobuild
