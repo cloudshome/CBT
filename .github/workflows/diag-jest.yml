@@ -50,15 +50,16 @@ jobs:
 
       - name: Emit Jest diagnostics as annotations
         if: always()
+        shell: bash
         run: |
-          echo "===META==="; cat /tmp/jest-meta.txt
-          # Combine meta + head (suite summary) + tail (failure detail) into one file
+          set +e
           {
-            echo "[meta] $(cat /tmp/jest-meta.txt)"
-            echo "[--- suite summary ---]"
-            grep -E "^(PASS|FAIL|Test Suites:|Tests:|Snapshot|Time:|Ran all)" /tmp/jest.log | head -60
-            echo "[--- failure tail ---]"
-            tail -60 /tmp/jest.log
+            echo "[meta]"
+            cat /tmp/jest-meta.txt 2>/dev/null
+            echo "[--- suite summary (PASS/FAIL + totals) ---]"
+            grep -aE "^(PASS|FAIL|Test Suites|Tests:|Snapshots|Time:|Ran all)" /tmp/jest.log 2>/dev/null
+            echo "[--- last 70 lines ---]"
+            tail -n 70 /tmp/jest.log 2>/dev/null
           } > /tmp/jest-diag.txt
           n=0
           while IFS= read -r line; do
@@ -67,3 +68,4 @@ jobs:
             echo "::error title=JD$n::$esc"
           done < /tmp/jest-diag.txt
           echo "::notice::emitted $n annotation lines"
+          exit 0
