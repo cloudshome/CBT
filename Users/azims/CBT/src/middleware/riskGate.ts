@@ -135,7 +135,10 @@ export async function riskGate(
         closedAt: { gte: today },
       },
     });
-    const dailyPnL = closedToday.reduce((acc, t) => acc + (t.pnl || 0), 0);
+    const dailyPnL = closedToday.reduce(
+      (acc: number, trade: { pnl: number | null }) => acc + (trade.pnl || 0),
+      0
+    );
     const maxDailyLoss = config.accountBalance * (config.dailyLossLimit || 0.05);
 
     if (dailyPnL <= -maxDailyLoss) {

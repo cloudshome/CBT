@@ -72,24 +72,33 @@ describe('Enhanced Rate Limiting Middleware', () => {
   });
 
   it('should isolate rate limits across different client IPs', async () => {
+    const previousTrustProxy = process.env.TRUST_PROXY_XFF;
+    process.env.TRUST_PROXY_XFF = 'true';
     const limiter = createRateLimiter({
       windowMs: 10000,
       max: 2,
     });
     const app = createApp(limiter);
 
-    // IP 1: 2 requests
-    await request(app).get('/test').set('X-Forwarded-For', '10.0.0.1');
-    await request(app).get('/test').set('X-Forwarded-For', '10.0.0.1');
-    const ip1Blocked = await request(app).get('/test').set('X-Forwarded-For', '10.0.0.1');
-    expect(ip1Blocked.status).toBe(429);
+    try {
+      // IP 1: 2 requests
+      await request(app).get('/test').set('X-Forwarded-For', '10.0.0.1');
+      await request(app).get('/test').set('X-Forwarded-For', '10.0.0.1');
+      const ip1Blocked = await request(app).get('/test').set('X-Forwarded-For', '10.0.0.1');
+      expect(ip1Blocked.status).toBe(429);
 
-    // IP 2: Should still have full quota
-    const ip2Req = await request(app).get('/test').set('X-Forwarded-For', '10.0.0.2');
-    expect(ip2Req.status).toBe(200);
-    expect(ip2Req.headers['ratelimit-remaining']).toBe('1');
-
-    limiter.cleanup();
+      // IP 2: Should still have full quota
+      const ip2Req = await request(app).get('/test').set('X-Forwarded-For', '10.0.0.2');
+      expect(ip2Req.status).toBe(200);
+      expect(ip2Req.headers['ratelimit-remaining']).toBe('1');
+    } finally {
+      limiter.cleanup();
+      if (previousTrustProxy === undefined) {
+        delete process.env.TRUST_PROXY_XFF;
+      } else {
+        process.env.TRUST_PROXY_XFF = previousTrustProxy;
+      }
+    }
   });
 
   it('should reset limits when reset() is invoked', async () => {

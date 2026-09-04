@@ -200,4 +200,4 @@ def test_api_sky_decision_and_modules():
     assert res_stats.status_code == 200
     data_stats = res_stats.json()
     assert data_stats["concept_name"] == "SETUP_A_SWEEP_MSS"
-    assert isinstance(data_stats["expectancy_r"], (int, float)), "expectancy_r must be numeric"
+    assert isinstance(data_stats["expectancy_r"], int | float), "expectancy_r must be numeric"

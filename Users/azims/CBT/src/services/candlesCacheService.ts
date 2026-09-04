@@ -1,6 +1,15 @@
 import { prisma } from '../db/prisma';
 import { OHLCVCandle } from '../types/candles';
 
+interface CachedCandleRecord {
+  ts: bigint;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+}
+
 /**
  * Saves or updates a batch of candles in the SQLite cache
  */
@@ -60,5 +69,5 @@ export async function getCachedCandles(
   // Re-order chronologically (oldest -> newest)
   return records
     .reverse()
-    .map((r) => [Number(r.ts), r.o, r.h, r.l, r.c, r.v]);
+    .map((r: CachedCandleRecord) => [Number(r.ts), r.o, r.h, r.l, r.c, r.v]);
 }
