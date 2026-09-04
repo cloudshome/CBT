@@ -53,19 +53,11 @@ jobs:
         shell: bash
         run: |
           set +e
-          {
-            echo "[meta]"
-            cat /tmp/jest-meta.txt 2>/dev/null
-            echo "[--- suite summary (PASS/FAIL + totals) ---]"
-            grep -aE "^(PASS|FAIL|Test Suites|Tests:|Snapshots|Time:|Ran all)" /tmp/jest.log 2>/dev/null
-            echo "[--- last 70 lines ---]"
-            tail -n 70 /tmp/jest.log 2>/dev/null
-          } > /tmp/jest-diag.txt
-          n=0
-          while IFS= read -r line; do
-            n=$((n+1))
-            esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g' -e 's/::/%3A%3A/g')
-            echo "::error title=JD$n::$esc"
-          done < /tmp/jest-diag.txt
-          echo "::notice::emitted $n annotation lines"
+          cat /tmp/jest-meta.txt 2>/dev/null > /tmp/sum.txt
+          grep -aE "^(PASS|FAIL|Test Suites|Tests:|Snapshots|Ran all)" /tmp/jest.log 2>/dev/null >> /tmp/sum.txt
+          tail -n 4 /tmp/jest.log 2>/dev/null >> /tmp/sum.txt
+          tail -n 60 /tmp/jest.log 2>/dev/null > /tmp/detail.txt
+          enc() { sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g' -e 's/::/%3A%3A/g' < "$1"; }
+          echo "::error title=JEST_SUMMARY::$(enc /tmp/sum.txt)"
+          echo "::error title=JEST_DETAIL::$(enc /tmp/detail.txt)"
           exit 0
