@@ -38,10 +38,10 @@ class GitHubResearcher:
                 if isinstance(node, ast.Assign):
                     for target in node.targets:
                         if isinstance(target, ast.Name) and isinstance(
-                            node.value, (ast.Constant, ast.Num)
+                            node.value, ast.Constant | ast.Num
                         ):
                             val = node.value.value if hasattr(node.value, "value") else node.value.n
-                            if isinstance(val, (int, float)):
+                            if isinstance(val, int | float):
                                 params[target.id] = val
 
             return {
