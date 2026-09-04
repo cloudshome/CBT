@@ -3,13 +3,17 @@ SKY Quantitative Platform Preflight Verification Script.
 Executes deep pre-merge health checks across database integrity, test suites, and model adapters.
 """
 
-import sys
 import os
+import shutil
 import subprocess
-import sqlite3
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Ensure repository root is on sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, str(PROJECT_ROOT))
+
 
 def run_check(name, fn):
     print(f"[*] Running: {name}...", end=" ", flush=True)
@@ -17,12 +21,15 @@ def run_check(name, fn):
         fn()
         print("[PASS]")
         return True
-    except Exception as e:
+    # A preflight failure must not prevent the remaining independent gates from running.
+    except Exception as e:  # noqa: BLE001
         print(f"[FAIL] -> {e}")
         return False
 
+
 def check_db_integrity():
     from core.database import db_manager
+
     db_manager.init_all_schemas()
     conn = db_manager.get_experiment_conn()
     cursor = conn.cursor()
@@ -31,17 +38,58 @@ def check_db_integrity():
     assert "kronos_forecast_ledger" in tables, "kronos_forecast_ledger table missing"
     conn.close()
 
+
 def check_pytest():
-    res = subprocess.run([sys.executable, "-m", "pytest", "-q"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    res = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     assert res.returncode == 0, f"Pytest failed:\n{res.stdout}\n{res.stderr}"
 
+
+def run_npm(*args: str) -> subprocess.CompletedProcess[str]:
+    """Run npm reliably on POSIX and Windows without a shell on POSIX.
+
+    Passing an argument list together with ``shell=True`` causes POSIX shells to
+    receive only the first item (``npm``), silently dropping commands such as
+    ``test`` or ``run build``. Windows npm is commonly a ``.cmd`` shim, so invoke
+    it through ``cmd.exe`` there while retaining a fully quoted argument string.
+    """
+    npm = shutil.which("npm")
+    if npm is None:
+        raise RuntimeError("npm executable not found on PATH")
+
+    command: list[str]
+    if os.name == "nt":
+        comspec = os.environ.get("COMSPEC", "cmd.exe")
+        command = [comspec, "/d", "/s", "/c", subprocess.list2cmdline([npm, *args])]
+    else:
+        command = [npm, *args]
+
+    return subprocess.run(
+        command,
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        shell=False,
+    )
+
+
 def check_jest():
-    res = subprocess.run(["npm", "test"], capture_output=True, text=True, shell=True, encoding="utf-8", errors="replace")
+    res = run_npm("test")
     assert res.returncode == 0, f"Jest failed:\n{res.stdout}\n{res.stderr}"
 
+
 def check_frontend_build():
-    res = subprocess.run(["npm", "--prefix", "frontend", "run", "build"], capture_output=True, text=True, shell=True, encoding="utf-8", errors="replace")
+    res = run_npm("--prefix", "frontend", "run", "build")
     assert res.returncode == 0, f"Frontend build failed:\n{res.stdout}\n{res.stderr}"
+
 
 def main():
     print("=" * 60)
@@ -50,8 +98,8 @@ def main():
 
     checks = [
         ("Database Schema Integrity", check_db_integrity),
-        ("Pytest Quantitative Test Suite (191 tests)", check_pytest),
-        ("Jest Desk & Backend Test Suite (122 tests)", check_jest),
+        ("Pytest Quantitative Test Suite", check_pytest),
+        ("Jest Desk & Backend Test Suite", check_jest),
         ("Frontend Vite Production Build", check_frontend_build),
     ]
 
@@ -68,6 +116,7 @@ def main():
     else:
         print(">>> PREFLIGHT CHECKS FAILED <<<")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
