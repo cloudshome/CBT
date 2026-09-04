@@ -1,2 +1,2 @@
 # Development / CI-only tooling (not runtime requirements)
-ruff>=0.8.0,<0.10.0
+ruff>=0.16.5,<0.17.0
