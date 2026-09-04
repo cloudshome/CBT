@@ -202,6 +202,6 @@ def test_kelly_refuses_to_size_on_fabricated_evidence():
     )
     d = alloc.to_dict()
     size_fields = [v for k, v in d.items() if "units" in k or "size" in k or "risk_usd" in k]
-    assert all((not isinstance(v, (int, float))) or v == 0 for v in size_fields), (
+    assert all((not isinstance(v, int | float)) or v == 0 for v in size_fields), (
         f"fabricated evidence produced non-zero sizing: {d}"
     )
