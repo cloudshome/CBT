@@ -1,5 +1,8 @@
 [Unit]
-Description=ORION / SKY Institutional Autonomous Trading & Risk Sentinel
+Description=ORION / SKY Institutional Autonomous Trading & Risk Sentinel (bare-metal uvicorn)
+# WARNING: This unit runs uvicorn directly on port 8000. It CONFLICTS with
+# deploy/systemd/cbt-stack@.service (Docker Compose stack, which also exposes the
+# Python backend on port 8000). Enable EXACTLY ONE of the two — do not run both.
 After=network-online.target systemd-journald.service
 Wants=network-online.target
 

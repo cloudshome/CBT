@@ -37,7 +37,7 @@ export function createApp(): Express {
     res.json({
       name: 'Crypto Brain Terminal (CTB) API',
       status: 'online',
-      version: '0.1.0',
+      version: '3.0.0',
     });
   });
 
@@ -59,6 +59,11 @@ export function createApp(): Express {
     });
   });
 
+  // NOTE: The React terminal is served by nginx, which routes the full
+  // intelligence surface (/api/candles .. /api/auditor) to the FastAPI
+  // Python backend. These Express routers are the LEGACY / direct-access
+  // implementation (dev convenience + API compatibility) — FastAPI is the
+  // authoritative implementation. Keep behavior in sync or migrate callers.
   // --- Public Read-Only Routes (no auth required) ---
   app.use('/api/candles', candlesRouter);
   app.use('/api/mtf', mtfRouter);

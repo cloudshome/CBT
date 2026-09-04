@@ -15,6 +15,11 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
+      - TRUST_PROXY_XFF=true
+      - MAX_PAPER_OPEN_POSITIONS=3
+      - MAX_PAPER_ACCOUNT_BALANCE=100000
+      - MAX_PAPER_RISK_PCT=0.02
     deploy:
       resources:
         limits:
@@ -41,6 +46,7 @@ services:
       - API_KEY=${API_KEY}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TRUST_PROXY_XFF=true
     deploy:
       resources:
         limits:
