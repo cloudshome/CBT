@@ -81,9 +81,21 @@ jobs:
         run: npm test -- --coverage
 
       - name: Validate Docker Compose Configuration
+        env:
+          # docker-compose.prod.yml intentionally fails closed when CORS_ORIGIN
+          # is unset; supply a representative value for config validation.
+          CORS_ORIGIN: https://cbt.example.com
         run: |
           docker compose -f docker-compose.yml config
           docker compose -f docker-compose.prod.yml config
+
+      - name: Assert production Compose fails closed without CORS_ORIGIN
+        run: |
+          if docker compose -f docker-compose.prod.yml config >/dev/null 2>&1; then
+            echo "::error::docker-compose.prod.yml must fail when CORS_ORIGIN is unset"
+            exit 1
+          fi
+          echo "OK: production compose refuses to render without an explicit CORS_ORIGIN"
 
       - name: Build Full Production Bundle (Backend & Frontend)
         run: npm run build
