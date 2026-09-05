@@ -12,6 +12,6 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'agent:jules')
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Jules Action Stub Notice
         run: echo "[STUB] Jules task automation is currently non-operative. Maintainer webhook configuration required."
