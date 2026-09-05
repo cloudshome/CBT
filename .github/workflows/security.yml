@@ -75,7 +75,7 @@ jobs:
         working-directory: Users/azims/CBT/frontend
         run: npm audit --audit-level=high || echo "::warning::npm audit reported high/critical findings (frontend)"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
 
