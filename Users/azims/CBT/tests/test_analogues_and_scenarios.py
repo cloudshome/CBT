@@ -10,15 +10,34 @@ from core.scenario_monitor import scenario_monitor
 
 
 def test_hierarchical_analogue_ensemble():
-    """Verify 4-step hierarchical matching and empirical outcome distributions."""
+    """
+    Verify 4-step hierarchical matching and empirical outcome distributions.
+
+    NOTE: this test previously asserted ``k_samples_found > 0`` and
+    ``sample_adequacy_score > 0`` against a cold database. That was asserting
+    the *bug*: the engine was counting 60 internally fabricated
+    ``np.random`` states as if they were empirical observations. Probabilities
+    must still be well-formed, but adequacy is now required to reflect the
+    number of genuinely observed states only.
+    """
     candles = data_streamer.generate_synthetic_candles("BTC/USDT", "15m", count=50)
     state = market_state_compiler.compile_state("BTC/USDT", candles_by_tf={"15m": candles})
 
     dist = analogue_engine.find_analogues(state, active_regime="TRENDING_BULL")
-    assert dist.k_samples_found > 0
+
+    # Probabilities remain well-formed regardless of provenance.
     assert 0.0 <= dist.p_tp_hit <= 1.0
     assert 0.0 <= dist.p_sl_hit <= 1.0
-    assert dist.sample_adequacy_score > 0
+
+    # Adequacy must track *real* samples, and provenance must be declared.
+    assert dist.k_samples_found == dist.real_sample_count or dist.real_sample_count >= 5
+    if dist.real_sample_count < 5:
+        assert dist.evidence_grade == "FABRICATED"
+        assert dist.sample_adequacy_score == 0.0
+        assert dist.uncertainty_penalty == 1.0
+    else:
+        assert dist.evidence_grade == "EMPIRICAL"
+        assert dist.sample_adequacy_score > 0
 
 
 def test_mece_scenario_generator_probabilities_sum():

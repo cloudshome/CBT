@@ -56,10 +56,23 @@ class ConservativeKellyAllocator:
         uncertainty: UncertaintyBudget,
         current_drawdown_pct: float = 0.0,
         portfolio_correlation_factor: float = 0.0,
+        evidence_grade: str = "EMPIRICAL",
     ) -> KellyAllocationResult:
         """
         Calculates fractional Kelly sizing adjusted for empirical parameter uncertainty.
+
+        ``evidence_grade`` is the provenance of the win-probability estimate
+        (see core/evidence_integrity.py). Kelly sizing is only meaningful when
+        ``p`` is an empirical frequency; sizing off a fabricated ``p`` produces
+        a confident, precise, and entirely fictional position size.
         """
+        if evidence_grade != "EMPIRICAL":
+            return self._zero_allocation(
+                account_equity,
+                f"Evidence integrity halt: win probability is {evidence_grade}, "
+                "not empirically observed. Kelly sizing refused.",
+            )
+
         if not ev_result.is_tradable or account_equity <= 0 or entry_price <= 0:
             return self._zero_allocation(
                 account_equity, "Trade not tradable or insufficient equity."

@@ -17,15 +17,24 @@ dotenv.config();
 export function createApp(): Express {
   const app = express();
 
-  // --- CORS Configuration ---
-  // In production, restrict to specific origin(s) via CORS_ORIGIN env var.
-  // In development (or when unset), allow all origins for convenience.
+  // --- CORS Configuration (fail-closed in production) ---
+  // Production MUST set CORS_ORIGIN to an explicit allowlist; a wildcard
+  // fallback in production is a security misconfiguration, so we refuse to
+  // start rather than silently allowing every origin.
+  // In development/test (or when unset outside production) allow all origins.
   const corsOrigin = process.env.CORS_ORIGIN;
+  const allowWildcard = corsOrigin === '*';
+  if (process.env.NODE_ENV === 'production' && (!corsOrigin || allowWildcard)) {
+    throw new Error(
+      'Security misconfiguration: CORS_ORIGIN must be set to an explicit ' +
+      'comma-separated origin allowlist (not "*") when NODE_ENV=production.'
+    );
+  }
   app.use(cors({
-    origin: corsOrigin ? corsOrigin.split(',').map(o => o.trim()) : '*',
+    origin: corsOrigin && !allowWildcard ? corsOrigin.split(',').map(o => o.trim()) : '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-    credentials: !!corsOrigin,
+    credentials: !!corsOrigin && !allowWildcard,
   }));
   app.use(express.json());
 

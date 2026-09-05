@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from core.database import db_manager
+from core.evidence_integrity import EvidenceGrade
 from core.market_state import MarketStateVector
 
 logger = logging.getLogger("ai_quant_sentinel.analogue_engine")
@@ -51,6 +52,12 @@ class AnalogueDistribution:
     avg_bars_to_target: float
     top_matches: list[AnalogueMatch]
     uncertainty_penalty: float  # Higher when K is small or distribution is bimodal
+    evidence_grade: str = EvidenceGrade.EMPIRICAL.label
+    """Provenance of this distribution. FABRICATED when the brain memory was
+    cold and synthetic states were seeded — such a distribution must never
+    authorize risk. See core/evidence_integrity.py."""
+    real_sample_count: int = 0
+    """Number of genuinely observed historical states behind p_tp_hit."""
 
 
 class HierarchicalAnalogueEngine:
@@ -76,8 +83,13 @@ class HierarchicalAnalogueEngine:
             current_state.asset, "15m", active_regime, event_risk_mode
         )
 
-        if len(historical_states) < 5:
-            # Seed synthetic historical states if memory is fresh
+        real_sample_count = len(historical_states)
+        is_fabricated = False
+        if real_sample_count < 5:
+            # Cold brain memory. We still return a shaped distribution so the UI
+            # can render, but it is tagged FABRICATED and forced to declare a
+            # zero effective sample size — it must never authorize risk.
+            is_fabricated = True
             historical_states = self._generate_synthetic_historical_states(
                 current_state, active_regime, event_risk_mode, count=60
             )
@@ -140,19 +152,31 @@ class HierarchicalAnalogueEngine:
             )
 
         k_count = len(matches)
-        sample_adequacy = min(1.0, k_count / float(self.min_sample_threshold))
+        # Adequacy and uncertainty must be computed from *real* observations
+        # only. Counting synthetic states here is what previously produced
+        # sample_adequacy_score=1.0 / uncertainty_penalty=0.0 on an empty DB.
+        effective_k = 0 if is_fabricated else k_count
+        sample_adequacy = min(1.0, effective_k / float(self.min_sample_threshold))
         uncertainty_pen = max(0.0, 1.0 - sample_adequacy) * 0.40
+        if is_fabricated:
+            # Maximum penalty: no empirical information content whatsoever.
+            uncertainty_pen = 1.0
 
         p_tp = tp_hits / max(1, k_count)
         p_sl = sl_hits / max(1, k_count)
         med_mae = float(np.median(mae_list)) if mae_list else 0.5
         med_mfe = float(np.median(mfe_list)) if mfe_list else 1.2
         avg_bars = float(np.mean(bars_list)) if bars_list else 6.0
-        exp_r = (p_tp * (med_mfe / (med_mae + 1e-4))) - (p_sl * 1.0)
+        # Guard the reward/risk ratio: a near-zero MAE previously let this
+        # divide-by-epsilon explode (observed expected_r_multiple = 6467.56).
+        # Clamp to a plausible institutional range.
+        rr_ratio = med_mfe / max(med_mae, 0.01)
+        rr_ratio = float(np.clip(rr_ratio, 0.0, 20.0))
+        exp_r = (p_tp * rr_ratio) - (p_sl * 1.0)
 
         return AnalogueDistribution(
             query_asset=current_state.asset,
-            k_samples_found=k_count,
+            k_samples_found=effective_k,
             sample_adequacy_score=round(sample_adequacy, 2),
             p_tp_hit=round(p_tp, 3),
             p_sl_hit=round(p_sl, 3),
@@ -162,6 +186,10 @@ class HierarchicalAnalogueEngine:
             avg_bars_to_target=round(avg_bars, 1),
             top_matches=matches[:10],
             uncertainty_penalty=round(uncertainty_pen, 3),
+            evidence_grade=(
+                EvidenceGrade.FABRICATED.label if is_fabricated else EvidenceGrade.EMPIRICAL.label
+            ),
+            real_sample_count=real_sample_count,
         )
 
     def _compute_weighted_similarity(

@@ -33,8 +33,11 @@ def test_api_market_orderbook():
     assert data["symbol"] == "BTC/USDT"
     assert "asks" in data
     assert "bids" in data
-    assert len(data["asks"]) > 0
-    assert len(data["bids"]) > 0
+    # Depth may legitimately be empty when no real venue is reachable (as in
+    # CI). Fabricating book levels here previously fed order-book imbalance
+    # and VPIN toxicity signals into directional scoring.
+    if not data["asks"]:
+        assert data.get("evidence_grade") == "FABRICATED"
 
 
 def test_api_market_providers():
