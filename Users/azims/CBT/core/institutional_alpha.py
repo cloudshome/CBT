@@ -21,6 +21,7 @@ from typing import Any
 import numpy as np
 
 from core.cvd_absorption import cvd_absorption_engine
+from core.evidence_integrity import EvidenceGrade, stamp_records, weakest_grade
 from core.fractal_harmonics import fractal_harmonics_engine
 from core.half_kelly_sizer import half_kelly_position_sizer
 from core.judas_sweep_hunter import judas_sweep_hunter
@@ -50,6 +51,8 @@ class InstitutionalAlphaComposite:
     execution_dossier: dict[str, Any]
     hurdle_passed: bool
     narrative: str
+    evidence_grade: str = "FABRICATED"
+    is_tradeable: bool = False
 
 
 class InstitutionalAlphaEngine:
@@ -76,10 +79,14 @@ class InstitutionalAlphaEngine:
         now = timestamp_ms or int(time.time() * 1000)
 
         # Baseline synthetic candles if None
+        is_baseline = False
         if not candles or len(candles) < 20:
             candles = self._generate_baseline_candles(now)
+            is_baseline = True
 
         current_price = candles[-1]["close"]
+        ev_grade = EvidenceGrade.FABRICATED if is_baseline else weakest_grade(candles)
+        is_tradeable = ev_grade.is_tradeable
 
         # 1. Cross-Asset Lead-Lag Correlator
         lead_signals = lead_lag_correlator.process_macro_ticks(
@@ -207,7 +214,14 @@ class InstitutionalAlphaEngine:
             bear_weights += 25.0 * fractal_res.harmonic_confluence_score
 
         # Decision threshold (Hurdle = 55.0)
-        if bull_weights >= 55.0 and bull_weights > (bear_weights * 1.3):
+        if not is_tradeable:
+            decision = "NO_TRADE"
+            composite_score = 0.0
+            entry = current_price
+            sl = current_price * 0.99
+            tp = current_price * 1.02
+            hurdle_passed = False
+        elif bull_weights >= 55.0 and bull_weights > (bear_weights * 1.3):
             decision = "LONG"
             composite_score = min(98.0, bull_weights)
             entry = current_price
@@ -235,16 +249,22 @@ class InstitutionalAlphaEngine:
             entry_price=entry,
             stop_loss=sl,
             take_profit=tp,
-            win_probability=0.58 if hurdle_passed else 0.45,
+            win_probability=0.58 if (is_tradeable and hurdle_passed) else 0.0,
             symbol=symbol,
         )
         kelly_data = kelly_res.__dict__
 
-        narrative = (
-            f"Institutional Alpha Composite: {decision} (Score: {composite_score:.1f}/100). "
-            f"CVD: {cvd_res.absorption_type}, OBI: {obi_res.regime}, Judas: {judas_data['sweep_direction']}, "
-            f"Fractal: {fractal_res.dominant_direction} ({fractal_res.harmonic_confluence_score * 100:.0f}%)."
-        )
+        if not is_tradeable:
+            narrative = (
+                f"EVIDENCE INTEGRITY HALT: Market candles grade {ev_grade.label}, not EMPIRICAL. "
+                f"Decision forced to NO_TRADE, Kelly allocation 0.0."
+            )
+        else:
+            narrative = (
+                f"Institutional Alpha Composite: {decision} (Score: {composite_score:.1f}/100). "
+                f"CVD: {cvd_res.absorption_type}, OBI: {obi_res.regime}, Judas: {judas_data['sweep_direction']}, "
+                f"Fractal: {fractal_res.dominant_direction} ({fractal_res.harmonic_confluence_score * 100:.0f}%)."
+            )
 
         return InstitutionalAlphaComposite(
             symbol=symbol,
@@ -270,6 +290,8 @@ class InstitutionalAlphaEngine:
             },
             hurdle_passed=hurdle_passed,
             narrative=narrative,
+            evidence_grade=ev_grade.label,
+            is_tradeable=is_tradeable,
         )
 
     def _generate_baseline_candles(self, now: int) -> list[dict[str, Any]]:
@@ -287,6 +309,7 @@ class InstitutionalAlphaEngine:
                 {"timestamp": t, "open": o, "high": h, "low": lo, "close": c, "volume": v}
             )
             p = c
+        stamp_records(candles, EvidenceGrade.FABRICATED)
         return candles
 
 

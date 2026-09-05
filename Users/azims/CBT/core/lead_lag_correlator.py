@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from core.evidence_integrity import EvidenceGrade
+
 logger = logging.getLogger("ai_quant_sentinel.lead_lag_correlator")
 
 
@@ -25,6 +27,8 @@ class LeadSignal:
     confidence: float
     timestamp: int
     rationale: str
+    evidence_grade: str = "EMPIRICAL"
+    is_tradeable: bool = True
 
 
 class LeadLagCorrelator:
@@ -36,6 +40,7 @@ class LeadLagCorrelator:
         self.shock_threshold = shock_zscore_threshold
         self._dxy_returns: list[float] = []
         self._us10y_returns: list[float] = []
+        self._is_synthetic_baseline: bool = False
 
     def process_macro_ticks(
         self,
@@ -52,8 +57,17 @@ class LeadLagCorrelator:
         # Synthetic/fallback baseline variation if single tick
         if not self._dxy_returns:
             self._dxy_returns = list(np.random.normal(0.0, 0.0008, 60))
+            self._is_synthetic_baseline = True
         if not self._us10y_returns:
             self._us10y_returns = list(np.random.normal(0.0, 0.004, 60))
+            self._is_synthetic_baseline = True
+
+        ev_grade = (
+            EvidenceGrade.FABRICATED.label
+            if self._is_synthetic_baseline
+            else EvidenceGrade.EMPIRICAL.label
+        )
+        is_tradeable = not self._is_synthetic_baseline
 
         # 1-minute velocity estimation
         dxy_ret = (dxy_price - 104.5) / 104.5 * 0.01  # Instantaneous rate of change
@@ -90,6 +104,8 @@ class LeadLagCorrelator:
                     confidence=min(0.92, 0.65 + abs(dxy_z) * 0.08),
                     timestamp=now,
                     rationale=f"DXY {dxy_z:+.2f}sigma shock triggers inverse liquidity re-pricing in Gold across 3-5m window.",
+                    evidence_grade=ev_grade,
+                    is_tradeable=is_tradeable,
                 )
             )
             signals.append(
@@ -102,6 +118,8 @@ class LeadLagCorrelator:
                     confidence=min(0.88, 0.60 + abs(dxy_z) * 0.07),
                     timestamp=now,
                     rationale=f"DXY {dxy_z:+.2f}sigma shock triggers risk-asset beta flow into Crypto across 5-15m window.",
+                    evidence_grade=ev_grade,
+                    is_tradeable=is_tradeable,
                 )
             )
 
@@ -118,6 +136,8 @@ class LeadLagCorrelator:
                     confidence=min(0.85, 0.58 + abs(us10y_z) * 0.07),
                     timestamp=now,
                     rationale=f"US 10-Year Yield {us10y_z:+.2f}sigma displacement signals discount-rate repricing for crypto assets.",
+                    evidence_grade=ev_grade,
+                    is_tradeable=is_tradeable,
                 )
             )
 

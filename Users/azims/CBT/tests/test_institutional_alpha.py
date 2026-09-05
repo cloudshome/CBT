@@ -128,3 +128,26 @@ def test_master_institutional_alpha_composite():
     assert "vwap" in res.vwap_multisigma
     assert "harmonic_confluence_score" in res.fractal_harmonics
     assert "half_kelly_fraction" in res.half_kelly_sizing
+
+
+def test_institutional_alpha_evidence_integrity_gate():
+    """Verify that absent or fabricated candles force NO_TRADE with zero capital sizing."""
+    res_cold = institutional_alpha_engine.evaluate_alpha(candles=None)
+    assert res_cold.decision == "NO_TRADE"
+    assert res_cold.is_tradeable is False
+    assert res_cold.evidence_grade == "FABRICATED"
+    assert res_cold.execution_dossier["suggested_size_base"] == 0.0
+    assert "EVIDENCE INTEGRITY HALT" in res_cold.narrative
+
+    # Stamped empirical candles should be tradeable
+    from core.evidence_integrity import EvidenceGrade, stamp_records
+
+    now = int(time.time() * 1000)
+    empirical_candles = [
+        {"timestamp": now - (50 - i) * 60000, "open": 88000.0, "high": 88100.0, "low": 87900.0, "close": 88050.0, "volume": 100.0}
+        for i in range(50)
+    ]
+    stamp_records(empirical_candles, EvidenceGrade.EMPIRICAL)
+    res_empirical = institutional_alpha_engine.evaluate_alpha(candles=empirical_candles)
+    assert res_empirical.is_tradeable is True
+    assert res_empirical.evidence_grade == "EMPIRICAL"
