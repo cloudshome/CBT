@@ -2012,8 +2012,8 @@ async def get_orderbook_imbalance(
 
     if not bids or not asks:
         # Synthetic fallback anchored to last known price
-        state = market_state_compiler.compile_snapshot(symbol=symbol)
-        p = state.best_ask
+        candles = data_streamer.get_candles(symbol, "15m", limit=5)
+        p = float(candles[-1]["close"]) if candles else (77450.0 if "BTC" in symbol else 2430.0 if "ETH" in symbol else 4458.0)
         bids = [(p * (1.0 - 0.0005 * i), 1.5 + 0.3 * i) for i in range(15)]
         asks = [(p * (1.0 + 0.0005 * i), 1.2 + 0.35 * i) for i in range(15)]
         data_source = "SYNTHETIC"
