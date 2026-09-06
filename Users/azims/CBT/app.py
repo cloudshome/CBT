@@ -1807,6 +1807,81 @@ class ResearchIngestRequest(BaseModel):
     title: Optional[str] = None
 
 
+async def auto_dispatch_telegram_summary(result: dict[str, Any]) -> None:
+    """Automatically dispatches synthesized research summary to Telegram upon ingestion."""
+    try:
+        if not telegram_bot.is_configured():
+            return
+
+        source = result.get("source", {})
+        source_type = source.get("source_type") or "RESEARCH"
+        title = (source.get("title") or result.get("file_metadata", {}).get("book_title") or "Research Literature").replace("_", " ")
+        author = (source.get("author_creator") or result.get("file_metadata", {}).get("author_creator") or "External Contributor").replace("_", " ")
+        kid = result.get("knowledge_id") or "K-UNKNOWN"
+        summary_text = result.get("executive_summary") or result.get("verdict_message") or "Research synthesis completed."
+
+        source_emoji = {
+            "PDF_BOOK": "📖 [PDF Monograph]",
+            "PDF": "📄 [PDF Document]",
+            "YOUTUBE": "▶️ [YouTube Video]",
+            "GITHUB": "🐙 [GitHub Repo]",
+            "CODE": "💻 [Source Code]",
+            "ARTICLE": "📰 [Article/Post]",
+            "NOTES": "📝 [Research Notes]",
+            "IMAGE": "📸 [Vision Ingest]",
+        }.get(str(source_type).upper(), "📚 [Research Literature]")
+
+        clean_summary = summary_text.replace("\n\n", "\n").replace("_", " ").replace("*", "").strip()
+        if len(clean_summary) > 950:
+            clean_summary = clean_summary[:950] + "..."
+
+        ep = result.get("epistemic_counts", {})
+        facts = ep.get("facts", result.get("summary", {}).get("concepts_saved", 0))
+        hypo = ep.get("hypotheses", result.get("summary", {}).get("candidates_queued", 0))
+        rules = ep.get("rules", len(result.get("strategy_candidates", [])))
+        contra = ep.get("contradictions", 0)
+
+        lines = [
+            f"⚡ *AUTOMATIC RESEARCH INGESTION*",
+            f"*{source_emoji}*",
+            "━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📚 *Title:* {title}",
+            f"👤 *Author/Creator:* {author}",
+            f"🆔 *Ledger ID:* `{kid}`",
+            "",
+            "📝 *Executive Synthesis:*",
+            clean_summary,
+            "",
+            "⚖️ *Epistemic Classification (Quarantined 0.0):*",
+            f"• Facts (Causal): *{facts}*",
+            f"• Hypotheses: *{hypo}*",
+            f"• Proposed Rules: *{rules}*",
+            f"• Contradictions: *{contra}*",
+        ]
+
+        chap_breakdown = result.get("chapter_breakdown", [])
+        if chap_breakdown:
+            lines.append("")
+            lines.append("📑 *Sections / Chapters:*")
+            for ch in chap_breakdown[:4]:
+                lines.append(f"• {ch}")
+
+        cands = result.get("strategy_candidates", [])
+        if cands:
+            lines.append("")
+            lines.append("⚡ *Candidate Queued (UNTESTED):*")
+            lines.append(f"• `{cands[0].get('strategy_name', 'Candidate')}`")
+
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("🔬 _Automatically dispatched from SKY Terminal Research Lab_")
+
+        msg = "\n".join(lines)
+        await telegram_bot.send_message(msg, parse_mode="Markdown")
+        logger.info(f"Automatically dispatched research summary for {kid} to Telegram.")
+    except Exception as e:
+        logger.error(f"Error in auto_dispatch_telegram_summary: {e}")
+
+
 @app.post("/api/research/ingest", dependencies=[Depends(require_api_key)])
 async def ingest_research_text(req: ResearchIngestRequest):
     """
@@ -1828,6 +1903,7 @@ async def ingest_research_text(req: ResearchIngestRequest):
         author_creator=req.author_creator,
         title=req.title,
     )
+    asyncio.create_task(auto_dispatch_telegram_summary(result))
     return sanitize_numpy(result)
 
 
@@ -1866,6 +1942,7 @@ async def ingest_research_file(
             pdf_payload=metadata.get("pdf_research_payload"),
         )
         result["file_metadata"] = metadata
+        asyncio.create_task(auto_dispatch_telegram_summary(result))
         return sanitize_numpy(result)
     except HTTPException:
         raise

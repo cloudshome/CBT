@@ -139,3 +139,59 @@ def test_telegram_research_summary_dispatch():
     assert "K-TEST-992" in data["dispatched_text"]
     assert "Inventory Penalized" in data["dispatched_text"]
 
+
+@pytest.mark.asyncio
+async def test_telegram_reverse_flow_link_ingestion():
+    """Verifies that dropping a research link into Telegram automatically triggers Research Lab ingestion."""
+    from unittest.mock import AsyncMock, patch
+    from core.telegram_bot import telegram_bot
+
+    update = {
+        "update_id": 9991,
+        "message": {
+            "chat": {"id": 12345},
+            "text": "Check out this thesis: https://github.com/quant-research/smc-alpha",
+            "from": {"first_name": "QuantTrader"},
+        },
+    }
+
+    with patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = True
+        res = await telegram_bot.handle_webhook_update(update)
+        assert res["status"] == "RESEARCH_INGESTED"
+        assert res["type"] == "LINK"
+        assert res["knowledge_id"].startswith("K-")
+        assert mock_send.called
+        any_summary = any("FILED IN SKY RESEARCH LAB" in call.args[0] for call in mock_send.call_args_list)
+        assert any_summary
+
+
+@pytest.mark.asyncio
+async def test_telegram_reverse_flow_photo_ingestion():
+    """Verifies that dropping a photo into Telegram automatically triggers Vision OCR & Research Lab ingestion."""
+    from unittest.mock import AsyncMock, patch
+    from core.telegram_bot import telegram_bot
+
+    update = {
+        "update_id": 9992,
+        "message": {
+            "chat": {"id": 12345},
+            "photo": [{"file_id": "photo_low_res"}, {"file_id": "photo_high_res"}],
+            "caption": "BTC 15m Fair Value Gap Setup",
+            "from": {"first_name": "QuantTrader"},
+        },
+    }
+
+    with patch.object(telegram_bot, "download_telegram_file", new_callable=AsyncMock) as mock_download, \
+         patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send:
+        mock_download.return_value = b"\x89PNG\r\n\x1a\nfake_image_bytes"
+        mock_send.return_value = True
+        res = await telegram_bot.handle_webhook_update(update)
+        assert res["status"] == "RESEARCH_INGESTED"
+        assert res["type"] == "PHOTO"
+        assert res["knowledge_id"].startswith("K-")
+        assert mock_send.called
+        any_summary = any("FILED IN SKY RESEARCH LAB" in call.args[0] for call in mock_send.call_args_list)
+        assert any_summary
+
+

@@ -18,6 +18,8 @@ import logging
 import os
 import time
 from collections.abc import Callable
+from pathlib import Path
+import re
 from typing import Any
 
 import aiohttp
@@ -825,10 +827,12 @@ class TelegramBotDispatcher:
         """Registers an interactive command handler (e.g. '/signal', '/status', '/plan')."""
         self._command_handlers[command.lower().strip()] = handler
 
-    async def send_message(self, text: str, parse_mode: str = "Markdown") -> bool:
-        """Dispatches text message to the configured Telegram chat."""
+    async def send_message(
+        self, text: str, parse_mode: str = "Markdown", chat_id: int | str | None = None
+    ) -> bool:
+        """Dispatches text message to the target or configured Telegram chat."""
         token = self.bot_token
-        chat = self.chat_id
+        chat = chat_id or self.chat_id
         if not token or not chat:
             logger.debug("Telegram credentials not configured; logging message locally.")
             logger.info(f"[TELEGRAM LOCAL NOTIFICATION]\n{text}")
@@ -1388,14 +1392,229 @@ class TelegramBotDispatcher:
     # INTERACTIVE COMMAND & WEBHOOK ROUTER
     # ==============================================================================
 
+    async def download_telegram_file(self, file_id: str) -> bytes | None:
+        """Downloads raw binary bytes of a file from Telegram Bot API."""
+        token = self.bot_token
+        if not token:
+            return None
+        get_file_url = f"https://api.telegram.org/bot{token}/getFile"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(get_file_url, params={"file_id": file_id}, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status != 200:
+                        logger.error(f"Telegram getFile returned {resp.status}")
+                        return None
+                    data = await resp.json()
+                    file_path = data.get("result", {}).get("file_path")
+                    if not file_path:
+                        return None
+
+                download_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
+                async with session.get(download_url, timeout=aiohttp.ClientTimeout(total=30)) as resp2:
+                    if resp2.status == 200:
+                        return await resp2.read()
+                    logger.error(f"Telegram file download returned {resp2.status}")
+                    return None
+        except Exception as e:
+            logger.error(f"Failed downloading file from Telegram: {e}")
+            return None
+
+    def _format_research_summary_telegram(self, result: dict[str, Any], title_override: str | None = None) -> str:
+        """Formats an institutional Research Lab result into clean Telegram Markdown."""
+        source = result.get("source", {})
+        source_type = source.get("source_type") or "RESEARCH"
+        title = (title_override or source.get("title") or "Research Literature").replace("_", " ")
+        author = (source.get("author_creator") or "External Contributor").replace("_", " ")
+        kid = result.get("knowledge_id") or "K-UNKNOWN"
+        summary_text = result.get("executive_summary") or result.get("verdict_message") or "Research synthesis completed."
+
+        source_emoji = {
+            "PDF_BOOK": "📖 [PDF Monograph]",
+            "PDF": "📄 [PDF Document]",
+            "YOUTUBE": "▶️ [YouTube Video]",
+            "GITHUB": "🐙 [GitHub Repo]",
+            "CODE": "💻 [Source Code]",
+            "ARTICLE": "📰 [Article/Post]",
+            "NOTES": "📝 [Research Notes]",
+            "IMAGE": "📸 [Vision Ingest]",
+        }.get(str(source_type).upper(), "📚 [Research Literature]")
+
+        clean_summary = summary_text.replace("\n\n", "\n").replace("_", " ").replace("*", "").strip()
+        if len(clean_summary) > 900:
+            clean_summary = clean_summary[:900] + "..."
+
+        ep = result.get("epistemic_counts", {})
+        facts = ep.get("facts", result.get("summary", {}).get("concepts_saved", 0))
+        hypo = ep.get("hypotheses", result.get("summary", {}).get("candidates_queued", 0))
+        rules = ep.get("rules", len(result.get("strategy_candidates", [])))
+        contra = ep.get("contradictions", 0)
+
+        lines = [
+            f"✅ *FILED IN SKY RESEARCH LAB*",
+            f"*{source_emoji}*",
+            "━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📚 *Title:* {title}",
+            f"👤 *Author/Creator:* {author}",
+            f"🆔 *Ledger ID:* `{kid}`",
+            "",
+            "📝 *Executive Synthesis:*",
+            clean_summary,
+            "",
+            "⚖️ *Epistemic Classification (Quarantined 0.0):*",
+            f"• Facts (Causal): *{facts}*",
+            f"• Hypotheses: *{hypo}*",
+            f"• Proposed Rules: *{rules}*",
+            f"• Contradictions: *{contra}*",
+        ]
+
+        chap_breakdown = result.get("chapter_breakdown", [])
+        if chap_breakdown:
+            lines.append("")
+            lines.append("📑 *Sections / Chapters:*")
+            for ch in chap_breakdown[:4]:
+                lines.append(f"• {ch}")
+
+        cands = result.get("strategy_candidates", [])
+        if cands:
+            lines.append("")
+            lines.append("⚡ *Candidate Queued (UNTESTED):*")
+            lines.append(f"• `{cands[0].get('strategy_name', 'Candidate')}`")
+
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("🌐 _View full graph & backtest at http://localhost:5173_")
+        return "\n".join(lines)
+
+    async def handle_telegram_research_ingest(
+        self,
+        chat_id: int | str,
+        text: str = "",
+        caption: str = "",
+        photo: list[dict[str, Any]] | None = None,
+        document: dict[str, Any] | None = None,
+        from_user: str = "Telegram User",
+    ) -> dict[str, Any]:
+        """
+        Two-Way Reverse Flow: Ingests links, images, or documents dropped in Telegram
+        directly into the SKY / CBT Research Lab Provenance Ledger & Graph.
+        """
+        from core.universal_ingestor import universal_ingestor
+        from core.pdf_extractor import pdf_book_extractor
+
+        # 1. Handle Photo / Chart Image Ingestion
+        if photo:
+            await self.send_message("📸 *Image received!* Running SKY Multimodal Vision OCR & Market Structure extraction...", chat_id=chat_id)
+            file_id = photo[-1].get("file_id")
+            if not file_id:
+                await self.send_message("⚠️ Could not resolve image file ID.", chat_id=chat_id)
+                return {"status": "FAILED", "reason": "No file_id"}
+
+            img_bytes = await self.download_telegram_file(file_id)
+            if not img_bytes:
+                await self.send_message("⚠️ Failed downloading image from Telegram servers.", chat_id=chat_id)
+                return {"status": "FAILED", "reason": "Download error"}
+
+            prompt = (
+                "You are an institutional quantitative market structure researcher. "
+                "Analyze and transcribe this financial chart / trading document. "
+                "Extract all price levels, indicators, SMC market structures, Fair Value Gaps, "
+                "Order Blocks, and quantitative trading directives verbatim."
+            )
+            ocr_text, provider = pdf_book_extractor.extract_page_with_vision(
+                image_bytes=img_bytes,
+                mime_type="image/jpeg",
+                custom_prompt=prompt,
+            )
+            if not ocr_text:
+                ocr_text = caption or f"Quantitative chart/image uploaded via Telegram by {from_user}."
+
+            res = await universal_ingestor.ingest(
+                content=ocr_text,
+                mode="RESEARCH",
+                title=f"Telegram Vision Ingest ({caption[:30] if caption else 'Chart/Document'})",
+                author_creator=from_user,
+                source_uri="Telegram Photo Ingestion",
+            )
+            reply = self._format_research_summary_telegram(res, title_override=caption)
+            await self.send_message(reply, chat_id=chat_id)
+            return {"status": "RESEARCH_INGESTED", "type": "PHOTO", "knowledge_id": res.get("knowledge_id")}
+
+        # 2. Handle Document / PDF Ingestion
+        if document:
+            doc_name = document.get("file_name", "document.pdf")
+            await self.send_message(f"📄 *Document received (`{doc_name}`)*! Ingesting into Research Lab...", chat_id=chat_id)
+            file_id = document.get("file_id")
+            if not file_id:
+                return {"status": "FAILED", "reason": "No file_id"}
+
+            doc_bytes = await self.download_telegram_file(file_id)
+            if not doc_bytes:
+                await self.send_message("⚠️ Failed downloading document from Telegram.", chat_id=chat_id)
+                return {"status": "FAILED", "reason": "Download error"}
+
+            uploads_dir = Path(os.getenv("DATA_DIR", "data")) / "uploads"
+            uploads_dir.mkdir(parents=True, exist_ok=True)
+            save_path = uploads_dir / f"tg_{int(time.time())}_{doc_name}"
+            with open(save_path, "wb") as f:
+                f.write(doc_bytes)
+
+            text_content, metadata = universal_ingestor.extract_text_from_file(save_path)
+            res = await universal_ingestor.ingest(
+                content=text_content,
+                mode="RESEARCH",
+                file_name=doc_name,
+                source_uri=str(save_path),
+                author_creator=from_user,
+                title=metadata.get("book_title") or doc_name,
+                pdf_payload=metadata.get("pdf_research_payload"),
+            )
+            reply = self._format_research_summary_telegram(res)
+            await self.send_message(reply, chat_id=chat_id)
+            return {"status": "RESEARCH_INGESTED", "type": "DOCUMENT", "knowledge_id": res.get("knowledge_id")}
+
+        # 3. Handle Link / URL / /research Command Ingestion
+        url_match = re.search(r"https?://\S+", text or caption)
+        if url_match or text.lower().startswith("/research") or text.lower().startswith("/ingest"):
+            raw_url = url_match.group(0).rstrip(".,)>]") if url_match else text.split(maxsplit=1)[-1]
+            await self.send_message(f"🔬 *Research Ingestion Triggered!*\n`{raw_url[:60]}...`\nDeconstructing market structure & extracting rules...", chat_id=chat_id)
+            res = await universal_ingestor.ingest(
+                content=raw_url,
+                mode="RESEARCH",
+                author_creator=from_user,
+                source_uri=raw_url,
+            )
+            reply = self._format_research_summary_telegram(res)
+            await self.send_message(reply, chat_id=chat_id)
+            return {"status": "RESEARCH_INGESTED", "type": "LINK", "knowledge_id": res.get("knowledge_id")}
+
+        return {"status": "SKIPPED"}
+
     async def handle_webhook_update(self, update: dict[str, Any]) -> dict[str, Any]:
         """
         Parses an incoming Telegram update object. Routes commands to registered handlers,
-        and routes natural language conversational queries to QuantMentor AI.
+        reverse-flow links/images to Research Lab, and natural language conversational queries to QuantMentor AI.
         """
         message = update.get("message", {})
         text = message.get("text", "").strip()
+        caption = message.get("caption", "").strip()
+        photo = message.get("photo")
+        document = message.get("document")
         chat_id = message.get("chat", {}).get("id")
+        from_user = message.get("from", {}).get("first_name") or message.get("from", {}).get("username") or "Telegram User"
+
+        # 1. Reverse Flow: Detect Photo / Document / Links / /research command
+        has_url = bool(re.search(r"https?://\S+", text or caption))
+        is_research_cmd = text.lower().startswith("/research") or text.lower().startswith("/ingest")
+        if photo or document or has_url or is_research_cmd:
+            research_res = await self.handle_telegram_research_ingest(
+                chat_id=chat_id,
+                text=text,
+                caption=caption,
+                photo=photo,
+                document=document,
+                from_user=from_user,
+            )
+            if research_res.get("status") == "RESEARCH_INGESTED":
+                return research_res
 
         if not text:
             return {"status": "IGNORED", "reason": "No text content"}
