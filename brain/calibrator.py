@@ -28,15 +28,20 @@ dial*: `mult = clamp(1 + E_gross × gain × trust, min, max)` with
 `trust = clamp(score/50, 0.6, 1.5)` — a robust edge is trusted up to 1.5×,
 a fragile one is shrunk to the 0.6 floor.
 """
+
 from __future__ import annotations
 
 import time
-from typing import Optional
 
-from config import (CALIBRATE_MIN_N, CALIBRATE_MIN_PAPER_N, CALIBRATE_GAIN,
-                    CALIBRATE_MAX_MULT, CALIBRATE_MIN_MULT, CALIBRATE_FILTER,
-                    CALIBRATE_FILTER_THRESHOLD, TP_RR_MIN, TP_RR_MAX,
-                    BACKTEST_STEP)
+from config import (
+    BACKTEST_STEP,
+    CALIBRATE_FILTER,
+    CALIBRATE_FILTER_THRESHOLD,
+    CALIBRATE_MIN_N,
+    CALIBRATE_MIN_PAPER_N,
+    TP_RR_MAX,
+    TP_RR_MIN,
+)
 from data.database import SignalDB
 from data.provenance import KEY_SEP, describe_source, is_one_sided
 from data.provenance import parse_source_key as _parse_source_key
@@ -66,7 +71,7 @@ def profile_key(plan_type: str, regime: str = "", source_key: str = "") -> str:
     return f"{base}{KEY_SEP}{src}" if src else base
 
 
-def _key_source(key: str, entry: Optional[dict] = None) -> str:
+def _key_source(key: str, entry: dict | None = None) -> str:
     """The source key a profile entry belongs to (P12.11).
 
     Prefers the stored ``source_key`` field and falls back to parsing the
@@ -78,7 +83,9 @@ def _key_source(key: str, entry: Optional[dict] = None) -> str:
     return _source_key(*_parse_source_key(key.partition(KEY_SEP)[2]))
 
 
-def compute_expectancy_by_type(db: SignalDB, horizons: Optional[list[float]] = None) -> dict:
+def compute_expectancy_by_type(
+    db: SignalDB, horizons: list[float] | None = None
+) -> dict:
     """Expectancy (average R) per plan type from backtests + paper outcomes."""
     # Historical walk-forward grades and live-market paper outcomes are both
     # useful evidence, but remain separate tables so the dashboard can show
@@ -177,7 +184,9 @@ def _decided_by_key(db: SignalDB) -> dict:
             "paper_samples": r["paper_samples"] or 0,
             "win_rate": round(wins / decided, 3) if decided else None,
             "expectancy": round(r["avg_rr"] or 0.0, 3),
-            "avg_win_rr": round(r["avg_win_rr"], 3) if r["avg_win_rr"] is not None else None,
+            "avg_win_rr": round(r["avg_win_rr"], 3)
+            if r["avg_win_rr"] is not None
+            else None,
         }
     return out
 
@@ -213,12 +222,15 @@ def _decided_rows_by_key(db: SignalDB) -> tuple[dict, dict]:
     return rows_by_key, setup_rows_by_type
 
 
-def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
-                  min_n: int = CALIBRATE_MIN_N,
-                  min_paper_n: int = CALIBRATE_MIN_PAPER_N,
-                  min_decided: int = DEFAULT_MIN_DECIDED,
-                  criteria: Optional[dict] = None,
-                  step: int = BACKTEST_STEP) -> dict:
+def build_profile(
+    db: SignalDB,
+    filter_neg: bool = CALIBRATE_FILTER,
+    min_n: int = CALIBRATE_MIN_N,
+    min_paper_n: int = CALIBRATE_MIN_PAPER_N,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    criteria: dict | None = None,
+    step: int = BACKTEST_STEP,
+) -> dict:
     """Turn decided backtest/paper stats into a calibration profile.
 
     Trust thresholds follow the roadmap (decisions A6/B10): a setup is only
@@ -253,12 +265,18 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
         score_block = None
         if rows:
             score_block = strategy_score(
-                rows, plan_type=plan_type, regime=(regime or None),
+                rows,
+                plan_type=plan_type,
+                regime=(regime or None),
                 setup_rows=setup_rows_by_type.get(
-                    profile_key(plan_type, "", src), rows),
-                min_decided=min_decided, criteria=criteria, step=step)
+                    profile_key(plan_type, "", src), rows
+                ),
+                min_decided=min_decided,
+                criteria=criteria,
+                step=step,
+            )
         score_val = score_block.get("score") if score_block else None
-        exp_net = (score_block.get("expectancy_net") if score_block else None)
+        exp_net = score_block.get("expectancy_net") if score_block else None
 
         # P12.8 — the multiplier and the negative filter both judge the NET
         # number (what the money actually does), falling back to gross only
@@ -269,8 +287,11 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
         # P12.8 — "proven" judges the net number too, matching
         # `brain.risk_gate.setup_proven()`; gross is the fallback only when
         # costs could not be computed for this key.
-        proven = bool(st["backtest_samples"] >= min_n and
-                      st["paper_samples"] >= min_paper_n and exp_for_filter > 0)
+        proven = bool(
+            st["backtest_samples"] >= min_n
+            and st["paper_samples"] >= min_paper_n
+            and exp_for_filter > 0
+        )
         # Data-driven TP target (decision A2): measured average winner, clamped
         # to a sane range; None keeps the engine default until there is evidence.
         tp_rr = None
@@ -289,8 +310,9 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
             "source_key": src,
             "research_only": research_only,
             "expectancy": exp,
-            "expectancy_net": (score_block.get("expectancy_net")
-                               if score_block else None),
+            "expectancy_net": (
+                score_block.get("expectancy_net") if score_block else None
+            ),
             "samples": n,
             "backtest_samples": st["backtest_samples"],
             "paper_samples": st["paper_samples"],
@@ -302,14 +324,16 @@ def build_profile(db: SignalDB, filter_neg: bool = CALIBRATE_FILTER,
             # regime-fit × execution) + its band and per-component block.
             "strategy_score": score_val,
             "strategy_band": (score_block.get("band") if score_block else None),
-            "strategy_components": (score_block.get("components")
-                                    if score_block else None),
+            "strategy_components": (
+                score_block.get("components") if score_block else None
+            ),
         }
     return profile
 
 
-def suggest_tp_rr_by_type(profile: dict, regime: str = "",
-                          source_key: str = "") -> dict:
+def suggest_tp_rr_by_type(
+    profile: dict, regime: str = "", source_key: str = ""
+) -> dict:
     """Map plan_type -> suggested TP distance in R from the profile (A2).
 
     When a regime is given, regime-specific entries win; otherwise the best-
@@ -320,8 +344,7 @@ def suggest_tp_rr_by_type(profile: dict, regime: str = "",
     live take-profits.
     """
     want_src = _source_key(*_parse_source_key(source_key))
-    profile = {k: e for k, e in profile.items()
-               if _key_source(k, e) == want_src}
+    profile = {k: e for k, e in profile.items() if _key_source(k, e) == want_src}
     out: dict[str, dict] = {}
     for key, e in profile.items():
         if not e.get("tp_rr"):
@@ -349,16 +372,20 @@ def suggest_tp_rr_by_type(profile: dict, regime: str = "",
     return {pt: e["tp_rr"] for pt, e in out.items()}
 
 
-def learn(profile_path: Optional[str] = None) -> dict:
+def learn(profile_path: str | None = None) -> dict:
     """Run the calibration pass over the current database."""
     with SignalDB() as db:
         profile = build_profile(db)
         db.save_calibration(profile)
-    return {"profile": profile, "note": "saved to DB — engine will use it on the next scan"}
+    return {
+        "profile": profile,
+        "note": "saved to DB — engine will use it on the next scan",
+    }
 
 
-def apply_calibration(conf: int, plan_type: str, calibration: dict,
-                      regime: str = "", source_key: str = "") -> tuple[int, bool]:
+def apply_calibration(
+    conf: int, plan_type: str, calibration: dict, regime: str = "", source_key: str = ""
+) -> tuple[int, bool]:
     """Apply the calibration profile to one plan's confidence.
 
     Returns ``(adjusted_confidence, filtered_out)``.
@@ -399,21 +426,30 @@ def describe(profile: dict) -> str:
             tag = ""
         score = e.get("strategy_score")
         band = e.get("strategy_band")
-        score_bits = (f"score {score:.0f}/100 {band}" if score is not None
-                      else "score n/a")
+        score_bits = (
+            f"score {score:.0f}/100 {band}" if score is not None else "score n/a"
+        )
         if e["filtered"]:
-            lines.append(f"  {proven} {pt:<24} FILTERED (E {e['expectancy']:+.2f}R, "
-                         f"{score_bits}, n={e['samples']}){tag}")
+            lines.append(
+                f"  {proven} {pt:<24} FILTERED (E {e['expectancy']:+.2f}R, "
+                f"{score_bits}, n={e['samples']}){tag}"
+            )
         else:
-            lines.append(f"  {proven} {pt:<24} x{e['multiplier']:.2f}  "
-                         f"({score_bits}, E {e['expectancy']:+.2f}R "
-                         f"→ net {e['expectancy_net'] if e.get('expectancy_net') is not None else e['expectancy']:+.2f}R, "
-                         f"win {e['win_rate']*100:.0f}%, bt={e['backtest_samples']} pp={e['paper_samples']}, "
-                         f"tp_rr={e['tp_rr']}){tag}")
-    lines.append("  strategy score = E_R × sample-quality × regime-fit × "
-                 "execution (P12.5, evaluated NET of costs)")
-    lines.append("  multiplier anchors on NET expectancy (P12.8) — a setup that "
-                 "only profits before costs is dampened, never boosted")
+            lines.append(
+                f"  {proven} {pt:<24} x{e['multiplier']:.2f}  "
+                f"({score_bits}, E {e['expectancy']:+.2f}R "
+                f"→ net {e['expectancy_net'] if e.get('expectancy_net') is not None else e['expectancy']:+.2f}R, "
+                f"win {e['win_rate'] * 100:.0f}%, bt={e['backtest_samples']} pp={e['paper_samples']}, "
+                f"tp_rr={e['tp_rr']}){tag}"
+            )
+    lines.append(
+        "  strategy score = E_R × sample-quality × regime-fit × "
+        "execution (P12.5, evaluated NET of costs)"
+    )
+    lines.append(
+        "  multiplier anchors on NET expectancy (P12.8) — a setup that "
+        "only profits before costs is dampened, never boosted"
+    )
     return "\n".join(lines)
 
 

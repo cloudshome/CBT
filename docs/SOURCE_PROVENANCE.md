@@ -51,10 +51,10 @@ price_type  (blank) | bid | ask                which side of the spread
 They compose into a **source key**:
 
 ```python
-source_key()                                 # ''                    canonical live series
-source_key("binance", "spot")                # ''                    canonical live series
-source_key("binance", "perp")                # 'binance:perp'
-source_key("dukascopy", "spot", "bid")       # 'dukascopy:spot:bid'
+source_key()  # ''                    canonical live series
+source_key("binance", "spot")  # ''                    canonical live series
+source_key("binance", "perp")  # 'binance:perp'
+source_key("dukascopy", "spot", "bid")  # 'dukascopy:spot:bid'
 ```
 
 **The canonical live series is the empty string.** This is the load-bearing

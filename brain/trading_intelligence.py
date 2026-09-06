@@ -8,26 +8,35 @@ valid plan exists after professional filters, the report returns ``NO TRADE``.
 The shape mirrors the user's master prompt while keeping additional structured
 sections for dashboard/agent consumers.
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 
-from config import (ACCOUNT_BALANCE, RISK_PCT, MAX_DAILY_LOSS_PCT,
-                    MAX_WEEKLY_LOSS_PCT, INTELLIGENCE_MIN_CONFIDENCE,
-                    INTELLIGENCE_MIN_RR)
+from brain.institutional_score import (
+    compute_entry_zone,
+    compute_hold_time_and_expiry,
+    compute_ips_score,
+    compute_kelly_criterion,
+    compute_smart_tp_ladder,
+)
+from config import (
+    ACCOUNT_BALANCE,
+    INTELLIGENCE_MIN_CONFIDENCE,
+    INTELLIGENCE_MIN_RR,
+    MAX_DAILY_LOSS_PCT,
+    MAX_WEEKLY_LOSS_PCT,
+    RISK_PCT,
+)
 from data.symbols import resolve_symbol
 from engine.regime import classify_market_regime
-from brain.institutional_score import (compute_ips_score, compute_smart_tp_ladder,
-                                       compute_entry_zone, compute_hold_time_and_expiry,
-                                       compute_kelly_criterion)
-
 
 HIGH_IMPACT_MINUTES_WINDOW = 30
 
 
-def _round(x: Any, nd: int = 2) -> Optional[float]:
+def _round(x: Any, nd: int = 2) -> float | None:
     try:
         if x is None:
             return None
@@ -41,9 +50,17 @@ def _round(x: Any, nd: int = 2) -> Optional[float]:
 
 def _fmt_tf(tf: str) -> str:
     # Master prompt style: 15M, 4H, Daily/Weekly/Monthly where appropriate.
-    mapping = {"1m": "1M", "5m": "5M", "15m": "15M", "30m": "30M",
-               "1h": "1H", "4h": "4H", "1d": "Daily", "1w": "Weekly",
-               "1M": "Monthly"}
+    mapping = {
+        "1m": "1M",
+        "5m": "5M",
+        "15m": "15M",
+        "30m": "30M",
+        "1h": "1H",
+        "4h": "4H",
+        "1d": "Daily",
+        "1w": "Weekly",
+        "1M": "Monthly",
+    }
     return mapping.get(tf, tf.upper())
 
 
@@ -110,7 +127,9 @@ def _fvg_label(features: dict, action: str) -> str:
         return "Bullish Present"
     if action == "SELL" and features.get("fvg_bear_count"):
         return "Bearish Present"
-    total = (features.get("fvg_bull_count") or 0) + (features.get("fvg_bear_count") or 0)
+    total = (features.get("fvg_bull_count") or 0) + (
+        features.get("fvg_bear_count") or 0
+    )
     return "Present" if total else "None"
 
 
@@ -128,14 +147,24 @@ def _trend_analysis(mtf: dict, features: dict) -> dict:
     views = mtf.get("views") or {}
     primary = _title_trend(mtf.get("htf_bias"))
     one_h = views.get("1h", {})
-    secondary = _title_trend("bullish" if one_h.get("trend") == "bull" else
-                             "bearish" if one_h.get("trend") == "bear" else "neutral")
+    secondary = _title_trend(
+        "bullish"
+        if one_h.get("trend") == "bull"
+        else "bearish"
+        if one_h.get("trend") == "bear"
+        else "neutral"
+    )
     current = _title_trend(features.get("trend"))
     align = mtf.get("alignment") or {}
     score = align.get("score", 0) or 0
     adx = features.get("adx") or 0
-    reversal_probability = "High" if abs(score) < 15 and features.get("event_kind") in ("choch_up", "choch_down") else \
-                           "Medium" if abs(score) < 30 else "Low"
+    reversal_probability = (
+        "High"
+        if abs(score) < 15 and features.get("event_kind") in ("choch_up", "choch_down")
+        else "Medium"
+        if abs(score) < 30
+        else "Low"
+    )
     weakness = []
     if abs(score) < 30:
         weakness.append("multi-timeframe alignment not strong")
@@ -147,7 +176,11 @@ def _trend_analysis(mtf: dict, features: dict) -> dict:
         "primary_trend": primary,
         "secondary_trend": secondary,
         "current_trend": current,
-        "trend_strength": "Strong" if abs(score) >= 50 or adx >= 25 else "Moderate" if abs(score) >= 25 else "Weak",
+        "trend_strength": "Strong"
+        if abs(score) >= 50 or adx >= 25
+        else "Moderate"
+        if abs(score) >= 25
+        else "Weak",
         "trend_weakness": weakness,
         "trend_reversal_probability": reversal_probability,
         "alignment_score": score,
@@ -185,9 +218,15 @@ def _smc(features: dict, action: str) -> dict:
         "mitigation_block": "Not confirmed",
         "premium_zone": features.get("premium_discount") == "premium",
         "discount_zone": features.get("premium_discount") == "discount",
-        "imbalance": "Present" if ((features.get("fvg_bull_count") or 0) +
-                                    (features.get("fvg_bear_count") or 0)) else "None",
-        "institutional_footprint": "Possible" if features.get("volume_spike") or features.get("sweep") else "Not confirmed",
+        "imbalance": "Present"
+        if (
+            (features.get("fvg_bull_count") or 0)
+            + (features.get("fvg_bear_count") or 0)
+        )
+        else "None",
+        "institutional_footprint": "Possible"
+        if features.get("volume_spike") or features.get("sweep")
+        else "Not confirmed",
     }
 
 
@@ -199,11 +238,15 @@ def _supply_demand(features: dict) -> dict:
         "major_demand": demand,
         "fresh_zones": [x for x in (demand, supply) if x is not None],
         "tested_zones": [],
-        "reaction_strength": "Strong" if features.get("volume_spike") else "Moderate" if features.get("volume_above_avg") else "Weak/Unknown",
+        "reaction_strength": "Strong"
+        if features.get("volume_spike")
+        else "Moderate"
+        if features.get("volume_above_avg")
+        else "Weak/Unknown",
     }
 
 
-def rank_key_levels(features: dict, plan: Optional[dict] = None) -> list[dict]:
+def rank_key_levels(features: dict, plan: dict | None = None) -> list[dict]:
     """Rank the levels the desk can see into A/B/C importance tiers.
 
     P13: the ChatGPT desk-review asked for ranked levels instead of "hundreds
@@ -230,19 +273,25 @@ def rank_key_levels(features: dict, plan: Optional[dict] = None) -> list[dict]:
             level = float(level)
         except (TypeError, ValueError):
             return
-        tiers[tier].append({
-            "name": name,
-            "level": _round(level),
-            "note": note,
-            "distance_pct": round(abs(level - price) / price * 100.0, 3),
-        })
+        tiers[tier].append(
+            {
+                "name": name,
+                "level": _round(level),
+                "note": note,
+                "distance_pct": round(abs(level - price) / price * 100.0, 3),
+            }
+        )
 
     # A — liquidity & major structure
     sweep = features.get("sweep") or {}
     _side = str(sweep.get("side") or "").lower()
     _side_txt = _side if _side.endswith("side") else f"{_side}-side"
-    add("A", "Sweep level", sweep.get("level"),
-        f"{_side_txt} liquidity sweep" if _side_txt else "liquidity sweep")
+    add(
+        "A",
+        "Sweep level",
+        sweep.get("level"),
+        f"{_side_txt} liquidity sweep" if _side_txt else "liquidity sweep",
+    )
     for lvl in (features.get("liquidity_above") or [])[:3]:
         add("A", "Liquidity pool (above)", lvl, "buy-side liquidity")
     for lvl in (features.get("liquidity_below") or [])[:3]:
@@ -275,7 +324,7 @@ def rank_key_levels(features: dict, plan: Optional[dict] = None) -> list[dict]:
     return [dict(d, tier=tier) for tier in ("A", "B", "C") for d in tiers[tier]]
 
 
-def _price_action(df: Optional[pd.DataFrame]) -> dict:
+def _price_action(df: pd.DataFrame | None) -> dict:
     if df is None or len(df) < 2:
         return {"pattern": "Unknown", "confirmation": False}
     last = df.iloc[-1]
@@ -309,7 +358,11 @@ def _indicators(features: dict) -> dict:
         "EMA 20/50/200": features.get("trend"),
         "VWAP": "Above" if features.get("above_vwap") else "Below",
         "RSI": features.get("rsi"),
-        "MACD": "Bullish" if (features.get("macd_hist") or 0) > 0 else "Bearish" if (features.get("macd_hist") or 0) < 0 else "Flat",
+        "MACD": "Bullish"
+        if (features.get("macd_hist") or 0) > 0
+        else "Bearish"
+        if (features.get("macd_hist") or 0) < 0
+        else "Flat",
         "ADX": features.get("adx"),
         "ATR_pct": features.get("atr_pct"),
         "Bollinger": "Compression" if features.get("bb_compress") else "Normal",
@@ -334,7 +387,9 @@ def _fundamentals(ctx: dict) -> dict:
         "vix": changes.get("vix") or "Not connected",
         "gold_etf_flow": "Not connected",
         "central_bank_buying": "Not connected",
-        "geopolitical_risk": "Elevated" if (ctx.get("geopolitics") or {}).get("elevated") else "Normal",
+        "geopolitical_risk": "Elevated"
+        if (ctx.get("geopolitics") or {}).get("elevated")
+        else "Normal",
         "inflation_recession": "Monitor CPI/PPI/GDP events",
     }
 
@@ -344,7 +399,9 @@ def _sentiment(ctx: dict) -> dict:
     social = ctx.get("social") or {}
     news = ctx.get("news") or {}
     return {
-        "fear_greed": f"{fng.get('value')} ({fng.get('label')})" if fng.get("available") else "Unavailable",
+        "fear_greed": f"{fng.get('value')} ({fng.get('label')})"
+        if fng.get("available")
+        else "Unavailable",
         "retail_positioning": "Not connected",
         "institutional_positioning": "Not connected",
         "cot_report": "Not connected",
@@ -352,21 +409,25 @@ def _sentiment(ctx: dict) -> dict:
     }
 
 
-def _pick_plan(plans: list[dict], action: str | None = None) -> Optional[dict]:
+def _pick_plan(plans: list[dict], action: str | None = None) -> dict | None:
     candidates = [p for p in plans if p.get("entry") and p.get("stop_loss")]
     if action:
         candidates = [p for p in candidates if p.get("action") == action]
     if not candidates:
         return None
-    return sorted(candidates, key=lambda p: (p.get("confidence") or 0, p.get("risk_reward") or 0), reverse=True)[0]
+    return sorted(
+        candidates,
+        key=lambda p: (p.get("confidence") or 0, p.get("risk_reward") or 0),
+        reverse=True,
+    )[0]
 
 
-def _rr_string(plan: Optional[dict]) -> str:
+def _rr_string(plan: dict | None) -> str:
     rr = _round((plan or {}).get("risk_reward"), 2)
     return f"1:{rr}" if rr else "0"
 
 
-def _position_size(asset: str, entry: Optional[float], stop: Optional[float]) -> dict:
+def _position_size(asset: str, entry: float | None, stop: float | None) -> dict:
     if not ACCOUNT_BALANCE or not entry or not stop:
         return {
             "risk_percent": RISK_PCT,
@@ -378,8 +439,13 @@ def _position_size(asset: str, entry: Optional[float], stop: Optional[float]) ->
     spec = resolve_symbol(asset)
     stop_distance = abs(entry - stop)
     if stop_distance <= 0:
-        return {"risk_percent": RISK_PCT, "risk_amount": None, "units": None, "lots": None,
-                "note": "Invalid stop distance."}
+        return {
+            "risk_percent": RISK_PCT,
+            "risk_amount": None,
+            "units": None,
+            "lots": None,
+            "note": "Invalid stop distance.",
+        }
     risk_amount = ACCOUNT_BALANCE * (RISK_PCT / 100.0)
     units = risk_amount / stop_distance
     lots = units / spec.contract_size if spec.contract_size else None
@@ -395,26 +461,57 @@ def _position_size(asset: str, entry: Optional[float], stop: Optional[float]) ->
     }
 
 
-def _filters(plan: Optional[dict], action: str, confidence: int, features: dict, mtf: dict, ctx: dict) -> tuple[bool, list[str], dict]:
+def _filters(
+    plan: dict | None,
+    action: str,
+    confidence: int,
+    features: dict,
+    mtf: dict,
+    ctx: dict,
+) -> tuple[bool, list[str], dict]:
     rr = float((plan or {}).get("risk_reward") or 0)
     reasons: list[str] = []
     macro = ctx.get("macro") or {}
     checks = {
-        "rr_minimum": {"ok": rr >= INTELLIGENCE_MIN_RR, "value": rr, "required": INTELLIGENCE_MIN_RR},
-        "confidence_minimum": {"ok": confidence >= INTELLIGENCE_MIN_CONFIDENCE,
-                               "value": confidence, "required": INTELLIGENCE_MIN_CONFIDENCE},
-        "macro_calendar_available": {"ok": bool(macro.get("available")),
-                                     "value": "available" if macro.get("available") else "missing"},
-        "news_window_30m": {"ok": bool(macro.get("available")) and not macro.get("high_impact_imminent", False),
-                             "value": _news_label(ctx), "window_minutes": HIGH_IMPACT_MINUTES_WINDOW},
-        "volatility": {"ok": (features.get("atr_pct") or 0) <= 2.5,
-                       "value": features.get("atr_pct")},
-        "not_sideways": {"ok": not (features.get("trend") == "mixed" and
-                                     (mtf.get("alignment") or {}).get("label") in ("mixed", "counter_trend")),
-                         "value": features.get("trend")},
-        "no_htf_contradiction": {"ok": not ((action == "BUY" and mtf.get("htf_bias") == "bearish") or
-                                             (action == "SELL" and mtf.get("htf_bias") == "bullish")),
-                                 "value": mtf.get("htf_bias")},
+        "rr_minimum": {
+            "ok": rr >= INTELLIGENCE_MIN_RR,
+            "value": rr,
+            "required": INTELLIGENCE_MIN_RR,
+        },
+        "confidence_minimum": {
+            "ok": confidence >= INTELLIGENCE_MIN_CONFIDENCE,
+            "value": confidence,
+            "required": INTELLIGENCE_MIN_CONFIDENCE,
+        },
+        "macro_calendar_available": {
+            "ok": bool(macro.get("available")),
+            "value": "available" if macro.get("available") else "missing",
+        },
+        "news_window_30m": {
+            "ok": bool(macro.get("available"))
+            and not macro.get("high_impact_imminent", False),
+            "value": _news_label(ctx),
+            "window_minutes": HIGH_IMPACT_MINUTES_WINDOW,
+        },
+        "volatility": {
+            "ok": (features.get("atr_pct") or 0) <= 2.5,
+            "value": features.get("atr_pct"),
+        },
+        "not_sideways": {
+            "ok": not (
+                features.get("trend") == "mixed"
+                and (mtf.get("alignment") or {}).get("label")
+                in ("mixed", "counter_trend")
+            ),
+            "value": features.get("trend"),
+        },
+        "no_htf_contradiction": {
+            "ok": not (
+                (action == "BUY" and mtf.get("htf_bias") == "bearish")
+                or (action == "SELL" and mtf.get("htf_bias") == "bullish")
+            ),
+            "value": mtf.get("htf_bias"),
+        },
     }
     if not plan:
         checks["valid_plan"] = {"ok": False, "value": "no executable plan"}
@@ -426,7 +523,13 @@ def _filters(plan: Optional[dict], action: str, confidence: int, features: dict,
     return not reasons, reasons, checks
 
 
-def _reasons(plan: Optional[dict], features: dict, mtf: dict, ctx: dict, filter_reasons: list[str]) -> list[str]:
+def _reasons(
+    plan: dict | None,
+    features: dict,
+    mtf: dict,
+    ctx: dict,
+    filter_reasons: list[str],
+) -> list[str]:
     out: list[str] = []
     if plan:
         out.extend(str(r) for r in (plan.get("reasons") or [])[:5])
@@ -437,7 +540,13 @@ def _reasons(plan: Optional[dict], features: dict, mtf: dict, ctx: dict, filter_
     if features.get("rsi") is not None:
         out.append(f"RSI {features.get('rsi')}")
     if features.get("macd_hist") is not None:
-        out.append("MACD Bullish" if features.get("macd_hist") > 0 else "MACD Bearish" if features.get("macd_hist") < 0 else "MACD Flat")
+        out.append(
+            "MACD Bullish"
+            if features.get("macd_hist") > 0
+            else "MACD Bearish"
+            if features.get("macd_hist") < 0
+            else "MACD Flat"
+        )
     if features.get("volume_above_avg") or features.get("volume_spike"):
         out.append(_volume_label(features))
     if (ctx.get("geopolitics") or {}).get("elevated"):
@@ -454,7 +563,7 @@ def _reasons(plan: Optional[dict], features: dict, mtf: dict, ctx: dict, filter_
     return unique[:12] or ["Insufficient market data"]
 
 
-def _scenario(plan: Optional[dict], label: str, fallback: str) -> str:
+def _scenario(plan: dict | None, label: str, fallback: str) -> str:
     if not plan:
         return fallback
     cond = plan.get("condition") or fallback
@@ -462,8 +571,9 @@ def _scenario(plan: Optional[dict], label: str, fallback: str) -> str:
     return f"{label}: {cond}" + (f" Entry near {entry}." if entry else "")
 
 
-def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
-                       db=None) -> dict:
+def build_intelligence(
+    payload: dict, df: pd.DataFrame | None = None, db=None
+) -> dict:
     """Build the professional JSON report from a full analysis payload."""
     sig = payload.get("signal") or {}
     features = (payload.get("snapshot") or {}).get("features") or {}
@@ -475,18 +585,36 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
     initial_action = sig.get("action") if sig.get("action") in ("BUY", "SELL") else None
     plan = _pick_plan(plans, initial_action) or _pick_plan(plans)
     action = (plan or {}).get("action") or initial_action or "NO TRADE"
-    confidence = int((plan or {}).get("confidence") or
-                     max((payload.get("snapshot", {}).get("scores", {}).get("bull", {}) or {}).get("confidence_pct", 0),
-                         (payload.get("snapshot", {}).get("scores", {}).get("bear", {}) or {}).get("confidence_pct", 0)))
+    confidence = int(
+        (plan or {}).get("confidence")
+        or max(
+            (payload.get("snapshot", {}).get("scores", {}).get("bull", {}) or {}).get(
+                "confidence_pct", 0
+            ),
+            (payload.get("snapshot", {}).get("scores", {}).get("bear", {}) or {}).get(
+                "confidence_pct", 0
+            ),
+        )
+    )
 
-    passed, filter_reasons, checks = _filters(plan, action, confidence, features, mtf, ctx)
+    passed, filter_reasons, checks = _filters(
+        plan, action, confidence, features, mtf, ctx
+    )
     final_signal = action if passed and action in ("BUY", "SELL") else "NO TRADE"
-    entry = [_round((plan or {}).get("entry"))] if plan and final_signal != "NO TRADE" else []
+    entry = (
+        [_round((plan or {}).get("entry"))]
+        if plan and final_signal != "NO TRADE"
+        else []
+    )
     # Do not invent a second/third entry.  If the engine provided only one,
     # the report returns only one.
     entry = [x for x in entry if x is not None]
     stop = _round((plan or {}).get("stop_loss")) if final_signal != "NO TRADE" else None
-    tps = [x for x in [_round(tp) for tp in ((plan or {}).get("take_profits") or [])] if x is not None]
+    tps = [
+        x
+        for x in [_round(tp) for tp in ((plan or {}).get("take_profits") or [])]
+        if x is not None
+    ]
     if final_signal == "NO TRADE":
         tps = []
 
@@ -515,14 +643,24 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
     sl_pct = 0.0
     if stop and best_entry and best_entry > 0:
         sl_pct = round(abs(best_entry - stop) / best_entry * 100.0, 2)
-    sl_display = f"${stop:,.2f} ( -{sl_pct:.2f}% )" if stop and best_entry >= 10 else f"${stop} ( -{sl_pct:.2f}% )" if stop else "N/A"
+    sl_display = (
+        f"${stop:,.2f} ( -{sl_pct:.2f}% )"
+        if stop and best_entry >= 10
+        else f"${stop} ( -{sl_pct:.2f}% )"
+        if stop
+        else "N/A"
+    )
 
     tp_ladder = compute_smart_tp_ladder(final_signal, best_entry, stop or 0.0, tps, atr)
 
     # Invalidation conditions
     invalidation_conditions = []
     if stop:
-        invalidation_conditions.append(f"Candle close beyond stop loss level ${stop:,.2f}" if stop >= 10 else f"Candle close beyond stop loss level ${stop}")
+        invalidation_conditions.append(
+            f"Candle close beyond stop loss level ${stop:,.2f}"
+            if stop >= 10
+            else f"Candle close beyond stop loss level ${stop}"
+        )
     if final_signal == "BUY" and mtf.get("htf_bias") == "bearish":
         invalidation_conditions.append("HTF structure flips firmly bearish")
     elif final_signal == "SELL" and mtf.get("htf_bias") == "bullish":
@@ -537,18 +675,32 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
     if final_signal == "BUY" and sell_plan:
         alt_cond = sell_plan.get("condition") or "rejection at resistance"
         alt_entry = _round(sell_plan.get("entry"))
-        alt_scenario = f"If price rejects at resistance → watch for short setup: {alt_cond}" + (f" near ${alt_entry:,.2f}" if alt_entry else "")
+        alt_scenario = (
+            f"If price rejects at resistance → watch for short setup: {alt_cond}"
+            + (f" near ${alt_entry:,.2f}" if alt_entry else "")
+        )
     elif final_signal == "SELL" and buy_plan:
         alt_cond = buy_plan.get("condition") or "bounce at demand"
         alt_entry = _round(buy_plan.get("entry"))
-        alt_scenario = f"If price bounces at support → watch for long setup: {alt_cond}" + (f" near ${alt_entry:,.2f}" if alt_entry else "")
+        alt_scenario = (
+            f"If price bounces at support → watch for long setup: {alt_cond}"
+            + (f" near ${alt_entry:,.2f}" if alt_entry else "")
+        )
     elif final_signal == "NO TRADE":
         alt_scenario = "Stand aside until price sweeps key liquidity and prints clean CHOCH confirmation."
 
     # Kelly Criterion & Risk Calculation
-    est_win_rate = 68.0 if trade_quality_grade in ("A+", "A") else 58.0 if trade_quality_grade == "B" else 50.0
+    est_win_rate = (
+        68.0
+        if trade_quality_grade in ("A+", "A")
+        else 58.0
+        if trade_quality_grade == "B"
+        else 50.0
+    )
     rr_num = float((plan or {}).get("risk_reward") or 2.0)
-    kelly = compute_kelly_criterion(est_win_rate, rr_num, ACCOUNT_BALANCE or 10000.0, RISK_PCT)
+    kelly = compute_kelly_criterion(
+        est_win_rate, rr_num, ACCOUNT_BALANCE or 10000.0, RISK_PCT
+    )
 
     # Institutional Signal Card data container
     signal_card = {
@@ -557,7 +709,9 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
         "ai_confidence_index": f"{confidence:.1f}%",
         "confidence_delta": "+2.1%" if trade_quality_grade in ("A+", "A") else "+0.0%",
         "institutional_probability_score": ips_score,
-        "trade_quality_grade": trade_quality_grade if final_signal != "NO TRADE" else "F",
+        "trade_quality_grade": trade_quality_grade
+        if final_signal != "NO TRADE"
+        else "F",
         "entry_zone": ez_str if final_signal != "NO TRADE" else "N/A",
         "entry_low": ez_low if final_signal != "NO TRADE" else None,
         "entry_high": ez_high if final_signal != "NO TRADE" else None,
@@ -579,7 +733,9 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
         "signal": final_signal,
         "confidence": confidence,
         "institutional_probability_score": ips_score,
-        "trade_quality_grade": trade_quality_grade if final_signal != "NO TRADE" else "F",
+        "trade_quality_grade": trade_quality_grade
+        if final_signal != "NO TRADE"
+        else "F",
         "trend": trend["current_trend"],
         "market_structure": structure["structure"],
         "regime": regime,
@@ -603,8 +759,16 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
         "reason": reasons,
         "invalidation_conditions": invalidation_conditions,
         "alternative_scenario": alt_scenario,
-        "scenario_A": _scenario(buy_plan, "Bullish", "Bullish: wait for BOS above resistance with volume confirmation."),
-        "scenario_B": _scenario(sell_plan, "Bearish", "Bearish: sell only below support after rejection/CHOCH confirmation."),
+        "scenario_A": _scenario(
+            buy_plan,
+            "Bullish",
+            "Bullish: wait for BOS above resistance with volume confirmation.",
+        ),
+        "scenario_B": _scenario(
+            sell_plan,
+            "Bearish",
+            "Bearish: sell only below support after rejection/CHOCH confirmation.",
+        ),
         "scenario_C": "No Trade: stand aside if price ranges, confidence stays below threshold, RR is below 1:2, or high-impact news is near.",
         "risk": f"{RISK_PCT:g}%",
         "position_size": _position_size(asset, entry[0] if entry else None, stop),
@@ -628,7 +792,9 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
             "best_entry": entry[0] if entry else None,
             "entry_zone": ez_str if final_signal != "NO TRADE" else "N/A",
             "safe_entry": _round((plan or {}).get("trigger_level")) if plan else None,
-            "aggressive_entry": _round(features.get("price")) if plan and final_signal != "NO TRADE" else None,
+            "aggressive_entry": _round(features.get("price"))
+            if plan and final_signal != "NO TRADE"
+            else None,
             "conservative_entry": _round((plan or {}).get("entry")) if plan else None,
         },
         "risk_management": {
@@ -655,14 +821,20 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
             "is_liquidity_identified": smc["liquidity"] != "No clear sweep",
             "is_rr_acceptable": checks.get("rr_minimum", {}).get("ok", False),
             "any_news_risk": not checks.get("news_window_30m", {}).get("ok", True),
-            "any_conflicting_indicators": not checks.get("no_htf_contradiction", {}).get("ok", True),
+            "any_conflicting_indicators": not checks.get(
+                "no_htf_contradiction", {}
+            ).get("ok", True),
             "would_professional_take_trade": passed,
-            "capital_preservation_decision": "Trade allowed" if passed else "NO TRADE — capital protected",
+            "capital_preservation_decision": "Trade allowed"
+            if passed
+            else "NO TRADE — capital protected",
         },
         "data_quality": {
             "has_market_data": bool(features.get("price")),
             "has_macro_calendar": bool((ctx.get("macro") or {}).get("available")),
-            "has_futures_context": bool((payload.get("market_context") or {}).get("futures")),
+            "has_futures_context": bool(
+                (payload.get("market_context") or {}).get("futures")
+            ),
             "provider_symbol": (payload.get("market_context") or {}).get("data_symbol"),
         },
     }
@@ -679,8 +851,17 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
             reg = hreport.get("regime") or {}
             chart_read["regime"] = {
                 "label": reg.get("label", regime.get("label", "unknown")),
-                "probabilities": {k: v for k, v in reg.items()
-                                  if k in ("bull_trend", "bear_trend", "mean_reverting", "volatile_expansion")},
+                "probabilities": {
+                    k: v
+                    for k, v in reg.items()
+                    if k
+                    in (
+                        "bull_trend",
+                        "bear_trend",
+                        "mean_reverting",
+                        "volatile_expansion",
+                    )
+                },
                 "dominant": reg.get("dominant"),
                 "trap_detected": bool(reg.get("trap_detected", False)),
                 "cvd": hreport.get("cvd") or {},
@@ -690,9 +871,9 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
 
         if db is not None:
             try:
+                from brain import analytics as analytics_mod
                 from config import KELLY_MAX_RISK_PCT
                 from engine.hidden_alpha import kelly_from_rows
-                from brain import analytics as analytics_mod
 
                 # P12.15: the live book only (canonical-live, non-simulator);
                 # kelly_from_rows accepts trade rows — the old
@@ -700,7 +881,9 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
                 # failed into "unavailable" on a populated book.
                 kelly = kelly_from_rows(db.live_book_rows())
                 ks = kelly.get("kelly_size")
-                clamped = round(min(ks, KELLY_MAX_RISK_PCT), 4) if ks is not None else None
+                clamped = (
+                    round(min(ks, KELLY_MAX_RISK_PCT), 4) if ks is not None else None
+                )
                 chart_read["kelly"] = {
                     "kelly_size": ks,
                     "clamped_size": clamped,
@@ -723,13 +906,15 @@ def build_intelligence(payload: dict, df: Optional[pd.DataFrame] = None,
             report["chart_read"] = chart_read
 
     if not features.get("price"):
-        report.update({
-            "signal": "NO TRADE",
-            "confidence": 0,
-            "reason": ["Insufficient market data."],
-            "entry": [],
-            "stop_loss": None,
-            "take_profit": [],
-            "risk_reward": "0",
-        })
+        report.update(
+            {
+                "signal": "NO TRADE",
+                "confidence": 0,
+                "reason": ["Insufficient market data."],
+                "entry": [],
+                "stop_loss": None,
+                "take_profit": [],
+                "risk_reward": "0",
+            }
+        )
     return report

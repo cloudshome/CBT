@@ -17,25 +17,24 @@ Output aggregates win-rate, average R:R and expectancy by plan type, by
 confidence bucket and by action, per horizon. Results can be saved into the
 signal database (`--save`) so the engine learns which setups actually work.
 """
+
 from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 
-from config import (BACKTEST_HORIZONS, BACKTEST_MIN_BARS, BACKTEST_STEP,
-                    EXECUTION_MODEL)
-from data.symbols import normalize_symbol
+from config import BACKTEST_HORIZONS, BACKTEST_MIN_BARS, BACKTEST_STEP, EXECUTION_MODEL
 from data.binance_client import TIMEFRAME_TO_MS
-from data.costs import calculate_trade_cost, CostModel
-from engine.signal_engine import analyze_frame_at
-from engine.indicators import add_all_indicators
+from data.costs import calculate_trade_cost
+from data.symbols import normalize_symbol
 from engine.execution import adjust_for_slip
+from engine.indicators import add_all_indicators
+from engine.signal_engine import analyze_frame_at
 
 OUTCOMES = ("FULL_WIN", "PARTIAL_WIN", "LOSS", "OPEN", "NOT_TRIGGERED")
 WIN_SET = {"FULL_WIN", "PARTIAL_WIN"}
@@ -47,25 +46,25 @@ class GradedPlan:
     plan_type: str
     action: str
     confidence_pct: int
-    entry: Optional[float]
-    trigger_level: Optional[float]
+    entry: float | None
+    trigger_level: float | None
     horizon_hours: float
     outcome: str = "OPEN"
     rr_achieved: float = 0.0
     # Net R and cost breakdown (P12.6): E_net = E_gross − fees − slip − funding
-    rr_net: Optional[float] = None
+    rr_net: float | None = None
     fee_r: float = 0.0
     slip_r: float = 0.0
     funding_r: float = 0.0
     cost_r: float = 0.0
     max_favorable: float = 0.0
     max_adverse: float = 0.0
-    regime: str = ""   # market regime at signal time (decision B3)
+    regime: str = ""  # market regime at signal time (decision B3)
     # Bars from entry to the deciding touch (SL or TP), and the same span in
     # hours. Recorded, not decided: P12.3's scorecard needs to know how long
     # the money was exposed. None while the trade never reached a decision.
-    holding_bars: Optional[int] = None
-    holding_hours: Optional[float] = None
+    holding_bars: int | None = None
+    holding_hours: float | None = None
     #: True when the deciding candle touched BOTH the stop and the target, so
     #: the outcome was resolved by the conservative stop-first rule rather than
     #: observed ordering. In-memory diagnostic only (not persisted): on real
@@ -82,21 +81,34 @@ class GradedPlan:
     def __post_init__(self):
         if self.rr_net is None:
             if self.rr_achieved is not None:
-                self.rr_net = round(float(self.rr_achieved) - float(self.cost_r or 0.0), 3)
+                self.rr_net = round(
+                    float(self.rr_achieved) - float(self.cost_r or 0.0), 3
+                )
             else:
                 self.rr_net = None
 
     def as_row(self) -> dict:
         return {
-            "ts": self.ts, "plan_type": self.plan_type, "action": self.action,
-            "confidence_pct": self.confidence_pct, "entry": self.entry,
-            "trigger_level": self.trigger_level, "horizon_hours": self.horizon_hours,
-            "outcome": self.outcome, "rr_achieved": self.rr_achieved,
-            "rr_net": self.rr_net if self.rr_net is not None else (self.rr_achieved if self.rr_achieved is not None else 0.0),
-            "fee_r": self.fee_r, "slip_r": self.slip_r,
-            "funding_r": self.funding_r, "cost_r": self.cost_r,
-            "max_favorable": self.max_favorable, "max_adverse": self.max_adverse,
-            "regime": self.regime, "holding_bars": self.holding_bars,
+            "ts": self.ts,
+            "plan_type": self.plan_type,
+            "action": self.action,
+            "confidence_pct": self.confidence_pct,
+            "entry": self.entry,
+            "trigger_level": self.trigger_level,
+            "horizon_hours": self.horizon_hours,
+            "outcome": self.outcome,
+            "rr_achieved": self.rr_achieved,
+            "rr_net": self.rr_net
+            if self.rr_net is not None
+            else (self.rr_achieved if self.rr_achieved is not None else 0.0),
+            "fee_r": self.fee_r,
+            "slip_r": self.slip_r,
+            "funding_r": self.funding_r,
+            "cost_r": self.cost_r,
+            "max_favorable": self.max_favorable,
+            "max_adverse": self.max_adverse,
+            "regime": self.regime,
+            "holding_bars": self.holding_bars,
             "holding_hours": self.holding_hours,
             "sentiment_bucket": self.sentiment_bucket,
             "sentiment_score": self.sentiment_score,
@@ -105,8 +117,14 @@ class GradedPlan:
         }
 
 
-def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
-              regime: str = "", sentiment: Optional[dict] = None) -> GradedPlan:
+def _evaluate(
+    plan: dict,
+    df: pd.DataFrame,
+    i: int,
+    horizon_bars: int,
+    regime: str = "",
+    sentiment: dict | None = None,
+) -> GradedPlan:
     """Grade one plan produced at bar i over `horizon_bars` future bars."""
     entry = plan.get("entry")
     sl = plan.get("stop_loss")
@@ -118,11 +136,18 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
 
     sentiment = sentiment or {}
     gp = GradedPlan(
-        ts=int(df.iloc[i]["ts"]), plan_type=plan.get("type", "?"),
-        action=side or "?", confidence_pct=plan.get("confidence", 0),
-        entry=entry, trigger_level=plan.get("trigger_level"),
-        horizon_hours=round(horizon_bars * TIMEFRAME_TO_MS.get(
-            df.attrs.get("timeframe", "15m"), 900_000) / 3_600_000, 2),
+        ts=int(df.iloc[i]["ts"]),
+        plan_type=plan.get("type", "?"),
+        action=side or "?",
+        confidence_pct=plan.get("confidence", 0),
+        entry=entry,
+        trigger_level=plan.get("trigger_level"),
+        horizon_hours=round(
+            horizon_bars
+            * TIMEFRAME_TO_MS.get(df.attrs.get("timeframe", "15m"), 900_000)
+            / 3_600_000,
+            2,
+        ),
         regime=regime,
         sentiment_bucket=sentiment.get("bucket", ""),
         sentiment_score=float(sentiment.get("score", 0.0) or 0.0),
@@ -135,7 +160,7 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
 
     risk = abs(entry - sl)
     end = min(len(df), i + 1 + horizon_bars)
-    window = df.iloc[i + 1:end]
+    window = df.iloc[i + 1 : end]
     if window.empty:
         gp.outcome = "OPEN"
         return gp
@@ -145,7 +170,9 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
 
     # Did price ever trade at the entry level? Only conditional (waiting) plans
     # need the trigger — immediate plans execute at the current bar.
-    conditional = plan.get("status") == "waiting" or plan.get("trigger_level") is not None
+    conditional = (
+        plan.get("status") == "waiting" or plan.get("trigger_level") is not None
+    )
     touched_entry = True
     if conditional:
         touched_entry = ((lows <= entry) & (highs >= entry)).any()
@@ -157,7 +184,7 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
     sl_mask = (lows <= sl) if is_buy else (highs >= sl)
     tp1_mask = (highs >= tp1) if is_buy else (lows <= tp1)
 
-    def first(idx_arr) -> Optional[int]:
+    def first(idx_arr) -> int | None:
         idx = int(idx_arr[0]) if idx_arr.size else None
         return idx if idx is not None and 0 <= idx < len(window) else None
 
@@ -173,18 +200,21 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
     def realized_r(exit_price: float) -> float:
         if not risk:
             return 0.0
-        return round((exit_price - entry) / risk, 3) if is_buy \
+        return (
+            round((exit_price - entry) / risk, 3)
+            if is_buy
             else round((entry - exit_price) / risk, 3)
+        )
 
     # Bars held until the deciding touch. Measured off the same first-touch
     # indices the outcome uses, so holding time can never disagree with the
     # grade it belongs to.
     bar_ms = TIMEFRAME_TO_MS.get(df.attrs.get("timeframe", "15m"), 900_000)
 
-    def set_holding(bars_held: Optional[int]) -> None:
+    def set_holding(bars_held: int | None) -> None:
         if bars_held is None:
             return
-        gp.holding_bars = int(bars_held) + 1   # entry bar → deciding bar
+        gp.holding_bars = int(bars_held) + 1  # entry bar → deciding bar
         gp.holding_hours = round(gp.holding_bars * bar_ms / 3_600_000, 3)
 
     # Conservative same-bar rule (<=, not <): when the stop and the target are
@@ -240,8 +270,14 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
     if EXECUTION_MODEL != "none":
         try:
             row = df.iloc[i]
-            adjust_for_slip(gp, plan, row, window,
-                            df.attrs.get("symbol", "BTCUSDT"), EXECUTION_MODEL)
+            adjust_for_slip(
+                gp,
+                plan,
+                row,
+                window,
+                df.attrs.get("symbol", "BTCUSDT"),
+                EXECUTION_MODEL,
+            )
         except Exception:
             pass  # execution model failure must not break the backtest
 
@@ -270,11 +306,23 @@ def _evaluate(plan: dict, df: pd.DataFrame, i: int, horizon_bars: int,
 
 def _aggregate(graded: list[GradedPlan]) -> dict:
     if not graded:
-        return {"executed": 0, "wins": 0, "losses": 0, "opens": 0,
-                "not_triggered": 0, "win_rate": None, "avg_rr": 0.0,
-                "expectancy": 0.0, "expectancy_net": 0.0,
-                "win_rate_net": None, "avg_rr_net": 0.0,
-                "cost_r": 0.0, "fee_r": 0.0, "slip_r": 0.0, "funding_r": 0.0}
+        return {
+            "executed": 0,
+            "wins": 0,
+            "losses": 0,
+            "opens": 0,
+            "not_triggered": 0,
+            "win_rate": None,
+            "avg_rr": 0.0,
+            "expectancy": 0.0,
+            "expectancy_net": 0.0,
+            "win_rate_net": None,
+            "avg_rr_net": 0.0,
+            "cost_r": 0.0,
+            "fee_r": 0.0,
+            "slip_r": 0.0,
+            "funding_r": 0.0,
+        }
     executed = [g for g in graded if g.outcome != "NOT_TRIGGERED"]
     wins = [g for g in executed if g.outcome in WIN_SET]
     losses = [g for g in executed if g.outcome == "LOSS"]
@@ -284,7 +332,9 @@ def _aggregate(graded: list[GradedPlan]) -> dict:
     rr_vals = [g.rr_achieved for g in decided]
     avg_rr = round(sum(rr_vals) / len(rr_vals), 3) if rr_vals else 0.0
     # expectancy: average R per decided trade (wins positive, losses -1R)
-    exp = round(sum(g.rr_achieved for g in decided) / len(decided), 3) if decided else 0.0
+    exp = (
+        round(sum(g.rr_achieved for g in decided) / len(decided), 3) if decided else 0.0
+    )
 
     # Net metrics (P12.6)
     rr_net_vals = [getattr(g, "rr_net", g.rr_achieved) for g in decided]
@@ -302,12 +352,21 @@ def _aggregate(graded: list[GradedPlan]) -> dict:
     avg_funding = round(sum(fund_vals) / len(fund_vals), 4) if fund_vals else 0.0
 
     return {
-        "executed": len(executed), "wins": len(wins), "losses": len(losses),
-        "opens": len(opens), "not_triggered": len(graded) - len(executed),
-        "win_rate": win_rate, "avg_rr": avg_rr, "expectancy": exp,
-        "expectancy_net": exp_net, "win_rate_net": win_rate_net,
-        "avg_rr_net": avg_rr_net, "cost_r": avg_cost, "fee_r": avg_fee,
-        "slip_r": avg_slip, "funding_r": avg_funding,
+        "executed": len(executed),
+        "wins": len(wins),
+        "losses": len(losses),
+        "opens": len(opens),
+        "not_triggered": len(graded) - len(executed),
+        "win_rate": win_rate,
+        "avg_rr": avg_rr,
+        "expectancy": exp,
+        "expectancy_net": exp_net,
+        "win_rate_net": win_rate_net,
+        "avg_rr_net": avg_rr_net,
+        "cost_r": avg_cost,
+        "fee_r": avg_fee,
+        "slip_r": avg_slip,
+        "funding_r": avg_funding,
     }
 
 
@@ -319,11 +378,15 @@ def group_by(graded: list[GradedPlan], key_fn) -> dict:
     return {k: _aggregate(v) for k, v in out.items()}
 
 
-def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15m",
-                 horizons: Optional[list[float]] = None,
-                 min_bars: int = BACKTEST_MIN_BARS,
-                 step: int = BACKTEST_STEP,
-                 min_confidence: int = 55) -> dict:
+def run_backtest(
+    df: pd.DataFrame,
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    horizons: list[float] | None = None,
+    min_bars: int = BACKTEST_MIN_BARS,
+    step: int = BACKTEST_STEP,
+    min_confidence: int = 55,
+) -> dict:
     """Walk the engine over history and grade every plan at every horizon."""
     symbol = normalize_symbol(symbol)
     horizons = horizons or BACKTEST_HORIZONS
@@ -350,11 +413,18 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
     # direction holds, neutral/flips reset. Plans are tagged with the colour
     # the desk would have seen at that exact bar.
     from engine.sentiment import SentimentClock, compute_historical
+
     clock = SentimentClock()
 
     for i in range(min_bars, len(df), step):
-        out = analyze_frame_at(ind, df, i, symbol=symbol, timeframe=timeframe,
-                               min_confidence=min_confidence)
+        out = analyze_frame_at(
+            ind,
+            df,
+            i,
+            symbol=symbol,
+            timeframe=timeframe,
+            min_confidence=min_confidence,
+        )
         bar_ts = int(df.iloc[i]["ts"])
         sig = out.best_signal or {}
         hist_score = compute_historical(
@@ -374,16 +444,22 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
         for h in horizons:
             horizon_bars = max(1, int(h * 3_600_000 / tf_ms))
             for plan in plans:
-                all_graded.append(_evaluate(plan, df, i, horizon_bars,
-                                            regime=regime, sentiment=sentiment))
+                all_graded.append(
+                    _evaluate(
+                        plan, df, i, horizon_bars, regime=regime, sentiment=sentiment
+                    )
+                )
 
     report = {
         "meta": {
-            "symbol": symbol, "timeframe": timeframe,
-            "bars_total": len(df), "bars_analyzed": scans_done,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "bars_total": len(df),
+            "bars_analyzed": scans_done,
             "plans_generated": plans_total,
             "horizons_hours": horizons,
-            "min_bars": min_bars, "step": step,
+            "min_bars": min_bars,
+            "step": step,
             "runtime_seconds": round(time.time() - start, 2),
             "engine_min_confidence": min_confidence,
             # P16 — the colour proof runs on the offline mirror of the live
@@ -391,7 +467,9 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
             # the walk couldn't see (funding/news/fear&greed/MTF excluded).
             "sentiment_mode": "historical",
         },
-        "summary": _aggregate([g for g in all_graded if g.horizon_hours == horizons[0]]),
+        "summary": _aggregate(
+            [g for g in all_graded if g.horizon_hours == horizons[0]]
+        ),
         "per_horizon": {
             str(h): _aggregate([g for g in all_graded if g.horizon_hours == h])
             for h in horizons
@@ -400,13 +478,17 @@ def run_backtest(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15
         "by_action": group_by(all_graded, lambda g: g.action),
         "by_confidence": group_by(
             all_graded,
-            lambda g: "HIGH" if g.confidence_pct >= 80
-                      else "MEDIUM" if g.confidence_pct >= 60 else "LOW",
+            lambda g: (
+                "HIGH"
+                if g.confidence_pct >= 80
+                else "MEDIUM"
+                if g.confidence_pct >= 60
+                else "LOW"
+            ),
         ),
         "by_regime": group_by(all_graded, lambda g: g.regime or "UNKNOWN"),
         # P16 — does the colour pay? The same buckets the strip paints.
-        "by_sentiment": group_by(
-            all_graded, lambda g: g.sentiment_bucket or "UNKNOWN"),
+        "by_sentiment": group_by(all_graded, lambda g: g.sentiment_bucket or "UNKNOWN"),
     }
     return {"report": report, "graded": all_graded}
 
@@ -416,13 +498,17 @@ def save_report(report: dict, path: str = "data_samples/backtest_report.json") -
     Path(path).write_text(json.dumps(report, indent=2, default=str))
 
 
-def run_backtest_on_store(exchange: str = "binance", market: str = "perp",
-                           symbol: str = "BTCUSDT", timeframe: str = "15m",
-                           bars: int = 300,
-                           horizons: Optional[list[float]] = None,
-                           min_bars: int = BACKTEST_MIN_BARS,
-                           step: int = BACKTEST_STEP,
-                           min_confidence: int = 55) -> dict:
+def run_backtest_on_store(
+    exchange: str = "binance",
+    market: str = "perp",
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    bars: int = 300,
+    horizons: list[float] | None = None,
+    min_bars: int = BACKTEST_MIN_BARS,
+    step: int = BACKTEST_STEP,
+    min_confidence: int = 55,
+) -> dict:
     """P10.11 — backtest that reads from the stored Parquet series.
 
     The engine no longer depends on a live ``client.klines()`` fetch; it reads
@@ -434,76 +520,120 @@ def run_backtest_on_store(exchange: str = "binance", market: str = "perp",
     error is returned rather than a corrupt result.
     """
     from data.store import CandleStore
+
     store = CandleStore()
     df = store.read(exchange, market, symbol, timeframe)
     if df.empty:
-        return {"ok": False, "error": f"No stored candles for {exchange}/{market}/{symbol}/{timeframe}",
-                "report": {}, "graded": []}
+        return {
+            "ok": False,
+            "error": f"No stored candles for {exchange}/{market}/{symbol}/{timeframe}",
+            "report": {},
+            "graded": [],
+        }
     if len(df) < min_bars:
-        return {"ok": False, "error": f"Only {len(df)} bars stored (need >= {min_bars})",
-                "stored": len(df), "required": min_bars,
-                "report": {}, "graded": []}
+        return {
+            "ok": False,
+            "error": f"Only {len(df)} bars stored (need >= {min_bars})",
+            "stored": len(df),
+            "required": min_bars,
+            "report": {},
+            "graded": [],
+        }
     # Respect the `bars` cap for quick backtests (same contract as REST).
     df = df.tail(bars).reset_index(drop=True)
-    result = run_backtest(df, symbol=symbol, timeframe=timeframe,
-                          horizons=horizons, min_bars=min_bars,
-                          step=step, min_confidence=min_confidence)
+    result = run_backtest(
+        df,
+        symbol=symbol,
+        timeframe=timeframe,
+        horizons=horizons,
+        min_bars=min_bars,
+        step=step,
+        min_confidence=min_confidence,
+    )
     # P12.11 — report the provenance of the series that was actually graded,
     # read off the stored frame itself rather than assumed from arguments.
     from data.provenance import provenance_of_frame, source_key
+
     prov_exchange, prov_market, prov_price_type = provenance_of_frame(
-        df, exchange=exchange, market=market)
-    return {"ok": True, **result, "store_source": True,
-            "store_path": store._series_dir(exchange, market, symbol, timeframe).as_posix(),
-            "bars_read": len(df),
-            "exchange": prov_exchange, "market": prov_market,
-            "price_type": prov_price_type,
-            "source_key": source_key(prov_exchange, prov_market, prov_price_type)}
+        df, exchange=exchange, market=market
+    )
+    return {
+        "ok": True,
+        **result,
+        "store_source": True,
+        "store_path": store._series_dir(exchange, market, symbol, timeframe).as_posix(),
+        "bars_read": len(df),
+        "exchange": prov_exchange,
+        "market": prov_market,
+        "price_type": prov_price_type,
+        "source_key": source_key(prov_exchange, prov_market, prov_price_type),
+    }
 
 
 def print_report(report: dict) -> None:
     meta, s = report["meta"], report["summary"]
     print("=" * 66)
-    print(f"BACKTEST  {meta['symbol']} {meta['timeframe']}  "
-          f"bars={meta['bars_total']} analyzed={meta['bars_analyzed']} "
-          f"plans={meta['plans_generated']} ({meta['runtime_seconds']}s)")
-    print(f"primary horizon {meta['horizons_hours'][0]}h — "
-          f"executed {s['executed']} | wins {s['wins']} | losses {s['losses']} | "
-          f"open {s['opens']} | not-triggered {s['not_triggered']}")
+    print(
+        f"BACKTEST  {meta['symbol']} {meta['timeframe']}  "
+        f"bars={meta['bars_total']} analyzed={meta['bars_analyzed']} "
+        f"plans={meta['plans_generated']} ({meta['runtime_seconds']}s)"
+    )
+    print(
+        f"primary horizon {meta['horizons_hours'][0]}h — "
+        f"executed {s['executed']} | wins {s['wins']} | losses {s['losses']} | "
+        f"open {s['opens']} | not-triggered {s['not_triggered']}"
+    )
     wr = s["win_rate"]
-    print(f"win-rate {f'{wr*100:.1f}%' if wr is not None else 'n/a'}  "
-          f"avg R {s['avg_rr']}  expectancy {s['expectancy']}R/trade")
+    print(
+        f"win-rate {f'{wr * 100:.1f}%' if wr is not None else 'n/a'}  "
+        f"avg R {s['avg_rr']}  expectancy {s['expectancy']}R/trade"
+    )
     print("-" * 66)
     for h, agg in report["per_horizon"].items():
         wr = agg["win_rate"]
-        print(f"  {h}h: win {f'{wr*100:.1f}%' if wr is not None else 'n/a'}"
-              f" ({agg['wins']}/{agg['wins']+agg['losses']})  avgR {agg['avg_rr']}  "
-              f"exp {agg['expectancy']}  exec {agg['executed']}")
+        print(
+            f"  {h}h: win {f'{wr * 100:.1f}%' if wr is not None else 'n/a'}"
+            f" ({agg['wins']}/{agg['wins'] + agg['losses']})  avgR {agg['avg_rr']}  "
+            f"exp {agg['expectancy']}  exec {agg['executed']}"
+        )
     print("-" * 66)
     print("by plan type:")
-    for t, agg in sorted(report["by_type"].items(), key=lambda kv: -(kv[1]["executed"] or 0)):
+    for t, agg in sorted(
+        report["by_type"].items(), key=lambda kv: -(kv[1]["executed"] or 0)
+    ):
         wr = agg["win_rate"]
-        print(f"  {t:<24} exec {agg['executed']:>4}  win "
-              f"{f'{wr*100:.1f}%' if wr is not None else 'n/a'}  "
-              f"avgR {agg['avg_rr']}  exp {agg['expectancy']}")
+        print(
+            f"  {t:<24} exec {agg['executed']:>4}  win "
+            f"{f'{wr * 100:.1f}%' if wr is not None else 'n/a'}  "
+            f"avgR {agg['avg_rr']}  exp {agg['expectancy']}"
+        )
     print("by confidence:")
     for c, agg in report["by_confidence"].items():
         wr = agg["win_rate"]
-        print(f"  {c:<8} exec {agg['executed']:>4}  win "
-              f"{f'{wr*100:.1f}%' if wr is not None else 'n/a'}  "
-              f"avgR {agg['avg_rr']}  exp {agg['expectancy']}")
+        print(
+            f"  {c:<8} exec {agg['executed']:>4}  win "
+            f"{f'{wr * 100:.1f}%' if wr is not None else 'n/a'}  "
+            f"avgR {agg['avg_rr']}  exp {agg['expectancy']}"
+        )
     print("by regime (decision B3 — strategy = setup × regime × asset):")
-    for r, agg in sorted(report.get("by_regime", {}).items(),
-                         key=lambda kv: -(kv[1]["executed"] or 0)):
+    for r, agg in sorted(
+        report.get("by_regime", {}).items(), key=lambda kv: -(kv[1]["executed"] or 0)
+    ):
         wr = agg["win_rate"]
-        print(f"  {r:<22} exec {agg['executed']:>4}  win "
-              f"{f'{wr*100:.1f}%' if wr is not None else 'n/a'}  "
-              f"avgR {agg['avg_rr']}  exp {agg['expectancy']}")
+        print(
+            f"  {r:<22} exec {agg['executed']:>4}  win "
+            f"{f'{wr * 100:.1f}%' if wr is not None else 'n/a'}  "
+            f"avgR {agg['avg_rr']}  exp {agg['expectancy']}"
+        )
     print("by sentiment colour (P16 — does deep green actually pay?):")
     from engine.sentiment import bucket_label
-    for r, agg in sorted(report.get("by_sentiment", {}).items(),
-                         key=lambda kv: -(kv[1]["executed"] or 0)):
+
+    for r, agg in sorted(
+        report.get("by_sentiment", {}).items(), key=lambda kv: -(kv[1]["executed"] or 0)
+    ):
         wr = agg["win_rate"]
-        print(f"  {bucket_label(r):<12} exec {agg['executed']:>4}  win "
-              f"{f'{wr*100:.1f}%' if wr is not None else 'n/a'}  "
-              f"avgR {agg['avg_rr']}  exp {agg['expectancy']}")
+        print(
+            f"  {bucket_label(r):<12} exec {agg['executed']:>4}  win "
+            f"{f'{wr * 100:.1f}%' if wr is not None else 'n/a'}  "
+            f"avgR {agg['avg_rr']}  exp {agg['expectancy']}"
+        )

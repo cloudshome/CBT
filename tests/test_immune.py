@@ -1,7 +1,11 @@
 """tests/test_immune.py — Unit tests for immune health, staleness detection, and diagnostic alarms."""
-import pytest
-from brain.immune import (check_database, check_data_freshness, check_risk_system,
-                          check_calibration_health, run_health_check)
+
+from brain.immune import (
+    check_data_freshness,
+    check_database,
+    check_risk_system,
+    run_health_check,
+)
 from data.database import SignalDB
 
 

@@ -26,6 +26,7 @@ Dukascopy-derived calibration. This is that blocker closed.
 class MarketCalendar(Protocol):
     name: str
     always_open: bool
+
     def is_open(self, ts_ms: int) -> bool: ...
     def closed_intervals(self, start_ms: int, end_ms: int) -> list[tuple[int, int]]: ...
 ```
@@ -85,10 +86,10 @@ It is wired so that it can never weaken an existing check:
 ## Counting helpers
 
 ```python
-expected_bars(start_ms, end_ms, step_ms, calendar)   # OPENs the venue owed
-open_bars_between(start_ms, end_ms, step_ms, cal)    # staleness, in trading bars
-closed_bar_count(start_ms, end_ms, step_ms, cal)     # OPENs skipped by closure
-split_by_session(timestamps, calendar)               # (during_session, while_closed)
+expected_bars(start_ms, end_ms, step_ms, calendar)  # OPENs the venue owed
+open_bars_between(start_ms, end_ms, step_ms, cal)  # staleness, in trading bars
+closed_bar_count(start_ms, end_ms, step_ms, cal)  # OPENs skipped by closure
+split_by_session(timestamps, calendar)  # (during_session, while_closed)
 ```
 
 ## CLI

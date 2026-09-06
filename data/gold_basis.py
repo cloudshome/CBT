@@ -4,27 +4,28 @@ This module deliberately does not pool histories, write calibration state, recor
 human approval, or place orders.  It measures exact-time overlap between two
 separately stored series and inspects the existing sealed validation envelope.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from data.store import DEFAULT_ROOT as DEFAULT_STORE_ROOT, CandleStore
+from data.store import DEFAULT_ROOT as DEFAULT_STORE_ROOT
+from data.store import CandleStore
 from data.validation import DEFAULT_SEAL_DIR, GRADUATION_CRITERIA
-
 
 DEFAULT_MIN_OVERLAP = 100
 PAXG_SOURCE = {"exchange": "binance", "market": "spot", "symbol": "PAXGUSDT"}
 XAU_SOURCE = {"exchange": "dukascopy", "market": "spot", "symbol": "XAUUSD"}
 
 
-def _number(value: Any, digits: int = 8) -> Optional[float]:
+def _number(value: Any, digits: int = 8) -> float | None:
     try:
         result = float(value)
     except (TypeError, ValueError):
@@ -34,7 +35,7 @@ def _number(value: Any, digits: int = 8) -> Optional[float]:
     return round(result, digits)
 
 
-def _iso_ms(value: Any) -> Optional[str]:
+def _iso_ms(value: Any) -> str | None:
     try:
         timestamp = pd.to_datetime(int(value), unit="ms", utc=True)
     except (TypeError, ValueError, OverflowError):
@@ -42,17 +43,19 @@ def _iso_ms(value: Any) -> Optional[str]:
     return timestamp.isoformat().replace("+00:00", "Z")
 
 
-def _source_label(source: Dict[str, str]) -> str:
+def _source_label(source: dict[str, str]) -> str:
     return f"{source['exchange']}:{source['market']}:{source['symbol']}"
 
 
-def _clean_series(frame: pd.DataFrame, source: Dict[str, str]) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+def _clean_series(
+    frame: pd.DataFrame, source: dict[str, str]
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Validate one stored series without interpolating or changing timestamps."""
     label = _source_label(source)
-    meta: Dict[str, Any] = {
+    meta: dict[str, Any] = {
         "source": dict(source),
         "source_key": label,
-        "input_rows": int(len(frame)) if frame is not None else 0,
+        "input_rows": len(frame) if frame is not None else 0,
         "valid_rows": 0,
         "invalid_rows": 0,
         "duplicate_timestamps_removed": 0,
@@ -99,8 +102,12 @@ def _clean_series(frame: pd.DataFrame, source: Dict[str, str]) -> Tuple[pd.DataF
     cleaned["ts"] = cleaned["ts"].astype("int64")
     duplicates = int(cleaned.duplicated(subset=["ts"], keep="last").sum())
     meta["duplicate_timestamps_removed"] = duplicates
-    cleaned = cleaned.drop_duplicates(subset=["ts"], keep="last").sort_values("ts").reset_index(drop=True)
-    meta["valid_rows"] = int(len(cleaned))
+    cleaned = (
+        cleaned.drop_duplicates(subset=["ts"], keep="last")
+        .sort_values("ts")
+        .reset_index(drop=True)
+    )
+    meta["valid_rows"] = len(cleaned)
     if cleaned.empty:
         meta["errors"].append(f"No valid positive-price candles for {label}")
     return cleaned, meta
@@ -109,11 +116,13 @@ def _clean_series(frame: pd.DataFrame, source: Dict[str, str]) -> Tuple[pd.DataF
 def _fingerprint(aligned: pd.DataFrame) -> str:
     digest = hashlib.sha256()
     for row in aligned.itertuples(index=False):
-        digest.update(f"{int(row.ts)},{float(row.paxg_close):.12g},{float(row.xau_close):.12g}\n".encode())
+        digest.update(
+            f"{int(row.ts)},{float(row.paxg_close):.12g},{float(row.xau_close):.12g}\n".encode()
+        )
     return digest.hexdigest()
 
 
-def _correlation(left: pd.Series, right: pd.Series) -> Optional[float]:
+def _correlation(left: pd.Series, right: pd.Series) -> float | None:
     """Return correlation only when both vectors contain actual variation."""
     if len(left) < 2 or len(right) < 2:
         return None
@@ -127,9 +136,9 @@ def measure_gold_basis(
     xau: pd.DataFrame,
     *,
     min_overlap: int = DEFAULT_MIN_OVERLAP,
-    paxg_source: Optional[Dict[str, str]] = None,
-    xau_source: Optional[Dict[str, str]] = None,
-) -> Dict[str, Any]:
+    paxg_source: dict[str, str] | None = None,
+    xau_source: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Measure exact-timestamp PAXG/XAU basis without filling or resampling.
 
     ``ok`` means the minimum overlap needed for a meaningful measurement was
@@ -153,15 +162,22 @@ def measure_gold_basis(
         )
 
     aligned = paxg_clean.rename(columns={"close": "paxg_close"}).merge(
-        xau_clean.rename(columns={"close": "xau_close"}), on="ts", how="inner", validate="one_to_one"
+        xau_clean.rename(columns={"close": "xau_close"}),
+        on="ts",
+        how="inner",
+        validate="one_to_one",
     )
     aligned = aligned.sort_values("ts").reset_index(drop=True)
-    matched = int(len(aligned))
-    status = "MEASURED" if matched >= min_overlap and not errors else "INSUFFICIENT_EVIDENCE"
+    matched = len(aligned)
+    status = (
+        "MEASURED" if matched >= min_overlap and not errors else "INSUFFICIENT_EVIDENCE"
+    )
     if matched < min_overlap:
-        errors.append(f"Exact-time overlap {matched} is below required minimum {min_overlap}")
+        errors.append(
+            f"Exact-time overlap {matched} is below required minimum {min_overlap}"
+        )
 
-    report: Dict[str, Any] = {
+    report: dict[str, Any] = {
         "ok": status == "MEASURED",
         "status": status,
         "research_only": True,
@@ -175,8 +191,12 @@ def measure_gold_basis(
         "paxg": paxg_meta,
         "xau": xau_meta,
         "coverage": {
-            "paxg_matched_pct": _number(100.0 * matched / len(paxg_clean)) if len(paxg_clean) else None,
-            "xau_matched_pct": _number(100.0 * matched / len(xau_clean)) if len(xau_clean) else None,
+            "paxg_matched_pct": _number(100.0 * matched / len(paxg_clean))
+            if len(paxg_clean)
+            else None,
+            "xau_matched_pct": _number(100.0 * matched / len(xau_clean))
+            if len(xau_clean)
+            else None,
             "paxg_unmatched_rows": int(max(0, len(paxg_clean) - matched)),
             "xau_unmatched_rows": int(max(0, len(xau_clean) - matched)),
         },
@@ -221,12 +241,16 @@ def measure_gold_basis(
     return_pairs = pd.DataFrame({"paxg": paxg_returns, "xau": xau_returns}).dropna()
     level_corr = _correlation(aligned["paxg_close"], aligned["xau_close"])
     return_corr = _correlation(return_pairs["paxg"], return_pairs["xau"])
-    tracking_error = (return_pairs["paxg"] - return_pairs["xau"]).std(ddof=0) * 10000.0 if len(return_pairs) else None
+    tracking_error = (
+        (return_pairs["paxg"] - return_pairs["xau"]).std(ddof=0) * 10000.0
+        if len(return_pairs)
+        else None
+    )
     report["tracking"] = {
         "price_level_correlation": level_corr,
         "log_return_correlation": return_corr,
         "tracking_error_bps": _number(tracking_error),
-        "return_pairs": int(len(return_pairs)),
+        "return_pairs": len(return_pairs),
     }
     return report
 
@@ -241,13 +265,13 @@ def inspect_sealed_oos(
     seal_key: str,
     *,
     expected_symbol: str = "XAUUSD",
-    expected_timeframe: Optional[str] = None,
-) -> Dict[str, Any]:
+    expected_timeframe: str | None = None,
+) -> dict[str, Any]:
     """Inspect, but never create or reseal, the latest validation envelope."""
     path = _seal_path(Path(seal_dir), seal_key)
     if expected_timeframe is None:
         expected_timeframe = seal_key.rsplit("_", 1)[-1]
-    base: Dict[str, Any] = {
+    base: dict[str, Any] = {
         "available": False,
         "clears_unchanged_bar": False,
         "status": "MISSING",
@@ -267,7 +291,9 @@ def inspect_sealed_oos(
         "reasons": [],
     }
     if not path.exists():
-        base["reasons"].append("No sealed validation envelope found for the Dukascopy XAU series")
+        base["reasons"].append(
+            "No sealed validation envelope found for the Dukascopy XAU series"
+        )
         return base
     try:
         raw = json.loads(path.read_text())
@@ -287,16 +313,23 @@ def inspect_sealed_oos(
         return base
     latest = history[-1]
     payload = latest.get("payload") if isinstance(latest.get("payload"), dict) else {}
-    verdict = payload.get("verdicts", {}).get("ALL", {}) if isinstance(payload.get("verdicts"), dict) else {}
-    meta = payload.get("meta", {}) if isinstance(payload.get("meta"), dict) else {}
-    criteria = meta.get("criteria", {}) if isinstance(meta.get("criteria"), dict) else {}
-    source_match = (
-        str(meta.get("symbol", "")).upper() == str(expected_symbol).upper()
-        and str(meta.get("timeframe", "")) == str(expected_timeframe)
+    verdict = (
+        payload.get("verdicts", {}).get("ALL", {})
+        if isinstance(payload.get("verdicts"), dict)
+        else {}
     )
+    meta = payload.get("meta", {}) if isinstance(payload.get("meta"), dict) else {}
+    criteria = (
+        meta.get("criteria", {}) if isinstance(meta.get("criteria"), dict) else {}
+    )
+    source_match = str(meta.get("symbol", "")).upper() == str(
+        expected_symbol
+    ).upper() and str(meta.get("timeframe", "")) == str(expected_timeframe)
     expected = dict(GRADUATION_CRITERIA)
     criteria_match = criteria == expected
-    windows = payload.get("windows", {}) if isinstance(payload.get("windows"), dict) else {}
+    windows = (
+        payload.get("windows", {}) if isinstance(payload.get("windows"), dict) else {}
+    )
     window_bar_met = all(
         isinstance(windows.get(name), dict) and windows[name].get("bar_met") is True
         for name in ("train", "val", "oos", "recent")
@@ -329,22 +362,36 @@ def inspect_sealed_oos(
     )
     reasons = []
     if not source_match:
-        reasons.append("Envelope metadata does not match the expected XAU symbol/timeframe")
+        reasons.append(
+            "Envelope metadata does not match the expected XAU symbol/timeframe"
+        )
     if not seal_key_match:
-        reasons.append("Envelope seal key does not match the requested XAU evidence key")
+        reasons.append(
+            "Envelope seal key does not match the requested XAU evidence key"
+        )
     if not envelope_integrity:
         reasons.append("Envelope fingerprint and latest payload seal do not match")
     if not criteria_match:
-        reasons.append("Envelope criteria do not exactly match the current unchanged graduation bar")
+        reasons.append(
+            "Envelope criteria do not exactly match the current unchanged graduation bar"
+        )
     if payload.get("ok") is not True:
-        reasons.append("Latest sealed validation payload is not a successful protocol run")
+        reasons.append(
+            "Latest sealed validation payload is not a successful protocol run"
+        )
     if not window_bar_met:
-        reasons.append("At least one train/validation/sealed-OOS/recent window misses the bar")
+        reasons.append(
+            "At least one train/validation/sealed-OOS/recent window misses the bar"
+        )
     if not combined_verdict_pass:
-        reasons.append("Combined verdict does not pass both sealed OOS and recent checks")
+        reasons.append(
+            "Combined verdict does not pass both sealed OOS and recent checks"
+        )
 
     reseal_count = sum(
-        1 for entry in history if isinstance(entry, dict) and entry.get("reseal") is True
+        1
+        for entry in history
+        if isinstance(entry, dict) and entry.get("reseal") is True
     )
     base.update(
         available=True,
@@ -378,7 +425,7 @@ def build_xau_evidence_dossier(
     timeframe: str = "15m",
     bars: int = 12000,
     min_overlap: int = DEFAULT_MIN_OVERLAP,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build a research-only dossier from separately stored PAXG and XAU data."""
     if bars < 1:
         raise ValueError("bars must be at least 1")
@@ -403,7 +450,9 @@ def build_xau_evidence_dossier(
         "sealed_oos": sealed_oos,
         "requirements": {
             "basis_measured_not_assumed": bool(basis.get("ok")),
-            "sealed_oos_clears_unchanged_bar": bool(sealed_oos.get("clears_unchanged_bar")),
+            "sealed_oos_clears_unchanged_bar": bool(
+                sealed_oos.get("clears_unchanged_bar")
+            ),
             "explicit_human_approval": False,
         },
         "decision": {

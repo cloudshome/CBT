@@ -3,14 +3,23 @@
 Validation for the CryptoBrain signal JSON so downstream consumers (webhooks,
 dashboards, backtesters, your other agents) can rely on the shape.
 """
+
 from __future__ import annotations
 
 import re
-from typing import Any
 
 REQUIRED_SIGNAL_FIELDS = [
-    "signal_id", "timestamp", "asset", "action", "entry", "stop_loss",
-    "take_profit", "risk_reward", "confidence", "timeframe", "reason",
+    "signal_id",
+    "timestamp",
+    "asset",
+    "action",
+    "entry",
+    "stop_loss",
+    "take_profit",
+    "risk_reward",
+    "confidence",
+    "timeframe",
+    "reason",
 ]
 VALID_ACTIONS = {"BUY", "SELL", "NO TRADE"}
 VALID_CONFIDENCE = {"HIGH", "MEDIUM", "LOW", "NO TRADE"}
@@ -25,7 +34,9 @@ def validate_signal(sig: dict) -> list[str]:
         errors.append(f"invalid action: {sig['action']}")
     if "confidence" in sig and sig["confidence"] not in VALID_CONFIDENCE:
         errors.append(f"invalid confidence: {sig['confidence']}")
-    if "signal_id" in sig and not re.match(r"^[A-Z0-9]+_\d{8}_\d{4}$", sig["signal_id"]):
+    if "signal_id" in sig and not re.match(
+        r"^[A-Z0-9]+_\d{8}_\d{4}$", sig["signal_id"]
+    ):
         errors.append(f"signal_id format: {sig['signal_id']}")
     if sig.get("entry") and sig.get("stop_loss"):
         if sig["action"] == "BUY" and sig["stop_loss"] >= sig["entry"]:
@@ -37,7 +48,16 @@ def validate_signal(sig: dict) -> list[str]:
 
 def validate_plan(plan: dict) -> list[str]:
     errors = []
-    for f in ("id", "type", "action", "condition", "entry", "stop_loss", "take_profits", "confidence"):
+    for f in (
+        "id",
+        "type",
+        "action",
+        "condition",
+        "entry",
+        "stop_loss",
+        "take_profits",
+        "confidence",
+    ):
         if f not in plan:
             errors.append(f"missing plan field: {f}")
     if plan.get("entry") and plan.get("stop_loss"):

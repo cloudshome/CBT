@@ -24,24 +24,32 @@ Honesty rules:
 Offline (DEMO_MODE=1) this works on the committed BTC sample + deterministic
 synthetic series, which is exactly how the grind runs in this sandbox.
 """
+
 from __future__ import annotations
 
 import time
 
-from config import (SYMBOLS, TIMEFRAME, BARS, MIN_CONFIDENCE, BACKTEST_HORIZONS,
-                    BACKTEST_MIN_BARS, CALIBRATE_MIN_N, CALIBRATE_MIN_PAPER_N,
-                    PRIMARY_SETUP_FAMILY, PRIMARY_FAMILIES)
-from data.symbols import parse_symbol_list
-from data.sample_client import maybe_client
-from data.backtester import _evaluate, GradedPlan
+from config import (
+    BACKTEST_HORIZONS,
+    BACKTEST_MIN_BARS,
+    BARS,
+    CALIBRATE_MIN_N,
+    CALIBRATE_MIN_PAPER_N,
+    MIN_CONFIDENCE,
+    PRIMARY_FAMILIES,
+    PRIMARY_SETUP_FAMILY,
+    TIMEFRAME,
+)
+from data.backtester import GradedPlan, _evaluate
 from data.provenance import LIVE_SOURCE_KEY, describe_source, is_canonical
-from engine.signal_engine import analyze_frame_at
+from data.sample_client import maybe_client
+from data.symbols import parse_symbol_list
 from engine.indicators import add_all_indicators
-
+from engine.signal_engine import analyze_frame_at
 
 WIN_OUTCOME_TO_PAPER = {
     "FULL_WIN": "TP_HIT",
-    "PARTIAL_WIN": "TP_HIT",   # first target hit = a decided win at that target
+    "PARTIAL_WIN": "TP_HIT",  # first target hit = a decided win at that target
     "LOSS": "STOP_LOSS",
 }
 _PAPER_OUTCOMES = set(WIN_OUTCOME_TO_PAPER)
@@ -55,21 +63,33 @@ def _pp_key(symbol: str, tf: str, plan: dict, ts: int) -> str:
     return f"pp:{symbol}:{tf}:{ts}:{plan.get('type', '?')}:{plan.get('action', '?')}"
 
 
-def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
-                 min_confidence: int, horizons: list[float],
-                 df, db, run_id: str, seen_bt: set[str], seen_pp: set[str],
-                 save: bool) -> dict:
+def _walk_symbol(
+    symbol: str,
+    timeframe: str,
+    bars: int,
+    step: int,
+    min_confidence: int,
+    horizons: list[float],
+    df,
+    db,
+    run_id: str,
+    seen_bt: set[str],
+    seen_pp: set[str],
+    save: bool,
+) -> dict:
     """One symbol: walk history, grade plans, store unique samples.
 
     Returns counts added to the learning store (backtest + paper samples).
     """
     from data.database import SignalDB
     from data.provenance import provenance_of_frame
+
     # P12.11 — every sample this walk stores is stamped with the price series
     # it came from, read off the frame the store handed us.
     prov_exchange, prov_market, prov_price_type = provenance_of_frame(df)
     tf_ms = df.attrs.get("timeframe", timeframe)
     from data.binance_client import TIMEFRAME_TO_MS
+
     ms = TIMEFRAME_TO_MS.get(tf_ms, 900_000)
 
     bt_added = 0
@@ -83,8 +103,14 @@ def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
     ind = add_all_indicators(df)
 
     for i in range(BACKTEST_MIN_BARS, len(df), step):
-        out = analyze_frame_at(ind, df, i, symbol=symbol, timeframe=timeframe,
-                               min_confidence=min_confidence)
+        out = analyze_frame_at(
+            ind,
+            df,
+            i,
+            symbol=symbol,
+            timeframe=timeframe,
+            min_confidence=min_confidence,
+        )
         plans = out.plans
         if not plans:
             continue
@@ -112,9 +138,11 @@ def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
                 bt_added += 1
                 # Track the strongest plan of this window (first horizon) as
                 # the candidate paper sample.
-                if h == horizons[0] and (best_plan is None
-                                         or (plan.get("confidence") or 0) >
-                                         (best_plan[0].get("confidence") or 0)):
+                if h == horizons[0] and (
+                    best_plan is None
+                    or (plan.get("confidence") or 0)
+                    > (best_plan[0].get("confidence") or 0)
+                ):
                     best_plan = (plan, graded)
 
         # One decided paper sample per window: the highest-confidence plan.
@@ -124,12 +152,18 @@ def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
             key = _pp_key(symbol, timeframe, plan, graded.ts)
             if outcome is not None and key not in seen_pp:
                 seen_pp.add(key)
-                paper_samples.append({
-                    "plan": plan, "graded": graded, "outcome": outcome,
-                    "sim_key": key, "regime": regime,
-                    "exchange": prov_exchange, "market": prov_market,
-                    "price_type": prov_price_type,
-                })
+                paper_samples.append(
+                    {
+                        "plan": plan,
+                        "graded": graded,
+                        "outcome": outcome,
+                        "sim_key": key,
+                        "regime": regime,
+                        "exchange": prov_exchange,
+                        "market": prov_market,
+                        "price_type": prov_price_type,
+                    }
+                )
                 pp_added += 1
 
     if save and bt_rows:
@@ -138,14 +172,20 @@ def _walk_symbol(symbol: str, timeframe: str, bars: int, step: int,
     if save and paper_samples:
         _persist_paper_samples(symbol, timeframe, paper_samples, db)
 
-    return {"symbol": symbol, "plans_generated": plans_total,
-            "backtest_added": bt_added, "paper_added": pp_added}
+    return {
+        "symbol": symbol,
+        "plans_generated": plans_total,
+        "backtest_added": bt_added,
+        "paper_added": pp_added,
+    }
 
 
-def _persist_paper_samples(symbol: str, timeframe: str, samples: list[dict],
-                           db) -> None:
+def _persist_paper_samples(
+    symbol: str, timeframe: str, samples: list[dict], db
+) -> None:
     """Create + immediately close one simulated paper trade per sample."""
     from data.database import SignalDB
+
     ts = time.time()
     with SignalDB() as sdb:
         for s in samples:
@@ -161,25 +201,41 @@ def _persist_paper_samples(symbol: str, timeframe: str, samples: list[dict],
             risk = abs(float(entry) - float(sl)) or 1.0
             rr = plan.get("risk_reward")
             try:
-                rr = float(rr) if rr is not None else round(
-                    abs(float(tp) - float(entry)) / risk, 3)
+                rr = (
+                    float(rr)
+                    if rr is not None
+                    else round(abs(float(tp) - float(entry)) / risk, 3)
+                )
             except (TypeError, ValueError):
                 rr = round(abs(float(tp) - float(entry)) / risk, 3)
             payload = {
                 "signal": {
                     "signal_id": f"{symbol}_{graded.ts}_{plan.get('id', 'sim')}",
-                    "timestamp": graded.ts, "asset": symbol,
-                    "timeframe": timeframe, "action": action,
-                    "entry": entry, "stop_loss": sl, "take_profit": tp,
-                    "risk_reward": rr, "confidence": "HIGH" if graded.confidence_pct >= 80
-                    else "MEDIUM" if graded.confidence_pct >= 60 else "LOW",
+                    "timestamp": graded.ts,
+                    "asset": symbol,
+                    "timeframe": timeframe,
+                    "action": action,
+                    "entry": entry,
+                    "stop_loss": sl,
+                    "take_profit": tp,
+                    "risk_reward": rr,
+                    "confidence": "HIGH"
+                    if graded.confidence_pct >= 80
+                    else "MEDIUM"
+                    if graded.confidence_pct >= 60
+                    else "LOW",
                     "confidence_pct": graded.confidence_pct,
                     "reason": "simulator paper sample",
                     "signal_type": plan.get("type"),
                 },
                 "plans": [plan],
-                "snapshot": {"features": {"price": entry, "regime_name": s["regime"],
-                                          "score_used": graded.confidence_pct}},
+                "snapshot": {
+                    "features": {
+                        "price": entry,
+                        "regime_name": s["regime"],
+                        "score_used": graded.confidence_pct,
+                    }
+                },
                 "market_context": {},
             }
             scan_id = sdb.save_scan(payload, status_override="APPROVED")
@@ -188,23 +244,37 @@ def _persist_paper_samples(symbol: str, timeframe: str, samples: list[dict],
                 "signal_id": payload["signal"]["signal_id"],
                 "plan_id": plan.get("id", "signal"),
                 "plan_type": plan.get("type", "Signal"),
-                "symbol": symbol, "timeframe": timeframe, "action": action,
-                "entry": entry, "stop_loss": sl, "take_profit": tp,
-                "risk_reward": rr, "confidence_pct": graded.confidence_pct,
-                "status": "OPEN", "created_ts": graded.ts,
-                "opened_ts": graded.ts, "entry_price": entry,
-                "regime": s["regime"], "sim_key": s["sim_key"],
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "action": action,
+                "entry": entry,
+                "stop_loss": sl,
+                "take_profit": tp,
+                "risk_reward": rr,
+                "confidence_pct": graded.confidence_pct,
+                "status": "OPEN",
+                "created_ts": graded.ts,
+                "opened_ts": graded.ts,
+                "entry_price": entry,
+                "regime": s["regime"],
+                "sim_key": s["sim_key"],
                 # P12.11 — provenance travels with the simulated paper sample.
-                "exchange": s.get("exchange"), "market": s.get("market"),
+                "exchange": s.get("exchange"),
+                "market": s.get("market"),
                 "price_type": s.get("price_type"),
             }
             trade, created = sdb.create_paper_trade(fields)
             if not created:
                 continue
             exit_price = sl if s["outcome"] == "STOP_LOSS" else tp
-            sdb.close_paper_trade(trade["id"], s["outcome"], float(exit_price),
-                                  float(graded.rr_achieved), "simulator",
-                                  graded.ts)
+            sdb.close_paper_trade(
+                trade["id"],
+                s["outcome"],
+                float(exit_price),
+                float(graded.rr_achieved),
+                "simulator",
+                graded.ts,
+            )
             # Journal the closed paper sample (TODO-11): the simulator's paper
             # trade is a mechanical execution — the engine filled its own plan
             # at the planned levels and closed at SL/TP, so it followed the
@@ -213,17 +283,29 @@ def _persist_paper_samples(symbol: str, timeframe: str, samples: list[dict],
             # P12.14: these rows carry a sim_key and are therefore EXCLUDED
             # from the graduation discipline criterion — machine execution
             # cannot prove human discipline.
-            sdb.save_journal(scan_id, followed_rules=1, emotion="calm",
-                             mistake="none", notes="simulator paper sample — "
-                             "mechanical rule-following execution")
+            sdb.save_journal(
+                scan_id,
+                followed_rules=1,
+                emotion="calm",
+                mistake="none",
+                notes="simulator paper sample — mechanical rule-following execution",
+            )
 
 
-def simulate_round(symbols: list[str] | None = None, timeframe: str = TIMEFRAME,
-                   bars: int = BARS, step: int = 3, min_confidence: int = MIN_CONFIDENCE,
-                   horizons: list[float] | None = None, save: bool = True,
-                   client=None, db=None) -> dict:
+def simulate_round(
+    symbols: list[str] | None = None,
+    timeframe: str = TIMEFRAME,
+    bars: int = BARS,
+    step: int = 3,
+    min_confidence: int = MIN_CONFIDENCE,
+    horizons: list[float] | None = None,
+    save: bool = True,
+    client=None,
+    db=None,
+) -> dict:
     """One grind round: walk history for every symbol, store unique samples."""
     from data.database import SignalDB
+
     symbols = parse_symbol_list(symbols)
     horizons = horizons or BACKTEST_HORIZONS
     client = client or maybe_client()
@@ -236,17 +318,42 @@ def simulate_round(symbols: list[str] | None = None, timeframe: str = TIMEFRAME,
         for symbol in symbols:
             try:
                 df = client.klines(symbol, timeframe, bars)
-                results.append(_walk_symbol(
-                    symbol, timeframe, bars, step, min_confidence, horizons,
-                    df, sdb, run_id, seen_bt, seen_pp, save))
+                results.append(
+                    _walk_symbol(
+                        symbol,
+                        timeframe,
+                        bars,
+                        step,
+                        min_confidence,
+                        horizons,
+                        df,
+                        sdb,
+                        run_id,
+                        seen_bt,
+                        seen_pp,
+                        save,
+                    )
+                )
             except Exception as exc:
-                results.append({"symbol": symbol, "error": f"{type(exc).__name__}: {exc}",
-                                "backtest_added": 0, "paper_added": 0})
+                results.append(
+                    {
+                        "symbol": symbol,
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "backtest_added": 0,
+                        "paper_added": 0,
+                    }
+                )
     total_bt = sum(r.get("backtest_added", 0) for r in results)
     total_pp = sum(r.get("paper_added", 0) for r in results)
-    return {"run_id": run_id, "symbols": results,
-            "backtest_added": total_bt, "paper_added": total_pp,
-            "saved": save, "horizons": horizons, "timeframe": timeframe}
+    return {
+        "run_id": run_id,
+        "symbols": results,
+        "backtest_added": total_bt,
+        "paper_added": total_pp,
+        "saved": save,
+        "horizons": horizons,
+        "timeframe": timeframe,
+    }
 
 
 def paper_progress(db) -> list[dict]:
@@ -281,7 +388,9 @@ def paper_progress(db) -> list[dict]:
            FROM backtest_results
            WHERE outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')
              AND COALESCE(source_key,'')=?
-           GROUP BY plan_type ORDER BY n DESC""", (LIVE_SOURCE_KEY,)).fetchall()
+           GROUP BY plan_type ORDER BY n DESC""",
+        (LIVE_SOURCE_KEY,),
+    ).fetchall()
     pp = db.conn.execute(
         """SELECT plan_type,
                   SUM(CASE WHEN sim_key IS NULL THEN 1 ELSE 0 END) + COUNT(DISTINCT sim_key) n,
@@ -301,66 +410,89 @@ def paper_progress(db) -> list[dict]:
            FROM paper_trades
            WHERE outcome IN ('TP_HIT','STOP_LOSS')
              AND COALESCE(source_key,'')=?
-           GROUP BY plan_type ORDER BY n DESC""", (LIVE_SOURCE_KEY,)).fetchall()
+           GROUP BY plan_type ORDER BY n DESC""",
+        (LIVE_SOURCE_KEY,),
+    ).fetchall()
     bt_map = {r["plan_type"]: dict(r) for r in bt}
     pp_map = {r["plan_type"]: dict(r) for r in pp}
     plan_types = sorted(set(bt_map) | set(pp_map))
     progress = []
+
     # Net values legitimately can be exactly zero.  Truthiness fallback (``net
     # or gross``) would replace that zero with the gross value and can flip the
     # sign of the proof shown to the micro-live gate.  Fall back only when the
     # net measurement is genuinely absent.
     def net_or(value, gross, default=0.0):
-        return gross if value is None and gross is not None else (default if value is None else value)
+        return (
+            gross
+            if value is None and gross is not None
+            else (default if value is None else value)
+        )
 
     for pt in plan_types:
         b = bt_map.get(pt, {})
         p = pp_map.get(pt, {})
         b_n, p_n = b.get("n") or 0, p.get("n") or 0
-        expectancy = ((b.get("expectancy") or 0.0) * b_n + (p.get("expectancy") or 0.0) * p_n) \
-            / (b_n + p_n) if (b_n + p_n) else 0.0
-        exp_net = (net_or(b.get("expectancy_net"), b.get("expectancy")) * b_n
-                   + net_or(p.get("expectancy_net"), p.get("expectancy")) * p_n) \
-            / (b_n + p_n) if (b_n + p_n) else 0.0
+        expectancy = (
+            ((b.get("expectancy") or 0.0) * b_n + (p.get("expectancy") or 0.0) * p_n)
+            / (b_n + p_n)
+            if (b_n + p_n)
+            else 0.0
+        )
+        exp_net = (
+            (
+                net_or(b.get("expectancy_net"), b.get("expectancy")) * b_n
+                + net_or(p.get("expectancy_net"), p.get("expectancy")) * p_n
+            )
+            / (b_n + p_n)
+            if (b_n + p_n)
+            else 0.0
+        )
         wins = (b.get("wins") or 0) + (p.get("wins") or 0)
         losses = (b.get("losses") or 0) + (p.get("losses") or 0)
-        wins_net = (net_or(b.get("wins_net"), b.get("wins"), 0)
-                    + net_or(p.get("wins_net"), p.get("wins"), 0))
+        wins_net = net_or(b.get("wins_net"), b.get("wins"), 0) + net_or(
+            p.get("wins_net"), p.get("wins"), 0
+        )
         win_r = (b.get("win_r") or 0.0) + (p.get("win_r") or 0.0)
         loss_r = (b.get("loss_r") or 0.0) + (p.get("loss_r") or 0.0)
-        win_r_net = (net_or(b.get("win_r_net"), b.get("win_r"))
-                     + net_or(p.get("win_r_net"), p.get("win_r")))
-        loss_r_net = (net_or(b.get("loss_r_net"), b.get("loss_r"))
-                      + net_or(p.get("loss_r_net"), p.get("loss_r")))
+        win_r_net = net_or(b.get("win_r_net"), b.get("win_r")) + net_or(
+            p.get("win_r_net"), p.get("win_r")
+        )
+        loss_r_net = net_or(b.get("loss_r_net"), b.get("loss_r")) + net_or(
+            p.get("loss_r_net"), p.get("loss_r")
+        )
         decided = wins + losses
-        progress.append({
-            "plan_type": pt,
-            # Permission-bearing progress always belongs to the canonical live
-            # source. Keeping this field explicit lets downstream gate code
-            # fail closed if a caller constructs non-canonical progress.
-            "source_key": LIVE_SOURCE_KEY,
-            "source": describe_source(LIVE_SOURCE_KEY),
-            "backtest_n": b_n,
-            "paper_n": p_n,
-            "backtest_target": CALIBRATE_MIN_N,
-            "paper_target": CALIBRATE_MIN_PAPER_N,
-            "n": b_n + p_n,
-            "wins": wins,
-            "losses": losses,
-            "wins_net": wins_net,
-            "win_rate": round(wins / decided, 3) if decided else None,
-            "win_rate_net": round(wins_net / decided, 3) if decided else None,
-            "pf": round(win_r / loss_r, 3) if loss_r > 0 else None,
-            "pf_net": round(win_r_net / loss_r_net, 3) if loss_r_net > 0 else None,
-            "win_r": round(win_r, 3),
-            "loss_r": round(loss_r, 3),
-            "win_r_net": round(win_r_net, 3),
-            "loss_r_net": round(loss_r_net, 3),
-            "expectancy": round(expectancy, 3),
-            "expectancy_net": round(exp_net, 3),
-            "proven": b_n >= CALIBRATE_MIN_N and p_n >= CALIBRATE_MIN_PAPER_N
-                      and exp_net > 0,
-        })
+        progress.append(
+            {
+                "plan_type": pt,
+                # Permission-bearing progress always belongs to the canonical live
+                # source. Keeping this field explicit lets downstream gate code
+                # fail closed if a caller constructs non-canonical progress.
+                "source_key": LIVE_SOURCE_KEY,
+                "source": describe_source(LIVE_SOURCE_KEY),
+                "backtest_n": b_n,
+                "paper_n": p_n,
+                "backtest_target": CALIBRATE_MIN_N,
+                "paper_target": CALIBRATE_MIN_PAPER_N,
+                "n": b_n + p_n,
+                "wins": wins,
+                "losses": losses,
+                "wins_net": wins_net,
+                "win_rate": round(wins / decided, 3) if decided else None,
+                "win_rate_net": round(wins_net / decided, 3) if decided else None,
+                "pf": round(win_r / loss_r, 3) if loss_r > 0 else None,
+                "pf_net": round(win_r_net / loss_r_net, 3) if loss_r_net > 0 else None,
+                "win_r": round(win_r, 3),
+                "loss_r": round(loss_r, 3),
+                "win_r_net": round(win_r_net, 3),
+                "loss_r_net": round(loss_r_net, 3),
+                "expectancy": round(expectancy, 3),
+                "expectancy_net": round(exp_net, 3),
+                "proven": b_n >= CALIBRATE_MIN_N
+                and p_n >= CALIBRATE_MIN_PAPER_N
+                and exp_net > 0,
+            }
+        )
     return progress
 
 
@@ -393,8 +525,14 @@ def grind_verdict(progress: list[dict]) -> dict:
         p = by_type.get(pt)
         if p is None:
             ready = False
-            needed.append({"plan_type": pt, "backtest_n": 0, "paper_n": 0,
-                           "missing": "no samples yet"})
+            needed.append(
+                {
+                    "plan_type": pt,
+                    "backtest_n": 0,
+                    "paper_n": 0,
+                    "missing": "no samples yet",
+                }
+            )
             continue
 
         # Recompute this safety decision from its evidence instead of trusting
@@ -403,9 +541,11 @@ def grind_verdict(progress: list[dict]) -> dict:
         exp_net = p.get("expectancy_net")
         if exp_net is None:
             exp_net = p.get("expectancy", 0.0)
-        proven = (p["backtest_n"] >= CALIBRATE_MIN_N
-                  and p["paper_n"] >= CALIBRATE_MIN_PAPER_N
-                  and exp_net > 0)
+        proven = (
+            p["backtest_n"] >= CALIBRATE_MIN_N
+            and p["paper_n"] >= CALIBRATE_MIN_PAPER_N
+            and exp_net > 0
+        )
         if not proven:
             ready = False
             parts = []
@@ -415,15 +555,18 @@ def grind_verdict(progress: list[dict]) -> dict:
                 parts.append("paper")
             if exp_net <= 0:
                 parts.append("positive net expectancy")
-            needed.append({
-                "plan_type": pt, "backtest_n": p["backtest_n"],
-                "paper_n": p["paper_n"], "expectancy": p["expectancy"],
-                "expectancy_net": exp_net,
-                "missing": ", ".join(parts),
-            })
+            needed.append(
+                {
+                    "plan_type": pt,
+                    "backtest_n": p["backtest_n"],
+                    "paper_n": p["paper_n"],
+                    "expectancy": p["expectancy"],
+                    "expectancy_net": exp_net,
+                    "missing": ", ".join(parts),
+                }
+            )
     source_labels = sorted(
-        "pooled/unknown" if key is None else describe_source(key)
-        for key in source_keys
+        "pooled/unknown" if key is None else describe_source(key) for key in source_keys
     )
     return {
         "ready": ready,
@@ -431,14 +574,17 @@ def grind_verdict(progress: list[dict]) -> dict:
         "primary_plan_types": primary,
         "missing": needed,
         "source_is_canonical": source_is_canonical,
-        "source_keys": sorted("<pooled>" if key is None else str(key)
-                              for key in source_keys),
+        "source_keys": sorted(
+            "<pooled>" if key is None else str(key) for key in source_keys
+        ),
         "source_labels": source_labels or [describe_source(LIVE_SOURCE_KEY)],
-        "source_block": (None if source_is_canonical else
-                         "graduation requires canonical live-series evidence; "
-                         "research sources are reporting-only"),
-        "targets": {"backtest": CALIBRATE_MIN_N,
-                    "paper": CALIBRATE_MIN_PAPER_N},
+        "source_block": (
+            None
+            if source_is_canonical
+            else "graduation requires canonical live-series evidence; "
+            "research sources are reporting-only"
+        ),
+        "targets": {"backtest": CALIBRATE_MIN_N, "paper": CALIBRATE_MIN_PAPER_N},
     }
 
 
@@ -451,15 +597,18 @@ def grind_verdict(progress: list[dict]) -> dict:
 #   rule compliance >= 90%  (from the journal)
 # combined with the 100-backtest / 20-paper sample proof of grind_verdict.
 GRADUATION_CRITERIA: dict[str, float] = {
-    "expectancy": 0.50,   # average R per decided trade (backtest + paper)
-    "win_rate": 0.55,     # fraction of decided trades that won
-    "pf": 1.5,            # gross win R / gross loss R
-    "compliance": 0.90,   # P12.14: journaled-compliant / eligible real trades
+    "expectancy": 0.50,  # average R per decided trade (backtest + paper)
+    "win_rate": 0.55,  # fraction of decided trades that won
+    "pf": 1.5,  # gross win R / gross loss R
+    "compliance": 0.90,  # P12.14: journaled-compliant / eligible real trades
 }
 
 
-def graduation_status(progress: list[dict], compliance: float | None = None,
-                      discipline: dict | None = None) -> dict:
+def graduation_status(
+    progress: list[dict],
+    compliance: float | None = None,
+    discipline: dict | None = None,
+) -> dict:
     """Blueprint graduation gate: is the desk ready for PROGRESSION=micro?
 
     Aggregates every decided sample (backtest + paper, deduped) across the
@@ -494,48 +643,70 @@ def graduation_status(progress: list[dict], compliance: float | None = None,
     win_rate_net = round(wins_net / decided, 3) if decided else None
     pf = round(win_r / loss_r, 3) if loss_r > 0 else None
     pf_net = round(win_r_net / loss_r_net, 3) if loss_r_net > 0 else None
-    stats = {"plan_types": primary, "n": n, "decided": decided,
-             "expectancy": expectancy, "expectancy_net": expectancy_net,
-             "win_rate": win_rate, "win_rate_net": win_rate_net,
-             "pf": pf, "pf_net": pf_net,
-             "compliance": compliance}
+    stats = {
+        "plan_types": primary,
+        "n": n,
+        "decided": decided,
+        "expectancy": expectancy,
+        "expectancy_net": expectancy_net,
+        "win_rate": win_rate,
+        "win_rate_net": win_rate_net,
+        "pf": pf,
+        "pf_net": pf_net,
+        "compliance": compliance,
+    }
     met = {
         "expectancy": expectancy_net >= GRADUATION_CRITERIA["expectancy"],
-        "win_rate": (win_rate_net is not None and win_rate_net > GRADUATION_CRITERIA["win_rate"])
-                    if win_rate_net is not None else (win_rate is not None and win_rate > GRADUATION_CRITERIA["win_rate"]),
+        "win_rate": (
+            win_rate_net is not None and win_rate_net > GRADUATION_CRITERIA["win_rate"]
+        )
+        if win_rate_net is not None
+        else (win_rate is not None and win_rate > GRADUATION_CRITERIA["win_rate"]),
         "pf": (pf_net is not None and pf_net >= GRADUATION_CRITERIA["pf"])
-              or (pf_net is None and loss_r_net == 0 and win_r_net > 0),
+        or (pf_net is None and loss_r_net == 0 and win_r_net > 0),
         "compliance": compliance is not None
-                      and compliance >= GRADUATION_CRITERIA["compliance"],
+        and compliance >= GRADUATION_CRITERIA["compliance"],
     }
     verdict = grind_verdict(progress)
     samples_ok = verdict["ready"]
-    return {"ready": bool(samples_ok and all(met.values())),
-            "discipline": dict(discipline) if discipline else None,
-            "samples_proven": bool(samples_ok),
-            "sample_gaps": verdict["missing"],
-            "source_is_canonical": verdict["source_is_canonical"],
-            "source_keys": verdict["source_keys"],
-            "source_labels": verdict["source_labels"],
-            "source_block": verdict["source_block"],
-            "criteria": dict(GRADUATION_CRITERIA),
-            "stats": stats, "met": met}
+    return {
+        "ready": bool(samples_ok and all(met.values())),
+        "discipline": dict(discipline) if discipline else None,
+        "samples_proven": bool(samples_ok),
+        "sample_gaps": verdict["missing"],
+        "source_is_canonical": verdict["source_is_canonical"],
+        "source_keys": verdict["source_keys"],
+        "source_labels": verdict["source_labels"],
+        "source_block": verdict["source_block"],
+        "criteria": dict(GRADUATION_CRITERIA),
+        "stats": stats,
+        "met": met,
+    }
 
 
 def format_graduation(g: dict) -> str:
     """Human-readable graduation gate block (simulator + `agent ask`)."""
     s = g["stats"]
     c = g["criteria"]
-    lines = ["=" * 70, "GRADUATION GATE — ready for PROGRESSION=micro? "
-                       "(BLUEPRINT Step 2 → 3)", "-" * 70]
-    lines.append(f"  primary family : {', '.join(s['plan_types']) or 'none'} "
-                 f"({s['n']} decided samples)")
+    lines = [
+        "=" * 70,
+        "GRADUATION GATE — ready for PROGRESSION=micro? (BLUEPRINT Step 2 → 3)",
+        "-" * 70,
+    ]
+    lines.append(
+        f"  primary family : {', '.join(s['plan_types']) or 'none'} "
+        f"({s['n']} decided samples)"
+    )
     source_mark = "✓" if g.get("source_is_canonical", True) else "✗"
-    source_labels = ", ".join(g.get("source_labels") or
-                              [describe_source(LIVE_SOURCE_KEY)])
+    source_labels = ", ".join(
+        g.get("source_labels") or [describe_source(LIVE_SOURCE_KEY)]
+    )
     lines.append(f"  {source_mark} evidence source : {source_labels}")
-    exp_str = (f"{s.get('expectancy_net', s['expectancy']):+.3f}R (net)"
-               if "expectancy_net" in s else f"{s['expectancy']:+.3f}R")
+    exp_str = (
+        f"{s.get('expectancy_net', s['expectancy']):+.3f}R (net)"
+        if "expectancy_net" in s
+        else f"{s['expectancy']:+.3f}R"
+    )
     wr = s.get("win_rate_net", s.get("win_rate"))
     wr_str = f"{wr * 100:.1f}% (net)" if wr is not None else "n/a"
     pf = s.get("pf_net", s.get("pf"))
@@ -544,8 +715,14 @@ def format_graduation(g: dict) -> str:
         ("expectancy", exp_str, "≥ +0.50R", g["met"]["expectancy"]),
         ("win rate", wr_str, "> 55%", g["met"]["win_rate"]),
         ("profit factor", pf_str, "≥ 1.50", g["met"]["pf"]),
-        ("rule compliance", f"{s['compliance'] * 100:.1f}%" if s["compliance"] is not None
-         else "no real journaled trades", "≥ 90%", g["met"]["compliance"]),
+        (
+            "rule compliance",
+            f"{s['compliance'] * 100:.1f}%"
+            if s["compliance"] is not None
+            else "no real journaled trades",
+            "≥ 90%",
+            g["met"]["compliance"],
+        ),
     ]
     for name, value, target, ok in rows:
         mark = "✓" if ok else "✗"
@@ -555,55 +732,79 @@ def format_graduation(g: dict) -> str:
     d = g.get("discipline")
     if d:
         if d.get("eligible"):
-            detail = (f"{d['compliant']}/{d['eligible']} decided real trades on "
-                      f"{d.get('source') or describe_source(LIVE_SOURCE_KEY)}")
+            detail = (
+                f"{d['compliant']}/{d['eligible']} decided real trades on "
+                f"{d.get('source') or describe_source(LIVE_SOURCE_KEY)}"
+            )
             if d.get("missing_journals"):
                 detail += f", {d['missing_journals']} MISSING journal(s)"
             if d.get("violations"):
                 detail += f", {d['violations']} violation(s)"
         else:
-            detail = ("no decided real trades on the canonical live book — "
-                      "simulator samples do not count")
+            detail = (
+                "no decided real trades on the canonical live book — "
+                "simulator samples do not count"
+            )
         lines.append(f"    discipline    : {detail}")
     lines.append("-" * 70)
-    proof = ("✓ 100 backtest + 20 paper per primary setup" if g["samples_proven"]
-             else "✗ grind more history first")
+    proof = (
+        "✓ 100 backtest + 20 paper per primary setup"
+        if g["samples_proven"]
+        else "✗ grind more history first"
+    )
     lines.append(f"  sample proof  : {proof}")
     if g["ready"]:
-        lines.append("  ✅ GRADUATED — you may set PROGRESSION=micro in .env "
-                     "and trade small live size (0.5% risk/trade, -1.5% daily stop).")
+        lines.append(
+            "  ✅ GRADUATED — you may set PROGRESSION=micro in .env "
+            "and trade small live size (0.5% risk/trade, -1.5% daily stop)."
+        )
     else:
-        lines.append("  ⏳ not graduated — keep paper-trading; re-run "
-                     "`python main.py simulator` as new bars arrive, "
-                     "journal every trade.")
+        lines.append(
+            "  ⏳ not graduated — keep paper-trading; re-run "
+            "`python main.py simulator` as new bars arrive, "
+            "journal every trade."
+        )
     return "\n".join(lines)
 
 
 def format_progress(progress: list[dict], verdict: dict) -> str:
-    lines = ["=" * 70, "SIMULATOR GRIND — unique learning samples per setup",
-             "-" * 70,
-             f"  {'PLAN TYPE':<26}{'BACKTEST':>10}{'PAPER':>8}{'E_NET':>10}  PROVEN"]
+    lines = [
+        "=" * 70,
+        "SIMULATOR GRIND — unique learning samples per setup",
+        "-" * 70,
+        f"  {'PLAN TYPE':<26}{'BACKTEST':>10}{'PAPER':>8}{'E_NET':>10}  PROVEN",
+    ]
     for p in progress:
         mark = "✓" if p["proven"] else "·"
         exp_net = p.get("expectancy_net")
         if exp_net is None:  # legacy callers without cost measurements
             exp_net = p["expectancy"]
-        lines.append(f"  {p['plan_type']:<26}{p['backtest_n']:>6}/{p['backtest_target']}"
-                     f"{p['paper_n']:>5}/{p['paper_target']}{exp_net:>+9.3f}R  {mark}")
+        lines.append(
+            f"  {p['plan_type']:<26}{p['backtest_n']:>6}/{p['backtest_target']}"
+            f"{p['paper_n']:>5}/{p['paper_target']}{exp_net:>+9.3f}R  {mark}"
+        )
     lines.append("-" * 70)
-    lines.append(f"  primary setup family: {verdict['primary_setup_family']} "
-                 f"({', '.join(verdict['primary_plan_types']) or 'none'})")
+    lines.append(
+        f"  primary setup family: {verdict['primary_setup_family']} "
+        f"({', '.join(verdict['primary_plan_types']) or 'none'})"
+    )
     if verdict["ready"]:
-        lines.append("  ✅ PRIMARY SETUPS PROVEN — you may set PROGRESSION=micro "
-                     "in .env (paper-trade 100–200 samples on small real capital).")
+        lines.append(
+            "  ✅ PRIMARY SETUPS PROVEN — you may set PROGRESSION=micro "
+            "in .env (paper-trade 100–200 samples on small real capital)."
+        )
     else:
         lines.append("  ⏳ not proven yet:")
         if verdict.get("source_block"):
             lines.append(f"     source: {verdict['source_block']}")
         for m in verdict["missing"]:
-            lines.append(f"     {m['plan_type']}: missing {m['missing']} "
-                         f"(backtest {m['backtest_n']}/{CALIBRATE_MIN_N}, "
-                         f"paper {m['paper_n']}/{CALIBRATE_MIN_PAPER_N})")
-        lines.append("     re-run `python main.py simulator` on live data as "
-                     "new bars arrive, or use a longer window (--bars / --step 1).")
+            lines.append(
+                f"     {m['plan_type']}: missing {m['missing']} "
+                f"(backtest {m['backtest_n']}/{CALIBRATE_MIN_N}, "
+                f"paper {m['paper_n']}/{CALIBRATE_MIN_PAPER_N})"
+            )
+        lines.append(
+            "     re-run `python main.py simulator` on live data as "
+            "new bars arrive, or use a longer window (--bars / --step 1)."
+        )
     return "\n".join(lines)

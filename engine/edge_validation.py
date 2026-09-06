@@ -34,13 +34,12 @@ Design notes
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 import numpy as np
 
 from data.backtester import GradedPlan, run_backtest
 from data.validation import bucket_by_window, walk_forward_windows, window_stats
-
 
 # The windows that count as *untouched* evidence.  Train and val are where the
 # walk effectively selects/calibrates; OOS + recent are the sealed/unseen tail.
@@ -51,9 +50,11 @@ EDGE_CONFIRMED = "EDGE_CONFIRMED"
 NO_EDGE = "NO EDGE"
 INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 
-DEFAULT_MIN_DECIDED = 30          # overall decisive sample floor
-DEFAULT_REGIME_MIN_DECIDED = 10   # a regime must reach this to count as sampled
-DEFAULT_POSITIVE_REGIME_FRAC = 0.5  # majority of well-sampled regimes must be net-positive
+DEFAULT_MIN_DECIDED = 30  # overall decisive sample floor
+DEFAULT_REGIME_MIN_DECIDED = 10  # a regime must reach this to count as sampled
+DEFAULT_POSITIVE_REGIME_FRAC = (
+    0.5  # majority of well-sampled regimes must be net-positive
+)
 
 
 def net_r(g: GradedPlan) -> float:
@@ -63,11 +64,13 @@ def net_r(g: GradedPlan) -> float:
     return float(g.rr_achieved or 0.0)
 
 
-def monte_carlo_decisive(plans: list[GradedPlan],
-                         samples: int = 2_000,
-                         risk_pct: float = 1.0,
-                         ruin_threshold_pct: float = 50.0,
-                         seed: Optional[int] = None) -> dict:
+def monte_carlo_decisive(
+    plans: list[GradedPlan],
+    samples: int = 2_000,
+    risk_pct: float = 1.0,
+    ruin_threshold_pct: float = 50.0,
+    seed: int | None = None,
+) -> dict:
     """Monte-Carlo resampling of the decisive-window net R series (P13.5).
 
     Reports expectancy stability (p5 / p50 / p95), expected maximum drawdown,
@@ -98,14 +101,15 @@ def monte_carlo_decisive(plans: list[GradedPlan],
     """
     # Filter to decided outcomes — only FULL_WIN / PARTIAL_WIN / LOSS carry
     # a meaningful R.  UNDECIDED / EXPIRED are not evidence.
-    decided = [g for g in plans
-               if g.outcome in ("FULL_WIN", "PARTIAL_WIN", "LOSS")]
+    decided = [g for g in plans if g.outcome in ("FULL_WIN", "PARTIAL_WIN", "LOSS")]
     outcomes = np.array([net_r(g) for g in decided], dtype=float)
     n = len(outcomes)
     if n < 2:
-        return {"available": False,
-                "note": f"need >= 2 decided trades for MC; have {n}",
-                "n_trades": n}
+        return {
+            "available": False,
+            "note": f"need >= 2 decided trades for MC; have {n}",
+            "n_trades": n,
+        }
 
     rng = np.random.default_rng(seed)
     start = 10_000.0
@@ -123,9 +127,8 @@ def monte_carlo_decisive(plans: list[GradedPlan],
         peak = start
         dd = 0.0
         for rr in perm:
-            equity *= (1.0 + rr * growth)
-            if equity > peak:
-                peak = equity
+            equity *= 1.0 + rr * growth
+            peak = max(peak, equity)
             dd = max(dd, 1.0 - equity / peak)
         terminals[s] = equity
         max_dds[s] = dd
@@ -190,9 +193,11 @@ def segment_by_regime(plans: Iterable[GradedPlan]) -> dict[str, list[GradedPlan]
     return out
 
 
-def regime_edge_report(plans: list[GradedPlan],
-                       regime_min_decided: int = DEFAULT_REGIME_MIN_DECIDED,
-                       decisive_windows: tuple[str, ...] = DECISIVE_WINDOWS) -> dict:
+def regime_edge_report(
+    plans: list[GradedPlan],
+    regime_min_decided: int = DEFAULT_REGIME_MIN_DECIDED,
+    decisive_windows: tuple[str, ...] = DECISIVE_WINDOWS,
+) -> dict:
     """Per-regime and overall edge statistics for a set of decisive plans.
 
     ``plans`` should already be restricted to the decisive windows.  Returns
@@ -201,21 +206,24 @@ def regime_edge_report(plans: list[GradedPlan],
     """
     overall = edge_stats(plans)
     per_regime = {
-        regime: edge_stats(group)
-        for regime, group in segment_by_regime(plans).items()
+        regime: edge_stats(group) for regime, group in segment_by_regime(plans).items()
     }
     sampled = []
     for regime, stats in per_regime.items():
-        sampled.append({
-            "regime": regime,
-            "decided": stats["decided"],
-            "expectancy_net": stats.get("expectancy_net"),
-            "win_rate_net": stats.get("win_rate_net"),
-            "pf_net": stats.get("pf_net"),
-            "positive_net": bool(stats.get("expectancy_net") is not None
-                                 and stats.get("expectancy_net", 0.0) > 0),
-            "well_sampled": stats["decided"] >= regime_min_decided,
-        })
+        sampled.append(
+            {
+                "regime": regime,
+                "decided": stats["decided"],
+                "expectancy_net": stats.get("expectancy_net"),
+                "win_rate_net": stats.get("win_rate_net"),
+                "pf_net": stats.get("pf_net"),
+                "positive_net": bool(
+                    stats.get("expectancy_net") is not None
+                    and stats.get("expectancy_net", 0.0) > 0
+                ),
+                "well_sampled": stats["decided"] >= regime_min_decided,
+            }
+        )
     sampled = sorted(sampled, key=lambda r: -r["decided"])
     well_sampled = [r for r in sampled if r["well_sampled"]]
     return {
@@ -227,12 +235,14 @@ def regime_edge_report(plans: list[GradedPlan],
     }
 
 
-def edge_verdict(report: dict,
-                 min_decided: int = DEFAULT_MIN_DECIDED,
-                 positive_regime_frac: float = DEFAULT_POSITIVE_REGIME_FRAC,
-                 regime_min_decided: int = DEFAULT_REGIME_MIN_DECIDED,
-                 monte: Optional[dict] = None,
-                 monte_floor: bool = True) -> dict:
+def edge_verdict(
+    report: dict,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    positive_regime_frac: float = DEFAULT_POSITIVE_REGIME_FRAC,
+    regime_min_decided: int = DEFAULT_REGIME_MIN_DECIDED,
+    monte: dict | None = None,
+    monte_floor: bool = True,
+) -> dict:
     """Decide EDGE_CONFIRMED / NO EDGE / INSUFFICIENT_DATA from a regime report.
 
     Rules (all evaluated NET of costs):
@@ -272,8 +282,10 @@ def edge_verdict(report: dict,
         exp = 0.0 if exp_net is None else round(float(exp_net), 3)
         return {
             "verdict": NO_EDGE,
-            "reasons": [f"net expectancy {exp:+.3f}R <= 0 — the edge does not "
-                        "survive costs on untouched windows"],
+            "reasons": [
+                f"net expectancy {exp:+.3f}R <= 0 — the edge does not "
+                "survive costs on untouched windows"
+            ],
             "overall": _public_stats(overall),
             "regimes": report.get("regimes", []),
             "positive_regime_frac": positive_regime_frac,
@@ -283,18 +295,19 @@ def edge_verdict(report: dict,
         }
 
     # Regime stability.
-    well_sampled = [r for r in report.get("regimes", [])
-                    if r.get("well_sampled")]
+    well_sampled = [r for r in report.get("regimes", []) if r.get("well_sampled")]
     if well_sampled:
         positive = sum(1 for r in well_sampled if r.get("positive_net"))
         frac = positive / len(well_sampled)
         if frac < positive_regime_frac - 1e-9:
             return {
                 "verdict": NO_EDGE,
-                "reasons": [f"positive net expectancy in only {positive}/"
-                            f"{len(well_sampled)} well-sampled regimes "
-                            f"({frac:.0%} < {positive_regime_frac:.0%}) — the "
-                            "edge is not stable across regimes"],
+                "reasons": [
+                    f"positive net expectancy in only {positive}/"
+                    f"{len(well_sampled)} well-sampled regimes "
+                    f"({frac:.0%} < {positive_regime_frac:.0%}) — the "
+                    "edge is not stable across regimes"
+                ],
                 "overall": _public_stats(overall),
                 "regimes": report.get("regimes", []),
                 "positive_regime_frac": positive_regime_frac,
@@ -302,12 +315,13 @@ def edge_verdict(report: dict,
                 "decisive_windows": _decisive,
                 "monte": monte,
             }
-        stability_note = (f"stable across {len(well_sampled)} well-sampled "
-                          f"regime(s)")
+        stability_note = f"stable across {len(well_sampled)} well-sampled regime(s)"
     else:
-        stability_note = ("stability across regimes not measurable "
-                          "(no regime reached the sample floor) — treat this "
-                          "confirmation as provisional")
+        stability_note = (
+            "stability across regimes not measurable "
+            "(no regime reached the sample floor) — treat this "
+            "confirmation as provisional"
+        )
 
     # P13.5 — Monte-Carlo floor: 5th-percentile expectancy must be > 0.
     if monte and monte.get("available") and monte_floor:
@@ -328,9 +342,11 @@ def edge_verdict(report: dict,
                 "decisive_windows": _decisive,
                 "monte": monte,
             }
-        stability_note += (f"; MC p5 expectancy {p5_exp:+.4f}R > 0 "
-                           f"({monte['n_trades']} trades, "
-                           f"{monte['samples']} samples)")
+        stability_note += (
+            f"; MC p5 expectancy {p5_exp:+.4f}R > 0 "
+            f"({monte['n_trades']} trades, "
+            f"{monte['samples']} samples)"
+        )
 
     return {
         "verdict": EDGE_CONFIRMED,
@@ -365,6 +381,7 @@ def _public_stats(stats: dict) -> dict:
 # live paper book (P11).  It is a comparison surface only — it never approves,
 # never moves a threshold, never places an order.
 
+
 def paper_stats_from_rows(rows: list[dict]) -> dict:
     """Aggregate the canonical live paper book (P11) into public stats.
 
@@ -397,8 +414,11 @@ def paper_stats_from_rows(rows: list[dict]) -> dict:
         "losses": losses,
         "expectancy_net": round(float(np.mean(net)), 3),
         "win_rate_net": round(wins_net / len(decided), 4),
-        "pf_net": (round(win_r_net / loss_r_net, 3) if loss_r_net > 0
-                   else (99.0 if win_r_net > 0 else None)),
+        "pf_net": (
+            round(win_r_net / loss_r_net, 3)
+            if loss_r_net > 0
+            else (99.0 if win_r_net > 0 else None)
+        ),
     }
 
 
@@ -407,24 +427,34 @@ def _ladder_note(rungs: dict) -> str:
     oos = rungs.get("oos") or {}
     paper = rungs.get("paper") or {}
     if not oos.get("decided"):
-        return ("OOS rung empty — the decisive-window sample is too thin; "
-                "the ladder cannot show an honest backtest → OOS → paper "
-                "degradation yet")
+        return (
+            "OOS rung empty — the decisive-window sample is too thin; "
+            "the ladder cannot show an honest backtest → OOS → paper "
+            "degradation yet"
+        )
     if not paper.get("decided"):
-        return ("paper rung empty — no decided canonical live trades yet; "
-                "simulator rows never count (P12.13). Keep grinding P11.")
+        return (
+            "paper rung empty — no decided canonical live trades yet; "
+            "simulator rows never count (P12.13). Keep grinding P11."
+        )
     oos_e = oos.get("expectancy_net")
     paper_e = paper.get("expectancy_net")
     if oos_e is None or paper_e is None:
-        return ("rungs have decided samples but net expectancy is missing on "
-                "one of them — treat the ladder as partial")
+        return (
+            "rungs have decided samples but net expectancy is missing on "
+            "one of them — treat the ladder as partial"
+        )
     if paper_e < oos_e:
-        return (f"paper expectancy {paper_e:+.3f}R is below OOS "
-                f"{oos_e:+.3f}R (Δ {paper_e - oos_e:+.3f}R) — expected "
-                "degradation as costs, slippage and human decisions enter "
-                "the ladder")
-    return (f"paper expectancy {paper_e:+.3f}R holds at or above OOS "
-            f"{oos_e:+.3f}R — no degradation measured on this book")
+        return (
+            f"paper expectancy {paper_e:+.3f}R is below OOS "
+            f"{oos_e:+.3f}R (Δ {paper_e - oos_e:+.3f}R) — expected "
+            "degradation as costs, slippage and human decisions enter "
+            "the ladder"
+        )
+    return (
+        f"paper expectancy {paper_e:+.3f}R holds at or above OOS "
+        f"{oos_e:+.3f}R — no degradation measured on this book"
+    )
 
 
 def compare_ladder(report: dict, paper_stats: dict) -> dict:
@@ -457,12 +487,16 @@ def format_compare_ladder(report: dict) -> str:
     if not ladder:
         return ""
     rungs = ladder.get("rungs", {})
-    lines = ["-" * 70,
-             "  COMPARE LADDER  backtest -> OOS -> paper (P13.6):",
-             f"  {'rung':<26}{'n':>5}{'exp_net':>10}{'wr_net':>9}{'pf_net':>8}"]
-    for name, label in (("backtest", "BACKTEST (all windows)"),
-                        ("oos", "OOS + RECENT (decisive)"),
-                        ("paper", "PAPER (canonical live)")):
+    lines = [
+        "-" * 70,
+        "  COMPARE LADDER  backtest -> OOS -> paper (P13.6):",
+        f"  {'rung':<26}{'n':>5}{'exp_net':>10}{'wr_net':>9}{'pf_net':>8}",
+    ]
+    for name, label in (
+        ("backtest", "BACKTEST (all windows)"),
+        ("oos", "OOS + RECENT (decisive)"),
+        ("paper", "PAPER (canonical live)"),
+    ):
         s = rungs.get(name) or {}
         if not s or not s.get("decided"):
             lines.append(f"  {label:<26}{'—':>5}{'n/a':>10}{'':>9}{'':>8}")
@@ -479,21 +513,28 @@ def format_compare_ladder(report: dict) -> str:
     return "\n".join(lines)
 
 
-def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
-                         horizons: Optional[list[float]] = None,
-                         min_bars: int = 120, step: int = 3,
-                         min_confidence: int = 55,
-                         min_decided: int = DEFAULT_MIN_DECIDED,
-                         regime_min_decided: int = DEFAULT_REGIME_MIN_DECIDED,
-                         positive_regime_frac: float = DEFAULT_POSITIVE_REGIME_FRAC,
-                         decisive_windows: tuple[str, ...] = DECISIVE_WINDOWS,
-                         train_frac: float = 0.60, val_frac: float = 0.15,
-                         oos_frac: float = 0.15, recent_frac: float = 0.10,
-                         monte: bool = False,
-                         monte_samples: int = 2_000,
-                         monte_risk_pct: float = 1.0,
-                         monte_seed: Optional[int] = None,
-                         paper_rows: Optional[list] = None) -> dict:
+def edge_validate_report(
+    df,
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    horizons: list[float] | None = None,
+    min_bars: int = 120,
+    step: int = 3,
+    min_confidence: int = 55,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    regime_min_decided: int = DEFAULT_REGIME_MIN_DECIDED,
+    positive_regime_frac: float = DEFAULT_POSITIVE_REGIME_FRAC,
+    decisive_windows: tuple[str, ...] = DECISIVE_WINDOWS,
+    train_frac: float = 0.60,
+    val_frac: float = 0.15,
+    oos_frac: float = 0.15,
+    recent_frac: float = 0.10,
+    monte: bool = False,
+    monte_samples: int = 2_000,
+    monte_risk_pct: float = 1.0,
+    monte_seed: int | None = None,
+    paper_rows: list | None = None,
+) -> dict:
     """Run the no-look-ahead walk and produce the decisive-window edge verdict.
 
     One pass of the engine over the series, outcomes graded only after the
@@ -512,22 +553,30 @@ def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
     """
     df = df.reset_index(drop=True).copy()
     if len(df) <= min_bars:
-        return {"ok": False,
-                "error": f"series has {len(df)} bars; need > min_bars={min_bars}"}
+        return {
+            "ok": False,
+            "error": f"series has {len(df)} bars; need > min_bars={min_bars}",
+        }
 
     try:
-        windows = walk_forward_windows(len(df), min_bars, train_frac, val_frac,
-                                       oos_frac, recent_frac)
+        windows = walk_forward_windows(
+            len(df), min_bars, train_frac, val_frac, oos_frac, recent_frac
+        )
     except Exception as exc:  # ValidationWindowError
         return {"ok": False, "error": str(exc)}
 
     horizons = horizons or [1.0]
     primary = horizons[0]
-    result = run_backtest(df, symbol=symbol, timeframe=timeframe,
-                          horizons=horizons, min_bars=min_bars, step=step,
-                          min_confidence=min_confidence)
-    graded = [g for g in result["graded"]
-              if abs(g.horizon_hours - primary) < 0.01]
+    result = run_backtest(
+        df,
+        symbol=symbol,
+        timeframe=timeframe,
+        horizons=horizons,
+        min_bars=min_bars,
+        step=step,
+        min_confidence=min_confidence,
+    )
+    graded = [g for g in result["graded"] if abs(g.horizon_hours - primary) < 0.01]
 
     ts_to_index = {int(t): i for i, t in enumerate(df["ts"])}
     buckets = bucket_by_window(graded, windows, ts_to_index)
@@ -535,34 +584,48 @@ def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
     for name in decisive_windows:
         decisive.extend(buckets.get(name, []))
 
-    report = regime_edge_report(decisive, regime_min_decided=regime_min_decided,
-                                decisive_windows=decisive_windows)
+    report = regime_edge_report(
+        decisive,
+        regime_min_decided=regime_min_decided,
+        decisive_windows=decisive_windows,
+    )
 
     # P13.5 — Monte-Carlo on the decisive-window R series.
-    mc_block: Optional[dict] = None
+    mc_block: dict | None = None
     if monte:
         mc_block = monte_carlo_decisive(
-            decisive, samples=monte_samples, risk_pct=monte_risk_pct,
-            seed=monte_seed)
+            decisive, samples=monte_samples, risk_pct=monte_risk_pct, seed=monte_seed
+        )
 
-    verdict = edge_verdict(report, min_decided=min_decided,
-                           positive_regime_frac=positive_regime_frac,
-                           regime_min_decided=regime_min_decided,
-                           monte=mc_block)
-    per_window = {name: _public_stats(window_stats(buckets.get(name, [])))
-                  for name in ("train", "val", "oos", "recent")}
+    verdict = edge_verdict(
+        report,
+        min_decided=min_decided,
+        positive_regime_frac=positive_regime_frac,
+        regime_min_decided=regime_min_decided,
+        monte=mc_block,
+    )
+    per_window = {
+        name: _public_stats(window_stats(buckets.get(name, [])))
+        for name in ("train", "val", "oos", "recent")
+    }
     meta = {
-        "symbol": symbol, "timeframe": timeframe,
+        "symbol": symbol,
+        "timeframe": timeframe,
         "primary_horizon_hours": primary,
-        "bars_total": len(df), "bars_analyzed": result["report"]["meta"]["bars_analyzed"],
+        "bars_total": len(df),
+        "bars_analyzed": result["report"]["meta"]["bars_analyzed"],
         "plans_generated": result["report"]["meta"]["plans_generated"],
         "runtime_seconds": result["report"]["meta"]["runtime_seconds"],
         "min_decided": min_decided,
         "regime_min_decided": regime_min_decided,
         "positive_regime_frac": positive_regime_frac,
         "decisive_windows": list(decisive_windows),
-        "window_fractions": {"train": train_frac, "val": val_frac,
-                             "oos": oos_frac, "recent": recent_frac},
+        "window_fractions": {
+            "train": train_frac,
+            "val": val_frac,
+            "oos": oos_frac,
+            "recent": recent_frac,
+        },
     }
     if mc_block:
         meta["monte"] = True
@@ -585,30 +648,34 @@ def edge_validate_report(df, symbol: str = "BTCUSDT", timeframe: str = "15m",
 def format_edge_verdict(report: dict) -> str:
     """Human-readable edge block in the honest NO-EDGE style."""
     if not report.get("ok"):
-        return "EDGE VALIDATION — could not run\n  " + str(report.get("error", "unknown"))
+        return "EDGE VALIDATION — could not run\n  " + str(
+            report.get("error", "unknown")
+        )
     edge = report["edge"]
     meta = report["meta"]
     o = edge["overall"]
     exp = o.get("expectancy_net")
     exp_str = f"{exp:+.3f}R" if exp is not None else "n/a"
     wr = o.get("win_rate_net")
-    wr_str = f"{wr*100:.1f}%" if wr is not None else "n/a"
+    wr_str = f"{wr * 100:.1f}%" if wr is not None else "n/a"
     pf = o.get("pf_net")
     pf_str = f"{pf:.2f}" if pf is not None else "n/a"
 
-    lines = ["=" * 70,
-             f"EDGE VALIDATION  {meta['symbol']} {meta['timeframe']}  "
-             f"primary {meta['primary_horizon_hours']}h",
-             "-" * 70,
-             f"  decisive windows : {', '.join(meta['decisive_windows'])} "
-             f"(unseen by the walk)",
-             f"  decided samples  : {o['decided']}   (wins {o['wins']} / "
-             f"losses {o['losses']})",
-             f"  expectancy (net) : {exp_str}",
-             f"  win rate (net)   : {wr_str}",
-             f"  profit factor    : {pf_str}",
-             "-" * 70,
-             "  by regime (net expectancy):"]
+    lines = [
+        "=" * 70,
+        f"EDGE VALIDATION  {meta['symbol']} {meta['timeframe']}  "
+        f"primary {meta['primary_horizon_hours']}h",
+        "-" * 70,
+        f"  decisive windows : {', '.join(meta['decisive_windows'])} "
+        f"(unseen by the walk)",
+        f"  decided samples  : {o['decided']}   (wins {o['wins']} / "
+        f"losses {o['losses']})",
+        f"  expectancy (net) : {exp_str}",
+        f"  win rate (net)   : {wr_str}",
+        f"  profit factor    : {pf_str}",
+        "-" * 70,
+        "  by regime (net expectancy):",
+    ]
     if not edge["regimes"]:
         lines.append("    (no decided samples on decisive windows)")
     for r in edge["regimes"]:
@@ -616,36 +683,50 @@ def format_edge_verdict(report: dict) -> str:
         rexp_str = f"{rexp:+.3f}R" if rexp is not None else "n/a"
         mark = "✓" if r.get("positive_net") else "✗"
         flag = "  well-sampled" if r.get("well_sampled") else "  thin"
-        lines.append(f"    {mark} {r['regime']:<22} n={r['decided']:>4}  "
-                     f"exp {rexp_str}{flag}")
+        lines.append(
+            f"    {mark} {r['regime']:<22} n={r['decided']:>4}  exp {rexp_str}{flag}"
+        )
 
     # P13.5 — Monte-Carlo stability block.
     mc = report.get("monte") or edge.get("monte")
     if mc and mc.get("available"):
         lines.append("-" * 70)
         lines.append("  MONTE CARLO (decisive-window resampling):")
-        lines.append(f"    trades {mc['n_trades']}  samples {mc['samples']}  "
-                     f"risk {mc['risk_pct']}%/trade")
+        lines.append(
+            f"    trades {mc['n_trades']}  samples {mc['samples']}  "
+            f"risk {mc['risk_pct']}%/trade"
+        )
         e = mc["expectancy"]
-        lines.append(f"    expectancy  p5 {e['p5']:+.4f}R   "
-                     f"p50 {e['p50']:+.4f}R   p95 {e['p95']:+.4f}R")
+        lines.append(
+            f"    expectancy  p5 {e['p5']:+.4f}R   "
+            f"p50 {e['p50']:+.4f}R   p95 {e['p95']:+.4f}R"
+        )
         dd = mc["drawdown"]
-        lines.append(f"    drawdown    median {dd['median_pct']:.1f}%   "
-                     f"p95 {dd['p95_pct']:.1f}%")
-        lines.append(f"    ruin prob   {mc['ruin_prob']*100:.1f}%   "
-                     f"(>= {mc['ruin_threshold_pct']}% drawdown)")
-        lines.append(f"    below start {mc['prob_below_start']*100:.1f}%   "
-                     f"loss streak p50 {mc['longest_loss_streak_p50']}")
+        lines.append(
+            f"    drawdown    median {dd['median_pct']:.1f}%   p95 {dd['p95_pct']:.1f}%"
+        )
+        lines.append(
+            f"    ruin prob   {mc['ruin_prob'] * 100:.1f}%   "
+            f"(>= {mc['ruin_threshold_pct']}% drawdown)"
+        )
+        lines.append(
+            f"    below start {mc['prob_below_start'] * 100:.1f}%   "
+            f"loss streak p50 {mc['longest_loss_streak_p50']}"
+        )
         eq = mc["equity"]
-        lines.append(f"    equity      p5 {eq['p5']:,.0f}   "
-                     f"p50 {eq['p50']:,.0f}   p95 {eq['p95']:,.0f}")
+        lines.append(
+            f"    equity      p5 {eq['p5']:,.0f}   "
+            f"p50 {eq['p50']:,.0f}   p95 {eq['p95']:,.0f}"
+        )
         # MC floor check
         p5_exp = e["p5"]
         if p5_exp > 0:
             lines.append(f"    MC floor    ✓ p5 expectancy {p5_exp:+.4f}R > 0")
         else:
-            lines.append(f"    MC floor    ✗ p5 expectancy {p5_exp:+.4f}R <= 0 "
-                         f"— edge not stable under resampling")
+            lines.append(
+                f"    MC floor    ✗ p5 expectancy {p5_exp:+.4f}R <= 0 "
+                f"— edge not stable under resampling"
+            )
     elif mc and not mc.get("available"):
         lines.append("-" * 70)
         lines.append(f"  MONTE CARLO: unavailable — {mc.get('note', 'unknown')}")

@@ -1,4 +1,5 @@
 """P12.12 tests for the read-only PAXG/XAU promotion-evidence dossier."""
+
 from __future__ import annotations
 
 import json
@@ -27,14 +28,16 @@ def _prices(ts, closes, price_type=None):
 
 
 def _candles(ts, closes, *, exchange, symbol, price_type=""):
-    raw = pd.DataFrame({
-        "ts": ts,
-        "open": closes,
-        "high": [value + 1 for value in closes],
-        "low": [value - 1 for value in closes],
-        "close": closes,
-        "volume": [1.0] * len(ts),
-    })
+    raw = pd.DataFrame(
+        {
+            "ts": ts,
+            "open": closes,
+            "high": [value + 1 for value in closes],
+            "low": [value - 1 for value in closes],
+            "close": closes,
+            "volume": [1.0] * len(ts),
+        }
+    )
     return normalise_klines(
         raw,
         exchange=exchange,
@@ -47,12 +50,13 @@ def _candles(ts, closes, *, exchange, symbol, price_type=""):
     )
 
 
-def _write_seal(directory: Path, *, pass_bar=True, criteria=None, fingerprint="sealed-1"):
+def _write_seal(
+    directory: Path, *, pass_bar=True, criteria=None, fingerprint="sealed-1"
+):
     directory.mkdir(parents=True, exist_ok=True)
     criteria = criteria or dict(GRADUATION_CRITERIA)
     windows = {
-        name: {"bar_met": bool(pass_bar)}
-        for name in ("train", "val", "oos", "recent")
+        name: {"bar_met": bool(pass_bar)} for name in ("train", "val", "oos", "recent")
     }
     payload = {
         "ok": True,
@@ -289,7 +293,11 @@ def test_dossier_reads_separate_store_keys_and_never_promotes(tmp_path):
     store = CandleStore(root=store_root)
     ts = [1_700_000_000_000 + i * 900_000 for i in range(4)]
     store.write(_candles(ts, [2010.0] * 4, exchange="binance", symbol="PAXGUSDT"))
-    store.write(_candles(ts, [2000.0] * 4, exchange="dukascopy", symbol="XAUUSD", price_type="bid"))
+    store.write(
+        _candles(
+            ts, [2000.0] * 4, exchange="dukascopy", symbol="XAUUSD", price_type="bid"
+        )
+    )
     _write_seal(seal_dir)
 
     dossier = build_xau_evidence_dossier(
@@ -318,7 +326,15 @@ def test_failed_oos_keeps_human_review_closed(tmp_path):
     store = CandleStore(root=store_root)
     ts = [1_700_000_000_000 + i * 900_000 for i in range(2)]
     store.write(_candles(ts, [2010.0, 2011.0], exchange="binance", symbol="PAXGUSDT"))
-    store.write(_candles(ts, [2000.0, 2001.0], exchange="dukascopy", symbol="XAUUSD", price_type="bid"))
+    store.write(
+        _candles(
+            ts,
+            [2000.0, 2001.0],
+            exchange="dukascopy",
+            symbol="XAUUSD",
+            price_type="bid",
+        )
+    )
     _write_seal(seal_dir, pass_bar=False)
 
     dossier = build_xau_evidence_dossier(
@@ -335,12 +351,16 @@ def test_cli_clean_checkout_fails_without_manufacturing_evidence(tmp_path, capsy
     store_root = tmp_path / "absent-store"
     seal_dir = tmp_path / "absent-seals"
 
-    rc = main([
-        "xau-evidence",
-        "--store-root", str(store_root),
-        "--seal-dir", str(seal_dir),
-        "--json",
-    ])
+    rc = main(
+        [
+            "xau-evidence",
+            "--store-root",
+            str(store_root),
+            "--seal-dir",
+            str(seal_dir),
+            "--json",
+        ]
+    )
     payload = json.loads(capsys.readouterr().out)
 
     assert rc == 1

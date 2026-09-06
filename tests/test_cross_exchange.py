@@ -5,6 +5,7 @@ Milestone deliverable (docs/DATA_INFRASTRUCTURE_ROADMAP.md §9):
 same function health/preflight already call. All tests are fully
 offline (FakeVenueTransport + tmp stores + injected clock).
 """
+
 from __future__ import annotations
 
 import pandas as pd
@@ -34,7 +35,7 @@ from data.derivatives import DerivativesStore, coerce_derivative_frame
 from data.store import CandleStore, normalise_klines
 
 EXCH_BYBIT, MARKET, SYMBOL = "bybit", "perp", "BTCUSDT"
-START = 1_749_600_000_000          # hour-aligned AND 8h-aligned
+START = 1_749_600_000_000  # hour-aligned AND 8h-aligned
 HOUR = 3_600_000
 STEP_1M = 60_000
 FUND_STEP = 8 * HOUR
@@ -55,46 +56,90 @@ def derivs(tmp_path):
     return DerivativesStore(root=tmp_path / "derivs")
 
 
-def _candles(exchange: str, closes: list[float], *,
-             start: int = START, step: int = STEP_1M) -> pd.DataFrame:
+def _candles(
+    exchange: str, closes: list[float], *, start: int = START, step: int = STEP_1M
+) -> pd.DataFrame:
     rows = []
     for i, close in enumerate(closes):
         ts = start + i * step
-        rows.append({
-            "ts": ts, "open": close, "high": close + 1, "low": close - 1,
-            "close": close, "volume": 10.0,
-        })
+        rows.append(
+            {
+                "ts": ts,
+                "open": close,
+                "high": close + 1,
+                "low": close - 1,
+                "close": close,
+                "volume": 10.0,
+            }
+        )
     return normalise_klines(
-        pd.DataFrame(rows), exchange=exchange, market=MARKET,
-        symbol=SYMBOL, timeframe="1m", ingested_at=start)
+        pd.DataFrame(rows),
+        exchange=exchange,
+        market=MARKET,
+        symbol=SYMBOL,
+        timeframe="1m",
+        ingested_at=start,
+    )
 
 
-def _funding_frame(exchange: str, rates: list[float], *,
-                   start: int = START, step: int = FUND_STEP) -> pd.DataFrame:
-    return coerce_derivative_frame([
-        {"ts": start + i * step, "exchange": exchange, "market": "perp",
-         "symbol": SYMBOL, "metric": "funding_rate", "value": rate,
-         "ingested_at": start}
-        for i, rate in enumerate(rates)
-    ])
+def _funding_frame(
+    exchange: str, rates: list[float], *, start: int = START, step: int = FUND_STEP
+) -> pd.DataFrame:
+    return coerce_derivative_frame(
+        [
+            {
+                "ts": start + i * step,
+                "exchange": exchange,
+                "market": "perp",
+                "symbol": SYMBOL,
+                "metric": "funding_rate",
+                "value": rate,
+                "ingested_at": start,
+            }
+            for i, rate in enumerate(rates)
+        ]
+    )
 
 
-def collect(store, *, candle_store=None, deriv_store=None, transport=None,
-            since=None, until=None, snapshot=True, dry_run=False,
-            binance_last=None, binance_funding=None, clock=None):
-    t = transport if transport is not None else FakeVenueTransport(
-        start_ts=START, end_ts=START + 4 * FUND_STEP)
+def collect(
+    store,
+    *,
+    candle_store=None,
+    deriv_store=None,
+    transport=None,
+    since=None,
+    until=None,
+    snapshot=True,
+    dry_run=False,
+    binance_last=None,
+    binance_funding=None,
+    clock=None,
+):
+    t = (
+        transport
+        if transport is not None
+        else FakeVenueTransport(start_ts=START, end_ts=START + 4 * FUND_STEP)
+    )
     return CrossExchangeCollector(
-        store, candle_store=candle_store, deriv_store=deriv_store,
-        get=t.get, funding_fetch=t.funding_history,
+        store,
+        candle_store=candle_store,
+        deriv_store=deriv_store,
+        get=t.get,
+        funding_fetch=t.funding_history,
         clock=clock if clock is not None else (lambda: START + 2 * HOUR),
-        sleep_s=0.0, sleep_fn=lambda _s: None,
+        sleep_s=0.0,
+        sleep_fn=lambda _s: None,
     ).collect(
-        SYMBOL, market=MARKET, timeframe="1m", since=since, until=until,
-        snapshot=snapshot, dry_run=dry_run,
-        binance_last=binance_last if binance_last is not None
-        else {SYMBOL: 60_000.0},
-        binance_funding=binance_funding if binance_funding is not None
+        SYMBOL,
+        market=MARKET,
+        timeframe="1m",
+        since=since,
+        until=until,
+        snapshot=snapshot,
+        dry_run=dry_run,
+        binance_last=binance_last if binance_last is not None else {SYMBOL: 60_000.0},
+        binance_funding=binance_funding
+        if binance_funding is not None
         else {SYMBOL: 0.0001},
     )
 
@@ -103,19 +148,20 @@ def collect(store, *, candle_store=None, deriv_store=None, transport=None,
 # Schema / derivation
 # --------------------------------------------------------------------------- #
 
+
 def test_empty_frame_matches_derivatives_schema():
     df = empty_frame()
     assert list(df.columns) == CROSS_COLUMNS
     assert CROSS_PK == ["exchange", "market", "symbol", "metric", "ts"]
-    assert set(ALL_CROSS_METRICS) == {
-        PRICE, PREMIUM_PCT, FUNDING_RATE, FUNDING_SPREAD}
+    assert set(ALL_CROSS_METRICS) == {PRICE, PREMIUM_PCT, FUNDING_RATE, FUNDING_SPREAD}
 
 
 def test_derive_premium_is_percent_vs_reference():
     ref = pd.DataFrame({"ts": [100, 200, 300], "close": [100.0, 100.0, 200.0]})
     oth = pd.DataFrame({"ts": [100, 200, 300], "close": [101.0, 100.0, 198.0]})
-    prem = derive_premium(ref, oth, exchange=EXCH_BYBIT, market=MARKET,
-                          symbol=SYMBOL, ingested_at=1)
+    prem = derive_premium(
+        ref, oth, exchange=EXCH_BYBIT, market=MARKET, symbol=SYMBOL, ingested_at=1
+    )
     assert prem["metric"].tolist() == [PREMIUM_PCT] * 3
     assert prem["value"].round(6).tolist() == [1.0, 0.0, -1.0]
     assert (prem["exchange"] == EXCH_BYBIT).all()
@@ -133,8 +179,9 @@ def test_derive_premium_joins_only_common_ts_and_drops_zero_ref():
 def test_derive_funding_spread_is_other_minus_reference():
     ref = pd.DataFrame({"ts": [100, 200], "funding_rate": [0.0001, 0.0002]})
     oth = pd.DataFrame({"ts": [100, 200], "funding_rate": [0.0003, 0.0002]})
-    spr = derive_funding_spread(ref, oth, exchange=EXCH_BYBIT,
-                                market="perp", symbol=SYMBOL, ingested_at=1)
+    spr = derive_funding_spread(
+        ref, oth, exchange=EXCH_BYBIT, market="perp", symbol=SYMBOL, ingested_at=1
+    )
     assert spr["metric"].tolist() == [FUNDING_SPREAD] * 2
     assert spr["value"].round(8).tolist() == [0.0002, 0.0]
 
@@ -143,6 +190,7 @@ def test_derive_funding_spread_is_other_minus_reference():
 # The probe (one function, many surfaces)
 # --------------------------------------------------------------------------- #
 
+
 def test_venues_are_kucoin_okx_bybit():
     assert list(VENUES) == ["kucoin", "okx", "bybit"]
     assert "XAUUSD" not in VENUES["bybit"].symbols
@@ -150,13 +198,15 @@ def test_venues_are_kucoin_okx_bybit():
 
 
 def test_snapshot_prices_uses_newest_candle_and_flags():
-    t = FakeVenueTransport(prices={
-        "kucoin": {SYMBOL: 100.0},
-        "okx": {SYMBOL: 101.5},          # +1.5% → flag
-        "bybit": {SYMBOL: 100.0},
-    })
+    t = FakeVenueTransport(
+        prices={
+            "kucoin": {SYMBOL: 100.0},
+            "okx": {SYMBOL: 101.5},  # +1.5% → flag
+            "bybit": {SYMBOL: 100.0},
+        }
+    )
     snap = snapshot_prices({SYMBOL: 100.0}, get=t.get)
-    assert snap["ok"] is True            # venues responded; flag ≠ failure
+    assert snap["ok"] is True  # venues responded; flag ≠ failure
     assert snap["threshold_pct"] == 1.0
     assert snap["exchanges"]["kucoin"]["symbols"][SYMBOL]["flag"] is False
     assert snap["exchanges"]["okx"]["symbols"][SYMBOL]["flag"] is True
@@ -185,15 +235,19 @@ def test_snapshot_skips_xau_on_bybit():
 def test_agent_probe_is_snapshot_prices():
     """Invariant: do not write a second probe."""
     from brain.agent import _cross_exchange_probe
-    t = FakeVenueTransport(prices={
-        "kucoin": {SYMBOL: 60_000.0},
-        "okx": {SYMBOL: 60_000.0},
-        "bybit": {SYMBOL: 60_000.0},
-    })
+
+    t = FakeVenueTransport(
+        prices={
+            "kucoin": {SYMBOL: 60_000.0},
+            "okx": {SYMBOL: 60_000.0},
+            "bybit": {SYMBOL: 60_000.0},
+        }
+    )
     # Both entry points must agree on the same payload.
     via_mod = snapshot_prices({SYMBOL: 60_000.0}, get=t.get)
     # The agent wrapper uses requests.get; inject the fake there.
     import data.cross_exchange as cx
+
     original = cx.snapshot_prices
 
     def wrapped(last, **kw):
@@ -212,6 +266,7 @@ def test_agent_probe_is_snapshot_prices():
 # --------------------------------------------------------------------------- #
 # Store + collector
 # --------------------------------------------------------------------------- #
+
 
 def test_snapshot_persist_is_queryable(store):
     runs = collect(store, snapshot=True, candle_store=None, deriv_store=None)
@@ -239,13 +294,22 @@ def test_collect_from_candle_stores_writes_bybit_premium(store, candles):
 def test_collect_funding_spread_is_queryable(store, derivs):
     derivs.write(_funding_frame("binance", [0.0001, 0.0001, 0.0001, 0.0001]))
     t = FakeVenueTransport(
-        start_ts=START, end_ts=START + 3 * FUND_STEP,
-        funding={"bybit": {SYMBOL: 0.0003},
-                 "kucoin": {SYMBOL: 0.0001},
-                 "okx": {SYMBOL: 0.0001}},
+        start_ts=START,
+        end_ts=START + 3 * FUND_STEP,
+        funding={
+            "bybit": {SYMBOL: 0.0003},
+            "kucoin": {SYMBOL: 0.0001},
+            "okx": {SYMBOL: 0.0001},
+        },
     )
-    runs = collect(store, deriv_store=derivs, transport=t, snapshot=False,
-                   since=START, until=START + 3 * FUND_STEP)
+    runs = collect(
+        store,
+        deriv_store=derivs,
+        transport=t,
+        snapshot=False,
+        since=START,
+        until=START + 3 * FUND_STEP,
+    )
     assert f"{EXCH_BYBIT}.perp.{FUNDING_SPREAD}" in runs
     spr = store.read(EXCH_BYBIT, "perp", SYMBOL, FUNDING_SPREAD)
     assert not spr.empty
@@ -259,8 +323,14 @@ def test_rerun_adds_zero_rows(store, candles, derivs):
     candles.write(_candles("bybit", [100.5, 100.5, 100.5]))
     derivs.write(_funding_frame("binance", [0.0001, 0.0001]))
     t = FakeVenueTransport(start_ts=START, end_ts=START + FUND_STEP)
-    kwargs = dict(candle_store=candles, deriv_store=derivs, transport=t,
-                  snapshot=True, since=START, until=START + FUND_STEP)
+    kwargs = dict(
+        candle_store=candles,
+        deriv_store=derivs,
+        transport=t,
+        snapshot=True,
+        since=START,
+        until=START + FUND_STEP,
+    )
     collect(store, **kwargs)
     second = collect(store, **kwargs)
     for key, run in second.items():
@@ -304,27 +374,48 @@ def test_default_get_is_offline_in_demo(monkeypatch):
 def test_cli_cross_demo_is_offline_and_queryable(tmp_path, monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "1")
     from main import main
+
     root = tmp_path / "cross"
-    argv = ["cross", "collect", "--symbol", "BTCUSDT",
-            "--root", str(root), "--since", str(START),
-            "--until", str(START + FUND_STEP), "--sleep", "0", "--json"]
+    argv = [
+        "cross",
+        "collect",
+        "--symbol",
+        "BTCUSDT",
+        "--root",
+        str(root),
+        "--since",
+        str(START),
+        "--until",
+        str(START + FUND_STEP),
+        "--sleep",
+        "0",
+        "--json",
+    ]
     assert main(argv) == 0
-    assert main(argv) == 0                            # idempotent re-run
+    assert main(argv) == 0  # idempotent re-run
     store = CrossExchangeStore(root=root)
     # DEMO snapshot wrote premium for the three venues
     assert store.count("bybit", "spot", SYMBOL, PREMIUM_PCT) == 1
-    assert main(["cross", "status", "--symbol", "BTCUSDT",
-                 "--root", str(root), "--json"]) == 0
+    assert (
+        main(["cross", "status", "--symbol", "BTCUSDT", "--root", str(root), "--json"])
+        == 0
+    )
 
 
 def test_bybit_funding_history_parses_v5(monkeypatch):
     from data.bybit_client import BybitClient
 
     rows = [
-        {"symbol": "BTCUSDT", "fundingRate": "0.0002",
-         "fundingRateTimestamp": str(START + FUND_STEP)},
-        {"symbol": "BTCUSDT", "fundingRate": "0.0001",
-         "fundingRateTimestamp": str(START)},
+        {
+            "symbol": "BTCUSDT",
+            "fundingRate": "0.0002",
+            "fundingRateTimestamp": str(START + FUND_STEP),
+        },
+        {
+            "symbol": "BTCUSDT",
+            "fundingRate": "0.0001",
+            "fundingRateTimestamp": str(START),
+        },
     ]
 
     def fake(self, hosts, path, params, timeout=None, retries=None):
@@ -335,12 +426,13 @@ def test_bybit_funding_history_parses_v5(monkeypatch):
     monkeypatch.setattr(BybitClient, "_get_page_with_headers", fake)
     df = BybitClient().funding_history(SYMBOL, START, START + FUND_STEP, 200)
     assert list(df.columns) == ["ts", "funding_rate"]
-    assert df["ts"].tolist() == [START, START + FUND_STEP]   # ascending
+    assert df["ts"].tolist() == [START, START + FUND_STEP]  # ascending
     assert df["funding_rate"].tolist() == [0.0001, 0.0002]
 
 
 def test_bybit_funding_history_skips_gold(monkeypatch):
     from data.bybit_client import BybitClient
+
     calls = []
 
     def fake(self, hosts, path, params, timeout=None, retries=None):

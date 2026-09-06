@@ -6,15 +6,16 @@ Verifies the mathematical invariants established in docs/PATH_TO_REAL_MONEY.md Â
   * Long pays positive funding; short receives positive funding
   * Net R turns small gross winners into net losses honestly
 """
+
 from __future__ import annotations
 
 import pytest
 
 from data.costs import (
-    CostModel, TradeCost, calculate_trade_cost, get_funding_rate_as_of_t,
-    DEFAULT_TAKER_FEE_PCT, DEFAULT_MAKER_FEE_PCT, DEFAULT_SPOT_FEE_PCT,
-    DEFAULT_FUNDING_RATE_8H, DEFAULT_HOLDING_HOURS, DEFAULT_STOP_DISTANCE_PCT,
-    SPREADS,
+    DEFAULT_FUNDING_RATE_8H,
+    CostModel,
+    calculate_trade_cost,
+    get_funding_rate_as_of_t,
 )
 
 
@@ -40,8 +41,14 @@ def test_fee_r_scales_with_stop_distance():
     # Entry 100,000, SL 99,177 -> stop distance 823 (0.823% of entry)
     entry = 100_000.0
     sl = 99_177.0
-    cost = calculate_trade_cost(entry=entry, stop_loss=sl, action="BUY",
-                                gross_r=2.0, holding_hours=1.8, symbol="BTCUSDT")
+    cost = calculate_trade_cost(
+        entry=entry,
+        stop_loss=sl,
+        action="BUY",
+        gross_r=2.0,
+        holding_hours=1.8,
+        symbol="BTCUSDT",
+    )
 
     # 2 * 0.05% = 0.10% round trip = 0.0010
     # stop distance = 823 / 100000 = 0.00823
@@ -51,15 +58,17 @@ def test_fee_r_scales_with_stop_distance():
 
 def test_fee_r_wider_stop_is_cheaper_in_r():
     # 2.0% stop distance -> fee_r = 0.0010 / 0.020 = 0.050R
-    cost = calculate_trade_cost(entry=100.0, stop_loss=98.0, action="BUY",
-                                gross_r=2.0, symbol="BTCUSDT")
+    cost = calculate_trade_cost(
+        entry=100.0, stop_loss=98.0, action="BUY", gross_r=2.0, symbol="BTCUSDT"
+    )
     assert cost.fee_r == pytest.approx(0.050, abs=1e-4)
 
 
 def test_fee_r_tighter_stop_is_more_expensive_in_r():
     # 0.20% stop distance -> fee_r = 0.0010 / 0.0020 = 0.500R (huge drag!)
-    cost = calculate_trade_cost(entry=100.0, stop_loss=99.8, action="BUY",
-                                gross_r=2.0, symbol="BTCUSDT")
+    cost = calculate_trade_cost(
+        entry=100.0, stop_loss=99.8, action="BUY", gross_r=2.0, symbol="BTCUSDT"
+    )
     assert cost.fee_r == pytest.approx(0.500, abs=1e-4)
 
 
@@ -72,7 +81,9 @@ def test_spread_r_calculation():
 
     # ETHUSDT spread = 0.035% half-spread -> 0.07% round trip (0.0007)
     # spread_r = 0.0007 / 0.00823 = 0.0851R
-    cost_eth = calculate_trade_cost(entry=100_000.0, stop_loss=99_177.0, symbol="ETHUSDT")
+    cost_eth = calculate_trade_cost(
+        entry=100_000.0, stop_loss=99_177.0, symbol="ETHUSDT"
+    )
     assert cost_eth.slip_r == pytest.approx(0.0851, abs=1e-4)
 
 
@@ -81,14 +92,24 @@ def test_funding_r_holding_time_and_direction():
     # 1.8h hold with 0.01%/8h rate on 0.823% stop:
     # funding_pct = 0.0001 * (1.8 / 8.0) = 0.0000225 (0.00225%)
     # funding_r = 0.0000225 / 0.00823 = 0.00273R
-    cost_buy = calculate_trade_cost(entry=100_000.0, stop_loss=99_177.0, action="BUY",
-                                    holding_hours=1.8, symbol="BTCUSDT")
+    cost_buy = calculate_trade_cost(
+        entry=100_000.0,
+        stop_loss=99_177.0,
+        action="BUY",
+        holding_hours=1.8,
+        symbol="BTCUSDT",
+    )
     assert cost_buy.funding_r == pytest.approx(0.0027, abs=1e-4)
     assert cost_buy.fee_r / cost_buy.funding_r == pytest.approx(45.0, abs=1.0)
 
     # SELL receives positive funding -> credit / negative funding_r
-    cost_sell = calculate_trade_cost(entry=100_000.0, stop_loss=100_823.0, action="SELL",
-                                     holding_hours=1.8, symbol="BTCUSDT")
+    cost_sell = calculate_trade_cost(
+        entry=100_000.0,
+        stop_loss=100_823.0,
+        action="SELL",
+        holding_hours=1.8,
+        symbol="BTCUSDT",
+    )
     assert cost_sell.funding_r == pytest.approx(-0.0027, abs=1e-4)
     # Total cost for short is lower because funding is received
     assert cost_sell.total_cost_r < cost_buy.total_cost_r
@@ -96,8 +117,9 @@ def test_funding_r_holding_time_and_direction():
 
 def test_spot_market_has_no_funding():
     model = CostModel(market="spot")
-    cost = calculate_trade_cost(entry=100.0, stop_loss=99.0, action="BUY",
-                                holding_hours=24.0, cost_model=model)
+    cost = calculate_trade_cost(
+        entry=100.0, stop_loss=99.0, action="BUY", holding_hours=24.0, cost_model=model
+    )
     assert cost.funding_r == 0.0
     # Spot fee is 0.10% per side -> 0.20% round trip (0.0020 / 0.010 = 0.20R)
     assert cost.fee_r == pytest.approx(0.20, abs=1e-4)
@@ -105,8 +127,14 @@ def test_spot_market_has_no_funding():
 
 def test_net_r_turns_small_gross_winner_into_net_loss():
     # Gross win of +0.10R with cost of ~0.17R yields net -0.07R (loss!)
-    cost = calculate_trade_cost(entry=100_000.0, stop_loss=99_177.0, action="BUY",
-                                gross_r=0.10, holding_hours=1.8, symbol="BTCUSDT")
+    cost = calculate_trade_cost(
+        entry=100_000.0,
+        stop_loss=99_177.0,
+        action="BUY",
+        gross_r=0.10,
+        holding_hours=1.8,
+        symbol="BTCUSDT",
+    )
     assert cost.gross_r == 0.10
     assert cost.total_cost_r > 0.15
     assert cost.net_r < 0.0
@@ -114,15 +142,23 @@ def test_net_r_turns_small_gross_winner_into_net_loss():
 
 def test_net_r_increases_loss_size():
     # Gross loss of -1.0R with cost of 0.17R yields net -1.17R
-    cost = calculate_trade_cost(entry=100_000.0, stop_loss=99_177.0, action="BUY",
-                                gross_r=-1.0, holding_hours=1.8, symbol="BTCUSDT")
+    cost = calculate_trade_cost(
+        entry=100_000.0,
+        stop_loss=99_177.0,
+        action="BUY",
+        gross_r=-1.0,
+        holding_hours=1.8,
+        symbol="BTCUSDT",
+    )
     assert cost.gross_r == -1.0
     assert cost.net_r == pytest.approx(-1.173, abs=0.01)
 
 
 def test_costs_disabled_returns_zero_drag():
     model = CostModel(enabled=False)
-    cost = calculate_trade_cost(entry=100.0, stop_loss=99.0, gross_r=1.5, cost_model=model)
+    cost = calculate_trade_cost(
+        entry=100.0, stop_loss=99.0, gross_r=1.5, cost_model=model
+    )
     assert cost.fee_r == 0.0
     assert cost.slip_r == 0.0
     assert cost.funding_r == 0.0
@@ -137,12 +173,14 @@ def test_maker_execution_cheaper_than_taker():
 
     c_taker = calculate_trade_cost(entry=100.0, stop_loss=99.0, cost_model=taker_model)
     c_maker = calculate_trade_cost(entry=100.0, stop_loss=99.0, cost_model=maker_model)
-    c_hybrid = calculate_trade_cost(entry=100.0, stop_loss=99.0, cost_model=maker_in_taker_out)
+    c_hybrid = calculate_trade_cost(
+        entry=100.0, stop_loss=99.0, cost_model=maker_in_taker_out
+    )
 
     assert c_maker.fee_r < c_hybrid.fee_r < c_taker.fee_r
-    assert c_maker.fee_r == pytest.approx(0.04, abs=1e-4)   # 2 * 0.02% / 1%
+    assert c_maker.fee_r == pytest.approx(0.04, abs=1e-4)  # 2 * 0.02% / 1%
     assert c_hybrid.fee_r == pytest.approx(0.07, abs=1e-4)  # (0.02% + 0.05%) / 1%
-    assert c_taker.fee_r == pytest.approx(0.10, abs=1e-4)   # 2 * 0.05% / 1%
+    assert c_taker.fee_r == pytest.approx(0.10, abs=1e-4)  # 2 * 0.05% / 1%
 
 
 def test_get_funding_rate_as_of_t_fallback():
@@ -154,8 +192,10 @@ def test_get_funding_rate_as_of_t_fallback():
 # P12.10: XAU bid/ask cost model (Dukascopy blocker #2)
 # ---------------------------------------------------------------------------
 
+
 def test_is_gold_symbol():
-    from data.costs import is_gold_symbol, GOLD_SYMBOL_PREFIXES
+    from data.costs import is_gold_symbol
+
     assert is_gold_symbol("XAUUSD")
     assert is_gold_symbol("xauusd")
     assert is_gold_symbol("XAU/USD")
@@ -168,7 +208,8 @@ def test_is_gold_symbol():
 
 
 def test_cost_model_for_symbol_selects_gold_model():
-    from data.costs import cost_model_for_symbol, DEFAULT_GOLD_COMMISSION_PCT
+    from data.costs import DEFAULT_GOLD_COMMISSION_PCT, cost_model_for_symbol
+
     m = cost_model_for_symbol("XAUUSD")
     assert m.market == "spot"
     assert m.default_funding_rate_8h == 0.0
@@ -183,6 +224,7 @@ def test_cost_model_for_symbol_selects_gold_model():
 
 def test_cost_model_for_symbol_returns_base_model_unchanged():
     from data.costs import cost_model_for_symbol
+
     explicit = CostModel(market="perp", execution_type="maker")
     result = cost_model_for_symbol("XAUUSD", base_model=explicit)
     assert result is explicit
@@ -191,8 +233,14 @@ def test_cost_model_for_symbol_returns_base_model_unchanged():
 
 def test_xau_auto_detection_no_cost_model():
     """XAUUSD automatically uses spot gold assumptions when no cost_model given."""
-    cost = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, action="BUY",
-                                gross_r=2.0, holding_hours=1.8, symbol="XAUUSD")
+    cost = calculate_trade_cost(
+        entry=2000.0,
+        stop_loss=1980.0,
+        action="BUY",
+        gross_r=2.0,
+        holding_hours=1.8,
+        symbol="XAUUSD",
+    )
     # No funding on spot gold
     assert cost.funding_r == 0.0
     assert cost.funding_rate_8h == 0.0
@@ -204,10 +252,20 @@ def test_xau_auto_detection_no_cost_model():
 
 def test_xau_has_no_funding_short_or_long():
     """Both long and short XAU have zero funding cost."""
-    cost_buy = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, action="BUY",
-                                    holding_hours=24.0, symbol="XAUUSD")
-    cost_sell = calculate_trade_cost(entry=2000.0, stop_loss=2020.0, action="SELL",
-                                     holding_hours=24.0, symbol="XAUUSD")
+    cost_buy = calculate_trade_cost(
+        entry=2000.0,
+        stop_loss=1980.0,
+        action="BUY",
+        holding_hours=24.0,
+        symbol="XAUUSD",
+    )
+    cost_sell = calculate_trade_cost(
+        entry=2000.0,
+        stop_loss=2020.0,
+        action="SELL",
+        holding_hours=24.0,
+        symbol="XAUUSD",
+    )
     assert cost_buy.funding_r == 0.0
     assert cost_sell.funding_r == 0.0
     # Total costs are identical (no direction asymmetry on spot)
@@ -227,8 +285,9 @@ def test_xau_gold_commission_scales_with_stop():
 def test_xau_explicit_model_overrides_auto_detect():
     """Passing an explicit CostModel prevents auto-detection."""
     crypto_model = CostModel(market="perp", taker_fee_pct=0.0005)
-    cost = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, symbol="XAUUSD",
-                                cost_model=crypto_model)
+    cost = calculate_trade_cost(
+        entry=2000.0, stop_loss=1980.0, symbol="XAUUSD", cost_model=crypto_model
+    )
     # If auto-detect was active, funding_r would be 0 and fee_r would be 0.01.
     # With explicit perp model, fee uses taker rate and funding is computed.
     assert cost.funding_r != 0.0  # perp model applies funding
@@ -237,8 +296,9 @@ def test_xau_explicit_model_overrides_auto_detect():
 def test_xau_net_r_small_winner():
     """A small gross win on XAU is reduced by spread + commission."""
     # Gross win +0.50R on $2000 gold with 1% stop
-    cost = calculate_trade_cost(entry=2000.0, stop_loss=1980.0, action="BUY",
-                                gross_r=0.50, symbol="XAUUSD")
+    cost = calculate_trade_cost(
+        entry=2000.0, stop_loss=1980.0, action="BUY", gross_r=0.50, symbol="XAUUSD"
+    )
     # Total cost = fee_r + slip_r = 0.01 + 0.12 = 0.13R
     assert cost.gross_r == 0.50
     assert cost.total_cost_r == pytest.approx(0.13, abs=1e-4)
@@ -251,15 +311,16 @@ def test_xau_spread_is_primary_cost():
     assert cost.slip_r > 0
     assert cost.fee_r > 0
     assert cost.slip_r > cost.fee_r  # spread is the main cost
-    assert cost.funding_r == 0.0     # no funding on spot
+    assert cost.funding_r == 0.0  # no funding on spot
 
 
 def test_gold_symbol_prefixes_match_common_variants():
     from data.costs import is_gold_symbol
+
     assert is_gold_symbol("XAUEUR")
     assert is_gold_symbol("XAUGBP")
     assert is_gold_symbol("XAU/GBP")
     assert is_gold_symbol("GOLD100")
     assert is_gold_symbol("gold-futures")
-    assert not is_gold_symbol("BTCXAU")    # suffix, not prefix
-    assert not is_gold_symbol("PAXGUSDT")   # tokenized gold, not spot gold
+    assert not is_gold_symbol("BTCXAU")  # suffix, not prefix
+    assert not is_gold_symbol("PAXGUSDT")  # tokenized gold, not spot gold

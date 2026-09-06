@@ -17,17 +17,23 @@ These tests pin the arithmetic (always the correct Monday, on every date of a
 six-year sweep), pin the gate surfaces to answering across a month boundary,
 and pin the immune check to always returning a verdict rather than dying.
 """
+
 from __future__ import annotations
 
-import time
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
 
-import brain.risk_gate as risk_gate
+from brain import risk_gate
 from brain.immune import check_risk_system, run_health_check
-from brain.risk_gate import _day_start_utc, _week_start_utc, daily_weekly, evaluate, status_text
+from brain.risk_gate import (
+    _day_start_utc,
+    _week_start_utc,
+    daily_weekly,
+    evaluate,
+    status_text,
+)
 from data.database import SignalDB
 
 # 2026-09-01 is a Tuesday; its week began Monday 2026-08-31 (previous month).
@@ -41,23 +47,28 @@ def _frozen(now: datetime):
         @classmethod
         def now(cls, tz=None):
             return now
+
     return mock.patch.object(risk_gate, "datetime", FrozenDT)
 
 
 def _monday_of(now: datetime) -> datetime:
     return (now - timedelta(days=now.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0)
+        hour=0, minute=0, second=0, microsecond=0
+    )
 
 
 # ── 1. the arithmetic ──────────────────────────────────────────────────────
-@pytest.mark.parametrize("stamp", [
-    "2026-01-01",  # Thu, week began Mon 2025-12-29 (previous YEAR)
-    "2026-02-01",  # Sun, week began Mon 2026-01-26
-    "2026-03-01",  # Sun, week began Mon 2026-02-23
-    "2026-09-01",  # Tue, week began Mon 2026-08-31
-    "2026-11-01",  # Sun, week began Mon 2026-10-26
-    "2027-01-01",  # Fri, week began Mon 2026-12-28
-])
+@pytest.mark.parametrize(
+    "stamp",
+    [
+        "2026-01-01",  # Thu, week began Mon 2025-12-29 (previous YEAR)
+        "2026-02-01",  # Sun, week began Mon 2026-01-26
+        "2026-03-01",  # Sun, week began Mon 2026-02-23
+        "2026-09-01",  # Tue, week began Mon 2026-08-31
+        "2026-11-01",  # Sun, week began Mon 2026-10-26
+        "2027-01-01",  # Fri, week began Mon 2026-12-28
+    ],
+)
 def test_week_start_survives_month_and_year_boundaries(stamp):
     now = datetime.fromisoformat(stamp).replace(hour=12, tzinfo=timezone.utc)
     got = datetime.fromtimestamp(_week_start_utc(now) / 1000, timezone.utc)
@@ -133,9 +144,9 @@ def test_weekly_limit_still_blocks_across_a_month_boundary(tmp_path):
     """The fix must not weaken the weekly limit: losses in the part of the
     week that fell in the PREVIOUS month must still count."""
     db = SignalDB(tmp_path / "d.db")
-    monday = _monday_of(CROSSING)                      # 2026-08-31, last month
+    monday = _monday_of(CROSSING)  # 2026-08-31, last month
     ts = int((monday + timedelta(hours=6)).timestamp() * 1000)
-    for i in range(9):                                 # 9 x -0.25% = -2.25%
+    for i in range(9):  # 9 x -0.25% = -2.25%
         db.conn.execute(
             """INSERT INTO paper_trades(scan_id, signal_id, plan_type, symbol,
                                         timeframe, action, entry, stop_loss,
@@ -148,15 +159,37 @@ def test_weekly_limit_still_blocks_across_a_month_boundary(tmp_path):
             # rr_net == rr_achieved: this test is about DATE arithmetic, so the
             # row is deliberately cost-free and the -2.25% figure stays exact
             # under the P12.18 net anchor.
-            (i, f"SIG{i}", "Buy Pullback", "BTCUSDT", "15m", "BUY", 100.0, 99.0,
-             102.0, 2.0, 70, "CLOSED", ts, ts, ts, 100.0, 99.0, "STOP_LOSS",
-             -1.0, -1.0, "test", ""))
+            (
+                i,
+                f"SIG{i}",
+                "Buy Pullback",
+                "BTCUSDT",
+                "15m",
+                "BUY",
+                100.0,
+                99.0,
+                102.0,
+                2.0,
+                70,
+                "CLOSED",
+                ts,
+                ts,
+                ts,
+                100.0,
+                99.0,
+                "STOP_LOSS",
+                -1.0,
+                -1.0,
+                "test",
+                "",
+            ),
+        )
     db.conn.commit()
     with _frozen(CROSSING):
         dw = daily_weekly(db)
     assert dw["week"]["n"] == 9
     assert dw["week"]["pct"] == pytest.approx(-2.25)
-    assert dw["weekly_blocked"] is True                # limit is 2.0%
+    assert dw["weekly_blocked"] is True  # limit is 2.0%
     db.close()
 
 
@@ -172,8 +205,10 @@ def test_immune_risk_check_reports_ok_across_a_month_boundary(tmp_path):
 def test_immune_risk_check_reports_critical_when_the_gate_raises(tmp_path):
     """Defence in depth: an unanswerable gate must read CRITICAL, not crash."""
     db = SignalDB(tmp_path / "d.db")
-    with mock.patch("brain.immune.evaluate_risk_gate",
-                    side_effect=ValueError("day is out of range for month")):
+    with mock.patch(
+        "brain.immune.evaluate_risk_gate",
+        side_effect=ValueError("day is out of range for month"),
+    ):
         check = check_risk_system(db)
     assert check["status"] == "CRITICAL"
     assert "could not be evaluated" in check["detail"]
@@ -183,8 +218,7 @@ def test_immune_risk_check_reports_critical_when_the_gate_raises(tmp_path):
 
 def test_health_report_survives_a_raising_risk_gate(tmp_path):
     db = SignalDB(tmp_path / "d.db")
-    with mock.patch("brain.immune.evaluate_risk_gate",
-                    side_effect=ValueError("boom")):
+    with mock.patch("brain.immune.evaluate_risk_gate", side_effect=ValueError("boom")):
         report = run_health_check(db)
     assert report["status"] == "CRITICAL"
     risk = next(c for c in report["checks"] if c["name"] == "risk_system")

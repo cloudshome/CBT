@@ -7,15 +7,22 @@ quarantine ⇒ no signal, proven by test."
 All tests are fully offline and deterministic: fixed timestamps, no
 network, tmp_path stores.
 """
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from data.quality import (FRESH_MULT, GAP_DOWN, LAG_MULT, MAX_SERIES,
-                          checks_on_frame, series_health, series_item,
-                          verdict_for)
+from data.quality import (
+    FRESH_MULT,
+    GAP_DOWN,
+    LAG_MULT,
+    MAX_SERIES,
+    checks_on_frame,
+    series_item,
+    verdict_for,
+)
 from data.store import CandleStore, normalise_klines
 
 STEP = 60_000
@@ -29,33 +36,43 @@ def store(tmp_path):
     return CandleStore(root=tmp_path)
 
 
-def frame(n: int = 300, *, last_ts: int = NOW - 10 * STEP,
-          seed: int = 7) -> pd.DataFrame:
+def frame(
+    n: int = 300, *, last_ts: int = NOW - 10 * STEP, seed: int = 7
+) -> pd.DataFrame:
     """Deterministic healthy 1m OHLCV ending at ``last_ts``."""
     rng = np.random.default_rng(seed)
     ts = np.arange(n, dtype=np.int64) * STEP + (last_ts - (n - 1) * STEP)
     close = 60_000.0 + rng.normal(0, 20, n).cumsum()
-    return pd.DataFrame({
-        "ts": ts,
-        "open": np.round(close, 2),
-        "high": np.round(close + 15, 2),
-        "low": np.round(close - 15, 2),
-        "close": np.round(close, 2),
-        "volume": np.round(rng.uniform(1, 50, n), 4),
-    })
+    return pd.DataFrame(
+        {
+            "ts": ts,
+            "open": np.round(close, 2),
+            "high": np.round(close + 15, 2),
+            "low": np.round(close - 15, 2),
+            "close": np.round(close, 2),
+            "volume": np.round(rng.uniform(1, 50, n), 4),
+        }
+    )
 
 
 def write_series(store, df, **kwargs):
     """Persist a closed-candle series through the real store boundary."""
-    norm = normalise_klines(df, exchange=EXCH, market=MARKET,
-                            symbol=SYMBOL, timeframe=TF, source="rest",
-                            ingested_at=NOW)
+    norm = normalise_klines(
+        df,
+        exchange=EXCH,
+        market=MARKET,
+        symbol=SYMBOL,
+        timeframe=TF,
+        source="rest",
+        ingested_at=NOW,
+    )
     store.write(norm)
 
 
 # --------------------------------------------------------------------------- #
 # Staleness ladder (timeframe-scaled)
 # --------------------------------------------------------------------------- #
+
 
 def test_fresh_frame_is_ok():
     h = checks_on_frame(frame(last_ts=NOW - 2 * STEP), TF, now_ms=NOW)
@@ -90,6 +107,7 @@ def test_stale_frame_is_quarantined():
 # Gaps (reuses P10.3 detect_gaps)
 # --------------------------------------------------------------------------- #
 
+
 def test_large_gap_in_recent_window_quarantines():
     df = frame(600, last_ts=NOW - 2 * STEP)
     drop = df[(df["ts"] > NOW - 300 * STEP) & (df["ts"] < NOW - 150 * STEP)]
@@ -105,7 +123,7 @@ def test_large_gap_in_recent_window_quarantines():
 
 def test_small_gap_degrades_but_does_not_quarantine():
     df = frame(600, last_ts=NOW - 2 * STEP)
-    drop_idx = [300, 301, 302, 303, 304]                     # 5 candles gone
+    drop_idx = [300, 301, 302, 303, 304]  # 5 candles gone
     holey = df.drop(df.index[drop_idx]).reset_index(drop=True)
     h = checks_on_frame(holey, TF, now_ms=NOW)
     assert 0 < h["gap_fraction"] <= GAP_DOWN
@@ -119,6 +137,7 @@ def test_small_gap_degrades_but_does_not_quarantine():
 # Price / volume / ordering sanity
 # --------------------------------------------------------------------------- #
 
+
 def test_negative_close_quarantines():
     df = frame(last_ts=NOW - STEP)
     df.loc[df.index[-1], "close"] = -1.0
@@ -130,7 +149,7 @@ def test_negative_close_quarantines():
 
 def test_inverted_high_quarantines():
     df = frame(last_ts=NOW - STEP)
-    df.loc[df.index[-1], "high"] = df["close"].min() - 5.0   # high below body
+    df.loc[df.index[-1], "high"] = df["close"].min() - 5.0  # high below body
     v = verdict_for(checks_on_frame(df, TF, now_ms=NOW))
     assert v["level"] == "down"
     assert v["quarantined"] is True
@@ -139,7 +158,7 @@ def test_inverted_high_quarantines():
 
 def test_inverted_low_quarantines():
     df = frame(last_ts=NOW - STEP)
-    df.loc[df.index[-1], "low"] = df["close"].max() + 5.0    # low above body
+    df.loc[df.index[-1], "low"] = df["close"].max() + 5.0  # low above body
     v = verdict_for(checks_on_frame(df, TF, now_ms=NOW))
     assert v["level"] == "down"
     assert v["quarantined"] is True
@@ -168,7 +187,7 @@ def test_zero_volume_with_range_is_suspicious_not_corrupt():
 
 def test_non_monotonic_ts_quarantines():
     df = frame(last_ts=NOW - STEP)
-    df.loc[df.index[-1], "ts"] = df["ts"].iloc[0]            # duplicate ts
+    df.loc[df.index[-1], "ts"] = df["ts"].iloc[0]  # duplicate ts
     v = verdict_for(checks_on_frame(df, TF, now_ms=NOW))
     assert v["level"] == "down"
     assert v["quarantined"] is True
@@ -179,15 +198,18 @@ def test_non_monotonic_ts_quarantines():
 # Store path: corrupt fixture ⇒ quarantine through the real boundary
 # --------------------------------------------------------------------------- #
 
+
 def test_corrupt_fixture_written_through_store_is_quarantined(store):
     """The milestone's done-when: a corrupt fixture, persisted exactly the
     way the backfill persists data, is detected and quarantined."""
     df = frame(200, last_ts=NOW - 2 * STEP)
-    df.loc[df.index[100], "close"] = 0.0        # corruption
+    df.loc[df.index[100], "close"] = 0.0  # corruption
     write_series(store, df)
-    item = series_item(store, {"exchange": EXCH, "market": MARKET,
-                               "symbol": SYMBOL, "timeframe": TF},
-                       now_ms=NOW)
+    item = series_item(
+        store,
+        {"exchange": EXCH, "market": MARKET, "symbol": SYMBOL, "timeframe": TF},
+        now_ms=NOW,
+    )
     assert item["candles"] == 200
     assert item["level"] == "down"
     assert item["quarantined"] is True
@@ -196,9 +218,11 @@ def test_corrupt_fixture_written_through_store_is_quarantined(store):
 
 def test_healthy_series_through_store_is_fresh(store):
     write_series(store, frame(300, last_ts=NOW - 2 * STEP))
-    item = series_item(store, {"exchange": EXCH, "market": MARKET,
-                               "symbol": SYMBOL, "timeframe": TF},
-                       now_ms=NOW)
+    item = series_item(
+        store,
+        {"exchange": EXCH, "market": MARKET, "symbol": SYMBOL, "timeframe": TF},
+        now_ms=NOW,
+    )
     assert item["level"] == "ok"
     assert item["quarantined"] is False
     assert item["candles"] == 300
@@ -207,13 +231,23 @@ def test_healthy_series_through_store_is_fresh(store):
 def test_list_series_and_empty_store(store):
     assert store.list_series() == []
     write_series(store, frame(10, last_ts=NOW - STEP))
-    assert store.list_series() == [{"exchange": EXCH, "market": MARKET,
-                                    "symbol": SYMBOL, "timeframe": TF}]
+    assert store.list_series() == [
+        {"exchange": EXCH, "market": MARKET, "symbol": SYMBOL, "timeframe": TF}
+    ]
     # a second series sorts and both appear
     from data.store import normalise_klines as nk
-    store.write(nk(frame(5, last_ts=NOW - STEP), exchange="binance",
-                   market="spot", symbol="ETHUSDT", timeframe="1m",
-                   source="rest", ingested_at=NOW))
+
+    store.write(
+        nk(
+            frame(5, last_ts=NOW - STEP),
+            exchange="binance",
+            market="spot",
+            symbol="ETHUSDT",
+            timeframe="1m",
+            source="rest",
+            ingested_at=NOW,
+        )
+    )
     listed = store.list_series()
     assert len(listed) == 2
     assert listed[0]["symbol"] == "BTCUSDT"
@@ -230,27 +264,46 @@ def test_empty_series_verdict_is_degraded_not_down():
 # Readiness integration: quarantine ⇒ no signal (ready False)
 # --------------------------------------------------------------------------- #
 
+
 def test_quarantined_data_rolls_desk_to_not_ready(store, monkeypatch):
     """Corrupt fixture → data pillar down → readiness_strip not ready."""
-    import brain.agent as agent
+    from brain import agent
     from brain.agent import _data_pillar
 
     df = frame(100, last_ts=NOW - STEP)
     df.loc[df.index[50], "volume"] = -1.0
     write_series(store, df)
 
-    monkeypatch.setattr(agent, "_channels_pillar", lambda: {
-        "name": "channels", "level": "ok", "headline": "4/4 live", "detail": ""})
-    monkeypatch.setattr(agent, "_immune_pillar", lambda: {
-        "name": "immune", "level": "ok", "headline": "ok", "detail": ""})
-    monkeypatch.setattr(agent, "_gate_pillar", lambda status: {
-        "name": "risk_gate", "level": "ok", "headline": "gate OPEN",
-        "detail": "no blocks"})
-    monkeypatch.setattr(agent, "_data_pillar",
-                        lambda: _data_pillar(store=store, now_ms=NOW))
+    monkeypatch.setattr(
+        agent,
+        "_channels_pillar",
+        lambda: {
+            "name": "channels",
+            "level": "ok",
+            "headline": "4/4 live",
+            "detail": "",
+        },
+    )
+    monkeypatch.setattr(
+        agent,
+        "_immune_pillar",
+        lambda: {"name": "immune", "level": "ok", "headline": "ok", "detail": ""},
+    )
+    monkeypatch.setattr(
+        agent,
+        "_gate_pillar",
+        lambda status: {
+            "name": "risk_gate",
+            "level": "ok",
+            "headline": "gate OPEN",
+            "detail": "no blocks",
+        },
+    )
+    monkeypatch.setattr(
+        agent, "_data_pillar", lambda: _data_pillar(store=store, now_ms=NOW)
+    )
 
-    strip = agent.readiness_strip(status={"time": NOW, "version": "x",
-                                          "advice": {}})
+    strip = agent.readiness_strip(status={"time": NOW, "version": "x", "advice": {}})
     assert strip["level"] == "down"
     assert strip["ready"] is False
     data = next(p for p in strip["pillars"] if p["name"] == "data")
@@ -261,14 +314,14 @@ def test_quarantined_data_rolls_desk_to_not_ready(store, monkeypatch):
 
 def test_data_pillar_is_exception_isolated(store, monkeypatch):
     """A crashing probe degrades the data pillar, never the whole strip."""
-    import brain.agent as agent
-    import data.quality as quality
+    from brain import agent
+    from data import quality
 
     def boom(*a, **k):
         raise RuntimeError("store exploded")
 
     monkeypatch.setattr(quality, "series_item", boom)
-    write_series(store, frame(10, last_ts=NOW - STEP))   # so the pillar has work to do
+    write_series(store, frame(10, last_ts=NOW - STEP))  # so the pillar has work to do
 
     pillar = agent._data_pillar(store=store, now_ms=NOW)
     assert pillar["name"] == "data"
@@ -278,20 +331,42 @@ def test_data_pillar_is_exception_isolated(store, monkeypatch):
 
     # and the strip still renders with every other pillar intact
     real_pillar = agent._data_pillar
-    monkeypatch.setattr(agent, "_channels_pillar", lambda: {
-        "name": "channels", "level": "ok", "headline": "4/4 live", "detail": ""})
-    monkeypatch.setattr(agent, "_immune_pillar", lambda: {
-        "name": "immune", "level": "ok", "headline": "ok", "detail": ""})
-    monkeypatch.setattr(agent, "_gate_pillar", lambda status: {
-        "name": "risk_gate", "level": "ok", "headline": "gate OPEN",
-        "detail": "no blocks"})
-    monkeypatch.setattr(agent, "_data_pillar",
-                        lambda: real_pillar(store=store, now_ms=NOW))
-    strip = agent.readiness_strip(status={"time": NOW, "version": "x",
-                                          "advice": {}})
+    monkeypatch.setattr(
+        agent,
+        "_channels_pillar",
+        lambda: {
+            "name": "channels",
+            "level": "ok",
+            "headline": "4/4 live",
+            "detail": "",
+        },
+    )
+    monkeypatch.setattr(
+        agent,
+        "_immune_pillar",
+        lambda: {"name": "immune", "level": "ok", "headline": "ok", "detail": ""},
+    )
+    monkeypatch.setattr(
+        agent,
+        "_gate_pillar",
+        lambda status: {
+            "name": "risk_gate",
+            "level": "ok",
+            "headline": "gate OPEN",
+            "detail": "no blocks",
+        },
+    )
+    monkeypatch.setattr(
+        agent, "_data_pillar", lambda: real_pillar(store=store, now_ms=NOW)
+    )
+    strip = agent.readiness_strip(status={"time": NOW, "version": "x", "advice": {}})
     assert strip["level"] == "down"
     assert {p["name"] for p in strip["pillars"]} == {
-        "channels", "immune", "risk_gate", "data"}
+        "channels",
+        "immune",
+        "risk_gate",
+        "data",
+    }
 
 
 def test_max_series_cap_is_positive():

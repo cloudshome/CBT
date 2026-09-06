@@ -5,6 +5,7 @@ decided and never re-grades anything.  These tests pin the arithmetic, the
 splits (side / regime / session / setup), the holding-time plumbing and the
 fact that the verdict never loosens the graduation bar.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -13,10 +14,21 @@ import pytest
 
 from data.database import SignalDB
 from data.scorecard import (
-    DECIDED_BACKTEST, DECIDED_PAPER, SESSION_NAMES, build_scorecard,
-    effective_sample_size, max_drawdown_r, overlap_factor, print_scorecard,
-    rows_from_backtest_db, rows_from_graded, rows_from_paper_db,
-    scorecard_from_db, session_of_hour, session_of_ts, trade_stats,
+    DECIDED_BACKTEST,
+    DECIDED_PAPER,
+    SESSION_NAMES,
+    build_scorecard,
+    effective_sample_size,
+    max_drawdown_r,
+    overlap_factor,
+    print_scorecard,
+    rows_from_backtest_db,
+    rows_from_graded,
+    rows_from_paper_db,
+    scorecard_from_db,
+    session_of_hour,
+    session_of_ts,
+    trade_stats,
 )
 
 MS_PER_HOUR = 3_600_000
@@ -24,15 +36,35 @@ MS_PER_HOUR = 3_600_000
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
-def row(r, *, ts=0, side="BUY", setup="Buy Pullback", regime="RANGING",
-        outcome=None, hold=2.0, symbol="BTCUSDT", source="backtest"):
+
+def row(
+    r,
+    *,
+    ts=0,
+    side="BUY",
+    setup="Buy Pullback",
+    regime="RANGING",
+    outcome=None,
+    hold=2.0,
+    symbol="BTCUSDT",
+    source="backtest",
+):
     """One decided row in the shape the scorecard consumes."""
     if outcome is None:
         outcome = "FULL_WIN" if r > 0 else "LOSS"
-    return {"ts": ts, "side": side, "setup": setup, "regime": regime,
-            "r": float(r), "outcome": outcome, "holding_hours": hold,
-            "symbol": symbol, "timeframe": "15m", "source": source,
-            "session": session_of_ts(ts)}
+    return {
+        "ts": ts,
+        "side": side,
+        "setup": setup,
+        "regime": regime,
+        "r": float(r),
+        "outcome": outcome,
+        "holding_hours": hold,
+        "symbol": symbol,
+        "timeframe": "15m",
+        "source": source,
+        "session": session_of_ts(ts),
+    }
 
 
 def rows_at(rs, **kw):
@@ -41,6 +73,7 @@ def rows_at(rs, **kw):
 
 
 # ── sessions ───────────────────────────────────────────────────────────────
+
 
 def test_session_of_hour_covers_every_hour():
     got = {session_of_hour(h) for h in range(24)}
@@ -65,6 +98,7 @@ def test_session_of_ts_handles_missing():
 
 # ── metrics ────────────────────────────────────────────────────────────────
 
+
 def test_trade_stats_empty_is_zeroed_not_crashing():
     s = trade_stats([])
     assert s["n"] == 0 and s["win_rate"] is None and s["total_r"] == 0.0
@@ -74,9 +108,9 @@ def test_trade_stats_arithmetic():
     s = trade_stats(rows_at([2.0, -1.0, 2.0, -1.0]))
     assert s["n"] == 4 and s["wins"] == 2 and s["losses"] == 2
     assert s["win_rate"] == 0.5
-    assert s["expectancy"] == 0.5          # (2 - 1 + 2 - 1) / 4
+    assert s["expectancy"] == 0.5  # (2 - 1 + 2 - 1) / 4
     assert s["total_r"] == 2.0
-    assert s["pf"] == 2.0                  # gross win 4 / gross loss 2
+    assert s["pf"] == 2.0  # gross win 4 / gross loss 2
     assert s["avg_win_r"] == 2.0 and s["avg_loss_r"] == -1.0
     assert s["best_r"] == 2.0 and s["worst_r"] == -1.0
 
@@ -85,7 +119,7 @@ def test_trade_stats_all_wins_pf_is_capped_not_infinite():
     s = trade_stats(rows_at([1.0, 2.0]))
     assert s["pf"] == 99.0
     assert s["max_drawdown_r"] == 0.0
-    assert s["calmar"] is None             # no drawdown → undefined, not inf
+    assert s["calmar"] is None  # no drawdown → undefined, not inf
 
 
 def test_trade_stats_streaks():
@@ -122,9 +156,11 @@ def test_metrics_are_per_trade_never_annualised():
 
 
 def test_holding_time_is_averaged_and_counted():
-    rows = [row(1.0, ts=MS_PER_HOUR, hold=1.0),
-            row(-1.0, ts=2 * MS_PER_HOUR, hold=3.0),
-            row(1.0, ts=3 * MS_PER_HOUR, hold=None)]
+    rows = [
+        row(1.0, ts=MS_PER_HOUR, hold=1.0),
+        row(-1.0, ts=2 * MS_PER_HOUR, hold=3.0),
+        row(1.0, ts=3 * MS_PER_HOUR, hold=None),
+    ]
     s = trade_stats(rows)
     assert s["avg_holding_hours"] == 2.0
     assert s["median_holding_hours"] == 2.0
@@ -138,16 +174,26 @@ def test_holding_time_absent_when_nothing_is_timed():
 
 # ── the report ─────────────────────────────────────────────────────────────
 
+
 def test_build_scorecard_has_all_six_dimensions():
     """P12.3 done-when: long/short, regime, session, Sharpe/Sortino/Calmar,
     holding time — one block."""
-    rows = (rows_at([2.0, -1.0], side="BUY", regime="RANGING")
-            + rows_at([1.0, -1.0], side="SELL", regime="TRENDING_BULL",
-                      setup="Sell Pullback"))
+    rows = rows_at([2.0, -1.0], side="BUY", regime="RANGING") + rows_at(
+        [1.0, -1.0], side="SELL", regime="TRENDING_BULL", setup="Sell Pullback"
+    )
     rep = build_scorecard(rows, min_decided=2)
     assert rep["ok"] is True
-    for key in ("overall", "by_side", "by_regime", "by_session", "by_setup",
-                "criteria", "bar", "verdict", "meta"):
+    for key in (
+        "overall",
+        "by_side",
+        "by_regime",
+        "by_session",
+        "by_setup",
+        "criteria",
+        "bar",
+        "verdict",
+        "meta",
+    ):
         assert key in rep
     assert set(rep["by_side"]) == {"BUY", "SELL"}
     assert set(rep["by_regime"]) == {"RANGING", "TRENDING_BULL"}
@@ -157,8 +203,7 @@ def test_build_scorecard_has_all_six_dimensions():
 
 
 def test_splits_partition_the_sample():
-    rows = (rows_at([1.0, -1.0, 2.0], side="BUY")
-            + rows_at([-1.0, -1.0], side="SELL"))
+    rows = rows_at([1.0, -1.0, 2.0], side="BUY") + rows_at([-1.0, -1.0], side="SELL")
     rep = build_scorecard(rows, min_decided=1)
     n = rep["overall"]["n"]
     assert n == 5
@@ -189,8 +234,7 @@ def test_thin_sample_is_insufficient_even_when_perfect():
 
 def test_verdict_fails_below_the_graduation_bar():
     # 40% WR, +0.2R expectancy — the P11 shape: profitable-ish, not graduated.
-    rep = build_scorecard(rows_at([2.0, -1.0, -1.0, 2.0, -1.0] * 8),
-                          min_decided=30)
+    rep = build_scorecard(rows_at([2.0, -1.0, -1.0, 2.0, -1.0] * 8), min_decided=30)
     assert rep["verdict"]["status"] == "FAIL"
     assert rep["bar"]["met"] is False
     assert rep["bar"]["unmet"]
@@ -221,9 +265,11 @@ def test_build_scorecard_is_pure():
 
 
 def test_print_scorecard_runs_for_every_verdict(capsys):
-    for rows, want in ((rows_at([1.0, -1.0]), "INSUFFICIENT_DATA"),
-                       (rows_at([2.0, -1.0] * 20), "FAIL"),
-                       (rows_at([3.0, 3.0, 3.0, -1.0] * 10), "PASS")):
+    for rows, want in (
+        (rows_at([1.0, -1.0]), "INSUFFICIENT_DATA"),
+        (rows_at([2.0, -1.0] * 20), "FAIL"),
+        (rows_at([3.0, 3.0, 3.0, -1.0] * 10), "PASS"),
+    ):
         rep = build_scorecard(rows, min_decided=30)
         assert rep["verdict"]["status"] == want
         print_scorecard(rep)
@@ -242,19 +288,32 @@ def test_print_scorecard_reports_the_cannot_run_case(capsys):
 
 # ── adapters: in-memory graded plans ───────────────────────────────────────
 
+
 def test_rows_from_graded_filters_undecided_and_one_horizon():
     from data.backtester import GradedPlan
 
     def gp(ts, outcome, rr, horizon=4.0):
-        g = GradedPlan(ts=ts, plan_type="Immediate Buy", action="BUY",
-                       confidence_pct=70, entry=100.0, trigger_level=None,
-                       horizon_hours=horizon, outcome=outcome, rr_achieved=rr)
+        g = GradedPlan(
+            ts=ts,
+            plan_type="Immediate Buy",
+            action="BUY",
+            confidence_pct=70,
+            entry=100.0,
+            trigger_level=None,
+            horizon_hours=horizon,
+            outcome=outcome,
+            rr_achieved=rr,
+        )
         g.holding_hours = 1.5
         return g
 
-    graded = [gp(1, "FULL_WIN", 2.0), gp(2, "LOSS", -1.0),
-              gp(3, "NOT_TRIGGERED", None), gp(4, "OPEN", None),
-              gp(5, "FULL_WIN", 2.0, horizon=12.0)]
+    graded = [
+        gp(1, "FULL_WIN", 2.0),
+        gp(2, "LOSS", -1.0),
+        gp(3, "NOT_TRIGGERED", None),
+        gp(4, "OPEN", None),
+        gp(5, "FULL_WIN", 2.0, horizon=12.0),
+    ]
     rows = rows_from_graded(graded, symbol="BTCUSDT", timeframe="15m")
     assert len(rows) == 2, "undecided rows and other horizons are dropped"
     assert {r["outcome"] for r in rows} == {"FULL_WIN", "LOSS"}
@@ -264,13 +323,30 @@ def test_rows_from_graded_filters_undecided_and_one_horizon():
 
 def test_rows_from_graded_respects_explicit_horizon():
     from data.backtester import GradedPlan
+
     graded = [
-        GradedPlan(ts=1, plan_type="p", action="BUY", confidence_pct=70,
-                   entry=100.0, trigger_level=None, horizon_hours=4.0,
-                   outcome="LOSS", rr_achieved=-1.0),
-        GradedPlan(ts=2, plan_type="p", action="BUY", confidence_pct=70,
-                   entry=100.0, trigger_level=None, horizon_hours=12.0,
-                   outcome="FULL_WIN", rr_achieved=2.0),
+        GradedPlan(
+            ts=1,
+            plan_type="p",
+            action="BUY",
+            confidence_pct=70,
+            entry=100.0,
+            trigger_level=None,
+            horizon_hours=4.0,
+            outcome="LOSS",
+            rr_achieved=-1.0,
+        ),
+        GradedPlan(
+            ts=2,
+            plan_type="p",
+            action="BUY",
+            confidence_pct=70,
+            entry=100.0,
+            trigger_level=None,
+            horizon_hours=12.0,
+            outcome="FULL_WIN",
+            rr_achieved=2.0,
+        ),
     ]
     rows = rows_from_graded(graded, horizon_hours=12.0)
     assert len(rows) == 1 and rows[0]["r"] == 2.0
@@ -283,6 +359,7 @@ def test_decided_sets_are_disjoint_per_book():
 
 # ── adapters: the database ─────────────────────────────────────────────────
 
+
 @pytest.fixture
 def db(tmp_path):
     d = SignalDB(path=str(tmp_path / "sc.db"))
@@ -291,21 +368,45 @@ def db(tmp_path):
     d.close()
 
 
-def bt_row(ts, action, outcome, rr, *, regime="RANGING", hold_h=2.0,
-           hold_bars=8, sim_key=None, symbol="BTCUSDT"):
-    return {"ts": ts, "symbol": symbol, "timeframe": "15m",
-            "plan_type": "Buy Pullback", "action": action,
-            "confidence_pct": 70, "horizon_hours": 4.0, "outcome": outcome,
-            "rr_achieved": rr, "max_favorable": None, "max_adverse": None,
-            "entry": 100.0, "trigger_level": None, "regime": regime,
-            "sim_key": sim_key, "holding_bars": hold_bars,
-            "holding_hours": hold_h}
+def bt_row(
+    ts,
+    action,
+    outcome,
+    rr,
+    *,
+    regime="RANGING",
+    hold_h=2.0,
+    hold_bars=8,
+    sim_key=None,
+    symbol="BTCUSDT",
+):
+    return {
+        "ts": ts,
+        "symbol": symbol,
+        "timeframe": "15m",
+        "plan_type": "Buy Pullback",
+        "action": action,
+        "confidence_pct": 70,
+        "horizon_hours": 4.0,
+        "outcome": outcome,
+        "rr_achieved": rr,
+        "max_favorable": None,
+        "max_adverse": None,
+        "entry": 100.0,
+        "trigger_level": None,
+        "regime": regime,
+        "sim_key": sim_key,
+        "holding_bars": hold_bars,
+        "holding_hours": hold_h,
+    }
 
 
 def test_save_and_read_back_backtest_rows_with_holding_time(db):
-    rows = [bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 2.0),
-            bt_row(2 * MS_PER_HOUR, "SELL", "LOSS", -1.0, hold_h=0.5),
-            bt_row(3 * MS_PER_HOUR, "BUY", "OPEN", None)]
+    rows = [
+        bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 2.0),
+        bt_row(2 * MS_PER_HOUR, "SELL", "LOSS", -1.0, hold_h=0.5),
+        bt_row(3 * MS_PER_HOUR, "BUY", "OPEN", None),
+    ]
     assert db.save_backtest_rows(rows, run_id="t1") == 3
 
     got = rows_from_backtest_db(db)
@@ -316,24 +417,39 @@ def test_save_and_read_back_backtest_rows_with_holding_time(db):
 
 def test_backtest_rows_can_exclude_simulator_samples(db):
     db.save_backtest_rows(
-        [bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 2.0),
-         bt_row(2 * MS_PER_HOUR, "BUY", "LOSS", -1.0, sim_key="sweep_x")],
-        run_id="t1")
+        [
+            bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 2.0),
+            bt_row(2 * MS_PER_HOUR, "BUY", "LOSS", -1.0, sim_key="sweep_x"),
+        ],
+        run_id="t1",
+    )
     assert len(rows_from_backtest_db(db, include_sim=True)) == 2
     assert len(rows_from_backtest_db(db, include_sim=False)) == 1
 
 
 def test_backtest_rows_filter_by_symbol(db):
     db.save_backtest_rows(
-        [bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 2.0, symbol="BTCUSDT"),
-         bt_row(2 * MS_PER_HOUR, "BUY", "LOSS", -1.0, symbol="ETHUSDT")],
-        run_id="t1")
+        [
+            bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 2.0, symbol="BTCUSDT"),
+            bt_row(2 * MS_PER_HOUR, "BUY", "LOSS", -1.0, symbol="ETHUSDT"),
+        ],
+        run_id="t1",
+    )
     got = rows_from_backtest_db(db, symbol="ETHUSDT")
     assert len(got) == 1 and got[0]["symbol"] == "ETHUSDT"
 
 
-def add_paper(db, *, action="BUY", outcome="TP_HIT", rr=2.0, opened=1000,
-              closed=1000 + 3 * MS_PER_HOUR, sim_key=None, counter=[0]):
+def add_paper(
+    db,
+    *,
+    action="BUY",
+    outcome="TP_HIT",
+    rr=2.0,
+    opened=1000,
+    closed=1000 + 3 * MS_PER_HOUR,
+    sim_key=None,
+    counter=[0],
+):
     counter[0] += 1
     db.conn.execute(
         "INSERT INTO paper_trades "
@@ -342,10 +458,33 @@ def add_paper(db, *, action="BUY", outcome="TP_HIT", rr=2.0, opened=1000,
         "created_ts,opened_ts,closed_ts,entry_price,exit_price,outcome,"
         "rr_achieved,close_reason,checks,regime,sim_key) "
         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (1000 + counter[0], f"s{counter[0]}", "p1", "Buy Pullback", "BTCUSDT",
-         "15m", action, 100.0, 90.0, 120.0, 2.0, 70, "CLOSED",
-         900, opened, closed, 100.0, 120.0, outcome, rr, "tp",
-         counter[0], "RANGING", sim_key))
+        (
+            1000 + counter[0],
+            f"s{counter[0]}",
+            "p1",
+            "Buy Pullback",
+            "BTCUSDT",
+            "15m",
+            action,
+            100.0,
+            90.0,
+            120.0,
+            2.0,
+            70,
+            "CLOSED",
+            900,
+            opened,
+            closed,
+            100.0,
+            120.0,
+            outcome,
+            rr,
+            "tp",
+            counter[0],
+            "RANGING",
+            sim_key,
+        ),
+    )
     db.conn.commit()
 
 
@@ -366,6 +505,7 @@ def test_paper_rows_exclude_simulator_by_default(db):
 
 # ── scorecard_from_db ──────────────────────────────────────────────────────
 
+
 def test_scorecard_from_db_rejects_unknown_source(db):
     rep = scorecard_from_db(source="bogus", db=db)
     assert rep["ok"] is False and "unknown source" in rep["error"]
@@ -379,8 +519,12 @@ def test_scorecard_from_db_empty_is_a_clean_refusal(db):
 
 def test_scorecard_from_db_combines_both_books(db):
     db.save_backtest_rows(
-        [bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 2.0),
-         bt_row(2 * MS_PER_HOUR, "SELL", "LOSS", -1.0)], run_id="t1")
+        [
+            bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 2.0),
+            bt_row(2 * MS_PER_HOUR, "SELL", "LOSS", -1.0),
+        ],
+        run_id="t1",
+    )
     add_paper(db, action="SELL", outcome="STOP_LOSS", rr=-1.0)
 
     both = scorecard_from_db(source="all", min_decided=1, db=db)
@@ -396,14 +540,14 @@ def test_scorecard_from_db_combines_both_books(db):
 
 def test_scorecard_from_db_never_regrades(db):
     """The stored R is reported verbatim — the scorecard is not a grader."""
-    db.save_backtest_rows([bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 7.5)],
-                          run_id="t1")
+    db.save_backtest_rows([bt_row(MS_PER_HOUR, "BUY", "FULL_WIN", 7.5)], run_id="t1")
     rep = scorecard_from_db(source="backtest", min_decided=1, db=db)
     assert rep["overall"]["total_r"] == 7.5
     assert rep["meta"]["note"] == "stored outcomes (no re-grading)"
 
 
 # ── the CLI surface ────────────────────────────────────────────────────────
+
 
 def test_cli_scorecard_json_on_an_empty_db(tmp_path, monkeypatch, capsys):
     """`python main.py scorecard --json` degrades to a machine-readable
@@ -413,6 +557,7 @@ def test_cli_scorecard_json_on_an_empty_db(tmp_path, monkeypatch, capsys):
     # config.DB_PATH is read at construction time, so patch the attribute:
     # setenv alone is too late once config has been imported.
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "cli.db"))
     from main import main
 
@@ -424,12 +569,15 @@ def test_cli_scorecard_json_on_an_empty_db(tmp_path, monkeypatch, capsys):
 
 def test_cli_scorecard_prints_the_block(tmp_path, monkeypatch, capsys):
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "cli2.db"))
     from main import main
 
     rows = rows_at([2.0, -1.0, 2.0, -1.0] * 10)
-    monkeypatch.setattr("data.scorecard.scorecard_from_db",
-                        lambda **kw: build_scorecard(rows, min_decided=30))
+    monkeypatch.setattr(
+        "data.scorecard.scorecard_from_db",
+        lambda **kw: build_scorecard(rows, min_decided=30),
+    )
     rc = main(["scorecard"])
     out = capsys.readouterr().out
     assert "STRATEGY SCORECARD" in out
@@ -443,35 +591,40 @@ def test_rows_from_backtest_db_honours_since_until_eras(tmp_path, monkeypatch):
     """P12.3.2: synthetic and real rows live in one book; era filters
     must separate them by signal bar without mixing."""
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "era.db"))
     from data.database import SignalDB
     from data.scorecard import rows_from_backtest_db
 
     with SignalDB() as db:
-        db.save_backtest_rows([
-            bt_row(1_700_000_000_000, "BUY", "FULL_WIN", 2.0),
-            bt_row(1_700_000_000_001, "BUY", "LOSS", -1.0),
-            bt_row(1_800_000_000_000, "BUY", "FULL_WIN", 2.0),
-            bt_row(1_800_000_000_001, "SELL", "FULL_WIN", 1.5),
-        ], run_id="era_test")
+        db.save_backtest_rows(
+            [
+                bt_row(1_700_000_000_000, "BUY", "FULL_WIN", 2.0),
+                bt_row(1_700_000_000_001, "BUY", "LOSS", -1.0),
+                bt_row(1_800_000_000_000, "BUY", "FULL_WIN", 2.0),
+                bt_row(1_800_000_000_001, "SELL", "FULL_WIN", 1.5),
+            ],
+            run_id="era_test",
+        )
         rows = rows_from_backtest_db(db, symbol="BTCUSDT")
         assert len(rows) == 4
-        old = rows_from_backtest_db(db, symbol="BTCUSDT",
-                                    until_ts=1_750_000_000_000)
+        old = rows_from_backtest_db(db, symbol="BTCUSDT", until_ts=1_750_000_000_000)
         assert [r["ts"] for r in old] == [1_700_000_000_000, 1_700_000_000_001]
-        new = rows_from_backtest_db(db, symbol="BTCUSDT",
-                                    since_ts=1_750_000_000_000)
+        new = rows_from_backtest_db(db, symbol="BTCUSDT", since_ts=1_750_000_000_000)
         assert [r["ts"] for r in new] == [1_800_000_000_000, 1_800_000_000_001]
         # Date strings route through the same CLI parser.
-        assert rows_from_backtest_db(db, symbol="BTCUSDT",
-                                     since_ts=0, until_ts=1_750_000_000_000) \
+        assert (
+            rows_from_backtest_db(
+                db, symbol="BTCUSDT", since_ts=0, until_ts=1_750_000_000_000
+            )
             == old
+        )
 
 
 def test_cli_scorecard_era_flags_pass_through(tmp_path, monkeypatch, capsys):
     """`scorecard --since/--until` parse dates/epoch-ms into ts bounds."""
-    import json
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "era_cli.db"))
     from main import main
 
@@ -479,25 +632,50 @@ def test_cli_scorecard_era_flags_pass_through(tmp_path, monkeypatch, capsys):
 
     def fake_from_db(**kw):
         seen.update(kw)
-        return {"ok": True, "rows": 0, "meta": {}, "overall": {},
-                "by_side": {}, "by_regime": {}, "by_session": {},
-                "by_setup": {}, "criteria": {}, "bar": {}, "verdict": {}}
+        return {
+            "ok": True,
+            "rows": 0,
+            "meta": {},
+            "overall": {},
+            "by_side": {},
+            "by_regime": {},
+            "by_session": {},
+            "by_setup": {},
+            "criteria": {},
+            "bar": {},
+            "verdict": {},
+        }
 
     monkeypatch.setattr("data.scorecard.scorecard_from_db", fake_from_db)
-    assert main(["scorecard", "--source", "backtest", "--symbol", "BTCUSDT",
-                 "--since", "2025-01-01", "--until", "2026-04-30",
-                 "--json"]) == 0
+    assert (
+        main(
+            [
+                "scorecard",
+                "--source",
+                "backtest",
+                "--symbol",
+                "BTCUSDT",
+                "--since",
+                "2025-01-01",
+                "--until",
+                "2026-04-30",
+                "--json",
+            ]
+        )
+        == 0
+    )
     capsys.readouterr()
-    assert seen["since_ts"] == 1_735_689_600_000   # 2025-01-01T00:00:00Z
-    assert seen["until_ts"] == 1_777_507_200_000   # 2026-04-30T00:00:00Z
+    assert seen["since_ts"] == 1_735_689_600_000  # 2025-01-01T00:00:00Z
+    assert seen["until_ts"] == 1_777_507_200_000  # 2026-04-30T00:00:00Z
     assert seen["source"] == "backtest"
 
 
 # ── P12.6 Net-of-costs (E_net) & Conditioned Expectancy tests ─────────────
 
+
 def test_scorecard_net_metrics_computation():
     """Verify scorecard computes both gross and net metrics with cost drag."""
-    from data.costs import CostModel
+
     # 40 trades: 24 wins at +2.0R, 16 losses at -1.0R (gross WR 60%, gross E +0.80R)
     # Entry 100,000, SL 99,177 (stop dist 0.823% -> fee_r = 0.1215R, slip_r = 0.0486R, fund_r = 0.0027R, total = 0.1728R)
     rows = []
@@ -522,8 +700,9 @@ def test_scorecard_verdict_fails_when_gross_passes_but_net_fails():
     """P12.6 core honesty proof: gross +0.55R passes gross bar, but net +0.38R FAILS net bar."""
     # Build a book with gross E = +0.55R, gross WR = 58%
     # E.g., 29 wins of +1.5R and 21 losses of -0.76R -> sum = 43.5 - 15.96 = 27.54 / 50 = +0.5508R
-    rows = [row(1.5, ts=(i + 1) * MS_PER_HOUR) for i in range(29)] + \
-           [row(-0.76, ts=(30 + i) * MS_PER_HOUR) for i in range(21)]
+    rows = [row(1.5, ts=(i + 1) * MS_PER_HOUR) for i in range(29)] + [
+        row(-0.76, ts=(30 + i) * MS_PER_HOUR) for i in range(21)
+    ]
     rep = build_scorecard(rows, min_decided=30)
     o = rep["overall"]
     assert o["expectancy"] > 0.50
@@ -556,6 +735,7 @@ def test_scorecard_conditioned_splits():
 
 
 # ── P12.3.3 — effective sample size (overlap-corrected, honest counts) ────
+
 
 def bt_row_overlap(r, ts, *, horizon_hours=24.0, step=3, timeframe="15m"):
     """A decided backtest row carrying its own horizon + step (walk-forward)."""
@@ -592,22 +772,26 @@ def test_overlap_factor_paper_and_unknown_are_independent():
 
 
 def test_effective_sample_size_divides_by_overlap():
-    rows = [bt_row_overlap(1.0, ts=i + 1, horizon_hours=24.0, step=3)
-            for i in range(96)]
+    rows = [
+        bt_row_overlap(1.0, ts=i + 1, horizon_hours=24.0, step=3) for i in range(96)
+    ]
     n_eff, overlap = effective_sample_size(rows)
-    assert n_eff == 3.0        # 96 decided / 32× overlap
+    assert n_eff == 3.0  # 96 decided / 32× overlap
     assert overlap == 32.0
     # Independent rows (paper) contribute one full unit each.
-    assert effective_sample_size([row(1.0, ts=1, source="paper"),
-                                  row(-1.0, ts=2, source="paper")]) == (2.0, 1.0)
+    assert effective_sample_size(
+        [row(1.0, ts=1, source="paper"), row(-1.0, ts=2, source="paper")]
+    ) == (2.0, 1.0)
     assert effective_sample_size([]) == (0.0, None)
 
 
 def test_trade_stats_reports_honest_n_eff_and_widens_ci():
     """SE = σ/√N_eff, not σ/√N — the raw N would understate uncertainty ~32×."""
     rs = [1.0 if i % 2 == 0 else -1.0 for i in range(96)]
-    rows = [bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3)
-            for i, r in enumerate(rs)]
+    rows = [
+        bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3)
+        for i, r in enumerate(rs)
+    ]
     s = trade_stats(rows, step=3)
     assert s["n"] == 96
     assert s["n_eff"] == 3.0
@@ -624,8 +808,10 @@ def test_trade_stats_reports_honest_n_eff_and_widens_ci():
 def test_build_scorecard_flags_n_eff_below_min_decided():
     # 96 overlapping rows = only 3 independent, yet raw n clears min 30.
     rs = [1.0 if i % 2 == 0 else -1.0 for i in range(96)]
-    rows = [bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3)
-            for i, r in enumerate(rs)]
+    rows = [
+        bt_row_overlap(r, ts=i + 1, horizon_hours=24.0, step=3)
+        for i, r in enumerate(rs)
+    ]
     rep = build_scorecard(rows, min_decided=30, step=3)
     assert rep["overall"]["n_eff"] == 3.0
     assert rep["overall"]["overlap"] == 32.0

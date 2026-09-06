@@ -23,7 +23,6 @@ from engine.sentiment import (
     compute_historical,
 )
 
-
 # ── bucketing ──────────────────────────────────────────────────────────────
 
 
@@ -56,15 +55,22 @@ def test_compute_historical_direction_and_renormalisation():
     bear = compute_historical(10, 80, {"trend": "bearish", "adx": 30}, "SELL", "MEDIUM")
     assert bull > 40 and bear < -40
     # same scores, opposite signal action → score moves with the action
-    assert compute_historical(50, 30, {"trend": "mixed"}, "BUY", "MEDIUM") > \
-           compute_historical(50, 30, {"trend": "mixed"}, "SELL", "MEDIUM")
+    assert compute_historical(
+        50, 30, {"trend": "mixed"}, "BUY", "MEDIUM"
+    ) > compute_historical(50, 30, {"trend": "mixed"}, "SELL", "MEDIUM")
     # no signal + mixed trend still resolves from the engine scores alone
     assert compute_historical(30, 35, {}, "NO TRADE") < 0
 
 
 def test_compute_historical_is_bounded():
-    assert abs(compute_historical(100, 0, {"trend": "bullish", "adx": 50}, "BUY", "HIGH")) <= 100
-    assert abs(compute_historical(0, 100, {"trend": "bearish", "adx": 50}, "SELL", "HIGH")) <= 100
+    assert (
+        abs(compute_historical(100, 0, {"trend": "bullish", "adx": 50}, "BUY", "HIGH"))
+        <= 100
+    )
+    assert (
+        abs(compute_historical(0, 100, {"trend": "bearish", "adx": 50}, "SELL", "HIGH"))
+        <= 100
+    )
 
 
 # ── walk clock (time-in-condition) ─────────────────────────────────────────
@@ -112,13 +118,21 @@ def test_clock_bucket_follows_score():
 @pytest.fixture
 def _walk_df():
     from tests.conftest import make_ohlcv
+
     return make_ohlcv(n=350, seed=11)
 
 
 def test_run_backtest_tags_plans_with_sentiment(_walk_df):
     from data.backtester import run_backtest
-    result = run_backtest(_walk_df, symbol="BTCUSDT", timeframe="15m",
-                          horizons=[1.0], min_confidence=40, step=2)
+
+    result = run_backtest(
+        _walk_df,
+        symbol="BTCUSDT",
+        timeframe="15m",
+        horizons=[1.0],
+        min_confidence=40,
+        step=2,
+    )
     graded = result["graded"]
     assert graded, "demo walk produced no plans"
     for g in graded:
@@ -137,6 +151,7 @@ def test_run_backtest_tags_plans_with_sentiment(_walk_df):
 @pytest.fixture
 def _tmp_db(monkeypatch, tmp_path):
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "p16.db"))
 
 
@@ -144,25 +159,43 @@ def test_scorecard_splits_by_sentiment(_tmp_db, _walk_df):
     from data.backtester import run_backtest
     from data.database import SignalDB
     from data.scorecard import scorecard_from_db
-    result = run_backtest(_walk_df, symbol="BTCUSDT", timeframe="15m",
-                          horizons=[1.0], min_confidence=40, step=2)
+
+    result = run_backtest(
+        _walk_df,
+        symbol="BTCUSDT",
+        timeframe="15m",
+        horizons=[1.0],
+        min_confidence=40,
+        step=2,
+    )
     run_id = time.strftime("%Y%m%d_%H%M%S")
     rows = []
     for g in result["graded"]:
         r = g.as_row()
-        r.update({"run_id": run_id, "symbol": "BTCUSDT", "timeframe": "15m",
-                  "step": 2, "exchange": "binance", "market": "spot",
-                  "price_type": ""})
+        r.update(
+            {
+                "run_id": run_id,
+                "symbol": "BTCUSDT",
+                "timeframe": "15m",
+                "step": 2,
+                "exchange": "binance",
+                "market": "spot",
+                "price_type": "",
+            }
+        )
         rows.append(r)
     with SignalDB() as db:
         n = db.save_backtest_rows(rows, run_id)
         assert n == len(rows)
         # the persisted row really carries the colour
         from data.scorecard import rows_from_backtest_db
+
         db_rows = rows_from_backtest_db(db)
-        assert db_rows and all(r["sentiment_bucket"] in
-                               ("deep_bull", "bull", "slate", "bear", "deep_bear", "UNKNOWN")
-                               for r in db_rows)
+        assert db_rows and all(
+            r["sentiment_bucket"]
+            in ("deep_bull", "bull", "slate", "bear", "deep_bear", "UNKNOWN")
+            for r in db_rows
+        )
         assert any(r["sentiment_bucket"] != "UNKNOWN" for r in db_rows)
     sc = scorecard_from_db(min_decided=1)
     assert "by_sentiment" in sc and "by_sentiment_depth" in sc
@@ -177,20 +210,42 @@ def test_scorecard_splits_by_sentiment(_tmp_db, _walk_df):
 def test_scan_persists_sentiment_bucket(_tmp_db):
     """save_scan stores the sentiment colour; paper fields carry it through."""
     from data.database import SignalDB
+
     payload = {
-        "signal": {"signal_id": "TEST_1", "timestamp": int(time.time() * 1000),
-                   "asset": "BTCUSDT", "timeframe": "15m", "action": "BUY",
-                   "entry": 100.0, "stop_loss": 97.0, "take_profit": 109.0,
-                   "risk_reward": 3.0, "confidence": "MEDIUM",
-                   "reason": "t", "signal_type": "SIGNAL"},
-        "plans": [{"type": "Immediate Buy", "action": "BUY", "entry": 100.0,
-                   "stop_loss": 97.0, "take_profits": [109.0],
-                   "risk_reward": 3.0, "confidence": 70}],
+        "signal": {
+            "signal_id": "TEST_1",
+            "timestamp": int(time.time() * 1000),
+            "asset": "BTCUSDT",
+            "timeframe": "15m",
+            "action": "BUY",
+            "entry": 100.0,
+            "stop_loss": 97.0,
+            "take_profit": 109.0,
+            "risk_reward": 3.0,
+            "confidence": "MEDIUM",
+            "reason": "t",
+            "signal_type": "SIGNAL",
+        },
+        "plans": [
+            {
+                "type": "Immediate Buy",
+                "action": "BUY",
+                "entry": 100.0,
+                "stop_loss": 97.0,
+                "take_profits": [109.0],
+                "risk_reward": 3.0,
+                "confidence": 70,
+            }
+        ],
         "snapshot": {"features": {"price": 100.0}},
         "market_context": {},
-        "sentiment": {"score": 71.0, "bucket": "deep_bull",
-                      "direction": "bullish", "label": "STRONG BULLISH",
-                      "intensity": 0.66},
+        "sentiment": {
+            "score": 71.0,
+            "bucket": "deep_bull",
+            "direction": "bullish",
+            "label": "STRONG BULLISH",
+            "intensity": 0.66,
+        },
     }
     with SignalDB() as db:
         scan_id = db.save_scan(payload)
@@ -199,6 +254,7 @@ def test_scan_persists_sentiment_bucket(_tmp_db):
         assert row["sentiment_score"] == 71.0
         assert row["sentiment_intensity"] == 0.66
         from data.paper_trading import paper_fields_from_scan
+
         fields = paper_fields_from_scan(row)
         assert fields["sentiment_bucket"] == "deep_bull"
         assert fields["sentiment_score"] == 71.0
@@ -208,17 +264,36 @@ def test_legacy_rows_without_sentiment_are_unknown(_tmp_db):
     """Pre-P16 rows (NULL sentiment) must show as UNKNOWN, never slate."""
     from data.database import SignalDB
     from data.scorecard import scorecard_from_db
+
     run_id = "legacy"
     with SignalDB() as db:
-        db.save_backtest_rows([{
-            "run_id": run_id, "ts": int(time.time() * 1000),
-            "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Immediate Buy",
-            "action": "BUY", "confidence_pct": 70, "horizon_hours": 1.0,
-            "step": 1, "outcome": "FULL_WIN", "rr_achieved": 2.0,
-            "rr_net": 1.8, "max_favorable": 2.0, "max_adverse": -0.5,
-            "entry": 100.0, "trigger_level": None, "regime": "",
-            "exchange": "binance", "market": "spot", "price_type": "",
-            "source_key": "",
-        }], run_id)
+        db.save_backtest_rows(
+            [
+                {
+                    "run_id": run_id,
+                    "ts": int(time.time() * 1000),
+                    "symbol": "BTCUSDT",
+                    "timeframe": "15m",
+                    "plan_type": "Immediate Buy",
+                    "action": "BUY",
+                    "confidence_pct": 70,
+                    "horizon_hours": 1.0,
+                    "step": 1,
+                    "outcome": "FULL_WIN",
+                    "rr_achieved": 2.0,
+                    "rr_net": 1.8,
+                    "max_favorable": 2.0,
+                    "max_adverse": -0.5,
+                    "entry": 100.0,
+                    "trigger_level": None,
+                    "regime": "",
+                    "exchange": "binance",
+                    "market": "spot",
+                    "price_type": "",
+                    "source_key": "",
+                }
+            ],
+            run_id,
+        )
     sc = scorecard_from_db(min_decided=1)
     assert sc["by_sentiment"]["UNKNOWN"]["n"] >= 1

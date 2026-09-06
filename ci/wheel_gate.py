@@ -15,11 +15,11 @@ The `--install` path needs network (pip will fetch the declared
 runtime deps: numpy/pandas/flask/...). The default path is offline
 once `build`/`setuptools`/`wheel` are already installed.
 """
+
 from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -42,8 +42,14 @@ def build_wheel(out_dir: Path) -> Path:
     """Build a wheel into *out_dir* and return the .whl path."""
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
-        sys.executable, "-m", "pip", "wheel",
-        str(ROOT), "-w", str(out_dir), "--no-deps",
+        sys.executable,
+        "-m",
+        "pip",
+        "wheel",
+        str(ROOT),
+        "-w",
+        str(out_dir),
+        "--no-deps",
     ]
     subprocess.run(cmd, check=True, cwd=str(ROOT))
     wheels = sorted(out_dir.glob("cryptobrain-*.whl"))
@@ -60,15 +66,17 @@ def smoke_install(wheel_path: Path) -> None:
         pip = venv / ("Scripts" if os.name == "nt" else "bin") / "pip"
         py = venv / ("Scripts" if os.name == "nt" else "bin") / "python"
         cli = venv / ("Scripts" if os.name == "nt" else "bin") / "cryptobrain"
-        subprocess.run(
-            [str(pip), "install", "--upgrade", "pip"], check=True)
+        subprocess.run([str(pip), "install", "--upgrade", "pip"], check=True)
         subprocess.run([str(pip), "install", str(wheel_path)], check=True)
         # 1) import cryptobrain (the P9 definition-of-done contract)
         subprocess.run(
-            [str(py), "-c",
-             "import cryptobrain, main, config; "
-             "assert cryptobrain.__version__ == config.VERSION; "
-             "print('import OK', cryptobrain.__version__)"],
+            [
+                str(py),
+                "-c",
+                "import cryptobrain, main, config; "
+                "assert cryptobrain.__version__ == config.VERSION; "
+                "print('import OK', cryptobrain.__version__)",
+            ],
             check=True,
         )
         # 2) CLI smoke — doctor is read-only and never needs a network
@@ -77,17 +85,22 @@ def smoke_install(wheel_path: Path) -> None:
         env["PYTHONUNBUFFERED"] = "1"
         subprocess.run(
             [str(cli), "doctor", "--json"],
-            check=True, env=env,
+            check=True,
+            env=env,
         )
         print("CLI smoke OK: cryptobrain doctor --json")
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="CryptoBrain wheel-gate")
-    ap.add_argument("--install", action="store_true",
-                    help="also install the wheel into a clean venv and smoke-test")
-    ap.add_argument("--out", default=None,
-                    help="directory to write the wheel (default: a temp dir)")
+    ap.add_argument(
+        "--install",
+        action="store_true",
+        help="also install the wheel into a clean venv and smoke-test",
+    )
+    ap.add_argument(
+        "--out", default=None, help="directory to write the wheel (default: a temp dir)"
+    )
     args = ap.parse_args(argv)
 
     tmp = None

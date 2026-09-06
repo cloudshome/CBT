@@ -35,6 +35,7 @@ Safety model
 * **One worker, one job at a time.** Long jobs are heavy and share the same
   Parquet store and SQLite DB; running several at once would just thrash.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -42,14 +43,14 @@ import json
 import math
 import os
 import re
-import signal
 import subprocess
 import sys
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import config
 
@@ -68,15 +69,36 @@ JOB_KINDS: dict[str, dict] = {
         "argv": ["backfill"],
         "what": "Download paginated candle history into the local Parquet store.",
         "inputs": [
-            {"name": "symbol", "label": "Asset", "type": "text", "default": "BTCUSDT",
-             "flag": "--symbol"},
-            {"name": "tf", "label": "Timeframe", "type": "choice",
-             "options": ["1m", "5m", "15m", "1h", "4h", "1d"], "default": "1m",
-             "flag": "--tf"},
-            {"name": "market", "label": "Market", "type": "choice",
-             "options": ["spot", "perp"], "default": "perp", "flag": "--market"},
-            {"name": "since", "label": "Since", "type": "text", "default": "30d",
-             "flag": "--since"},
+            {
+                "name": "symbol",
+                "label": "Asset",
+                "type": "text",
+                "default": "BTCUSDT",
+                "flag": "--symbol",
+            },
+            {
+                "name": "tf",
+                "label": "Timeframe",
+                "type": "choice",
+                "options": ["1m", "5m", "15m", "1h", "4h", "1d"],
+                "default": "1m",
+                "flag": "--tf",
+            },
+            {
+                "name": "market",
+                "label": "Market",
+                "type": "choice",
+                "options": ["spot", "perp"],
+                "default": "perp",
+                "flag": "--market",
+            },
+            {
+                "name": "since",
+                "label": "Since",
+                "type": "text",
+                "default": "30d",
+                "flag": "--since",
+            },
         ],
     },
     "backtest": {
@@ -84,28 +106,58 @@ JOB_KINDS: dict[str, dict] = {
         "argv": ["backtest"],
         "what": "Walk-forward grade of the engine's plans over stored history.",
         "inputs": [
-            {"name": "symbol", "label": "Asset", "type": "text", "default": "BTCUSDT",
-             "flag": "--symbol"},
-            {"name": "tf", "label": "Timeframe", "type": "choice",
-             "options": ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"],
-             "default": "15m", "flag": "--tf"},
-            {"name": "bars", "label": "Bars", "type": "int", "default": 500,
-             "flag": "--bars"},
+            {
+                "name": "symbol",
+                "label": "Asset",
+                "type": "text",
+                "default": "BTCUSDT",
+                "flag": "--symbol",
+            },
+            {
+                "name": "tf",
+                "label": "Timeframe",
+                "type": "choice",
+                "options": ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"],
+                "default": "15m",
+                "flag": "--tf",
+            },
+            {
+                "name": "bars",
+                "label": "Bars",
+                "type": "int",
+                "default": 500,
+                "flag": "--bars",
+            },
         ],
     },
     "simulator": {
         "title": "Simulator",
         "argv": ["simulator"],
         "what": "Grind unique backtest and paper samples per setup toward the "
-                "100/20 evidence bar (simulator rows never count as live evidence).",
+        "100/20 evidence bar (simulator rows never count as live evidence).",
         "inputs": [
-            {"name": "rounds", "label": "Rounds", "type": "int", "default": 3,
-             "flag": "--rounds"},
-            {"name": "symbols", "label": "Assets", "type": "text", "default": "",
-             "flag": "--symbols"},
-            {"name": "tf", "label": "Timeframe", "type": "choice",
-             "options": ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"],
-             "default": "15m", "flag": "--tf"},
+            {
+                "name": "rounds",
+                "label": "Rounds",
+                "type": "int",
+                "default": 3,
+                "flag": "--rounds",
+            },
+            {
+                "name": "symbols",
+                "label": "Assets",
+                "type": "text",
+                "default": "",
+                "flag": "--symbols",
+            },
+            {
+                "name": "tf",
+                "label": "Timeframe",
+                "type": "choice",
+                "options": ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"],
+                "default": "15m",
+                "flag": "--tf",
+            },
         ],
     },
     "scorecard": {
@@ -113,9 +165,14 @@ JOB_KINDS: dict[str, dict] = {
         "argv": ["scorecard"],
         "what": "Strategy scorecard net of costs, by setup / regime / side / session.",
         "inputs": [
-            {"name": "source", "label": "Book", "type": "choice",
-             "options": ["db", "backtest", "paper", "store"], "default": "db",
-             "flag": "--source"},
+            {
+                "name": "source",
+                "label": "Book",
+                "type": "choice",
+                "options": ["db", "backtest", "paper", "store"],
+                "default": "db",
+                "flag": "--source",
+            },
         ],
     },
     "derivatives_collect": {
@@ -123,8 +180,13 @@ JOB_KINDS: dict[str, dict] = {
         "argv": ["derivatives", "collect"],
         "what": "Collect funding, open interest, mark, index and basis history.",
         "inputs": [
-            {"name": "symbol", "label": "Asset", "type": "text", "default": "BTCUSDT",
-             "flag": "--symbol"},
+            {
+                "name": "symbol",
+                "label": "Asset",
+                "type": "text",
+                "default": "BTCUSDT",
+                "flag": "--symbol",
+            },
         ],
     },
     "cross_collect": {
@@ -132,8 +194,13 @@ JOB_KINDS: dict[str, dict] = {
         "argv": ["cross", "collect"],
         "what": "Collect premium/discount and funding spread across venues.",
         "inputs": [
-            {"name": "symbol", "label": "Asset", "type": "text", "default": "BTCUSDT",
-             "flag": "--symbol"},
+            {
+                "name": "symbol",
+                "label": "Asset",
+                "type": "text",
+                "default": "BTCUSDT",
+                "flag": "--symbol",
+            },
         ],
     },
 }
@@ -145,31 +212,56 @@ COMPOSITE_JOBS: dict[str, dict] = {
     "evidence": {
         "title": "Build my evidence",
         "what": "One guided run: Backfill → Backtest → Simulator → Scorecard, "
-                "streamed with live progress.",
+        "streamed with live progress.",
         # W1: these are deliberately closed/validated inputs, not arbitrary
         # command arguments.  The selected asset/timeframe flow into every
         # applicable child step so the four-stage run measures one coherent
         # series rather than silently mixing defaults.
         "inputs": [
-            {"name": "symbol", "label": "Asset", "type": "text",
-             "default": "BTCUSDT"},
-            {"name": "tf", "label": "Timeframe", "type": "choice",
-             "options": ["1m", "5m", "15m", "1h", "4h", "1d"],
-             "default": "15m"},
-            {"name": "market", "label": "Market", "type": "choice",
-             "options": ["spot", "perp"], "default": "spot"},
-            {"name": "since", "label": "History", "type": "choice",
-             "options": ["7d", "30d", "90d", "180d", "365d"], "default": "30d"},
-            {"name": "bars", "label": "Backtest bars", "type": "int", "default": 500,
-             "max": 100_000},
-            {"name": "rounds", "label": "Simulator rounds", "type": "int", "default": 3,
-             "max": 1_000},
+            {"name": "symbol", "label": "Asset", "type": "text", "default": "BTCUSDT"},
+            {
+                "name": "tf",
+                "label": "Timeframe",
+                "type": "choice",
+                "options": ["1m", "5m", "15m", "1h", "4h", "1d"],
+                "default": "15m",
+            },
+            {
+                "name": "market",
+                "label": "Market",
+                "type": "choice",
+                "options": ["spot", "perp"],
+                "default": "spot",
+            },
+            {
+                "name": "since",
+                "label": "History",
+                "type": "choice",
+                "options": ["7d", "30d", "90d", "180d", "365d"],
+                "default": "30d",
+            },
+            {
+                "name": "bars",
+                "label": "Backtest bars",
+                "type": "int",
+                "default": 500,
+                "max": 100_000,
+            },
+            {
+                "name": "rounds",
+                "label": "Simulator rounds",
+                "type": "int",
+                "default": 3,
+                "max": 1_000,
+            },
         ],
         "steps": [
             {"kind": "backfill", "params_from": ["symbol", "tf", "market", "since"]},
             {"kind": "backtest", "params_from": ["symbol", "tf", "bars"]},
-            {"kind": "simulator", "params_map": {"symbol": "symbols", "tf": "tf",
-                                                    "rounds": "rounds"}},
+            {
+                "kind": "simulator",
+                "params_map": {"symbol": "symbols", "tf": "tf", "rounds": "rounds"},
+            },
             {"kind": "scorecard", "params": {"source": "db"}},
         ],
     },
@@ -181,8 +273,12 @@ TERMINAL = {"succeeded", "failed", "cancelled", "interrupted"}
 LIVE = {"queued", "running"}
 
 STATUS_LABELS = {
-    "queued": "queued", "running": "running", "succeeded": "succeeded",
-    "failed": "failed", "cancelled": "cancelled", "interrupted": "interrupted",
+    "queued": "queued",
+    "running": "running",
+    "succeeded": "succeeded",
+    "failed": "failed",
+    "cancelled": "cancelled",
+    "interrupted": "interrupted",
 }
 
 
@@ -196,7 +292,7 @@ def params_hash(kind: str, params: dict) -> str:
         canonical = json.dumps(params, sort_keys=True, default=str)
     except Exception:
         canonical = repr(params)
-    return hashlib.sha256(f"{kind}\n{canonical}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{kind}\n{canonical}".encode()).hexdigest()
 
 
 def _coerce_param(spec: dict, raw: Any) -> Any:
@@ -291,8 +387,9 @@ def _job_row_to_payload(row: dict) -> dict:
     return {
         "job_id": row["job_id"],
         "kind": row["kind"],
-        "title": (JOB_KINDS.get(row["kind"]) or COMPOSITE_JOBS.get(row["kind"])
-                  or {}).get("title", row["kind"]),
+        "title": (
+            JOB_KINDS.get(row["kind"]) or COMPOSITE_JOBS.get(row["kind"]) or {}
+        ).get("title", row["kind"]),
         "params": params,
         "status": row["status"],
         "user": row.get("username"),
@@ -317,31 +414,37 @@ class JobManager:
     per-job file; only the tail is loaded into memory for status/SSE.
     """
 
-    def __init__(self, db_path: Optional[str] = None,
-                 log_dir: Optional[str | Path] = None,
-                 runner: Optional[Callable[..., int]] = None):
+    def __init__(
+        self,
+        db_path: str | None = None,
+        log_dir: str | Path | None = None,
+        runner: Callable[..., int] | None = None,
+    ):
         self.db_path = db_path or config.DB_PATH
-        self.log_dir = Path(log_dir) if log_dir else (
-            Path(self.db_path).parent / "job_logs")
+        self.log_dir = (
+            Path(log_dir) if log_dir else (Path(self.db_path).parent / "job_logs")
+        )
         self.log_dir.mkdir(parents=True, exist_ok=True)
         #: Injectable subprocess runner — tests replace this with a fake that
         #: streams a few lines and returns an exit code without a real shell.
         self._runner = runner or self._default_runner
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._wake = threading.Event()
         self._lock = threading.Lock()
 
     # ── db helpers ───────────────────────────────────────────────────────
     def _db(self):
         from data.database import SignalDB
+
         return SignalDB(self.db_path) if self.db_path else SignalDB()
 
     def _log_file(self, job_id: str) -> Path:
         return self.log_dir / f"{job_id}.log"
 
     # ── submission ───────────────────────────────────────────────────────
-    def submit(self, kind: str, params: dict | None = None,
-               user: Optional[dict] = None) -> dict:
+    def submit(
+        self, kind: str, params: dict | None = None, user: dict | None = None
+    ) -> dict:
         """Validate, dedup and enqueue a job. Returns ``{job_id, created}``.
 
         ``created`` is False when an identical job is already queued/running —
@@ -371,26 +474,40 @@ class JobManager:
             existing = db.conn.execute(
                 "SELECT job_id FROM jobs WHERE params_hash=? AND status IN "
                 "('queued','running') ORDER BY created_ts DESC LIMIT 1",
-                (fingerprint,)).fetchone()
+                (fingerprint,),
+            ).fetchone()
             if existing is not None:
                 return {"job_id": existing["job_id"], "created": False}
             db.conn.execute(
                 "INSERT INTO jobs(job_id, kind, params_json, params_hash, status, "
                 "user_id, username, created_ts, step_index, step_total, phase, "
                 "log_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                (job_id, kind, json.dumps(params, default=str), fingerprint,
-                 "queued", user_id, username, now, 0, step_total,
-                 "queued", log_path))
+                (
+                    job_id,
+                    kind,
+                    json.dumps(params, default=str),
+                    fingerprint,
+                    "queued",
+                    user_id,
+                    username,
+                    now,
+                    0,
+                    step_total,
+                    "queued",
+                    log_path,
+                ),
+            )
             db.conn.commit()
         self._wake.set()
         self.start()
         return {"job_id": job_id, "created": True}
 
-    def get(self, job_id: str, tail_lines: int = 200) -> Optional[dict]:
+    def get(self, job_id: str, tail_lines: int = 200) -> dict | None:
         """One job's persisted state plus a tail of its log."""
         with self._db() as db:
             row = db.conn.execute(
-                "SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+                "SELECT * FROM jobs WHERE job_id=?", (job_id,)
+            ).fetchone()
             if row is None:
                 return None
             payload = _job_row_to_payload(dict(row))
@@ -398,7 +515,7 @@ class JobManager:
         payload["log_full"] = str(self._log_file(job_id))
         return payload
 
-    def list_jobs(self, limit: int = 50, status: Optional[str] = None) -> list[dict]:
+    def list_jobs(self, limit: int = 50, status: str | None = None) -> list[dict]:
         """Recent jobs, newest first, optionally filtered by status."""
         q = "SELECT * FROM jobs"
         args: tuple = ()
@@ -431,13 +548,18 @@ class JobManager:
         inventing a percentage.
         """
         primary = [s for s in (by_setup or []) if s.get("primary", True)]
-        bt_gap = sum(max(0, int(s.get("backtest_target") or 0)
-                         - int(s.get("backtest_n") or 0)) for s in primary)
-        pp_gap = sum(max(0, int(s.get("paper_target") or 0)
-                         - int(s.get("paper_n") or 0)) for s in primary)
+        bt_gap = sum(
+            max(0, int(s.get("backtest_target") or 0) - int(s.get("backtest_n") or 0))
+            for s in primary
+        )
+        pp_gap = sum(
+            max(0, int(s.get("paper_target") or 0) - int(s.get("paper_n") or 0))
+            for s in primary
+        )
 
         pattern = re.compile(
-            r"round\s+\d+:\s+\+(\d+)\s+backtest samples,\s+\+(\d+)\s+paper samples")
+            r"round\s+\d+:\s+\+(\d+)\s+backtest samples,\s+\+(\d+)\s+paper samples"
+        )
         observed: list[tuple[int, int]] = []
         # list_jobs is newest-first; reverse to chronological order before
         # keeping the last observations below.
@@ -466,24 +588,31 @@ class JobManager:
         else:
             projected = max(
                 math.ceil(bt_gap / bt_rate) if bt_gap else 0,
-                math.ceil(pp_gap / pp_rate) if pp_gap else 0)
+                math.ceil(pp_gap / pp_rate) if pp_gap else 0,
+            )
             projection_state = "estimated"
 
         def _sample_complete(setup: dict) -> bool:
             bt_target = int(setup.get("backtest_target") or 0)
             pp_target = int(setup.get("paper_target") or 0)
-            return (bt_target > 0 and pp_target > 0
-                    and int(setup.get("backtest_n") or 0) >= bt_target
-                    and int(setup.get("paper_n") or 0) >= pp_target)
+            return (
+                bt_target > 0
+                and pp_target > 0
+                and int(setup.get("backtest_n") or 0) >= bt_target
+                and int(setup.get("paper_n") or 0) >= pp_target
+            )
 
         incomplete = [s for s in primary if not _sample_complete(s)]
         # Report a completed setup's losing/absent net expectancy immediately,
         # even if another primary setup is still gathering samples. Hiding that
         # result behind the family-wide gap would invite more grinding or tuning
         # of a setup for which the honest measured result is already “no edge”.
-        no_edge = [s for s in primary if _sample_complete(s) and
-                   (s.get("expectancy_net") is None
-                    or float(s.get("expectancy_net")) <= 0)]
+        no_edge = [
+            s
+            for s in primary
+            if _sample_complete(s)
+            and (s.get("expectancy_net") is None or float(s.get("expectancy_net")) <= 0)
+        ]
         proven = [s for s in primary if s.get("proven")]
         no_edge_names = [str(s.get("plan_type")) for s in no_edge]
         if not primary:
@@ -493,16 +622,22 @@ class JobManager:
             names = ", ".join(no_edge_names)
             if incomplete:
                 result = "mixed"
-                headline = (f"No positive net edge measured for {names}; other primary "
-                            "setups are still incomplete. Do not tune parameters just "
-                            "to turn this green.")
+                headline = (
+                    f"No positive net edge measured for {names}; other primary "
+                    "setups are still incomplete. Do not tune parameters just "
+                    "to turn this green."
+                )
             else:
                 result = "no_edge"
-                headline = (f"No positive net edge measured for {names}. "
-                            "Do not tune parameters just to turn this green.")
+                headline = (
+                    f"No positive net edge measured for {names}. "
+                    "Do not tune parameters just to turn this green."
+                )
         elif incomplete:
             result = "incomplete"
-            headline = "Evidence is incomplete — keep measuring; do not infer an edge yet."
+            headline = (
+                "Evidence is incomplete — keep measuring; do not infer an edge yet."
+            )
         elif len(proven) == len(primary):
             result = "edge_measured"
             headline = "Positive net edge measured at the sample bar; graduation rules still apply."
@@ -511,38 +646,50 @@ class JobManager:
             headline = "The evidence is mixed; no blanket edge claim is justified."
 
         return {
-            "result": result, "headline": headline,
+            "result": result,
+            "headline": headline,
             "no_edge_setups": no_edge_names,
-            "primary_setups": len(primary), "backtest_gap": bt_gap,
-            "paper_gap": pp_gap, "projection_state": projection_state,
-            "projected_rounds": projected, "observed_rounds": len(observed),
+            "primary_setups": len(primary),
+            "backtest_gap": bt_gap,
+            "paper_gap": pp_gap,
+            "projection_state": projection_state,
+            "projected_rounds": projected,
+            "observed_rounds": len(observed),
             "observed_rate": {
-                "backtest_per_round": round(bt_rate, 2) if bt_rate is not None else None,
+                "backtest_per_round": round(bt_rate, 2)
+                if bt_rate is not None
+                else None,
                 "paper_per_round": round(pp_rate, 2) if pp_rate is not None else None,
             },
-            "caveat": ("Rough estimate from recent aggregate additions; unique-window "
-                       "deduplication can slow later rounds. It is not a promise."),
+            "caveat": (
+                "Rough estimate from recent aggregate additions; unique-window "
+                "deduplication can slow later rounds. It is not a promise."
+            ),
         }
 
     # ── cancellation ─────────────────────────────────────────────────────
-    def request_cancel(self, job_id: str, user: Optional[dict] = None) -> dict:
+    def request_cancel(self, job_id: str, user: dict | None = None) -> dict:
         """Ask the worker to stop a queued/running job. Returns the new state."""
         with self._db() as db:
             row = db.conn.execute(
-                "SELECT status FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+                "SELECT status FROM jobs WHERE job_id=?", (job_id,)
+            ).fetchone()
             if row is None:
                 raise JobError(f"no such job: {job_id}")
             if row["status"] in TERMINAL:
-                raise JobError(f"job is already {row['status']} and cannot be cancelled")
+                raise JobError(
+                    f"job is already {row['status']} and cannot be cancelled"
+                )
             if row["status"] == "queued":
                 db.conn.execute(
                     "UPDATE jobs SET status='cancelled', cancel_requested=1, "
                     "finished_ts=? WHERE job_id=?",
-                    (int(time.time() * 1000), job_id))
+                    (int(time.time() * 1000), job_id),
+                )
             else:
                 db.conn.execute(
-                    "UPDATE jobs SET cancel_requested=1 WHERE job_id=?",
-                    (job_id,))
+                    "UPDATE jobs SET cancel_requested=1 WHERE job_id=?", (job_id,)
+                )
             db.conn.commit()
         self._wake.set()
         return self.get(job_id) or {}
@@ -560,7 +707,8 @@ class JobManager:
             if self._thread is not None and self._thread.is_alive():
                 return
             self._thread = threading.Thread(
-                target=self._worker_loop, name="sky-jobs", daemon=True)
+                target=self._worker_loop, name="sky-jobs", daemon=True
+            )
             self._thread.start()
 
     def stop(self) -> None:
@@ -592,11 +740,12 @@ class JobManager:
                 continue
             self._run_job(job_id)
 
-    def _next_queued(self) -> Optional[str]:
+    def _next_queued(self) -> str | None:
         with self._db() as db:
             row = db.conn.execute(
                 "SELECT job_id FROM jobs WHERE status='queued' "
-                "ORDER BY created_ts ASC LIMIT 1").fetchone()
+                "ORDER BY created_ts ASC LIMIT 1"
+            ).fetchone()
             return row["job_id"] if row else None
 
     def _adopt_interrupted(self) -> None:
@@ -611,22 +760,32 @@ class JobManager:
                 "UPDATE jobs SET status='interrupted', finished_ts=?, "
                 "error='server restarted mid-run; resubmit to continue' "
                 "WHERE status='running'",
-                (int(time.time() * 1000),))
+                (int(time.time() * 1000),),
+            )
             db.conn.commit()
 
     def _set(self, job_id: str, **fields: Any) -> None:
         """Update one job's mutable columns (no log/params)."""
-        allowed = {"status", "started_ts", "finished_ts", "step_index",
-                   "step_total", "phase", "exit_code", "error",
-                   "cancel_requested", "log_path"}
+        allowed = {
+            "status",
+            "started_ts",
+            "finished_ts",
+            "step_index",
+            "step_total",
+            "phase",
+            "exit_code",
+            "error",
+            "cancel_requested",
+            "log_path",
+        }
         cols = {k: v for k, v in fields.items() if k in allowed}
         if not cols:
             return
         sets = ", ".join(f"{k}=?" for k in cols)
         with self._db() as db:
             db.conn.execute(
-                f"UPDATE jobs SET {sets} WHERE job_id=?",
-                (*cols.values(), job_id))
+                f"UPDATE jobs SET {sets} WHERE job_id=?", (*cols.values(), job_id)
+            )
             db.conn.commit()
 
     # ── execution ────────────────────────────────────────────────────────
@@ -655,7 +814,8 @@ class JobManager:
         """Execute one job's steps sequentially, streaming output to the log."""
         with self._db() as db:
             row = db.conn.execute(
-                "SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+                "SELECT * FROM jobs WHERE job_id=?", (job_id,)
+            ).fetchone()
             if row is None:
                 return
             kind, params_json = row["kind"], row["params_json"]
@@ -667,13 +827,16 @@ class JobManager:
             # the job sat in the queue).
             if row["cancel_requested"]:
                 db.conn.execute(
-                    "UPDATE jobs SET status='cancelled', finished_ts=? "
-                    "WHERE job_id=?", (int(time.time() * 1000), job_id))
+                    "UPDATE jobs SET status='cancelled', finished_ts=? WHERE job_id=?",
+                    (int(time.time() * 1000), job_id),
+                )
                 db.conn.commit()
                 return
             db.conn.execute(
                 "UPDATE jobs SET status='running', started_ts=?, phase=? "
-                "WHERE job_id=?", (int(time.time() * 1000), "starting", job_id))
+                "WHERE job_id=?",
+                (int(time.time() * 1000), "starting", job_id),
+            )
             db.conn.commit()
 
         steps = self._steps_for(kind, params)
@@ -689,43 +852,62 @@ class JobManager:
         def _should_cancel() -> bool:
             with self._db() as db:
                 r = db.conn.execute(
-                    "SELECT cancel_requested FROM jobs WHERE job_id=?",
-                    (job_id,)).fetchone()
+                    "SELECT cancel_requested FROM jobs WHERE job_id=?", (job_id,)
+                ).fetchone()
                 return bool(r and r["cancel_requested"])
 
         for i, (step_kind, step_params) in enumerate(steps):
             if _should_cancel():
-                self._set(job_id, status="cancelled",
-                          finished_ts=int(time.time() * 1000),
-                          phase="cancelled")
+                self._set(
+                    job_id,
+                    status="cancelled",
+                    finished_ts=int(time.time() * 1000),
+                    phase="cancelled",
+                )
                 return
             argv = build_argv(step_kind, step_params)
             step_label = (JOB_KINDS.get(step_kind) or {}).get("title", step_kind)
-            phase = (f"step {i + 1}/{total}: {step_label}"
-                     if total > 1 else step_label)
+            phase = f"step {i + 1}/{total}: {step_label}" if total > 1 else step_label
             self._set(job_id, step_index=i, step_total=total, phase=phase)
             _append(f"── {phase} — python main.py {' '.join(argv)}")
 
-            code = self._runner(argv, on_line=_append,
-                                should_cancel=_should_cancel)
+            code = self._runner(argv, on_line=_append, should_cancel=_should_cancel)
             if _should_cancel() or code == -15:
-                self._set(job_id, status="cancelled", exit_code=code,
-                          finished_ts=int(time.time() * 1000),
-                          phase="cancelled")
+                self._set(
+                    job_id,
+                    status="cancelled",
+                    exit_code=code,
+                    finished_ts=int(time.time() * 1000),
+                    phase="cancelled",
+                )
                 return
             if code != 0:
-                self._set(job_id, status="failed", exit_code=code,
-                          error=f"step {i + 1} '{step_kind}' exited {code}",
-                          finished_ts=int(time.time() * 1000),
-                          phase=f"failed at {step_label}")
+                self._set(
+                    job_id,
+                    status="failed",
+                    exit_code=code,
+                    error=f"step {i + 1} '{step_kind}' exited {code}",
+                    finished_ts=int(time.time() * 1000),
+                    phase=f"failed at {step_label}",
+                )
                 return
 
-        self._set(job_id, status="succeeded", exit_code=0,
-                  step_index=total, finished_ts=int(time.time() * 1000),
-                  phase="done")
+        self._set(
+            job_id,
+            status="succeeded",
+            exit_code=0,
+            step_index=total,
+            finished_ts=int(time.time() * 1000),
+            phase="done",
+        )
 
-    def _default_runner(self, argv: list[str], *, on_line: Callable[[str], None],
-                        should_cancel: Callable[[], bool]) -> int:
+    def _default_runner(
+        self,
+        argv: list[str],
+        *,
+        on_line: Callable[[str], None],
+        should_cancel: Callable[[], bool],
+    ) -> int:
         """Run ``python main.py <argv>`` and stream each output line to the log.
 
         Uses Popen with an unbuffered text pipe so progress lines arrive as
@@ -736,9 +918,13 @@ class JobManager:
         env["SKY_NO_AUTO_INSTALL"] = "1"
         proc = subprocess.Popen(
             [sys.executable, str(ROOT / "main.py"), *argv],
-            cwd=str(ROOT), env=env,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1)
+            cwd=str(ROOT),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
         assert proc.stdout is not None
         for line in proc.stdout:
             line = line.rstrip("\n")
@@ -765,8 +951,9 @@ class JobManager:
                 pass
 
     # ── SSE ──────────────────────────────────────────────────────────────
-    def events(self, job_id: str, interval: float = 1.0,
-               last_event_id: Optional[str] = None):
+    def events(
+        self, job_id: str, interval: float = 1.0, last_event_id: str | None = None
+    ):
         """Yield ``text/event-stream`` frames of a job's persisted state.
 
         Every frame is a full snapshot, so a client that reconnects (with or

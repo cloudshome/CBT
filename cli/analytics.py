@@ -5,14 +5,15 @@ scorecard, calendar and quality commands used to live inline in ``main.py``;
 they live here now, byte-identical, and ``main`` re-exports them so the
 argparse wiring keeps working unchanged.  Read-only analytics.
 """
+
 from __future__ import annotations
 
 import json
-import time
 import sys
+import time
 
+from cli.common import _source_key_arg, _sym
 from config import SYMBOL
-from cli.common import _sym, _source_key_arg
 
 
 def cmd_scorecard(args) -> int:
@@ -24,8 +25,7 @@ def cmd_scorecard(args) -> int:
     NET of costs (fees, slip, funding) per P12.6.
     """
     from data.costs import CostModel
-    from data.scorecard import (print_scorecard, scorecard_from_db,
-                                scorecard_from_store)
+    from data.scorecard import print_scorecard, scorecard_from_db, scorecard_from_store
 
     cost_model = CostModel(
         execution_type="maker" if getattr(args, "maker", False) else "taker",
@@ -37,15 +37,23 @@ def cmd_scorecard(args) -> int:
     if args.source == "store":
         horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
         report = scorecard_from_store(
-            exchange=args.exchange, market=args.market,
-            symbol=_sym(args.symbol or SYMBOL), timeframe=args.tf,
+            exchange=args.exchange,
+            market=args.market,
+            symbol=_sym(args.symbol or SYMBOL),
+            timeframe=args.tf,
             bars=args.bars,
-            horizons=horizons, min_bars=args.min_bars, step=args.step,
-            min_confidence=args.min_conf, min_decided=args.min_decided,
-            cost_model=cost_model, conditioned=conditioned,
-            quality=quality)
+            horizons=horizons,
+            min_bars=args.min_bars,
+            step=args.step,
+            min_confidence=args.min_conf,
+            min_decided=args.min_decided,
+            cost_model=cost_model,
+            conditioned=conditioned,
+            quality=quality,
+        )
     else:
         from data.backfill import BackfillError, parse_ts
+
         now_ms = int(time.time() * 1000)
         try:
             since_ts = parse_ts(args.since, now_ms=now_ms) if args.since else None
@@ -57,11 +65,16 @@ def cmd_scorecard(args) -> int:
         report = scorecard_from_db(
             source_key=_source_key_arg(getattr(args, "source_key", None)),
             symbol=_sym(args.symbol) if args.symbol else None,
-            source=source, min_decided=args.min_decided,
+            source=source,
+            min_decided=args.min_decided,
             include_sim=not args.exclude_sim,
-            since_ts=since_ts, until_ts=until_ts,
-            cost_model=cost_model, conditioned=conditioned,
-            quality=quality, step=args.step)
+            since_ts=since_ts,
+            until_ts=until_ts,
+            cost_model=cost_model,
+            conditioned=conditioned,
+            quality=quality,
+            step=args.step,
+        )
 
     if args.json:
         print(json.dumps(report, indent=2, default=str))
@@ -78,20 +91,30 @@ def cmd_calendar(args) -> int:
     command answers two operator questions offline: *is the venue open right
     now?* and *how much of a stored series' span was scheduled closure?*
     """
-    from data.calendar import (calendar_for, closed_bar_count, describe,
-                               expected_bars, get_calendar)
     from data.backfill import fmt_ts
+    from data.calendar import (
+        calendar_for,
+        closed_bar_count,
+        describe,
+        expected_bars,
+        get_calendar,
+    )
     from data.gaps import step_ms
 
     symbol = _sym(args.symbol) if args.symbol else "XAUUSD"
-    cal = (get_calendar(args.calendar) if args.calendar
-           else calendar_for(args.exchange, args.market, symbol))
+    cal = (
+        get_calendar(args.calendar)
+        if args.calendar
+        else calendar_for(args.exchange, args.market, symbol)
+    )
     now_ms = args.at if args.at is not None else int(time.time() * 1000)
 
     payload = {
         "ok": True,
-        "exchange": args.exchange, "market": args.market,
-        "symbol": symbol, "timeframe": args.tf,
+        "exchange": args.exchange,
+        "market": args.market,
+        "symbol": symbol,
+        "timeframe": args.tf,
         "calendar": describe(cal),
         "at_ms": now_ms,
         "open_now": bool(cal.is_open(now_ms)),
@@ -102,18 +125,28 @@ def cmd_calendar(args) -> int:
         from data.store import CandleStore
 
         store = CandleStore(root=args.root) if args.root else CandleStore()
-        health = series_health(store, args.exchange, args.market, symbol,
-                               args.tf, now_ms=now_ms, calendar=cal)
+        health = series_health(
+            store,
+            args.exchange,
+            args.market,
+            symbol,
+            args.tf,
+            now_ms=now_ms,
+            calendar=cal,
+        )
         verdict = verdict_for(health)
         step = step_ms(args.tf)
         first, last = health.get("first_ts"), health.get("last_ts")
         payload["series"] = {
             "candles": health["candles"],
-            "first_ts": first, "last_ts": last,
-            "expected_open_bars": (expected_bars(first, last, step, cal)
-                                   if first is not None else 0),
-            "closed_session_bars": (closed_bar_count(first, last, step, cal)
-                                    if first is not None else 0),
+            "first_ts": first,
+            "last_ts": last,
+            "expected_open_bars": (
+                expected_bars(first, last, step, cal) if first is not None else 0
+            ),
+            "closed_session_bars": (
+                closed_bar_count(first, last, step, cal) if first is not None else 0
+            ),
             "missing": health["missing"],
             "gap_fraction": health["gap_fraction"],
             "age_bars": health["age_mult"],
@@ -127,18 +160,24 @@ def cmd_calendar(args) -> int:
         return 0
 
     name = payload["calendar"]["name"]
-    print(f"calendar    {name}"
-          f"{'  (always open)' if payload['calendar']['always_open'] else ''}")
+    print(
+        f"calendar    {name}"
+        f"{'  (always open)' if payload['calendar']['always_open'] else ''}"
+    )
     print(f"  series    {args.exchange}/{args.market}/{symbol}/{args.tf}")
     print(f"  at        {fmt_ts(now_ms)} UTC")
     print(f"  open now  {'YES' if payload['open_now'] else 'no — venue shut'}")
     ser = payload.get("series")
     if ser:
-        print(f"  stored    {ser['candles']:,} candles  "
-              f"expected-open {ser['expected_open_bars']:,}  "
-              f"closed-session {ser['closed_session_bars']:,}")
-        print(f"  missing   {ser['missing']:,} "
-              f"({ser['gap_fraction']:.2%})  age {ser['age_bars']} bars")
+        print(
+            f"  stored    {ser['candles']:,} candles  "
+            f"expected-open {ser['expected_open_bars']:,}  "
+            f"closed-session {ser['closed_session_bars']:,}"
+        )
+        print(
+            f"  missing   {ser['missing']:,} "
+            f"({ser['gap_fraction']:.2%})  age {ser['age_bars']} bars"
+        )
         print(f"  verdict   {ser['level']} — {ser['headline']}")
         if ser["detail"]:
             print(f"            {ser['detail']}")
@@ -164,12 +203,18 @@ def cmd_quality(args) -> int:
     )
     horizons = [float(h) for h in args.horizons.split(",") if h.strip()]
     report = run_quality_sweep(
-        exchange=args.exchange, market=args.market,
-        symbol=_sym(args.symbol or SYMBOL), timeframe=args.tf,
-        bars=args.bars, horizons=horizons,
-        min_bars=args.min_bars, step=args.step,
-        min_confidence=args.min_conf, min_decided=args.min_decided,
-        cost_model=cost_model)
+        exchange=args.exchange,
+        market=args.market,
+        symbol=_sym(args.symbol or SYMBOL),
+        timeframe=args.tf,
+        bars=args.bars,
+        horizons=horizons,
+        min_bars=args.min_bars,
+        step=args.step,
+        min_confidence=args.min_conf,
+        min_decided=args.min_decided,
+        cost_model=cost_model,
+    )
 
     if args.json:
         print(json.dumps(report, indent=2, default=str))

@@ -14,6 +14,7 @@ terminal actually *wires* the paper-trade loop:
 
 They skip when node is unavailable, exactly like the existing JS tests.
 """
+
 from __future__ import annotations
 
 import json
@@ -34,7 +35,7 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="node not installed")
 
 def _extract_js() -> str:
     html = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
-    return re.findall(r"<script>(.*?)</script>", html, re.S)[-1]
+    return re.findall(r"<script>(.*?)</script>", html, re.DOTALL)[-1]
 
 
 _HARNESS_HEAD = r"""
@@ -124,10 +125,11 @@ __DASHBOARD_JS__
 
 
 def _run(api: dict, body: str) -> dict:
-    harness = (_HARNESS_HEAD
-               .replace("__API__", json.dumps(api))
-               .replace("__DASHBOARD_JS__", _extract_js())
-               .replace("__BODY__", body))
+    harness = (
+        _HARNESS_HEAD.replace("__API__", json.dumps(api))
+        .replace("__DASHBOARD_JS__", _extract_js())
+        .replace("__BODY__", body)
+    )
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
         f.write(harness)
         path = f.name
@@ -139,15 +141,17 @@ def _run(api: dict, body: str) -> dict:
         Path(path).unlink(missing_ok=True)
 
 
-_OUT = ("console.log(JSON.stringify({posts: POSTS, toasts: TOASTS, "
-        "positionsTab: (elements['btab-positions']||{}).innerHTML || '', "
-        "journalTab: (elements['btab-journal']||{}).innerHTML || '', "
-        "posDetail: (elements['posDetail']||{}).innerHTML || '', "
-        "gate: (elements['tGate']||{}).innerHTML || '', "
-        "gateCls: (elements['tGate']||{}).className || '', "
-        "confirmDisabled: (elements['tConfirm']||{}).disabled, "
-        "confirmText: (elements['tConfirm']||{}).textContent || '', "
-        "confirmPrompt: global.__lastConfirm || null }));")
+_OUT = (
+    "console.log(JSON.stringify({posts: POSTS, toasts: TOASTS, "
+    "positionsTab: (elements['btab-positions']||{}).innerHTML || '', "
+    "journalTab: (elements['btab-journal']||{}).innerHTML || '', "
+    "posDetail: (elements['posDetail']||{}).innerHTML || '', "
+    "gate: (elements['tGate']||{}).innerHTML || '', "
+    "gateCls: (elements['tGate']||{}).className || '', "
+    "confirmDisabled: (elements['tConfirm']||{}).disabled, "
+    "confirmText: (elements['tConfirm']||{}).textContent || '', "
+    "confirmPrompt: global.__lastConfirm || null }));"
+)
 
 
 def _ticket_setup() -> str:
@@ -165,36 +169,75 @@ _DRAIN = "for(let i=0;i<10;i++) await new Promise(r=>setTimeout(r,0));"
 
 
 def _confirm_ok() -> dict:
-    return {"status": 200, "body": {
-        "ok": True, "scan_id": 7, "status": "EXECUTED",
-        "gate": {"allowed": True, "blocked_by": []},
-        "paper_trade": {"id": 3, "scan_id": 7, "status": "OPEN",
-                        "symbol": "BTCUSDT", "action": "BUY",
-                        "entry": 60000.0, "entry_price": 60000.0,
-                        "stop_loss": 59000.0, "take_profit": 62000.0,
-                        "plan_type": "Manual"}}}
+    return {
+        "status": 200,
+        "body": {
+            "ok": True,
+            "scan_id": 7,
+            "status": "EXECUTED",
+            "gate": {"allowed": True, "blocked_by": []},
+            "paper_trade": {
+                "id": 3,
+                "scan_id": 7,
+                "status": "OPEN",
+                "symbol": "BTCUSDT",
+                "action": "BUY",
+                "entry": 60000.0,
+                "entry_price": 60000.0,
+                "stop_loss": 59000.0,
+                "take_profit": 62000.0,
+                "plan_type": "Manual",
+            },
+        },
+    }
 
 
 def _trades_open() -> dict:
-    return {"status": 200, "body": {
-        "ok": True, "count": 1,
-        "open": [{"id": 3, "scan_id": 7, "status": "OPEN", "symbol": "BTCUSDT",
-                  "action": "BUY", "entry": 60000.0, "entry_price": 60000.0,
-                  "stop_loss": 59000.0, "take_profit": 62000.0,
-                  "current_price": 60500.0, "current_r": 0.5,
-                  "mae": -0.1, "mfe": 0.6, "minutes_in_trade": 10,
-                  "plan_type": "Manual",
-                  "management": ["HOLD — thesis intact.",
-                                 "REDUCE — close ~50% at TP1 62000.00."]}]}}
+    return {
+        "status": 200,
+        "body": {
+            "ok": True,
+            "count": 1,
+            "open": [
+                {
+                    "id": 3,
+                    "scan_id": 7,
+                    "status": "OPEN",
+                    "symbol": "BTCUSDT",
+                    "action": "BUY",
+                    "entry": 60000.0,
+                    "entry_price": 60000.0,
+                    "stop_loss": 59000.0,
+                    "take_profit": 62000.0,
+                    "current_price": 60500.0,
+                    "current_r": 0.5,
+                    "mae": -0.1,
+                    "mfe": 0.6,
+                    "minutes_in_trade": 10,
+                    "plan_type": "Manual",
+                    "management": [
+                        "HOLD — thesis intact.",
+                        "REDUCE — close ~50% at TP1 62000.00.",
+                    ],
+                }
+            ],
+        },
+    }
 
 
 def test_confirm_posts_the_ticket_and_opens_positions():
-    api = {"/api/terminal/confirm": _confirm_ok(),
-           "/api/trades": _trades_open()}
-    out = _run(api, _ticket_setup() + """
+    api = {"/api/terminal/confirm": _confirm_ok(), "/api/trades": _trades_open()}
+    out = _run(
+        api,
+        _ticket_setup()
+        + """
       await submitPaperTicket();
-      """ + _DRAIN + """
-    """ + _OUT)
+      """
+        + _DRAIN
+        + """
+    """
+        + _OUT,
+    )
     assert len(out["posts"]) == 1, out["posts"]
     body = json.loads(out["posts"][0]["body"])
     assert body["action"] == "BUY" and body["entry"] == 60000
@@ -208,50 +251,98 @@ def test_confirm_posts_the_ticket_and_opens_positions():
 
 
 def test_confirm_server_gate_block_paints_the_real_verdict():
-    api = {"/api/terminal/confirm": {"status": 409, "body": {
-        "error": "Risk gate CLOSED — setup unproven (Manual): 0 backtest / 0 paper samples",
-        "blocked_by": ["setup unproven (Manual): 0 backtest / 0 paper samples"],
-        "force_available": False}}}
-    out = _run(api, _ticket_setup() + """
+    api = {
+        "/api/terminal/confirm": {
+            "status": 409,
+            "body": {
+                "error": "Risk gate CLOSED — setup unproven (Manual): 0 backtest / 0 paper samples",
+                "blocked_by": ["setup unproven (Manual): 0 backtest / 0 paper samples"],
+                "force_available": False,
+            },
+        }
+    }
+    out = _run(
+        api,
+        _ticket_setup()
+        + """
       await submitPaperTicket();
-      """ + _DRAIN + """
-    """ + _OUT)
+      """
+        + _DRAIN
+        + """
+    """
+        + _OUT,
+    )
     assert "BLOCKED" in out["gate"] and "setup unproven" in out["gate"]
     assert any("Risk gate CLOSED" in t for t in out["toasts"])
     assert out["confirmDisabled"] is False  # re-enabled for a corrected ticket
-    assert out["positionsTab"] == ""        # never navigated to positions
+    assert out["positionsTab"] == ""  # never navigated to positions
 
 
 def test_confirm_journal_first_discipline_holds_until_acknowledged():
-    api = {"/api/terminal/confirm": [
-        {"status": 409, "body": {
-            "error": "Journal-first discipline: 1 decided real trade(s) unjournaled",
-            "journal_block": {"missing": 1,
-                              "trades": [{"scan_id": 9, "outcome": "TP_HIT"}]},
-            "acknowledge_available": True}},
-        {"status": 200, "body": {
-            "ok": True, "scan_id": 10, "status": "APPROVED",
-            "gate": {"allowed": True, "blocked_by": []},
-            "paper_trade": {"id": 4, "scan_id": 10, "status": "WAITING_ENTRY",
-                            "entry": 1000.0}}},
-    ], "/api/journal": {"status": 200, "body": {
-        "journalable": [], "emotions": ["calm"], "summary": {}}}}
+    api = {
+        "/api/terminal/confirm": [
+            {
+                "status": 409,
+                "body": {
+                    "error": "Journal-first discipline: 1 decided real trade(s) unjournaled",
+                    "journal_block": {
+                        "missing": 1,
+                        "trades": [{"scan_id": 9, "outcome": "TP_HIT"}],
+                    },
+                    "acknowledge_available": True,
+                },
+            },
+            {
+                "status": 200,
+                "body": {
+                    "ok": True,
+                    "scan_id": 10,
+                    "status": "APPROVED",
+                    "gate": {"allowed": True, "blocked_by": []},
+                    "paper_trade": {
+                        "id": 4,
+                        "scan_id": 10,
+                        "status": "WAITING_ENTRY",
+                        "entry": 1000.0,
+                    },
+                },
+            },
+        ],
+        "/api/journal": {
+            "status": 200,
+            "body": {"journalable": [], "emotions": ["calm"], "summary": {}},
+        },
+    }
     # Cancel the audited escape → held, journal tab opens, exactly one POST.
-    out = _run(api, _ticket_setup() + """
+    out = _run(
+        api,
+        _ticket_setup()
+        + """
       global.__confirmAnswer = false;
       await submitPaperTicket();
-      """ + _DRAIN + """
-    """ + _OUT)
+      """
+        + _DRAIN
+        + """
+    """
+        + _OUT,
+    )
     assert len(out["posts"]) == 1
     assert "#9 TP_HIT" in (out["confirmPrompt"] or "")
     assert any("Journal first" in t for t in out["toasts"])
 
     # Accept the audited escape → acknowledged retry lands.
-    out = _run(api, _ticket_setup() + """
+    out = _run(
+        api,
+        _ticket_setup()
+        + """
       global.__confirmAnswer = true;
       await submitPaperTicket();
-      """ + _DRAIN + """
-    """ + _OUT)
+      """
+        + _DRAIN
+        + """
+    """
+        + _OUT,
+    )
     assert len(out["posts"]) == 2
     assert json.loads(out["posts"][1]["body"])["acknowledge_journal"] is True
     assert any("Ticket confirmed" in t for t in out["toasts"])
@@ -259,11 +350,17 @@ def test_confirm_journal_first_discipline_holds_until_acknowledged():
 
 def test_positions_row_opens_inline_management_card():
     api = {"/api/trades": _trades_open()}
-    out = _run(api, """
+    out = _run(
+        api,
+        """
       await paintBottomPositions(el('btab-positions'));
       await selectBottomPosition('3');
-      """ + _DRAIN + """
-    """ + _OUT)
+      """
+        + _DRAIN
+        + """
+    """
+        + _OUT,
+    )
     assert "BTCUSDT" in out["positionsTab"]
     assert "Close Position" in out["posDetail"]
     assert "Management advice" in out["posDetail"]
@@ -274,29 +371,53 @@ def test_positions_row_opens_inline_management_card():
 
 def test_close_records_outcome_and_opens_the_journal_drawer():
     api = {
-        "/api/terminal/close": {"status": 200, "body": {
-            "ok": True, "trade_id": 3, "scan_id": 7, "status": "CLOSED",
-            "outcome": "TP_HIT", "exit_price": 61500.0, "rr_achieved": 1.5,
-            "journal_required": True}},
+        "/api/terminal/close": {
+            "status": 200,
+            "body": {
+                "ok": True,
+                "trade_id": 3,
+                "scan_id": 7,
+                "status": "CLOSED",
+                "outcome": "TP_HIT",
+                "exit_price": 61500.0,
+                "rr_achieved": 1.5,
+                "journal_required": True,
+            },
+        },
         "/api/trades": {"status": 200, "body": {"ok": True, "open": []}},
-        "/api/journal?scan_id=": {"status": 200, "body": {
-            "ok": True, "entry": None, "emotions": ["calm", "fear"]}},
+        "/api/journal?scan_id=": {
+            "status": 200,
+            "body": {"ok": True, "entry": None, "emotions": ["calm", "fear"]},
+        },
         "/api/journal": [
-            {"status": 200, "body": {"journalable": [], "emotions": ["calm"],
-                                     "summary": {}}},
-            {"status": 200, "body": {"ok": True, "scan_id": 7,
-                                     "entry": {"followed_rules": 1}}}],
+            {
+                "status": 200,
+                "body": {"journalable": [], "emotions": ["calm"], "summary": {}},
+            },
+            {
+                "status": 200,
+                "body": {"ok": True, "scan_id": 7, "entry": {"followed_rules": 1}},
+            },
+        ],
     }
-    out = _run(api, """
+    out = _run(
+        api,
+        """
       global.__confirmAnswer = true;
       await terminalClosePosition(3);
-      """ + _DRAIN + """
+      """
+        + _DRAIN
+        + """
       const drawerBefore = elements['btab-journal'].innerHTML;
       global.__drawerBefore = drawerBefore;
       await saveTerminalJournal();
-    """ + _OUT.replace("confirmPrompt: global.__lastConfirm || null }",
-                       "confirmPrompt: global.__lastConfirm || null, "
-                       "drawerBefore: global.__drawerBefore || '' }"))
+    """
+        + _OUT.replace(
+            "confirmPrompt: global.__lastConfirm || null }",
+            "confirmPrompt: global.__lastConfirm || null, "
+            "drawerBefore: global.__drawerBefore || '' }",
+        ),
+    )
     assert any("Closed #3" in t for t in out["toasts"])
     assert "Journal this trade" in out["drawerBefore"]
     assert "TP_HIT" in out["drawerBefore"] and "+1.50R" in out["drawerBefore"]
@@ -308,11 +429,17 @@ def test_close_records_outcome_and_opens_the_journal_drawer():
 
 
 def test_confirm_retry_reuses_the_same_ticket_id():
-    api = {"/api/terminal/confirm": [
-        {"status": 200, "body": _confirm_ok()["body"]},
-        {"status": 200, "body": dict(_confirm_ok()["body"], duplicate=True)},
-    ], "/api/trades": _trades_open()}
-    out = _run(api, _ticket_setup() + """
+    api = {
+        "/api/terminal/confirm": [
+            {"status": 200, "body": _confirm_ok()["body"]},
+            {"status": 200, "body": dict(_confirm_ok()["body"], duplicate=True)},
+        ],
+        "/api/trades": _trades_open(),
+    }
+    out = _run(
+        api,
+        _ticket_setup()
+        + """
       const _origFetch = fetch; let failing = true; const sentIds = [];
       fetch = async (url, opts) => {
         if(String(url).includes('/api/terminal/confirm')){
@@ -324,16 +451,22 @@ def test_confirm_retry_reuses_the_same_ticket_id():
       await submitPaperTicket();   // response lost — the ticket id survives
       await submitPaperTicket();   // retried confirm reuses the same id
       global.__sentIds = sentIds;
-      """ + _DRAIN + """
-    """ + _OUT.replace("confirmPrompt: global.__lastConfirm || null }",
-                       "confirmPrompt: global.__lastConfirm || null, "
-                       "sentIds: global.__sentIds || [] }"))
+      """
+        + _DRAIN
+        + """
+    """
+        + _OUT.replace(
+            "confirmPrompt: global.__lastConfirm || null }",
+            "confirmPrompt: global.__lastConfirm || null, "
+            "sentIds: global.__sentIds || [] }",
+        ),
+    )
     assert len(out["sentIds"]) == 2, "both attempts must send a ticket id"
-    assert out["sentIds"][0] == out["sentIds"][1], \
+    assert out["sentIds"][0] == out["sentIds"][1], (
         "a retried confirm must reuse its ticket id"
+    )
     assert any("Ticket error" in t for t in out["toasts"]), out["toasts"]
     assert any("Paper position open" in t for t in out["toasts"])
-
 
 
 _CHART_SEED = """
@@ -349,26 +482,31 @@ _CHART_SEED = """
       drawChart({fit:true});
 """
 
-_REFRESH_OUT = ("console.log(JSON.stringify({chartCount: CHARTS.length, "
-                "removed: CHARTS.filter(c=>c.removed).length, "
-                "fitted: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.fitted)||0),0), "
-                "restored: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.restored)||0),0), "
-                "scrolled: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.scrolled)||0),0), "
-                "sets: (CHARTS[0]&&CHARTS[0].series[0]&&CHARTS[0].series[0].sets)||0, "
-                "wl: (elements['wlList']||{}).innerHTML||'', "
-                "entry: (elements['tEntry']||{}).value||'', "
-                "updated: (elements['updated']||{}).textContent||'', "
-                "feed: (elements['feedTxt']||{}).textContent||'', "
-                "toasts: TOASTS, "
-                "liveFollow: !!_chartLiveFollow, "
-                "sym: (elements['sym']||{}).value||'', "
-                "range: (CHARTS[0]&&CHARTS[0]._ts&&CHARTS[0]._ts.range)||null "
-                "}));")
+_REFRESH_OUT = (
+    "console.log(JSON.stringify({chartCount: CHARTS.length, "
+    "removed: CHARTS.filter(c=>c.removed).length, "
+    "fitted: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.fitted)||0),0), "
+    "restored: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.restored)||0),0), "
+    "scrolled: CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.scrolled)||0),0), "
+    "sets: (CHARTS[0]&&CHARTS[0].series[0]&&CHARTS[0].series[0].sets)||0, "
+    "wl: (elements['wlList']||{}).innerHTML||'', "
+    "entry: (elements['tEntry']||{}).value||'', "
+    "updated: (elements['updated']||{}).textContent||'', "
+    "feed: (elements['feedTxt']||{}).textContent||'', "
+    "toasts: TOASTS, "
+    "liveFollow: !!_chartLiveFollow, "
+    "sym: (elements['sym']||{}).value||'', "
+    "range: (CHARTS[0]&&CHARTS[0]._ts&&CHARTS[0]._ts.range)||null "
+    "}));"
+)
 
 
 def test_quiet_refresh_does_not_recreate_chart_or_fit_content():
     """A 30s data refresh must update series in place, never remount or fitContent."""
-    out = _run({}, _CHART_SEED + """
+    out = _run(
+        {},
+        _CHART_SEED
+        + """
       const before = CHARTS.length;
       const fittedBefore = CHARTS.reduce((n,c)=>n+((c._ts&&c._ts.fitted)||0),0);
       CHARTS[0].timeScale().range = {from:5, to:20};
@@ -378,9 +516,15 @@ def test_quiet_refresh_does_not_recreate_chart_or_fit_content():
       drawChart({preserveViewport:true});
       global.__before = before;
       global.__fittedBefore = fittedBefore;
-    """ + _DRAIN + """
-    """ + _REFRESH_OUT.replace("chartCount: CHARTS.length",
-                               "chartCount: CHARTS.length, before: global.__before, fittedBefore: global.__fittedBefore"))
+    """
+        + _DRAIN
+        + """
+    """
+        + _REFRESH_OUT.replace(
+            "chartCount: CHARTS.length",
+            "chartCount: CHARTS.length, before: global.__before, fittedBefore: global.__fittedBefore",
+        ),
+    )
     assert out["chartCount"] == out["before"] == out.get("before", out["chartCount"])
     assert out["removed"] == 0
     assert out["fitted"] == out.get("fittedBefore", out["fitted"]), out
@@ -389,7 +533,10 @@ def test_quiet_refresh_does_not_recreate_chart_or_fit_content():
 
 
 def test_historical_viewport_survives_refresh_live_follows():
-    out = _run({}, _CHART_SEED + """
+    out = _run(
+        {},
+        _CHART_SEED
+        + """
       CHARTS[0].timeScale().range = {from:8, to:18};
       _chartLiveFollow = false;
       _chartViewport = {from:8, to:18};
@@ -399,18 +546,38 @@ def test_historical_viewport_survives_refresh_live_follows():
       drawChart({preserveViewport:true});
       global.__hist = hist;
       global.__scrolled = CHARTS[0].timeScale().scrolled;
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({hist: global.__hist, scrolled: global.__scrolled, liveFollow: !!_chartLiveFollow, restored: CHARTS[0]._ts.restored}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({hist: global.__hist, scrolled: global.__scrolled, liveFollow: !!_chartLiveFollow, restored: CHARTS[0]._ts.restored}));",
+    )
     assert out["hist"]["from"] == 8 and out["hist"]["to"] == 18
     assert out["scrolled"] >= 1
     assert out["restored"] >= 1
 
 
 def test_watchlist_refresh_never_blanks_existing_rows():
-    api = {"/api/agents": {"status": 200, "body": {
-        "assets": [{"symbol":"BTCUSDT","entry":60000,"change_pct_24h":1.2,
-                    "desk_action":"BUY","reason":"x","confidence_pct":70}]}}}
-    out = _run(api, """
+    api = {
+        "/api/agents": {
+            "status": 200,
+            "body": {
+                "assets": [
+                    {
+                        "symbol": "BTCUSDT",
+                        "entry": 60000,
+                        "change_pct_24h": 1.2,
+                        "desk_action": "BUY",
+                        "reason": "x",
+                        "confidence_pct": 70,
+                    }
+                ]
+            },
+        }
+    }
+    out = _run(
+        api,
+        """
       await loadWatchlistPrices();
       const first = el('wlList').innerHTML;
       const origFetch = fetch;
@@ -428,8 +595,12 @@ def test_watchlist_refresh_never_blanks_existing_rows():
       await p;
       global.__first = first;
       global.__after = el('wlList').innerHTML;
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({first: global.__first, during: global.__during, after: global.__after, blanked: !!global.__blanked}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({first: global.__first, during: global.__during, after: global.__after, blanked: !!global.__blanked}));",
+    )
     assert "BTCUSDT" in out["first"]
     assert "loading prices" not in (out["during"] or "")
     assert not out["blanked"]
@@ -439,37 +610,77 @@ def test_watchlist_refresh_never_blanks_existing_rows():
 def test_quiet_scan_keeps_ticket_and_does_not_toast_failure():
     api = {
         "/api/scan": [
-            {"status": 200, "body": {
-                "signal": {"action":"BUY","asset":"BTCUSDT","timeframe":"15m",
-                           "entry": 61000, "stop_loss": 60000, "take_profit": 63000,
-                           "confidence":"MEDIUM","reason":"boot"},
-                "plans": [{"entry":61000,"stop_loss":60000,"take_profits":[63000],"type":"Manual"}],
-                "decision": {"action":"BUY"},
-                "snapshot": {"features":{}, "scores":{}},
-            }},
+            {
+                "status": 200,
+                "body": {
+                    "signal": {
+                        "action": "BUY",
+                        "asset": "BTCUSDT",
+                        "timeframe": "15m",
+                        "entry": 61000,
+                        "stop_loss": 60000,
+                        "take_profit": 63000,
+                        "confidence": "MEDIUM",
+                        "reason": "boot",
+                    },
+                    "plans": [
+                        {
+                            "entry": 61000,
+                            "stop_loss": 60000,
+                            "take_profits": [63000],
+                            "type": "Manual",
+                        }
+                    ],
+                    "decision": {"action": "BUY"},
+                    "snapshot": {"features": {}, "scores": {}},
+                },
+            },
             {"status": 502, "body": {"error": "upstream down"}},
         ]
     }
-    out = _run(api, """
+    out = _run(
+        api,
+        """
       el('sym').value='BTCUSDT'; el('tf').value='15m';
       el('tEntry').value='111'; _ticketDirty = true;
       await load(false, true);
       const afterOk = el('tEntry').value;
       await load(false, true);
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({entry: elements['tEntry'].value, afterOk: null, updated: elements['updated'].textContent, toasts: TOASTS, payload: !!__lastPayload}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({entry: elements['tEntry'].value, afterOk: null, updated: elements['updated'].textContent, toasts: TOASTS, payload: !!__lastPayload}));",
+    )
     # first quiet success must not overwrite a dirty ticket
     assert out["entry"] == "111"
-    assert "Data stale" in (out["updated"] or "") or "stale" in (out["updated"] or "").lower()
+    assert (
+        "Data stale" in (out["updated"] or "")
+        or "stale" in (out["updated"] or "").lower()
+    )
     assert not any("Refresh failed" in t for t in out["toasts"])
 
 
 def test_stale_scan_response_cannot_overwrite_newer():
-    api = {"/api/scan": {"status": 200, "body": {
-        "signal": {"action":"SELL","asset":"ETHUSDT","timeframe":"15m","entry":1},
-        "plans": [], "decision": {}, "snapshot": {"features":{}, "scores":{}},
-    }}}
-    out = _run(api, """
+    api = {
+        "/api/scan": {
+            "status": 200,
+            "body": {
+                "signal": {
+                    "action": "SELL",
+                    "asset": "ETHUSDT",
+                    "timeframe": "15m",
+                    "entry": 1,
+                },
+                "plans": [],
+                "decision": {},
+                "snapshot": {"features": {}, "scores": {}},
+            },
+        }
+    }
+    out = _run(
+        api,
+        """
       el('sym').value='BTCUSDT'; el('tf').value='15m';
       const orig = fetch;
       const deferred = [];
@@ -492,22 +703,44 @@ def test_stale_scan_response_cannot_overwrite_newer():
         plans:[], decision:{}, snapshot:{features:{},scores:{}}
       })});
       await p1; await p2;
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({reason: (__lastPayload&&__lastPayload.signal&&__lastPayload.signal.reason)||'', action: (__lastPayload&&__lastPayload.signal&&__lastPayload.signal.action)||''}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({reason: (__lastPayload&&__lastPayload.signal&&__lastPayload.signal.reason)||'', action: (__lastPayload&&__lastPayload.signal&&__lastPayload.signal.action)||''}));",
+    )
     assert out["reason"] == "new"
     assert out["action"] == "BUY"
 
 
 def test_symbol_survives_quiet_refresh():
-    api = {"/api/scan": {"status": 200, "body": {
-        "signal": {"action":"BUY","asset":"ETHUSDT","timeframe":"1h","entry":1},
-        "plans": [], "decision": {}, "snapshot": {"features":{}, "scores":{}},
-    }}}
-    out = _run(api, """
+    api = {
+        "/api/scan": {
+            "status": 200,
+            "body": {
+                "signal": {
+                    "action": "BUY",
+                    "asset": "ETHUSDT",
+                    "timeframe": "1h",
+                    "entry": 1,
+                },
+                "plans": [],
+                "decision": {},
+                "snapshot": {"features": {}, "scores": {}},
+            },
+        }
+    }
+    out = _run(
+        api,
+        """
       el('sym').value='ETHUSDT'; el('tf').value='1h';
       await load(false, true);
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({sym: elements['sym'].value, tf: elements['tf'].value, live: (elements['updated']||{}).textContent||''}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({sym: elements['sym'].value, tf: elements['tf'].value, live: (elements['updated']||{}).textContent||''}));",
+    )
     assert out["sym"] == "ETHUSDT"
     assert out["tf"] == "1h"
     assert "Data live" in out["live"]
@@ -517,20 +750,51 @@ def test_thirty_second_refresh_updates_data_only():
     """The auto-refresh callback is load(false, true). It must not remount
     the chart, jump the viewport, blank the watchlist, or clobber a dirty ticket."""
     api = {
-        "/api/scan": {"status": 200, "body": {
-            "signal": {"action": "BUY", "asset": "BTCUSDT", "timeframe": "15m",
-                       "entry": 77777, "stop_loss": 70000, "take_profit": 80000,
-                       "confidence": "MEDIUM", "reason": "tick"},
-            "plans": [{"entry": 77777, "stop_loss": 70000, "take_profits": [80000],
-                       "type": "Manual"}],
-            "decision": {"action": "BUY"},
-            "snapshot": {"features": {}, "scores": {}},
-        }},
-        "/api/agents": {"status": 200, "body": {
-            "assets": [{"symbol": "BTCUSDT", "entry": 60000, "change_pct_24h": 1.2,
-                        "desk_action": "BUY", "reason": "x", "confidence_pct": 70}]}},
+        "/api/scan": {
+            "status": 200,
+            "body": {
+                "signal": {
+                    "action": "BUY",
+                    "asset": "BTCUSDT",
+                    "timeframe": "15m",
+                    "entry": 77777,
+                    "stop_loss": 70000,
+                    "take_profit": 80000,
+                    "confidence": "MEDIUM",
+                    "reason": "tick",
+                },
+                "plans": [
+                    {
+                        "entry": 77777,
+                        "stop_loss": 70000,
+                        "take_profits": [80000],
+                        "type": "Manual",
+                    }
+                ],
+                "decision": {"action": "BUY"},
+                "snapshot": {"features": {}, "scores": {}},
+            },
+        },
+        "/api/agents": {
+            "status": 200,
+            "body": {
+                "assets": [
+                    {
+                        "symbol": "BTCUSDT",
+                        "entry": 60000,
+                        "change_pct_24h": 1.2,
+                        "desk_action": "BUY",
+                        "reason": "x",
+                        "confidence_pct": 70,
+                    }
+                ]
+            },
+        },
     }
-    out = _run(api, _CHART_SEED + """
+    out = _run(
+        api,
+        _CHART_SEED
+        + """
       await loadWatchlistPrices();
       el('tEntry').value = '111'; _ticketDirty = true;
       CHARTS[0].timeScale().range = {from:12, to:30};
@@ -547,8 +811,12 @@ def test_thirty_second_refresh_updates_data_only():
         updated: el('updated').textContent, toasts: TOASTS,
         live: (window._skyPayload&&window._skyPayload.signal&&window._skyPayload.signal.reason)||''
       };
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify(global.__out));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify(global.__out));",
+    )
     assert out["n1"] == out["n0"]
     assert out["removed"] == 0
     assert out["fitted1"] == out["fitted0"]
@@ -563,17 +831,29 @@ def test_thirty_second_refresh_updates_data_only():
 
 # ── T2 — AI Copilot polish ───────────────────────────────────────────────
 
+
 def test_copilot_renders_sections_and_sources_without_double_print():
     """A structured answer renders its titled sections + a sources footer,
     and never re-prints the raw text after the sectioned version."""
-    api = {"/api/ask": {"status": 200, "body": {
-        "intent": "desk",
-        "answer": ["DESK STATUS", "  risk gate: OPEN", "  ADVICE: STAND_ASIDE"],
-        "sections": [{"title": "Desk status",
-                      "body": "DESK STATUS\n  risk gate: OPEN\n  ADVICE: STAND_ASIDE"}],
-        "sources": ["desk snapshot — brain.agent.desk_status"],
-    }}}
-    out = _run(api, """
+    api = {
+        "/api/ask": {
+            "status": 200,
+            "body": {
+                "intent": "desk",
+                "answer": ["DESK STATUS", "  risk gate: OPEN", "  ADVICE: STAND_ASIDE"],
+                "sections": [
+                    {
+                        "title": "Desk status",
+                        "body": "DESK STATUS\n  risk gate: OPEN\n  ADVICE: STAND_ASIDE",
+                    }
+                ],
+                "sources": ["desk snapshot — brain.agent.desk_status"],
+            },
+        }
+    }
+    out = _run(
+        api,
+        """
       const messages = [];
       const _origMsg = aiAppendMsg;
       const _origSrc = aiAppendSources;
@@ -582,13 +862,20 @@ def test_copilot_renders_sections_and_sources_without_double_print():
       el('aiInput').value = 'what should I do?';
       await aiSend('drawer');
       global.__messages = messages;
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify(global.__messages));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify(global.__messages));",
+    )
     assert out[0]["kind"] == "msg" and out[0]["who"] == "user"
     bot_msgs = [m for m in out if m.get("kind") == "msg" and m.get("who") == "bot"]
-    assert len(bot_msgs) == 1, "exactly one bot answer — no double-print of the raw text"
+    assert len(bot_msgs) == 1, (
+        "exactly one bot answer — no double-print of the raw text"
+    )
     assert bot_msgs[0]["sections"] == {
-        "Desk status": "DESK STATUS\n  risk gate: OPEN\n  ADVICE: STAND_ASIDE"}
+        "Desk status": "DESK STATUS\n  risk gate: OPEN\n  ADVICE: STAND_ASIDE"
+    }
     src = [m for m in out if m.get("kind") == "src"]
     assert len(src) == 1
     assert src[0]["sources"] == ["desk snapshot — brain.agent.desk_status"]
@@ -597,20 +884,31 @@ def test_copilot_renders_sections_and_sources_without_double_print():
 def test_copilot_joins_list_answers_when_no_sections():
     """When the backend sends only a list answer (no sections), it must be
     joined with newlines, not comma-joined into one line."""
-    api = {"/api/ask": {"status": 200, "body": {
-        "intent": "paper",
-        "answer": ["Paper trading: 3 tracked", "  open 1 · closed 2"],
-        "sources": ["paper book — SignalDB.paper_trade_stats"],
-    }}}
-    out = _run(api, """
+    api = {
+        "/api/ask": {
+            "status": 200,
+            "body": {
+                "intent": "paper",
+                "answer": ["Paper trading: 3 tracked", "  open 1 · closed 2"],
+                "sources": ["paper book — SignalDB.paper_trade_stats"],
+            },
+        }
+    }
+    out = _run(
+        api,
+        """
       const messages = [];
       const _origMsg = aiAppendMsg;
       aiAppendMsg = (c, who, text, sections) => { messages.push({who, text, sections}); return _origMsg(c, who, text, sections); };
       el('aiInput').value = 'paper book?';
       await aiSend('drawer');
       global.__messages = messages;
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify(global.__messages));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify(global.__messages));",
+    )
     bot = [m for m in out if m.get("who") == "bot" and m.get("text")][0]
     assert bot["text"] == "Paper trading: 3 tracked\n  open 1 · closed 2"
 
@@ -618,7 +916,9 @@ def test_copilot_joins_list_answers_when_no_sections():
 def test_copilot_prepare_ticket_fills_but_never_confirms():
     """Prepare-ticket pre-fills the ticket from the desk plan and switches to
     the Ticket tab — advisory only, it must never POST a confirm."""
-    out = _run({}, """
+    out = _run(
+        {},
+        """
       window._skyPayload = {
         signal:{asset:'BTCUSDT',timeframe:'15m',action:'BUY',entry:61000,
                 stop_loss:60000,take_profit:63000,confidence:'MEDIUM',reason:'test'},
@@ -628,11 +928,15 @@ def test_copilot_prepare_ticket_fills_but_never_confirms():
         snapshot:{features:{},scores:{}},
       };
       aiPrepareTicket();
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({side:_ticketSide, type:_ticketType, "
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({side:_ticketSide, type:_ticketType, "
         "entry:elements['tEntry'].value, sl:elements['tSL'].value, "
         "tp1:elements['tTP1'].value, tp2:elements['tTP2'].value, "
-        "posts:POSTS, toasts:TOASTS}));")
+        "posts:POSTS, toasts:TOASTS}));",
+    )
     assert out["side"] == "BUY"
     assert out["type"] == "market"
     assert float(out["entry"]) == 61000
@@ -645,29 +949,42 @@ def test_copilot_prepare_ticket_fills_but_never_confirms():
 
 def test_copilot_prepare_ticket_refuses_without_action():
     """When the desk has no actionable plan, prepare-ticket stands aside."""
-    out = _run({}, """
+    out = _run(
+        {},
+        """
       window._skyPayload = { signal:{asset:'BTCUSDT',action:'NO TRADE'},
         plans:[], decision:{action:'NO TRADE'} };
       aiPrepareTicket();
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({posts:POSTS, toasts:TOASTS}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({posts:POSTS, toasts:TOASTS}));",
+    )
     assert out["posts"] == []
     assert any("stand aside" in t for t in out["toasts"])
 
 
 # ── T4 — professional polish: honest sizing/fees + bottom-tab re-fetch ───
 
+
 def test_ticket_sizing_uses_real_account_balance():
     """Risk dollars and units come from the server's account balance, not an
     invented $100k default."""
-    out = _run({}, """
+    out = _run(
+        {},
+        """
       _ticketMeta = {account_balance: 10000, round_trip_cost_pct: 0.0012};
       el('tEntry').value = 61000; el('tSL').value = 60000;
       el('tTP1').value = 62000; el('tRisk').value = '0.5';
       recalcTicket();
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({risk:elements['tRiskUsd'].textContent, "
-        "size:elements['tSize'].value, fees:elements['tFees'].textContent}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({risk:elements['tRiskUsd'].textContent, "
+        "size:elements['tSize'].value, fees:elements['tFees'].textContent}));",
+    )
     assert out["risk"] == "$50"
     assert float(out["size"]) == 0.05
     assert "0.12% rt" in out["fees"]
@@ -675,13 +992,19 @@ def test_ticket_sizing_uses_real_account_balance():
 
 def test_ticket_sizing_never_invents_account():
     """With no ACCOUNT_BALANCE the ticket shows '—', never a fake $100k."""
-    out = _run({}, """
+    out = _run(
+        {},
+        """
       _ticketMeta = {account_balance: 0, round_trip_cost_pct: 0.0014};
       el('tEntry').value = 61000; el('tSL').value = 60000;
       recalcTicket();
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({risk:elements['tRiskUsd'].textContent, "
-        "size:elements['tSize'].value, fees:elements['tFees'].textContent}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({risk:elements['tRiskUsd'].textContent, "
+        "size:elements['tSize'].value, fees:elements['tFees'].textContent}));",
+    )
     assert out["risk"] == "—"
     assert out["size"] == "—"
     assert "100000" not in out["risk"] and "100000" not in out["size"]
@@ -690,14 +1013,28 @@ def test_ticket_sizing_never_invents_account():
 
 def test_load_ticket_meta_fetches_real_meta():
     """loadTicketMeta() reads /api/ticket/meta for the selected symbol."""
-    api = {"/api/ticket/meta": {"status": 200, "body": {
-        "account_balance": 25000, "account_configured": True,
-        "round_trip_cost_pct": 0.0014, "market": "perp"}}}
-    out = _run(api, """
+    api = {
+        "/api/ticket/meta": {
+            "status": 200,
+            "body": {
+                "account_balance": 25000,
+                "account_configured": True,
+                "round_trip_cost_pct": 0.0014,
+                "market": "perp",
+            },
+        }
+    }
+    out = _run(
+        api,
+        """
       el('sym').value = 'BTCUSDT';
       await loadTicketMeta();
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({meta: _ticketMeta}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({meta: _ticketMeta}));",
+    )
     assert out["meta"]["account_balance"] == 25000
     assert out["meta"]["round_trip_cost_pct"] == 0.0014
 
@@ -706,11 +1043,15 @@ def test_bottom_tabs_refetch_on_every_switch():
     """The one-shot bottom-tab cache is gone: switching re-fetches, so a
     position the runner just closed cannot linger as a stale row."""
     api = {
-        "/api/journal": {"status": 200, "body": {
-            "journalable": [], "emotions": ["calm"], "summary": {}}},
+        "/api/journal": {
+            "status": 200,
+            "body": {"journalable": [], "emotions": ["calm"], "summary": {}},
+        },
         "/api/trades": {"status": 200, "body": {"ok": True, "open": []}},
     }
-    out = _run(api, """
+    out = _run(
+        api,
+        """
       const hits = [];
       const origFetch = fetch;
       fetch = async (url, opts) => {
@@ -721,18 +1062,25 @@ def test_bottom_tabs_refetch_on_every_switch():
       switchBottomTab('journal');
       switchBottomTab('positions');
       switchBottomTab('journal');
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({hits: hits}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({hits: hits}));",
+    )
     assert out["hits"].count("journal") == 2, out["hits"]
     assert out["hits"].count("trades") == 1, out["hits"]
 
 
 # ── T4 part 2 — resizable/collapsible panels, persistence, conn state ──────
 
+
 def test_panel_collapse_toggles_persist_to_localstorage():
     """Collapsing a panel flips its class and remembers the choice, so the
     layout survives a reload. Presentation only — no endpoint is touched."""
-    out = _run({}, """
+    out = _run(
+        {},
+        """
       _layout = null;                      // start from a clean layout
       global.localStorage.store = {};
       toggleWatchlistPanel();
@@ -743,20 +1091,28 @@ def test_panel_collapse_toggles_persist_to_localstorage():
       global.__orderClass = term.classList.contains('order-collapsed');
       global.__saved = global.localStorage.getItem('sky.terminal.layout.v1');
       global.__btnTxt = (elements['bottomCollapseBtn']||{}).textContent || '';
-    """ + _DRAIN + """
-    """ + ("console.log(JSON.stringify({wl: global.__wlClass, bottom: global.__bottomClass, "
-           "order: global.__orderClass, saved: global.__saved, btnTxt: global.__btnTxt}));"))
+    """
+        + _DRAIN
+        + """
+    """
+        + (
+            "console.log(JSON.stringify({wl: global.__wlClass, bottom: global.__bottomClass, "
+            "order: global.__orderClass, saved: global.__saved, btnTxt: global.__btnTxt}));"
+        ),
+    )
     assert out["wl"] is True and out["bottom"] is True
-    assert out["order"] is False           # untouched panel stays open
+    assert out["order"] is False  # untouched panel stays open
     saved = json.loads(out["saved"])
     assert saved["wlCollapsed"] is True and saved["bottomCollapsed"] is True
     assert saved["orderCollapsed"] is False
-    assert out["btnTxt"] == "\u25b4"        # ▴ = expand affordance when collapsed
+    assert out["btnTxt"] == "\u25b4"  # ▴ = expand affordance when collapsed
 
 
 def test_panel_collapse_round_trips_from_saved_layout():
     """A remembered collapsed state is re-applied on the next load."""
-    out = _run({}, """
+    out = _run(
+        {},
+        """
       _layout = null;
       global.localStorage.store = {};
       global.localStorage.setItem('sky.terminal.layout.v1',
@@ -765,15 +1121,21 @@ def test_panel_collapse_round_trips_from_saved_layout():
       const term = el('terminal');
       global.__wl = term.classList.contains('wl-collapsed');
       global.__order = term.classList.contains('order-collapsed');
-    """ + _DRAIN + """
-    """ + "console.log(JSON.stringify({wl: global.__wl, order: global.__order}));")
+    """
+        + _DRAIN
+        + """
+    """
+        + "console.log(JSON.stringify({wl: global.__wl, order: global.__order}));",
+    )
     assert out["wl"] is True and out["order"] is False
 
 
 def test_terminal_connection_state_surfaces_after_repeated_failures():
     """Two consecutive feed failures raise an explicit stale banner with a
     Retry affordance; a subsequent success clears it. No silent frozen panel."""
-    out = _run({}, """
+    out = _run(
+        {},
+        """
       _termConnFails = 0; _termConnDown = false;
       reportFeed(false, 'watchlist');
       const afterOne = (elements['termConn']||{}).className || '';
@@ -782,29 +1144,43 @@ def test_terminal_connection_state_surfaces_after_repeated_failures():
       const msgDown = (elements['termConnMsg']||{}).textContent || '';
       reportFeed(true, 'watchlist');
       const afterRecover = (elements['termConn']||{}).className || '';
-    """ + _DRAIN + """
-    """ + ("console.log(JSON.stringify({afterOne: afterOne, afterTwo: afterTwo, "
-           "msgDown: msgDown, afterRecover: afterRecover}));"))
-    assert "show" not in out["afterOne"]          # one blip is not yet "down"
+    """
+        + _DRAIN
+        + """
+    """
+        + (
+            "console.log(JSON.stringify({afterOne: afterOne, afterTwo: afterTwo, "
+            "msgDown: msgDown, afterRecover: afterRecover}));"
+        ),
+    )
+    assert "show" not in out["afterOne"]  # one blip is not yet "down"
     assert "show" in out["afterTwo"] and "warn" in out["afterTwo"]
     assert "stale" in out["msgDown"].lower()
-    assert out["afterRecover"] == "term-conn"     # recovered → hidden again
+    assert out["afterRecover"] == "term-conn"  # recovered → hidden again
 
 
 def test_watchlist_failure_reports_the_feed_down():
     """A failing watchlist fetch drives the connection state, not just a blank
     panel."""
     api = {"/api/agents": {"status": 500, "body": {"error": "boom"}}}
-    out = _run(api, """
+    out = _run(
+        api,
+        """
       _termConnFails = 0; _termConnDown = false;
       _wlPrices = [];
       const origFetch = fetch;
       fetch = async (url, opts) => { if(String(url).indexOf('/api/agents')>=0) throw new Error('down'); return origFetch(url, opts); };
       await loadWatchlistPrices();
       await loadWatchlistPrices();
-    """ + _DRAIN + """
-    """ + ("console.log(JSON.stringify({conn: (elements['termConn']||{}).className||'', "
-           "wl: (elements['wlList']||{}).innerHTML||''}));"))
+    """
+        + _DRAIN
+        + """
+    """
+        + (
+            "console.log(JSON.stringify({conn: (elements['termConn']||{}).className||'', "
+            "wl: (elements['wlList']||{}).innerHTML||''}));"
+        ),
+    )
     assert "show" in out["conn"]
     assert "unavailable" in out["wl"]
 
@@ -813,12 +1189,20 @@ def test_selecting_symbol_persists_and_closes_mobile_drawer():
     """Choosing a symbol remembers it for next load and closes the mobile
     watchlist drawer."""
     api = {"/api/agents": {"status": 200, "body": {"assets": []}}}
-    out = _run(api, """
+    out = _run(
+        api,
+        """
       global.localStorage.store = {};
       el('terminal').classList.add('mobile-wl-open');
       setSymbol('ETHUSDT');
-    """ + _DRAIN + """
-    """ + ("console.log(JSON.stringify({sym: global.localStorage.getItem('sky.symbol'), "
-           "drawerOpen: el('terminal').classList.contains('mobile-wl-open')}));"))
+    """
+        + _DRAIN
+        + """
+    """
+        + (
+            "console.log(JSON.stringify({sym: global.localStorage.getItem('sky.symbol'), "
+            "drawerOpen: el('terminal').classList.contains('mobile-wl-open')}));"
+        ),
+    )
     assert out["sym"] == "ETHUSDT"
     assert out["drawerOpen"] is False

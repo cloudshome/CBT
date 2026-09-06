@@ -4,6 +4,7 @@
 Signing is intentionally external: CI signs platform artifacts first, then
 passes the resulting files here. This script never accepts private-key values.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,8 +19,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from config import VERSION
-from ops.release import (CHANNELS, dependency_inventory, signing_readiness,
-                         write_checksums, write_release_manifest, write_sbom)
+from ops.release import (
+    CHANNELS,
+    dependency_inventory,
+    signing_readiness,
+    write_checksums,
+    write_release_manifest,
+    write_sbom,
+)
 
 
 def _commit() -> str:
@@ -49,14 +56,24 @@ def main(argv: list[str] | None = None) -> int:
 
     args.output.mkdir(parents=True, exist_ok=True)
     checksums = write_checksums(args.output / "SHA256SUMS", args.artifact)
-    sbom = write_sbom(args.output / "sky.spdx.json",
-                      requirements=args.requirements, version=args.version)
+    sbom = write_sbom(
+        args.output / "sky.spdx.json",
+        requirements=args.requirements,
+        version=args.version,
+    )
     inventory = args.output / "dependencies.json"
-    inventory.write_text(json.dumps(dependency_inventory(args.requirements),
-                                    indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    inventory.write_text(
+        json.dumps(dependency_inventory(args.requirements), indent=2, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
     manifest = write_release_manifest(
-        args.output / "release.json", args.artifact, channel=args.channel,
-        version=args.version, commit=_commit())
+        args.output / "release.json",
+        args.artifact,
+        channel=args.channel,
+        version=args.version,
+        commit=_commit(),
+    )
     readiness = signing_readiness()
     result = {
         "ok": True,

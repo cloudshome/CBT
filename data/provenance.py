@@ -30,9 +30,8 @@ Design rules (deliberate — do not "simplify" away):
   round-trip, so the CLI, HTTP, MCP and DB layers cannot disagree about what
   ``dukascopy:spot:bid`` means (invariant #10).
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 # The canonical live series the desk actually trades. Rows carrying this
 # provenance — and rows predating P12.11, whose columns are NULL — key to "".
@@ -53,15 +52,18 @@ KEY_SEP = "@"
 ONE_SIDED_PRICE_TYPES = frozenset({"bid", "ask"})
 
 
-def _clean(value: Optional[str]) -> str:
+def _clean(value: str | None) -> str:
     """Normalise one provenance field: strip, lowercase, empty when unknown."""
     if value is None:
         return ""
     return str(value).strip().lower()
 
 
-def normalize(exchange: Optional[str] = None, market: Optional[str] = None,
-              price_type: Optional[str] = None) -> tuple[str, str, str]:
+def normalize(
+    exchange: str | None = None,
+    market: str | None = None,
+    price_type: str | None = None,
+) -> tuple[str, str, str]:
     """Normalise a provenance triple, defaulting to the canonical live series.
 
     ``None``/blank exchange or market means "the row predates provenance
@@ -78,8 +80,11 @@ def normalize(exchange: Optional[str] = None, market: Optional[str] = None,
     return ex, mk, pt
 
 
-def source_key(exchange: Optional[str] = None, market: Optional[str] = None,
-               price_type: Optional[str] = None) -> str:
+def source_key(
+    exchange: str | None = None,
+    market: str | None = None,
+    price_type: str | None = None,
+) -> str:
     """``exchange:market[:price_type]`` — or ``""`` for the canonical series.
 
     >>> source_key()                                    # live Binance spot
@@ -97,7 +102,7 @@ def source_key(exchange: Optional[str] = None, market: Optional[str] = None,
     return FIELD_SEP.join([ex, mk] + ([pt] if pt else []))
 
 
-def parse_source_key(key: Optional[str]) -> tuple[str, str, str]:
+def parse_source_key(key: str | None) -> tuple[str, str, str]:
     """Inverse of `source_key` — always returns a normalised triple."""
     raw = _clean(key)
     if not raw:
@@ -109,12 +114,12 @@ def parse_source_key(key: Optional[str]) -> tuple[str, str, str]:
     return normalize(ex, mk, pt)
 
 
-def is_canonical(key: Optional[str]) -> bool:
+def is_canonical(key: str | None) -> bool:
     """True when this source key is the live series the desk trades."""
     return source_key(*parse_source_key(key)) == LIVE_SOURCE_KEY
 
 
-def is_one_sided(key: Optional[str]) -> bool:
+def is_one_sided(key: str | None) -> bool:
     """True when the series is bid-only or ask-only (not a round trip).
 
     A bid-only book cannot be entered and exited at the printed price, so it
@@ -124,7 +129,7 @@ def is_one_sided(key: Optional[str]) -> bool:
     return price_type in ONE_SIDED_PRICE_TYPES
 
 
-def describe_source(key: Optional[str]) -> str:
+def describe_source(key: str | None) -> str:
     """Human label for a source key, for CLI/report lines."""
     ex, mk, pt = parse_source_key(key)
     if source_key(ex, mk, pt) == LIVE_SOURCE_KEY:
@@ -154,8 +159,9 @@ def split_profile_key(key: str) -> tuple[str, str, str]:
     return plan_type, regime, (src if sep else "")
 
 
-def provenance_of_frame(df, exchange: Optional[str] = None,
-                        market: Optional[str] = None) -> tuple[str, str, str]:
+def provenance_of_frame(
+    df, exchange: str | None = None, market: str | None = None
+) -> tuple[str, str, str]:
     """Read provenance off a candle frame produced by the store or a client.
 
     The store stamps ``exchange`` / ``market`` / ``price_type`` onto every
@@ -170,7 +176,9 @@ def provenance_of_frame(df, exchange: Optional[str] = None,
     if not pt and df is not None and getattr(df, "empty", True) is False:
         try:
             if "price_type" in df.columns:
-                vals = {str(v).strip().lower() for v in df["price_type"].dropna().unique()}
+                vals = {
+                    str(v).strip().lower() for v in df["price_type"].dropna().unique()
+                }
                 vals.discard("")
                 # A mixed-side series is a bug the importer already refuses;
                 # if one ever appears, do not silently pick a side.

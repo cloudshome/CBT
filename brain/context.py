@@ -12,12 +12,11 @@ unreachable (or geo-blocked) the field reports `available: false` and the
 rest of the brain keeps working. Results are cached for a few minutes so the
 30s dashboard refresh never hammers external APIs.
 """
+
 from __future__ import annotations
 
-import re
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import requests
 
@@ -29,22 +28,57 @@ CACHE_TTL = 300  # seconds
 # ── Macro calendar (curated recurring events; best-effort) ──────────────
 # 2026 FOMC meeting dates (per the Fed's published schedule).
 FOMC_2026 = [
-    datetime(2026, 1, 28), datetime(2026, 3, 18), datetime(2026, 4, 29),
-    datetime(2026, 6, 17), datetime(2026, 7, 29), datetime(2026, 9, 16),
-    datetime(2026, 10, 28), datetime(2026, 12, 9),
+    datetime(2026, 1, 28),
+    datetime(2026, 3, 18),
+    datetime(2026, 4, 29),
+    datetime(2026, 6, 17),
+    datetime(2026, 7, 29),
+    datetime(2026, 9, 16),
+    datetime(2026, 10, 28),
+    datetime(2026, 12, 9),
 ]
 HALVINGS = [
-    datetime(2012, 11, 28), datetime(2016, 7, 9), datetime(2020, 5, 11),
-    datetime(2024, 4, 20), datetime(2028, 4, 20),  # ~4y cadence
+    datetime(2012, 11, 28),
+    datetime(2016, 7, 9),
+    datetime(2020, 5, 11),
+    datetime(2024, 4, 20),
+    datetime(2028, 4, 20),  # ~4y cadence
 ]
 GEOPOLITICAL_KEYWORDS = [
-    "war", "invasion", "sanction", "conflict", "missile", "nuclear",
-    "ceasefire", "military", "geopolitic", "china", "russia", "ukraine",
-    "israel", "iran", "oil price", "opec", "tariff", "trade war", "crisis",
+    "war",
+    "invasion",
+    "sanction",
+    "conflict",
+    "missile",
+    "nuclear",
+    "ceasefire",
+    "military",
+    "geopolitic",
+    "china",
+    "russia",
+    "ukraine",
+    "israel",
+    "iran",
+    "oil price",
+    "opec",
+    "tariff",
+    "trade war",
+    "crisis",
 ]
 INFLUENCER_KEYWORDS = [
-    "elon", "musk", "trump", "sec", "etf", "blackrock", "fidelity",
-    "cathie wood", "saylor", "microstrategy", "cz", "binance", "coinbase",
+    "elon",
+    "musk",
+    "trump",
+    "sec",
+    "etf",
+    "blackrock",
+    "fidelity",
+    "cathie wood",
+    "saylor",
+    "microstrategy",
+    "cz",
+    "binance",
+    "coinbase",
 ]
 
 
@@ -66,24 +100,34 @@ def fear_greed() -> dict:
     def _f():
         r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=6)
         d = r.json()["data"][0]
-        return {"available": True, "value": int(d["value"]),
-                "label": d["value_classification"]}
+        return {
+            "available": True,
+            "value": int(d["value"]),
+            "label": d["value_classification"],
+        }
+
     return _cached("fng", _f)
 
 
 # ── BTC dominance / total market cap (CoinGecko global) ──────────────────
 def dominance() -> dict:
     def _d():
-        r = requests.get("https://api.coingecko.com/api/v3/global", timeout=6,
-                         headers={"User-Agent": "CryptoBrain/1.0"})
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/global",
+            timeout=6,
+            headers={"User-Agent": "CryptoBrain/1.0"},
+        )
         g = r.json()["data"]
         return {
             "available": True,
             "btc_dominance": round(g["market_cap_percentage"]["btc"], 2),
             "eth_dominance": round(g["market_cap_percentage"]["eth"], 2),
             "total_market_cap_usd": g["total_market_cap"]["usd"],
-            "market_cap_change_24h_pct": round(g["market_cap_change_percentage_24h_usd"], 2),
+            "market_cap_change_24h_pct": round(
+                g["market_cap_change_percentage_24h_usd"], 2
+            ),
         }
+
     return _cached("dominance", _d)
 
 
@@ -107,6 +151,7 @@ def equities() -> dict:
         if not rows:
             return {"available": False}
         return {"available": True, "change_pct": rows}
+
     return _cached("equities", _e, ttl=600)
 
 
@@ -118,11 +163,17 @@ def macro_events() -> dict:
         for d in FOMC_2026:
             days = (d.date() - today).days
             if -2 <= days <= 60:
-                events.append({"name": "FOMC meeting", "date": d.strftime("%Y-%m-%d"),
-                               "days_until": max(days, 0), "high_impact": True})
+                events.append(
+                    {
+                        "name": "FOMC meeting",
+                        "date": d.strftime("%Y-%m-%d"),
+                        "days_until": max(days, 0),
+                        "high_impact": True,
+                    }
+                )
         # NFP: first Friday of each month (heuristic)
         y, mo = today.year, today.month
-        for offset in range(0, 3):
+        for offset in range(3):
             m = mo + offset
             yy = y + (m - 1) // 12
             mm = (m - 1) % 12 + 1
@@ -131,28 +182,44 @@ def macro_events() -> dict:
             nfp = first + timedelta(days=shift)
             days = (nfp.date() - today).days
             if 0 <= days <= 45:
-                events.append({"name": "US Non-Farm Payrolls", "date": nfp.strftime("%Y-%m-%d"),
-                               "days_until": days, "high_impact": True})
+                events.append(
+                    {
+                        "name": "US Non-Farm Payrolls",
+                        "date": nfp.strftime("%Y-%m-%d"),
+                        "days_until": days,
+                        "high_impact": True,
+                    }
+                )
         # CPI: ~mid-month heuristic (2nd Tuesday-ish)
-        for offset in range(0, 3):
+        for offset in range(3):
             m = mo + offset
             yy = y + (m - 1) // 12
             mm = (m - 1) % 12 + 1
             cpi = datetime(yy, mm, 13)
             days = (cpi.date() - today).days
             if 0 <= days <= 45:
-                events.append({"name": "US CPI", "date": cpi.strftime("%Y-%m-%d"),
-                               "days_until": days, "high_impact": True})
+                events.append(
+                    {
+                        "name": "US CPI",
+                        "date": cpi.strftime("%Y-%m-%d"),
+                        "days_until": days,
+                        "high_impact": True,
+                    }
+                )
         events.sort(key=lambda e: e["days_until"])
         imminent = [e for e in events if e["days_until"] <= 2]
-        return {"available": True, "events": events[:6],
-                "high_impact_imminent": bool(imminent),
-                "imminent": imminent}
+        return {
+            "available": True,
+            "events": events[:6],
+            "high_impact_imminent": bool(imminent),
+            "imminent": imminent,
+        }
+
     return _cached("macro", _m, ttl=3600)
 
 
 # ── Cycle (halving phase + long-term position) ───────────────────────────
-def cycle(sma200_1d: Optional[float] = None, price_1d: Optional[float] = None) -> dict:
+def cycle(sma200_1d: float | None = None, price_1d: float | None = None) -> dict:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     # latest past halving
     past = [h for h in HALVINGS if h <= now]
@@ -172,16 +239,23 @@ def cycle(sma200_1d: Optional[float] = None, price_1d: Optional[float] = None) -
     position = None
     if sma200_1d and price_1d:
         ratio = price_1d / sma200_1d if sma200_1d else None
-        position = "above-200d" if ratio and ratio > 1.05 else \
-                   "below-200d" if ratio and ratio < 0.95 else "around-200d"
+        position = (
+            "above-200d"
+            if ratio and ratio > 1.05
+            else "below-200d"
+            if ratio and ratio < 0.95
+            else "around-200d"
+        )
     return {
         "available": True,
         "days_since_halving": days_since,
         "phase": phase,
         "next_halving": max(HALVINGS).strftime("%Y-%m-%d"),
         "position_vs_200d": position,
-        "note": ("Halving cycles historically mark multi-year expansion after the event; "
-                 "the phase is a macro filter, not a timing signal."),
+        "note": (
+            "Halving cycles historically mark multi-year expansion after the event; "
+            "the phase is a macro filter, not a timing signal."
+        ),
     }
 
 
@@ -194,8 +268,7 @@ def social_pulse(headlines: list[dict]) -> dict:
             if kw in text:
                 hits.append({"keyword": kw, "title": h.get("title", "")[:120]})
                 break
-    return {"available": True, "influencer_mentions": hits[:8],
-            "count": len(hits)}
+    return {"available": True, "influencer_mentions": hits[:8], "count": len(hits)}
 
 
 # ── Geopolitics (keyword scan over headlines) ────────────────────────────
@@ -207,8 +280,12 @@ def geopolitics(headlines: list[dict]) -> dict:
             if kw in text:
                 hits.append({"keyword": kw, "title": h.get("title", "")[:120]})
                 break
-    return {"available": True, "hits": hits[:8], "count": len(hits),
-            "elevated": len(hits) >= 2}
+    return {
+        "available": True,
+        "hits": hits[:8],
+        "count": len(hits),
+        "elevated": len(hits) >= 2,
+    }
 
 
 # ── Risk regime: equities + dollar + fear&greed + dominance ──────────────
@@ -248,7 +325,9 @@ def _safe(fn, *a, **k) -> dict:
         return {"available": False}
 
 
-def collect(price_1d: Optional[float] = None, sma200_1d: Optional[float] = None) -> dict:
+def collect(
+    price_1d: float | None = None, sma200_1d: float | None = None
+) -> dict:
     """Gather the full market context (cached, best-effort, parallel).
 
     All external providers run concurrently and are individually guarded, so

@@ -14,18 +14,32 @@ candle endpoint used to hand Flask raw Pandas/NumPy values straight from
 not JSON serializable`` and left the page with no chart at all.  A single
 :func:`_num` funnel makes that class of failure impossible.
 """
+
 from __future__ import annotations
 
 import math
-from typing import Any, Optional
+from typing import Any
 
-TF_SECONDS = {"1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800,
-              "1h": 3600, "2h": 7200, "4h": 14400, "6h": 21600, "8h": 28800,
-              "12h": 43200, "1d": 86400, "3d": 259200, "1w": 604800,
-              "1M": 2592000}
+TF_SECONDS = {
+    "1m": 60,
+    "3m": 180,
+    "5m": 300,
+    "15m": 900,
+    "30m": 1800,
+    "1h": 3600,
+    "2h": 7200,
+    "4h": 14400,
+    "6h": 21600,
+    "8h": 28800,
+    "12h": 43200,
+    "1d": 86400,
+    "3d": 259200,
+    "1w": 604800,
+    "1M": 2592000,
+}
 
 
-def _num(value: Any) -> Optional[float]:
+def _num(value: Any) -> float | None:
     """Any Pandas/NumPy/Python scalar → a JSON-safe float (or ``None``).
 
     Handles ``numpy.float64``, ``numpy.int64``, ``numpy.bool_``, ``Decimal``,
@@ -36,8 +50,8 @@ def _num(value: Any) -> Optional[float]:
         return None
     try:
         if hasattr(value, "item") and not isinstance(value, (str, bytes)):
-            value = value.item()          # numpy scalar → python scalar
-    except Exception:                      # pragma: no cover — defensive
+            value = value.item()  # numpy scalar → python scalar
+    except Exception:  # pragma: no cover — defensive
         pass
     if isinstance(value, bool):
         return float(value)
@@ -50,7 +64,7 @@ def _num(value: Any) -> Optional[float]:
     return out
 
 
-def _epoch_seconds(ts: Any) -> Optional[int]:
+def _epoch_seconds(ts: Any) -> int | None:
     """Candle open time → epoch **seconds** (Lightweight Charts' unit)."""
     raw = _num(ts)
     if raw is None:
@@ -60,12 +74,12 @@ def _epoch_seconds(ts: Any) -> Optional[int]:
             if callable(fn):
                 try:
                     return int(fn())
-                except Exception:          # pragma: no cover
+                except Exception:  # pragma: no cover
                     return None
         return None
-    if raw > 1e12:      # epoch milliseconds
+    if raw > 1e12:  # epoch milliseconds
         raw = raw / 1000.0
-    elif raw > 1e15:    # epoch microseconds
+    elif raw > 1e15:  # epoch microseconds
         raw = raw / 1_000_000.0
     return int(raw)
 
@@ -83,8 +97,9 @@ def _series(frame, column: str, times: list[int]) -> list[dict]:
     return out
 
 
-def build_chart(df, symbol: str, timeframe: str, *, payload: dict | None = None,
-                limit: int = 300) -> dict:
+def build_chart(
+    df, symbol: str, timeframe: str, *, payload: dict | None = None, limit: int = 300
+) -> dict:
     """Build the full chart workspace payload from an OHLCV frame.
 
     ``payload`` is an optional scan payload; when given, its entry / stop /
@@ -95,7 +110,7 @@ def build_chart(df, symbol: str, timeframe: str, *, payload: dict | None = None,
     frame = df.tail(int(limit)).reset_index(drop=True)
     try:
         frame = add_all_indicators(frame)
-    except Exception:      # indicators are a display aid, never a hard gate
+    except Exception:  # indicators are a display aid, never a hard gate
         pass
 
     times = [_epoch_seconds(t) for t in frame["ts"].tolist()]
@@ -113,8 +128,13 @@ def build_chart(df, symbol: str, timeframe: str, *, payload: dict | None = None,
         candles.append({"time": t, "open": o, "high": h, "low": low, "close": c})
         vol = _num(frame["volume"].iloc[i]) if "volume" in frame.columns else None
         if vol is not None:
-            volume.append({"time": t, "value": vol,
-                           "color": "rgba(34,197,94,.55)" if c >= o else "rgba(239,68,68,.55)"})
+            volume.append(
+                {
+                    "time": t,
+                    "value": vol,
+                    "color": "rgba(34,197,94,.55)" if c >= o else "rgba(239,68,68,.55)",
+                }
+            )
 
     overlays = {
         "ema20": _series(frame, "ema_20", times),
@@ -167,18 +187,26 @@ def _stats(frame, candles: list[dict]) -> dict:
         return {}
     row = frame.iloc[-1]
 
-    def get(name: str) -> Optional[float]:
+    def get(name: str) -> float | None:
         return _num(row[name]) if name in frame.columns else None
 
     highs = [c["high"] for c in candles] or [0.0]
     lows = [c["low"] for c in candles] or [0.0]
     return {
-        "rsi": get("rsi"), "adx": get("adx"), "atr": get("atr"),
-        "atr_pct": get("atr_pct"), "macd": get("macd"),
-        "macd_signal": get("macd_signal"), "vwap": get("vwap"),
-        "ema20": get("ema_20"), "ema50": get("ema_50"), "ema200": get("ema_200"),
-        "volume": get("volume"), "volume_ratio": get("volume_ratio"),
-        "range_high": max(highs), "range_low": min(lows),
+        "rsi": get("rsi"),
+        "adx": get("adx"),
+        "atr": get("atr"),
+        "atr_pct": get("atr_pct"),
+        "macd": get("macd"),
+        "macd_signal": get("macd_signal"),
+        "vwap": get("vwap"),
+        "ema20": get("ema_20"),
+        "ema50": get("ema_50"),
+        "ema200": get("ema_200"),
+        "volume": get("volume"),
+        "volume_ratio": get("volume_ratio"),
+        "range_high": max(highs),
+        "range_low": min(lows),
     }
 
 
@@ -192,17 +220,30 @@ def _levels(payload: dict | None) -> list[dict]:
     for price in (keys.get("support") or [])[:4]:
         val = _num(price)
         if val is not None:
-            out.append({"price": val, "kind": "support", "label": "Support",
-                        "color": "#22c55e"})
+            out.append(
+                {
+                    "price": val,
+                    "kind": "support",
+                    "label": "Support",
+                    "color": "#22c55e",
+                }
+            )
     for price in (keys.get("resistance") or [])[:4]:
         val = _num(price)
         if val is not None:
-            out.append({"price": val, "kind": "resistance", "label": "Resistance",
-                        "color": "#ef4444"})
+            out.append(
+                {
+                    "price": val,
+                    "kind": "resistance",
+                    "label": "Resistance",
+                    "color": "#ef4444",
+                }
+            )
     pivot = _num(mtf.get("pivot"))
     if pivot is not None:
-        out.append({"price": pivot, "kind": "pivot", "label": "Pivot",
-                    "color": "#f59e0b"})
+        out.append(
+            {"price": pivot, "kind": "pivot", "label": "Pivot", "color": "#f59e0b"}
+        )
     return out
 
 
@@ -218,7 +259,7 @@ def _zones(payload: dict | None) -> dict:
     """
     if not payload:
         return {}
-    structure = ((payload.get("snapshot") or {}).get("structure") or {})
+    structure = (payload.get("snapshot") or {}).get("structure") or {}
 
     def _band(top, bottom):
         t, b = _num(top), _num(bottom)
@@ -230,16 +271,23 @@ def _zones(payload: dict | None) -> dict:
     for ob in (structure.get("order_blocks") or [])[-6:]:
         band = _band(ob.get("top"), ob.get("bottom"))
         if band:
-            band.update({"side": ob.get("side"), "tested": bool(ob.get("tested")),
-                         "broken": bool(ob.get("broken")), "kind": "order_block"})
+            band.update(
+                {
+                    "side": ob.get("side"),
+                    "tested": bool(ob.get("tested")),
+                    "broken": bool(ob.get("broken")),
+                    "kind": "order_block",
+                }
+            )
             order_blocks.append(band)
 
     fvgs = []
     for f in (structure.get("fvgs") or [])[-6:]:
         band = _band(f.get("top"), f.get("bottom"))
         if band:
-            band.update({"side": f.get("side"), "filled": bool(f.get("filled")),
-                         "kind": "fvg"})
+            band.update(
+                {"side": f.get("side"), "filled": bool(f.get("filled")), "kind": "fvg"}
+            )
             fvgs.append(band)
 
     liquidity = []
@@ -255,17 +303,25 @@ def _zones(payload: dict | None) -> dict:
     sweep = None
     s = structure.get("sweep")
     if s and _num(s.get("level")) is not None:
-        sweep = {"level": _num(s.get("level")), "side": s.get("side"),
-                 "recovered": bool(s.get("recovered")), "kind": "sweep"}
+        sweep = {
+            "level": _num(s.get("level")),
+            "side": s.get("side"),
+            "recovered": bool(s.get("recovered")),
+            "kind": "sweep",
+        }
 
     dealing_range = None
     pd_ = structure.get("premium_discount")
     if pd_:
         band = _band(pd_.get("top"), pd_.get("bottom"))
         if band:
-            band.update({"zone": pd_.get("zone"),
-                         "position": _num(pd_.get("position")),
-                         "kind": "dealing_range"})
+            band.update(
+                {
+                    "zone": pd_.get("zone"),
+                    "position": _num(pd_.get("position")),
+                    "kind": "dealing_range",
+                }
+            )
             dealing_range = band
 
     return {
@@ -292,7 +348,9 @@ def _plan_overlay(payload: dict | None) -> dict:
         return {}
     return {
         "action": sig.get("action") or plan.get("action"),
-        "entry": entry, "stop_loss": stop, "take_profit": take,
+        "entry": entry,
+        "stop_loss": stop,
+        "take_profit": take,
         "take_profits": [_num(t) for t in tps if _num(t) is not None],
         "risk_reward": _num(sig.get("risk_reward")),
         "setup": plan.get("type"),

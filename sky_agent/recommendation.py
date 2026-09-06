@@ -4,17 +4,18 @@ Outputs: WATCH / WAIT / CONSIDER / AVOID (never BUY NOW) with explicit
 FACT vs INTERPRETATION vs HYPOTHESIS tags and an invalidation condition.
 Reuses SKY's desk report shape where possible.
 """
+
 from __future__ import annotations
 
 from typing import Any
-
 
 RECOMMENDATIONS = ("WATCH", "WAIT", "CONSIDER", "AVOID")
 CONFIDENCE_LEVELS = ("LOW", "MEDIUM", "HIGH")
 RISK_STATUS = ("PASS", "FAIL", "UNKNOWN")
 
 
-def build_recommendation(*,
+def build_recommendation(
+    *,
     asset: str,
     timeframe: str,
     regime: str,
@@ -37,7 +38,12 @@ def build_recommendation(*,
     # Decision rule: positive expectancy + PASS + sufficient sample → CONSIDER; otherwise WATCH/WAIT/AVOID
     if risk_status == "FAIL":
         rec = "AVOID"
-    elif expectancy_R is not None and expectancy_R > 0.2 and (sample_n or 0) >= 100 and risk_status == "PASS":
+    elif (
+        expectancy_R is not None
+        and expectancy_R > 0.2
+        and (sample_n or 0) >= 100
+        and risk_status == "PASS"
+    ):
         rec = "CONSIDER"
     elif expectancy_R is not None and expectancy_R <= 0:
         rec = "AVOID"

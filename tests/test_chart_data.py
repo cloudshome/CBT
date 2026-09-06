@@ -10,12 +10,13 @@ structure payload must map 1:1 into zone bands with plain-float values, and a
 payload with no structure must yield an empty-but-shaped ``zones`` dict rather
 than raise.
 """
+
 from __future__ import annotations
 
 import numpy as np
 
-from web.chart_data import _zones, build_chart
 from tests.conftest import make_ohlcv
+from web.chart_data import _zones, build_chart
 
 
 def _structure_payload() -> dict:
@@ -23,20 +24,33 @@ def _structure_payload() -> dict:
         "snapshot": {
             "structure": {
                 "order_blocks": [
-                    {"side": "bullish", "top": 100.0, "bottom": 99.0,
-                     "tested": False, "broken": False},
-                    {"side": "bearish", "top": 110.0, "bottom": 109.5,
-                     "tested": True, "broken": False},
+                    {
+                        "side": "bullish",
+                        "top": 100.0,
+                        "bottom": 99.0,
+                        "tested": False,
+                        "broken": False,
+                    },
+                    {
+                        "side": "bearish",
+                        "top": 110.0,
+                        "bottom": 109.5,
+                        "tested": True,
+                        "broken": False,
+                    },
                 ],
                 "fvgs": [
-                    {"side": "bullish", "top": 105.0, "bottom": 104.0,
-                     "filled": False},
+                    {"side": "bullish", "top": 105.0, "bottom": 104.0, "filled": False},
                 ],
                 "liquidity_above": [115.0, 118.0],
                 "liquidity_below": [95.0],
                 "sweep": {"side": "buyside", "level": 116.0, "recovered": True},
-                "premium_discount": {"top": 112.0, "bottom": 96.0,
-                                     "position": 0.7, "zone": "premium"},
+                "premium_discount": {
+                    "top": 112.0,
+                    "bottom": 96.0,
+                    "position": 0.7,
+                    "zone": "premium",
+                },
             }
         }
     }
@@ -72,19 +86,46 @@ def test_zones_map_structure_to_bands():
 
 def test_zones_normalise_top_bottom_order():
     """A band's top/bottom are stored as (top, bottom) regardless of input."""
-    z = _zones({"snapshot": {"structure": {
-        "order_blocks": [{"side": "bullish", "top": 50.0, "bottom": 60.0,
-                          "tested": False, "broken": False}]}}})
+    z = _zones(
+        {
+            "snapshot": {
+                "structure": {
+                    "order_blocks": [
+                        {
+                            "side": "bullish",
+                            "top": 50.0,
+                            "bottom": 60.0,
+                            "tested": False,
+                            "broken": False,
+                        }
+                    ]
+                }
+            }
+        }
+    )
     assert z["order_blocks"][0]["top"] == 60.0
     assert z["order_blocks"][0]["bottom"] == 50.0
 
 
 def test_zones_handle_numpy_scalars():
     """Values funnel through _num, so numpy scalars must survive to floats."""
-    z = _zones({"snapshot": {"structure": {
-        "order_blocks": [{"side": "bearish", "top": np.float64(200.0),
-                          "bottom": np.int64(199), "tested": False,
-                          "broken": False}]}}})
+    z = _zones(
+        {
+            "snapshot": {
+                "structure": {
+                    "order_blocks": [
+                        {
+                            "side": "bearish",
+                            "top": np.float64(200.0),
+                            "bottom": np.int64(199),
+                            "tested": False,
+                            "broken": False,
+                        }
+                    ]
+                }
+            }
+        }
+    )
     assert z["order_blocks"][0]["top"] == 200.0
     assert isinstance(z["order_blocks"][0]["top"], float)
 
@@ -92,14 +133,18 @@ def test_zones_handle_numpy_scalars():
 def test_zones_empty_when_no_structure():
     assert _zones(None) == {}
     z = _zones({"snapshot": {}})
-    assert z == {"order_blocks": [], "fvgs": [], "liquidity": [],
-                 "sweep": None, "dealing_range": None}
+    assert z == {
+        "order_blocks": [],
+        "fvgs": [],
+        "liquidity": [],
+        "sweep": None,
+        "dealing_range": None,
+    }
 
 
 def test_build_chart_includes_zones_key():
     df = make_ohlcv(200)
-    chart = build_chart(df, "BTCUSDT", "15m", payload=_structure_payload(),
-                        limit=150)
+    chart = build_chart(df, "BTCUSDT", "15m", payload=_structure_payload(), limit=150)
     assert "zones" in chart
     assert len(chart["zones"]["order_blocks"]) == 2
     assert "candles" in chart and len(chart["candles"]) == 150

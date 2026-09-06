@@ -16,6 +16,7 @@ These tests pin every live control to ``SignalDB.live_book_rows()`` —
 decided, non-simulator, canonical-live (legacy NULL provenance kept) — and
 keep a canonical-only book computing exactly as before.
 """
+
 from __future__ import annotations
 
 import time
@@ -31,12 +32,18 @@ from engine.hidden_alpha import kelly_from_rows
 RESEARCH_KEY = "dukascopy:spot:bid"
 
 
-def _paper(db: SignalDB, scan_id: int, *, rr: float = 2.0,
-           rr_net: float | None = None,
-           sim_key: str | None = None,
-           source_key: str | None = LIVE_SOURCE_KEY,
-           ts: int | None = None,
-           mae: float | None = None, mfe: float | None = None) -> None:
+def _paper(
+    db: SignalDB,
+    scan_id: int,
+    *,
+    rr: float = 2.0,
+    rr_net: float | None = None,
+    sim_key: str | None = None,
+    source_key: str | None = LIVE_SOURCE_KEY,
+    ts: int | None = None,
+    mae: float | None = None,
+    mfe: float | None = None,
+) -> None:
     """Insert one decided (CLOSED) paper trade with explicit provenance.
 
     ``rr_net`` defaults to ``rr`` (a cost-free row). These tests isolate rows
@@ -57,10 +64,34 @@ def _paper(db: SignalDB, scan_id: int, *, rr: float = 2.0,
                                     rr_achieved, rr_net, mae, mfe, close_reason,
                                     sim_key, source_key)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (scan_id, f"SIG{scan_id}", "Buy Pullback", "BTCUSDT", "15m", "BUY",
-         100.0, 99.0, 102.0, 2.0, 70, "CLOSED", ts, ts, ts,
-         100.0, 102.0 if rr > 0 else 99.0, outcome, rr, rr_net, mae, mfe,
-         "test", sim_key, source_key))
+        (
+            scan_id,
+            f"SIG{scan_id}",
+            "Buy Pullback",
+            "BTCUSDT",
+            "15m",
+            "BUY",
+            100.0,
+            99.0,
+            102.0,
+            2.0,
+            70,
+            "CLOSED",
+            ts,
+            ts,
+            ts,
+            100.0,
+            102.0 if rr > 0 else 99.0,
+            outcome,
+            rr,
+            rr_net,
+            mae,
+            mfe,
+            "test",
+            sim_key,
+            source_key,
+        ),
+    )
     db.conn.commit()
 
 
@@ -71,10 +102,10 @@ _OLD = _NOW - 10_000_000
 # ── 0. the population itself ───────────────────────────────────────────────
 def test_live_book_rows_is_canonical_non_sim_decided(tmp_path):
     db = SignalDB(tmp_path / "d.db")
-    _paper(db, 1, source_key=LIVE_SOURCE_KEY)              # counts
-    _paper(db, 2, source_key=None)                         # legacy NULL: counts
-    _paper(db, 3, source_key=RESEARCH_KEY)                 # research: out
-    _paper(db, 4, sim_key="BTCUSDT:15m:0:pullback:BUY")    # simulator: out
+    _paper(db, 1, source_key=LIVE_SOURCE_KEY)  # counts
+    _paper(db, 2, source_key=None)  # legacy NULL: counts
+    _paper(db, 3, source_key=RESEARCH_KEY)  # research: out
+    _paper(db, 4, sim_key="BTCUSDT:15m:0:pullback:BUY")  # simulator: out
     rows = db.live_book_rows()
     assert sorted(r["scan_id"] for r in rows) == [1, 2]
     db.close()
@@ -83,9 +114,9 @@ def test_live_book_rows_is_canonical_non_sim_decided(tmp_path):
 # ── 1. daily/weekly loss limits fail closed on the canonical book ─────────
 def test_research_wins_cannot_mask_daily_losses(tmp_path):
     db = SignalDB(tmp_path / "d.db")
-    for i in range(5):                       # −1.25% at student risk 0.25%
+    for i in range(5):  # −1.25% at student risk 0.25%
         _paper(db, 100 + i, rr=-1.0, ts=_NOW)
-    for i in range(6):                       # research profit the desk never made
+    for i in range(6):  # research profit the desk never made
         _paper(db, 200 + i, rr=2.0, source_key=RESEARCH_KEY, ts=_NOW)
     dw = daily_weekly(db)
     # P12.18 added gross_* / cost_r alongside the net figures; assert the
@@ -103,7 +134,7 @@ def test_research_losses_cannot_trip_the_daily_limit(tmp_path):
         _paper(db, 300 + i, rr=-1.0, source_key=RESEARCH_KEY, ts=_NOW)
     dw = daily_weekly(db)
     assert dw["today"]["n"] == 0
-    assert dw["daily_blocked"] is False      # the live desk has not traded
+    assert dw["daily_blocked"] is False  # the live desk has not traded
     db.close()
 
 
@@ -111,7 +142,7 @@ def test_research_losses_cannot_trip_the_daily_limit(tmp_path):
 def test_research_wins_cannot_hide_a_real_drawdown(tmp_path):
     db = SignalDB(tmp_path / "d.db")
     t = _OLD
-    for i in range(24):                      # 24 × 0.25% = 6.0% canonical dd
+    for i in range(24):  # 24 × 0.25% = 6.0% canonical dd
         _paper(db, 400 + i, rr=-1.0, ts=t)
         t += 10
         _paper(db, 500 + i, rr=2.0, source_key=RESEARCH_KEY, ts=t)
@@ -124,7 +155,7 @@ def test_research_wins_cannot_hide_a_real_drawdown(tmp_path):
 
 def test_research_losses_cannot_deepen_the_ladder(tmp_path):
     db = SignalDB(tmp_path / "d.db")
-    for i in range(40):                      # would be 10% dd if it counted
+    for i in range(40):  # would be 10% dd if it counted
         _paper(db, 600 + i, rr=-1.0, source_key=RESEARCH_KEY, ts=_OLD + i)
     dd = drawdown(db)
     assert dd["max_drawdown_pct"] == 0.0
@@ -139,7 +170,7 @@ def test_kelly_from_rows_reads_the_live_book_only(tmp_path):
         _paper(db, 700 + i, rr=2.0, ts=_OLD + i)
     for i in range(8):
         _paper(db, 800 + i, rr=-1.0, ts=_OLD + 100 + i)
-    for i in range(30):                      # research wins must not inflate it
+    for i in range(30):  # research wins must not inflate it
         _paper(db, 900 + i, rr=2.0, source_key=RESEARCH_KEY, ts=_OLD + 200 + i)
     k = kelly_from_rows(db.live_book_rows())
     assert k["n_trades"] == 20
@@ -166,7 +197,7 @@ def test_kelly_advisory_surfaces_through_the_risk_gate(tmp_path):
 
 def test_kelly_judges_net_outcomes_and_stands_aside(tmp_path):
     db = SignalDB(tmp_path / "d.db")
-    for i in range(10):                      # gross winner, net loser (P12.8)
+    for i in range(10):  # gross winner, net loser (P12.8)
         _paper(db, 1000 + i, rr=0.05, rr_net=-0.05, ts=_OLD + i)
     k = kelly_from_rows(db.live_book_rows())
     assert k["stand_aside"] is True
@@ -180,7 +211,7 @@ def test_kelly_empty_book_suggests_nothing(tmp_path):
     k = kelly_from_rows(db.live_book_rows())
     assert k["n_trades"] == 0
     assert k["kelly_size"] is None
-    assert k["stand_aside"] is False         # no suggestion, never a block
+    assert k["stand_aside"] is False  # no suggestion, never a block
     db.close()
 
 
@@ -188,8 +219,9 @@ def test_kelly_empty_book_suggests_nothing(tmp_path):
 def test_mc_and_business_reads_ignore_research_books(tmp_path):
     db = SignalDB(tmp_path / "d.db")
     for i in range(8):
-        _paper(db, 1100 + i, rr=-1.0, source_key=RESEARCH_KEY, ts=_NOW,
-               mae=0.5, mfe=1.5)
+        _paper(
+            db, 1100 + i, rr=-1.0, source_key=RESEARCH_KEY, ts=_NOW, mae=0.5, mfe=1.5
+        )
     assert monte_carlo_ruin_table(db, samples=20, seed=1)["available"] is False
     assert monte_carlo_equity(db, samples=20, seed=1)["available"] is False
     assert mae_mfe_summary(db)["available"] is False
@@ -274,6 +306,5 @@ def test_canonical_only_book_is_unchanged(tmp_path):
     assert dw["daily_blocked"] is False
     # identical to the unfiltered read on this book — strictly a no-op here
     pooled = db.decided_paper_rows(exclude_sim=True)
-    assert [r["scan_id"] for r in db.live_book_rows()] == \
-           [r["scan_id"] for r in pooled]
+    assert [r["scan_id"] for r in db.live_book_rows()] == [r["scan_id"] for r in pooled]
     db.close()

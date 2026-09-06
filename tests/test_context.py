@@ -1,7 +1,6 @@
 """Tests for the market-context layer (network mocked / offline)."""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from brain import context as ctx_mod
 
@@ -9,7 +8,12 @@ from brain import context as ctx_mod
 def test_cycle_phase_deterministic():
     c = ctx_mod.cycle()
     assert c["available"] is True
-    assert c["phase"] in ("early-post-halving", "expansion", "late-cycle", "pre-halving")
+    assert c["phase"] in (
+        "early-post-halving",
+        "expansion",
+        "late-cycle",
+        "pre-halving",
+    )
     assert c["days_since_halving"] > 0
     # position proxy only when price+sma given
     assert c["position_vs_200d"] is None
@@ -78,14 +82,21 @@ def test_risk_regime_off():
 
 def test_collect_degrades_without_network(monkeypatch):
     """collect() must never raise even if every external API fails."""
+
     def unavailable(*a, **k):
         return {"available": False}
+
     monkeypatch.setattr(ctx_mod, "fear_greed", unavailable)
     monkeypatch.setattr(ctx_mod, "dominance", unavailable)
     monkeypatch.setattr(ctx_mod, "equities", unavailable)
-    monkeypatch.setattr(ctx_mod, "macro_events", lambda: {"available": True,
-                                                          "events": [], "high_impact_imminent": False})
-    monkeypatch.setattr(ctx_mod, "cycle", lambda *a, **k: {"available": True, "phase": "expansion"})
+    monkeypatch.setattr(
+        ctx_mod,
+        "macro_events",
+        lambda: {"available": True, "events": [], "high_impact_imminent": False},
+    )
+    monkeypatch.setattr(
+        ctx_mod, "cycle", lambda *a, **k: {"available": True, "phase": "expansion"}
+    )
     monkeypatch.setattr(ctx_mod, "fetch_news", lambda limit=15: {"headlines": []})
     c = ctx_mod.collect()
     assert c["fear_greed"]["available"] is False

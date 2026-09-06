@@ -3,20 +3,16 @@
 import os
 import tempfile
 from pathlib import Path
-import pytest
-from flask import Flask
 
-from data.database import SignalDB
-from data.push_notifications import (
-    get_or_create_vapid_keys,
-    get_vapid_public_key,
-    create_vapid_jwt,
-    send_web_push,
-    broadcast_push_notification,
-)
+import pytest
+
 from brain.analytics import r_distribution
 from brain.connections import _probe_webpush
-from brain.decision import build_decision
+from data.database import SignalDB
+from data.push_notifications import (
+    create_vapid_jwt,
+    get_or_create_vapid_keys,
+)
 from web.app import make_app
 
 
@@ -68,7 +64,9 @@ def test_vapid_jwt_creation(tmp_vapid_key):
 
 def test_push_subscriptions_db(tmp_db):
     ep = "https://push.example.com/sub/1"
-    res = tmp_db.save_push_subscription(ep, p256dh="test_p256dh", auth="test_auth", user_agent="PyTest")
+    res = tmp_db.save_push_subscription(
+        ep, p256dh="test_p256dh", auth="test_auth", user_agent="PyTest"
+    )
     assert res["ok"] is True
 
     subs = tmp_db.list_push_subscriptions()
@@ -83,7 +81,11 @@ def test_push_subscriptions_db(tmp_db):
 
 def test_risk_veto_db_and_decision(tmp_db):
     res = tmp_db.record_risk_veto(
-        symbol="BTCUSDT", setup="breakout", action="BUY", reason="Daily loss limit reached", veto_type="risk_gate"
+        symbol="BTCUSDT",
+        setup="breakout",
+        action="BUY",
+        reason="Daily loss limit reached",
+        veto_type="risk_gate",
     )
     assert res["id"] > 0
 
@@ -105,12 +107,40 @@ def test_r_distribution_with_trades(tmp_db):
     tmp_db.conn.execute(
         "INSERT INTO paper_trades (scan_id, plan_type, symbol, timeframe, action, entry, stop_loss, take_profit, status, outcome, rr_achieved, closed_ts, source_key) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (1, "trend", "BTCUSDT", "15m", "BUY", 50000, 49000, 52000, "CLOSED", "TP_HIT", 2.0, now, "")
+        (
+            1,
+            "trend",
+            "BTCUSDT",
+            "15m",
+            "BUY",
+            50000,
+            49000,
+            52000,
+            "CLOSED",
+            "TP_HIT",
+            2.0,
+            now,
+            "",
+        ),
     )
     tmp_db.conn.execute(
         "INSERT INTO paper_trades (scan_id, plan_type, symbol, timeframe, action, entry, stop_loss, take_profit, status, outcome, rr_achieved, closed_ts, source_key) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (2, "reversal", "ETHUSDT", "15m", "SELL", 3000, 3100, 2800, "CLOSED", "STOP_LOSS", -1.0, now + 100, "")
+        (
+            2,
+            "reversal",
+            "ETHUSDT",
+            "15m",
+            "SELL",
+            3000,
+            3100,
+            2800,
+            "CLOSED",
+            "STOP_LOSS",
+            -1.0,
+            now + 100,
+            "",
+        ),
     )
     tmp_db.conn.commit()
 
@@ -132,7 +162,7 @@ def test_push_endpoints(app_client):
     # Subscribe endpoint
     sub_payload = {
         "endpoint": "https://fcm.googleapis.com/fcm/send/client_test_123",
-        "keys": {"p256dh": "dummy_p256dh_key", "auth": "dummy_auth_key"}
+        "keys": {"p256dh": "dummy_p256dh_key", "auth": "dummy_auth_key"},
     }
     sub_resp = app_client.post("/api/push/subscribe", json=sub_payload)
     assert sub_resp.status_code == 200
@@ -144,7 +174,9 @@ def test_push_endpoints(app_client):
     assert test_resp.get_json()["ok"] is True
 
     # Unsubscribe endpoint
-    unsub_resp = app_client.post("/api/push/unsubscribe", json={"endpoint": sub_payload["endpoint"]})
+    unsub_resp = app_client.post(
+        "/api/push/unsubscribe", json={"endpoint": sub_payload["endpoint"]}
+    )
     assert unsub_resp.status_code == 200
     assert unsub_resp.get_json()["ok"] is True
 
@@ -174,7 +206,12 @@ def test_connection_probe_webpush():
 
 def test_generated_pwa_icons_exist():
     icons_dir = Path(__file__).parent.parent / "web" / "static" / "icons"
-    for icon_name in ["icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]:
+    for icon_name in [
+        "icon-180.png",
+        "icon-192.png",
+        "icon-512.png",
+        "icon-maskable-512.png",
+    ]:
         p = icons_dir / icon_name
         assert p.exists()
         assert p.stat().st_size > 1000

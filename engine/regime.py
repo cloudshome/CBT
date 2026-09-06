@@ -3,9 +3,9 @@
 Identifies market environment (Trending Bull/Bear, Ranging, Volatility Compression/Expansion,
 Liquidity Trap / Chop) and filters fake breakouts (Swing Failure Patterns, volume divergence).
 """
+
 from __future__ import annotations
 
-from typing import Optional
 import numpy as np
 import pandas as pd
 
@@ -47,7 +47,9 @@ def classify_market_regime(df: pd.DataFrame, features: dict) -> dict:
     lows = tail["low"].astype(float).values
     opens = tail["open"].astype(float).values
     closes = tail["close"].astype(float).values
-    volumes = tail["volume"].astype(float).values if "volume" in tail else np.ones(len(tail))
+    volumes = (
+        tail["volume"].astype(float).values if "volume" in tail else np.ones(len(tail))
+    )
 
     ranges = np.maximum(highs - lows, 1e-9)
     bodies = np.abs(closes - opens)
@@ -74,7 +76,9 @@ def classify_market_regime(df: pd.DataFrame, features: dict) -> dict:
         fake_breakout_down = True
 
     # Low-volume breakout warning
-    volume_exhaustion = (last_h > np.max(highs[:-1]) or last_l < np.min(lows[:-1])) and (last_v < avg_v * 0.7)
+    volume_exhaustion = (
+        last_h > np.max(highs[:-1]) or last_l < np.min(lows[:-1])
+    ) and (last_v < avg_v * 0.7)
     fake_breakout = fake_breakout_up or fake_breakout_down or volume_exhaustion
 
     # 2. Liquidity Void / Imbalance spike
@@ -83,8 +87,9 @@ def classify_market_regime(df: pd.DataFrame, features: dict) -> dict:
         # Large displacement candle with minimal overlap
         prev_h = highs[-2]
         prev_l = lows[-2]
-        if (last_c > prev_h and bodies[-1] > np.mean(bodies) * 2.2) or \
-           (last_c < prev_l and bodies[-1] > np.mean(bodies) * 2.2):
+        if (last_c > prev_h and bodies[-1] > np.mean(bodies) * 2.2) or (
+            last_c < prev_l and bodies[-1] > np.mean(bodies) * 2.2
+        ):
             liquidity_void = True
 
     # 3. Volatility State
@@ -128,7 +133,13 @@ def classify_market_regime(df: pd.DataFrame, features: dict) -> dict:
         "label": label,
         "trap_detected": trap_detected,
         "fake_breakout": fake_breakout,
-        "fake_breakout_type": "Bearish SFP" if fake_breakout_up else "Bullish SFP" if fake_breakout_down else "Volume Divergence" if volume_exhaustion else "None",
+        "fake_breakout_type": "Bearish SFP"
+        if fake_breakout_up
+        else "Bullish SFP"
+        if fake_breakout_down
+        else "Volume Divergence"
+        if volume_exhaustion
+        else "None",
         "liquidity_void": liquidity_void,
         "volatility_state": volatility_state,
         "wick_ratio": round(float(wick_ratio), 3),

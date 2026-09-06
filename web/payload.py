@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import time
 
-import config
 from config import BARS, DEFAULT_RISK_REWARD, MIN_CONFIDENCE, SYMBOL
 from data.sample_client import maybe_client
 from data.symbols import normalize_symbol, resolve_symbol
@@ -31,7 +30,9 @@ from engine.signal_engine import analyze_frame
 from output.signal_schema import validate_output
 
 _CACHE: dict = {"payload": None, "ts": 0, "ttl": 40}
-_LAST_GOOD: dict[tuple[str, str], dict] = {}   # last successful payload by (symbol, timeframe)
+_LAST_GOOD: dict[
+    tuple[str, str], dict
+] = {}  # last successful payload by (symbol, timeframe)
 
 _SCAN_TIMEOUT = 45  # seconds — hard cap on a full analysis; fall back below
 
@@ -49,8 +50,10 @@ def _source_key_param(value):
         return None
     if text in ("live", "canonical", "binance", "default"):
         from data.provenance import LIVE_SOURCE_KEY
+
         return LIVE_SOURCE_KEY
     from data.provenance import parse_source_key, source_key
+
     return source_key(*parse_source_key(text))
 
 
@@ -63,6 +66,7 @@ def _sanitize_for_json(obj):
     keeps every engine endpoint 200-safe.
     """
     import numpy as np
+
     if isinstance(obj, dict):
         return {k: _sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
@@ -93,8 +97,11 @@ def _scan_row_to_payload(row: dict | None) -> dict:
     if not row:
         return {}
     features, plans, context = {}, [], {}
-    for key, target in (("features_json", "features"), ("plans_json", "plans"),
-                        ("context_json", "context")):
+    for key, target in (
+        ("features_json", "features"),
+        ("plans_json", "plans"),
+        ("context_json", "context"),
+    ):
         raw = row.get(key)
         if not raw:
             continue
@@ -111,20 +118,30 @@ def _scan_row_to_payload(row: dict | None) -> dict:
     return {
         "scan_id": row.get("id"),
         "signal": {
-            "signal_id": row.get("signal_id"), "timestamp": row.get("ts"),
-            "asset": row.get("symbol"), "timeframe": row.get("timeframe"),
-            "action": row.get("action"), "entry": row.get("entry"),
-            "stop_loss": row.get("stop_loss"), "take_profit": row.get("take_profit"),
+            "signal_id": row.get("signal_id"),
+            "timestamp": row.get("ts"),
+            "asset": row.get("symbol"),
+            "timeframe": row.get("timeframe"),
+            "action": row.get("action"),
+            "entry": row.get("entry"),
+            "stop_loss": row.get("stop_loss"),
+            "take_profit": row.get("take_profit"),
             "risk_reward": row.get("risk_reward"),
             "confidence": row.get("confidence_label"),
-            "reason": row.get("reason"), "signal_type": row.get("signal_type"),
+            "reason": row.get("reason"),
+            "signal_type": row.get("signal_type"),
         },
         "plans": plans,
-        "snapshot": {"features": {**features, "regime_label": row.get("regime")},
-                     "scores": {}},
+        "snapshot": {
+            "features": {**features, "regime_label": row.get("regime")},
+            "scores": {},
+        },
         "context": context,
         "intelligence": {"regime_label": row.get("regime")},
-        "lifecycle": {"status": row.get("status"), "note": row.get("approve_note") or ""},
+        "lifecycle": {
+            "status": row.get("status"),
+            "note": row.get("approve_note") or "",
+        },
     }
 
 
@@ -132,6 +149,7 @@ def _attach_management(payload: dict) -> dict:
     """P13/P14: attach the HOLD/REDUCE/TRAIL/EXIT card to a scan payload."""
     try:
         from brain.coach import management_checklist
+
         plans = payload.get("plans") or []
         payload["management"] = management_checklist(plans[0] if plans else None)
     except Exception:
@@ -144,6 +162,7 @@ def _persist(payload: dict) -> tuple[int, str]:
     (scan_id, lifecycle_status)."""
     from data.database import SignalDB
     from engine.lifecycle import reviewable
+
     sig = payload.get("signal", {})
     decision = payload.get("decision") or {}
     # Desk-first (decision A4): desk-vetoed signals never enter the queue.
@@ -162,10 +181,13 @@ def _persist(payload: dict) -> tuple[int, str]:
     if status == "CREATED" and decision and decision.get("blocked_by"):
         note = "DESK BLOCKED — " + "; ".join(decision["blocked_by"])
     else:
-        note = ("awaiting human approval — click Approve / Reject"
-                if status == "PENDING_REVIEW" else
-                "monitor-only signal (no action required)" if status == "CREATED" else
-                f"current state: {status}")
+        note = (
+            "awaiting human approval — click Approve / Reject"
+            if status == "PENDING_REVIEW"
+            else "monitor-only signal (no action required)"
+            if status == "CREATED"
+            else f"current state: {status}"
+        )
     payload["lifecycle"] = {"status": status, "note": note}
     return scan_id, status
 
@@ -174,6 +196,7 @@ def _basic_scan(symbol: str, tf: str, save: bool) -> dict:
     """Engine-only quick scan (no MTF/context) — the guaranteed fallback so the
     dashboard always shows data even if external sources are unreachable."""
     import threading
+
     symbol = _sym(symbol)
     result: dict = {}
 
@@ -181,20 +204,29 @@ def _basic_scan(symbol: str, tf: str, save: bool) -> dict:
         try:
             client = maybe_client()
             df = client.klines(symbol, tf, bars=BARS)
-            out = analyze_frame(df, symbol=symbol, timeframe=tf,
-                                min_confidence=MIN_CONFIDENCE,
-                                default_rr=DEFAULT_RISK_REWARD)
+            out = analyze_frame(
+                df,
+                symbol=symbol,
+                timeframe=tf,
+                min_confidence=MIN_CONFIDENCE,
+                default_rr=DEFAULT_RISK_REWARD,
+            )
             payload = out.as_json()
             payload["market_context"] = client.market_context(symbol)
-            payload["market_context"]["fallback_note"] = "futures not fully checked (fallback mode)"
+            payload["market_context"]["fallback_note"] = (
+                "futures not fully checked (fallback mode)"
+            )
             try:
                 from brain.trading_intelligence import build_intelligence
+
                 payload["intelligence"] = build_intelligence(payload, df=df)
             except Exception:
                 pass
             payload["validation"] = validate_output(payload)
             payload["degraded"] = True
-            payload["degraded_reason"] = "full analysis timed out — showing engine-only signal"
+            payload["degraded_reason"] = (
+                "full analysis timed out — showing engine-only signal"
+            )
             _attach_management(payload)
             result["payload"] = payload
         except Exception as exc:  # pragma: no cover
@@ -221,32 +253,55 @@ def _attach_sentiment(payload: dict, symbol: str, tf: str) -> dict:
     scan payload. Never raises — sentiment is a display aid, not a gate."""
     try:
         from engine.sentiment import current_sentiment_safe
+
         payload["sentiment"] = current_sentiment_safe(symbol, tf, payload)
     except Exception:  # pragma: no cover — defensive only
-        payload.setdefault("sentiment", {"available": False, "score": 0.0,
-                                         "direction": "neutral", "label": "NO DATA",
-                                         "color": "#5f6d84", "intensity": 0.0})
+        payload.setdefault(
+            "sentiment",
+            {
+                "available": False,
+                "score": 0.0,
+                "direction": "neutral",
+                "label": "NO DATA",
+                "color": "#5f6d84",
+                "intensity": 0.0,
+            },
+        )
     return payload
 
 
-def compute_payload(symbol: str, tf: str, save: bool = True, use_cache: bool = True) -> dict:
+def compute_payload(
+    symbol: str, tf: str, save: bool = True, use_cache: bool = True
+) -> dict:
     symbol = _sym(symbol)
-    if use_cache and _CACHE["payload"] and _CACHE["payload"].get("signal", {}).get("asset") == symbol \
-            and _CACHE["payload"].get("signal", {}).get("timeframe") == tf \
-            and time.time() - _CACHE["ts"] < _CACHE["ttl"]:
+    if (
+        use_cache
+        and _CACHE["payload"]
+        and _CACHE["payload"].get("signal", {}).get("asset") == symbol
+        and _CACHE["payload"].get("signal", {}).get("timeframe") == tf
+        and time.time() - _CACHE["ts"] < _CACHE["ttl"]
+    ):
         return _CACHE["payload"]
 
     # Run the full analysis (MTF + context + styles + memory) in a watchdog
     # thread: if it exceeds _SCAN_TIMEOUT we fall back to the engine-only scan.
     import threading
+
     result: dict = {}
 
     def _work():
         try:
             from brain.full_pipeline import analyze_full
+
             client = maybe_client()
-            payload = analyze_full(symbol, tf, bars=BARS, client=client,
-                                   with_context=True, with_memory=True)
+            payload = analyze_full(
+                symbol,
+                tf,
+                bars=BARS,
+                client=client,
+                with_context=True,
+                with_memory=True,
+            )
             payload["validation"] = validate_output(payload)
             result["payload"] = payload
         except Exception as exc:  # pragma: no cover
@@ -272,17 +327,32 @@ def compute_payload(symbol: str, tf: str, save: bool = True, use_cache: bool = T
         except Exception as exc:
             spec = resolve_symbol(symbol)
             payload = {
-                "signal": {"signal_id": f"{symbol}_{int(time.time()*1000)}",
-                           "timestamp": int(time.time()*1000), "asset": symbol,
-                           "action": "NO TRADE", "entry": None, "stop_loss": None,
-                           "take_profit": None, "risk_reward": 0,
-                           "confidence": "LOW", "timeframe": tf,
-                           "reason": f"scan failed: {exc}", "signal_type": "ERROR"},
-                "plans": [], "snapshot": {"features": {}, "scores": {}},
-                "market_context": {"symbol": spec.symbol, "data_symbol": spec.data_symbol,
-                                   "market": spec.market, "provider": spec.provider,
-                                   "futures": False, "note": spec.note or "not checked"},
-                "error": str(exc), "lifecycle": {"status": "ERROR", "note": str(exc)},
+                "signal": {
+                    "signal_id": f"{symbol}_{int(time.time() * 1000)}",
+                    "timestamp": int(time.time() * 1000),
+                    "asset": symbol,
+                    "action": "NO TRADE",
+                    "entry": None,
+                    "stop_loss": None,
+                    "take_profit": None,
+                    "risk_reward": 0,
+                    "confidence": "LOW",
+                    "timeframe": tf,
+                    "reason": f"scan failed: {exc}",
+                    "signal_type": "ERROR",
+                },
+                "plans": [],
+                "snapshot": {"features": {}, "scores": {}},
+                "market_context": {
+                    "symbol": spec.symbol,
+                    "data_symbol": spec.data_symbol,
+                    "market": spec.market,
+                    "provider": spec.provider,
+                    "futures": False,
+                    "note": spec.note or "not checked",
+                },
+                "error": str(exc),
+                "lifecycle": {"status": "ERROR", "note": str(exc)},
             }
             _attach_sentiment(payload, symbol, tf)
         _CACHE.update(payload=payload, ts=time.time())

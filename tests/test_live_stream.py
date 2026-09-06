@@ -11,6 +11,7 @@ that contract without a network or a real clock:
     going (a transient hiccup must not force a browser reconnect);
   * nothing NumPy/Pandas-shaped can reach ``json.dumps``.
 """
+
 from __future__ import annotations
 
 import json
@@ -22,8 +23,18 @@ from web import live_stream as ls
 
 
 def _df(ts: int, close: float = 100.0, volume: float = 5.0):
-    return pd.DataFrame([{"ts": ts * 1000, "open": 99.0, "high": 101.0,
-                          "low": 98.0, "close": close, "volume": volume}])
+    return pd.DataFrame(
+        [
+            {
+                "ts": ts * 1000,
+                "open": 99.0,
+                "high": 101.0,
+                "low": 98.0,
+                "close": close,
+                "volume": volume,
+            }
+        ]
+    )
 
 
 def _parse(frames: list[str]) -> list[tuple[str, dict]]:
@@ -33,7 +44,7 @@ def _parse(frames: list[str]) -> list[tuple[str, dict]]:
         assert lines[0].startswith("id: "), frame
         assert lines[1].startswith("event: "), frame
         assert lines[2].startswith("data: "), frame
-        out.append((lines[1][len("event: "):], json.loads(lines[2][len("data: "):])))
+        out.append((lines[1][len("event: ") :], json.loads(lines[2][len("data: ") :])))
     return out
 
 
@@ -52,11 +63,11 @@ class _Clock:
 
 # ── the cadence itself ────────────────────────────────────────────────────
 def test_poll_interval_is_bounded_on_both_ends():
-    assert ls.poll_interval("1m") == pytest.approx(10.0)      # 60/6
-    assert ls.poll_interval("1d") == ls.MAX_INTERVAL          # clamped down
+    assert ls.poll_interval("1m") == pytest.approx(10.0)  # 60/6
+    assert ls.poll_interval("1d") == ls.MAX_INTERVAL  # clamped down
     assert ls.MIN_INTERVAL <= ls.poll_interval("5m") <= ls.MAX_INTERVAL
-    assert ls.poll_interval("nonsense") == ls.MAX_INTERVAL    # unknown tf → slowest
-    assert ls.stale_after("1m") == pytest.approx(120.0)       # 2 × the timeframe
+    assert ls.poll_interval("nonsense") == ls.MAX_INTERVAL  # unknown tf → slowest
+    assert ls.stale_after("1m") == pytest.approx(120.0)  # 2 × the timeframe
     # an unknown timeframe falls back to the 15m budget, never to "never"
     assert ls.stale_after("nonsense") == pytest.approx(1800.0)
     assert ls.stale_after("1m") >= ls.MIN_STALE_AFTER
@@ -66,9 +77,15 @@ def test_poll_interval_is_bounded_on_both_ends():
 # ── frame content ─────────────────────────────────────────────────────────
 def test_last_candle_is_json_safe_and_none_on_empty():
     bar = ls.last_candle(_df(1_780_000_000, close=63500.5))
-    assert bar == {"time": 1_780_000_000, "open": 99.0, "high": 101.0,
-                   "low": 98.0, "close": 63500.5, "volume": 5.0}
-    json.dumps(bar)                     # would raise on a NumPy scalar
+    assert bar == {
+        "time": 1_780_000_000,
+        "open": 99.0,
+        "high": 101.0,
+        "low": 98.0,
+        "close": 63500.5,
+        "volume": 5.0,
+    }
+    json.dumps(bar)  # would raise on a NumPy scalar
     assert ls.last_candle(pd.DataFrame()) is None
     assert ls.last_candle(None) is None
 
@@ -80,9 +97,19 @@ def test_a_changed_bar_streams_a_candle_frame():
     def fetch(symbol, tf, limit):
         return _df(1_780_000_000, close=next(prices))
 
-    frames = _parse(list(ls.candle_events(
-        fetch, "BTCUSDT", "15m", interval=5, max_frames=3,
-        sleep=clock.sleep, clock=clock.now)))
+    frames = _parse(
+        list(
+            ls.candle_events(
+                fetch,
+                "BTCUSDT",
+                "15m",
+                interval=5,
+                max_frames=3,
+                sleep=clock.sleep,
+                clock=clock.now,
+            )
+        )
+    )
     kinds = [(event, data["state"]) for event, data in frames]
     assert kinds == [("candle", "live"), ("status", "waiting"), ("candle", "live")]
     assert frames[0][1]["candle"]["close"] == 100.0
@@ -97,9 +124,19 @@ def test_an_unchanging_feed_calls_itself_stale():
     def fetch(symbol, tf, limit):
         return _df(1_780_000_000, close=100.0)
 
-    frames = _parse(list(ls.candle_events(
-        fetch, "BTCUSDT", "1m", interval=60, max_frames=4,
-        sleep=clock.sleep, clock=clock.now)))
+    frames = _parse(
+        list(
+            ls.candle_events(
+                fetch,
+                "BTCUSDT",
+                "1m",
+                interval=60,
+                max_frames=4,
+                sleep=clock.sleep,
+                clock=clock.now,
+            )
+        )
+    )
     states = [data["state"] for _, data in frames]
     # a 1m chart tolerates 2 bars of silence (120s), then says so
     assert states == ["live", "waiting", "waiting", "stale"]
@@ -118,9 +155,19 @@ def test_a_broken_source_reports_and_keeps_streaming():
             raise ConnectionError("binance unreachable")
         return _df(1_780_000_000, close=100.0)
 
-    frames = _parse(list(ls.candle_events(
-        fetch, "BTCUSDT", "15m", interval=5, max_frames=3,
-        sleep=clock.sleep, clock=clock.now)))
+    frames = _parse(
+        list(
+            ls.candle_events(
+                fetch,
+                "BTCUSDT",
+                "15m",
+                interval=5,
+                max_frames=3,
+                sleep=clock.sleep,
+                clock=clock.now,
+            )
+        )
+    )
     assert [data["state"] for _, data in frames] == ["error", "error", "live"]
     assert "binance unreachable" in frames[0][1]["message"]
     # the retry backed off instead of hammering the dead source
@@ -129,18 +176,36 @@ def test_a_broken_source_reports_and_keeps_streaming():
 
 def test_an_empty_source_is_an_error_not_a_silent_stream():
     clock = _Clock()
-    frames = _parse(list(ls.candle_events(
-        lambda *a: pd.DataFrame(), "BTCUSDT", "15m", interval=5, max_frames=1,
-        sleep=clock.sleep, clock=clock.now)))
+    frames = _parse(
+        list(
+            ls.candle_events(
+                lambda *a: pd.DataFrame(),
+                "BTCUSDT",
+                "15m",
+                interval=5,
+                max_frames=1,
+                sleep=clock.sleep,
+                clock=clock.now,
+            )
+        )
+    )
     assert frames[0][1]["state"] == "error"
     assert "no candle" in frames[0][1]["message"]
 
 
 def test_frames_carry_an_id_so_a_reconnect_resumes_on_the_same_bar():
     clock = _Clock()
-    frames = list(ls.candle_events(
-        lambda *a: _df(1_780_000_000), "BTCUSDT", "15m", interval=5,
-        max_frames=1, sleep=clock.sleep, clock=clock.now))
+    frames = list(
+        ls.candle_events(
+            lambda *a: _df(1_780_000_000),
+            "BTCUSDT",
+            "15m",
+            interval=5,
+            max_frames=1,
+            sleep=clock.sleep,
+            clock=clock.now,
+        )
+    )
     assert frames[0].startswith("id: BTCUSDT:15m:1780000000:live")
 
 
@@ -150,8 +215,10 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "stream.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "stream.db"))
     from web.app import make_app
+
     app = make_app()
     app.testing = True
     return app.test_client()
@@ -164,7 +231,7 @@ def test_chart_stream_endpoint_speaks_sse(client):
     assert resp.headers["Cache-Control"] == "no-cache"
     body = resp.get_data(as_text=True)
     assert "event: candle" in body or "event: status" in body
-    payload = json.loads(body.strip().splitlines()[2][len("data: "):])
+    payload = json.loads(body.strip().splitlines()[2][len("data: ") :])
     assert payload["symbol"] == "BTCUSDT" and payload["tf"] == "15m"
     assert payload["state"] in {"live", "waiting", "stale", "error"}
 

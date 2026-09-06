@@ -23,13 +23,14 @@ If a future session adds order placement, it must be a separate, explicitly
 named module with its own human confirmation — never an extension of this one.
 See ``HANDOVER.md``.
 """
+
 from __future__ import annotations
 
 import hashlib
 import hmac
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 import requests
@@ -44,9 +45,14 @@ READ_ONLY_PATHS = {
 # Exchange permission strings that mean the key can move money. Any of these
 # present on the key → refuse the connection.
 DANGEROUS_PERMISSIONS = {
-    "SPOT_TRADING", "MARGIN_TRADING", "FUTURES_TRADING", "WITHDRAWALS",
-    "ENABLE_SPOT_AND_MARGIN_TRADING", "ENABLE_WITHDRAWALS",
-    "ENABLE_FUTURES", "ENABLE_MARGIN",
+    "SPOT_TRADING",
+    "MARGIN_TRADING",
+    "FUTURES_TRADING",
+    "WITHDRAWALS",
+    "ENABLE_SPOT_AND_MARGIN_TRADING",
+    "ENABLE_WITHDRAWALS",
+    "ENABLE_FUTURES",
+    "ENABLE_MARGIN",
 }
 
 RECV_WINDOW = 5000
@@ -70,14 +76,24 @@ class ExchangeAccount:
     rest of the desk continues on public market data.
     """
 
-    def __init__(self, api_key: str | None = None, api_secret: str | None = None,
-                 base_url: str | None = None, timeout: int = TIMEOUT):
-        self.api_key = (api_key if api_key is not None
-                        else os.getenv("BINANCE_READ_API_KEY", "")).strip()
-        self.api_secret = (api_secret if api_secret is not None
-                           else os.getenv("BINANCE_READ_API_SECRET", "")).strip()
-        self.base_url = (base_url or os.getenv("BINANCE_ACCOUNT_HOST")
-                         or "https://api.binance.com").rstrip("/")
+    def __init__(
+        self,
+        api_key: str | None = None,
+        api_secret: str | None = None,
+        base_url: str | None = None,
+        timeout: int = TIMEOUT,
+    ):
+        self.api_key = (
+            api_key if api_key is not None else os.getenv("BINANCE_READ_API_KEY", "")
+        ).strip()
+        self.api_secret = (
+            api_secret
+            if api_secret is not None
+            else os.getenv("BINANCE_READ_API_SECRET", "")
+        ).strip()
+        self.base_url = (
+            base_url or os.getenv("BINANCE_ACCOUNT_HOST") or "https://api.binance.com"
+        ).rstrip("/")
         self.timeout = timeout
 
     # ── plumbing ─────────────────────────────────────────────────────────
@@ -87,15 +103,17 @@ class ExchangeAccount:
 
     def _sign(self, params: dict) -> str:
         query = urlencode(params)
-        signature = hmac.new(self.api_secret.encode(), query.encode(),
-                             hashlib.sha256).hexdigest()
+        signature = hmac.new(
+            self.api_secret.encode(), query.encode(), hashlib.sha256
+        ).hexdigest()
         return f"{query}&signature={signature}"
 
     def _signed_get(self, path: str, params: dict | None = None) -> Any:
         """The ONLY request primitive in this module. GET, allow-listed."""
         if path not in READ_ONLY_PATHS:
             raise ExchangeAccountError(
-                f"{path} is not in the read-only allow-list — refusing to sign it")
+                f"{path} is not in the read-only allow-list — refusing to sign it"
+            )
         if not self.configured:
             raise ExchangeAccountError("no read-only API key configured")
         payload = dict(params or {})
@@ -103,18 +121,24 @@ class ExchangeAccount:
         payload["recvWindow"] = RECV_WINDOW
         url = f"{self.base_url}{path}?{self._sign(payload)}"
         try:
-            resp = requests.get(url, headers={"X-MBX-APIKEY": self.api_key},
-                                timeout=self.timeout)
+            resp = requests.get(
+                url, headers={"X-MBX-APIKEY": self.api_key}, timeout=self.timeout
+            )
         except requests.RequestException as exc:
             raise ExchangeAccountError(f"{type(exc).__name__}: {exc}") from exc
         if resp.status_code == 401:
-            raise ExchangeAccountError("exchange rejected the key (401) — "
-                                       "check the key, secret and IP allow-list")
+            raise ExchangeAccountError(
+                "exchange rejected the key (401) — "
+                "check the key, secret and IP allow-list"
+            )
         if resp.status_code == 418 or resp.status_code == 429:
-            raise ExchangeAccountError("rate-limited by the exchange — try again shortly")
+            raise ExchangeAccountError(
+                "rate-limited by the exchange — try again shortly"
+            )
         if resp.status_code >= 400:
             raise ExchangeAccountError(
-                f"exchange returned {resp.status_code}: {resp.text[:160]}")
+                f"exchange returned {resp.status_code}: {resp.text[:160]}"
+            )
         return resp.json()
 
     # ── read-only reads ──────────────────────────────────────────────────
@@ -141,18 +165,28 @@ class ExchangeAccount:
             total = free + locked
             if total <= min_value:
                 continue
-            out.append({"asset": row.get("asset"), "free": free,
-                        "locked": locked, "total": total})
+            out.append(
+                {
+                    "asset": row.get("asset"),
+                    "free": free,
+                    "locked": locked,
+                    "total": total,
+                }
+            )
         out.sort(key=lambda r: r["total"], reverse=True)
         return out
 
     def snapshot(self) -> dict:
         """Everything the dashboard's Connections card needs, in one call."""
         if not self.configured:
-            return {"configured": False, "connected": False,
-                    "note": "no read-only API key set — the desk runs on public "
-                            "market data only",
-                    "balances": [], "open_orders": []}
+            return {
+                "configured": False,
+                "connected": False,
+                "note": "no read-only API key set — the desk runs on public "
+                "market data only",
+                "balances": [],
+                "open_orders": [],
+            }
         try:
             acct = self.account()
             permissions = _permissions(acct)
@@ -163,8 +197,14 @@ class ExchangeAccount:
                 locked = float(row.get("locked") or 0)
                 if free + locked <= 0:
                     continue
-                balances.append({"asset": row.get("asset"), "free": free,
-                                 "locked": locked, "total": free + locked})
+                balances.append(
+                    {
+                        "asset": row.get("asset"),
+                        "free": free,
+                        "locked": locked,
+                        "total": free + locked,
+                    }
+                )
             balances.sort(key=lambda r: r["total"], reverse=True)
             orders = self.open_orders()
             return {
@@ -181,14 +221,22 @@ class ExchangeAccount:
                 "open_orders": orders,
                 "open_order_count": len(orders),
                 "demo": _demo(),
-                "warning": (None if safe else
-                            "This key can TRADE or WITHDRAW. SKY will not use it "
-                            "for anything except reading — but replace it with a "
-                            "read-only key."),
+                "warning": (
+                    None
+                    if safe
+                    else "This key can TRADE or WITHDRAW. SKY will not use it "
+                    "for anything except reading — but replace it with a "
+                    "read-only key."
+                ),
             }
         except ExchangeAccountError as exc:
-            return {"configured": True, "connected": False, "error": str(exc),
-                    "balances": [], "open_orders": []}
+            return {
+                "configured": True,
+                "connected": False,
+                "error": str(exc),
+                "balances": [],
+                "open_orders": [],
+            }
 
 
 def _permissions(account: dict) -> set[str]:
@@ -215,14 +263,18 @@ def assert_read_only_key(account: dict) -> None:
     safe, danger = _is_read_only(_permissions(account))
     if not safe:
         raise ExchangeAccountError(
-            "this API key has " + ", ".join(sorted(danger)) +
-            " permission — create a NEW key with only 'Enable Reading' ticked")
+            "this API key has "
+            + ", ".join(sorted(danger))
+            + " permission — create a NEW key with only 'Enable Reading' ticked"
+        )
 
 
 def _demo_account() -> dict:
     """Deterministic offline account so the UI is demonstrable with no key."""
     return {
-        "accountType": "SPOT", "canTrade": False, "canWithdraw": False,
+        "accountType": "SPOT",
+        "canTrade": False,
+        "canWithdraw": False,
         "permissions": ["SPOT_READ"],
         "balances": [
             {"asset": "USDT", "free": "1000.00000000", "locked": "0.00000000"},

@@ -6,6 +6,7 @@ This checkout still cannot sign or install. The module only:
 - refuses to mark a drill passed without every required field
 - never claims P22 complete from Linux CI or empty files
 """
+
 from __future__ import annotations
 
 import json
@@ -30,8 +31,13 @@ DRILLS: dict[str, dict[str, Any]] = {
         "kind": "signing",
         "title": "Sign Debian repository metadata",
         "required": (
-            "operator", "host", "key_id_last4", "inrelease_sha256",
-            "release_gpg_sha256", "deb_sha256", "verified_on_clean_vm",
+            "operator",
+            "host",
+            "key_id_last4",
+            "inrelease_sha256",
+            "release_gpg_sha256",
+            "deb_sha256",
+            "verified_on_clean_vm",
         ),
         "steps": (
             "On an isolated Ubuntu signer, import the SKY Debian key (never commit it).",
@@ -47,8 +53,13 @@ DRILLS: dict[str, dict[str, Any]] = {
         "kind": "signing",
         "title": "Authenticode-sign Windows companion",
         "required": (
-            "operator", "host", "publisher", "timestamp_ok",
-            "signed_sha256", "signtool_verify", "clean_windows11",
+            "operator",
+            "host",
+            "publisher",
+            "timestamp_ok",
+            "signed_sha256",
+            "signtool_verify",
+            "clean_windows11",
         ),
         "steps": (
             "Compile packaging/windows/SkyCompanion on a Windows 11 host.",
@@ -63,8 +74,13 @@ DRILLS: dict[str, dict[str, Any]] = {
         "kind": "signing",
         "title": "apksigner-verify Android companion",
         "required": (
-            "operator", "host", "keystore_alias", "apk_sha256",
-            "apksigner_verify", "device_model", "play_protect_ok",
+            "operator",
+            "host",
+            "keystore_alias",
+            "apk_sha256",
+            "apksigner_verify",
+            "device_model",
+            "play_protect_ok",
         ),
         "steps": (
             "Assemble packaging/android/SkyCompanion on a trusted Linux/macOS host.",
@@ -79,8 +95,14 @@ DRILLS: dict[str, dict[str, Any]] = {
         "kind": "physical",
         "title": "Clean Ubuntu Hub install / upgrade / restore / rollback",
         "required": (
-            "operator", "host", "install_ok", "backup_sha256",
-            "upgrade_ok", "restore_ok", "rollback_ok", "doctor_ok",
+            "operator",
+            "host",
+            "install_ok",
+            "backup_sha256",
+            "upgrade_ok",
+            "restore_ok",
+            "rollback_ok",
+            "doctor_ok",
         ),
         "steps": (
             "Fresh Ubuntu VM: install signed Hub package; bind loopback + TLS proxy.",
@@ -95,8 +117,13 @@ DRILLS: dict[str, dict[str, Any]] = {
         "kind": "physical",
         "title": "Clean Windows 11 install / pair / upgrade / rollback",
         "required": (
-            "operator", "host", "install_ok", "pair_ok",
-            "authorized_paper_ok", "upgrade_ok", "rollback_ok",
+            "operator",
+            "host",
+            "install_ok",
+            "pair_ok",
+            "authorized_paper_ok",
+            "upgrade_ok",
+            "rollback_ok",
             "live_exchange_execution",
         ),
         "steps": (
@@ -112,8 +139,14 @@ DRILLS: dict[str, dict[str, Any]] = {
         "kind": "physical",
         "title": "Clean Android install / biometric / pair / upgrade / rollback",
         "required": (
-            "operator", "device_model", "install_ok", "biometric_ok",
-            "pair_ok", "online_only_ok", "upgrade_ok", "rollback_ok",
+            "operator",
+            "device_model",
+            "install_ok",
+            "biometric_ok",
+            "pair_ok",
+            "online_only_ok",
+            "upgrade_ok",
+            "rollback_ok",
             "live_exchange_execution",
         ),
         "steps": (
@@ -134,14 +167,16 @@ class DrillError(ValueError):
 def drill_catalog() -> dict[str, Any]:
     items = []
     for drill_id, spec in DRILLS.items():
-        items.append({
-            "id": drill_id,
-            "platform": spec["platform"],
-            "kind": spec["kind"],
-            "title": spec["title"],
-            "required": list(spec["required"]),
-            "steps": list(spec["steps"]),
-        })
+        items.append(
+            {
+                "id": drill_id,
+                "platform": spec["platform"],
+                "kind": spec["kind"],
+                "title": spec["title"],
+                "required": list(spec["required"]),
+                "steps": list(spec["steps"]),
+            }
+        )
     return {
         "schema": SCHEMA_VERSION,
         "product": "SKY",
@@ -169,6 +204,7 @@ def evaluate_evidence(drill_id: str, evidence: dict[str, Any]) -> dict[str, Any]
     if drill_id not in DRILLS:
         raise DrillError(f"unknown drill {drill_id}")
     spec = DRILLS[drill_id]
+
     def _present(key: str) -> bool:
         value = evidence.get(key, None)
         if value is False or value == 0:
@@ -203,8 +239,8 @@ def evaluate_evidence(drill_id: str, evidence: dict[str, Any]) -> dict[str, Any]
         "evaluated_at": int(time.time()),
         "note": (
             "passed — attach this JSON to the release review"
-            if passed else
-            "not passed — do not mark P22 complete"
+            if passed
+            else "not passed — do not mark P22 complete"
         ),
     }
 
@@ -253,7 +289,9 @@ def format_catalog(payload: dict[str, Any]) -> str:
         "",
     ]
     for item in payload.get("drills") or []:
-        result = next((r for r in payload.get("results") or [] if r["id"] == item["id"]), None)
+        result = next(
+            (r for r in payload.get("results") or [] if r["id"] == item["id"]), None
+        )
         mark = "PASS" if result and result.get("passed") else "OPEN"
         lines.append(f"[{mark}] {item['id']} — {item['title']}")
         for step in item["steps"]:

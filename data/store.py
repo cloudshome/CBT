@@ -27,11 +27,12 @@ Hive-style partitioning means a query for one month reads one file, and the
 whole series stays small enough to keep in ``data/store/`` on disk (never in
 Git).
 """
+
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -41,9 +42,22 @@ import pandas as pd
 # --------------------------------------------------------------------------- #
 
 CANDLE_COLUMNS: list[str] = [
-    "ts", "exchange", "market", "symbol", "timeframe",
-    "open", "high", "low", "close", "volume", "quote_volume", "trades",
-    "closed", "source", "price_type", "ingested_at",
+    "ts",
+    "exchange",
+    "market",
+    "symbol",
+    "timeframe",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "quote_volume",
+    "trades",
+    "closed",
+    "source",
+    "price_type",
+    "ingested_at",
 ]
 
 PRIMARY_KEY: list[str] = ["exchange", "market", "symbol", "timeframe", "ts"]
@@ -148,9 +162,9 @@ def normalise_klines(
     frame["symbol"] = symbol
     frame["timeframe"] = timeframe
     if "closed" in ohlcv.columns:
-        frame["closed"] = ohlcv["closed"]   # coerce_candle_frame cleans it
+        frame["closed"] = ohlcv["closed"]  # coerce_candle_frame cleans it
     else:
-        frame["closed"] = True              # history is closed unless told otherwise
+        frame["closed"] = True  # history is closed unless told otherwise
     frame["source"] = source
     # Exchange candles are usually last-trade prices; Dukascopy OHLC is
     # explicitly bid or ask. Keep that distinction in the canonical row so a
@@ -165,7 +179,12 @@ def normalise_klines(
 # --------------------------------------------------------------------------- #
 
 import os
-DEFAULT_ROOT = Path(os.getenv("SKY_STORE_ROOT", Path(__file__).resolve().parent.parent / "data" / "store"))
+
+DEFAULT_ROOT = Path(
+    os.getenv(
+        "SKY_STORE_ROOT", Path(__file__).resolve().parent.parent / "data" / "store"
+    )
+)
 
 
 class CandleStore:
@@ -181,8 +200,9 @@ class CandleStore:
         self.parquet_dir = self.root / "parquet" / "candles"
 
     # -- paths -------------------------------------------------------------- #
-    def _series_dir(self, exchange: str, market: str,
-                    symbol: str, timeframe: str) -> Path:
+    def _series_dir(
+        self, exchange: str, market: str, symbol: str, timeframe: str
+    ) -> Path:
         return (
             self.parquet_dir
             / f"exchange={exchange}"
@@ -279,19 +299,18 @@ class CandleStore:
         return coerce_candle_frame(df)
 
     # -- introspection ------------------------------------------------------ #
-    def count(self, exchange: str, market: str,
-              symbol: str, timeframe: str) -> int:
+    def count(self, exchange: str, market: str, symbol: str, timeframe: str) -> int:
         return len(self.read(exchange, market, symbol, timeframe))
 
-    def series(self, exchange: str, market: str,
-               symbol: str, timeframe: str) -> list[str]:
+    def series(
+        self, exchange: str, market: str, symbol: str, timeframe: str
+    ) -> list[str]:
         """List stored partition keys (year/month) for a series."""
         series_dir = self._series_dir(exchange, market, symbol, timeframe)
         if not series_dir.exists():
             return []
         return sorted(
-            f"{p.parent.name}/{p.name}"
-            for p in series_dir.glob("year=*/month=*")
+            f"{p.parent.name}/{p.name}" for p in series_dir.glob("year=*/month=*")
         )
 
     def list_series(self) -> list[dict]:
@@ -303,16 +322,21 @@ class CandleStore:
         if not self.parquet_dir.exists():
             return []
         found: dict[tuple[str, str, str, str], dict] = {}
-        for tdir in sorted(self.parquet_dir.glob(
-                "exchange=*/market=*/symbol=*/timeframe=*")):
+        for tdir in sorted(
+            self.parquet_dir.glob("exchange=*/market=*/symbol=*/timeframe=*")
+        ):
             meta: dict[str, str] = {}
             for seg in tdir.parts:
                 key, _, value = seg.partition("=")
                 if key in ("exchange", "market", "symbol", "timeframe"):
                     meta[key] = value
             if len(meta) == 4:
-                key = (meta["exchange"], meta["market"],
-                       meta["symbol"], meta["timeframe"])
+                key = (
+                    meta["exchange"],
+                    meta["market"],
+                    meta["symbol"],
+                    meta["timeframe"],
+                )
                 found[key] = meta
         return [found[k] for k in sorted(found)]
 
@@ -320,6 +344,7 @@ class CandleStore:
 # --------------------------------------------------------------------------- #
 # klines-style read client (P12.3.2 — real market data)
 # --------------------------------------------------------------------------- #
+
 
 class StoreClient:
     """Drop-in ``klines()`` reader over the Parquet store.
@@ -336,14 +361,25 @@ class StoreClient:
     exactly like the demo client outside its synthetic range.
     """
 
-    def __init__(self, store: CandleStore | None = None, *,
-                 exchange: str = "binance", market: str = "spot"):
+    def __init__(
+        self,
+        store: CandleStore | None = None,
+        *,
+        exchange: str = "binance",
+        market: str = "spot",
+    ):
         self.store = store or CandleStore()
         self.exchange = exchange
         self.market = market
 
-    def klines(self, symbol: str = "BTCUSDT", timeframe: str = "15m",
-               limit: int = 500, start_time=None, end_time=None):
+    def klines(
+        self,
+        symbol: str = "BTCUSDT",
+        timeframe: str = "15m",
+        limit: int = 500,
+        start_time=None,
+        end_time=None,
+    ):
         """OHLCV tail from the store, honouring cursors like the REST client."""
         df = self.store.read(self.exchange, self.market, symbol, timeframe)
         if not df.empty:

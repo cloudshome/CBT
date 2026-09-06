@@ -15,6 +15,7 @@ research profile — filed under ``…@dukascopy:spot:bid`` — is never matched
 and can never move the confidence of a live signal. Profiles written before
 P12.11 have no suffix, so they resolve exactly as they always did.
 """
+
 from __future__ import annotations
 
 from data.provenance import KEY_SEP, LIVE_SOURCE_KEY
@@ -27,9 +28,13 @@ def _composite(plan_type: str, regime: str, source: str = LIVE_SOURCE_KEY) -> st
     return f"{base}{KEY_SEP}{source}" if source else base
 
 
-def apply_calibration(conf: int, plan_type: str, calibration: dict,
-                      regime: str = "",
-                      source_key: str = LIVE_SOURCE_KEY) -> tuple[int, bool]:
+def apply_calibration(
+    conf: int,
+    plan_type: str,
+    calibration: dict,
+    regime: str = "",
+    source_key: str = LIVE_SOURCE_KEY,
+) -> tuple[int, bool]:
     """Return (adjusted_confidence, filtered_out).
 
     Lookup narrows from ``plan_type::regime`` to ``plan_type`` **within one

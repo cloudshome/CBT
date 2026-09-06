@@ -8,22 +8,24 @@ never periodOfReport (look-ahead bias guard).
 
 Refs: discovery doc §5, SEC fair-access docs cited in *03.
 """
+
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
-from dataclasses import dataclass
-from typing import Any, Optional
-import os
+from typing import Any
 
 import requests
 
-from sky_agent.config import SEC_USER_AGENT, SEC_MAX_RPS
+from sky_agent.config import SEC_MAX_RPS, SEC_USER_AGENT
 
 SEC_BASE = "https://data.sec.gov"
 SEC_SUBMISSIONS = SEC_BASE + "/submissions/CIK{cik:010d}.json"
-SEC_TICKER_MAP = SEC_BASE + "/submissions/CIK{cik:010d}.json"  # same; ticker→cik via lookup below
+SEC_TICKER_MAP = (
+    SEC_BASE + "/submissions/CIK{cik:010d}.json"
+)  # same; ticker→cik via lookup below
 TICKER_CIK_URL = "https://www.sec.gov/files/company_tickers.json"
 XBRL_FACTS_URL = SEC_BASE + "/api/xbrl/companyfacts/CIK{cik:010d}.json"
 
@@ -34,18 +36,66 @@ FORMS_OF_INTEREST = ("8-K", "10-Q", "10-K", "20-F", "6-K", "S-1", "S-3")
 
 # Minimal event taxonomy for 8-K (extendable)
 EVENT_TAXONOMY = {
-    "bankruptcy": {"severity": 5, "direction": "bearish", "match": re.compile(r"bankruptcy|chapter\s*11", re.I)},
-    "going_concern": {"severity": 5, "direction": "bearish", "match": re.compile(r"going concern", re.I)},
-    "ceo_resignation": {"severity": 3, "direction": "context", "match": re.compile(r"ceo.*resign|resignation.*ceo|chief executive", re.I)},
-    "acquisition": {"severity": 3, "direction": "context", "match": re.compile(r"acquisition|merger", re.I)},
-    "debt_default": {"severity": 5, "direction": "bearish", "match": re.compile(r"default.*debt|debt.*default", re.I)},
-    "major_contract": {"severity": 4, "direction": "bullish", "match": re.compile(r"material.*definitive.*agreement|major.*contract", re.I)},
-    "secondary_offering": {"severity": 4, "direction": "bearish", "match": re.compile(r"secondary offering|at-the-market", re.I)},
-    "buyback": {"severity": 3, "direction": "bullish", "match": re.compile(r"share.*repurchase|buyback", re.I)},
-    "guidance_increase": {"severity": 4, "direction": "bullish", "match": re.compile(r"guidance.*increase|raise.*outlook", re.I)},
-    "guidance_reduction": {"severity": 4, "direction": "bearish", "match": re.compile(r"guidance.*reduc|lower.*outlook|cut.*forecast", re.I)},
-    "litigation": {"severity": 3, "direction": "bearish", "match": re.compile(r"litigation|lawsuit", re.I)},
-    "earnings_release": {"severity": 4, "direction": "context", "match": re.compile(r"earnings.*release|results.*operations", re.I)},
+    "bankruptcy": {
+        "severity": 5,
+        "direction": "bearish",
+        "match": re.compile(r"bankruptcy|chapter\s*11", re.IGNORECASE),
+    },
+    "going_concern": {
+        "severity": 5,
+        "direction": "bearish",
+        "match": re.compile(r"going concern", re.IGNORECASE),
+    },
+    "ceo_resignation": {
+        "severity": 3,
+        "direction": "context",
+        "match": re.compile(r"ceo.*resign|resignation.*ceo|chief executive", re.IGNORECASE),
+    },
+    "acquisition": {
+        "severity": 3,
+        "direction": "context",
+        "match": re.compile(r"acquisition|merger", re.IGNORECASE),
+    },
+    "debt_default": {
+        "severity": 5,
+        "direction": "bearish",
+        "match": re.compile(r"default.*debt|debt.*default", re.IGNORECASE),
+    },
+    "major_contract": {
+        "severity": 4,
+        "direction": "bullish",
+        "match": re.compile(r"material.*definitive.*agreement|major.*contract", re.IGNORECASE),
+    },
+    "secondary_offering": {
+        "severity": 4,
+        "direction": "bearish",
+        "match": re.compile(r"secondary offering|at-the-market", re.IGNORECASE),
+    },
+    "buyback": {
+        "severity": 3,
+        "direction": "bullish",
+        "match": re.compile(r"share.*repurchase|buyback", re.IGNORECASE),
+    },
+    "guidance_increase": {
+        "severity": 4,
+        "direction": "bullish",
+        "match": re.compile(r"guidance.*increase|raise.*outlook", re.IGNORECASE),
+    },
+    "guidance_reduction": {
+        "severity": 4,
+        "direction": "bearish",
+        "match": re.compile(r"guidance.*reduc|lower.*outlook|cut.*forecast", re.IGNORECASE),
+    },
+    "litigation": {
+        "severity": 3,
+        "direction": "bearish",
+        "match": re.compile(r"litigation|lawsuit", re.IGNORECASE),
+    },
+    "earnings_release": {
+        "severity": 4,
+        "direction": "context",
+        "match": re.compile(r"earnings.*release|results.*operations", re.IGNORECASE),
+    },
 }
 
 _last_req_ts = 0.0
@@ -62,13 +112,29 @@ def _throttle() -> None:
 
 
 def _headers() -> dict[str, str]:
-    return {"User-Agent": SEC_USER_AGENT, "Accept-Encoding": "gzip", "Host": "data.sec.gov"}
+    return {
+        "User-Agent": SEC_USER_AGENT,
+        "Accept-Encoding": "gzip",
+        "Host": "data.sec.gov",
+    }
 
 
 def fetch_json(url: str, *, timeout: int = 15) -> dict[str, Any]:
     if os.getenv("DEMO_MODE") == "1":
         # Deterministic offline stub
-        return {"demo": True, "url": url, "filings": {"recent": {"accessionNumber": [], "form": [], "filingDate": [], "acceptanceDateTime": [], "reportDate": []}}}
+        return {
+            "demo": True,
+            "url": url,
+            "filings": {
+                "recent": {
+                    "accessionNumber": [],
+                    "form": [],
+                    "filingDate": [],
+                    "acceptanceDateTime": [],
+                    "reportDate": [],
+                }
+            },
+        }
     _throttle()
     resp = requests.get(url, headers=_headers(), timeout=timeout)
     resp.raise_for_status()
@@ -99,7 +165,13 @@ def classify_event_text(text: str) -> tuple[str, int, str]:
     return "other", 2, "context"
 
 
-def ingest_recent_filings(*, tickers: list[str] | None = None, ciks: list[str] | None = None, limit: int = 20, demo: bool = False) -> list[dict[str, Any]]:
+def ingest_recent_filings(
+    *,
+    tickers: list[str] | None = None,
+    ciks: list[str] | None = None,
+    limit: int = 20,
+    demo: bool = False,
+) -> list[dict[str, Any]]:
     """Fetch recent filings for a small universe; return normalised rows ready for upsert.
 
     Idempotent: callers should upsert on accession PK.
@@ -149,23 +221,29 @@ def ingest_recent_filings(*, tickers: list[str] | None = None, ciks: list[str] |
                 acc = filings.get("accessionNumber", [""])[i]
                 fdate = filings.get("filingDate", [""])[i]
                 adt = filings.get("acceptanceDateTime", [""])[i]
-                report = filings.get("reportDate", [""])[i] if "reportDate" in filings else ""
+                report = (
+                    filings.get("reportDate", [""])[i]
+                    if "reportDate" in filings
+                    else ""
+                )
                 # Best-effort event classification from form + description
                 etype, sev, direction = classify_event_text(f"{form} {adt}")
-                rows.append({
-                    "accession": acc,
-                    "cik": cik,
-                    "ticker": "",
-                    "form": form,
-                    "filing_date": fdate,
-                    "acceptance_datetime": adt,
-                    "period_of_report": report,
-                    "url": f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc.replace('-','')}/{acc}-index.html",
-                    "raw": {"cik": cik, "form": form},
-                    "event_type": etype,
-                    "severity": sev,
-                    "direction": direction,
-                })
+                rows.append(
+                    {
+                        "accession": acc,
+                        "cik": cik,
+                        "ticker": "",
+                        "form": form,
+                        "filing_date": fdate,
+                        "acceptance_datetime": adt,
+                        "period_of_report": report,
+                        "url": f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc.replace('-', '')}/{acc}-index.html",
+                        "raw": {"cik": cik, "form": form},
+                        "event_type": etype,
+                        "severity": sev,
+                        "direction": direction,
+                    }
+                )
         except Exception:
             continue
     return rows
@@ -176,10 +254,12 @@ def upsert_filings(rows: list[dict[str, Any]], *, db=None) -> int:
     close = False
     if db is None:
         from data.database import SignalDB
+
         db = SignalDB()
         close = True
     try:
         from sky_agent.memory import ensure_memory_schema
+
         ensure_memory_schema(db)
         count = 0
         for r in rows:
@@ -188,12 +268,30 @@ def upsert_filings(rows: list[dict[str, Any]], *, db=None) -> int:
                 continue
             db.conn.execute(
                 "INSERT OR REPLACE INTO sec_filings(accession,cik,ticker,form,filing_date,acceptance_datetime,period_of_report,url,raw_json) VALUES (?,?,?,?,?,?,?,?,?)",
-                (acc, r.get("cik"), r.get("ticker"), r.get("form"), r.get("filing_date"), r.get("acceptance_datetime"), r.get("period_of_report"), r.get("url"), json.dumps(r.get("raw") or {})),
+                (
+                    acc,
+                    r.get("cik"),
+                    r.get("ticker"),
+                    r.get("form"),
+                    r.get("filing_date"),
+                    r.get("acceptance_datetime"),
+                    r.get("period_of_report"),
+                    r.get("url"),
+                    json.dumps(r.get("raw") or {}),
+                ),
             )
             # Event row (one per filing for MVP)
             db.conn.execute(
                 "INSERT INTO sec_events(accession,event_type,severity,direction,score,classification,created_ts) VALUES (?,?,?,?,?,?,?)",
-                (acc, r.get("event_type", "other"), int(r.get("severity", 2)), r.get("direction", "context"), int(r.get("severity", 2)) * 20, r.get("form"), int(time.time())),
+                (
+                    acc,
+                    r.get("event_type", "other"),
+                    int(r.get("severity", 2)),
+                    r.get("direction", "context"),
+                    int(r.get("severity", 2)) * 20,
+                    r.get("form"),
+                    int(time.time()),
+                ),
             )
             count += 1
         db.conn.commit()

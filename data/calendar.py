@@ -38,11 +38,13 @@ The gold week (America/New_York wall time, DST-aware)
     daily break    17:00–18:00 ET, Monday–Thursday
     holidays       1 Jan, 25 Dec (full day)
 """
+
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
-from typing import Iterable, Optional, Protocol, Sequence
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 MS_PER_DAY = 86_400_000
@@ -77,10 +79,10 @@ class CryptoCalendar:
     name: str = "crypto-24x7"
     always_open: bool = True
 
-    def is_open(self, ts_ms: int) -> bool:  # noqa: D102 - protocol
+    def is_open(self, ts_ms: int) -> bool:
         return True
 
-    def closed_intervals(self, start_ms: int, end_ms: int) -> list[tuple[int, int]]:  # noqa: D102
+    def closed_intervals(self, start_ms: int, end_ms: int) -> list[tuple[int, int]]:
         return []
 
 
@@ -90,10 +92,10 @@ class CryptoCalendar:
 
 _ET = ZoneInfo("America/New_York")
 
-WEEK_OPEN_HOUR = 18      # Sunday 18:00 ET
-WEEK_CLOSE_HOUR = 17     # Friday 17:00 ET
-BREAK_START_HOUR = 17    # daily maintenance break 17:00 ET …
-BREAK_END_HOUR = 18      # … until 18:00 ET
+WEEK_OPEN_HOUR = 18  # Sunday 18:00 ET
+WEEK_CLOSE_HOUR = 17  # Friday 17:00 ET
+BREAK_START_HOUR = 17  # daily maintenance break 17:00 ET …
+BREAK_END_HOUR = 18  # … until 18:00 ET
 
 #: Full-day closures, as (month, day) in New York local time.
 GOLD_HOLIDAYS: tuple[tuple[int, int], ...] = ((1, 1), (12, 25))
@@ -123,17 +125,17 @@ class GoldCalendar:
 
     # -- membership ------------------------------------------------------- #
 
-    def is_open(self, ts_ms: int) -> bool:  # noqa: D102 - protocol
+    def is_open(self, ts_ms: int) -> bool:
         et = _to_et(int(ts_ms))
         if (et.month, et.day) in GOLD_HOLIDAYS:
             return False
-        weekday = et.weekday()          # Mon=0 … Sun=6
+        weekday = et.weekday()  # Mon=0 … Sun=6
         hour = et.hour
-        if weekday == 5:                # Saturday — shut all day
+        if weekday == 5:  # Saturday — shut all day
             return False
-        if weekday == 6:                # Sunday — opens 18:00 ET
+        if weekday == 6:  # Sunday — opens 18:00 ET
             return hour >= WEEK_OPEN_HOUR
-        if weekday == 4 and hour >= WEEK_CLOSE_HOUR:   # Friday close
+        if weekday == 4 and hour >= WEEK_CLOSE_HOUR:  # Friday close
             return False
         if BREAK_START_HOUR <= hour < BREAK_END_HOUR:  # daily break
             return False
@@ -141,7 +143,7 @@ class GoldCalendar:
 
     # -- closed spans ----------------------------------------------------- #
 
-    def closed_intervals(self, start_ms: int, end_ms: int) -> list[tuple[int, int]]:  # noqa: D102
+    def closed_intervals(self, start_ms: int, end_ms: int) -> list[tuple[int, int]]:
         start_ms, end_ms = int(start_ms), int(end_ms)
         if end_ms <= start_ms:
             return []
@@ -165,18 +167,21 @@ class GoldCalendar:
         midnight = _et_ms(day, 0)
         next_midnight = int(
             datetime.combine(
-                (day + timedelta(days=1)).date(), time(0), tzinfo=_ET,
-            ).timestamp() * 1000
+                (day + timedelta(days=1)).date(),
+                time(0),
+                tzinfo=_ET,
+            ).timestamp()
+            * 1000
         )
         if (day.month, day.day) in GOLD_HOLIDAYS:
             return [(midnight, next_midnight)]
 
         weekday = day.weekday()
-        if weekday == 5:                       # Saturday: closed all day
+        if weekday == 5:  # Saturday: closed all day
             return [(midnight, next_midnight)]
-        if weekday == 6:                       # Sunday: closed until 18:00 ET
+        if weekday == 6:  # Sunday: closed until 18:00 ET
             return [(midnight, _et_ms(day, WEEK_OPEN_HOUR))]
-        if weekday == 4:                       # Friday: closed from 17:00 ET
+        if weekday == 4:  # Friday: closed from 17:00 ET
             return [(_et_ms(day, WEEK_CLOSE_HOUR), next_midnight)]
         # Mon–Thu: the 17:00–18:00 ET maintenance break
         return [(_et_ms(day, BREAK_START_HOUR), _et_ms(day, BREAK_END_HOUR))]
@@ -211,8 +216,9 @@ CALENDARS: dict[str, MarketCalendar] = {
 }
 
 
-def calendar_for(exchange: str = "", market: str = "",
-                 symbol: str = "") -> MarketCalendar:
+def calendar_for(
+    exchange: str = "", market: str = "", symbol: str = ""
+) -> MarketCalendar:
     """Pick the calendar for a stored series.
 
     Defaults to 24/7 — an unknown venue keeps today's crypto behaviour, so
@@ -243,14 +249,15 @@ def _count_aligned(lo: int, hi: int, step: int) -> int:
     """Count timestamps ``t`` with ``lo <= t <= hi`` and ``t % step == 0``."""
     if step <= 0 or hi < lo:
         return 0
-    first = -(-lo // step) * step      # ceil to the next aligned stamp
+    first = -(-lo // step) * step  # ceil to the next aligned stamp
     if first > hi:
         return 0
     return (hi - first) // step + 1
 
 
-def expected_bars(start_ms: int, end_ms: int, step_ms: int,
-                  calendar: Optional[MarketCalendar] = None) -> int:
+def expected_bars(
+    start_ms: int, end_ms: int, step_ms: int, calendar: MarketCalendar | None = None
+) -> int:
     """Number of candle OPENs the venue should have produced in ``[start, end]``.
 
     Inclusive of both ends, aligned to ``step_ms``. With the crypto
@@ -269,8 +276,9 @@ def expected_bars(start_ms: int, end_ms: int, step_ms: int,
     return max(0, total - closed)
 
 
-def open_bars_between(start_ms: int, end_ms: int, step_ms: int,
-                      calendar: Optional[MarketCalendar] = None) -> int:
+def open_bars_between(
+    start_ms: int, end_ms: int, step_ms: int, calendar: MarketCalendar | None = None
+) -> int:
     """Trading-time distance in bars between two candle OPENs (exclusive of
     ``start``, inclusive of ``end``).
 
@@ -283,16 +291,17 @@ def open_bars_between(start_ms: int, end_ms: int, step_ms: int,
     return max(0, expected_bars(start_ms, end_ms, step_ms, calendar) - 1)
 
 
-def closed_bar_count(start_ms: int, end_ms: int, step_ms: int,
-                     calendar: Optional[MarketCalendar] = None) -> int:
+def closed_bar_count(
+    start_ms: int, end_ms: int, step_ms: int, calendar: MarketCalendar | None = None
+) -> int:
     """How many aligned OPENs inside ``[start, end]`` fall while shut."""
     total = _count_aligned(int(start_ms), int(end_ms), int(step_ms))
     return max(0, total - expected_bars(start_ms, end_ms, step_ms, calendar))
 
 
-def split_by_session(timestamps: Iterable[int],
-                     calendar: Optional[MarketCalendar] = None
-                     ) -> tuple[list[int], list[int]]:
+def split_by_session(
+    timestamps: Iterable[int], calendar: MarketCalendar | None = None
+) -> tuple[list[int], list[int]]:
     """Split candle OPENs into ``(during_session, while_closed)``."""
     cal = calendar or CRYPTO
     if getattr(cal, "always_open", False):

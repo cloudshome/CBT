@@ -30,10 +30,10 @@ Checks (per stored candle series):
     ordering    non-monotonic / duplicate ts (defensive; the store's
                 upsert PK + sort already prevents this on disk)
 """
+
 from __future__ import annotations
 
 import time
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -43,8 +43,8 @@ from data.gaps import detect_gaps
 from data.store import CandleStore
 
 # Staleness thresholds, in multiples of the timeframe step.
-FRESH_MULT = 3        # newest candle ≤ 3×step old → fresh (ok)
-LAG_MULT = 30         # ≤ 30×step old → lagging (degraded); older → unusable (down)
+FRESH_MULT = 3  # newest candle ≤ 3×step old → fresh (ok)
+LAG_MULT = 30  # ≤ 30×step old → lagging (degraded); older → unusable (down)
 
 # Gap thresholds over the recent window (missing / expected candles).
 GAP_DEGRADED = 0.005
@@ -62,12 +62,13 @@ MAX_SERIES = 12
 # Per-frame checks (pure, deterministic)
 # --------------------------------------------------------------------------- #
 
+
 def checks_on_frame(
     frame: pd.DataFrame,
     timeframe: str = "1m",
     *,
-    now_ms: Optional[int] = None,
-    step_ms: Optional[int] = None,
+    now_ms: int | None = None,
+    step_ms: int | None = None,
     window_bars: int = WINDOW_BARS,
     calendar=None,
 ) -> dict:
@@ -106,8 +107,8 @@ def checks_on_frame(
         "expected": 0,
         "missing": 0,
         "gap_fraction": 0.0,
-        "violations": [],      # hard corruption → quarantine (down)
-        "suspicious": [],      # soft flags → degraded
+        "violations": [],  # hard corruption → quarantine (down)
+        "suspicious": [],  # soft flags → degraded
     }
     if frame is None or frame.empty:
         return health
@@ -149,31 +150,36 @@ def checks_on_frame(
         # Staleness in trading bars: a closed market cannot be stale.
         age_bars = open_bars_between(last, now, step_ms, cal)
         age_mult = round(float(age_bars), 2)
-        health["closed_bars"] = max(
-            0, ((last - first) // step_ms + 1) - expected)
+        health["closed_bars"] = max(0, ((last - first) // step_ms + 1) - expected)
     else:
         expected = (last - first) // step_ms + 1
         missing = sum(g.missing for g in detect_gaps(win, timeframe))
         age_mult = None
     age_ms = max(0, now - last)
 
-    health.update({
-        "candles": int(len(f)),
-        "first_ts": first,
-        "last_ts": last,
-        "age_ms": age_ms,
-        "age_mult": (age_mult if session
-                     else (round(age_ms / step_ms, 2) if step_ms else None)),
-        "expected": expected,
-        "missing": missing,
-        "gap_fraction": round(missing / expected, 6) if expected else 0.0,
-    })
+    health.update(
+        {
+            "candles": len(f),
+            "first_ts": first,
+            "last_ts": last,
+            "age_ms": age_ms,
+            "age_mult": (
+                age_mult
+                if session
+                else (round(age_ms / step_ms, 2) if step_ms else None)
+            ),
+            "expected": expected,
+            "missing": missing,
+            "gap_fraction": round(missing / expected, 6) if expected else 0.0,
+        }
+    )
     return health
 
 
 # --------------------------------------------------------------------------- #
 # Verdict (per-series quarantine decision)
 # --------------------------------------------------------------------------- #
+
 
 def verdict_for(health: dict) -> dict:
     """Map a health dict onto the readiness ladder with a quarantine flag.
@@ -182,60 +188,100 @@ def verdict_for(health: dict) -> dict:
     for the risk gate). ``quarantined=True`` means the series must not
     feed analytics — it rolls the desk to *not ready* via the pillar.
     """
-    name = "/".join(str(health.get(k) or "?")
-                    for k in ("exchange", "market", "symbol", "timeframe")
-                    if k in health) or health.get("timeframe", "?")
+    name = "/".join(
+        str(health.get(k) or "?")
+        for k in ("exchange", "market", "symbol", "timeframe")
+        if k in health
+    ) or health.get("timeframe", "?")
     if health.get("candles", 0) == 0:
-        return {"level": "degraded", "headline": "no candles stored",
-                "detail": "series exists but holds no candles",
-                "quarantined": False, "name": name}
+        return {
+            "level": "degraded",
+            "headline": "no candles stored",
+            "detail": "series exists but holds no candles",
+            "quarantined": False,
+            "name": name,
+        }
 
     if health["violations"]:
-        return {"level": "down", "quarantined": True,
-                "headline": "corrupt data — quarantined",
-                "detail": "; ".join(health["violations"]), "name": name}
+        return {
+            "level": "down",
+            "quarantined": True,
+            "headline": "corrupt data — quarantined",
+            "detail": "; ".join(health["violations"]),
+            "name": name,
+        }
     # P12.9: on a session venue `age_mult` counts *trading* bars, so a closed
     # market cannot age the series. Say so, or the operator reads a Sunday as
     # a broken feed.
-    stale_unit = ("trading bars" if health.get("calendar", "crypto-24x7")
-                  != "crypto-24x7" else "× the timeframe")
-    shut = (health.get("market_open") is False)
+    stale_unit = (
+        "trading bars"
+        if health.get("calendar", "crypto-24x7") != "crypto-24x7"
+        else "× the timeframe"
+    )
+    shut = health.get("market_open") is False
     if (health["age_mult"] or 0) > LAG_MULT:
-        return {"level": "down", "quarantined": True,
-                "headline": "history too stale — quarantined",
-                "detail": (f"newest candle is {health['age_mult']:.0f} "
-                           f"{stale_unit} old"),
-                "name": name}
+        return {
+            "level": "down",
+            "quarantined": True,
+            "headline": "history too stale — quarantined",
+            "detail": (f"newest candle is {health['age_mult']:.0f} {stale_unit} old"),
+            "name": name,
+        }
     if health["gap_fraction"] > GAP_DOWN:
-        return {"level": "down", "quarantined": True,
-                "headline": "gaps in recent history — quarantined",
-                "detail": (f"{health['missing']}/{health['expected']} recent "
-                           f"candles missing ({health['gap_fraction']:.1%})"),
-                "name": name}
+        return {
+            "level": "down",
+            "quarantined": True,
+            "headline": "gaps in recent history — quarantined",
+            "detail": (
+                f"{health['missing']}/{health['expected']} recent "
+                f"candles missing ({health['gap_fraction']:.1%})"
+            ),
+            "name": name,
+        }
     if health["gap_fraction"] > GAP_DEGRADED:
-        return {"level": "degraded", "quarantined": False,
-                "headline": "small gaps in recent history",
-                "detail": (f"{health['missing']}/{health['expected']} recent "
-                           f"candles missing ({health['gap_fraction']:.1%})"),
-                "name": name}
+        return {
+            "level": "degraded",
+            "quarantined": False,
+            "headline": "small gaps in recent history",
+            "detail": (
+                f"{health['missing']}/{health['expected']} recent "
+                f"candles missing ({health['gap_fraction']:.1%})"
+            ),
+            "name": name,
+        }
     if health["suspicious"]:
-        return {"level": "degraded", "quarantined": False,
-                "headline": "suspicious candles",
-                "detail": "; ".join(health["suspicious"]), "name": name}
+        return {
+            "level": "degraded",
+            "quarantined": False,
+            "headline": "suspicious candles",
+            "detail": "; ".join(health["suspicious"]),
+            "name": name,
+        }
     if (health["age_mult"] or 0) > FRESH_MULT:
-        return {"level": "degraded", "quarantined": False,
-                "headline": "lagging",
-                "detail": (f"newest candle is {health['age_mult']:.0f} "
-                           f"{stale_unit} old"),
-                "name": name}
+        return {
+            "level": "degraded",
+            "quarantined": False,
+            "headline": "lagging",
+            "detail": (f"newest candle is {health['age_mult']:.0f} {stale_unit} old"),
+            "name": name,
+        }
     if shut:
-        return {"level": "ok", "quarantined": False,
-                "headline": "market closed — clean",
-                "detail": (f"{health['candles']} candles; venue shut "
-                           f"({health['calendar']})"), "name": name}
-    return {"level": "ok", "quarantined": False,
-            "headline": "fresh and clean",
-            "detail": f"{health['candles']} candles", "name": name}
+        return {
+            "level": "ok",
+            "quarantined": False,
+            "headline": "market closed — clean",
+            "detail": (
+                f"{health['candles']} candles; venue shut ({health['calendar']})"
+            ),
+            "name": name,
+        }
+    return {
+        "level": "ok",
+        "quarantined": False,
+        "headline": "fresh and clean",
+        "detail": f"{health['candles']} candles",
+        "name": name,
+    }
 
 
 def series_health(
@@ -245,7 +291,7 @@ def series_health(
     symbol: str,
     timeframe: str,
     *,
-    now_ms: Optional[int] = None,
+    now_ms: int | None = None,
     window_bars: int = WINDOW_BARS,
     calendar=None,
 ) -> dict:
@@ -258,10 +304,17 @@ def series_health(
 
     cal = calendar or calendar_for(exchange, market, symbol)
     frame = store.read(exchange, market, symbol, timeframe)
-    health = checks_on_frame(frame, timeframe, now_ms=now_ms,
-                             window_bars=window_bars, calendar=cal)
-    health.update({"exchange": exchange, "market": market,
-                   "symbol": symbol, "timeframe": timeframe})
+    health = checks_on_frame(
+        frame, timeframe, now_ms=now_ms, window_bars=window_bars, calendar=cal
+    )
+    health.update(
+        {
+            "exchange": exchange,
+            "market": market,
+            "symbol": symbol,
+            "timeframe": timeframe,
+        }
+    )
     return health
 
 
@@ -269,17 +322,27 @@ def series_item(
     store: CandleStore,
     series: dict,
     *,
-    now_ms: Optional[int] = None,
+    now_ms: int | None = None,
 ) -> dict:
     """One pillar item: health + verdict for a stored series."""
     health = series_health(
-        store, series["exchange"], series["market"],
-        series["symbol"], series["timeframe"], now_ms=now_ms,
+        store,
+        series["exchange"],
+        series["market"],
+        series["symbol"],
+        series["timeframe"],
+        now_ms=now_ms,
     )
     verdict = verdict_for(health)
     return {
-        "name": "/".join((series["exchange"], series["market"],
-                          series["symbol"], series["timeframe"])),
+        "name": "/".join(
+            (
+                series["exchange"],
+                series["market"],
+                series["symbol"],
+                series["timeframe"],
+            )
+        ),
         "level": verdict["level"],
         "headline": verdict["headline"],
         "detail": verdict["detail"],

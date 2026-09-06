@@ -33,6 +33,7 @@ Usage (dashboard / test):
     c = WsClient(demo=True)  # never touches the network
     events = list(DEMO_EVENT_STREAM(5))
 """
+
 from __future__ import annotations
 
 import json
@@ -41,17 +42,17 @@ import random
 import threading
 import time
 from collections import deque
-from typing import Callable, Iterator
+from collections.abc import Callable, Iterator
 
 # Optional: full websocket clients.  When absent, we fall back to the stub.
 try:
-    import websocket  # type: ignore  # websocket-client
+
     HAS_WEBSOCKET_CLIENT = True
 except Exception:
     HAS_WEBSOCKET_CLIENT = False
 
 try:
-    import websockets  # type: ignore
+
     HAS_WEBSOCKETS = True
 except Exception:
     HAS_WEBSOCKETS = False
@@ -118,16 +119,20 @@ def DEMO_EVENT_STREAM(count: int = 5) -> Iterator[dict]:
 # --------------------------------------------------------------------------- #
 
 
-def _backoff_delay(attempt: int, initial: float = INITIAL_BACKOFF,
-                    mult: float = BACKOFF_MULTIPLIER,
-                    cap: float = MAX_RECONNECT_DELAY) -> float:
-    base = min(initial * (mult ** attempt), cap)
+def _backoff_delay(
+    attempt: int,
+    initial: float = INITIAL_BACKOFF,
+    mult: float = BACKOFF_MULTIPLIER,
+    cap: float = MAX_RECONNECT_DELAY,
+) -> float:
+    base = min(initial * (mult**attempt), cap)
     return base + random.uniform(0, JITTER_MAX)
 
 
 # --------------------------------------------------------------------------- #
 # WebSocket client
 # --------------------------------------------------------------------------- #
+
 
 class WsClient:
     """Lightweight Binance public-stream client with reconnect / backoff.
@@ -149,9 +154,12 @@ class WsClient:
     ``DEMO_EVENT_STREAM`` on a timer so tests stay green and offline.
     """
 
-    def __init__(self, demo: bool | None = None,
-                 symbol: str | None = None,
-                 max_liquidation_memory: int = 500):
+    def __init__(
+        self,
+        demo: bool | None = None,
+        symbol: str | None = None,
+        max_liquidation_memory: int = 500,
+    ):
         self.demo = DEMO_MODE if demo is None else bool(demo)
         self.symbol = (symbol or SYMBOL).replace("PERP", "").upper() or "BTCUSDT"
         self.max_liquidation_memory = max_liquidation_memory
@@ -176,13 +184,15 @@ class WsClient:
             out[k] = {
                 "connected": self._connected.get(k, False),
                 "reconnect_attempts": self._reconnect_attempts.get(k, 0),
-                "last_heartbeat_s_ago": round(now - self._last_heartbeat.get(k, now), 1),
+                "last_heartbeat_s_ago": round(
+                    now - self._last_heartbeat.get(k, now), 1
+                ),
             }
         return out
 
     def recent_liquidations(self, n: int = 20) -> list[dict]:
         with self._lock:
-            return list(self._liquidations)[-min(n, len(self._liquidations)):]
+            return list(self._liquidations)[-min(n, len(self._liquidations)) :]
 
     def health(self) -> dict:
         with self._lock:
@@ -251,14 +261,14 @@ class WsClient:
                     return
                 slept += chunk
 
-    def _run_websockets(self, stream_key: str, url: str,
-                        parser: Callable, stop_ev: threading.Event):
+    def _run_websockets(
+        self, stream_key: str, url: str, parser: Callable, stop_ev: threading.Event
+    ):
         import asyncio  # noqa
-        import websockets  # noqa
+        import websockets
 
         async def _inner():
-            async for ws in websockets.connect(url, ping_interval=20,
-                                              ping_timeout=30):
+            async for ws in websockets.connect(url, ping_interval=20, ping_timeout=30):
                 if stop_ev.is_set():
                     break
                 self._connected[stream_key] = True
@@ -284,8 +294,9 @@ class WsClient:
             except Exception:
                 pass
 
-    def _run_websocket_client(self, stream_key: str, url: str,
-                               parser: Callable, stop_ev: threading.Event):
+    def _run_websocket_client(
+        self, stream_key: str, url: str, parser: Callable, stop_ev: threading.Event
+    ):
         import websocket  # type: ignore
 
         def on_open(ws):
@@ -316,13 +327,15 @@ class WsClient:
         ws_app.run_forever()
         # If run_forever exits (disconnect), return so reconnect loop retries.
 
-    def _run_health_probe_only(self, stream_key: str, url: str,
-                                stop_ev: threading.Event):
+    def _run_health_probe_only(
+        self, stream_key: str, url: str, stop_ev: threading.Event
+    ):
         """When no websocket library exists, we probe the stream endpoint
         with a lightweight HTTP GET (Binance's stream info endpoint is not
         strictly needed; we just check host reachability) and then return
         so the reconnect loop retries — this keeps backoff alive."""
-        import requests  # noqa
+        import requests
+
         try:
             # A 2-second timeout is enough to confirm the host is up.
             host = url.replace("wss://", "https://").split("/")[0]
@@ -346,11 +359,13 @@ class WsClient:
         def parse_force(event: dict):
             with self._lock:
                 self._liquidations.append(event)
+
         def parse_kline(event: dict):
             # Hot-tail accumulation is out of scope for P10.10; we only
             # parse so the stream stays active in case a future milestone
             # needs the live candle feed.  Nothing is stored here.
             pass
+
         return parse_force if stream_key == "forceOrder" else parse_kline
 
     # -- lifecycle ---------------------------------------------------------- #

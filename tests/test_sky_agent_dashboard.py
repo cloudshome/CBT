@@ -1,7 +1,6 @@
 """W4.1 — clickable 24/7 Agent tab + report archive (never a trade)."""
-from __future__ import annotations
 
-import os
+from __future__ import annotations
 
 import pytest
 
@@ -12,8 +11,10 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("SKY_NO_AUTO_INSTALL", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "agent.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "agent.db"))
     from web.app import make_app
+
     app = make_app()
     app.testing = True
     return app.test_client()
@@ -69,8 +70,9 @@ def test_archive_daily_report_is_memory_only(client):
 
 
 def test_archive_never_opens_the_risk_gate(client):
-    from data.database import SignalDB
     from brain.risk_gate import evaluate
+    from data.database import SignalDB
+
     client.post("/api/sky-agent/report", json={"demo": True})
     with SignalDB() as db:
         gate = evaluate(db)

@@ -42,3 +42,10 @@ exclude = ["tests*", "ops*", "docs*", "ci*"]
 # Non-.py assets the installed app needs at runtime (terminal template).
 [tool.setuptools.package-data]
 web = ["static/*.html", "static/*.js", "static/*.json", "static/*.png", "static/*.svg", "static/*.ico", "static/*.webmanifest"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

@@ -17,15 +17,16 @@ fresh. This module gives the AI that same behaviour:
 State lives in SQLite (`market_state` + `state_events`), so memory survives
 restarts — the AI genuinely remembers what it said last time.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import time
-from typing import Optional
 
-from config import SIGNAL_COOLDOWN_MINUTES, FLIP_PRICE_THRESHOLD_PCT, MAX_FLIPS_PER_HOUR
-from .styles import STYLE_COOLDOWN_MIN, ORDER
+from config import MAX_FLIPS_PER_HOUR
+
+from .styles import ORDER, STYLE_COOLDOWN_MIN
 
 
 def _fp_components(mtf: dict, styles: dict, f: dict) -> dict:
@@ -39,10 +40,21 @@ def _fp_components(mtf: dict, styles: dict, f: dict) -> dict:
     swing_hi = f.get("swing_high")
     swing_lo = f.get("swing_low")
     zone = f.get("premium_discount")
-    bucket = "above" if (swing_hi and price > swing_hi) else "below" if (swing_lo and price < swing_lo) else "inside"
+    bucket = (
+        "above"
+        if (swing_hi and price > swing_hi)
+        else "below"
+        if (swing_lo and price < swing_lo)
+        else "inside"
+    )
     return {
-        "htf": htf, "align": align, "event": event,
-        "styles_on": styles_on, "dirs": dirs, "zone": zone, "bucket": bucket,
+        "htf": htf,
+        "align": align,
+        "event": event,
+        "styles_on": styles_on,
+        "dirs": dirs,
+        "zone": zone,
+        "bucket": bucket,
     }
 
 
@@ -59,6 +71,7 @@ class SignalMemory:
     def __init__(self, db=None):
         if db is None:
             from data.database import SignalDB
+
             db = SignalDB()
         self.db = db
         self._ensure_tables()
@@ -81,10 +94,10 @@ class SignalMemory:
         self.db.conn.commit()
 
     # ── state persistence ────────────────────────────────────────────────
-    def get_state(self, symbol: str, tf: str) -> Optional[dict]:
+    def get_state(self, symbol: str, tf: str) -> dict | None:
         row = self.db.conn.execute(
-            "SELECT * FROM market_state WHERE symbol=? AND timeframe=?",
-            (symbol, tf)).fetchone()
+            "SELECT * FROM market_state WHERE symbol=? AND timeframe=?", (symbol, tf)
+        ).fetchone()
         return dict(row) if row else None
 
     def _put_state(self, symbol, tf, state: dict) -> None:
@@ -102,19 +115,34 @@ class SignalMemory:
                  last_flip_at=excluded.last_flip_at,
                  styles_json=excluded.styles_json,
                  last_signal_json=excluded.last_signal_json""",
-            (symbol, tf, state["state_hash"], state["htf_bias"], state["alignment"],
-             state["last_event"], state["price"], state["updated_at"],
-             state["reaffirms"], state["flips_1h"], state["last_flip_at"],
-             state["styles_json"], state["last_signal_json"]))
+            (
+                symbol,
+                tf,
+                state["state_hash"],
+                state["htf_bias"],
+                state["alignment"],
+                state["last_event"],
+                state["price"],
+                state["updated_at"],
+                state["reaffirms"],
+                state["flips_1h"],
+                state["last_flip_at"],
+                state["styles_json"],
+                state["last_signal_json"],
+            ),
+        )
         self.db.conn.commit()
 
     def _log_event(self, symbol, tf, kind, detail) -> None:
         self.db.conn.execute(
             "INSERT INTO state_events(symbol, timeframe, kind, detail, ts) VALUES (?,?,?,?,?)",
-            (symbol, tf, kind, detail, _now_ms()))
+            (symbol, tf, kind, detail, _now_ms()),
+        )
         self.db.conn.commit()
 
-    def history(self, symbol: str | None = None, tf: str | None = None, limit: int = 30) -> list[dict]:
+    def history(
+        self, symbol: str | None = None, tf: str | None = None, limit: int = 30
+    ) -> list[dict]:
         q = "SELECT * FROM state_events"
         conds, args = [], []
         if symbol:
@@ -130,8 +158,9 @@ class SignalMemory:
         return [dict(r) for r in self.db.conn.execute(q, args).fetchall()]
 
     # ── the decision ─────────────────────────────────────────────────────
-    def update(self, symbol: str, tf: str, mtf: dict, styles: dict,
-               frame: dict) -> dict:
+    def update(
+        self, symbol: str, tf: str, mtf: dict, styles: dict, frame: dict
+    ) -> dict:
         """Reconcile the current analysis with what the AI remembered.
 
         Returns a dict describing what happened:
@@ -148,7 +177,9 @@ class SignalMemory:
         fp = _fingerprint(parts)
         prev = self.get_state(symbol, tf)
 
-        htf_flip = prev and prev["htf_bias"] != parts["htf"] and parts["htf"] != "neutral"
+        htf_flip = (
+            prev and prev["htf_bias"] != parts["htf"] and parts["htf"] != "neutral"
+        )
         # pricestill inside previous state's range?
         price = f.get("price") or 0.0
 
@@ -172,8 +203,11 @@ class SignalMemory:
             status = "UPDATED"
             if prev.get("last_event") != parts["event"]:
                 changes.append(f"structure event: {parts['event']}")
-            prev_on = set(json.loads(prev.get("styles_json") or "{}").get("__on", [])) \
-                if prev.get("styles_json") else set()
+            prev_on = (
+                set(json.loads(prev.get("styles_json") or "{}").get("__on", []))
+                if prev.get("styles_json")
+                else set()
+            )
             new_on = set(parts["styles_on"])
             if new_on != prev_on:
                 added = new_on - prev_on
@@ -186,24 +220,31 @@ class SignalMemory:
                 changes.append("market state changed (levels/zone moved)")
         else:
             # same fingerprint → reaffirm; roll a fresh flip window
-            if prev.get("last_flip_at") and now - prev.get("last_flip_at", 0) > 3600_000:
+            if (
+                prev.get("last_flip_at")
+                and now - prev.get("last_flip_at", 0) > 3600_000
+            ):
                 flips = 0
             else:
                 flips = prev.get("flips_1h", 0)
-            self._put_state(symbol, tf, {
-                **prev,
-                "price": price,
-                "updated_at": now,
-                "reaffirms": prev.get("reaffirms", 0) + 1,
-                "flips_1h": flips,
-                "last_flip_at": prev.get("last_flip_at"),
-                "state_hash": fp,
-                "htf_bias": parts["htf"],
-                "alignment": parts["align"],
-                "last_event": parts["event"],
-                "styles_json": prev.get("styles_json", "{}"),
-                "last_signal_json": prev.get("last_signal_json", "{}"),
-            })
+            self._put_state(
+                symbol,
+                tf,
+                {
+                    **prev,
+                    "price": price,
+                    "updated_at": now,
+                    "reaffirms": prev.get("reaffirms", 0) + 1,
+                    "flips_1h": flips,
+                    "last_flip_at": prev.get("last_flip_at"),
+                    "state_hash": fp,
+                    "htf_bias": parts["htf"],
+                    "alignment": parts["align"],
+                    "last_event": parts["event"],
+                    "styles_json": prev.get("styles_json", "{}"),
+                    "last_signal_json": prev.get("last_signal_json", "{}"),
+                },
+            )
             return {
                 "status": "SAME",
                 "fresh_styles": [],
@@ -227,7 +268,9 @@ class SignalMemory:
 
         whipsaw = flips_1h >= MAX_FLIPS_PER_HOUR
         if whipsaw:
-            changes.append(f"⚠️ whipsaw guard: {flips_1h} HTF flips in the last hour — signals suppressed")
+            changes.append(
+                f"⚠️ whipsaw guard: {flips_1h} HTF flips in the last hour — signals suppressed"
+            )
 
         # per-style cooldowns
         fresh: list[str] = []
@@ -259,18 +302,30 @@ class SignalMemory:
         styles_json["__on"] = list(parts["styles_on"])
 
         state = {
-            "state_hash": fp, "htf_bias": parts["htf"], "alignment": parts["align"],
-            "last_event": parts["event"], "price": price, "updated_at": now,
-            "reaffirms": 0, "flips_1h": flips_1h, "last_flip_at": last_flip_at,
+            "state_hash": fp,
+            "htf_bias": parts["htf"],
+            "alignment": parts["align"],
+            "last_event": parts["event"],
+            "price": price,
+            "updated_at": now,
+            "reaffirms": 0,
+            "flips_1h": flips_1h,
+            "last_flip_at": last_flip_at,
             "styles_json": json.dumps(styles_json),
-            "last_signal_json": json.dumps({
-                "status": status, "htf": parts["htf"], "align": parts["align"],
-                "event": parts["event"], "styles_on": list(parts["styles_on"]),
-            }),
+            "last_signal_json": json.dumps(
+                {
+                    "status": status,
+                    "htf": parts["htf"],
+                    "align": parts["align"],
+                    "event": parts["event"],
+                    "styles_on": list(parts["styles_on"]),
+                }
+            ),
         }
         self._put_state(symbol, tf, state)
-        self._log_event(symbol, tf, status,
-                        "; ".join(changes) if changes else "state changed")
+        self._log_event(
+            symbol, tf, status, "; ".join(changes) if changes else "state changed"
+        )
 
         # stable_since = when this fingerprint first appeared
         stable_since = now

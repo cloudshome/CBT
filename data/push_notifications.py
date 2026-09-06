@@ -11,16 +11,16 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
 import requests
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
-import os
-
-VAPID_KEY_FILE = Path(os.getenv("SKY_STORE_ROOT", Path(__file__).parent / "store")) / "vapid_keys.json"
+VAPID_KEY_FILE = (
+    Path(os.getenv("SKY_STORE_ROOT", Path(__file__).parent / "store"))
+    / "vapid_keys.json"
+)
 
 
 def _b64url(data: bytes | str) -> str:
@@ -29,7 +29,9 @@ def _b64url(data: bytes | str) -> str:
     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
 
 
-def get_or_create_vapid_keys(key_path: Path | None = None) -> tuple[ec.EllipticCurvePrivateKey, str]:
+def get_or_create_vapid_keys(
+    key_path: Path | None = None,
+) -> tuple[ec.EllipticCurvePrivateKey, str]:
     """Load or generate SECP256R1 VAPID keys.
 
     Returns (private_key_obj, urlsafe_b64_public_key_point).
@@ -67,11 +69,15 @@ def get_or_create_vapid_keys(key_path: Path | None = None) -> tuple[ec.EllipticC
     pub_b64 = _b64url(raw_pub)
 
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({
-            "private_key_pem": priv_pem,
-            "public_key_b64": pub_b64,
-            "created_ts": int(time.time()),
-        }, f, indent=2)
+        json.dump(
+            {
+                "private_key_pem": priv_pem,
+                "public_key_b64": pub_b64,
+                "created_ts": int(time.time()),
+            },
+            f,
+            indent=2,
+        )
 
     return priv_key, pub_b64
 
@@ -82,8 +88,12 @@ def get_vapid_public_key(key_path: Path | None = None) -> str:
     return pub_b64
 
 
-def create_vapid_jwt(endpoint: str, key_path: Path | None = None,
-                     sub: str = "mailto:owner@sky.local", ttl: int = 43200) -> str:
+def create_vapid_jwt(
+    endpoint: str,
+    key_path: Path | None = None,
+    sub: str = "mailto:owner@sky.local",
+    ttl: int = 43200,
+) -> str:
     """Generate RFC 8292 VAPID JWT for a target push service endpoint."""
     parsed = urlparse(endpoint)
     origin = f"{parsed.scheme}://{parsed.netloc}"
@@ -97,7 +107,9 @@ def create_vapid_jwt(endpoint: str, key_path: Path | None = None,
         "sub": sub,
     }
 
-    sig_input = f"{_b64url(json.dumps(header))}.{_b64url(json.dumps(claims))}".encode("ascii")
+    sig_input = f"{_b64url(json.dumps(header))}.{_b64url(json.dumps(claims))}".encode(
+        "ascii"
+    )
     der_sig = priv_key.sign(sig_input, ec.ECDSA(hashes.SHA256()))
 
     # Convert DER signature to IEEE P1363 (64 bytes raw r + s)
@@ -107,8 +119,14 @@ def create_vapid_jwt(endpoint: str, key_path: Path | None = None,
     return f"{sig_input.decode('ascii')}.{_b64url(raw_sig)}"
 
 
-def send_web_push(endpoint: str, p256dh: str, auth: str, payload: dict,
-                  key_path: Path | None = None, timeout: int = 5) -> tuple[bool, int, str]:
+def send_web_push(
+    endpoint: str,
+    p256dh: str,
+    auth: str,
+    payload: dict,
+    key_path: Path | None = None,
+    timeout: int = 5,
+) -> tuple[bool, int, str]:
     """Send a VAPID web push notification to a browser subscription endpoint."""
     jwt = create_vapid_jwt(endpoint, key_path=key_path)
     _, pub_b64 = get_or_create_vapid_keys(key_path)
@@ -128,12 +146,19 @@ def send_web_push(endpoint: str, p256dh: str, auth: str, payload: dict,
         return False, 0, str(exc)
 
 
-def broadcast_push_notification(db, title: str, body: str,
-                                icon: str = "/static/icons/icon-192.png",
-                                url: str = "/", data: dict | None = None,
-                                key_path: Path | None = None) -> dict:
+def broadcast_push_notification(
+    db,
+    title: str,
+    body: str,
+    icon: str = "/static/icons/icon-192.png",
+    url: str = "/",
+    data: dict | None = None,
+    key_path: Path | None = None,
+) -> dict:
     """Broadcast a push notification to all stored device subscriptions."""
-    subs = db.list_push_subscriptions() if hasattr(db, "list_push_subscriptions") else []
+    subs = (
+        db.list_push_subscriptions() if hasattr(db, "list_push_subscriptions") else []
+    )
     if not subs:
         return {"sent": 0, "succeeded": 0, "failed": 0, "removed": 0}
 

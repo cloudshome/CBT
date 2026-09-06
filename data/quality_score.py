@@ -57,15 +57,16 @@ itself (`backtest_quality_score`) is pure and works on any decided rows,
 which is what lets the scorecard, the CLI, HTTP, and MCP all read the
 same computation (invariant #10).
 """
+
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from config import MIN_CONFIDENCE
-from data.backtester import WIN_SET
 from data.costs import calculate_trade_cost
 from data.scorecard import (
-    effective_sample_size, max_drawdown_r, trade_stats,
+    max_drawdown_r,
+    trade_stats,
 )
 from data.validation import DEFAULT_MIN_DECIDED, VALIDATION_CRITERIA
 
@@ -82,8 +83,12 @@ WEIGHTS: dict[str, float] = {
 #: exists at one parameter point is a fit, not a strategy (BT5).
 PLATEAU_CAP = 50.0
 
-BAND_CUTS = ((80.0, "robust"), (60.0, "acceptable"),
-             (40.0, "borderline"), (None, "fragile"))
+BAND_CUTS = (
+    (80.0, "robust"),
+    (60.0, "acceptable"),
+    (40.0, "borderline"),
+    (None, "fragile"),
+)
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -96,17 +101,21 @@ def _net_r(r: dict) -> float:
     if v is not None:
         return float(v)
     cost = calculate_trade_cost(
-        entry=r.get("entry"), stop_loss=r.get("stop_loss"),
-        action=r.get("side", "BUY"), gross_r=float(r.get("r", 0.0)),
-        holding_hours=r.get("holding_hours"), symbol=r.get("symbol", "BTCUSDT"),
-        ts=r.get("ts"))
+        entry=r.get("entry"),
+        stop_loss=r.get("stop_loss"),
+        action=r.get("side", "BUY"),
+        gross_r=float(r.get("r", 0.0)),
+        holding_hours=r.get("holding_hours"),
+        symbol=r.get("symbol", "BTCUSDT"),
+        ts=r.get("ts"),
+    )
     return cost.net_r
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # Component 1 — edge (0–100)
 # ──────────────────────────────────────────────────────────────────────────
-def edge_score(stats: dict, criteria: Optional[dict] = None) -> dict:
+def edge_score(stats: dict, criteria: dict | None = None) -> dict:
     """How far net expectancy sits above the bar, shape-discounted.
 
     ``e_net`` is mapped linearly: ≤ 0R → 0, at the bar → 50, at 2× the bar
@@ -125,8 +134,10 @@ def edge_score(stats: dict, criteria: Optional[dict] = None) -> dict:
     wr_net = stats.get("win_rate_net")
     if wr_net is not None and float(wr_net) <= float(criteria["win_rate"]):
         shape *= 0.85
-        notes.append(f"win_rate_net {float(wr_net):.1%} <= "
-                     f"{float(criteria['win_rate']):.0%} → ×0.85")
+        notes.append(
+            f"win_rate_net {float(wr_net):.1%} <= "
+            f"{float(criteria['win_rate']):.0%} → ×0.85"
+        )
     pf_net = stats.get("pf_net")
     if pf_net is not None and float(pf_net) < float(criteria["pf"]):
         shape *= 0.85
@@ -144,7 +155,7 @@ def edge_score(stats: dict, criteria: Optional[dict] = None) -> dict:
 # ──────────────────────────────────────────────────────────────────────────
 # Component 2 — curve robustness (0–100)
 # ──────────────────────────────────────────────────────────────────────────
-def _top_n_share(net_r: list[float], k: int = 5) -> Optional[float]:
+def _top_n_share(net_r: list[float], k: int = 5) -> float | None:
     """Share of gross positive R earned by the best k trades."""
     positive = sorted((v for v in net_r if v > 0), reverse=True)
     total = sum(positive)
@@ -153,7 +164,7 @@ def _top_n_share(net_r: list[float], k: int = 5) -> Optional[float]:
     return round(sum(positive[:k]) / total, 4)
 
 
-def _segments(net_r: list[float], n: int) -> Optional[list[float]]:
+def _segments(net_r: list[float], n: int) -> list[float] | None:
     """Chronological equal-count chunks → mean net R per chunk.
 
     Returns ``None`` when the book is too small to judge time-persistence
@@ -165,7 +176,7 @@ def _segments(net_r: list[float], n: int) -> Optional[list[float]]:
     chunk = n // n_seg
     means = []
     for i in range(n_seg):
-        part = net_r[i * chunk:(i + 1) * chunk]
+        part = net_r[i * chunk : (i + 1) * chunk]
         if part:
             means.append(sum(part) / len(part))
     return means
@@ -186,18 +197,27 @@ def curve_robustness(rows: list[dict]) -> dict:
     net_r = [_net_r(r) for r in ordered]
     n = len(net_r)
     if n == 0:
-        return {"score": 0.0, "n": 0, "concentration": None,
-                "drawdown": None, "segments": None,
-                "notes": ["no decided trades — nothing to be robust about"]}
+        return {
+            "score": 0.0,
+            "n": 0,
+            "concentration": None,
+            "drawdown": None,
+            "segments": None,
+            "notes": ["no decided trades — nothing to be robust about"],
+        }
 
     # concentration
     share = _top_n_share(net_r)
     if share is None:
-        conc_score, conc_note = 0.0, "no positive net R — the book has no edge to be concentrated in"
+        conc_score, conc_note = (
+            0.0,
+            "no positive net R — the book has no edge to be concentrated in",
+        )
     else:
         conc_score = 100.0 * _clamp(1.0 - share / 0.5, 0.0, 1.0)
-        conc_note = (f"top-5 wins = {share:.1%} of gross wins"
-                     if share > 0 else "no wins")
+        conc_note = (
+            f"top-5 wins = {share:.1%} of gross wins" if share > 0 else "no wins"
+        )
 
     # drawdown
     total_net = sum(net_r)
@@ -209,20 +229,20 @@ def curve_robustness(rows: list[dict]) -> dict:
     else:
         ratio = dd / abs(total_net)
         dd_score = 100.0 * _clamp(1.0 - ratio / 0.5, 0.0, 1.0)
-        dd_note = (f"max DD {dd:.2f}R = {ratio:.1%} of total "
-                   f"{total_net:+.2f}R")
+        dd_note = f"max DD {dd:.2f}R = {ratio:.1%} of total {total_net:+.2f}R"
 
     # segments
     seg_means = _segments(net_r, n)
     if seg_means is None:
-        seg_score: Optional[float] = None
+        seg_score: float | None = None
         seg_note = f"n={n} too small to split chronologically"
-        hit: Optional[float] = None
+        hit: float | None = None
     else:
         hit = sum(1 for m in seg_means if m > 0) / len(seg_means)
         seg_score = 100.0 * hit
-        seg_note = (f"{sum(1 for m in seg_means if m > 0)}/"
-                    f"{len(seg_means)} segments positive")
+        seg_note = (
+            f"{sum(1 for m in seg_means if m > 0)}/{len(seg_means)} segments positive"
+        )
 
     # weighted blend (renormalised when segments are unavailable)
     parts: list[tuple[float, float]] = []
@@ -238,12 +258,22 @@ def curve_robustness(rows: list[dict]) -> dict:
     return {
         "score": round(score, 1),
         "n": n,
-        "concentration": {"score": round(conc_score, 1),
-                          "share_top5": share, "note": conc_note},
-        "drawdown": {"score": round(dd_score, 1), "max_dd_r": round(dd, 3),
-                     "total_net_r": round(total_net, 3), "note": dd_note},
-        "segments": {"score": round(seg_score, 1) if seg_score is not None else None,
-                     "positive_fraction": hit, "note": seg_note},
+        "concentration": {
+            "score": round(conc_score, 1),
+            "share_top5": share,
+            "note": conc_note,
+        },
+        "drawdown": {
+            "score": round(dd_score, 1),
+            "max_dd_r": round(dd, 3),
+            "total_net_r": round(total_net, 3),
+            "note": dd_note,
+        },
+        "segments": {
+            "score": round(seg_score, 1) if seg_score is not None else None,
+            "positive_fraction": hit,
+            "note": seg_note,
+        },
         "notes": [conc_note, dd_note, seg_note],
     }
 
@@ -251,8 +281,9 @@ def curve_robustness(rows: list[dict]) -> dict:
 # ──────────────────────────────────────────────────────────────────────────
 # Component 3 — sample confidence (0–100)
 # ──────────────────────────────────────────────────────────────────────────
-def sample_score(stats: dict, min_decided: int = DEFAULT_MIN_DECIDED,
-                 criteria: Optional[dict] = None) -> dict:
+def sample_score(
+    stats: dict, min_decided: int = DEFAULT_MIN_DECIDED, criteria: dict | None = None
+) -> dict:
     """Evidence sufficiency, overlap-corrected.
 
     size:         N_eff / min_decided — a book with fewer *independent*
@@ -270,7 +301,7 @@ def sample_score(stats: dict, min_decided: int = DEFAULT_MIN_DECIDED,
     size_score = 100.0 * _clamp(n_eff / max(1, min_decided), 0.0, 1.0)
 
     ci = stats.get("expectancy_net_ci95")
-    sig: Optional[float] = None
+    sig: float | None = None
     if ci and ci[0] is not None:
         lo = float(ci[0])
         sig = 100.0 * _clamp((lo + bar_e) / max(bar_e, 1e-9), 0.0, 1.0)
@@ -280,13 +311,19 @@ def sample_score(stats: dict, min_decided: int = DEFAULT_MIN_DECIDED,
         sig_block = None
     else:
         score = 0.5 * size_score + 0.5 * sig
-        sig_block = {"score": round(sig, 1), "ci95_low": round(float(ci[0]), 4),
-                     "note": "CI lower bound vs break-even"}
+        sig_block = {
+            "score": round(sig, 1),
+            "ci95_low": round(float(ci[0]), 4),
+            "note": "CI lower bound vs break-even",
+        }
 
     return {
         "score": round(score, 1),
-        "size": {"score": round(size_score, 1), "n_eff": round(n_eff, 2),
-                 "min_decided": min_decided},
+        "size": {
+            "score": round(size_score, 1),
+            "n_eff": round(n_eff, 2),
+            "min_decided": min_decided,
+        },
         "significance": sig_block,
     }
 
@@ -294,7 +331,7 @@ def sample_score(stats: dict, min_decided: int = DEFAULT_MIN_DECIDED,
 # ──────────────────────────────────────────────────────────────────────────
 # Component 4 — parameter plateau (0–100), the BT5 cap
 # ──────────────────────────────────────────────────────────────────────────
-def plateau_score(plateau: dict, criteria: Optional[dict] = None) -> dict:
+def plateau_score(plateau: dict, criteria: dict | None = None) -> dict:
     """The parameter-plateau test (BT5): does the edge persist across a
     neighbourhood of a strategy parameter, or only at one isolated point?
 
@@ -316,13 +353,17 @@ def plateau_score(plateau: dict, criteria: Optional[dict] = None) -> dict:
     bar_e = float(criteria["expectancy"])
     points = plateau.get("points") or []
     if len(points) < 2:
-        return {"score": None, "cap": False, "points": [],
-                "note": "fewer than 2 parameter points — plateau not testable"}
-    positives = [p for p in points
-                 if float(p.get("expectancy_net", 0.0) or 0.0) > 0]
+        return {
+            "score": None,
+            "cap": False,
+            "points": [],
+            "note": "fewer than 2 parameter points — plateau not testable",
+        }
+    positives = [p for p in points if float(p.get("expectancy_net", 0.0) or 0.0) > 0]
     frac_pos = len(positives) / len(points)
-    mean_e = sum(float(p.get("expectancy_net", 0.0) or 0.0)
-                 for p in points) / len(points)
+    mean_e = sum(float(p.get("expectancy_net", 0.0) or 0.0) for p in points) / len(
+        points
+    )
     magnitude = _clamp(mean_e / max(bar_e, 1e-9), 0.0, 1.0)
     score = 100.0 * (0.7 * frac_pos + 0.3 * magnitude)
     return {
@@ -333,15 +374,17 @@ def plateau_score(plateau: dict, criteria: Optional[dict] = None) -> dict:
         "fraction_positive": round(frac_pos, 3),
         "mean_expectancy_net": round(mean_e, 3),
         "points": points,
-        "note": (f"{len(positives)}/{len(points)} points positive, "
-                 f"mean E_net {mean_e:+.3f}R vs bar {bar_e:+.2f}R"),
+        "note": (
+            f"{len(positives)}/{len(points)} points positive, "
+            f"mean E_net {mean_e:+.3f}R vs bar {bar_e:+.2f}R"
+        ),
     }
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # The composite
 # ──────────────────────────────────────────────────────────────────────────
-def _band(score: Optional[float]) -> Optional[str]:
+def _band(score: float | None) -> str | None:
     if score is None:
         return None
     for cut, label in BAND_CUTS:
@@ -350,11 +393,14 @@ def _band(score: Optional[float]) -> Optional[str]:
     return "fragile"
 
 
-def backtest_quality_score(rows: list[dict], *,
-                           min_decided: int = DEFAULT_MIN_DECIDED,
-                           criteria: Optional[dict] = None,
-                           step: int = 1,
-                           plateau: Optional[dict] = None) -> dict:
+def backtest_quality_score(
+    rows: list[dict],
+    *,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    criteria: dict | None = None,
+    step: int = 1,
+    plateau: dict | None = None,
+) -> dict:
     """The P12.4 Backtest Quality Score 0–100 for one book of decided rows.
 
     Pure: same rows in → same score out. Never raises on an empty book —
@@ -369,10 +415,16 @@ def backtest_quality_score(rows: list[dict], *,
     criteria = criteria or VALIDATION_CRITERIA
     rows = [r for r in rows if r.get("r") is not None]
     if not rows:
-        return {"ok": True, "quality": None, "band": None,
-                "components": None, "plateau_cap": False,
-                "reason": "no decided trades — nothing to score",
-                "evaluated_on": "net", "overlap_corrected": True}
+        return {
+            "ok": True,
+            "quality": None,
+            "band": None,
+            "components": None,
+            "plateau_cap": False,
+            "reason": "no decided trades — nothing to score",
+            "evaluated_on": "net",
+            "overlap_corrected": True,
+        }
 
     stats = trade_stats(rows, step=step)
     edge = edge_score(stats, criteria)
@@ -381,7 +433,8 @@ def backtest_quality_score(rows: list[dict], *,
     plat = plateau_score(plateau, criteria) if plateau else None
 
     parts: list[tuple[str, float]] = [
-        ("edge", edge["score"]), ("robustness", robustness["score"]),
+        ("edge", edge["score"]),
+        ("robustness", robustness["score"]),
         ("sample", sample["score"]),
     ]
     if plat is not None and plat["score"] is not None:
@@ -417,38 +470,63 @@ def backtest_quality_score(rows: list[dict], *,
 # ──────────────────────────────────────────────────────────────────────────
 # The plateau sweep (store-only, like the locked P12.1 protocol)
 # ──────────────────────────────────────────────────────────────────────────
-def _grade_store_book(exchange: str, market: str, symbol: str,
-                      timeframe: str, bars: int, horizons: Optional[list],
-                      min_bars: Optional[int], step: int,
-                      min_confidence: int, cost_model=None) -> dict:
+def _grade_store_book(
+    exchange: str,
+    market: str,
+    symbol: str,
+    timeframe: str,
+    bars: int,
+    horizons: list | None,
+    min_bars: int | None,
+    step: int,
+    min_confidence: int,
+    cost_model=None,
+) -> dict:
     """One walk-forward grade of the stored series at one parameter point."""
     from config import BACKTEST_MIN_BARS
     from data.backtester import run_backtest_on_store
     from data.scorecard import rows_from_graded
 
     result = run_backtest_on_store(
-        exchange=exchange, market=market, symbol=symbol, timeframe=timeframe,
-        bars=bars, horizons=horizons,
+        exchange=exchange,
+        market=market,
+        symbol=symbol,
+        timeframe=timeframe,
+        bars=bars,
+        horizons=horizons,
         min_bars=BACKTEST_MIN_BARS if min_bars is None else min_bars,
-        step=step, min_confidence=min_confidence)
+        step=step,
+        min_confidence=min_confidence,
+    )
     if not result.get("ok", True) or result.get("error"):
         return {"ok": False, "error": result.get("error", "backtest failed")}
-    rows = rows_from_graded(result.get("graded", []), symbol=symbol,
-                            timeframe=timeframe, cost_model=cost_model)
-    return {"ok": True, "rows": rows,
-            "meta": result.get("report", {}).get("meta", {})}
+    rows = rows_from_graded(
+        result.get("graded", []),
+        symbol=symbol,
+        timeframe=timeframe,
+        cost_model=cost_model,
+    )
+    return {"ok": True, "rows": rows, "meta": result.get("report", {}).get("meta", {})}
 
 
-def run_quality_sweep(*, exchange: str = "binance", market: str = "perp",
-                      symbol: str = "BTCUSDT", timeframe: str = "15m",
-                      bars: int = 1000, horizons: Optional[list] = None,
-                      min_bars: Optional[int] = None, step: int = 3,
-                      min_confidence: int = MIN_CONFIDENCE,
-                      min_decided: int = DEFAULT_MIN_DECIDED,
-                      cost_model=None,
-                      offsets: tuple = (-5, 0, 5),
-                      conf_min: int = 40, conf_max: int = 90,
-                      grade_fn: Optional[Callable] = None) -> dict:
+def run_quality_sweep(
+    *,
+    exchange: str = "binance",
+    market: str = "perp",
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    bars: int = 1000,
+    horizons: list | None = None,
+    min_bars: int | None = None,
+    step: int = 3,
+    min_confidence: int = MIN_CONFIDENCE,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    cost_model=None,
+    offsets: tuple = (-5, 0, 5),
+    conf_min: int = 40,
+    conf_max: int = 90,
+    grade_fn: Callable | None = None,
+) -> dict:
     """P12.4 plateau sweep: re-grade the stored series at every point of a
     strategy-parameter neighbourhood and score the base book with that
     evidence.
@@ -464,12 +542,21 @@ def run_quality_sweep(*, exchange: str = "binance", market: str = "perp",
     like the locked P12.1 protocol. Missing/short series return a clear
     error, never a score.
     """
-    from data.costs import CostModel
 
-    grade_fn = grade_fn or (lambda conf: _grade_store_book(
-        exchange=exchange, market=market, symbol=symbol, timeframe=timeframe,
-        bars=bars, horizons=horizons, min_bars=min_bars, step=step,
-        min_confidence=conf, cost_model=cost_model))
+    grade_fn = grade_fn or (
+        lambda conf: _grade_store_book(
+            exchange=exchange,
+            market=market,
+            symbol=symbol,
+            timeframe=timeframe,
+            bars=bars,
+            horizons=horizons,
+            min_bars=min_bars,
+            step=step,
+            min_confidence=conf,
+            cost_model=cost_model,
+        )
+    )
 
     # The base parameter point is sacred — grade it even when the offsets
     # clamp onto it (e.g. min_confidence at the floor makes -5 a duplicate).
@@ -482,14 +569,13 @@ def run_quality_sweep(*, exchange: str = "binance", market: str = "perp",
     if base_conf not in confs:
         confs.insert(0, base_conf)
 
-    base_rows: Optional[list] = None
+    base_rows: list | None = None
     points: list[dict] = []
     meta: dict = {}
     for conf in confs:
         book = grade_fn(conf)
         if not book.get("ok") or book.get("error"):
-            return {"ok": False,
-                    "error": book.get("error", "grade failed")}
+            return {"ok": False, "error": book.get("error", "grade failed")}
         rows = book.get("rows") or []
         stats = trade_stats(rows, step=step) if rows else {}
         point = {
@@ -509,10 +595,10 @@ def run_quality_sweep(*, exchange: str = "binance", market: str = "perp",
     if base_rows is None:
         return {"ok": False, "error": "base parameter point not in sweep"}
 
-    plateau = {"param": "min_confidence", "base": base_conf,
-               "points": points}
+    plateau = {"param": "min_confidence", "base": base_conf, "points": points}
     quality = backtest_quality_score(
-        base_rows, min_decided=min_decided, step=step, plateau=plateau)
+        base_rows, min_decided=min_decided, step=step, plateau=plateau
+    )
 
     return {
         "ok": True,
@@ -520,9 +606,12 @@ def run_quality_sweep(*, exchange: str = "binance", market: str = "perp",
         "plateau": plateau,
         "meta": {
             **meta,
-            "symbol": symbol, "timeframe": timeframe,
-            "exchange": exchange, "market": market,
-            "bars": bars, "step": step,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "exchange": exchange,
+            "market": market,
+            "bars": bars,
+            "step": step,
             "min_confidence_swept": min_confidence,
             "param_sweep": "min_confidence",
             "offsets": list(offsets),
@@ -553,20 +642,23 @@ def print_quality(report: dict) -> None:
         return
 
     print("=" * W)
-    print(f"BACKTEST QUALITY  {_fmt(report['quality'])}/100   "
-          f"band: {report['band']}   evaluated NET of costs, "
-          f"overlap-corrected (P12.4)")
+    print(
+        f"BACKTEST QUALITY  {_fmt(report['quality'])}/100   "
+        f"band: {report['band']}   evaluated NET of costs, "
+        f"overlap-corrected (P12.4)"
+    )
     comp = report.get("components") or {}
     weights = report.get("weights") or {}
-    w_parts = " · ".join(f"{k} {w:.0%}"
-                         for k, w in sorted(weights.items()))
+    w_parts = " · ".join(f"{k} {w:.0%}" for k, w in sorted(weights.items()))
     print(f"weights   {w_parts}")
     print("-" * W)
     if comp.get("edge"):
         e = comp["edge"]
-        print(f"  edge       {_fmt(e['score']):>6}/100  "
-              f"E_net {e['expectancy_net']:+.3f}R vs bar "
-              f"{e['bar_expectancy']:+.2f}R  shape ×{e['shape']}")
+        print(
+            f"  edge       {_fmt(e['score']):>6}/100  "
+            f"E_net {e['expectancy_net']:+.3f}R vs bar "
+            f"{e['bar_expectancy']:+.2f}R  shape ×{e['shape']}"
+        )
         for note in e.get("notes", []):
             print(f"              ⚠ {note}")
     if comp.get("robustness"):
@@ -574,37 +666,47 @@ def print_quality(report: dict) -> None:
         print(f"  robustness {_fmt(r['score']):>6}/100  n={r['n']}")
         if r.get("concentration"):
             c = r["concentration"]
-            print(f"              concentration {_fmt(c['score']):>5}/100  "
-                  f"top-5 share "
-                  f"{_fmt(c['share_top5'], '.1%') if c['share_top5'] is not None else 'n/a'}")
+            print(
+                f"              concentration {_fmt(c['score']):>5}/100  "
+                f"top-5 share "
+                f"{_fmt(c['share_top5'], '.1%') if c['share_top5'] is not None else 'n/a'}"
+            )
         if r.get("drawdown"):
             d = r["drawdown"]
-            print(f"              drawdown      {_fmt(d['score']):>5}/100  "
-                  f"{d['note']}")
+            print(f"              drawdown      {_fmt(d['score']):>5}/100  {d['note']}")
         if r.get("segments"):
             s = r["segments"]
             seg_s = _fmt(s["score"]) if s["score"] is not None else "n/a"
             print(f"              segments      {seg_s:>5}/100  {s['note']}")
     if comp.get("sample"):
         s = comp["sample"]
-        print(f"  sample     {_fmt(s['score']):>6}/100  "
-              f"N_eff {_fmt(s['size']['n_eff'], '.2f')} vs "
-              f"min_decided {s['size']['min_decided']}")
+        print(
+            f"  sample     {_fmt(s['score']):>6}/100  "
+            f"N_eff {_fmt(s['size']['n_eff'], '.2f')} vs "
+            f"min_decided {s['size']['min_decided']}"
+        )
         if s.get("significance"):
             sig = s["significance"]
-            print(f"              significance  {_fmt(sig['score']):>5}/100  "
-                  f"CI95 low {sig['ci95_low']:+.3f}R (break-even = 0)")
+            print(
+                f"              significance  {_fmt(sig['score']):>5}/100  "
+                f"CI95 low {sig['ci95_low']:+.3f}R (break-even = 0)"
+            )
     if comp.get("plateau") and comp["plateau"].get("score") is not None:
         p = comp["plateau"]
-        print(f"  plateau    {_fmt(p['score']):>6}/100  "
-              f"{p['note']}")
+        print(f"  plateau    {_fmt(p['score']):>6}/100  {p['note']}")
         if p.get("cap"):
-            print("              🛑 isolated parameter peak — total "
-                  "CAPPED at 50 (a fit, not an edge)")
+            print(
+                "              🛑 isolated parameter peak — total "
+                "CAPPED at 50 (a fit, not an edge)"
+            )
     print("-" * W)
-    print(f"BACKTEST QUALITY VERDICT  "
-          f"{'🟢 ' + report['band'] if report['quality'] >= 60 else '🔴 ' + report['band']}  "
-          f"{report['quality']}/100")
-    print("  A quality score reports robustness; it does not grant "
-          "permission. The graduation bar is unchanged.")
+    print(
+        f"BACKTEST QUALITY VERDICT  "
+        f"{'🟢 ' + report['band'] if report['quality'] >= 60 else '🔴 ' + report['band']}  "
+        f"{report['quality']}/100"
+    )
+    print(
+        "  A quality score reports robustness; it does not grant "
+        "permission. The graduation bar is unchanged."
+    )
     print("=" * W)

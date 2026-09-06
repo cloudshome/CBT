@@ -4,17 +4,22 @@ Indexes structured knowledge, backtest performance, asset playbooks, risk
 management rules, and SMC/ICT concepts so the system can answer queries
 with verifiable citations.
 """
+
 from __future__ import annotations
 
 import re
-from typing import Optional
 
-from data.database import SignalDB
 from brain.playbooks import PLAYBOOKS
-from config import (MAX_DAILY_LOSS_PCT, MAX_WEEKLY_LOSS_PCT, RISK_PCT,
-                    PROGRESSION_LEVELS, PROGRESSION, GOLD_LONDON_WINDOW,
-                    GOLD_NY_WINDOW)
-
+from config import (
+    GOLD_LONDON_WINDOW,
+    GOLD_NY_WINDOW,
+    MAX_DAILY_LOSS_PCT,
+    MAX_WEEKLY_LOSS_PCT,
+    PROGRESSION,
+    PROGRESSION_LEVELS,
+    RISK_PCT,
+)
+from data.database import SignalDB
 
 # Default calibrated knowledge base (baseline when DB has few live rows)
 DEFAULT_BACKTEST_KNOWLEDGE = [
@@ -67,7 +72,7 @@ DEFAULT_BACKTEST_KNOWLEDGE = [
 
 
 class TradingLibrary:
-    def __init__(self, db: Optional[SignalDB] = None):
+    def __init__(self, db: SignalDB | None = None):
         self.db = db
         self.documents: list[dict] = []
         self._build_index()
@@ -87,15 +92,22 @@ class TradingLibrary:
                 stats = self.db.backtest_stats()
                 by_type = stats.get("by_type", [])
                 for b in by_type:
-                    rows.append({
-                        "plan_type": b.get("plan_type"),
-                        "regime": "all",
-                        "samples": b.get("n", 0),
-                        "expectancy": round(float(b.get("avg_rr", 0.0) * (b.get("win_rate") or 0.5)), 2),
-                        "win_rate": b.get("win_rate") or 0.0,
-                        "avg_rr": b.get("avg_rr", 0.0),
-                        "note": f"Recorded database backtest for {b.get('plan_type')}",
-                    })
+                    rows.append(
+                        {
+                            "plan_type": b.get("plan_type"),
+                            "regime": "all",
+                            "samples": b.get("n", 0),
+                            "expectancy": round(
+                                float(
+                                    b.get("avg_rr", 0.0) * (b.get("win_rate") or 0.5)
+                                ),
+                                2,
+                            ),
+                            "win_rate": b.get("win_rate") or 0.0,
+                            "avg_rr": b.get("avg_rr", 0.0),
+                            "note": f"Recorded database backtest for {b.get('plan_type')}",
+                        }
+                    )
             except Exception:
                 rows = []
 
@@ -113,14 +125,16 @@ class TradingLibrary:
                 f"{pt}: bt n={n} exp={exp_sign}R (win {win}%) in {reg} regime. "
                 f"Avg RR: {r.get('avg_rr', 0.0)}. {r.get('note', '')}"
             )
-            self.documents.append({
-                "doc_id": f"bt_{pt.lower().replace(' ', '_')}_{reg}",
-                "category": "backtest_results",
-                "title": f"Backtest Performance: {pt} ({reg})",
-                "content": content,
-                "citation": "backtest_results",
-                "metadata": r,
-            })
+            self.documents.append(
+                {
+                    "doc_id": f"bt_{pt.lower().replace(' ', '_')}_{reg}",
+                    "category": "backtest_results",
+                    "title": f"Backtest Performance: {pt} ({reg})",
+                    "content": content,
+                    "citation": "backtest_results",
+                    "metadata": r,
+                }
+            )
 
     def _index_playbooks(self) -> None:
         for sym, pb in PLAYBOOKS.items():
@@ -135,60 +149,120 @@ class TradingLibrary:
             elif sym == "XAUUSD":
                 content += f" Rule: London ({GOLD_LONDON_WINDOW[0]}:00-{GOLD_LONDON_WINDOW[1]}:00 UTC) and NY ({GOLD_NY_WINDOW[0]}:00-{GOLD_NY_WINDOW[1]}:00 UTC) preferred. Asia is off-window."
 
-            self.documents.append({
-                "doc_id": f"playbook_{sym.lower()}",
-                "category": "playbooks",
-                "title": f"{sym} Playbook Rules",
-                "content": content,
-                "citation": f"playbooks/{sym.replace('USDT', '').replace('USD', '')}",
-                "metadata": {"symbol": sym, **pb},
-            })
+            self.documents.append(
+                {
+                    "doc_id": f"playbook_{sym.lower()}",
+                    "category": "playbooks",
+                    "title": f"{sym} Playbook Rules",
+                    "content": content,
+                    "citation": f"playbooks/{sym.replace('USDT', '').replace('USD', '')}",
+                    "metadata": {"symbol": sym, **pb},
+                }
+            )
 
     def _index_risk_rules(self) -> None:
-        ladder = ", ".join(f"{k}: max {v.get('risk_pct')}%" for k, v in PROGRESSION_LEVELS.items())
+        ladder = ", ".join(
+            f"{k}: max {v.get('risk_pct')}%" for k, v in PROGRESSION_LEVELS.items()
+        )
         rules = [
-            ("daily_weekly_loss", "Daily and Weekly Loss Limits",
-             f"Maximum daily loss is {MAX_DAILY_LOSS_PCT}% of account. Maximum weekly loss is {MAX_WEEKLY_LOSS_PCT}%. "
-             f"If breached, trading is hard-blocked until reset.", "risk_rules"),
-            ("drawdown_ladder", "Drawdown Ladder Halts",
-             "Drawdown rules: at -5% drawdown size drops 50%; at -8% drawdown size drops 75%; at -10% drawdown full trading halt.", "risk_rules"),
-            ("behavioral_state", "Trader Behavioral Gate",
-             "Trading is blocked if trader is marked angry, tired, revenge trading, or chasing price. Discipline gate enforced.", "risk_rules"),
-            ("progression_ladder", "Progression Ladder Tiers",
-             f"Progression tiers ({ladder}). Current level: {PROGRESSION}. Default base risk: {RISK_PCT}%.", "risk_rules"),
-            ("correlated_crypto", "Correlated Crypto Risk Bucket",
-             "BTC and ETH are correlated crypto assets. Same-direction trades share the portfolio risk cap (max 2 correlated positions).", "risk_rules"),
+            (
+                "daily_weekly_loss",
+                "Daily and Weekly Loss Limits",
+                f"Maximum daily loss is {MAX_DAILY_LOSS_PCT}% of account. Maximum weekly loss is {MAX_WEEKLY_LOSS_PCT}%. "
+                f"If breached, trading is hard-blocked until reset.",
+                "risk_rules",
+            ),
+            (
+                "drawdown_ladder",
+                "Drawdown Ladder Halts",
+                "Drawdown rules: at -5% drawdown size drops 50%; at -8% drawdown size drops 75%; at -10% drawdown full trading halt.",
+                "risk_rules",
+            ),
+            (
+                "behavioral_state",
+                "Trader Behavioral Gate",
+                "Trading is blocked if trader is marked angry, tired, revenge trading, or chasing price. Discipline gate enforced.",
+                "risk_rules",
+            ),
+            (
+                "progression_ladder",
+                "Progression Ladder Tiers",
+                f"Progression tiers ({ladder}). Current level: {PROGRESSION}. Default base risk: {RISK_PCT}%.",
+                "risk_rules",
+            ),
+            (
+                "correlated_crypto",
+                "Correlated Crypto Risk Bucket",
+                "BTC and ETH are correlated crypto assets. Same-direction trades share the portfolio risk cap (max 2 correlated positions).",
+                "risk_rules",
+            ),
         ]
         for doc_id, title, content, citation in rules:
-            self.documents.append({
-                "doc_id": f"risk_{doc_id}",
-                "category": "risk_rules",
-                "title": title,
-                "content": content,
-                "citation": citation,
-                "metadata": {"rule_id": doc_id},
-            })
+            self.documents.append(
+                {
+                    "doc_id": f"risk_{doc_id}",
+                    "category": "risk_rules",
+                    "title": title,
+                    "content": content,
+                    "citation": citation,
+                    "metadata": {"rule_id": doc_id},
+                }
+            )
 
     def _index_glossary(self) -> None:
         terms = [
-            ("order_block", "Order Block (OB)", "Last down-candle before an impulsive up-move (bullish OB) or last up-candle before an impulsive down-move (bearish OB). Institutional supply/demand level.", "glossary/OB"),
-            ("fair_value_gap", "Fair Value Gap (FVG)", "3-candle price imbalance where candle 1 high does not overlap candle 3 low. Acts as an inefficiency target or re-entry zone.", "glossary/FVG"),
-            ("break_of_structure", "Break of Structure (BOS)", "Candle close beyond previous swing high in uptrend or swing low in downtrend confirming trend continuation.", "glossary/BOS"),
-            ("change_of_character", "Change of Character (CHOCH)", "First break of counter-trend swing point signalling potential trend reversal.", "glossary/CHOCH"),
-            ("liquidity_sweep", "Liquidity Sweep", "Price briefly wicks past key swing highs (buy-side liquidity) or swing lows (sell-side liquidity) before reversing sharply.", "glossary/sweep"),
-            ("premium_discount", "Premium vs Discount Zone", "Dealing range midpoint (50% equilibrium). Above 50% is premium (favors selling), below 50% is discount (favors buying).", "glossary/equilibrium"),
+            (
+                "order_block",
+                "Order Block (OB)",
+                "Last down-candle before an impulsive up-move (bullish OB) or last up-candle before an impulsive down-move (bearish OB). Institutional supply/demand level.",
+                "glossary/OB",
+            ),
+            (
+                "fair_value_gap",
+                "Fair Value Gap (FVG)",
+                "3-candle price imbalance where candle 1 high does not overlap candle 3 low. Acts as an inefficiency target or re-entry zone.",
+                "glossary/FVG",
+            ),
+            (
+                "break_of_structure",
+                "Break of Structure (BOS)",
+                "Candle close beyond previous swing high in uptrend or swing low in downtrend confirming trend continuation.",
+                "glossary/BOS",
+            ),
+            (
+                "change_of_character",
+                "Change of Character (CHOCH)",
+                "First break of counter-trend swing point signalling potential trend reversal.",
+                "glossary/CHOCH",
+            ),
+            (
+                "liquidity_sweep",
+                "Liquidity Sweep",
+                "Price briefly wicks past key swing highs (buy-side liquidity) or swing lows (sell-side liquidity) before reversing sharply.",
+                "glossary/sweep",
+            ),
+            (
+                "premium_discount",
+                "Premium vs Discount Zone",
+                "Dealing range midpoint (50% equilibrium). Above 50% is premium (favors selling), below 50% is discount (favors buying).",
+                "glossary/equilibrium",
+            ),
         ]
         for doc_id, title, content, citation in terms:
-            self.documents.append({
-                "doc_id": f"glossary_{doc_id}",
-                "category": "glossary",
-                "title": title,
-                "content": content,
-                "citation": citation,
-                "metadata": {"term_id": doc_id},
-            })
+            self.documents.append(
+                {
+                    "doc_id": f"glossary_{doc_id}",
+                    "category": "glossary",
+                    "title": title,
+                    "content": content,
+                    "citation": citation,
+                    "metadata": {"term_id": doc_id},
+                }
+            )
 
-    def search(self, query: str, top_k: int = 4, category: Optional[str] = None) -> list[dict]:
+    def search(
+        self, query: str, top_k: int = 4, category: str | None = None
+    ) -> list[dict]:
         """Simple TF-IDF / lexical ranking search across indexed documents."""
         q_tokens = set(re.findall(r"\w+", query.lower()))
         if not q_tokens:

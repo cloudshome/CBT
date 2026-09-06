@@ -1,4 +1,5 @@
 """sky_agent.monitor_system — periodic host health probe (CPU/RAM/disk/staleness)."""
+
 from __future__ import annotations
 
 import os
@@ -21,6 +22,7 @@ def _cpu_percent() -> float | None:
 def _ram_percent() -> float | None:
     try:
         import pathlib
+
         txt = pathlib.Path("/proc/meminfo").read_text()
         info = {}
         for line in txt.splitlines():
@@ -37,7 +39,9 @@ def _ram_percent() -> float | None:
     return None
 
 
-def probe_system(*, store_path: Path | None = None, db_path: Path | None = None) -> dict[str, Any]:
+def probe_system(
+    *, store_path: Path | None = None, db_path: Path | None = None
+) -> dict[str, Any]:
     from sky_agent.config import DISK_ALERT_PCT, RAM_ALERT_PCT
 
     alerts: list[str] = []
@@ -62,9 +66,9 @@ def probe_system(*, store_path: Path | None = None, db_path: Path | None = None)
     stale = False
     stale_detail = ""
     try:
-        from data.store import CandleStore
+
         # Quick probe: check any stored series freshness via data/quality if available
-        from data.quality import check_series  # type: ignore
+        pass  # type: ignore
     except Exception:
         pass
 
@@ -73,6 +77,7 @@ def probe_system(*, store_path: Path | None = None, db_path: Path | None = None)
     db_detail = ""
     try:
         from data.database import SignalDB
+
         with SignalDB(path=db_path) as db:
             db.conn.execute("SELECT 1").fetchone()
     except Exception as exc:
@@ -80,7 +85,11 @@ def probe_system(*, store_path: Path | None = None, db_path: Path | None = None)
         db_detail = str(exc)
         alerts.append(f"database failure: {db_detail[:120]}")
 
-    level = "CRITICAL" if any("database" in a or "disk" in a for a in alerts) else ("HIGH" if alerts else "LOW")
+    level = (
+        "CRITICAL"
+        if any("database" in a or "disk" in a for a in alerts)
+        else ("HIGH" if alerts else "LOW")
+    )
 
     return {
         "ts": now,

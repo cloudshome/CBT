@@ -26,16 +26,16 @@ Surfaces: ``python main.py weekly``, ``GET /api/weekly`` (+ ``/export``),
 the dashboard Review tab, the ``weekly_review`` MCP tool, and the
 ``WeeklyReviewAgent`` payload. Same computation everywhere (invariant #10).
 """
+
 from __future__ import annotations
 
 import time
 from collections import Counter
-from typing import Optional
 
+from brain.journal import graduation_discipline
 from data.costs import net_r_of_row
 from data.database import SignalDB
 from data.simulator import GRADUATION_CRITERIA, paper_progress
-from brain.journal import graduation_discipline
 
 # The journal-first approval gate (W3.3) uses this population and this label.
 JOURNAL_GATE_LABEL = "journal-first discipline"
@@ -54,11 +54,18 @@ def _book_stats(rows: list[dict]) -> dict:
     """
     if not rows:
         return {
-            "n": 0, "wins": 0, "losses": 0, "win_rate": None,
-            "expectancy_net": None, "expectancy_gross": None,
-            "profit_factor": None, "total_r_net": 0.0,
-            "avg_win_r": None, "avg_loss_r": None,
-            "best_r": None, "worst_r": None,
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "win_rate": None,
+            "expectancy_net": None,
+            "expectancy_gross": None,
+            "profit_factor": None,
+            "total_r_net": 0.0,
+            "avg_win_r": None,
+            "avg_loss_r": None,
+            "best_r": None,
+            "worst_r": None,
         }
     net = [net_r_of_row(r) for r in rows]
     gross = [float(r.get("rr_achieved") or 0.0) for r in rows]
@@ -86,7 +93,7 @@ def _book_stats(rows: list[dict]) -> dict:
 
 
 # R-multiple histogram buckets: (label, low_exclusive_or_None, high_inclusive)
-_R_BUCKETS: tuple[tuple[str, Optional[float], Optional[float]], ...] = (
+_R_BUCKETS: tuple[tuple[str, float | None, float | None], ...] = (
     ("≤ -2R", None, -2.0),
     ("(-2R,-1R]", -2.0, -1.0),
     ("(-1R,-0.5R]", -1.0, -0.5),
@@ -112,8 +119,13 @@ def _r_distribution(rows: list[dict]) -> list[dict]:
             n = sum(1 for x in nets if x > lo)
         else:
             n = sum(1 for x in nets if lo < x <= hi)
-        out.append({"bucket": label, "n": n,
-                    "pct": round(100.0 * n / len(nets), 1) if nets else 0.0})
+        out.append(
+            {
+                "bucket": label,
+                "n": n,
+                "pct": round(100.0 * n / len(nets), 1) if nets else 0.0,
+            }
+        )
     return out
 
 
@@ -136,7 +148,8 @@ def _violations(db: SignalDB, since_ts_ms: int) -> dict:
            WHERE p.outcome IN ('TP_HIT','STOP_LOSS')
              AND p.sim_key IS NULL
              AND COALESCE(p.source_key,'')=''
-           ORDER BY ts ASC""").fetchall()
+           ORDER BY ts ASC"""
+    ).fetchall()
     by_mistake: Counter = Counter()
     by_emotion: Counter = Counter()
     recent: list[dict] = []
@@ -151,15 +164,17 @@ def _violations(db: SignalDB, since_ts_ms: int) -> dict:
             em = r["emotion"] or "unspecified"
             by_mistake[mk] += 1
             by_emotion[em] += 1
-            recent.append({
-                "scan_id": int(r["scan_id"]),
-                "ts": int(r["ts"] or 0),
-                "day": _day_key(int(r["ts"] or 0)),
-                "outcome": r["outcome"],
-                "mistake": mk,
-                "emotion": em,
-                "in_window": int(r["ts"] or 0) >= since_ts_ms,
-            })
+            recent.append(
+                {
+                    "scan_id": int(r["scan_id"]),
+                    "ts": int(r["ts"] or 0),
+                    "day": _day_key(int(r["ts"] or 0)),
+                    "outcome": r["outcome"],
+                    "mistake": mk,
+                    "emotion": em,
+                    "in_window": int(r["ts"] or 0) >= since_ts_ms,
+                }
+            )
     return {
         "eligible": discipline["eligible"],
         "journaled": discipline["journaled"],
@@ -192,10 +207,12 @@ def missing_journals(db: SignalDB) -> dict:
         "missing": len(missing),
         "scan_ids": [int(r["scan_id"]) for r in missing][-10:],
         "trades": [
-            {"scan_id": int(r["scan_id"]),
-             "day": _day_key(int(r.get("ts") or 0)),
-             "plan_type": r.get("plan_type"),
-             "outcome": r.get("outcome")}
+            {
+                "scan_id": int(r["scan_id"]),
+                "day": _day_key(int(r.get("ts") or 0)),
+                "plan_type": r.get("plan_type"),
+                "outcome": r.get("outcome"),
+            }
             for r in missing
         ][-10:],
     }
@@ -215,6 +232,7 @@ def _graduation_tracker(db: SignalDB) -> list[dict]:
         return []
     try:
         from data.simulator import primary_plan_types
+
         primary = set(primary_plan_types())
     except Exception:
         primary = set()
@@ -229,24 +247,30 @@ def _graduation_tracker(db: SignalDB) -> list[dict]:
         e_net = p.get("expectancy_net")
         missing: list[str] = []
         if bt_n < bt_t:
-            missing.append(f"{bt_t - bt_n} more unique backtest samples ({bt_n}/{bt_t})")
+            missing.append(
+                f"{bt_t - bt_n} more unique backtest samples ({bt_n}/{bt_t})"
+            )
         if pp_n < pp_t:
             missing.append(f"{pp_t - pp_n} more real paper samples ({pp_n}/{pp_t})")
         if bt_n >= bt_t and pp_n >= pp_t and (e_net is None or e_net < bar_e):
             shown = "n/a" if e_net is None else f"{e_net:+.3f}R"
             missing.append(f"net expectancy {shown} < {bar_e:+.2f}R bar")
-        tracker.append({
-            "plan_type": p["plan_type"],
-            "primary": p["plan_type"] in primary,
-            "backtest_n": bt_n, "backtest_target": bt_t,
-            "backtest_pct": round(100.0 * min(bt_n, bt_t) / bt_t, 1),
-            "paper_n": pp_n, "paper_target": pp_t,
-            "paper_pct": round(100.0 * min(pp_n, pp_t) / pp_t, 1),
-            "expectancy_net": e_net,
-            "win_rate_net": p.get("win_rate_net"),
-            "proven": bool(p.get("proven")),
-            "missing": missing,
-        })
+        tracker.append(
+            {
+                "plan_type": p["plan_type"],
+                "primary": p["plan_type"] in primary,
+                "backtest_n": bt_n,
+                "backtest_target": bt_t,
+                "backtest_pct": round(100.0 * min(bt_n, bt_t) / bt_t, 1),
+                "paper_n": pp_n,
+                "paper_target": pp_t,
+                "paper_pct": round(100.0 * min(pp_n, pp_t) / pp_t, 1),
+                "expectancy_net": e_net,
+                "win_rate_net": p.get("win_rate_net"),
+                "proven": bool(p.get("proven")),
+                "missing": missing,
+            }
+        )
     tracker.sort(key=lambda r: (not r["primary"], r["plan_type"]))
     return tracker
 
@@ -265,24 +289,33 @@ def _next_task(review: dict) -> dict:
         return {
             "name": "journal_first",
             "title": f"Journal {v['missing_journals']} unjournaled trade(s) before anything else",
-            "detail": ("Every decided real trade needs its 'did you follow the "
-                       "system?' answer. Missing journals lower graduation "
-                       "compliance exactly like violations (P12.14) — and the "
-                       "journal-first gate (W3.3) will hold your next approval "
-                       "until this is done."),
-            "action": "unjournaled scans: " + ", ".join(
-                f"#{s}" for s in v["missing_scan_ids"]) if v["missing_scan_ids"] else "open the Journal tab",
+            "detail": (
+                "Every decided real trade needs its 'did you follow the "
+                "system?' answer. Missing journals lower graduation "
+                "compliance exactly like violations (P12.14) — and the "
+                "journal-first gate (W3.3) will hold your next approval "
+                "until this is done."
+            ),
+            "action": "unjournaled scans: "
+            + ", ".join(f"#{s}" for s in v["missing_scan_ids"])
+            if v["missing_scan_ids"]
+            else "open the Journal tab",
         }
-    if v["compliance"] is not None and v["compliance"] < GRADUATION_CRITERIA["compliance"]:
+    if (
+        v["compliance"] is not None
+        and v["compliance"] < GRADUATION_CRITERIA["compliance"]
+    ):
         top = next(iter(v["by_mistake"]), None)
         return {
             "name": "discipline",
             "title": f"Compliance {v['compliance'] * 100:.0f}% is below the 90% bar",
-            "detail": ("You broke your own rules on "
-                       f"{v['violations']} decided trade(s)"
-                       + (f" — most repeated mistake: '{top}'." if top else ".")
-                       + " One bad habit repeated is the lesson for next week; "
-                         "size down until the journal is clean."),
+            "detail": (
+                "You broke your own rules on "
+                f"{v['violations']} decided trade(s)"
+                + (f" — most repeated mistake: '{top}'." if top else ".")
+                + " One bad habit repeated is the lesson for next week; "
+                "size down until the journal is clean."
+            ),
             "action": "review the violations card, then write one rule you will not break twice",
         }
     unproven = [t for t in tracker if t["primary"] and not t["proven"] and t["missing"]]
@@ -291,35 +324,43 @@ def _next_task(review: dict) -> dict:
         return {
             "name": "build_evidence",
             "title": f"Finish the {t['plan_type']} evidence",
-            "detail": ("The graduation bar is earned setup by setup. "
-                       f"{t['plan_type']} still needs: " + "; ".join(t["missing"]) + "."),
+            "detail": (
+                "The graduation bar is earned setup by setup. "
+                f"{t['plan_type']} still needs: " + "; ".join(t["missing"]) + "."
+            ),
             "action": "run the Evidence pipeline for this setup, then keep the paper monitor on",
         }
     if week["n"] == 0:
         return {
             "name": "no_activity",
             "title": "No real paper decisions closed this week",
-            "detail": ("The review is only honest when your own decisions are "
-                       "in it. Keep the paper monitor running, approve or "
-                       "reject real candidates, and journal every outcome."),
+            "detail": (
+                "The review is only honest when your own decisions are "
+                "in it. Keep the paper monitor running, approve or "
+                "reject real candidates, and journal every outcome."
+            ),
             "action": "python main.py paper --watch",
         }
     if week["expectancy_net"] is not None and week["expectancy_net"] <= 0:
         return {
             "name": "protect_capital",
             "title": "Week closed below breakeven (net) — study, don't chase",
-            "detail": (f"This week printed {week['expectancy_net']:+.3f}R net per trade. "
-                       "The losing R-multiples in the distribution are the "
-                       "teacher: replay them, find the shared mistake, and "
-                       "stand aside until you could explain what changes."),
+            "detail": (
+                f"This week printed {week['expectancy_net']:+.3f}R net per trade. "
+                "The losing R-multiples in the distribution are the "
+                "teacher: replay them, find the shared mistake, and "
+                "stand aside until you could explain what changes."
+            ),
             "action": "open the R-distribution card and re-read the worst 3 trades in the Journal",
         }
     return {
         "name": "maintain",
         "title": "Keep doing the boring things — they are the edge",
-        "detail": ("Discipline is holding above the bar and the book is net "
-                   "positive this week. The riskiest trade now is the "
-                   "overconfident one: keep risk per trade unchanged."),
+        "detail": (
+            "Discipline is holding above the bar and the book is net "
+            "positive this week. The riskiest trade now is the "
+            "overconfident one: keep risk per trade unchanged."
+        ),
         "action": "python main.py daily — same ritual tomorrow",
     }
 
@@ -334,48 +375,92 @@ def _grade(review: dict) -> dict:
     score = 0
     # 1. compliance vs 90% bar (30%)
     c = v["compliance"]
-    pts = 30 if (c is not None and c >= GRADUATION_CRITERIA["compliance"]) else (
-        15 if (c is not None and c >= 0.75) else 0)
+    pts = (
+        30
+        if (c is not None and c >= GRADUATION_CRITERIA["compliance"])
+        else (15 if (c is not None and c >= 0.75) else 0)
+    )
     score += pts
-    comps.append({"name": "rule compliance ≥ 90%",
-                  "current": None if c is None else round(c * 100, 1),
-                  "points": pts, "max": 30})
+    comps.append(
+        {
+            "name": "rule compliance ≥ 90%",
+            "current": None if c is None else round(c * 100, 1),
+            "points": pts,
+            "max": 30,
+        }
+    )
     # 2. journals complete (20%)
-    pts = 20 if v["eligible"] and not v["missing_journals"] else (
-        10 if v["eligible"] == 0 else max(0, 20 - 5 * v["missing_journals"]))
+    pts = (
+        20
+        if v["eligible"] and not v["missing_journals"]
+        else (10 if v["eligible"] == 0 else max(0, 20 - 5 * v["missing_journals"]))
+    )
     score += pts
-    comps.append({"name": "every decided trade journaled",
-                  "current": f"{v['journaled']}/{v['eligible']}",
-                  "points": pts, "max": 20})
+    comps.append(
+        {
+            "name": "every decided trade journaled",
+            "current": f"{v['journaled']}/{v['eligible']}",
+            "points": pts,
+            "max": 20,
+        }
+    )
     # 3. week activity (10%)
     pts = 10 if week["n"] >= 1 else 0
     score += pts
-    comps.append({"name": "≥1 real paper decision closed this week",
-                  "current": week["n"], "points": pts, "max": 10})
+    comps.append(
+        {
+            "name": "≥1 real paper decision closed this week",
+            "current": week["n"],
+            "points": pts,
+            "max": 10,
+        }
+    )
     # 4. week net expectancy > 0 (25%)
     e = week["expectancy_net"]
     pts = 25 if (e is not None and e > 0) else (12 if e == 0 else 0)
     score += pts
-    comps.append({"name": "week net expectancy > 0R",
-                  "current": e, "points": pts, "max": 25})
+    comps.append(
+        {"name": "week net expectancy > 0R", "current": e, "points": pts, "max": 25}
+    )
     # 5. expectancy trend not degrading vs all-time (15%)
     all_e = review["all_time"]["expectancy_net"]
     pts = 15 if (e is None or all_e is None or e >= all_e) else 0
     score += pts
-    comps.append({"name": "week not below its all-time net expectancy",
-                  "current": None if e is None else f"{e:+.3f}R",
-                  "points": pts, "max": 15})
-    grade = ("A" if score >= 85 else "B" if score >= 70 else
-             "C" if score >= 50 else "D" if score >= 30 else "E")
+    comps.append(
+        {
+            "name": "week not below its all-time net expectancy",
+            "current": None if e is None else f"{e:+.3f}R",
+            "points": pts,
+            "max": 15,
+        }
+    )
+    grade = (
+        "A"
+        if score >= 85
+        else "B"
+        if score >= 70
+        else "C"
+        if score >= 50
+        else "D"
+        if score >= 30
+        else "E"
+    )
     if review["all_time"]["n"] == 0 and week["n"] == 0:
         grade = "—"
-    return {"grade": grade, "score": score, "max": 100, "components": comps,
-            "note": ("advisory self-review only — the unchanged graduation "
-                     "bar is the only authoritative gate; a good week is not "
-                     "a proven edge")}
+    return {
+        "grade": grade,
+        "score": score,
+        "max": 100,
+        "components": comps,
+        "note": (
+            "advisory self-review only — the unchanged graduation "
+            "bar is the only authoritative gate; a good week is not "
+            "a proven edge"
+        ),
+    }
 
 
-def weekly_review(db: SignalDB, days: int = 7, now_ms: Optional[int] = None) -> dict:
+def weekly_review(db: SignalDB, days: int = 7, now_ms: int | None = None) -> dict:
     """The weekly trader review over the canonical live paper book.
 
     ``days`` is the review window (default 7). ``now_ms`` injects "now" so
@@ -405,12 +490,16 @@ def weekly_review(db: SignalDB, days: int = 7, now_ms: Optional[int] = None) -> 
     # Equity curve + drawdown — reuse the exact business-metrics computation
     # so the page can never disagree with the Risk center (invariant #10).
     from brain.metrics import business_metrics
+
     metrics = business_metrics(db)
     review["equity_curve"] = metrics.get("equity_curve") or []
-    review["drawdown"] = (review.get("equity_curve") and {
-        "max_drawdown_pct": (metrics.get("overall") or {}).get("max_drawdown_pct"),
-        "final_equity": (metrics.get("overall") or {}).get("final_equity"),
-    }) or {"max_drawdown_pct": 0.0, "final_equity": 10_000.0}
+    review["drawdown"] = (
+        review.get("equity_curve")
+        and {
+            "max_drawdown_pct": (metrics.get("overall") or {}).get("max_drawdown_pct"),
+            "final_equity": (metrics.get("overall") or {}).get("final_equity"),
+        }
+    ) or {"max_drawdown_pct": 0.0, "final_equity": 10_000.0}
 
     review["violations"] = _violations(db, since_ts)
     review["journal_gate"] = missing_journals(db)
@@ -454,10 +543,14 @@ def format_weekly_review(review: dict) -> str:
     if w["n"] == 0 and a["n"] == 0:
         lines.append("  No decided real paper trades yet — approve candidates, let the")
         lines.append("  paper runner close them, and journal every outcome. This page")
-        lines.append("  fills in as your own decisions land. Simulator rows never count.")
+        lines.append(
+            "  fills in as your own decisions land. Simulator rows never count."
+        )
     dd = review["drawdown"]
-    lines.append(f"  drawdown       {dd.get('max_drawdown_pct', 0.0):.2f}% max   "
-                 f"final equity {dd.get('final_equity', 10_000.0):,.2f} (net, compounding)")
+    lines.append(
+        f"  drawdown       {dd.get('max_drawdown_pct', 0.0):.2f}% max   "
+        f"final equity {dd.get('final_equity', 10_000.0):,.2f} (net, compounding)"
+    )
     # R distribution (all time)
     if a["n"]:
         lines.append("  R distribution (all time, net):")
@@ -471,8 +564,12 @@ def format_weekly_review(review: dict) -> str:
         "-" * 74,
         f"  discipline     {v['journaled']}/{v['eligible']} journaled · {v['violations']} violations · "
         f"compliance {_f(c * 100 if c is not None else None, '{:.1f}', '%')}"
-        + (f" — {v['missing_journals']} missing journal(s): "
-           + ", ".join(f"#{s}" for s in v["missing_scan_ids"]) if v["missing_journals"] else ""),
+        + (
+            f" — {v['missing_journals']} missing journal(s): "
+            + ", ".join(f"#{s}" for s in v["missing_scan_ids"])
+            if v["missing_journals"]
+            else ""
+        ),
     ]
     if v["by_mistake"]:
         top = ", ".join(f"{k} ×{n}" for k, n in list(v["by_mistake"].items())[:4])
@@ -481,9 +578,15 @@ def format_weekly_review(review: dict) -> str:
     if review["graduation_tracker"]:
         lines.append("  graduation tracker (per setup, canonical live only):")
         for t in review["graduation_tracker"]:
-            mark = "✓ proven" if t["proven"] else "· " + ("; ".join(t["missing"]) or "watching")
-            lines.append(f"    {t['plan_type']:<26} bt {t['backtest_n']}/{t['backtest_target']}"
-                         f"  paper {t['paper_n']}/{t['paper_target']}  {mark}")
+            mark = (
+                "✓ proven"
+                if t["proven"]
+                else "· " + ("; ".join(t["missing"]) or "watching")
+            )
+            lines.append(
+                f"    {t['plan_type']:<26} bt {t['backtest_n']}/{t['backtest_target']}"
+                f"  paper {t['paper_n']}/{t['paper_target']}  {mark}"
+            )
     # Task + grade breakdown
     task = review["next_practice_task"]
     lines += [
@@ -496,8 +599,10 @@ def format_weekly_review(review: dict) -> str:
     ]
     for c_ in g["components"]:
         cur = c_["current"]
-        lines.append(f"    [{c_['points']:>2}/{c_['max']:<2}] {c_['name']}"
-                     + (f"  ({cur})" if cur is not None else ""))
+        lines.append(
+            f"    [{c_['points']:>2}/{c_['max']:<2}] {c_['name']}"
+            + (f"  ({cur})" if cur is not None else "")
+        )
     lines.append(f"  {g['note']}")
     lines.append("=" * 74)
     return "\n".join(lines)

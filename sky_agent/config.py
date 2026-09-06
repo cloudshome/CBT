@@ -1,4 +1,5 @@
 """sky_agent.config — env-driven config for the 24/7 intelligence agent."""
+
 from __future__ import annotations
 
 import os
@@ -14,10 +15,14 @@ SYSTEM_POLL_SECONDS = int(os.getenv("SKY_AGENT_SYSTEM_POLL_SECONDS", "300"))
 REPORT_HOUR_UTC = int(os.getenv("SKY_AGENT_REPORT_HOUR_UTC", "5"))
 
 # Reliability thresholds (see discovery doc §2.6 scoring)
-NOTIFY_MIN_LEVEL = os.getenv("SKY_AGENT_NOTIFY_LEVEL", "HIGH")  # LOW/MEDIUM/HIGH/CRITICAL
+NOTIFY_MIN_LEVEL = os.getenv(
+    "SKY_AGENT_NOTIFY_LEVEL", "HIGH"
+)  # LOW/MEDIUM/HIGH/CRITICAL
 
 # SEC EDGAR (fair-access)
-SEC_USER_AGENT = os.getenv("SKY_SEC_USER_AGENT", "SKY Research Agent (azimshawon@SKY; educational)")
+SEC_USER_AGENT = os.getenv(
+    "SKY_SEC_USER_AGENT", "SKY Research Agent (azimshawon@SKY; educational)"
+)
 SEC_MAX_RPS = float(os.getenv("SKY_SEC_MAX_RPS", "5"))  # stay well under 10/s
 
 # System alert thresholds

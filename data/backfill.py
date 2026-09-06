@@ -37,6 +37,7 @@ Properties that are guaranteed by tests (all offline):
 - **Offline-first** — ``DEMO_MODE=1`` uses ``SampleClient``; tests use
   ``FakePagedTransport`` (deterministic, fault/weight injection).
 """
+
 from __future__ import annotations
 
 import gzip
@@ -46,10 +47,10 @@ import os
 import re
 import time
 import zlib
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -74,6 +75,7 @@ class BackfillError(Exception):
 # Results
 # --------------------------------------------------------------------------- #
 
+
 @dataclass
 class BackfillResult:
     exchange: str
@@ -84,16 +86,16 @@ class BackfillResult:
     rows_before: int
     rows_after: int
     rows_added: int
-    resumed_from: Optional[int]
-    last_ts: Optional[int]
+    resumed_from: int | None
+    last_ts: int | None
     sleeps: int
     demo: bool
     # hardening-session fields (2026-08-13)
-    rate_limit_stalls: int = 0      # 429/418 responses absorbed by backoff
-    retries: int = 0                # requests retried after a failure
-    geo_blocked: bool = False       # 403/451 seen (aborted before retrying)
-    forming_skipped: int = 0        # still-forming tail candles not persisted
-    requests: int = 0               # total transport requests this run
+    rate_limit_stalls: int = 0  # 429/418 responses absorbed by backoff
+    retries: int = 0  # requests retried after a failure
+    geo_blocked: bool = False  # 403/451 seen (aborted before retrying)
+    forming_skipped: int = 0  # still-forming tail candles not persisted
+    requests: int = 0  # total transport requests this run
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -103,13 +105,14 @@ class BackfillResult:
 # Time helpers
 # --------------------------------------------------------------------------- #
 
+
 def _step_ms(timeframe: str) -> int:
     if timeframe not in TIMEFRAME_TO_MS:
         raise ValueError(f"unknown timeframe: {timeframe}")
     return TIMEFRAME_TO_MS[timeframe]
 
 
-def parse_ts(value: Optional[str], *, now_ms: Optional[int] = None) -> Optional[int]:
+def parse_ts(value: str | None, *, now_ms: int | None = None) -> int | None:
     """Parse a CLI timestamp into UTC epoch ms.
 
     Accepts ``None``/empty (→ None), raw epoch ms, an ISO date or datetime
@@ -138,7 +141,7 @@ def parse_ts(value: Optional[str], *, now_ms: Optional[int] = None) -> Optional[
         )
 
 
-def fmt_ts(ts: Optional[int]) -> str:
+def fmt_ts(ts: int | None) -> str:
     """UTC 'YYYY-MM-DD HH:MM' for a human summary line."""
     if ts is None:
         return "-"
@@ -148,6 +151,7 @@ def fmt_ts(ts: Optional[int]) -> str:
 # --------------------------------------------------------------------------- #
 # Rate-limit-aware transport (the hardening)
 # --------------------------------------------------------------------------- #
+
 
 @dataclass
 class _RateLimitState:
@@ -160,12 +164,20 @@ class _RateLimitState:
     weight_sleeps: int = 0
 
 
-def _rate_limited_fetch(client: BinanceClient, symbol: str, timeframe: str,
-                        market: str, *, page_limit: int = PAGE_LIMIT,
-                        max_requests: int = 0, backoff_attempts: int = 3,
-                        backoff_base: float = 1.0, weight_min: int = 100,
-                        weight_sleep: float = 5.0, low_weight_sleep: float = 20.0,
-                        ) -> tuple[FetchFn, _RateLimitState]:
+def _rate_limited_fetch(
+    client: BinanceClient,
+    symbol: str,
+    timeframe: str,
+    market: str,
+    *,
+    page_limit: int = PAGE_LIMIT,
+    max_requests: int = 0,
+    backoff_attempts: int = 3,
+    backoff_base: float = 1.0,
+    weight_min: int = 100,
+    weight_sleep: float = 5.0,
+    low_weight_sleep: float = 20.0,
+) -> tuple[FetchFn, _RateLimitState]:
     """Wrap ``client.klines_page`` with retry/backoff/weight pacing.
 
     The returned fetch never returns ``None`` for a transient failure — it
@@ -195,12 +207,21 @@ def _rate_limited_fetch(client: BinanceClient, symbol: str, timeframe: str,
                     f"re-run resumes where it stopped"
                 )
             result: PageResult = client.klines_page(
-                symbol, timeframe, limit=limit,
-                start_time=start_time, end_time=end_time, market=market)
+                symbol,
+                timeframe,
+                limit=limit,
+                start_time=start_time,
+                end_time=end_time,
+                market=market,
+            )
             if result.data is not None:
-                _pace_for_weight(result.headers, state, weight_min=weight_min,
-                                 weight_sleep=weight_sleep,
-                                 low_weight_sleep=low_weight_sleep)
+                _pace_for_weight(
+                    result.headers,
+                    state,
+                    weight_min=weight_min,
+                    weight_sleep=weight_sleep,
+                    low_weight_sleep=low_weight_sleep,
+                )
                 return result.data
             status = result.status
             if status in (403, 451):
@@ -224,9 +245,14 @@ def _rate_limited_fetch(client: BinanceClient, symbol: str, timeframe: str,
     return fetch, state
 
 
-def _pace_for_weight(headers: Optional[dict], state: _RateLimitState, *,
-                     weight_min: int, weight_sleep: float,
-                     low_weight_sleep: float) -> None:
+def _pace_for_weight(
+    headers: dict | None,
+    state: _RateLimitState,
+    *,
+    weight_min: int,
+    weight_sleep: float,
+    low_weight_sleep: float,
+) -> None:
     """Sleep longer when Binance's remaining-weight budget runs low."""
     if not headers:
         return
@@ -239,26 +265,45 @@ def _pace_for_weight(headers: Optional[dict], state: _RateLimitState, *,
         time.sleep(low_weight_sleep if remaining <= 0 else weight_sleep)
 
 
-def _fetch_for_client(client, symbol: str, timeframe: str, market: str, *,
-                      page_limit: int, max_requests: int, backoff_attempts: int,
-                      backoff_base: float, weight_min: int, weight_sleep: float,
-                      low_weight_sleep: float) -> tuple[FetchFn, _RateLimitState]:
+def _fetch_for_client(
+    client,
+    symbol: str,
+    timeframe: str,
+    market: str,
+    *,
+    page_limit: int,
+    max_requests: int,
+    backoff_attempts: int,
+    backoff_base: float,
+    weight_min: int,
+    weight_sleep: float,
+    low_weight_sleep: float,
+) -> tuple[FetchFn, _RateLimitState]:
     """Build the fetch for a transport: any ``klines_page`` client
     (BinanceClient, BybitClient, FakePagedTransport) or a demo transport."""
-    if hasattr(client, "klines_page"):          # BinanceClient / FakePagedTransport
+    if hasattr(client, "klines_page"):  # BinanceClient / FakePagedTransport
         return _rate_limited_fetch(
-            client, symbol, timeframe, market, page_limit=page_limit,
-            max_requests=max_requests, backoff_attempts=backoff_attempts,
-            backoff_base=backoff_base, weight_min=weight_min,
-            weight_sleep=weight_sleep, low_weight_sleep=low_weight_sleep)
+            client,
+            symbol,
+            timeframe,
+            market,
+            page_limit=page_limit,
+            max_requests=max_requests,
+            backoff_attempts=backoff_attempts,
+            backoff_base=backoff_base,
+            weight_min=weight_min,
+            weight_sleep=weight_sleep,
+            low_weight_sleep=low_weight_sleep,
+        )
 
     # SampleClient-style demo transport (klines-only; no rate limits offline)
     state = _RateLimitState()
 
     def fetch(start_time=None, end_time=None, limit: int = page_limit) -> pd.DataFrame:
         state.requests += 1
-        return client.klines(symbol, timeframe, limit=limit,
-                             start_time=start_time, end_time=end_time)
+        return client.klines(
+            symbol, timeframe, limit=limit, start_time=start_time, end_time=end_time
+        )
 
     return fetch, state
 
@@ -267,11 +312,12 @@ def _fetch_for_client(client, symbol: str, timeframe: str, market: str, *,
 # Paging
 # --------------------------------------------------------------------------- #
 
+
 def _iter_klines_pages(
     fetch: FetchFn,
     *,
-    start_ts: Optional[int],
-    end_ts: Optional[int],
+    start_ts: int | None,
+    end_ts: int | None,
     page_limit: int = PAGE_LIMIT,
     step_ms: int = 60_000,
 ):
@@ -287,7 +333,7 @@ def _iter_klines_pages(
     last stored candle instead of starting over.
     """
     cursor = start_ts
-    seen_last: Optional[int] = None
+    seen_last: int | None = None
     while True:
         page = fetch(start_time=cursor, end_time=end_ts, limit=page_limit)
         if page is None or getattr(page, "empty", True):
@@ -311,20 +357,27 @@ def _iter_klines_pages(
 def iter_klines_pages(
     fetch: FetchFn,
     *,
-    start_ts: Optional[int],
-    end_ts: Optional[int],
+    start_ts: int | None,
+    end_ts: int | None,
     page_limit: int = PAGE_LIMIT,
     step_ms: int = 60_000,
 ) -> list[pd.DataFrame]:
     """List form of :func:`_iter_klines_pages` (backwards-compatible)."""
-    return list(_iter_klines_pages(
-        fetch, start_ts=start_ts, end_ts=end_ts,
-        page_limit=page_limit, step_ms=step_ms))
+    return list(
+        _iter_klines_pages(
+            fetch,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            page_limit=page_limit,
+            step_ms=step_ms,
+        )
+    )
 
 
 # --------------------------------------------------------------------------- #
 # Backfill
 # --------------------------------------------------------------------------- #
+
 
 def backfill(
     *,
@@ -333,9 +386,9 @@ def backfill(
     timeframe: str = "1m",
     exchange: str = "binance",
     market: str = "perp",
-    start_ts: Optional[int] = None,
-    end_ts: Optional[int] = None,
-    fetch: Optional[FetchFn] = None,
+    start_ts: int | None = None,
+    end_ts: int | None = None,
+    fetch: FetchFn | None = None,
     client=None,
     page_limit: int = PAGE_LIMIT,
     sleep_s: float = 0.0,
@@ -346,7 +399,7 @@ def backfill(
     weight_min: int = 100,
     weight_sleep: float = 5.0,
     low_weight_sleep: float = 20.0,
-    clock: Optional[Callable[[], int]] = None,
+    clock: Callable[[], int] | None = None,
     dry_run: bool = False,
 ) -> BackfillResult:
     """Paginated REST backfill into ``store``. Returns a row-count report.
@@ -370,16 +423,23 @@ def backfill(
     if fetch is None:
         fetch, rl = _fetch_for_client(
             client if client is not None else maybe_client(),
-            symbol, timeframe, market, page_limit=page_limit,
-            max_requests=max_requests, backoff_attempts=backoff_attempts,
-            backoff_base=backoff_base, weight_min=weight_min,
-            weight_sleep=weight_sleep, low_weight_sleep=low_weight_sleep)
+            symbol,
+            timeframe,
+            market,
+            page_limit=page_limit,
+            max_requests=max_requests,
+            backoff_attempts=backoff_attempts,
+            backoff_base=backoff_base,
+            weight_min=weight_min,
+            weight_sleep=weight_sleep,
+            low_weight_sleep=low_weight_sleep,
+        )
     else:
         rl = _RateLimitState()
 
     before = store.count(exchange, market, symbol, timeframe)
     existing = store.read(exchange, market, symbol, timeframe)
-    resumed_from: Optional[int] = None
+    resumed_from: int | None = None
     cursor = start_ts
     if resume and not existing.empty:
         resumed_from = int(existing["ts"].max()) + step
@@ -387,12 +447,15 @@ def backfill(
             cursor = resumed_from
 
     pages = _iter_klines_pages(
-        fetch, start_ts=cursor, end_ts=end_ts,
-        page_limit=page_limit, step_ms=step,
+        fetch,
+        start_ts=cursor,
+        end_ts=end_ts,
+        page_limit=page_limit,
+        step_ms=step,
     )
 
     sleeps = 0
-    last_ts: Optional[int] = None
+    last_ts: int | None = None
     existing_ts = {int(t) for t in existing["ts"]} if dry_run else None
     forming_skipped = 0
     dry_new = 0
@@ -400,20 +463,24 @@ def backfill(
     for i, page in enumerate(pages):
         pages_seen += 1
         page = page.copy()
-        closed = (page["ts"] + step) <= now           # forming tail → not closed
+        closed = (page["ts"] + step) <= now  # forming tail → not closed
         page["closed"] = closed
         forming_skipped += int((~closed).sum())
         if dry_run:
             dry_new += len({int(t) for t in page["ts"][closed]} - existing_ts)
         else:
             frame = normalise_klines(
-                page[closed], exchange=exchange, market=market,
-                symbol=symbol, timeframe=timeframe, source="rest",
+                page[closed],
+                exchange=exchange,
+                market=market,
+                symbol=symbol,
+                timeframe=timeframe,
+                source="rest",
             )
             store.write(frame)
         if not page.empty:
             last_ts = int(page["ts"].max())
-        if i > 0 and sleep_s:                    # between pages, not after the last
+        if i > 0 and sleep_s:  # between pages, not after the last
             time.sleep(sleep_s)
             sleeps += 1
 
@@ -421,12 +488,22 @@ def backfill(
     if last_ts is None and not existing.empty:
         last_ts = int(existing["ts"].max())
     return BackfillResult(
-        exchange=exchange, market=market, symbol=symbol, timeframe=timeframe,
-        pages=pages_seen, rows_before=before, rows_after=after,
+        exchange=exchange,
+        market=market,
+        symbol=symbol,
+        timeframe=timeframe,
+        pages=pages_seen,
+        rows_before=before,
+        rows_after=after,
         rows_added=dry_new if dry_run else after - before,
-        resumed_from=resumed_from, last_ts=last_ts, sleeps=sleeps, demo=demo,
-        rate_limit_stalls=rl.rate_limit_stalls, retries=rl.retries,
-        geo_blocked=rl.geo_blocked, forming_skipped=forming_skipped,
+        resumed_from=resumed_from,
+        last_ts=last_ts,
+        sleeps=sleeps,
+        demo=demo,
+        rate_limit_stalls=rl.rate_limit_stalls,
+        retries=rl.retries,
+        geo_blocked=rl.geo_blocked,
+        forming_skipped=forming_skipped,
         requests=rl.requests,
     )
 
@@ -434,6 +511,7 @@ def backfill(
 # --------------------------------------------------------------------------- #
 # Offline fake transport (tests + explicit demo sandbox)
 # --------------------------------------------------------------------------- #
+
 
 def _seed(key: str) -> int:
     """Deterministic seed (crc32 — plain hash() is salted per process)."""
@@ -451,21 +529,26 @@ class FakePagedTransport:
     so rate-limit pacing is testable without a network.
     """
 
-    def __init__(self, start_ts: Optional[int] = None,
-                 end_ts: Optional[int] = None, *,
-                 seed: int = 7,
-                 faults: Optional[dict[int, Optional[int]]] = None,
-                 weight_budget: Optional[int] = None,
-                 base_prices: Optional[dict[str, float]] = None):
+    def __init__(
+        self,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+        *,
+        seed: int = 7,
+        faults: dict[int, int | None] | None = None,
+        weight_budget: int | None = None,
+        base_prices: dict[str, float] | None = None,
+    ):
         self.start_ts = start_ts
         self.end_ts = end_ts
         self.seed = seed
         self.faults = dict(faults or {})
         self.weight_budget = weight_budget
-        self.base_prices = dict(base_prices or {
-            "BTCUSDT": 60_000.0, "ETHUSDT": 3_000.0, "XAUUSD": 2_300.0})
+        self.base_prices = dict(
+            base_prices or {"BTCUSDT": 60_000.0, "ETHUSDT": 3_000.0, "XAUUSD": 2_300.0}
+        )
         self.requests = 0
-        self.calls: list[dict] = []           # (symbol, market, start_time, limit)
+        self.calls: list[dict] = []  # (symbol, market, start_time, limit)
         self._frames: dict[tuple[str, str], pd.DataFrame] = {}
 
     # -- generation --------------------------------------------------------- #
@@ -476,7 +559,7 @@ class FakePagedTransport:
         tf = TIMEFRAME_TO_MS[timeframe]
         start = self.start_ts if self.start_ts is not None else 1_700_000_000_000
         end = self.end_ts if self.end_ts is not None else start + 100_000 * tf
-        first_open = ((start + tf - 1) // tf) * tf        # align up to a candle boundary
+        first_open = ((start + tf - 1) // tf) * tf  # align up to a candle boundary
         n = max(0, (end - first_open) // tf)
         rng = np.random.default_rng(_seed(f"{symbol}:{timeframe}:{self.seed}"))
         base = self.base_prices.get(symbol, 100.0)
@@ -488,32 +571,45 @@ class FakePagedTransport:
         high = np.maximum(high, np.maximum(close, low) * 1.001)
         low = np.minimum(low, np.minimum(close, high) * 0.999)
         volume = rng.uniform(50, 400, n)
-        frame = pd.DataFrame({
-            "ts": ts,
-            "open": np.round(close, 2),
-            "high": np.round(high, 2),
-            "low": np.round(low, 2),
-            "close": np.round(close, 2),
-            "volume": np.round(volume, 4),
-            "close_ts": ts + tf - 1,
-            "quote_volume": np.round(volume * close, 2),
-            "trades": rng.integers(50, 2000, n),
-            "taker_buy_base": np.round(volume * 0.5, 4),
-            "taker_buy_quote": np.round(volume * 0.5 * close, 2),
-            "ignore": np.zeros(n, dtype=np.int64),
-        })
+        frame = pd.DataFrame(
+            {
+                "ts": ts,
+                "open": np.round(close, 2),
+                "high": np.round(high, 2),
+                "low": np.round(low, 2),
+                "close": np.round(close, 2),
+                "volume": np.round(volume, 4),
+                "close_ts": ts + tf - 1,
+                "quote_volume": np.round(volume * close, 2),
+                "trades": rng.integers(50, 2000, n),
+                "taker_buy_base": np.round(volume * 0.5, 4),
+                "taker_buy_quote": np.round(volume * 0.5 * close, 2),
+                "ignore": np.zeros(n, dtype=np.int64),
+            }
+        )
         self._frames[key] = frame
         return frame
 
     # -- transport contract -------------------------------------------------- #
-    def klines_page(self, symbol: str, timeframe: str, limit: int = 1000,
-                    start_time: Optional[int] = None,
-                    end_time: Optional[int] = None,
-                    market: str = "spot") -> PageResult:
+    def klines_page(
+        self,
+        symbol: str,
+        timeframe: str,
+        limit: int = 1000,
+        start_time: int | None = None,
+        end_time: int | None = None,
+        market: str = "spot",
+    ) -> PageResult:
         self.requests += 1
-        self.calls.append({"symbol": symbol, "market": market,
-                           "start_time": start_time, "end_time": end_time,
-                           "limit": limit})
+        self.calls.append(
+            {
+                "symbol": symbol,
+                "market": market,
+                "start_time": start_time,
+                "end_time": end_time,
+                "limit": limit,
+            }
+        )
         if self.faults and self.requests in self.faults:
             status = self.faults.pop(self.requests)
             return PageResult(None, self._headers(), status)
@@ -539,8 +635,17 @@ class FakePagedTransport:
 # --------------------------------------------------------------------------- #
 
 _KLINES_12_COLS = [
-    "open_time", "open", "high", "low", "close", "volume", "close_time",
-    "quote_volume", "trades", "taker_buy_volume", "taker_buy_quote_volume",
+    "open_time",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "close_time",
+    "quote_volume",
+    "trades",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
     "ignore",
 ]
 
@@ -578,7 +683,8 @@ def _read_ohlcv_csv(csv_path: str | Path) -> tuple[pd.DataFrame, bytes, str]:
             df.columns = _VISION_6_COLS
         else:
             raise BackfillError(
-                f"headerless CSV has {df.shape[1]} columns; expected 6 or 12")
+                f"headerless CSV has {df.shape[1]} columns; expected 6 or 12"
+            )
     else:
         df = pd.read_csv(buf)
     if "ts" not in df.columns:
@@ -590,8 +696,7 @@ def _read_ohlcv_csv(csv_path: str | Path) -> tuple[pd.DataFrame, bytes, str]:
                 break
     missing = {"ts", "open", "high", "low", "close", "volume"} - set(df.columns)
     if missing:
-        raise BackfillError(
-            f"CSV is missing required columns: {sorted(missing)}")
+        raise BackfillError(f"CSV is missing required columns: {sorted(missing)}")
     df["ts"] = pd.to_numeric(df["ts"], errors="coerce")
     if df["ts"].isna().any():
         raise BackfillError("CSV contains non-numeric timestamps")
@@ -609,7 +714,7 @@ def backfill_from_csv(
     timeframe: str = "1m",
     exchange: str = "binance",
     market: str = "spot",
-    expected_sha256: Optional[str] = None,
+    expected_sha256: str | None = None,
     source: str = "csv",
     price_type: str = "",
 ) -> dict:
@@ -639,36 +744,54 @@ def backfill_from_csv(
     if expected_sha256 and digest.lower() != expected_sha256.strip().lower():
         raise BackfillError(
             f"sha256 mismatch: file {digest} != pin {expected_sha256.strip()} "
-            f"(nothing was written)")
+            f"(nothing was written)"
+        )
     step = step_ms(timeframe)
     frame = frame.sort_values("ts").reset_index(drop=True)
     n_read = len(frame)
     duplicates = int(frame["ts"].duplicated().sum())
     frame = frame.drop_duplicates(subset=["ts"], keep="last").reset_index(drop=True)
 
-    pos = (frame["open"] > 0) & (frame["high"] > 0) & (frame["low"] > 0) \
-        & (frame["close"] > 0) & (frame["volume"] >= 0)
-    sane = pos & (frame["high"] >= frame[["open", "close"]].max(axis=1)) \
+    pos = (
+        (frame["open"] > 0)
+        & (frame["high"] > 0)
+        & (frame["low"] > 0)
+        & (frame["close"] > 0)
+        & (frame["volume"] >= 0)
+    )
+    sane = (
+        pos
+        & (frame["high"] >= frame[["open", "close"]].max(axis=1))
         & (frame["low"] <= frame[["open", "close"]].min(axis=1))
+    )
     sanity_dropped = int((~sane).sum())
     frame = frame[sane].reset_index(drop=True)
 
     misaligned = int((frame["ts"] % step != 0).sum())
 
     existing = store.read(exchange, market, symbol, timeframe)
-    existing_price_types = ({str(v) for v in existing.get("price_type", [])
-                             if str(v)} if not existing.empty else set())
+    existing_price_types = (
+        {str(v) for v in existing.get("price_type", []) if str(v)}
+        if not existing.empty
+        else set()
+    )
     if price_type and existing_price_types and existing_price_types != {price_type}:
         raise BackfillError(
             f"price_type mismatch: existing series is "
             f"{sorted(existing_price_types)}, import is {price_type}; "
-            f"bid/ask candles must not share one store series")
+            f"bid/ask candles must not share one store series"
+        )
 
     before = len(existing)
     if not frame.empty:
         canon = normalise_klines(
-            frame, exchange=exchange, market=market, symbol=symbol,
-            timeframe=timeframe, source=source, price_type=price_type,
+            frame,
+            exchange=exchange,
+            market=market,
+            symbol=symbol,
+            timeframe=timeframe,
+            source=source,
+            price_type=price_type,
         )
         store.write(canon)
     after = store.count(exchange, market, symbol, timeframe)
@@ -676,20 +799,29 @@ def backfill_from_csv(
     # P12.9: judge gaps against the venue's calendar. Crypto stays 24/7;
     # a Dukascopy XAU import no longer reports the gold weekend as missing data.
     from data.calendar import calendar_for
+
     cal = calendar_for(exchange, market, symbol)
-    gaps = detect_gaps(store.read(exchange, market, symbol, timeframe),
-                       timeframe, cal) if after else []
+    gaps = (
+        detect_gaps(store.read(exchange, market, symbol, timeframe), timeframe, cal)
+        if after
+        else []
+    )
     closed_bars = 0
     if not frame.empty and not getattr(cal, "always_open", True):
         from data.calendar import closed_bar_count
+
         closed_bars = closed_bar_count(
-            int(frame["ts"].iloc[0]), int(frame["ts"].iloc[-1]), step, cal)
+            int(frame["ts"].iloc[0]), int(frame["ts"].iloc[-1]), step, cal
+        )
     first_ts = int(frame["ts"].iloc[0]) if not frame.empty else None
     last_ts = int(frame["ts"].iloc[-1]) if not frame.empty else None
     return {
         "ok": True,
-        "exchange": exchange, "market": market, "symbol": symbol,
-        "timeframe": timeframe, "source": source,
+        "exchange": exchange,
+        "market": market,
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "source": source,
         "price_type": price_type,
         "csv_path": str(csv_path),
         "sha256": digest,
@@ -706,5 +838,6 @@ def backfill_from_csv(
         "first_ts": first_ts,
         "last_ts": last_ts,
         "span_days": round((last_ts - first_ts) / 86_400_000, 2)
-        if first_ts is not None else 0.0,
+        if first_ts is not None
+        else 0.0,
     }

@@ -3,6 +3,7 @@
 Each event gets 7 subscores (0–10) then a weighted sum 0–70.
 See discovery doc §2.6.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,7 +20,15 @@ class Scores:
     relation: int = 0
 
     def total(self) -> int:
-        return self.relevance + self.impact + self.confidence + self.urgency + self.novelty + self.reliability + self.relation
+        return (
+            self.relevance
+            + self.impact
+            + self.confidence
+            + self.urgency
+            + self.novelty
+            + self.reliability
+            + self.relation
+        )
 
     def level(self) -> str:
         t = self.total()
@@ -43,7 +52,14 @@ RELIABILITY_PRIVATE = 3
 SEVERITY_IMPACT = {1: 2, 2: 4, 3: 6, 4: 8, 5: 10}
 
 
-def score_edgar_event(*, severity: int, novel: bool, urgency: int = 5, relevance: int = 7, relation: int = 5) -> Scores:
+def score_edgar_event(
+    *,
+    severity: int,
+    novel: bool,
+    urgency: int = 5,
+    relevance: int = 7,
+    relation: int = 5,
+) -> Scores:
     """Convenience scorer for a classified EDGAR event."""
     return Scores(
         relevance=max(0, min(10, relevance)),
@@ -56,7 +72,15 @@ def score_edgar_event(*, severity: int, novel: bool, urgency: int = 5, relevance
     )
 
 
-def score_market_event(*, relevance: int, impact: int, confidence: int, urgency: int, novel: bool, relation: int) -> Scores:
+def score_market_event(
+    *,
+    relevance: int,
+    impact: int,
+    confidence: int,
+    urgency: int,
+    novel: bool,
+    relation: int,
+) -> Scores:
     return Scores(
         relevance=max(0, min(10, relevance)),
         impact=max(0, min(10, impact)),

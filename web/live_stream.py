@@ -26,11 +26,13 @@ The generator is deliberately pure-ish: the clock, the sleep and the candle
 source are injected, so the tests drive it deterministically without a network
 or a real timer.
 """
+
 from __future__ import annotations
 
 import json
 import time
-from typing import Any, Callable, Iterator, Optional
+from collections.abc import Callable, Iterator
+from typing import Any
 
 from web.chart_data import TF_SECONDS, _epoch_seconds, _num
 
@@ -57,7 +59,7 @@ def stale_after(tf: str) -> float:
     return max(MIN_STALE_AFTER, seconds * STALE_FACTOR)
 
 
-def last_candle(df) -> Optional[dict]:
+def last_candle(df) -> dict | None:
     """Newest row of an OHLCV frame → a Lightweight-Charts bar (or ``None``).
 
     Uses the same ``_num`` / ``_epoch_seconds`` funnel as the chart payload so
@@ -67,7 +69,7 @@ def last_candle(df) -> Optional[dict]:
         return None
     try:
         row = df.iloc[-1]
-    except Exception:                      # pragma: no cover — defensive
+    except Exception:  # pragma: no cover — defensive
         return None
     time_s = _epoch_seconds(row["ts"]) if "ts" in row else None
     if time_s is None:
@@ -98,8 +100,8 @@ def candle_events(
     symbol: str,
     tf: str,
     *,
-    interval: Optional[float] = None,
-    max_frames: Optional[int] = None,
+    interval: float | None = None,
+    max_frames: int | None = None,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.time,
 ) -> Iterator[str]:
@@ -113,7 +115,7 @@ def candle_events(
     tick = float(interval if interval is not None else poll_interval(tf))
     limit_stale = stale_after(tf)
     sent = 0
-    last_bar: Optional[dict] = None
+    last_bar: dict | None = None
     last_change = clock()
     backoff = 0.0
 
@@ -121,36 +123,67 @@ def candle_events(
         try:
             bar = last_candle(fetch(symbol, tf, 2))
             error = None
-        except Exception as exc:            # a broken source is a frame, not a crash
+        except Exception as exc:  # a broken source is a frame, not a crash
             bar, error = None, f"{type(exc).__name__}: {exc}"
 
         now = clock()
         if error is not None:
             backoff = min(MAX_ERROR_BACKOFF, (backoff or tick) * 2)
-            payload = {"symbol": symbol, "tf": tf, "state": "error",
-                       "message": error, "age": round(now - last_change, 3),
-                       "ts": now}
+            payload = {
+                "symbol": symbol,
+                "tf": tf,
+                "state": "error",
+                "message": error,
+                "age": round(now - last_change, 3),
+                "ts": now,
+            }
             yield _frame("status", payload)
         elif bar is None:
             backoff = min(MAX_ERROR_BACKOFF, (backoff or tick) * 2)
-            yield _frame("status", {"symbol": symbol, "tf": tf, "state": "error",
-                                    "message": "source returned no candle",
-                                    "age": round(now - last_change, 3), "ts": now})
+            yield _frame(
+                "status",
+                {
+                    "symbol": symbol,
+                    "tf": tf,
+                    "state": "error",
+                    "message": "source returned no candle",
+                    "age": round(now - last_change, 3),
+                    "ts": now,
+                },
+            )
         elif bar != last_bar:
             backoff = 0.0
             last_bar, last_change = bar, now
-            yield _frame("candle", {"symbol": symbol, "tf": tf, "state": "live",
-                                    "candle": bar, "time": bar["time"],
-                                    "age": 0.0, "ts": now})
+            yield _frame(
+                "candle",
+                {
+                    "symbol": symbol,
+                    "tf": tf,
+                    "state": "live",
+                    "candle": bar,
+                    "time": bar["time"],
+                    "age": 0.0,
+                    "ts": now,
+                },
+            )
         else:
             backoff = 0.0
             age = now - last_change
             state = "stale" if age > limit_stale else "waiting"
-            yield _frame("status", {"symbol": symbol, "tf": tf, "state": state,
-                                    "time": bar["time"], "age": round(age, 3),
-                                    "ts": now,
-                                    "message": ("no new data for "
-                                                f"{int(age)}s") if state == "stale" else ""})
+            yield _frame(
+                "status",
+                {
+                    "symbol": symbol,
+                    "tf": tf,
+                    "state": state,
+                    "time": bar["time"],
+                    "age": round(age, 3),
+                    "ts": now,
+                    "message": (f"no new data for {int(age)}s")
+                    if state == "stale"
+                    else "",
+                },
+            )
         sent += 1
         if max_frames is not None and sent >= max_frames:
             return

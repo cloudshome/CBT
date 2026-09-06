@@ -10,31 +10,32 @@ Combines:
 
 Returns one JSON-able dict that the CLI and dashboard both render.
 """
+
 from __future__ import annotations
 
 import time
-from typing import Optional
 
-from config import SYMBOL, TIMEFRAME, BARS, MIN_CONFIDENCE, DEFAULT_RISK_REWARD
-from data.symbols import normalize_symbol
+import brain.context as context_mod
+from config import BARS, DEFAULT_RISK_REWARD, MIN_CONFIDENCE, SYMBOL, TIMEFRAME
 from data.binance_client import BinanceClient
 from data.sample_client import maybe_client
+from data.symbols import normalize_symbol
 from engine.mtf import analyze_mtf, analyze_timeframe
 from engine.signal_engine import analyze_frame
 from output.signal_schema import validate_output
-import brain.context as context_mod
-from .calibrator import apply_calibration as _cal_apply
+
 from .calibrator import suggest_tp_rr_by_type
+from .decision import build_decision
+from .playbooks import primary_plan_types
 from .state_memory import SignalMemory
 from .styles import classify_styles
 from .trading_intelligence import build_intelligence
-from .playbooks import primary_plan_types
-from .decision import build_decision
 
 
 def _load_calibration(db=None) -> dict:
     try:
         from ..data.database import SignalDB
+
         with SignalDB() as _db:
             return _db.load_calibration()
     except Exception:
@@ -65,10 +66,15 @@ def _eth_context(client: BinanceClient) -> dict:
     return out
 
 
-def analyze_full(symbol: str = SYMBOL, timeframe: str = TIMEFRAME,
-                 bars: int = BARS, client: Optional[BinanceClient] = None,
-                 with_context: bool = True, with_memory: bool = True,
-                 db=None) -> dict:
+def analyze_full(
+    symbol: str = SYMBOL,
+    timeframe: str = TIMEFRAME,
+    bars: int = BARS,
+    client: BinanceClient | None = None,
+    with_context: bool = True,
+    with_memory: bool = True,
+    db=None,
+) -> dict:
     """Run the complete pipeline. Returns a dict with keys:
     signal, plans, snapshot, styles, mtf, context, memory, market_context,
     validation, analyzed_at."""
@@ -85,12 +91,18 @@ def analyze_full(symbol: str = SYMBOL, timeframe: str = TIMEFRAME,
 
     # 2) single-frame engine (with calibration + professional narrowing)
     calib = _load_calibration()
-    primary = primary_plan_types(symbol)          # decision A1
-    tp_rr = suggest_tp_rr_by_type(calib)          # decision A2 (data-driven TP)
-    frame = analyze_frame(df, symbol=symbol, timeframe=timeframe,
-                          min_confidence=MIN_CONFIDENCE,
-                          default_rr=DEFAULT_RISK_REWARD, calibration=calib,
-                          primary_types=primary, tp_rr_by_type=tp_rr)
+    primary = primary_plan_types(symbol)  # decision A1
+    tp_rr = suggest_tp_rr_by_type(calib)  # decision A2 (data-driven TP)
+    frame = analyze_frame(
+        df,
+        symbol=symbol,
+        timeframe=timeframe,
+        min_confidence=MIN_CONFIDENCE,
+        default_rr=DEFAULT_RISK_REWARD,
+        calibration=calib,
+        primary_types=primary,
+        tp_rr_by_type=tp_rr,
+    )
     payload = frame.as_json()
     payload["market_context"] = client.market_context(symbol)
 
@@ -98,9 +110,10 @@ def analyze_full(symbol: str = SYMBOL, timeframe: str = TIMEFRAME,
     ctx = {}
     if with_context:
         v1d = mtf.get("views", {}).get("1d", {})
-        ctx = context_mod.collect(price_1d=v1d.get("price"),
-                                  sma200_1d=None if not v1d.get("available") else
-                                  _sma200(v1d))
+        ctx = context_mod.collect(
+            price_1d=v1d.get("price"),
+            sma200_1d=None if not v1d.get("available") else _sma200(v1d),
+        )
     payload["context"] = ctx
     payload["mtf"] = mtf
 
@@ -133,9 +146,13 @@ def analyze_full(symbol: str = SYMBOL, timeframe: str = TIMEFRAME,
             df_1d = client.klines(symbol, "1d", 30)
         except Exception:
             df_1d = None
-    payload["decision"] = build_decision(payload, symbol, btc_bias=extra.get("btc_bias"),
-                                         eth_btc_slope=extra.get("eth_btc_slope"),
-                                         df_1d=df_1d)
+    payload["decision"] = build_decision(
+        payload,
+        symbol,
+        btc_bias=extra.get("btc_bias"),
+        eth_btc_slope=extra.get("eth_btc_slope"),
+        df_1d=df_1d,
+    )
 
     payload["validation"] = validate_output(payload)
     payload["analyzed_at"] = int(time.time() * 1000)
@@ -143,7 +160,7 @@ def analyze_full(symbol: str = SYMBOL, timeframe: str = TIMEFRAME,
     return payload
 
 
-def _sma200(v: dict) -> Optional[float]:
+def _sma200(v: dict) -> float | None:
     """Approx 200d SMA proxy from the 1d view (fall back to price)."""
     return v.get("price")
 
@@ -154,6 +171,11 @@ def summarize_styles(styles: dict) -> str:
     offered = styles.get("market_offering", [])
     if not offered:
         return "Stand aside — " + "; ".join(styles.get("stand_aside", [])) + "."
-    return "Market offering: " + ", ".join(
-        f"{s} ({styles['styles'][s]['direction']} {styles['styles'][s]['confidence']}%)"
-        for s in offered) + "."
+    return (
+        "Market offering: "
+        + ", ".join(
+            f"{s} ({styles['styles'][s]['direction']} {styles['styles'][s]['confidence']}%)"
+            for s in offered
+        )
+        + "."
+    )

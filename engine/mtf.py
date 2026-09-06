@@ -9,6 +9,7 @@ Each timeframe is analyzed with the same indicator + structure engine, then
 combined into an alignment score (-100..+100), a suggested bias, and a set of
 key levels (support / resistance) carried down from the higher frames.
 """
+
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
@@ -16,16 +17,35 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 
 from data.symbols import normalize_symbol
+
 from .indicators import add_all_indicators
 from .structure import analyze_structure
 
 # (timeframe, bars) — institutional top-down map:
 # Monthly/Weekly/Daily set the macro bias; 4H/1H/30M frame the session;
 # 15M/5M/1M time the execution. Binance monthly interval is "1M".
-TF_CONFIG = [("1M", 80), ("1w", 160), ("1d", 200), ("4h", 240), ("1h", 300),
-             ("30m", 300), ("15m", 300), ("5m", 260), ("1m", 240)]
-WEIGHTS = {"1M": 0.18, "1w": 0.16, "1d": 0.15, "4h": 0.14, "1h": 0.12,
-           "30m": 0.09, "15m": 0.07, "5m": 0.05, "1m": 0.04}
+TF_CONFIG = [
+    ("1M", 80),
+    ("1w", 160),
+    ("1d", 200),
+    ("4h", 240),
+    ("1h", 300),
+    ("30m", 300),
+    ("15m", 300),
+    ("5m", 260),
+    ("1m", 240),
+]
+WEIGHTS = {
+    "1M": 0.18,
+    "1w": 0.16,
+    "1d": 0.15,
+    "4h": 0.14,
+    "1h": 0.12,
+    "30m": 0.09,
+    "15m": 0.07,
+    "5m": 0.05,
+    "1m": 0.04,
+}
 
 
 def analyze_timeframe(df: pd.DataFrame, tf: str) -> dict:
@@ -37,7 +57,13 @@ def analyze_timeframe(df: pd.DataFrame, tf: str) -> dict:
     last = ind.iloc[-1]
     price = float(last.close)
     ema20, ema50, ema200 = (float(last.get(f"ema_{p}", price)) for p in (20, 50, 200))
-    alignment = "bull" if ema20 > ema50 > ema200 else "bear" if ema20 < ema50 < ema200 else "mixed"
+    alignment = (
+        "bull"
+        if ema20 > ema50 > ema200
+        else "bear"
+        if ema20 < ema50 < ema200
+        else "mixed"
+    )
     pd_zone = ms.premium_discount["zone"] if ms.premium_discount else "unknown"
     return {
         "tf": tf,
@@ -73,9 +99,13 @@ def _score(view: dict) -> float:
     return 0.0
 
 
-def analyze_mtf(symbol: str, client, tfs: list | None = None,
-                config: list | None = None,
-                prefetched: dict | None = None) -> dict:
+def analyze_mtf(
+    symbol: str,
+    client,
+    tfs: list | None = None,
+    config: list | None = None,
+    prefetched: dict | None = None,
+) -> dict:
     """Fetch and analyze multiple timeframes in parallel, then combine into a
     consensus read.
 
@@ -110,7 +140,9 @@ def analyze_mtf(symbol: str, client, tfs: list | None = None,
 
     htf_tfs = [t for t in ("1M", "1w", "1d", "4h") if views.get(t, {}).get("available")]
     mtd_tf = views.get("1h", {})
-    ltf_tfs = [t for t in ("30m", "15m", "5m", "1m") if views.get(t, {}).get("available")]
+    ltf_tfs = [
+        t for t in ("30m", "15m", "5m", "1m") if views.get(t, {}).get("available")
+    ]
 
     def _bias(tfs: list) -> str:
         s = sum(_score(views[t]) * WEIGHTS[t] for t in tfs)
@@ -151,7 +183,9 @@ def analyze_mtf(symbol: str, client, tfs: list | None = None,
         "alignment": {"score": alignment_score, "label": alignment},
         "key_levels": {"support": supports, "resistance": resistances},
         "pivot": pivot,
-        "suggested_bias": "bullish" if htf_bias == "bullish" and ltf_bias != "bearish"
-                          else "bearish" if htf_bias == "bearish" and ltf_bias != "bullish"
-                          else htf_bias,
+        "suggested_bias": "bullish"
+        if htf_bias == "bullish" and ltf_bias != "bearish"
+        else "bearish"
+        if htf_bias == "bearish" and ltf_bias != "bullish"
+        else htf_bias,
     }

@@ -1272,7 +1272,7 @@ roughly one day in ten.
 `brain.risk_gate._week_start_utc()` computed Monday 00:00 UTC as:
 
 ```python
-start = start.replace(day=start.day - start.weekday())   # Monday
+start = start.replace(day=start.day - start.weekday())  # Monday
 ```
 
 `datetime.replace()` cannot cross a month boundary. Whenever the current week

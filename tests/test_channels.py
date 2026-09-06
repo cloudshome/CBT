@@ -4,14 +4,13 @@ The new module is purely additive — these tests are *only* checks of
 new behaviour, not regressions on existing modules.  They must pass
 with the rest of the suite (38 modules, 258+ tests).
 """
+
 from __future__ import annotations
 
 import json
 import os
 import sys
 from pathlib import Path
-
-import pytest
 
 # Ensure repo root on path (matches the project's pytest.ini `pythonpath = .`)
 ROOT = Path(__file__).resolve().parent.parent
@@ -21,8 +20,10 @@ if str(ROOT) not in sys.path:
 
 # ── brain/channels.py — registry & probe ─────────────────────────────────
 
+
 def test_channels_module_imports():
     from brain import channels
+
     assert hasattr(channels, "CHANNELS")
     assert hasattr(channels, "probe_all")
     assert hasattr(channels, "doctor_report")
@@ -31,12 +32,14 @@ def test_channels_module_imports():
 
 def test_channels_registry_has_expected_channels():
     from brain.channels import CHANNELS
+
     # The four CryptoBrain channels
     assert set(CHANNELS.keys()) == {"cryptodada", "discord", "news", "llm"}
 
 
 def test_channels_each_has_ordered_backends():
     from brain.channels import CHANNELS
+
     # The tail of every channel must be an "always-available" backend
     # so the engine is never blocked. We accept either the explicit
     # "none" sentinel or a domain-specific always-on fallback like
@@ -67,7 +70,8 @@ def test_probe_all_isolates_exceptions(monkeypatch):
 
 
 def test_probe_all_picks_first_configured_and_ok_backend():
-    from brain.channels import probe_all, _probe_news_backends
+    from brain.channels import probe_all
+
     # news is always fully configured; the first backend (rss_parallel) wins
     result = probe_all()
     assert result["news"].active == "rss_parallel"
@@ -95,7 +99,9 @@ def test_discord_webhook_is_preferred_over_token(monkeypatch):
     """Webhook (safe outbound) is the first Discord backend."""
     from brain import channels
 
-    monkeypatch.setattr(channels, "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/x/y")
+    monkeypatch.setattr(
+        channels, "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/x/y"
+    )
     monkeypatch.setattr(channels, "DISCORD_ANNOUNCE_WEBHOOK", "")
     monkeypatch.setattr(channels, "DISCORD_TOKEN", "")
     monkeypatch.setattr(channels, "DISCORD_CHANNEL_IDS", [])
@@ -139,6 +145,7 @@ def test_doctor_report_text_is_human_readable(monkeypatch):
 
 def test_doctor_report_json_is_machine_readable(monkeypatch):
     from brain import channels
+
     monkeypatch.setattr(channels, "DISCORD_WEBHOOK_URL", "")
     monkeypatch.setattr(channels, "DISCORD_TOKEN", "")
     monkeypatch.setattr(channels, "DISCORD_CHANNEL_IDS", [])
@@ -154,12 +161,14 @@ def test_doctor_report_json_is_machine_readable(monkeypatch):
 
 def test_list_channels_returns_table_string():
     from brain.channels import list_channels
+
     out = list_channels(as_json=False)
     assert isinstance(out, str)
     assert "channel" in out  # the header
 
 
 # ── SKILL.md — content contract ──────────────────────────────────────────
+
 
 def test_skill_md_exists():
     skill = ROOT / "SKILL.md"
@@ -171,14 +180,26 @@ def test_skill_md_is_brief():
     skill = ROOT / "SKILL.md"
     text = skill.read_text(encoding="utf-8")
     n_lines = len(text.splitlines())
-    assert n_lines < 300, f"SKILL.md is {n_lines} lines; keep it short (Agent-Reach pattern)"
+    assert n_lines < 300, (
+        f"SKILL.md is {n_lines} lines; keep it short (Agent-Reach pattern)"
+    )
 
 
 def test_skill_md_lists_the_core_tools():
     skill = ROOT / "SKILL.md"
     text = skill.read_text(encoding="utf-8").lower()
-    for tool in ("scan", "intelligence", "brief", "ask", "postreview",
-                 "health", "risk", "doctor", "skill", "daily"):
+    for tool in (
+        "scan",
+        "intelligence",
+        "brief",
+        "ask",
+        "postreview",
+        "health",
+        "risk",
+        "doctor",
+        "skill",
+        "daily",
+    ):
         assert tool in text, f"SKILL.md must mention the '{tool}' tool"
 
 
@@ -186,7 +207,9 @@ def test_skill_md_states_safety_guarantee():
     skill = ROOT / "SKILL.md"
     text = skill.read_text(encoding="utf-8").lower()
     # Must include a "never place an order" or equivalent safety statement
-    assert "never" in text and ("order" in text or "execution" in text or "trade" in text)
+    assert "never" in text and (
+        "order" in text or "execution" in text or "trade" in text
+    )
 
 
 def test_skill_md_requires_citations_for_ask():
@@ -199,12 +222,17 @@ def test_skill_md_requires_citations_for_ask():
 
 # ── main.py — new CLI subcommands (P7) ───────────────────────────────────
 
+
 def test_main_help_mentions_doctor_channels_skill():
     """`python main.py --help` should list the new subcommands."""
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "--help"],
-        capture_output=True, text=True, timeout=20, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=20,
+        cwd=str(ROOT),
     )
     assert res.returncode == 0, res.stderr
     out = res.stdout.lower()
@@ -215,9 +243,13 @@ def test_main_help_mentions_doctor_channels_skill():
 def test_main_doctor_text_runs(capsys):
     """`python main.py doctor` should exit 0 and produce a report."""
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "doctor"],
-        capture_output=True, text=True, timeout=30, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        cwd=str(ROOT),
     )
     assert res.returncode == 0, res.stderr
     assert "doctor" in res.stdout.lower() or "channel" in res.stdout.lower()
@@ -225,9 +257,13 @@ def test_main_doctor_text_runs(capsys):
 
 def test_main_doctor_json_is_valid(capsys):
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "doctor", "--json"],
-        capture_output=True, text=True, timeout=30, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        cwd=str(ROOT),
     )
     assert res.returncode == 0, res.stderr
     parsed = json.loads(res.stdout)
@@ -237,9 +273,13 @@ def test_main_doctor_json_is_valid(capsys):
 def test_main_desk_json_is_valid():
     """`python main.py desk --json` is the one-call advisory."""
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "desk", "--json"],
-        capture_output=True, text=True, timeout=40, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=40,
+        cwd=str(ROOT),
         env={**os.environ, "DEMO_MODE": "1"},
     )
     assert res.returncode == 0, res.stderr
@@ -250,9 +290,13 @@ def test_main_desk_json_is_valid():
 
 def test_main_channels_runs():
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "channels"],
-        capture_output=True, text=True, timeout=20, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=20,
+        cwd=str(ROOT),
     )
     assert res.returncode == 0, res.stderr
     out = res.stdout.lower()
@@ -263,9 +307,13 @@ def test_main_channels_runs():
 def test_main_skill_print_runs():
     """`python main.py skill` defaults to printing the SKILL.md to stdout."""
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "skill"],
-        capture_output=True, text=True, timeout=20, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=20,
+        cwd=str(ROOT),
     )
     assert res.returncode == 0, res.stderr
     # The SKILL.md frontmatter should be in the output
@@ -275,9 +323,13 @@ def test_main_skill_print_runs():
 def test_main_skill_install_requires_system(tmp_path, monkeypatch):
     """Without --system, --install must refuse (no $HOME writes)."""
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "skill", "--install"],
-        capture_output=True, text=True, timeout=20, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=20,
+        cwd=str(ROOT),
     )
     # Exit 2 = "refused without --system"
     assert res.returncode == 2, (res.stdout, res.stderr)
@@ -291,10 +343,20 @@ def test_main_skill_install_dry_run_does_not_write(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(fake_home))
 
     import subprocess
+
     res = subprocess.run(
-        [sys.executable, str(ROOT / "main.py"), "skill",
-         "--install", "--system", "--dry-run"],
-        capture_output=True, text=True, timeout=20, cwd=str(ROOT),
+        [
+            sys.executable,
+            str(ROOT / "main.py"),
+            "skill",
+            "--install",
+            "--system",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        cwd=str(ROOT),
     )
     assert res.returncode == 0, (res.stdout, res.stderr)
     assert "dry-run" in res.stdout.lower()
@@ -307,10 +369,21 @@ def test_main_skill_install_writes_to_target_dir(tmp_path, monkeypatch):
     target = tmp_path / "my_skills" / "cryptobrain"
 
     import subprocess
+
     res = subprocess.run(
-        [sys.executable, str(ROOT / "main.py"), "skill",
-         "--install", "--system", "--target-dir", str(target)],
-        capture_output=True, text=True, timeout=20, cwd=str(ROOT),
+        [
+            sys.executable,
+            str(ROOT / "main.py"),
+            "skill",
+            "--install",
+            "--system",
+            "--target-dir",
+            str(target),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        cwd=str(ROOT),
     )
     assert res.returncode == 0, (res.stdout, res.stderr)
     written = target / "SKILL.md"
@@ -326,10 +399,21 @@ def test_main_skill_uninstall_removes_written_file(tmp_path, monkeypatch):
     (target / "SKILL.md").write_text("placeholder", encoding="utf-8")
 
     import subprocess
+
     res = subprocess.run(
-        [sys.executable, str(ROOT / "main.py"), "skill",
-         "--uninstall", "--system", "--target-dir", str(target)],
-        capture_output=True, text=True, timeout=20, cwd=str(ROOT),
+        [
+            sys.executable,
+            str(ROOT / "main.py"),
+            "skill",
+            "--uninstall",
+            "--system",
+            "--target-dir",
+            str(target),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        cwd=str(ROOT),
     )
     assert res.returncode == 0, (res.stdout, res.stderr)
     assert not (target / "SKILL.md").exists()
@@ -338,9 +422,13 @@ def test_main_skill_uninstall_removes_written_file(tmp_path, monkeypatch):
 def test_main_doctor_strip_text_runs():
     """`python main.py doctor --strip` prints the combined verdict (TODO-1.bis)."""
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "doctor", "--strip"],
-        capture_output=True, text=True, timeout=40, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=40,
+        cwd=str(ROOT),
         env={**os.environ, "DEMO_MODE": "1"},
     )
     assert res.returncode == 0, res.stderr
@@ -351,24 +439,36 @@ def test_main_doctor_strip_text_runs():
 
 def test_main_doctor_strip_json_is_valid():
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "doctor", "--strip", "--json"],
-        capture_output=True, text=True, timeout=40, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=40,
+        cwd=str(ROOT),
         env={**os.environ, "DEMO_MODE": "1"},
     )
     assert res.returncode == 0, res.stderr
     parsed = json.loads(res.stdout)
     assert parsed["level"] in {"ok", "degraded", "blocked", "down"}
     assert {p["name"] for p in parsed["pillars"]} == {
-        "channels", "immune", "risk_gate", "data"}
+        "channels",
+        "immune",
+        "risk_gate",
+        "data",
+    }
 
 
 def test_main_doctor_json_includes_readiness():
     """The full doctor JSON carries the strip alongside channels + immune."""
     import subprocess
+
     res = subprocess.run(
         [sys.executable, str(ROOT / "main.py"), "doctor", "--json"],
-        capture_output=True, text=True, timeout=40, cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=40,
+        cwd=str(ROOT),
         env={**os.environ, "DEMO_MODE": "1"},
     )
     assert res.returncode == 0, res.stderr
@@ -378,6 +478,7 @@ def test_main_doctor_json_includes_readiness():
 
 
 # ── Roadmap document ─────────────────────────────────────────────────────
+
 
 def test_roadmap_exists_and_mentions_phases():
     doc = ROOT / "ROADMAP_AGENT_REACH_UPGRADE.md"

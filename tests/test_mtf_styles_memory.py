@@ -1,10 +1,9 @@
 """Tests for multi-timeframe analysis + trading-style classification + state memory."""
+
 from __future__ import annotations
 
-import pytest
-
 from brain.state_memory import SignalMemory
-from brain.styles import classify_styles, STYLE_COOLDOWN_MIN, ORDER
+from brain.styles import ORDER, STYLE_COOLDOWN_MIN, classify_styles
 from data.database import SignalDB
 from engine.mtf import analyze_mtf, analyze_timeframe
 from engine.signal_engine import analyze_frame
@@ -20,6 +19,7 @@ class FakeClient:
 
 def _frames(seed_offset=0):
     from tests.conftest import make_ohlcv
+
     return {
         "1d": make_ohlcv(n=160, seed=10 + seed_offset),
         "4h": make_ohlcv(n=220, seed=11 + seed_offset),
@@ -44,12 +44,16 @@ def _ctx(**over):
 
 def _frame_payload():
     from tests.conftest import make_ohlcv
+
     df = make_ohlcv(n=300, seed=13)
-    return analyze_frame(df, symbol="BTCUSDT", timeframe="15m", min_confidence=0).as_json()
+    return analyze_frame(
+        df, symbol="BTCUSDT", timeframe="15m", min_confidence=0
+    ).as_json()
 
 
 def test_mtf_analyze_timeframe_shape():
     from tests.conftest import make_ohlcv
+
     v = analyze_timeframe(make_ohlcv(n=200, seed=1), "4h")
     assert v["available"] is True
     for k in ("trend", "rsi", "adx", "swing_high", "swing_low", "premium_discount"):
@@ -60,13 +64,19 @@ def test_mtf_analyze_combines():
     mtf = analyze_mtf("BTCUSDT", FakeClient(_frames()))
     assert set(mtf["views"]) >= {"1d", "4h", "1h", "15m", "5m"}
     assert mtf["htf_bias"] in ("bullish", "bearish", "neutral")
-    assert mtf["alignment"]["label"] in ("aligned_bull", "aligned_bear", "mixed", "counter_trend")
+    assert mtf["alignment"]["label"] in (
+        "aligned_bull",
+        "aligned_bear",
+        "mixed",
+        "counter_trend",
+    )
     assert isinstance(mtf["key_levels"]["support"], list)
     assert isinstance(mtf["key_levels"]["resistance"], list)
 
 
 class PartialClient:
     """Returns nothing for timeframes it doesn't have (no fallback)."""
+
     def __init__(self, frames):
         self.frames = frames
 
@@ -94,8 +104,10 @@ def test_styles_all_present():
 
 def test_styles_stand_aside_when_chop():
     """Mixed alignment + no volume + weak trend -> nothing offered."""
-    from tests.conftest import make_ohlcv
     import numpy as np
+
+    from tests.conftest import make_ohlcv
+
     rng = np.random.default_rng(9)
     n = 300
     close = np.cumsum(rng.normal(0, 0.003, n)) + 60000

@@ -12,6 +12,7 @@ FHS layout used by the Debian package:
 Tests override the roots via ``SKY_HUB_PREFIX`` so the same code runs
 offline without installing a package or talking to systemd.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -79,20 +80,24 @@ class HubPaths:
     var: Path
 
     @classmethod
-    def resolve(cls, prefix: Path | str | None = None) -> "HubPaths":
+    def resolve(cls, prefix: Path | str | None = None) -> HubPaths:
         if prefix is None:
             raw = os.getenv("SKY_HUB_PREFIX", "")
             prefix = Path(raw) if raw else Path("/")
         prefix = Path(prefix)
         if str(prefix) in ("", "/"):
-            return cls(prefix=Path("/"),
-                       opt=Path("/opt/sky"),
-                       etc=Path("/etc/sky"),
-                       var=Path("/var/lib/sky"))
-        return cls(prefix=prefix,
-                   opt=prefix / "opt" / "sky",
-                   etc=prefix / "etc" / "sky",
-                   var=prefix / "var" / "lib" / "sky")
+            return cls(
+                prefix=Path("/"),
+                opt=Path("/opt/sky"),
+                etc=Path("/etc/sky"),
+                var=Path("/var/lib/sky"),
+            )
+        return cls(
+            prefix=prefix,
+            opt=prefix / "opt" / "sky",
+            etc=prefix / "etc" / "sky",
+            var=prefix / "var" / "lib" / "sky",
+        )
 
     @property
     def env_file(self) -> Path:
@@ -115,8 +120,7 @@ class HubPaths:
         return self.var / "backups"
 
 
-def default_env_body(*, mode: str = "local",
-                     owner_hint: str = "") -> str:
+def default_env_body(*, mode: str = "local", owner_hint: str = "") -> str:
     bind = "127.0.0.1"
     remote = "0" if mode == "local" else "0"
     # Remote still binds loopback; Caddy/nginx terminates TLS in front.
@@ -187,16 +191,16 @@ def ensure_layout(paths: HubPaths) -> dict[str, str]:
     return created
 
 
-def write_env(paths: HubPaths, *, mode: str, owner_hint: str = "",
-              overwrite: bool = False) -> Path:
+def write_env(
+    paths: HubPaths, *, mode: str, owner_hint: str = "", overwrite: bool = False
+) -> Path:
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}")
     paths.etc.mkdir(parents=True, exist_ok=True)
     if paths.env_file.exists() and not overwrite:
         return paths.env_file
     tmp = paths.env_file.with_suffix(".env.tmp")
-    tmp.write_text(default_env_body(mode=mode, owner_hint=owner_hint),
-                   encoding="utf-8")
+    tmp.write_text(default_env_body(mode=mode, owner_hint=owner_hint), encoding="utf-8")
     tmp.replace(paths.env_file)
     try:
         _chmod_private(paths.env_file)
@@ -205,9 +209,14 @@ def write_env(paths: HubPaths, *, mode: str, owner_hint: str = "",
     return paths.env_file
 
 
-def setup(*, mode: str = "local", owner: str = "",
-          notify_test: bool = False, prefix: Path | str | None = None,
-          overwrite_env: bool = False) -> dict[str, Any]:
+def setup(
+    *,
+    mode: str = "local",
+    owner: str = "",
+    notify_test: bool = False,
+    prefix: Path | str | None = None,
+    overwrite_env: bool = False,
+) -> dict[str, Any]:
     """First-run wizard. Creates the FHS tree and a private env file.
 
     Owner account creation stays in ``web.auth`` (P18.1) so we do not
@@ -218,8 +227,7 @@ def setup(*, mode: str = "local", owner: str = "",
         raise ValueError(f"mode must be one of {MODES}")
     paths = HubPaths.resolve(prefix)
     layout = ensure_layout(paths)
-    env_path = write_env(paths, mode=mode, owner_hint=owner,
-                         overwrite=overwrite_env)
+    env_path = write_env(paths, mode=mode, owner_hint=owner, overwrite=overwrite_env)
     storage = storage_check(paths)
     stamp = {
         "version": VERSION,
@@ -232,8 +240,7 @@ def setup(*, mode: str = "local", owner: str = "",
         "notify_test": "skipped" if not notify_test else "requested",
         "live_exchange_execution": False,
     }
-    paths.setup_stamp.write_text(json.dumps(stamp, indent=2) + "\n",
-                                 encoding="utf-8")
+    paths.setup_stamp.write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
     try:
         _chmod_private(paths.setup_stamp)
     except OSError:
@@ -246,8 +253,7 @@ def setup(*, mode: str = "local", owner: str = "",
             "in front (ops/proxy/). Do not expose gunicorn publicly."
         )
     stamp["verdict"] = verdict
-    paths.setup_stamp.write_text(json.dumps(stamp, indent=2) + "\n",
-                                 encoding="utf-8")
+    paths.setup_stamp.write_text(json.dumps(stamp, indent=2) + "\n", encoding="utf-8")
     return {
         "ok": storage["ok"],
         "verdict": verdict,
@@ -266,8 +272,9 @@ def setup(*, mode: str = "local", owner: str = "",
 
 def storage_check(paths: HubPaths | None = None) -> dict[str, Any]:
     paths = paths or HubPaths.resolve()
-    usage = shutil.disk_usage(str(paths.var if paths.var.exists()
-                                  else paths.prefix or Path.cwd()))
+    usage = shutil.disk_usage(
+        str(paths.var if paths.var.exists() else paths.prefix or Path.cwd())
+    )
     free_mb = usage.free // (1024 * 1024)
     warn_mb = int(os.getenv("SKY_DISK_WARN_MB", "1024"))
     ok = free_mb >= 256
@@ -312,9 +319,12 @@ def _is_world_readable(path: Path) -> bool:
     return bool(mode & stat.S_IROTH)
 
 
-def backup(*, prefix: Path | str | None = None,
-           include_store: bool = True,
-           retention_days: int = DEFAULT_RETENTION_DAYS) -> dict[str, Any]:
+def backup(
+    *,
+    prefix: Path | str | None = None,
+    include_store: bool = True,
+    retention_days: int = DEFAULT_RETENTION_DAYS,
+) -> dict[str, Any]:
     """SQLite-safe + config (+ optional Parquet) archive under backups/.
 
     Archives are created 0600 and never include Telegram/Discord/LLM
@@ -347,8 +357,9 @@ def backup(*, prefix: Path | str | None = None,
             "store_files": store_files,
             "live_exchange_execution": False,
         }
-        (work / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n",
-                                          encoding="utf-8")
+        (work / MANIFEST_NAME).write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
         archive = paths.backup_dir / f"{ARCHIVE_PREFIX}{stamp}.tar.gz"
         with tarfile.open(archive, "w:gz") as tar:
             for child in work.iterdir():
@@ -406,8 +417,9 @@ def redact_env_text(text: str) -> str:
     return "\n".join(out) + ("\n" if text.endswith("\n") else "")
 
 
-def restore(archive: Path | str, *, prefix: Path | str | None = None,
-            overwrite: bool = False) -> dict[str, Any]:
+def restore(
+    archive: Path | str, *, prefix: Path | str | None = None, overwrite: bool = False
+) -> dict[str, Any]:
     """Restore DB + store from a backup archive. Config stays unless empty."""
     paths = HubPaths.resolve(prefix)
     archive = Path(archive)
@@ -430,7 +442,8 @@ def restore(archive: Path | str, *, prefix: Path | str | None = None,
         if db_src.exists():
             if paths.db_path.exists() and not overwrite:
                 raise FileExistsError(
-                    f"{paths.db_path} exists — pass overwrite=True to replace")
+                    f"{paths.db_path} exists — pass overwrite=True to replace"
+                )
             shutil.copy2(db_src, paths.db_path)
             try:
                 _chmod_private(paths.db_path)
@@ -438,14 +451,24 @@ def restore(archive: Path | str, *, prefix: Path | str | None = None,
                 pass
         store_src = work / "store"
         if store_src.exists():
-            if paths.store_dir.exists() and any(paths.store_dir.iterdir()) and not overwrite:
+            if (
+                paths.store_dir.exists()
+                and any(paths.store_dir.iterdir())
+                and not overwrite
+            ):
                 raise FileExistsError(
-                    f"{paths.store_dir} is not empty — pass overwrite=True")
+                    f"{paths.store_dir} is not empty — pass overwrite=True"
+                )
             if paths.store_dir.exists():
                 shutil.rmtree(paths.store_dir)
             shutil.copytree(store_src, paths.store_dir)
-        return {"ok": True, "archive": str(archive), "manifest": manifest,
-                "db": str(paths.db_path), "store": str(paths.store_dir)}
+        return {
+            "ok": True,
+            "archive": str(archive),
+            "manifest": manifest,
+            "db": str(paths.db_path),
+            "store": str(paths.store_dir),
+        }
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -460,13 +483,16 @@ def _systemctl(*args: str) -> dict[str, Any]:
     cmd.extend(args)
     try:
         proc = subprocess.run(
-            cmd,
-            capture_output=True, text=True, timeout=8, check=False)
+            cmd, capture_output=True, text=True, timeout=8, check=False
+        )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"available": True, "error": str(exc)}
-    return {"available": True, "code": proc.returncode,
-            "stdout": (proc.stdout or "").strip(),
-            "stderr": (proc.stderr or "").strip()}
+    return {
+        "available": True,
+        "code": proc.returncode,
+        "stdout": (proc.stdout or "").strip(),
+        "stderr": (proc.stderr or "").strip(),
+    }
 
 
 def host_role() -> dict[str, Any]:
@@ -490,24 +516,36 @@ def host_role() -> dict[str, Any]:
             "is the decision maker."
         ),
         "run": [
-            {"unit": "sky-dashboard.service",
-             "job": "clickable desk at 127.0.0.1:8050",
-             "required": True},
-            {"unit": "sky-paper.service",
-             "job": "paper --watch — the money path (P11)",
-             "required": True},
-            {"unit": "sky-scan.timer",
-             "job": "scheduled scans into the store",
-             "required": True},
-            {"unit": "sky-backup.timer",
-             "job": "nightly SQLite-safe backup",
-             "required": True},
-            {"unit": "sky-agent.service",
-             "job": "24/7 research: WATCH / CONSIDER / WAIT / AVOID",
-             "required": True},
-            {"unit": "sky-agent.timer",
-             "job": "05:00 UTC daily-report nudge",
-             "required": False},
+            {
+                "unit": "sky-dashboard.service",
+                "job": "clickable desk at 127.0.0.1:8050",
+                "required": True,
+            },
+            {
+                "unit": "sky-paper.service",
+                "job": "paper --watch — the money path (P11)",
+                "required": True,
+            },
+            {
+                "unit": "sky-scan.timer",
+                "job": "scheduled scans into the store",
+                "required": True,
+            },
+            {
+                "unit": "sky-backup.timer",
+                "job": "nightly SQLite-safe backup",
+                "required": True,
+            },
+            {
+                "unit": "sky-agent.service",
+                "job": "24/7 research: WATCH / CONSIDER / WAIT / AVOID",
+                "required": True,
+            },
+            {
+                "unit": "sky-agent.timer",
+                "job": "05:00 UTC daily-report nudge",
+                "required": False,
+            },
         ],
         "human_still_does": [
             "approve or reject every paper trade",
@@ -533,8 +571,11 @@ def host_role() -> dict[str, Any]:
 def unit_status() -> dict[str, Any]:
     """Best-effort systemd snapshot. Offline / no-root → reported, not faked."""
     if not shutil.which("systemctl"):
-        return {"available": False, "units": {},
-                "note": "systemctl not present — source/dev checkout"}
+        return {
+            "available": False,
+            "units": {},
+            "note": "systemctl not present — source/dev checkout",
+        }
     units: dict[str, Any] = {}
     for name in UNITS:
         info = _systemctl("is-active", name)
@@ -557,13 +598,19 @@ def status(*, prefix: Path | str | None = None) -> dict[str, Any]:
             setup_info = {"error": "setup.json unreadable"}
     backups = []
     if paths.backup_dir.exists():
-        backups = sorted(p.name for p in paths.backup_dir.glob(f"{ARCHIVE_PREFIX}*.tar.gz"))
+        backups = sorted(
+            p.name for p in paths.backup_dir.glob(f"{ARCHIVE_PREFIX}*.tar.gz")
+        )
     return {
         "ok": True,
         "version": VERSION,
         "package": PACKAGE_NAME,
-        "paths": {"opt": str(paths.opt), "etc": str(paths.etc),
-                  "var": str(paths.var), "db": str(paths.db_path)},
+        "paths": {
+            "opt": str(paths.opt),
+            "etc": str(paths.etc),
+            "var": str(paths.var),
+            "db": str(paths.db_path),
+        },
         "env_present": paths.env_file.exists(),
         "setup": setup_info,
         "storage": storage,
@@ -580,30 +627,49 @@ def doctor(*, prefix: Path | str | None = None) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
     def add(name: str, ok: bool, detail: str, level: str = "ok") -> None:
-        checks.append({"name": name, "ok": ok, "detail": detail,
-                       "level": level if ok else "blocked"})
+        checks.append(
+            {
+                "name": name,
+                "ok": ok,
+                "detail": detail,
+                "level": level if ok else "blocked",
+            }
+        )
 
-    add("opt", paths.opt.exists() or os.getenv("SKY_HUB_PREFIX") is not None,
-        str(paths.opt))
+    add(
+        "opt",
+        paths.opt.exists() or os.getenv("SKY_HUB_PREFIX") is not None,
+        str(paths.opt),
+    )
     add("etc", paths.etc.exists(), str(paths.etc))
     add("var", paths.var.exists(), str(paths.var))
     if paths.env_file.exists():
         world = _is_world_readable(paths.env_file)
-        add("env_privacy", not world,
-            "world-readable" if world else "mode is private")
+        add("env_privacy", not world, "world-readable" if world else "mode is private")
         text = paths.env_file.read_text(encoding="utf-8")
-        add("loopback_bind", "DASHBOARD_HOST=127.0.0.1" in text
-            or "DASHBOARD_HOST=localhost" in text,
-            "dashboard must stay on loopback behind the proxy")
+        add(
+            "loopback_bind",
+            "DASHBOARD_HOST=127.0.0.1" in text or "DASHBOARD_HOST=localhost" in text,
+            "dashboard must stay on loopback behind the proxy",
+        )
     else:
         add("env", False, "sky.env missing — run sky setup")
     storage = storage_check(paths)
-    add("disk", storage["ok"],
-        f"{storage['free_mb']} MB free"
-        + (" (warn)" if storage["warn"] else ""))
-    backups = list(paths.backup_dir.glob(f"{ARCHIVE_PREFIX}*.tar.gz")) if paths.backup_dir.exists() else []
-    add("backup", True if backups else False,
-        f"{len(backups)} archive(s)" if backups else "no backups yet")
+    add(
+        "disk",
+        storage["ok"],
+        f"{storage['free_mb']} MB free" + (" (warn)" if storage["warn"] else ""),
+    )
+    backups = (
+        list(paths.backup_dir.glob(f"{ARCHIVE_PREFIX}*.tar.gz"))
+        if paths.backup_dir.exists()
+        else []
+    )
+    add(
+        "backup",
+        True if backups else False,
+        f"{len(backups)} archive(s)" if backups else "no backups yet",
+    )
     for bak in backups:
         if _is_world_readable(bak):
             add("backup_privacy", False, f"{bak.name} is world-readable")
@@ -617,16 +683,21 @@ def doctor(*, prefix: Path | str | None = None) -> dict[str, Any]:
         agent = (svc.get("units") or {}).get("sky-agent.service") or {}
         # Inactive on first night is a warning, not a hard fail — sudo
         # enable happens after the no-root bootstrap.
-        add("sky_agent_unit", True,
+        add(
+            "sky_agent_unit",
+            True,
             f"sky-agent.service {agent.get('active', 'unknown')} / "
             f"{agent.get('enabled', 'unknown')}",
-            level="ok" if agent.get("active") == "active" else "degraded")
+            level="ok" if agent.get("active") == "active" else "degraded",
+        )
     else:
-        add("systemd", True, svc.get("note") or "not installed (dev)",
-            level="degraded")
-        add("sky_agent_unit", True,
+        add("systemd", True, svc.get("note") or "not installed (dev)", level="degraded")
+        add(
+            "sky_agent_unit",
+            True,
             "catalogued (sky-agent.service + timer) — enable on the Hub",
-            level="degraded")
+            level="degraded",
+        )
     # backup absence is a warning, not a hard fail on first day
     blocked = [c for c in checks if not c["ok"] and c["name"] != "backup"]
     return {
@@ -639,8 +710,9 @@ def doctor(*, prefix: Path | str | None = None) -> dict[str, Any]:
     }
 
 
-def diagnostics(*, prefix: Path | str | None = None,
-                output: Path | str | None = None) -> dict[str, Any]:
+def diagnostics(
+    *, prefix: Path | str | None = None, output: Path | str | None = None
+) -> dict[str, Any]:
     """Export a private, secret-free P22 support bundle.
 
     The bundle deliberately excludes the database, market store, environment
@@ -655,8 +727,9 @@ def diagnostics(*, prefix: Path | str | None = None,
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         output = paths.backup_dir / f"sky-support-{stamp}.tar.gz"
     output = Path(output)
-    write_support_bundle(output, hub_status=status(prefix=prefix),
-                         hub_doctor=doctor(prefix=prefix))
+    write_support_bundle(
+        output, hub_status=status(prefix=prefix), hub_doctor=doctor(prefix=prefix)
+    )
     return {
         "ok": True,
         "archive": str(output),
@@ -676,19 +749,37 @@ def logs(*, unit: str = "sky-dashboard.service", lines: int = 80) -> dict[str, A
         return {"ok": False, "error": f"refusing unknown unit {unit}", "lines": []}
     try:
         proc = subprocess.run(
-            [exe, "-u", unit, "-n", str(max(1, min(lines, 500))),
-             "--no-pager", "-o", "cat"],
-            capture_output=True, text=True, timeout=8, check=False)
+            [
+                exe,
+                "-u",
+                unit,
+                "-n",
+                str(max(1, min(lines, 500))),
+                "--no-pager",
+                "-o",
+                "cat",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"ok": False, "error": str(exc), "lines": []}
     text = proc.stdout or ""
     for secret in SECRET_ENV_KEYS:
         text = text.replace(secret, secret)  # keys themselves are fine
-    return {"ok": proc.returncode == 0, "unit": unit,
-            "lines": text.splitlines(), "code": proc.returncode}
+    return {
+        "ok": proc.returncode == 0,
+        "unit": unit,
+        "lines": text.splitlines(),
+        "code": proc.returncode,
+    }
 
 
-def uninstall(*, prefix: Path | str | None = None, purge: bool = False) -> dict[str, Any]:
+def uninstall(
+    *, prefix: Path | str | None = None, purge: bool = False
+) -> dict[str, Any]:
     """Remove application files. Data survives unless purge=True."""
     paths = HubPaths.resolve(prefix)
     removed: list[str] = []
@@ -696,9 +787,13 @@ def uninstall(*, prefix: Path | str | None = None, purge: bool = False) -> dict[
     # Never delete /opt/sky of a real host from a source checkout unless
     # SKY_HUB_PREFIX is set — that is the test/dev sandbox contract.
     if prefix is None and not os.getenv("SKY_HUB_PREFIX"):
-        return {"ok": False, "error": "refusing uninstall without SKY_HUB_PREFIX "
-                "or an explicit prefix (protects a live Hub)",
-                "removed": [], "kept": []}
+        return {
+            "ok": False,
+            "error": "refusing uninstall without SKY_HUB_PREFIX "
+            "or an explicit prefix (protects a live Hub)",
+            "removed": [],
+            "kept": [],
+        }
     if paths.opt.exists():
         shutil.rmtree(paths.opt, ignore_errors=True)
         removed.append(str(paths.opt))
@@ -711,8 +806,13 @@ def uninstall(*, prefix: Path | str | None = None, purge: bool = False) -> dict[
         for p in (paths.etc, paths.var):
             if p.exists():
                 kept.append(str(p))
-    return {"ok": True, "purge": purge, "removed": removed, "kept": kept,
-            "note": "user data preserved" if not purge else "user data deleted"}
+    return {
+        "ok": True,
+        "purge": purge,
+        "removed": removed,
+        "kept": kept,
+        "note": "user data preserved" if not purge else "user data deleted",
+    }
 
 
 def format_status(payload: dict[str, Any]) -> str:
@@ -724,11 +824,15 @@ def format_status(payload: dict[str, Any]) -> str:
         f"  env  {'yes' if payload.get('env_present') else 'missing'}",
     ]
     st = payload.get("storage") or {}
-    lines.append(f"  disk {st.get('free_mb', '?')} MB free"
-                 + ("  ⚠ low" if st.get("warn") else ""))
+    lines.append(
+        f"  disk {st.get('free_mb', '?')} MB free"
+        + ("  ⚠ low" if st.get("warn") else "")
+    )
     setup = payload.get("setup") or {}
     if setup:
-        lines.append(f"  mode {setup.get('mode', '?')}  setup {setup.get('created_at', '')}")
+        lines.append(
+            f"  mode {setup.get('mode', '?')}  setup {setup.get('created_at', '')}"
+        )
     lines.append(f"  backups {len(payload.get('backups') or [])}")
     svc = payload.get("services") or {}
     if not svc.get("available"):
@@ -738,7 +842,9 @@ def format_status(payload: dict[str, Any]) -> str:
             lines.append(f"  {name:<24} {u.get('active')} / {u.get('enabled')}")
     role = payload.get("host_role") or {}
     if role:
-        lines.append(f"  host  {role.get('role', '?')} — one research agent, no second PC agent")
+        lines.append(
+            f"  host  {role.get('role', '?')} — one research agent, no second PC agent"
+        )
     lines.append("  live exchange execution  NO")
     return "\n".join(lines)
 
@@ -790,13 +896,21 @@ def first_night() -> dict[str, Any]:
     }
 
 
-def dispatch(action: str, *, prefix: Path | str | None = None,
-             mode: str = "local", owner: str = "",
-             archive: str | None = None, overwrite: bool = False,
-             purge: bool = False, include_store: bool = True,
-             retention_days: int = DEFAULT_RETENTION_DAYS,
-             unit: str = "sky-dashboard.service",
-             lines: int = 80, platform: str = "windows") -> dict[str, Any]:
+def dispatch(
+    action: str,
+    *,
+    prefix: Path | str | None = None,
+    mode: str = "local",
+    owner: str = "",
+    archive: str | None = None,
+    overwrite: bool = False,
+    purge: bool = False,
+    include_store: bool = True,
+    retention_days: int = DEFAULT_RETENTION_DAYS,
+    unit: str = "sky-dashboard.service",
+    lines: int = 80,
+    platform: str = "windows",
+) -> dict[str, Any]:
     action = (action or "").strip().lower()
     if action == "setup":
         return setup(mode=mode, owner=owner, prefix=prefix, overwrite_env=overwrite)
@@ -805,8 +919,9 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
     if action == "doctor":
         return doctor(prefix=prefix)
     if action == "backup":
-        return backup(prefix=prefix, include_store=include_store,
-                      retention_days=retention_days)
+        return backup(
+            prefix=prefix, include_store=include_store, retention_days=retention_days
+        )
     if action == "restore":
         if not archive:
             raise ValueError("restore requires --archive")
@@ -822,7 +937,8 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
     if action in ("role", "host-role", "pc"):
         return host_role()
     if action == "pair":
-        from web.auth import AuthManager, ROLE_VIEWER
+        from web.auth import ROLE_VIEWER, AuthManager
+
         platform = (platform or "windows").lower()
         if platform == "android":
             from ops.android_companion import pairing_payload, pairing_qr_text
@@ -832,12 +948,14 @@ def dispatch(action: str, *, prefix: Path | str | None = None,
         if not mgr.owner_exists():
             raise ValueError("create the owner account first (dashboard setup)")
         from data.database import SignalDB
+
         with SignalDB() as db:
             row = db.conn.execute(
                 "SELECT id FROM users WHERE role='operator' ORDER BY id LIMIT 1"
             ).fetchone()
-        minted = mgr.create_pairing_code(int(row["id"]), name=owner or platform,
-                                         scope=ROLE_VIEWER)
+        minted = mgr.create_pairing_code(
+            int(row["id"]), name=owner or platform, scope=ROLE_VIEWER
+        )
         hub_url = "https://127.0.0.1"
         payload = pairing_payload(hub_url=hub_url, code=minted["raw"])
         return {

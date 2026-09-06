@@ -19,15 +19,25 @@ The gate combines:
 
 ``evaluate()`` is a pure read of the DB + config; nothing here mutates state.
 """
+
 from __future__ import annotations
 
-import time
 from datetime import datetime, timedelta, timezone
 
-from config import (PROGRESSION, PROGRESSION_LEVELS, ENFORCE_RISK_LIMITS,
-                    TRADER_STATE_BLOCK, DRAWDOWN_REDUCE_PCT, DRAWDOWN_STOP_PCT,
-                    DRAWDOWN_REVIEW_PCT, RISK_PCT, MAX_DAILY_LOSS_PCT,
-                    MAX_WEEKLY_LOSS_PCT, ACCOUNT_BALANCE, KELLY_MAX_RISK_PCT)
+from config import (
+    ACCOUNT_BALANCE,
+    DRAWDOWN_REDUCE_PCT,
+    DRAWDOWN_REVIEW_PCT,
+    DRAWDOWN_STOP_PCT,
+    ENFORCE_RISK_LIMITS,
+    KELLY_MAX_RISK_PCT,
+    MAX_DAILY_LOSS_PCT,
+    MAX_WEEKLY_LOSS_PCT,
+    PROGRESSION,
+    PROGRESSION_LEVELS,
+    RISK_PCT,
+    TRADER_STATE_BLOCK,
+)
 from data.costs import net_r_of_row
 from data.database import SignalDB
 from data.provenance import LIVE_SOURCE_KEY
@@ -55,8 +65,11 @@ def effective_risk() -> dict:
         "daily": prog["daily"],
         "weekly": prog["weekly"],
         "source": "progression",
-        "env": {"risk_pct": RISK_PCT, "daily": MAX_DAILY_LOSS_PCT,
-                "weekly": MAX_WEEKLY_LOSS_PCT},
+        "env": {
+            "risk_pct": RISK_PCT,
+            "daily": MAX_DAILY_LOSS_PCT,
+            "weekly": MAX_WEEKLY_LOSS_PCT,
+        },
     }
 
 
@@ -103,12 +116,15 @@ def closed_pnl(db: SignalDB, since_ts: int, risk_pct: float) -> dict:
     rows = db.live_book_rows(since_ts=since_ts)
     r_sum = round(sum(net_r_of_row(r) for r in rows), 3)
     gross_sum = round(sum(float(r["rr_achieved"] or 0.0) for r in rows), 3)
-    return {"n": len(rows), "r_sum": r_sum,
-            "pct": round(r_sum * risk_pct, 3),
-            # Kept visible so a reviewer can see the cost drag explicitly.
-            "gross_r_sum": gross_sum,
-            "gross_pct": round(gross_sum * risk_pct, 3),
-            "cost_r": round(gross_sum - r_sum, 3)}
+    return {
+        "n": len(rows),
+        "r_sum": r_sum,
+        "pct": round(r_sum * risk_pct, 3),
+        # Kept visible so a reviewer can see the cost drag explicitly.
+        "gross_r_sum": gross_sum,
+        "gross_pct": round(gross_sum * risk_pct, 3),
+        "cost_r": round(gross_sum - r_sum, 3),
+    }
 
 
 def daily_weekly(db: SignalDB) -> dict:
@@ -169,8 +185,11 @@ def drawdown(db: SignalDB) -> dict:
         "max_drawdown_pct": round(max_dd, 2),
         "level": level,
         "blocked": blocked,
-        "ladder": {"reduce": DRAWDOWN_REDUCE_PCT, "stop": DRAWDOWN_STOP_PCT,
-                   "review": DRAWDOWN_REVIEW_PCT},
+        "ladder": {
+            "reduce": DRAWDOWN_REDUCE_PCT,
+            "stop": DRAWDOWN_STOP_PCT,
+            "review": DRAWDOWN_REVIEW_PCT,
+        },
     }
 
 
@@ -183,8 +202,9 @@ def trader_state_blocked(db: SignalDB) -> dict:
     return {"blocked": bool(flags), "state": st, "flags": flags}
 
 
-def setup_proven(db: SignalDB, plan_type: str,
-                 source_key: str | None = LIVE_SOURCE_KEY) -> dict:
+def setup_proven(
+    db: SignalDB, plan_type: str, source_key: str | None = LIVE_SOURCE_KEY
+) -> dict:
     """Setup-proven gate (decisions A6/B10): >=100 backtest samples AND >=20
     decided paper samples AND positive expectancy.
 
@@ -201,20 +221,38 @@ def setup_proven(db: SignalDB, plan_type: str,
     Strictly tighter, never looser: the floors and the bar are unchanged.
     """
     st = db.setup_stats(plan_type or "", source_key=source_key)
-    bt_e = (st["backtest_expectancy"] if st.get("backtest_expectancy_net") is None
-            else st["backtest_expectancy_net"])
-    pp_e = (st["paper_expectancy"] if st.get("paper_expectancy_net") is None
-            else st["paper_expectancy_net"])
-    proven = bool(st["backtest_n"] >= 100 and st["paper_n"] >= 20 and
-                  pp_e > 0 and bt_e > 0)
-    return {"proven": proven, "source_key": source_key,
-            "proven_on": "net" if (
-        st.get("backtest_expectancy_net") is not None
-        or st.get("paper_expectancy_net") is not None) else "gross", **st}
+    bt_e = (
+        st["backtest_expectancy"]
+        if st.get("backtest_expectancy_net") is None
+        else st["backtest_expectancy_net"]
+    )
+    pp_e = (
+        st["paper_expectancy"]
+        if st.get("paper_expectancy_net") is None
+        else st["paper_expectancy_net"]
+    )
+    proven = bool(
+        st["backtest_n"] >= 100 and st["paper_n"] >= 20 and pp_e > 0 and bt_e > 0
+    )
+    return {
+        "proven": proven,
+        "source_key": source_key,
+        "proven_on": "net"
+        if (
+            st.get("backtest_expectancy_net") is not None
+            or st.get("paper_expectancy_net") is not None
+        )
+        else "gross",
+        **st,
+    }
 
 
-def evaluate(db: SignalDB, symbol: str | None = None, plan_type: str | None = None,
-             action: str | None = None) -> dict:
+def evaluate(
+    db: SignalDB,
+    symbol: str | None = None,
+    plan_type: str | None = None,
+    action: str | None = None,
+) -> dict:
     """Full gate evaluation. ``allowed=False`` means: do not open a new trade.
 
     Returns everything the CLI/dashboard need to explain *why*.
@@ -229,16 +267,22 @@ def evaluate(db: SignalDB, symbol: str | None = None, plan_type: str | None = No
 
     if dws["daily_blocked"]:
         blocked_by.append(
-            f"daily loss limit reached ({dws['today']['pct']:.2f}% ≤ -{risk['daily']}%)")
+            f"daily loss limit reached ({dws['today']['pct']:.2f}% ≤ -{risk['daily']}%)"
+        )
     if dws["weekly_blocked"]:
         blocked_by.append(
-            f"weekly loss limit reached ({dws['week']['pct']:.2f}% ≤ -{risk['weekly']}%) — reduced activity")
+            f"weekly loss limit reached ({dws['week']['pct']:.2f}% ≤ -{risk['weekly']}%) — reduced activity"
+        )
     if dw["blocked"]:
         blocked_by.append(
-            f"drawdown ladder: {dw['level']} at {dw['max_drawdown_pct']:.2f}% drawdown")
+            f"drawdown ladder: {dw['level']} at {dw['max_drawdown_pct']:.2f}% drawdown"
+        )
     if ts["blocked"]:
-        blocked_by.append("trader state: " + ", ".join(ts["flags"]) +
-                          " — no trading while these flags are set")
+        blocked_by.append(
+            "trader state: "
+            + ", ".join(ts["flags"])
+            + " — no trading while these flags are set"
+        )
 
     proven_check = None
     if plan_type:
@@ -248,33 +292,45 @@ def evaluate(db: SignalDB, symbol: str | None = None, plan_type: str | None = No
             # P12.8 — say *which* condition failed. When the sample floors are
             # met, the setup is unproven because it does not make money net of
             # costs, and reporting only the counts would read as a bug.
-            floors_met = (proven_check["backtest_n"] >= 100
-                          and proven_check["paper_n"] >= 20)
+            floors_met = (
+                proven_check["backtest_n"] >= 100 and proven_check["paper_n"] >= 20
+            )
             if floors_met:
-                bt_e = (proven_check["backtest_expectancy"]
-                        if proven_check.get("backtest_expectancy_net") is None
-                        else proven_check["backtest_expectancy_net"])
-                pp_e = (proven_check["paper_expectancy"]
-                        if proven_check.get("paper_expectancy_net") is None
-                        else proven_check["paper_expectancy_net"])
-                reason = (f"expectancy {proven_check['proven_on']} "
-                          f"(backtest {bt_e:+.3f}R / paper {pp_e:+.3f}R) "
-                          f"is not positive")
+                bt_e = (
+                    proven_check["backtest_expectancy"]
+                    if proven_check.get("backtest_expectancy_net") is None
+                    else proven_check["backtest_expectancy_net"]
+                )
+                pp_e = (
+                    proven_check["paper_expectancy"]
+                    if proven_check.get("paper_expectancy_net") is None
+                    else proven_check["paper_expectancy_net"]
+                )
+                reason = (
+                    f"expectancy {proven_check['proven_on']} "
+                    f"(backtest {bt_e:+.3f}R / paper {pp_e:+.3f}R) "
+                    f"is not positive"
+                )
             else:
-                reason = (f"{proven_check['backtest_n']} backtest / "
-                          f"{proven_check['paper_n']} paper samples")
+                reason = (
+                    f"{proven_check['backtest_n']} backtest / "
+                    f"{proven_check['paper_n']} paper samples"
+                )
             blocked_by.append(
                 f"setup unproven ({plan_type}): {reason} — research only at "
-                f"'{prog['level']}' level")
+                f"'{prog['level']}' level"
+            )
 
-    details.update({
-        "progression": prog,
-        "effective_risk": risk,
-        "daily_weekly": dws,
-        "drawdown": dw,
-        "trader_state": ts,
-        "enforced": ENFORCE_RISK_LIMITS,
-    })
+    details.update(
+        {
+            "progression": prog,
+            "effective_risk": risk,
+            "daily_weekly": dws,
+            "drawdown": dw,
+            "trader_state": ts,
+            "enforced": ENFORCE_RISK_LIMITS,
+        }
+    )
 
     # ── kelly advisory (hidden_alpha; advisory-only, never auto-executes) ──
     # P12.15: this used to call kelly_from_progress() on raw paper_trades
@@ -313,9 +369,12 @@ def evaluate(db: SignalDB, symbol: str | None = None, plan_type: str | None = No
     }
 
 
-def evaluate_risk_gate(db: SignalDB, symbol: str | None = None,
-                       plan_type: str | None = None,
-                       action: str | None = None) -> dict:
+def evaluate_risk_gate(
+    db: SignalDB,
+    symbol: str | None = None,
+    plan_type: str | None = None,
+    action: str | None = None,
+) -> dict:
     """Convenience alias for evaluate (used by agents / immune / MCP)."""
     return evaluate(db, symbol=symbol, plan_type=plan_type, action=action)
 
@@ -343,11 +402,17 @@ def status_text(db: SignalDB) -> str:
         # P12.18 — these percentages are NET of costs; show the drag when
         # there is any, so the number is never mistaken for a gross read.
         f"  today  {dws['today']['n']:>3} trades  {dws['today']['pct']:+.2f}%   (limit {risk['daily']}%)"
-        + (f"   [gross {dws['today']['gross_pct']:+.2f}%, costs {dws['today']['cost_r']:.2f}R]"
-           if dws['today'].get('cost_r') else ""),
+        + (
+            f"   [gross {dws['today']['gross_pct']:+.2f}%, costs {dws['today']['cost_r']:.2f}R]"
+            if dws["today"].get("cost_r")
+            else ""
+        ),
         f"  week   {dws['week']['n']:>3} trades  {dws['week']['pct']:+.2f}%   (limit {risk['weekly']}%)"
-        + (f"   [gross {dws['week']['gross_pct']:+.2f}%, costs {dws['week']['cost_r']:.2f}R]"
-           if dws['week'].get('cost_r') else ""),
+        + (
+            f"   [gross {dws['week']['gross_pct']:+.2f}%, costs {dws['week']['cost_r']:.2f}R]"
+            if dws["week"].get("cost_r")
+            else ""
+        ),
         f"  drawdown           {dw['max_drawdown_pct']:.2f}%  -> {dw['level']}   equity {dw['equity']:,.2f}",
         f"  trader state       {', '.join(ts['flags']) if ts['flags'] else 'clear'}",
         f"  enforced           {'yes' if d['enforced'] else 'no (advisory only)'}",

@@ -24,8 +24,6 @@ demo matrix is never silently confused with a live one.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
@@ -54,12 +52,14 @@ def _positional_align(returns: dict[str, pd.Series]) -> pd.DataFrame:
     n = min(len(r) for r in returns.values())
     if n <= 0:
         return pd.DataFrame()
-    return pd.DataFrame({sym: r.tail(n).reset_index(drop=True)
-                         for sym, r in returns.items()})
+    return pd.DataFrame(
+        {sym: r.tail(n).reset_index(drop=True) for sym, r in returns.items()}
+    )
 
 
-def aligned_returns(series: dict[str, pd.DataFrame],
-                    min_rows: int = MIN_ALIGNED_ROWS) -> tuple[pd.DataFrame, str]:
+def aligned_returns(
+    series: dict[str, pd.DataFrame], min_rows: int = MIN_ALIGNED_ROWS
+) -> tuple[pd.DataFrame, str]:
     """Align per-symbol return series into one observation matrix.
 
     Returns ``(frame, mode)`` where mode is ``"ts"`` (exact timestamp join) or
@@ -81,7 +81,7 @@ def aligned_returns(series: dict[str, pd.DataFrame],
     return pd.DataFrame(), "insufficient"
 
 
-def _beta(ret_x: pd.Series, ret_y: pd.Series) -> Optional[float]:
+def _beta(ret_x: pd.Series, ret_y: pd.Series) -> float | None:
     """beta of x on y: cov(x, y) / var(y)."""
     var_y = float(np.var(ret_y, ddof=1))
     if var_y <= 0 or len(ret_x) < 3:
@@ -90,9 +90,9 @@ def _beta(ret_x: pd.Series, ret_y: pd.Series) -> Optional[float]:
     return round(cov / var_y, 3)
 
 
-def correlation_report(series: dict[str, pd.DataFrame],
-                       window: int = 60,
-                       min_rows: int = MIN_ALIGNED_ROWS) -> dict:
+def correlation_report(
+    series: dict[str, pd.DataFrame], window: int = 60, min_rows: int = MIN_ALIGNED_ROWS
+) -> dict:
     """Rolling correlation matrix + ETH/BTC beta + bucket-assumption check.
 
     ``series`` maps a symbol to its OHLCV frame.  ``window`` bounds how many
@@ -100,25 +100,36 @@ def correlation_report(series: dict[str, pd.DataFrame],
     """
     symbols = [s for s in series if series[s] is not None and len(series[s]) >= 2]
     if len(symbols) < 2:
-        return {"available": False,
-                "note": "need at least two symbols with price history",
-                "symbols": list(series)}
+        return {
+            "available": False,
+            "note": "need at least two symbols with price history",
+            "symbols": list(series),
+        }
 
     frame, mode = aligned_returns({s: series[s] for s in symbols})
     if frame.empty or len(frame) < min_rows:
-        return {"available": False,
-                "note": f"not enough aligned observations ({len(frame)} < {min_rows})",
-                "symbols": symbols,
-                "alignment": mode}
+        return {
+            "available": False,
+            "note": f"not enough aligned observations ({len(frame)} < {min_rows})",
+            "symbols": symbols,
+            "alignment": mode,
+        }
 
     obs = frame.tail(window)
     corr = obs.corr()
-    matrix = {s1: {s2: (round(float(corr.loc[s1, s2]), 3)
-                        if pd.notna(corr.loc[s1, s2]) else None)
-                   for s2 in corr.columns}
-              for s1 in corr.index}
+    matrix = {
+        s1: {
+            s2: (
+                round(float(corr.loc[s1, s2]), 3)
+                if pd.notna(corr.loc[s1, s2])
+                else None
+            )
+            for s2 in corr.columns
+        }
+        for s1 in corr.index
+    }
 
-    def pair(a: str, b: str) -> Optional[float]:
+    def pair(a: str, b: str) -> float | None:
         try:
             v = matrix[a][b]
         except KeyError:
@@ -142,16 +153,19 @@ def correlation_report(series: dict[str, pd.DataFrame],
     elif btc_eth >= 0.8:
         affirmations.append(
             f"BTC/ETH strongly correlated ({btc_eth:+.2f}) — the ONE-bucket "
-            f"portfolio rule is confirmed by current measurement")
+            f"portfolio rule is confirmed by current measurement"
+        )
     elif btc_eth >= 0.5:
         warnings.append(
             f"BTC/ETH correlation only moderate ({btc_eth:+.2f}) — the bucket "
-            f"rule still applies; treat halves of the bucket with care")
+            f"rule still applies; treat halves of the bucket with care"
+        )
     else:
         warnings.append(
             f"BTC/ETH decoupled right now ({btc_eth:+.2f}) — the static bucket "
             f"rule stays conservative; review before treating BTC and ETH "
-            f"as independent trades")
+            f"as independent trades"
+        )
 
     # Gold vs crypto: normally low; macro risk-off can couple everything.
     crypto_gold = [c for c in (btc_gold, eth_gold) if c is not None]
@@ -160,15 +174,18 @@ def correlation_report(series: dict[str, pd.DataFrame],
         if mx >= 0.7:
             warnings.append(
                 f"gold/crypto coupling unusually high (max {mx:+.2f}) — "
-                f"macro risk regime; gold is NOT an independent hedge this week")
+                f"macro risk regime; gold is NOT an independent hedge this week"
+            )
 
     if obs.isna().any().any():
-        warnings.append("NaNs detected in aligned returns — matrix computed on pairwise data")
+        warnings.append(
+            "NaNs detected in aligned returns — matrix computed on pairwise data"
+        )
 
     return {
         "available": True,
         "symbols": list(obs.columns),
-        "n_observations": int(len(obs)),
+        "n_observations": len(obs),
         "window": int(window),
         "alignment": mode,
         "matrix": matrix,
@@ -178,15 +195,21 @@ def correlation_report(series: dict[str, pd.DataFrame],
         "eth_btc_beta": beta,
         "warnings": warnings,
         "confirmations": affirmations,
-        "note": ("positional alignment (mixed demo/sample data — not a live "
-                 "matrix)" if mode == "positional" else
-                 "timestamp-aligned returns"),
+        "note": (
+            "positional alignment (mixed demo/sample data — not a live matrix)"
+            if mode == "positional"
+            else "timestamp-aligned returns"
+        ),
     }
 
 
-def fetch_report(client, symbols: list[str] | tuple[str, ...] | None = DEFAULT_SYMBOLS,
-                 timeframe: str = "1h", bars: int = 300,
-                 window: int = 60) -> dict:
+def fetch_report(
+    client,
+    symbols: list[str] | tuple[str, ...] | None = DEFAULT_SYMBOLS,
+    timeframe: str = "1h",
+    bars: int = 300,
+    window: int = 60,
+) -> dict:
     """Fetch klines for the watchlist and build the correlation report."""
     symbols = tuple(symbols or DEFAULT_SYMBOLS)
     series: dict[str, pd.DataFrame] = {}
@@ -207,34 +230,50 @@ def fetch_report(client, symbols: list[str] | tuple[str, ...] | None = DEFAULT_S
 
 def format_correlation(res: dict) -> str:
     """Human-readable cross-asset correlation summary for the CLI."""
-    lines = ["=" * 72, "CROSS-ASSET CORRELATION — measured bucket check (read-only)",
-             "-" * 72]
+    lines = [
+        "=" * 72,
+        "CROSS-ASSET CORRELATION — measured bucket check (read-only)",
+        "-" * 72,
+    ]
     if not res.get("available"):
         lines.append(f"  unavailable: {res.get('note', 'unknown reason')}")
         return "\n".join(lines)
 
     syms = res["symbols"]
-    lines.append(f"  tf={res.get('timeframe', '?')}  window={res['window']} "
-                 f"obs={res['n_observations']}  alignment={res['alignment']}")
+    lines.append(
+        f"  tf={res.get('timeframe', '?')}  window={res['window']} "
+        f"obs={res['n_observations']}  alignment={res['alignment']}"
+    )
     header = "  " + " " * 10 + "".join(f"{s[:9]:>12}" for s in syms)
     lines.append(header)
     for s1 in syms:
-        row = [f"{((res['matrix'][s1][s2] if res['matrix'][s1][s2] is not None else float('nan'))):+12.3f}"
-               for s2 in syms]
+        row = [
+            f"{(res['matrix'][s1][s2] if res['matrix'][s1][s2] is not None else float('nan')):+12.3f}"
+            for s2 in syms
+        ]
         lines.append(f"  {s1[:10]:<10}" + "".join(row))
     lines.append("-" * 72)
     if res.get("btc_eth_corr") is not None:
-        lines.append(f"  BTC/ETH corr  {res['btc_eth_corr']:+.3f}"
-                     + (f"   ETH/BTC beta {res['eth_btc_beta']:+.3f}"
-                        if res.get("eth_btc_beta") is not None else ""))
+        lines.append(
+            f"  BTC/ETH corr  {res['btc_eth_corr']:+.3f}"
+            + (
+                f"   ETH/BTC beta {res['eth_btc_beta']:+.3f}"
+                if res.get("eth_btc_beta") is not None
+                else ""
+            )
+        )
     if res.get("btc_gold_corr") is not None:
-        lines.append(f"  BTC/GOLD corr {res['btc_gold_corr']:+.3f}   "
-                     f"ETH/GOLD corr {res['eth_gold_corr']:+.3f}")
+        lines.append(
+            f"  BTC/GOLD corr {res['btc_gold_corr']:+.3f}   "
+            f"ETH/GOLD corr {res['eth_gold_corr']:+.3f}"
+        )
     for line in res.get("confirmations", []):
         lines.append(f"  ✓ {line}")
     for line in res.get("warnings", []):
         lines.append(f"  ⚠ {line}")
     lines.append(f"  note: {res.get('note', '')}")
-    lines.append("  static rule (brain/portfolio.py): BTC+ETH = ONE crypto bucket, "
-                 "gold separate — this report only measures it.")
+    lines.append(
+        "  static rule (brain/portfolio.py): BTC+ETH = ONE crypto bucket, "
+        "gold separate — this report only measures it."
+    )
     return "\n".join(lines)

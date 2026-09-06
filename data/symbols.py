@@ -9,11 +9,12 @@ without hard-coding provider symbols in multiple places.
 tokenized spot gold).  Signals keep the user-facing asset as ``XAUUSD`` while
 payloads also include provider metadata via ``market_context``.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
-from typing import Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -145,8 +146,9 @@ def resolve_symbol(value: str | None, *, default: str = "BTCUSDT") -> SymbolSpec
     )
 
 
-def parse_symbol_list(value: str | Iterable[str] | None,
-                      *, default: Iterable[str] = DEFAULT_WATCHLIST) -> list[str]:
+def parse_symbol_list(
+    value: str | Iterable[str] | None, *, default: Iterable[str] = DEFAULT_WATCHLIST
+) -> list[str]:
     """Parse a comma/list watchlist into canonical symbols without duplicates."""
     if value is None:
         raw_items = list(default)
@@ -170,5 +172,9 @@ def parse_symbol_list(value: str | Iterable[str] | None,
 
 def symbol_choices(symbols: Iterable[str] | None = None) -> list[dict]:
     """Return UI-friendly choices for the configured watchlist."""
-    return [resolve_symbol(sym).as_choice()
-            for sym in parse_symbol_list(symbols if symbols is not None else DEFAULT_WATCHLIST)]
+    return [
+        resolve_symbol(sym).as_choice()
+        for sym in parse_symbol_list(
+            symbols if symbols is not None else DEFAULT_WATCHLIST
+        )
+    ]

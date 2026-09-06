@@ -6,6 +6,7 @@ every judgement is NET of costs (P12.18), and the graduation bar is quoted,
 never moved. The next-practice-task ladder is deterministic and honest —
 journals before discipline before samples before expectancy.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,16 +14,23 @@ import time
 
 import pytest
 
+from brain.weekly import format_weekly_review, missing_journals, weekly_review
 from data.database import SignalDB
-from brain.weekly import (weekly_review, format_weekly_review,
-                          missing_journals)
 
 DAY = 86_400_000
 
 
-def _trade(db: SignalDB, sid: int, rr: float, days_ago: float, *,
-           now: int, sim_key: str | None = None,
-           source_key: str | None = None, plan: str = "Buy Pullback") -> None:
+def _trade(
+    db: SignalDB,
+    sid: int,
+    rr: float,
+    days_ago: float,
+    *,
+    now: int,
+    sim_key: str | None = None,
+    source_key: str | None = None,
+    plan: str = "Buy Pullback",
+) -> None:
     """Insert one decided paper row. Cost-free (rr_net == rr) so the review's
     arithmetic is pinned independently of the cost model."""
     ts = int(now - days_ago * DAY)
@@ -32,9 +40,32 @@ def _trade(db: SignalDB, sid: int, rr: float, days_ago: float, *,
              status, created_ts, opened_ts, closed_ts, entry_price, exit_price,
              outcome, rr_achieved, rr_net, close_reason, sim_key, source_key)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (sid, f"SIG{sid}", plan, "BTCUSDT", "15m", "BUY", 100.0, 99.0, 102.0, 2.0,
-         70, "CLOSED", ts, ts, ts, 100.0, 99.0 if rr < 0 else 102.0,
-         "TP_HIT" if rr > 0 else "STOP_LOSS", rr, rr, "test", sim_key, source_key))
+        (
+            sid,
+            f"SIG{sid}",
+            plan,
+            "BTCUSDT",
+            "15m",
+            "BUY",
+            100.0,
+            99.0,
+            102.0,
+            2.0,
+            70,
+            "CLOSED",
+            ts,
+            ts,
+            ts,
+            100.0,
+            99.0 if rr < 0 else 102.0,
+            "TP_HIT" if rr > 0 else "STOP_LOSS",
+            rr,
+            rr,
+            "test",
+            sim_key,
+            source_key,
+        ),
+    )
 
 
 @pytest.fixture
@@ -59,12 +90,11 @@ def seeded_db(tmp_path, now):
     _trade(db, 3, 1.5, 1, now=now)
     _trade(db, 4, -1.0, 10, now=now)
     _trade(db, 5, 1.0, 20, now=now)
-    _trade(db, 6, 3.0, 2, now=now, sim_key="sim:6")                    # simulator
-    _trade(db, 7, 4.0, 2, now=now, source_key="dukascopy:spot:bid")    # research
+    _trade(db, 6, 3.0, 2, now=now, sim_key="sim:6")  # simulator
+    _trade(db, 7, 4.0, 2, now=now, source_key="dukascopy:spot:bid")  # research
     db.conn.commit()
     db.save_journal(1, followed_rules=True, emotion="calm", mistake="none")
-    db.save_journal(2, followed_rules=False, emotion="greedy",
-                    mistake="entered early")
+    db.save_journal(2, followed_rules=False, emotion="greedy", mistake="entered early")
     yield db
     db.close()
 
@@ -75,8 +105,12 @@ def test_empty_book_is_honest(empty_db, now):
     assert r["week"]["expectancy_net"] is None
     assert r["grade"]["grade"] == "—"
     # honest starter task, and never a fake equity curve
-    assert r["next_practice_task"]["name"] in {"no_activity", "build_evidence",
-                                               "journal_first", "discipline"}
+    assert r["next_practice_task"]["name"] in {
+        "no_activity",
+        "build_evidence",
+        "journal_first",
+        "discipline",
+    }
     assert r["equity_curve"] == []
     assert all(b["n"] == 0 for b in r["r_distribution"])
     assert r["violations"]["compliance"] is None
@@ -95,8 +129,7 @@ def test_week_window_vs_all_time(seeded_db, now):
     assert r["week"]["n"] == 3, "only trades closed within the window"
     assert r["all_time"]["n"] == 5
     # net of costs == gross here (cost-free fixture): week = (2.0 -1.0 +1.5)/3
-    assert r["week"]["expectancy_net"] == pytest.approx((2.0 - 1.0 + 1.5) / 3,
-                                                        rel=1e-3)
+    assert r["week"]["expectancy_net"] == pytest.approx((2.0 - 1.0 + 1.5) / 3, rel=1e-3)
     assert r["all_time"]["total_r_net"] == pytest.approx(2.0 - 1.0 + 1.5 - 1.0 + 1.0)
     assert r["all_time"]["profit_factor"] == pytest.approx(4.5 / 2.0, rel=1e-3)
     # a custom window changes the week, never the all-time book
@@ -119,9 +152,9 @@ def test_r_distribution_buckets_cover_the_book(seeded_db, now):
     total = sum(b["n"] for b in r["r_distribution"])
     assert total == r["all_time"]["n"]
     by_label = {b["bucket"]: b["n"] for b in r["r_distribution"]}
-    assert by_label["(-2R,-1R]"] == 2        # 2 × -1.0R
-    assert by_label["(+1R,+2R]"] == 2        # 2.0R and 1.5R
-    assert by_label["(+0.5R,+1R]"] == 1      # 1.0R
+    assert by_label["(-2R,-1R]"] == 2  # 2 × -1.0R
+    assert by_label["(+1R,+2R]"] == 2  # 2.0R and 1.5R
+    assert by_label["(+0.5R,+1R]"] == 1  # 1.0R
     week_total = sum(b["n"] for b in r["r_distribution_week"])
     assert week_total == r["week"]["n"]
 
@@ -130,6 +163,7 @@ def test_equity_curve_matches_business_metrics(seeded_db, now):
     """One computation, many surfaces: the page cannot disagree with the
     Risk center's business scorecard."""
     from brain.metrics import business_metrics
+
     r = weekly_review(seeded_db, now_ms=now)
     m = business_metrics(seeded_db)
     assert r["equity_curve"] == m["equity_curve"]
@@ -146,8 +180,7 @@ def test_missing_journals_drive_task_and_gate(seeded_db, now):
     assert set(jg["scan_ids"]) == {3, 4, 5}
     # finishing the journals lifts the hold
     for sid in (3, 4, 5):
-        seeded_db.save_journal(sid, followed_rules=True, emotion="calm",
-                               mistake="none")
+        seeded_db.save_journal(sid, followed_rules=True, emotion="calm", mistake="none")
     assert missing_journals(seeded_db)["missing"] == 0
     r2 = weekly_review(seeded_db, now_ms=now)
     assert r2["next_practice_task"]["name"] != "journal_first"
@@ -203,15 +236,27 @@ def test_protect_capital_task_on_losing_week(tmp_path, now):
     db.conn.commit()
     for sid in (11, 12, 13):
         db.save_journal(sid, followed_rules=True, emotion="calm", mistake="none")
-    import data.simulator as sim
+
     # pretend all primary setups are already proven so the ladder reaches
     # the expectancy step honestly instead of asking for more samples
-    import brain.weekly as weekly
-    monkey_tracker = [{"plan_type": "Buy Pullback", "primary": True,
-                       "backtest_n": 100, "backtest_target": 100,
-                       "backtest_pct": 100.0, "paper_n": 20, "paper_target": 20,
-                       "paper_pct": 100.0, "expectancy_net": 0.6,
-                       "win_rate_net": 0.6, "proven": True, "missing": []}]
+    from brain import weekly
+
+    monkey_tracker = [
+        {
+            "plan_type": "Buy Pullback",
+            "primary": True,
+            "backtest_n": 100,
+            "backtest_target": 100,
+            "backtest_pct": 100.0,
+            "paper_n": 20,
+            "paper_target": 20,
+            "paper_pct": 100.0,
+            "expectancy_net": 0.6,
+            "win_rate_net": 0.6,
+            "proven": True,
+            "missing": [],
+        }
+    ]
     orig = weekly._graduation_tracker
     weekly._graduation_tracker = lambda _db: monkey_tracker
     try:
@@ -236,6 +281,7 @@ def test_grade_components_sum_to_score(seeded_db, now):
 def test_weekly_agent_carries_the_same_payload(tmp_path, now):
     """WeeklyReviewAgent archives the same computation (invariant #10)."""
     from brain.agents import WeeklyReviewAgent
+
     db = SignalDB(tmp_path / "w.db")
     _trade(db, 1, 1.0, 1, now=now)
     db.conn.commit()
@@ -268,12 +314,14 @@ def test_root_mcp_weekly_review_tool(tmp_path, monkeypatch, now):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "mcp.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "mcp.db"))
     db = SignalDB()
     _trade(db, 1, 1.0, 1, now=now)
     db.conn.commit()
     db.close()
     import mcp_server
+
     assert "weekly_review" in mcp_server.ALLOWED_TOOLS
     res = mcp_server.handle_tool_call("weekly_review", {"days": 7})
     assert res["all_time"]["n"] == 1

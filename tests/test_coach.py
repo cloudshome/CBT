@@ -1,44 +1,86 @@
 """Tests for the Coach teaching layer."""
+
 from __future__ import annotations
 
-from brain.coach import (GLOSSARY, _expand, explain_signal, mentor,
-                         personal_feedback, five_levels, management_checklist)
+from brain.coach import (
+    GLOSSARY,
+    _expand,
+    explain_signal,
+    five_levels,
+    management_checklist,
+    mentor,
+    personal_feedback,
+)
 from data.database import SignalDB
 
 
 def _payload() -> dict:
     return {
-        "signal": {"signal_id": "BTCUSDT_20260804_1452", "action": "BUY",
-                   "asset": "BTCUSDT", "timeframe": "15m", "confidence": "HIGH",
-                   "reason": "Bullish BOS + volume spike above VWAP + bullish RSI divergence"},
+        "signal": {
+            "signal_id": "BTCUSDT_20260804_1452",
+            "action": "BUY",
+            "asset": "BTCUSDT",
+            "timeframe": "15m",
+            "confidence": "HIGH",
+            "reason": "Bullish BOS + volume spike above VWAP + bullish RSI divergence",
+        },
         "plans": [
-            {"type": "Buy Pullback", "action": "BUY", "confidence": 84,
-             "condition": "IF price pulls back to bullish Order Block near 61000.00 AND shows rejection",
-             "entry": 61000.0, "stop_loss": 60600.0,
-             "take_profits": [61900.0, 62800.0], "risk_reward": 2.2,
-             "status": "waiting", "reasons": ["Bullish structure (bos_up)",
-                                               "Unfilled bullish fair value gap"]},
+            {
+                "type": "Buy Pullback",
+                "action": "BUY",
+                "confidence": 84,
+                "condition": "IF price pulls back to bullish Order Block near 61000.00 AND shows rejection",
+                "entry": 61000.0,
+                "stop_loss": 60600.0,
+                "take_profits": [61900.0, 62800.0],
+                "risk_reward": 2.2,
+                "status": "waiting",
+                "reasons": [
+                    "Bullish structure (bos_up)",
+                    "Unfilled bullish fair value gap",
+                ],
+            },
         ],
-        "snapshot": {"features": {"trend": "bullish", "ema_alignment_bull": True,
-                                  "supertrend_bull": True, "adx": 28, "rsi": 58,
-                                  "volume_spike": True, "volume_ratio": 2.4,
-                                  "above_vwap": True, "close_vs_vwap_pct": 0.4,
-                                  "event_kind": "bos_up", "trend_bias": "bullish",
-                                  "premium_discount": "discount",
-                                  "premium_discount_position": 0.3,
-                                  "sweep": {"side": "sellside", "level": 60500.0},
-                                  "rsi_divergence": {"bull": 2, "bear": 0}}},
+        "snapshot": {
+            "features": {
+                "trend": "bullish",
+                "ema_alignment_bull": True,
+                "supertrend_bull": True,
+                "adx": 28,
+                "rsi": 58,
+                "volume_spike": True,
+                "volume_ratio": 2.4,
+                "above_vwap": True,
+                "close_vs_vwap_pct": 0.4,
+                "event_kind": "bos_up",
+                "trend_bias": "bullish",
+                "premium_discount": "discount",
+                "premium_discount_position": 0.3,
+                "sweep": {"side": "sellside", "level": 60500.0},
+                "rsi_divergence": {"bull": 2, "bear": 0},
+            }
+        },
     }
 
 
 def test_glossary_has_core_terms():
-    for term in ("BOS", "CHOCH", "FVG", "Order Block", "Liquidity Sweep", "VWAP",
-                 "Risk:Reward", "Expectancy"):
+    for term in (
+        "BOS",
+        "CHOCH",
+        "FVG",
+        "Order Block",
+        "Liquidity Sweep",
+        "VWAP",
+        "Risk:Reward",
+        "Expectancy",
+    ):
         assert term in GLOSSARY
 
 
 def test_expand_annotates_terms():
-    out = _expand("IF price pulls back to bullish Order Block near 61000 AND shows rejection")
+    out = _expand(
+        "IF price pulls back to bullish Order Block near 61000 AND shows rejection"
+    )
     assert "Order Block" in out and "footprint" in out
 
 
@@ -59,15 +101,30 @@ def test_mentor_walks_through():
 
 
 def test_mentor_no_plans():
-    out = mentor({"signal": {"action": "NO TRADE"}, "plans": [],
-                  "snapshot": {"features": {"trend": "mixed", "price": 60000.0,
-                                            "trend_bias": "neutral"}}})
+    out = mentor(
+        {
+            "signal": {"action": "NO TRADE"},
+            "plans": [],
+            "snapshot": {
+                "features": {
+                    "trend": "mixed",
+                    "price": 60000.0,
+                    "trend_bias": "neutral",
+                }
+            },
+        }
+    )
     assert "best trade is no trade" in out.lower()
 
 
 def test_management_checklist_has_position_manager_steps():
-    plan = {"type": "Buy Pullback", "take_profits": [61900.0, 62800.0],
-            "entry": 61000.0, "stop_loss": 60600.0, "risk_reward": 2.2}
+    plan = {
+        "type": "Buy Pullback",
+        "take_profits": [61900.0, 62800.0],
+        "entry": 61000.0,
+        "stop_loss": 60600.0,
+        "risk_reward": 2.2,
+    }
     out = management_checklist(plan)
     joined = "\n".join(out)
     assert "HOLD" in joined and "REDUCE" in joined and "TRAIL" in joined
@@ -84,9 +141,13 @@ def test_management_checklist_no_plan():
 
 def test_five_levels_has_all_five_ladders():
     joined = "\n".join(five_levels(_payload()))
-    for level in ("LEVEL 1 — OBSERVATION", "LEVEL 2 — INTERPRETATION",
-                  "LEVEL 3 — OPPORTUNITY", "LEVEL 4 — DECISION",
-                  "LEVEL 5 — ACTION"):
+    for level in (
+        "LEVEL 1 — OBSERVATION",
+        "LEVEL 2 — INTERPRETATION",
+        "LEVEL 3 — OPPORTUNITY",
+        "LEVEL 4 — DECISION",
+        "LEVEL 5 — ACTION",
+    ):
         assert level in joined
     # interpretation explains the structure, not just reports it
     assert "Structural bias is bullish" in joined
@@ -105,9 +166,11 @@ def test_five_levels_action_lists_entry_stop_targets():
 
 def test_five_levels_decision_reflects_desk_block():
     payload = _payload()
-    payload["decision"] = {"action": "NO TRADE",
-                           "blocked_by": ["risk(daily_loss_limit)"],
-                           "decision_text": "WAIT — no trade"}
+    payload["decision"] = {
+        "action": "NO TRADE",
+        "blocked_by": ["risk(daily_loss_limit)"],
+        "decision_text": "WAIT — no trade",
+    }
     joined = "\n".join(five_levels(payload))
     assert "Desk decision: NO TRADE" in joined
     assert "risk(daily_loss_limit)" in joined
@@ -115,9 +178,13 @@ def test_five_levels_decision_reflects_desk_block():
 
 
 def test_five_levels_no_plans_teaches_waiting():
-    payload = {"signal": {"action": "NO TRADE"}, "plans": [],
-               "snapshot": {"features": {"trend": "mixed", "price": 60000.0,
-                                         "trend_bias": "neutral"}}}
+    payload = {
+        "signal": {"action": "NO TRADE"},
+        "plans": [],
+        "snapshot": {
+            "features": {"trend": "mixed", "price": 60000.0, "trend_bias": "neutral"}
+        },
+    }
     joined = "\n".join(five_levels(payload))
     assert "No plan above the confidence threshold" in joined
     assert "Stand aside" in joined
@@ -141,6 +208,7 @@ def test_personal_feedback_empty(tmp_path):
 def test_personal_feedback_with_activity(tmp_path):
     db = SignalDB(tmp_path / "t.db")
     from tests.test_database import _payload as mk
+
     sid = db.save_scan(mk())
     db.update_status(sid, "APPROVED", note="strong setup")
     fb = personal_feedback(db)

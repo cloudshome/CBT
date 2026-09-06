@@ -6,20 +6,19 @@ Provides:
   2. Post-Trade Review: Post-mortem on executed/paper trades covering R achieved,
      MAE/MFE excursion, rule compliance, and mentor takeaways.
 """
+
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from typing import Optional
 
+from brain.full_pipeline import analyze_full
+from brain.playbooks import session_status
+from brain.risk_gate import evaluate_risk_gate
 from data.database import SignalDB
 from data.symbols import normalize_symbol
-from brain.playbooks import get_playbook, session_status, apply_playbook
-from brain.risk_gate import evaluate_risk_gate
-from brain.full_pipeline import analyze_full
 
 
-def post_trade_review(scan_id: int, db: Optional[SignalDB] = None) -> dict:
+def post_trade_review(scan_id: int, db: SignalDB | None = None) -> dict:
     """Generate a post-mortem review for a specific scan / trade."""
     close_db = False
     if db is None:
@@ -37,7 +36,8 @@ def post_trade_review(scan_id: int, db: Optional[SignalDB] = None) -> dict:
 
         paper = db.paper_trade_for_scan(scan_id) or {}
         journal = db.conn.execute(
-            "SELECT * FROM journal_entries WHERE scan_id=?", (scan_id,)).fetchone()
+            "SELECT * FROM journal_entries WHERE scan_id=?", (scan_id,)
+        ).fetchone()
         journal_dict = dict(journal) if journal else {}
 
         outcome = paper.get("outcome") or scan.get("status") or "UNKNOWN"
@@ -59,15 +59,21 @@ def post_trade_review(scan_id: int, db: Optional[SignalDB] = None) -> dict:
         # Key lessons / mentor feedback
         takeaways = []
         if outcome in ("WIN", "FULL_WIN", "TP_HIT"):
-            takeaways.append("Target reached according to plan. Good discipline and patience.")
+            takeaways.append(
+                "Target reached according to plan. Good discipline and patience."
+            )
         elif outcome in ("LOSS", "SL_HIT"):
-            takeaways.append("Stop loss protected capital. Loss is an ordinary cost of doing business.")
+            takeaways.append(
+                "Stop loss protected capital. Loss is an ordinary cost of doing business."
+            )
         else:
             takeaways.append("Trade concluded under monitored market conditions.")
 
         if mae is not None and mfe is not None and mae > 0:
             ratio = round(mfe / mae, 2) if mae else 0.0
-            takeaways.append(f"Excursion ratio (MFE/MAE): {ratio:.2f} — entry precision evaluated.")
+            takeaways.append(
+                f"Excursion ratio (MFE/MAE): {ratio:.2f} — entry precision evaluated."
+            )
 
         if journal_dict.get("emotion"):
             takeaways.append(f"Recorded emotion: {journal_dict['emotion']}.")
@@ -93,8 +99,9 @@ def post_trade_review(scan_id: int, db: Optional[SignalDB] = None) -> dict:
             db.close()
 
 
-def generate_morning_brief(symbols: list[str] | None = None,
-                           db: Optional[SignalDB] = None) -> dict:
+def generate_morning_brief(
+    symbols: list[str] | None = None, db: SignalDB | None = None
+) -> dict:
     """Cross-asset morning briefing for the trading desk."""
     target_symbols = symbols or ["BTCUSDT", "ETHUSDT", "XAUUSD"]
     target_symbols = [normalize_symbol(s) for s in target_symbols]
@@ -111,7 +118,9 @@ def generate_morning_brief(symbols: list[str] | None = None,
 
         for sym in target_symbols:
             try:
-                payload = analyze_full(sym, "15m", 150, with_context=False, with_memory=False)
+                payload = analyze_full(
+                    sym, "15m", 150, with_context=False, with_memory=False
+                )
                 sig = payload.get("signal", {})
                 act = sig.get("action", "NO TRADE")
                 conf = sig.get("confidence", 50)

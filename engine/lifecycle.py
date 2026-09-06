@@ -22,14 +22,19 @@ Every transition is written to the `decisions` table so the coach can later
 teach from *your* decision history, and the calibrator can learn which signal
 types you (and the engine) actually profit from.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 VALID_STATES = {
-    "CREATED", "PENDING_REVIEW", "APPROVED", "REJECTED",
-    "EXECUTED", "SKIPPED", "CLOSED",
+    "CREATED",
+    "PENDING_REVIEW",
+    "APPROVED",
+    "REJECTED",
+    "EXECUTED",
+    "SKIPPED",
+    "CLOSED",
 }
 TRANSITIONS = {
     "CREATED": {"PENDING_REVIEW"},
@@ -43,8 +48,13 @@ TRANSITIONS = {
 
 # For feedback prompts in the approval UI / CLI
 REJECT_REASONS = [
-    "low_confidence", "bad_risk_reward", "trend_conflict", "news_conflict",
-    "already_in_position", "avoid_overtrade", "other",
+    "low_confidence",
+    "bad_risk_reward",
+    "trend_conflict",
+    "news_conflict",
+    "already_in_position",
+    "avoid_overtrade",
+    "other",
 ]
 
 

@@ -1,8 +1,7 @@
 """P19 Ubuntu Hub — layout, backup/restore, privacy, uninstall, no-order."""
+
 from __future__ import annotations
 
-import json
-import os
 import sqlite3
 import stat
 from pathlib import Path
@@ -14,13 +13,13 @@ from ops.hub import (
     SECRET_ENV_KEYS,
     UNITS,
     HubPaths,
-    host_role,
     backup,
     default_env_body,
     dispatch,
     doctor,
     format_doctor,
     format_status,
+    host_role,
     redact_env_text,
     restore,
     setup,
@@ -127,6 +126,7 @@ def test_backup_does_not_embed_secrets(prefix):
     paths.env_file.write_text(text + "TELEGRAM_BOT_TOKEN=super-secret\n")
     snap = backup(prefix=prefix, include_store=False)
     import tarfile
+
     with tarfile.open(snap["archive"], "r:gz") as tar:
         names = tar.getnames()
         assert "sky.env.redacted" in names
@@ -179,6 +179,7 @@ def test_cli_hub_setup_json(tmp_path, monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("SKY_HUB_PREFIX", str(tmp_path / "cli"))
     from main import main
+
     rc = main(["hub", "setup", "--mode", "local", "--json"])
     assert rc == 0
 
@@ -193,9 +194,10 @@ def test_systemd_units_are_hardened_and_loopback():
     assert "/opt/sky" in dash
     paper = (root / "sky-paper.service").read_text()
     assert "paper --watch" in paper
-    assert "never sends" in paper.lower() or "never sends orders" in (
-        root / "sky-paper.service"
-    ).read_text().lower()
+    assert (
+        "never sends" in paper.lower()
+        or "never sends orders" in (root / "sky-paper.service").read_text().lower()
+    )
     backup_unit = (root / "sky-backup.service").read_text()
     assert "hub backup" in backup_unit
     for name in UNITS:
@@ -203,8 +205,12 @@ def test_systemd_units_are_hardened_and_loopback():
 
 
 def test_proxy_configs_do_not_cache_api():
-    caddy = (Path(__file__).resolve().parent.parent / "ops" / "proxy" / "Caddyfile").read_text()
-    nginx = (Path(__file__).resolve().parent.parent / "ops" / "proxy" / "nginx-sky.conf").read_text()
+    caddy = (
+        Path(__file__).resolve().parent.parent / "ops" / "proxy" / "Caddyfile"
+    ).read_text()
+    nginx = (
+        Path(__file__).resolve().parent.parent / "ops" / "proxy" / "nginx-sky.conf"
+    ).read_text()
     assert "127.0.0.1:8050" in caddy and "127.0.0.1:8050" in nginx
     assert "no-store" in caddy and "no-store" in nginx
 
@@ -220,6 +226,7 @@ def test_packaging_files_exist():
 
 def test_first_night_guide_is_honest():
     from ops.hub import first_night, first_night_guide
+
     text = first_night_guide().lower()
     assert "127.0.0.1" in text
     assert "demo_mode=0" in text
@@ -227,14 +234,18 @@ def test_first_night_guide_is_honest():
     payload = first_night()
     assert payload["ok"] and payload["live_exchange_execution"] is False
     assert "port-forward 8050" in payload["forbidden"]
-    assert any("second" in x.lower() and "agent" in x.lower()
-               for x in payload["forbidden"])
+    assert any(
+        "second" in x.lower() and "agent" in x.lower() for x in payload["forbidden"]
+    )
     assert payload["host_role"]["second_agent"] is False
 
 
 def test_dispatch_first_night():
     payload = dispatch("first-night")
-    assert "hub setup" in payload["guide"].lower() or "first night" in payload["guide"].lower()
+    assert (
+        "hub setup" in payload["guide"].lower()
+        or "first night" in payload["guide"].lower()
+    )
 
 
 def test_host_role_is_one_hub_one_agent():

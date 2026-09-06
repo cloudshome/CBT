@@ -6,6 +6,7 @@ starts empty. The journal-first gate is a trainer-side delay on *commitments*
 only — it never opens anything, never bypasses the risk gate, and rejects,
 closes and skips are unaffected.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,9 +15,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from brain.ritual import RITUAL_STEPS, ritual_set, ritual_today
 from data.database import SignalDB
-from brain.ritual import ritual_today, ritual_set, RITUAL_STEPS
-
 
 DAY = 86_400_000
 
@@ -29,15 +29,26 @@ def db(tmp_path):
 
 
 def _seed_scan(db: SignalDB, sig_id: str = "SIG-P1") -> int:
-    return db.save_scan({
-        "signal": {"signal_id": sig_id, "signal_type": "SIGNAL",
-                   "asset": "BTCUSDT", "timeframe": "15m",
-                   "action": "BUY", "entry": 100.0, "stop_loss": 99.0,
-                   "take_profit": 101.0, "risk_reward": 1.0, "confidence": 70},
-        "plans": [{"type": "Buy Pullback", "entry": 100.0, "stop": 99.0,
-                   "tps": [101.0]}],
-        "snapshot": {"features": {}},
-    })
+    return db.save_scan(
+        {
+            "signal": {
+                "signal_id": sig_id,
+                "signal_type": "SIGNAL",
+                "asset": "BTCUSDT",
+                "timeframe": "15m",
+                "action": "BUY",
+                "entry": 100.0,
+                "stop_loss": 99.0,
+                "take_profit": 101.0,
+                "risk_reward": 1.0,
+                "confidence": 70,
+            },
+            "plans": [
+                {"type": "Buy Pullback", "entry": 100.0, "stop": 99.0, "tps": [101.0]}
+            ],
+            "snapshot": {"features": {}},
+        }
+    )
 
 
 def _seed_unjournaled_decided(db: SignalDB, sid: int = 900) -> None:
@@ -48,13 +59,35 @@ def _seed_unjournaled_decided(db: SignalDB, sid: int = 900) -> None:
              status, created_ts, opened_ts, closed_ts, entry_price, exit_price,
              outcome, rr_achieved, rr_net, close_reason)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (sid, f"SIG{sid}", "Buy Pullback", "BTCUSDT", "15m", "BUY", 100.0, 99.0,
-         101.5, 1.5, 70, "CLOSED", now, now, now, 100.0, 101.5, "TP_HIT",
-         1.5, 1.5, "test"))
+        (
+            sid,
+            f"SIG{sid}",
+            "Buy Pullback",
+            "BTCUSDT",
+            "15m",
+            "BUY",
+            100.0,
+            99.0,
+            101.5,
+            1.5,
+            70,
+            "CLOSED",
+            now,
+            now,
+            now,
+            100.0,
+            101.5,
+            "TP_HIT",
+            1.5,
+            1.5,
+            "test",
+        ),
+    )
     db.conn.commit()
 
 
 # ── ritual persistence ───────────────────────────────────────────────────
+
 
 def test_ritual_steps_canonical_vocabulary():
     assert RITUAL_STEPS == ("readiness", "loop", "gate", "act")
@@ -109,20 +142,23 @@ def test_unknown_step_fails_closed(db):
 def test_ritual_state_raw_db_roundtrip(db):
     day = time.strftime("%Y-%m-%d", time.gmtime())
     db.ritual_mark(day, "gate", True)
-    db.ritual_mark(day, "gate", True)      # idempotent
+    db.ritual_mark(day, "gate", True)  # idempotent
     db.ritual_mark(day, "gate", False)
-    assert db.ritual_state(day) == {}      # undone rows do not count
+    assert db.ritual_state(day) == {}  # undone rows do not count
 
 
 # ── web endpoints ────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def client(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "ws.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "ws.db"))
     from web.app import make_app
+
     app = make_app()
     app.testing = True
     return app.test_client()
@@ -148,9 +184,19 @@ def test_weekly_api_and_export(client):
     r = client.get("/api/weekly")
     assert r.status_code == 200
     body = r.get_json()
-    for key in ("window", "week", "all_time", "r_distribution", "violations",
-                "graduation_tracker", "next_practice_task", "grade",
-                "journal_gate", "equity_curve", "bar"):
+    for key in (
+        "window",
+        "week",
+        "all_time",
+        "r_distribution",
+        "violations",
+        "graduation_tracker",
+        "next_practice_task",
+        "grade",
+        "journal_gate",
+        "equity_curve",
+        "bar",
+    ):
         assert key in body, key
     assert body["bar"]["expectancy"] == pytest.approx(0.50)
     r = client.get("/api/weekly/export")
@@ -162,13 +208,22 @@ def test_weekly_api_and_export(client):
 
 # ── W3.3 journal-first approval gate (web) ───────────────────────────────
 
+
 def _allow_gate(monkeypatch):
     """Make the risk gate allow so the journal gate is the only hold."""
     import brain.risk_gate as gate
+
     monkeypatch.setattr(
-        gate, "evaluate",
-        lambda db, **kw: {"allowed": True, "blocked_by": [], "profile": "test",
-                          "risk_pct": 0.25, "trader_flags": []})
+        gate,
+        "evaluate",
+        lambda db, **kw: {
+            "allowed": True,
+            "blocked_by": [],
+            "profile": "test",
+            "risk_pct": 0.25,
+            "trader_flags": [],
+        },
+    )
 
 
 def test_approve_held_while_unjournaled(client, monkeypatch):
@@ -177,8 +232,7 @@ def test_approve_held_while_unjournaled(client, monkeypatch):
     _seed_unjournaled_decided(db, sid=901)
     scan_id = _seed_scan(db)
     db.close()
-    r = client.post("/api/review",
-                    json={"scan_id": scan_id, "decision": "APPROVED"})
+    r = client.post("/api/review", json={"scan_id": scan_id, "decision": "APPROVED"})
     assert r.status_code == 409
     body = r.get_json()
     assert "journal" in body["error"].lower()
@@ -196,9 +250,10 @@ def test_approve_acknowledge_is_audited_and_passes(client, monkeypatch):
     _seed_unjournaled_decided(db, sid=902)
     scan_id = _seed_scan(db)
     db.close()
-    r = client.post("/api/review",
-                    json={"scan_id": scan_id, "decision": "APPROVED",
-                          "acknowledge_journal": True})
+    r = client.post(
+        "/api/review",
+        json={"scan_id": scan_id, "decision": "APPROVED", "acknowledge_journal": True},
+    )
     assert r.status_code == 200, r.get_json()
     assert r.get_json()["ok"] is True
     db = SignalDB()
@@ -213,8 +268,7 @@ def test_approve_unblocked_once_journaled(client, monkeypatch):
     db.save_journal(903, followed_rules=True, emotion="calm", mistake="none")
     scan_id = _seed_scan(db)
     db.close()
-    r = client.post("/api/review",
-                    json={"scan_id": scan_id, "decision": "APPROVED"})
+    r = client.post("/api/review", json={"scan_id": scan_id, "decision": "APPROVED"})
     assert r.status_code == 200, r.get_json()
 
 
@@ -225,8 +279,7 @@ def test_reject_never_held_by_journal_gate(client):
     _seed_unjournaled_decided(db, sid=904)
     scan_id = _seed_scan(db)
     db.close()
-    r = client.post("/api/review",
-                    json={"scan_id": scan_id, "decision": "REJECTED"})
+    r = client.post("/api/review", json={"scan_id": scan_id, "decision": "REJECTED"})
     assert r.status_code == 200, r.get_json()
     assert r.get_json()["ok"] is True
 
@@ -237,29 +290,56 @@ def test_simulator_and_research_debt_do_not_hold(client, monkeypatch):
     _allow_gate(monkeypatch)
     db = SignalDB()
     now = int(time.time() * 1000)
-    for sid, sim_key, src in ((905, "sim:905", None), (906, None, "dukascopy:spot:bid")):
+    for sid, sim_key, src in (
+        (905, "sim:905", None),
+        (906, None, "dukascopy:spot:bid"),
+    ):
         db.conn.execute(
             """INSERT INTO paper_trades(scan_id, signal_id, plan_type, symbol, timeframe,
                  action, entry, stop_loss, take_profit, risk_reward, confidence_pct,
                  status, created_ts, opened_ts, closed_ts, entry_price, exit_price,
                  outcome, rr_achieved, rr_net, close_reason, sim_key, source_key)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (sid, f"SIG{sid}", "Buy Pullback", "BTCUSDT", "15m", "BUY", 100.0, 99.0,
-             101.5, 1.5, 70, "CLOSED", now, now, now, 100.0, 101.5, "TP_HIT",
-             1.5, 1.5, "test", sim_key, src))
+            (
+                sid,
+                f"SIG{sid}",
+                "Buy Pullback",
+                "BTCUSDT",
+                "15m",
+                "BUY",
+                100.0,
+                99.0,
+                101.5,
+                1.5,
+                70,
+                "CLOSED",
+                now,
+                now,
+                now,
+                100.0,
+                101.5,
+                "TP_HIT",
+                1.5,
+                1.5,
+                "test",
+                sim_key,
+                src,
+            ),
+        )
     db.conn.commit()
     scan_id = _seed_scan(db)
     db.close()
-    r = client.post("/api/review",
-                    json={"scan_id": scan_id, "decision": "APPROVED"})
+    r = client.post("/api/review", json={"scan_id": scan_id, "decision": "APPROVED"})
     assert r.status_code == 200, r.get_json()
 
 
 # ── W3.3 journal-first approval gate (CLI approve) ───────────────────────
 
+
 def _cli_args(scan_id, **kw):
-    base = dict(scan_id=scan_id, note="", force=False,
-                acknowledge_journal=False, json=False)
+    base = dict(
+        scan_id=scan_id, note="", force=False, acknowledge_journal=False, json=False
+    )
     base.update(kw)
     return SimpleNamespace(**base)
 
@@ -268,6 +348,7 @@ def test_cli_approve_held_while_unjournaled(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "c.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "c.db"))
     _allow_gate(monkeypatch)
     db = SignalDB()
@@ -275,6 +356,7 @@ def test_cli_approve_held_while_unjournaled(monkeypatch, tmp_path, capsys):
     scan_id = _seed_scan(db)
     db.close()
     import main
+
     rc = main.cmd_approve(_cli_args(scan_id))
     assert rc == 2
     err = capsys.readouterr().err
@@ -290,6 +372,7 @@ def test_cli_approve_acknowledge_journals(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "c.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "c.db"))
     _allow_gate(monkeypatch)
     db = SignalDB()
@@ -297,6 +380,7 @@ def test_cli_approve_acknowledge_journals(monkeypatch, tmp_path, capsys):
     scan_id = _seed_scan(db)
     db.close()
     import main
+
     rc = main.cmd_approve(_cli_args(scan_id, acknowledge_journal=True))
     assert rc == 0
     db = SignalDB()
@@ -306,18 +390,21 @@ def test_cli_approve_acknowledge_journals(monkeypatch, tmp_path, capsys):
 
 # ── CLI weekly ───────────────────────────────────────────────────────────
 
+
 def test_cli_weekly_json_and_export(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "c.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "c.db"))
     import main
+
     out = tmp_path / "review.json"
     rc = main.cmd_weekly(SimpleNamespace(json=True, days=7, export=str(out)))
     assert rc == 0
     printed = capsys.readouterr().out
     # the export notice prints above the JSON; parse from the first '{'
-    payload = json.loads(printed[printed.index("{"):])
+    payload = json.loads(printed[printed.index("{") :])
     assert payload["window"]["days"] == 7
     assert json.loads(out.read_text())["week"]["n"] == payload["week"]["n"]
 
@@ -326,8 +413,10 @@ def test_cli_weekly_text_report(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "c.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "c.db"))
     import main
+
     rc = main.cmd_weekly(SimpleNamespace(json=False, days=7, export=None))
     assert rc == 0
     out = capsys.readouterr().out

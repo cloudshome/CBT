@@ -1,12 +1,13 @@
 """Unit tests for brain/institutional_score.py — IPS, TP Ladder, Kelly Criterion, and Expiry."""
+
 from __future__ import annotations
 
 from brain.institutional_score import (
+    compute_entry_zone,
     compute_hold_time_and_expiry,
     compute_ips_score,
-    compute_smart_tp_ladder,
-    compute_entry_zone,
     compute_kelly_criterion,
+    compute_smart_tp_ladder,
 )
 
 
@@ -34,7 +35,9 @@ def test_compute_ips_score():
     plan = {"risk_reward": 3.2}
     regime = {"regime": "TRENDING_BULL", "trap_detected": False}
 
-    ips, grade, breakdown = compute_ips_score(features, mtf, ctx, plan, regime, base_confidence=85)
+    ips, grade, breakdown = compute_ips_score(
+        features, mtf, ctx, plan, regime, base_confidence=85
+    )
     assert 0 <= ips <= 100
     assert ips >= 70
     assert grade in ("A+", "A", "B")
@@ -65,9 +68,14 @@ def test_compute_entry_zone():
 
 
 def test_kelly_criterion():
-    res = compute_kelly_criterion(win_rate_pct=65.0, risk_reward=2.5, account_balance=10000.0, max_risk_cap=2.0)
+    res = compute_kelly_criterion(
+        win_rate_pct=65.0, risk_reward=2.5, account_balance=10000.0, max_risk_cap=2.0
+    )
     assert res["win_rate_assumed_pct"] == 65.0
     assert res["full_kelly_pct"] > 0
     assert 0 < res["recommended_risk_pct"] <= 2.0
     assert res["recommended_risk_amt"] > 0
-    assert "Isolated" in res["recommended_leverage"] or "Spot" in res["recommended_leverage"]
+    assert (
+        "Isolated" in res["recommended_leverage"]
+        or "Spot" in res["recommended_leverage"]
+    )

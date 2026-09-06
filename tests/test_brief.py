@@ -1,6 +1,6 @@
 """tests/test_brief.py — Unit tests for post-trade review & morning brief."""
-import pytest
-from brain.brief import post_trade_review, generate_morning_brief
+
+from brain.brief import generate_morning_brief, post_trade_review
 from data.database import SignalDB
 
 
@@ -18,7 +18,7 @@ def test_post_trade_review_populated(tmp_path):
         # Create scan
         cur = db.conn.execute(
             "INSERT INTO scans(signal_id, symbol, timeframe, action, price, status) VALUES(?,?,?,?,?,?)",
-            ("sig_100", "BTCUSDT", "15m", "BUY", 65000.0, "EXECUTED")
+            ("sig_100", "BTCUSDT", "15m", "BUY", 65000.0, "EXECUTED"),
         )
         scan_id = cur.lastrowid
 
@@ -27,13 +27,24 @@ def test_post_trade_review_populated(tmp_path):
             """INSERT INTO paper_trades(scan_id, signal_id, symbol, timeframe, action,
                                         status, outcome, rr_achieved, mae, mfe)
                VALUES(?,?,?,?,?,?,?,?,?,?)""",
-            (scan_id, "sig_100", "BTCUSDT", "15m", "BUY", "CLOSED", "TP_HIT", 1.5, 30.0, 1200.0)
+            (
+                scan_id,
+                "sig_100",
+                "BTCUSDT",
+                "15m",
+                "BUY",
+                "CLOSED",
+                "TP_HIT",
+                1.5,
+                30.0,
+                1200.0,
+            ),
         )
 
         # Create journal entry
         db.conn.execute(
             "INSERT INTO journal_entries(scan_id, followed_rules, emotion, notes) VALUES(?,?,?,?)",
-            (scan_id, 1, "calm", "Followed 15m entry rules perfectly")
+            (scan_id, 1, "calm", "Followed 15m entry rules perfectly"),
         )
         db.conn.commit()
 
@@ -41,7 +52,10 @@ def test_post_trade_review_populated(tmp_path):
         assert rev["outcome"] == "TP_HIT"
         assert rev["rr_achieved"] == 1.5
         assert rev["followed_rules"] == "YES"
-        assert "TP_HIT · 1.5R · MAE 30.0 · MFE 1200.0 · Followed rules: YES" in rev["headline"]
+        assert (
+            "TP_HIT · 1.5R · MAE 30.0 · MFE 1200.0 · Followed rules: YES"
+            in rev["headline"]
+        )
         assert len(rev["takeaways"]) > 0
 
 

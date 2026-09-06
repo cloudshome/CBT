@@ -44,6 +44,7 @@ places no orders. Run:
 
     .venv/bin/python ops/probes/p12_18_netlimits_probe.py
 """
+
 from __future__ import annotations
 
 import json
@@ -51,23 +52,29 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import brain.risk_gate as risk_gate
+from brain import risk_gate
 from brain.analytics import _net_outcome
 from brain.metrics import business_metrics
 from brain.risk_gate import daily_weekly, drawdown
 from data.database import SignalDB
 
-RISK_PCT = 0.25          # student progression risk per trade
-DAILY_LIMIT = 1.0        # student daily loss limit (%)
-WEEKLY_LIMIT = 2.0       # student weekly loss limit (%)
+RISK_PCT = 0.25  # student progression risk per trade
+DAILY_LIMIT = 1.0  # student daily loss limit (%)
+WEEKLY_LIMIT = 2.0  # student weekly loss limit (%)
 
 
-def _paper(db: SignalDB, scan_id: int, *, rr: float, ts: int,
-           hold_hours: float = 6.0, rr_net: float | None = None) -> None:
+def _paper(
+    db: SignalDB,
+    scan_id: int,
+    *,
+    rr: float,
+    ts: int,
+    hold_hours: float = 6.0,
+    rr_net: float | None = None,
+) -> None:
     """Insert one decided live paper trade. rr_net defaults to NULL, which is
     what the live runner actually writes (close_paper_trade stores gross only)."""
     outcome = "TP_HIT" if rr > 0 else "STOP_LOSS"
@@ -79,9 +86,31 @@ def _paper(db: SignalDB, scan_id: int, *, rr: float, ts: int,
                                     closed_ts, entry_price, exit_price, outcome,
                                     rr_achieved, rr_net, close_reason, source_key)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (scan_id, f"SIG{scan_id}", "Buy Pullback", "BTCUSDT", "15m", "BUY",
-         100.0, 99.0, 102.0, 2.0, 70, "CLOSED", opened, opened, ts,
-         100.0, 102.0 if rr > 0 else 99.0, outcome, rr, rr_net, "probe", ""))
+        (
+            scan_id,
+            f"SIG{scan_id}",
+            "Buy Pullback",
+            "BTCUSDT",
+            "15m",
+            "BUY",
+            100.0,
+            99.0,
+            102.0,
+            2.0,
+            70,
+            "CLOSED",
+            opened,
+            opened,
+            ts,
+            100.0,
+            102.0 if rr > 0 else 99.0,
+            outcome,
+            rr,
+            rr_net,
+            "probe",
+            "",
+        ),
+    )
     db.conn.commit()
 
 
@@ -109,18 +138,24 @@ def case(title: str, fn) -> dict:
 # ── A. the daily loss limit ───────────────────────────────────────────────
 def case_daily_limit(db: SignalDB) -> dict:
     now = int(time.time() * 1000)
-    for i in range(8):                     # scratch losses: small gross, real net
+    for i in range(8):  # scratch losses: small gross, real net
         _paper(db, i, rr=-0.4, ts=now)
     gross, net = _sums(db)
     dw = daily_weekly(db)
-    return {"canonical_reality": f"8 live losses: {gross:+.3f}R gross "
-                                 f"({gross * RISK_PCT:+.3f}%) but {net:+.3f}R net "
-                                 f"({net * RISK_PCT:+.3f}%) once fees are paid",
-            "net_breaches_limit": round(net * RISK_PCT, 3) <= -DAILY_LIMIT,
-            "observed": {"daily_blocked": dw["daily_blocked"],
-                         "reported_pct": dw["today"]["pct"]},
-            "expected_after_P12_18": {"daily_blocked": True,
-                                      "reported_pct": round(net * RISK_PCT, 3)}}
+    return {
+        "canonical_reality": f"8 live losses: {gross:+.3f}R gross "
+        f"({gross * RISK_PCT:+.3f}%) but {net:+.3f}R net "
+        f"({net * RISK_PCT:+.3f}%) once fees are paid",
+        "net_breaches_limit": round(net * RISK_PCT, 3) <= -DAILY_LIMIT,
+        "observed": {
+            "daily_blocked": dw["daily_blocked"],
+            "reported_pct": dw["today"]["pct"],
+        },
+        "expected_after_P12_18": {
+            "daily_blocked": True,
+            "reported_pct": round(net * RISK_PCT, 3),
+        },
+    }
 
 
 # ── B. the weekly loss limit ──────────────────────────────────────────────
@@ -130,19 +165,25 @@ def case_weekly_limit(db: SignalDB) -> dict:
     monday = risk_gate._week_start_utc()
     ts = monday + 3_600_000
     day_start = risk_gate._day_start_utc()
-    if ts >= day_start:                     # keep the rows out of "today"
+    if ts >= day_start:  # keep the rows out of "today"
         ts = monday + 60_000
     for i in range(16):
         _paper(db, i, rr=-0.4, ts=min(ts + i * 60_000, max(monday, day_start - 60_000)))
     gross, net = _sums(db)
     dw = daily_weekly(db)
-    return {"canonical_reality": f"16 live losses this week: {gross:+.3f}R gross "
-                                 f"vs {net:+.3f}R net",
-            "net_breaches_limit": round(net * RISK_PCT, 3) <= -WEEKLY_LIMIT,
-            "observed": {"weekly_blocked": dw["weekly_blocked"],
-                         "reported_pct": dw["week"]["pct"]},
-            "expected_after_P12_18": {"weekly_blocked": True,
-                                      "reported_pct": round(net * RISK_PCT, 3)}}
+    return {
+        "canonical_reality": f"16 live losses this week: {gross:+.3f}R gross "
+        f"vs {net:+.3f}R net",
+        "net_breaches_limit": round(net * RISK_PCT, 3) <= -WEEKLY_LIMIT,
+        "observed": {
+            "weekly_blocked": dw["weekly_blocked"],
+            "reported_pct": dw["week"]["pct"],
+        },
+        "expected_after_P12_18": {
+            "weekly_blocked": True,
+            "reported_pct": round(net * RISK_PCT, 3),
+        },
+    }
 
 
 # ── C. the drawdown ladder ────────────────────────────────────────────────
@@ -155,6 +196,7 @@ def case_drawdown_ladder(db: SignalDB) -> dict:
     gross, net = _sums(db)
     # The true (net) ladder reading, computed the same way drawdown() does.
     from config import ACCOUNT_BALANCE
+
     balance = ACCOUNT_BALANCE or 10_000.0
     equity = peak = balance
     net_dd = 0.0
@@ -162,15 +204,22 @@ def case_drawdown_ladder(db: SignalDB) -> dict:
         equity += balance * (_net_outcome(r) * RISK_PCT / 100.0)
         peak = max(peak, equity)
         net_dd = max(net_dd, (peak - equity) / peak * 100.0 if peak else 0.0)
-    return {"canonical_reality": f"a 32-trade losing run: {gross:+.3f}R gross vs "
-                                 f"{net:+.3f}R net — the true curve is deeper",
-            "gross_r": gross, "net_r": net,
-            "gross_drawdown_pct": round(abs(gross) * RISK_PCT, 2),
-            "net_drawdown_pct": round(net_dd, 2),
-            "observed": {"reported_drawdown_pct": dd["max_drawdown_pct"],
-                         "level": dd["level"]},
-            "expected_after_P12_18": {"reported_drawdown_pct": round(net_dd, 2),
-                                      "level": "reduce_risk"}}
+    return {
+        "canonical_reality": f"a 32-trade losing run: {gross:+.3f}R gross vs "
+        f"{net:+.3f}R net — the true curve is deeper",
+        "gross_r": gross,
+        "net_r": net,
+        "gross_drawdown_pct": round(abs(gross) * RISK_PCT, 2),
+        "net_drawdown_pct": round(net_dd, 2),
+        "observed": {
+            "reported_drawdown_pct": dd["max_drawdown_pct"],
+            "level": dd["level"],
+        },
+        "expected_after_P12_18": {
+            "reported_drawdown_pct": round(net_dd, 2),
+            "level": "reduce_risk",
+        },
+    }
 
 
 # ── D. the business scorecard ─────────────────────────────────────────────
@@ -182,14 +231,18 @@ def case_scorecard(db: SignalDB) -> dict:
         _paper(db, i, rr=-1.0, ts=ts + i * 600_000)
     gross, net = _sums(db)
     overall = business_metrics(db)["overall"]
-    return {"canonical_reality": f"6 wins / 8 losses: {gross:+.3f}R gross vs "
-                                 f"{net:+.3f}R net",
-            "observed": {"expectancy_is_net":
-                         abs(overall["expectancy_r"] - round(net / 14.0, 3)) < 5e-4},
-            "reported_expectancy_r": overall["expectancy_r"],
-            "gross_expectancy_r": round(gross / 14.0, 3),
-            "net_expectancy_r": round(net / 14.0, 3),
-            "expected_after_P12_18": {"expectancy_is_net": True}}
+    return {
+        "canonical_reality": f"6 wins / 8 losses: {gross:+.3f}R gross vs "
+        f"{net:+.3f}R net",
+        "observed": {
+            "expectancy_is_net": abs(overall["expectancy_r"] - round(net / 14.0, 3))
+            < 5e-4
+        },
+        "reported_expectancy_r": overall["expectancy_r"],
+        "gross_expectancy_r": round(gross / 14.0, 3),
+        "net_expectancy_r": round(net / 14.0, 3),
+        "expected_after_P12_18": {"expectancy_is_net": True},
+    }
 
 
 # ── E. live rows really do carry rr_net IS NULL ───────────────────────────
@@ -197,13 +250,19 @@ def case_live_rows_have_no_net(db: SignalDB) -> dict:
     now = int(time.time() * 1000)
     _paper(db, 1, rr=-1.0, ts=now)
     row = db.live_book_rows()[0]
-    return {"canonical_reality": "close_paper_trade() writes rr_achieved only, "
-                                 "so costs must be computed on read",
-            "observed": {"rr_net_is_null": row["rr_net"] is None,
-                         "net_differs_from_gross":
-                             abs(_net_outcome(row) - float(row["rr_achieved"])) > 1e-9},
-            "expected_after_P12_18": {"rr_net_is_null": True,
-                                      "net_differs_from_gross": True}}
+    return {
+        "canonical_reality": "close_paper_trade() writes rr_achieved only, "
+        "so costs must be computed on read",
+        "observed": {
+            "rr_net_is_null": row["rr_net"] is None,
+            "net_differs_from_gross": abs(_net_outcome(row) - float(row["rr_achieved"]))
+            > 1e-9,
+        },
+        "expected_after_P12_18": {
+            "rr_net_is_null": True,
+            "net_differs_from_gross": True,
+        },
+    }
 
 
 # ── F. control: a zero-cost book must be untouched ────────────────────────
@@ -214,33 +273,50 @@ def case_control_zero_cost(db: SignalDB) -> dict:
         _paper(db, i, rr=-0.5, ts=now, rr_net=-0.5)
     dw = daily_weekly(db)
     gross, net = _sums(db)
-    return {"canonical_reality": "rr_net == rr_achieved, so nothing may move",
-            "observed": {"gross_equals_net": gross == net,
-                         "reported_pct": dw["today"]["pct"],
-                         "daily_blocked": dw["daily_blocked"]},
-            "expected_after_P12_18": {"gross_equals_net": True,
-                                      "reported_pct": -0.5,
-                                      "daily_blocked": False}}
+    return {
+        "canonical_reality": "rr_net == rr_achieved, so nothing may move",
+        "observed": {
+            "gross_equals_net": gross == net,
+            "reported_pct": dw["today"]["pct"],
+            "daily_blocked": dw["daily_blocked"],
+        },
+        "expected_after_P12_18": {
+            "gross_equals_net": True,
+            "reported_pct": -0.5,
+            "daily_blocked": False,
+        },
+    }
 
 
 CASES = [
     ("A. daily loss limit fails OPEN on a net-breaching book", case_daily_limit),
     ("B. weekly loss limit fails OPEN on a net-breaching book", case_weekly_limit),
-    ("C. drawdown ladder under-reports the true (net) equity curve",
-     case_drawdown_ladder),
+    (
+        "C. drawdown ladder under-reports the true (net) equity curve",
+        case_drawdown_ladder,
+    ),
     ("D. business scorecard expectancy/PF are gross-anchored", case_scorecard),
-    ("E. live paper rows carry rr_net IS NULL (the normal path)",
-     case_live_rows_have_no_net),
+    (
+        "E. live paper rows carry rr_net IS NULL (the normal path)",
+        case_live_rows_have_no_net,
+    ),
     ("F. control: a zero-cost book is unchanged", case_control_zero_cost),
 ]
 
 
 def main() -> int:
     results = [case(title, fn) for title, fn in CASES]
-    print(json.dumps({"probe": "P12.18 net anchor at the hard limits",
-                      "results": results,
-                      "all_fixed": all(r["fixed"] for r in results)},
-                     indent=2, default=str))
+    print(
+        json.dumps(
+            {
+                "probe": "P12.18 net anchor at the hard limits",
+                "results": results,
+                "all_fixed": all(r["fixed"] for r in results),
+            },
+            indent=2,
+            default=str,
+        )
+    )
     return 0 if all(r["fixed"] for r in results) else 1
 
 

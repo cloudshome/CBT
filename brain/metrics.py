@@ -8,11 +8,12 @@ remains a separate general view.
 Expectancy formula:
   E = (win_rate * avg_win_R) - (loss_rate * abs(avg_loss_R))
 """
+
 from __future__ import annotations
 
+from brain.risk_gate import effective_risk
 from data.costs import net_r_of_row
 from data.database import SignalDB
-from brain.risk_gate import effective_risk
 
 
 def _equity_curve(db: SignalDB, start: float = 10_000.0) -> list[dict]:
@@ -32,23 +33,34 @@ def _equity_curve(db: SignalDB, start: float = 10_000.0) -> list[dict]:
         dollar_risk = equity * (risk["risk_pct"] / 100.0)
         pnl = dollar_risk * rr
         equity = max(100.0, equity + pnl)
-        out.append({
-            "scan_id": r["scan_id"],
-            "closed_ts": r["closed_ts"],
-            "rr": rr,
-            "pnl": pnl,
-            "equity": round(equity, 2),
-        })
+        out.append(
+            {
+                "scan_id": r["scan_id"],
+                "closed_ts": r["closed_ts"],
+                "rr": rr,
+                "pnl": pnl,
+                "equity": round(equity, 2),
+            }
+        )
     return out
 
 
 def _metrics(rows: list[dict]) -> dict:
     if not rows:
         return {
-            "n": 0, "wins": 0, "losses": 0, "win_rate": None,
-            "avg_win_r": 0.0, "avg_loss_r": 0.0, "expectancy_r": 0.0,
-            "profit_factor": None, "max_drawdown_pct": 0.0, "final_equity": 10_000.0,
-            "win_streak": 0, "loss_streak": 0, "max_win_streak": 0,
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "win_rate": None,
+            "avg_win_r": 0.0,
+            "avg_loss_r": 0.0,
+            "expectancy_r": 0.0,
+            "profit_factor": None,
+            "max_drawdown_pct": 0.0,
+            "final_equity": 10_000.0,
+            "win_streak": 0,
+            "loss_streak": 0,
+            "max_win_streak": 0,
             "max_loss_streak": 0,
         }
     # P12.18 — every judgement below is NET of costs. A win is a NET win:
@@ -67,7 +79,11 @@ def _metrics(rows: list[dict]) -> dict:
 
     gross_profit = sum(wins)
     gross_loss = abs(sum(losses))
-    pf = (gross_profit / gross_loss) if gross_loss > 0 else (99.0 if gross_profit > 0 else None)
+    pf = (
+        (gross_profit / gross_loss)
+        if gross_loss > 0
+        else (99.0 if gross_profit > 0 else None)
+    )
 
     # Streaks
     cur_w, cur_l, max_w, max_l = 0, 0, 0, 0
@@ -113,16 +129,18 @@ def business_metrics(db: SignalDB, windows: tuple[int, ...] = (50, 100)) -> dict
         rolling[f"last_{w}"] = rolling[str(w)]
 
     from brain.risk_gate import drawdown
+
     dw = drawdown(db)
     overall["max_drawdown_pct"] = dw["max_drawdown_pct"]
-    overall["final_equity"] = dw.get("final_equity",
-                                     dw.get("current_equity",
-                                            dw.get("equity", 10_000.0)))
+    overall["final_equity"] = dw.get(
+        "final_equity", dw.get("current_equity", dw.get("equity", 10_000.0))
+    )
 
     # P12.15 follow-up: execution discipline must use the same canonical live
     # business population as the scorecard's P&L/equity rows. The broad
     # `violation_rate()` report remains available for general journal views.
     from brain.journal import live_execution_stats
+
     v = live_execution_stats(db)
     return {
         "overall": overall,
@@ -135,13 +153,15 @@ def business_metrics(db: SignalDB, windows: tuple[int, ...] = (50, 100)) -> dict
 def format_metrics(metrics: dict) -> str:
     o = metrics["overall"]
     if not o.get("n"):
-        return ("No decided paper trades yet — approve signals and run "
-                "`python main.py paper --watch` to build your track record.")
+        return (
+            "No decided paper trades yet — approve signals and run "
+            "`python main.py paper --watch` to build your track record."
+        )
     lines = [
         "=" * 66,
         f"BUSINESS SCORECARD  ({o['n']} decided paper trades)",
         "-" * 66,
-        f"  win rate        {o['win_rate']*100:.1f}%  ({o['wins']}W / {o['losses']}L)",
+        f"  win rate        {o['win_rate'] * 100:.1f}%  ({o['wins']}W / {o['losses']}L)",
         f"  avg winner      {o['avg_win_r']:+.2f}R    avg loser {o['avg_loss_r']:.2f}R",
         f"  expectancy      {o['expectancy_r']:+.3f}R per trade",
         f"  profit factor   {o['profit_factor'] if o['profit_factor'] is not None else 'n/a'}",
@@ -150,20 +170,29 @@ def format_metrics(metrics: dict) -> str:
     ]
     for w, r in metrics["rolling"].items():
         if r.get("n"):
-            lines.append(f"  last {w:<4} trades: win {r['win_rate']*100:.0f}%  "
-                         f"exp {r['expectancy_r']:+.3f}R  pf {r['profit_factor']}")
+            lines.append(
+                f"  last {w:<4} trades: win {r['win_rate'] * 100:.0f}%  "
+                f"exp {r['expectancy_r']:+.3f}R  pf {r['profit_factor']}"
+            )
     e = metrics["execution"]
     if e.get("eligible") or e.get("n"):
-        rate = (f"{e['violation_rate'] * 100:.0f}%"
-                if e.get("violation_rate") is not None else "n/a")
-        line = (f"  execution       {rate} rule violations "
-                f"({e.get('violations', 0)}/{e.get('n', 0)} journaled trades)")
+        rate = (
+            f"{e['violation_rate'] * 100:.0f}%"
+            if e.get("violation_rate") is not None
+            else "n/a"
+        )
+        line = (
+            f"  execution       {rate} rule violations "
+            f"({e.get('violations', 0)}/{e.get('n', 0)} journaled trades)"
+        )
         if e.get("missing_journals"):
             line += f"; {e['missing_journals']} missing journal(s)"
         lines.append(line)
     return "\n".join(lines)
 
 
-def compute_business_metrics(db: SignalDB, windows: tuple[int, ...] = (50, 100)) -> dict:
+def compute_business_metrics(
+    db: SignalDB, windows: tuple[int, ...] = (50, 100)
+) -> dict:
     """Convenience alias for business_metrics."""
     return business_metrics(db, windows=windows)

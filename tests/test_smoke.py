@@ -1,7 +1,9 @@
 """Offline smoke test verifying signal engine on sample data."""
+
 from __future__ import annotations
 
 import pandas as pd
+
 from engine.signal_engine import analyze_frame
 
 

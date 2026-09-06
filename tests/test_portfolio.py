@@ -1,21 +1,38 @@
 """Tests for the portfolio/correlation risk engine (decision B2)."""
+
 from __future__ import annotations
 
+from brain.portfolio import bucket_state, portfolio_veto
 from data.database import SignalDB
-from brain.portfolio import portfolio_veto, bucket_state
 
 
-def _open_trade(db: SignalDB, symbol: str, action: str, status: str = "OPEN",
-                scan_id: int = 1000) -> int:
+def _open_trade(
+    db: SignalDB, symbol: str, action: str, status: str = "OPEN", scan_id: int = 1000
+) -> int:
     """Insert an open paper trade directly (fast, deterministic)."""
     cur = db.conn.execute(
         """INSERT INTO paper_trades(scan_id, signal_id, plan_type, symbol, timeframe,
                                     action, entry, stop_loss, take_profit, risk_reward,
                                     confidence_pct, status, created_ts, opened_ts, entry_price)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (scan_id, f"SIG{scan_id}", "Buy Pullback", symbol, "15m", action,
-         100.0, 99.0, 102.0, 2.0, 70, status, 1_780_000_000_000,
-         1_780_000_000_001, 100.0))
+        (
+            scan_id,
+            f"SIG{scan_id}",
+            "Buy Pullback",
+            symbol,
+            "15m",
+            action,
+            100.0,
+            99.0,
+            102.0,
+            2.0,
+            70,
+            status,
+            1_780_000_000_000,
+            1_780_000_000_001,
+            100.0,
+        ),
+    )
     db.conn.commit()
     return cur.lastrowid
 

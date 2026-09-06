@@ -6,6 +6,7 @@ cross, correlation) used to live inline in ``main.py``; they live here now,
 byte-identical, and ``main`` re-exports them so the argparse wiring keeps
 working unchanged.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,7 +15,6 @@ import sys
 import time
 
 from cli.common import _client, _sym, _symbols
-from data.sample_client import maybe_client
 
 
 def cmd_backfill(args) -> int:
@@ -44,13 +44,16 @@ def cmd_backfill(args) -> int:
     # P12.3.2 — offline CSV import (never touches a network socket).
     if args.from_csv:
         from data.backfill import backfill_from_csv
+
         # dukascopy-node is an optional external acquisition tool, not a SKY
         # runtime dependency. Its CSV enters through our existing validation
         # boundary and receives its own series/provenance identity.
         csv_source = getattr(args, "csv_source", "binance")
         csv_exchange = "dukascopy" if csv_source == "dukascopy" else args.exchange
         csv_market = "spot" if csv_source == "dukascopy" else args.market
-        price_type = getattr(args, "price_type", "") if csv_source == "dukascopy" else ""
+        price_type = (
+            getattr(args, "price_type", "") if csv_source == "dukascopy" else ""
+        )
         source_tag = "dukascopy_csv" if csv_source == "dukascopy" else "csv"
         try:
             payload = backfill_from_csv(
@@ -66,40 +69,59 @@ def cmd_backfill(args) -> int:
             )
             if args.rollup:
                 payload["rollup"] = rollup(
-                    store, exchange=csv_exchange, market=csv_market,
+                    store,
+                    exchange=csv_exchange,
+                    market=csv_market,
                     symbol=_sym(args.symbol),
                 )
             from data.calendar import calendar_for
+
             csv_cal = calendar_for(csv_exchange, csv_market, _sym(args.symbol))
-            payload["gaps_remaining"] = len(detect_gaps(
-                store.read(csv_exchange, csv_market,
-                           _sym(args.symbol), args.tf), args.tf, csv_cal))
+            payload["gaps_remaining"] = len(
+                detect_gaps(
+                    store.read(csv_exchange, csv_market, _sym(args.symbol), args.tf),
+                    args.tf,
+                    csv_cal,
+                )
+            )
         except BackfillError as exc:
             print(f"[!] {exc}", file=sys.stderr)
             return 1
         if args.json:
             print(json.dumps(payload, indent=2, default=str))
         else:
-            print(f"csv import  {payload['exchange']}/{payload['market']}/"
-                  f"{payload['symbol']}/{payload['timeframe']}")
-            print(f"  sha256 {payload['sha256']}"
-                  f"{'  ✓ pin verified' if payload['sha256_verified'] else ''}")
-            print(f"  rows read {payload['rows_read']:,}  added "
-                  f"{payload['rows_added']:,}  (store now "
-                  f"{payload['rows_after']:,})")
+            print(
+                f"csv import  {payload['exchange']}/{payload['market']}/"
+                f"{payload['symbol']}/{payload['timeframe']}"
+            )
+            print(
+                f"  sha256 {payload['sha256']}"
+                f"{'  ✓ pin verified' if payload['sha256_verified'] else ''}"
+            )
+            print(
+                f"  rows read {payload['rows_read']:,}  added "
+                f"{payload['rows_added']:,}  (store now "
+                f"{payload['rows_after']:,})"
+            )
             if payload["duplicates_dropped"]:
                 print(f"  duplicates dropped {payload['duplicates_dropped']:,}")
             if payload["sanity_dropped"]:
                 print(f"  sanity dropped {payload['sanity_dropped']:,}")
             if payload["misaligned_ts"]:
                 print(f"  misaligned ts {payload['misaligned_ts']:,}")
-            print(f"  span {payload['span_days']} days  gaps "
-                  f"{payload['gaps_found']}  gaps_remaining "
-                  f"{payload['gaps_remaining']}")
-            print(f"  calendar {payload['calendar']}"
-                  + (f"  closed-session bars skipped "
-                     f"{payload['closed_session_bars']:,}"
-                     if payload.get("closed_session_bars") else ""))
+            print(
+                f"  span {payload['span_days']} days  gaps "
+                f"{payload['gaps_found']}  gaps_remaining "
+                f"{payload['gaps_remaining']}"
+            )
+            print(
+                f"  calendar {payload['calendar']}"
+                + (
+                    f"  closed-session bars skipped {payload['closed_session_bars']:,}"
+                    if payload.get("closed_session_bars")
+                    else ""
+                )
+            )
             if payload["rows_added"] == 0:
                 print("  ✓ idempotent re-run — zero rows added")
             if args.rollup:
@@ -122,6 +144,7 @@ def cmd_backfill(args) -> int:
     demo = os.getenv("DEMO_MODE", "0") in ("1", "true", "yes")
     if not demo and args.exchange == "bybit":
         from data.bybit_client import BybitClient
+
         client = BybitClient()
 
     try:
@@ -146,29 +169,44 @@ def cmd_backfill(args) -> int:
 
     payload = result.as_dict()
     if args.repair:
-        if client is not None:      # live BybitClient (its klines() has market)
+        if client is not None:  # live BybitClient (its klines() has market)
+
             def fetch(start_time=None, end_time=None, limit=1000):
                 return client.klines(
-                    _sym(args.symbol), args.tf, limit=limit,
-                    start_time=start_time, end_time=end_time,
-                    market=args.market)
-        else:                       # demo or live Binance
+                    _sym(args.symbol),
+                    args.tf,
+                    limit=limit,
+                    start_time=start_time,
+                    end_time=end_time,
+                    market=args.market,
+                )
+        else:  # demo or live Binance
             from data.sample_client import maybe_client
+
             client = maybe_client()
 
             def fetch(start_time=None, end_time=None, limit=1000):
                 return client.klines(
-                    _sym(args.symbol), args.tf, limit=limit,
-                    start_time=start_time, end_time=end_time,
+                    _sym(args.symbol),
+                    args.tf,
+                    limit=limit,
+                    start_time=start_time,
+                    end_time=end_time,
                 )
 
         payload["repair"] = repair_gaps(
-            store, fetch, exchange=args.exchange, market=args.market,
-            symbol=_sym(args.symbol), timeframe=args.tf,
+            store,
+            fetch,
+            exchange=args.exchange,
+            market=args.market,
+            symbol=_sym(args.symbol),
+            timeframe=args.tf,
         )
     if args.rollup:
         payload["rollup"] = rollup(
-            store, exchange=args.exchange, market=args.market,
+            store,
+            exchange=args.exchange,
+            market=args.market,
             symbol=_sym(args.symbol),
         )
     remaining = detect_gaps(
@@ -179,16 +217,22 @@ def cmd_backfill(args) -> int:
     if args.json:
         print(json.dumps(payload, indent=2, default=str))
     else:
-        print(f"backfill {result.exchange}/{result.market}/{result.symbol}/{result.timeframe}")
-        print(f"  pages {result.pages}  before {result.rows_before}  "
-              f"after {result.rows_after}  added {result.rows_added}")
+        print(
+            f"backfill {result.exchange}/{result.market}/{result.symbol}/{result.timeframe}"
+        )
+        print(
+            f"  pages {result.pages}  before {result.rows_before}  "
+            f"after {result.rows_after}  added {result.rows_added}"
+        )
         if result.resumed_from is not None:
             print(f"  resumed from {fmt_ts(result.resumed_from)} UTC")
         if result.forming_skipped:
             print(f"  forming skipped {result.forming_skipped} (picked up next run)")
         if result.rate_limit_stalls or result.retries:
-            print(f"  transport  {result.rate_limit_stalls} rate-limit stalls · "
-                  f"{result.retries} retries · {result.requests} requests")
+            print(
+                f"  transport  {result.rate_limit_stalls} rate-limit stalls · "
+                f"{result.retries} retries · {result.requests} requests"
+            )
         if args.repair:
             print(f"  repair: {payload['repair']}")
         if args.rollup:
@@ -221,20 +265,30 @@ def cmd_store(args) -> int:
         return 0
 
     payload = {
-        "exchange": args.exchange, "market": args.market, "symbol": symbol,
-        "timeframe": args.tf, "count": len(df),
-        "first_ts": int(df["ts"].iloc[0]), "last_ts": int(df["ts"].iloc[-1]),
-        "first": fmt_ts(int(df["ts"].iloc[0])), "last": fmt_ts(int(df["ts"].iloc[-1])),
+        "exchange": args.exchange,
+        "market": args.market,
+        "symbol": symbol,
+        "timeframe": args.tf,
+        "count": len(df),
+        "first_ts": int(df["ts"].iloc[0]),
+        "last_ts": int(df["ts"].iloc[-1]),
+        "first": fmt_ts(int(df["ts"].iloc[0])),
+        "last": fmt_ts(int(df["ts"].iloc[-1])),
         "span_days": round((df["ts"].iloc[-1] - df["ts"].iloc[0]) / 86_400_000, 1),
-        "partitions": parts, "root": str(store.parquet_dir),
+        "partitions": parts,
+        "root": str(store.parquet_dir),
     }
     if args.json:
         print(json.dumps(payload, indent=2, default=str))
     else:
-        print(f"store: {payload['count']:,} candles · {payload['first']} → "
-              f"{payload['last']} UTC · {payload['span_days']} days")
-        print(f"  series: {payload['exchange']}/{payload['market']}/{payload['symbol']} "
-              f"{payload['timeframe']}  ·  {len(parts)} year/month partitions")
+        print(
+            f"store: {payload['count']:,} candles · {payload['first']} → "
+            f"{payload['last']} UTC · {payload['span_days']} days"
+        )
+        print(
+            f"  series: {payload['exchange']}/{payload['market']}/{payload['symbol']} "
+            f"{payload['timeframe']}  ·  {len(parts)} year/month partitions"
+        )
         print(f"  root:   {payload['root']}")
     return 0
 
@@ -254,6 +308,7 @@ def cmd_doctor(args) -> int:
     # Same payload the dashboard strip and MCP `readiness` tool render.
     if getattr(args, "strip", False):
         from brain.agent import format_readiness_strip, readiness_strip
+
         strip = readiness_strip()
         if args.json:
             print(json.dumps(strip, indent=2, default=str))
@@ -266,9 +321,12 @@ def cmd_doctor(args) -> int:
         try:
             immune = run_health_check()
         except Exception as exc:  # pragma: no cover - defensive
-            immune = {"error": f"immune.run_health_check() failed: {type(exc).__name__}: {exc}"}
+            immune = {
+                "error": f"immune.run_health_check() failed: {type(exc).__name__}: {exc}"
+            }
         try:
             from brain.agent import readiness_strip
+
             strip = readiness_strip()
         except Exception as exc:  # pragma: no cover - defensive
             strip = {"error": f"readiness_strip() failed: {type(exc).__name__}: {exc}"}
@@ -284,6 +342,7 @@ def cmd_doctor(args) -> int:
     # the per-channel detail, then the existing full report.
     try:
         from brain.agent import format_readiness_strip, readiness_strip
+
         print(format_readiness_strip(readiness_strip()))
         print()
     except Exception as exc:  # pragma: no cover - defensive
@@ -296,6 +355,7 @@ def cmd_doctor(args) -> int:
     print("─" * 60)
     try:
         from brain.immune import run_health_check
+
         immune = run_health_check()
         if isinstance(immune, dict):
             for k, v in immune.items():
@@ -313,9 +373,11 @@ def cmd_channels(args) -> int:
 
     if args.json:
         channels = probe_all()
-        print(json.dumps(
-            {n: ch.to_dict() for n, ch in channels.items()},
-            indent=2, default=str))
+        print(
+            json.dumps(
+                {n: ch.to_dict() for n, ch in channels.items()}, indent=2, default=str
+            )
+        )
         return 0
     print(list_channels(as_json=False))
     return 0
@@ -326,9 +388,12 @@ def cmd_derivatives(args) -> int:
     mark, index, basis). Resumable, idempotent, rate-limit aware.
     DEMO_MODE=1 uses SampleClient (offline)."""
     from data.backfill import fmt_ts
-    from data.derivatives import (ALL_METRICS, DerivativesCollector,
-                                  DerivativesStore, DerivativesTransportError,
-                                  default_derivatives_transport)
+    from data.derivatives import (
+        ALL_METRICS,
+        DerivativesCollector,
+        DerivativesStore,
+        DerivativesTransportError,
+    )
     from data.symbols import resolve_symbol
 
     store = DerivativesStore()
@@ -340,9 +405,14 @@ def cmd_derivatives(args) -> int:
             metrics = [m.strip() for m in args.metrics.split(",") if m.strip()]
         try:
             collector = DerivativesCollector(store, sleep_s=args.sleep)
-            runs = collector.collect(symbol, market=args.market, since=args.since,
-                                     until=args.until, metrics=metrics,
-                                     dry_run=args.dry_run)
+            runs = collector.collect(
+                symbol,
+                market=args.market,
+                since=args.since,
+                until=args.until,
+                metrics=metrics,
+                dry_run=args.dry_run,
+            )
         except DerivativesTransportError as exc:
             print(f"[!] derivatives collect aborted: {exc}", file=sys.stderr)
             return 1
@@ -350,11 +420,15 @@ def cmd_derivatives(args) -> int:
         if args.json:
             print(json.dumps(payload, indent=2, default=str))
         else:
-            print(f"derivatives {symbol}/{args.market} "
-                  f"({'dry-run — nothing written' if args.dry_run else 'written to ' + str(store.root)})")
+            print(
+                f"derivatives {symbol}/{args.market} "
+                f"({'dry-run — nothing written' if args.dry_run else 'written to ' + str(store.root)})"
+            )
             for metric, r in runs.items():
-                print(f"  {metric:<22} pages {r.pages:>3}  fetched {r.rows_fetched:>7}  "
-                      f"new {r.rows_new:>7}  {fmt_ts(r.first_ts)} → {fmt_ts(r.last_ts)} UTC")
+                print(
+                    f"  {metric:<22} pages {r.pages:>3}  fetched {r.rows_fetched:>7}  "
+                    f"new {r.rows_new:>7}  {fmt_ts(r.first_ts)} → {fmt_ts(r.last_ts)} UTC"
+                )
         return 0
 
     # status
@@ -363,18 +437,29 @@ def cmd_derivatives(args) -> int:
         df = store.read("binance", args.market, symbol, metric)
         if df.empty:
             continue
-        rows.append({
-            "metric": metric,
-            "count": len(df),
-            "first_ts": int(df["ts"].iloc[0]),
-            "last_ts": int(df["ts"].iloc[-1]),
-            "first": fmt_ts(int(df["ts"].iloc[0])),
-            "last": fmt_ts(int(df["ts"].iloc[-1])),
-        })
+        rows.append(
+            {
+                "metric": metric,
+                "count": len(df),
+                "first_ts": int(df["ts"].iloc[0]),
+                "last_ts": int(df["ts"].iloc[-1]),
+                "first": fmt_ts(int(df["ts"].iloc[0])),
+                "last": fmt_ts(int(df["ts"].iloc[-1])),
+            }
+        )
     if args.json:
-        print(json.dumps({"symbol": symbol, "market": args.market,
-                          "root": str(store.root), "series": rows},
-                         indent=2, default=str))
+        print(
+            json.dumps(
+                {
+                    "symbol": symbol,
+                    "market": args.market,
+                    "root": str(store.root),
+                    "series": rows,
+                },
+                indent=2,
+                default=str,
+            )
+        )
     else:
         if not rows:
             print(f"derivatives: nothing stored for {symbol}/{args.market}")
@@ -382,7 +467,9 @@ def cmd_derivatives(args) -> int:
             return 0
         print(f"derivatives {symbol}/{args.market} — {len(rows)} metrics stored")
         for r in rows:
-            print(f"  {r['metric']:<22} {r['count']:>9,} rows  {r['first']} → {r['last']} UTC")
+            print(
+                f"  {r['metric']:<22} {r['count']:>9,} rows  {r['first']} → {r['last']} UTC"
+            )
     return 0
 
 
@@ -394,32 +481,45 @@ def cmd_cross(args) -> int:
     premium is derived from the candle store when both venues exist.
     """
     from data.backfill import fmt_ts
-    from data.cross_exchange import (CrossExchangeCollector,
-                                     CrossExchangeError, CrossExchangeStore)
-    from data.store import CandleStore
+    from data.cross_exchange import (
+        CrossExchangeCollector,
+        CrossExchangeError,
+        CrossExchangeStore,
+    )
     from data.derivatives import DerivativesStore
+    from data.store import CandleStore
     from data.symbols import resolve_symbol
 
-    store = (CrossExchangeStore(root=args.root)
-             if getattr(args, "root", None) else CrossExchangeStore())
+    store = (
+        CrossExchangeStore(root=args.root)
+        if getattr(args, "root", None)
+        else CrossExchangeStore()
+    )
     symbol = resolve_symbol(args.symbol).symbol
 
     if args.subcmd == "collect":
         candle_root = getattr(args, "candle_root", None)
         deriv_root = getattr(args, "deriv_root", None)
-        candle_store = (CandleStore(root=candle_root) if candle_root
-                        else CandleStore())
-        deriv_store = (DerivativesStore(root=deriv_root) if deriv_root
-                       else DerivativesStore())
+        candle_store = CandleStore(root=candle_root) if candle_root else CandleStore()
+        deriv_store = (
+            DerivativesStore(root=deriv_root) if deriv_root else DerivativesStore()
+        )
         try:
             collector = CrossExchangeCollector(
-                store, candle_store=candle_store, deriv_store=deriv_store,
-                sleep_s=getattr(args, "sleep", 0.0))
+                store,
+                candle_store=candle_store,
+                deriv_store=deriv_store,
+                sleep_s=getattr(args, "sleep", 0.0),
+            )
             runs = collector.collect(
-                symbol, market=args.market, timeframe=args.tf,
-                since=args.since, until=args.until,
+                symbol,
+                market=args.market,
+                timeframe=args.tf,
+                since=args.since,
+                until=args.until,
                 snapshot=not getattr(args, "no_snapshot", False),
-                dry_run=args.dry_run)
+                dry_run=args.dry_run,
+            )
         except CrossExchangeError as exc:
             print(f"[!] cross collect aborted: {exc}", file=sys.stderr)
             return 1
@@ -427,38 +527,55 @@ def cmd_cross(args) -> int:
         if args.json:
             print(json.dumps(payload, indent=2, default=str))
         else:
-            dest = ("dry-run — nothing written" if args.dry_run
-                    else "written to " + str(store.root))
+            dest = (
+                "dry-run — nothing written"
+                if args.dry_run
+                else "written to " + str(store.root)
+            )
             print(f"cross {symbol}/{args.market} ({dest})")
             if not runs:
-                print("  (nothing collected — backfill both venues or rely on the snapshot)")
+                print(
+                    "  (nothing collected — backfill both venues or rely on the snapshot)"
+                )
             for key, r in runs.items():
-                print(f"  {key:<28} fetched {r.rows_fetched:>5}  "
-                      f"new {r.rows_new:>5}  "
-                      f"{fmt_ts(r.first_ts)} → {fmt_ts(r.last_ts)} UTC  "
-                      f"[{r.source}]")
+                print(
+                    f"  {key:<28} fetched {r.rows_fetched:>5}  "
+                    f"new {r.rows_new:>5}  "
+                    f"{fmt_ts(r.first_ts)} → {fmt_ts(r.last_ts)} UTC  "
+                    f"[{r.source}]"
+                )
         return 0
 
     rows = []
     for series in store.list_series():
         if series["symbol"] != symbol:
             continue
-        df = store.read(series["exchange"], series["market"],
-                        series["symbol"], series["metric"])
+        df = store.read(
+            series["exchange"], series["market"], series["symbol"], series["metric"]
+        )
         if df.empty:
             continue
-        rows.append({
-            "exchange": series["exchange"], "market": series["market"],
-            "metric": series["metric"], "count": len(df),
-            "first_ts": int(df["ts"].iloc[0]),
-            "last_ts": int(df["ts"].iloc[-1]),
-            "first": fmt_ts(int(df["ts"].iloc[0])),
-            "last": fmt_ts(int(df["ts"].iloc[-1])),
-            "last_value": float(df["value"].iloc[-1]),
-        })
+        rows.append(
+            {
+                "exchange": series["exchange"],
+                "market": series["market"],
+                "metric": series["metric"],
+                "count": len(df),
+                "first_ts": int(df["ts"].iloc[0]),
+                "last_ts": int(df["ts"].iloc[-1]),
+                "first": fmt_ts(int(df["ts"].iloc[0])),
+                "last": fmt_ts(int(df["ts"].iloc[-1])),
+                "last_value": float(df["value"].iloc[-1]),
+            }
+        )
     if args.json:
-        print(json.dumps({"symbol": symbol, "root": str(store.root),
-                          "series": rows}, indent=2, default=str))
+        print(
+            json.dumps(
+                {"symbol": symbol, "root": str(store.root), "series": rows},
+                indent=2,
+                default=str,
+            )
+        )
     else:
         if not rows:
             print(f"cross: nothing stored for {symbol}")
@@ -466,9 +583,11 @@ def cmd_cross(args) -> int:
             return 0
         print(f"cross {symbol} — {len(rows)} series stored")
         for r in rows:
-            print(f"  {r['exchange']:<8} {r['market']:<5} {r['metric']:<16} "
-                  f"{r['count']:>7,} rows  {r['first']} → {r['last']} UTC  "
-                  f"last={r['last_value']}")
+            print(
+                f"  {r['exchange']:<8} {r['market']:<5} {r['metric']:<16} "
+                f"{r['count']:>7,} rows  {r['first']} → {r['last']} UTC  "
+                f"last={r['last_value']}"
+            )
     return 0
 
 
@@ -478,8 +597,9 @@ def cmd_correlation(args) -> int:
 
     client = _client()
     symbols = _symbols(args.symbols) if getattr(args, "symbols", None) else None
-    res = fetch_report(client, symbols=symbols, timeframe=args.tf,
-                       bars=args.bars, window=args.window)
+    res = fetch_report(
+        client, symbols=symbols, timeframe=args.tf, bars=args.bars, window=args.window
+    )
     if args.json:
         print(json.dumps(res, indent=2, default=str))
     else:

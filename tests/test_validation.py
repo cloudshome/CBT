@@ -6,6 +6,7 @@ walk-forward grader the desk already uses — no look-ahead by construction).
 The P12.2 source guard is also tested against a deliberately future-peeking
 ``shift(-n)`` feature so CI fails if the scanner ever stops catching it.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,21 +15,45 @@ import pytest
 
 from data.backtester import GradedPlan
 from data.validation import (
-    DEFAULT_MIN_DECIDED, VALIDATION_CRITERIA, LookaheadViolation,
-    ValidationWindowError, assert_no_lookahead, bucket_by_window,
-    config_fingerprint, load_seal, meets_bar, protocol_verdict,
-    run_validation, scan_lookahead, walk_forward_windows, window_stats,
+    DEFAULT_MIN_DECIDED,
+    VALIDATION_CRITERIA,
+    LookaheadViolation,
+    ValidationWindowError,
+    assert_no_lookahead,
+    bucket_by_window,
+    config_fingerprint,
+    load_seal,
+    meets_bar,
+    protocol_verdict,
+    run_validation,
+    scan_lookahead,
+    walk_forward_windows,
+    window_stats,
     write_seal,
 )
 
-
 # ── helpers ────────────────────────────────────────────────────────────────
 
-def gp(ts: int, plan_type: str = "Buy Pullback", outcome: str = "FULL_WIN",
-       rr: float = 2.0, horizon: float = 1.0, action: str = "BUY") -> GradedPlan:
-    return GradedPlan(ts=ts, plan_type=plan_type, action=action,
-                      confidence_pct=80, entry=100.0, trigger_level=None,
-                      horizon_hours=horizon, outcome=outcome, rr_achieved=rr)
+
+def gp(
+    ts: int,
+    plan_type: str = "Buy Pullback",
+    outcome: str = "FULL_WIN",
+    rr: float = 2.0,
+    horizon: float = 1.0,
+    action: str = "BUY",
+) -> GradedPlan:
+    return GradedPlan(
+        ts=ts,
+        plan_type=plan_type,
+        action=action,
+        confidence_pct=80,
+        entry=100.0,
+        trigger_level=None,
+        horizon_hours=horizon,
+        outcome=outcome,
+        rr_achieved=rr,
+    )
 
 
 def _window(plans: list, min_decided: int = DEFAULT_MIN_DECIDED) -> dict:
@@ -39,8 +64,9 @@ def _window(plans: list, min_decided: int = DEFAULT_MIN_DECIDED) -> dict:
 
 def _strong_window(n_wins: int = 24, n_losses: int = 16) -> list:
     """A window that meets the graduation bar: WR 60%, E +0.8R, PF 3.0."""
-    return ([gp(i, outcome="FULL_WIN", rr=2.0) for i in range(n_wins)]
-            + [gp(1000 + i, outcome="LOSS", rr=-1.0) for i in range(n_losses)])
+    return [gp(i, outcome="FULL_WIN", rr=2.0) for i in range(n_wins)] + [
+        gp(1000 + i, outcome="LOSS", rr=-1.0) for i in range(n_losses)
+    ]
 
 
 def _weak_window() -> list:
@@ -50,16 +76,18 @@ def _weak_window() -> list:
 
 # ── window split ───────────────────────────────────────────────────────────
 
+
 def test_walk_forward_windows_tile_the_analyzed_range():
     windows = walk_forward_windows(n_bars=1000, min_bars=120)
     assert list(windows) == ["train", "val", "oos", "recent"]
-    assert windows["train"][0] == 120          # starts at warm-up end
-    assert windows["recent"][1] == 1000        # ends at the last bar
+    assert windows["train"][0] == 120  # starts at warm-up end
+    assert windows["recent"][1] == 1000  # ends at the last bar
     cursor = 120
     for name in ("train", "val", "oos", "recent"):
         start, end = windows[name]
-        assert (start, end) == (cursor, cursor + (end - start)), \
+        assert (start, end) == (cursor, cursor + (end - start)), (
             f"{name} window must be contiguous"
+        )
         assert end > start, f"{name} window must be non-empty"
         cursor = end
     assert cursor == 1000
@@ -70,29 +98,38 @@ def test_walk_forward_windows_tile_the_analyzed_range():
 
 def test_walk_forward_windows_reject_bad_fractions():
     with pytest.raises(ValidationWindowError):
-        walk_forward_windows(1000, 120, train_frac=0.5, val_frac=0.2,
-                             oos_frac=0.2, recent_frac=0.2)  # sums to 1.1
+        walk_forward_windows(
+            1000, 120, train_frac=0.5, val_frac=0.2, oos_frac=0.2, recent_frac=0.2
+        )  # sums to 1.1
     with pytest.raises(ValidationWindowError):
-        walk_forward_windows(1000, 120, train_frac=0.0, val_frac=0.3,
-                             oos_frac=0.3, recent_frac=0.4)  # zero window
+        walk_forward_windows(
+            1000, 120, train_frac=0.0, val_frac=0.3, oos_frac=0.3, recent_frac=0.4
+        )  # zero window
     with pytest.raises(ValidationWindowError):
-        walk_forward_windows(1000, 120, train_frac=1.0, val_frac=0.0,
-                             oos_frac=0.0, recent_frac=0.0)  # degenerate
+        walk_forward_windows(
+            1000, 120, train_frac=1.0, val_frac=0.0, oos_frac=0.0, recent_frac=0.0
+        )  # degenerate
 
 
 def test_walk_forward_windows_reject_short_series():
     with pytest.raises(ValidationWindowError):
-        walk_forward_windows(120, 120)          # nothing beyond warm-up
+        walk_forward_windows(120, 120)  # nothing beyond warm-up
     with pytest.raises(ValidationWindowError):
         walk_forward_windows(125, 120, min_window_bars=3)  # can't fit 4 windows
 
 
 # ── bucketing ──────────────────────────────────────────────────────────────
 
+
 def test_bucket_by_window_uses_signal_bar_not_exit_bar():
     windows = {"train": (10, 20), "val": (20, 30)}
     ts_to_index = {t: i for i, t in enumerate(range(1000, 1040))}
-    plans = [gp(1010), gp(1015), gp(1025), gp(1035)]  # idx 10,15 → train; 25 → val; 35 → nowhere
+    plans = [
+        gp(1010),
+        gp(1015),
+        gp(1025),
+        gp(1035),
+    ]  # idx 10,15 → train; 25 → val; 35 → nowhere
     buckets = bucket_by_window(plans, windows, ts_to_index)
     assert len(buckets["train"]) == 2
     assert len(buckets["val"]) == 1
@@ -100,6 +137,7 @@ def test_bucket_by_window_uses_signal_bar_not_exit_bar():
 
 
 # ── bar checks ─────────────────────────────────────────────────────────────
+
 
 def test_meets_bar_passes_a_strong_window():
     stats = window_stats(_strong_window())
@@ -128,6 +166,7 @@ def test_meets_bar_never_passes_on_too_few_samples():
 
 
 # ── protocol verdicts ──────────────────────────────────────────────────────
+
 
 def test_verdict_cannot_pass_on_train_alone():
     """P12.1 done-when: a setup that passes train but fails val is FAIL."""
@@ -183,6 +222,7 @@ def test_verdict_insufficient_data():
 
 # ── sealed envelope ────────────────────────────────────────────────────────
 
+
 def test_seal_roundtrip_and_fingerprint_gate(tmp_path):
     cfg = {"symbol": "BTCUSDT", "timeframe": "15m", "train_frac": 0.6}
     fp = config_fingerprint(cfg)
@@ -210,12 +250,22 @@ def test_seal_records_reseals_in_history(tmp_path):
 
 # ── end-to-end protocol run (offline synthetic candles) ────────────────────
 
+
 def test_run_validation_end_to_end_and_seal_reuse(tmp_path):
     from tests.conftest import make_ohlcv
+
     df = make_ohlcv(n=450, seed=11)
-    kwargs = dict(symbol="BTCUSDT", timeframe="15m", horizons=[1.0],
-                  min_bars=150, step=5, min_confidence=0, min_decided=1,
-                  seal_dir=tmp_path, seal_key="e2e")
+    kwargs = dict(
+        symbol="BTCUSDT",
+        timeframe="15m",
+        horizons=[1.0],
+        min_bars=150,
+        step=5,
+        min_confidence=0,
+        min_decided=1,
+        seal_dir=tmp_path,
+        seal_key="e2e",
+    )
     first = run_validation(df, **kwargs)
     assert first["ok"]
     assert list(first["windows"]) == ["train", "val", "oos", "recent"]
@@ -226,7 +276,11 @@ def test_run_validation_end_to_end_and_seal_reuse(tmp_path):
         cursor = end
     assert cursor == 450
     assert first["verdicts"]["ALL"]["status"] in {
-        "PASS", "PASS_WITH_WARNINGS", "FAIL", "INSUFFICIENT_DATA"}
+        "PASS",
+        "PASS_WITH_WARNINGS",
+        "FAIL",
+        "INSUFFICIENT_DATA",
+    }
     assert first["seal"]["fingerprint"]
     assert first["seal"]["resealed"] is False
 
@@ -251,6 +305,7 @@ def test_run_validation_end_to_end_and_seal_reuse(tmp_path):
 
 def test_run_validation_refuses_too_short_series(tmp_path):
     from tests.conftest import make_ohlcv
+
     df = make_ohlcv(n=100, seed=3)
     result = run_validation(df, min_bars=120, seal_dir=tmp_path, seal_key="x")
     assert not result["ok"]
@@ -259,10 +314,18 @@ def test_run_validation_refuses_too_short_series(tmp_path):
 
 def test_run_validation_refuses_bad_window_fractions(tmp_path):
     from tests.conftest import make_ohlcv
+
     df = make_ohlcv(n=400, seed=3)
-    result = run_validation(df, min_bars=150, train_frac=0.6, val_frac=0.2,
-                            oos_frac=0.2, recent_frac=0.2,
-                            seal_dir=tmp_path, seal_key="x")
+    result = run_validation(
+        df,
+        min_bars=150,
+        train_frac=0.6,
+        val_frac=0.2,
+        oos_frac=0.2,
+        recent_frac=0.2,
+        seal_dir=tmp_path,
+        seal_key="x",
+    )
     assert not result["ok"]
     assert "fractions" in result["error"]
 
@@ -270,6 +333,7 @@ def test_run_validation_refuses_bad_window_fractions(tmp_path):
 def test_criteria_are_the_live_graduation_bar():
     """The validation bar and the graduation gate must never diverge."""
     from data.simulator import GRADUATION_CRITERIA
+
     assert VALIDATION_CRITERIA == dict(GRADUATION_CRITERIA)
     assert VALIDATION_CRITERIA["expectancy"] == 0.50
     assert VALIDATION_CRITERIA["win_rate"] == 0.55
@@ -277,6 +341,7 @@ def test_criteria_are_the_live_graduation_bar():
 
 
 # ── P12.2 lookahead guard ─────────────────────────────────────────────────
+
 
 def test_lookahead_guard_passes_first_party_sources():
     """CI's unit form scans the real feature/signal source tree."""
@@ -326,13 +391,17 @@ def test_validate_lookahead_cli_json_and_exit_code(tmp_path, capsys):
     from main import main
 
     safe = tmp_path / "safe.py"
-    safe.write_text("def feature(frame):\n    return frame.close.shift(1)\n", encoding="utf-8")
+    safe.write_text(
+        "def feature(frame):\n    return frame.close.shift(1)\n", encoding="utf-8"
+    )
     assert main(["validate", "lookahead", "--path", str(safe), "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "PASS"
 
     bad = tmp_path / "bad.py"
-    bad.write_text("def feature(frame):\n    return frame.close.shift(-1)\n", encoding="utf-8")
+    bad.write_text(
+        "def feature(frame):\n    return frame.close.shift(-1)\n", encoding="utf-8"
+    )
     assert main(["validate", "lookahead", "--path", str(bad), "--json"]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "FAIL"

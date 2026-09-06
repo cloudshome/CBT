@@ -14,6 +14,7 @@ This checkout does **not** ship a signed ``.exe``. The packaging recipe
 under ``packaging/windows/`` is unsigned by design (signing is P22).
 No exchange-order path exists here or anywhere in SKY.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -22,8 +23,9 @@ import os
 import stat
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 from web.api_v1 import (
@@ -69,7 +71,9 @@ def validate_hub_url(url: str, *, allow_insecure_loopback: bool = True) -> str:
 
 def pairing_payload(*, hub_url: str, code: str) -> dict[str, Any]:
     """QR / deep-link payload printed by ``hub pair``."""
-    display = code if "-" in code else f"{code[:4]}-{code[4:]}" if len(code) == 8 else code
+    display = (
+        code if "-" in code else f"{code[:4]}-{code[4:]}" if len(code) == 8 else code
+    )
     return {
         "v": 1,
         "hub": validate_hub_url(hub_url, allow_insecure_loopback=True),
@@ -83,7 +87,9 @@ def pairing_qr_text(payload: dict[str, Any]) -> str:
     return json.dumps(payload, separators=(",", ":"), sort_keys=True)
 
 
-def negotiate_version(info: dict[str, Any], *, client_build: int = CLIENT_BUILD) -> dict[str, Any]:
+def negotiate_version(
+    info: dict[str, Any], *, client_build: int = CLIENT_BUILD
+) -> dict[str, Any]:
     """Apply the same compatibility rules the Hub enforces."""
     bad = check_client_version(str(client_build))
     caps = (info or {}).get("capabilities") or {}
@@ -95,10 +101,12 @@ def negotiate_version(info: dict[str, Any], *, client_build: int = CLIENT_BUILD)
     server_max = int((info or {}).get("max_client_version") or MAX_CLIENT_VERSION)
     if client_build < server_min:
         raise CompanionError(
-            f"This companion (v{client_build}) is older than the Hub minimum (v{server_min}).")
+            f"This companion (v{client_build}) is older than the Hub minimum (v{server_min})."
+        )
     if client_build > server_max:
         raise CompanionError(
-            f"This companion (v{client_build}) is newer than the Hub (v{server_max}).")
+            f"This companion (v{client_build}) is newer than the Hub (v{server_max})."
+        )
     return {
         "ok": True,
         "client_build": client_build,
@@ -113,7 +121,9 @@ def new_idempotency_key() -> str:
     return uuid.uuid4().hex
 
 
-def mutation_headers(*, token: str, idempotency_key: str | None = None) -> dict[str, str]:
+def mutation_headers(
+    *, token: str, idempotency_key: str | None = None
+) -> dict[str, str]:
     key = idempotency_key or new_idempotency_key()
     if len(key) < 8:
         raise CompanionError("idempotency key too short")
@@ -134,11 +144,13 @@ def read_headers(*, token: str) -> dict[str, str]:
     }
 
 
-def tray_status(loop_health: dict[str, Any] | None,
-                readiness: dict[str, Any] | None,
-                *,
-                connected: bool,
-                last_ok_ts: int | None = None) -> dict[str, Any]:
+def tray_status(
+    loop_health: dict[str, Any] | None,
+    readiness: dict[str, Any] | None,
+    *,
+    connected: bool,
+    last_ok_ts: int | None = None,
+) -> dict[str, Any]:
     """System-tray snapshot. Honest about stale / offline."""
     now = int(time.time() * 1000)
     stale = False
@@ -146,7 +158,7 @@ def tray_status(loop_health: dict[str, Any] | None,
         stale = now - int(last_ok_ts) > 5 * 60 * 1000
     loop = loop_health or {}
     ready = readiness or {}
-    gate = (loop.get("gate") or {})
+    gate = loop.get("gate") or {}
     if isinstance(gate, dict):
         gate_open = bool(gate.get("allowed", gate.get("open")))
     else:
@@ -170,8 +182,9 @@ def tray_status(loop_health: dict[str, Any] | None,
         "gate_open": gate_open if connected else False,
         "open_paper": open_n,
         "pending": pending,
-        "headline": ready.get("headline") or loop.get("advice") or (
-            "Hub offline" if not connected else "connected"),
+        "headline": ready.get("headline")
+        or loop.get("advice")
+        or ("Hub offline" if not connected else "connected"),
         "live_exchange_execution": False,
         "mutations_allowed": bool(connected and not stale),
     }
@@ -185,8 +198,15 @@ class TokenStore:
     """
 
     def __init__(self, path: Path | str | None = None):
-        self.path = Path(path) if path else Path(
-            os.getenv("SKY_COMPANION_STATE", str(Path.home() / ".sky" / "companion.json")))
+        self.path = (
+            Path(path)
+            if path
+            else Path(
+                os.getenv(
+                    "SKY_COMPANION_STATE", str(Path.home() / ".sky" / "companion.json")
+                )
+            )
+        )
 
     def _win_cred_write(self, token: str) -> bool:
         if os.name != "nt":
@@ -217,8 +237,9 @@ class TokenStore:
             cred.Type = 1  # GENERIC
             cred.TargetName = CREDENTIAL_TARGET
             cred.CredentialBlobSize = len(blob)
-            cred.CredentialBlob = ctypes.cast(ctypes.create_string_buffer(blob),
-                                              ctypes.POINTER(ctypes.c_char))
+            cred.CredentialBlob = ctypes.cast(
+                ctypes.create_string_buffer(blob), ctypes.POINTER(ctypes.c_char)
+            )
             cred.Persist = 2  # LOCAL_MACHINE
             cred.UserName = CLIENT_NAME
             if not adv.CredWriteW(ctypes.byref(cred), 0):
@@ -232,7 +253,7 @@ class TokenStore:
             return None
         try:
             import ctypes
-            from ctypes import wintypes
+
             adv = ctypes.WinDLL("advapi32", use_last_error=True)
             ptr = ctypes.c_void_p()
             if not adv.CredReadW(CREDENTIAL_TARGET, 1, 0, ctypes.byref(ptr)):
@@ -242,7 +263,9 @@ class TokenStore:
         except Exception:
             return None
 
-    def save(self, *, hub_url: str, token: str, scope: str, name: str) -> dict[str, Any]:
+    def save(
+        self, *, hub_url: str, token: str, scope: str, name: str
+    ) -> dict[str, Any]:
         if scope not in ALLOWED_SCOPES:
             raise CompanionError(f"scope must be one of {ALLOWED_SCOPES}")
         used_credman = self._win_cred_write(token)
@@ -257,14 +280,16 @@ class TokenStore:
         }
         if used_credman:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps({**record, "token": None}, indent=2) + "\n",
-                                 encoding="utf-8")
+            self.path.write_text(
+                json.dumps({**record, "token": None}, indent=2) + "\n", encoding="utf-8"
+            )
             return record
         if os.getenv("SKY_COMPANION_ALLOW_FILE_TOKEN") != "1":
             raise CompanionError(
                 "Windows Credential Manager unavailable — refusing to write the "
                 "device token to a file (set SKY_COMPANION_ALLOW_FILE_TOKEN=1 "
-                "only for tests)")
+                "only for tests)"
+            )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {**record, "token": token}
         tmp = self.path.with_suffix(".tmp")
@@ -300,28 +325,44 @@ class TokenStore:
             self.path.unlink()
 
 
-def pair_with_hub(*, hub_url: str, code: str, device_name: str = "windows",
-                  transport: Callable[..., dict] | None = None,
-                  store: TokenStore | None = None) -> dict[str, Any]:
+def pair_with_hub(
+    *,
+    hub_url: str,
+    code: str,
+    device_name: str = "windows",
+    transport: Callable[..., dict] | None = None,
+    store: TokenStore | None = None,
+) -> dict[str, Any]:
     """POST /api/v1/pair then persist the token."""
     origin = validate_hub_url(hub_url)
-    body = {"code": code, "name": device_name, "client": CLIENT_NAME,
-            "client_build": CLIENT_BUILD}
+    body = {
+        "code": code,
+        "name": device_name,
+        "client": CLIENT_NAME,
+        "client_build": CLIENT_BUILD,
+    }
     if transport is None:
         raise CompanionError("no transport (tests inject one; .exe uses HTTPS)")
-    envelope = transport("POST", origin + "/api/v1/pair", json=body,
-                         headers={CLIENT_VERSION_HEADER: str(CLIENT_BUILD)})
+    envelope = transport(
+        "POST",
+        origin + "/api/v1/pair",
+        json=body,
+        headers={CLIENT_VERSION_HEADER: str(CLIENT_BUILD)},
+    )
     if not envelope.get("ok"):
-        err = (envelope.get("error") or {})
+        err = envelope.get("error") or {}
         raise CompanionError(err.get("message") or "pairing failed")
     data = envelope.get("data") or {}
     token = data.get("token")
     if not token:
         raise CompanionError("Hub did not return a device token")
     store = store or TokenStore()
-    meta = store.save(hub_url=origin, token=token,
-                      scope=str(data.get("scope") or "viewer"),
-                      name=str(data.get("name") or device_name))
+    meta = store.save(
+        hub_url=origin,
+        token=token,
+        scope=str(data.get("scope") or "viewer"),
+        name=str(data.get("name") or device_name),
+    )
     return {**meta, "paired": True, "token_shown": False}
 
 

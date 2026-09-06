@@ -9,12 +9,11 @@ cover the pieces that must stay true even when we are not building:
   * duplicate-entry detection flags a bad zip and passes a clean one
   * `main.main([...])` accepts an argv list (the smoke-test contract)
 """
+
 from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -31,12 +30,14 @@ def test_pyproject_toml_exists_and_names_cryptobrain():
 def test_cryptobrain_package_imports():
     import cryptobrain
     from config import VERSION
+
     assert cryptobrain.__version__ == VERSION
     assert VERSION  # non-empty
 
 
 def test_find_duplicate_entries_flags_bad_zip(tmp_path):
     from ci.wheel_gate import find_duplicate_entries
+
     bad = tmp_path / "dup.whl"
     with zipfile.ZipFile(bad, "w") as zf:
         zf.writestr("cryptobrain/__init__.py", "x = 1\n")
@@ -48,6 +49,7 @@ def test_find_duplicate_entries_flags_bad_zip(tmp_path):
 
 def test_find_duplicate_entries_clean_zip(tmp_path):
     from ci.wheel_gate import find_duplicate_entries
+
     good = tmp_path / "clean.whl"
     with zipfile.ZipFile(good, "w") as zf:
         zf.writestr("cryptobrain/__init__.py", "x = 1\n")
@@ -60,6 +62,7 @@ def test_main_accepts_argv_list(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "wheel.db"))
     import main as main_mod
+
     # argparse writes to stdout; we just need it not to raise and to
     # return an int. desk is read-only and offline-safe.
     rc = main_mod.main(["desk", "--json"])

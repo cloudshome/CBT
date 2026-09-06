@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from flask import jsonify, request
 
-from web.payload import _CACHE, _sanitize_for_json, _sym, compute_payload
 from config import SYMBOL, TIMEFRAME
+from web.payload import _CACHE, _sanitize_for_json, _sym, compute_payload
 
 
 def register(app, ctx):
@@ -23,8 +23,11 @@ def register(app, ctx):
         try:
             if force:
                 _CACHE.update(payload=None, ts=0, ttl=_CACHE.get("ttl", 40))
-            return jsonify(_sanitize_for_json(
-                compute_payload(symbol, tf, save=True, use_cache=not force)))
+            return jsonify(
+                _sanitize_for_json(
+                    compute_payload(symbol, tf, save=True, use_cache=not force)
+                )
+            )
         except ConnectionError as exc:
             return jsonify({"error": str(exc)}), 502
         except Exception as exc:  # pragma: no cover
@@ -43,17 +46,37 @@ def register(app, ctx):
         try:
             payload = compute_payload(symbol, tf, save=False, use_cache=not force)
             sent = payload.get("sentiment") or {
-                "available": False, "score": 0.0, "direction": "neutral",
-                "label": "NO DATA", "color": "#5f6d84", "intensity": 0.0,
-                "duration_min": 0.0, "duration_text": "—", "history": []}
-            return jsonify(_sanitize_for_json({
-                "symbol": symbol, "timeframe": tf, "sentiment": sent}))
+                "available": False,
+                "score": 0.0,
+                "direction": "neutral",
+                "label": "NO DATA",
+                "color": "#5f6d84",
+                "intensity": 0.0,
+                "duration_min": 0.0,
+                "duration_text": "—",
+                "history": [],
+            }
+            return jsonify(
+                _sanitize_for_json(
+                    {"symbol": symbol, "timeframe": tf, "sentiment": sent}
+                )
+            )
         except Exception as exc:
-            return jsonify({"symbol": symbol, "timeframe": tf,
-                            "sentiment": {"available": False, "score": 0.0,
-                                          "direction": "neutral", "label": "NO DATA",
-                                          "color": "#5f6d84", "intensity": 0.0,
-                                          "error": f"{type(exc).__name__}: {exc}"}}), 200
+            return jsonify(
+                {
+                    "symbol": symbol,
+                    "timeframe": tf,
+                    "sentiment": {
+                        "available": False,
+                        "score": 0.0,
+                        "direction": "neutral",
+                        "label": "NO DATA",
+                        "color": "#5f6d84",
+                        "intensity": 0.0,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    },
+                }
+            ), 200
 
     @app.get("/api/intelligence")
     def api_intelligence():
@@ -65,25 +88,31 @@ def register(app, ctx):
             payload = compute_payload(symbol, tf, save=False, use_cache=not force)
             return jsonify(_sanitize_for_json(payload.get("intelligence", {})))
         except Exception as exc:
-            return jsonify({
-                "asset": symbol,
-                "signal": "NO TRADE",
-                "confidence": 0,
-                "reason": [f"Insufficient market data: {type(exc).__name__}: {exc}"],
-            }), 200
+            return jsonify(
+                {
+                    "asset": symbol,
+                    "signal": "NO TRADE",
+                    "confidence": 0,
+                    "reason": [
+                        f"Insufficient market data: {type(exc).__name__}: {exc}"
+                    ],
+                }
+            ), 200
 
     @app.get("/api/pending")
     def api_pending():
-        from data.database import SignalDB
         from brain.coach import management_checklist
+        from data.database import SignalDB
+
         with SignalDB() as db:
             pending = db.pending_reviews()
         for item in pending:
             tp = item.get("take_profit")
-            item["management"] = management_checklist({
-                "entry": item.get("entry"),
-                "stop_loss": item.get("stop_loss"),
-                "take_profits": [tp] if tp is not None else [],
-            })
+            item["management"] = management_checklist(
+                {
+                    "entry": item.get("entry"),
+                    "stop_loss": item.get("stop_loss"),
+                    "take_profits": [tp] if tp is not None else [],
+                }
+            )
         return jsonify({"pending": pending})
-

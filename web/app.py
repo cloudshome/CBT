@@ -36,43 +36,57 @@ Endpoints
   GET /api/desk     one-call desk advisory (gate + P&L + graduation + advice)
   GET /api/loop-health  the one daily number (real paper n / E_net / graduation bar)
 """
+
 from __future__ import annotations
 
-import json
 import secrets
 import sys
-import time
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from flask import Flask, Response, g, jsonify, render_template_string, request, session
+from flask import Flask, g, jsonify, render_template_string, request, session
 
 import config
-from config import SYMBOL, SYMBOLS, TIMEFRAME, MIN_CONFIDENCE, DASHBOARD_HOST, DASHBOARD_PORT, VERSION
+from config import (
+    DASHBOARD_HOST,
+    DASHBOARD_PORT,
+    SYMBOL,
+    SYMBOLS,
+    TIMEFRAME,
+    VERSION,
+)
 from data.symbols import symbol_choices
-from data.sample_client import maybe_client
-from web import auth as authmod
 from web import api_v1 as apiv1
-from web import jobs as jobsmod
+from web import auth as authmod
+
 # Refactor step 1 (ROADMAP §19): the scan-payload pipeline lives in
 # web/payload.py.  Names are re-exported here so every existing import of
 # web.app (routes, tests) keeps working unchanged.
 from web.payload import (  # noqa: F401 — re-exported for back-compat
-    _CACHE, _LAST_GOOD, _SCAN_TIMEOUT,
-    _attach_management, _attach_sentiment, _basic_scan, _persist,
-    _sanitize_for_json, _scan_row_to_payload, _source_key_param, _sym,
-    build_payload, compute_payload,
+    _CACHE,
+    _LAST_GOOD,
+    _SCAN_TIMEOUT,
+    _attach_management,
+    _attach_sentiment,
+    _basic_scan,
+    _persist,
+    _sanitize_for_json,
+    _scan_row_to_payload,
+    _source_key_param,
+    _sym,
+    build_payload,
+    compute_payload,
 )
-
 
 # Keep this a normal triple-quoted string so the lightweight CI extractor can
 # read it directly. Embedded JavaScript deliberately uses `nl` below instead
 # of a `\n` string escape, which stays correct without a raw Python literal.
 # The terminal template (HTML/JS) lives in web/static/terminal.html; loaded at import so the served output is byte-identical to the inline
 # literal it replaces (rendered via render_template_string below).
-HTML = (Path(__file__).resolve().parent / "static" / "terminal.html").read_text(encoding="utf-8")
+HTML = (Path(__file__).resolve().parent / "static" / "terminal.html").read_text(
+    encoding="utf-8"
+)
 
 
 def make_app(job_manager=None) -> Flask:
@@ -89,10 +103,12 @@ def make_app(job_manager=None) -> Flask:
         SESSION_COOKIE_SECURE=bool(config.SKY_TRUSTED_PROXY_IPS),
     )
     from datetime import timedelta
+
     app.permanent_session_lifetime = timedelta(hours=config.SKY_SESSION_TTL_HOURS)
     if config.SKY_TRUSTED_PROXY_IPS:  # pragma: no cover - deployment-only
         try:
             from werkzeug.middleware.proxy_fix import ProxyFix
+
             app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
         except Exception:
             pass
@@ -129,21 +145,32 @@ def make_app(job_manager=None) -> Flask:
         return tok
 
     def _csrf_ok() -> bool:
-        supplied = (request.headers.get("X-CSRF-Token")
-                    or (request.get_json(silent=True) or {}).get("_csrf")
-                    or (request.form or {}).get("_csrf"))
+        supplied = (
+            request.headers.get("X-CSRF-Token")
+            or (request.get_json(silent=True) or {}).get("_csrf")
+            or (request.form or {}).get("_csrf")
+        )
         expected = session.get("_csrf")
         if not expected or not supplied:
             return False
         import hmac as _hmac
+
         return _hmac.compare_digest(str(supplied), str(expected))
 
-    def _audit(action: str, target: str = "", ok: bool = True,
-               detail: dict | None = None) -> None:
+    def _audit(
+        action: str, target: str = "", ok: bool = True, detail: dict | None = None
+    ) -> None:
         try:
             user = getattr(g, "user", None)
-            auth.audit(action, target, user=user, ok=ok, ip=_client_ip(),
-                       user_agent=_client_ua(), detail=detail)
+            auth.audit(
+                action,
+                target,
+                user=user,
+                ok=ok,
+                ip=_client_ip(),
+                user_agent=_client_ua(),
+                detail=detail,
+            )
         except Exception:
             pass
 
@@ -171,7 +198,7 @@ def make_app(job_manager=None) -> Flask:
 
     def _v1_sub(path: str) -> str:
         """'/api/v1/review' -> '/review' (the ROUTES key)."""
-        return path[len(V1_PREFIX):] or "/"
+        return path[len(V1_PREFIX) :] or "/"
 
     # (sub_path, METHOD) -> minimum role, built from the declared route table
     # so the gate and the published catalog can never disagree.
@@ -220,8 +247,9 @@ def make_app(job_manager=None) -> Flask:
             return role
         return "operator" if path not in authmod.VIEWER_POST_PATHS else "viewer"
 
-    def _deny(path: str, code: str, message: str, status: int,
-              details: dict | None = None):
+    def _deny(
+        path: str, code: str, message: str, status: int, details: dict | None = None
+    ):
         """Auth-gate refusal, rendered in whichever contract the caller used.
 
         A v1 client must never have to parse the legacy shape, and the legacy
@@ -234,20 +262,39 @@ def make_app(job_manager=None) -> Flask:
     @app.before_request
     def _auth_gate():
         path = request.path or "/"
-        if path == "/" or path.startswith("/static/") or path in ("/sw.js", "/manifest.json", "/offline.html", "/offline", "/api/push/vapid-key"):
+        if (
+            path == "/"
+            or path.startswith("/static/")
+            or path
+            in (
+                "/sw.js",
+                "/manifest.json",
+                "/offline.html",
+                "/offline",
+                "/api/push/vapid-key",
+            )
+        ):
             return None
         # Compatibility negotiation happens before authentication: a client too
         # old to speak this contract must be told to upgrade, not handed a 401
         # it will misreport as "wrong password".
         if _is_v1(path):
             bad = apiv1.check_client_version(
-                request.headers.get(apiv1.CLIENT_VERSION_HEADER))
+                request.headers.get(apiv1.CLIENT_VERSION_HEADER)
+            )
             if bad is not None:
                 code, message = bad
-                return jsonify(apiv1.envelope_error(
-                    code, message, {"min_client_version": apiv1.MIN_CLIENT_VERSION,
-                                    "max_client_version": apiv1.MAX_CLIENT_VERSION,
-                                    "server_version": config.VERSION})), 400
+                return jsonify(
+                    apiv1.envelope_error(
+                        code,
+                        message,
+                        {
+                            "min_client_version": apiv1.MIN_CLIENT_VERSION,
+                            "max_client_version": apiv1.MAX_CLIENT_VERSION,
+                            "server_version": config.VERSION,
+                        },
+                    )
+                ), 400
             # /api/v1/version is deliberately public: a client must be able to
             # discover the compatibility range before it can authenticate.
             if _v1_sub(path) == "/version":
@@ -259,44 +306,69 @@ def make_app(job_manager=None) -> Flask:
                 return None
             user = _current_user()
             if user is None:
-                return _deny(path, apiv1.ErrorCode.UNAUTHENTICATED,
-                             "authentication required", 401)
+                return _deny(
+                    path,
+                    apiv1.ErrorCode.UNAUTHENTICATED,
+                    "authentication required",
+                    401,
+                )
             g.user = user
-            if request.method in ("POST", "PUT", "PATCH", "DELETE") and \
-                    _using_cookie_session() and not _csrf_ok():
-                return _deny(path, apiv1.ErrorCode.CSRF,
-                             "CSRF token missing or invalid", 403)
+            if (
+                request.method in ("POST", "PUT", "PATCH", "DELETE")
+                and _using_cookie_session()
+                and not _csrf_ok()
+            ):
+                return _deny(
+                    path, apiv1.ErrorCode.CSRF, "CSRF token missing or invalid", 403
+                )
             return None
         if not auth.is_enabled():
             return None
         user = _current_user()
         if user is None:
-            return _deny(path, apiv1.ErrorCode.UNAUTHENTICATED,
-                         "authentication required", 401)
+            return _deny(
+                path, apiv1.ErrorCode.UNAUTHENTICATED, "authentication required", 401
+            )
         g.user = user
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             required = _required_role(path)
             if not authmod.role_allows(user.get("role"), required):
-                return _deny(path, apiv1.ErrorCode.FORBIDDEN,
-                             f"insufficient role — {required} required", 403,
-                             {"required_role": required,
-                              "your_role": user.get("role")})
+                return _deny(
+                    path,
+                    apiv1.ErrorCode.FORBIDDEN,
+                    f"insufficient role — {required} required",
+                    403,
+                    {"required_role": required, "your_role": user.get("role")},
+                )
             if _using_cookie_session() and not _csrf_ok():
-                return _deny(path, apiv1.ErrorCode.CSRF,
-                             "CSRF token missing or invalid", 403)
+                return _deny(
+                    path, apiv1.ErrorCode.CSRF, "CSRF token missing or invalid", 403
+                )
         return None
 
     @app.get("/")
     def index():
-        return render_template_string(HTML, symbol=SYMBOL, tf=TIMEFRAME,
-                                      version=VERSION, symbols=symbol_choices(SYMBOLS),
-                                      auth_state=_auth_state())
+        return render_template_string(
+            HTML,
+            symbol=SYMBOL,
+            tf=TIMEFRAME,
+            version=VERSION,
+            symbols=symbol_choices(SYMBOLS),
+            auth_state=_auth_state(),
+        )
 
     # ── P18.4 PWA foundation — installable shell, offline, never-cache API ─
     @app.get("/sw.js")
     def sw_js():
-        from flask import send_from_directory, make_response
-        resp = make_response(send_from_directory(str(Path(__file__).parent / "static"), "sw.js", mimetype="application/javascript"))
+        from flask import make_response, send_from_directory
+
+        resp = make_response(
+            send_from_directory(
+                str(Path(__file__).parent / "static"),
+                "sw.js",
+                mimetype="application/javascript",
+            )
+        )
         resp.headers["Service-Worker-Allowed"] = "/"
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         return resp
@@ -304,39 +376,71 @@ def make_app(job_manager=None) -> Flask:
     @app.get("/manifest.json")
     def pwa_manifest():
         from flask import send_from_directory
-        return send_from_directory(str(Path(__file__).parent / "static"), "manifest.json", mimetype="application/manifest+json")
+
+        return send_from_directory(
+            str(Path(__file__).parent / "static"),
+            "manifest.json",
+            mimetype="application/manifest+json",
+        )
 
     @app.get("/offline.html")
     def offline_page():
         from flask import send_from_directory
-        return send_from_directory(str(Path(__file__).parent / "static"), "offline.html", mimetype="text/html")
+
+        return send_from_directory(
+            str(Path(__file__).parent / "static"), "offline.html", mimetype="text/html"
+        )
 
     @app.get("/offline")
     def offline_alias():
         from flask import send_from_directory
-        return send_from_directory(str(Path(__file__).parent / "static"), "offline.html", mimetype="text/html")
+
+        return send_from_directory(
+            str(Path(__file__).parent / "static"), "offline.html", mimetype="text/html"
+        )
 
     from web.routes_auth import register as _register_auth
-    _register_auth(app, dict(auth=auth, _auth_state=_auth_state,
-                            _current_user=_current_user,
-                            _client_ip=_client_ip,
-                            _client_ua=_client_ua,
-                            _audit=_audit))
+
+    _register_auth(
+        app,
+        dict(
+            auth=auth,
+            _auth_state=_auth_state,
+            _current_user=_current_user,
+            _client_ip=_client_ip,
+            _client_ua=_client_ua,
+            _audit=_audit,
+        ),
+    )
     from web.routes_scan import register as _register_scan
+
     _register_scan(app, None)
     from web.routes_paper import register as _register_paper
+
     _register_paper(app, dict(_audit=_audit))
     from web.routes_chart import register as _register_chart
+
     _register_chart(app, dict(_audit=_audit))
     from web.routes_system import register as _register_system
-    _jobs = _register_system(app, dict(_audit=_audit,
-                                      job_manager=job_manager,
-                                      V1_PREFIX=V1_PREFIX))
+
+    _jobs = _register_system(
+        app, dict(_audit=_audit, job_manager=job_manager, V1_PREFIX=V1_PREFIX)
+    )
     from web.routes_v1 import register as _register_v1
-    _register_v1(app, dict(auth=auth, _audit=_audit,
-                          _client_ip=_client_ip, _client_ua=_client_ua,
-                          _current_user=_current_user, _is_v1=_is_v1,
-                          _jobs=_jobs, V1_PREFIX=V1_PREFIX))
+
+    _register_v1(
+        app,
+        dict(
+            auth=auth,
+            _audit=_audit,
+            _client_ip=_client_ip,
+            _client_ua=_client_ua,
+            _current_user=_current_user,
+            _is_v1=_is_v1,
+            _jobs=_jobs,
+            V1_PREFIX=V1_PREFIX,
+        ),
+    )
     return app
 
 

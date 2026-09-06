@@ -3,9 +3,8 @@
 Renders the fund-grade Institutional AI Signal Card in high-fidelity terminal box-drawing format
 and provides helper methods for JSON export and web rendering.
 """
-from __future__ import annotations
 
-from typing import Any, Optional
+from __future__ import annotations
 
 
 def format_signal_card(intel: dict) -> str:
@@ -36,44 +35,88 @@ def format_signal_card(intel: dict) -> str:
 
     reasons = card.get("why_ai_took_trade") or intel.get("reason", [])[:4]
     invalidations = card.get("invalidation_conditions") or [
-        f"15m close beyond stop loss level",
-        f"HTF market structure flips against direction",
+        "15m close beyond stop loss level",
+        "HTF market structure flips against direction",
     ]
-    alt_scenario = card.get("alternative_scenario") or intel.get("scenario_B", "Wait for confirmed structure break.")
+    alt_scenario = card.get("alternative_scenario") or intel.get(
+        "scenario_B", "Wait for confirmed structure break."
+    )
 
-    regime_label = (intel.get("regime") or {}).get("label", intel.get("market_structure", "Normal"))
+    regime_label = (intel.get("regime") or {}).get(
+        "label", intel.get("market_structure", "Normal")
+    )
 
     lines = []
-    lines.append("╔══════════════════════════════════════════════════════════════════════════════════╗")
-    lines.append(f"║                     INSTITUTIONAL AI TRADING PLATFORM v2.0                      ║")
-    lines.append(f"║                     \"Enterprise-Grade Intelligence for Alpha Generation\"        ║")
-    lines.append("╚══════════════════════════════════════════════════════════════════════════════════╝")
-    lines.append("┌──────────────────────────────────────────────────────────────────────────────────┐")
-    lines.append(f"│  ASSET: {asset:<16} TIMEFRAME: {intel.get('timeframe', '15M'):<12} REGIME: {regime_label[:28]:<28}│")
-    lines.append("├──────────────────────────────────────────────────────────────────────────────────┤")
+    lines.append(
+        "╔══════════════════════════════════════════════════════════════════════════════════╗"
+    )
+    lines.append(
+        "║                     INSTITUTIONAL AI TRADING PLATFORM v2.0                      ║"
+    )
+    lines.append(
+        '║                     "Enterprise-Grade Intelligence for Alpha Generation"        ║'
+    )
+    lines.append(
+        "╚══════════════════════════════════════════════════════════════════════════════════╝"
+    )
+    lines.append(
+        "┌──────────────────────────────────────────────────────────────────────────────────┐"
+    )
+    lines.append(
+        f"│  ASSET: {asset:<16} TIMEFRAME: {intel.get('timeframe', '15M'):<12} REGIME: {regime_label[:28]:<28}│"
+    )
+    lines.append(
+        "├──────────────────────────────────────────────────────────────────────────────────┤"
+    )
     lines.append(f"│   {action_badge:<78}│")
-    lines.append("├──────────────────────────────────────────────────────────────────────────────────┤")
-    lines.append(f"│   AI Confidence Index       : {str(conf_idx):<10} {conf_delta:<48}│")
-    lines.append(f"│   Institutional Probability : {str(ips) + '/100':<10} Trade Quality Grade: {grade:<26}│")
-    lines.append("├──────────────────────────────────────────────────────────────────────────────────┤")
+    lines.append(
+        "├──────────────────────────────────────────────────────────────────────────────────┤"
+    )
+    lines.append(
+        f"│   AI Confidence Index       : {conf_idx!s:<10} {conf_delta:<48}│"
+    )
+    lines.append(
+        f"│   Institutional Probability : {str(ips) + '/100':<10} Trade Quality Grade: {grade:<26}│"
+    )
+    lines.append(
+        "├──────────────────────────────────────────────────────────────────────────────────┤"
+    )
     lines.append(f"│   Entry Zone                : {entry_zone:<49}│")
     lines.append(f"│   Stop Loss                 : {stop_loss:<49}│")
     for tp in tp_ladder[:3]:
         tp_str = f"{tp.get('target', 'TP')}: ${tp.get('price', 0):,} ({'+' if tp.get('gain_pct', 0) >= 0 else ''}{tp.get('gain_pct', 0):.2f}%) — {tp.get('allocation_pct', 0)}% size ({tp.get('management', '')})"
         lines.append(f"│   {tp_str:<78}│")
-    lines.append(f"│   Risk-Reward Ratio         : {rr:<16} Expected Hold Time: {hold_time:<24}│")
-    lines.append("├──────────────────────────────────────────────────────────────────────────────────┤")
-    lines.append("│   Why AI Took This Trade:                                                        │")
+    lines.append(
+        f"│   Risk-Reward Ratio         : {rr:<16} Expected Hold Time: {hold_time:<24}│"
+    )
+    lines.append(
+        "├──────────────────────────────────────────────────────────────────────────────────┤"
+    )
+    lines.append(
+        "│   Why AI Took This Trade:                                                        │"
+    )
     for r in reasons[:4]:
         lines.append(f"│   • {r[:74]:<76}│")
-    lines.append("├──────────────────────────────────────────────────────────────────────────────────┤")
-    lines.append("│   Invalidation Conditions:                                                       │")
+    lines.append(
+        "├──────────────────────────────────────────────────────────────────────────────────┤"
+    )
+    lines.append(
+        "│   Invalidation Conditions:                                                       │"
+    )
     for inv in invalidations[:3]:
         lines.append(f"│   • {inv[:74]:<76}│")
-    lines.append("├──────────────────────────────────────────────────────────────────────────────────┤")
-    lines.append("│   Alternative Scenario:                                                          │")
+    lines.append(
+        "├──────────────────────────────────────────────────────────────────────────────────┤"
+    )
+    lines.append(
+        "│   Alternative Scenario:                                                          │"
+    )
     lines.append(f"│   {alt_scenario[:78]:<78}│")
-    lines.append("├──────────────────────────────────────────────────────────────────────────────────┤")
+    lines.append(
+        "├──────────────────────────────────────────────────────────────────────────────────┤"
+    )
     lines.append(f"│   ⏳ Signal Active Until: {active_until:<54}│")
-    lines.append("└──────────────────────────────────────────────────────────────────────────────────┘")
+    lines.append(
+        "└──────────────────────────────────────────────────────────────────────────────────┘"
+    )
     return "\n".join(lines)

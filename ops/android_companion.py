@@ -21,6 +21,7 @@ This checkout does **not** ship a signed ``.apk`` (signing is P22). The recipe
 under ``packaging/android/`` is unsigned by design. No exchange-order path
 exists here or anywhere in SKY.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -34,12 +35,23 @@ from urllib.parse import quote, urlparse
 
 from ops.windows_companion import (
     CompanionError,  # same exception the shared helpers raise
-    IDEMPOTENCY_HEADER,
-    negotiate_version as _negotiate_version,
-    pairing_qr_text as _pairing_qr_text,
-    pairing_payload as _pairing_payload,
-    read_headers as _read_headers,
+)
+from ops.windows_companion import (
     mutation_headers as _mutation_headers,
+)
+from ops.windows_companion import (
+    negotiate_version as _negotiate_version,
+)
+from ops.windows_companion import (
+    pairing_payload as _pairing_payload,
+)
+from ops.windows_companion import (
+    pairing_qr_text as _pairing_qr_text,
+)
+from ops.windows_companion import (
+    read_headers as _read_headers,
+)
+from ops.windows_companion import (
     validate_hub_url as _validate_hub_url,
 )
 from web.api_v1 import CLIENT_VERSION_HEADER
@@ -100,14 +112,18 @@ def pairing_qr_text(payload: dict[str, Any]) -> str:
     return _pairing_qr_text(payload)
 
 
-def negotiate_version(info: dict[str, Any], *, client_build: int = CLIENT_BUILD) -> dict[str, Any]:
+def negotiate_version(
+    info: dict[str, Any], *, client_build: int = CLIENT_BUILD
+) -> dict[str, Any]:
     """Apply the same compatibility rules the Hub enforces (Android client)."""
     out = _negotiate_version(info, client_build=client_build)
     out["client_name"] = CLIENT_NAME
     return out
 
 
-def mutation_headers(*, token: str, idempotency_key: str | None = None) -> dict[str, str]:
+def mutation_headers(
+    *, token: str, idempotency_key: str | None = None
+) -> dict[str, str]:
     return _mutation_headers(token=token, idempotency_key=idempotency_key)
 
 
@@ -127,15 +143,25 @@ class KeystoreTokenStore:
     """
 
     def __init__(self, path: Path | str | None = None):
-        self.path = Path(path) if path else Path(
-            os.getenv("SKY_ANDROID_STATE", str(Path.home() / ".sky" / "android_companion.json")))
+        self.path = (
+            Path(path)
+            if path
+            else Path(
+                os.getenv(
+                    "SKY_ANDROID_STATE",
+                    str(Path.home() / ".sky" / "android_companion.json"),
+                )
+            )
+        )
         self._backend = "android_keystore" if os.name != "nt" else "credential_manager"
 
     def _keystore_write(self, token: str) -> bool:
         """No-op outside Android: real Keystore access lives in the APK."""
         return False
 
-    def save(self, *, hub_url: str, token: str, scope: str, name: str) -> dict[str, Any]:
+    def save(
+        self, *, hub_url: str, token: str, scope: str, name: str
+    ) -> dict[str, Any]:
         if scope not in ALLOWED_SCOPES:
             raise CompanionError(f"scope must be one of {ALLOWED_SCOPES}")
         used_keystore = self._keystore_write(token)
@@ -151,13 +177,15 @@ class KeystoreTokenStore:
         }
         if used_keystore:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps({**record, "token": None}, indent=2) + "\n",
-                                 encoding="utf-8")
+            self.path.write_text(
+                json.dumps({**record, "token": None}, indent=2) + "\n", encoding="utf-8"
+            )
             return record
         if os.getenv("SKY_ANDROID_ALLOW_FILE_TOKEN") != "1":
             raise CompanionError(
                 "Android Keystore unavailable — refusing to write the device "
-                "token to a file (set SKY_ANDROID_ALLOW_FILE_TOKEN=1 only for tests)")
+                "token to a file (set SKY_ANDROID_ALLOW_FILE_TOKEN=1 only for tests)"
+            )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {**record, "token": token}
         tmp = self.path.with_suffix(".tmp")
@@ -192,16 +220,30 @@ class KeystoreTokenStore:
             self.path.unlink()
 
 
-def pair_with_hub(*, hub_url: str, code: str, device_name: str = "android",
-                  transport=None, store: KeystoreTokenStore | None = None) -> dict[str, Any]:
+def pair_with_hub(
+    *,
+    hub_url: str,
+    code: str,
+    device_name: str = "android",
+    transport=None,
+    store: KeystoreTokenStore | None = None,
+) -> dict[str, Any]:
     """POST /api/v1/pair then persist the token (Android client)."""
     origin = validate_hub_url(hub_url)
-    body = {"code": code, "name": device_name, "client": CLIENT_NAME,
-            "client_build": CLIENT_BUILD}
+    body = {
+        "code": code,
+        "name": device_name,
+        "client": CLIENT_NAME,
+        "client_build": CLIENT_BUILD,
+    }
     if transport is None:
         raise CompanionError("no transport (tests inject one; the APK uses HTTPS)")
-    envelope = transport("POST", origin + "/api/v1/pair", json=body,
-                         headers={CLIENT_VERSION_HEADER: str(CLIENT_BUILD)})
+    envelope = transport(
+        "POST",
+        origin + "/api/v1/pair",
+        json=body,
+        headers={CLIENT_VERSION_HEADER: str(CLIENT_BUILD)},
+    )
     if not envelope.get("ok"):
         err = envelope.get("error") or {}
         raise CompanionError(err.get("message") or "pairing failed")
@@ -210,15 +252,23 @@ def pair_with_hub(*, hub_url: str, code: str, device_name: str = "android",
     if not token:
         raise CompanionError("Hub did not return a device token")
     store = store or KeystoreTokenStore()
-    meta = store.save(hub_url=origin, token=token,
-                      scope=str(data.get("scope") or "viewer"),
-                      name=str(data.get("name") or device_name))
+    meta = store.save(
+        hub_url=origin,
+        token=token,
+        scope=str(data.get("scope") or "viewer"),
+        name=str(data.get("name") or device_name),
+    )
     return {**meta, "paired": True, "token_shown": False}
 
 
 # ── Biometric re-check policy (describes when the app must re-auth) ────────
-BIOMETRIC_MUTATIONS = ("approve_paper", "journal_write", "revoke_device",
-                       "paper_reject", "risk_override")
+BIOMETRIC_MUTATIONS = (
+    "approve_paper",
+    "journal_write",
+    "revoke_device",
+    "paper_reject",
+    "risk_override",
+)
 
 BIOMETRIC_POLICY = {
     "enabled": True,
@@ -247,10 +297,14 @@ def requires_biometric(action: str, scope: str = "operator") -> bool:
 
 
 # ── Online-only mutations / connection snapshot ────────────────────────────
-def connection_snapshot(*, connected: bool, last_ok_ts: int | None = None,
-                        readiness: dict[str, Any] | None = None,
-                        loop_health: dict[str, Any] | None = None,
-                        biometric_ok: bool = True) -> dict[str, Any]:
+def connection_snapshot(
+    *,
+    connected: bool,
+    last_ok_ts: int | None = None,
+    readiness: dict[str, Any] | None = None,
+    loop_health: dict[str, Any] | None = None,
+    biometric_ok: bool = True,
+) -> dict[str, Any]:
     """Android status snapshot. Honest about stale / offline.
 
     Mirrors the Windows tray snapshot but encodes the Android rule that a
@@ -264,9 +318,15 @@ def connection_snapshot(*, connected: bool, last_ok_ts: int | None = None,
     ready = readiness or {}
     loop = loop_health or {}
     gate = loop.get("gate") or {}
-    gate_open = bool(gate.get("allowed", gate.get("open"))) if isinstance(gate, dict) else False
+    gate_open = (
+        bool(gate.get("allowed", gate.get("open"))) if isinstance(gate, dict) else False
+    )
     paper = loop.get("loop") or loop.get("paper") or {}
-    open_n = int(paper.get("open") or paper.get("live_open") or 0) if isinstance(paper, dict) else 0
+    open_n = (
+        int(paper.get("open") or paper.get("live_open") or 0)
+        if isinstance(paper, dict)
+        else 0
+    )
     pending = int(paper.get("pending") or 0) if isinstance(paper, dict) else 0
     level = "offline"
     if connected and not stale:
@@ -283,9 +343,10 @@ def connection_snapshot(*, connected: bool, last_ok_ts: int | None = None,
         "pending": pending,
         "biometric_ok": bool(biometric_ok),
         "mutations_allowed": bool(connected and not stale and biometric_ok),
-        "offline_queue": "never",   # no approval is replayed offline
-        "headline": ready.get("headline") or loop.get("advice") or (
-            "Hub offline" if not connected else "connected"),
+        "offline_queue": "never",  # no approval is replayed offline
+        "headline": ready.get("headline")
+        or loop.get("advice")
+        or ("Hub offline" if not connected else "connected"),
         "live_exchange_execution": False,
     }
 

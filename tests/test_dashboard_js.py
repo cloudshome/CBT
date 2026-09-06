@@ -13,6 +13,7 @@ When `node` is available (CI has it), we:
 
 If node is missing the tests skip (they never fail a machine without node).
 """
+
 from __future__ import annotations
 
 import json
@@ -30,19 +31,36 @@ SAMPLE = ROOT / "data_samples" / "example_payload.json"
 
 NODE = shutil.which("node")
 
-CARDS = ["LIVE SIGNAL", "CANDLESTICK", "MULTI-TIMEFRAME", "WHAT THE MARKET OFFERS",
-         "CONTEXT — WHAT AFFECTS PRICE", "STATE MEMORY", "HUMAN APPROVAL QUEUE",
-         "PAPER TRADING", "RECENT SIGNALS", "LEARNING", "COACH", "CONNECTIONS",
-         "SYSTEM HEALTH", "AGENTS — MORNING BRIEFING", "MCP SERVER", "ASK THE DESK",
-         "DESK STATUS", "STRATEGY SCORECARD", "LOOP HEALTH", "KEY LEVELS",
-         "MARKET SENTIMENT — THE COLOUR IS THE MARKET"]
+CARDS = [
+    "LIVE SIGNAL",
+    "CANDLESTICK",
+    "MULTI-TIMEFRAME",
+    "WHAT THE MARKET OFFERS",
+    "CONTEXT — WHAT AFFECTS PRICE",
+    "STATE MEMORY",
+    "HUMAN APPROVAL QUEUE",
+    "PAPER TRADING",
+    "RECENT SIGNALS",
+    "LEARNING",
+    "COACH",
+    "CONNECTIONS",
+    "SYSTEM HEALTH",
+    "AGENTS — MORNING BRIEFING",
+    "MCP SERVER",
+    "ASK THE DESK",
+    "DESK STATUS",
+    "STRATEGY SCORECARD",
+    "LOOP HEALTH",
+    "KEY LEVELS",
+    "MARKET SENTIMENT — THE COLOUR IS THE MARKET",
+]
 
 
 def _extract_js() -> str:
     # The terminal template moved out of app.py into web/static/terminal.html
     # (maintainability refactor); the served script is byte-identical.
     html = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
-    sm = re.search(r"<script>(.*?)</script>", html, re.S)
+    sm = re.search(r"<script>(.*?)</script>", html, re.DOTALL)
     assert sm, "script block not found"
     return sm.group(1)
 
@@ -50,51 +68,123 @@ def _extract_js() -> str:
 def _synthetic_payload() -> dict:
     """A minimal but realistic payload for render()."""
     return {
-        "signal": {"action": "BUY", "asset": "BTCUSDT", "timeframe": "15m",
-                   "confidence": "MEDIUM", "signal_id": "BTCUSDT_20260804_0000",
-                   "entry": 63000.0, "stop_loss": 62700.0, "take_profit": 63600.0,
-                   "risk_reward": 2.0, "reason": "test"},
-        "plans": [{"type": "Buy Pullback", "action": "BUY", "confidence": 70,
-                   "confidence_label": "MEDIUM", "condition": "IF price pulls back",
-                   "entry": 63000.0, "stop_loss": 62700.0, "take_profits": [63600.0],
-                   "risk_reward": 2.0}],
-        "snapshot": {"features": {"price": 63000.0, "trend": "bullish",
-                                  "rsi": 58, "adx": 25, "volume_ratio": 1.5,
-                                  "above_vwap": True, "premium_discount": "discount",
-                                  "event_kind": "bos_up", "swing_high": 64000.0,
-                                  "swing_low": 62000.0, "atr_pct": 0.2,
-                                  "rsi_divergence": {"bull": 0, "bear": 0}},
-                     "scores": {"bull": {"score": 60, "conditions": {"Trend": 15}},
-                                "bear": {"score": 20, "conditions": {}}}},
-        "mtf": {"htf_bias": "bullish", "ltf_bias": "neutral",
-                "alignment": {"score": 40, "label": "aligned_bull"},
-                "views": {"1d": {"available": True, "trend": "bull", "rsi": 60,
-                                 "adx": 26, "event_kind": "bos_up",
-                                 "premium_discount": "discount"},
-                          "4h": {"available": True, "trend": "bull", "rsi": 58,
-                                 "adx": 24, "event_kind": None,
-                                 "premium_discount": "equilibrium"},
-                          "1h": {"available": True, "trend": "bull", "rsi": 55,
-                                 "adx": 22, "event_kind": None,
-                                 "premium_discount": "equilibrium"},
-                          "15m": {"available": True, "trend": "bull", "rsi": 54,
-                                  "adx": 20, "event_kind": None,
-                                  "premium_discount": "discount"},
-                          "5m": {"available": False}},
-                "key_levels": {"support": [62000.0], "resistance": [64000.0]}},
-        "styles": {"market_offering": ["Day"], "stand_aside": [],
-                   "styles": {"Scalp": {"available": False}, "Day": {"available": True,
-                             "direction": "BUY", "confidence": 70, "horizon": "1 session",
-                             "reason": "test"}, "Swing": {"available": False},
-                             "Momentum": {"available": False}, "Position": {"available": False}}},
-        "context": {"fear_greed": {"available": True, "value": 55},
-                    "dominance": {"available": False}, "equities": {"available": False},
-                    "macro": {"available": True, "events": []},
-                    "cycle": {"available": True, "phase": "expansion"},
-                    "geopolitics": {"available": True, "count": 0},
-                    "social": {"available": True, "count": 1,
-                               "influencer_mentions": [{"keyword": "etf"}]},
-                    "risk_regime": {"regime": "neutral"}},
+        "signal": {
+            "action": "BUY",
+            "asset": "BTCUSDT",
+            "timeframe": "15m",
+            "confidence": "MEDIUM",
+            "signal_id": "BTCUSDT_20260804_0000",
+            "entry": 63000.0,
+            "stop_loss": 62700.0,
+            "take_profit": 63600.0,
+            "risk_reward": 2.0,
+            "reason": "test",
+        },
+        "plans": [
+            {
+                "type": "Buy Pullback",
+                "action": "BUY",
+                "confidence": 70,
+                "confidence_label": "MEDIUM",
+                "condition": "IF price pulls back",
+                "entry": 63000.0,
+                "stop_loss": 62700.0,
+                "take_profits": [63600.0],
+                "risk_reward": 2.0,
+            }
+        ],
+        "snapshot": {
+            "features": {
+                "price": 63000.0,
+                "trend": "bullish",
+                "rsi": 58,
+                "adx": 25,
+                "volume_ratio": 1.5,
+                "above_vwap": True,
+                "premium_discount": "discount",
+                "event_kind": "bos_up",
+                "swing_high": 64000.0,
+                "swing_low": 62000.0,
+                "atr_pct": 0.2,
+                "rsi_divergence": {"bull": 0, "bear": 0},
+            },
+            "scores": {
+                "bull": {"score": 60, "conditions": {"Trend": 15}},
+                "bear": {"score": 20, "conditions": {}},
+            },
+        },
+        "mtf": {
+            "htf_bias": "bullish",
+            "ltf_bias": "neutral",
+            "alignment": {"score": 40, "label": "aligned_bull"},
+            "views": {
+                "1d": {
+                    "available": True,
+                    "trend": "bull",
+                    "rsi": 60,
+                    "adx": 26,
+                    "event_kind": "bos_up",
+                    "premium_discount": "discount",
+                },
+                "4h": {
+                    "available": True,
+                    "trend": "bull",
+                    "rsi": 58,
+                    "adx": 24,
+                    "event_kind": None,
+                    "premium_discount": "equilibrium",
+                },
+                "1h": {
+                    "available": True,
+                    "trend": "bull",
+                    "rsi": 55,
+                    "adx": 22,
+                    "event_kind": None,
+                    "premium_discount": "equilibrium",
+                },
+                "15m": {
+                    "available": True,
+                    "trend": "bull",
+                    "rsi": 54,
+                    "adx": 20,
+                    "event_kind": None,
+                    "premium_discount": "discount",
+                },
+                "5m": {"available": False},
+            },
+            "key_levels": {"support": [62000.0], "resistance": [64000.0]},
+        },
+        "styles": {
+            "market_offering": ["Day"],
+            "stand_aside": [],
+            "styles": {
+                "Scalp": {"available": False},
+                "Day": {
+                    "available": True,
+                    "direction": "BUY",
+                    "confidence": 70,
+                    "horizon": "1 session",
+                    "reason": "test",
+                },
+                "Swing": {"available": False},
+                "Momentum": {"available": False},
+                "Position": {"available": False},
+            },
+        },
+        "context": {
+            "fear_greed": {"available": True, "value": 55},
+            "dominance": {"available": False},
+            "equities": {"available": False},
+            "macro": {"available": True, "events": []},
+            "cycle": {"available": True, "phase": "expansion"},
+            "geopolitics": {"available": True, "count": 0},
+            "social": {
+                "available": True,
+                "count": 1,
+                "influencer_mentions": [{"keyword": "etf"}],
+            },
+            "risk_regime": {"regime": "neutral"},
+        },
         "memory": {"status": "SAME", "reaffirms": 2, "changes": []},
         "market_context": {"futures": False},
         "lifecycle": {"status": "PENDING_REVIEW", "note": "awaiting"},
@@ -181,23 +271,42 @@ def _run_readiness_harness(strip: dict) -> str:
 @pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_readiness_strip_renders_every_pillar():
     """The strip shows one chip per pillar and the rolled-up verdict."""
-    out = json.loads(_run_readiness_harness({
-        "level": "degraded",
-        "ready": False,
-        "headline": "desk degraded — channels",
-        "pillars": [
-            {"name": "channels", "level": "degraded",
-             "headline": "2/4 channels live", "detail": "news=rss_parallel"},
-            {"name": "immune", "level": "ok",
-             "headline": "4 check(s) ok", "detail": ""},
-            {"name": "risk_gate", "level": "ok",
-             "headline": "gate OPEN", "detail": "no blocks"},
-            {"name": "data", "level": "degraded",
-             "headline": "no stored market history yet",
-             "detail": "run `python main.py backfill`"},
-        ],
-        "advice": {"action": "PAPER_GRIND", "headline": "keep paper-trading"},
-    }))
+    out = json.loads(
+        _run_readiness_harness(
+            {
+                "level": "degraded",
+                "ready": False,
+                "headline": "desk degraded — channels",
+                "pillars": [
+                    {
+                        "name": "channels",
+                        "level": "degraded",
+                        "headline": "2/4 channels live",
+                        "detail": "news=rss_parallel",
+                    },
+                    {
+                        "name": "immune",
+                        "level": "ok",
+                        "headline": "4 check(s) ok",
+                        "detail": "",
+                    },
+                    {
+                        "name": "risk_gate",
+                        "level": "ok",
+                        "headline": "gate OPEN",
+                        "detail": "no blocks",
+                    },
+                    {
+                        "name": "data",
+                        "level": "degraded",
+                        "headline": "no stored market history yet",
+                        "detail": "run `python main.py backfill`",
+                    },
+                ],
+                "advice": {"action": "PAPER_GRIND", "headline": "keep paper-trading"},
+            }
+        )
+    )
     html = out["html"]
     for pillar in ("channels", "immune", "risk_gate", "data"):
         assert pillar in html, f"readiness strip missing the {pillar!r} chip"
@@ -209,10 +318,17 @@ def test_readiness_strip_renders_every_pillar():
 @pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_readiness_strip_handles_error_payload():
     """A degraded /api/readiness response must still render, not throw."""
-    out = json.loads(_run_readiness_harness({
-        "ok": False, "level": "down", "headline": "readiness unavailable",
-        "pillars": [], "error": "RuntimeError: boom",
-    }))
+    out = json.loads(
+        _run_readiness_harness(
+            {
+                "ok": False,
+                "level": "down",
+                "headline": "readiness unavailable",
+                "pillars": [],
+                "error": "RuntimeError: boom",
+            }
+        )
+    )
     assert out["cls"] == "strip lvl-down"
     assert "RuntimeError" in out["html"]
 
@@ -243,7 +359,8 @@ def test_served_script_is_valid_javascript():
     characters on disk. This one parses what Flask actually serves.
     """
     from web.app import HTML
-    scripts = re.findall(r"<script>(.*?)</script>", HTML, re.S)
+
+    scripts = re.findall(r"<script>(.*?)</script>", HTML, re.DOTALL)
     assert scripts, "no inline script in the served template"
     for i, js in enumerate(scripts):
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
@@ -253,7 +370,8 @@ def test_served_script_is_valid_javascript():
             r = subprocess.run([NODE, "--check", path], capture_output=True, text=True)
             assert r.returncode == 0, (
                 f"served <script> #{i} is not valid JS "
-                f"(a backslash escape was probably eaten by Python):\n{r.stderr}")
+                f"(a backslash escape was probably eaten by Python):\n{r.stderr}"
+            )
         finally:
             Path(path).unlink(missing_ok=True)
 
@@ -322,16 +440,37 @@ def _run_sentiment_harness(payload_json: str) -> str:
 def test_sentiment_strip_colours_bullish_deep_green():
     payload = _synthetic_payload()
     payload["sentiment"] = {
-        "available": True, "score": 71.0, "direction": "bullish",
-        "label": "STRONG BULLISH", "strength": 0.71, "duration_min": 150,
-        "duration_text": "2h 30m", "persistence": 0.83, "intensity": 0.66,
+        "available": True,
+        "score": 71.0,
+        "direction": "bullish",
+        "label": "STRONG BULLISH",
+        "strength": 0.71,
+        "duration_min": 150,
+        "duration_text": "2h 30m",
+        "persistence": 0.83,
+        "intensity": 0.66,
         "color": "hsl(142,74%,37%)",
-        "parts": [{"name": "engine bull − bear scores", "weight": 0.5,
-                   "raw": 40.0, "contrib": 20.0, "detail": "bull 60 vs bear 20 / 100"},
-                  {"name": "MTF alignment", "weight": 0.2, "raw": 40.0,
-                   "contrib": 8.0, "detail": "aligned"}],
-        "history": [{"ts": 1, "score": 30.0}, {"ts": 2, "score": 45.0},
-                    {"ts": 3, "score": 71.0}],
+        "parts": [
+            {
+                "name": "engine bull − bear scores",
+                "weight": 0.5,
+                "raw": 40.0,
+                "contrib": 20.0,
+                "detail": "bull 60 vs bear 20 / 100",
+            },
+            {
+                "name": "MTF alignment",
+                "weight": 0.2,
+                "raw": 40.0,
+                "contrib": 8.0,
+                "detail": "aligned",
+            },
+        ],
+        "history": [
+            {"ts": 1, "score": 30.0},
+            {"ts": 2, "score": 45.0},
+            {"ts": 3, "score": 71.0},
+        ],
     }
     out = json.loads(_run_sentiment_harness(json.dumps(payload)))
     assert out["card"] and out["labelInCard"] and out["legend"] and out["parts"]
@@ -346,20 +485,36 @@ def test_sentiment_strip_colours_bullish_deep_green():
 def test_sentiment_strip_colours_bearish_red_and_neutral_slate():
     payload = _synthetic_payload()
     payload["sentiment"] = {
-        "available": True, "score": -42.0, "direction": "bearish",
-        "label": "BEARISH", "strength": 0.42, "duration_min": 20,
-        "duration_text": "20m", "persistence": 0.11, "intensity": 0.27,
-        "color": "hsl(0,67%,47%)", "parts": [], "history": [],
+        "available": True,
+        "score": -42.0,
+        "direction": "bearish",
+        "label": "BEARISH",
+        "strength": 0.42,
+        "duration_min": 20,
+        "duration_text": "20m",
+        "persistence": 0.11,
+        "intensity": 0.27,
+        "color": "hsl(0,67%,47%)",
+        "parts": [],
+        "history": [],
     }
     out = json.loads(_run_sentiment_harness(json.dumps(payload)))
     assert out["bar"].startswith("hsl(0,67%,47%)"), out
     assert out["needle"] == "29%", out
 
     payload["sentiment"] = {
-        "available": True, "score": 3.0, "direction": "neutral",
-        "label": "NEUTRAL", "strength": 0.03, "duration_min": 0,
-        "duration_text": "—", "persistence": 0.0, "intensity": 0.0,
-        "color": "#5f6d84", "parts": [], "history": [],
+        "available": True,
+        "score": 3.0,
+        "direction": "neutral",
+        "label": "NEUTRAL",
+        "strength": 0.03,
+        "duration_min": 0,
+        "duration_text": "—",
+        "persistence": 0.0,
+        "intensity": 0.0,
+        "color": "#5f6d84",
+        "parts": [],
+        "history": [],
     }
     out = json.loads(_run_sentiment_harness(json.dumps(payload)))
     assert out["bar"] == "#5f6d84", out
@@ -401,7 +556,9 @@ def test_sentiment_fallback_renders_without_backend_block():
         path = f.name
     try:
         r = subprocess.run([NODE, path], capture_output=True, text=True)
-        assert r.returncode == 0, f"fallback sentiment render failed:\n{r.stdout}\n{r.stderr}"
+        assert r.returncode == 0, (
+            f"fallback sentiment render failed:\n{r.stdout}\n{r.stderr}"
+        )
         out = json.loads(r.stdout.strip().splitlines()[-1])
     finally:
         Path(path).unlink(missing_ok=True)
@@ -458,8 +615,13 @@ def test_auth_form_setup_and_login_js():
         r = subprocess.run([NODE, path], capture_output=True, text=True)
         assert r.returncode == 0, f"auth js failed:\n{r.stdout}\n{r.stderr}"
         out = json.loads(r.stdout.strip().splitlines()[-1])
-        assert out[0] == {"url": "/api/auth/setup", "body": {"username": "alice", "password": "secret1234"}}
-        assert out[1] == {"url": "/api/auth/login", "body": {"username": "bob", "password": "secret1234"}}
+        assert out[0] == {
+            "url": "/api/auth/setup",
+            "body": {"username": "alice", "password": "secret1234"},
+        }
+        assert out[1] == {
+            "url": "/api/auth/login",
+            "body": {"username": "bob", "password": "secret1234"},
+        }
     finally:
         Path(path).unlink(missing_ok=True)
-

@@ -249,24 +249,36 @@ so the findings can be re-checked without re-deriving them.
 **Same-bar tie direction (§3):**
 
 ```python
-import sys; sys.path.insert(0, '.')
+import sys
+
+sys.path.insert(0, ".")
 import pandas as pd
 from data.backtester import _evaluate
 from data.paper_trading import exit_event
 
-df = pd.DataFrame([
-    {"ts": 0,      "open": 100, "high": 100, "low": 100, "close": 100},
-    {"ts": 900000, "open": 100, "high": 112, "low":  88, "close": 100},
-])
+df = pd.DataFrame(
+    [
+        {"ts": 0, "open": 100, "high": 100, "low": 100, "close": 100},
+        {"ts": 900000, "open": 100, "high": 112, "low": 88, "close": 100},
+    ]
+)
 df.attrs["timeframe"] = "15m"
-plan = {"entry": 100, "stop_loss": 95, "take_profits": [110],
-        "action": "BUY", "type": "X", "confidence": 80}
+plan = {
+    "entry": 100,
+    "stop_loss": 95,
+    "take_profits": [110],
+    "action": "BUY",
+    "type": "X",
+    "confidence": 80,
+}
 
 gp = _evaluate(plan, df, 0, horizon_bars=1)
-print("BACKTESTER ->", gp.outcome, gp.rr_achieved)          # PARTIAL_WIN 2.0
-ev = exit_event({"action": "BUY", "entry": 100, "stop_loss": 95,
-                 "take_profit": 110}, {"high": 112, "low": 88})
-print("PAPER      ->", ev["outcome"], ev["rr_achieved"])    # STOP_LOSS -1.0
+print("BACKTESTER ->", gp.outcome, gp.rr_achieved)  # PARTIAL_WIN 2.0
+ev = exit_event(
+    {"action": "BUY", "entry": 100, "stop_loss": 95, "take_profit": 110},
+    {"high": 112, "low": 88},
+)
+print("PAPER      ->", ev["outcome"], ev["rr_achieved"])  # STOP_LOSS -1.0
 ```
 
 **Cost in R (§2)** — instrument `_evaluate` to collect `|entry−sl|/entry`

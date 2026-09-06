@@ -1,9 +1,13 @@
 """Tests for market-structure detection."""
+
 from __future__ import annotations
 
 from engine.indicators import add_all_indicators
 from engine.structure import (
-    analyze_structure, detect_swings, detect_fvgs, detect_events,
+    analyze_structure,
+    detect_events,
+    detect_fvgs,
+    detect_swings,
 )
 
 

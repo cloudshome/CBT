@@ -11,15 +11,14 @@ These run against the real Flask app in-process (like test_web_api.py) with a
 throwaway database, plus unit tests for the auth primitives and the remote
 deployment guard.
 """
-from __future__ import annotations
 
-import json
+from __future__ import annotations
 
 import pytest
 
 import config
 from web import auth as authmod
-from web.auth import AuthManager, hash_password, verify_password, role_allows
+from web.auth import AuthManager, hash_password, role_allows, verify_password
 
 
 @pytest.fixture
@@ -32,12 +31,14 @@ def client(monkeypatch, tmp_path):
     monkeypatch.delenv("SKY_TRUSTED_PROXY_IPS", raising=False)
     monkeypatch.delenv("SKY_SECRET_KEY", raising=False)
     import config as _c
+
     monkeypatch.setattr(_c, "DB_PATH", str(tmp_path / "auth.db"))
     monkeypatch.setattr(_c, "SKY_AUTH_MODE", "auto")
     monkeypatch.setattr(_c, "SKY_ALLOW_FORCE_APPROVE", False)
     monkeypatch.setattr(_c, "SKY_ALLOW_REMOTE_NO_TLS", False)
     monkeypatch.setattr(_c, "SKY_TRUSTED_PROXY_IPS", [])
     from web.app import make_app
+
     app = make_app()
     app.testing = True
     return app.test_client()
@@ -48,27 +49,45 @@ PASSWORD = "correct horse battery staple"
 
 
 def _setup(client, username=OWNER, password=PASSWORD):
-    r = client.post("/api/auth/setup", json={"username": username, "password": password})
+    r = client.post(
+        "/api/auth/setup", json={"username": username, "password": password}
+    )
     assert r.status_code == 200, r.get_data(as_text=True)
     return r.get_json()
 
 
 def _login(client, username=OWNER, password=PASSWORD):
-    r = client.post("/api/auth/login", json={"username": username, "password": password})
+    r = client.post(
+        "/api/auth/login", json={"username": username, "password": password}
+    )
     assert r.status_code == 200, r.get_data(as_text=True)
     return r.get_json()
 
 
 def _insert_scan(status="PENDING_REVIEW", action="BUY"):
     import time
+
     from data.database import SignalDB
+
     with SignalDB() as db:
         cur = db.conn.execute(
             "INSERT INTO scans(signal_id, ts, symbol, timeframe, price, action, "
             "entry, stop_loss, take_profit, confidence_label, status) "
             "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-            (f"TEST_{int(time.time()*1000)}", int(time.time()*1000), "BTCUSDT",
-             "15m", 60000.0, action, 60000.0, 59000.0, 62000.0, "MEDIUM", status))
+            (
+                f"TEST_{int(time.time() * 1000)}",
+                int(time.time() * 1000),
+                "BTCUSDT",
+                "15m",
+                60000.0,
+                action,
+                60000.0,
+                59000.0,
+                62000.0,
+                "MEDIUM",
+                status,
+            ),
+        )
         db.conn.commit()
         return cur.lastrowid
 
@@ -120,11 +139,18 @@ def test_unauthenticated_cannot_read_or_mutate(client):
     assert anon.get("/api/scan?symbol=BTCUSDT&tf=15m").status_code == 401
     assert anon.get("/api/pending").status_code == 401
     assert anon.get("/api/health").status_code == 401
-    assert anon.post("/api/review", json={"scan_id": 1, "decision": "APPROVED"}).status_code == 401
+    assert (
+        anon.post(
+            "/api/review", json={"scan_id": 1, "decision": "APPROVED"}
+        ).status_code
+        == 401
+    )
     assert anon.post("/api/trader-state", json={"angry": True}).status_code == 401
     assert anon.post("/api/journal", json={"scan_id": 1}).status_code == 401
     assert anon.post("/api/commands/run", json={"id": "mcp"}).status_code == 401
-    assert anon.post("/api/alerts/test", json={"channel": "telegram"}).status_code == 401
+    assert (
+        anon.post("/api/alerts/test", json={"channel": "telegram"}).status_code == 401
+    )
     assert anon.post("/api/learn").status_code == 401
     assert anon.post("/api/backtest", json={}).status_code == 401
     assert anon.post("/api/paper/run", json={}).status_code == 401
@@ -154,7 +180,9 @@ def test_login_wrong_password_and_throttle(client):
     _setup(client)
     anon = _fresh_client(client)
     for _ in range(config.SKY_LOGIN_MAX_ATTEMPTS):
-        r = anon.post("/api/auth/login", json={"username": OWNER, "password": "wrong-password"})
+        r = anon.post(
+            "/api/auth/login", json={"username": OWNER, "password": "wrong-password"}
+        )
         assert r.status_code == 401
     # now locked out — even the correct password is refused
     r = anon.post("/api/auth/login", json={"username": OWNER, "password": PASSWORD})
@@ -165,13 +193,20 @@ def test_login_wrong_password_and_throttle(client):
 def test_viewer_device_token_reads_but_cannot_mutate(client):
     _setup(client)
     csrf = _login(client)["csrf"]
-    tok = client.post("/api/auth/devices",
-                      json={"name": "phone", "scope": "viewer"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["token"]
+    tok = client.post(
+        "/api/auth/devices",
+        json={"name": "phone", "scope": "viewer"},
+        headers={"X-CSRF-Token": csrf},
+    ).get_json()["token"]
     anon = _fresh_client(client)
     # read allowed
-    assert anon.get("/api/scan?symbol=BTCUSDT&tf=15m",
-                    headers={"Authorization": f"Bearer {tok}"}).status_code == 200
+    assert (
+        anon.get(
+            "/api/scan?symbol=BTCUSDT&tf=15m",
+            headers={"Authorization": f"Bearer {tok}"},
+        ).status_code
+        == 200
+    )
     # writes denied
     for path, payload in [
         ("/api/review", {"scan_id": 1, "decision": "APPROVED"}),
@@ -193,22 +228,30 @@ def test_operator_can_reject_and_force_approve_is_disabled(client):
     scan_id = _insert_scan(status="PENDING_REVIEW", action="BUY")
     csrf = _login(client)["csrf"]
     # operator can reject (write that skips the gate)
-    r = client.post("/api/review", json={"scan_id": scan_id, "decision": "REJECTED"},
-                    headers={"X-CSRF-Token": csrf})
+    r = client.post(
+        "/api/review",
+        json={"scan_id": scan_id, "decision": "REJECTED"},
+        headers={"X-CSRF-Token": csrf},
+    )
     assert r.status_code == 200, r.get_data(as_text=True)
     assert r.get_json()["status"] == "REJECTED"
     # operator cannot bypass the risk gate: APPROVED on an unproven setup is
     # blocked and force-approve is disabled by default.
     scan2 = _insert_scan(status="PENDING_REVIEW", action="BUY")
-    r = client.post("/api/review", json={"scan_id": scan2, "decision": "APPROVED"},
-                    headers={"X-CSRF-Token": csrf})
+    r = client.post(
+        "/api/review",
+        json={"scan_id": scan2, "decision": "APPROVED"},
+        headers={"X-CSRF-Token": csrf},
+    )
     assert r.status_code == 409
     body = r.get_json()
     assert body["force_available"] is False
     # explicit force is refused outright
-    r = client.post("/api/review", json={"scan_id": scan2, "decision": "APPROVED",
-                                         "force": True},
-                    headers={"X-CSRF-Token": csrf})
+    r = client.post(
+        "/api/review",
+        json={"scan_id": scan2, "decision": "APPROVED", "force": True},
+        headers={"X-CSRF-Token": csrf},
+    )
     assert r.status_code == 403
 
 
@@ -222,8 +265,9 @@ def test_csrf_required_for_cookie_mutations(client):
     assert r.status_code == 403
     assert r.get_json()["code"] == "CSRF"
     # with the token: accepted
-    r = client.post("/api/trader-state", json={"angry": True},
-                    headers={"X-CSRF-Token": csrf})
+    r = client.post(
+        "/api/trader-state", json={"angry": True}, headers={"X-CSRF-Token": csrf}
+    )
     assert r.status_code == 200
     # GETs never need CSRF
     assert client.get("/api/risk").status_code == 200
@@ -232,12 +276,17 @@ def test_csrf_required_for_cookie_mutations(client):
 def test_bearer_tokens_do_not_require_csrf(client):
     _setup(client)
     csrf = _login(client)["csrf"]
-    tok = client.post("/api/auth/devices",
-                      json={"name": "desktop", "scope": "operator"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["token"]
+    tok = client.post(
+        "/api/auth/devices",
+        json={"name": "desktop", "scope": "operator"},
+        headers={"X-CSRF-Token": csrf},
+    ).get_json()["token"]
     anon = _fresh_client(client)
-    r = anon.post("/api/trader-state", json={"angry": False},
-                  headers={"Authorization": f"Bearer {tok}"})
+    r = anon.post(
+        "/api/trader-state",
+        json={"angry": False},
+        headers={"Authorization": f"Bearer {tok}"},
+    )
     assert r.status_code == 200
 
 
@@ -250,41 +299,68 @@ def test_logout_and_logout_all(client):
     assert client.get("/api/auth/me").status_code == 401
 
     csrf = _login(client)["csrf"]
-    tok = client.post("/api/auth/devices",
-                      json={"name": "phone", "scope": "viewer"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["token"]
+    tok = client.post(
+        "/api/auth/devices",
+        json={"name": "phone", "scope": "viewer"},
+        headers={"X-CSRF-Token": csrf},
+    ).get_json()["token"]
     r = client.post("/api/auth/logout-all", headers={"X-CSRF-Token": csrf})
     assert r.status_code == 200
     anon = _fresh_client(client)
-    assert anon.get("/api/scan?symbol=BTCUSDT&tf=15m",
-                    headers={"Authorization": f"Bearer {tok}"}).status_code == 401
+    assert (
+        anon.get(
+            "/api/scan?symbol=BTCUSDT&tf=15m",
+            headers={"Authorization": f"Bearer {tok}"},
+        ).status_code
+        == 401
+    )
 
 
 def test_device_token_revoke(client):
     _setup(client)
     csrf = _login(client)["csrf"]
-    tok = client.post("/api/auth/devices",
-                      json={"name": "phone", "scope": "viewer"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["token"]
+    tok = client.post(
+        "/api/auth/devices",
+        json={"name": "phone", "scope": "viewer"},
+        headers={"X-CSRF-Token": csrf},
+    ).get_json()["token"]
     devices = client.get("/api/auth/devices").get_json()["devices"]
     handle = devices[0]["id"]
-    assert client.post("/api/auth/devices/revoke", json={"id": handle},
-                       headers={"X-CSRF-Token": csrf}).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/devices/revoke",
+            json={"id": handle},
+            headers={"X-CSRF-Token": csrf},
+        ).status_code
+        == 200
+    )
     anon = _fresh_client(client)
-    assert anon.get("/api/scan?symbol=BTCUSDT&tf=15m",
-                    headers={"Authorization": f"Bearer {tok}"}).status_code == 401
+    assert (
+        anon.get(
+            "/api/scan?symbol=BTCUSDT&tf=15m",
+            headers={"Authorization": f"Bearer {tok}"},
+        ).status_code
+        == 401
+    )
 
 
 def test_password_change(client):
     _setup(client)
     csrf = _login(client)["csrf"]
-    r = client.post("/api/auth/password",
-                    json={"current": PASSWORD, "new": "a brand new password 123"},
-                    headers={"X-CSRF-Token": csrf})
+    r = client.post(
+        "/api/auth/password",
+        json={"current": PASSWORD, "new": "a brand new password 123"},
+        headers={"X-CSRF-Token": csrf},
+    )
     assert r.status_code == 200, r.get_data(as_text=True)
     client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf})
-    assert client.post("/api/auth/login",
-                       json={"username": OWNER, "password": "a brand new password 123"}).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"username": OWNER, "password": "a brand new password 123"},
+        ).status_code
+        == 200
+    )
 
 
 # ── audit log ─────────────────────────────────────────────────────────────
@@ -293,9 +369,14 @@ def test_sensitive_actions_are_audited(client):
     _login(client)
     csrf = _login(client)["csrf"]
     scan_id = _insert_scan(status="PENDING_REVIEW", action="BUY")
-    client.post("/api/review", json={"scan_id": scan_id, "decision": "REJECTED"},
-                headers={"X-CSRF-Token": csrf})
-    client.post("/api/trader-state", json={"angry": True}, headers={"X-CSRF-Token": csrf})
+    client.post(
+        "/api/review",
+        json={"scan_id": scan_id, "decision": "REJECTED"},
+        headers={"X-CSRF-Token": csrf},
+    )
+    client.post(
+        "/api/trader-state", json={"angry": True}, headers={"X-CSRF-Token": csrf}
+    )
     rows = client.get("/api/auth/audit").get_json()["rows"]
     actions = {r["action"] for r in rows}
     assert {"login", "review", "trader_state"} <= actions

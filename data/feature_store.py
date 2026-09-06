@@ -29,33 +29,52 @@ Usage (P11 paper-book / P12 validation engine):
     # condition on `regime`, `funding_rate_pct`, `open_interest`, `cvd_z`,
     # etc. — the conditioned-query goal of P10.12.
 """
+
 from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Optional
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from data.store import CandleStore, DEFAULT_ROOT
 from data.derivatives import DerivativesSeries  # existing P10.4 module
+from data.store import DEFAULT_ROOT, CandleStore
 
 FEATURE_STORE_DIR = DEFAULT_ROOT / "features"
 FEATURE_COLUMNS = [
     # primary key
-    "symbol", "timeframe", "ts",
+    "symbol",
+    "timeframe",
+    "ts",
     # price (from CandleStore)
-    "open", "high", "low", "close", "volume",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
     # derivatives (P10.4 series)
-    "funding_rate_pct", "open_interest", "long_short_ratio",
-    "basis", "index_price", "mark_price",
+    "funding_rate_pct",
+    "open_interest",
+    "long_short_ratio",
+    "basis",
+    "index_price",
+    "mark_price",
     # flow / order-flow (engine hidden_alpha / feature snapshot)
-    "cvd_z", "volume_delta_z", "volume_spike_ratio",
-    "buy_volume_pct", "sell_volume_pct", "above_vwap",
+    "cvd_z",
+    "volume_delta_z",
+    "volume_spike_ratio",
+    "buy_volume_pct",
+    "sell_volume_pct",
+    "above_vwap",
     # regime / structure (engine hidden_alpha / structure)
-    "regime", "trend_bias", "ema_alignment_bull",
-    "event_kind", "premium_discount", "fvg_bull_count", "fvg_bear_count",
+    "regime",
+    "trend_bias",
+    "ema_alignment_bull",
+    "event_kind",
+    "premium_discount",
+    "fvg_bull_count",
+    "fvg_bear_count",
     # meta
     "ingested_at",
 ]
@@ -96,8 +115,9 @@ def build_feature_table(
     # 2. Derivatives (existing series — P10.4)
     # DerivativesSeries provides funding/OI/basis as a time-aligned DataFrame.
     try:
-        deriv_df = DerivativesSeries(symbol=exchange, market=market,
-                                     symbol_name=symbol).to_frame()
+        deriv_df = DerivativesSeries(
+            symbol=exchange, market=market, symbol_name=symbol
+        ).to_frame()
     except Exception:
         # If the derivatives series has no stored data yet, we fall back
         # to empty columns (the feature table degrades, never crashes).
@@ -108,6 +128,7 @@ def build_feature_table(
     # large backtests, this can be replaced by a pre-computed feature file.
     try:
         from engine.hidden_alpha import compute_feature_snapshot
+
         feature_rows = []
         for _, row in price_df.iterrows():
             try:
@@ -124,6 +145,7 @@ def build_feature_table(
     # 4. Regime (from hidden_alpha or structure output)
     try:
         from engine.hidden_alpha import regime_for_frame
+
         regime_rows = []
         for _, row in price_df.iterrows():
             try:
@@ -136,25 +158,42 @@ def build_feature_table(
 
     # 5. Assemble wide table (one row per ts; no duplicate timestamps)
     # Primary key: (symbol, timeframe, ts)
-    result = price_df.rename(columns={
-        "ts": "ts",
-        "open": "open", "high": "high", "low": "low",
-        "close": "close", "volume": "volume",
-    })
+    result = price_df.rename(
+        columns={
+            "ts": "ts",
+            "open": "open",
+            "high": "high",
+            "low": "low",
+            "close": "close",
+            "volume": "volume",
+        }
+    )
 
     # Derivatives merge (left join on index; both sorted by ts if possible)
     # For simplicity we align by position when the series share length;
     # a full time-alignment (ts merge) is the production upgrade path.
-    for col in ["funding_rate_pct", "open_interest", "long_short_ratio",
-                "basis", "index_price", "mark_price"]:
+    for col in [
+        "funding_rate_pct",
+        "open_interest",
+        "long_short_ratio",
+        "basis",
+        "index_price",
+        "mark_price",
+    ]:
         if col in deriv_df.columns:
             result[col] = deriv_df[col].values
         else:
             result[col] = np.nan
 
     # Flow / hidden alpha
-    for col in ["cvd_z", "volume_delta_z", "volume_spike_ratio",
-                "buy_volume_pct", "sell_volume_pct", "above_vwap"]:
+    for col in [
+        "cvd_z",
+        "volume_delta_z",
+        "volume_spike_ratio",
+        "buy_volume_pct",
+        "sell_volume_pct",
+        "above_vwap",
+    ]:
         if col in feature_df.columns:
             result[col] = feature_df[col].values
         else:
@@ -167,12 +206,24 @@ def build_feature_table(
         result["regime"] = ""
 
     # Additional structure fields
-    result["trend_bias"] = feature_df.get("trend_bias", pd.Series(np.nan, index=price_df.index)).values
-    result["ema_alignment_bull"] = feature_df.get("ema_alignment_bull", pd.Series(np.nan, index=price_df.index)).values
-    result["event_kind"] = feature_df.get("event_kind", pd.Series("", index=price_df.index)).values
-    result["premium_discount"] = feature_df.get("premium_discount", pd.Series("", index=price_df.index)).values
-    result["fvg_bull_count"] = feature_df.get("fvg_bull_count", pd.Series(0, index=price_df.index)).values
-    result["fvg_bear_count"] = feature_df.get("fvg_bear_count", pd.Series(0, index=price_df.index)).values
+    result["trend_bias"] = feature_df.get(
+        "trend_bias", pd.Series(np.nan, index=price_df.index)
+    ).values
+    result["ema_alignment_bull"] = feature_df.get(
+        "ema_alignment_bull", pd.Series(np.nan, index=price_df.index)
+    ).values
+    result["event_kind"] = feature_df.get(
+        "event_kind", pd.Series("", index=price_df.index)
+    ).values
+    result["premium_discount"] = feature_df.get(
+        "premium_discount", pd.Series("", index=price_df.index)
+    ).values
+    result["fvg_bull_count"] = feature_df.get(
+        "fvg_bull_count", pd.Series(0, index=price_df.index)
+    ).values
+    result["fvg_bear_count"] = feature_df.get(
+        "fvg_bear_count", pd.Series(0, index=price_df.index)
+    ).values
 
     # Meta / key fields
     result["symbol"] = symbol.upper()
@@ -184,7 +235,13 @@ def build_feature_table(
     # Reindex to canonical column order (fill missing with safe defaults)
     for col in FEATURE_COLUMNS:
         if col not in result.columns:
-            if col in ("symbol", "timeframe", "regime", "event_kind", "premium_discount"):
+            if col in (
+                "symbol",
+                "timeframe",
+                "regime",
+                "event_kind",
+                "premium_discount",
+            ):
                 result[col] = ""
             elif col in ("fvg_bull_count", "fvg_bear_count", "ingested_at"):
                 result[col] = 0
@@ -205,7 +262,7 @@ def save_feature_table(df: pd.DataFrame, symbol: str, timeframe: str) -> Path:
     """Persist the feature table as a single Parquet file (derived layer)."""
     path = feature_path(symbol, timeframe)
     path.mkdir(parents=True, exist_ok=True)
-    out_path = path / f"part-000.parquet"
+    out_path = path / "part-000.parquet"
     df.to_parquet(out_path, index=False)
     return out_path
 

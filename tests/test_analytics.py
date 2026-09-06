@@ -3,6 +3,7 @@
 Both functions read db.decided_paper_rows(exclude_sim=True) — simulator
 samples (sim_key NOT NULL) are excluded from the live book the desk reviews.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -12,8 +13,8 @@ import pytest
 from brain.analytics import mae_mfe_summary, monte_carlo_equity
 from data.database import SignalDB
 
-
 # ── fixture + helper (defined here so pytest discovers them) ───────────────
+
 
 @pytest.fixture
 def db():
@@ -32,21 +33,37 @@ def db():
             "outcome,rr_achieved,close_reason,last_candle_ts,last_price,"
             "checks,error,regime,mae,mfe,sim_key) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (sid, "s1", "p1", kw.pop("plan_type", "trend_following"),
-             kw.pop("symbol", "BTC"), kw.pop("timeframe", "1h"),
-             kw.pop("action", "BUY"),
-             kw.pop("entry", 100.0), kw.pop("stop_loss", 90.0),
-             kw.pop("take_profit", 120.0), kw.pop("risk_reward", 2.0),
-             kw.pop("confidence_pct", 70), kw.pop("status", "CLOSED"),
-             1000, 1100, 2000,   # created_ts, opened_ts, closed_ts
-             kw.pop("entry_price", 100.0), kw.pop("exit_price", 100.0),
-             kw.pop("outcome", "TP_Hit"), kw.pop("rr_achieved", 2.0),
-             kw.pop("close_reason", "slip"),
-             2000, 100.0,
-             counter[0],          # checks (unique per trade)
-             kw.pop("error", None), kw.pop("regime", ""),
-             kw.pop("mae", None), kw.pop("mfe", None),
-             kw.pop("sim_key", None)),
+            (
+                sid,
+                "s1",
+                "p1",
+                kw.pop("plan_type", "trend_following"),
+                kw.pop("symbol", "BTC"),
+                kw.pop("timeframe", "1h"),
+                kw.pop("action", "BUY"),
+                kw.pop("entry", 100.0),
+                kw.pop("stop_loss", 90.0),
+                kw.pop("take_profit", 120.0),
+                kw.pop("risk_reward", 2.0),
+                kw.pop("confidence_pct", 70),
+                kw.pop("status", "CLOSED"),
+                1000,
+                1100,
+                2000,  # created_ts, opened_ts, closed_ts
+                kw.pop("entry_price", 100.0),
+                kw.pop("exit_price", 100.0),
+                kw.pop("outcome", "TP_Hit"),
+                kw.pop("rr_achieved", 2.0),
+                kw.pop("close_reason", "slip"),
+                2000,
+                100.0,
+                counter[0],  # checks (unique per trade)
+                kw.pop("error", None),
+                kw.pop("regime", ""),
+                kw.pop("mae", None),
+                kw.pop("mfe", None),
+                kw.pop("sim_key", None),
+            ),
         )
         counter[0] += 1
         d.conn.commit()
@@ -56,6 +73,7 @@ def db():
 
 
 # ── MAE / MFE summary ──────────────────────────────────────────────────────
+
 
 def test_mae_mfe_no_trades(db):
     r = mae_mfe_summary(db)
@@ -69,14 +87,26 @@ def test_mae_mfe_empty_filter(db):
 
 
 def test_mae_mfe_by_setup(db):
-    db.add_trade( plan_type="trend_following", outcome="TP_HIT",
-              rr_achieved=2.0, mae=5.0, mfe=15.0)
-    db.add_trade( plan_type="trend_following", outcome="STOP_LOSS",
-              rr_achieved=-1.0, mae=9.5, mfe=3.0)
-    db.add_trade( plan_type="reversal", outcome="TP_HIT",
-              rr_achieved=1.5, mae=3.0, mfe=8.0)
-    db.add_trade( plan_type="reversal", outcome="STOP_LOSS",
-              rr_achieved=-1.0, mae=8.0, mfe=2.0)
+    db.add_trade(
+        plan_type="trend_following",
+        outcome="TP_HIT",
+        rr_achieved=2.0,
+        mae=5.0,
+        mfe=15.0,
+    )
+    db.add_trade(
+        plan_type="trend_following",
+        outcome="STOP_LOSS",
+        rr_achieved=-1.0,
+        mae=9.5,
+        mfe=3.0,
+    )
+    db.add_trade(
+        plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0
+    )
+    db.add_trade(
+        plan_type="reversal", outcome="STOP_LOSS", rr_achieved=-1.0, mae=8.0, mfe=2.0
+    )
 
     r = mae_mfe_summary(db)
     assert r["available"] is True
@@ -96,14 +126,26 @@ def test_mae_mfe_by_setup(db):
 
 
 def test_mae_mfe_overall_insight(db):
-    db.add_trade( plan_type="trend_following", outcome="TP_HIT",
-              rr_achieved=2.0, mae=5.0, mfe=15.0)
-    db.add_trade( plan_type="trend_following", outcome="STOP_LOSS",
-              rr_achieved=-1.0, mae=9.5, mfe=3.0)
-    db.add_trade( plan_type="reversal", outcome="TP_HIT",
-              rr_achieved=1.5, mae=3.0, mfe=8.0)
-    db.add_trade( plan_type="reversal", outcome="STOP_LOSS",
-              rr_achieved=-1.0, mae=8.0, mfe=2.0)
+    db.add_trade(
+        plan_type="trend_following",
+        outcome="TP_HIT",
+        rr_achieved=2.0,
+        mae=5.0,
+        mfe=15.0,
+    )
+    db.add_trade(
+        plan_type="trend_following",
+        outcome="STOP_LOSS",
+        rr_achieved=-1.0,
+        mae=9.5,
+        mfe=3.0,
+    )
+    db.add_trade(
+        plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0
+    )
+    db.add_trade(
+        plan_type="reversal", outcome="STOP_LOSS", rr_achieved=-1.0, mae=8.0, mfe=2.0
+    )
 
     r = mae_mfe_summary(db)
     assert r["overall"]["n"] == 4
@@ -114,8 +156,8 @@ def test_mae_mfe_overall_insight(db):
 
 
 def test_mae_mfe_high_mae_insight(db):
-    db.add_trade( outcome="TP_HIT", rr_achieved=2.0, mae=9.5, mfe=12.0)
-    db.add_trade( outcome="STOP_LOSS", rr_achieved=-1.0, mae=9.0, mfe=2.0)
+    db.add_trade(outcome="TP_HIT", rr_achieved=2.0, mae=9.5, mfe=12.0)
+    db.add_trade(outcome="STOP_LOSS", rr_achieved=-1.0, mae=9.0, mfe=2.0)
 
     r = mae_mfe_summary(db)
     insight = r["insight"]
@@ -123,8 +165,8 @@ def test_mae_mfe_high_mae_insight(db):
 
 
 def test_mae_mfe_low_mae_insight(db):
-    db.add_trade( outcome="TP_HIT", rr_achieved=2.0, mae=2.5, mfe=8.0)
-    db.add_trade( outcome="STOP_LOSS", rr_achieved=-1.0, mae=3.5, mfe=1.0)
+    db.add_trade(outcome="TP_HIT", rr_achieved=2.0, mae=2.5, mfe=8.0)
+    db.add_trade(outcome="STOP_LOSS", rr_achieved=-1.0, mae=3.5, mfe=1.0)
 
     r = mae_mfe_summary(db)
     insight = r["insight"]
@@ -132,8 +174,8 @@ def test_mae_mfe_low_mae_insight(db):
 
 
 def test_mae_mfe_runner_insight(db):
-    db.add_trade( outcome="TP_HIT", rr_achieved=2.0, mae=4.0, mfe=18.0)
-    db.add_trade( outcome="STOP_LOSS", rr_achieved=-1.0, mae=5.0, mfe=12.0)
+    db.add_trade(outcome="TP_HIT", rr_achieved=2.0, mae=4.0, mfe=18.0)
+    db.add_trade(outcome="STOP_LOSS", rr_achieved=-1.0, mae=5.0, mfe=12.0)
 
     r = mae_mfe_summary(db)
     insight = r["insight"]
@@ -141,10 +183,16 @@ def test_mae_mfe_runner_insight(db):
 
 
 def test_mae_mfe_plan_type_filter(db):
-    db.add_trade( plan_type="trend_following", outcome="TP_HIT",
-              rr_achieved=2.0, mae=5.0, mfe=15.0)
-    db.add_trade( plan_type="reversal", outcome="TP_HIT",
-              rr_achieved=1.5, mae=3.0, mfe=8.0)
+    db.add_trade(
+        plan_type="trend_following",
+        outcome="TP_HIT",
+        rr_achieved=2.0,
+        mae=5.0,
+        mfe=15.0,
+    )
+    db.add_trade(
+        plan_type="reversal", outcome="TP_HIT", rr_achieved=1.5, mae=3.0, mfe=8.0
+    )
 
     r_all = mae_mfe_summary(db)
     assert r_all["overall"]["n"] == 2
@@ -155,7 +203,7 @@ def test_mae_mfe_plan_type_filter(db):
 
 
 def test_mae_mfe_missing_fields(db):
-    db.add_trade( outcome="TP_HIT", rr_achieved=2.0, mae=None, mfe=None)
+    db.add_trade(outcome="TP_HIT", rr_achieved=2.0, mae=None, mfe=None)
     r = mae_mfe_summary(db)
     assert r["available"] is True
     assert r["overall"]["avg_mae_r"] is None
@@ -164,6 +212,7 @@ def test_mae_mfe_missing_fields(db):
 
 # ── Monte Carlo equity ─────────────────────────────────────────────────────
 
+
 def test_mc_no_trades(db):
     r = monte_carlo_equity(db)
     assert r["available"] is False
@@ -171,9 +220,9 @@ def test_mc_no_trades(db):
 
 
 def test_mc_structure(db):
-    db.add_trade( outcome="TP_HIT", rr_achieved=2.0)
-    db.add_trade( outcome="STOP_LOSS", rr_achieved=-1.0)
-    db.add_trade( outcome="TP_HIT", rr_achieved=1.5)
+    db.add_trade(outcome="TP_HIT", rr_achieved=2.0)
+    db.add_trade(outcome="STOP_LOSS", rr_achieved=-1.0)
+    db.add_trade(outcome="TP_HIT", rr_achieved=1.5)
 
     r = monte_carlo_equity(db, samples=500, seed=42)
     assert r["available"] is True
@@ -191,8 +240,8 @@ def test_mc_structure(db):
 
 
 def test_mc_deterministic_with_seed(db):
-    db.add_trade( outcome="TP_HIT", rr_achieved=2.0)
-    db.add_trade( outcome="STOP_LOSS", rr_achieved=-1.0)
+    db.add_trade(outcome="TP_HIT", rr_achieved=2.0)
+    db.add_trade(outcome="STOP_LOSS", rr_achieved=-1.0)
 
     r1 = monte_carlo_equity(db, samples=200, seed=7)
     r2 = monte_carlo_equity(db, samples=200, seed=7)
@@ -201,11 +250,10 @@ def test_mc_deterministic_with_seed(db):
 
 
 def test_mc_excludes_sim_samples(db):
-    db.add_trade( outcome="TP_HIT", rr_achieved=2.0, sim_key=None)
-    db.add_trade( outcome="TP_HIT", rr_achieved=3.0, sim_key="sim-1")
-    db.add_trade( outcome="TP_HIT", rr_achieved=4.0, sim_key="sim-2")
+    db.add_trade(outcome="TP_HIT", rr_achieved=2.0, sim_key=None)
+    db.add_trade(outcome="TP_HIT", rr_achieved=3.0, sim_key="sim-1")
+    db.add_trade(outcome="TP_HIT", rr_achieved=4.0, sim_key="sim-2")
 
     r = monte_carlo_equity(db, samples=100, seed=1)
     assert r["available"] is True
     assert r["n_trades"] == 1
-

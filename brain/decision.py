@@ -13,6 +13,7 @@ decision is what the approval queue, CLI, dashboard and notifiers surface.
 NO TRADE is a first-class, respectable answer.  Conflicting evidence,
 portfolio exposure, risk limits, or a behavioral flag all produce NO TRADE.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -34,10 +35,16 @@ def _top_plan_type(payload: dict) -> str:
     return (plans[0].get("type") if plans else "") or ""
 
 
-def build_decision(payload: dict, symbol: str, db: SignalDB | None = None,
-                   *, btc_bias: str | None = None,
-                   eth_btc_slope: float | None = None,
-                   df_1d=None, now: datetime | None = None) -> dict:
+def build_decision(
+    payload: dict,
+    symbol: str,
+    db: SignalDB | None = None,
+    *,
+    btc_bias: str | None = None,
+    eth_btc_slope: float | None = None,
+    df_1d=None,
+    now: datetime | None = None,
+) -> dict:
     """Compute the final desk decision for a full-analysis payload.
 
     ``btc_bias`` / ``eth_btc_slope`` come from the pipeline's ETH playbook
@@ -54,26 +61,57 @@ def build_decision(payload: dict, symbol: str, db: SignalDB | None = None,
     owns_db = db is None
     db = db or SignalDB()
     try:
-        return _build_decision_inner(payload, symbol, db, intel, features, ctx,
-                                     desk_action, plan_type, btc_bias,
-                                     eth_btc_slope, df_1d, now)
+        return _build_decision_inner(
+            payload,
+            symbol,
+            db,
+            intel,
+            features,
+            ctx,
+            desk_action,
+            plan_type,
+            btc_bias,
+            eth_btc_slope,
+            df_1d,
+            now,
+        )
     finally:
         if owns_db:
             db.close()
 
 
-def _build_decision_inner(payload: dict, symbol: str, db: SignalDB, intel: dict,
-                          features: dict, ctx: dict, desk_action: str,
-                          plan_type: str, btc_bias, eth_btc_slope, df_1d, now) -> dict:
-    gates = {"desk": {"ok": desk_action in ("BUY", "SELL"),
-                      "detail": f"desk filter says {desk_action}"}}
+def _build_decision_inner(
+    payload: dict,
+    symbol: str,
+    db: SignalDB,
+    intel: dict,
+    features: dict,
+    ctx: dict,
+    desk_action: str,
+    plan_type: str,
+    btc_bias,
+    eth_btc_slope,
+    df_1d,
+    now,
+) -> dict:
+    gates = {
+        "desk": {
+            "ok": desk_action in ("BUY", "SELL"),
+            "detail": f"desk filter says {desk_action}",
+        }
+    }
 
     # 1) Per-asset playbook (B1/B8)
     news_imminent = bool((ctx.get("macro") or {}).get("high_impact_imminent"))
     pb = playbooks_mod.apply_playbook(
-        symbol, desk_action if desk_action != "NO TRADE" else None,
-        now=now, news_imminent=news_imminent, df_1d=df_1d,
-        btc_bias=btc_bias, eth_btc_slope=eth_btc_slope)
+        symbol,
+        desk_action if desk_action != "NO TRADE" else None,
+        now=now,
+        news_imminent=news_imminent,
+        df_1d=df_1d,
+        btc_bias=btc_bias,
+        eth_btc_slope=eth_btc_slope,
+    )
     gates["playbook"] = {
         "name": pb["playbook"],
         "ok": not pb["blocked"],
@@ -86,15 +124,25 @@ def _build_decision_inner(payload: dict, symbol: str, db: SignalDB, intel: dict,
     pv = {"ok": True, "reasons": [], "exposure": None}
     if desk_action in ("BUY", "SELL"):
         _pv = portfolio_mod.portfolio_veto(db, symbol, desk_action)
-        pv = {"ok": _pv["allowed"], "reasons": _pv["reasons"],
-              "exposure": _pv["exposure"]}
+        pv = {
+            "ok": _pv["allowed"],
+            "reasons": _pv["reasons"],
+            "exposure": _pv["exposure"],
+        }
     gates["portfolio"] = pv
 
     # 3) Risk & discipline gate (B6/B7/B9/B10)
-    rg_full = risk_gate_mod.evaluate(db, symbol=symbol, plan_type=plan_type,
-                                     action=desk_action if desk_action != "NO TRADE" else None)
-    rg = {"ok": rg_full["allowed"], "blocked_by": rg_full["blocked_by"],
-          "details": rg_full["details"]}
+    rg_full = risk_gate_mod.evaluate(
+        db,
+        symbol=symbol,
+        plan_type=plan_type,
+        action=desk_action if desk_action != "NO TRADE" else None,
+    )
+    rg = {
+        "ok": rg_full["allowed"],
+        "blocked_by": rg_full["blocked_by"],
+        "details": rg_full["details"],
+    }
     gates["risk"] = rg
 
     blocked_by: list[str] = []
@@ -108,9 +156,19 @@ def _build_decision_inner(payload: dict, symbol: str, db: SignalDB, intel: dict,
 
         if blocked_by and hasattr(db, "record_risk_veto"):
             reason_str = "; ".join(blocked_by)
-            vtype = "playbook" if not gates["playbook"]["ok"] else ("portfolio" if not gates["portfolio"]["ok"] else "risk_gate")
+            vtype = (
+                "playbook"
+                if not gates["playbook"]["ok"]
+                else ("portfolio" if not gates["portfolio"]["ok"] else "risk_gate")
+            )
             try:
-                db.record_risk_veto(symbol=symbol, setup=plan_type, action=desk_action, reason=reason_str, veto_type=vtype)
+                db.record_risk_veto(
+                    symbol=symbol,
+                    setup=plan_type,
+                    action=desk_action,
+                    reason=reason_str,
+                    veto_type=vtype,
+                )
             except Exception:
                 pass
 
@@ -125,6 +183,9 @@ def _build_decision_inner(payload: dict, symbol: str, db: SignalDB, intel: dict,
         "regime_label": features.get("regime_label"),
         "desk_default": DESK_DEFAULT,
         "utc": (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d %H:%M UTC"),
-        "decision_text": ("WAIT — no trade" if final == "NO TRADE" else
-                          f"TRADE {final} (desk-approved)"),
+        "decision_text": (
+            "WAIT — no trade"
+            if final == "NO TRADE"
+            else f"TRADE {final} (desk-approved)"
+        ),
     }

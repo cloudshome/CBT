@@ -17,6 +17,7 @@ the real served dashboard JavaScript in node against stubbed APIs and assert
 
 They skip when node is unavailable, exactly like the existing JS tests.
 """
+
 from __future__ import annotations
 
 import json
@@ -37,7 +38,7 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="node not installed")
 
 def _extract_js() -> str:
     html = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
-    return re.findall(r"<script>(.*?)</script>", html, re.S)[-1]
+    return re.findall(r"<script>(.*?)</script>", html, re.DOTALL)[-1]
 
 
 _HARNESS_HEAD = r"""
@@ -114,11 +115,12 @@ __DASHBOARD_JS__
 
 
 def _run(body: str, api: dict | None = None, initial_hash: str = "") -> dict:
-    harness = (_HARNESS_HEAD
-               .replace("__API__", json.dumps(api or {}))
-               .replace("__INITIAL_HASH__", initial_hash)
-               .replace("__DASHBOARD_JS__", _extract_js())
-               .replace("__BODY__", body))
+    harness = (
+        _HARNESS_HEAD.replace("__API__", json.dumps(api or {}))
+        .replace("__INITIAL_HASH__", initial_hash)
+        .replace("__DASHBOARD_JS__", _extract_js())
+        .replace("__BODY__", body)
+    )
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
         f.write(harness)
         path = f.name
@@ -151,50 +153,66 @@ console.log(JSON.stringify({
 
 def test_markets_is_focused_one_section_at_a_time():
     out = _run("navTo('markets');" + _DRAIN + _OUT)
-    assert ">Markets<" in out["head"]                            # identity header
+    assert ">Markets<" in out["head"]  # identity header
     assert "Overview" in out["head"] and "Intelligence" in out["head"]
     assert 'data-asub="overview"' in out["head"]
-    assert out["head"].count('class="active"') == 1              # one active sub
+    assert out["head"].count('class="active"') == 1  # one active sub
     assert out["panels"]["overview"] is True
-    assert out["panels"]["market"] is False                      # no stack
+    assert out["panels"]["market"] is False  # no stack
     assert out["panels"]["intelligence"] is False
     assert out["panels"]["manage"] is False
 
 
 def test_sub_switch_shows_exactly_one_section_and_persists():
-    out = _run("""
+    out = _run(
+        """
       navTo('portfolio');
       switchSub('portfolio', 'risk');
-      """ + _DRAIN + _OUT)
+      """
+        + _DRAIN
+        + _OUT
+    )
     assert out["panels"]["risk"] is True
-    assert out["panels"]["manage"] is False                      # default replaced
+    assert out["panels"]["manage"] is False  # default replaced
     assert out["panels"]["trades"] is False
-    assert out["lastHash"] == "#risk"                            # deep-linkable
+    assert out["lastHash"] == "#risk"  # deep-linkable
     assert out["activeTab"] == "risk"
 
 
 def test_remembered_sub_reopens_with_the_area():
-    out = _run("""
+    out = _run(
+        """
       localStorage.setItem('sky.sub.portfolio', 'weekly');
       navTo('portfolio');
-      """ + _DRAIN + _OUT)
+      """
+        + _DRAIN
+        + _OUT
+    )
     assert out["panels"]["weekly"] is True
     assert out["panels"]["manage"] is False
     assert 'data-asub="weekly" class="active"' in out["head"]
 
 
 def test_remembered_sub_that_no_longer_exists_falls_back_to_default():
-    out = _run("""
+    out = _run(
+        """
       localStorage.setItem('sky.sub.portfolio', 'renamed_away');
       navTo('portfolio');
-      """ + _DRAIN + _OUT)
-    assert out["panels"]["manage"] is True                       # area default
+      """
+        + _DRAIN
+        + _OUT
+    )
+    assert out["panels"]["manage"] is True  # area default
 
 
 def test_legacy_switchtab_calls_land_on_the_right_focused_section():
-    out = _run("""
+    out = _run(
+        """
       switchTab('learn');                                        // old quickbar idiom
-      """ + _DRAIN + _OUT)
+      """
+        + _DRAIN
+        + _OUT
+    )
     assert out["nav"] == "evidence"
     assert out["navbtns"]["evidence"] is True
     assert out["panels"]["learn"] is True
@@ -203,16 +221,19 @@ def test_legacy_switchtab_calls_land_on_the_right_focused_section():
 
 
 def test_apply_nav_panels_keeps_the_current_section_after_rerender():
-    out = _run("""
+    out = _run(
+        """
       navTo('markets');
       switchSub('markets', 'intelligence');
       // simulate render() rebuilding #app: all dynamic panels recreated
       REGISTRY['.tabpanel'].forEach(p=> p.classList.remove('active'));
       applyNavPanels();
-      """ + _OUT)
+      """
+        + _OUT
+    )
     assert out["panels"]["intelligence"] is True
     assert out["panels"]["overview"] is False
-    assert out["nav"] == "markets"                               # never navigated
+    assert out["nav"] == "markets"  # never navigated
 
 
 def test_section_deep_link_lands_on_the_owning_page():
@@ -224,10 +245,13 @@ def test_section_deep_link_lands_on_the_owning_page():
 
 
 def test_terminal_and_home_hide_the_area_header():
-    out = _run("""
+    out = _run(
+        """
       navTo('portfolio');      // header on
       navTo('trade');          // header off for terminal
-      """ + _OUT)
+      """
+        + _OUT
+    )
     assert out["headShown"] == "none"
 
 
@@ -243,28 +267,43 @@ def test_mobile_bar_navigates_and_paints_active_section():
 
 
 def test_mobile_ai_section_opens_the_copilot_drawer():
-    out = _run("""
+    out = _run(
+        """
       mobileGo('ai');
       closeAiDrawer();        // wrapped: closes + syncs the bar
-      """ + _DRAIN + _OUT)
+      """
+        + _DRAIN
+        + _OUT
+    )
     # drawer opened during the run, then closing cleared the AI highlight
     assert out["drawerOpen"] is False
     assert out["mobileBtns"]["ai"] is False
 
 
 def test_mobile_ticket_sheet_re_reads_the_gate_fresh():
-    api = {"/api/risk": {"status": 200, "body": {
-        "gate": {"allowed": True, "blocked_by": []}}}}
-    out = _run("""
+    api = {
+        "/api/risk": {
+            "status": 200,
+            "body": {"gate": {"allowed": True, "blocked_by": []}},
+        }
+    }
+    out = _run(
+        """
       const before = GETS.filter(u=> u.includes('/api/risk')).length;
       navTo('trade');
-      """ + _DRAIN + """
+      """
+        + _DRAIN
+        + """
       const mid = GETS.filter(u=> u.includes('/api/risk')).length;
       openMobileTicket();
-      """ + _DRAIN + """
+      """
+        + _DRAIN
+        + """
       global.__riskReads = [before, mid,
         GETS.filter(u=> u.includes('/api/risk')).length];
-      """ + _OUT)
+      """
+        + _OUT
+    )
     assert out["termCls"] == ["ticket-sheet"]
     risk_reads = out["riskReads"]
     # opening the sheet issues fresh gate reads (risk chip + ticket gate)
@@ -272,21 +311,29 @@ def test_mobile_ticket_sheet_re_reads_the_gate_fresh():
 
 
 def test_closing_the_ticket_sheet_hides_it():
-    out = _run("""
+    out = _run(
+        """
       navTo('trade');
       openMobileTicket();
       closeMobileTicket();
-      """ + _OUT)
+      """
+        + _OUT
+    )
     assert "ticket-sheet" not in out["termCls"]
 
 
 def test_open_sheet_then_navigating_closes_it():
-    out = _run("""
+    out = _run(
+        """
       navTo('trade');
       openMobileTicket();
-      """ + _DRAIN + """
+      """
+        + _DRAIN
+        + """
       navTo('markets');
-      """ + _OUT)
+      """
+        + _OUT
+    )
     assert "ticket-sheet" not in out["termCls"]
     assert out["nav"] == "markets"
 

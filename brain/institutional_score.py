@@ -3,12 +3,10 @@
 Computes fund-grade risk scores, trade quality grades (A+, A, B, C, F), Kelly Criterion
 position sizing, smart TP ladders with percentage gains, entry zones, and active-until timestamps.
 """
+
 from __future__ import annotations
 
-import math
-import time
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Any
+from datetime import datetime, timedelta, timezone
 
 
 def compute_hold_time_and_expiry(timeframe: str) -> tuple[str, str, int]:
@@ -33,7 +31,9 @@ def compute_hold_time_and_expiry(timeframe: str) -> tuple[str, str, int]:
     elif tf in ("4h", "6h", "8h", "12h"):
         hold_str = "2–5 Days"
         expiry = now + timedelta(days=5)
-    elif tf in ("1d", "d", "daily", "1w", "weekly", "1m", "monthly") and tf not in ("1m",):
+    elif tf in ("1d", "d", "daily", "1w", "weekly", "1m", "monthly") and tf not in (
+        "1m",
+    ):
         hold_str = "1–3 Weeks"
         expiry = now + timedelta(days=21)
     else:
@@ -45,8 +45,14 @@ def compute_hold_time_and_expiry(timeframe: str) -> tuple[str, str, int]:
     return hold_str, expiry_str, expiry_ms
 
 
-def compute_ips_score(features: dict, mtf: dict, ctx: dict, plan: Optional[dict],
-                      regime: dict, base_confidence: int) -> tuple[int, str, dict]:
+def compute_ips_score(
+    features: dict,
+    mtf: dict,
+    ctx: dict,
+    plan: dict | None,
+    regime: dict,
+    base_confidence: int,
+) -> tuple[int, str, dict]:
     """Compute Institutional Probability Score (IPS 0–100) and Trade Quality Grade.
 
     Scoring Breakdown (Max 100):
@@ -79,7 +85,9 @@ def compute_ips_score(features: dict, mtf: dict, ctx: dict, plan: Optional[dict]
 
     if features.get("nearest_bull_ob") or features.get("nearest_bear_ob"):
         pts_smc += 4
-    if (features.get("fvg_bull_count") or 0) + (features.get("fvg_bear_count") or 0) > 0:
+    if (features.get("fvg_bull_count") or 0) + (
+        features.get("fvg_bear_count") or 0
+    ) > 0:
         pts_smc += 3
 
     # 2. MTF & Trend (25 pts)
@@ -113,7 +121,11 @@ def compute_ips_score(features: dict, mtf: dict, ctx: dict, plan: Optional[dict]
     # 4. Regime & Volatility (15 pts)
     if regime.get("trap_detected") or regime.get("fake_breakout"):
         pts_regime += 2
-    elif regime.get("regime") in ("TRENDING_BULL", "TRENDING_BEAR", "VOLATILITY_EXPANSION"):
+    elif regime.get("regime") in (
+        "TRENDING_BULL",
+        "TRENDING_BEAR",
+        "VOLATILITY_EXPANSION",
+    ):
         pts_regime += 15
     elif regime.get("regime") == "VOLATILITY_COMPRESSION":
         pts_regime += 10
@@ -163,8 +175,9 @@ def compute_ips_score(features: dict, mtf: dict, ctx: dict, plan: Optional[dict]
     return final_ips, grade, breakdown
 
 
-def compute_smart_tp_ladder(action: str, entry: float, stop_loss: float,
-                            existing_tps: list[float], atr: float) -> list[dict]:
+def compute_smart_tp_ladder(
+    action: str, entry: float, stop_loss: float, existing_tps: list[float], atr: float
+) -> list[dict]:
     """Compute TP1, TP2, TP3 targets with price, percent gain, and partial sizing recommendation."""
     if not entry or not stop_loss or entry <= 0:
         return []
@@ -173,7 +186,7 @@ def compute_smart_tp_ladder(action: str, entry: float, stop_loss: float,
     if risk_dist <= 0:
         risk_dist = max(atr * 1.5, entry * 0.005)
 
-    is_buy = (action == "BUY")
+    is_buy = action == "BUY"
     tps_out: list[dict] = []
 
     # Target multipliers: TP1 (1.5R - 2.0R), TP2 (2.5R - 3.2R), TP3 (4.0R - 5.0R)
@@ -192,31 +205,49 @@ def compute_smart_tp_ladder(action: str, entry: float, stop_loss: float,
             else:
                 target_price = max(entry - (risk_dist * r_mult), 1e-6)
 
-        pct_gain = ((target_price - entry) / entry * 100.0) if is_buy else ((entry - target_price) / entry * 100.0)
-        tps_out.append({
-            "target": f"TP{idx}",
-            "price": round(target_price, 2) if target_price >= 1 else round(target_price, 6),
-            "gain_pct": round(pct_gain, 2),
-            "allocation_pct": pct_close,
-            "management": note,
-        })
+        pct_gain = (
+            ((target_price - entry) / entry * 100.0)
+            if is_buy
+            else ((entry - target_price) / entry * 100.0)
+        )
+        tps_out.append(
+            {
+                "target": f"TP{idx}",
+                "price": round(target_price, 2)
+                if target_price >= 1
+                else round(target_price, 6),
+                "gain_pct": round(pct_gain, 2),
+                "allocation_pct": pct_close,
+                "management": note,
+            }
+        )
 
     return tps_out
 
 
-def compute_entry_zone(entry: float, atr: float, action: str) -> tuple[float, float, str]:
+def compute_entry_zone(
+    entry: float, atr: float, action: str
+) -> tuple[float, float, str]:
     """Compute entry zone (low and high bounds) around the target entry."""
     if not entry or entry <= 0:
         return (0.0, 0.0, "$0 – $0")
     buffer = max(atr * 0.20, entry * 0.0012)
     low_bound = round(entry - buffer, 2) if entry >= 1 else round(entry - buffer, 6)
     high_bound = round(entry + buffer, 2) if entry >= 1 else round(entry + buffer, 6)
-    fmt_str = f"${low_bound:,.2f} – ${high_bound:,.2f}" if entry >= 10 else f"${low_bound} – ${high_bound}"
+    fmt_str = (
+        f"${low_bound:,.2f} – ${high_bound:,.2f}"
+        if entry >= 10
+        else f"${low_bound} – ${high_bound}"
+    )
     return (low_bound, high_bound, fmt_str)
 
 
-def compute_kelly_criterion(win_rate_pct: float, risk_reward: float,
-                            account_balance: float = 10000.0, max_risk_cap: float = 2.0) -> dict:
+def compute_kelly_criterion(
+    win_rate_pct: float,
+    risk_reward: float,
+    account_balance: float = 10000.0,
+    max_risk_cap: float = 2.0,
+) -> dict:
     """Compute Kelly Criterion optimal position fraction and conservative Half-Kelly."""
     p = max(0.01, min(0.99, win_rate_pct / 100.0))
     q = 1.0 - p
@@ -228,8 +259,14 @@ def compute_kelly_criterion(win_rate_pct: float, risk_reward: float,
     half_kelly_pct = kelly_full_pct / 2.0
 
     # Cap by max risk policy
-    recommended_risk_pct = min(half_kelly_pct if half_kelly_pct > 0 else 1.0, max_risk_cap)
-    recommended_risk_amt = round(account_balance * (recommended_risk_pct / 100.0), 2) if account_balance else 0.0
+    recommended_risk_pct = min(
+        half_kelly_pct if half_kelly_pct > 0 else 1.0, max_risk_cap
+    )
+    recommended_risk_amt = (
+        round(account_balance * (recommended_risk_pct / 100.0), 2)
+        if account_balance
+        else 0.0
+    )
 
     # Recommended leverage
     if recommended_risk_pct >= 1.5:

@@ -1,4 +1,5 @@
 """Tests for the SQLite signal database (offline, tmp_path)."""
+
 from __future__ import annotations
 
 from data.database import SignalDB
@@ -7,23 +8,48 @@ from data.database import SignalDB
 def _payload() -> dict:
     return {
         "signal": {
-            "signal_id": "BTCUSDT_20260804_1452", "timestamp": 1785826521000,
-            "asset": "BTCUSDT", "action": "BUY", "entry": 61250.0,
-            "stop_loss": 60700.0, "take_profit": 62200.0, "risk_reward": 2.1,
-            "confidence": "HIGH", "timeframe": "15m", "reason": "test",
+            "signal_id": "BTCUSDT_20260804_1452",
+            "timestamp": 1785826521000,
+            "asset": "BTCUSDT",
+            "action": "BUY",
+            "entry": 61250.0,
+            "stop_loss": 60700.0,
+            "take_profit": 62200.0,
+            "risk_reward": 2.1,
+            "confidence": "HIGH",
+            "timeframe": "15m",
+            "reason": "test",
             "signal_type": "SIGNAL",
         },
         "plans": [
-            {"id": "imm_buy", "type": "Immediate Buy", "action": "BUY",
-             "condition": "enter now", "trigger_level": None, "entry": 61250.0,
-             "stop_loss": 60700.0, "take_profits": [62200.0, 63200.0],
-             "risk_reward": 2.1, "confidence": 90, "confidence_label": "HIGH",
-             "status": "active"},
-            {"id": "buy_pullback", "type": "Buy Pullback", "action": "BUY",
-             "condition": "pullback to OB", "trigger_level": 61000.0,
-             "entry": 61000.0, "stop_loss": 60600.0, "take_profits": [61900.0],
-             "risk_reward": 2.0, "confidence": 84, "confidence_label": "HIGH",
-             "status": "waiting"},
+            {
+                "id": "imm_buy",
+                "type": "Immediate Buy",
+                "action": "BUY",
+                "condition": "enter now",
+                "trigger_level": None,
+                "entry": 61250.0,
+                "stop_loss": 60700.0,
+                "take_profits": [62200.0, 63200.0],
+                "risk_reward": 2.1,
+                "confidence": 90,
+                "confidence_label": "HIGH",
+                "status": "active",
+            },
+            {
+                "id": "buy_pullback",
+                "type": "Buy Pullback",
+                "action": "BUY",
+                "condition": "pullback to OB",
+                "trigger_level": 61000.0,
+                "entry": 61000.0,
+                "stop_loss": 60600.0,
+                "take_profits": [61900.0],
+                "risk_reward": 2.0,
+                "confidence": 84,
+                "confidence_label": "HIGH",
+                "status": "waiting",
+            },
         ],
         "snapshot": {"features": {"price": 61250.0, "trend": "bullish"}},
         "market_context": {"funding_rate_pct": 0.01},
@@ -78,6 +104,7 @@ def test_db_can_be_written_from_multiple_threads(tmp_path):
     the real code does). WAL + busy_timeout must make concurrent writes safe —
     no 'database is locked' errors."""
     import threading
+
     errors = []
 
     def worker():
@@ -113,14 +140,36 @@ def test_backtest_stats_empty_db_does_not_crash(tmp_path):
 def test_backtest_rows_and_stats(tmp_path):
     db = SignalDB(tmp_path / "test.db")
     rows = [
-        {"ts": 1, "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Immediate Buy",
-         "action": "BUY", "confidence_pct": 85, "horizon_hours": 4.0,
-         "outcome": "FULL_WIN", "rr_achieved": 2.0, "max_favorable": 300.0,
-         "max_adverse": -50.0, "entry": 60000.0, "trigger_level": None},
-        {"ts": 2, "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Immediate Buy",
-         "action": "BUY", "confidence_pct": 70, "horizon_hours": 4.0,
-         "outcome": "LOSS", "rr_achieved": -1.0, "max_favorable": 20.0,
-         "max_adverse": -400.0, "entry": 60500.0, "trigger_level": None},
+        {
+            "ts": 1,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "plan_type": "Immediate Buy",
+            "action": "BUY",
+            "confidence_pct": 85,
+            "horizon_hours": 4.0,
+            "outcome": "FULL_WIN",
+            "rr_achieved": 2.0,
+            "max_favorable": 300.0,
+            "max_adverse": -50.0,
+            "entry": 60000.0,
+            "trigger_level": None,
+        },
+        {
+            "ts": 2,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "plan_type": "Immediate Buy",
+            "action": "BUY",
+            "confidence_pct": 70,
+            "horizon_hours": 4.0,
+            "outcome": "LOSS",
+            "rr_achieved": -1.0,
+            "max_favorable": 20.0,
+            "max_adverse": -400.0,
+            "entry": 60500.0,
+            "trigger_level": None,
+        },
     ]
     n = db.save_backtest_rows(rows, run_id="test_run")
     assert n == 2
@@ -139,6 +188,7 @@ def test_decided_paper_rows_exclude_sim(tmp_path):
     """exclude_sim=True drops simulator walk-forward samples (sim_key NOT
     NULL): they are calibration evidence, not the live paper book."""
     import time
+
     db = SignalDB(tmp_path / "ex.db")
     ts = int(time.time() * 1000)
 
@@ -151,13 +201,35 @@ def test_decided_paper_rows_exclude_sim(tmp_path):
                                         closed_ts, entry_price, exit_price, outcome,
                                         rr_achieved, close_reason, sim_key)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (9000 + i, f"S{i}", "Buy Pullback", "BTCUSDT", "15m", "BUY",
-             100.0, 99.0, 102.0, 2.0, 70, "CLOSED", ts, ts, ts,
-             100.0, 102.0 if rr > 0 else 99.0, outcome, rr, "test", sim_key))
+            (
+                9000 + i,
+                f"S{i}",
+                "Buy Pullback",
+                "BTCUSDT",
+                "15m",
+                "BUY",
+                100.0,
+                99.0,
+                102.0,
+                2.0,
+                70,
+                "CLOSED",
+                ts,
+                ts,
+                ts,
+                100.0,
+                102.0 if rr > 0 else 99.0,
+                outcome,
+                rr,
+                "test",
+                sim_key,
+            ),
+        )
+
     db.conn.commit()
 
-    insert(2.0, sim_key=None, i=0)                                  # real trade
-    insert(-1.0, sim_key="pp:btc:15m:1:buy_pullback:BUY", i=1)      # sim sample
+    insert(2.0, sim_key=None, i=0)  # real trade
+    insert(-1.0, sim_key="pp:btc:15m:1:buy_pullback:BUY", i=1)  # sim sample
 
     assert len(db.decided_paper_rows()) == 2
     real = db.decided_paper_rows(exclude_sim=True)

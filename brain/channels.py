@@ -20,13 +20,13 @@ The design contract:
 
 This file is the foundation of P8 in ``ROADMAP_AGENT_REACH_UPGRADE.md``.
 """
+
 from __future__ import annotations
 
-import importlib
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 # ── Backwards-compatible env-var reads ────────────────────────────────────
 # We import from config lazily so the module can be loaded in test
@@ -36,10 +36,17 @@ from typing import Any, Callable, Optional
 
 try:
     from config import (
-        CRYPTODADA_MODE, CRYPTODADA_BASE_URL, CRYPTODADA_EMAIL,
-        DISCORD_WEBHOOK_URL, DISCORD_TOKEN, DISCORD_CHANNEL_IDS,
+        CRYPTODADA_BASE_URL,
+        CRYPTODADA_EMAIL,
+        CRYPTODADA_MODE,
         DISCORD_ANNOUNCE_WEBHOOK,
-        LLM_PROVIDER, OPENAI_API_KEY, GEMINI_API_KEY, OPENAI_BASE_URL,
+        DISCORD_CHANNEL_IDS,
+        DISCORD_TOKEN,
+        DISCORD_WEBHOOK_URL,
+        GEMINI_API_KEY,
+        LLM_PROVIDER,
+        OPENAI_API_KEY,
+        OPENAI_BASE_URL,
     )
 except Exception:  # pragma: no cover - defensive
     CRYPTODADA_MODE = "auto"
@@ -57,6 +64,7 @@ except Exception:  # pragma: no cover - defensive
 
 # ── Data classes ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class Backend:
     """One candidate backend for a channel.
@@ -64,13 +72,14 @@ class Backend:
     The order of `backends` on a `Channel` IS the preference order:
     index 0 is preferred, index N-1 is the last-resort fallback.
     """
+
     name: str
     label: str
     configured: bool
     ok: bool = False
     detail: str = ""
     latency_ms: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -87,11 +96,12 @@ class Backend:
 @dataclass
 class Channel:
     """A logical capability with one or more backend candidates."""
+
     name: str
     description: str
     backends: list[Backend] = field(default_factory=list)
-    active: Optional[str] = None  # name of the first ok backend, or None
-    status: str = "unknown"        # "ok" | "degraded" | "down" | "unknown"
+    active: str | None = None  # name of the first ok backend, or None
+    status: str = "unknown"  # "ok" | "degraded" | "down" | "unknown"
 
     def to_dict(self) -> dict:
         return {
@@ -107,6 +117,7 @@ class Channel:
 # Each probe is a quick, *non-mutating* check: is the module importable,
 # is the credential present, does a 1-byte HEAD/PING return?  Probes
 # never POST/PUT or authenticate.
+
 
 def _now() -> float:
     return time.perf_counter()
@@ -134,6 +145,7 @@ def _probe_cryptodada_backends() -> list[Backend]:
         if base_ok:
             # Lazy import — do not require playwright unless browser backend is chosen
             from data.sources.cryptodada_website import CryptoDadaConnector
+
             probe = CryptoDadaConnector(mode="api", base_url=CRYPTODADA_BASE_URL)
             api.detail = f"base_url={CRYPTODADA_BASE_URL}"
             api.ok = probe.configured
@@ -156,8 +168,10 @@ def _probe_cryptodada_backends() -> list[Backend]:
     try:
         if base_ok and has_creds:
             from data.sources.cryptodada_website import CryptoDadaConnector
-            probe = CryptoDadaConnector(mode="browser", base_url=CRYPTODADA_BASE_URL,
-                                        email=CRYPTODADA_EMAIL)
+
+            probe = CryptoDadaConnector(
+                mode="browser", base_url=CRYPTODADA_BASE_URL, email=CRYPTODADA_EMAIL
+            )
             browser.detail = f"base_url={CRYPTODADA_BASE_URL}, email set"
             browser.ok = probe.configured
         else:
@@ -198,11 +212,13 @@ def _probe_discord_backends() -> list[Backend]:
     wh = Backend(
         name="webhook",
         label="Outbound webhook (push only, ToS-safe)",
-        configured=bool(DISCORD_WEBHOOK_URL) or bool(
-            os.getenv("DISCORD_ANNOUNCE_WEBHOOK", "")),
-        detail=("DISCORD_WEBHOOK_URL or DISCORD_ANNOUNCE_WEBHOOK set"
-                if (DISCORD_WEBHOOK_URL or os.getenv("DISCORD_ANNOUNCE_WEBHOOK", ""))
-                else "no webhook configured"),
+        configured=bool(DISCORD_WEBHOOK_URL)
+        or bool(os.getenv("DISCORD_ANNOUNCE_WEBHOOK", "")),
+        detail=(
+            "DISCORD_WEBHOOK_URL or DISCORD_ANNOUNCE_WEBHOOK set"
+            if (DISCORD_WEBHOOK_URL or os.getenv("DISCORD_ANNOUNCE_WEBHOOK", ""))
+            else "no webhook configured"
+        ),
     )
     wh.ok = wh.configured
     out.append(wh)
@@ -300,11 +316,14 @@ def _probe_llm_backends() -> list[Backend]:
     openai = Backend(
         name="openai",
         label="OpenAI (or any OpenAI-compatible endpoint)",
-        configured=bool(OPENAI_API_KEY) and "groq" not in (OPENAI_BASE_URL or "").lower(),
+        configured=bool(OPENAI_API_KEY)
+        and "groq" not in (OPENAI_BASE_URL or "").lower(),
     )
     if openai.configured:
         openai.ok = True
-        openai.detail = f"OPENAI_BASE_URL={OPENAI_BASE_URL}, model={os.getenv('OPENAI_MODEL','')}"
+        openai.detail = (
+            f"OPENAI_BASE_URL={OPENAI_BASE_URL}, model={os.getenv('OPENAI_MODEL', '')}"
+        )
     else:
         openai.detail = "needs OPENAI_API_KEY + OPENAI_BASE_URL (non-groq)"
     out.append(openai)
@@ -316,7 +335,7 @@ def _probe_llm_backends() -> list[Backend]:
     )
     if gemini.configured:
         gemini.ok = True
-        gemini.detail = f"GEMINI_MODEL={os.getenv('GEMINI_MODEL','')}"
+        gemini.detail = f"GEMINI_MODEL={os.getenv('GEMINI_MODEL', '')}"
     else:
         gemini.detail = "needs GEMINI_API_KEY"
     out.append(gemini)
@@ -461,9 +480,13 @@ def doctor_report(as_json: bool = False) -> Any:
         if ch.status == "ok":
             lines.append(f"      → serving via: {ch.active}")
         elif ch.status == "degraded":
-            lines.append("      → no backend configured; channel returns empty results safely")
+            lines.append(
+                "      → no backend configured; channel returns empty results safely"
+            )
         else:
-            lines.append("      → all backends failed; engine continues with empty data")
+            lines.append(
+                "      → all backends failed; engine continues with empty data"
+            )
     return "\n".join(lines)
 
 
@@ -486,6 +509,6 @@ def list_channels(as_json: bool = False) -> Any:
         n_ok = sum(1 for b in ch.backends if b.configured and b.ok)
         n_tot = len(ch.backends)
         lines.append(
-            f"{name:<12} {ch.status:<10} {str(ch.active or '-'):<14} {n_ok}/{n_tot} ok"
+            f"{name:<12} {ch.status:<10} {ch.active or '-'!s:<14} {n_ok}/{n_tot} ok"
         )
     return "\n".join(lines)

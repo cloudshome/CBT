@@ -17,6 +17,7 @@ OUT_DIR = Path(__file__).parent.parent / "web" / "static" / "icons"
 
 def _write_png(path: Path, width: int, height: int, rgba_pixels: bytes) -> None:
     """Write an uncompressed or zlib-compressed 32-bit RGBA PNG."""
+
     def _chunk(chunk_type: bytes, data: bytes) -> bytes:
         content = chunk_type + data
         crc = zlib.crc32(content) & 0xFFFFFFFF
@@ -49,8 +50,8 @@ def render_sky_icon(size: int, maskable: bool = False) -> bytes:
     radius = size * 0.48 if not maskable else size * 0.40  # safe margin for maskable
 
     # Palette
-    bg_r, bg_g, bg_b = 0x07, 0x0B, 0x14      # Deep navy #070b14
-    bg2_r, bg2_g, bg2_b = 0x0E, 0x18, 0x2E   # Slate blue #0e182e
+    bg_r, bg_g, bg_b = 0x07, 0x0B, 0x14  # Deep navy #070b14
+    bg2_r, bg2_g, bg2_b = 0x0E, 0x18, 0x2E  # Slate blue #0e182e
     cyan_r, cyan_g, cyan_b = 0x38, 0xBD, 0xF8  # Cyan #38bdf8
     emerald_r, emerald_g, emerald_b = 0x34, 0xD3, 0x99  # Emerald #34d399
     white_r, white_g, white_b = 0xF8, 0xFA, 0xFC
@@ -70,7 +71,11 @@ def render_sky_icon(size: int, maskable: bool = False) -> bytes:
                 corner_radius = size * 0.22
                 qx = abs(dx) - (center - corner_radius)
                 qy = abs(dy) - (center - corner_radius)
-                q_dist = math.sqrt(max(0, qx) ** 2 + max(0, qy) ** 2) if qx > 0 and qy > 0 else max(qx, qy)
+                q_dist = (
+                    math.sqrt(max(0, qx) ** 2 + max(0, qy) ** 2)
+                    if qx > 0 and qy > 0
+                    else max(qx, qy)
+                )
                 if q_dist > corner_radius:
                     pixels[idx : idx + 4] = bytes([0, 0, 0, 0])
                     continue
@@ -93,23 +98,31 @@ def render_sky_icon(size: int, maskable: bool = False) -> bytes:
             # Wicks
             in_wick = False
             if 0.325 <= norm_x <= 0.335 and 0.38 <= norm_y <= 0.78:
-                in_wick = True; wr, wg, wb = emerald_r, emerald_g, emerald_b
+                in_wick = True
+                wr, wg, wb = emerald_r, emerald_g, emerald_b
             elif 0.485 <= norm_x <= 0.495 and 0.25 <= norm_y <= 0.70:
-                in_wick = True; wr, wg, wb = cyan_r, cyan_g, cyan_b
+                in_wick = True
+                wr, wg, wb = cyan_r, cyan_g, cyan_b
             elif 0.645 <= norm_x <= 0.655 and 0.16 <= norm_y <= 0.58:
-                in_wick = True; wr, wg, wb = emerald_r, emerald_g, emerald_b
+                in_wick = True
+                wr, wg, wb = emerald_r, emerald_g, emerald_b
 
             if in_wick:
-                r = wr; g = wg; b = wb
+                r = wr
+                g = wg
+                b = wb
 
             # Candle bodies
             in_body = False
             if 0.30 <= norm_x <= 0.36 and 0.46 <= norm_y <= 0.70:
-                in_body = True; br, bg_c, bb = emerald_r, emerald_g, emerald_b
+                in_body = True
+                br, bg_c, bb = emerald_r, emerald_g, emerald_b
             elif 0.46 <= norm_x <= 0.52 and 0.32 <= norm_y <= 0.62:
-                in_body = True; br, bg_c, bb = cyan_r, cyan_g, cyan_b
+                in_body = True
+                br, bg_c, bb = cyan_r, cyan_g, cyan_b
             elif 0.62 <= norm_x <= 0.68 and 0.22 <= norm_y <= 0.50:
-                in_body = True; br, bg_c, bb = emerald_r, emerald_g, emerald_b
+                in_body = True
+                br, bg_c, bb = emerald_r, emerald_g, emerald_b
 
             if in_body:
                 r, g, b = br, bg_c, bb

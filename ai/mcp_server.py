@@ -32,6 +32,7 @@ The server speaks the standard MCP protocol over stdio (JSON-RPC 2.0).  It
 requires the official `mcp` package (pip install mcp) — a clear error is
 printed otherwise.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -47,67 +48,83 @@ def _json_lines(obj: dict) -> str:
 
 def _scan(symbol: str, timeframe: str, bars: int) -> dict:
     from main import run_scan
+
     payload = run_scan(symbol, timeframe, bars, save_db=False)
-    return {"signal": payload.get("signal", {}),
-            "decision": payload.get("decision", {}),
-            "plans": payload.get("plans", [])[:6],
-            "snapshot": {"features": payload.get("snapshot", {}).get("features", {})},
-            "lifecycle": payload.get("lifecycle", {})}
+    return {
+        "signal": payload.get("signal", {}),
+        "decision": payload.get("decision", {}),
+        "plans": payload.get("plans", [])[:6],
+        "snapshot": {"features": payload.get("snapshot", {}).get("features", {})},
+        "lifecycle": payload.get("lifecycle", {}),
+    }
 
 
 def _desk(symbol: str, timeframe: str, bars: int) -> dict:
     from brain.full_pipeline import analyze_full
+
     payload = analyze_full(symbol, timeframe, bars, with_context=True)
     return payload.get("intelligence", {})
 
 
 def _health() -> dict:
     from brain.agent import health_report
+
     return health_report()
 
 
 def _morning(symbols: list[str] | None, timeframe: str, bars: int) -> dict:
     from brain.agent import morning_briefing
+
     return morning_briefing(symbols=symbols, timeframe=timeframe, bars=bars)
 
 
 def _risk() -> dict:
-    from data.database import SignalDB
-    from brain.risk_gate import evaluate
     from brain.analytics import monte_carlo_ruin_table
+    from brain.risk_gate import evaluate
+    from data.database import SignalDB
+
     with SignalDB() as db:
         gate = evaluate(db)
         gate["ruin_table"] = monte_carlo_ruin_table(db)
-        return {"allowed": gate["allowed"], "blocked_by": gate.get("blocked_by", []),
-                "details": gate.get("details", {}),
-                "ruin_table": gate["ruin_table"]}
+        return {
+            "allowed": gate["allowed"],
+            "blocked_by": gate.get("blocked_by", []),
+            "details": gate.get("details", {}),
+            "ruin_table": gate["ruin_table"],
+        }
 
 
 def _monte(samples: int = 2000, seed: int | None = None) -> dict:
-    from data.database import SignalDB
     from brain.analytics import monte_carlo_ruin_table
+    from data.database import SignalDB
+
     with SignalDB() as db:
         return monte_carlo_ruin_table(db, samples=samples, seed=seed)
 
 
 def _ask(question: str, symbol: str | None, timeframe: str) -> dict:
     from brain.agent import ask
+
     return ask(question, symbol=symbol, timeframe=timeframe)
 
 
 def _pending() -> dict:
     from data.database import SignalDB
+
     with SignalDB() as db:
         return {"pending": db.pending_reviews()}
 
 
 def _stats() -> dict:
-    from data.database import SignalDB
     from brain.metrics import business_metrics
+    from data.database import SignalDB
+
     with SignalDB() as db:
-        out = {"backtest": db.backtest_stats(),
-               "calibration": db.load_calibration(),
-               "plan_stats": db.plan_stats()}
+        out = {
+            "backtest": db.backtest_stats(),
+            "calibration": db.load_calibration(),
+            "plan_stats": db.plan_stats(),
+        }
         try:
             out["metrics"] = business_metrics(db)
         except Exception:
@@ -117,24 +134,28 @@ def _stats() -> dict:
 
 def _paper() -> dict:
     from data.database import SignalDB
+
     with SignalDB() as db:
         return {"paper": db.paper_trade_stats()["overall"]}
 
 
 def _learn() -> dict:
     from brain.calibrator import learn
+
     result = learn()
     return {"profile": result["profile"]}
 
 
 def _loop() -> dict:
     from brain.agent import loop_health
+
     return loop_health()
 
 
 def _weekly(days: int = 7) -> dict:
     from brain.weekly import weekly_review
     from data.database import SignalDB
+
     with SignalDB() as db:
         return weekly_review(db, days=min(90, max(1, int(days))))
 
@@ -142,6 +163,7 @@ def _weekly(days: int = 7) -> dict:
 def _practice(days: int = 30) -> dict:
     from brain.practice import practice_scorecard
     from data.database import SignalDB
+
     with SignalDB() as db:
         return practice_scorecard(db, days=min(365, max(1, int(days))))
 
@@ -150,115 +172,173 @@ TOOLS = [
     {
         "name": "cryptobrain_health",
         "description": "CryptoBrain system health: data feeds, database, risk gate, "
-                       "learning store, MCP and LLM availability.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "learning store, MCP and LLM availability.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_morning",
         "description": "Morning desk briefing: every watchlist asset with the final "
-                       "desk decision (desk-first), risk gate, pending reviews, "
-                       "exposure and paper-book stats.",
-        "inputSchema": {"type": "object", "properties": {
-            "symbols": {"type": "array", "items": {"type": "string"},
-                        "description": "optional watchlist, e.g. [BTCUSDT, ETHUSDT, XAUUSD]"},
-            "timeframe": {"type": "string", "default": "15m"},
-        }, "additionalProperties": False},
+        "desk decision (desk-first), risk gate, pending reviews, "
+        "exposure and paper-book stats.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "symbols": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "optional watchlist, e.g. [BTCUSDT, ETHUSDT, XAUUSD]",
+                },
+                "timeframe": {"type": "string", "default": "15m"},
+            },
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_scan",
         "description": "Fresh scan of one symbol: signal, desk decision, plans.",
-        "inputSchema": {"type": "object", "properties": {
-            "symbol": {"type": "string", "default": "BTCUSDT"},
-            "timeframe": {"type": "string", "default": "15m"},
-        }, "required": ["symbol"], "additionalProperties": False},
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "symbol": {"type": "string", "default": "BTCUSDT"},
+                "timeframe": {"type": "string", "default": "15m"},
+            },
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_desk",
         "description": "Strict professional desk report (intelligence) for one symbol: "
-                       "signal card, self-review, risk, scenario B.",
-        "inputSchema": {"type": "object", "properties": {
-            "symbol": {"type": "string", "default": "BTCUSDT"},
-            "timeframe": {"type": "string", "default": "15m"},
-        }, "required": ["symbol"], "additionalProperties": False},
+        "signal card, self-review, risk, scenario B.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "symbol": {"type": "string", "default": "BTCUSDT"},
+                "timeframe": {"type": "string", "default": "15m"},
+            },
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_risk",
         "description": "Risk & discipline gate: daily/weekly limits, drawdown ladder, "
-                       "trader-state flags, progression level. Includes a Monte Carlo "
-                       "risk-of-ruin table (expected DD / ruin prob / streak / TTR).",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "trader-state flags, progression level. Includes a Monte Carlo "
+        "risk-of-ruin table (expected DD / ruin prob / streak / TTR).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_monte",
         "description": "Monte Carlo risk-of-ruin sweep across risk %/trade. Returns "
-                       "expected max drawdown, ruin probability, longest losing streak "
-                       "and time-to-recovery using NET realised paper outcomes.",
-        "inputSchema": {"type": "object", "properties": {
-            "samples": {"type": "integer", "default": 2000},
-            "seed": {"type": "integer"},
-        }, "additionalProperties": False},
+        "expected max drawdown, ruin probability, longest losing streak "
+        "and time-to-recovery using NET realised paper outcomes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "samples": {"type": "integer", "default": 2000},
+                "seed": {"type": "integer"},
+            },
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_ask",
         "description": "Ask the desk a natural-language question (risk, exposure, "
-                       "pending reviews, journal, calibration, stats, market scan, …).",
-        "inputSchema": {"type": "object", "properties": {
-            "question": {"type": "string"},
-            "symbol": {"type": "string", "default": None},
-        }, "required": ["question"], "additionalProperties": False},
+        "pending reviews, journal, calibration, stats, market scan, …).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string"},
+                "symbol": {"type": "string", "default": None},
+            },
+            "required": ["question"],
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_pending",
         "description": "Signals awaiting human approval.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_stats",
         "description": "What the engine has learned: backtest stats, calibration "
-                       "profile, plan distribution, business scorecard.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "profile, plan distribution, business scorecard.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_paper",
         "description": "Paper-trading book: tracked/open/closed trades, win rate, avg R.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_learn",
         "description": "Recompute the self-improvement calibration profile from "
-                       "stored backtest + paper outcomes.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "stored backtest + paper outcomes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_loop",
         "description": "The one daily number: real/canonical paper n, net expectancy, "
-                       "per-setup progress, and whether the graduation bar is moving. "
-                       "Same payload as `python main.py daily` / GET /api/loop-health.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "per-setup progress, and whether the graduation bar is moving. "
+        "Same payload as `python main.py daily` / GET /api/loop-health.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_weekly",
         "description": "W3 weekly trader review: this week vs all time on the canonical "
-                       "live paper book (net of costs), R-multiple distribution, rule "
-                       "violations + repeating mistakes, per-setup graduation tracker "
-                       "with the exact missing evidence, one next practice task and an "
-                       "advisory grade. Same computation as `python main.py weekly`, "
-                       "GET /api/weekly, and the root MCP weekly_review tool.",
-        "inputSchema": {"type": "object",
-                        "properties": {"days": {"type": "integer", "default": 7}},
-                        "additionalProperties": False},
+        "live paper book (net of costs), R-multiple distribution, rule "
+        "violations + repeating mistakes, per-setup graduation tracker "
+        "with the exact missing evidence, one next practice task and an "
+        "advisory grade. Same computation as `python main.py weekly`, "
+        "GET /api/weekly, and the root MCP weekly_review tool.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"days": {"type": "integer", "default": 7}},
+            "additionalProperties": False,
+        },
     },
     {
         "name": "cryptobrain_practice",
         "description": "W3.4 practice calibration: reads the trader committed on the Chart "
-                       "tab, scored for agreement with the desk's read at that moment — bias "
-                       "and final-call agreement, component means, weakest link with one "
-                       "coaching takeaway and recent attempts. Coaching memory only — not "
-                       "evidence, feeds no gate. Same computation as `python main.py practice`, "
-                       "GET /api/practice, and the root MCP practice_scorecard tool.",
-        "inputSchema": {"type": "object",
-                        "properties": {"days": {"type": "integer", "default": 30}},
-                        "additionalProperties": False},
+        "tab, scored for agreement with the desk's read at that moment — bias "
+        "and final-call agreement, component means, weakest link with one "
+        "coaching takeaway and recent attempts. Coaching memory only — not "
+        "evidence, feeds no gate. Same computation as `python main.py practice`, "
+        "GET /api/practice, and the root MCP practice_scorecard tool.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"days": {"type": "integer", "default": 30}},
+            "additionalProperties": False,
+        },
     },
 ]
 
@@ -301,13 +381,14 @@ def _call_tool(name: str, arguments: dict | None) -> dict:
 
 def _handle_call_tool(name: str, arguments: dict | None) -> CallToolResult:
     from mcp.types import CallToolResult, TextContent
+
     try:
         result = _call_tool(name, arguments)
         text = _json_lines(result)
     except Exception as exc:
-        text = json.dumps({"ok": False,
-                           "error": f"{type(exc).__name__}: {exc}"},
-                          default=str)
+        text = json.dumps(
+            {"ok": False, "error": f"{type(exc).__name__}: {exc}"}, default=str
+        )
     return CallToolResult(content=[TextContent(type="text", text=text)])
 
 
@@ -317,19 +398,28 @@ async def _serve() -> None:
     from mcp.types import ListToolsResult, Tool
 
     async def list_tools(_ctx, _params) -> ListToolsResult:
-        return ListToolsResult(tools=[
-            Tool(name=t["name"], description=t["description"],
-                 inputSchema=t["inputSchema"]) for t in TOOLS])
+        return ListToolsResult(
+            tools=[
+                Tool(
+                    name=t["name"],
+                    description=t["description"],
+                    inputSchema=t["inputSchema"],
+                )
+                for t in TOOLS
+            ]
+        )
 
     async def call_tool(_ctx, params) -> CallToolResult:
         return _handle_call_tool(params.name, params.arguments)
 
-    server = Server("cryptobrain", version=VERSION,
-                    on_list_tools=list_tools, on_call_tool=call_tool)
+    server = Server(
+        "cryptobrain", version=VERSION, on_list_tools=list_tools, on_call_tool=call_tool
+    )
 
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream,
-                         server.create_initialization_options())
+        await server.run(
+            read_stream, write_stream, server.create_initialization_options()
+        )
 
 
 def run() -> int:
@@ -337,8 +427,10 @@ def run() -> int:
     try:
         import mcp  # noqa: F401
     except Exception:
-        print("mcp package not installed.  Install it with:  pip install mcp",
-              file=sys.stderr)
+        print(
+            "mcp package not installed.  Install it with:  pip install mcp",
+            file=sys.stderr,
+        )
         return 1
     try:
         asyncio.run(_serve())

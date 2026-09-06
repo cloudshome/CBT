@@ -1,13 +1,18 @@
 """P22.3: drills stay open unless operator evidence is complete."""
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
-from ops.release_drills import (DRILLS, DrillError, evaluate_evidence,
-                                evaluate_file, p22_status)
+from ops.release_drills import (
+    DRILLS,
+    DrillError,
+    evaluate_evidence,
+    evaluate_file,
+    p22_status,
+)
 
 
 def _complete(drill_id: str) -> dict:
@@ -73,7 +78,8 @@ def test_live_execution_flag_must_stay_false():
 def test_complete_evidence_passes_and_status_can_go_green(tmp_path):
     for drill_id in DRILLS:
         (tmp_path / f"{drill_id}.json").write_text(
-            json.dumps(_complete(drill_id)), encoding="utf-8")
+            json.dumps(_complete(drill_id)), encoding="utf-8"
+        )
     status = p22_status(tmp_path)
     assert status["p22_complete"] is True
     assert all(r["passed"] for r in status["results"])
@@ -88,6 +94,7 @@ def test_evaluate_file_rejects_garbage(tmp_path):
 
 def test_cli_drills_open(capsys):
     from main import main
+
     assert main(["release", "drills", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["p22_complete"] is False

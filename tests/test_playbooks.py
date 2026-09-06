@@ -1,31 +1,43 @@
 """Tests for the per-asset professional playbooks (decisions A1, B1, B8)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
 import pandas as pd
 
-from brain.playbooks import (get_playbook, primary_plan_types, apply_playbook,
-                             session_status, previous_day_levels, gold_gates,
-                             eth_gates)
+from brain.playbooks import (
+    apply_playbook,
+    eth_gates,
+    get_playbook,
+    previous_day_levels,
+    primary_plan_types,
+    session_status,
+)
 
 
 def _d1_frame() -> pd.DataFrame:
-    return pd.DataFrame({
-        "ts": [1_780_000_000_000, 1_780_086_400_000],
-        "open": [2000.0, 2010.0],
-        "high": [2015.0, 2030.0],
-        "low": [1990.0, 2005.0],
-        "close": [2010.0, 2025.0],
-        "volume": [100.0, 120.0],
-    })
+    return pd.DataFrame(
+        {
+            "ts": [1_780_000_000_000, 1_780_086_400_000],
+            "open": [2000.0, 2010.0],
+            "high": [2015.0, 2030.0],
+            "low": [1990.0, 2005.0],
+            "close": [2010.0, 2025.0],
+            "volume": [100.0, 120.0],
+        }
+    )
 
 
 def test_primary_family_narrowing():
     """Decision A1: only the chosen family may become the best signal."""
     types = primary_plan_types("BTCUSDT")
-    assert types == {"Sweep Reversal Buy", "Sweep Reversal Sell",
-                     "Buy Pullback", "Sell Pullback"}
+    assert types == {
+        "Sweep Reversal Buy",
+        "Sweep Reversal Sell",
+        "Buy Pullback",
+        "Sell Pullback",
+    }
     assert "Breakout Buy" not in types
     assert "FVG Retest Buy" not in types
 
@@ -45,9 +57,13 @@ def test_playbooks_are_per_asset():
 
 def test_gold_news_block():
     """Decision B8: gold goes no-entry around high-impact US data."""
-    res = apply_playbook("XAUUSD", "BUY", now=datetime(2026, 8, 9, 14, 0,
-                                                       tzinfo=timezone.utc),
-                         news_imminent=True, df_1d=_d1_frame())
+    res = apply_playbook(
+        "XAUUSD",
+        "BUY",
+        now=datetime(2026, 8, 9, 14, 0, tzinfo=timezone.utc),
+        news_imminent=True,
+        df_1d=_d1_frame(),
+    )
     assert res["blocked"] is True
     assert "us_data_countdown" in res["blocking_checks"]
 
@@ -55,21 +71,29 @@ def test_gold_news_block():
 def test_gold_session_warn(monkeypatch):
     """Off-window session warns when warn mode is explicitly selected."""
     monkeypatch.setattr("brain.playbooks.GOLD_SESSION_MODE", "warn")
-    res = apply_playbook("XAUUSD", "BUY", now=datetime(2026, 8, 9, 3, 0,
-                                                       tzinfo=timezone.utc),
-                         news_imminent=False, df_1d=_d1_frame())
+    res = apply_playbook(
+        "XAUUSD",
+        "BUY",
+        now=datetime(2026, 8, 9, 3, 0, tzinfo=timezone.utc),
+        news_imminent=False,
+        df_1d=_d1_frame(),
+    )
     assert res["blocked"] is False
     assert any(c["check"] == "session_window" for c in res["checks"])
 
 
 def test_gold_session_block_mode():
     import brain.playbooks as pb
+
     old = pb.GOLD_SESSION_MODE
     pb.GOLD_SESSION_MODE = "block"
     try:
-        res = apply_playbook("XAUUSD", "BUY", now=datetime(2026, 8, 9, 3, 0,
-                                                           tzinfo=timezone.utc),
-                             news_imminent=False)
+        res = apply_playbook(
+            "XAUUSD",
+            "BUY",
+            now=datetime(2026, 8, 9, 3, 0, tzinfo=timezone.utc),
+            news_imminent=False,
+        )
         assert res["blocked"] is True
         assert "session_window" in res["blocking_checks"]
     finally:

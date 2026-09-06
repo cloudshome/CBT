@@ -49,25 +49,26 @@ P12.3.3 closes the same overlap gap for sample *counts*: ``N_eff = N / overlap``
 standard error / 95% confidence interval uses ``√N_eff`` rather than ``√N`` so
 the reported uncertainty does not silently shrink ~30×.
 """
+
 from __future__ import annotations
 
 import math
 import statistics
 import time
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from config import BACKTEST_STEP, GOLD_LONDON_WINDOW, GOLD_NY_WINDOW
 from data.backtester import WIN_SET
-from engine.sentiment import BUCKETS
+from data.binance_client import TIMEFRAME_TO_MS
+from data.costs import (
+    CostModel,
+    calculate_trade_cost,
+)
 from data.provenance import normalize as _provenance_normalize
 from data.provenance import parse_source_key as _provenance_parse
 from data.provenance import source_key as _provenance_key
-from data.binance_client import TIMEFRAME_TO_MS
-from data.costs import (
-    CostModel, TradeCost, calculate_trade_cost, DEFAULT_STOP_DISTANCE_PCT,
-    DEFAULT_HOLDING_HOURS,
-)
 from data.validation import DEFAULT_MIN_DECIDED, VALIDATION_CRITERIA, meets_bar
+from engine.sentiment import BUCKETS
 
 DECIDED_BACKTEST = set(WIN_SET) | {"LOSS"}
 DECIDED_PAPER = {"TP_HIT", "STOP_LOSS"}
@@ -83,11 +84,11 @@ SESSION_NEWYORK = "newyork"
 SESSION_NAMES = (SESSION_ASIA, SESSION_LONDON, SESSION_NEWYORK)
 SESSION_LABELS = {
     SESSION_ASIA: f"Asia / off-window (outside {GOLD_LONDON_WINDOW[0]:02d}:00–"
-                  f"{GOLD_NY_WINDOW[1]:02d}:00 UTC)",
+    f"{GOLD_NY_WINDOW[1]:02d}:00 UTC)",
     SESSION_LONDON: f"London ({GOLD_LONDON_WINDOW[0]:02d}:00–"
-                    f"{GOLD_NY_WINDOW[0]:02d}:00 UTC)",
+    f"{GOLD_NY_WINDOW[0]:02d}:00 UTC)",
     SESSION_NEWYORK: f"New York ({GOLD_NY_WINDOW[0]:02d}:00–"
-                     f"{GOLD_NY_WINDOW[1]:02d}:00 UTC)",
+    f"{GOLD_NY_WINDOW[1]:02d}:00 UTC)",
 }
 
 MS_PER_HOUR = 3_600_000
@@ -107,7 +108,7 @@ def session_of_hour(hour: int) -> str:
     return SESSION_ASIA
 
 
-def session_of_ts(ts_ms: Optional[int]) -> Optional[str]:
+def session_of_ts(ts_ms: int | None) -> str | None:
     """Epoch-milliseconds → session bucket; ``None`` when there is no clock."""
     if ts_ms is None:
         return None
@@ -121,18 +122,39 @@ def session_of_ts(ts_ms: Optional[int]) -> Optional[str]:
 # ──────────────────────────────────────────────────────────────────────────
 # Row adapters — every source is flattened to one honest row shape
 # ──────────────────────────────────────────────────────────────────────────
-def _row(ts, side, setup, regime, r, outcome, holding_hours,
-         symbol="", timeframe="", source="", entry=None, stop_loss=None,
-         r_net=None, fee_r=None, slip_r=None, funding_r=None, cost_r=None,
-         funding_rate=None, cvd_z=None, oi_trend=None,
-         horizon_hours: Optional[float] = None, step: Optional[int] = None,
-         cost_model: Optional[CostModel] = None,
-         exchange=None, market=None, price_type=None,
-         sentiment_bucket=None, sentiment_score=None,
-         sentiment_intensity=None) -> dict:
+def _row(
+    ts,
+    side,
+    setup,
+    regime,
+    r,
+    outcome,
+    holding_hours,
+    symbol="",
+    timeframe="",
+    source="",
+    entry=None,
+    stop_loss=None,
+    r_net=None,
+    fee_r=None,
+    slip_r=None,
+    funding_r=None,
+    cost_r=None,
+    funding_rate=None,
+    cvd_z=None,
+    oi_trend=None,
+    horizon_hours: float | None = None,
+    step: int | None = None,
+    cost_model: CostModel | None = None,
+    exchange=None,
+    market=None,
+    price_type=None,
+    sentiment_bucket=None,
+    sentiment_score=None,
+    sentiment_intensity=None,
+) -> dict:
     gross_r = float(r) if r is not None else 0.0
-    hold = (round(float(holding_hours), 3)
-            if holding_hours is not None else None)
+    hold = round(float(holding_hours), 3) if holding_hours is not None else None
 
     # If net R and costs are not pre-computed, calculate via the cost model
     if r_net is None or fee_r is None:
@@ -159,14 +181,19 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
     # series produced it. Missing fields normalise to the canonical live
     # series, which is what all pre-provenance history actually is.
     prov_exchange, prov_market, prov_price_type = _provenance_normalize(
-        exchange, market, price_type)
+        exchange, market, price_type
+    )
 
     # P16 — the sentiment colour at signal time. Pre-P16 rows carry NULL and
     # must stay UNKNOWN (never silently re-labelled slate).
     s_bucket = sentiment_bucket or "UNKNOWN"
-    s_intensity = float(sentiment_intensity) if sentiment_intensity is not None else None
+    s_intensity = (
+        float(sentiment_intensity) if sentiment_intensity is not None else None
+    )
     if s_bucket in ("bull", "bear", "deep_bull", "deep_bear"):
-        s_depth = "DEEP" if (s_intensity is not None and s_intensity >= 0.5) else "FRESH"
+        s_depth = (
+            "DEEP" if (s_intensity is not None and s_intensity >= 0.5) else "FRESH"
+        )
     elif s_bucket == "slate":
         s_depth = "SLATE"
     else:
@@ -199,18 +226,24 @@ def _row(ts, side, setup, regime, r, outcome, holding_hours,
         "price_type": prov_price_type,
         "source_key": _provenance_key(prov_exchange, prov_market, prov_price_type),
         "sentiment_bucket": s_bucket,
-        "sentiment_score": float(sentiment_score) if sentiment_score is not None else None,
+        "sentiment_score": float(sentiment_score)
+        if sentiment_score is not None
+        else None,
         "sentiment_intensity": s_intensity,
         "sentiment_depth": s_depth,
     }
 
 
-def rows_from_graded(graded: Iterable, symbol: str = "", timeframe: str = "",
-                     horizon_hours: Optional[float] = None,
-                     cost_model: Optional[CostModel] = None,
-                     exchange: Optional[str] = None,
-                     market: Optional[str] = None,
-                     price_type: Optional[str] = None) -> list[dict]:
+def rows_from_graded(
+    graded: Iterable,
+    symbol: str = "",
+    timeframe: str = "",
+    horizon_hours: float | None = None,
+    cost_model: CostModel | None = None,
+    exchange: str | None = None,
+    market: str | None = None,
+    price_type: str | None = None,
+) -> list[dict]:
     """Decided rows from in-memory `GradedPlan` objects (the grader's output).
 
     ``horizon_hours`` filters to one horizon so a multi-horizon backtest is
@@ -226,26 +259,36 @@ def rows_from_graded(graded: Iterable, symbol: str = "", timeframe: str = "",
             continue
         if g.outcome not in DECIDED_BACKTEST:
             continue
-        rows.append(_row(
-            ts=g.ts, side=g.action, setup=g.plan_type, regime=g.regime,
-            r=g.rr_achieved, outcome=g.outcome,
-            holding_hours=getattr(g, "holding_hours", None),
-            symbol=symbol, timeframe=timeframe, source="backtest",
-            entry=getattr(g, "entry", None),
-            r_net=getattr(g, "rr_net", None),
-            fee_r=getattr(g, "fee_r", None),
-            slip_r=getattr(g, "slip_r", None),
-            funding_r=getattr(g, "funding_r", None),
-            cost_r=getattr(g, "cost_r", None),
-            horizon_hours=getattr(g, "horizon_hours", None),
-            cost_model=cost_model,
-            exchange=exchange, market=market, price_type=price_type,
-        ))
+        rows.append(
+            _row(
+                ts=g.ts,
+                side=g.action,
+                setup=g.plan_type,
+                regime=g.regime,
+                r=g.rr_achieved,
+                outcome=g.outcome,
+                holding_hours=getattr(g, "holding_hours", None),
+                symbol=symbol,
+                timeframe=timeframe,
+                source="backtest",
+                entry=getattr(g, "entry", None),
+                r_net=getattr(g, "rr_net", None),
+                fee_r=getattr(g, "fee_r", None),
+                slip_r=getattr(g, "slip_r", None),
+                funding_r=getattr(g, "funding_r", None),
+                cost_r=getattr(g, "cost_r", None),
+                horizon_hours=getattr(g, "horizon_hours", None),
+                cost_model=cost_model,
+                exchange=exchange,
+                market=market,
+                price_type=price_type,
+            )
+        )
     rows.sort(key=lambda r: (r["ts"] is None, r["ts"]))
     return rows
 
 
-def _source_sql(cols: set, source_key: Optional[str], args: list) -> str:
+def _source_sql(cols: set, source_key: str | None, args: list) -> str:
     """P12.11 source filter for the `backtest_results` reader.
 
     The canonical key ``""`` also matches legacy NULL rows: history written
@@ -261,12 +304,15 @@ def _source_sql(cols: set, source_key: Optional[str], args: list) -> str:
     return " AND source_key=?"
 
 
-def rows_from_backtest_db(db, symbol: Optional[str] = None,
-                          include_sim: bool = True,
-                          since_ts: Optional[int] = None,
-                          until_ts: Optional[int] = None,
-                          cost_model: Optional[CostModel] = None,
-                          source_key: Optional[str] = None) -> list[dict]:
+def rows_from_backtest_db(
+    db,
+    symbol: str | None = None,
+    include_sim: bool = True,
+    since_ts: int | None = None,
+    until_ts: int | None = None,
+    cost_model: CostModel | None = None,
+    source_key: str | None = None,
+) -> list[dict]:
     """Decided rows from the stored `backtest_results` table.
 
     ``since_ts`` / ``until_ts`` bound the signal bar (inclusive) so one
@@ -275,17 +321,42 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
     """
     # Verify available columns gracefully for backwards compatibility
     cols = {r["name"] for r in db.conn.execute("PRAGMA table_info(backtest_results)")}
-    sel_cols = ["ts", "symbol", "timeframe", "plan_type", "action", "outcome",
-                "rr_achieved", "regime", "holding_hours", "horizon_hours"]
-    for extra in ("entry", "trigger_level", "rr_net", "fee_r", "slip_r", "funding_r",
-                  "cost_r", "step", "exchange", "market", "price_type",
-                  "sentiment_bucket", "sentiment_score", "sentiment_intensity"):
+    sel_cols = [
+        "ts",
+        "symbol",
+        "timeframe",
+        "plan_type",
+        "action",
+        "outcome",
+        "rr_achieved",
+        "regime",
+        "holding_hours",
+        "horizon_hours",
+    ]
+    for extra in (
+        "entry",
+        "trigger_level",
+        "rr_net",
+        "fee_r",
+        "slip_r",
+        "funding_r",
+        "cost_r",
+        "step",
+        "exchange",
+        "market",
+        "price_type",
+        "sentiment_bucket",
+        "sentiment_score",
+        "sentiment_intensity",
+    ):
         if extra in cols:
             sel_cols.append(extra)
 
-    q = (f"SELECT {', '.join(sel_cols)} "
-         "FROM backtest_results WHERE outcome IN "
-         f"({','.join('?' * len(DECIDED_BACKTEST))})")
+    q = (
+        f"SELECT {', '.join(sel_cols)} "
+        "FROM backtest_results WHERE outcome IN "
+        f"({','.join('?' * len(DECIDED_BACKTEST))})"
+    )
     args: list = sorted(DECIDED_BACKTEST)
     if symbol:
         q += " AND symbol=?"
@@ -304,38 +375,58 @@ def rows_from_backtest_db(db, symbol: Optional[str] = None,
     out = []
     for r in db.conn.execute(q, args).fetchall():
         d = dict(r)
-        out.append(_row(
-            ts=d.get("ts"), side=d.get("action"), setup=d.get("plan_type"),
-            regime=d.get("regime"), r=d.get("rr_achieved") or 0.0,
-            outcome=d.get("outcome"), holding_hours=d.get("holding_hours"),
-            symbol=d.get("symbol"), timeframe=d.get("timeframe"),
-            source="backtest", entry=d.get("entry"),
-            r_net=d.get("rr_net"), fee_r=d.get("fee_r"),
-            slip_r=d.get("slip_r"), funding_r=d.get("funding_r"),
-            cost_r=d.get("cost_r"), cost_model=cost_model,
-            horizon_hours=d.get("horizon_hours"), step=d.get("step"),
-            exchange=d.get("exchange"), market=d.get("market"),
-            price_type=d.get("price_type"),
-            sentiment_bucket=d.get("sentiment_bucket"),
-            sentiment_score=d.get("sentiment_score"),
-            sentiment_intensity=d.get("sentiment_intensity"),
-        ))
+        out.append(
+            _row(
+                ts=d.get("ts"),
+                side=d.get("action"),
+                setup=d.get("plan_type"),
+                regime=d.get("regime"),
+                r=d.get("rr_achieved") or 0.0,
+                outcome=d.get("outcome"),
+                holding_hours=d.get("holding_hours"),
+                symbol=d.get("symbol"),
+                timeframe=d.get("timeframe"),
+                source="backtest",
+                entry=d.get("entry"),
+                r_net=d.get("rr_net"),
+                fee_r=d.get("fee_r"),
+                slip_r=d.get("slip_r"),
+                funding_r=d.get("funding_r"),
+                cost_r=d.get("cost_r"),
+                cost_model=cost_model,
+                horizon_hours=d.get("horizon_hours"),
+                step=d.get("step"),
+                exchange=d.get("exchange"),
+                market=d.get("market"),
+                price_type=d.get("price_type"),
+                sentiment_bucket=d.get("sentiment_bucket"),
+                sentiment_score=d.get("sentiment_score"),
+                sentiment_intensity=d.get("sentiment_intensity"),
+            )
+        )
     return out
 
 
-def rows_from_paper_db(db, symbol: Optional[str] = None,
-                       include_sim: bool = False,
-                       since_ts: Optional[int] = None,
-                       cost_model: Optional[CostModel] = None,
-                       source_key: Optional[str] = None) -> list[dict]:
+def rows_from_paper_db(
+    db,
+    symbol: str | None = None,
+    include_sim: bool = False,
+    since_ts: int | None = None,
+    cost_model: CostModel | None = None,
+    source_key: str | None = None,
+) -> list[dict]:
     """Decided rows from the real paper book (TP_HIT / STOP_LOSS).
 
     Holding time here is measured, not assumed: ``closed_ts - opened_ts``.
     ``since_ts`` bounds ``closed_ts`` (the same era-separation the
     backtest book uses, on the column paper trades actually close on).
     """
-    rows = db.decided_paper_rows(symbol=symbol, exclude_sim=not include_sim,
-                                 since_ts=since_ts, source_key=source_key)
+    rows = db.decided_paper_rows(
+        symbol=symbol,
+        exclude_sim=not include_sim,
+        since_ts=since_ts,
+        source_key=source_key,
+    )
     out = []
     for d in rows:
         opened = d.get("opened_ts")
@@ -344,21 +435,34 @@ def rows_from_paper_db(db, symbol: Optional[str] = None,
         if opened and closed and closed >= opened:
             hold = (closed - opened) / MS_PER_HOUR
         ts = closed or opened or d.get("created_ts")
-        out.append(_row(
-            ts=ts, side=d.get("action"), setup=d.get("plan_type"),
-            regime=d.get("regime"), r=d.get("rr_achieved") or 0.0,
-            outcome=d.get("outcome"), holding_hours=hold,
-            symbol=d.get("symbol"), timeframe=d.get("timeframe"),
-            source="paper", entry=d.get("entry"), stop_loss=d.get("stop_loss"),
-            r_net=d.get("rr_net"), fee_r=d.get("fee_r"),
-            slip_r=d.get("slip_r"), funding_r=d.get("funding_r"),
-            cost_r=d.get("cost_r"), cost_model=cost_model,
-            exchange=d.get("exchange"), market=d.get("market"),
-            price_type=d.get("price_type"),
-            sentiment_bucket=d.get("sentiment_bucket"),
-            sentiment_score=d.get("sentiment_score"),
-            sentiment_intensity=d.get("sentiment_intensity"),
-        ))
+        out.append(
+            _row(
+                ts=ts,
+                side=d.get("action"),
+                setup=d.get("plan_type"),
+                regime=d.get("regime"),
+                r=d.get("rr_achieved") or 0.0,
+                outcome=d.get("outcome"),
+                holding_hours=hold,
+                symbol=d.get("symbol"),
+                timeframe=d.get("timeframe"),
+                source="paper",
+                entry=d.get("entry"),
+                stop_loss=d.get("stop_loss"),
+                r_net=d.get("rr_net"),
+                fee_r=d.get("fee_r"),
+                slip_r=d.get("slip_r"),
+                funding_r=d.get("funding_r"),
+                cost_r=d.get("cost_r"),
+                cost_model=cost_model,
+                exchange=d.get("exchange"),
+                market=d.get("market"),
+                price_type=d.get("price_type"),
+                sentiment_bucket=d.get("sentiment_bucket"),
+                sentiment_score=d.get("sentiment_score"),
+                sentiment_intensity=d.get("sentiment_intensity"),
+            )
+        )
     return out
 
 
@@ -367,27 +471,58 @@ def rows_from_paper_db(db, symbol: Optional[str] = None,
 # ──────────────────────────────────────────────────────────────────────────
 def _empty_stats() -> dict:
     return {
-        "n": 0, "decided": 0, "wins": 0, "losses": 0, "win_rate": None,
-        "expectancy": 0.0, "avg_win_r": None, "avg_loss_r": None,
-        "pf": None, "total_r": 0.0, "max_drawdown_r": 0.0,
-        "sharpe": None, "sortino": None, "calmar": None,
-        "stdev_r": None, "best_r": None, "worst_r": None,
-        "max_win_streak": 0, "max_loss_streak": 0,
+        "n": 0,
+        "decided": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": None,
+        "expectancy": 0.0,
+        "avg_win_r": None,
+        "avg_loss_r": None,
+        "pf": None,
+        "total_r": 0.0,
+        "max_drawdown_r": 0.0,
+        "sharpe": None,
+        "sortino": None,
+        "calmar": None,
+        "stdev_r": None,
+        "best_r": None,
+        "worst_r": None,
+        "max_win_streak": 0,
+        "max_loss_streak": 0,
         # Net metrics (P12.6)
-        "wins_net": 0, "losses_net": 0, "win_rate_net": None,
-        "expectancy_net": 0.0, "avg_win_r_net": None, "avg_loss_r_net": None,
-        "pf_net": None, "total_r_net": 0.0, "max_drawdown_r_net": 0.0,
-        "sharpe_net": None, "sortino_net": None, "calmar_net": None,
-        "stdev_r_net": None, "best_r_net": None, "worst_r_net": None,
-        "max_win_streak_net": 0, "max_loss_streak_net": 0,
+        "wins_net": 0,
+        "losses_net": 0,
+        "win_rate_net": None,
+        "expectancy_net": 0.0,
+        "avg_win_r_net": None,
+        "avg_loss_r_net": None,
+        "pf_net": None,
+        "total_r_net": 0.0,
+        "max_drawdown_r_net": 0.0,
+        "sharpe_net": None,
+        "sortino_net": None,
+        "calmar_net": None,
+        "stdev_r_net": None,
+        "best_r_net": None,
+        "worst_r_net": None,
+        "max_win_streak_net": 0,
+        "max_loss_streak_net": 0,
         # Cost breakdown
-        "fee_r": 0.0, "slip_r": 0.0, "funding_r": 0.0, "cost_r": 0.0,
-        "avg_holding_hours": None, "median_holding_hours": None,
+        "fee_r": 0.0,
+        "slip_r": 0.0,
+        "funding_r": 0.0,
+        "cost_r": 0.0,
+        "avg_holding_hours": None,
+        "median_holding_hours": None,
         "holding_samples": 0,
         # Effective sample size (P12.3.3) — overlap-corrected, honest counts
-        "n_eff": 0.0, "overlap": None,
-        "expectancy_se": None, "expectancy_ci95": None,
-        "expectancy_net_se": None, "expectancy_net_ci95": None,
+        "n_eff": 0.0,
+        "overlap": None,
+        "expectancy_se": None,
+        "expectancy_ci95": None,
+        "expectancy_net_se": None,
+        "expectancy_net_ci95": None,
     }
 
 
@@ -447,8 +582,9 @@ def overlap_factor(row: dict, default_step: int = BACKTEST_STEP) -> float:
     return max(1.0, horizon_bars / step)
 
 
-def effective_sample_size(rows: list[dict],
-                          default_step: int = BACKTEST_STEP) -> tuple[float, Optional[float]]:
+def effective_sample_size(
+    rows: list[dict], default_step: int = BACKTEST_STEP
+) -> tuple[float, float | None]:
     """``(n_eff, overlap)`` — honest independent sample size.
 
     ``n_eff = Σ 1/overlap_i``: each row contributes one independent unit
@@ -497,13 +633,16 @@ def trade_stats(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
     losses = [r for r in r_values if r < 0]
     gross_win = sum(wins)
     gross_loss = abs(sum(losses))
-    pf = (round(gross_win / gross_loss, 3) if gross_loss > 0
-          else (99.0 if gross_win > 0 else None))
+    pf = (
+        round(gross_win / gross_loss, 3)
+        if gross_loss > 0
+        else (99.0 if gross_win > 0 else None)
+    )
     mean_r = sum(r_values) / n
     stdev = statistics.stdev(r_values) if n > 1 else None
-    sharpe = (round(mean_r / stdev, 3) if stdev else None)
+    sharpe = round(mean_r / stdev, 3) if stdev else None
     downside = math.sqrt(sum(min(r, 0.0) ** 2 for r in r_values) / n)
-    sortino = (round(mean_r / downside, 3) if downside > 0 else None)
+    sortino = round(mean_r / downside, 3) if downside > 0 else None
     dd = max_drawdown_r(r_values)
     total_r = round(sum(r_values), 3)
     calmar = round(total_r / dd, 3) if dd > 0 else None
@@ -514,13 +653,16 @@ def trade_stats(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
     losses_net = [r for r in r_net_values if r <= 0]
     net_win_sum = sum(wins_net)
     net_loss_sum = abs(sum(losses_net))
-    pf_net = (round(net_win_sum / net_loss_sum, 3) if net_loss_sum > 0
-              else (99.0 if net_win_sum > 0 else None))
+    pf_net = (
+        round(net_win_sum / net_loss_sum, 3)
+        if net_loss_sum > 0
+        else (99.0 if net_win_sum > 0 else None)
+    )
     mean_r_net = sum(r_net_values) / n
     stdev_net = statistics.stdev(r_net_values) if n > 1 else None
-    sharpe_net = (round(mean_r_net / stdev_net, 3) if stdev_net else None)
+    sharpe_net = round(mean_r_net / stdev_net, 3) if stdev_net else None
     downside_net = math.sqrt(sum(min(r, 0.0) ** 2 for r in r_net_values) / n)
-    sortino_net = (round(mean_r_net / downside_net, 3) if downside_net > 0 else None)
+    sortino_net = round(mean_r_net / downside_net, 3) if downside_net > 0 else None
     dd_net = max_drawdown_r(r_net_values)
     total_r_net = round(sum(r_net_values), 3)
     calmar_net = round(total_r_net / dd_net, 3) if dd_net > 0 else None
@@ -537,7 +679,7 @@ def trade_stats(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
     # ── Effective sample size: honest standard error & 95% CI (P12.3.3) ────
     # SE = σ / √N_eff.  The raw N would silently narrow every interval by the
     # overlap factor (~30× on a 24h/15m walk-forward); N_eff does not.
-    def _ci(mean: float, sd: Optional[float]) -> tuple:
+    def _ci(mean: float, sd: float | None) -> tuple:
         if not sd or n_eff <= 0:
             return None, None
         se = sd / math.sqrt(n_eff)
@@ -579,7 +721,9 @@ def trade_stats(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
         "win_rate_net": round(len(wins_net) / n, 3),
         "expectancy_net": round(mean_r_net, 3),
         "avg_win_r_net": round(net_win_sum / len(wins_net), 3) if wins_net else None,
-        "avg_loss_r_net": round(sum(losses_net) / len(losses_net), 3) if losses_net else None,
+        "avg_loss_r_net": round(sum(losses_net) / len(losses_net), 3)
+        if losses_net
+        else None,
         "pf_net": pf_net,
         "total_r_net": total_r_net,
         "max_drawdown_r_net": dd_net,
@@ -597,8 +741,7 @@ def trade_stats(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
         "funding_r": funding_r_avg,
         "cost_r": cost_r_avg,
         "avg_holding_hours": round(sum(holds) / len(holds), 2) if holds else None,
-        "median_holding_hours": (round(statistics.median(holds), 2)
-                                 if holds else None),
+        "median_holding_hours": (round(statistics.median(holds), 2) if holds else None),
         "holding_samples": len(holds),
     }
 
@@ -612,12 +755,19 @@ def _span(rows: list[dict]) -> dict:
     if span_ms <= 0:
         return {}
     days = span_ms / (24 * MS_PER_HOUR)
-    return {"span_days": round(days, 1),
-            "trades_per_day": round(len(ts) / days, 2) if days else None}
+    return {
+        "span_days": round(days, 1),
+        "trades_per_day": round(len(ts) / days, 2) if days else None,
+    }
 
 
-def _split(rows: list[dict], key: str, order: Optional[tuple] = None,
-           step: int = BACKTEST_STEP, empty_label: Optional[str] = "UNKNOWN") -> dict:
+def _split(
+    rows: list[dict],
+    key: str,
+    order: tuple | None = None,
+    step: int = BACKTEST_STEP,
+    empty_label: str | None = "UNKNOWN",
+) -> dict:
     """Group rows by a field and score each bucket.
 
     ``empty_label=None`` keeps an empty value as its own real bucket instead
@@ -633,15 +783,18 @@ def _split(rows: list[dict], key: str, order: Optional[tuple] = None,
         else:
             k = str(raw or empty_label)
         buckets.setdefault(k, []).append(r)
-    keys = list(order) if order else sorted(buckets,
-                                            key=lambda k: -len(buckets[k]))
-    return {k: trade_stats(buckets.get(k, []), step=step) for k in keys
-            if order or buckets.get(k)}
+    keys = list(order) if order else sorted(buckets, key=lambda k: -len(buckets[k]))
+    return {
+        k: trade_stats(buckets.get(k, []), step=step)
+        for k in keys
+        if order or buckets.get(k)
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # Conditioned Expectancy (P12.6)
 # ──────────────────────────────────────────────────────────────────────────
+
 
 def _funding_regime_label(r: dict) -> str:
     f = r.get("funding_rate")
@@ -680,7 +833,9 @@ def conditioned_splits(rows: list[dict], step: int = BACKTEST_STEP) -> dict:
         by_cvd.setdefault(lbl, []).append(r)
 
     return {
-        "by_funding": {k: trade_stats(v, step=step) for k, v in sorted(by_funding.items())},
+        "by_funding": {
+            k: trade_stats(v, step=step) for k, v in sorted(by_funding.items())
+        },
         "by_cvd": {k: trade_stats(v, step=step) for k, v in sorted(by_cvd.items())},
     }
 
@@ -714,13 +869,19 @@ def _source_inventory(rows: list[dict]) -> dict:
     }
 
 
-def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
-                    source: str = "", min_decided: int = DEFAULT_MIN_DECIDED,
-                    criteria: Optional[dict] = None,
-                    note: str = "",
-                    conditioned: bool = False,
-                    quality: bool = False,
-                    step: int = BACKTEST_STEP) -> dict:
+def build_scorecard(
+    rows: list[dict],
+    *,
+    symbol: str = "",
+    timeframe: str = "",
+    source: str = "",
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    criteria: dict | None = None,
+    note: str = "",
+    conditioned: bool = False,
+    quality: bool = False,
+    step: int = BACKTEST_STEP,
+) -> dict:
     """Assemble the boxed report from already-graded rows.
 
     Pure: same rows in → same report out.  Never raises on an empty sample;
@@ -741,17 +902,20 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
     overall.update(_span(rows))
 
     # Bar is evaluated NET of costs (P12.6)
-    bar_met, bar_unmet = meets_bar(overall, min_decided=min_decided,
-                                   criteria=criteria)
+    bar_met, bar_unmet = meets_bar(overall, min_decided=min_decided, criteria=criteria)
     if overall["n"] < min_decided:
         status = "INSUFFICIENT_DATA"
-        reason = (f"{overall['n']} decided trades < min {min_decided} — "
-                  f"not enough evidence to judge the edge")
+        reason = (
+            f"{overall['n']} decided trades < min {min_decided} — "
+            f"not enough evidence to judge the edge"
+        )
     elif bar_met:
         status = "PASS"
-        reason = (f"expectancy net {overall['expectancy_net']:+.3f}R (gross {overall['expectancy']:+.3f}R), "
-                  f"WR {overall['win_rate_net']:.1%}, PF {overall['pf_net']} — "
-                  f"clears the graduation bar")
+        reason = (
+            f"expectancy net {overall['expectancy_net']:+.3f}R (gross {overall['expectancy']:+.3f}R), "
+            f"WR {overall['win_rate_net']:.1%}, PF {overall['pf_net']} — "
+            f"clears the graduation bar"
+        )
     else:
         status = "FAIL"
         reason = "; ".join(bar_unmet) or "below the graduation bar"
@@ -784,44 +948,56 @@ def build_scorecard(rows: list[dict], *, symbol: str = "", timeframe: str = "",
         # P16 — the sentiment colour proof: does what the strip painted
         # actually correlate with what the trades earned? UNKNOWN keeps
         # pre-P16 rows visible instead of silently disappearing.
-        "by_sentiment": _split(rows, "sentiment_bucket",
-                               order=BUCKETS + ("UNKNOWN",), step=step),
+        "by_sentiment": _split(
+            rows, "sentiment_bucket", order=BUCKETS + ("UNKNOWN",), step=step
+        ),
         # The deepening hypothesis in its own split: within a coloured
         # condition, does more time-in-condition (DEEP) beat a fresh reading?
-        "by_sentiment_depth": _split(rows, "sentiment_depth",
-                                     order=("DEEP", "FRESH", "SLATE"), step=step),
+        "by_sentiment_depth": _split(
+            rows, "sentiment_depth", order=("DEEP", "FRESH", "SLATE"), step=step
+        ),
         # P12.11 — the same block per price series, so a pooled book can
         # always be taken apart into the series that produced it.
         "by_source": _split(rows, "source_key", step=step, empty_label=None),
         "sources": _source_inventory(rows),
         "criteria": dict(criteria),
-        "bar": {"met": bool(bar_met), "unmet": bar_unmet,
-                "min_decided": min_decided, "evaluated_on": "net",
-                # P12.3.3: the gate still reads raw N (min_decided revisit is a
-                # later decision) — this flag is the honest signal that the
-                # overlap-corrected sample is below the floor.
-                "n_eff_below_min_decided": overall["n_eff"] < min_decided},
+        "bar": {
+            "met": bool(bar_met),
+            "unmet": bar_unmet,
+            "min_decided": min_decided,
+            "evaluated_on": "net",
+            # P12.3.3: the gate still reads raw N (min_decided revisit is a
+            # later decision) — this flag is the honest signal that the
+            # overlap-corrected sample is below the floor.
+            "n_eff_below_min_decided": overall["n_eff"] < min_decided,
+        },
         "verdict": {"status": status, "reason": reason},
     }
     if conditioned:
         report["conditioned"] = conditioned_splits(rows, step=step)
     if quality:
         from data.quality_score import backtest_quality_score
+
         report["quality"] = backtest_quality_score(
-            rows, min_decided=min_decided, criteria=criteria, step=step)
+            rows, min_decided=min_decided, criteria=criteria, step=step
+        )
     return report
 
 
-def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
-                      min_decided: int = DEFAULT_MIN_DECIDED,
-                      include_sim: bool = True, db=None,
-                      since_ts: Optional[int] = None,
-                      until_ts: Optional[int] = None,
-                      cost_model: Optional[CostModel] = None,
-                      conditioned: bool = False,
-                      quality: bool = False,
-                      step: int = BACKTEST_STEP,
-                      source_key: Optional[str] = None) -> dict:
+def scorecard_from_db(
+    symbol: str | None = None,
+    source: str = "all",
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    include_sim: bool = True,
+    db=None,
+    since_ts: int | None = None,
+    until_ts: int | None = None,
+    cost_model: CostModel | None = None,
+    conditioned: bool = False,
+    quality: bool = False,
+    step: int = BACKTEST_STEP,
+    source_key: str | None = None,
+) -> dict:
     """Scorecard over what the desk has already graded and stored.
 
     ``source``: ``backtest`` | ``paper`` | ``all`` (both books combined).
@@ -835,26 +1011,33 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
     every source, and the report always names the sources it mixed.
     """
     if source not in ("backtest", "paper", "all"):
-        return {"ok": False,
-                "error": f"unknown source {source!r} (backtest|paper|all)"}
+        return {"ok": False, "error": f"unknown source {source!r} (backtest|paper|all)"}
 
     from data.database import SignalDB
+
     owned = db is None
     db = db or SignalDB()
     try:
         rows: list[dict] = []
         if source in ("backtest", "all"):
-            rows += rows_from_backtest_db(db, symbol=symbol,
-                                          include_sim=include_sim,
-                                          since_ts=since_ts, until_ts=until_ts,
-                                          cost_model=cost_model,
-                                          source_key=source_key)
+            rows += rows_from_backtest_db(
+                db,
+                symbol=symbol,
+                include_sim=include_sim,
+                since_ts=since_ts,
+                until_ts=until_ts,
+                cost_model=cost_model,
+                source_key=source_key,
+            )
         if source in ("paper", "all"):
-            rows += rows_from_paper_db(db, symbol=symbol,
-                                       include_sim=include_sim,
-                                       since_ts=since_ts,
-                                       cost_model=cost_model,
-                                       source_key=source_key)
+            rows += rows_from_paper_db(
+                db,
+                symbol=symbol,
+                include_sim=include_sim,
+                since_ts=since_ts,
+                cost_model=cost_model,
+                source_key=source_key,
+            )
     finally:
         if owned:
             db.close()
@@ -863,30 +1046,46 @@ def scorecard_from_db(symbol: Optional[str] = None, source: str = "all",
         hint = ""
         if source_key is not None:
             from data.provenance import describe_source
-            hint = (f" No decided rows carry source "
-                    f"{describe_source(source_key)!r}.")
-        return {"ok": False,
-                "error": ("No decided outcomes stored yet — run "
-                          "`python main.py backtest --save` (or the paper "
-                          "runner) first, then re-run the scorecard." + hint),
-                "source": source, "rows": 0,
-                "source_key": source_key}
-    return build_scorecard(rows, symbol=symbol or "", source=source,
-                           min_decided=min_decided,
-                           note="stored outcomes (no re-grading)",
-                           conditioned=conditioned, quality=quality,
-                           step=step)
+
+            hint = f" No decided rows carry source {describe_source(source_key)!r}."
+        return {
+            "ok": False,
+            "error": (
+                "No decided outcomes stored yet — run "
+                "`python main.py backtest --save` (or the paper "
+                "runner) first, then re-run the scorecard." + hint
+            ),
+            "source": source,
+            "rows": 0,
+            "source_key": source_key,
+        }
+    return build_scorecard(
+        rows,
+        symbol=symbol or "",
+        source=source,
+        min_decided=min_decided,
+        note="stored outcomes (no re-grading)",
+        conditioned=conditioned,
+        quality=quality,
+        step=step,
+    )
 
 
-def scorecard_from_store(exchange: str = "binance", market: str = "perp",
-                         symbol: str = "BTCUSDT", timeframe: str = "15m",
-                         bars: int = 1000, horizons: Optional[list] = None,
-                         min_bars: Optional[int] = None,
-                         step: int = 3, min_confidence: Optional[int] = None,
-                         min_decided: int = DEFAULT_MIN_DECIDED,
-                         cost_model: Optional[CostModel] = None,
-                         conditioned: bool = False,
-                         quality: bool = False) -> dict:
+def scorecard_from_store(
+    exchange: str = "binance",
+    market: str = "perp",
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    bars: int = 1000,
+    horizons: list | None = None,
+    min_bars: int | None = None,
+    step: int = 3,
+    min_confidence: int | None = None,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    cost_model: CostModel | None = None,
+    conditioned: bool = False,
+    quality: bool = False,
+) -> dict:
     """Scorecard over a fresh walk-forward grade of the stored series.
 
     Delegates every grading decision to `data.backtester.run_backtest_on_store`
@@ -896,33 +1095,56 @@ def scorecard_from_store(exchange: str = "binance", market: str = "perp",
     from data.backtester import run_backtest_on_store
 
     result = run_backtest_on_store(
-        exchange=exchange, market=market, symbol=symbol, timeframe=timeframe,
-        bars=bars, horizons=horizons,
+        exchange=exchange,
+        market=market,
+        symbol=symbol,
+        timeframe=timeframe,
+        bars=bars,
+        horizons=horizons,
         min_bars=BACKTEST_MIN_BARS if min_bars is None else min_bars,
         step=step,
-        min_confidence=MIN_CONFIDENCE if min_confidence is None else min_confidence)
+        min_confidence=MIN_CONFIDENCE if min_confidence is None else min_confidence,
+    )
     if not result.get("ok", True) or result.get("error"):
-        return {"ok": False, "error": result.get("error", "backtest failed"),
-                "source": "store"}
+        return {
+            "ok": False,
+            "error": result.get("error", "backtest failed"),
+            "source": "store",
+        }
 
-    primary = (result.get("report", {}).get("meta", {})
-               .get("horizons_hours") or [None])[0]
-    rows = rows_from_graded(result.get("graded", []), symbol=symbol,
-                            timeframe=timeframe, cost_model=cost_model,
-                            exchange=exchange, market=market,
-                            price_type=result.get("price_type"))
+    primary = (
+        result.get("report", {}).get("meta", {}).get("horizons_hours") or [None]
+    )[0]
+    rows = rows_from_graded(
+        result.get("graded", []),
+        symbol=symbol,
+        timeframe=timeframe,
+        cost_model=cost_model,
+        exchange=exchange,
+        market=market,
+        price_type=result.get("price_type"),
+    )
     if not rows:
-        return {"ok": False,
-                "error": (f"Graded {len(result.get('graded', []))} plans but "
-                          f"none reached a decision (all OPEN or "
-                          f"NOT_TRIGGERED) — widen --bars or --horizons."),
-                "source": "store"}
-    card = build_scorecard(rows, symbol=symbol, timeframe=timeframe,
-                           source="store", min_decided=min_decided,
-                           note=f"fresh walk-forward grade, primary horizon "
-                                f"{primary}h",
-                           conditioned=conditioned, quality=quality,
-                           step=step)
+        return {
+            "ok": False,
+            "error": (
+                f"Graded {len(result.get('graded', []))} plans but "
+                f"none reached a decision (all OPEN or "
+                f"NOT_TRIGGERED) — widen --bars or --horizons."
+            ),
+            "source": "store",
+        }
+    card = build_scorecard(
+        rows,
+        symbol=symbol,
+        timeframe=timeframe,
+        source="store",
+        min_decided=min_decided,
+        note=f"fresh walk-forward grade, primary horizon {primary}h",
+        conditioned=conditioned,
+        quality=quality,
+        step=step,
+    )
     card["meta"]["bars_read"] = result.get("bars_read")
     card["meta"]["store_path"] = result.get("store_path")
     card["meta"]["primary_horizon_hours"] = primary
@@ -936,7 +1158,7 @@ W = 82
 
 
 def _fmt_pct(v) -> str:
-    return f"{v*100:.1f}%" if v is not None else "n/a"
+    return f"{v * 100:.1f}%" if v is not None else "n/a"
 
 
 def _fmt(v, spec: str = "+.3f") -> str:
@@ -948,21 +1170,29 @@ def _fmt_hours(v) -> str:
 
 
 def _split_line(label: str, s: dict) -> str:
-    pf_net = str(s.get("pf_net", s.get("pf"))) if (s.get("pf_net") is not None or s.get("pf") is not None) else "n/a"
+    pf_net = (
+        str(s.get("pf_net", s.get("pf")))
+        if (s.get("pf_net") is not None or s.get("pf") is not None)
+        else "n/a"
+    )
     hold = _fmt_hours(s.get("avg_holding_hours"))
     wr_net = s.get("win_rate_net", s.get("win_rate"))
     e_gross = s.get("expectancy")
     e_net = s.get("expectancy_net", e_gross)
     tot_r_net = s.get("total_r_net", s.get("total_r"))
-    return (f"  {label:<18} {s['n']:>5} {_fmt_pct(wr_net):>7} "
-            f"{_fmt(e_gross):>8} {_fmt(e_net):>8} {pf_net:>7} "
-            f"{_fmt(tot_r_net, '+.1f'):>9} {hold:>7}")
+    return (
+        f"  {label:<18} {s['n']:>5} {_fmt_pct(wr_net):>7} "
+        f"{_fmt(e_gross):>8} {_fmt(e_net):>8} {pf_net:>7} "
+        f"{_fmt(tot_r_net, '+.1f'):>9} {hold:>7}"
+    )
 
 
 def _split_header(title: str) -> str:
-    return (f"{title}\n"
-            f"  {'':<18} {'n':>5} {'WR_net':>7} {'E_gross':>8} {'E_net':>8} {'PF_net':>7} {'totR_net':>9} "
-            f"{'hold':>7}")
+    return (
+        f"{title}\n"
+        f"  {'':<18} {'n':>5} {'WR_net':>7} {'E_gross':>8} {'E_net':>8} {'PF_net':>7} {'totR_net':>9} "
+        f"{'hold':>7}"
+    )
 
 
 def print_scorecard(report: dict) -> None:
@@ -974,9 +1204,11 @@ def print_scorecard(report: dict) -> None:
 
     m, o = report["meta"], report["overall"]
     print("=" * W)
-    print(f"STRATEGY SCORECARD  {m['symbol']}"
-          f"{' ' + m['timeframe'] if m['timeframe'] else ''}"
-          f"   source: {m['source']}")
+    print(
+        f"STRATEGY SCORECARD  {m['symbol']}"
+        f"{' ' + m['timeframe'] if m['timeframe'] else ''}"
+        f"   source: {m['source']}"
+    )
     span = ""
     if m.get("span_days") or o.get("span_days"):
         span = f"   span {o.get('span_days')}d"
@@ -984,56 +1216,91 @@ def print_scorecard(report: dict) -> None:
     if o.get("n_eff"):
         ov = f", overlap ×{o['overlap']}" if o.get("overlap") else ""
         n_eff_bits = f"   (~{o['n_eff']} independent{ov})"
-    print(f"decided trades {o['n']}{n_eff_bits}   min_decided {m['min_decided']}{span}"
-          f"{'   ' + m['note'] if m.get('note') else ''}")
+    print(
+        f"decided trades {o['n']}{n_eff_bits}   min_decided {m['min_decided']}{span}"
+        f"{'   ' + m['note'] if m.get('note') else ''}"
+    )
     print("-" * W)
     ci = ""
     if o.get("expectancy_net_ci95"):
         lo, hi = o["expectancy_net_ci95"]
         ci = f"   95% CI net [{lo:+.3f}, {hi:+.3f}]R (N_eff={o['n_eff']})"
-    print(f"  expectancy   {_fmt(o['expectancy'])}R gross → {_fmt(o['expectancy_net'])}R net  "
-          f"(cost {_fmt(-o['cost_r'])}R: fee {_fmt(o['fee_r'])}R, slip {_fmt(o['slip_r'])}R, fund {_fmt(o['funding_r'])}R)")
+    print(
+        f"  expectancy   {_fmt(o['expectancy'])}R gross → {_fmt(o['expectancy_net'])}R net  "
+        f"(cost {_fmt(-o['cost_r'])}R: fee {_fmt(o['fee_r'])}R, slip {_fmt(o['slip_r'])}R, fund {_fmt(o['funding_r'])}R)"
+    )
     if ci:
         print(f"  expectancy CI{ci}")
-    print(f"  win rate     {_fmt_pct(o['win_rate'])} gross → {_fmt_pct(o['win_rate_net'])} net "
-          f"({o.get('wins_net', o['wins'])}W/{o.get('losses_net', o['losses'])}L net)")
-    pf_g = str(o['pf']) if o['pf'] is not None else 'n/a'
-    pf_n = str(o.get('pf_net', o['pf'])) if o.get('pf_net') is not None or o['pf'] is not None else 'n/a'
-    print(f"  profit factor {pf_g} gross → {pf_n} net      "
-          f"total R   {_fmt(o['total_r'], '+.2f')}R gross → {_fmt(o.get('total_r_net', o['total_r']), '+.2f')}R net")
-    avg_win_g = _fmt(o['avg_win_r'])
-    avg_win_n = _fmt(o.get('avg_win_r_net', o['avg_win_r']))
-    avg_loss_g = _fmt(o['avg_loss_r'])
-    avg_loss_n = _fmt(o.get('avg_loss_r_net', o['avg_loss_r']))
-    print(f"  avg win      {avg_win_g}R gross → {avg_win_n}R net  "
-          f"avg loss  {avg_loss_g}R gross → {avg_loss_n}R net")
+    print(
+        f"  win rate     {_fmt_pct(o['win_rate'])} gross → {_fmt_pct(o['win_rate_net'])} net "
+        f"({o.get('wins_net', o['wins'])}W/{o.get('losses_net', o['losses'])}L net)"
+    )
+    pf_g = str(o["pf"]) if o["pf"] is not None else "n/a"
+    pf_n = (
+        str(o.get("pf_net", o["pf"]))
+        if o.get("pf_net") is not None or o["pf"] is not None
+        else "n/a"
+    )
+    print(
+        f"  profit factor {pf_g} gross → {pf_n} net      "
+        f"total R   {_fmt(o['total_r'], '+.2f')}R gross → {_fmt(o.get('total_r_net', o['total_r']), '+.2f')}R net"
+    )
+    avg_win_g = _fmt(o["avg_win_r"])
+    avg_win_n = _fmt(o.get("avg_win_r_net", o["avg_win_r"]))
+    avg_loss_g = _fmt(o["avg_loss_r"])
+    avg_loss_n = _fmt(o.get("avg_loss_r_net", o["avg_loss_r"]))
+    print(
+        f"  avg win      {avg_win_g}R gross → {avg_win_n}R net  "
+        f"avg loss  {avg_loss_g}R gross → {avg_loss_n}R net"
+    )
     dd_g = f"{o['max_drawdown_r']:.2f}R"
     dd_n = f"{o.get('max_drawdown_r_net', o['max_drawdown_r']):.2f}R"
-    w_streak = o.get('max_win_streak_net', o['max_win_streak'])
-    l_streak = o.get('max_loss_streak_net', o['max_loss_streak'])
-    print(f"  max drawdown {dd_g} gross → {dd_n} net  "
-          f"streaks   {w_streak}W / {l_streak}L net")
-    sharpe_g = str(o['sharpe']) if o['sharpe'] is not None else 'n/a'
-    sharpe_n = str(o.get('sharpe_net', o['sharpe'])) if (o.get('sharpe_net') is not None or o['sharpe'] is not None) else 'n/a'
-    sortino_g = str(o['sortino']) if o['sortino'] is not None else 'n/a'
-    sortino_n = str(o.get('sortino_net', o['sortino'])) if (o.get('sortino_net') is not None or o['sortino'] is not None) else 'n/a'
-    calmar_g = str(o['calmar']) if o['calmar'] is not None else 'n/a'
-    calmar_n = str(o.get('calmar_net', o['calmar'])) if (o.get('calmar_net') is not None or o['calmar'] is not None) else 'n/a'
-    sharpe_extra = (f"   ({o['trades_per_day']} trades/day — per-trade, "
-                    f"NOT annualised)"
-                    if o.get("trades_per_day") is not None else
-                    "   (per-trade, not annualised)")
-    print(f"  Sharpe {sharpe_g} → {sharpe_n} net   "
-          f"Sortino {sortino_g} → {sortino_n} net   "
-          f"Calmar {calmar_g} → {calmar_n} net{sharpe_extra}")
+    w_streak = o.get("max_win_streak_net", o["max_win_streak"])
+    l_streak = o.get("max_loss_streak_net", o["max_loss_streak"])
+    print(
+        f"  max drawdown {dd_g} gross → {dd_n} net  "
+        f"streaks   {w_streak}W / {l_streak}L net"
+    )
+    sharpe_g = str(o["sharpe"]) if o["sharpe"] is not None else "n/a"
+    sharpe_n = (
+        str(o.get("sharpe_net", o["sharpe"]))
+        if (o.get("sharpe_net") is not None or o["sharpe"] is not None)
+        else "n/a"
+    )
+    sortino_g = str(o["sortino"]) if o["sortino"] is not None else "n/a"
+    sortino_n = (
+        str(o.get("sortino_net", o["sortino"]))
+        if (o.get("sortino_net") is not None or o["sortino"] is not None)
+        else "n/a"
+    )
+    calmar_g = str(o["calmar"]) if o["calmar"] is not None else "n/a"
+    calmar_n = (
+        str(o.get("calmar_net", o["calmar"]))
+        if (o.get("calmar_net") is not None or o["calmar"] is not None)
+        else "n/a"
+    )
+    sharpe_extra = (
+        f"   ({o['trades_per_day']} trades/day — per-trade, NOT annualised)"
+        if o.get("trades_per_day") is not None
+        else "   (per-trade, not annualised)"
+    )
+    print(
+        f"  Sharpe {sharpe_g} → {sharpe_n} net   "
+        f"Sortino {sortino_g} → {sortino_n} net   "
+        f"Calmar {calmar_g} → {calmar_n} net{sharpe_extra}"
+    )
     hold = o.get("avg_holding_hours")
     if hold is not None:
-        print(f"  holding time avg {hold:.1f}h   median "
-              f"{o['median_holding_hours']:.1f}h   "
-              f"({o['holding_samples']}/{o['n']} trades timed)")
+        print(
+            f"  holding time avg {hold:.1f}h   median "
+            f"{o['median_holding_hours']:.1f}h   "
+            f"({o['holding_samples']}/{o['n']} trades timed)"
+        )
     else:
-        print("  holding time n/a — these outcomes were graded before "
-              "holding time was recorded")
+        print(
+            "  holding time n/a — these outcomes were graded before "
+            "holding time was recorded"
+        )
     print("-" * W)
     print(_split_header("by side (long / short):"))
     for side in SIDES:
@@ -1054,6 +1321,7 @@ def print_scorecard(report: dict) -> None:
     # P16 — the sentiment colour proof, in the same boxed block as the CLI.
     if "by_sentiment" in report:
         from engine.sentiment import bucket_label
+
         print(_split_header("by sentiment colour (P16 — does the colour pay?):"))
         for name, s in report["by_sentiment"].items():
             if s.get("n"):
@@ -1066,17 +1334,22 @@ def print_scorecard(report: dict) -> None:
     srcs = report.get("sources") or {}
     if srcs.get("keys"):
         from data.provenance import describe_source
+
         if srcs.get("mixed") or not srcs.get("canonical_only"):
             print(_split_header("by source series (P12.11):"))
             for name, s in report.get("by_source", {}).items():
                 label = describe_source(name)
                 print(_split_line(label[:18], s))
             if srcs.get("mixed"):
-                print("  ⚠ this book POOLS several price series — the headline "
-                      "number is a blend, not one market")
+                print(
+                    "  ⚠ this book POOLS several price series — the headline "
+                    "number is a blend, not one market"
+                )
             for k in srcs.get("one_sided", []):
-                print(f"  ⚠ {describe_source(k)} is one-sided: the printed "
-                      f"price is not an executable round trip (research only)")
+                print(
+                    f"  ⚠ {describe_source(k)} is one-sided: the printed "
+                    f"price is not an executable round trip (research only)"
+                )
     if "conditioned" in report:
         print("-" * W)
         print(_split_header("by funding regime:"))
@@ -1089,18 +1362,22 @@ def print_scorecard(report: dict) -> None:
     c = report["criteria"]
     v = report["verdict"]
     icon = {"PASS": "🟢", "FAIL": "🔴", "INSUFFICIENT_DATA": "⚪"}.get(
-        v["status"], "❓")
-    print(f"bar (NET): expectancy >= {c['expectancy']:+.2f}R   "
-          f"win rate > {c['win_rate']:.0%}   PF >= {c['pf']}   "
-          f"decided >= {report['bar']['min_decided']}")
+        v["status"], "❓"
+    )
+    print(
+        f"bar (NET): expectancy >= {c['expectancy']:+.2f}R   "
+        f"win rate > {c['win_rate']:.0%}   PF >= {c['pf']}   "
+        f"decided >= {report['bar']['min_decided']}"
+    )
     print(f"VERDICT  {icon} {v['status']}  —  {v['reason']}")
     if report["bar"].get("n_eff_below_min_decided"):
-        print(f"  ⚠ overlap-corrected sample {o['n_eff']} < min_decided "
-              f"{report['bar']['min_decided']} — the raw count overstates the "
-              f"evidence ~×{o['overlap']}")
+        print(
+            f"  ⚠ overlap-corrected sample {o['n_eff']} < min_decided "
+            f"{report['bar']['min_decided']} — the raw count overstates the "
+            f"evidence ~×{o['overlap']}"
+        )
     if v["status"] != "PASS":
-        print("  This is a scorecard, not permission. The graduation bar is "
-              "unchanged.")
+        print("  This is a scorecard, not permission. The graduation bar is unchanged.")
     # P12.4 — Backtest Quality Score 0–100 (embedded by --quality).
     q = report.get("quality")
     if q and q.get("ok") and q.get("quality") is not None:
@@ -1115,14 +1392,21 @@ def print_scorecard(report: dict) -> None:
             bits.append(f"plateau {_fmt(plat['score'], '.0f')}")
         else:
             bits.append("plateau n/a (re-grade sweep via `python main.py quality`)")
-        cap_note = ("  🛑 isolated parameter peak — total CAPPED at 50 "
-                    "(a fit, not an edge)") if q.get("plateau_cap") else ""
+        cap_note = (
+            ("  🛑 isolated parameter peak — total CAPPED at 50 (a fit, not an edge)")
+            if q.get("plateau_cap")
+            else ""
+        )
         print("=" * W)
-        print(f"BACKTEST QUALITY  {_fmt(q['quality'], '.1f')}/100  "
-              f"band: {q['band']}   "
-              f"{' · '.join(bits)}")
+        print(
+            f"BACKTEST QUALITY  {_fmt(q['quality'], '.1f')}/100  "
+            f"band: {q['band']}   "
+            f"{' · '.join(bits)}"
+        )
         if cap_note:
             print(cap_note)
-        print("  A quality score reports robustness; it does not grant "
-              "permission. The graduation bar is unchanged.")
+        print(
+            "  A quality score reports robustness; it does not grant "
+            "permission. The graduation bar is unchanged."
+        )
     print("=" * W)

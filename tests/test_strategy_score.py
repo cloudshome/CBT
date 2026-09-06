@@ -4,16 +4,22 @@ Pure-function tests (same rows in → same score out) plus the calibrator
 integration: `build_profile` entries carry the strategy score and the
 multiplier is gated by it (E_R × sample-quality × regime-fit × execution).
 """
+
 from __future__ import annotations
 
 import pytest
 
 from brain.calibrator import (
-    _decided_by_key, _decided_rows_by_key, build_profile, profile_key,
+    _decided_rows_by_key,
+    build_profile,
+    profile_key,
 )
 from data.database import SignalDB
 from data.strategy_score import (
-    execution_score, multiplier_from_score, regime_fit_score, strategy_score,
+    execution_score,
+    multiplier_from_score,
+    regime_fit_score,
+    strategy_score,
 )
 
 
@@ -28,20 +34,27 @@ def _rows(n: int = 60, *, e_net: float = 0.6, seed: int = 0) -> list[dict]:
     for i in range(n):
         win = (i % 3) != 0  # 2 wins per 3
         r = (e_net * 2.4) if win else (-e_net * 1.2)
-        out.append({
-            "ts": 1_700_000_000_000 + (i + seed) * 3_600_000,
-            "side": "BUY" if i % 2 == 0 else "SELL",
-            "setup": "Buy Pullback",
-            "regime": "TRENDING_BULL",
-            "r": round(r, 3),
-            "r_net": round(r - 0.12, 3),
-            "fee_r": 0.08, "slip_r": 0.03, "funding_r": 0.01,
-            "cost_r": 0.12,
-            "outcome": "FULL_WIN" if win else "LOSS",
-            "holding_hours": 4.0,
-            "symbol": "BTCUSDT", "timeframe": "15m", "source": "backtest",
-            "horizon_hours": 4.0, "step": 1,
-        })
+        out.append(
+            {
+                "ts": 1_700_000_000_000 + (i + seed) * 3_600_000,
+                "side": "BUY" if i % 2 == 0 else "SELL",
+                "setup": "Buy Pullback",
+                "regime": "TRENDING_BULL",
+                "r": round(r, 3),
+                "r_net": round(r - 0.12, 3),
+                "fee_r": 0.08,
+                "slip_r": 0.03,
+                "funding_r": 0.01,
+                "cost_r": 0.12,
+                "outcome": "FULL_WIN" if win else "LOSS",
+                "holding_hours": 4.0,
+                "symbol": "BTCUSDT",
+                "timeframe": "15m",
+                "source": "backtest",
+                "horizon_hours": 4.0,
+                "step": 1,
+            }
+        )
     return out
 
 
@@ -188,33 +201,56 @@ def _seed_strategy_books(db: SignalDB) -> None:
     # Good setup: 120 decided, net-positive, spread over time.
     for i in range(120):
         win = (i % 3) != 0
-        rows.append({
-            "ts": 1_700_000_000_000 + i * 3_600_000,
-            "symbol": "BTCUSDT", "timeframe": "15m",
-            "plan_type": "Buy Pullback", "action": "BUY",
-            "confidence_pct": 80, "horizon_hours": 4.0, "step": 1,
-            "outcome": "FULL_WIN" if win else "LOSS",
-            "rr_achieved": 1.2 if win else -0.4,
-            "max_favorable": 1.0, "max_adverse": -1.0,
-            "entry": 60000.0, "trigger_level": None,
-            "regime": "TRENDING_BULL",
-            "rr_net": 1.08 if win else -0.52,
-            "fee_r": 0.08, "slip_r": 0.03, "funding_r": 0.01, "cost_r": 0.12,
-        })
+        rows.append(
+            {
+                "ts": 1_700_000_000_000 + i * 3_600_000,
+                "symbol": "BTCUSDT",
+                "timeframe": "15m",
+                "plan_type": "Buy Pullback",
+                "action": "BUY",
+                "confidence_pct": 80,
+                "horizon_hours": 4.0,
+                "step": 1,
+                "outcome": "FULL_WIN" if win else "LOSS",
+                "rr_achieved": 1.2 if win else -0.4,
+                "max_favorable": 1.0,
+                "max_adverse": -1.0,
+                "entry": 60000.0,
+                "trigger_level": None,
+                "regime": "TRENDING_BULL",
+                "rr_net": 1.08 if win else -0.52,
+                "fee_r": 0.08,
+                "slip_r": 0.03,
+                "funding_r": 0.01,
+                "cost_r": 0.12,
+            }
+        )
     # Bad setup: net-negative, all losses.
     for i in range(60):
-        rows.append({
-            "ts": 1_700_000_000_000 + i * 3_600_000,
-            "symbol": "BTCUSDT", "timeframe": "15m",
-            "plan_type": "Breakout Buy", "action": "BUY",
-            "confidence_pct": 60, "horizon_hours": 4.0, "step": 1,
-            "outcome": "LOSS", "rr_achieved": -1.0,
-            "max_favorable": 0.1, "max_adverse": -1.0,
-            "entry": 61000.0, "trigger_level": 61200.0,
-            "regime": "TRENDING_BULL",
-            "rr_net": -1.12, "fee_r": 0.08, "slip_r": 0.03,
-            "funding_r": 0.01, "cost_r": 0.12,
-        })
+        rows.append(
+            {
+                "ts": 1_700_000_000_000 + i * 3_600_000,
+                "symbol": "BTCUSDT",
+                "timeframe": "15m",
+                "plan_type": "Breakout Buy",
+                "action": "BUY",
+                "confidence_pct": 60,
+                "horizon_hours": 4.0,
+                "step": 1,
+                "outcome": "LOSS",
+                "rr_achieved": -1.0,
+                "max_favorable": 0.1,
+                "max_adverse": -1.0,
+                "entry": 61000.0,
+                "trigger_level": 61200.0,
+                "regime": "TRENDING_BULL",
+                "rr_net": -1.12,
+                "fee_r": 0.08,
+                "slip_r": 0.03,
+                "funding_r": 0.01,
+                "cost_r": 0.12,
+            }
+        )
     db.save_backtest_rows(rows, run_id="strategy_books")
 
 
@@ -226,8 +262,12 @@ def test_build_profile_carries_strategy_score(tmp_path):
     assert bp["strategy_score"] is not None and bp["strategy_score"] > 0
     assert bp["strategy_band"] in ("borderline", "acceptable", "robust")
     assert bp["expectancy_net"] is not None
-    assert set(bp["strategy_components"]) == {"e_r", "sample_quality",
-                                              "regime_fit", "execution"}
+    assert set(bp["strategy_components"]) == {
+        "e_r",
+        "sample_quality",
+        "regime_fit",
+        "execution",
+    }
     assert bp["multiplier"] > 1.0  # positive net edge → boosted
 
     bb = profile[profile_key("Breakout Buy", "TRENDING_BULL")]
@@ -249,11 +289,21 @@ def test_build_profile_multiplier_still_gated_by_min_n(tmp_path):
 
 def test_strategy_score_stored_and_loaded(tmp_path):
     db = SignalDB(tmp_path / "cal.db")
-    profile = {"Buy Pullback": {
-        "multiplier": 1.2, "expectancy": 0.6, "samples": 120,
-        "backtest_samples": 100, "paper_samples": 20, "win_rate": 0.6,
-        "filtered": False, "proven": True, "tp_rr": 2.0,
-        "strategy_score": 71.4, "strategy_band": "acceptable"}}
+    profile = {
+        "Buy Pullback": {
+            "multiplier": 1.2,
+            "expectancy": 0.6,
+            "samples": 120,
+            "backtest_samples": 100,
+            "paper_samples": 20,
+            "win_rate": 0.6,
+            "filtered": False,
+            "proven": True,
+            "tp_rr": 2.0,
+            "strategy_score": 71.4,
+            "strategy_band": "acceptable",
+        }
+    }
     db.save_calibration(profile)
     loaded = db.load_calibration()["Buy Pullback"]
     assert loaded["strategy_score"] == 71.4

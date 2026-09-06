@@ -1,9 +1,14 @@
 """Tests for the self-improvement calibrator + DB lifecycle integration."""
+
 from __future__ import annotations
 
 import pytest
 
-from brain.calibrator import apply_calibration, build_profile, compute_expectancy_by_type
+from brain.calibrator import (
+    apply_calibration,
+    build_profile,
+    compute_expectancy_by_type,
+)
 from data.database import SignalDB
 from engine.lifecycle import LifecycleError
 
@@ -11,25 +16,73 @@ from engine.lifecycle import LifecycleError
 def _seed_backtests(db: SignalDB) -> None:
     rows = [
         # Buy Pullback: strong positive expectancy (4 wins, 1 loss)
-        *[{"ts": i, "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Buy Pullback",
-           "action": "BUY", "confidence_pct": 80, "horizon_hours": 4.0,
-           "outcome": "FULL_WIN", "rr_achieved": 2.0, "max_favorable": 100.0,
-           "max_adverse": -20.0, "entry": 60000.0, "trigger_level": None}
-          for i in range(4)],
-        {"ts": 9, "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Buy Pullback",
-         "action": "BUY", "confidence_pct": 80, "horizon_hours": 4.0,
-         "outcome": "LOSS", "rr_achieved": -1.0, "max_favorable": 10.0,
-         "max_adverse": -200.0, "entry": 60000.0, "trigger_level": None},
+        *[
+            {
+                "ts": i,
+                "symbol": "BTCUSDT",
+                "timeframe": "15m",
+                "plan_type": "Buy Pullback",
+                "action": "BUY",
+                "confidence_pct": 80,
+                "horizon_hours": 4.0,
+                "outcome": "FULL_WIN",
+                "rr_achieved": 2.0,
+                "max_favorable": 100.0,
+                "max_adverse": -20.0,
+                "entry": 60000.0,
+                "trigger_level": None,
+            }
+            for i in range(4)
+        ],
+        {
+            "ts": 9,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "plan_type": "Buy Pullback",
+            "action": "BUY",
+            "confidence_pct": 80,
+            "horizon_hours": 4.0,
+            "outcome": "LOSS",
+            "rr_achieved": -1.0,
+            "max_favorable": 10.0,
+            "max_adverse": -200.0,
+            "entry": 60000.0,
+            "trigger_level": None,
+        },
         # Breakout Buy: negative (1 win, 4 losses)
-        {"ts": 20, "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Breakout Buy",
-         "action": "BUY", "confidence_pct": 60, "horizon_hours": 4.0,
-         "outcome": "PARTIAL_WIN", "rr_achieved": 0.5, "max_favorable": 50.0,
-         "max_adverse": -30.0, "entry": 61000.0, "trigger_level": 61200.0},
-        *[{"ts": 20 + i, "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Breakout Buy",
-           "action": "BUY", "confidence_pct": 60, "horizon_hours": 4.0,
-           "outcome": "LOSS", "rr_achieved": -1.0, "max_favorable": 5.0,
-           "max_adverse": -150.0, "entry": 61000.0, "trigger_level": 61200.0}
-          for i in range(1, 5)],
+        {
+            "ts": 20,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "plan_type": "Breakout Buy",
+            "action": "BUY",
+            "confidence_pct": 60,
+            "horizon_hours": 4.0,
+            "outcome": "PARTIAL_WIN",
+            "rr_achieved": 0.5,
+            "max_favorable": 50.0,
+            "max_adverse": -30.0,
+            "entry": 61000.0,
+            "trigger_level": 61200.0,
+        },
+        *[
+            {
+                "ts": 20 + i,
+                "symbol": "BTCUSDT",
+                "timeframe": "15m",
+                "plan_type": "Breakout Buy",
+                "action": "BUY",
+                "confidence_pct": 60,
+                "horizon_hours": 4.0,
+                "outcome": "LOSS",
+                "rr_achieved": -1.0,
+                "max_favorable": 5.0,
+                "max_adverse": -150.0,
+                "entry": 61000.0,
+                "trigger_level": 61200.0,
+            }
+            for i in range(1, 5)
+        ],
     ]
     db.save_backtest_rows(rows, run_id="test_calib")
 
@@ -38,8 +91,12 @@ def test_expectancy_computation(tmp_path):
     db = SignalDB(tmp_path / "t.db")
     _seed_backtests(db)
     stats = compute_expectancy_by_type(db)
-    assert stats["Buy Pullback"]["expectancy"] == pytest.approx(1.4, abs=0.01)  # (2*4 - 1)/5
-    assert stats["Breakout Buy"]["expectancy"] == pytest.approx(-0.7, abs=0.01)  # (0.5 - 4)/5
+    assert stats["Buy Pullback"]["expectancy"] == pytest.approx(
+        1.4, abs=0.01
+    )  # (2*4 - 1)/5
+    assert stats["Breakout Buy"]["expectancy"] == pytest.approx(
+        -0.7, abs=0.01
+    )  # (0.5 - 4)/5
     db.close()
 
 
@@ -57,9 +114,11 @@ def test_build_profile_multipliers(tmp_path):
 
 
 def test_apply_calibration():
-    cal = {"Buy Pullback": {"multiplier": 1.2, "filtered": False, "samples": 50},
-           "Breakout Buy": {"multiplier": 0.6, "filtered": False, "samples": 50},
-           "Sell Pullback": {"multiplier": 1.0, "filtered": True, "samples": 40}}
+    cal = {
+        "Buy Pullback": {"multiplier": 1.2, "filtered": False, "samples": 50},
+        "Breakout Buy": {"multiplier": 0.6, "filtered": False, "samples": 50},
+        "Sell Pullback": {"multiplier": 1.0, "filtered": True, "samples": 40},
+    }
     conf, filtered = apply_calibration(80, "Buy Pullback", cal)
     assert filtered is False and conf == 96
     conf, filtered = apply_calibration(60, "Breakout Buy", cal)
@@ -74,6 +133,7 @@ def test_apply_calibration():
 def test_db_lifecycle_roundtrip(tmp_path):
     db = SignalDB(tmp_path / "t.db")
     from tests.test_database import _payload
+
     scan_id = db.save_scan(_payload())
     assert db.get_scan(scan_id)["status"] == "PENDING_REVIEW"
     assert db.update_status(scan_id, "APPROVED", note="looks good") == "APPROVED"
@@ -91,6 +151,7 @@ def test_db_lifecycle_roundtrip(tmp_path):
 def test_pending_reviews(tmp_path):
     db = SignalDB(tmp_path / "t.db")
     from tests.test_database import _payload
+
     p = _payload()
     db.save_scan(p)
     pending = db.pending_reviews()
@@ -101,8 +162,9 @@ def test_pending_reviews(tmp_path):
 
 def test_calibration_save_load(tmp_path):
     db = SignalDB(tmp_path / "t.db")
-    db.save_calibration({"Buy Pullback": {"multiplier": 1.2, "expectancy": 1.4,
-                                          "samples": 50}})
+    db.save_calibration(
+        {"Buy Pullback": {"multiplier": 1.2, "expectancy": 1.4, "samples": 50}}
+    )
     loaded = db.load_calibration()
     assert loaded["Buy Pullback"]["multiplier"] == 1.2
     db.close()
@@ -111,13 +173,25 @@ def test_calibration_save_load(tmp_path):
 def test_regime_dimensioned_profile(tmp_path):
     """Decision B3: profiles are keyed by setup × regime."""
     from brain.calibrator import _decided_by_key, profile_key
+
     db = SignalDB(tmp_path / "reg.db")
     rows = [
-        {"ts": i, "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Buy Pullback",
-         "action": "BUY", "confidence_pct": 80, "horizon_hours": 4.0,
-         "outcome": "FULL_WIN", "rr_achieved": 2.0, "max_favorable": 1.0,
-         "max_adverse": -1.0, "entry": 100.0, "trigger_level": None,
-         "regime": "TRENDING_BULL"}
+        {
+            "ts": i,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "plan_type": "Buy Pullback",
+            "action": "BUY",
+            "confidence_pct": 80,
+            "horizon_hours": 4.0,
+            "outcome": "FULL_WIN",
+            "rr_achieved": 2.0,
+            "max_favorable": 1.0,
+            "max_adverse": -1.0,
+            "entry": 100.0,
+            "trigger_level": None,
+            "regime": "TRENDING_BULL",
+        }
         for i in range(6)
     ]
     db.save_backtest_rows(rows, run_id="reg")
@@ -131,13 +205,25 @@ def test_profile_proven_and_tp_rr(tmp_path):
     """Decisions B10/A2: proven flag requires 100 backtest + 20 paper samples;
     tp_rr is derived from the measured average winner."""
     from brain.calibrator import build_profile
+
     db = SignalDB(tmp_path / "reg.db")
     rows = [
-        {"ts": i, "symbol": "BTCUSDT", "timeframe": "15m", "plan_type": "Buy Pullback",
-         "action": "BUY", "confidence_pct": 80, "horizon_hours": 4.0,
-         "outcome": "FULL_WIN", "rr_achieved": 2.5, "max_favorable": 1.0,
-         "max_adverse": -1.0, "entry": 100.0, "trigger_level": None,
-         "regime": "TRENDING_BULL"}
+        {
+            "ts": i,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "plan_type": "Buy Pullback",
+            "action": "BUY",
+            "confidence_pct": 80,
+            "horizon_hours": 4.0,
+            "outcome": "FULL_WIN",
+            "rr_achieved": 2.5,
+            "max_favorable": 1.0,
+            "max_adverse": -1.0,
+            "entry": 100.0,
+            "trigger_level": None,
+            "regime": "TRENDING_BULL",
+        }
         for i in range(100)
     ]
     db.save_backtest_rows(rows, run_id="proven")
@@ -149,9 +235,30 @@ def test_profile_proven_and_tp_rr(tmp_path):
                                         closed_ts, entry_price, exit_price, outcome,
                                         rr_achieved, close_reason, regime)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (10000 + i, f"P{i}", "Buy Pullback", "BTCUSDT", "15m", "BUY",
-             100.0, 99.0, 102.0, 2.0, 70, "CLOSED", 1, 2, 3, 100.0, 102.0,
-             "TP_HIT", 2.5, "test", "TRENDING_BULL"))
+            (
+                10000 + i,
+                f"P{i}",
+                "Buy Pullback",
+                "BTCUSDT",
+                "15m",
+                "BUY",
+                100.0,
+                99.0,
+                102.0,
+                2.0,
+                70,
+                "CLOSED",
+                1,
+                2,
+                3,
+                100.0,
+                102.0,
+                "TP_HIT",
+                2.5,
+                "test",
+                "TRENDING_BULL",
+            ),
+        )
     db.conn.commit()
     profile = build_profile(db, min_n=100, min_paper_n=20)
     key = "Buy Pullback::TRENDING_BULL"
@@ -166,6 +273,7 @@ def test_profile_proven_and_tp_rr(tmp_path):
 
 def test_suggest_tp_rr_by_type(tmp_path):
     from brain.calibrator import suggest_tp_rr_by_type
+
     profile = {
         "Buy Pullback::TRENDING_BULL": {"tp_rr": 2.5, "samples": 100},
         "Buy Pullback::RANGING": {"tp_rr": 1.6, "samples": 60},

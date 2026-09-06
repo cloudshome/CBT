@@ -3,22 +3,21 @@
 Runs periodic, specialized desk workflows and logs all actions into the SQLite
 `agent_runs` store.
 """
+
 from __future__ import annotations
 
-import json
 import time
-from typing import Optional
 
-from data.database import SignalDB
 from brain.brief import generate_morning_brief, post_trade_review
-from brain.risk_gate import evaluate_risk_gate
 from brain.metrics import compute_business_metrics
+from brain.risk_gate import evaluate_risk_gate
+from data.database import SignalDB
 
 
 class BaseAgent:
     name: str = "base"
 
-    def __init__(self, db: Optional[SignalDB] = None):
+    def __init__(self, db: SignalDB | None = None):
         self.db = db
 
     def run(self) -> dict:
@@ -30,12 +29,16 @@ class MorningBriefAgent(BaseAgent):
 
     def run(self) -> dict:
         brief = generate_morning_brief(db=self.db)
-        summary = f"{brief.get('bias_summary', 'Neutral')} — {brief.get('risk_summary', '')}"
+        summary = (
+            f"{brief.get('bias_summary', 'Neutral')} — {brief.get('risk_summary', '')}"
+        )
         if brief.get("notes"):
             summary += f" ({'; '.join(brief['notes'])})"
 
         if self.db:
-            self.db.record_agent_run(self.name, "COMPLETED", summary=summary, payload=brief)
+            self.db.record_agent_run(
+                self.name, "COMPLETED", summary=summary, payload=brief
+            )
 
         return {
             "agent": self.name,
@@ -66,7 +69,9 @@ class WatchdogAgent(BaseAgent):
 
             issues = []
             if not rg.get("open"):
-                issues.append("Risk gate closed: " + "; ".join(rg.get("blocked_by", [])))
+                issues.append(
+                    "Risk gate closed: " + "; ".join(rg.get("blocked_by", []))
+                )
 
             stale_count = 0
             now = int(time.time())
@@ -117,27 +122,34 @@ class PaperReviewerAgent(BaseAgent):
         try:
             # Query recent closed trades
             closed = db.conn.execute(
-                "SELECT * FROM paper_trades WHERE status='CLOSED' ORDER BY closed_ts DESC LIMIT 10").fetchall()
+                "SELECT * FROM paper_trades WHERE status='CLOSED' ORDER BY closed_ts DESC LIMIT 10"
+            ).fetchall()
 
             reviews = []
             for r in closed:
                 scan_id = r["scan_id"]
                 rev = post_trade_review(scan_id, db=db)
-                reviews.append({
-                    "scan_id": scan_id,
-                    "symbol": r["symbol"],
-                    "outcome": r["outcome"],
-                    "rr_achieved": r["rr_achieved"],
-                    "headline": rev.get("headline"),
-                })
+                reviews.append(
+                    {
+                        "scan_id": scan_id,
+                        "symbol": r["symbol"],
+                        "outcome": r["outcome"],
+                        "rr_achieved": r["rr_achieved"],
+                        "headline": rev.get("headline"),
+                    }
+                )
 
             summary = f"Reviewed {len(reviews)} closed paper trades."
             if reviews:
-                wins = sum(1 for r in reviews if r["outcome"] in ("WIN", "FULL_WIN", "TP_HIT"))
-                summary += f" Win rate: {wins}/{len(reviews)} ({int(wins/len(reviews)*100)}%)."
+                wins = sum(
+                    1 for r in reviews if r["outcome"] in ("WIN", "FULL_WIN", "TP_HIT")
+                )
+                summary += f" Win rate: {wins}/{len(reviews)} ({int(wins / len(reviews) * 100)}%)."
 
             payload = {"reviewed_count": len(reviews), "reviews": reviews}
-            db.record_agent_run(self.name, "COMPLETED", summary=summary, payload=payload)
+            db.record_agent_run(
+                self.name, "COMPLETED", summary=summary, payload=payload
+            )
 
             return {
                 "agent": self.name,
@@ -174,8 +186,10 @@ class WeeklyReviewAgent(BaseAgent):
             if rule_rate < 80:
                 change_note = "Warning: Rule compliance below 80% threshold."
 
-            summary = (f"Weekly review: {n_trades} trades, PF {pf:.2f}, "
-                       f"Rule compliance {rule_rate}%. {change_note}")
+            summary = (
+                f"Weekly review: {n_trades} trades, PF {pf:.2f}, "
+                f"Rule compliance {rule_rate}%. {change_note}"
+            )
 
             payload = {"metrics": metrics, "change_detection": change_note}
             # W3 — attach the full weekly review (same computation as
@@ -184,10 +198,13 @@ class WeeklyReviewAgent(BaseAgent):
             # next practice task, not only the flat scorecard.
             try:
                 from brain.weekly import weekly_review
+
                 payload["weekly"] = weekly_review(db)
             except Exception as exc:  # never break the agent on a report
                 payload["weekly_error"] = f"{type(exc).__name__}: {exc}"
-            db.record_agent_run(self.name, "COMPLETED", summary=summary, payload=payload)
+            db.record_agent_run(
+                self.name, "COMPLETED", summary=summary, payload=payload
+            )
 
             return {
                 "agent": self.name,
@@ -214,17 +231,20 @@ AGENTS = {
 # Canonical autonomous-agent cadence. Used by desk_status() to answer
 # "which agent should run next?" without inventing a scheduler.
 CORE_AGENTS: tuple[str, ...] = (
-    "morning_brief", "watchdog", "paper_reviewer", "weekly_review",
+    "morning_brief",
+    "watchdog",
+    "paper_reviewer",
+    "weekly_review",
 )
 AGENT_CADENCE_HOURS: dict[str, float] = {
-    "morning_brief": 24.0,     # once per UTC day
-    "watchdog": 4.0,           # a few times a day
-    "paper_reviewer": 24.0,    # after the session
-    "weekly_review": 168.0,    # once a week
+    "morning_brief": 24.0,  # once per UTC day
+    "watchdog": 4.0,  # a few times a day
+    "paper_reviewer": 24.0,  # after the session
+    "weekly_review": 168.0,  # once a week
 }
 
 
-def run_agent(name: str, db: Optional[SignalDB] = None) -> dict:
+def run_agent(name: str, db: SignalDB | None = None) -> dict:
     """Run an agent by name."""
     cls = AGENTS.get(name.lower().replace("-", "_"))
     if not cls:
@@ -237,13 +257,15 @@ def run_agent(name: str, db: Optional[SignalDB] = None) -> dict:
     return cls(db=db).run()
 
 
-def run_all_agents(db: Optional[SignalDB] = None) -> dict:
+def run_all_agents(db: SignalDB | None = None) -> dict:
     """Run all core desk agents."""
     results = {}
-    for name, cls in (("morning_brief", MorningBriefAgent),
-                      ("watchdog", WatchdogAgent),
-                      ("paper_reviewer", PaperReviewerAgent),
-                      ("weekly_review", WeeklyReviewAgent)):
+    for name, cls in (
+        ("morning_brief", MorningBriefAgent),
+        ("watchdog", WatchdogAgent),
+        ("paper_reviewer", PaperReviewerAgent),
+        ("weekly_review", WeeklyReviewAgent),
+    ):
         results[name] = cls(db=db).run()
     return {
         "status": "COMPLETED",
@@ -252,7 +274,7 @@ def run_all_agents(db: Optional[SignalDB] = None) -> dict:
     }
 
 
-def next_scheduled_agent(db: Optional[SignalDB] = None) -> dict:
+def next_scheduled_agent(db: SignalDB | None = None) -> dict:
     """Which autonomous desk agent is most overdue.
 
     Looks at last-run timestamps in ``agent_runs`` and compares them
@@ -280,17 +302,21 @@ def next_scheduled_agent(db: Optional[SignalDB] = None) -> dict:
             last = last_by_name.get(name)
             last_ts = int(last["ts"]) if last and last.get("ts") else None
             age_hours = None if last_ts is None else max(0.0, (now - last_ts) / 3600.0)
-            overdue_hours = cadence if last_ts is None else max(0.0, age_hours - cadence)
+            overdue_hours = (
+                cadence if last_ts is None else max(0.0, age_hours - cadence)
+            )
             never_run = last_ts is None
-            candidates.append({
-                "name": name,
-                "cadence_hours": cadence,
-                "last_run_ts": last_ts,
-                "age_hours": None if age_hours is None else round(age_hours, 2),
-                "overdue_hours": round(overdue_hours, 2),
-                "never_run": never_run,
-                "last_status": (last or {}).get("status"),
-            })
+            candidates.append(
+                {
+                    "name": name,
+                    "cadence_hours": cadence,
+                    "last_run_ts": last_ts,
+                    "age_hours": None if age_hours is None else round(age_hours, 2),
+                    "overdue_hours": round(overdue_hours, 2),
+                    "never_run": never_run,
+                    "last_status": (last or {}).get("status"),
+                }
+            )
 
         # If nothing has ever run, start with morning_brief (cheapest first
         # desk action). Otherwise pick the most overdue agent.
@@ -300,14 +326,20 @@ def next_scheduled_agent(db: Optional[SignalDB] = None) -> dict:
             candidates.sort(key=lambda c: (-c["overdue_hours"], c["name"]))
             pick = candidates[0]
         if pick["never_run"]:
-            reason = (f"{pick['name']} has never run — start the desk with "
-                      f"`python main.py agent {pick['name'].replace('_', '-')}`")
+            reason = (
+                f"{pick['name']} has never run — start the desk with "
+                f"`python main.py agent {pick['name'].replace('_', '-')}`"
+            )
         elif pick["overdue_hours"] > 0:
-            reason = (f"{pick['name']} is {pick['overdue_hours']:.1f}h overdue "
-                      f"(cadence {pick['cadence_hours']:.0f}h)")
+            reason = (
+                f"{pick['name']} is {pick['overdue_hours']:.1f}h overdue "
+                f"(cadence {pick['cadence_hours']:.0f}h)"
+            )
         else:
-            reason = (f"all agents are within cadence; next up is "
-                      f"{pick['name']} (last run {pick['age_hours']:.1f}h ago)")
+            reason = (
+                f"all agents are within cadence; next up is "
+                f"{pick['name']} (last run {pick['age_hours']:.1f}h ago)"
+            )
         return {
             "name": pick["name"],
             "overdue_hours": pick["overdue_hours"],

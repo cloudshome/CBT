@@ -27,10 +27,14 @@ def test_manifest_exists_and_valid():
     assert data.get("name"), "manifest name missing"
     assert data.get("short_name"), "manifest short_name missing"
     assert data.get("start_url", "").startswith("/"), "start_url must be /"
-    assert data.get("display") in ("standalone", "minimal-ui", "fullscreen"), f"display {data.get('display')} not installable"
+    assert data.get("display") in ("standalone", "minimal-ui", "fullscreen"), (
+        f"display {data.get('display')} not installable"
+    )
     assert data.get("background_color"), "background_color missing"
     assert data.get("theme_color"), "theme_color missing"
-    assert data["theme_color"].lower() == "#070b14", f"theme_color should be #070b14, got {data['theme_color']}"
+    assert data["theme_color"].lower() == "#070b14", (
+        f"theme_color should be #070b14, got {data['theme_color']}"
+    )
     icons = data.get("icons") or []
     assert len(icons) >= 3, f"expected at least 3 icons, got {len(icons)}"
     sizes = {i.get("sizes") for i in icons}
@@ -43,7 +47,9 @@ def test_manifest_exists_and_valid():
     for icon in icons:
         src = icon.get("src") or ""
         assert src.startswith("/static/"), f"icon src must be /static/, got {src}"
-        assert icon.get("type") == "image/png", f"icon type should be image/png, got {icon}"
+        assert icon.get("type") == "image/png", (
+            f"icon type should be image/png, got {icon}"
+        )
 
 
 def test_icons_exist_and_are_png():
@@ -63,21 +69,33 @@ def test_sw_exists_and_safe():
     # Must precache offline and manifest, chart lib, icons — never API
     assert "/offline.html" in js, "offline.html not precached"
     assert "/static/manifest.json" in js, "manifest not precached"
-    assert "/static/lightweight-charts" in js or "lightweight" in js, "chart lib not precached"
+    assert "/static/lightweight-charts" in js or "lightweight" in js, (
+        "chart lib not precached"
+    )
     # Safety: NEVER_CACHE must include /api/
-    assert "startsWith('/api/')" in js or 'startsWith("/api/")' in js, "NEVER_CACHE must check /api/"
-    assert "/api/chart/stream" in js or "/api/v1/jobs" in js, "SSE routes must be explicitly never-cached"
+    assert "startsWith('/api/')" in js or 'startsWith("/api/")' in js, (
+        "NEVER_CACHE must check /api/"
+    )
+    assert "/api/chart/stream" in js or "/api/v1/jobs" in js, (
+        "SSE routes must be explicitly never-cached"
+    )
     # Must bypass non-GET (POST mutations)
-    assert "req.method !== 'GET'" in js or 'request.method' in js, "must bypass non-GET mutations"
+    assert "req.method !== 'GET'" in js or "request.method" in js, (
+        "must bypass non-GET mutations"
+    )
     # Must not precache API
     assert "SHELL_URLS" in js
     # Extract SHELL_URLS and ensure no /api/ inside
-    shell_match = re.search(r"SHELL_URLS\s*=\s*\[(.*?)\]", js, re.S)
+    shell_match = re.search(r"SHELL_URLS\s*=\s*\[(.*?)\]", js, re.DOTALL)
     if shell_match:
         shell_block = shell_match.group(1)
-        assert "/api/" not in shell_block, f"SHELL must never contain /api/, got {shell_block}"
+        assert "/api/" not in shell_block, (
+            f"SHELL must never contain /api/, got {shell_block}"
+        )
     # Push stub exists (abstraction)
-    assert "addEventListener('push'" in js or 'addEventListener("push"' in js, "push handler missing"
+    assert "addEventListener('push'" in js or 'addEventListener("push"' in js, (
+        "push handler missing"
+    )
     assert "showNotification" in js, "push must call showNotification"
     assert "notificationclick" in js, "notificationclick missing"
     # Must have skipWaiting handler
@@ -95,7 +113,7 @@ def test_sw_never_caches_private_payloads():
     next_respond = js.find("respondWith", never_idx, never_idx + 2000)
     # There should be a `return;` between NEVER_CACHE check and first respondWith after it
     # Actually our code has `if (NEVER_CACHE) return;` then later navigation check does respondWith
-    segment = js[never_idx: never_idx + 800]
+    segment = js[never_idx : never_idx + 800]
     assert "return;" in segment, "NEVER_CACHE must bare-return (network-only, no cache)"
     # Ensure Cache-Control no-cache for sw.js route is set in web/app.py (checked elsewhere)
     # Also ensure sw.js itself is not cached long — checked via route header test
@@ -105,31 +123,45 @@ def test_offline_html_exists_and_safe():
     assert OFFLINE.exists(), "offline.html missing"
     html = OFFLINE.read_text()
     assert "Offline" in html, "offline page should mention Offline"
-    assert "cached shell" in html or "OFFLINE SHELL" in html, "offline shell marker missing"
-    assert "Mutations disabled" in html or "mutations" in html.lower(), "offline must warn mutations disabled"
-    assert "never" in html.lower() and "cache" in html.lower(), "offline must explain never-cache privacy"
+    assert "cached shell" in html or "OFFLINE SHELL" in html, (
+        "offline shell marker missing"
+    )
+    assert "Mutations disabled" in html or "mutations" in html.lower(), (
+        "offline must warn mutations disabled"
+    )
+    assert "never" in html.lower() and "cache" in html.lower(), (
+        "offline must explain never-cache privacy"
+    )
 
 
 def test_app_html_has_pwa_links():
     # The terminal template lives in web/static/terminal.html (moved out of
     # app.py during the maintainability refactor).
     html = (ROOT / "web" / "static" / "terminal.html").read_text(encoding="utf-8")
-    assert '<link rel="manifest" href="/static/manifest.json">' in html, "manifest link missing"
+    assert '<link rel="manifest" href="/static/manifest.json">' in html, (
+        "manifest link missing"
+    )
     assert '<meta name="theme-color" content="#070b14">' in html, "theme-color missing"
-    assert 'apple-mobile-web-app-capable' in html, "apple-mobile-web-app-capable missing"
-    assert 'apple-touch-icon' in html, "apple-touch-icon missing"
-    assert '/static/icons/icon-192.png' in html, "icon 192 link missing"
-    assert '/static/icons/icon-180.png' in html, "icon 180 link missing"
-    assert 'id=\"offlineBanner\"' in html, "offlineBanner div missing"
-    assert 'id=\"installBanner\"' in html, "installBanner div missing"
-    assert 'Offline — showing cached shell' in html, "offline banner text missing"
-    assert 'Install SKY' in html, "install prompt text missing"
+    assert "apple-mobile-web-app-capable" in html, (
+        "apple-mobile-web-app-capable missing"
+    )
+    assert "apple-touch-icon" in html, "apple-touch-icon missing"
+    assert "/static/icons/icon-192.png" in html, "icon 192 link missing"
+    assert "/static/icons/icon-180.png" in html, "icon 180 link missing"
+    assert 'id="offlineBanner"' in html, "offlineBanner div missing"
+    assert 'id="installBanner"' in html, "installBanner div missing"
+    assert "Offline — showing cached shell" in html, "offline banner text missing"
+    assert "Install SKY" in html, "install prompt text missing"
     # Responsive compact CSS
-    assert '@media(max-width:640px)' in html, "640px compact media query missing"
+    assert "@media(max-width:640px)" in html, "640px compact media query missing"
     # Service worker registration
     assert "serviceWorker" in html, "serviceWorker registration missing"
-    assert "register('/sw.js'" in html or 'register("/sw.js"' in html, "register /sw.js missing"
-    assert "scope:'/'" in html or 'scope: "/"' in html or "scope:'/'" in html, "sw scope / missing"
+    assert "register('/sw.js'" in html or 'register("/sw.js"' in html, (
+        "register /sw.js missing"
+    )
+    assert "scope:'/'" in html or 'scope: "/"' in html or "scope:'/'" in html, (
+        "sw scope / missing"
+    )
     assert "beforeinstallprompt" in html, "beforeinstallprompt handler missing"
     assert "appinstalled" in html, "appinstalled handler missing"
     assert "navigator.onLine" in html, "online/offline detection missing"
@@ -138,14 +170,19 @@ def test_app_html_has_pwa_links():
 
 def test_pwa_routes_serve_without_auth():
     from web.app import make_app
+
     app = make_app()
     client = app.test_client()
     # sw.js
     r = client.get("/sw.js")
     assert r.status_code == 200, f"/sw.js {r.status_code}"
     assert b"CACHE_NAME" in r.data
-    assert r.headers.get("Service-Worker-Allowed") == "/", f"SW Allowed header missing: {r.headers}"
-    assert "no-cache" in r.headers.get("Cache-Control", ""), f"sw.js Cache-Control should be no-cache, got {r.headers.get('Cache-Control')}"
+    assert r.headers.get("Service-Worker-Allowed") == "/", (
+        f"SW Allowed header missing: {r.headers}"
+    )
+    assert "no-cache" in r.headers.get("Cache-Control", ""), (
+        f"sw.js Cache-Control should be no-cache, got {r.headers.get('Cache-Control')}"
+    )
     assert r.mimetype == "application/javascript"
     # manifest
     r = client.get("/manifest.json")
@@ -169,6 +206,7 @@ def test_pwa_routes_serve_without_auth():
 
 def test_no_private_caching_in_sw_headers():
     from web.app import make_app
+
     app = make_app()
     client = app.test_client()
     # API routes must have no service-worker caching headers (they are network-only)
@@ -191,10 +229,11 @@ def test_release_versions_and_pwa_cache_stay_in_lockstep():
     import config
 
     txt = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
-    project_match = re.search(r'^version = "([^"]+)"', txt, re.M)
+    project_match = re.search(r'^version = "([^"]+)"', txt, re.MULTILINE)
     assert project_match, "pyproject.toml version missing"
     assert config.VERSION == project_match.group(1), (
-        f"config.VERSION {config.VERSION} != pyproject {project_match.group(1)}")
+        f"config.VERSION {config.VERSION} != pyproject {project_match.group(1)}"
+    )
 
     sw_match = re.search(
         r"const CACHE_NAME\s*=\s*['\"]sky-shell-v([^'\"]+)['\"]",
@@ -210,9 +249,14 @@ def test_release_versions_and_pwa_cache_stay_in_lockstep():
 
 def test_html_still_valid_js():
     # Re-use the served-template parser from test_dashboard_js
+    import re
+    import shutil
+    import subprocess
+    import tempfile
+
     from web.app import HTML
-    import re, tempfile, subprocess, shutil
-    scripts = re.findall(r"<script>(.*?)</script>", HTML, re.S)
+
+    scripts = re.findall(r"<script>(.*?)</script>", HTML, re.DOTALL)
     assert scripts, "no script in served template"
     NODE = shutil.which("node")
     if NODE is None:
@@ -223,6 +267,8 @@ def test_html_still_valid_js():
             path = f.name
         try:
             r = subprocess.run([NODE, "--check", path], capture_output=True, text=True)
-            assert r.returncode == 0, f"served script #{i} invalid JS after PWA edit:\n{r.stderr}"
+            assert r.returncode == 0, (
+                f"served script #{i} invalid JS after PWA edit:\n{r.stderr}"
+            )
         finally:
             Path(path).unlink(missing_ok=True)

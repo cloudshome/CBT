@@ -1,4 +1,5 @@
 """P22.1 release metadata, channels, SBOM and private diagnostics."""
+
 from __future__ import annotations
 
 import json
@@ -9,9 +10,17 @@ from pathlib import Path
 import pytest
 
 from ops.hub import diagnostics, dispatch, setup
-from ops.release import (ReleaseError, artifact_record, dependency_inventory,
-                         redact, release_manifest, signing_readiness, spdx_sbom,
-                         write_checksums, write_support_bundle)
+from ops.release import (
+    ReleaseError,
+    artifact_record,
+    dependency_inventory,
+    redact,
+    release_manifest,
+    signing_readiness,
+    spdx_sbom,
+    write_checksums,
+    write_support_bundle,
+)
 
 
 def test_manifest_is_sorted_versioned_and_no_order_path(tmp_path):
@@ -19,8 +28,9 @@ def test_manifest_is_sorted_versioned_and_no_order_path(tmp_path):
     a = tmp_path / "a.deb"
     z.write_bytes(b"android")
     a.write_bytes(b"ubuntu")
-    payload = release_manifest([z, a], channel="beta", version="9.1.2",
-                               commit="abc", created_at=123)
+    payload = release_manifest(
+        [z, a], channel="beta", version="9.1.2", commit="abc", created_at=123
+    )
     assert [row["name"] for row in payload["artifacts"]] == ["a.deb", "z.apk"]
     assert payload["channel"] == "beta"
     assert payload["api_compatibility"] == {"min": 1, "max": 1}
@@ -43,8 +53,10 @@ def test_cannot_claim_signed_without_verifier_record(tmp_path):
 
 
 def test_checksums_are_reproducible_and_sorted(tmp_path):
-    b = tmp_path / "b.zip"; b.write_bytes(b"b")
-    a = tmp_path / "a.zip"; a.write_bytes(b"a")
+    b = tmp_path / "b.zip"
+    b.write_bytes(b"b")
+    a = tmp_path / "a.zip"
+    a.write_bytes(b"a")
     first = write_checksums(tmp_path / "one", [b, a]).read_text()
     second = write_checksums(tmp_path / "two", [a, b]).read_text()
     assert first == second
@@ -64,11 +76,13 @@ def test_spdx_and_license_inventory(tmp_path):
 
 
 def test_recursive_redaction():
-    payload = redact({
-        "api_token": "danger",
-        "nested": {"password": "danger2", "safe": "Bearer abc.def"},
-        "url": "https://me:password@example.test/path",
-    })
+    payload = redact(
+        {
+            "api_token": "danger",
+            "nested": {"password": "danger2", "safe": "Bearer abc.def"},
+            "url": "https://me:password@example.test/path",
+        }
+    )
     text = json.dumps(payload)
     assert "danger" not in text and "abc.def" not in text and "me:password" not in text
     assert payload["nested"]["safe"] == "Bearer ***REDACTED***"
@@ -76,9 +90,15 @@ def test_recursive_redaction():
 
 def test_support_bundle_is_private_and_minimal(tmp_path):
     output = tmp_path / "support.tar.gz"
-    write_support_bundle(output,
-        hub_status={"ok": True, "device_token": "never", "paths": {"db": "/private/db"}},
-        hub_doctor={"ok": True, "password": "never2"})
+    write_support_bundle(
+        output,
+        hub_status={
+            "ok": True,
+            "device_token": "never",
+            "paths": {"db": "/private/db"},
+        },
+        hub_doctor={"ok": True, "password": "never2"},
+    )
     assert not (output.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO))
     with tarfile.open(output, "r:gz") as archive:
         assert archive.getnames() == ["diagnostics.json"]
@@ -102,8 +122,9 @@ def test_hub_diagnostics_dispatch(tmp_path, monkeypatch):
     result = diagnostics(prefix=prefix, output=output)
     assert result["ok"] and result["archive"] == str(output)
     assert "secrets" in result["excludes"]
-    via_dispatch = dispatch("diagnostics", prefix=prefix,
-                            archive=str(tmp_path / "second.tar.gz"))
+    via_dispatch = dispatch(
+        "diagnostics", prefix=prefix, archive=str(tmp_path / "second.tar.gz")
+    )
     assert via_dispatch["ok"]
 
 
@@ -123,7 +144,9 @@ def test_release_workflow_and_runbook_exist():
     assert "permissions:" in workflow and "contents: read" in workflow
     assert "pip-audit" in workflow
     assert "build_release.py" in workflow
-    assert "secrets." not in workflow, "untrusted PR workflow must never receive signing secrets"
+    assert "secrets." not in workflow, (
+        "untrusted PR workflow must never receive signing secrets"
+    )
     build_deb = (root / "packaging" / "build_deb.sh").read_text()
     postinst = (root / "packaging" / "debian" / "postinst").read_text()
     postrm = (root / "packaging" / "debian" / "postrm").read_text()

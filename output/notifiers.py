@@ -3,17 +3,15 @@
 Push CryptoBrain signals to Telegram and/or Discord (webhook) channels.
 All pushes are best-effort — failures are logged, never raised.
 """
-from __future__ import annotations
 
-import json
-from typing import Optional
+from __future__ import annotations
 
 import requests
 
-from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, DISCORD_ANNOUNCE_WEBHOOK
+from config import DISCORD_ANNOUNCE_WEBHOOK, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 
-def format_signal_message(signal: dict, plans: Optional[list] = None) -> str:
+def format_signal_message(signal: dict, plans: list | None = None) -> str:
     lines = [
         f"**{signal.get('action')} {signal.get('asset')}** — {signal.get('timeframe')}",
         f"`{signal.get('signal_id')}`  conf: {signal.get('confidence')}",
@@ -25,38 +23,52 @@ def format_signal_message(signal: dict, plans: Optional[list] = None) -> str:
         lines.append("")
         lines.append("Conditional plans:")
         for p in plans[:4]:
-            lines.append(f"  • {p['type']} ({p['confidence']}%) — {p['condition'][:120]}")
+            lines.append(
+                f"  • {p['type']} ({p['confidence']}%) — {p['condition'][:120]}"
+            )
     lines.append("")
     lines.append("⚠️ Not financial advice. Use stop-losses.")
     return "\n".join(lines)
 
 
-def notify_telegram(signal: dict, plans: Optional[list] = None,
-                    token: str = TELEGRAM_BOT_TOKEN, chat_id: str = TELEGRAM_CHAT_ID) -> bool:
+def notify_telegram(
+    signal: dict,
+    plans: list | None = None,
+    token: str = TELEGRAM_BOT_TOKEN,
+    chat_id: str = TELEGRAM_CHAT_ID,
+) -> bool:
     if not token or not chat_id:
         return False
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": format_signal_message(signal, plans), "parse_mode": "Markdown"},
-            timeout=10)
+            json={
+                "chat_id": chat_id,
+                "text": format_signal_message(signal, plans),
+                "parse_mode": "Markdown",
+            },
+            timeout=10,
+        )
         return r.status_code == 200
     except requests.RequestException:
         return False
 
 
-def notify_discord(signal: dict, plans: Optional[list] = None,
-                   webhook: str = DISCORD_ANNOUNCE_WEBHOOK) -> bool:
+def notify_discord(
+    signal: dict, plans: list | None = None, webhook: str = DISCORD_ANNOUNCE_WEBHOOK
+) -> bool:
     if not webhook:
         return False
     try:
-        r = requests.post(webhook, json={"content": format_signal_message(signal, plans)}, timeout=10)
+        r = requests.post(
+            webhook, json={"content": format_signal_message(signal, plans)}, timeout=10
+        )
         return r.status_code in (200, 204)
     except requests.RequestException:
         return False
 
 
-def notify_all(signal: dict, plans: Optional[list] = None) -> dict:
+def notify_all(signal: dict, plans: list | None = None) -> dict:
     return {
         "telegram": notify_telegram(signal, plans),
         "discord": notify_discord(signal, plans),
@@ -80,36 +92,69 @@ def send_test_alert(channel: str) -> dict:
     channel = (channel or "").strip().lower()
     if channel == "telegram":
         if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-            return {"ok": False, "channel": channel,
-                    "error": "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID are not set "
-                             "in your .env"}
+            return {
+                "ok": False,
+                "channel": channel,
+                "error": "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID are not set "
+                "in your .env",
+            }
         try:
             r = requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                json={"chat_id": TELEGRAM_CHAT_ID, "text": TEST_MESSAGE,
-                      "parse_mode": "Markdown"}, timeout=10)
+                json={
+                    "chat_id": TELEGRAM_CHAT_ID,
+                    "text": TEST_MESSAGE,
+                    "parse_mode": "Markdown",
+                },
+                timeout=10,
+            )
             if r.status_code == 200:
-                return {"ok": True, "channel": channel,
-                        "detail": "sent — check your Telegram"}
-            return {"ok": False, "channel": channel,
-                    "error": f"Telegram returned {r.status_code}: {r.text[:160]}"}
+                return {
+                    "ok": True,
+                    "channel": channel,
+                    "detail": "sent — check your Telegram",
+                }
+            return {
+                "ok": False,
+                "channel": channel,
+                "error": f"Telegram returned {r.status_code}: {r.text[:160]}",
+            }
         except requests.RequestException as exc:
-            return {"ok": False, "channel": channel,
-                    "error": f"{type(exc).__name__}: {exc}"}
+            return {
+                "ok": False,
+                "channel": channel,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
     if channel == "discord":
         if not DISCORD_ANNOUNCE_WEBHOOK:
-            return {"ok": False, "channel": channel,
-                    "error": "DISCORD_ANNOUNCE_WEBHOOK is not set in your .env"}
+            return {
+                "ok": False,
+                "channel": channel,
+                "error": "DISCORD_ANNOUNCE_WEBHOOK is not set in your .env",
+            }
         try:
-            r = requests.post(DISCORD_ANNOUNCE_WEBHOOK,
-                              json={"content": TEST_MESSAGE}, timeout=10)
+            r = requests.post(
+                DISCORD_ANNOUNCE_WEBHOOK, json={"content": TEST_MESSAGE}, timeout=10
+            )
             if r.status_code in (200, 204):
-                return {"ok": True, "channel": channel,
-                        "detail": "sent — check your Discord channel"}
-            return {"ok": False, "channel": channel,
-                    "error": f"Discord returned {r.status_code}: {r.text[:160]}"}
+                return {
+                    "ok": True,
+                    "channel": channel,
+                    "detail": "sent — check your Discord channel",
+                }
+            return {
+                "ok": False,
+                "channel": channel,
+                "error": f"Discord returned {r.status_code}: {r.text[:160]}",
+            }
         except requests.RequestException as exc:
-            return {"ok": False, "channel": channel,
-                    "error": f"{type(exc).__name__}: {exc}"}
-    return {"ok": False, "channel": channel,
-            "error": "unknown alert channel — use 'telegram' or 'discord'"}
+            return {
+                "ok": False,
+                "channel": channel,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+    return {
+        "ok": False,
+        "channel": channel,
+        "error": "unknown alert channel — use 'telegram' or 'discord'",
+    }

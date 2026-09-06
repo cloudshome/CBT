@@ -14,39 +14,41 @@ Detects and labels (per candle, plus a 'latest snapshot' dict):
 All structure events are computed with only *closed* candles, so there is no
 look-ahead. The engine then reasons over the most recent events.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 
 from .indicators import _fractals, find_equal_levels
 
-
 # ──────────────────────────────────────────────────────────────────────────
 # Data containers
 # ──────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class SwingPoint:
     index: int
-    kind: str            # "high" | "low"
+    kind: str  # "high" | "low"
     price: float
-    ts: int              # epoch ms
+    ts: int  # epoch ms
+
 
 @dataclass
 class StructureEvent:
-    kind: str            # "bos_up" | "bos_down" | "choch_up" | "choch_down"
+    kind: str  # "bos_up" | "bos_down" | "choch_up" | "choch_down"
     index: int
     price: float
     ts: int
     context: str = ""
 
+
 @dataclass
 class OrderBlock:
-    side: str            # "bullish" | "bearish"
+    side: str  # "bullish" | "bearish"
     index: int
     top: float
     bottom: float
@@ -54,14 +56,16 @@ class OrderBlock:
     tested: bool = False
     broken: bool = False
 
+
 @dataclass
 class FVG:
-    side: str            # "bullish" | "bearish"
+    side: str  # "bullish" | "bearish"
     index: int
     top: float
     bottom: float
     ts: int
     filled: bool = False
+
 
 @dataclass
 class MarketStructure:
@@ -70,17 +74,17 @@ class MarketStructure:
     order_blocks: list[OrderBlock] = field(default_factory=list)
     fvgs: list[FVG] = field(default_factory=list)
     # Latest-state fields (convenience)
-    last_event: Optional[StructureEvent] = None
-    trend_bias: str = "neutral"          # "bullish" | "bearish" | "neutral"
+    last_event: StructureEvent | None = None
+    trend_bias: str = "neutral"  # "bullish" | "bearish" | "neutral"
     liquidity_above: list[float] = field(default_factory=list)
     liquidity_below: list[float] = field(default_factory=list)
-    sweep: Optional[dict] = None         # {side, level, index, ts, recovered}
-    premium_discount: Optional[dict] = None
+    sweep: dict | None = None  # {side, level, index, ts, recovered}
+    premium_discount: dict | None = None
     equal_levels: dict = field(default_factory=dict)
-    last_swing_high: Optional[float] = None
-    last_swing_low: Optional[float] = None
-    swing_high_index: Optional[int] = None
-    swing_low_index: Optional[int] = None
+    last_swing_high: float | None = None
+    last_swing_low: float | None = None
+    swing_high_index: int | None = None
+    swing_low_index: int | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -89,7 +93,9 @@ class MarketStructure:
                 "kind": self.last_event.kind,
                 "price": self.last_event.price,
                 "index": self.last_event.index,
-            } if self.last_event else None,
+            }
+            if self.last_event
+            else None,
             "last_swing_high": self.last_swing_high,
             "last_swing_low": self.last_swing_low,
             "liquidity_above": self.liquidity_above[:6],
@@ -99,7 +105,13 @@ class MarketStructure:
             "equal_highs": self.equal_levels.get("equal_highs", []),
             "equal_lows": self.equal_levels.get("equal_lows", []),
             "order_blocks": [
-                {"side": ob.side, "top": ob.top, "bottom": ob.bottom, "tested": ob.tested, "broken": ob.broken}
+                {
+                    "side": ob.side,
+                    "top": ob.top,
+                    "bottom": ob.bottom,
+                    "tested": ob.tested,
+                    "broken": ob.broken,
+                }
                 for ob in self.order_blocks[-6:]
             ],
             "fvgs": [
@@ -112,6 +124,7 @@ class MarketStructure:
 # ──────────────────────────────────────────────────────────────────────────
 # Detection
 # ──────────────────────────────────────────────────────────────────────────
+
 
 def detect_swings(df: pd.DataFrame, window: int = 2) -> list[SwingPoint]:
     hi_idx, lo_idx = _fractals(df, window)
@@ -157,22 +170,42 @@ def detect_events(df: pd.DataFrame, swings: list[SwingPoint]) -> list[StructureE
         prev = ordered[i - 1]
         if s.kind == "high":
             # breakout above a prior swing high
-            ref_highs = [p.price for p in ordered[:i] if p.kind == "high" and p.index < s.index]
+            ref_highs = [
+                p.price for p in ordered[:i] if p.kind == "high" and p.index < s.index
+            ]
             if ref_highs:
                 ref = max(ref_highs)
                 if ref < s.price:
                     kind = "bos_up" if bias in ("neutral", "bullish") else "choch_up"
-                    events.append(StructureEvent(kind, s.index, s.price, int(ts[s.index]),
-                                                 context=f"above {ref:.2f}"))
+                    events.append(
+                        StructureEvent(
+                            kind,
+                            s.index,
+                            s.price,
+                            int(ts[s.index]),
+                            context=f"above {ref:.2f}",
+                        )
+                    )
                     bias = "bullish" if kind == "bos_up" else "bearish"
         else:
-            ref_lows = [p.price for p in ordered[:i] if p.kind == "low" and p.index < s.index]
+            ref_lows = [
+                p.price for p in ordered[:i] if p.kind == "low" and p.index < s.index
+            ]
             if ref_lows:
                 ref = min(ref_lows)
                 if ref > s.price:
-                    kind = "bos_down" if bias in ("neutral", "bearish") else "choch_down"
-                    events.append(StructureEvent(kind, s.index, s.price, int(ts[s.index]),
-                                                 context=f"below {ref:.2f}"))
+                    kind = (
+                        "bos_down" if bias in ("neutral", "bearish") else "choch_down"
+                    )
+                    events.append(
+                        StructureEvent(
+                            kind,
+                            s.index,
+                            s.price,
+                            int(ts[s.index]),
+                            context=f"below {ref:.2f}",
+                        )
+                    )
                     bias = "bearish" if kind == "bos_down" else "bullish"
 
     # Additionally detect price (candle-close) breaks of the last swing level
@@ -186,22 +219,38 @@ def detect_events(df: pd.DataFrame, swings: list[SwingPoint]) -> list[StructureE
             if len(above):
                 bi = int(above[0]) + idx + 1
                 kind = "bos_up" if bias in ("neutral", "bullish") else "choch_up"
-                events.append(StructureEvent(kind, bi, float(closes_arr[bi]), int(ts[bi]),
-                                             context=f"close above swing high {last.price:.2f}"))
+                events.append(
+                    StructureEvent(
+                        kind,
+                        bi,
+                        float(closes_arr[bi]),
+                        int(ts[bi]),
+                        context=f"close above swing high {last.price:.2f}",
+                    )
+                )
                 bias = "bullish"
         elif last.kind == "low" and len(closes_arr) > idx:
             below = np.where(closes_arr[idx + 1 :] < last.price)[0]
             if len(below):
                 bi = int(below[0]) + idx + 1
                 kind = "bos_down" if bias in ("neutral", "bearish") else "choch_down"
-                events.append(StructureEvent(kind, bi, float(closes_arr[bi]), int(ts[bi]),
-                                             context=f"close below swing low {last.price:.2f}"))
+                events.append(
+                    StructureEvent(
+                        kind,
+                        bi,
+                        float(closes_arr[bi]),
+                        int(ts[bi]),
+                        context=f"close below swing low {last.price:.2f}",
+                    )
+                )
                 bias = "bearish"
 
     return events
 
 
-def detect_order_blocks(df: pd.DataFrame, events: list[StructureEvent], window: int = 5) -> list[OrderBlock]:
+def detect_order_blocks(
+    df: pd.DataFrame, events: list[StructureEvent], window: int = 5
+) -> list[OrderBlock]:
     """Order blocks: the last opposite-color candle before a structure event.
     A bullish OB = the last down candle whose high/low is immediately below the
     price before a bos_up/choch_up event. Zone = [open, high] (bull) / [low, open] (bear)."""
@@ -216,15 +265,33 @@ def detect_order_blocks(df: pd.DataFrame, events: list[StructureEvent], window: 
         i = ev.index
         start = max(0, i - window)
         if ev.kind in ("bos_up", "choch_up"):
-            base = next((j for j in range(i - 1, start - 1, -1) if closes[j] < opens[j]), None)
+            base = next(
+                (j for j in range(i - 1, start - 1, -1) if closes[j] < opens[j]), None
+            )
             if base is not None and closes[i] > highs[base]:
-                blocks.append(OrderBlock("bullish", base, float(highs[base]), float(opens[base]),
-                                         int(ts_arr[base])))
+                blocks.append(
+                    OrderBlock(
+                        "bullish",
+                        base,
+                        float(highs[base]),
+                        float(opens[base]),
+                        int(ts_arr[base]),
+                    )
+                )
         elif ev.kind in ("bos_down", "choch_down"):
-            base = next((j for j in range(i - 1, start - 1, -1) if closes[j] > opens[j]), None)
+            base = next(
+                (j for j in range(i - 1, start - 1, -1) if closes[j] > opens[j]), None
+            )
             if base is not None and closes[i] < lows[base]:
-                blocks.append(OrderBlock("bearish", base, float(opens[base]), float(lows[base]),
-                                         int(ts_arr[base])))
+                blocks.append(
+                    OrderBlock(
+                        "bearish",
+                        base,
+                        float(opens[base]),
+                        float(lows[base]),
+                        int(ts_arr[base]),
+                    )
+                )
     # "any later bar reached the level" is a running min/max of the bars AFTER
     # each position — precompute once with a reversed accumulate instead of a
     # per-block tail scan (the fast walk calls this every bar).
@@ -270,9 +337,25 @@ def detect_fvgs(df: pd.DataFrame, lookback: int = 200) -> list[FVG]:
         max_high_after[:-1] = np.maximum.accumulate(highs[::-1])[::-1][1:]
     for i in range(1, n - 1):
         if lows[i + 1] > highs[i - 1]:
-            fvgs.append(FVG("bullish", int(i + 1), float(lows[i + 1]), float(highs[i - 1]), int(ts[i + 1])))
+            fvgs.append(
+                FVG(
+                    "bullish",
+                    int(i + 1),
+                    float(lows[i + 1]),
+                    float(highs[i - 1]),
+                    int(ts[i + 1]),
+                )
+            )
         elif highs[i + 1] < lows[i - 1]:
-            fvgs.append(FVG("bearish", int(i + 1), float(lows[i - 1]), float(highs[i + 1]), int(ts[i + 1])))
+            fvgs.append(
+                FVG(
+                    "bearish",
+                    int(i + 1),
+                    float(lows[i - 1]),
+                    float(highs[i + 1]),
+                    int(ts[i + 1]),
+                )
+            )
     for f in fvgs:
         idx = f.index
         if idx + 1 >= n:
@@ -284,16 +367,21 @@ def detect_fvgs(df: pd.DataFrame, lookback: int = 200) -> list[FVG]:
     return fvgs
 
 
-def detect_liquidity(df: pd.DataFrame, swings: list[SwingPoint],
-                     sweep_scan: int = 8) -> tuple[list[float], list[float], Optional[dict]]:
+def detect_liquidity(
+    df: pd.DataFrame, swings: list[SwingPoint], sweep_scan: int = 8
+) -> tuple[list[float], list[float], dict | None]:
     """Buyside liquidity = recent swing highs above price; sellside = swing
     lows below price. A sweep is a candle that wicks beyond a level then closes
     back inside it (stop hunt / liquidity grab). Scans the last `sweep_scan`
     candles so a sweep that happened a few bars ago is still reported."""
     closes = df.close.to_numpy()
     price = float(closes[-1])
-    bs = sorted({s.price for s in swings if s.kind == "high" and s.price > price}, reverse=True)
-    ss = sorted({s.price for s in swings if s.kind == "low" and s.price < price}, reverse=True)
+    bs = sorted(
+        {s.price for s in swings if s.kind == "high" and s.price > price}, reverse=True
+    )
+    ss = sorted(
+        {s.price for s in swings if s.kind == "low" and s.price < price}, reverse=True
+    )
 
     sweep = None
     window = df.tail(min(sweep_scan, len(df))).reset_index(drop=True)
@@ -309,21 +397,31 @@ def detect_liquidity(df: pd.DataFrame, swings: list[SwingPoint],
                 # only flag if the previous candle did NOT already sit beyond
                 already_beyond = prev_close >= level
                 if not already_beyond or recovered:
-                    sweep = {"side": "buyside", "level": float(level),
-                             "recovered": bool(recovered), "bars_ago": len(window) - 1 - i}
+                    sweep = {
+                        "side": "buyside",
+                        "level": float(level),
+                        "recovered": bool(recovered),
+                        "bars_ago": len(window) - 1 - i,
+                    }
                     return bs, ss, sweep
         for level in ss[:4]:
             if wl[i] < level:
                 recovered = wc[i] > level
                 already_beyond = prev_close <= level
                 if not already_beyond or recovered:
-                    sweep = {"side": "sellside", "level": float(level),
-                             "recovered": bool(recovered), "bars_ago": len(window) - 1 - i}
+                    sweep = {
+                        "side": "sellside",
+                        "level": float(level),
+                        "recovered": bool(recovered),
+                        "bars_ago": len(window) - 1 - i,
+                    }
                     return bs, ss, sweep
     return bs, ss, sweep
 
 
-def detect_premium_discount(df: pd.DataFrame, swings: list[SwingPoint]) -> Optional[dict]:
+def detect_premium_discount(
+    df: pd.DataFrame, swings: list[SwingPoint]
+) -> dict | None:
     """Position within the last dealing range (most recent confirmed swing low
     -> swing high). 0 = deep discount, 1 = deep premium, 0.5 = equilibrium."""
     price = float(df.close.iloc[-1])
@@ -336,8 +434,16 @@ def detect_premium_discount(df: pd.DataFrame, swings: list[SwingPoint]) -> Optio
     if top <= bottom:
         return None
     pos = (price - bottom) / (top - bottom)
-    return {"top": top, "bottom": bottom, "position": round(pos, 3),
-            "zone": "premium" if pos > 0.62 else "discount" if pos < 0.38 else "equilibrium"}
+    return {
+        "top": top,
+        "bottom": bottom,
+        "position": round(pos, 3),
+        "zone": "premium"
+        if pos > 0.62
+        else "discount"
+        if pos < 0.38
+        else "equilibrium",
+    }
 
 
 def analyze_structure(df: pd.DataFrame, lookback: int = 200) -> MarketStructure:
@@ -366,12 +472,20 @@ def analyze_structure(df: pd.DataFrame, lookback: int = 200) -> MarketStructure:
     lows = [s.price for s in swings if s.kind == "low"]
     ms.last_swing_high = highs[-1] if highs else None
     ms.last_swing_low = lows[-1] if lows else None
-    ms.swing_high_index = [s.index for s in swings if s.kind == "high"][-1] if highs else None
-    ms.swing_low_index = [s.index for s in swings if s.kind == "low"][-1] if lows else None
+    ms.swing_high_index = (
+        [s.index for s in swings if s.kind == "high"][-1] if highs else None
+    )
+    ms.swing_low_index = (
+        [s.index for s in swings if s.kind == "low"][-1] if lows else None
+    )
 
     if ms.last_event:
-        ms.trend_bias = {"bos_up": "bullish", "choch_down": "bearish",
-                         "bos_down": "bearish", "choch_up": "bullish"}.get(ms.last_event.kind, "neutral")
+        ms.trend_bias = {
+            "bos_up": "bullish",
+            "choch_down": "bearish",
+            "bos_down": "bearish",
+            "choch_up": "bullish",
+        }.get(ms.last_event.kind, "neutral")
     else:
         ms.trend_bias = "neutral"
     return ms

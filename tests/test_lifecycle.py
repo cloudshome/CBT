@@ -1,10 +1,15 @@
 """Tests for the signal lifecycle (human approval gate)."""
+
 from __future__ import annotations
 
 import pytest
 
 from engine.lifecycle import (
-    LifecycleError, can_transition, next_states, reviewable, transition,
+    LifecycleError,
+    can_transition,
+    next_states,
+    reviewable,
+    transition,
 )
 
 
@@ -18,7 +23,7 @@ def test_valid_states():
 
 
 def test_invalid_transitions():
-    assert not can_transition("REJECTED", "APPROVED")   # dead end
+    assert not can_transition("REJECTED", "APPROVED")  # dead end
     assert not can_transition("APPROVED", "PENDING_REVIEW")
     assert not can_transition("PENDING_REVIEW", "CLOSED")
     assert not can_transition("CLOSED", "EXECUTED")

@@ -11,12 +11,13 @@ close | place_order | sign | withdraw | transfer) are NEVER in this map and
 MUST NOT be added — the engine physically cannot be asked to trade. The
 human-approval gate is the only path to action and lives in `brain/risk_gate.py`.
 """
+
 from __future__ import annotations
 
 import json
 import os
 import sys
-from typing import Any, Optional
+from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -41,7 +42,10 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Question to answer (e.g. 'which setups have positive expectancy in ranging markets?')"}
+                "query": {
+                    "type": "string",
+                    "description": "Question to answer (e.g. 'which setups have positive expectancy in ranging markets?')",
+                }
             },
             "required": ["query"],
         },
@@ -51,7 +55,11 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "enum": ["get", "set", "clear"], "default": "get"},
+                "action": {
+                    "type": "string",
+                    "enum": ["get", "set", "clear"],
+                    "default": "get",
+                },
                 "angry": {"type": "boolean"},
                 "tired": {"type": "boolean"},
                 "revenge": {"type": "boolean"},
@@ -79,7 +87,11 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "symbols": {"type": "array", "items": {"type": "string"}, "description": "List of symbols to brief"}
+                "symbols": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of symbols to brief",
+                }
             },
         },
     },
@@ -88,7 +100,10 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "scan_id": {"type": "integer", "description": "Database scan ID to review"}
+                "scan_id": {
+                    "type": "integer",
+                    "description": "Database scan ID to review",
+                }
             },
             "required": ["scan_id"],
         },
@@ -109,10 +124,26 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "symbols": {"type": "array", "items": {"type": "string"}, "description": "Watchlist (default BTCUSDT,ETHUSDT,XAUUSD)"},
-                "timeframe": {"type": "string", "default": "1h", "description": "Candle timeframe"},
-                "bars": {"type": "integer", "default": 300, "description": "History length (max 1000)"},
-                "window": {"type": "integer", "default": 60, "description": "Rolling window of aligned returns"},
+                "symbols": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Watchlist (default BTCUSDT,ETHUSDT,XAUUSD)",
+                },
+                "timeframe": {
+                    "type": "string",
+                    "default": "1h",
+                    "description": "Candle timeframe",
+                },
+                "bars": {
+                    "type": "integer",
+                    "default": 300,
+                    "description": "History length (max 1000)",
+                },
+                "window": {
+                    "type": "integer",
+                    "default": 60,
+                    "description": "Rolling window of aligned returns",
+                },
             },
         },
     },
@@ -121,13 +152,40 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "source": {"type": "string", "enum": ["db", "backtest", "paper"], "default": "db", "description": "db = stored backtest + paper outcomes combined; or one book alone"},
-                "symbol": {"type": "string", "description": "Optional asset filter (BTCUSDT, ETHUSDT, XAUUSD)"},
-                "min_decided": {"type": "integer", "default": 30, "description": "Minimum decided trades before a verdict is given"},
-                "exclude_sim": {"type": "boolean", "default": False, "description": "Drop simulator walk-forward samples (real paper book only)"},
-                "no_costs": {"type": "boolean", "default": False, "description": "Disable cost modeling (evaluate gross only)"},
-                "conditioned": {"type": "boolean", "default": False, "description": "Include conditioned splits by funding and CVD order flow"},
-                "source_key": {"type": "string", "description": "P12.11 price-series filter: 'live' (canonical Binance spot), 'exchange:market[:bid|ask]' e.g. 'dukascopy:spot:bid', or 'all' (default) to pool every source. The report always names the sources it mixed and flags one-sided (bid/ask-only) series as research-only."},
+                "source": {
+                    "type": "string",
+                    "enum": ["db", "backtest", "paper"],
+                    "default": "db",
+                    "description": "db = stored backtest + paper outcomes combined; or one book alone",
+                },
+                "symbol": {
+                    "type": "string",
+                    "description": "Optional asset filter (BTCUSDT, ETHUSDT, XAUUSD)",
+                },
+                "min_decided": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "Minimum decided trades before a verdict is given",
+                },
+                "exclude_sim": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Drop simulator walk-forward samples (real paper book only)",
+                },
+                "no_costs": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Disable cost modeling (evaluate gross only)",
+                },
+                "conditioned": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Include conditioned splits by funding and CVD order flow",
+                },
+                "source_key": {
+                    "type": "string",
+                    "description": "P12.11 price-series filter: 'live' (canonical Binance spot), 'exchange:market[:bid|ask]' e.g. 'dukascopy:spot:bid', or 'all' (default) to pool every source. The report always names the sources it mixed and flags one-sided (bid/ask-only) series as research-only.",
+                },
             },
         },
     },
@@ -136,9 +194,17 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "symbol": {"type": "string", "default": "BTCUSDT", "description": "Asset (aliases: BTC, ETH, XAU/GOLD)"},
+                "symbol": {
+                    "type": "string",
+                    "default": "BTCUSDT",
+                    "description": "Asset (aliases: BTC, ETH, XAU/GOLD)",
+                },
                 "timeframe": {"type": "string", "default": "15m"},
-                "bars": {"type": "integer", "default": 500, "description": "History length"},
+                "bars": {
+                    "type": "integer",
+                    "default": 500,
+                    "description": "History length",
+                },
             },
         },
     },
@@ -147,7 +213,10 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "plan_type": {"type": "string", "description": "Optional plan-type filter (e.g. 'Buy Pullback')"},
+                "plan_type": {
+                    "type": "string",
+                    "description": "Optional plan-type filter (e.g. 'Buy Pullback')",
+                },
             },
         },
     },
@@ -156,8 +225,15 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "samples": {"type": "integer", "default": 2000, "description": "Number of Monte Carlo samples"},
-                "seed": {"type": "integer", "description": "Optional RNG seed for reproducible runs"},
+                "samples": {
+                    "type": "integer",
+                    "default": 2000,
+                    "description": "Number of Monte Carlo samples",
+                },
+                "seed": {
+                    "type": "integer",
+                    "description": "Optional RNG seed for reproducible runs",
+                },
             },
         },
     },
@@ -191,7 +267,11 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "days": {"type": "integer", "default": 7, "description": "Review window in days (1-90, default 7)"},
+                "days": {
+                    "type": "integer",
+                    "default": 7,
+                    "description": "Review window in days (1-90, default 7)",
+                },
             },
         },
     },
@@ -201,7 +281,11 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "days": {"type": "integer", "default": 30, "description": "Window in days (1-365, default 30)"},
+                "days": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "Window in days (1-365, default 30)",
+                },
             },
         },
     },
@@ -218,7 +302,11 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "demo": {"type": "boolean", "default": False, "description": "Use deterministic demo data (offline)"},
+                "demo": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Use deterministic demo data (offline)",
+                },
             },
         },
     },
@@ -234,7 +322,10 @@ ALLOWED_TOOLS = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "hypothesis_id": {"type": "string", "description": "Optional: which hypothesis to backtest (e.g. H-001). Omit to just list."},
+                "hypothesis_id": {
+                    "type": "string",
+                    "description": "Optional: which hypothesis to backtest (e.g. H-001). Omit to just list.",
+                },
                 "symbol": {"type": "string", "default": "BTCUSDT"},
                 "timeframe": {"type": "string", "default": "15m"},
             },
@@ -245,7 +336,9 @@ ALLOWED_TOOLS = {
 
 def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
     if name not in ALLOWED_TOOLS:
-        raise ValueError(f"Tool '{name}' is not permitted or does not exist. (Permission map enforced: read-only tools only)")
+        raise ValueError(
+            f"Tool '{name}' is not permitted or does not exist. (Permission map enforced: read-only tools only)"
+        )
 
     if name == "ask":
         query = args.get("query", "")
@@ -256,7 +349,13 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         action = args.get("action", "get")
         with SignalDB() as db:
             if action == "clear":
-                db.set_trader_state(angry=False, tired=False, revenge=False, chasing=False, note="cleared via MCP")
+                db.set_trader_state(
+                    angry=False,
+                    tired=False,
+                    revenge=False,
+                    chasing=False,
+                    note="cleared via MCP",
+                )
             elif action == "set":
                 db.set_trader_state(
                     angry=args.get("angry"),
@@ -275,6 +374,7 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
 
     elif name == "health":
         from brain.immune import run_health_check
+
         return run_health_check()
 
     elif name == "brief":
@@ -291,12 +391,14 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         # and `python main.py channels --json`. Probe-isolated by
         # brain.channels.probe_all().
         from brain.channels import list_channels
+
         return list_channels(as_json=True)
 
     elif name == "correlation":
         # Measured cross-asset correlation + ETH/BTC beta. Read-only.
         from data.sample_client import maybe_client
         from engine.correlation import fetch_report
+
         client = maybe_client()
         syms = args.get("symbols")
         symbols = tuple(syms) if isinstance(syms, list) and syms else None
@@ -313,6 +415,7 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         # re-reads the store, never re-grades and never places anything.
         from data.costs import CostModel
         from data.scorecard import scorecard_from_db
+
         src = args.get("source", "db")
         cost_model = CostModel(enabled=not bool(args.get("no_costs", False)))
         # P12.11 — an explicit price-series filter; default pools and reports.
@@ -321,11 +424,19 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
         if raw_key is not None:
             text = str(raw_key).strip().lower()
             if text not in ("", "all", "any", "*"):
-                from data.provenance import (LIVE_SOURCE_KEY, parse_source_key,
-                                             source_key as _mk_source_key)
-                source_key = (LIVE_SOURCE_KEY
-                              if text in ("live", "canonical", "binance", "default")
-                              else _mk_source_key(*parse_source_key(text)))
+                from data.provenance import (
+                    LIVE_SOURCE_KEY,
+                    parse_source_key,
+                )
+                from data.provenance import (
+                    source_key as _mk_source_key,
+                )
+
+                source_key = (
+                    LIVE_SOURCE_KEY
+                    if text in ("live", "canonical", "binance", "default")
+                    else _mk_source_key(*parse_source_key(text))
+                )
         return scorecard_from_db(
             symbol=normalize_symbol(args["symbol"]) if args.get("symbol") else None,
             source="all" if src == "db" else src,
@@ -334,12 +445,14 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
             cost_model=cost_model,
             conditioned=bool(args.get("conditioned", False)),
             quality=bool(args.get("quality", False)),
-            source_key=source_key)
+            source_key=source_key,
+        )
 
     elif name == "hidden_chart_read":
         # HMM regime + CVD + Kelly advisory for one symbol. Read-only.
         from data.sample_client import maybe_client
         from engine.hidden_alpha import hidden_alpha_report
+
         sym = normalize_symbol(args.get("symbol", "BTCUSDT"))
         tf = args.get("timeframe", "15m")
         bars = min(int(args.get("bars", 500)), 1000)
@@ -350,6 +463,7 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
     elif name == "hidden_analytics_mae":
         # MAE/MFE summary from the paper-trade DB. Read-only.
         from brain.analytics import mae_mfe_summary
+
         plan_type = args.get("plan_type")
         with SignalDB() as db:
             return mae_mfe_summary(db, plan_type=plan_type)
@@ -357,30 +471,36 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
     elif name == "hidden_analytics_mc":
         # Monte Carlo equity / drawdown distribution. Read-only.
         from brain.analytics import monte_carlo_equity
+
         samples = min(int(args.get("samples", 2000)), 20000)
         seed = args.get("seed")
         with SignalDB() as db:
-            return monte_carlo_equity(db, samples=samples,
-                                      seed=int(seed) if seed is not None else None)
+            return monte_carlo_equity(
+                db, samples=samples, seed=int(seed) if seed is not None else None
+            )
 
     elif name == "desk_status":
         from brain.agent import desk_status
+
         return desk_status()
 
     elif name == "readiness":
         # Combined channels + immune + risk-gate + data-quality verdict. Read-only;
         # every pillar is exception-isolated inside readiness_strip().
         from brain.agent import readiness_strip
+
         return readiness_strip()
 
     elif name == "loop_health":
         # P14 daily ritual. Composes desk_status + readiness + paper_progress.
         from brain.agent import loop_health
+
         return loop_health()
 
     elif name == "weekly_review":
         # W3 weekly trader review. Canonical live book only, NET of costs.
         from brain.weekly import weekly_review
+
         days = min(90, max(1, int(args.get("days", 7))))
         with SignalDB() as db:
             return weekly_review(db, days=days)
@@ -388,28 +508,57 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
     elif name == "practice_scorecard":
         # W3.4 practice calibration. Coaching memory only — feeds no gate.
         from brain.practice import practice_scorecard
+
         days = min(365, max(1, int(args.get("days", 30))))
         with SignalDB() as db:
             return practice_scorecard(db, days=days)
 
     elif name == "sky_agent_status":
         from sky_agent.memory import ensure_memory_schema
+
         with SignalDB() as db:
             ensure_memory_schema(db)
-            hyps = [dict(r) for r in db.conn.execute("SELECT hypothesis_id,setup,status,created_ts FROM research_hypotheses ORDER BY created_ts DESC LIMIT 20").fetchall()]
-            reports = [dict(r) for r in db.conn.execute("SELECT report_date,kind,asset,recommendation,level,created_ts FROM intelligence_reports ORDER BY created_ts DESC LIMIT 10").fetchall()]
-            regimes = [dict(r) for r in db.conn.execute("SELECT symbol,timeframe,regime,volatility_state,ts FROM market_regime_log ORDER BY ts DESC LIMIT 10").fetchall()]
-            filings = [dict(r) for r in db.conn.execute("SELECT accession,event_type,severity FROM sec_events ORDER BY created_ts DESC LIMIT 10").fetchall()]
-        return {"hypotheses": hyps, "reports": reports, "regimes": regimes, "sec_events": filings}
+            hyps = [
+                dict(r)
+                for r in db.conn.execute(
+                    "SELECT hypothesis_id,setup,status,created_ts FROM research_hypotheses ORDER BY created_ts DESC LIMIT 20"
+                ).fetchall()
+            ]
+            reports = [
+                dict(r)
+                for r in db.conn.execute(
+                    "SELECT report_date,kind,asset,recommendation,level,created_ts FROM intelligence_reports ORDER BY created_ts DESC LIMIT 10"
+                ).fetchall()
+            ]
+            regimes = [
+                dict(r)
+                for r in db.conn.execute(
+                    "SELECT symbol,timeframe,regime,volatility_state,ts FROM market_regime_log ORDER BY ts DESC LIMIT 10"
+                ).fetchall()
+            ]
+            filings = [
+                dict(r)
+                for r in db.conn.execute(
+                    "SELECT accession,event_type,severity FROM sec_events ORDER BY created_ts DESC LIMIT 10"
+                ).fetchall()
+            ]
+        return {
+            "hypotheses": hyps,
+            "reports": reports,
+            "regimes": regimes,
+            "sec_events": filings,
+        }
 
     elif name == "sky_agent_report":
         from sky_agent.daily_report import build_daily_report
+
         demo = bool(args.get("demo", False))
         return build_daily_report(demo=demo)
 
     elif name == "sky_agent_health":
         from brain.agent import readiness_strip
         from sky_agent.monitor_system import probe_system
+
         try:
             strip = readiness_strip()
         except Exception as exc:
@@ -418,17 +567,22 @@ def handle_tool_call(name: str, args: dict[str, Any]) -> dict:
 
     elif name == "sky_agent_hypotheses":
         from sky_agent.hypothesis import propose_hypotheses, run_hypothesis_backtest
+
         hyps = propose_hypotheses()
         out: dict[str, Any] = {"hypotheses": hyps}
         hid = args.get("hypothesis_id")
         if hid:
-            out["backtest"] = run_hypothesis_backtest(str(hid), symbol=str(args.get("symbol", "BTCUSDT")), timeframe=str(args.get("timeframe", "15m")))
+            out["backtest"] = run_hypothesis_backtest(
+                str(hid),
+                symbol=str(args.get("symbol", "BTCUSDT")),
+                timeframe=str(args.get("timeframe", "15m")),
+            )
         return out
 
     raise ValueError(f"Unhandled tool: {name}")
 
 
-def process_message(msg: dict) -> Optional[dict]:
+def process_message(msg: dict) -> dict | None:
     msg_id = msg.get("id")
     method = msg.get("method")
     params = msg.get("params") or {}
@@ -458,11 +612,13 @@ def process_message(msg: dict) -> Optional[dict]:
     elif method == "tools/list":
         tools_out = []
         for name, spec in ALLOWED_TOOLS.items():
-            tools_out.append({
-                "name": name,
-                "description": spec["description"],
-                "inputSchema": spec["inputSchema"],
-            })
+            tools_out.append(
+                {
+                    "name": name,
+                    "description": spec["description"],
+                    "inputSchema": spec["inputSchema"],
+                }
+            )
         return {"jsonrpc": "2.0", "id": msg_id, "result": {"tools": tools_out}}
 
     elif method == "tools/call":
@@ -475,7 +631,10 @@ def process_message(msg: dict) -> Optional[dict]:
                 "id": msg_id,
                 "result": {
                     "content": [
-                        {"type": "text", "text": json.dumps(res_data, indent=2, default=str)}
+                        {
+                            "type": "text",
+                            "text": json.dumps(res_data, indent=2, default=str),
+                        }
                     ]
                 },
             }

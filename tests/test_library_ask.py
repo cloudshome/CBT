@@ -1,7 +1,7 @@
 """tests/test_library_ask.py — Unit tests for RAG library indexing and query answering."""
-import pytest
-from brain.library import TradingLibrary
+
 from brain.ask import ask
+from brain.library import TradingLibrary
 from data.database import SignalDB
 
 

@@ -1,11 +1,9 @@
 """sky_agent.memory — structured memory tables for the intelligence agent."""
+
 from __future__ import annotations
 
 import json
 import time
-import sqlite3
-from pathlib import Path
-from typing import Any
 
 # Reuse canonical DB path resolution
 from data.database import SignalDB
@@ -90,36 +88,101 @@ def ensure_memory_schema(db: SignalDB | None = None) -> None:
             db.close()
 
 
-def record_regime(db: SignalDB, *, symbol: str, timeframe: str, regime: str, volatility_state: str, details: dict) -> None:
+def record_regime(
+    db: SignalDB,
+    *,
+    symbol: str,
+    timeframe: str,
+    regime: str,
+    volatility_state: str,
+    details: dict,
+) -> None:
     ensure_memory_schema(db)
     db.conn.execute(
         "INSERT INTO market_regime_log(ts,symbol,timeframe,regime,volatility_state,details_json) VALUES (?,?,?,?,?,?)",
-        (int(time.time()), symbol, timeframe, regime, volatility_state, json.dumps(details)),
+        (
+            int(time.time()),
+            symbol,
+            timeframe,
+            regime,
+            volatility_state,
+            json.dumps(details),
+        ),
     )
     db.conn.commit()
 
 
-def record_report(db: SignalDB, *, kind: str, asset: str, timeframe: str, recommendation: str, confidence: str, level: str, evidence: dict) -> int:
+def record_report(
+    db: SignalDB,
+    *,
+    kind: str,
+    asset: str,
+    timeframe: str,
+    recommendation: str,
+    confidence: str,
+    level: str,
+    evidence: dict,
+) -> int:
     ensure_memory_schema(db)
     cur = db.conn.execute(
         "INSERT INTO intelligence_reports(report_date,kind,asset,timeframe,recommendation,confidence,level,evidence_json,created_ts) VALUES (?,?,?,?,?,?,?,?,?)",
-        (time.strftime("%Y-%m-%d"), kind, asset, timeframe, recommendation, confidence, level, json.dumps(evidence), int(time.time())),
+        (
+            time.strftime("%Y-%m-%d"),
+            kind,
+            asset,
+            timeframe,
+            recommendation,
+            confidence,
+            level,
+            json.dumps(evidence),
+            int(time.time()),
+        ),
     )
     db.conn.commit()
     return cur.lastrowid
 
 
-def upsert_hypothesis(db: SignalDB, *, hypothesis_id: str, setup: str, filters: dict, status: str = "proposed", metrics: dict | None = None, notes: str = "") -> None:
+def upsert_hypothesis(
+    db: SignalDB,
+    *,
+    hypothesis_id: str,
+    setup: str,
+    filters: dict,
+    status: str = "proposed",
+    metrics: dict | None = None,
+    notes: str = "",
+) -> None:
     ensure_memory_schema(db)
-    existing = db.conn.execute("SELECT id FROM research_hypotheses WHERE hypothesis_id=?", (hypothesis_id,)).fetchone()
+    existing = db.conn.execute(
+        "SELECT id FROM research_hypotheses WHERE hypothesis_id=?", (hypothesis_id,)
+    ).fetchone()
     if existing:
         db.conn.execute(
             "UPDATE research_hypotheses SET setup=?, filters_json=?, status=?, tested_ts=?, metrics_json=?, notes=? WHERE hypothesis_id=?",
-            (setup, json.dumps(filters), status, int(time.time()) if status in ("tested", "accepted", "rejected") else None, json.dumps(metrics or {}), notes, hypothesis_id),
+            (
+                setup,
+                json.dumps(filters),
+                status,
+                int(time.time())
+                if status in ("tested", "accepted", "rejected")
+                else None,
+                json.dumps(metrics or {}),
+                notes,
+                hypothesis_id,
+            ),
         )
     else:
         db.conn.execute(
             "INSERT INTO research_hypotheses(hypothesis_id,setup,filters_json,status,created_ts,tested_ts,metrics_json,notes) VALUES (?,?,?,?,?,?,?,?)",
-            (hypothesis_id, setup, json.dumps(filters), status, int(time.time()), None, json.dumps(metrics or {}), notes),
+            (
+                hypothesis_id,
+                setup,
+                json.dumps(filters),
+                status,
+                int(time.time()),
+                None,
+                json.dumps(metrics or {}),
+                notes,
+            ),
         )
     db.conn.commit()

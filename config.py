@@ -1,8 +1,10 @@
 """CryptoBrain configuration — copy .env.example to .env to override."""
+
 from __future__ import annotations
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 from data.symbols import DEFAULT_WATCHLIST, normalize_symbol, parse_symbol_list
@@ -39,7 +41,9 @@ KELLY_MAX_RISK_PCT = float(os.getenv("KELLY_MAX_RISK_PCT", "0.5"))
 # (not a fixed target); setup-specific targets come from measured expectancy.
 INTELLIGENCE_MIN_CONFIDENCE = int(os.getenv("INTELLIGENCE_MIN_CONFIDENCE", "80"))
 INTELLIGENCE_MIN_RR = float(os.getenv("INTELLIGENCE_MIN_RR", "1.5"))
-ACCOUNT_BALANCE = float(os.getenv("ACCOUNT_BALANCE", "0") or 0)  # optional; enables position sizing
+ACCOUNT_BALANCE = float(
+    os.getenv("ACCOUNT_BALANCE", "0") or 0
+)  # optional; enables position sizing
 RISK_PCT = max(0.0, min(MAX_RISK_PCT, float(os.getenv("RISK_PCT", "0.5"))))
 MAX_DAILY_LOSS_PCT = float(os.getenv("MAX_DAILY_LOSS_PCT", "1.5"))
 MAX_WEEKLY_LOSS_PCT = float(os.getenv("MAX_WEEKLY_LOSS_PCT", "3.0"))
@@ -55,12 +59,48 @@ DESK_DEFAULT = os.getenv("DESK_DEFAULT", "true").lower() in ("1", "true", "yes")
 # than 20 decided paper samples, or non-positive expectancy (decision A6/B10).
 PROGRESSION = os.getenv("PROGRESSION", "student").strip().lower()
 PROGRESSION_LEVELS = {
-    "student":    {"risk_pct": 0.25, "daily": 1.0, "weekly": 2.0, "approve_unproven": False, "label": "Learn: market structure + macro + risk"},
-    "researcher": {"risk_pct": 0.25, "daily": 1.0, "weekly": 2.0, "approve_unproven": False, "label": "Backtest one strategy; no live approvals"},
-    "simulator":  {"risk_pct": 0.50, "daily": 1.5, "weekly": 3.0, "approve_unproven": True,  "label": "Paper-trade 100–200 samples"},
-    "micro":      {"risk_pct": 0.50, "daily": 1.5, "weekly": 3.0, "approve_unproven": True,  "label": "Very small real capital"},
-    "consistent": {"risk_pct": 0.75, "daily": 2.0, "weekly": 4.0, "approve_unproven": True,  "label": "Proven expectancy + controlled drawdown"},
-    "scale":      {"risk_pct": 1.00, "daily": 2.5, "weekly": 5.0, "approve_unproven": True,  "label": "Increase capital slowly"},
+    "student": {
+        "risk_pct": 0.25,
+        "daily": 1.0,
+        "weekly": 2.0,
+        "approve_unproven": False,
+        "label": "Learn: market structure + macro + risk",
+    },
+    "researcher": {
+        "risk_pct": 0.25,
+        "daily": 1.0,
+        "weekly": 2.0,
+        "approve_unproven": False,
+        "label": "Backtest one strategy; no live approvals",
+    },
+    "simulator": {
+        "risk_pct": 0.50,
+        "daily": 1.5,
+        "weekly": 3.0,
+        "approve_unproven": True,
+        "label": "Paper-trade 100–200 samples",
+    },
+    "micro": {
+        "risk_pct": 0.50,
+        "daily": 1.5,
+        "weekly": 3.0,
+        "approve_unproven": True,
+        "label": "Very small real capital",
+    },
+    "consistent": {
+        "risk_pct": 0.75,
+        "daily": 2.0,
+        "weekly": 4.0,
+        "approve_unproven": True,
+        "label": "Proven expectancy + controlled drawdown",
+    },
+    "scale": {
+        "risk_pct": 1.00,
+        "daily": 2.5,
+        "weekly": 5.0,
+        "approve_unproven": True,
+        "label": "Increase capital slowly",
+    },
 }
 if PROGRESSION not in PROGRESSION_LEVELS:
     PROGRESSION = "student"
@@ -69,11 +109,15 @@ if PROGRESSION not in PROGRESSION_LEVELS:
 # tradeable confidence; every other setup is a watch-item until individually
 # proven.  Default = the roadmap's suggested first edge: liquidity sweep +
 # trend continuation (sweep reversals + OB/FVG pullbacks).
-PRIMARY_SETUP_FAMILY = os.getenv("PRIMARY_SETUP_FAMILY", "sweep_trend_continuation").strip().lower()
+PRIMARY_SETUP_FAMILY = (
+    os.getenv("PRIMARY_SETUP_FAMILY", "sweep_trend_continuation").strip().lower()
+)
 PRIMARY_FAMILIES = {
     "sweep_trend_continuation": {
-        "Sweep Reversal Buy", "Sweep Reversal Sell",
-        "Buy Pullback", "Sell Pullback",
+        "Sweep Reversal Buy",
+        "Sweep Reversal Sell",
+        "Buy Pullback",
+        "Sell Pullback",
     },
     "all": None,  # explicit opt-out of narrowing (radar mode)
 }
@@ -84,7 +128,7 @@ TP_RR_MIN = float(os.getenv("TP_RR_MIN", "1.5"))
 TP_RR_MAX = float(os.getenv("TP_RR_MAX", "4.0"))
 
 # ── CryptoDada connector ─────────────────────────────────────────────────
-CRYPTODADA_MODE = os.getenv("CRYPTODADA_MODE", "auto")          # auto|api|browser
+CRYPTODADA_MODE = os.getenv("CRYPTODADA_MODE", "auto")  # auto|api|browser
 CRYPTODADA_BASE_URL = os.getenv("CRYPTODADA_BASE_URL", "").rstrip("/")
 CRYPTODADA_EMAIL = os.getenv("CRYPTODADA_EMAIL", "")
 CRYPTODADA_PASSWORD = os.getenv("CRYPTODADA_PASSWORD", "")
@@ -93,11 +137,13 @@ CRYPTODADA_2FA = os.getenv("CRYPTODADA_2FA", "")
 # ── Discord ──────────────────────────────────────────────────────────────
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
-DISCORD_CHANNEL_IDS = [c.strip() for c in os.getenv("DISCORD_CHANNEL_IDS", "").split(",") if c.strip()]
+DISCORD_CHANNEL_IDS = [
+    c.strip() for c in os.getenv("DISCORD_CHANNEL_IDS", "").split(",") if c.strip()
+]
 DISCORD_ANNOUNCE_WEBHOOK = os.getenv("DISCORD_ANNOUNCE_WEBHOOK", "")
 
 # ── LLM AI Brain ─────────────────────────────────────────────────────────
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "off")                 # auto|groq|openai|gemini|off
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "off")  # auto|groq|openai|gemini|off
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -139,13 +185,23 @@ SKY_LOGIN_LOCKOUT_SECONDS = int(os.getenv("SKY_LOGIN_LOCKOUT_SECONDS", "300"))
 
 # The approve endpoint normally cannot bypass the risk gate. This explicit
 # opt-in re-enables the legacy "force approve" escape hatch (always audited).
-SKY_ALLOW_FORCE_APPROVE = os.getenv("SKY_ALLOW_FORCE_APPROVE", "false").lower() in ("1", "true", "yes")
+SKY_ALLOW_FORCE_APPROVE = os.getenv("SKY_ALLOW_FORCE_APPROVE", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 # Remote deployment guard: binding to a non-loopback host is refused unless an
 # owner account exists AND a TLS-terminating reverse proxy is configured
 # (SKY_TRUSTED_PROXY_IPS), or SKY_ALLOW_REMOTE_NO_TLS is explicitly enabled.
-SKY_ALLOW_REMOTE_NO_TLS = os.getenv("SKY_ALLOW_REMOTE_NO_TLS", "false").lower() in ("1", "true", "yes")
-SKY_TRUSTED_PROXY_IPS = [i.strip() for i in os.getenv("SKY_TRUSTED_PROXY_IPS", "").split(",") if i.strip()]
+SKY_ALLOW_REMOTE_NO_TLS = os.getenv("SKY_ALLOW_REMOTE_NO_TLS", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+SKY_TRUSTED_PROXY_IPS = [
+    i.strip() for i in os.getenv("SKY_TRUSTED_PROXY_IPS", "").split(",") if i.strip()
+]
 
 # ── Signal database (learning store) ─────────────────────────────────────
 DB_PATH = os.getenv("DB_PATH", str(ROOT / "data" / "cryptobrain.db"))
@@ -157,7 +213,9 @@ PAPER_POLL_SECONDS = int(os.getenv("PAPER_POLL_SECONDS", "30"))
 PAPER_MAX_CANDLES_PER_CHECK = int(os.getenv("PAPER_MAX_CANDLES_PER_CHECK", "1000"))
 
 # ── Backtester ───────────────────────────────────────────────────────────
-BACKTEST_HORIZONS = [float(h) for h in os.getenv("BACKTEST_HORIZONS", "1,4,24").split(",")]
+BACKTEST_HORIZONS = [
+    float(h) for h in os.getenv("BACKTEST_HORIZONS", "1,4,24").split(",")
+]
 BACKTEST_MIN_BARS = int(os.getenv("BACKTEST_MIN_BARS", "120"))
 BACKTEST_STEP = int(os.getenv("BACKTEST_STEP", "1"))
 EXECUTION_MODEL = os.getenv("EXECUTION_MODEL", "none")  # none | slip | impact
@@ -165,19 +223,33 @@ EXECUTION_MODEL = os.getenv("EXECUTION_MODEL", "none")  # none | slip | impact
 # ── Calibration (self-improvement) ───────────────────────────────────────
 # Trust thresholds follow the roadmap: >=100 backtest samples and >=20 decided
 # paper samples before a setup is treated as PROVEN (decisions A6/B10).
-CALIBRATE_MIN_N = int(os.getenv("CALIBRATE_MIN_N", "100"))      # min backtest+paper samples to calibrate a setup
+CALIBRATE_MIN_N = int(
+    os.getenv("CALIBRATE_MIN_N", "100")
+)  # min backtest+paper samples to calibrate a setup
 CALIBRATE_MIN_PAPER_N = int(os.getenv("CALIBRATE_MIN_PAPER_N", "20"))
-CALIBRATE_GAIN = float(os.getenv("CALIBRATE_GAIN", "0.25"))   # expectancy -> multiplier sensitivity
+CALIBRATE_GAIN = float(
+    os.getenv("CALIBRATE_GAIN", "0.25")
+)  # expectancy -> multiplier sensitivity
 CALIBRATE_MAX_MULT = float(os.getenv("CALIBRATE_MAX_MULT", "1.25"))
 CALIBRATE_MIN_MULT = float(os.getenv("CALIBRATE_MIN_MULT", "0.6"))
-CALIBRATE_FILTER = os.getenv("CALIBRATE_FILTER", "false").lower() in ("1", "true", "yes")
-CALIBRATE_FILTER_THRESHOLD = float(os.getenv("CALIBRATE_FILTER_THRESHOLD", "-0.35"))  # R, negative
+CALIBRATE_FILTER = os.getenv("CALIBRATE_FILTER", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+CALIBRATE_FILTER_THRESHOLD = float(
+    os.getenv("CALIBRATE_FILTER_THRESHOLD", "-0.35")
+)  # R, negative
 
 # ── Risk enforcement (decision B6) ───────────────────────────────────────
 # When enabled, the approval queue and paper runner HALT new trades once the
 # daily loss limit is reached, flag reduced activity at the weekly limit, and
 # apply the drawdown ladder (-5% reduce / -8% stop & review / -10% full review).
-ENFORCE_RISK_LIMITS = os.getenv("ENFORCE_RISK_LIMITS", "true").lower() in ("1", "true", "yes")
+ENFORCE_RISK_LIMITS = os.getenv("ENFORCE_RISK_LIMITS", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 DRAWDOWN_REDUCE_PCT = float(os.getenv("DRAWDOWN_REDUCE_PCT", "5.0"))
 DRAWDOWN_STOP_PCT = float(os.getenv("DRAWDOWN_STOP_PCT", "8.0"))
 DRAWDOWN_REVIEW_PCT = float(os.getenv("DRAWDOWN_REVIEW_PCT", "10.0"))
@@ -185,7 +257,11 @@ DRAWDOWN_REVIEW_PCT = float(os.getenv("DRAWDOWN_REVIEW_PCT", "10.0"))
 # ── Trader-state no-trade gate (decision B7) ─────────────────────────────
 # angry / tired / revenge / chasing flags block the approval queue until
 # cleared.  Set with `python main.py tradestate --angry ...` or the dashboard.
-TRADER_STATE_BLOCK = os.getenv("TRADER_STATE_BLOCK", "true").lower() in ("1", "true", "yes")
+TRADER_STATE_BLOCK = os.getenv("TRADER_STATE_BLOCK", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 # ── Portfolio / correlation risk (decision B2) ───────────────────────────
 # BTC + ETH are ONE correlated crypto-risk bucket: same-direction duplicates,
@@ -200,18 +276,28 @@ GOLD_OWN_BUCKET = True  # gold exposure is tracked separately from crypto
 # the existing macro calendar's high-impact window.  Mode: warn | block | off.
 # Fail closed by default for unattended operation; local research may override.
 GOLD_SESSION_MODE = os.getenv("GOLD_SESSION_MODE", "block").strip().lower()
-GOLD_LONDON_WINDOW = (7, 16)      # UTC hours, inclusive start / exclusive end
-GOLD_NY_WINDOW = (12, 21)         # UTC hours
+GOLD_LONDON_WINDOW = (7, 16)  # UTC hours, inclusive start / exclusive end
+GOLD_NY_WINDOW = (12, 21)  # UTC hours
 GOLD_PDH_PDL = True
 GOLD_NEWS_BLOCK = os.getenv("GOLD_NEWS_BLOCK", "true").lower() in ("1", "true", "yes")
 
 # ── Information hierarchy / source trust (decision A5) ───────────────────
 # Tier 1 market data, 2 macro, 3 positioning, 4 sentiment, 5 private signals.
 # Private sources can never auto-trigger trades; conflicts force NO TRADE.
-SOURCE_TIER_MAX_AUTO = int(os.getenv("SOURCE_TIER_MAX_AUTO", "2"))  # tiers <= this may contribute to a tradeable signal
-SOURCE_TIER_NAMES = {1: "market_data", 2: "macro", 3: "positioning", 4: "sentiment", 5: "private"}
+SOURCE_TIER_MAX_AUTO = int(
+    os.getenv("SOURCE_TIER_MAX_AUTO", "2")
+)  # tiers <= this may contribute to a tradeable signal
+SOURCE_TIER_NAMES = {
+    1: "market_data",
+    2: "macro",
+    3: "positioning",
+    4: "sentiment",
+    5: "private",
+}
 
 # ── State memory / signal stability (anti-spam, anti-whipsaw) ────────────
-SIGNAL_COOLDOWN_MINUTES = int(os.getenv("SIGNAL_COOLDOWN_MINUTES", "30"))  # global floor
+SIGNAL_COOLDOWN_MINUTES = int(
+    os.getenv("SIGNAL_COOLDOWN_MINUTES", "30")
+)  # global floor
 FLIP_PRICE_THRESHOLD_PCT = float(os.getenv("FLIP_PRICE_THRESHOLD_PCT", "0.8"))
 MAX_FLIPS_PER_HOUR = int(os.getenv("MAX_FLIPS_PER_HOUR", "2"))

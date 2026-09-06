@@ -1,10 +1,11 @@
 """Tests for the scoring + rule engine."""
+
 from __future__ import annotations
 
 from engine.features import build_snapshot
 from engine.indicators import add_all_indicators, find_rsi_divergence
 from engine.rules import build_plans
-from engine.scorer import score_bullish, score_bearish, _mapped_confidence
+from engine.scorer import _mapped_confidence, score_bearish, score_bullish
 from engine.structure import analyze_structure
 
 

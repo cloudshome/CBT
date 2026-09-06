@@ -47,11 +47,10 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Optional
 
-NEUTRAL_BAND = 10.0      # |score| below this = no colour (slate)
-DEEP_AFTER_MIN = 180.0   # minutes of the same direction → deepest colour
-GAP_CAP_MIN = 15.0       # a history gap longer than this doesn't count as persistence
+NEUTRAL_BAND = 10.0  # |score| below this = no colour (slate)
+DEEP_AFTER_MIN = 180.0  # minutes of the same direction → deepest colour
+GAP_CAP_MIN = 15.0  # a history gap longer than this doesn't count as persistence
 _HISTORY_WINDOW_MIN = 720  # how far back duration can reach
 
 # Colour buckets (P16): the same thresholds as the strip labels, so the
@@ -183,8 +182,13 @@ def _funding_contribution(market_context: dict) -> float:
 def _trend_contribution(features: dict) -> float:
     trend = str(features.get("trend", "")).lower()
     bias = str(features.get("trend_bias", "")).lower()
-    raw = 1.0 if trend == "bullish" else -1.0 if trend == "bearish" else (
-        0.6 if bias == "bullish" else -0.6 if bias == "bearish" else 0.0)
+    raw = (
+        1.0
+        if trend == "bullish"
+        else -1.0
+        if trend == "bearish"
+        else (0.6 if bias == "bullish" else -0.6 if bias == "bearish" else 0.0)
+    )
     if raw == 0.0:
         return 0.0
     adx = _num(features.get("adx"), 20.0)
@@ -212,35 +216,54 @@ def compute(payload: dict) -> dict:
     parts: list[dict] = []
 
     def _part(name: str, weight: float, raw: float, detail: str = "") -> None:
-        parts.append({
-            "name": name,
-            "weight": weight,
-            "raw": round(_clamp(raw), 1),
-            "detail": detail,
-        })
+        parts.append(
+            {
+                "name": name,
+                "weight": weight,
+                "raw": round(_clamp(raw), 1),
+                "detail": detail,
+            }
+        )
 
     # 1. engine scores (the brain's core read) — 50%
     engine_raw = _clamp(bull - bear)
-    _part("engine bull − bear scores", 0.50, engine_raw,
-          f"bull {round(bull)} vs bear {round(bear)} / 100")
+    _part(
+        "engine bull − bear scores",
+        0.50,
+        engine_raw,
+        f"bull {round(bull)} vs bear {round(bear)} / 100",
+    )
 
     # 2. multi-timeframe alignment — 20%
     align_raw = _clamp(_num(alignment.get("score")))
-    _part("MTF alignment", 0.20, align_raw,
-          f"HTF {mtf.get('htf_bias', '—')} · LTF {mtf.get('ltf_bias', '—')} "
-          f"· {alignment.get('label', '—')}")
+    _part(
+        "MTF alignment",
+        0.20,
+        align_raw,
+        f"HTF {mtf.get('htf_bias', '—')} · LTF {mtf.get('ltf_bias', '—')} "
+        f"· {alignment.get('label', '—')}",
+    )
 
     # 3. trend × ADX strength — 10%
     trend_raw = _trend_contribution(features)
-    _part("trend × ADX", 0.10, trend_raw,
-          f"trend {features.get('trend', '—')} · ADX {_num(features.get('adx'), 20):.1f}")
+    _part(
+        "trend × ADX",
+        0.10,
+        trend_raw,
+        f"trend {features.get('trend', '—')} · ADX {_num(features.get('adx'), 20):.1f}",
+    )
 
     # 4. funding — 5%
     funding_raw = _funding_contribution(market_context)
-    _part("funding (crowding)", 0.05, funding_raw,
-          f"{_num(market_context.get('funding_rate_pct')) * 100:.3f}%/8h "
-          f"({market_context.get('note', '—')[:44]})" if market_context.get("funding_rate_pct") is not None
-          else "no futures context")
+    _part(
+        "funding (crowding)",
+        0.05,
+        funding_raw,
+        f"{_num(market_context.get('funding_rate_pct')) * 100:.3f}%/8h "
+        f"({market_context.get('note', '—')[:44]})"
+        if market_context.get("funding_rate_pct") is not None
+        else "no futures context",
+    )
 
     # 5. news sentiment tally — 5%
     news_raw = _news_contribution(context)
@@ -249,9 +272,19 @@ def compute(payload: dict) -> dict:
 
     # 6. fear & greed — 5%
     fng = context.get("fear_greed") or {}
-    fng_raw = _clamp((_num(fng.get("value"), 50.0) - 50.0) * 2.0) if fng.get("available") else 0.0
-    _part("fear & greed", 0.05, fng_raw,
-          f"{fng.get('value', '—')} {fng.get('label', '')}".strip() if fng.get("available") else "unavailable")
+    fng_raw = (
+        _clamp((_num(fng.get("value"), 50.0) - 50.0) * 2.0)
+        if fng.get("available")
+        else 0.0
+    )
+    _part(
+        "fear & greed",
+        0.05,
+        fng_raw,
+        f"{fng.get('value', '—')} {fng.get('label', '')}".strip()
+        if fng.get("available")
+        else "unavailable",
+    )
 
     # 7. signal action × confidence — 5%
     action = str(signal.get("action", "")).upper()
@@ -304,10 +337,13 @@ _HISTORICAL_WEIGHTS = {
 }
 
 
-def compute_historical(bull_score: float, bear_score: float,
-                       features: Optional[dict] = None,
-                       signal_action: str = "NO TRADE",
-                       signal_confidence: str = "") -> float:
+def compute_historical(
+    bull_score: float,
+    bear_score: float,
+    features: dict | None = None,
+    signal_action: str = "NO TRADE",
+    signal_confidence: str = "",
+) -> float:
     """Sentiment score from bar-slice inputs only, renormalised over the
     weights available offline. Returns a value in [-100, +100]."""
     features = features or {}
@@ -338,15 +374,18 @@ class SentimentClock:
 
     def __init__(self, deep_after_min: float = DEEP_AFTER_MIN):
         self.deep_after_min = deep_after_min
-        self.last_ts_ms: Optional[int] = None
-        self.last_direction: Optional[str] = None
+        self.last_ts_ms: int | None = None
+        self.last_direction: str | None = None
         self.persistence_min = 0.0
 
     def tick(self, ts_ms: int, direction: str) -> float:
         """Register one reading; returns the persistence in minutes AFTER the
         update (0.0 when the condition broke)."""
-        if direction != "neutral" and direction == self.last_direction \
-                and self.last_ts_ms is not None:
+        if (
+            direction != "neutral"
+            and direction == self.last_direction
+            and self.last_ts_ms is not None
+        ):
             self.persistence_min += max(0.0, (ts_ms - self.last_ts_ms) / 60000.0)
         else:
             self.persistence_min = 0.0
@@ -361,7 +400,9 @@ class SentimentClock:
         persistence = self.tick(ts_ms, direction)
         strength = min(abs(score) / 100.0, 1.0) if direction != "neutral" else 0.0
         persistence_frac = min(persistence / self.deep_after_min, 1.0)
-        intensity = _depth(strength, persistence_frac) if direction != "neutral" else 0.0
+        intensity = (
+            _depth(strength, persistence_frac) if direction != "neutral" else 0.0
+        )
         return {
             "score": float(score),
             "bucket": bucket(score) if direction != "neutral" else "slate",
@@ -379,6 +420,7 @@ def record(symbol: str, timeframe: str, result: dict) -> bool:
     """Store one sentiment reading (one row per symbol/timeframe/minute)."""
     try:
         from data.database import SignalDB
+
         with SignalDB() as db:
             db.save_sentiment(
                 symbol=symbol,
@@ -394,17 +436,22 @@ def record(symbol: str, timeframe: str, result: dict) -> bool:
         return False
 
 
-def history(symbol: str, timeframe: str, minutes: int = _HISTORY_WINDOW_MIN) -> list[dict]:
+def history(
+    symbol: str, timeframe: str, minutes: int = _HISTORY_WINDOW_MIN
+) -> list[dict]:
     """Recent persisted readings, oldest first."""
     try:
         from data.database import SignalDB
+
         with SignalDB() as db:
             return db.sentiment_history(symbol, timeframe, minutes=minutes)
     except Exception:
         return []
 
 
-def duration_of(rows: list[dict], direction: str, now_ms: Optional[int] = None) -> float:
+def duration_of(
+    rows: list[dict], direction: str, now_ms: int | None = None
+) -> float:
     """Minutes the current direction has held UNINTERRUPTED, walking back
     through the history. Gaps longer than ``GAP_CAP_MIN`` don't count —
     the desk only knows the market held the condition while it watched it.
@@ -474,8 +521,19 @@ def current_sentiment_safe(symbol: str, timeframe: str, payload: dict) -> dict:
     try:
         return current_sentiment(symbol, timeframe, payload)
     except Exception as exc:  # pragma: no cover — defensive only
-        return {"available": False, "score": 0.0, "direction": "neutral",
-                "label": "NO DATA", "strength": 0.0, "duration_min": 0.0,
-                "duration_text": "—", "persistence": 0.0, "intensity": 0.0,
-                "color": "#5f6d84", "parts": [], "history": [],
-                "deepening": False, "error": str(exc)}
+        return {
+            "available": False,
+            "score": 0.0,
+            "direction": "neutral",
+            "label": "NO DATA",
+            "strength": 0.0,
+            "duration_min": 0.0,
+            "duration_text": "—",
+            "persistence": 0.0,
+            "intensity": 0.0,
+            "color": "#5f6d84",
+            "parts": [],
+            "history": [],
+            "deepening": False,
+            "error": str(exc),
+        }

@@ -20,14 +20,12 @@ profit-factor number cannot answer:
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 
 from config import RISK_PCT
 
 
-def mae_mfe_summary(db, plan_type: Optional[str] = None) -> dict:
+def mae_mfe_summary(db, plan_type: str | None = None) -> dict:
     """MAE / MFE statistics per setup, in R (price excursion / planned risk).
 
     Returns per-setup aggregates plus an overall insight.  Runs on the live
@@ -52,9 +50,16 @@ def mae_mfe_summary(db, plan_type: Optional[str] = None) -> dict:
         rr = r.get("rr_achieved")
         mae_r = (mae / risk) if (mae is not None and risk) else None
         mfe_r = (mfe / risk) if (mfe is not None and risk) else None
-        bucket = by_type.setdefault(pt, {
-            "n": 0, "mae_r": [], "mfe_r": [], "wins": 0, "losses": 0,
-        })
+        bucket = by_type.setdefault(
+            pt,
+            {
+                "n": 0,
+                "mae_r": [],
+                "mfe_r": [],
+                "wins": 0,
+                "losses": 0,
+            },
+        )
         bucket["n"] += 1
         if mae_r is not None:
             bucket["mae_r"].append(mae_r)
@@ -103,29 +108,44 @@ def _mae_mfe_insight(mae_r: list[float], mfe_r: list[float]) -> list[str]:
     avg_mae = float(np.mean(mae_r))
     avg_mfe = float(np.mean(mfe_r))
     if avg_mae >= 0.9:
-        out.append(f"MAE averages {avg_mae:.2f}R — you are getting stopped out "
-                   f"close to your stop; entries are acceptable, keep the risk "
-                   f"discipline")
+        out.append(
+            f"MAE averages {avg_mae:.2f}R — you are getting stopped out "
+            f"close to your stop; entries are acceptable, keep the risk "
+            f"discipline"
+        )
     elif avg_mae <= 0.4:
-        out.append(f"MAE averages only {avg_mae:.2f}R against a typical 1R stop — "
-                   f"your stops may be too tight; consider whether noise is taking "
-                   f"you out before the move")
+        out.append(
+            f"MAE averages only {avg_mae:.2f}R against a typical 1R stop — "
+            f"your stops may be too tight; consider whether noise is taking "
+            f"you out before the move"
+        )
     if avg_mfe >= 1.5:
-        out.append(f"MFE averages {avg_mfe:.2f}R — the setups run well past 1R; a "
-                   f"runner (move stop to breakeven at 1R, trail the rest) would "
-                   f"capture more")
+        out.append(
+            f"MFE averages {avg_mfe:.2f}R — the setups run well past 1R; a "
+            f"runner (move stop to breakeven at 1R, trail the rest) would "
+            f"capture more"
+        )
     elif avg_mfe <= 0.8 and avg_mfe < avg_mae:
-        out.append(f"MFE ({avg_mfe:.2f}R) is below MAE ({avg_mae:.2f}R) — trades "
-                   f"rarely run in your favour; review entries / setup quality "
-                   f"before increasing size")
+        out.append(
+            f"MFE ({avg_mfe:.2f}R) is below MAE ({avg_mae:.2f}R) — trades "
+            f"rarely run in your favour; review entries / setup quality "
+            f"before increasing size"
+        )
     if not out:
-        out.append(f"MAE {avg_mae:.2f}R vs MFE {avg_mfe:.2f}R — reasonable "
-                   f"asymmetry, keep executing")
+        out.append(
+            f"MAE {avg_mae:.2f}R vs MFE {avg_mfe:.2f}R — reasonable "
+            f"asymmetry, keep executing"
+        )
     return out
 
 
-def monte_carlo_equity(db, start: float = 10_000.0, risk_pct: float = None,
-                       samples: int = 2000, seed: Optional[int] = None) -> dict:
+def monte_carlo_equity(
+    db,
+    start: float = 10_000.0,
+    risk_pct: float = None,
+    samples: int = 2000,
+    seed: int | None = None,
+) -> dict:
     """Distribution of terminal equity and drawdown from the realised trade book.
 
     Resamples the decided paper-trade outcomes (with replacement) ``samples``
@@ -136,8 +156,9 @@ def monte_carlo_equity(db, start: float = 10_000.0, risk_pct: float = None,
     (:func:`SignalDB.live_book_rows`, P12.15).
     """
     rows = db.live_book_rows()
-    outcomes = [float(r["rr_achieved"]) for r in rows
-                if r.get("rr_achieved") is not None]
+    outcomes = [
+        float(r["rr_achieved"]) for r in rows if r.get("rr_achieved") is not None
+    ]
     if not outcomes:
         return {"available": False, "note": "no decided paper trades yet"}
 
@@ -152,9 +173,8 @@ def monte_carlo_equity(db, start: float = 10_000.0, risk_pct: float = None,
         peak = start
         dd = 0.0
         for rr in perm:
-            equity *= (1.0 + rr * risk_pct / 100.0)
-            if equity > peak:
-                peak = equity
+            equity *= 1.0 + rr * risk_pct / 100.0
+            peak = max(peak, equity)
             dd = max(dd, 1.0 - equity / peak)
         terminals[s] = equity
         max_dds[s] = dd
@@ -211,7 +231,7 @@ def _historical_metrics(rows: list[dict]) -> dict:
     rec_count = 0
     recoveries = []
     for rr in outcomes:
-        equity *= (1.0 + rr * 0.01)  # use 1% as a normalised unit; we only want trades
+        equity *= 1.0 + rr * 0.01  # use 1% as a normalised unit; we only want trades
         if equity > peak:
             if in_dd:
                 recoveries.append(rec_count)
@@ -227,15 +247,16 @@ def _historical_metrics(rows: list[dict]) -> dict:
     max_dd = 0.0
     equity = 1.0
     for rr in outcomes:
-        equity *= (1.0 + rr * 0.01)
+        equity *= 1.0 + rr * 0.01
         peak = max(peak, equity)
         if peak:
             max_dd = max(max_dd, 1.0 - equity / peak)
 
     return {
         "longest_loss_streak": max_l,
-        "median_time_to_recovery_trades": (round(float(np.median(recoveries)), 1)
-                                           if recoveries else 0.0),
+        "median_time_to_recovery_trades": (
+            round(float(np.median(recoveries)), 1) if recoveries else 0.0
+        ),
         "max_time_to_recovery_trades": (max(recoveries) if recoveries else 0),
         "max_drawdown_pct": round(max_dd * 100, 2),
     }
@@ -243,12 +264,12 @@ def _historical_metrics(rows: list[dict]) -> dict:
 
 def monte_carlo_ruin_table(
     db=None,
-    rows: Optional[list[dict]] = None,
+    rows: list[dict] | None = None,
     start: float = 10_000.0,
     risk_percents: tuple[float, ...] = (0.25, 0.5, 1.0, 1.5, 2.0),
     ruin_threshold_pct: float = 50.0,
     samples: int = 2_000,
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> dict:
     """Risk-of-ruin sweep across position sizes using NET realised outcomes.
 
@@ -309,9 +330,8 @@ def monte_carlo_ruin_table(
             ttr_peak = start
 
             for rr in perm:
-                equity *= (1.0 + rr * growth)
-                if equity > peak:
-                    peak = equity
+                equity *= 1.0 + rr * growth
+                peak = max(peak, equity)
                 dd = max(dd, 1.0 - equity / peak)
 
                 # streaks (net outcome <= 0 is a loss)
@@ -341,19 +361,21 @@ def monte_carlo_ruin_table(
         median_ttr = round(float(np.median(time_to_recovery)), 1)
         mean_ttr = round(float(np.mean(time_to_recovery)), 1)
 
-        table.append({
-            "risk_pct": risk_pct,
-            "expected_dd_pct": round(float(np.mean(max_dds)) * 100, 2),
-            "ruin_prob": ruin_prob,
-            "prob_below_start": below_start_prob,
-            "terminal_median": round(float(np.median(terminals)), 2),
-            "terminal_p5": round(float(np.percentile(terminals, 5)), 2),
-            "terminal_p95": round(float(np.percentile(terminals, 95)), 2),
-            "max_loss_streak_median": int(np.median(max_loss_streaks)),
-            "max_loss_streak_p95": int(np.percentile(max_loss_streaks, 95)),
-            "time_to_recovery_median_trades": median_ttr,
-            "time_to_recovery_mean_trades": mean_ttr,
-        })
+        table.append(
+            {
+                "risk_pct": risk_pct,
+                "expected_dd_pct": round(float(np.mean(max_dds)) * 100, 2),
+                "ruin_prob": ruin_prob,
+                "prob_below_start": below_start_prob,
+                "terminal_median": round(float(np.median(terminals)), 2),
+                "terminal_p5": round(float(np.percentile(terminals, 5)), 2),
+                "terminal_p95": round(float(np.percentile(terminals, 95)), 2),
+                "max_loss_streak_median": int(np.median(max_loss_streaks)),
+                "max_loss_streak_p95": int(np.percentile(max_loss_streaks, 95)),
+                "time_to_recovery_median_trades": median_ttr,
+                "time_to_recovery_mean_trades": mean_ttr,
+            }
+        )
 
     return {
         "available": True,

@@ -38,15 +38,13 @@ rather than raising, so the layer can never break the engine.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
 # ── tunables (local so the module stays self-contained) ───────────────────
-WINDOW = 20          # trailing feature window (bars)
-HISTORY = 100        # trailing history for z-score / ratio normalisation
-PERSISTENCE = 0.65   # HMM-style transition prior (self-persistence)
+WINDOW = 20  # trailing feature window (bars)
+HISTORY = 100  # trailing history for z-score / ratio normalisation
+PERSISTENCE = 0.65  # HMM-style transition prior (self-persistence)
 
 REGIME_KEYS = ("bull_trend", "bear_trend", "mean_reverting", "volatile_expansion")
 
@@ -62,13 +60,14 @@ REGIME_LABELS = {
 # dim is the JOINT vol+bw expansion factor, so a wide-bar volatility
 # expansion cannot be confused with a high-vol bear trend.
 EMISSION_MEANS: dict[str, np.ndarray] = {
-    "bull_trend":         np.array([0.6, -0.3, 0.0, -0.2, 0.0]),
-    "bear_trend":         np.array([-0.6, 0.4, 0.0, 0.3, 0.0]),
-    "mean_reverting":     np.array([0.0, -0.3, -0.6, -0.3, 0.0]),
+    "bull_trend": np.array([0.6, -0.3, 0.0, -0.2, 0.0]),
+    "bear_trend": np.array([-0.6, 0.4, 0.0, 0.3, 0.0]),
+    "mean_reverting": np.array([0.0, -0.3, -0.6, -0.3, 0.0]),
     "volatile_expansion": np.array([0.0, 0.8, 0.2, 0.8, 1.0]),
 }
 EMISSION_SIGMA = np.array([0.55, 0.55, 0.55, 0.55, 0.45])
 _STATES = list(REGIME_KEYS)
+
 
 # ── helpers ───────────────────────────────────────────────────────────────
 def _safe_div(a: float, b: float, default: float = 0.0) -> float:
@@ -76,6 +75,7 @@ def _safe_div(a: float, b: float, default: float = 0.0) -> float:
         return float(a / b) if b else default
     except (TypeError, ValueError, ZeroDivisionError):
         return default
+
 
 def _volume_delta(df: pd.DataFrame) -> np.ndarray:
     """Per-bar proxy delta: volume x directional body fraction in [-1, 1]."""
@@ -91,6 +91,7 @@ def _volume_delta(df: pd.DataFrame) -> np.ndarray:
     frac = np.clip(frac, -1.0, 1.0)
     return v * frac
 
+
 def _zscore(x: np.ndarray) -> np.ndarray:
     """z-score of a trailing series; zeros when flat (std ~ 0)."""
     if x is None or len(x) < 2:
@@ -101,9 +102,11 @@ def _zscore(x: np.ndarray) -> np.ndarray:
         return np.zeros_like(x)
     return (x - x.mean()) / sd
 
+
 # ── 1. latent regime probabilities ────────────────────────────────────────
-def _emission_matrix(df: pd.DataFrame, window: int = WINDOW,
-                     history: int = HISTORY) -> np.ndarray:
+def _emission_matrix(
+    df: pd.DataFrame, window: int = WINDOW, history: int = HISTORY
+) -> np.ndarray:
     """(n, 5) emission features for every bar — vectorised rolling.
 
     All five features are tanh-saturated to [-1, 1] so a single anomalous bar
@@ -135,7 +138,7 @@ def _emission_matrix(df: pd.DataFrame, window: int = WINDOW,
 
     c = df["close"].astype(float)
     rets = c.pct_change()
-    long = max(history, min(500, n))          # long baseline = the whole frame
+    long = max(history, min(500, n))  # long baseline = the whole frame
 
     ret_win = rets.rolling(window).sum()
     vol20 = rets.rolling(window).std()
@@ -173,13 +176,15 @@ def _emission_matrix(df: pd.DataFrame, window: int = WINDOW,
     em[:, 4] = exp.fillna(0.0).to_numpy()
     return em
 
+
 def _emission_scores(feat: np.ndarray) -> np.ndarray:
     """Unnormalised Gaussian emission scores for one feature vector."""
     scores = np.empty(len(_STATES), dtype=float)
     for k, key in enumerate(_STATES):
         d = feat - EMISSION_MEANS[key]
-        scores[k] = float(np.exp(-0.5 * float(((d * d) / (EMISSION_SIGMA ** 2)).sum())))
+        scores[k] = float(np.exp(-0.5 * float(((d * d) / (EMISSION_SIGMA**2)).sum())))
     return scores
+
 
 def _forward_probs(em: np.ndarray) -> np.ndarray:
     """Markov forward pass: (n, 4) smoothed regime probabilities."""
@@ -197,7 +202,8 @@ def _forward_probs(em: np.ndarray) -> np.ndarray:
         out[t] = probs
     return out
 
-def regime_probabilities(df: pd.DataFrame, i: Optional[int] = None) -> dict:
+
+def regime_probabilities(df: pd.DataFrame, i: int | None = None) -> dict:
     """Probability over the 4 latent regimes at bar ``i`` (default: last).
 
     Emissions are smoothed by a Markov persistence prior (forward pass), so
@@ -215,6 +221,7 @@ def regime_probabilities(df: pd.DataFrame, i: Optional[int] = None) -> dict:
     result["label"] = REGIME_LABELS[dom]
     return result
 
+
 def _neutral_regime(reason: str) -> dict:
     p = 1.0 / len(_STATES)
     result = {k: p for k in _STATES}
@@ -222,9 +229,11 @@ def _neutral_regime(reason: str) -> dict:
     result["label"] = f"Neutral ({reason})"
     return result
 
+
 # ── 2. order flow / microstructure ────────────────────────────────────────
-def cvd_analysis(df: pd.DataFrame, i: Optional[int] = None,
-                 history: int = HISTORY) -> dict:
+def cvd_analysis(
+    df: pd.DataFrame, i: int | None = None, history: int = HISTORY
+) -> dict:
     """Cumulative volume delta + absorption/exhaustion at bar ``i``."""
     if df is None or len(df) < 30:
         return {"available": False, "note": "insufficient data"}
@@ -232,7 +241,7 @@ def cvd_analysis(df: pd.DataFrame, i: Optional[int] = None,
     idx = n - 1 if i is None else max(0, min(i, n - 1))
     delta = _volume_delta(df)
     cvd = np.cumsum(delta)
-    hist = cvd[max(0, idx - history):idx + 1]
+    hist = cvd[max(0, idx - history) : idx + 1]
     cvd_z = float(_zscore(hist)[-1]) if len(hist) > 2 else 0.0
 
     o = df["open"].astype(float).to_numpy()
@@ -243,10 +252,10 @@ def cvd_analysis(df: pd.DataFrame, i: Optional[int] = None,
     rng = np.maximum(h - l, 1e-9)
     body_ratio = np.abs(c - o) / rng
 
-    vol_hist = v[max(0, idx - history):idx + 1]
+    vol_hist = v[max(0, idx - history) : idx + 1]
     vol_z = float(_zscore(vol_hist)[-1]) if len(vol_hist) > 2 else 0.0
 
-    w = df.iloc[max(0, idx - WINDOW):idx + 1]
+    w = df.iloc[max(0, idx - WINDOW) : idx + 1]
     buy_vol = float(w.loc[w["close"] >= w["open"], "volume"].sum())
     total = float(w["volume"].sum()) or 1e-9
     buy_pressure = round(buy_vol / total, 3)
@@ -260,12 +269,12 @@ def cvd_analysis(df: pd.DataFrame, i: Optional[int] = None,
     if absorption:
         absorption_direction = "bullish" if c[idx] >= o[idx] else "bearish"
 
-    exhaustion = bool(vol_z >= 1.5 and body > 0
-                      and (upper_wick >= 2 * body or lower_wick >= 2 * body))
+    exhaustion = bool(
+        vol_z >= 1.5 and body > 0 and (upper_wick >= 2 * body or lower_wick >= 2 * body)
+    )
     exhaustion_direction = None
     if exhaustion:
-        exhaustion_direction = ("bearish" if upper_wick >= 2 * body
-                                else "bullish")
+        exhaustion_direction = "bearish" if upper_wick >= 2 * body else "bullish"
 
     return {
         "available": True,
@@ -281,9 +290,11 @@ def cvd_analysis(df: pd.DataFrame, i: Optional[int] = None,
         "exhaustion_direction": exhaustion_direction,
     }
 
+
 # ── 3. Bayesian fractional Kelly sizing ───────────────────────────────────
-def bayesian_win_rate(wins: int, losses: int,
-                      prior_a: float = 2.0, prior_b: float = 2.0):
+def bayesian_win_rate(
+    wins: int, losses: int, prior_a: float = 2.0, prior_b: float = 2.0
+):
     """Beta-posterior win rate: (wins + a) / (n + a + b).
 
     The weak prior (a=b=2, mean 0.5) keeps low-sample estimates neutral
@@ -295,8 +306,13 @@ def bayesian_win_rate(wins: int, losses: int,
     p = (wins + prior_a) / (n + prior_a + prior_b)
     return round(float(p), 4), n
 
-def kelly_size(win_rate: Optional[float], payoff: Optional[float],
-               fraction: float = 0.25, max_risk: float = 1.0) -> dict:
+
+def kelly_size(
+    win_rate: float | None,
+    payoff: float | None,
+    fraction: float = 0.25,
+    max_risk: float = 1.0,
+) -> dict:
     """Fractional Kelly size as % of capital risked per trade.
 
     f* = (p.b - (1-p)) / b ;  edge = p.b - (1-p).
@@ -304,25 +320,44 @@ def kelly_size(win_rate: Optional[float], payoff: Optional[float],
     Unknown edge (no samples) => no suggestion (None), never a forced block.
     """
     if win_rate is None or payoff is None or payoff <= 0:
-        return {"edge": None, "full_kelly": None, "suggested_risk_pct": None,
-                "stand_aside": False, "note": "insufficient evidence"}
+        return {
+            "edge": None,
+            "full_kelly": None,
+            "suggested_risk_pct": None,
+            "stand_aside": False,
+            "note": "insufficient evidence",
+        }
     p = float(win_rate)
     b = float(payoff)
     edge = p * b - (1.0 - p)
     if edge <= 0:
-        return {"edge": round(edge, 4), "full_kelly": 0.0,
-                "suggested_risk_pct": 0.0, "stand_aside": True,
-                "note": "negative edge — stand aside (0.0% risk)"}
+        return {
+            "edge": round(edge, 4),
+            "full_kelly": 0.0,
+            "suggested_risk_pct": 0.0,
+            "stand_aside": True,
+            "note": "negative edge — stand aside (0.0% risk)",
+        }
     full = edge / b
     frac = full * fraction
     suggested = min(frac * 100.0, max_risk)
-    return {"edge": round(edge, 4), "full_kelly": round(full, 4),
-            "suggested_risk_pct": round(suggested, 3), "stand_aside": False,
-            "note": "fractional Kelly, clamped to the risk cap"}
+    return {
+        "edge": round(edge, 4),
+        "full_kelly": round(full, 4),
+        "suggested_risk_pct": round(suggested, 3),
+        "stand_aside": False,
+        "note": "fractional Kelly, clamped to the risk cap",
+    }
 
-def kelly_from_stats(wins: int, losses: int, avg_win_r: Optional[float],
-                     avg_loss_r: Optional[float], fraction: float = 0.25,
-                     max_risk: float = 1.0) -> dict:
+
+def kelly_from_stats(
+    wins: int,
+    losses: int,
+    avg_win_r: float | None,
+    avg_loss_r: float | None,
+    fraction: float = 0.25,
+    max_risk: float = 1.0,
+) -> dict:
     """Kelly from decided-sample statistics (R-based)."""
     p, n = bayesian_win_rate(wins, losses)
     if n == 0:
@@ -338,15 +373,18 @@ def kelly_from_stats(wins: int, losses: int, avg_win_r: Optional[float],
     out["payoff"] = round(payoff, 3) if payoff is not None else None
     return out
 
-def kelly_from_progress(progress: list[dict], plan_types=None,
-                        fraction: float = 0.25, max_risk: float = 1.0) -> dict:
+
+def kelly_from_progress(
+    progress: list[dict], plan_types=None, fraction: float = 0.25, max_risk: float = 1.0
+) -> dict:
     """Kelly from simulator progress rows (paper_progress output).
 
     Aggregates wins/losses/win R/loss R over ``plan_types`` (default: all
     rows given) — the same deduped samples the graduation gate uses.
     """
-    rows = [p for p in progress
-            if plan_types is None or p["plan_type"] in set(plan_types)]
+    rows = [
+        p for p in progress if plan_types is None or p["plan_type"] in set(plan_types)
+    ]
     if not rows:
         return kelly_size(None, None, fraction, max_risk)
     wins = sum(p["wins"] for p in rows)
@@ -355,16 +393,18 @@ def kelly_from_progress(progress: list[dict], plan_types=None,
     loss_r = sum(p.get("loss_r") or 0.0 for p in rows)
     avg_win_r = _safe_div(win_r, wins) if wins else None
     avg_loss_r = _safe_div(loss_r, losses) if losses else None
-    out = kelly_from_stats(wins, losses, avg_win_r, avg_loss_r,
-                           fraction=fraction, max_risk=max_risk)
+    out = kelly_from_stats(
+        wins, losses, avg_win_r, avg_loss_r, fraction=fraction, max_risk=max_risk
+    )
     out["plan_types"] = [p["plan_type"] for p in rows]
     out["avg_win_r"] = round(avg_win_r, 3) if avg_win_r is not None else None
     out["avg_loss_r"] = round(avg_loss_r, 3) if avg_loss_r is not None else None
     return out
 
 
-def kelly_from_rows(rows: list[dict], fraction: float = 0.25,
-                    max_risk: float = 1.0) -> dict:
+def kelly_from_rows(
+    rows: list[dict], fraction: float = 0.25, max_risk: float = 1.0
+) -> dict:
     """Kelly advisory from decided paper-trade *rows* (the live book).
 
     **P12.15.** The risk gate and the chart-read advisory used to feed raw
@@ -406,11 +446,24 @@ def kelly_from_rows(rows: list[dict], fraction: float = 0.25,
         # A decided book with no net winners has an unambiguous negative
         # edge: stand aside, don't plead "insufficient evidence".
         out = kelly_size(0.0, 1.0, fraction, max_risk)
-        out.update({"wins": 0, "losses": len(losses), "n": len(outcomes),
-                    "win_rate": 0.0, "payoff": None})
+        out.update(
+            {
+                "wins": 0,
+                "losses": len(losses),
+                "n": len(outcomes),
+                "win_rate": 0.0,
+                "payoff": None,
+            }
+        )
     else:
-        out = kelly_from_stats(len(wins), len(losses), avg_win_r, avg_loss_r,
-                               fraction=fraction, max_risk=max_risk)
+        out = kelly_from_stats(
+            len(wins),
+            len(losses),
+            avg_win_r,
+            avg_loss_r,
+            fraction=fraction,
+            max_risk=max_risk,
+        )
     out["kelly_size"] = out.get("suggested_risk_pct")
     out["expectancy"] = round(sum(outcomes) / len(outcomes), 4)
     out["n_trades"] = len(outcomes)
@@ -418,12 +471,23 @@ def kelly_from_rows(rows: list[dict], fraction: float = 0.25,
     out["avg_loss_r"] = round(avg_loss_r, 3) if avg_loss_r is not None else None
     return out
 
-# ── 4. 8D state vector + similarity search ────────────────────────────────
-STATE_DIM_NAMES = ("return_z", "vol_z", "volume_z", "skew_z", "bandwidth_z",
-                   "trend_slope_z", "cvd_z", "mean_reverting_p")
 
-def state_vectors(df: pd.DataFrame, window: int = WINDOW,
-                  history: int = HISTORY) -> pd.DataFrame:
+# ── 4. 8D state vector + similarity search ────────────────────────────────
+STATE_DIM_NAMES = (
+    "return_z",
+    "vol_z",
+    "volume_z",
+    "skew_z",
+    "bandwidth_z",
+    "trend_slope_z",
+    "cvd_z",
+    "mean_reverting_p",
+)
+
+
+def state_vectors(
+    df: pd.DataFrame, window: int = WINDOW, history: int = HISTORY
+) -> pd.DataFrame:
     """8D normalized state vectors for every bar (vectorised, [-1, 1])."""
     n = len(df)
     if n < window + 4:
@@ -451,38 +515,50 @@ def state_vectors(df: pd.DataFrame, window: int = WINDOW,
         s = series.rolling(win, min_periods=2).std()
         return ((series - m) / s.replace(0, np.nan)).fillna(0.0)
 
-    out = pd.DataFrame({
-        "return_z": _z(ret_win, history),
-        "vol_z": _z(vol, history),
-        "volume_z": volume_z.replace([np.inf, -np.inf], np.nan).fillna(0.0),
-        "skew_z": _z(skew, history),
-        "bandwidth_z": _z(bw, history),
-        "trend_slope_z": _z(slope, history),
-        "cvd_z": cvd_z.replace([np.inf, -np.inf], np.nan).fillna(0.0),
-        "mean_reverting_p": 0.0,
-    })
+    out = pd.DataFrame(
+        {
+            "return_z": _z(ret_win, history),
+            "vol_z": _z(vol, history),
+            "volume_z": volume_z.replace([np.inf, -np.inf], np.nan).fillna(0.0),
+            "skew_z": _z(skew, history),
+            "bandwidth_z": _z(bw, history),
+            "trend_slope_z": _z(slope, history),
+            "cvd_z": cvd_z.replace([np.inf, -np.inf], np.nan).fillna(0.0),
+            "mean_reverting_p": 0.0,
+        }
+    )
     out = out.replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
     # dim 8: mean-reverting latent probability mapped to [-1, 1] (one pass)
     em = _emission_matrix(df, window, history)
     fp = _forward_probs(em)
-    out["mean_reverting_p"] = (2.0 * fp[:, 3] - 1.0)
+    out["mean_reverting_p"] = 2.0 * fp[:, 3] - 1.0
 
     return np.tanh(out).round(4)
 
-def state_vector(df: pd.DataFrame, i: Optional[int] = None) -> dict:
+
+def state_vector(df: pd.DataFrame, i: int | None = None) -> dict:
     """The 8D fingerprint at bar ``i`` (default: last)."""
     sv = state_vectors(df)
     if sv.empty:
-        return {"vector": [0.0] * 8, "names": list(STATE_DIM_NAMES),
-                "available": False}
+        return {"vector": [0.0] * 8, "names": list(STATE_DIM_NAMES), "available": False}
     idx = len(sv) - 1 if i is None else min(i, len(sv) - 1)
     vec = [round(float(x), 4) for x in sv.iloc[idx].tolist()]
-    return {"vector": vec, "names": list(STATE_DIM_NAMES),
-            "index": idx, "available": True}
+    return {
+        "vector": vec,
+        "names": list(STATE_DIM_NAMES),
+        "index": idx,
+        "available": True,
+    }
 
-def similar_states(df: pd.DataFrame, i: Optional[int] = None, k: int = 5,
-                   horizon: int = 24, window: int = WINDOW) -> dict:
+
+def similar_states(
+    df: pd.DataFrame,
+    i: int | None = None,
+    k: int = 5,
+    horizon: int = 24,
+    window: int = WINDOW,
+) -> dict:
     """Nearest historical state fingerprints + what happened next.
 
     Each match reports the euclidean distance to the current 8D vector and the
@@ -500,13 +576,18 @@ def similar_states(df: pd.DataFrame, i: Optional[int] = None, k: int = 5,
     matches = []
     for j in range(window, n - horizon):
         if abs(j - idx) <= horizon:
-            continue                      # skip self and the overlap window
+            continue  # skip self and the overlap window
         d = float(np.sqrt(((sv.iloc[j].to_numpy(dtype=float) - cur) ** 2).sum()))
         fwd = (closes[j + horizon] / closes[j] - 1.0) * 100.0
-        fwd_vol = float(rets[j:j + horizon].std() * 100.0)
-        matches.append({"index": j, "distance": round(d, 4),
-                        "forward_return_pct": round(fwd, 3),
-                        "forward_vol_pct": round(fwd_vol, 3)})
+        fwd_vol = float(rets[j : j + horizon].std() * 100.0)
+        matches.append(
+            {
+                "index": j,
+                "distance": round(d, 4),
+                "forward_return_pct": round(fwd, 3),
+                "forward_vol_pct": round(fwd_vol, 3),
+            }
+        )
     matches.sort(key=lambda m: m["distance"])
     top = matches[:k]
     if not top:
@@ -518,15 +599,25 @@ def similar_states(df: pd.DataFrame, i: Optional[int] = None, k: int = 5,
         "median_forward_return_pct": round(float(np.median(fwds)), 3),
         "win_rate_forward": round(sum(1 for f in fwds if f > 0) / len(fwds), 3),
     }
-    return {"available": True, "current_index": idx, "horizon": horizon,
-            "matches": top, "stats": stats}
+    return {
+        "available": True,
+        "current_index": idx,
+        "horizon": horizon,
+        "matches": top,
+        "stats": stats,
+    }
+
 
 # ── combined report (CLI / intelligence / dashboard) ──────────────────────
-def hidden_alpha_report(df: pd.DataFrame, symbol: str, timeframe: str,
-                        with_kelly: bool = True) -> dict:
+def hidden_alpha_report(
+    df: pd.DataFrame, symbol: str, timeframe: str, with_kelly: bool = True
+) -> dict:
     """One JSON-able snapshot of the whole hidden alpha layer."""
-    report: dict = {"symbol": symbol, "timeframe": timeframe,
-                    "bars": 0 if df is None else len(df)}
+    report: dict = {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "bars": 0 if df is None else len(df),
+    }
     if df is None or len(df) < WINDOW + 4:
         report["available"] = False
         report["note"] = "insufficient data"
@@ -540,20 +631,28 @@ def hidden_alpha_report(df: pd.DataFrame, symbol: str, timeframe: str,
         try:
             from data.database import SignalDB
             from data.simulator import paper_progress, primary_plan_types
+
             with SignalDB() as db:
                 progress = paper_progress(db)
             report["kelly"] = kelly_from_progress(
-                progress, plan_types=primary_plan_types())
+                progress, plan_types=primary_plan_types()
+            )
         except Exception as exc:
-            report["kelly"] = {"available": False,
-                               "reason": f"{type(exc).__name__}: {exc}"}
+            report["kelly"] = {
+                "available": False,
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
     return report
+
 
 def format_hidden(report: dict) -> str:
     """Human-readable block for `python main.py hidden`."""
-    lines = ["=" * 66,
-             f"HIDDEN ALPHA — {report.get('symbol')} {report.get('timeframe')} "
-             f"({report.get('bars')} bars)", "-" * 66]
+    lines = [
+        "=" * 66,
+        f"HIDDEN ALPHA — {report.get('symbol')} {report.get('timeframe')} "
+        f"({report.get('bars')} bars)",
+        "-" * 66,
+    ]
     if not report.get("available"):
         lines.append(f"  unavailable: {report.get('note', 'no data')}")
         return "\n".join(lines)
@@ -565,23 +664,36 @@ def format_hidden(report: dict) -> str:
         lines.append(f"    {key:<18} {reg[key]:>6.1%}  {bar}{marker}")
     lines.append(f"    → dominant: {reg['dominant']} — {reg['label']}")
     cvd = report["cvd"]
-    lines.append(f"  order flow    : CVD {cvd['cvd']:+,.0f} (z {cvd['cvd_z']:+.2f}), "
-                 f"buy {cvd['buy_pressure']:.0%} / sell {cvd['sell_pressure']:.0%}")
+    lines.append(
+        f"  order flow    : CVD {cvd['cvd']:+,.0f} (z {cvd['cvd_z']:+.2f}), "
+        f"buy {cvd['buy_pressure']:.0%} / sell {cvd['sell_pressure']:.0%}"
+    )
     if cvd["absorption"]:
-        lines.append(f"    ⚡ absorption: {cvd['absorption_direction']} — "
-                     f"large volume absorbed on a narrow range")
+        lines.append(
+            f"    ⚡ absorption: {cvd['absorption_direction']} — "
+            f"large volume absorbed on a narrow range"
+        )
     if cvd["exhaustion"]:
-        lines.append(f"    ⚡ exhaustion: {cvd['exhaustion_direction']} — "
-                     f"high volume, long wick against the trend")
+        lines.append(
+            f"    ⚡ exhaustion: {cvd['exhaustion_direction']} — "
+            f"high volume, long wick against the trend"
+        )
     kelly = report.get("kelly") or {}
     if kelly.get("suggested_risk_pct") is not None:
-        note = "STAND ASIDE (negative edge)" if kelly.get("stand_aside") \
+        note = (
+            "STAND ASIDE (negative edge)"
+            if kelly.get("stand_aside")
             else "within the progression cap"
-        lines.append(f"  kelly size    : {kelly['suggested_risk_pct']}% risk/trade "
-                     f"(edge {kelly.get('edge')}, p={kelly.get('win_rate')}, "
-                     f"b={kelly.get('payoff')}, n={kelly.get('n')}) — {note}")
+        )
+        lines.append(
+            f"  kelly size    : {kelly['suggested_risk_pct']}% risk/trade "
+            f"(edge {kelly.get('edge')}, p={kelly.get('win_rate')}, "
+            f"b={kelly.get('payoff')}, n={kelly.get('n')}) — {note}"
+        )
     elif kelly:
-        lines.append(f"  kelly size    : {kelly.get('note', 'not enough evidence yet')}")
+        lines.append(
+            f"  kelly size    : {kelly.get('note', 'not enough evidence yet')}"
+        )
     sv = report["state_vector"]
     if sv.get("available"):
         vec = " ".join(f"{x:+.2f}" for x in sv["vector"])
@@ -589,11 +701,15 @@ def format_hidden(report: dict) -> str:
     sim = report["similar_states"]
     if sim.get("available"):
         s = sim["stats"]
-        lines.append(f"  similar states: {s['n']} matches @ {sim['horizon']} bars — "
-                     f"mean fwd {s['mean_forward_return_pct']:+.2f}%, "
-                     f"win rate {s['win_rate_forward']:.0%}")
+        lines.append(
+            f"  similar states: {s['n']} matches @ {sim['horizon']} bars — "
+            f"mean fwd {s['mean_forward_return_pct']:+.2f}%, "
+            f"win rate {s['win_rate_forward']:.0%}"
+        )
         for m in sim["matches"][:3]:
-            lines.append(f"    bar {m['index']}  d={m['distance']:.3f}  "
-                         f"fwd {m['forward_return_pct']:+.2f}% "
-                         f"(vol {m['forward_vol_pct']:.2f}%)")
+            lines.append(
+                f"    bar {m['index']}  d={m['distance']:.3f}  "
+                f"fwd {m['forward_return_pct']:+.2f}% "
+                f"(vol {m['forward_vol_pct']:.2f}%)"
+            )
     return "\n".join(lines)

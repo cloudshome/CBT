@@ -1,8 +1,8 @@
 """Unit tests for engine/regime.py — Market Regime Classification & Fakeout Detection."""
+
 from __future__ import annotations
 
 import pandas as pd
-import numpy as np
 
 from engine.regime import classify_market_regime
 

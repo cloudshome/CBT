@@ -3,22 +3,19 @@
 Monitors database integrity, market data freshness (e.g. catching stale sample data),
 risk gate violations, behavioral flags, and calibration health.
 """
+
 from __future__ import annotations
 
-import os
 import time
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
-from data.database import SignalDB
 from brain.risk_gate import evaluate_risk_gate
-from config import DB_PATH
+from data.database import SignalDB
 
 
-def check_database(db: Optional[SignalDB] = None) -> dict:
+def check_database(db: SignalDB | None = None) -> dict:
     """Verify database existence, schema, and table integrity."""
     close_db = False
     if db is None:
@@ -26,10 +23,21 @@ def check_database(db: Optional[SignalDB] = None) -> dict:
         close_db = True
 
     try:
-        tables = [r[0] for r in db.conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-        required = ["scans", "plans", "backtest_results", "paper_trades",
-                    "agent_runs", "journal_entries", "trader_state"]
+        tables = [
+            r[0]
+            for r in db.conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        ]
+        required = [
+            "scans",
+            "plans",
+            "backtest_results",
+            "paper_trades",
+            "agent_runs",
+            "journal_entries",
+            "trader_state",
+        ]
         missing = [t for t in required if t not in tables]
 
         if missing:
@@ -59,6 +67,7 @@ def check_database(db: Optional[SignalDB] = None) -> dict:
 def check_data_freshness() -> dict:
     """Check timestamp freshness. If in live/hub mode, skip the static sample file check."""
     import config as _config
+
     if getattr(_config, "DEMO_MODE", 1) == 0:
         return {
             "name": "data_freshness",
@@ -76,7 +85,11 @@ def check_data_freshness() -> dict:
 
     try:
         df = pd.read_csv(sample_file)
-        ts_col = "ts" if "ts" in df.columns else ("timestamp" if "timestamp" in df.columns else None)
+        ts_col = (
+            "ts"
+            if "ts" in df.columns
+            else ("timestamp" if "timestamp" in df.columns else None)
+        )
         if ts_col and len(df) > 0:
             last_ts = df[ts_col].iloc[-1]
             try:
@@ -116,7 +129,7 @@ def check_data_freshness() -> dict:
         }
 
 
-def check_risk_system(db: Optional[SignalDB] = None) -> dict:
+def check_risk_system(db: SignalDB | None = None) -> dict:
     """Check risk limits, drawdown halts, and emotional/behavioral flags."""
     close_db = False
     if db is None:
@@ -134,7 +147,9 @@ def check_risk_system(db: Optional[SignalDB] = None) -> dict:
 
         # Check behavioral flags directly
         st = db.get_trader_state()
-        active_flags = [k for k in ("angry", "tired", "revenge", "chasing") if st.get(k)]
+        active_flags = [
+            k for k in ("angry", "tired", "revenge", "chasing") if st.get(k)
+        ]
         if active_flags:
             return {
                 "name": "risk_system",
@@ -163,7 +178,7 @@ def check_risk_system(db: Optional[SignalDB] = None) -> dict:
             db.close()
 
 
-def check_calibration_health(db: Optional[SignalDB] = None) -> dict:
+def check_calibration_health(db: SignalDB | None = None) -> dict:
     """Check self-improvement calibration state."""
     close_db = False
     if db is None:
@@ -189,7 +204,7 @@ def check_calibration_health(db: Optional[SignalDB] = None) -> dict:
             db.close()
 
 
-def run_health_check(db: Optional[SignalDB] = None) -> dict:
+def run_health_check(db: SignalDB | None = None) -> dict:
     """Aggregate all immune system checks into a single diagnostic report."""
     checks = [
         check_database(db=db),

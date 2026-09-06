@@ -12,6 +12,7 @@ crypto-risk bucket:
 The engine is advisory-hard: it VETOES (blocked=True) so the desk decision
 cannot produce a trade that doubles correlated exposure.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -58,8 +59,7 @@ def bucket_state(db, symbol: str) -> BucketState:
     )
 
 
-def portfolio_veto(db, symbol: str, action: str,
-                   planned_risk_pct: float = 0.5) -> dict:
+def portfolio_veto(db, symbol: str, action: str, planned_risk_pct: float = 0.5) -> dict:
     """Decide whether a new trade is allowed at the portfolio level.
 
     Returns ``{allowed, reasons, exposure}``.
@@ -76,14 +76,16 @@ def portfolio_veto(db, symbol: str, action: str,
         allowed = False
         reasons.append(
             f"Portfolio veto: {action} already open in the {state.market} risk "
-            f"bucket ({state.n_open} open) — correlated exposure, not a second edge")
+            f"bucket ({state.n_open} open) — correlated exposure, not a second edge"
+        )
 
     # 2) Bucket size cap.
     if allowed and state.n_open >= state.max_trades:
         allowed = False
         reasons.append(
             f"Portfolio veto: {state.market} bucket is full "
-            f"({state.n_open}/{state.max_trades} trades)")
+            f"({state.n_open}/{state.max_trades} trades)"
+        )
 
     # 3) Combined planned-risk cap.
     if allowed and state.planned_risk_pct + planned_risk_pct > state.max_risk_pct:
@@ -91,7 +93,8 @@ def portfolio_veto(db, symbol: str, action: str,
         reasons.append(
             f"Portfolio veto: combined planned risk "
             f"{state.planned_risk_pct + planned_risk_pct:.2f}% would exceed the "
-            f"{state.market} bucket cap of {state.max_risk_pct:.2f}%")
+            f"{state.market} bucket cap of {state.max_risk_pct:.2f}%"
+        )
 
     return {
         "allowed": allowed,

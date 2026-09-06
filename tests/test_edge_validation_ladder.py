@@ -7,19 +7,22 @@ an empty rung renders as n/a, never as an invented number.
 
 All offline: synthetic rows + synthetic candles.
 """
+
 from __future__ import annotations
 
 from engine.edge_validation import (
-    compare_ladder, edge_validate_report, format_compare_ladder,
+    compare_ladder,
+    edge_validate_report,
+    format_compare_ladder,
     paper_stats_from_rows,
 )
-
 from tests.conftest import make_ohlcv
 
 
-def _paper(outcome: str, rr_net: float | None, rr_achieved: float | None = None) -> dict:
-    return {"outcome": outcome, "rr_net": rr_net,
-            "rr_achieved": rr_achieved}
+def _paper(
+    outcome: str, rr_net: float | None, rr_achieved: float | None = None
+) -> dict:
+    return {"outcome": outcome, "rr_net": rr_net, "rr_achieved": rr_achieved}
 
 
 def _report(backtest: dict | None = None, oos: dict | None = None) -> dict:
@@ -34,8 +37,7 @@ def _report(backtest: dict | None = None, oos: dict | None = None) -> dict:
 # ── paper_stats_from_rows ─────────────────────────────────────────────────
 def test_paper_stats_empty_rows_no_fabricated_number():
     assert paper_stats_from_rows([]) == {}
-    assert paper_stats_from_rows(
-        [{"outcome": "PENDING_REVIEW", "rr_net": 2.0}]) == {}
+    assert paper_stats_from_rows([{"outcome": "PENDING_REVIEW", "rr_net": 2.0}]) == {}
 
 
 def test_paper_stats_aggregates_net_of_costs():
@@ -86,14 +88,34 @@ def test_paper_stats_pf_none_when_no_losses():
 # ── compare_ladder ────────────────────────────────────────────────────────
 def test_compare_ladder_rungs_present():
     r = _report(
-        backtest={"decided": 40, "wins": 22, "losses": 18,
-                  "expectancy_net": 0.45, "win_rate_net": 0.55, "pf_net": 1.6},
-        oos={"decided": 12, "wins": 7, "losses": 5,
-             "expectancy_net": 0.32, "win_rate_net": 0.58, "pf_net": 1.4},
+        backtest={
+            "decided": 40,
+            "wins": 22,
+            "losses": 18,
+            "expectancy_net": 0.45,
+            "win_rate_net": 0.55,
+            "pf_net": 1.6,
+        },
+        oos={
+            "decided": 12,
+            "wins": 7,
+            "losses": 5,
+            "expectancy_net": 0.32,
+            "win_rate_net": 0.58,
+            "pf_net": 1.4,
+        },
     )
-    ladder = compare_ladder(r, {"decided": 5, "wins": 3, "losses": 2,
-                                "expectancy_net": 0.25, "win_rate_net": 0.6,
-                                "pf_net": 1.3})
+    ladder = compare_ladder(
+        r,
+        {
+            "decided": 5,
+            "wins": 3,
+            "losses": 2,
+            "expectancy_net": 0.25,
+            "win_rate_net": 0.6,
+            "pf_net": 1.3,
+        },
+    )
     assert set(ladder["rungs"]) == {"backtest", "oos", "paper"}
     assert ladder["rungs"]["backtest"]["decided"] == 40
     assert ladder["rungs"]["oos"]["expectancy_net"] == 0.32
@@ -102,8 +124,10 @@ def test_compare_ladder_rungs_present():
 
 
 def test_compare_ladder_empty_rungs_stay_empty():
-    r = _report(backtest={"decided": 40, "expectancy_net": 0.3},
-                oos={"decided": 12, "expectancy_net": 0.2})
+    r = _report(
+        backtest={"decided": 40, "expectancy_net": 0.3},
+        oos={"decided": 12, "expectancy_net": 0.2},
+    )
     ladder = compare_ladder(r, {})
     assert ladder["rungs"]["paper"] == {}
     assert "paper rung empty" in ladder["note"]
@@ -133,8 +157,7 @@ def test_compare_ladder_thin_oos_note():
 def test_edge_validate_report_includes_ladder_with_paper():
     df = make_ohlcv(n=600, seed=7)
     paper = [_paper("TP_HIT", 1.5), _paper("STOP_LOSS", -1.0)]
-    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3,
-                             paper_rows=paper)
+    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3, paper_rows=paper)
     assert r["ok"] is True
     assert "ladder" in r and "backtest_stats" in r
     assert set(r["ladder"]["rungs"]) == {"backtest", "oos", "paper"}
@@ -151,8 +174,7 @@ def test_edge_validate_report_no_ladder_without_paper():
 
 def test_edge_validate_report_empty_paper_ladder_empty_rung():
     df = make_ohlcv(n=600, seed=7)
-    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3,
-                             paper_rows=[])
+    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3, paper_rows=[])
     assert r["ladder"]["rungs"]["paper"] == {}
     assert "paper rung empty" in r["ladder"]["note"]
 
@@ -160,8 +182,9 @@ def test_edge_validate_report_empty_paper_ladder_empty_rung():
 # ── format_compare_ladder ─────────────────────────────────────────────────
 def test_format_compare_ladder_renders_table():
     df = make_ohlcv(n=600, seed=7)
-    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3,
-                             paper_rows=[_paper("TP_HIT", 1.5)])
+    r = edge_validate_report(
+        df, horizons=[1.0], min_bars=120, step=3, paper_rows=[_paper("TP_HIT", 1.5)]
+    )
     text = format_compare_ladder(r)
     assert "COMPARE LADDER" in text
     assert "BACKTEST (all windows)" in text
@@ -172,8 +195,7 @@ def test_format_compare_ladder_renders_table():
 
 def test_format_compare_ladder_empty_rung_shows_na():
     df = make_ohlcv(n=600, seed=7)
-    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3,
-                             paper_rows=[])
+    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3, paper_rows=[])
     text = format_compare_ladder(r)
     assert "n/a" in text
     assert "—" in text

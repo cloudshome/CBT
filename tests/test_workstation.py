@@ -10,6 +10,7 @@ These guard the browser-first control centre the trader actually uses:
   * the journal form endpoints must round-trip an entry;
   * every workstation tab the dashboard advertises must exist in the HTML.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,8 +24,10 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "ws.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "ws.db"))
     from web.app import make_app
+
     app = make_app()
     app.testing = True
     return app.test_client()
@@ -65,7 +68,9 @@ def test_chart_numbers_are_native_python():
     """_num() converts every NumPy/Pandas scalar and drops NaN/inf."""
     import numpy as np
     import pandas as pd
+
     from web.chart_data import _epoch_seconds, _num
+
     assert _num(np.float64(1.5)) == 1.5
     assert _num(np.int64(7)) == 7.0
     assert _num(np.bool_(True)) == 1.0
@@ -94,16 +99,36 @@ def test_command_catalog_is_complete_and_documented(client):
             assert cmd["safety"] in ("read", "write", "long", "blocked")
             ids.add(cmd["id"])
     # the categories the trader asked to see as clickable actions
-    for expected in ("scan", "risk", "desk", "daily", "review", "approve",
-                     "backtest", "scorecard", "journal_new", "backfill",
-                     "channels", "coach", "doctor", "simulator"):
+    for expected in (
+        "scan",
+        "risk",
+        "desk",
+        "daily",
+        "review",
+        "approve",
+        "backtest",
+        "scorecard",
+        "journal_new",
+        "backfill",
+        "channels",
+        "coach",
+        "doctor",
+        "simulator",
+    ):
         assert expected in ids, f"missing clickable action: {expected}"
 
 
 def test_command_argv_is_built_safely():
     from web.command_center import CommandError, build_argv
+
     assert build_argv("scan", {"symbol": "ETHUSDT", "tf": "1h", "json": True}) == [
-        "scan", "--symbol", "ETHUSDT", "--tf", "1h", "--json"]
+        "scan",
+        "--symbol",
+        "ETHUSDT",
+        "--tf",
+        "1h",
+        "--json",
+    ]
     # positionals land directly after the subcommand
     assert build_argv("approve", {"scan_id": 5, "force": True})[:2] == ["approve", "5"]
     assert build_argv("agent_morning", {})[:2] == ["agent", "morning"]
@@ -118,6 +143,7 @@ def test_command_argv_is_built_safely():
 
 def test_command_inputs_are_validated():
     from web.command_center import CommandError, build_argv
+
     with pytest.raises(CommandError):
         build_argv("approve", {"scan_id": "not-a-number"})
     with pytest.raises(CommandError):
@@ -150,9 +176,16 @@ def test_a_read_only_command_actually_runs(client):
 
 # ── position sizer ────────────────────────────────────────────────────
 def test_position_size_respects_the_progression_cap(client):
-    resp = client.post("/api/position-size", json={
-        "balance": 10000, "risk_pct": 5.0, "entry": 63000,
-        "stop_loss": 62700, "take_profit": 63900})
+    resp = client.post(
+        "/api/position-size",
+        json={
+            "balance": 10000,
+            "risk_pct": 5.0,
+            "entry": 63000,
+            "stop_loss": 62700,
+            "take_profit": 63900,
+        },
+    )
     assert resp.status_code == 200
     d = resp.get_json()
     assert d["ok"] is True
@@ -167,15 +200,22 @@ def test_position_size_respects_the_progression_cap(client):
 def test_position_size_requires_entry_and_stop(client):
     d = client.post("/api/position-size", json={"balance": 1000}).get_json()
     assert d["ok"] is False and "stop-loss" in d["error"].lower()
-    d = client.post("/api/position-size", json={
-        "balance": 1000, "entry": 100, "stop_loss": 100}).get_json()
+    d = client.post(
+        "/api/position-size", json={"balance": 1000, "entry": 100, "stop_loss": 100}
+    ).get_json()
     assert d["ok"] is False
 
 
 def test_position_size_is_zero_when_the_gate_is_closed():
     from web.position_sizer import calculate
-    d = calculate(balance=10000, risk_pct=0.25, entry=100, stop=99,
-                  gate={"allowed": False, "blocked_by": ["trader state: tired"]})
+
+    d = calculate(
+        balance=10000,
+        risk_pct=0.25,
+        entry=100,
+        stop=99,
+        gate={"allowed": False, "blocked_by": ["trader state: tired"]},
+    )
     assert d["recommended_units"] == 0.0
     assert "CLOSED" in d["verdict"] and "tired" in d["verdict"]
 
@@ -189,10 +229,17 @@ def test_journal_round_trip(client):
     assert listing["journalable"], "no scans offered for journalling"
     scan_id = listing["journalable"][0]["id"]
 
-    saved = client.post("/api/journal", json={
-        "scan_id": scan_id, "followed_rules": "1", "emotion": "calm",
-        "mistake": "none", "notes": "test entry",
-        "would_change": "size smaller"}).get_json()
+    saved = client.post(
+        "/api/journal",
+        json={
+            "scan_id": scan_id,
+            "followed_rules": "1",
+            "emotion": "calm",
+            "mistake": "none",
+            "notes": "test entry",
+            "would_change": "size smaller",
+        },
+    ).get_json()
     assert saved["ok"] is True
     assert saved["entry"]["emotion"] == "calm"
     assert saved["entry"]["followed_rules"] == 1
@@ -214,17 +261,29 @@ def test_journal_requires_a_scan_id(client):
 # ── trade manager ─────────────────────────────────────────────────────
 def test_trade_manager_reports_live_r(client):
     from data.database import SignalDB
+
     assert client.get("/api/scan?symbol=BTCUSDT&tf=15m&force=1").status_code == 200
     now = int(time.time() * 1000)
     with SignalDB() as db:
         scan = db.latest_scans(limit=1)[0]
-        trade, _ = db.create_paper_trade({
-            "scan_id": scan["id"], "signal_id": scan["signal_id"], "plan_id": "p1",
-            "plan_type": "Sweep Reversal Sell", "symbol": "BTCUSDT",
-            "timeframe": "15m", "action": "BUY", "entry": 60000.0,
-            "stop_loss": 59000.0, "take_profit": 62000.0, "risk_reward": 2.0,
-            "confidence_pct": 70, "status": "WAITING_ENTRY",
-            "created_ts": now - 3_600_000})
+        trade, _ = db.create_paper_trade(
+            {
+                "scan_id": scan["id"],
+                "signal_id": scan["signal_id"],
+                "plan_id": "p1",
+                "plan_type": "Sweep Reversal Sell",
+                "symbol": "BTCUSDT",
+                "timeframe": "15m",
+                "action": "BUY",
+                "entry": 60000.0,
+                "stop_loss": 59000.0,
+                "take_profit": 62000.0,
+                "risk_reward": 2.0,
+                "confidence_pct": 70,
+                "status": "WAITING_ENTRY",
+                "created_ts": now - 3_600_000,
+            }
+        )
         db.open_paper_trade(trade["id"], 60000.0, now - 1_800_000, mae=-0.4, mfe=0.9)
 
     d = client.get("/api/trades").get_json()
@@ -252,24 +311,52 @@ def test_module_catalog_lists_the_engine(client):
 
 def test_dashboard_exposes_every_workstation_tab(client):
     html = client.get("/").get_data(as_text=True)
-    for tab in ("chart", "market", "intelligence", "trades", "manage",
-                "risk", "journal", "learn", "commands", "modules", "system",
-                "agent"):
+    for tab in (
+        "chart",
+        "market",
+        "intelligence",
+        "trades",
+        "manage",
+        "risk",
+        "journal",
+        "learn",
+        "commands",
+        "modules",
+        "system",
+        "agent",
+    ):
         assert f'data-tab="{tab}"' in html, f"tab {tab} missing from the shell"
     assert 'id="hubRole"' in html
     # the clickable panels the trader asked for
-    for anchor in ("chartMain", "tradeManager", "riskCenterGate", "psResult",
-                   "jScan", "commandList", "moduleList",
-                   "drawTrendline", "drawRay", "drawBox", "drawList", "drawStatus",
-                   "liveBtn", "liveState"):
+    for anchor in (
+        "chartMain",
+        "tradeManager",
+        "riskCenterGate",
+        "psResult",
+        "jScan",
+        "commandList",
+        "moduleList",
+        "drawTrendline",
+        "drawRay",
+        "drawBox",
+        "drawList",
+        "drawStatus",
+        "liveBtn",
+        "liveState",
+    ):
         assert f'id="{anchor}"' in html, f"panel {anchor} missing"
 
 
 def test_lightweight_charts_is_the_real_vendored_build():
     """The stub silently drew nothing; the real build must be vendored."""
     from pathlib import Path
-    js = (Path(__file__).resolve().parent.parent / "web" / "static"
-          / "lightweight-charts.standalone.js")
+
+    js = (
+        Path(__file__).resolve().parent.parent
+        / "web"
+        / "static"
+        / "lightweight-charts.standalone.js"
+    )
     text = js.read_text()
     assert len(text) > 100_000, "the vendored chart build looks like the old stub"
     assert "Minimal working stub" not in text

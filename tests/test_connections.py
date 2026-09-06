@@ -11,6 +11,7 @@ carrying trade/withdraw permission must be reported as unsafe.
 and be *earnable*. These tests prove the evidence bars move as samples
 accumulate and that the gate actually opens once a setup is proven.
 """
+
 from __future__ import annotations
 
 import time
@@ -22,9 +23,15 @@ import pytest
 def test_order_endpoints_are_refused():
     """The signer must reject anything outside the read-only allow-list."""
     from data.exchange_account import ExchangeAccount, ExchangeAccountError
+
     acct = ExchangeAccount(api_key="k", api_secret="s")
-    for path in ("/api/v3/order", "/api/v3/order/test", "/sapi/v1/capital/withdraw/apply",
-                 "/fapi/v1/order", "/api/v3/openOrders/cancelAll"):
+    for path in (
+        "/api/v3/order",
+        "/api/v3/order/test",
+        "/sapi/v1/capital/withdraw/apply",
+        "/fapi/v1/order",
+        "/api/v3/openOrders/cancelAll",
+    ):
         with pytest.raises(ExchangeAccountError, match="allow-list"):
             acct._signed_get(path, {"symbol": "BTCUSDT"})
 
@@ -32,15 +39,23 @@ def test_order_endpoints_are_refused():
 def test_module_has_no_write_http_verb():
     """There must be no POST/PUT/DELETE call anywhere in the account client."""
     from pathlib import Path
-    src = (Path(__file__).resolve().parent.parent / "data"
-           / "exchange_account.py").read_text()
-    for verb in ("requests.post", "requests.put", "requests.delete",
-                 "requests.patch", "session.post"):
+
+    src = (
+        Path(__file__).resolve().parent.parent / "data" / "exchange_account.py"
+    ).read_text()
+    for verb in (
+        "requests.post",
+        "requests.put",
+        "requests.delete",
+        "requests.patch",
+        "session.post",
+    ):
         assert verb not in src, f"{verb} must not exist in the read-only client"
 
 
 def test_allow_list_is_read_only():
     from data.exchange_account import READ_ONLY_PATHS
+
     for path in READ_ONLY_PATHS:
         assert "order" not in path or "openOrders" in path
         assert "withdraw" not in path.lower()
@@ -48,18 +63,22 @@ def test_allow_list_is_read_only():
 
 def test_a_trading_key_is_flagged_as_unsafe():
     from data.exchange_account import ExchangeAccountError, assert_read_only_key
+
     with pytest.raises(ExchangeAccountError, match="Enable Reading"):
-        assert_read_only_key({"canTrade": True, "canWithdraw": False,
-                              "permissions": ["SPOT_TRADING"]})
+        assert_read_only_key(
+            {"canTrade": True, "canWithdraw": False, "permissions": ["SPOT_TRADING"]}
+        )
     with pytest.raises(ExchangeAccountError):
         assert_read_only_key({"permissions": ["WITHDRAWALS"]})
     # a genuinely read-only key passes
-    assert_read_only_key({"canTrade": False, "canWithdraw": False,
-                          "permissions": ["SPOT_READ"]}) is None
+    assert_read_only_key(
+        {"canTrade": False, "canWithdraw": False, "permissions": ["SPOT_READ"]}
+    ) is None
 
 
 def test_unconfigured_account_degrades_quietly():
     from data.exchange_account import ExchangeAccount
+
     snap = ExchangeAccount(api_key="", api_secret="").snapshot()
     assert snap["configured"] is False
     assert snap["connected"] is False
@@ -70,6 +89,7 @@ def test_unconfigured_account_degrades_quietly():
 def test_demo_account_snapshot(monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "1")
     from data.exchange_account import ExchangeAccount
+
     snap = ExchangeAccount(api_key="demo", api_secret="demo").snapshot()
     assert snap["connected"] is True
     assert snap["read_only"] is True
@@ -80,6 +100,7 @@ def test_demo_account_snapshot(monkeypatch):
 # ── connection registry ──────────────────────────────────────────────────
 def test_every_connection_is_documented():
     from brain.connections import CONNECTIONS, TIER_LABELS
+
     ids = set()
     for c in CONNECTIONS:
         assert c["gives"], f"{c['id']} does not say what it gives the trader"
@@ -89,14 +110,22 @@ def test_every_connection_is_documented():
         assert callable(c["probe"])
         ids.add(c["id"])
     # the links the user asked for
-    for expected in ("market_data", "derivatives", "news", "telegram",
-                     "discord", "llm", "account"):
+    for expected in (
+        "market_data",
+        "derivatives",
+        "news",
+        "telegram",
+        "discord",
+        "llm",
+        "account",
+    ):
         assert expected in ids
 
 
 def test_probe_all_reports_demo_mode(monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "1")
     from brain.connections import probe_all
+
     d = probe_all(ids=["market_data", "derivatives"])
     assert d["demo_mode"] is True
     assert "DEMO" in d["headline"].upper()
@@ -120,12 +149,14 @@ def test_probe_survives_a_crashing_probe(monkeypatch):
 
 def test_unknown_connection_raises():
     from brain.connections import probe_one
+
     with pytest.raises(ValueError):
         probe_one("not-a-connection")
 
 
 def test_alert_test_reports_missing_config(monkeypatch):
     import output.notifiers as n
+
     monkeypatch.setattr(n, "TELEGRAM_BOT_TOKEN", "")
     monkeypatch.setattr(n, "TELEGRAM_CHAT_ID", "")
     monkeypatch.setattr(n, "DISCORD_ANNOUNCE_WEBHOOK", "")
@@ -140,21 +171,34 @@ def test_alert_test_reports_missing_config(monkeypatch):
 def db(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "unlock.db"))
     from data.database import SignalDB
+
     with SignalDB() as conn:
         yield conn
 
 
 def _add_backtest(db, plan_type: str, n: int, winning: bool = True):
-    rows = [{
-        "run_id": "t", "ts": 1_780_000_000_000 + i * 900_000, "symbol": "BTCUSDT",
-        "timeframe": "15m", "plan_type": plan_type, "action": "BUY",
-        "confidence_pct": 70, "horizon_hours": 4, "step": 3,
-        "outcome": "FULL_WIN" if (i % 3 and winning) else "LOSS",
-        "rr_achieved": 2.0 if (i % 3 and winning) else -1.0,
-        "rr_net": 1.9 if (i % 3 and winning) else -1.05,
-        "entry": 60000.0, "regime": "TRENDING"} for i in range(n)]
+    rows = [
+        {
+            "run_id": "t",
+            "ts": 1_780_000_000_000 + i * 900_000,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "plan_type": plan_type,
+            "action": "BUY",
+            "confidence_pct": 70,
+            "horizon_hours": 4,
+            "step": 3,
+            "outcome": "FULL_WIN" if (i % 3 and winning) else "LOSS",
+            "rr_achieved": 2.0 if (i % 3 and winning) else -1.0,
+            "rr_net": 1.9 if (i % 3 and winning) else -1.05,
+            "entry": 60000.0,
+            "regime": "TRENDING",
+        }
+        for i in range(n)
+    ]
     db.save_backtest_rows(rows, "t")
 
 
@@ -166,15 +210,29 @@ def _add_paper(db, plan_type: str, n: int, winning: bool = True):
                  action, entry, stop_loss, take_profit, status, outcome,
                  rr_achieved, rr_net, created_ts, closed_ts)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (9000 + i, plan_type, "BTCUSDT", "15m", "BUY", 60000, 59500, 61000,
-             "CLOSED", "TP_HIT" if (i % 3 and winning) else "STOP_LOSS",
-             2.0 if (i % 3 and winning) else -1.0,
-             1.9 if (i % 3 and winning) else -1.05, now, now))
+            (
+                9000 + i,
+                plan_type,
+                "BTCUSDT",
+                "15m",
+                "BUY",
+                60000,
+                59500,
+                61000,
+                "CLOSED",
+                "TP_HIT" if (i % 3 and winning) else "STOP_LOSS",
+                2.0 if (i % 3 and winning) else -1.0,
+                1.9 if (i % 3 and winning) else -1.05,
+                now,
+                now,
+            ),
+        )
     db.conn.commit()
 
 
 def test_block_is_explained_in_plain_language(db):
     from brain.unlock import explain
+
     d = explain(db, plan_type="Buy Pullback")
     assert d["allowed"] is False
     assert d["has_earnable"] is True
@@ -188,6 +246,7 @@ def test_block_is_explained_in_plain_language(db):
 
 def test_evidence_bars_move_as_samples_accumulate(db):
     from brain.unlock import setup_progress
+
     start = setup_progress(db, "Buy Pullback")
     assert start["pct"] == 0.0 and start["proven"] is False
     assert start["next_action"]["action"] == "backtest"
@@ -210,6 +269,7 @@ def test_the_gate_actually_opens_once_earned(db):
     """The unlock path is real: proven evidence → the gate allows the trade."""
     from brain.risk_gate import evaluate
     from brain.unlock import explain
+
     assert evaluate(db, plan_type="Buy Pullback")["allowed"] is False
 
     _add_backtest(db, "Buy Pullback", 110)
@@ -225,18 +285,20 @@ def test_losing_evidence_does_not_prove_a_setup(db):
     """Enough samples is not enough — it must also make money net of costs."""
     from brain.risk_gate import evaluate
     from brain.unlock import setup_progress
+
     _add_backtest(db, "Buy Pullback", 110, winning=False)
     _add_paper(db, "Buy Pullback", 22, winning=False)
     p = setup_progress(db, "Buy Pullback")
-    assert p["criteria"][0]["met"] is True    # sample floors met
+    assert p["criteria"][0]["met"] is True  # sample floors met
     assert p["criteria"][1]["met"] is True
-    assert p["criteria"][2]["met"] is False   # expectancy is not
+    assert p["criteria"][2]["met"] is False  # expectancy is not
     assert p["proven"] is False
     assert evaluate(db, plan_type="Buy Pullback")["allowed"] is False
 
 
 def test_evidence_overview_lists_setups(db):
     from brain.unlock import evidence_overview
+
     _add_backtest(db, "Buy Pullback", 110)
     d = evidence_overview(db)
     assert d["count"] >= 1
@@ -250,6 +312,7 @@ def test_evidence_overview_lists_setups(db):
 def test_wait_blocks_are_distinguished_from_earn_blocks(db):
     """A trader-state flag is a 'wait', not something you grind samples for."""
     from brain.unlock import explain
+
     db.set_trader_state(tired=True, note="test")
     d = explain(db, plan_type="Buy Pullback")
     kinds = {b["kind"] for b in d["blocks"]}
@@ -265,8 +328,10 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "api.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "api.db"))
     from web.app import make_app
+
     app = make_app()
     app.testing = True
     return app.test_client()

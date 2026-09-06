@@ -5,6 +5,7 @@ JSON serializable") when numpy scalars from the quant layer leaked into the
 payload: Flask's jsonify is strict, unlike json.dumps(default=str).  Every
 heavy engine endpoint is exercised here so a numpy leak can never ship again.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -19,8 +20,10 @@ def client(monkeypatch, tmp_path):
     # Patch the attribute too — SignalDB reads it at construction, so this is
     # what actually keeps these endpoints off the developer's real database.
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "web.db"))
     from web.app import make_app
+
     app = make_app()
     app.testing = True
     return app.test_client()
@@ -82,9 +85,19 @@ def test_sentiment_endpoint(client):
     data = resp.get_json()
     assert data["symbol"] == "BTCUSDT"
     sent = data["sentiment"]
-    for key in ("score", "direction", "label", "strength", "duration_min",
-                "duration_text", "persistence", "intensity", "color", "parts",
-                "history"):
+    for key in (
+        "score",
+        "direction",
+        "label",
+        "strength",
+        "duration_min",
+        "duration_text",
+        "persistence",
+        "intensity",
+        "color",
+        "parts",
+        "history",
+    ):
         assert key in sent, f"sentiment missing {key!r}: {sent}"
     assert -100 <= sent["score"] <= 100
     assert sent["direction"] in ("bullish", "bearish", "neutral")
@@ -97,21 +110,29 @@ def test_sentiment_endpoint(client):
 
 def test_sanitize_for_json_helper():
     import numpy as np
+
     from web.app import _sanitize_for_json
-    out = _sanitize_for_json({
-        "b": np.bool_(True), "i": np.int64(3), "f": np.float64(1.5),
-        "arr": np.array([1, 2]), "nested": [{"x": np.bool_(False)}],
-    })
+
+    out = _sanitize_for_json(
+        {
+            "b": np.bool_(True),
+            "i": np.int64(3),
+            "f": np.float64(1.5),
+            "arr": np.array([1, 2]),
+            "nested": [{"x": np.bool_(False)}],
+        }
+    )
     import json
+
     json.dumps(out)  # must not raise
-    assert out == {"b": True, "i": 3, "f": 1.5, "arr": [1, 2],
-                   "nested": [{"x": False}]}
+    assert out == {"b": True, "i": 3, "f": 1.5, "arr": [1, 2], "nested": [{"x": False}]}
 
 
 # ── /api/channels + /api/doctor — P8 dashboard surface ────────────────
 # The Channels layer is the Panniantong/Agent-Reach ordered-backend
 # pattern (P8). It must reach the dashboard without numpy-leak 500s and
 # without any single probe being able to crash the endpoint.
+
 
 def test_channels_endpoint_returns_registry(client):
     """`/api/channels` must return the four channels with status+active+backends."""
@@ -139,6 +160,7 @@ def test_channels_endpoint_is_json_serializable_under_numpy_leak(client):
     regression that bit /api/scan and /api/intelligence per
     MERGE_NOTES.md must not bite /api/channels."""
     import json
+
     resp = client.get("/api/channels")
     assert resp.status_code == 200
     # If we got this far, Flask jsonify already serialized cleanly.
@@ -178,6 +200,7 @@ def test_doctor_endpoint_returns_text_report(client):
 def test_readiness_endpoint_returns_strip(client):
     """`/api/readiness` is the combined doctor strip (TODO-1.bis)."""
     import json
+
     resp = client.get("/api/readiness")
     assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
     payload = resp.get_json()
@@ -185,15 +208,23 @@ def test_readiness_endpoint_returns_strip(client):
     assert payload["ready"] == (payload["level"] == "ok")
     assert payload["headline"]
     assert {p["name"] for p in payload["pillars"]} == {
-        "channels", "immune", "risk_gate", "data"}
+        "channels",
+        "immune",
+        "risk_gate",
+        "data",
+    }
     json.loads(resp.get_data(as_text=True))  # numpy-leak safety
 
 
 def test_readiness_endpoint_never_500s(client, monkeypatch):
     """A crashing strip degrades to a JSON error, never an HTTP 500."""
-    import brain.agent as agent
-    monkeypatch.setattr(agent, "readiness_strip",
-                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    from brain import agent
+
+    monkeypatch.setattr(
+        agent,
+        "readiness_strip",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
     resp = client.get("/api/readiness")
     assert resp.status_code == 200
     payload = resp.get_json()
@@ -205,13 +236,18 @@ def test_readiness_endpoint_never_500s(client, monkeypatch):
 def test_desk_endpoint_returns_advisory(client):
     """`/api/desk` is the one-call advisory (same as `python main.py desk`)."""
     import json
+
     resp = client.get("/api/desk")
     assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
     payload = resp.get_json()
     assert "advice" in payload
     assert payload["advice"]["action"] in {
-        "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
-        "JOURNAL", "PAPER_GRIND", "SCAN",
+        "CLEAR_STATE",
+        "STAND_ASIDE",
+        "REVIEW_QUEUE",
+        "JOURNAL",
+        "PAPER_GRIND",
+        "SCAN",
     }
     assert "risk_gate" in payload
     assert "graduation" in payload
@@ -221,6 +257,7 @@ def test_desk_endpoint_returns_advisory(client):
 def test_loop_health_endpoint_returns_advisory(client):
     """`/api/loop-health` is the one daily number (same as `python main.py daily`)."""
     import json
+
     resp = client.get("/api/loop-health")
     assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
     payload = resp.get_json()
@@ -229,17 +266,25 @@ def test_loop_health_endpoint_returns_advisory(client):
     assert "graduation" in payload
     assert "ritual" in payload
     assert payload["advice"]["action"] in {
-        "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
-        "JOURNAL", "PAPER_GRIND", "SCAN",
+        "CLEAR_STATE",
+        "STAND_ASIDE",
+        "REVIEW_QUEUE",
+        "JOURNAL",
+        "PAPER_GRIND",
+        "SCAN",
     }
     json.loads(resp.get_data(as_text=True))  # numpy-leak safety
 
 
 def test_loop_health_endpoint_never_500s(client, monkeypatch):
     """A crashing loop_health degrades to a JSON error, never an HTTP 500."""
-    import brain.agent as agent
-    monkeypatch.setattr(agent, "loop_health",
-                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    from brain import agent
+
+    monkeypatch.setattr(
+        agent,
+        "loop_health",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
     resp = client.get("/api/loop-health")
     assert resp.status_code == 200
     payload = resp.get_json()
@@ -291,21 +336,40 @@ def test_scorecard_endpoint_returns_the_full_block(client, tmp_path, monkeypatch
     import data.scorecard as sc
     from data.scorecard import build_scorecard
 
-    rows = [{"ts": (i + 1) * 3_600_000,
-             "side": "BUY" if i % 2 else "SELL",
-             "setup": "Buy Pullback", "regime": "RANGING",
-             "r": 2.0 if i % 3 else -1.0, "outcome": "FULL_WIN",
-             "holding_hours": 1.5, "symbol": "BTCUSDT", "timeframe": "15m",
-             "source": "backtest", "session": "london"} for i in range(40)]
-    monkeypatch.setattr(sc, "scorecard_from_db",
-                        lambda **kw: build_scorecard(rows, min_decided=30))
+    rows = [
+        {
+            "ts": (i + 1) * 3_600_000,
+            "side": "BUY" if i % 2 else "SELL",
+            "setup": "Buy Pullback",
+            "regime": "RANGING",
+            "r": 2.0 if i % 3 else -1.0,
+            "outcome": "FULL_WIN",
+            "holding_hours": 1.5,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "source": "backtest",
+            "session": "london",
+        }
+        for i in range(40)
+    ]
+    monkeypatch.setattr(
+        sc, "scorecard_from_db", lambda **kw: build_scorecard(rows, min_decided=30)
+    )
 
     resp = client.get("/api/scorecard?symbol=BTCUSDT")
     assert resp.status_code == 200
     payload = resp.get_json()
     assert payload["ok"] is True
-    for key in ("overall", "by_side", "by_regime", "by_session", "by_setup",
-                "verdict", "criteria", "bar"):
+    for key in (
+        "overall",
+        "by_side",
+        "by_regime",
+        "by_session",
+        "by_setup",
+        "verdict",
+        "criteria",
+        "bar",
+    ):
         assert key in payload
     assert payload["overall"]["n"] == 40
     assert payload["verdict"]["status"] in {"PASS", "FAIL", "INSUFFICIENT_DATA"}
@@ -314,8 +378,10 @@ def test_scorecard_endpoint_returns_the_full_block(client, tmp_path, monkeypatch
 
 def test_scorecard_endpoint_never_500s(client, monkeypatch):
     import data.scorecard as sc
-    monkeypatch.setattr(sc, "scorecard_from_db",
-                        lambda **k: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    monkeypatch.setattr(
+        sc, "scorecard_from_db", lambda **k: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
     resp = client.get("/api/scorecard")
     assert resp.status_code == 200
     payload = resp.get_json()
@@ -327,6 +393,7 @@ def test_ticket_meta_endpoint_returns_honest_inputs(client):
     """T4 — the ticket's sizing/fee inputs must come from the server, never
     invented client-side. Unset ACCOUNT_BALANCE reports 0, not a fake $100k."""
     import json
+
     resp = client.get("/api/ticket/meta?symbol=BTCUSDT")
     assert resp.status_code == 200, resp.get_data(as_text=True)[:300]
     meta = resp.get_json()

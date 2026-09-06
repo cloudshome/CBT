@@ -21,14 +21,15 @@ Design rules (same spine as the candle store — do not bend):
 6. **Store first. Do not turn these into trading rules until the data
    proves them** (the roadmap's discipline for Layer 2).
 """
+
 from __future__ import annotations
 
 import os
 import time
 import zlib
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -40,7 +41,13 @@ from data.binance_client import TIMEFRAME_TO_MS, BinanceClient
 # --------------------------------------------------------------------------- #
 
 DERIVATIVE_COLUMNS: list[str] = [
-    "ts", "exchange", "market", "symbol", "metric", "value", "ingested_at",
+    "ts",
+    "exchange",
+    "market",
+    "symbol",
+    "metric",
+    "value",
+    "ingested_at",
 ]
 DERIVATIVE_PK: list[str] = ["exchange", "market", "symbol", "metric", "ts"]
 
@@ -53,14 +60,18 @@ INDEX_PRICE = "index_price"
 BASIS = "basis"
 
 ALL_METRICS: tuple[str, ...] = (
-    FUNDING_RATE, OPEN_INTEREST, OPEN_INTEREST_VALUE,
-    MARK_PRICE, INDEX_PRICE, BASIS,
+    FUNDING_RATE,
+    OPEN_INTEREST,
+    OPEN_INTEREST_VALUE,
+    MARK_PRICE,
+    INDEX_PRICE,
+    BASIS,
 )
 
-DEFAULT_OA_PERIOD = "1h"          # open-interest history bucket
-DEFAULT_OA_TIMEFRAME = "1h"       # mark/index kline timeframe
-FUNDING_STEP_MS = 8 * 3_600_000   # Binance funding interval (BTCUSDT) —
-                                 # not a kline interval, so it lives outside TIMEFRAME_TO_MS
+DEFAULT_OA_PERIOD = "1h"  # open-interest history bucket
+DEFAULT_OA_TIMEFRAME = "1h"  # mark/index kline timeframe
+FUNDING_STEP_MS = 8 * 3_600_000  # Binance funding interval (BTCUSDT) —
+# not a kline interval, so it lives outside TIMEFRAME_TO_MS
 
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent / "data" / "store" / "derivatives"
 
@@ -106,6 +117,7 @@ def coerce_derivative_frame(frame: pd.DataFrame | list[dict]) -> pd.DataFrame:
 # Store
 # --------------------------------------------------------------------------- #
 
+
 class DerivativesStore:
     """Partitioned Parquet derivatives store with an upsert primary key.
 
@@ -119,10 +131,14 @@ class DerivativesStore:
     def __init__(self, root: str | Path | None = None):
         self.root = Path(root) if root else DEFAULT_ROOT
 
-    def _series_dir(self, exchange: str, market: str, symbol: str,
-                    metric: str) -> Path:
-        return (self.root / f"exchange={exchange}" / f"market={market}"
-                / f"symbol={symbol}" / f"metric={metric}")
+    def _series_dir(self, exchange: str, market: str, symbol: str, metric: str) -> Path:
+        return (
+            self.root
+            / f"exchange={exchange}"
+            / f"market={market}"
+            / f"symbol={symbol}"
+            / f"metric={metric}"
+        )
 
     def _partition_paths(self, frame: pd.DataFrame):
         dt = pd.to_datetime(frame["ts"], unit="ms", utc=True)
@@ -137,7 +153,12 @@ class DerivativesStore:
         metric = frame["metric"].iloc[0]
         base = self._series_dir(exchange, market, symbol, metric)
         for (year, month), idxs in sorted(groups.items()):
-            yield year, month, base / f"year={year:04d}" / f"month={month:02d}", frame.iloc[idxs]
+            yield (
+                year,
+                month,
+                base / f"year={year:04d}" / f"month={month:02d}",
+                frame.iloc[idxs],
+            )
 
     def write(self, frame: pd.DataFrame | list[dict]) -> int:
         """Upsert derivative rows (last write wins on the PK)."""
@@ -159,9 +180,16 @@ class DerivativesStore:
             total += len(sub)
         return total
 
-    def read(self, exchange: str, market: str, symbol: str, metric: str, *,
-             start_ts: Optional[int] = None,
-             end_ts: Optional[int] = None) -> pd.DataFrame:
+    def read(
+        self,
+        exchange: str,
+        market: str,
+        symbol: str,
+        metric: str,
+        *,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+    ) -> pd.DataFrame:
         """Return rows for a metric series, deduplicated, sorted by ``ts``."""
         series_dir = self._series_dir(exchange, market, symbol, metric)
         if not series_dir.exists():
@@ -183,16 +211,20 @@ class DerivativesStore:
 
     def metrics(self, exchange: str, market: str, symbol: str) -> list[str]:
         """List metrics stored for a series."""
-        base = self.root / f"exchange={exchange}" / f"market={market}" / f"symbol={symbol}"
+        base = (
+            self.root / f"exchange={exchange}" / f"market={market}" / f"symbol={symbol}"
+        )
         if not base.exists():
             return []
-        return sorted(p.name.replace("metric=", "")
-                      for p in base.glob("metric=*") if p.is_dir())
+        return sorted(
+            p.name.replace("metric=", "") for p in base.glob("metric=*") if p.is_dir()
+        )
 
 
 # --------------------------------------------------------------------------- #
 # Basis derivation
 # --------------------------------------------------------------------------- #
+
 
 def _price_col(frame: pd.DataFrame, raw: str) -> str:
     """Raw fetch frames use ``mark_price``/``index_price``; canonical store
@@ -200,10 +232,15 @@ def _price_col(frame: pd.DataFrame, raw: str) -> str:
     return raw if raw in frame.columns else "value"
 
 
-def derive_basis(mark: pd.DataFrame, index: pd.DataFrame,
-                 *, exchange: str = "binance", market: str = "perp",
-                 symbol: str = "BTCUSDT",
-                 ingested_at: Optional[int] = None) -> pd.DataFrame:
+def derive_basis(
+    mark: pd.DataFrame,
+    index: pd.DataFrame,
+    *,
+    exchange: str = "binance",
+    market: str = "perp",
+    symbol: str = "BTCUSDT",
+    ingested_at: int | None = None,
+) -> pd.DataFrame:
     """basis = mark − index at each timestamp where both are known.
 
     ``mark`` / ``index`` need ``ts`` and a price column (``mark_price`` /
@@ -220,18 +257,25 @@ def derive_basis(mark: pd.DataFrame, index: pd.DataFrame,
     if merged.empty:
         return empty_frame()
     ingest = ingested_at if ingested_at is not None else int(time.time() * 1000)
-    return coerce_derivative_frame(pd.DataFrame({
-        "ts": merged["ts"].astype("int64"),
-        "exchange": exchange, "market": market, "symbol": symbol,
-        "metric": BASIS,
-        "value": (merged["mark_price"] - merged["index_price"]).astype(float),
-        "ingested_at": ingest,
-    }))
+    return coerce_derivative_frame(
+        pd.DataFrame(
+            {
+                "ts": merged["ts"].astype("int64"),
+                "exchange": exchange,
+                "market": market,
+                "symbol": symbol,
+                "metric": BASIS,
+                "value": (merged["mark_price"] - merged["index_price"]).astype(float),
+                "ingested_at": ingest,
+            }
+        )
+    )
 
 
 # --------------------------------------------------------------------------- #
 # Transport contract
 # --------------------------------------------------------------------------- #
+
 
 class DerivativesTransportError(Exception):
     """A derivatives fetch failed (network, geo-block, exhausted retries)."""
@@ -241,8 +285,9 @@ class _TransientFetchError(Exception):
     """Injected one-off fault (offline fake transport) — retryable."""
 
 
-def _futures_pair(symbol: str) -> Optional[str]:
+def _futures_pair(symbol: str) -> str | None:
     from data.symbols import resolve_symbol
+
     return resolve_symbol(symbol).futures_symbol
 
 
@@ -254,9 +299,14 @@ class BinanceDerivativesTransport:
     clear :class:`DerivativesTransportError`.
     """
 
-    def __init__(self, client: Optional[BinanceClient] = None, *,
-                 backoff_attempts: int = 3, backoff_base: float = 1.0,
-                 sleep_fn: Optional[Callable[[float], None]] = None):
+    def __init__(
+        self,
+        client: BinanceClient | None = None,
+        *,
+        backoff_attempts: int = 3,
+        backoff_base: float = 1.0,
+        sleep_fn: Callable[[float], None] | None = None,
+    ):
         self.client = client if client is not None else BinanceClient()
         self.backoff_attempts = backoff_attempts
         self.backoff_base = backoff_base
@@ -274,7 +324,7 @@ class BinanceDerivativesTransport:
             fn = getattr(self.client, method)
             try:
                 result = fn(*args)
-            except Exception as exc:                      # transport error
+            except Exception as exc:  # transport error
                 attempts += 1
                 if attempts > self.backoff_attempts:
                     raise DerivativesTransportError(
@@ -298,30 +348,62 @@ class BinanceDerivativesTransport:
             self.sleep_fn(self.backoff_base * (2 ** (attempts - 1)))
         raise AssertionError("unreachable")
 
-    def funding_rate_page(self, symbol: str, start_time, end_time,
-                          limit: int = 1000) -> pd.DataFrame:
-        return self._fetch("funding_rate_history", symbol, start_time, end_time,
-                           limit, what="funding history")
+    def funding_rate_page(
+        self, symbol: str, start_time, end_time, limit: int = 1000
+    ) -> pd.DataFrame:
+        return self._fetch(
+            "funding_rate_history",
+            symbol,
+            start_time,
+            end_time,
+            limit,
+            what="funding history",
+        )
 
-    def open_interest_page(self, symbol: str, start_time, end_time,
-                           limit: int = 500) -> pd.DataFrame:
-        return self._fetch("open_interest_history", symbol, DEFAULT_OA_PERIOD,
-                           start_time, end_time, limit, what="OI history")
+    def open_interest_page(
+        self, symbol: str, start_time, end_time, limit: int = 500
+    ) -> pd.DataFrame:
+        return self._fetch(
+            "open_interest_history",
+            symbol,
+            DEFAULT_OA_PERIOD,
+            start_time,
+            end_time,
+            limit,
+            what="OI history",
+        )
 
-    def mark_price_page(self, symbol: str, start_time, end_time,
-                        limit: int = 1000) -> pd.DataFrame:
-        return self._fetch("mark_price_klines", symbol, DEFAULT_OA_TIMEFRAME,
-                           start_time, end_time, limit, what="mark prices")
+    def mark_price_page(
+        self, symbol: str, start_time, end_time, limit: int = 1000
+    ) -> pd.DataFrame:
+        return self._fetch(
+            "mark_price_klines",
+            symbol,
+            DEFAULT_OA_TIMEFRAME,
+            start_time,
+            end_time,
+            limit,
+            what="mark prices",
+        )
 
-    def index_price_page(self, symbol: str, start_time, end_time,
-                         limit: int = 1000) -> pd.DataFrame:
-        return self._fetch("index_price_klines", symbol, DEFAULT_OA_TIMEFRAME,
-                           start_time, end_time, limit, what="index prices")
+    def index_price_page(
+        self, symbol: str, start_time, end_time, limit: int = 1000
+    ) -> pd.DataFrame:
+        return self._fetch(
+            "index_price_klines",
+            symbol,
+            DEFAULT_OA_TIMEFRAME,
+            start_time,
+            end_time,
+            limit,
+            what="index prices",
+        )
 
 
 # --------------------------------------------------------------------------- #
 # Offline fake transport (tests + DEMO_MODE)
 # --------------------------------------------------------------------------- #
+
 
 def _seed(key: str) -> int:
     """Deterministic seed (crc32 — plain hash() is salted per process)."""
@@ -337,11 +419,15 @@ class FakeDerivativesTransport:
     (1-based, consumed on first hit so a retry succeeds).
     """
 
-    def __init__(self, *, seed: int = 7,
-                 start_ts: Optional[int] = None,
-                 end_ts: Optional[int] = None,
-                 faults: Optional[dict[int, Exception]] = None,
-                 base_prices: Optional[dict[str, float]] = None):
+    def __init__(
+        self,
+        *,
+        seed: int = 7,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+        faults: dict[int, Exception] | None = None,
+        base_prices: dict[str, float] | None = None,
+    ):
         self.seed = seed
         self.start_ts = start_ts
         self.end_ts = end_ts
@@ -368,10 +454,11 @@ class FakeDerivativesTransport:
         rng = np.random.default_rng(_seed(f"{symbol}:funding:{self.seed}"))
         ts = first + np.arange(n, dtype=np.int64) * step
         base = self.base_prices.get(symbol, 60_000.0)
-        rate = rng.normal(0.0001, 0.0002, n)                  # ~0.01%/8h mean
+        rate = rng.normal(0.0001, 0.0002, n)  # ~0.01%/8h mean
         mark = base + np.cumsum(rng.normal(0, base * 0.002, n))
-        df = pd.DataFrame({"ts": ts, "funding_rate": rate,
-                           "mark_price": np.round(mark, 2)})
+        df = pd.DataFrame(
+            {"ts": ts, "funding_rate": rate, "mark_price": np.round(mark, 2)}
+        )
         self._frames[key] = df
         return df
 
@@ -387,10 +474,15 @@ class FakeDerivativesTransport:
         rng = np.random.default_rng(_seed(f"{symbol}:oi:{self.seed}"))
         ts = first + np.arange(n, dtype=np.int64) * step
         base = self.base_prices.get(symbol, 60_000.0)
-        oi = base * 100_000 + np.cumsum(rng.normal(0, base * 50, n))   # notional-ish
+        oi = base * 100_000 + np.cumsum(rng.normal(0, base * 50, n))  # notional-ish
         oi = np.maximum(base * 10_000, oi)
-        df = pd.DataFrame({"ts": ts, "open_interest": np.round(oi, 2),
-                           "open_interest_value": np.round(oi * base, 2)})
+        df = pd.DataFrame(
+            {
+                "ts": ts,
+                "open_interest": np.round(oi, 2),
+                "open_interest_value": np.round(oi * base, 2),
+            }
+        )
         self._frames[key] = df
         return df
 
@@ -412,8 +504,9 @@ class FakeDerivativesTransport:
         return df
 
     # -- transport contract -------------------------------------------------- #
-    def funding_rate_page(self, symbol: str, start_time, end_time,
-                          limit: int = 1000) -> pd.DataFrame:
+    def funding_rate_page(
+        self, symbol: str, start_time, end_time, limit: int = 1000
+    ) -> pd.DataFrame:
         self._raise_fault()
         df = self._funding(symbol)
         df = df[df["ts"] >= (start_time if start_time is not None else 0)]
@@ -421,8 +514,9 @@ class FakeDerivativesTransport:
             df = df[df["ts"] <= end_time]
         return df.head(int(limit)).reset_index(drop=True)
 
-    def open_interest_page(self, symbol: str, start_time, end_time,
-                           limit: int = 500) -> pd.DataFrame:
+    def open_interest_page(
+        self, symbol: str, start_time, end_time, limit: int = 500
+    ) -> pd.DataFrame:
         self._raise_fault()
         df = self._oi(symbol)
         df = df[df["ts"] >= (start_time if start_time is not None else 0)]
@@ -430,8 +524,9 @@ class FakeDerivativesTransport:
             df = df[df["ts"] <= end_time]
         return df.head(int(limit)).reset_index(drop=True)
 
-    def mark_price_page(self, symbol: str, start_time, end_time,
-                        limit: int = 1000) -> pd.DataFrame:
+    def mark_price_page(
+        self, symbol: str, start_time, end_time, limit: int = 1000
+    ) -> pd.DataFrame:
         self._raise_fault()
         df = self._price_klines(symbol, "mark_price")
         df = df[df["ts"] >= (start_time if start_time is not None else 0)]
@@ -439,8 +534,9 @@ class FakeDerivativesTransport:
             df = df[df["ts"] <= end_time]
         return df.head(int(limit)).reset_index(drop=True)
 
-    def index_price_page(self, symbol: str, start_time, end_time,
-                         limit: int = 1000) -> pd.DataFrame:
+    def index_price_page(
+        self, symbol: str, start_time, end_time, limit: int = 1000
+    ) -> pd.DataFrame:
         self._raise_fault()
         df = self._price_klines(symbol, "index_price")
         df = df[df["ts"] >= (start_time if start_time is not None else 0)]
@@ -453,6 +549,7 @@ def default_derivatives_transport():
     """DEMO_MODE → SampleClient-backed transport; else Binance."""
     if os.getenv("DEMO_MODE", "0") in ("1", "true", "yes"):
         from data.sample_client import SampleClient
+
         return BinanceDerivativesTransport(SampleClient())
     return BinanceDerivativesTransport()
 
@@ -461,24 +558,33 @@ def default_derivatives_transport():
 # Collector
 # --------------------------------------------------------------------------- #
 
+
 @dataclass
 class MetricRun:
     metric: str
     pages: int = 0
     rows_fetched: int = 0
     rows_new: int = 0
-    first_ts: Optional[int] = None
-    last_ts: Optional[int] = None
+    first_ts: int | None = None
+    last_ts: int | None = None
     skipped_forming: int = 0
 
     def as_dict(self) -> dict:
         return asdict(self)
 
 
-def _page_all(fetch, *, symbol: str, start_ts: Optional[int],
-              end_ts: Optional[int], page_limit: int, step_ms: int,
-              max_retries: int = 3, backoff_base: float = 1.0,
-              sleep_fn: Callable[[float], None] = time.sleep):
+def _page_all(
+    fetch,
+    *,
+    symbol: str,
+    start_ts: int | None,
+    end_ts: int | None,
+    page_limit: int,
+    step_ms: int,
+    max_retries: int = 3,
+    backoff_base: float = 1.0,
+    sleep_fn: Callable[[float], None] = time.sleep,
+):
     """Page ``fetch(symbol, start_time, end_time, limit)`` forward.
 
     Generator yielding frames; cursor advances ``last_ts + step_ms`` so the
@@ -487,7 +593,7 @@ def _page_all(fetch, *, symbol: str, start_ts: Optional[int],
     backoff; terminal :class:`DerivativesTransportError` propagates.
     """
     cursor = start_ts
-    seen_last: Optional[int] = None
+    seen_last: int | None = None
     while True:
         attempts = 0
         while True:
@@ -527,14 +633,21 @@ class DerivativesCollector:
     rate-limit/geo-block aware via the transport.
     """
 
-    def __init__(self, store: DerivativesStore,
-                 transport=None, *, sleep_s: float = 0.2,
-                 page_limit: int = 1000, oa_page_limit: int = 500,
-                 clock: Optional[Callable[[], int]] = None,
-                 sleep_fn: Optional[Callable[[float], None]] = None):
+    def __init__(
+        self,
+        store: DerivativesStore,
+        transport=None,
+        *,
+        sleep_s: float = 0.2,
+        page_limit: int = 1000,
+        oa_page_limit: int = 500,
+        clock: Callable[[], int] | None = None,
+        sleep_fn: Callable[[float], None] | None = None,
+    ):
         self.store = store
-        self.transport = transport if transport is not None \
-            else default_derivatives_transport()
+        self.transport = (
+            transport if transport is not None else default_derivatives_transport()
+        )
         self.sleep_s = sleep_s
         self.page_limit = page_limit
         self.oa_page_limit = oa_page_limit
@@ -542,13 +655,19 @@ class DerivativesCollector:
         self.sleep_fn = sleep_fn if sleep_fn is not None else time.sleep
 
     # -- public -------------------------------------------------------------- #
-    def collect(self, symbol: str, market: str = "perp", *,
-                since: Optional[int] = None,
-                until: Optional[int] = None,
-                metrics: Optional[list[str]] = None,
-                dry_run: bool = False) -> dict[str, MetricRun]:
+    def collect(
+        self,
+        symbol: str,
+        market: str = "perp",
+        *,
+        since: int | None = None,
+        until: int | None = None,
+        metrics: list[str] | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, MetricRun]:
         """Collect the requested metrics (default: all six)."""
         from data.symbols import resolve_symbol
+
         spec = resolve_symbol(symbol)
         if market != "perp":
             raise DerivativesTransportError(
@@ -576,64 +695,119 @@ class DerivativesCollector:
 
         if FUNDING_RATE in want:
             runs[FUNDING_RATE] = self._run(
-                FUNDING_RATE, self.transport.funding_rate_page, spec.symbol,
-                market, since, until, self.page_limit,
-                step_ms=FUNDING_STEP_MS, dry_run=dry_run,
+                FUNDING_RATE,
+                self.transport.funding_rate_page,
+                spec.symbol,
+                market,
+                since,
+                until,
+                self.page_limit,
+                step_ms=FUNDING_STEP_MS,
+                dry_run=dry_run,
             )
         if OPEN_INTEREST in want:
             runs[OPEN_INTEREST] = self._run(
-                OPEN_INTEREST, self.transport.open_interest_page, spec.symbol,
-                market, since, until, self.oa_page_limit,
-                step_ms=TIMEFRAME_TO_MS[DEFAULT_OA_PERIOD], dry_run=dry_run,
+                OPEN_INTEREST,
+                self.transport.open_interest_page,
+                spec.symbol,
+                market,
+                since,
+                until,
+                self.oa_page_limit,
+                step_ms=TIMEFRAME_TO_MS[DEFAULT_OA_PERIOD],
+                dry_run=dry_run,
             )
         if OPEN_INTEREST_VALUE in want:
             runs[OPEN_INTEREST_VALUE] = self._run_value_of(
-                OPEN_INTEREST, spec.symbol, market, since, until, dry_run=dry_run,
+                OPEN_INTEREST,
+                spec.symbol,
+                market,
+                since,
+                until,
+                dry_run=dry_run,
             )
         if collect_mark:
             runs[MARK_PRICE] = self._run(
-                MARK_PRICE, self.transport.mark_price_page, spec.symbol,
-                market, since, until, self.page_limit,
-                step_ms=TIMEFRAME_TO_MS[DEFAULT_OA_TIMEFRAME], dry_run=dry_run,
+                MARK_PRICE,
+                self.transport.mark_price_page,
+                spec.symbol,
+                market,
+                since,
+                until,
+                self.page_limit,
+                step_ms=TIMEFRAME_TO_MS[DEFAULT_OA_TIMEFRAME],
+                dry_run=dry_run,
             )
         if collect_index:
             runs[INDEX_PRICE] = self._run(
-                INDEX_PRICE, self.transport.index_price_page, spec.symbol,
-                market, since, until, self.page_limit,
-                step_ms=TIMEFRAME_TO_MS[DEFAULT_OA_TIMEFRAME], dry_run=dry_run,
+                INDEX_PRICE,
+                self.transport.index_price_page,
+                spec.symbol,
+                market,
+                since,
+                until,
+                self.page_limit,
+                step_ms=TIMEFRAME_TO_MS[DEFAULT_OA_TIMEFRAME],
+                dry_run=dry_run,
             )
         if BASIS in want and not dry_run:
             mark = self.store.read("binance", market, spec.symbol, MARK_PRICE)
             index = self.store.read("binance", market, spec.symbol, INDEX_PRICE)
             before = self.store.count("binance", market, spec.symbol, BASIS)
-            basis = derive_basis(mark, index, exchange="binance",
-                                 market=market, symbol=spec.symbol,
-                                 ingested_at=now)
+            basis = derive_basis(
+                mark,
+                index,
+                exchange="binance",
+                market=market,
+                symbol=spec.symbol,
+                ingested_at=now,
+            )
             if not basis.empty:
                 self.store.write(basis)
             runs[BASIS] = MetricRun(
-                metric=BASIS, rows_fetched=len(basis),
-                rows_new=max(0, self.store.count("binance", market,
-                                                 spec.symbol, BASIS) - before),
+                metric=BASIS,
+                rows_fetched=len(basis),
+                rows_new=max(
+                    0, self.store.count("binance", market, spec.symbol, BASIS) - before
+                ),
                 first_ts=int(basis["ts"].iloc[0]) if not basis.empty else None,
                 last_ts=int(basis["ts"].iloc[-1]) if not basis.empty else None,
             )
         return runs
 
     # -- internals ------------------------------------------------------------ #
-    def _run(self, metric: str, fetch, symbol: str, market: str,
-             since: Optional[int], until: int, page_limit: int, *,
-             step_ms: int, dry_run: bool) -> MetricRun:
+    def _run(
+        self,
+        metric: str,
+        fetch,
+        symbol: str,
+        market: str,
+        since: int | None,
+        until: int,
+        page_limit: int,
+        *,
+        step_ms: int,
+        dry_run: bool,
+    ) -> MetricRun:
         existing = self.store.read("binance", market, symbol, metric)
         last_ts = int(existing["ts"].max()) if not existing.empty else None
-        cursor = since if since is not None else (
-            last_ts + step_ms if last_ts is not None else None)
+        cursor = (
+            since
+            if since is not None
+            else (last_ts + step_ms if last_ts is not None else None)
+        )
         run = MetricRun(metric=metric)
         before = self.store.count("binance", market, symbol, metric)
         existing_ts = {int(t) for t in existing["ts"]} if dry_run else None
-        for page in _page_all(fetch, symbol=symbol, start_ts=cursor,
-                              end_ts=until, page_limit=page_limit,
-                              step_ms=step_ms, sleep_fn=self.sleep_fn):
+        for page in _page_all(
+            fetch,
+            symbol=symbol,
+            start_ts=cursor,
+            end_ts=until,
+            page_limit=page_limit,
+            step_ms=step_ms,
+            sleep_fn=self.sleep_fn,
+        ):
             run.pages += 1
             run.rows_fetched += len(page)
             if run.first_ts is None and not page.empty:
@@ -648,24 +822,40 @@ class DerivativesCollector:
             if self.sleep_s:
                 self.sleep_fn(self.sleep_s)
         if not dry_run:
-            run.rows_new = max(0, self.store.count("binance", market, symbol,
-                                                   metric) - before)
+            run.rows_new = max(
+                0, self.store.count("binance", market, symbol, metric) - before
+            )
         return run
 
-    def _run_value_of(self, oi_metric: str, symbol: str, market: str,
-                      since: Optional[int], until: int, *,
-                      dry_run: bool) -> MetricRun:
+    def _run_value_of(
+        self,
+        oi_metric: str,
+        symbol: str,
+        market: str,
+        since: int | None,
+        until: int,
+        *,
+        dry_run: bool,
+    ) -> MetricRun:
         """open_interest_value rides along with the OI pages (same rows)."""
         existing = self.store.read("binance", market, symbol, OPEN_INTEREST_VALUE)
         last_ts = int(existing["ts"].max()) if not existing.empty else None
-        cursor = since if since is not None else (
-            last_ts + 3_600_000 if last_ts is not None else None)
+        cursor = (
+            since
+            if since is not None
+            else (last_ts + 3_600_000 if last_ts is not None else None)
+        )
         run = MetricRun(metric=OPEN_INTEREST_VALUE)
         before = self.store.count("binance", market, symbol, OPEN_INTEREST_VALUE)
-        for page in _page_all(self.transport.open_interest_page, symbol=symbol,
-                              start_ts=cursor, end_ts=until,
-                              page_limit=self.oa_page_limit,
-                              step_ms=3_600_000, sleep_fn=self.sleep_fn):
+        for page in _page_all(
+            self.transport.open_interest_page,
+            symbol=symbol,
+            start_ts=cursor,
+            end_ts=until,
+            page_limit=self.oa_page_limit,
+            step_ms=3_600_000,
+            sleep_fn=self.sleep_fn,
+        ):
             run.pages += 1
             value = page[["ts", "open_interest_value"]].copy()
             run.rows_fetched += len(value)
@@ -676,26 +866,42 @@ class DerivativesCollector:
             if not dry_run:
                 canonical = self._to_canonical(
                     value.rename(columns={"open_interest_value": "value"}),
-                    OPEN_INTEREST_VALUE, market, symbol)
+                    OPEN_INTEREST_VALUE,
+                    market,
+                    symbol,
+                )
                 self.store.write(canonical)
             if self.sleep_s:
                 self.sleep_fn(self.sleep_s)
         if not dry_run:
-            run.rows_new = max(0, self.store.count(
-                "binance", market, symbol, OPEN_INTEREST_VALUE) - before)
+            run.rows_new = max(
+                0,
+                self.store.count("binance", market, symbol, OPEN_INTEREST_VALUE)
+                - before,
+            )
         return run
 
     @staticmethod
-    def _to_canonical(page: pd.DataFrame, metric: str, market: str,
-                      symbol: str) -> pd.DataFrame:
-        value_col = {"funding_rate": "funding_rate",
-                     "open_interest": "open_interest",
-                     "open_interest_value": "value",
-                     "mark_price": "mark_price",
-                     "index_price": "index_price"}.get(metric, "value")
-        return coerce_derivative_frame(pd.DataFrame({
-            "ts": page["ts"].astype("int64"),
-            "exchange": "binance", "market": market, "symbol": symbol,
-            "metric": metric, "value": page[value_col].astype(float),
-            "ingested_at": int(time.time() * 1000),
-        }))
+    def _to_canonical(
+        page: pd.DataFrame, metric: str, market: str, symbol: str
+    ) -> pd.DataFrame:
+        value_col = {
+            "funding_rate": "funding_rate",
+            "open_interest": "open_interest",
+            "open_interest_value": "value",
+            "mark_price": "mark_price",
+            "index_price": "index_price",
+        }.get(metric, "value")
+        return coerce_derivative_frame(
+            pd.DataFrame(
+                {
+                    "ts": page["ts"].astype("int64"),
+                    "exchange": "binance",
+                    "market": market,
+                    "symbol": symbol,
+                    "metric": metric,
+                    "value": page[value_col].astype(float),
+                    "ingested_at": int(time.time() * 1000),
+                }
+            )
+        )

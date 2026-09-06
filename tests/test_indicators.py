@@ -1,21 +1,46 @@
 """Tests for the indicator suite."""
+
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 
 from engine.indicators import (
-    add_all_indicators, add_rsi, add_supertrend, find_rsi_divergence,
-    find_equal_levels, add_session_vwap,
+    add_all_indicators,
+    add_rsi,
+    add_session_vwap,
+    add_supertrend,
+    find_equal_levels,
+    find_rsi_divergence,
 )
 
 
 def test_columns_added(df):
     out = add_all_indicators(df)
-    for col in ("rsi", "macd", "macd_hist", "atr", "atr_pct", "bb_upper", "bb_lower",
-                "supertrend", "supertrend_bull", "adx", "plus_di", "minus_di",
-                "stoch_k", "stoch_d", "wt1", "wt2", "volume_ratio", "obv",
-                "vwap", "price_above_vwap", "ema_20", "ema_50", "ema_200"):
+    for col in (
+        "rsi",
+        "macd",
+        "macd_hist",
+        "atr",
+        "atr_pct",
+        "bb_upper",
+        "bb_lower",
+        "supertrend",
+        "supertrend_bull",
+        "adx",
+        "plus_di",
+        "minus_di",
+        "stoch_k",
+        "stoch_d",
+        "wt1",
+        "wt2",
+        "volume_ratio",
+        "obv",
+        "vwap",
+        "price_above_vwap",
+        "ema_20",
+        "ema_50",
+        "ema_200",
+    ):
         assert col in out.columns, f"missing {col}"
     assert out["close"].notna().all()
 

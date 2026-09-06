@@ -67,10 +67,10 @@ gates how much of the observed gross expectancy is trusted to repeat
 floor). Positive-expectancy setups are only boosted when the evidence is
 strong; a fragile curve is dampened, not celebrated.
 """
+
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 from config import BACKTEST_STEP, CALIBRATE_GAIN, CALIBRATE_MAX_MULT, CALIBRATE_MIN_MULT
 from data.quality_score import backtest_quality_score, edge_score
@@ -88,15 +88,19 @@ WEIGHTS: dict[str, float] = {
     "execution": 0.15,
 }
 
-BAND_CUTS = ((80.0, "robust"), (60.0, "acceptable"),
-             (40.0, "borderline"), (None, "fragile"))
+BAND_CUTS = (
+    (80.0, "robust"),
+    (60.0, "acceptable"),
+    (40.0, "borderline"),
+    (None, "fragile"),
+)
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
-def _band(score: Optional[float]) -> Optional[str]:
+def _band(score: float | None) -> str | None:
     if score is None:
         return None
     for cut, label in BAND_CUTS:
@@ -114,8 +118,12 @@ def _net_e(rows: list[dict]) -> float:
 # ──────────────────────────────────────────────────────────────────────────
 # Components
 # ──────────────────────────────────────────────────────────────────────────
-def regime_fit_score(rows: list[dict], *, regime: Optional[str] = None,
-                     setup_rows: Optional[list[dict]] = None) -> dict:
+def regime_fit_score(
+    rows: list[dict],
+    *,
+    regime: str | None = None,
+    setup_rows: list[dict] | None = None,
+) -> dict:
     """Does the edge persist across regimes (base key) or fit THIS regime
     (plan_type::regime key)?
 
@@ -136,8 +144,11 @@ def regime_fit_score(rows: list[dict], *, regime: Optional[str] = None,
         for r in setup_rows:
             by_regime.setdefault(str(r.get("regime") or "UNKNOWN"), []).append(r)
         if len(by_regime) <= 1:
-            return {"score": 100.0, "regimes": 1, "note":
-                    "single-regime book — no conditioning to apply (neutral)"}
+            return {
+                "score": 100.0,
+                "regimes": 1,
+                "note": "single-regime book — no conditioning to apply (neutral)",
+            }
         total = 0
         positive = 0
         per: dict[str, float] = {}
@@ -148,28 +159,50 @@ def regime_fit_score(rows: list[dict], *, regime: Optional[str] = None,
             if e > 0:
                 positive += len(sub)
         frac = positive / total if total else 0.0
-        return {"score": round(100.0 * frac, 1), "regimes": len(by_regime),
-                "fraction_positive": round(frac, 3), "per_regime": per,
-                "note": (f"{positive}/{total} samples in regimes with "
-                         f"positive E_net ({len(by_regime)} regimes)")}
+        return {
+            "score": round(100.0 * frac, 1),
+            "regimes": len(by_regime),
+            "fraction_positive": round(frac, 3),
+            "per_regime": per,
+            "note": (
+                f"{positive}/{total} samples in regimes with "
+                f"positive E_net ({len(by_regime)} regimes)"
+            ),
+        }
     # regime-specific key
     key_e = _net_e(rows)
     setup_e = _net_e(setup_rows)
     if setup_e > 0:
         ratio = _clamp(key_e / setup_e, 0.0, 1.5)
         score = 100.0 * ratio / 1.5
-        note = (f"E_net in {regime} {key_e:+.3f}R vs setup average "
-                f"{setup_e:+.3f}R → ratio {ratio:.2f}")
+        note = (
+            f"E_net in {regime} {key_e:+.3f}R vs setup average "
+            f"{setup_e:+.3f}R → ratio {ratio:.2f}"
+        )
     elif key_e > 0:
-        score, note = 100.0, (f"only positive E_net lives in {regime} "
-                              f"({key_e:+.3f}R); setup average {setup_e:+.3f}R")
+        score, note = (
+            100.0,
+            (
+                f"only positive E_net lives in {regime} "
+                f"({key_e:+.3f}R); setup average {setup_e:+.3f}R"
+            ),
+        )
     else:
-        score, note = 0.0, (f"no positive E_net in {regime} "
-                            f"({key_e:+.3f}R) and setup average "
-                            f"{setup_e:+.3f}R")
-    return {"score": round(score, 1), "regime": regime,
-            "regime_e_net": round(key_e, 3), "setup_e_net": round(setup_e, 3),
-            "note": note}
+        score, note = (
+            0.0,
+            (
+                f"no positive E_net in {regime} "
+                f"({key_e:+.3f}R) and setup average "
+                f"{setup_e:+.3f}R"
+            ),
+        )
+    return {
+        "score": round(score, 1),
+        "regime": regime,
+        "regime_e_net": round(key_e, 3),
+        "setup_e_net": round(setup_e, 3),
+        "note": note,
+    }
 
 
 def execution_score(rows: list[dict]) -> dict:
@@ -189,16 +222,23 @@ def execution_score(rows: list[dict]) -> dict:
     avg_gross = sum(float(r.get("r", 0.0) or 0.0) for r in rows) / n
     avg_cost = sum(float(r.get("cost_r", 0.0) or 0.0) for r in rows) / n
     if avg_gross <= 0:
-        return {"score": 0.0, "avg_gross_r": round(avg_gross, 3),
-                "avg_cost_r": round(avg_cost, 4),
-                "note": f"gross E {avg_gross:+.3f}R <= 0 — nothing to survive costs"}
-    share = _clamp(1.0 - avg_cost / avg_gross, 0.0, 1.0)
-    return {"score": round(100.0 * share, 1),
+        return {
+            "score": 0.0,
             "avg_gross_r": round(avg_gross, 3),
             "avg_cost_r": round(avg_cost, 4),
-            "cost_share": round(avg_cost / avg_gross, 4),
-            "note": (f"{share:.0%} of gross E {avg_gross:+.3f}R survives "
-                     f"avg cost {avg_cost:.4f}R/trade")}
+            "note": f"gross E {avg_gross:+.3f}R <= 0 — nothing to survive costs",
+        }
+    share = _clamp(1.0 - avg_cost / avg_gross, 0.0, 1.0)
+    return {
+        "score": round(100.0 * share, 1),
+        "avg_gross_r": round(avg_gross, 3),
+        "avg_cost_r": round(avg_cost, 4),
+        "cost_share": round(avg_cost / avg_gross, 4),
+        "note": (
+            f"{share:.0%} of gross E {avg_gross:+.3f}R survives "
+            f"avg cost {avg_cost:.4f}R/trade"
+        ),
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -209,16 +249,20 @@ def _geo_mean(parts: list[tuple[str, float]], weights: dict[str, float]) -> floa
     if not parts or total_w <= 0:
         return 0.0
     return 100.0 * math.prod(
-        (_clamp(s, 0.0, 100.0) / 100.0) ** (weights[k] / total_w)
-        for k, s in parts)
+        (_clamp(s, 0.0, 100.0) / 100.0) ** (weights[k] / total_w) for k, s in parts
+    )
 
 
-def strategy_score(rows: list[dict], *, plan_type: str = "",
-                   regime: Optional[str] = None,
-                   setup_rows: Optional[list[dict]] = None,
-                   min_decided: int = DEFAULT_MIN_DECIDED,
-                   criteria: Optional[dict] = None,
-                   step: int = BACKTEST_STEP) -> dict:
+def strategy_score(
+    rows: list[dict],
+    *,
+    plan_type: str = "",
+    regime: str | None = None,
+    setup_rows: list[dict] | None = None,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    criteria: dict | None = None,
+    step: int = BACKTEST_STEP,
+) -> dict:
     """The P12.5 strategy score 0–100 for one calibration key's decided rows.
 
     Pure: same rows in → same score out. Never raises on an empty book —
@@ -233,15 +277,23 @@ def strategy_score(rows: list[dict], *, plan_type: str = "",
     criteria = criteria or VALIDATION_CRITERIA
     rows = [r for r in rows if r.get("r") is not None]
     if not rows:
-        return {"ok": True, "score": None, "band": None,
-                "components": None, "reason": "no decided trades — nothing to score",
-                "plan_type": plan_type, "regime": regime,
-                "evaluated_on": "net", "overlap_corrected": True}
+        return {
+            "ok": True,
+            "score": None,
+            "band": None,
+            "components": None,
+            "reason": "no decided trades — nothing to score",
+            "plan_type": plan_type,
+            "regime": regime,
+            "evaluated_on": "net",
+            "overlap_corrected": True,
+        }
 
     stats = trade_stats(rows, step=step)
     e_r = edge_score(stats, criteria)
-    q = backtest_quality_score(rows, min_decided=min_decided,
-                               criteria=criteria, step=step)
+    q = backtest_quality_score(
+        rows, min_decided=min_decided, criteria=criteria, step=step
+    )
     sample_q = q.get("quality")  # 0–100 or None (never on a non-empty book)
     rf = regime_fit_score(rows, regime=regime, setup_rows=setup_rows)
     ex = execution_score(rows)
@@ -263,11 +315,18 @@ def strategy_score(rows: list[dict], *, plan_type: str = "",
         "n": stats.get("n"),
         "n_eff": stats.get("n_eff"),
         "components": {
-            "e_r": {"score": e_r["score"], "expectancy_net": e_r["expectancy_net"],
-                    "bar_expectancy": e_r["bar_expectancy"],
-                    "shape": e_r["shape"], "notes": e_r.get("notes", [])},
-            "sample_quality": {"score": sample_q, "band": q.get("band"),
-                               "quality_block": q},
+            "e_r": {
+                "score": e_r["score"],
+                "expectancy_net": e_r["expectancy_net"],
+                "bar_expectancy": e_r["bar_expectancy"],
+                "shape": e_r["shape"],
+                "notes": e_r.get("notes", []),
+            },
+            "sample_quality": {
+                "score": sample_q,
+                "band": q.get("band"),
+                "quality_block": q,
+            },
             "regime_fit": rf,
             "execution": ex,
         },
@@ -281,12 +340,14 @@ def strategy_score(rows: list[dict], *, plan_type: str = "",
 # ──────────────────────────────────────────────────────────────────────────
 # Calibrator wiring — the trust dial
 # ──────────────────────────────────────────────────────────────────────────
-def multiplier_from_score(expectancy: float,
-                          strategy_score_value: Optional[float],
-                          gain: float = CALIBRATE_GAIN,
-                          mult_min: float = CALIBRATE_MIN_MULT,
-                          mult_max: float = CALIBRATE_MAX_MULT,
-                          expectancy_net: Optional[float] = None) -> float:
+def multiplier_from_score(
+    expectancy: float,
+    strategy_score_value: float | None,
+    gain: float = CALIBRATE_GAIN,
+    mult_min: float = CALIBRATE_MIN_MULT,
+    mult_max: float = CALIBRATE_MAX_MULT,
+    expectancy_net: float | None = None,
+) -> float:
     """Expectancy → calibration multiplier, gated by the strategy score.
 
     ``mult = clamp(1 + E_anchor × gain × trust, mult_min, mult_max)`` where
@@ -308,7 +369,10 @@ def multiplier_from_score(expectancy: float,
     can never be boosted. This is strictly tighter than the previous
     behaviour: it can only lower a multiplier, never raise one.
     """
-    trust = 1.0 if strategy_score_value is None \
+    trust = (
+        1.0
+        if strategy_score_value is None
         else _clamp(float(strategy_score_value) / 50.0, 0.6, 1.5)
+    )
     anchor = float(expectancy if expectancy_net is None else expectancy_net)
     return round(max(mult_min, min(mult_max, 1.0 + anchor * gain * trust)), 3)

@@ -6,6 +6,7 @@ advisory grade that quotes (never moves) the graduation bar, and — most
 importantly — practice rows are coaching memory that **no** live-book,
 risk-gate or graduation surface ever reads. Those invariants are pinned here.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,13 +14,24 @@ import time
 
 import pytest
 
+from brain.practice import (
+    DISCLAIMER,
+    RR_FLOOR,
+    TAPE_DISCLAIMER,
+    TAPE_KIND,
+    desk_read_from_payload,
+    format_practice_scorecard,
+    locate_commit,
+    practice_scorecard,
+    score_attempt,
+    score_tape,
+    submit_attempt,
+    submit_tape_attempt,
+    validate_tape_request,
+    validate_user_read,
+    walk_tape,
+)
 from data.database import SignalDB
-from brain.practice import (DISCLAIMER, RR_FLOOR, TAPE_DISCLAIMER, TAPE_KIND,
-                            desk_read_from_payload, format_practice_scorecard,
-                            locate_commit, practice_scorecard, score_attempt,
-                            score_tape, submit_attempt, submit_tape_attempt,
-                            validate_tape_request, validate_user_read,
-                            walk_tape)
 
 DAY = 86_400_000
 
@@ -27,20 +39,45 @@ DAY = 86_400_000
 # ── fixtures ────────────────────────────────────────────────────────────
 
 
-def _payload(action="BUY", bull=65, bear=30, entry=100.0, stop=99.0,
-             target=102.5, atr=0.5, regime="TRENDING") -> dict:
-    sig = {"signal_id": "BTC_T", "asset": "BTCUSDT", "timeframe": "15m",
-           "action": action, "entry": entry, "stop_loss": stop,
-           "take_profit": target, "risk_reward": 2.5, "confidence": "HIGH"}
+def _payload(
+    action="BUY",
+    bull=65,
+    bear=30,
+    entry=100.0,
+    stop=99.0,
+    target=102.5,
+    atr=0.5,
+    regime="TRENDING",
+) -> dict:
+    sig = {
+        "signal_id": "BTC_T",
+        "asset": "BTCUSDT",
+        "timeframe": "15m",
+        "action": action,
+        "entry": entry,
+        "stop_loss": stop,
+        "take_profit": target,
+        "risk_reward": 2.5,
+        "confidence": "HIGH",
+    }
     if action == "NO TRADE":
-        sig.update({"entry": None, "stop_loss": None, "take_profit": None,
-                    "risk_reward": 0.0, "confidence": "LOW"})
-    return {"signal": sig,
-            "plans": [{"plan_type": "Buy Pullback", "primary": True}],
-            "snapshot": {"features": {"atr": atr, "price": entry or 100.1,
-                                      "regime_name": regime},
-                         "scores": {"bull": {"score": bull},
-                                    "bear": {"score": bear}}}}
+        sig.update(
+            {
+                "entry": None,
+                "stop_loss": None,
+                "take_profit": None,
+                "risk_reward": 0.0,
+                "confidence": "LOW",
+            }
+        )
+    return {
+        "signal": sig,
+        "plans": [{"plan_type": "Buy Pullback", "primary": True}],
+        "snapshot": {
+            "features": {"atr": atr, "price": entry or 100.1, "regime_name": regime},
+            "scores": {"bull": {"score": bull}, "bear": {"score": bear}},
+        },
+    }
 
 
 def _desk(**kw) -> dict:
@@ -48,9 +85,17 @@ def _desk(**kw) -> dict:
 
 
 def _read(**kw) -> dict:
-    base = {"symbol": "BTCUSDT", "tf": "15m", "bias": "bullish",
-            "decision": "buy", "entry": 100.1, "stop": 99.0, "target": 102.6,
-            "confidence": 70, "note": ""}
+    base = {
+        "symbol": "BTCUSDT",
+        "tf": "15m",
+        "bias": "bullish",
+        "decision": "buy",
+        "entry": 100.1,
+        "stop": 99.0,
+        "target": 102.6,
+        "confidence": 70,
+        "note": "",
+    }
     base.update(kw)
     return validate_user_read(base)
 
@@ -123,9 +168,17 @@ def test_validate_cleans_symbol_and_caps_note():
 
 
 def _read_raw(**kw) -> dict:
-    base = {"symbol": "BTCUSDT", "tf": "15m", "bias": "bullish",
-            "decision": "buy", "entry": 100.1, "stop": 99.0, "target": 102.6,
-            "confidence": 70, "note": "ok"}
+    base = {
+        "symbol": "BTCUSDT",
+        "tf": "15m",
+        "bias": "bullish",
+        "decision": "buy",
+        "entry": 100.1,
+        "stop": 99.0,
+        "target": 102.6,
+        "confidence": 70,
+        "note": "ok",
+    }
     base.update(kw)
     return base
 
@@ -149,11 +202,17 @@ def test_bias_components_exact_neutral_opposite():
 
 
 def test_decision_missed_vs_overruled():
-    miss = score_attempt(_read(decision="no_trade", entry=None, stop=None,
-                               target=None), _desk())
-    assert miss["components"][1]["points"] == 15 and "missed" in miss["components"][1]["detail"]
-    over = score_attempt(_read(decision="buy", entry=None, stop=None,
-                               target=None), _desk(action="NO TRADE"))
+    miss = score_attempt(
+        _read(decision="no_trade", entry=None, stop=None, target=None), _desk()
+    )
+    assert (
+        miss["components"][1]["points"] == 15
+        and "missed" in miss["components"][1]["detail"]
+    )
+    over = score_attempt(
+        _read(decision="buy", entry=None, stop=None, target=None),
+        _desk(action="NO TRADE"),
+    )
     assert over["components"][1]["points"] == 0
     assert "overruled the desk's NO TRADE filter" in over["components"][1]["detail"]
 
@@ -166,9 +225,10 @@ def test_no_ladder_renormalizes_over_70():
 
 
 def test_ladder_unscored_when_desk_is_no_trade():
-    sc = score_attempt(_read(bias="bearish", decision="no_trade"),
-                       _desk(action="NO TRADE", bull=20, bear=55, atr=None),
-                       )
+    sc = score_attempt(
+        _read(bias="bearish", decision="no_trade"),
+        _desk(action="NO TRADE", bull=20, bear=55, atr=None),
+    )
     assert sc["earned_max"] == 70 and sc["total"] == 100
     assert "desk itself is NO TRADE" in sc["components"][2]["detail"]
 
@@ -206,8 +266,7 @@ def test_submit_persists_and_dedupes_identical_reads(db):
     assert dup["duplicate"] is True and dup["attempt"]["id"] == 1
     rows = db.practice_attempts()
     assert len(rows) == 1, "the double-submit must not inflate history"
-    changed = submit_attempt(db, _read_raw(bias="bearish"), _desk(),
-                             now_ms=now + 6_000)
+    changed = submit_attempt(db, _read_raw(bias="bearish"), _desk(), now_ms=now + 6_000)
     assert changed["duplicate"] is False
     assert len(db.practice_attempts()) == 2
 
@@ -230,8 +289,12 @@ def test_submit_rejects_malformed_body_fail_closed(db):
 def test_scorecard_aggregates_and_names_weakest(db):
     now = int(time.time() * 1000)
     submit_attempt(db, _read_raw(), _desk(), now_ms=now - 2 * DAY)
-    submit_attempt(db, _read_raw(bias="bearish", decision="no_trade"),
-                   _desk(), now_ms=now - 1 * DAY)
+    submit_attempt(
+        db,
+        _read_raw(bias="bearish", decision="no_trade"),
+        _desk(),
+        now_ms=now - 1 * DAY,
+    )
     card = practice_scorecard(db, days=30, now_ms=now)
     json.dumps(card)  # JSON-safe without default=str
     assert card["n"] == 2
@@ -263,8 +326,9 @@ def test_scorecard_perfect_agreement_claims_no_weakest(db):
 def test_scorecard_window_excludes_old_attempts(db):
     now = int(time.time() * 1000)
     submit_attempt(db, _read_raw(), _desk(), now_ms=now - 45 * DAY)
-    submit_attempt(db, _read_raw(bias="bearish", decision="no_trade"),
-                   _desk(), now_ms=now)
+    submit_attempt(
+        db, _read_raw(bias="bearish", decision="no_trade"), _desk(), now_ms=now
+    )
     card = practice_scorecard(db, days=30, now_ms=now)
     assert card["n"] == 1
 
@@ -283,13 +347,18 @@ def test_format_report_smoke(db):
 def test_practice_rows_never_reach_the_live_book_or_graduation(db):
     from brain.weekly import weekly_review
     from data.simulator import paper_progress
+
     before_rows = db.live_book_rows()
     before_week = weekly_review(db)["all_time"]["n"]
     before_progress = paper_progress(db)
     now = int(time.time() * 1000)
     for i in range(3):
-        submit_attempt(db, _read_raw(note=f"read {i}" + str(i * 37)),
-                       _desk(), now_ms=now + i * 200_000)
+        submit_attempt(
+            db,
+            _read_raw(note=f"read {i}" + str(i * 37)),
+            _desk(),
+            now_ms=now + i * 200_000,
+        )
     assert len(db.practice_attempts()) == 3
     assert db.live_book_rows() == before_rows
     assert weekly_review(db)["all_time"]["n"] == before_week
@@ -304,8 +373,10 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "p.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "p.db"))
     from web.app import make_app
+
     app = make_app()
     app.testing = True
     return app.test_client()
@@ -315,8 +386,16 @@ def test_api_practice_get_shape(client):
     r = client.get("/api/practice")
     assert r.status_code == 200
     d = r.get_json()
-    for key in ("n", "bias_agreement", "decision_agreement", "component_means",
-                    "weakest_component", "coaching", "recent", "disclaimer"):
+    for key in (
+        "n",
+        "bias_agreement",
+        "decision_agreement",
+        "component_means",
+        "weakest_component",
+        "coaching",
+        "recent",
+        "disclaimer",
+    ):
         assert key in d
     assert d["n"] == 0
 
@@ -331,8 +410,8 @@ def test_api_practice_post_validation_fail_closed(client):
 
 def test_api_practice_post_happy_path(client, monkeypatch):
     import web.routes_system as _rsys
-    monkeypatch.setattr(_rsys, "compute_payload",
-                        lambda *a, **k: _payload())
+
+    monkeypatch.setattr(_rsys, "compute_payload", lambda *a, **k: _payload())
     r = client.post("/api/practice", json=_read_raw())
     assert r.status_code == 200
     d = r.get_json()
@@ -347,6 +426,7 @@ def test_api_practice_post_engine_failure_records_nothing(client, monkeypatch):
 
     def _boom(*a, **k):
         raise ConnectionError("no feed")
+
     monkeypatch.setattr(_rsys, "compute_payload", _boom)
     r = client.post("/api/practice", json=_read_raw())
     assert r.status_code == 502
@@ -357,11 +437,12 @@ def test_api_practice_post_engine_failure_records_nothing(client, monkeypatch):
 def test_api_practice_post_never_creates_a_scan(client, monkeypatch):
     """save=False: a practice read must not enter the review queue."""
     import web.routes_system as _rsys
-    monkeypatch.setattr(_rsys, "compute_payload",
-                        lambda *a, **k: _payload())
+
+    monkeypatch.setattr(_rsys, "compute_payload", lambda *a, **k: _payload())
     r = client.post("/api/practice", json=_read_raw())
     assert r.status_code == 200
     from data.database import SignalDB
+
     with SignalDB() as db:
         n_scans = db.conn.execute("SELECT COUNT(*) c FROM scans").fetchone()["c"]
         assert n_scans == 0
@@ -381,8 +462,9 @@ def _bar(ts, o, h, low, c):
 def _series(start=1_780_000_000_000, n=30, step=900_000, close=100.0):
     """Flat series: enough history to commit in the middle and still have
     a forward window."""
-    return [_bar(start + i * step, close, close + 0.2, close - 0.2, close)
-            for i in range(n)]
+    return [
+        _bar(start + i * step, close, close + 0.2, close - 0.2, close) for i in range(n)
+    ]
 
 
 def _rising_after(commit_i=10, n=30, start=1_780_000_000_000, step=900_000):
@@ -432,8 +514,9 @@ def test_tape_rejects_missing_commit_and_bad_horizon():
 
 def test_tape_rejects_wrong_side_ladder():
     with pytest.raises(ValueError, match="BUY paper trade requires"):
-        validate_tape_request(_read_raw(commit_time=1_780_000_000,
-                                        stop=101.5, target=103.0))
+        validate_tape_request(
+            _read_raw(commit_time=1_780_000_000, stop=101.5, target=103.0)
+        )
 
 
 def test_locate_commit_accepts_seconds_or_ms():
@@ -490,8 +573,9 @@ def test_walk_expired_window_partial_when_mfe_is_real(db):
     # future bars tick up 0.4 (never reach 102.5) so the window expires
     start, step = 1_780_000_000_000, 900_000
     commit = _bar(start, 100.0, 100.3, 99.8, 100.0)
-    future = [_bar(start + (i + 1) * step, 100.1, 101.2, 100.0, 100.4)
-              for i in range(16)]
+    future = [
+        _bar(start + (i + 1) * step, 100.1, 101.2, 100.0, 100.4) for i in range(16)
+    ]
     walk = walk_tape(user, future, commit)
     assert walk["outcome"] == "EXPIRED"
     assert walk["mfe"] >= 1.0
@@ -509,13 +593,15 @@ def test_submit_tape_persists_dedupes_and_refuses_short_window(db):
     assert dup["duplicate"] is True and dup["attempt"]["id"] == 1
     assert len(db.practice_attempts()) == 1
     with pytest.raises(ValueError, match="hidden bars"):
-        submit_tape_attempt(db, _read_raw(commit_time=candles[-2]["ts"]),
-                            candles, now_ms=now + 200_000)
+        submit_tape_attempt(
+            db, _read_raw(commit_time=candles[-2]["ts"]), candles, now_ms=now + 200_000
+        )
 
 
 def test_tape_rows_never_move_desk_agreement_or_live_book(db):
     from brain.weekly import weekly_review
     from data.simulator import paper_progress
+
     now = int(time.time() * 1000)
     submit_attempt(db, _read_raw(), _desk(), now_ms=now)
     before = practice_scorecard(db, now_ms=now)
@@ -523,9 +609,12 @@ def test_tape_rows_never_move_desk_agreement_or_live_book(db):
     before_week = weekly_review(db)["all_time"]["n"]
     before_progress = paper_progress(db)
     candles = _rising_after()
-    submit_tape_attempt(db, _read_raw(commit_time=candles[10]["ts"],
-                                      note="tape read"),
-                        candles, now_ms=now + 200_000)
+    submit_tape_attempt(
+        db,
+        _read_raw(commit_time=candles[10]["ts"], note="tape read"),
+        candles,
+        now_ms=now + 200_000,
+    )
     after = practice_scorecard(db, now_ms=now + 200_000)
     assert after["n"] == before["n"] == 1
     assert after["bias_agreement"] == before["bias_agreement"] == 1.0
@@ -541,8 +630,7 @@ def test_tape_rows_never_move_desk_agreement_or_live_book(db):
 def test_api_tape_post_happy_path(client, monkeypatch):
     candles = _rising_after()
     monkeypatch.setattr("brain.practice.load_ohlc", lambda *a, **k: candles)
-    r = client.post("/api/practice/tape",
-                    json=_read_raw(commit_time=candles[10]["ts"]))
+    r = client.post("/api/practice/tape", json=_read_raw(commit_time=candles[10]["ts"]))
     assert r.status_code == 200
     d = r.get_json()
     assert d["score"]["kind"] == TAPE_KIND
@@ -563,10 +651,10 @@ def test_api_tape_post_validation_fail_closed(client):
 def test_api_tape_never_creates_a_scan_or_paper_row(client, monkeypatch):
     candles = _rising_after()
     monkeypatch.setattr("brain.practice.load_ohlc", lambda *a, **k: candles)
-    r = client.post("/api/practice/tape",
-                    json=_read_raw(commit_time=candles[10]["ts"]))
+    r = client.post("/api/practice/tape", json=_read_raw(commit_time=candles[10]["ts"]))
     assert r.status_code == 200
     from data.database import SignalDB
+
     with SignalDB() as db:
         n_scans = db.conn.execute("SELECT COUNT(*) c FROM scans").fetchone()["c"]
         n_paper = db.conn.execute("SELECT COUNT(*) c FROM paper_trades").fetchone()["c"]
@@ -577,8 +665,10 @@ def test_api_tape_never_creates_a_scan_or_paper_row(client, monkeypatch):
 def test_cli_practice_json(capsys, monkeypatch, tmp_path):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "p.db"))
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "p.db"))
     import main as m
+
     rc = m.cmd_practice(type("A", (), {"days": 30, "json": True})())
     out = capsys.readouterr().out
     assert rc == 0

@@ -20,11 +20,10 @@ So these tests pin, in order:
    codes, the operator/viewer role split holds, and the SSE endpoint streams
    frames and closes on the terminal state.
 """
+
 from __future__ import annotations
 
-import json
 import time
-import uuid
 
 import pytest
 
@@ -49,9 +48,8 @@ def fake_runner(argv, *, on_line, should_cancel):
 
 def _manager(tmp_path, runner=fake_runner):
     return jobsmod.JobManager(
-        db_path=str(tmp_path / "jobs.db"),
-        log_dir=str(tmp_path / "logs"),
-        runner=runner)
+        db_path=str(tmp_path / "jobs.db"), log_dir=str(tmp_path / "logs"), runner=runner
+    )
 
 
 def _wait(job_id, mgr, statuses, timeout=5.0):
@@ -82,6 +80,7 @@ def test_failed_step_surfaces_exit_code_and_error(tmp_path):
     def failing(argv, *, on_line, should_cancel):
         on_line("boom")
         return 3
+
     mgr = _manager(tmp_path, runner=failing)
     res = mgr.submit("backtest", {"symbol": "ETHUSDT"})
     state = _wait(res["job_id"], mgr, {"failed"})
@@ -100,6 +99,7 @@ def test_job_runs_outside_the_calling_thread(tmp_path):
         started["n"] += 1
         on_line("x")
         return 0
+
     mgr = _manager(tmp_path, runner=counting)
     res = mgr.submit("simulator", {"rounds": 1})
     # The runner should not have executed synchronously inside submit() —
@@ -113,26 +113,43 @@ def test_evidence_guidance_projects_from_observed_rounds_and_reports_no_edge(tmp
     def measured(argv, *, on_line, should_cancel):
         on_line("round 1: +20 backtest samples, +4 paper samples (run sim_test)")
         return 0
+
     mgr = _manager(tmp_path, runner=measured)
     res = mgr.submit("simulator", {"rounds": 1})
     _wait(res["job_id"], mgr, {"succeeded"})
 
-    incomplete = mgr.evidence_guidance([{
-        "plan_type": "Sweep Reversal", "primary": True,
-        "backtest_n": 60, "backtest_target": 100,
-        "paper_n": 12, "paper_target": 20,
-        "expectancy_net": -0.1, "proven": False,
-    }])
+    incomplete = mgr.evidence_guidance(
+        [
+            {
+                "plan_type": "Sweep Reversal",
+                "primary": True,
+                "backtest_n": 60,
+                "backtest_target": 100,
+                "paper_n": 12,
+                "paper_target": 20,
+                "expectancy_net": -0.1,
+                "proven": False,
+            }
+        ]
+    )
     assert incomplete["result"] == "incomplete"
     assert incomplete["projected_rounds"] == 2
     assert incomplete["observed_rounds"] == 1
 
-    finished = mgr.evidence_guidance([{
-        "plan_type": "Sweep Reversal", "primary": True,
-        "backtest_n": 100, "backtest_target": 100,
-        "paper_n": 20, "paper_target": 20,
-        "expectancy_net": -0.1, "proven": False,
-    }])
+    finished = mgr.evidence_guidance(
+        [
+            {
+                "plan_type": "Sweep Reversal",
+                "primary": True,
+                "backtest_n": 100,
+                "backtest_target": 100,
+                "paper_n": 20,
+                "paper_target": 20,
+                "expectancy_net": -0.1,
+                "proven": False,
+            }
+        ]
+    )
     assert finished["result"] == "no_edge"
     assert finished["projected_rounds"] == 0
     assert "Do not tune" in finished["headline"]
@@ -140,20 +157,30 @@ def test_evidence_guidance_projects_from_observed_rounds_and_reports_no_edge(tmp
 
 def test_evidence_guidance_reports_completed_no_edge_amid_other_gaps(tmp_path):
     mgr = _manager(tmp_path)
-    guidance = mgr.evidence_guidance([
-        {
-            "plan_type": "Sweep Reversal", "primary": True,
-            "backtest_n": 100, "backtest_target": 100,
-            "paper_n": 20, "paper_target": 20,
-            "expectancy_net": -0.2, "proven": False,
-        },
-        {
-            "plan_type": "Trend Continuation", "primary": True,
-            "backtest_n": 40, "backtest_target": 100,
-            "paper_n": 5, "paper_target": 20,
-            "expectancy_net": 0.1, "proven": False,
-        },
-    ])
+    guidance = mgr.evidence_guidance(
+        [
+            {
+                "plan_type": "Sweep Reversal",
+                "primary": True,
+                "backtest_n": 100,
+                "backtest_target": 100,
+                "paper_n": 20,
+                "paper_target": 20,
+                "expectancy_net": -0.2,
+                "proven": False,
+            },
+            {
+                "plan_type": "Trend Continuation",
+                "primary": True,
+                "backtest_n": 40,
+                "backtest_target": 100,
+                "paper_n": 5,
+                "paper_target": 20,
+                "expectancy_net": 0.1,
+                "proven": False,
+            },
+        ]
+    )
     assert guidance["result"] == "mixed"
     assert guidance["no_edge_setups"] == ["Sweep Reversal"]
     assert "No positive net edge measured for Sweep Reversal" in guidance["headline"]
@@ -167,18 +194,26 @@ def test_evidence_guidance_is_unknown_then_stalled_without_inventing_a_rate(tmp_
         return 0
 
     mgr = _manager(tmp_path, runner=zero_yield)
-    gap = [{
-        "plan_type": "Sweep Reversal", "primary": True,
-        "backtest_n": 60, "backtest_target": 100,
-        "paper_n": 12, "paper_target": 20,
-        "expectancy_net": None, "proven": False,
-    }]
+    gap = [
+        {
+            "plan_type": "Sweep Reversal",
+            "primary": True,
+            "backtest_n": 60,
+            "backtest_target": 100,
+            "paper_n": 12,
+            "paper_target": 20,
+            "expectancy_net": None,
+            "proven": False,
+        }
+    ]
 
     unknown = mgr.evidence_guidance(gap)
     assert unknown["projection_state"] == "unknown"
     assert unknown["projected_rounds"] is None
     assert unknown["observed_rate"] == {
-        "backtest_per_round": None, "paper_per_round": None}
+        "backtest_per_round": None,
+        "paper_per_round": None,
+    }
 
     res = mgr.submit("simulator", {"rounds": 1})
     _wait(res["job_id"], mgr, {"succeeded"})
@@ -186,7 +221,9 @@ def test_evidence_guidance_is_unknown_then_stalled_without_inventing_a_rate(tmp_
     assert stalled["projection_state"] == "stalled"
     assert stalled["projected_rounds"] is None
     assert stalled["observed_rate"] == {
-        "backtest_per_round": 0.0, "paper_per_round": 0.0}
+        "backtest_per_round": 0.0,
+        "paper_per_round": 0.0,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -218,12 +255,23 @@ def test_newline_in_param_is_refused(tmp_path):
 
 def test_evidence_composite_validates_and_maps_one_series(tmp_path):
     mgr = _manager(tmp_path)
-    params = jobsmod.validate_composite("evidence", {
-        "symbol": "ETHUSDT", "tf": "1h", "market": "spot",
-        "since": "90d", "bars": 900, "rounds": 7})
+    params = jobsmod.validate_composite(
+        "evidence",
+        {
+            "symbol": "ETHUSDT",
+            "tf": "1h",
+            "market": "spot",
+            "since": "90d",
+            "bars": 900,
+            "rounds": 7,
+        },
+    )
     steps = mgr._steps_for("evidence", params)
     assert steps == [
-        ("backfill", {"symbol": "ETHUSDT", "tf": "1h", "market": "spot", "since": "90d"}),
+        (
+            "backfill",
+            {"symbol": "ETHUSDT", "tf": "1h", "market": "spot", "since": "90d"},
+        ),
         ("backtest", {"symbol": "ETHUSDT", "tf": "1h", "bars": 900}),
         ("simulator", {"symbols": "ETHUSDT", "tf": "1h", "rounds": 7}),
         ("scorecard", {"source": "db"}),
@@ -256,6 +304,7 @@ def test_duplicate_submission_returns_existing_job(tmp_path):
             if should_cancel():
                 return -15
         return 0
+
     mgr = _manager(tmp_path, runner=slow)
     first = mgr.submit("backfill", {"symbol": "BTCUSDT", "tf": "1m"})
     second = mgr.submit("backfill", {"symbol": "BTCUSDT", "tf": "1m"})
@@ -289,6 +338,7 @@ def test_cancel_queued_job(tmp_path):
             if should_cancel():
                 return -15
         return 0
+
     mgr = _manager(tmp_path, runner=blocking)
     # Occupy the single worker with a blocking job so the second stays queued.
     a = mgr.submit("backfill", {"symbol": "BTCUSDT"})
@@ -312,6 +362,7 @@ def test_cancel_running_job(tmp_path):
         while not should_cancel():
             time.sleep(0.01)
         return -15
+
     mgr = _manager(tmp_path, runner=slow)
     res = mgr.submit("simulator", {"rounds": 3})
     # Wait until the worker actually starts the run, then cancel it.
@@ -342,13 +393,14 @@ def test_orphaned_running_row_is_marked_interrupted(tmp_path):
     _wait(res["job_id"], mgr1, {"succeeded"})
     # Simulate a crash: the row is left 'running' with a finished process.
     from data.database import SignalDB
+
     with SignalDB(db_path) as db:
-        db.conn.execute("UPDATE jobs SET status='running' WHERE job_id=?",
-                        (res["job_id"],))
+        db.conn.execute(
+            "UPDATE jobs SET status='running' WHERE job_id=?", (res["job_id"],)
+        )
         db.conn.commit()
     # A fresh manager adopts the orphan and reports the truth.
-    mgr2 = jobsmod.JobManager(db_path=db_path, log_dir=log_dir,
-                              runner=fake_runner)
+    mgr2 = jobsmod.JobManager(db_path=db_path, log_dir=log_dir, runner=fake_runner)
     mgr2.start()  # boot-time adoption of orphaned rows
     state = _wait(res["job_id"], mgr2, {"interrupted"})
     assert state["status"] == "interrupted"
@@ -383,7 +435,8 @@ def test_worker_blocks_when_idle_does_not_poll(monkeypatch, tmp_path):
     baseline = opens["n"]
     time.sleep(0.8)
     assert opens["n"] == baseline, (
-        f"idle worker polled the database: {opens['n']} opens after {baseline}")
+        f"idle worker polled the database: {opens['n']} opens after {baseline}"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -395,13 +448,16 @@ def open_app(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "web.db"))
     import config as _c
+
     monkeypatch.setattr(_c, "DB_PATH", str(tmp_path / "web.db"))
     monkeypatch.setattr(_c, "SKY_AUTH_MODE", "disabled")
     mgr = jobsmod.JobManager(
         db_path=str(tmp_path / "jm.db"),
         log_dir=str(tmp_path / "logs"),
-        runner=fake_runner)
+        runner=fake_runner,
+    )
     from web.app import make_app
+
     application = make_app(job_manager=mgr)
     application.testing = True
     return application, mgr
@@ -432,8 +488,9 @@ def test_v1_jobs_list_is_enveloped(open_client):
 
 
 def test_v1_submit_and_stream(open_client, open_mgr):
-    r = open_client.post("/api/v1/jobs",
-                         json={"kind": "backfill", "params": {"symbol": "BTCUSDT"}})
+    r = open_client.post(
+        "/api/v1/jobs", json={"kind": "backfill", "params": {"symbol": "BTCUSDT"}}
+    )
     assert r.status_code == 201, r.get_data(as_text=True)
     body = r.get_json()
     assert body["ok"] is True
@@ -472,8 +529,7 @@ def test_v1_events_streams_and_closes(open_client, open_mgr):
     job_id = r.get_json()["data"]["job"]["job_id"]
     _wait_v1(job_id, open_mgr, {"succeeded"})
     # A finished job's stream emits one terminal frame then closes.
-    resp = open_client.get(f"/api/v1/jobs/{job_id}/events",
-                           buffered=False)
+    resp = open_client.get(f"/api/v1/jobs/{job_id}/events", buffered=False)
     assert resp.status_code == 200
     assert resp.mimetype == "text/event-stream"
     text = resp.get_data(as_text=True)
@@ -490,17 +546,21 @@ def test_v1_duplicate_submission_is_reported(open_client, open_mgr):
             if should_cancel():
                 return -15
         return 0
+
     open_mgr._runner = slow
-    r1 = open_client.post("/api/v1/jobs",
-                          json={"kind": "backfill", "params": {"symbol": "ETHUSDT"}})
-    r2 = open_client.post("/api/v1/jobs",
-                          json={"kind": "backfill", "params": {"symbol": "ETHUSDT"}})
+    r1 = open_client.post(
+        "/api/v1/jobs", json={"kind": "backfill", "params": {"symbol": "ETHUSDT"}}
+    )
+    r2 = open_client.post(
+        "/api/v1/jobs", json={"kind": "backfill", "params": {"symbol": "ETHUSDT"}}
+    )
     gate["release"] = True
     assert r1.status_code == 201
     assert r2.status_code == 201
     assert r2.get_json()["data"]["duplicate"] is True
-    assert r2.get_json()["data"]["job"]["job_id"] == \
-        r1.get_json()["data"]["job"]["job_id"]
+    assert (
+        r2.get_json()["data"]["job"]["job_id"] == r1.get_json()["data"]["job"]["job_id"]
+    )
 
 
 def test_v1_role_split(monkeypatch, tmp_path):
@@ -508,40 +568,50 @@ def test_v1_role_split(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "role.db"))
     import config as _c
+
     monkeypatch.setattr(_c, "DB_PATH", str(tmp_path / "role.db"))
     monkeypatch.setattr(_c, "SKY_AUTH_MODE", "auto")
     monkeypatch.setattr(_c, "SKY_ALLOW_FORCE_APPROVE", False)
     monkeypatch.setattr(_c, "SKY_TRUSTED_PROXY_IPS", [])
-    mgr = jobsmod.JobManager(db_path=str(tmp_path / "jm2.db"),
-                             log_dir=str(tmp_path / "logs2"),
-                             runner=fake_runner)
+    mgr = jobsmod.JobManager(
+        db_path=str(tmp_path / "jm2.db"),
+        log_dir=str(tmp_path / "logs2"),
+        runner=fake_runner,
+    )
     from web.app import make_app
+
     application = make_app(job_manager=mgr)
     application.testing = True
     client = application.test_client()
 
     # First-run owner creation (the P18.1 flow).
-    r = client.post("/api/auth/setup",
-                    json={"username": "owner", "password": "correct horse battery staple"})
+    r = client.post(
+        "/api/auth/setup",
+        json={"username": "owner", "password": "correct horse battery staple"},
+    )
     assert r.status_code == 200, r.get_data(as_text=True)
     csrf = r.get_json()["csrf"]
 
     # Owner (operator) can submit.
-    r = client.post("/api/v1/jobs", json={"kind": "scorecard", "params": {}},
-                    headers={"X-CSRF-Token": csrf})
+    r = client.post(
+        "/api/v1/jobs",
+        json={"kind": "scorecard", "params": {}},
+        headers={"X-CSRF-Token": csrf},
+    )
     assert r.status_code == 201, r.get_data(as_text=True)
     job_id = r.get_json()["data"]["job"]["job_id"]
 
     # A viewer-scoped device token can list and read, but not submit.
-    tok = client.post("/api/v1/devices",
-                      json={"name": "v", "scope": "viewer"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["data"]["token"]
+    tok = client.post(
+        "/api/v1/devices",
+        json={"name": "v", "scope": "viewer"},
+        headers={"X-CSRF-Token": csrf},
+    ).get_json()["data"]["token"]
     h = {"Authorization": f"Bearer {tok}"}
     anon = application.test_client()  # no owner session cookie — token only
     assert anon.get("/api/v1/jobs", headers=h).status_code == 200
     assert anon.get(f"/api/v1/jobs/{job_id}", headers=h).status_code == 200
-    r = anon.post("/api/v1/jobs", json={"kind": "backfill", "params": {}},
-                  headers=h)
+    r = anon.post("/api/v1/jobs", json={"kind": "backfill", "params": {}}, headers=h)
     assert r.status_code == 403
     assert r.get_json()["error"]["code"] == apiv1.ErrorCode.FORBIDDEN
 
@@ -550,26 +620,37 @@ def test_v1_cancel_requires_operator(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "role2.db"))
     import config as _c
+
     monkeypatch.setattr(_c, "DB_PATH", str(tmp_path / "role2.db"))
     monkeypatch.setattr(_c, "SKY_AUTH_MODE", "auto")
     monkeypatch.setattr(_c, "SKY_ALLOW_FORCE_APPROVE", False)
     monkeypatch.setattr(_c, "SKY_TRUSTED_PROXY_IPS", [])
-    mgr = jobsmod.JobManager(db_path=str(tmp_path / "jm3.db"),
-                             log_dir=str(tmp_path / "logs3"),
-                             runner=fake_runner)
+    mgr = jobsmod.JobManager(
+        db_path=str(tmp_path / "jm3.db"),
+        log_dir=str(tmp_path / "logs3"),
+        runner=fake_runner,
+    )
     from web.app import make_app
+
     application = make_app(job_manager=mgr)
     application.testing = True
     client = application.test_client()
-    r = client.post("/api/auth/setup",
-                    json={"username": "owner", "password": "correct horse battery staple"})
+    r = client.post(
+        "/api/auth/setup",
+        json={"username": "owner", "password": "correct horse battery staple"},
+    )
     csrf = r.get_json()["csrf"]
-    r = client.post("/api/v1/jobs", json={"kind": "scorecard", "params": {}},
-                    headers={"X-CSRF-Token": csrf})
+    r = client.post(
+        "/api/v1/jobs",
+        json={"kind": "scorecard", "params": {}},
+        headers={"X-CSRF-Token": csrf},
+    )
     job_id = r.get_json()["data"]["job"]["job_id"]
-    tok = client.post("/api/v1/devices",
-                      json={"name": "v", "scope": "viewer"},
-                      headers={"X-CSRF-Token": csrf}).get_json()["data"]["token"]
+    tok = client.post(
+        "/api/v1/devices",
+        json={"name": "v", "scope": "viewer"},
+        headers={"X-CSRF-Token": csrf},
+    ).get_json()["data"]["token"]
     h = {"Authorization": f"Bearer {tok}"}
     anon = application.test_client()
     r = anon.post(f"/api/v1/jobs/{job_id}/cancel", headers=h)

@@ -1,16 +1,20 @@
 """Tests for the enforced risk & discipline gate (decisions B6, B7, B9, B10)."""
+
 from __future__ import annotations
 
 import time
-
-import pytest
 
 import brain.risk_gate as rg
 from data.database import SignalDB
 
 
-def _decided(db: SignalDB, rr: float, n: int = 1, start_id: int = 9000,
-             closed_ts: int | None = None) -> None:
+def _decided(
+    db: SignalDB,
+    rr: float,
+    n: int = 1,
+    start_id: int = 9000,
+    closed_ts: int | None = None,
+) -> None:
     """Insert decided paper trades (TP_HIT/STOP_LOSS) directly."""
     ts = closed_ts or int(time.time() * 1000)
     for i in range(n):
@@ -22,9 +26,29 @@ def _decided(db: SignalDB, rr: float, n: int = 1, start_id: int = 9000,
                                         closed_ts, entry_price, exit_price, outcome,
                                         rr_achieved, close_reason)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (start_id + i, f"SIG{start_id+i}", "Buy Pullback", "BTCUSDT", "15m",
-             "BUY", 100.0, 99.0, 102.0, 2.0, 70, "CLOSED", ts, ts, ts,
-             100.0, 99.0 if rr < 0 else 102.0, outcome, rr, "test"))
+            (
+                start_id + i,
+                f"SIG{start_id + i}",
+                "Buy Pullback",
+                "BTCUSDT",
+                "15m",
+                "BUY",
+                100.0,
+                99.0,
+                102.0,
+                2.0,
+                70,
+                "CLOSED",
+                ts,
+                ts,
+                ts,
+                100.0,
+                99.0 if rr < 0 else 102.0,
+                outcome,
+                rr,
+                "test",
+            ),
+        )
     db.conn.commit()
 
 
@@ -95,23 +119,50 @@ def test_unproven_setup_blocked_at_student(tmp_path):
 def test_setup_proven_requires_100_backtest_and_20_paper(tmp_path):
     db = SignalDB(tmp_path / "g.db")
     # 99 backtests + 19 paper → still unproven
-    rows = [{"ts": i, "symbol": "BTCUSDT", "timeframe": "15m",
-             "plan_type": "Buy Pullback", "action": "BUY", "confidence_pct": 80,
-             "horizon_hours": 4.0, "outcome": "FULL_WIN", "rr_achieved": 2.0,
-             "max_favorable": 1.0, "max_adverse": -1.0, "entry": 100.0,
-             "trigger_level": None, "regime": "TRENDING_BULL"}
-            for i in range(99)]
+    rows = [
+        {
+            "ts": i,
+            "symbol": "BTCUSDT",
+            "timeframe": "15m",
+            "plan_type": "Buy Pullback",
+            "action": "BUY",
+            "confidence_pct": 80,
+            "horizon_hours": 4.0,
+            "outcome": "FULL_WIN",
+            "rr_achieved": 2.0,
+            "max_favorable": 1.0,
+            "max_adverse": -1.0,
+            "entry": 100.0,
+            "trigger_level": None,
+            "regime": "TRENDING_BULL",
+        }
+        for i in range(99)
+    ]
     db.save_backtest_rows(rows, run_id="proven")
     _decided(db, 2.0, n=19, start_id=5000)
     assert rg.setup_proven(db, "Buy Pullback")["proven"] is False
     # one more of each → proven (positive expectancy both sides)
-    db.save_backtest_rows([{"ts": 999, "symbol": "BTCUSDT", "timeframe": "15m",
-                            "plan_type": "Buy Pullback", "action": "BUY",
-                            "confidence_pct": 80, "horizon_hours": 4.0,
-                            "outcome": "FULL_WIN", "rr_achieved": 2.0,
-                            "max_favorable": 1.0, "max_adverse": -1.0,
-                            "entry": 100.0, "trigger_level": None,
-                            "regime": "TRENDING_BULL"}], run_id="proven2")
+    db.save_backtest_rows(
+        [
+            {
+                "ts": 999,
+                "symbol": "BTCUSDT",
+                "timeframe": "15m",
+                "plan_type": "Buy Pullback",
+                "action": "BUY",
+                "confidence_pct": 80,
+                "horizon_hours": 4.0,
+                "outcome": "FULL_WIN",
+                "rr_achieved": 2.0,
+                "max_favorable": 1.0,
+                "max_adverse": -1.0,
+                "entry": 100.0,
+                "trigger_level": None,
+                "regime": "TRENDING_BULL",
+            }
+        ],
+        run_id="proven2",
+    )
     _decided(db, 2.0, n=1, start_id=5090)
     st = rg.setup_proven(db, "Buy Pullback")
     assert st["backtest_n"] >= 100 and st["paper_n"] >= 20
@@ -144,19 +195,41 @@ def test_drawdown_and_daily_exclude_simulator_samples(tmp_path):
                                         closed_ts, entry_price, exit_price, outcome,
                                         rr_achieved, close_reason, sim_key)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (8000 + i, f"S{i}", "Sweep Reversal Buy", "BTCUSDT", "15m", "BUY",
-             100.0, 99.0, 102.0, 2.0, 70, "CLOSED", ts, ts, ts,
-             100.0, 99.0, outcome, rr, "test", sim_key))
+            (
+                8000 + i,
+                f"S{i}",
+                "Sweep Reversal Buy",
+                "BTCUSDT",
+                "15m",
+                "BUY",
+                100.0,
+                99.0,
+                102.0,
+                2.0,
+                70,
+                "CLOSED",
+                ts,
+                ts,
+                ts,
+                100.0,
+                99.0,
+                outcome,
+                rr,
+                "test",
+                sim_key,
+            ),
+        )
+
     db.conn.commit()
 
-    for i in range(200):                                    # 200 losing sim samples
+    for i in range(200):  # 200 losing sim samples
         insert(-1.0, sim_key=f"pp:sim:{i}", i=i)
     d = rg.drawdown(db)
     assert d["level"] == "normal"
     assert d["max_drawdown_pct"] == 0.0
     assert rg.daily_weekly(db)["today"]["n"] == 0
 
-    insert(-1.0, sim_key=None, i=500)                       # one REAL loss
+    insert(-1.0, sim_key=None, i=500)  # one REAL loss
     d2 = rg.drawdown(db)
     assert d2["max_drawdown_pct"] > 0.0
     assert rg.daily_weekly(db)["today"]["n"] == 1

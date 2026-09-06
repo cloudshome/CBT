@@ -7,6 +7,7 @@ brief / tradestate / postreview) with the permission map enforced.
 
 These tests spawn it as a subprocess exactly like an MCP client would.
 """
+
 from __future__ import annotations
 
 import json
@@ -22,10 +23,18 @@ SERVER = ROOT / "mcp_server.py"
 
 ROOT_TOOLS = {
     # Original 6
-    "ask", "tradestate", "risk", "health", "brief", "postreview",
+    "ask",
+    "tradestate",
+    "risk",
+    "health",
+    "brief",
+    "postreview",
     # P9 (TODO-2): capability endpoints
-    "channels", "correlation", "hidden_chart_read",
-    "hidden_analytics_mae", "hidden_analytics_mc",
+    "channels",
+    "correlation",
+    "hidden_chart_read",
+    "hidden_analytics_mae",
+    "hidden_analytics_mc",
     # P9 (TODO-4): desk advisory
     "desk_status",
     # P9 (TODO-1.bis): combined readiness strip
@@ -41,7 +50,10 @@ ROOT_TOOLS = {
     # coaching memory; feeds no gate
     "practice_scorecard",
     # 24/7 Intelligence Agent (read-only research & monitoring)
-    "sky_agent_status", "sky_agent_report", "sky_agent_health", "sky_agent_hypotheses",
+    "sky_agent_status",
+    "sky_agent_report",
+    "sky_agent_health",
+    "sky_agent_hypotheses",
 }
 
 
@@ -49,8 +61,14 @@ class StdioClient:
     def __init__(self, env: dict):
         self.proc = subprocess.Popen(
             [sys.executable, str(SERVER)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, env=env, cwd=str(ROOT), bufsize=1)
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            cwd=str(ROOT),
+            bufsize=1,
+        )
         self._id = 0
 
     def send(self, method: str, params: dict | None = None) -> dict:
@@ -102,8 +120,13 @@ def test_root_mcp_handshake_and_tools(env):
         assert payload["allowed"] is True
         assert payload["open"] is True
 
-        ans = client.send("tools/call", {"name": "ask", "arguments": {
-            "query": "what are the daily and weekly loss limits?"}})
+        ans = client.send(
+            "tools/call",
+            {
+                "name": "ask",
+                "arguments": {"query": "what are the daily and weekly loss limits?"},
+            },
+        )
         payload = json.loads(ans["result"]["content"][0]["text"])
         assert "risk_rules" in payload["citations"]
         assert "daily" in payload["answer"].lower()
@@ -136,8 +159,13 @@ def test_root_mcp_tradestate_roundtrip(env):
     client = StdioClient(env)
     try:
         client.send("initialize")
-        resp = client.send("tools/call", {"name": "tradestate", "arguments": {
-            "action": "set", "tired": True, "note": "long night"}})
+        resp = client.send(
+            "tools/call",
+            {
+                "name": "tradestate",
+                "arguments": {"action": "set", "tired": True, "note": "long night"},
+            },
+        )
         state = json.loads(resp["result"]["content"][0]["text"])
         assert state["tired"] in (True, 1)
 
@@ -146,8 +174,9 @@ def test_root_mcp_tradestate_roundtrip(env):
         assert gate["allowed"] is False
         assert any("trader state" in b for b in gate["blocked_by"])
 
-        resp = client.send("tools/call", {"name": "tradestate",
-                                          "arguments": {"action": "clear"}})
+        resp = client.send(
+            "tools/call", {"name": "tradestate", "arguments": {"action": "clear"}}
+        )
         state = json.loads(resp["result"]["content"][0]["text"])
         assert state["any"] is False
     finally:
@@ -173,6 +202,7 @@ def test_root_mcp_health_tool(env):
 # exposed via tools/list, return the expected shape, and that the deny
 # list (place_order, approve, etc.) is still enforced.
 
+
 def test_root_mcp_channels_tool(env):
     client = StdioClient(env)
     try:
@@ -193,10 +223,17 @@ def test_root_mcp_correlation_tool(env):
     client = StdioClient(env)
     try:
         client.send("initialize")
-        resp = client.send("tools/call", {
-            "name": "correlation",
-            "arguments": {"symbols": ["BTCUSDT", "ETHUSDT"], "bars": 100, "window": 30},
-        })
+        resp = client.send(
+            "tools/call",
+            {
+                "name": "correlation",
+                "arguments": {
+                    "symbols": ["BTCUSDT", "ETHUSDT"],
+                    "bars": 100,
+                    "window": 30,
+                },
+            },
+        )
         data = json.loads(resp["result"]["content"][0]["text"])
         # engine.correlation.fetch_report returns a dict; in DEMO_MODE it
         # succeeds and reports the measured matrix.
@@ -209,10 +246,13 @@ def test_root_mcp_hidden_chart_read_tool(env):
     client = StdioClient(env)
     try:
         client.send("initialize")
-        resp = client.send("tools/call", {
-            "name": "hidden_chart_read",
-            "arguments": {"symbol": "BTCUSDT", "timeframe": "15m", "bars": 200},
-        })
+        resp = client.send(
+            "tools/call",
+            {
+                "name": "hidden_chart_read",
+                "arguments": {"symbol": "BTCUSDT", "timeframe": "15m", "bars": 200},
+            },
+        )
         data = json.loads(resp["result"]["content"][0]["text"])
         # hidden_alpha_report returns a dict with at least these keys
         assert "symbol" in data
@@ -227,8 +267,9 @@ def test_root_mcp_hidden_analytics_mae_tool(env):
     try:
         client.send("initialize")
         # No args — should use defaults and return gracefully
-        resp = client.send("tools/call", {
-            "name": "hidden_analytics_mae", "arguments": {}})
+        resp = client.send(
+            "tools/call", {"name": "hidden_analytics_mae", "arguments": {}}
+        )
         data = json.loads(resp["result"]["content"][0]["text"])
         # mae_mfe_summary returns a dict; in an empty DB it has note/available
         assert "available" in data or "note" in data or "rows" in data
@@ -241,9 +282,10 @@ def test_root_mcp_hidden_analytics_mc_tool(env):
     try:
         client.send("initialize")
         # small sample count for speed; with a fixed seed for determinism
-        resp = client.send("tools/call", {
-            "name": "hidden_analytics_mc",
-            "arguments": {"samples": 50, "seed": 42}})
+        resp = client.send(
+            "tools/call",
+            {"name": "hidden_analytics_mc", "arguments": {"samples": 50, "seed": 42}},
+        )
         data = json.loads(resp["result"]["content"][0]["text"])
         assert "available" in data or "note" in data or "samples" in data
     finally:
@@ -259,8 +301,12 @@ def test_root_mcp_desk_status_tool(env):
         data = json.loads(resp["result"]["content"][0]["text"])
         assert "advice" in data
         assert data["advice"]["action"] in {
-            "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
-            "JOURNAL", "PAPER_GRIND", "SCAN",
+            "CLEAR_STATE",
+            "STAND_ASIDE",
+            "REVIEW_QUEUE",
+            "JOURNAL",
+            "PAPER_GRIND",
+            "SCAN",
         }
         assert "risk_gate" in data
         assert "graduation" in data
@@ -298,8 +344,12 @@ def test_root_mcp_loop_health_tool(env):
         assert "graduation" in data
         assert "ritual" in data
         assert data["advice"]["action"] in {
-            "CLEAR_STATE", "STAND_ASIDE", "REVIEW_QUEUE",
-            "JOURNAL", "PAPER_GRIND", "SCAN",
+            "CLEAR_STATE",
+            "STAND_ASIDE",
+            "REVIEW_QUEUE",
+            "JOURNAL",
+            "PAPER_GRIND",
+            "SCAN",
         }
     finally:
         client.close()
@@ -314,8 +364,16 @@ def test_root_mcp_deny_list_still_enforced(env):
         tools = client.send("tools/list")["result"]["tools"]
         tool_names = {t["name"] for t in tools}
         # None of these may appear in the permission map
-        for forbidden in ("approve", "reject", "execute", "close",
-                          "place_order", "sign", "withdraw", "transfer"):
+        for forbidden in (
+            "approve",
+            "reject",
+            "execute",
+            "close",
+            "place_order",
+            "sign",
+            "withdraw",
+            "transfer",
+        ):
             assert forbidden not in tool_names, (
                 f"forbidden tool {forbidden!r} appears in tools/list — "
                 f"permission map regression"

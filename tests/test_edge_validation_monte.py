@@ -8,34 +8,54 @@ negative.
 
 All offline: synthetic GradedPlan lists + end-to-end over synthetic candles.
 """
+
 from __future__ import annotations
 
 import pytest
 
 from data.backtester import GradedPlan
 from engine.edge_validation import (
-    EDGE_CONFIRMED, INSUFFICIENT_DATA, NO_EDGE,
-    edge_validate_report, edge_verdict, format_edge_verdict,
-    monte_carlo_decisive, regime_edge_report,
+    EDGE_CONFIRMED,
+    INSUFFICIENT_DATA,
+    NO_EDGE,
+    edge_validate_report,
+    edge_verdict,
+    format_edge_verdict,
+    monte_carlo_decisive,
+    regime_edge_report,
 )
-
 from tests.conftest import make_ohlcv
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
-def gp(ts: int, regime: str = "TRENDING_BULL", outcome: str = "FULL_WIN",
-       rr: float = 2.0, rr_net: float | None = None) -> GradedPlan:
-    return GradedPlan(ts=ts, plan_type="Buy Pullback", action="BUY",
-                      confidence_pct=80, entry=100.0, trigger_level=None,
-                      horizon_hours=1.0, outcome=outcome, rr_achieved=rr,
-                      rr_net=rr_net, regime=regime)
+def gp(
+    ts: int,
+    regime: str = "TRENDING_BULL",
+    outcome: str = "FULL_WIN",
+    rr: float = 2.0,
+    rr_net: float | None = None,
+) -> GradedPlan:
+    return GradedPlan(
+        ts=ts,
+        plan_type="Buy Pullback",
+        action="BUY",
+        confidence_pct=80,
+        entry=100.0,
+        trigger_level=None,
+        horizon_hours=1.0,
+        outcome=outcome,
+        rr_achieved=rr,
+        rr_net=rr_net,
+        regime=regime,
+    )
 
 
 def _strong_book(n: int = 60) -> list:
     """Net-positive book (50% wins at 2R, 50% losses at -1R, E = +0.50R)."""
     wins = [gp(i, rr=2.0, rr_net=2.0) for i in range(n // 2)]
-    losses = [gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0)
-              for i in range(n - n // 2)]
+    losses = [
+        gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0) for i in range(n - n // 2)
+    ]
     return wins + losses
 
 
@@ -44,16 +64,19 @@ def _fragile_book(n: int = 60) -> list:
     70% wins at +0.5R, 30% losses at -1R → E = +0.05R.  Small edge with
     asymmetric outcomes → bootstrap resamples will often have E <= 0."""
     wins = [gp(i, rr=0.5, rr_net=0.5) for i in range(int(n * 0.7))]
-    losses = [gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0)
-              for i in range(n - int(n * 0.7))]
+    losses = [
+        gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0)
+        for i in range(n - int(n * 0.7))
+    ]
     return wins + losses
 
 
 def _losing_book(n: int = 60) -> list:
     """Net-negative book (E < 0)."""
     wins = [gp(i, rr=1.0, rr_net=1.0) for i in range(n // 4)]
-    losses = [gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0)
-              for i in range(n - n // 4)]
+    losses = [
+        gp(10000 + i, outcome="LOSS", rr=-1.0, rr_net=-1.0) for i in range(n - n // 4)
+    ]
     return wins + losses
 
 
@@ -77,7 +100,11 @@ def test_monte_carlo_decisive_structure_and_seed_determinism():
     assert a["expectancy"]["p50"] == b["expectancy"]["p50"]
     assert a["ruin_prob"] == b["ruin_prob"]
     # Structure
-    assert "p5" in a["expectancy"] and "p50" in a["expectancy"] and "p95" in a["expectancy"]
+    assert (
+        "p5" in a["expectancy"]
+        and "p50" in a["expectancy"]
+        and "p95" in a["expectancy"]
+    )
     assert "median_pct" in a["drawdown"] and "p95_pct" in a["drawdown"]
     assert "p5" in a["equity"] and "p50" in a["equity"] and "p95" in a["equity"]
 
@@ -88,7 +115,8 @@ def test_monte_carlo_strong_book_p5_positive():
     mc = monte_carlo_decisive(plans, samples=1000, seed=7)
     assert mc["available"] is True
     assert mc["expectancy"]["p5"] > 0, (
-        f"p5 {mc['expectancy']['p5']} should be > 0 for a strong book")
+        f"p5 {mc['expectancy']['p5']} should be > 0 for a strong book"
+    )
     assert mc["expectancy"]["p50"] > mc["expectancy"]["p5"]
 
 
@@ -121,7 +149,7 @@ def test_monte_carlo_drawdown_scales_with_risk():
 def test_monte_carlo_equity_uses_net_r():
     """Net R (rr_net) should drive the simulation, falling back to gross."""
     plans_mixed = [
-        gp(1, rr=2.0, rr_net=1.5),   # net < gross (costs applied)
+        gp(1, rr=2.0, rr_net=1.5),  # net < gross (costs applied)
         gp(2, outcome="LOSS", rr=-1.0, rr_net=-1.2),  # net worse
     ] * 20
     mc = monte_carlo_decisive(plans_mixed, samples=500, seed=3)
@@ -147,13 +175,18 @@ def test_fragile_book_with_mc_floor_fails():
     # Build a synthetic MC block that reports p5 <= 0 (simulating a fragile
     # book that would naturally produce this under resampling).
     mc = {
-        "available": True, "n_trades": 60, "samples": 500,
-        "risk_pct": 1.0, "ruin_threshold_pct": 50.0,
+        "available": True,
+        "n_trades": 60,
+        "samples": 500,
+        "risk_pct": 1.0,
+        "ruin_threshold_pct": 50.0,
         "expectancy": {"p5": -0.05, "p50": 0.10, "p95": 0.25},
         "drawdown": {"median_pct": 5.0, "p95_pct": 15.0},
-        "ruin_prob": 0.0, "prob_below_start": 0.3,
+        "ruin_prob": 0.0,
+        "prob_below_start": 0.3,
         "equity": {"p5": 9500, "p50": 10600, "p95": 12500},
-        "longest_loss_streak_p50": 5, "longest_loss_streak_p95": 9,
+        "longest_loss_streak_p50": 5,
+        "longest_loss_streak_p95": 9,
     }
     v = edge_verdict(report, monte=mc)
     assert v["verdict"] == NO_EDGE
@@ -174,13 +207,18 @@ def test_mc_floor_disabled_when_monte_floor_false():
     plans = _fragile_book(60)
     report = regime_edge_report(plans)
     mc = {
-        "available": True, "n_trades": 60, "samples": 500,
-        "risk_pct": 1.0, "ruin_threshold_pct": 50.0,
+        "available": True,
+        "n_trades": 60,
+        "samples": 500,
+        "risk_pct": 1.0,
+        "ruin_threshold_pct": 50.0,
         "expectancy": {"p5": -0.05, "p50": 0.10, "p95": 0.25},
         "drawdown": {"median_pct": 5.0, "p95_pct": 15.0},
-        "ruin_prob": 0.0, "prob_below_start": 0.3,
+        "ruin_prob": 0.0,
+        "prob_below_start": 0.3,
         "equity": {"p5": 9500, "p50": 10600, "p95": 12500},
-        "longest_loss_streak_p50": 5, "longest_loss_streak_p95": 9,
+        "longest_loss_streak_p50": 5,
+        "longest_loss_streak_p95": 9,
     }
     v = edge_verdict(report, monte=mc, monte_floor=False)
     assert v["verdict"] == EDGE_CONFIRMED
@@ -200,8 +238,15 @@ def test_mc_unavailable_does_not_block():
 # ── edge_validate_report with --monte ─────────────────────────────────────
 def test_end_to_end_monte_produces_block():
     df = make_ohlcv(n=600, seed=7)
-    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3,
-                             monte=True, monte_samples=500, monte_seed=42)
+    r = edge_validate_report(
+        df,
+        horizons=[1.0],
+        min_bars=120,
+        step=3,
+        monte=True,
+        monte_samples=500,
+        monte_seed=42,
+    )
     assert r["ok"] is True
     assert r["monte"] is not None
     assert r["meta"].get("monte") is True
@@ -211,8 +256,7 @@ def test_end_to_end_monte_produces_block():
 
 def test_end_to_end_without_monte_no_block():
     df = make_ohlcv(n=600, seed=7)
-    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3,
-                             monte=False)
+    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3, monte=False)
     assert r["ok"] is True
     assert r["monte"] is None
     assert r["meta"].get("monte") is not True
@@ -220,8 +264,15 @@ def test_end_to_end_without_monte_no_block():
 
 def test_format_edge_verdict_with_monte():
     df = make_ohlcv(n=600, seed=7)
-    r = edge_validate_report(df, horizons=[1.0], min_bars=120, step=3,
-                             monte=True, monte_samples=500, monte_seed=42)
+    r = edge_validate_report(
+        df,
+        horizons=[1.0],
+        min_bars=120,
+        step=3,
+        monte=True,
+        monte_samples=500,
+        monte_seed=42,
+    )
     text = format_edge_verdict(r)
     assert "MONTE CARLO" in text
     assert "expectancy" in text.lower()

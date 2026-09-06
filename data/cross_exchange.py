@@ -27,14 +27,15 @@ Design rules (do not bend):
 6. **Store first.** Do not turn a premium or a funding spread into a
    trading rule until the data proves it.
 """
+
 from __future__ import annotations
 
 import os
 import time
 import zlib
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -58,16 +59,17 @@ FUNDING_RATE = "funding_rate"
 FUNDING_SPREAD = "funding_spread"
 
 ALL_CROSS_METRICS: tuple[str, ...] = (
-    PRICE, PREMIUM_PCT, FUNDING_RATE, FUNDING_SPREAD,
+    PRICE,
+    PREMIUM_PCT,
+    FUNDING_RATE,
+    FUNDING_SPREAD,
 )
 
-THRESHOLD_PCT = 1.0                 # same 1% flag the health probe always used
-SNAPSHOT_STEP_MS = 900_000          # 15m — the probe's candle
-FUNDING_STEP_MS = 8 * 3_600_000     # BTCUSDT funding interval
+THRESHOLD_PCT = 1.0  # same 1% flag the health probe always used
+SNAPSHOT_STEP_MS = 900_000  # 15m — the probe's candle
+FUNDING_STEP_MS = 8 * 3_600_000  # BTCUSDT funding interval
 
-DEFAULT_ROOT = (
-    Path(__file__).resolve().parent.parent / "data" / "store" / "cross"
-)
+DEFAULT_ROOT = Path(__file__).resolve().parent.parent / "data" / "store" / "cross"
 
 # Re-export so tests/CLI can pin the schema without importing derivatives.
 CROSS_COLUMNS = DERIVATIVE_COLUMNS
@@ -82,6 +84,7 @@ def floor_ts(now_ms: int, step_ms: int) -> int:
 # --------------------------------------------------------------------------- #
 # Venue registry — the single source of truth for the live probe
 # --------------------------------------------------------------------------- #
+
 
 @dataclass(frozen=True)
 class Venue:
@@ -100,22 +103,24 @@ class Venue:
     latest_idx: int
     close_idx: int
     envelope: str = "data"
-    funding_url: Optional[str] = None
-    funding_symbols: Optional[dict[str, str]] = None
-    funding_envelope: Optional[str] = None
-    funding_field: Optional[str] = None
+    funding_url: str | None = None
+    funding_symbols: dict[str, str] | None = None
+    funding_envelope: str | None = None
+    funding_field: str | None = None
 
 
 VENUES: dict[str, Venue] = {
     "kucoin": Venue(
         name="kucoin",
         url="https://api.kucoin.com/api/v1/market/candles?type=15min&symbol={sym}",
-        symbols={"BTCUSDT": "BTC-USDT", "ETHUSDT": "ETH-USDT",
-                 "XAUUSD": "PAXG-USDT"},
+        symbols={"BTCUSDT": "BTC-USDT", "ETHUSDT": "ETH-USDT", "XAUUSD": "PAXG-USDT"},
         # KuCoin: [time, open, close, high, low, volume, turnover], newest-first.
-        latest_idx=0, close_idx=2, envelope="data",
-        funding_url=("https://api-futures.kucoin.com/api/v1/"
-                     "funding-rate/{sym}/current"),
+        latest_idx=0,
+        close_idx=2,
+        envelope="data",
+        funding_url=(
+            "https://api-futures.kucoin.com/api/v1/funding-rate/{sym}/current"
+        ),
         funding_symbols={"BTCUSDT": "XBTUSDTM", "ETHUSDT": "ETHUSDTM"},
         funding_envelope="data",
         funding_field="value",
@@ -123,10 +128,11 @@ VENUES: dict[str, Venue] = {
     "okx": Venue(
         name="okx",
         url="https://www.okx.com/api/v5/market/candles?instId={sym}&bar=15m&limit=1",
-        symbols={"BTCUSDT": "BTC-USDT", "ETHUSDT": "ETH-USDT",
-                 "XAUUSD": "PAXG-USDT"},
+        symbols={"BTCUSDT": "BTC-USDT", "ETHUSDT": "ETH-USDT", "XAUUSD": "PAXG-USDT"},
         # OKX: [ts, o, h, l, c, vol, ...], newest-first.
-        latest_idx=0, close_idx=4, envelope="data",
+        latest_idx=0,
+        close_idx=4,
+        envelope="data",
         funding_url="https://www.okx.com/api/v5/public/funding-rate?instId={sym}",
         funding_symbols={"BTCUSDT": "BTC-USDT-SWAP", "ETHUSDT": "ETH-USDT-SWAP"},
         funding_envelope="data",
@@ -134,14 +140,19 @@ VENUES: dict[str, Venue] = {
     ),
     "bybit": Venue(
         name="bybit",
-        url=("https://api.bybit.com/v5/market/kline?category=spot"
-             "&symbol={sym}&interval=15&limit=1"),
+        url=(
+            "https://api.bybit.com/v5/market/kline?category=spot"
+            "&symbol={sym}&interval=15&limit=1"
+        ),
         # Bybit spot has no XAUUSD/PAXG we trust — skip gold (same rule as perp).
         symbols={"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT"},
         # V5 kline: [start, open, high, low, close, volume, turnover], newest-first.
-        latest_idx=0, close_idx=4, envelope="result.list",
-        funding_url=("https://api.bybit.com/v5/market/tickers"
-                     "?category=linear&symbol={sym}"),
+        latest_idx=0,
+        close_idx=4,
+        envelope="result.list",
+        funding_url=(
+            "https://api.bybit.com/v5/market/tickers?category=linear&symbol={sym}"
+        ),
         funding_symbols={"BTCUSDT": "BTCUSDT", "ETHUSDT": "ETHUSDT"},
         funding_envelope="result.list",
         funding_field="fundingRate",
@@ -183,10 +194,14 @@ def _funding_from_row(row, field: str) -> float:
 # The probe (this IS _cross_exchange_probe)
 # --------------------------------------------------------------------------- #
 
-def snapshot_prices(binance_last: dict, *,
-                    get: Optional[Callable] = None,
-                    timeout: int = 6,
-                    venues: Optional[dict[str, Venue]] = None) -> dict:
+
+def snapshot_prices(
+    binance_last: dict,
+    *,
+    get: Callable | None = None,
+    timeout: int = 6,
+    venues: dict[str, Venue] | None = None,
+) -> dict:
     """Best-effort price cross-check: Binance vs KuCoin + OKX + Bybit.
 
     Flags deviations > 1%. Every exchange call is wrapped — an unreachable
@@ -201,10 +216,12 @@ def snapshot_prices(binance_last: dict, *,
     """
     if get is None:
         import requests
+
         get = requests.get
     registry = venues if venues is not None else VENUES
-    names = " + ".join(v.name.capitalize() if v.name != "okx" else "OKX"
-                       for v in registry.values())
+    names = " + ".join(
+        v.name.capitalize() if v.name != "okx" else "OKX" for v in registry.values()
+    )
     # Keep the historical phrasing so existing docs still parse, then name
     # every venue actually compared.
     out = {
@@ -250,10 +267,13 @@ def snapshot_prices(binance_last: dict, *,
     return out
 
 
-def snapshot_funding(binance_funding: dict, *,
-                     get: Optional[Callable] = None,
-                     timeout: int = 6,
-                     venues: Optional[dict[str, Venue]] = None) -> dict:
+def snapshot_funding(
+    binance_funding: dict,
+    *,
+    get: Callable | None = None,
+    timeout: int = 6,
+    venues: dict[str, Venue] | None = None,
+) -> dict:
     """Best-effort funding-rate cross-check vs a Binance reference.
 
     Separate from :func:`snapshot_prices` so a missing funding endpoint
@@ -261,6 +281,7 @@ def snapshot_funding(binance_funding: dict, *,
     """
     if get is None:
         import requests
+
         get = requests.get
     registry = venues if venues is not None else VENUES
     out = {"ok": True, "note": "funding cross-check (public)", "exchanges": {}}
@@ -304,54 +325,79 @@ def snapshot_funding(binance_funding: dict, *,
 # Snapshot → store rows
 # --------------------------------------------------------------------------- #
 
-def snapshot_price_rows(snap: dict, *, ts: int, ingested_at: int,
-                        market: str = "spot") -> pd.DataFrame:
+
+def snapshot_price_rows(
+    snap: dict, *, ts: int, ingested_at: int, market: str = "spot"
+) -> pd.DataFrame:
     """Turn a :func:`snapshot_prices` result into canonical store rows."""
     rows: list[dict] = []
     for venue, ex in (snap.get("exchanges") or {}).items():
         for symbol, info in (ex.get("symbols") or {}).items():
             if "price" not in info:
                 continue
-            rows.append({
-                "ts": ts, "exchange": venue, "market": market,
-                "symbol": symbol, "metric": PRICE,
-                "value": float(info["price"]), "ingested_at": ingested_at,
-            })
-            rows.append({
-                "ts": ts, "exchange": venue, "market": market,
-                "symbol": symbol, "metric": PREMIUM_PCT,
-                "value": float(info["deviation_pct"]),
-                "ingested_at": ingested_at,
-            })
+            rows.append(
+                {
+                    "ts": ts,
+                    "exchange": venue,
+                    "market": market,
+                    "symbol": symbol,
+                    "metric": PRICE,
+                    "value": float(info["price"]),
+                    "ingested_at": ingested_at,
+                }
+            )
+            rows.append(
+                {
+                    "ts": ts,
+                    "exchange": venue,
+                    "market": market,
+                    "symbol": symbol,
+                    "metric": PREMIUM_PCT,
+                    "value": float(info["deviation_pct"]),
+                    "ingested_at": ingested_at,
+                }
+            )
     return coerce_derivative_frame(rows) if rows else empty_frame()
 
 
-def snapshot_funding_rows(snap: dict, *, ts: int, ingested_at: int,
-                          market: str = "perp") -> pd.DataFrame:
+def snapshot_funding_rows(
+    snap: dict, *, ts: int, ingested_at: int, market: str = "perp"
+) -> pd.DataFrame:
     """Turn a :func:`snapshot_funding` result into canonical store rows."""
     rows: list[dict] = []
     for venue, ex in (snap.get("exchanges") or {}).items():
         for symbol, info in (ex.get("symbols") or {}).items():
             if "funding_rate" not in info:
                 continue
-            rows.append({
-                "ts": ts, "exchange": venue, "market": market,
-                "symbol": symbol, "metric": FUNDING_RATE,
-                "value": float(info["funding_rate"]),
-                "ingested_at": ingested_at,
-            })
-            rows.append({
-                "ts": ts, "exchange": venue, "market": market,
-                "symbol": symbol, "metric": FUNDING_SPREAD,
-                "value": float(info["spread"]),
-                "ingested_at": ingested_at,
-            })
+            rows.append(
+                {
+                    "ts": ts,
+                    "exchange": venue,
+                    "market": market,
+                    "symbol": symbol,
+                    "metric": FUNDING_RATE,
+                    "value": float(info["funding_rate"]),
+                    "ingested_at": ingested_at,
+                }
+            )
+            rows.append(
+                {
+                    "ts": ts,
+                    "exchange": venue,
+                    "market": market,
+                    "symbol": symbol,
+                    "metric": FUNDING_SPREAD,
+                    "value": float(info["spread"]),
+                    "ingested_at": ingested_at,
+                }
+            )
     return coerce_derivative_frame(rows) if rows else empty_frame()
 
 
 # --------------------------------------------------------------------------- #
 # Historical derivation (Binance vs Bybit from our own stores)
 # --------------------------------------------------------------------------- #
+
 
 def _price_col(frame: pd.DataFrame) -> str:
     for col in ("close", "value", "funding_rate", "price"):
@@ -360,10 +406,15 @@ def _price_col(frame: pd.DataFrame) -> str:
     raise ValueError("frame needs a close / value / funding_rate column")
 
 
-def derive_premium(reference: pd.DataFrame, other: pd.DataFrame, *,
-                   exchange: str = "bybit", market: str = "perp",
-                   symbol: str = "BTCUSDT",
-                   ingested_at: Optional[int] = None) -> pd.DataFrame:
+def derive_premium(
+    reference: pd.DataFrame,
+    other: pd.DataFrame,
+    *,
+    exchange: str = "bybit",
+    market: str = "perp",
+    symbol: str = "BTCUSDT",
+    ingested_at: int | None = None,
+) -> pd.DataFrame:
     """premium_pct = (other / reference − 1) × 100 at common timestamps.
 
     Accepts candle frames (``close``) or canonical store frames (``value``).
@@ -381,20 +432,33 @@ def derive_premium(reference: pd.DataFrame, other: pd.DataFrame, *,
     if merged.empty:
         return empty_frame()
     ingest = ingested_at if ingested_at is not None else int(time.time() * 1000)
-    return coerce_derivative_frame(pd.DataFrame({
-        "ts": merged["ts"].astype("int64"),
-        "exchange": exchange, "market": market, "symbol": symbol,
-        "metric": PREMIUM_PCT,
-        "value": (merged["oth"].astype(float) / merged["ref"].astype(float)
-                  - 1.0) * 100.0,
-        "ingested_at": ingest,
-    }))
+    return coerce_derivative_frame(
+        pd.DataFrame(
+            {
+                "ts": merged["ts"].astype("int64"),
+                "exchange": exchange,
+                "market": market,
+                "symbol": symbol,
+                "metric": PREMIUM_PCT,
+                "value": (
+                    merged["oth"].astype(float) / merged["ref"].astype(float) - 1.0
+                )
+                * 100.0,
+                "ingested_at": ingest,
+            }
+        )
+    )
 
 
-def derive_funding_spread(reference: pd.DataFrame, other: pd.DataFrame, *,
-                          exchange: str = "bybit", market: str = "perp",
-                          symbol: str = "BTCUSDT",
-                          ingested_at: Optional[int] = None) -> pd.DataFrame:
+def derive_funding_spread(
+    reference: pd.DataFrame,
+    other: pd.DataFrame,
+    *,
+    exchange: str = "bybit",
+    market: str = "perp",
+    symbol: str = "BTCUSDT",
+    ingested_at: int | None = None,
+) -> pd.DataFrame:
     """funding_spread = other − reference at common timestamps."""
     if reference.empty or other.empty:
         return empty_frame()
@@ -406,18 +470,25 @@ def derive_funding_spread(reference: pd.DataFrame, other: pd.DataFrame, *,
     if merged.empty:
         return empty_frame()
     ingest = ingested_at if ingested_at is not None else int(time.time() * 1000)
-    return coerce_derivative_frame(pd.DataFrame({
-        "ts": merged["ts"].astype("int64"),
-        "exchange": exchange, "market": market, "symbol": symbol,
-        "metric": FUNDING_SPREAD,
-        "value": merged["oth"].astype(float) - merged["ref"].astype(float),
-        "ingested_at": ingest,
-    }))
+    return coerce_derivative_frame(
+        pd.DataFrame(
+            {
+                "ts": merged["ts"].astype("int64"),
+                "exchange": exchange,
+                "market": market,
+                "symbol": symbol,
+                "metric": FUNDING_SPREAD,
+                "value": merged["oth"].astype(float) - merged["ref"].astype(float),
+                "ingested_at": ingest,
+            }
+        )
+    )
 
 
 # --------------------------------------------------------------------------- #
 # Store
 # --------------------------------------------------------------------------- #
+
 
 class CrossExchangeStore(DerivativesStore):
     """Partitioned Parquet store for cross-exchange series.
@@ -435,16 +506,14 @@ class CrossExchangeStore(DerivativesStore):
         if not self.root.exists():
             return []
         found: dict[tuple[str, str, str, str], dict] = {}
-        for d in sorted(self.root.glob(
-                "exchange=*/market=*/symbol=*/metric=*")):
+        for d in sorted(self.root.glob("exchange=*/market=*/symbol=*/metric=*")):
             meta: dict[str, str] = {}
             for seg in d.parts:
                 key, _, value = seg.partition("=")
                 if key in ("exchange", "market", "symbol", "metric"):
                     meta[key] = value
             if len(meta) == 4:
-                key = (meta["exchange"], meta["market"],
-                       meta["symbol"], meta["metric"])
+                key = (meta["exchange"], meta["market"], meta["symbol"], meta["metric"])
                 found[key] = meta
         return [found[k] for k in sorted(found)]
 
@@ -452,6 +521,7 @@ class CrossExchangeStore(DerivativesStore):
 # --------------------------------------------------------------------------- #
 # Offline fake transport (tests + DEMO_MODE)
 # --------------------------------------------------------------------------- #
+
 
 def _seed(key: str) -> int:
     return zlib.crc32(key.encode("utf-8"))
@@ -473,17 +543,19 @@ class FakeVenueTransport:
     collector's historical path is fully offline.
     """
 
-    def __init__(self, *, prices: Optional[dict[str, dict[str, float]]] = None,
-                 funding: Optional[dict[str, dict[str, float]]] = None,
-                 start_ts: Optional[int] = None,
-                 end_ts: Optional[int] = None,
-                 seed: int = 7):
+    def __init__(
+        self,
+        *,
+        prices: dict[str, dict[str, float]] | None = None,
+        funding: dict[str, dict[str, float]] | None = None,
+        start_ts: int | None = None,
+        end_ts: int | None = None,
+        seed: int = 7,
+    ):
         # prices[venue][symbol] = last close
         self.prices = prices or {
-            "kucoin": {"BTCUSDT": 60_060.0, "ETHUSDT": 3_003.0,
-                       "XAUUSD": 2_301.0},
-            "okx": {"BTCUSDT": 59_940.0, "ETHUSDT": 2_997.0,
-                    "XAUUSD": 2_299.0},
+            "kucoin": {"BTCUSDT": 60_060.0, "ETHUSDT": 3_003.0, "XAUUSD": 2_301.0},
+            "okx": {"BTCUSDT": 59_940.0, "ETHUSDT": 2_997.0, "XAUUSD": 2_299.0},
             "bybit": {"BTCUSDT": 60_120.0, "ETHUSDT": 3_006.0},
         }
         self.funding = funding or {
@@ -506,7 +578,7 @@ class FakeVenueTransport:
             return "bybit"
         return "unknown"
 
-    def _symbol_from_url(self, url: str, venue: str) -> Optional[str]:
+    def _symbol_from_url(self, url: str, venue: str) -> str | None:
         cfg = VENUES.get(venue)
         if cfg is None:
             return None
@@ -525,8 +597,8 @@ class FakeVenueTransport:
         symbol = self._symbol_from_url(url, venue)
         cfg = VENUES.get(venue)
         is_funding = any(
-            token in url for token in
-            ("funding-rate", "fundingRate", "tickers", "funding")
+            token in url
+            for token in ("funding-rate", "fundingRate", "tickers", "funding")
         )
         if is_funding and cfg and cfg.funding_url and "kline" not in url:
             rate = (self.funding.get(venue) or {}).get(symbol or "", 0.0001)
@@ -542,8 +614,7 @@ class FakeVenueTransport:
         price = (self.prices.get(venue) or {}).get(symbol or "", 60_000.0)
         if venue == "kucoin":
             # [time, open, close, high, low, volume, turnover]
-            row = ["200", str(price), str(price), str(price), str(price),
-                   "1", "1"]
+            row = ["200", str(price), str(price), str(price), str(price), "1", "1"]
             older = ["100", "1", "1", "1", "1", "1", "1"]
             return _FakeResponse({"data": [row, older]})
         if venue == "okx":
@@ -553,22 +624,28 @@ class FakeVenueTransport:
             return _FakeResponse({"data": [row, older]})
         if venue == "bybit":
             # [start, open, high, low, close, volume, turnover]
-            row = ["200", str(price), str(price), str(price), str(price),
-                   "1", "1"]
+            row = ["200", str(price), str(price), str(price), str(price), "1", "1"]
             older = ["100", "1", "1", "1", "1", "1", "1"]
             return _FakeResponse({"result": {"list": [row, older]}})
         return _FakeResponse({"data": []})
 
-    def funding_history(self, symbol: str, start_time=None, end_time=None,
-                        limit: int = 200) -> pd.DataFrame:
+    def funding_history(
+        self, symbol: str, start_time=None, end_time=None, limit: int = 200
+    ) -> pd.DataFrame:
         """8h synthetic Bybit funding page (ascending ``ts``)."""
         self.requests += 1
-        start = (int(start_time) if start_time is not None
-                 else (self.start_ts if self.start_ts is not None
-                       else 1_700_000_000_000))
-        end = (int(end_time) if end_time is not None
-               else (self.end_ts if self.end_ts is not None
-                     else start + 30 * FUNDING_STEP_MS))
+        start = (
+            int(start_time)
+            if start_time is not None
+            else (self.start_ts if self.start_ts is not None else 1_700_000_000_000)
+        )
+        end = (
+            int(end_time)
+            if end_time is not None
+            else (
+                self.end_ts if self.end_ts is not None else start + 30 * FUNDING_STEP_MS
+            )
+        )
         step = FUNDING_STEP_MS
         first = ((start + step - 1) // step) * step
         n = max(0, (end - first) // step + (1 if first <= end else 0))
@@ -590,6 +667,7 @@ def default_http_get():
     if os.getenv("DEMO_MODE", "0") in ("1", "true", "yes"):
         return FakeVenueTransport().get
     import requests
+
     return requests.get
 
 
@@ -598,12 +676,14 @@ def default_funding_fetch():
     if os.getenv("DEMO_MODE", "0") in ("1", "true", "yes"):
         return FakeVenueTransport().funding_history
     from data.bybit_client import BybitClient
+
     return BybitClient().funding_history
 
 
 # --------------------------------------------------------------------------- #
 # Collector
 # --------------------------------------------------------------------------- #
+
 
 class CrossExchangeError(Exception):
     """A cross-exchange collect step failed honestly."""
@@ -616,15 +696,15 @@ class CrossRun:
     market: str
     rows_fetched: int = 0
     rows_new: int = 0
-    first_ts: Optional[int] = None
-    last_ts: Optional[int] = None
+    first_ts: int | None = None
+    last_ts: int | None = None
     source: str = ""
 
     def as_dict(self) -> dict:
         return asdict(self)
 
 
-def _span(frame: pd.DataFrame) -> tuple[Optional[int], Optional[int]]:
+def _span(frame: pd.DataFrame) -> tuple[int | None, int | None]:
     if frame is None or frame.empty:
         return None, None
     return int(frame["ts"].iloc[0]), int(frame["ts"].iloc[-1])
@@ -638,33 +718,42 @@ class CrossExchangeCollector:
     adds zero rows), and fully offline under ``DEMO_MODE=1``.
     """
 
-    def __init__(self, store: CrossExchangeStore, *,
-                 candle_store=None, deriv_store=None,
-                 get: Optional[Callable] = None,
-                 funding_fetch: Optional[Callable] = None,
-                 clock: Optional[Callable[[], int]] = None,
-                 sleep_fn: Optional[Callable[[float], None]] = None,
-                 sleep_s: float = 0.0):
+    def __init__(
+        self,
+        store: CrossExchangeStore,
+        *,
+        candle_store=None,
+        deriv_store=None,
+        get: Callable | None = None,
+        funding_fetch: Callable | None = None,
+        clock: Callable[[], int] | None = None,
+        sleep_fn: Callable[[float], None] | None = None,
+        sleep_s: float = 0.0,
+    ):
         self.store = store
         self.candle_store = candle_store
         self.deriv_store = deriv_store
         self.get = get if get is not None else default_http_get()
-        self.funding_fetch = (funding_fetch if funding_fetch is not None
-                              else default_funding_fetch())
-        self.clock = clock if clock is not None else (
-            lambda: int(time.time() * 1000))
+        self.funding_fetch = (
+            funding_fetch if funding_fetch is not None else default_funding_fetch()
+        )
+        self.clock = clock if clock is not None else (lambda: int(time.time() * 1000))
         self.sleep_fn = sleep_fn if sleep_fn is not None else time.sleep
         self.sleep_s = sleep_s
 
-    def collect(self, symbol: str, *,
-                market: str = "perp",
-                timeframe: str = "1m",
-                since: Optional[int] = None,
-                until: Optional[int] = None,
-                snapshot: bool = True,
-                dry_run: bool = False,
-                binance_last: Optional[dict] = None,
-                binance_funding: Optional[dict] = None) -> dict[str, CrossRun]:
+    def collect(
+        self,
+        symbol: str,
+        *,
+        market: str = "perp",
+        timeframe: str = "1m",
+        since: int | None = None,
+        until: int | None = None,
+        snapshot: bool = True,
+        dry_run: bool = False,
+        binance_last: dict | None = None,
+        binance_funding: dict | None = None,
+    ) -> dict[str, CrossRun]:
         """Collect premium/discount + funding spread for ``symbol``.
 
         Steps (each independent; a missing input skips that step):
@@ -681,49 +770,71 @@ class CrossExchangeCollector:
 
         if self.candle_store is not None:
             run = self._derive_premium_from_candles(
-                spec.symbol, market, timeframe, since, until, dry_run, now)
+                spec.symbol, market, timeframe, since, until, dry_run, now
+            )
             if run is not None:
                 runs[f"{run.venue}.{run.market}.{run.metric}"] = run
 
         if spec.futures_symbol:
             fund_run, spread_run = self._collect_bybit_funding(
-                spec.symbol, since, until, dry_run, now)
+                spec.symbol, since, until, dry_run, now
+            )
             if fund_run is not None:
                 runs[f"{fund_run.venue}.{fund_run.market}.{fund_run.metric}"] = fund_run
             if spread_run is not None:
-                runs[f"{spread_run.venue}.{spread_run.market}.{spread_run.metric}"] = spread_run
+                runs[f"{spread_run.venue}.{spread_run.market}.{spread_run.metric}"] = (
+                    spread_run
+                )
 
         if snapshot:
-            runs.update(self._persist_snapshot(
-                spec.symbol, dry_run=dry_run, now=now,
-                binance_last=binance_last,
-                binance_funding=binance_funding))
+            runs.update(
+                self._persist_snapshot(
+                    spec.symbol,
+                    dry_run=dry_run,
+                    now=now,
+                    binance_last=binance_last,
+                    binance_funding=binance_funding,
+                )
+            )
         return runs
 
     # -- historical premium -------------------------------------------------- #
-    def _derive_premium_from_candles(self, symbol: str, market: str,
-                                     timeframe: str, since, until,
-                                     dry_run: bool, now: int) -> Optional[CrossRun]:
+    def _derive_premium_from_candles(
+        self,
+        symbol: str,
+        market: str,
+        timeframe: str,
+        since,
+        until,
+        dry_run: bool,
+        now: int,
+    ) -> CrossRun | None:
         ref = self.candle_store.read(
-            "binance", market, symbol, timeframe,
-            start_ts=since, end_ts=until)
+            "binance", market, symbol, timeframe, start_ts=since, end_ts=until
+        )
         other = self.candle_store.read(
-            "bybit", market, symbol, timeframe,
-            start_ts=since, end_ts=until)
-        prem = derive_premium(ref, other, exchange="bybit", market=market,
-                              symbol=symbol, ingested_at=now)
-        return self._commit("bybit", PREMIUM_PCT, market, prem, dry_run,
-                            source="candle_store")
+            "bybit", market, symbol, timeframe, start_ts=since, end_ts=until
+        )
+        prem = derive_premium(
+            ref, other, exchange="bybit", market=market, symbol=symbol, ingested_at=now
+        )
+        return self._commit(
+            "bybit", PREMIUM_PCT, market, prem, dry_run, source="candle_store"
+        )
 
     # -- bybit funding history + spread -------------------------------------- #
-    def _collect_bybit_funding(self, symbol: str, since, until,
-                               dry_run: bool, now: int):
+    def _collect_bybit_funding(
+        self, symbol: str, since, until, dry_run: bool, now: int
+    ):
         existing = self.store.read("bybit", "perp", symbol, FUNDING_RATE)
         last_ts = int(existing["ts"].max()) if not existing.empty else None
-        cursor = since if since is not None else (
-            last_ts + FUNDING_STEP_MS if last_ts is not None else None)
+        cursor = (
+            since
+            if since is not None
+            else (last_ts + FUNDING_STEP_MS if last_ts is not None else None)
+        )
         pages: list[pd.DataFrame] = []
-        seen_last: Optional[int] = None
+        seen_last: int | None = None
         while True:
             page = self.funding_fetch(symbol, cursor, until, 200)
             if page is None or getattr(page, "empty", True):
@@ -748,44 +859,68 @@ class CrossExchangeCollector:
         if pages:
             raw = pd.concat(pages, ignore_index=True)
             raw = raw.drop_duplicates(subset=["ts"]).sort_values("ts")
-            bybit_fund = coerce_derivative_frame(pd.DataFrame({
-                "ts": raw["ts"].astype("int64"),
-                "exchange": "bybit", "market": "perp", "symbol": symbol,
-                "metric": FUNDING_RATE,
-                "value": raw["funding_rate"].astype(float),
-                "ingested_at": now,
-            }))
+            bybit_fund = coerce_derivative_frame(
+                pd.DataFrame(
+                    {
+                        "ts": raw["ts"].astype("int64"),
+                        "exchange": "bybit",
+                        "market": "perp",
+                        "symbol": symbol,
+                        "metric": FUNDING_RATE,
+                        "value": raw["funding_rate"].astype(float),
+                        "ingested_at": now,
+                    }
+                )
+            )
         else:
             bybit_fund = empty_frame()
 
-        fund_run = self._commit("bybit", FUNDING_RATE, "perp",
-                                bybit_fund, dry_run, source="bybit_history")
+        fund_run = self._commit(
+            "bybit", FUNDING_RATE, "perp", bybit_fund, dry_run, source="bybit_history"
+        )
 
         # Spread needs Binance funding from the P10.4 store.
         if self.deriv_store is None:
             return fund_run, None
         binance = self.deriv_store.read(
-            "binance", "perp", symbol, "funding_rate",
-            start_ts=since, end_ts=until)
+            "binance", "perp", symbol, "funding_rate", start_ts=since, end_ts=until
+        )
         # Prefer what we just wrote (or already had) for the Bybit side.
-        bybit = (bybit_fund if not bybit_fund.empty
-                 else self.store.read("bybit", "perp", symbol, FUNDING_RATE,
-                                      start_ts=since, end_ts=until))
+        bybit = (
+            bybit_fund
+            if not bybit_fund.empty
+            else self.store.read(
+                "bybit", "perp", symbol, FUNDING_RATE, start_ts=since, end_ts=until
+            )
+        )
         spread = derive_funding_spread(
-            binance, bybit, exchange="bybit", market="perp",
-            symbol=symbol, ingested_at=now)
-        spread_run = self._commit("bybit", FUNDING_SPREAD, "perp",
-                                  spread, dry_run, source="derived")
+            binance,
+            bybit,
+            exchange="bybit",
+            market="perp",
+            symbol=symbol,
+            ingested_at=now,
+        )
+        spread_run = self._commit(
+            "bybit", FUNDING_SPREAD, "perp", spread, dry_run, source="derived"
+        )
         return fund_run, spread_run
 
     # -- live / fake snapshot ------------------------------------------------ #
-    def _persist_snapshot(self, symbol: str, *, dry_run: bool, now: int,
-                          binance_last, binance_funding) -> dict[str, CrossRun]:
+    def _persist_snapshot(
+        self, symbol: str, *, dry_run: bool, now: int, binance_last, binance_funding
+    ) -> dict[str, CrossRun]:
         runs: dict[str, CrossRun] = {}
-        last = binance_last if binance_last is not None else (
-            self._demo_binance_last(symbol))
-        fund = binance_funding if binance_funding is not None else (
-            self._demo_binance_funding(symbol))
+        last = (
+            binance_last
+            if binance_last is not None
+            else (self._demo_binance_last(symbol))
+        )
+        fund = (
+            binance_funding
+            if binance_funding is not None
+            else (self._demo_binance_funding(symbol))
+        )
 
         price_ts = floor_ts(now, SNAPSHOT_STEP_MS)
         snap = snapshot_prices(last, get=self.get)
@@ -793,31 +928,41 @@ class CrossExchangeCollector:
         # Restrict to the requested symbol (the probe may return the watchlist).
         if not price_rows.empty:
             price_rows = price_rows[price_rows["symbol"] == symbol].reset_index(
-                drop=True)
+                drop=True
+            )
         for metric in (PRICE, PREMIUM_PCT):
-            part = (price_rows[price_rows["metric"] == metric]
-                    if not price_rows.empty else empty_frame())
+            part = (
+                price_rows[price_rows["metric"] == metric]
+                if not price_rows.empty
+                else empty_frame()
+            )
             # one row per venue
             if part.empty:
                 continue
             # commit per venue so status is readable
             for venue, chunk in part.groupby("exchange"):
-                run = self._commit(str(venue), metric, "spot",
-                                   coerce_derivative_frame(chunk),
-                                   dry_run, source="snapshot")
+                run = self._commit(
+                    str(venue),
+                    metric,
+                    "spot",
+                    coerce_derivative_frame(chunk),
+                    dry_run,
+                    source="snapshot",
+                )
                 if run is not None:
                     runs[f"{run.venue}.{run.market}.{run.metric}"] = run
 
         fund_ts = floor_ts(now, FUNDING_STEP_MS)
         fund_snap = snapshot_funding(fund, get=self.get)
-        fund_rows = snapshot_funding_rows(
-            fund_snap, ts=fund_ts, ingested_at=now)
+        fund_rows = snapshot_funding_rows(fund_snap, ts=fund_ts, ingested_at=now)
         if not fund_rows.empty:
-            fund_rows = fund_rows[fund_rows["symbol"] == symbol].reset_index(
-                drop=True)
+            fund_rows = fund_rows[fund_rows["symbol"] == symbol].reset_index(drop=True)
         for metric in (FUNDING_RATE, FUNDING_SPREAD):
-            part = (fund_rows[fund_rows["metric"] == metric]
-                    if not fund_rows.empty else empty_frame())
+            part = (
+                fund_rows[fund_rows["metric"] == metric]
+                if not fund_rows.empty
+                else empty_frame()
+            )
             if part.empty:
                 continue
             for venue, chunk in part.groupby("exchange"):
@@ -825,9 +970,14 @@ class CrossExchangeCollector:
                 # Historical bybit funding_rate / funding_spread already
                 # landed above; don't let the snapshot overwrite the key
                 # — still persist the snapshot row (same PK bucket).
-                run = self._commit(str(venue), metric, "perp",
-                                   coerce_derivative_frame(chunk),
-                                   dry_run, source="snapshot")
+                run = self._commit(
+                    str(venue),
+                    metric,
+                    "perp",
+                    coerce_derivative_frame(chunk),
+                    dry_run,
+                    source="snapshot",
+                )
                 if run is not None and key not in runs:
                     runs[key] = run
                 elif run is not None and key in runs:
@@ -839,6 +989,7 @@ class CrossExchangeCollector:
     def _demo_binance_last(self, symbol: str) -> dict:
         try:
             from data.sample_client import SampleClient
+
             df = SampleClient().klines(symbol, "15m", 60)
             if df is None or df.empty:
                 return {}
@@ -851,38 +1002,55 @@ class CrossExchangeCollector:
         if not spec.futures_symbol:
             return {}
         if self.deriv_store is not None:
-            df = self.deriv_store.read(
-                "binance", "perp", spec.symbol, "funding_rate")
+            df = self.deriv_store.read("binance", "perp", spec.symbol, "funding_rate")
             if not df.empty:
                 return {spec.symbol: float(df["value"].iloc[-1])}
         try:
             from data.sample_client import SampleClient
-            df = SampleClient().funding_rate_history(
-                spec.symbol, None, None, 8)
+
+            df = SampleClient().funding_rate_history(spec.symbol, None, None, 8)
             if df is None or df.empty:
                 return {spec.symbol: 0.0001}
             return {spec.symbol: float(df["funding_rate"].iloc[-1])}
         except Exception:
             return {spec.symbol: 0.0001}
 
-    def _commit(self, venue: str, metric: str, market: str,
-                frame: pd.DataFrame, dry_run: bool,
-                source: str) -> Optional[CrossRun]:
+    def _commit(
+        self,
+        venue: str,
+        metric: str,
+        market: str,
+        frame: pd.DataFrame,
+        dry_run: bool,
+        source: str,
+    ) -> CrossRun | None:
         if frame is None or frame.empty:
             return None
         first, last = _span(frame)
         before = self.store.count(venue, market, frame["symbol"].iloc[0], metric)
         if dry_run:
-            existing = self.store.read(
-                venue, market, frame["symbol"].iloc[0], metric)
+            existing = self.store.read(venue, market, frame["symbol"].iloc[0], metric)
             have = set(int(t) for t in existing["ts"]) if not existing.empty else set()
             new = len({int(t) for t in frame["ts"]} - have)
-            return CrossRun(venue=venue, metric=metric, market=market,
-                            rows_fetched=len(frame), rows_new=new,
-                            first_ts=first, last_ts=last, source=source)
+            return CrossRun(
+                venue=venue,
+                metric=metric,
+                market=market,
+                rows_fetched=len(frame),
+                rows_new=new,
+                first_ts=first,
+                last_ts=last,
+                source=source,
+            )
         self.store.write(frame)
         after = self.store.count(venue, market, frame["symbol"].iloc[0], metric)
-        return CrossRun(venue=venue, metric=metric, market=market,
-                        rows_fetched=len(frame),
-                        rows_new=max(0, after - before),
-                        first_ts=first, last_ts=last, source=source)
+        return CrossRun(
+            venue=venue,
+            metric=metric,
+            market=market,
+            rows_fetched=len(frame),
+            rows_new=max(0, after - before),
+            first_ts=first,
+            last_ts=last,
+            source=source,
+        )

@@ -1,6 +1,7 @@
 """Tests for the paper-sample grind (data/simulator.py): unique-sample
 dedupe, paper-trade creation, progress accounting, and the PROGRESSION=micro
 verdict.  Fully offline with a deterministic fake client."""
+
 from __future__ import annotations
 
 import pytest
@@ -33,26 +34,33 @@ def test_simulate_round_stores_unique_samples(sim_env):
     from data.simulator import simulate_round
 
     client = FakeClient(n=400, seed=5)
-    r1 = simulate_round(symbols=["BTCUSDT"], bars=400, step=8,
-                        min_confidence=50, horizons=[1], client=client)
+    r1 = simulate_round(
+        symbols=["BTCUSDT"],
+        bars=400,
+        step=8,
+        min_confidence=50,
+        horizons=[1],
+        client=client,
+    )
     assert r1["backtest_added"] > 0
     assert r1["paper_added"] > 0
     assert r1["saved"] is True
 
     with SignalDB() as db:
         bt = db.conn.execute(
-            "SELECT COUNT(*) n, COUNT(DISTINCT sim_key) keys "
-            "FROM backtest_results").fetchone()
+            "SELECT COUNT(*) n, COUNT(DISTINCT sim_key) keys FROM backtest_results"
+        ).fetchone()
         pp = db.conn.execute(
-            "SELECT COUNT(*) n, COUNT(DISTINCT sim_key) keys "
-            "FROM paper_trades").fetchone()
+            "SELECT COUNT(*) n, COUNT(DISTINCT sim_key) keys FROM paper_trades"
+        ).fetchone()
     assert bt["n"] == bt["keys"] == r1["backtest_added"]  # all unique
-    assert pp["n"] == pp["keys"] == r1["paper_added"]     # all unique
+    assert pp["n"] == pp["keys"] == r1["paper_added"]  # all unique
     # paper samples are decided + closed
     with SignalDB() as db:
         closed = db.conn.execute(
             "SELECT COUNT(*) n FROM paper_trades WHERE status='CLOSED' "
-            "AND outcome IN ('TP_HIT','STOP_LOSS')").fetchone()["n"]
+            "AND outcome IN ('TP_HIT','STOP_LOSS')"
+        ).fetchone()["n"]
     assert closed == r1["paper_added"]
 
 
@@ -60,26 +68,31 @@ def test_simulate_round_journals_closed_paper_samples(sim_env):
     """TODO-11: every closed simulator paper trade gets a journal entry with
     followed_rules=1 (mechanical execution), so the graduation gate's
     compliance criterion stops being None."""
+    from brain.journal import violation_rate
     from data.database import SignalDB
     from data.simulator import simulate_round
-    from brain.journal import violation_rate
 
     client = FakeClient(n=400, seed=13)
-    r1 = simulate_round(symbols=["BTCUSDT"], bars=400, step=8,
-                        min_confidence=50, horizons=[1], client=client)
+    r1 = simulate_round(
+        symbols=["BTCUSDT"],
+        bars=400,
+        step=8,
+        min_confidence=50,
+        horizons=[1],
+        client=client,
+    )
     assert r1["paper_added"] > 0
 
     with SignalDB() as db:
-        n = db.conn.execute(
-            "SELECT COUNT(*) n FROM journal_entries").fetchone()["n"]
+        n = db.conn.execute("SELECT COUNT(*) n FROM journal_entries").fetchone()["n"]
         j = violation_rate(db)
-    assert n == r1["paper_added"]                  # one journal per paper sample
+    assert n == r1["paper_added"]  # one journal per paper sample
     assert j["n"] == r1["paper_added"]
-    assert j["violation_rate"] == 0.0              # mechanical = rule-following
+    assert j["violation_rate"] == 0.0  # mechanical = rule-following
     with SignalDB() as db:
         bad = db.conn.execute(
-            "SELECT COUNT(*) n FROM journal_entries "
-            "WHERE followed_rules != 1").fetchone()["n"]
+            "SELECT COUNT(*) n FROM journal_entries WHERE followed_rules != 1"
+        ).fetchone()["n"]
     assert bad == 0
 
 
@@ -88,11 +101,23 @@ def test_simulate_round_dedupes_exact_rerun(sim_env):
     from data.simulator import simulate_round
 
     client = FakeClient(n=300, seed=7)
-    r1 = simulate_round(symbols=["BTCUSDT"], bars=300, step=6,
-                        min_confidence=50, horizons=[1], client=client)
+    r1 = simulate_round(
+        symbols=["BTCUSDT"],
+        bars=300,
+        step=6,
+        min_confidence=50,
+        horizons=[1],
+        client=client,
+    )
     assert r1["backtest_added"] > 0
-    r2 = simulate_round(symbols=["BTCUSDT"], bars=300, step=6,
-                        min_confidence=50, horizons=[1], client=client)
+    r2 = simulate_round(
+        symbols=["BTCUSDT"],
+        bars=300,
+        step=6,
+        min_confidence=50,
+        horizons=[1],
+        client=client,
+    )
     assert r2["backtest_added"] == 0
     assert r2["paper_added"] == 0
 
@@ -102,8 +127,15 @@ def test_simulate_round_dry_run_stores_nothing(sim_env):
     from data.simulator import simulate_round
 
     client = FakeClient(n=300, seed=9)
-    r = simulate_round(symbols=["BTCUSDT"], bars=300, step=6, save=False,
-                       min_confidence=50, horizons=[1], client=client)
+    r = simulate_round(
+        symbols=["BTCUSDT"],
+        bars=300,
+        step=6,
+        save=False,
+        min_confidence=50,
+        horizons=[1],
+        client=client,
+    )
     assert r["backtest_added"] > 0
     with SignalDB() as db:
         n = db.conn.execute("SELECT COUNT(*) n FROM backtest_results").fetchone()["n"]
@@ -112,12 +144,22 @@ def test_simulate_round_dry_run_stores_nothing(sim_env):
 
 def test_paper_progress_and_verdict(sim_env):
     from data.database import SignalDB
-    from data.simulator import (grind_verdict, paper_progress, simulate_round,
-                                primary_plan_types)
+    from data.simulator import (
+        grind_verdict,
+        paper_progress,
+        primary_plan_types,
+        simulate_round,
+    )
 
     client = FakeClient(n=500, seed=3)
-    simulate_round(symbols=["BTCUSDT", "ETHUSDT", "XAUUSD"], bars=500,
-                   step=4, min_confidence=50, horizons=[1], client=client)
+    simulate_round(
+        symbols=["BTCUSDT", "ETHUSDT", "XAUUSD"],
+        bars=500,
+        step=4,
+        min_confidence=50,
+        horizons=[1],
+        client=client,
+    )
     with SignalDB() as db:
         progress = paper_progress(db)
         verdict = grind_verdict(progress)
@@ -135,15 +177,36 @@ def test_paper_progress_and_verdict(sim_env):
 
 def test_grind_verdict_ready_when_proven(sim_env):
     from data.simulator import grind_verdict
+
     fake = [
-        {"plan_type": "Sweep Reversal Buy", "backtest_n": 150, "paper_n": 25,
-         "expectancy": 0.4, "proven": True},
-        {"plan_type": "Sweep Reversal Sell", "backtest_n": 130, "paper_n": 21,
-         "expectancy": 0.2, "proven": True},
-        {"plan_type": "Buy Pullback", "backtest_n": 120, "paper_n": 22,
-         "expectancy": 0.3, "proven": True},
-        {"plan_type": "Sell Pullback", "backtest_n": 110, "paper_n": 24,
-         "expectancy": 0.1, "proven": True},
+        {
+            "plan_type": "Sweep Reversal Buy",
+            "backtest_n": 150,
+            "paper_n": 25,
+            "expectancy": 0.4,
+            "proven": True,
+        },
+        {
+            "plan_type": "Sweep Reversal Sell",
+            "backtest_n": 130,
+            "paper_n": 21,
+            "expectancy": 0.2,
+            "proven": True,
+        },
+        {
+            "plan_type": "Buy Pullback",
+            "backtest_n": 120,
+            "paper_n": 22,
+            "expectancy": 0.3,
+            "proven": True,
+        },
+        {
+            "plan_type": "Sell Pullback",
+            "backtest_n": 110,
+            "paper_n": 24,
+            "expectancy": 0.1,
+            "proven": True,
+        },
     ]
     v = grind_verdict(fake)
     assert v["ready"] is True
@@ -152,9 +215,15 @@ def test_grind_verdict_ready_when_proven(sim_env):
 
 def test_grind_verdict_lists_missing(sim_env):
     from data.simulator import grind_verdict
+
     fake = [
-        {"plan_type": "Sweep Reversal Buy", "backtest_n": 150, "paper_n": 25,
-         "expectancy": 0.4, "proven": True},
+        {
+            "plan_type": "Sweep Reversal Buy",
+            "backtest_n": 150,
+            "paper_n": 25,
+            "expectancy": 0.4,
+            "proven": True,
+        },
         # other three primary setups have no samples at all
     ]
     v = grind_verdict(fake)
@@ -168,10 +237,19 @@ def test_grind_verdict_explains_cost_flipped_setup_on_net_expectancy(sim_env):
     from data.simulator import grind_verdict
 
     # Even a stale/caller-supplied proven=True cannot override the net book.
-    fake = [{"plan_type": "Buy Pullback", "backtest_n": 120, "paper_n": 25,
-             "expectancy": 0.10, "expectancy_net": -0.05, "proven": True}]
-    gap = next(m for m in grind_verdict(fake)["missing"]
-               if m["plan_type"] == "Buy Pullback")
+    fake = [
+        {
+            "plan_type": "Buy Pullback",
+            "backtest_n": 120,
+            "paper_n": 25,
+            "expectancy": 0.10,
+            "expectancy_net": -0.05,
+            "proven": True,
+        }
+    ]
+    gap = next(
+        m for m in grind_verdict(fake)["missing"] if m["plan_type"] == "Buy Pullback"
+    )
     assert gap["expectancy"] > 0
     assert gap["expectancy_net"] < 0
     assert "positive net expectancy" in gap["missing"]
@@ -184,14 +262,28 @@ def test_paper_progress_preserves_exact_zero_net_values(sim_env):
     from data.simulator import paper_progress
 
     with SignalDB() as db:
-        db.save_backtest_rows([{
-            "ts": 1_700_000_000_000, "symbol": "BTCUSDT", "timeframe": "15m",
-            "plan_type": "Zero Net", "action": "BUY", "confidence_pct": 70,
-            "horizon_hours": 4.0, "outcome": "FULL_WIN", "rr_achieved": 1.0,
-            "rr_net": 0.0, "max_favorable": 1.0, "max_adverse": -1.0,
-            "entry": 60_000.0, "stop_loss": 59_500.0,
-            "trigger_level": None,
-        }], run_id="zero-net")
+        db.save_backtest_rows(
+            [
+                {
+                    "ts": 1_700_000_000_000,
+                    "symbol": "BTCUSDT",
+                    "timeframe": "15m",
+                    "plan_type": "Zero Net",
+                    "action": "BUY",
+                    "confidence_pct": 70,
+                    "horizon_hours": 4.0,
+                    "outcome": "FULL_WIN",
+                    "rr_achieved": 1.0,
+                    "rr_net": 0.0,
+                    "max_favorable": 1.0,
+                    "max_adverse": -1.0,
+                    "entry": 60_000.0,
+                    "stop_loss": 59_500.0,
+                    "trigger_level": None,
+                }
+            ],
+            run_id="zero-net",
+        )
         row = next(p for p in paper_progress(db) if p["plan_type"] == "Zero Net")
 
     assert row["expectancy"] == 1.0
@@ -203,24 +295,41 @@ def test_paper_progress_preserves_exact_zero_net_values(sim_env):
 
 # ── graduation gate (BLUEPRINT Step 2 → Step 3) ───────────────────────────
 
-def _full_row(pt: str, n: int = 120, wins: int = 72, win_r: float = 108.0,
-              loss_r: float = 43.2, backtest_n: int = 120, paper_n: int = 20):
+
+def _full_row(
+    pt: str,
+    n: int = 120,
+    wins: int = 72,
+    win_r: float = 108.0,
+    loss_r: float = 43.2,
+    backtest_n: int = 120,
+    paper_n: int = 20,
+):
     """A progress row with the sample proof fields grind_verdict also checks."""
-    return {"plan_type": pt, "backtest_n": backtest_n, "paper_n": paper_n,
-            "n": n, "wins": wins, "losses": n - wins,
-            "win_r": win_r, "loss_r": loss_r,
-            "expectancy": round((win_r - loss_r) / n, 3),
-            "proven": backtest_n >= 100 and paper_n >= 20 and win_r > loss_r}
+    return {
+        "plan_type": pt,
+        "backtest_n": backtest_n,
+        "paper_n": paper_n,
+        "n": n,
+        "wins": wins,
+        "losses": n - wins,
+        "win_r": win_r,
+        "loss_r": loss_r,
+        "expectancy": round((win_r - loss_r) / n, 3),
+        "proven": backtest_n >= 100 and paper_n >= 20 and win_r > loss_r,
+    }
 
 
 def test_graduation_status_met_on_strong_edge(sim_env):
     """A strong primary family passes all four blueprint criteria AND the
     sample proof, so the gate says GRADUATED."""
     from data.simulator import graduation_status, primary_plan_types
+
     primary = primary_plan_types()
     # +0.54R expectancy, 60% win rate, PF 2.5, 95% compliance
-    progress = [_full_row(pt, n=120, wins=72, win_r=108.0, loss_r=43.2)
-                for pt in primary]
+    progress = [
+        _full_row(pt, n=120, wins=72, win_r=108.0, loss_r=43.2) for pt in primary
+    ]
     g = graduation_status(progress, compliance=0.95)
     assert g["stats"]["expectancy"] == 0.54
     assert g["stats"]["win_rate"] == 0.6
@@ -233,9 +342,11 @@ def test_graduation_status_met_on_strong_edge(sim_env):
 def test_graduation_status_fails_weak_edge(sim_env):
     """A losing family (like demo synthetic data) fails every criterion."""
     from data.simulator import graduation_status, primary_plan_types
+
     primary = primary_plan_types()
-    progress = [_full_row(pt, n=120, wins=40, win_r=60.0, loss_r=120.0)
-                for pt in primary]  # -0.50R, 33% win rate, PF 0.5
+    progress = [
+        _full_row(pt, n=120, wins=40, win_r=60.0, loss_r=120.0) for pt in primary
+    ]  # -0.50R, 33% win rate, PF 0.5
     g = graduation_status(progress, compliance=0.8)
     assert g["ready"] is False
     assert g["met"]["expectancy"] is False
@@ -247,6 +358,7 @@ def test_graduation_status_fails_weak_edge(sim_env):
 def test_graduation_compliance_requires_journal(sim_env):
     """compliance=None (no journal entries yet) never passes the gate."""
     from data.simulator import graduation_status, primary_plan_types
+
     primary = primary_plan_types()
     progress = [_full_row(pt) for pt in primary]
     g = graduation_status(progress, compliance=None)
@@ -258,9 +370,11 @@ def test_graduation_pf_without_losses(sim_env):
     """A family with wins and zero losses: PF is undefined but the criterion
     is treated as met (no losses to drag expectancy down)."""
     from data.simulator import graduation_status, primary_plan_types
+
     primary = primary_plan_types()
-    progress = [_full_row(pt, n=120, wins=120, win_r=240.0, loss_r=0.0)
-                for pt in primary]
+    progress = [
+        _full_row(pt, n=120, wins=120, win_r=240.0, loss_r=0.0) for pt in primary
+    ]
     g = graduation_status(progress, compliance=0.95)
     assert g["stats"]["pf"] is None
     assert g["met"]["pf"] is True
@@ -270,6 +384,7 @@ def test_graduation_pf_without_losses(sim_env):
 def test_graduation_requires_every_primary_setup(sim_env):
     """Missing one primary setup keeps the gate closed even with great math."""
     from data.simulator import graduation_status, primary_plan_types
+
     primary = primary_plan_types()
     progress = [_full_row(pt) for pt in primary[:-1]]  # one family member absent
     g = graduation_status(progress, compliance=0.95)
@@ -281,12 +396,22 @@ def test_paper_progress_rows_carry_win_stats_and_graduation_consistent(sim_env):
     """After a real grind, progress rows expose win_rate/pf/win_r/loss_r and
     graduation_status aggregates the exact same numbers."""
     from data.database import SignalDB
-    from data.simulator import (graduation_status, paper_progress,
-                                primary_plan_types, simulate_round)
+    from data.simulator import (
+        graduation_status,
+        paper_progress,
+        primary_plan_types,
+        simulate_round,
+    )
 
     client = FakeClient(n=400, seed=5)
-    simulate_round(symbols=["BTCUSDT"], bars=400, step=8, min_confidence=50,
-                   horizons=[1], client=client)
+    simulate_round(
+        symbols=["BTCUSDT"],
+        bars=400,
+        step=8,
+        min_confidence=50,
+        horizons=[1],
+        client=client,
+    )
     with SignalDB() as db:
         progress = paper_progress(db)
         gate = graduation_status(progress)

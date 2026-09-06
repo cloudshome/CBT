@@ -1,4 +1,5 @@
 """Tests for the Evidence-tab unlock explanation boundary."""
+
 from __future__ import annotations
 
 from brain import unlock

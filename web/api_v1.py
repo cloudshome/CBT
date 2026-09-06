@@ -45,13 +45,14 @@ Deliberate non-goals
   authenticated, role-checked and CSRF-protected by the same code path. This
   module must never introduce its own bypass.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import time
 import uuid
-from typing import Any, Callable, Optional
+from typing import Any
 
 import config
 
@@ -148,7 +149,7 @@ def new_request_id() -> str:
     return uuid.uuid4().hex[:16]
 
 
-def meta(request_id: Optional[str] = None, **extra: Any) -> dict:
+def meta(request_id: str | None = None, **extra: Any) -> dict:
     """The ``meta`` block every v1 response carries."""
     out = {
         "api_version": API_VERSION,
@@ -160,20 +161,32 @@ def meta(request_id: Optional[str] = None, **extra: Any) -> dict:
     return out
 
 
-def envelope_ok(data: Any, request_id: Optional[str] = None, **extra_meta: Any) -> dict:
+def envelope_ok(data: Any, request_id: str | None = None, **extra_meta: Any) -> dict:
     """Success envelope. ``error`` is always present and always null."""
-    return {"ok": True, "data": data, "error": None,
-            "meta": meta(request_id, **extra_meta)}
+    return {
+        "ok": True,
+        "data": data,
+        "error": None,
+        "meta": meta(request_id, **extra_meta),
+    }
 
 
-def envelope_error(code: str, message: str, details: Any = None,
-                   request_id: Optional[str] = None, **extra_meta: Any) -> dict:
+def envelope_error(
+    code: str,
+    message: str,
+    details: Any = None,
+    request_id: str | None = None,
+    **extra_meta: Any,
+) -> dict:
     """Failure envelope. ``data`` is always present and always null."""
     return {
         "ok": False,
         "data": None,
-        "error": {"code": code, "message": str(message),
-                  "details": details if details is not None else {}},
+        "error": {
+            "code": code,
+            "message": str(message),
+            "details": details if details is not None else {},
+        },
         "meta": meta(request_id, **extra_meta),
     }
 
@@ -203,7 +216,7 @@ def version_info() -> dict:
     }
 
 
-def check_client_version(raw: Optional[str]) -> Optional[tuple[str, str]]:
+def check_client_version(raw: str | None) -> tuple[str, str] | None:
     """Validate a declared client version.
 
     Returns ``None`` when the client is compatible (or did not declare a
@@ -214,17 +227,22 @@ def check_client_version(raw: Optional[str]) -> Optional[tuple[str, str]]:
     try:
         version = int(str(raw).strip())
     except (TypeError, ValueError):
-        return (ErrorCode.BAD_REQUEST,
-                f"{CLIENT_VERSION_HEADER} must be an integer build number, "
-                f"got {raw!r}")
+        return (
+            ErrorCode.BAD_REQUEST,
+            f"{CLIENT_VERSION_HEADER} must be an integer build number, got {raw!r}",
+        )
     if version < MIN_CLIENT_VERSION:
-        return (ErrorCode.CLIENT_TOO_OLD,
-                f"This client (v{version}) is older than the minimum supported "
-                f"version (v{MIN_CLIENT_VERSION}). Please update the app.")
+        return (
+            ErrorCode.CLIENT_TOO_OLD,
+            f"This client (v{version}) is older than the minimum supported "
+            f"version (v{MIN_CLIENT_VERSION}). Please update the app.",
+        )
     if version > MAX_CLIENT_VERSION:
-        return (ErrorCode.CLIENT_TOO_NEW,
-                f"This client (v{version}) is newer than this server supports "
-                f"(v{MAX_CLIENT_VERSION}). Please update the SKY Hub.")
+        return (
+            ErrorCode.CLIENT_TOO_NEW,
+            f"This client (v{version}) is newer than this server supports "
+            f"(v{MAX_CLIENT_VERSION}). Please update the SKY Hub.",
+        )
     return None
 
 
@@ -235,10 +253,10 @@ def request_fingerprint(endpoint: str, body: Any) -> str:
         canonical = json.dumps(body, sort_keys=True, default=str)
     except Exception:
         canonical = repr(body)
-    return hashlib.sha256(f"{endpoint}\n{canonical}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{endpoint}\n{canonical}".encode()).hexdigest()
 
 
-def validate_key(raw: Optional[str]) -> Optional[str]:
+def validate_key(raw: str | None) -> str | None:
     """Return a clean idempotency key, or ``None`` when absent.
 
     Raises ``ValueError`` for a supplied-but-unusable key: a client that sends
@@ -253,11 +271,12 @@ def validate_key(raw: Optional[str]) -> Optional[str]:
     if len(key) < MIN_IDEMPOTENCY_KEY_LEN:
         raise ValueError(
             f"{IDEMPOTENCY_HEADER} must be at least {MIN_IDEMPOTENCY_KEY_LEN} "
-            "characters (use a UUID)")
+            "characters (use a UUID)"
+        )
     if len(key) > MAX_IDEMPOTENCY_KEY_LEN:
         raise ValueError(
-            f"{IDEMPOTENCY_HEADER} must be at most {MAX_IDEMPOTENCY_KEY_LEN} "
-            "characters")
+            f"{IDEMPOTENCY_HEADER} must be at most {MAX_IDEMPOTENCY_KEY_LEN} characters"
+        )
     return key
 
 
@@ -270,15 +289,17 @@ class IdempotencyStore:
     byte-identical to what the first call returned.
     """
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path
 
     def _db(self):
         from data.database import SignalDB
+
         return SignalDB(self.db_path) if self.db_path else SignalDB()
 
-    def lookup(self, key: str, user_id: Optional[int], endpoint: str,
-               fingerprint: str) -> tuple[str, Any]:
+    def lookup(
+        self, key: str, user_id: int | None, endpoint: str, fingerprint: str
+    ) -> tuple[str, Any]:
         """Resolve a key.
 
         Returns one of:
@@ -292,13 +313,16 @@ class IdempotencyStore:
             row = db.conn.execute(
                 "SELECT request_hash, status_code, response_json, created_ts "
                 "FROM idempotency_keys WHERE key=? AND user_id IS ? AND endpoint=?",
-                (key, user_id, endpoint)).fetchone()
+                (key, user_id, endpoint),
+            ).fetchone()
             if row is None:
                 return ("miss", None)
             if (row["created_ts"] or 0) < cutoff:
                 db.conn.execute(
                     "DELETE FROM idempotency_keys WHERE key=? AND user_id IS ? "
-                    "AND endpoint=?", (key, user_id, endpoint))
+                    "AND endpoint=?",
+                    (key, user_id, endpoint),
+                )
                 db.conn.commit()
                 return ("miss", None)
             if row["request_hash"] != fingerprint:
@@ -311,47 +335,60 @@ class IdempotencyStore:
                 return ("miss", None)
             return ("replay", (int(row["status_code"] or 200), payload))
 
-    def reserve(self, key: str, user_id: Optional[int], endpoint: str,
-                fingerprint: str) -> bool:
+    def reserve(
+        self, key: str, user_id: int | None, endpoint: str, fingerprint: str
+    ) -> bool:
         """Claim a key before executing. False if someone else already has it."""
         import sqlite3
+
         with self._db() as db:
             try:
                 db.conn.execute(
                     "INSERT INTO idempotency_keys(key, user_id, endpoint, "
                     "request_hash, status_code, response_json, created_ts) "
                     "VALUES(?,?,?,?,NULL,NULL,?)",
-                    (key, user_id, endpoint, fingerprint, int(time.time())))
+                    (key, user_id, endpoint, fingerprint, int(time.time())),
+                )
                 db.conn.commit()
                 return True
             except sqlite3.IntegrityError:
                 return False
 
-    def complete(self, key: str, user_id: Optional[int], endpoint: str,
-                 status: int, payload: Any) -> None:
+    def complete(
+        self, key: str, user_id: int | None, endpoint: str, status: int, payload: Any
+    ) -> None:
         """Store the rendered response so retries replay it."""
         with self._db() as db:
             db.conn.execute(
                 "UPDATE idempotency_keys SET status_code=?, response_json=?, "
                 "created_ts=? WHERE key=? AND user_id IS ? AND endpoint=?",
-                (int(status), json.dumps(payload, default=str),
-                 int(time.time()), key, user_id, endpoint))
+                (
+                    int(status),
+                    json.dumps(payload, default=str),
+                    int(time.time()),
+                    key,
+                    user_id,
+                    endpoint,
+                ),
+            )
             db.conn.commit()
 
-    def release(self, key: str, user_id: Optional[int], endpoint: str) -> None:
+    def release(self, key: str, user_id: int | None, endpoint: str) -> None:
         """Drop a reservation whose handler raised, so a retry can proceed."""
         with self._db() as db:
             db.conn.execute(
                 "DELETE FROM idempotency_keys WHERE key=? AND user_id IS ? "
                 "AND endpoint=? AND response_json IS NULL",
-                (key, user_id, endpoint))
+                (key, user_id, endpoint),
+            )
             db.conn.commit()
 
     def purge_expired(self) -> int:
         cutoff = int(time.time()) - IDEMPOTENCY_TTL_SECONDS
         with self._db() as db:
             cur = db.conn.execute(
-                "DELETE FROM idempotency_keys WHERE created_ts < ?", (cutoff,))
+                "DELETE FROM idempotency_keys WHERE created_ts < ?", (cutoff,)
+            )
             db.conn.commit()
             return cur.rowcount
 
@@ -366,153 +403,419 @@ class IdempotencyStore:
 #: mutations that accept an ``Idempotency-Key``.
 ROUTES: tuple[dict, ...] = (
     # ── read: market & signal ─────────────────────────────────────────
-    {"path": "/scan", "method": "GET", "legacy": "/api/scan", "role": "viewer",
-     "summary": "Live engine scan for one symbol/timeframe."},
-    {"path": "/sentiment", "method": "GET", "legacy": "/api/sentiment",
-     "role": "viewer", "summary": "Market-sentiment colour reading."},
-    {"path": "/intelligence", "method": "GET", "legacy": "/api/intelligence",
-     "role": "viewer", "summary": "Institutional desk report."},
-    {"path": "/candles", "method": "GET", "legacy": "/api/candles",
-     "role": "viewer", "summary": "OHLCV candles for charting."},
-    {"path": "/chart", "method": "GET", "legacy": "/api/chart", "role": "viewer",
-     "summary": "Chart payload: candles plus overlays and levels."},
-    {"path": "/history", "method": "GET", "legacy": "/api/history",
-     "role": "viewer", "summary": "Recent scans with lifecycle status."},
-    {"path": "/signal", "method": "GET", "legacy": "/api/signal", "role": "viewer",
-     "summary": "Full detail, plans and decision trail for one scan."},
-    {"path": "/state", "method": "GET", "legacy": "/api/state", "role": "viewer",
-     "summary": "Signal state memory and change events."},
-
+    {
+        "path": "/scan",
+        "method": "GET",
+        "legacy": "/api/scan",
+        "role": "viewer",
+        "summary": "Live engine scan for one symbol/timeframe.",
+    },
+    {
+        "path": "/sentiment",
+        "method": "GET",
+        "legacy": "/api/sentiment",
+        "role": "viewer",
+        "summary": "Market-sentiment colour reading.",
+    },
+    {
+        "path": "/intelligence",
+        "method": "GET",
+        "legacy": "/api/intelligence",
+        "role": "viewer",
+        "summary": "Institutional desk report.",
+    },
+    {
+        "path": "/candles",
+        "method": "GET",
+        "legacy": "/api/candles",
+        "role": "viewer",
+        "summary": "OHLCV candles for charting.",
+    },
+    {
+        "path": "/chart",
+        "method": "GET",
+        "legacy": "/api/chart",
+        "role": "viewer",
+        "summary": "Chart payload: candles plus overlays and levels.",
+    },
+    {
+        "path": "/history",
+        "method": "GET",
+        "legacy": "/api/history",
+        "role": "viewer",
+        "summary": "Recent scans with lifecycle status.",
+    },
+    {
+        "path": "/signal",
+        "method": "GET",
+        "legacy": "/api/signal",
+        "role": "viewer",
+        "summary": "Full detail, plans and decision trail for one scan.",
+    },
+    {
+        "path": "/state",
+        "method": "GET",
+        "legacy": "/api/state",
+        "role": "viewer",
+        "summary": "Signal state memory and change events.",
+    },
     # ── read: desk, risk & evidence ───────────────────────────────────
-    {"path": "/pending", "method": "GET", "legacy": "/api/pending",
-     "role": "viewer", "summary": "Signals awaiting human approval."},
-    {"path": "/risk", "method": "GET", "legacy": "/api/risk", "role": "viewer",
-     "summary": "Risk & discipline gate status."},
-    {"path": "/desk", "method": "GET", "legacy": "/api/desk", "role": "viewer",
-     "summary": "One-call desk advisory."},
-    {"path": "/loop-health", "method": "GET", "legacy": "/api/loop-health",
-     "role": "viewer", "summary": "The one daily loop-health number."},
-    {"path": "/readiness", "method": "GET", "legacy": "/api/readiness",
-     "role": "viewer", "summary": "Four-pillar readiness verdict."},
-    {"path": "/doctor", "method": "GET", "legacy": "/api/doctor", "role": "viewer",
-     "summary": "Readiness verdict in human-readable form."},
-    {"path": "/scorecard", "method": "GET", "legacy": "/api/scorecard",
-     "role": "viewer", "summary": "Business scorecard."},
-    {"path": "/unlock", "method": "GET", "legacy": "/api/unlock", "role": "viewer",
-     "summary": "Why the desk is blocked and how to unblock it."},
-    {"path": "/evidence", "method": "GET", "legacy": "/api/evidence",
-     "role": "viewer", "summary": "Per-setup evidence scoreboard."},
-    {"path": "/learning", "method": "GET", "legacy": "/api/learning",
-     "role": "viewer", "summary": "Backtest stats and calibration profile."},
-    {"path": "/coach", "method": "GET", "legacy": "/api/coach", "role": "viewer",
-     "summary": "Explain / mentor / personal feedback."},
-    {"path": "/monte", "method": "GET", "legacy": "/api/monte", "role": "viewer",
-     "summary": "Monte-Carlo risk-of-ruin table."},
-
+    {
+        "path": "/pending",
+        "method": "GET",
+        "legacy": "/api/pending",
+        "role": "viewer",
+        "summary": "Signals awaiting human approval.",
+    },
+    {
+        "path": "/risk",
+        "method": "GET",
+        "legacy": "/api/risk",
+        "role": "viewer",
+        "summary": "Risk & discipline gate status.",
+    },
+    {
+        "path": "/desk",
+        "method": "GET",
+        "legacy": "/api/desk",
+        "role": "viewer",
+        "summary": "One-call desk advisory.",
+    },
+    {
+        "path": "/loop-health",
+        "method": "GET",
+        "legacy": "/api/loop-health",
+        "role": "viewer",
+        "summary": "The one daily loop-health number.",
+    },
+    {
+        "path": "/readiness",
+        "method": "GET",
+        "legacy": "/api/readiness",
+        "role": "viewer",
+        "summary": "Four-pillar readiness verdict.",
+    },
+    {
+        "path": "/doctor",
+        "method": "GET",
+        "legacy": "/api/doctor",
+        "role": "viewer",
+        "summary": "Readiness verdict in human-readable form.",
+    },
+    {
+        "path": "/scorecard",
+        "method": "GET",
+        "legacy": "/api/scorecard",
+        "role": "viewer",
+        "summary": "Business scorecard.",
+    },
+    {
+        "path": "/unlock",
+        "method": "GET",
+        "legacy": "/api/unlock",
+        "role": "viewer",
+        "summary": "Why the desk is blocked and how to unblock it.",
+    },
+    {
+        "path": "/evidence",
+        "method": "GET",
+        "legacy": "/api/evidence",
+        "role": "viewer",
+        "summary": "Per-setup evidence scoreboard.",
+    },
+    {
+        "path": "/learning",
+        "method": "GET",
+        "legacy": "/api/learning",
+        "role": "viewer",
+        "summary": "Backtest stats and calibration profile.",
+    },
+    {
+        "path": "/coach",
+        "method": "GET",
+        "legacy": "/api/coach",
+        "role": "viewer",
+        "summary": "Explain / mentor / personal feedback.",
+    },
+    {
+        "path": "/monte",
+        "method": "GET",
+        "legacy": "/api/monte",
+        "role": "viewer",
+        "summary": "Monte-Carlo risk-of-ruin table.",
+    },
     # ── read: book & journal ──────────────────────────────────────────
-    {"path": "/paper", "method": "GET", "legacy": "/api/paper", "role": "viewer",
-     "summary": "Paper-trade state and runner statistics."},
-    {"path": "/trades", "method": "GET", "legacy": "/api/trades", "role": "viewer",
-     "summary": "Live open book with R / MAE / MFE."},
-    {"path": "/journal", "method": "GET", "legacy": "/api/journal",
-     "role": "viewer", "summary": "Journal entries and discipline summary."},
-
+    {
+        "path": "/paper",
+        "method": "GET",
+        "legacy": "/api/paper",
+        "role": "viewer",
+        "summary": "Paper-trade state and runner statistics.",
+    },
+    {
+        "path": "/trades",
+        "method": "GET",
+        "legacy": "/api/trades",
+        "role": "viewer",
+        "summary": "Live open book with R / MAE / MFE.",
+    },
+    {
+        "path": "/journal",
+        "method": "GET",
+        "legacy": "/api/journal",
+        "role": "viewer",
+        "summary": "Journal entries and discipline summary.",
+    },
     # ── read: system ──────────────────────────────────────────────────
-    {"path": "/health", "method": "GET", "legacy": "/api/health", "role": "viewer",
-     "summary": "Full system health report."},
-    {"path": "/channels", "method": "GET", "legacy": "/api/channels",
-     "role": "viewer", "summary": "Ordered-backend channel registry."},
-    {"path": "/sources", "method": "GET", "legacy": "/api/sources",
-     "role": "viewer", "summary": "Source trust scores."},
-    {"path": "/connections", "method": "GET", "legacy": "/api/connections",
-     "role": "viewer", "summary": "Real-world connection registry."},
-    {"path": "/account", "method": "GET", "legacy": "/api/account", "role": "viewer",
-     "summary": "Read-only exchange account snapshot."},
-    {"path": "/modules", "method": "GET", "legacy": "/api/modules", "role": "viewer",
-     "summary": "Every module in the codebase."},
-    {"path": "/commands", "method": "GET", "legacy": "/api/commands",
-     "role": "viewer", "summary": "Allow-listed CLI command catalog."},
-    {"path": "/agents", "method": "GET", "legacy": "/api/agents", "role": "viewer",
-     "summary": "Desk morning briefing."},
-    {"path": "/glossary", "method": "GET", "legacy": "/api/glossary",
-     "role": "viewer", "summary": "Glossary lookup."},
-
+    {
+        "path": "/health",
+        "method": "GET",
+        "legacy": "/api/health",
+        "role": "viewer",
+        "summary": "Full system health report.",
+    },
+    {
+        "path": "/channels",
+        "method": "GET",
+        "legacy": "/api/channels",
+        "role": "viewer",
+        "summary": "Ordered-backend channel registry.",
+    },
+    {
+        "path": "/sources",
+        "method": "GET",
+        "legacy": "/api/sources",
+        "role": "viewer",
+        "summary": "Source trust scores.",
+    },
+    {
+        "path": "/connections",
+        "method": "GET",
+        "legacy": "/api/connections",
+        "role": "viewer",
+        "summary": "Real-world connection registry.",
+    },
+    {
+        "path": "/account",
+        "method": "GET",
+        "legacy": "/api/account",
+        "role": "viewer",
+        "summary": "Read-only exchange account snapshot.",
+    },
+    {
+        "path": "/modules",
+        "method": "GET",
+        "legacy": "/api/modules",
+        "role": "viewer",
+        "summary": "Every module in the codebase.",
+    },
+    {
+        "path": "/commands",
+        "method": "GET",
+        "legacy": "/api/commands",
+        "role": "viewer",
+        "summary": "Allow-listed CLI command catalog.",
+    },
+    {
+        "path": "/agents",
+        "method": "GET",
+        "legacy": "/api/agents",
+        "role": "viewer",
+        "summary": "Desk morning briefing.",
+    },
+    {
+        "path": "/glossary",
+        "method": "GET",
+        "legacy": "/api/glossary",
+        "role": "viewer",
+        "summary": "Glossary lookup.",
+    },
     # ── viewer-safe computations (POST but read-only) ─────────────────
-    {"path": "/ask", "method": "POST", "legacy": "/api/ask", "role": "viewer",
-     "summary": "Natural-language question to the desk."},
-    {"path": "/position-size", "method": "POST", "legacy": "/api/position-size",
-     "role": "viewer", "summary": "Position-size calculator bounded by the gate."},
-    {"path": "/connections/test", "method": "POST", "legacy": "/api/connections/test",
-     "role": "viewer", "summary": "Probe one real-world connection."},
-
+    {
+        "path": "/ask",
+        "method": "POST",
+        "legacy": "/api/ask",
+        "role": "viewer",
+        "summary": "Natural-language question to the desk.",
+    },
+    {
+        "path": "/position-size",
+        "method": "POST",
+        "legacy": "/api/position-size",
+        "role": "viewer",
+        "summary": "Position-size calculator bounded by the gate.",
+    },
+    {
+        "path": "/connections/test",
+        "method": "POST",
+        "legacy": "/api/connections/test",
+        "role": "viewer",
+        "summary": "Probe one real-world connection.",
+    },
     # ── human mutations (operator + idempotency) ──────────────────────
-    {"path": "/review", "method": "POST", "legacy": "/api/review", "role": "operator",
-     "idempotent": True,
-     "summary": "Approve / reject / execute / close a signal."},
-    {"path": "/journal", "method": "POST", "legacy": "/api/journal",
-     "role": "operator", "idempotent": True,
-     "summary": "Save a post-trade journal entry."},
-    {"path": "/paper/run", "method": "POST", "legacy": "/api/paper/run",
-     "role": "operator", "idempotent": True,
-     "summary": "One explicit paper-runner pass. Never places an order."},
-    {"path": "/trader-state", "method": "POST", "legacy": "/api/trader-state",
-     "role": "operator", "idempotent": True,
-     "summary": "Set or clear behavioral no-trade flags."},
-
+    {
+        "path": "/review",
+        "method": "POST",
+        "legacy": "/api/review",
+        "role": "operator",
+        "idempotent": True,
+        "summary": "Approve / reject / execute / close a signal.",
+    },
+    {
+        "path": "/journal",
+        "method": "POST",
+        "legacy": "/api/journal",
+        "role": "operator",
+        "idempotent": True,
+        "summary": "Save a post-trade journal entry.",
+    },
+    {
+        "path": "/paper/run",
+        "method": "POST",
+        "legacy": "/api/paper/run",
+        "role": "operator",
+        "idempotent": True,
+        "summary": "One explicit paper-runner pass. Never places an order.",
+    },
+    {
+        "path": "/trader-state",
+        "method": "POST",
+        "legacy": "/api/trader-state",
+        "role": "operator",
+        "idempotent": True,
+        "summary": "Set or clear behavioral no-trade flags.",
+    },
     # ── operator actions without idempotency (safely repeatable) ──────
-    {"path": "/commands/run", "method": "POST", "legacy": "/api/commands/run",
-     "role": "operator", "summary": "Run one allow-listed catalog command."},
-    {"path": "/learn", "method": "POST", "legacy": "/api/learn", "role": "operator",
-     "summary": "Recompute the calibration profile."},
-    {"path": "/backtest", "method": "POST", "legacy": "/api/backtest",
-     "role": "operator", "summary": "Run a backtest pass."},
-    {"path": "/alerts/test", "method": "POST", "legacy": "/api/alerts/test",
-     "role": "operator", "summary": "Send a test alert to configured notifiers."},
+    {
+        "path": "/commands/run",
+        "method": "POST",
+        "legacy": "/api/commands/run",
+        "role": "operator",
+        "summary": "Run one allow-listed catalog command.",
+    },
+    {
+        "path": "/learn",
+        "method": "POST",
+        "legacy": "/api/learn",
+        "role": "operator",
+        "summary": "Recompute the calibration profile.",
+    },
+    {
+        "path": "/backtest",
+        "method": "POST",
+        "legacy": "/api/backtest",
+        "role": "operator",
+        "summary": "Run a backtest pass.",
+    },
+    {
+        "path": "/alerts/test",
+        "method": "POST",
+        "legacy": "/api/alerts/test",
+        "role": "operator",
+        "summary": "Send a test alert to configured notifiers.",
+    },
 )
 
 #: Routes exposed under ``/api/v1/devices`` etc. are declared separately
 #: because they are implemented natively in v1 (they surface P18.1 state as a
 #: stable contract) rather than delegating to a legacy handler.
 NATIVE_ROUTES: tuple[dict, ...] = (
-    {"path": "/version", "method": "GET", "role": "public",
-     "summary": "API version and compatibility range."},
-    {"path": "/pair", "method": "POST", "role": "public",
-     "summary": "Redeem a one-time Hub pairing code for a device token (P20)."},
-    {"path": "/pair/code", "method": "POST", "role": "operator",
-     "summary": "Mint a short-lived pairing code / QR payload for a companion."},
-    {"path": "/routes", "method": "GET", "role": "viewer",
-     "summary": "Machine-readable route catalog."},
-    {"path": "/me", "method": "GET", "role": "viewer",
-     "summary": "The authenticated principal and its role."},
-    {"path": "/devices", "method": "GET", "role": "viewer",
-     "summary": "Connected companion devices."},
-    {"path": "/devices", "method": "POST", "role": "operator",
-     "summary": "Register a companion device; returns a scoped token once."},
-    {"path": "/devices/revoke", "method": "POST", "role": "operator",
-     "summary": "Revoke one device token."},
-    {"path": "/audit", "method": "GET", "role": "operator",
-     "summary": "Recent sensitive-action audit rows."},
+    {
+        "path": "/version",
+        "method": "GET",
+        "role": "public",
+        "summary": "API version and compatibility range.",
+    },
+    {
+        "path": "/pair",
+        "method": "POST",
+        "role": "public",
+        "summary": "Redeem a one-time Hub pairing code for a device token (P20).",
+    },
+    {
+        "path": "/pair/code",
+        "method": "POST",
+        "role": "operator",
+        "summary": "Mint a short-lived pairing code / QR payload for a companion.",
+    },
+    {
+        "path": "/routes",
+        "method": "GET",
+        "role": "viewer",
+        "summary": "Machine-readable route catalog.",
+    },
+    {
+        "path": "/me",
+        "method": "GET",
+        "role": "viewer",
+        "summary": "The authenticated principal and its role.",
+    },
+    {
+        "path": "/devices",
+        "method": "GET",
+        "role": "viewer",
+        "summary": "Connected companion devices.",
+    },
+    {
+        "path": "/devices",
+        "method": "POST",
+        "role": "operator",
+        "summary": "Register a companion device; returns a scoped token once.",
+    },
+    {
+        "path": "/devices/revoke",
+        "method": "POST",
+        "role": "operator",
+        "summary": "Revoke one device token.",
+    },
+    {
+        "path": "/audit",
+        "method": "GET",
+        "role": "operator",
+        "summary": "Recent sensitive-action audit rows.",
+    },
     # ── P18.3 background jobs ──────────────────────────────────────────
     # Path parameters (<job_id>) are declared as templates; the role gate
     # matches them with a segment wildcard so the published catalog and the
     # enforced minimum role can never disagree.
-    {"path": "/jobs", "method": "GET", "role": "viewer",
-     "summary": "List background jobs, newest first."},
-    {"path": "/jobs", "method": "POST", "role": "operator",
-     "summary": "Submit an allow-listed background job (backfill, backtest, "
-                "simulator, evidence build, …). Duplicate submissions return "
-                "the existing job."},
-    {"path": "/jobs/<job_id>", "method": "GET", "role": "viewer",
-     "summary": "One job's status, progress and log tail."},
-    {"path": "/jobs/<job_id>/cancel", "method": "POST", "role": "operator",
-     "summary": "Request cancellation of a queued or running job."},
-    {"path": "/jobs/<job_id>/events", "method": "GET", "role": "viewer",
-     "summary": "Server-sent events stream of a job's progress."},
+    {
+        "path": "/jobs",
+        "method": "GET",
+        "role": "viewer",
+        "summary": "List background jobs, newest first.",
+    },
+    {
+        "path": "/jobs",
+        "method": "POST",
+        "role": "operator",
+        "summary": "Submit an allow-listed background job (backfill, backtest, "
+        "simulator, evidence build, …). Duplicate submissions return "
+        "the existing job.",
+    },
+    {
+        "path": "/jobs/<job_id>",
+        "method": "GET",
+        "role": "viewer",
+        "summary": "One job's status, progress and log tail.",
+    },
+    {
+        "path": "/jobs/<job_id>/cancel",
+        "method": "POST",
+        "role": "operator",
+        "summary": "Request cancellation of a queued or running job.",
+    },
+    {
+        "path": "/jobs/<job_id>/events",
+        "method": "GET",
+        "role": "viewer",
+        "summary": "Server-sent events stream of a job's progress.",
+    },
 )
 
 
 def route_catalog() -> dict:
     """Machine-readable catalog for ``GET /api/v1/routes``."""
+
     def _entry(r: dict, native: bool) -> dict:
         return {
             "path": f"/api/v1{r['path']}",
@@ -523,6 +826,7 @@ def route_catalog() -> dict:
             "legacy": r.get("legacy"),
             "summary": r.get("summary", ""),
         }
+
     rows = [_entry(r, False) for r in ROUTES] + [_entry(r, True) for r in NATIVE_ROUTES]
     return {
         "count": len(rows),
@@ -534,7 +838,8 @@ def route_catalog() -> dict:
             "meta": "{api_version, server_version, request_id, ts}",
         },
         "error_codes": sorted(
-            v for k, v in vars(ErrorCode).items() if not k.startswith("_")),
+            v for k, v in vars(ErrorCode).items() if not k.startswith("_")
+        ),
     }
 
 
@@ -543,10 +848,25 @@ def idempotent_paths() -> set[str]:
 
 
 __all__ = [
-    "API_VERSION", "MIN_CLIENT_VERSION", "MAX_CLIENT_VERSION",
-    "CLIENT_VERSION_HEADER", "IDEMPOTENCY_HEADER", "IDEMPOTENCY_TTL_SECONDS",
-    "ErrorCode", "code_for_status", "envelope_ok", "envelope_error", "meta",
-    "new_request_id", "version_info", "check_client_version",
-    "request_fingerprint", "validate_key", "IdempotencyStore",
-    "ROUTES", "NATIVE_ROUTES", "route_catalog", "idempotent_paths",
+    "API_VERSION",
+    "CLIENT_VERSION_HEADER",
+    "IDEMPOTENCY_HEADER",
+    "IDEMPOTENCY_TTL_SECONDS",
+    "MAX_CLIENT_VERSION",
+    "MIN_CLIENT_VERSION",
+    "NATIVE_ROUTES",
+    "ROUTES",
+    "ErrorCode",
+    "IdempotencyStore",
+    "check_client_version",
+    "code_for_status",
+    "envelope_error",
+    "envelope_ok",
+    "idempotent_paths",
+    "meta",
+    "new_request_id",
+    "request_fingerprint",
+    "route_catalog",
+    "validate_key",
+    "version_info",
 ]

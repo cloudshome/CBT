@@ -1,4 +1,5 @@
 """P20 Windows companion — pairing, URL/TLS, token privacy, no-order."""
+
 from __future__ import annotations
 
 import json
@@ -58,21 +59,31 @@ def test_token_store_refuses_without_flag(tmp_path, monkeypatch):
     monkeypatch.delenv("SKY_COMPANION_ALLOW_FILE_TOKEN", raising=False)
     store = TokenStore(tmp_path / "c.json")
     with pytest.raises(CompanionError):
-        store.save(hub_url="https://hub.local", token="secret-token-value",
-                   scope="viewer", name="pc")
+        store.save(
+            hub_url="https://hub.local",
+            token="secret-token-value",
+            scope="viewer",
+            name="pc",
+        )
 
 
 def test_token_store_private_file(tmp_path, monkeypatch):
     monkeypatch.setenv("SKY_COMPANION_ALLOW_FILE_TOKEN", "1")
     store = TokenStore(tmp_path / "c.json")
-    rec = store.save(hub_url="https://hub.local", token="secret-token-value",
-                     scope="viewer", name="pc")
+    rec = store.save(
+        hub_url="https://hub.local",
+        token="secret-token-value",
+        scope="viewer",
+        name="pc",
+    )
     assert rec["stored"] == "file"
     mode = store.path.stat().st_mode
     assert not (mode & stat.S_IROTH)
     loaded = store.load()
     assert loaded["token"] == "secret-token-value"
-    assert "secret-token-value" not in json.dumps({k: v for k, v in rec.items() if k != "token"})
+    assert "secret-token-value" not in json.dumps(
+        {k: v for k, v in rec.items() if k != "token"}
+    )
 
 
 def test_pair_round_trip(tmp_path, monkeypatch):
@@ -81,6 +92,7 @@ def test_pair_round_trip(tmp_path, monkeypatch):
     db = tmp_path / "s.db"
     monkeypatch.setattr("config.DB_PATH", str(db), raising=False)
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(db))
     mgr = AuthManager(db)
     owner = mgr.create_owner("azim", "password12")
@@ -92,8 +104,13 @@ def test_pair_round_trip(tmp_path, monkeypatch):
         return {"ok": True, "data": result, "error": None}
 
     store = TokenStore(tmp_path / "state.json")
-    out = pair_with_hub(hub_url="https://hub.local", code=minted["code"],
-                        device_name="laptop", transport=transport, store=store)
+    out = pair_with_hub(
+        hub_url="https://hub.local",
+        code=minted["code"],
+        device_name="laptop",
+        transport=transport,
+        store=store,
+    )
     assert out["paired"] is True
     with pytest.raises(PermissionError):
         mgr.redeem_pairing_code(minted["raw"], "again")
@@ -104,26 +121,36 @@ def test_flask_pair_endpoints(tmp_path, monkeypatch):
     monkeypatch.setenv("SKY_AUTH_MODE", "required")
     monkeypatch.setenv("SKY_NO_AUTO_INSTALL", "1")
     import config
+
     monkeypatch.setattr(config, "DB_PATH", str(tmp_path / "web.db"))
     monkeypatch.setattr(config, "SKY_AUTH_MODE", "required")
     from web.app import make_app
     from web.jobs import JobManager
+
     app = make_app(job_manager=JobManager(db_path=str(tmp_path / "web.db")))
     client = app.test_client()
-    setup = client.post("/api/auth/setup", json={"username": "azim", "password": "password12"})
+    setup = client.post(
+        "/api/auth/setup", json={"username": "azim", "password": "password12"}
+    )
     assert setup.status_code == 200
     csrf = setup.get_json().get("csrf") or ""
-    minted = client.post("/api/v1/pair/code",
-                         json={"name": "win-pc", "hub_url": "https://hub.local"},
-                         headers={"X-CSRF-Token": csrf})
+    minted = client.post(
+        "/api/v1/pair/code",
+        json={"name": "win-pc", "hub_url": "https://hub.local"},
+        headers={"X-CSRF-Token": csrf},
+    )
     assert minted.status_code == 201
     body = minted.get_json()
     assert body["ok"] and body["data"]["code"]
-    redeem = client.post("/api/v1/pair", json={"code": body["data"]["code"], "name": "win-pc"})
+    redeem = client.post(
+        "/api/v1/pair", json={"code": body["data"]["code"], "name": "win-pc"}
+    )
     assert redeem.status_code == 201
     token = redeem.get_json()["data"]["token"]
     assert token
-    again = client.post("/api/v1/pair", json={"code": body["data"]["code"], "name": "win-pc"})
+    again = client.post(
+        "/api/v1/pair", json={"code": body["data"]["code"], "name": "win-pc"}
+    )
     assert again.status_code == 403
 
 
@@ -147,7 +174,12 @@ def test_spec_is_unsigned():
 
 
 def test_no_order_path_in_companion():
-    src = Path(__file__).resolve().parent.parent.joinpath("ops/windows_companion.py").read_text()
+    src = (
+        Path(__file__)
+        .resolve()
+        .parent.parent.joinpath("ops/windows_companion.py")
+        .read_text()
+    )
     for banned in ("create_order", "newOrder", "/api/v3/order", "place_order"):
         assert banned not in src
 
@@ -156,6 +188,7 @@ def test_cli_companion_spec(monkeypatch):
     monkeypatch.setenv("SKY_NO_AUTO_INSTALL", "1")
     monkeypatch.setenv("DEMO_MODE", "1")
     from main import main
+
     assert main(["companion", "spec", "--json"]) == 0
     assert main(["companion", "validate-url", "--hub", "https://hub.example"]) == 0
 

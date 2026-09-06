@@ -17,13 +17,13 @@ paper-trade outcome, then answer questions like
 
 No extra dependencies — stdlib sqlite3.
 """
+
 from __future__ import annotations
 
 import json
 import sqlite3
 import time
 from pathlib import Path
-from typing import Optional
 
 import config as _config
 from data.provenance import normalize as _normalize_provenance
@@ -37,13 +37,13 @@ def _provenance_values(row: dict) -> tuple[str, str, str, str]:
     disagree, and so a caller that supplies nothing gets the canonical live
     series rather than a NULL that later reads as "unknown".
     """
-    ex, mk, pt = _normalize_provenance(row.get("exchange"), row.get("market"),
-                                       row.get("price_type"))
+    ex, mk, pt = _normalize_provenance(
+        row.get("exchange"), row.get("market"), row.get("price_type")
+    )
     return ex, mk, pt, _source_key(ex, mk, pt)
 
 
-def _source_clause(conn, table: str, source_key: Optional[str],
-                   args: list) -> str:
+def _source_clause(conn, table: str, source_key: str | None, args: list) -> str:
     """SQL fragment restricting a query to one source series (P12.11).
 
     ``None`` means "every source" and appends nothing, so untouched callers
@@ -67,6 +67,7 @@ def _source_clause(conn, table: str, source_key: Optional[str],
 
 def _split_key(key: str):
     from data.provenance import parse_source_key
+
     return parse_source_key(key)
 
 
@@ -369,8 +370,9 @@ class SignalDB:
         # and auto-refresh all write to this DB concurrently. WAL mode +
         # busy_timeout + check_same_thread=False prevent periodic
         # "database is locked" crashes on busy machines.
-        self.conn = sqlite3.connect(str(self.path), timeout=30.0,
-                                    check_same_thread=False)
+        self.conn = sqlite3.connect(
+            str(self.path), timeout=30.0, check_same_thread=False
+        )
         self.conn.row_factory = sqlite3.Row
         self._init_db()
 
@@ -412,6 +414,7 @@ class SignalDB:
     def _migrate(self) -> None:
         """Add lifecycle + professional-mode columns to pre-existing DBs
         (idempotent)."""
+
         def _add(table: str, col: str, decl: str) -> None:
             cols = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
             if col not in cols:
@@ -499,34 +502,51 @@ class SignalDB:
         _add("calibration", "source_key", "TEXT DEFAULT ''")
 
     # ── lifecycle ────────────────────────────────────────────────────────
-    def update_status(self, scan_id: int, to_state: str, note: str = "",
-                      reviewer: str = "human") -> Optional[str]:
+    def update_status(
+        self, scan_id: int, to_state: str, note: str = "", reviewer: str = "human"
+    ) -> str | None:
         """Transition a scan's lifecycle state and log a decision row.
         Returns the new state, or None if the scan doesn't exist."""
+
         def _do_update():
-            row = self.conn.execute("SELECT status FROM scans WHERE id=?", (scan_id,)).fetchone()
+            row = self.conn.execute(
+                "SELECT status FROM scans WHERE id=?", (scan_id,)
+            ).fetchone()
             if row is None:
                 return None
-            from engine.lifecycle import transition, LifecycleError
+            from engine.lifecycle import LifecycleError, transition
+
             try:
                 new_state = transition(row["status"], to_state)
             except LifecycleError as exc:
                 raise LifecycleError(exc.message) from None
             self.conn.execute(
                 "UPDATE scans SET status=?, lifecycle_ts=? WHERE id=?",
-                (new_state, int(time.time() * 1000), scan_id))
+                (new_state, int(time.time() * 1000), scan_id),
+            )
             self.conn.execute(
                 "INSERT INTO decisions(scan_id, from_state, to_state, reviewer, note, ts) "
                 "VALUES (?,?,?,?,?,?)",
-                (scan_id, row["status"], new_state, reviewer, note, int(time.time() * 1000)))
+                (
+                    scan_id,
+                    row["status"],
+                    new_state,
+                    reviewer,
+                    note,
+                    int(time.time() * 1000),
+                ),
+            )
             self.conn.commit()
             return new_state
+
         return self._retry_write(_do_update)
 
     def pending_reviews(self, symbol: str | None = None) -> list[dict]:
         """Signals awaiting human approval, newest first."""
-        q = ("SELECT s.*, (SELECT COUNT(*) FROM plans p WHERE p.scan_id=s.id) n_plans "
-             "FROM scans s WHERE s.status='PENDING_REVIEW' AND s.action IN ('BUY','SELL')")
+        q = (
+            "SELECT s.*, (SELECT COUNT(*) FROM plans p WHERE p.scan_id=s.id) n_plans "
+            "FROM scans s WHERE s.status='PENDING_REVIEW' AND s.action IN ('BUY','SELL')"
+        )
         args: tuple = ()
         if symbol:
             q += " AND s.symbol=?"
@@ -537,10 +557,12 @@ class SignalDB:
     def decision_history(self, scan_id: int) -> list[dict]:
         rows = self.conn.execute(
             "SELECT from_state, to_state, reviewer, note, ts FROM decisions "
-            "WHERE scan_id=? ORDER BY ts", (scan_id,)).fetchall()
+            "WHERE scan_id=? ORDER BY ts",
+            (scan_id,),
+        ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_scan(self, scan_id: int) -> Optional[dict]:
+    def get_scan(self, scan_id: int) -> dict | None:
         row = self.conn.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
         return dict(row) if row else None
 
@@ -558,12 +580,16 @@ class SignalDB:
         q += " ORDER BY s.lifecycle_ts ASC, s.id ASC"
         return [dict(r) for r in self.conn.execute(q, args).fetchall()]
 
-    def get_paper_trade(self, trade_id: int) -> Optional[dict]:
-        row = self.conn.execute("SELECT * FROM paper_trades WHERE id=?", (trade_id,)).fetchone()
+    def get_paper_trade(self, trade_id: int) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM paper_trades WHERE id=?", (trade_id,)
+        ).fetchone()
         return dict(row) if row else None
 
-    def paper_trade_for_scan(self, scan_id: int) -> Optional[dict]:
-        row = self.conn.execute("SELECT * FROM paper_trades WHERE scan_id=?", (scan_id,)).fetchone()
+    def paper_trade_for_scan(self, scan_id: int) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM paper_trades WHERE scan_id=?", (scan_id,)
+        ).fetchone()
         return dict(row) if row else None
 
     def create_paper_trade(self, fields: dict) -> tuple[dict, bool]:
@@ -573,18 +599,42 @@ class SignalDB:
         accidentally-started runner processes idempotent.
         """
         cols = (
-            "scan_id", "signal_id", "plan_id", "plan_type", "symbol", "timeframe", "action",
-            "entry", "stop_loss", "take_profit", "risk_reward", "confidence_pct", "status",
-            "created_ts", "opened_ts", "entry_price", "regime", "sim_key",
+            "scan_id",
+            "signal_id",
+            "plan_id",
+            "plan_type",
+            "symbol",
+            "timeframe",
+            "action",
+            "entry",
+            "stop_loss",
+            "take_profit",
+            "risk_reward",
+            "confidence_pct",
+            "status",
+            "created_ts",
+            "opened_ts",
+            "entry_price",
+            "regime",
+            "sim_key",
             # P12.11 — the price series this simulated trade was taken on.
-            "exchange", "market", "price_type", "source_key",
+            "exchange",
+            "market",
+            "price_type",
+            "source_key",
             # P16 — the sentiment colour the strip painted when the trade was
             # enrolled, so decided paper outcomes split by colour too.
-            "sentiment_bucket", "sentiment_score", "sentiment_intensity",
+            "sentiment_bucket",
+            "sentiment_score",
+            "sentiment_intensity",
             "sentiment_persistence_min",
         )
-        prov = dict(zip(("exchange", "market", "price_type", "source_key"),
-                        _provenance_values(fields)))
+        prov = dict(
+            zip(
+                ("exchange", "market", "price_type", "source_key"),
+                _provenance_values(fields),
+            )
+        )
         values = tuple(prov.get(c, fields.get(c)) for c in cols)
         cur = self.conn.execute(
             f"INSERT OR IGNORE INTO paper_trades ({','.join(cols)}) VALUES ({','.join('?' for _ in cols)})",
@@ -596,8 +646,9 @@ class SignalDB:
             raise RuntimeError("paper trade insert did not return a row")
         return row, bool(cur.rowcount)
 
-    def active_paper_trades(self, symbol: str | None = None,
-                            include_all_sources: bool = False) -> list[dict]:
+    def active_paper_trades(
+        self, symbol: str | None = None, include_all_sources: bool = False
+    ) -> list[dict]:
         """Positions the paper runner should poll — the live open book (P12.16).
 
         Defaults to :func:`live_open_rows`' population: ``WAITING_ENTRY`` /
@@ -621,10 +672,16 @@ class SignalDB:
         q += " ORDER BY created_ts ASC, id ASC"
         return [dict(r) for r in self.conn.execute(q, args).fetchall()]
 
-    def open_paper_trade(self, trade_id: int, entry_price: float, opened_ts: int,
-                         last_candle_ts: int | None = None,
-                         last_price: float | None = None,
-                         mae: float | None = None, mfe: float | None = None) -> bool:
+    def open_paper_trade(
+        self,
+        trade_id: int,
+        entry_price: float,
+        opened_ts: int,
+        last_candle_ts: int | None = None,
+        last_price: float | None = None,
+        mae: float | None = None,
+        mfe: float | None = None,
+    ) -> bool:
         """Claim a waiting conditional trade as filled. Returns True once."""
         cur = self.conn.execute(
             """UPDATE paper_trades
@@ -632,17 +689,24 @@ class SignalDB:
                    last_price=?, mae=COALESCE(?, mae), mfe=COALESCE(?, mfe),
                    checks=checks+1
                WHERE id=? AND status='WAITING_ENTRY'""",
-            (opened_ts, entry_price, last_candle_ts, last_price,
-             mae, mfe, trade_id),
+            (opened_ts, entry_price, last_candle_ts, last_price, mae, mfe, trade_id),
         )
         self.conn.commit()
         return bool(cur.rowcount)
 
-    def close_paper_trade(self, trade_id: int, outcome: str, exit_price: float,
-                          rr_achieved: float, close_reason: str, closed_ts: int,
-                          last_candle_ts: int | None = None,
-                          last_price: float | None = None,
-                          mae: float | None = None, mfe: float | None = None) -> bool:
+    def close_paper_trade(
+        self,
+        trade_id: int,
+        outcome: str,
+        exit_price: float,
+        rr_achieved: float,
+        close_reason: str,
+        closed_ts: int,
+        last_candle_ts: int | None = None,
+        last_price: float | None = None,
+        mae: float | None = None,
+        mfe: float | None = None,
+    ) -> bool:
         """Atomically close an active paper trade; only one runner can win."""
         cur = self.conn.execute(
             """UPDATE paper_trades
@@ -651,8 +715,18 @@ class SignalDB:
                    mae=COALESCE(?, mae), mfe=COALESCE(?, mfe),
                    checks=checks+1
                WHERE id=? AND status IN ('WAITING_ENTRY','OPEN')""",
-            (outcome, exit_price, rr_achieved, close_reason, closed_ts,
-             last_candle_ts, last_price, mae, mfe, trade_id),
+            (
+                outcome,
+                exit_price,
+                rr_achieved,
+                close_reason,
+                closed_ts,
+                last_candle_ts,
+                last_price,
+                mae,
+                mfe,
+                trade_id,
+            ),
         )
         self.conn.commit()
         return bool(cur.rowcount)
@@ -668,10 +742,15 @@ class SignalDB:
         self.conn.commit()
         return bool(cur.rowcount)
 
-    def touch_paper_trade(self, trade_id: int, last_candle_ts: int | None = None,
-                          last_price: float | None = None,
-                          checked_ts: int | None = None,
-                          mae: float | None = None, mfe: float | None = None) -> None:
+    def touch_paper_trade(
+        self,
+        trade_id: int,
+        last_candle_ts: int | None = None,
+        last_price: float | None = None,
+        checked_ts: int | None = None,
+        mae: float | None = None,
+        mfe: float | None = None,
+    ) -> None:
         """Persist the runner cursor/last seen price after a non-decisive pass."""
         _ = checked_ts
         self.conn.execute(
@@ -686,11 +765,20 @@ class SignalDB:
         self.conn.commit()
 
     # ── professional journal (decision B5) ───────────────────────────────
-    def save_journal(self, scan_id: int, *, followed_rules: int | None = None,
-                     emotion: str = "", mistake: str = "", screenshot_path: str = "",
-                     would_change: str = "", notes: str = "") -> None:
+    def save_journal(
+        self,
+        scan_id: int,
+        *,
+        followed_rules: int | None = None,
+        emotion: str = "",
+        mistake: str = "",
+        screenshot_path: str = "",
+        would_change: str = "",
+        notes: str = "",
+    ) -> None:
         """Record post-trade journal fields for a closed scan. The headline
         field is ``followed_rules``: did I follow my system, win or lose?"""
+
         def _do_save():
             self.conn.execute(
                 """INSERT INTO journal_entries
@@ -703,15 +791,25 @@ class SignalDB:
                      screenshot_path=excluded.screenshot_path,
                      would_change=excluded.would_change,
                      notes=excluded.notes, ts=excluded.ts""",
-                (scan_id, followed_rules, emotion, mistake, screenshot_path,
-                 would_change, notes, int(time.time() * 1000)),
+                (
+                    scan_id,
+                    followed_rules,
+                    emotion,
+                    mistake,
+                    screenshot_path,
+                    would_change,
+                    notes,
+                    int(time.time() * 1000),
+                ),
             )
             self.conn.commit()
+
         return self._retry_write(_do_save)
 
-    def get_journal(self, scan_id: int) -> Optional[dict]:
+    def get_journal(self, scan_id: int) -> dict | None:
         row = self.conn.execute(
-            "SELECT * FROM journal_entries WHERE scan_id=?", (scan_id,)).fetchone()
+            "SELECT * FROM journal_entries WHERE scan_id=?", (scan_id,)
+        ).fetchone()
         return dict(row) if row else None
 
     def journal_stats(self) -> dict:
@@ -730,16 +828,32 @@ class SignalDB:
     def get_trader_state(self) -> dict:
         row = self.conn.execute("SELECT * FROM trader_state WHERE id=1").fetchone()
         if not row:
-            return {"angry": False, "tired": False, "revenge": False,
-                    "chasing": False, "note": "", "updated_ts": None, "any": False}
+            return {
+                "angry": False,
+                "tired": False,
+                "revenge": False,
+                "chasing": False,
+                "note": "",
+                "updated_ts": None,
+                "any": False,
+            }
         d = dict(row)
-        d["any"] = bool(d.get("angry") or d.get("tired") or d.get("revenge") or d.get("chasing"))
+        d["any"] = bool(
+            d.get("angry") or d.get("tired") or d.get("revenge") or d.get("chasing")
+        )
         return d
 
-    def set_trader_state(self, *, angry: bool | None = None, tired: bool | None = None,
-                         revenge: bool | None = None, chasing: bool | None = None,
-                         note: str = "") -> dict:
+    def set_trader_state(
+        self,
+        *,
+        angry: bool | None = None,
+        tired: bool | None = None,
+        revenge: bool | None = None,
+        chasing: bool | None = None,
+        note: str = "",
+    ) -> dict:
         """Set/clear the behavioral no-trade flags. Returns the new state."""
+
         def _do_save():
             cur = self.conn.execute("SELECT * FROM trader_state WHERE id=1")
             row = cur.fetchone()
@@ -747,19 +861,31 @@ class SignalDB:
                 self.conn.execute(
                     "INSERT INTO trader_state(id, angry, tired, revenge, chasing, note, updated_ts) "
                     "VALUES (1,?,?,?,?,?,?)",
-                    (1 if angry else 0, 1 if tired else 0, 1 if revenge else 0,
-                     1 if chasing else 0, note, int(time.time() * 1000)))
+                    (
+                        1 if angry else 0,
+                        1 if tired else 0,
+                        1 if revenge else 0,
+                        1 if chasing else 0,
+                        note,
+                        int(time.time() * 1000),
+                    ),
+                )
             else:
                 self.conn.execute(
                     """UPDATE trader_state SET
                          angry=?, tired=?, revenge=?, chasing=?, note=?, updated_ts=?
                        WHERE id=1""",
-                    (angry if angry is not None else row["angry"],
-                     tired if tired is not None else row["tired"],
-                     revenge if revenge is not None else row["revenge"],
-                     chasing if chasing is not None else row["chasing"],
-                     note if note else row["note"], int(time.time() * 1000)))
+                    (
+                        angry if angry is not None else row["angry"],
+                        tired if tired is not None else row["tired"],
+                        revenge if revenge is not None else row["revenge"],
+                        chasing if chasing is not None else row["chasing"],
+                        note if note else row["note"],
+                        int(time.time() * 1000),
+                    ),
+                )
             self.conn.commit()
+
         self._retry_write(_do_save)
         return self.get_trader_state()
 
@@ -770,18 +896,25 @@ class SignalDB:
     def ritual_state(self, day: str) -> dict:
         """All ticked ritual steps for one UTC day: {name: {done, ts}}."""
         rows = self.conn.execute(
-            "SELECT name, done, ts FROM ritual_checks WHERE day=?", (day,)).fetchall()
-        return {r["name"]: {"done": bool(r["done"]), "ts": r["ts"]} for r in rows
-                if r["done"]}
+            "SELECT name, done, ts FROM ritual_checks WHERE day=?", (day,)
+        ).fetchall()
+        return {
+            r["name"]: {"done": bool(r["done"]), "ts": r["ts"]}
+            for r in rows
+            if r["done"]
+        }
 
     def ritual_mark(self, day: str, name: str, done: bool) -> None:
         """Upsert one ritual step for a day (idempotent)."""
+
         def _do_save():
             self.conn.execute(
                 "INSERT INTO ritual_checks(day, name, done, ts) VALUES (?,?,?,?) "
                 "ON CONFLICT(day, name) DO UPDATE SET done=excluded.done, ts=excluded.ts",
-                (day, name, 1 if done else 0, int(time.time() * 1000)))
+                (day, name, 1 if done else 0, int(time.time() * 1000)),
+            )
             self.conn.commit()
+
         self._retry_write(_do_save)
 
     # ── W3.4 practice mode (coaching memory ONLY — see the schema note) ──
@@ -789,21 +922,34 @@ class SignalDB:
     # discipline_rows or any graduation surface: a practice read is the
     # user studying, not a decided trade.
 
-    def save_practice_attempt(self, symbol: str, timeframe: str,
-                              user_read: dict, desk_read: dict, score: dict,
-                              *, ts: int | None = None) -> int:
+    def save_practice_attempt(
+        self,
+        symbol: str,
+        timeframe: str,
+        user_read: dict,
+        desk_read: dict,
+        score: dict,
+        *,
+        ts: int | None = None,
+    ) -> int:
         """Persist one scored practice attempt; returns its row id."""
+
         def _do_save() -> int:
             cur = self.conn.execute(
                 "INSERT INTO practice_attempts(ts, symbol, timeframe, "
                 "user_read_json, desk_read_json, score_json) VALUES (?,?,?,?,?,?)",
-                (int(ts if ts is not None else time.time() * 1000),
-                 symbol, timeframe,
-                 json.dumps(user_read, sort_keys=True),
-                 json.dumps(desk_read, sort_keys=True),
-                 json.dumps(score, sort_keys=True)))
+                (
+                    int(ts if ts is not None else time.time() * 1000),
+                    symbol,
+                    timeframe,
+                    json.dumps(user_read, sort_keys=True),
+                    json.dumps(desk_read, sort_keys=True),
+                    json.dumps(score, sort_keys=True),
+                ),
+            )
             self.conn.commit()
             return int(cur.lastrowid)
+
         return self._retry_write(_do_save)
 
     @staticmethod
@@ -814,11 +960,16 @@ class SignalDB:
             except (TypeError, ValueError):
                 out = {}
             return out if isinstance(out, dict) else {}
-        return {"id": row["id"], "ts": row["ts"], "symbol": row["symbol"],
-                "timeframe": row["timeframe"],
-                "user_read": _dec(row["user_read_json"]),
-                "desk_read": _dec(row["desk_read_json"]),
-                "score": _dec(row["score_json"])}
+
+        return {
+            "id": row["id"],
+            "ts": row["ts"],
+            "symbol": row["symbol"],
+            "timeframe": row["timeframe"],
+            "user_read": _dec(row["user_read_json"]),
+            "desk_read": _dec(row["desk_read_json"]),
+            "score": _dec(row["score_json"]),
+        }
 
     def latest_practice_attempt(self, symbol: str, timeframe: str) -> dict | None:
         """The newest attempt for one symbol+timeframe (double-submit guard).
@@ -826,17 +977,24 @@ class SignalDB:
         desk_read, score} so callers can return it verbatim."""
         row = self.conn.execute(
             "SELECT * FROM practice_attempts WHERE symbol=? AND timeframe=? "
-            "ORDER BY ts DESC, id DESC LIMIT 1", (symbol, timeframe)).fetchone()
+            "ORDER BY ts DESC, id DESC LIMIT 1",
+            (symbol, timeframe),
+        ).fetchone()
         if row is None:
             return None
         r = self._practice_row(row)
-        r["attempt"] = {"id": r["id"], "ts": r["ts"], "symbol": r["symbol"],
-                        "timeframe": r["timeframe"],
-                        "day": time.strftime("%Y-%m-%d", time.gmtime(r["ts"] / 1000))}
+        r["attempt"] = {
+            "id": r["id"],
+            "ts": r["ts"],
+            "symbol": r["symbol"],
+            "timeframe": r["timeframe"],
+            "day": time.strftime("%Y-%m-%d", time.gmtime(r["ts"] / 1000)),
+        }
         return r
 
-    def practice_attempts(self, *, days: int | None = None,
-                          limit: int = 500, now: int | None = None) -> list[dict]:
+    def practice_attempts(
+        self, *, days: int | None = None, limit: int = 500, now: int | None = None
+    ) -> list[dict]:
         """Attempts newest-first; ``days`` bounds the window (ms epoch)."""
         sql = "SELECT * FROM practice_attempts"
         params: list = []
@@ -846,13 +1004,16 @@ class SignalDB:
             params.append(now - int(days) * 86_400_000)
         sql += " ORDER BY ts DESC, id DESC LIMIT ?"
         params.append(int(limit))
-        return [self._practice_row(r) for r in self.conn.execute(sql, params).fetchall()]
-
+        return [
+            self._practice_row(r) for r in self.conn.execute(sql, params).fetchall()
+        ]
 
     # ── information hierarchy / source trust (decision A5) ──────────────
-    def save_source_score(self, source: str, tier: int, trust: float,
-                          note: str = "") -> None:
+    def save_source_score(
+        self, source: str, tier: int, trust: float, note: str = ""
+    ) -> None:
         """Record a source's information tier (1-5) and trust score (0-1)."""
+
         def _do_save():
             self.conn.execute(
                 """INSERT INTO source_scores(source, tier, trust, last_seen, note)
@@ -860,45 +1021,66 @@ class SignalDB:
                    ON CONFLICT(source) DO UPDATE SET
                      tier=excluded.tier, trust=excluded.trust,
                      last_seen=excluded.last_seen, note=excluded.note""",
-                (source, int(tier), max(0.0, min(1.0, float(trust))),
-                 int(time.time() * 1000), note))
+                (
+                    source,
+                    int(tier),
+                    max(0.0, min(1.0, float(trust))),
+                    int(time.time() * 1000),
+                    note,
+                ),
+            )
             self.conn.commit()
+
         return self._retry_write(_do_save)
 
     def load_source_scores(self) -> list[dict]:
         rows = self.conn.execute(
-            "SELECT * FROM source_scores ORDER BY tier ASC, trust DESC").fetchall()
+            "SELECT * FROM source_scores ORDER BY tier ASC, trust DESC"
+        ).fetchall()
         return [dict(r) for r in rows]
 
     # ── market sentiment colour engine (engine/sentiment.py) ─────────────
-    def save_sentiment(self, symbol: str, timeframe: str, ts: int,
-                       score: float, direction: str, label: str,
-                       parts_json: str) -> None:
+    def save_sentiment(
+        self,
+        symbol: str,
+        timeframe: str,
+        ts: int,
+        score: float,
+        direction: str,
+        label: str,
+        parts_json: str,
+    ) -> None:
         """Store one sentiment reading, deduped to one row per minute bucket
         so a 30s auto-refresh can never double-count persistence time."""
+
         def _do_save():
             minute = (int(ts) // 60000) * 60000
             existing = self.conn.execute(
                 "SELECT id FROM sentiment_history WHERE symbol=? AND timeframe=? AND ts=?",
-                (symbol, timeframe, minute)).fetchone()
+                (symbol, timeframe, minute),
+            ).fetchone()
             if existing:
                 return
             self.conn.execute(
                 """INSERT INTO sentiment_history
                    (symbol, timeframe, ts, score, direction, label, parts_json)
                    VALUES (?,?,?,?,?,?,?)""",
-                (symbol, timeframe, minute, float(score), direction, label, parts_json))
+                (symbol, timeframe, minute, float(score), direction, label, parts_json),
+            )
             self.conn.commit()
+
         return self._retry_write(_do_save)
 
-    def sentiment_history(self, symbol: str, timeframe: str,
-                          minutes: int = 720) -> list[dict]:
+    def sentiment_history(
+        self, symbol: str, timeframe: str, minutes: int = 720
+    ) -> list[dict]:
         """Recent sentiment readings, oldest first."""
         since = int(time.time() * 1000) - int(minutes) * 60000
         rows = self.conn.execute(
             """SELECT ts, score, direction, label FROM sentiment_history
                WHERE symbol=? AND timeframe=? AND ts>=? ORDER BY ts ASC""",
-            (symbol, timeframe, since)).fetchall()
+            (symbol, timeframe, since),
+        ).fetchall()
         return [dict(r) for r in rows]
 
     # ── exposure + decided outcomes for risk/portfolio engines ───────────
@@ -926,8 +1108,7 @@ class SignalDB:
         unlock nor block (P12.13). Research books remain fully inspectable
         through the source-filtered scorecard surfaces.
         """
-        q = ("SELECT * FROM paper_trades "
-             "WHERE status IN ('WAITING_ENTRY','OPEN')")
+        q = "SELECT * FROM paper_trades WHERE status IN ('WAITING_ENTRY','OPEN')"
         args: tuple = ()
         q += _open_book_clause(self.conn)
         if symbol:
@@ -962,13 +1143,17 @@ class SignalDB:
                       0 AS paper_id, s.id AS scan_id
                FROM scans s LEFT JOIN paper_trades p ON p.scan_id = s.id
                WHERE p.id IS NULL AND s.status IN ('APPROVED','EXECUTED')
-               ORDER BY scan_id""").fetchall()
+               ORDER BY scan_id"""
+        ).fetchall()
         return [dict(r) for r in rows]
 
-    def decided_paper_rows(self, since_ts: int | None = None,
-                           symbol: str | None = None,
-                           exclude_sim: bool = False,
-                           source_key: str | None = None) -> list[dict]:
+    def decided_paper_rows(
+        self,
+        since_ts: int | None = None,
+        symbol: str | None = None,
+        exclude_sim: bool = False,
+        source_key: str | None = None,
+    ) -> list[dict]:
         """Closed, decided paper trades (TP_HIT / STOP_LOSS), oldest first.
 
         exclude_sim=True drops simulator walk-forward samples (sim_key NOT
@@ -976,8 +1161,7 @@ class SignalDB:
         they are NOT the live book — the daily/weekly loss limits, drawdown
         ladder and business scorecard must only see real paper trades.
         """
-        q = ("SELECT * FROM paper_trades "
-             "WHERE outcome IN ('TP_HIT','STOP_LOSS')")
+        q = "SELECT * FROM paper_trades WHERE outcome IN ('TP_HIT','STOP_LOSS')"
         args: list = []
         if exclude_sim:
             q += " AND sim_key IS NULL"
@@ -991,8 +1175,9 @@ class SignalDB:
         q += " ORDER BY COALESCE(closed_ts, opened_ts, created_ts) ASC"
         return [dict(r) for r in self.conn.execute(q, args).fetchall()]
 
-    def live_book_rows(self, since_ts: int | None = None,
-                       symbol: str | None = None) -> list[dict]:
+    def live_book_rows(
+        self, since_ts: int | None = None, symbol: str | None = None
+    ) -> list[dict]:
         """THE live paper book (P12.15): decided, non-simulator, canonical-live.
 
         One definition, many surfaces (invariant #10). Every live *risk
@@ -1017,9 +1202,9 @@ class SignalDB:
         P12.13). Research books remain fully inspectable through the
         source-filtered scorecard surfaces.
         """
-        return self.decided_paper_rows(since_ts=since_ts, symbol=symbol,
-                                       exclude_sim=True,
-                                       source_key="")
+        return self.decided_paper_rows(
+            since_ts=since_ts, symbol=symbol, exclude_sim=True, source_key=""
+        )
 
     def discipline_rows(self, source_key: str | None = "") -> list[dict]:
         """Decided REAL paper trades joined to their journal answer (P12.14).
@@ -1039,13 +1224,15 @@ class SignalDB:
         which the caller must treat as unproven rather than as compliance.
         """
         cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(paper_trades)")}
-        q = ("SELECT p.id AS trade_id, p.scan_id AS scan_id, p.plan_type AS plan_type, "
-             "p.symbol AS symbol, p.outcome AS outcome, "
-             "COALESCE(p.closed_ts, p.opened_ts, p.created_ts) AS ts, "
-             "j.followed_rules AS followed_rules "
-             "FROM paper_trades p "
-             "LEFT JOIN journal_entries j ON j.scan_id = p.scan_id "
-             "WHERE p.outcome IN ('TP_HIT','STOP_LOSS')")
+        q = (
+            "SELECT p.id AS trade_id, p.scan_id AS scan_id, p.plan_type AS plan_type, "
+            "p.symbol AS symbol, p.outcome AS outcome, "
+            "COALESCE(p.closed_ts, p.opened_ts, p.created_ts) AS ts, "
+            "j.followed_rules AS followed_rules "
+            "FROM paper_trades p "
+            "LEFT JOIN journal_entries j ON j.scan_id = p.scan_id "
+            "WHERE p.outcome IN ('TP_HIT','STOP_LOSS')"
+        )
         args: list = []
         if "sim_key" in cols:  # pragma: no branch - post-migration DBs always have it
             q += " AND p.sim_key IS NULL"
@@ -1071,31 +1258,39 @@ class SignalDB:
         the caller falls back to gross rather than guessing.
         """
         bt_args: list = [plan_type]
-        bt_q = ("""SELECT COUNT(*) n,
+        bt_q = """SELECT COUNT(*) n,
                       SUM(CASE WHEN outcome IN ('FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
                       ROUND(AVG(rr_achieved),3) avg_rr,
                       ROUND(AVG(rr_net),3) avg_rr_net
                FROM backtest_results WHERE plan_type=?
-                 AND outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')"""
-                + _source_clause(self.conn, "backtest_results", source_key, bt_args))
+                 AND outcome IN ('FULL_WIN','PARTIAL_WIN','LOSS')""" + _source_clause(
+            self.conn, "backtest_results", source_key, bt_args
+        )
         bt = self.conn.execute(bt_q, bt_args).fetchone()
         pp_args: list = [plan_type]
-        pp_q = ("""SELECT COUNT(*) n,
+        pp_q = """SELECT COUNT(*) n,
                       SUM(CASE WHEN outcome='TP_HIT' THEN 1 ELSE 0 END) wins,
                       ROUND(AVG(rr_achieved),3) avg_rr,
                       ROUND(AVG(rr_net),3) avg_rr_net
                FROM paper_trades WHERE plan_type=?
-                 AND outcome IN ('TP_HIT','STOP_LOSS')"""
-                + _source_clause(self.conn, "paper_trades", source_key, pp_args))
+                 AND outcome IN ('TP_HIT','STOP_LOSS')""" + _source_clause(
+            self.conn, "paper_trades", source_key, pp_args
+        )
         pp = self.conn.execute(pp_q, pp_args).fetchone()
         bt_n, bt_wins, bt_avg = (bt["n"] or 0, bt["wins"] or 0, bt["avg_rr"] or 0.0)
         pp_n, pp_wins, pp_avg = (pp["n"] or 0, pp["wins"] or 0, pp["avg_rr"] or 0.0)
         bt_net = bt["avg_rr_net"]
         pp_net = pp["avg_rr_net"]
         return {
-            "backtest_n": bt_n, "backtest_wins": bt_wins, "backtest_expectancy": round(bt_avg, 3),
-            "paper_n": pp_n, "paper_wins": pp_wins, "paper_expectancy": round(pp_avg, 3),
-            "backtest_expectancy_net": (round(bt_net, 3) if bt_net is not None else None),
+            "backtest_n": bt_n,
+            "backtest_wins": bt_wins,
+            "backtest_expectancy": round(bt_avg, 3),
+            "paper_n": pp_n,
+            "paper_wins": pp_wins,
+            "paper_expectancy": round(pp_avg, 3),
+            "backtest_expectancy_net": (
+                round(bt_net, 3) if bt_net is not None else None
+            ),
             "paper_expectancy_net": (round(pp_net, 3) if pp_net is not None else None),
         }
 
@@ -1108,9 +1303,15 @@ class SignalDB:
         n = row.get("n") or 0
         wins, losses = row.get("wins") or 0, row.get("losses") or 0
         decided = wins + losses
-        counts = {k: row.get(k) or 0 for k in ("waiting", "open", "closed", "cancelled")}
+        counts = {
+            k: row.get(k) or 0 for k in ("waiting", "open", "closed", "cancelled")
+        }
         return {
-            **row, **counts, "n": n, "wins": wins, "losses": losses,
+            **row,
+            **counts,
+            "n": n,
+            "wins": wins,
+            "losses": losses,
             "win_rate": round(wins / decided, 3) if decided else None,
             "avg_rr": row.get("avg_rr") or 0.0,
         }
@@ -1132,8 +1333,11 @@ class SignalDB:
         if symbol:
             where = " WHERE symbol=?"
             args = (symbol,)
-        overall = self._outcome_stats([dict(self.conn.execute(
-            f"""SELECT COUNT(*) n,
+        overall = self._outcome_stats(
+            [
+                dict(
+                    self.conn.execute(
+                        f"""SELECT COUNT(*) n,
                        SUM(CASE WHEN status='WAITING_ENTRY' THEN 1 ELSE 0 END) waiting,
                        SUM(CASE WHEN status='OPEN' THEN 1 ELSE 0 END) open,
                        SUM(CASE WHEN status='CLOSED' THEN 1 ELSE 0 END) closed,
@@ -1141,18 +1345,32 @@ class SignalDB:
                        SUM(CASE WHEN outcome='TP_HIT' THEN 1 ELSE 0 END) wins,
                        SUM(CASE WHEN outcome='STOP_LOSS' THEN 1 ELSE 0 END) losses,
                        ROUND(AVG(CASE WHEN outcome IN ('TP_HIT','STOP_LOSS') THEN rr_achieved END), 3) avg_rr
-                FROM paper_trades{where}""", args).fetchone())])
-        by_type = [dict(r) for r in self.conn.execute(
-            f"""SELECT plan_type, COUNT(*) n,
+                FROM paper_trades{where}""",
+                        args,
+                    ).fetchone()
+                )
+            ]
+        )
+        by_type = [
+            dict(r)
+            for r in self.conn.execute(
+                f"""SELECT plan_type, COUNT(*) n,
                        SUM(CASE WHEN outcome='TP_HIT' THEN 1 ELSE 0 END) wins,
                        SUM(CASE WHEN outcome='STOP_LOSS' THEN 1 ELSE 0 END) losses,
                        ROUND(AVG(CASE WHEN outcome IN ('TP_HIT','STOP_LOSS') THEN rr_achieved END), 3) avg_rr
                 FROM paper_trades{where}
-                GROUP BY plan_type ORDER BY n DESC""", args).fetchall()]
+                GROUP BY plan_type ORDER BY n DESC""",
+                args,
+            ).fetchall()
+        ]
         by_type = [self._outcome_stats([r]) for r in by_type]
-        recent = [dict(r) for r in self.conn.execute(
-            f"SELECT * FROM paper_trades{where} ORDER BY COALESCE(closed_ts, opened_ts, created_ts) DESC LIMIT ?",
-            args + (max(1, min(int(limit), 50)),)).fetchall()]
+        recent = [
+            dict(r)
+            for r in self.conn.execute(
+                f"SELECT * FROM paper_trades{where} ORDER BY COALESCE(closed_ts, opened_ts, created_ts) DESC LIMIT ?",
+                args + (max(1, min(int(limit), 50)),),
+            ).fetchall()
+        ]
         overall["live_open"] = len(self.live_open_rows(symbol=symbol))
         return {"overall": overall, "by_type": by_type, "recent": recent}
 
@@ -1167,22 +1385,25 @@ class SignalDB:
 
         counts: dict[str, dict] = {}
         for table, col, decided in (
-                ("backtest_results", "backtest",
-                 ("FULL_WIN", "PARTIAL_WIN", "LOSS")),
-                ("paper_trades", "paper", ("TP_HIT", "STOP_LOSS"))):
+            ("backtest_results", "backtest", ("FULL_WIN", "PARTIAL_WIN", "LOSS")),
+            ("paper_trades", "paper", ("TP_HIT", "STOP_LOSS")),
+        ):
             cols = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
             if "source_key" not in cols:  # pragma: no cover - pre-migration DB
                 continue
             rows = self.conn.execute(
                 f"""SELECT COALESCE(source_key,'') AS k, COUNT(*) n
                     FROM {table}
-                    WHERE outcome IN ({','.join('?' * len(decided))})
-                    GROUP BY k""", decided).fetchall()
+                    WHERE outcome IN ({",".join("?" * len(decided))})
+                    GROUP BY k""",
+                decided,
+            ).fetchall()
             for r in rows:
                 entry = counts.setdefault(r["k"], {"backtest": 0, "paper": 0})
                 entry[col] += r["n"] or 0
-        keys = sorted(counts, key=lambda k: (-(counts[k]["backtest"]
-                                               + counts[k]["paper"]), k))
+        keys = sorted(
+            counts, key=lambda k: (-(counts[k]["backtest"] + counts[k]["paper"]), k)
+        )
         return {
             "keys": keys,
             "counts": counts,
@@ -1213,34 +1434,49 @@ class SignalDB:
                          strategy_score=excluded.strategy_score,
                          strategy_band=excluded.strategy_band,
                          source_key=excluded.source_key""",
-                    (plan_type, entry.get("multiplier", 1.0),
-                     entry.get("expectancy"), entry.get("samples", 0),
-                     entry.get("regime", ""), 1 if entry.get("proven") else 0,
-                     entry.get("tp_rr"), entry.get("backtest_samples", 0),
-                     entry.get("paper_samples", 0), entry.get("win_rate"), now,
-                     entry.get("strategy_score"), entry.get("strategy_band"),
-                     entry.get("source_key", "") or ""))
+                    (
+                        plan_type,
+                        entry.get("multiplier", 1.0),
+                        entry.get("expectancy"),
+                        entry.get("samples", 0),
+                        entry.get("regime", ""),
+                        1 if entry.get("proven") else 0,
+                        entry.get("tp_rr"),
+                        entry.get("backtest_samples", 0),
+                        entry.get("paper_samples", 0),
+                        entry.get("win_rate"),
+                        now,
+                        entry.get("strategy_score"),
+                        entry.get("strategy_band"),
+                        entry.get("source_key", "") or "",
+                    ),
+                )
             self.conn.commit()
+
         return self._retry_write(_do_save)
 
     def load_calibration(self) -> dict:
         rows = self.conn.execute("SELECT * FROM calibration").fetchall()
-        return {r["plan_type"]: {
-            "multiplier": r["multiplier"],
-            "expectancy": r["expectancy"],
-            "samples": r["samples"],
-            "regime": r["regime"],
-            "proven": bool(r["proven"]),
-            "tp_rr": r["tp_rr"],
-            "backtest_samples": r["backtest_samples"],
-            "paper_samples": r["paper_samples"],
-            "win_rate": r["win_rate"],
-            "strategy_score": r["strategy_score"],
-            "strategy_band": r["strategy_band"],
-            # P12.11 — the price series this entry was learned from ("" = the
-            # canonical live Binance spot series).
-            "source_key": (r["source_key"] if "source_key" in r.keys() else "") or "",
-        } for r in rows}
+        return {
+            r["plan_type"]: {
+                "multiplier": r["multiplier"],
+                "expectancy": r["expectancy"],
+                "samples": r["samples"],
+                "regime": r["regime"],
+                "proven": bool(r["proven"]),
+                "tp_rr": r["tp_rr"],
+                "backtest_samples": r["backtest_samples"],
+                "paper_samples": r["paper_samples"],
+                "win_rate": r["win_rate"],
+                "strategy_score": r["strategy_score"],
+                "strategy_band": r["strategy_band"],
+                # P12.11 — the price series this entry was learned from ("" = the
+                # canonical live Binance spot series).
+                "source_key": (r["source_key"] if "source_key" in r.keys() else "")
+                or "",
+            }
+            for r in rows
+        }
 
     # ── scans ────────────────────────────────────────────────────────────
     def save_scan(self, payload: dict, status_override: str | None = None) -> int:
@@ -1250,12 +1486,14 @@ class SignalDB:
         the final decision is blocked (desk-first mode), so a signal the
         system already vetoed never appears in the human approval queue.
         """
+
         def _do_save():
             sig = payload.get("signal", {})
             snap = payload.get("snapshot", {})
             features = snap.get("features", {})
             plans = payload.get("plans", [])
             from engine.lifecycle import reviewable
+
             if status_override:
                 status = status_override
             else:
@@ -1305,15 +1543,25 @@ class SignalDB:
                         confidence_label, status)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
-                        scan_id, p.get("id"), p.get("type"), p.get("action"),
-                        p.get("condition"), p.get("trigger_level"), p.get("entry"),
-                        p.get("stop_loss"), tps[0] if len(tps) > 0 else None,
-                        tps[1] if len(tps) > 1 else None, p.get("risk_reward"),
-                        p.get("confidence"), p.get("confidence_label"), p.get("status"),
+                        scan_id,
+                        p.get("id"),
+                        p.get("type"),
+                        p.get("action"),
+                        p.get("condition"),
+                        p.get("trigger_level"),
+                        p.get("entry"),
+                        p.get("stop_loss"),
+                        tps[0] if len(tps) > 0 else None,
+                        tps[1] if len(tps) > 1 else None,
+                        p.get("risk_reward"),
+                        p.get("confidence"),
+                        p.get("confidence_label"),
+                        p.get("status"),
                     ),
                 )
             self.conn.commit()
             return scan_id
+
         return self._retry_write(_do_save)
 
     def latest_scans(self, symbol: str | None = None, limit: int = 20) -> list[dict]:
@@ -1352,23 +1600,42 @@ class SignalDB:
                         sentiment_bucket, sentiment_score, sentiment_intensity,
                         sentiment_persistence_min)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (run_id, r.get("ts"), r.get("symbol"), r.get("timeframe"),
-                     r.get("plan_type"), r.get("action"), r.get("confidence_pct"),
-                     r.get("horizon_hours"), r.get("step"), r.get("outcome"), r.get("rr_achieved"),
-                     r.get("max_favorable"), r.get("max_adverse"), r.get("entry"),
-                     r.get("trigger_level"), r.get("regime"), r.get("sim_key"),
-                     r.get("holding_bars"), r.get("holding_hours"),
-                     r.get("rr_net"), r.get("fee_r"), r.get("slip_r"),
-                     r.get("funding_r"), r.get("cost_r"),
-                     *_provenance_values(r),
-                     r.get("sentiment_bucket") or None,
-                     r.get("sentiment_score"),
-                     r.get("sentiment_intensity"),
-                     r.get("sentiment_persistence_min")),
+                    (
+                        run_id,
+                        r.get("ts"),
+                        r.get("symbol"),
+                        r.get("timeframe"),
+                        r.get("plan_type"),
+                        r.get("action"),
+                        r.get("confidence_pct"),
+                        r.get("horizon_hours"),
+                        r.get("step"),
+                        r.get("outcome"),
+                        r.get("rr_achieved"),
+                        r.get("max_favorable"),
+                        r.get("max_adverse"),
+                        r.get("entry"),
+                        r.get("trigger_level"),
+                        r.get("regime"),
+                        r.get("sim_key"),
+                        r.get("holding_bars"),
+                        r.get("holding_hours"),
+                        r.get("rr_net"),
+                        r.get("fee_r"),
+                        r.get("slip_r"),
+                        r.get("funding_r"),
+                        r.get("cost_r"),
+                        *_provenance_values(r),
+                        r.get("sentiment_bucket") or None,
+                        r.get("sentiment_score"),
+                        r.get("sentiment_intensity"),
+                        r.get("sentiment_persistence_min"),
+                    ),
                 )
                 n += 1
             self.conn.commit()
             return n
+
         return self._retry_write(_do_save)
 
     def sim_keys(self, table: str) -> set[str]:
@@ -1380,11 +1647,13 @@ class SignalDB:
         if table not in ("backtest_results", "paper_trades"):
             raise ValueError(f"sim_keys: unsupported table {table!r}")
         rows = self.conn.execute(
-            f"SELECT sim_key FROM {table} WHERE sim_key IS NOT NULL").fetchall()
+            f"SELECT sim_key FROM {table} WHERE sim_key IS NOT NULL"
+        ).fetchall()
         return {r["sim_key"] for r in rows}
 
     def backtest_stats(self) -> dict:
         """Win-rate learning: by plan type, by confidence bucket, by regime."""
+
         def agg(where: str = "") -> dict:
             q = f"""SELECT COUNT(*) n,
                            SUM(CASE WHEN outcome IN ('WIN','FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
@@ -1402,12 +1671,16 @@ class SignalDB:
             row["avg_rr"] = row["avg_rr"] or 0.0
             return row
 
-        by_type = [dict(r) for r in self.conn.execute(
-            """SELECT plan_type, COUNT(*) n,
+        by_type = [
+            dict(r)
+            for r in self.conn.execute(
+                """SELECT plan_type, COUNT(*) n,
                       SUM(CASE WHEN outcome IN ('WIN','FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
                       SUM(CASE WHEN outcome='LOSS' THEN 1 ELSE 0 END) losses,
                       ROUND(AVG(rr_achieved),2) avg_rr
-               FROM backtest_results GROUP BY plan_type ORDER BY n DESC""").fetchall()]
+               FROM backtest_results GROUP BY plan_type ORDER BY n DESC"""
+            ).fetchall()
+        ]
         for r in by_type:
             r["n"] = r["n"] or 0
             r["wins"] = r["wins"] or 0
@@ -1416,15 +1689,19 @@ class SignalDB:
             decided = r["wins"] + r["losses"]
             r["win_rate"] = round(r["wins"] / decided, 3) if decided else None
 
-        by_conf = [dict(r) for r in self.conn.execute(
-            """SELECT CASE WHEN confidence_pct >= 80 THEN 'HIGH'
+        by_conf = [
+            dict(r)
+            for r in self.conn.execute(
+                """SELECT CASE WHEN confidence_pct >= 80 THEN 'HIGH'
                            WHEN confidence_pct >= 60 THEN 'MEDIUM'
                            ELSE 'LOW' END bucket,
                       COUNT(*) n,
                       SUM(CASE WHEN outcome IN ('WIN','FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
                       SUM(CASE WHEN outcome='LOSS' THEN 1 ELSE 0 END) losses,
                       ROUND(AVG(rr_achieved),2) avg_rr
-               FROM backtest_results GROUP BY bucket""").fetchall()]
+               FROM backtest_results GROUP BY bucket"""
+            ).fetchall()
+        ]
         for r in by_conf:
             r["n"] = r["n"] or 0
             r["wins"] = r["wins"] or 0
@@ -1433,12 +1710,16 @@ class SignalDB:
             decided = r["wins"] + r["losses"]
             r["win_rate"] = round(r["wins"] / decided, 3) if decided else None
 
-        by_regime = [dict(r) for r in self.conn.execute(
-            """SELECT regime, COUNT(*) n,
+        by_regime = [
+            dict(r)
+            for r in self.conn.execute(
+                """SELECT regime, COUNT(*) n,
                       SUM(CASE WHEN outcome IN ('WIN','FULL_WIN','PARTIAL_WIN') THEN 1 ELSE 0 END) wins,
                       SUM(CASE WHEN outcome='LOSS' THEN 1 ELSE 0 END) losses,
                       ROUND(AVG(rr_achieved),2) avg_rr
-               FROM backtest_results GROUP BY regime ORDER BY n DESC""").fetchall()]
+               FROM backtest_results GROUP BY regime ORDER BY n DESC"""
+            ).fetchall()
+        ]
         for r in by_regime:
             r["n"] = r["n"] or 0
             r["wins"] = r["wins"] or 0
@@ -1447,12 +1728,17 @@ class SignalDB:
             decided = r["wins"] + r["losses"]
             r["win_rate"] = round(r["wins"] / decided, 3) if decided else None
 
-        return {"overall": agg(), "by_type": by_type, "by_confidence": by_conf,
-                "by_regime": by_regime}
+        return {
+            "overall": agg(),
+            "by_type": by_type,
+            "by_confidence": by_conf,
+            "by_regime": by_regime,
+        }
 
     # ── agent runs (autonomous desk agents audit log) ────────────────────
-    def record_agent_run(self, agent: str, status: str, summary: str = "",
-                         payload: dict | None = None) -> int:
+    def record_agent_run(
+        self, agent: str, status: str, summary: str = "", payload: dict | None = None
+    ) -> int:
         """Persist one autonomous-agent run (morning brief, watchdog, ...)."""
         ts = int(time.time())
         payload_json = json.dumps(payload or {}, default=str)
@@ -1461,21 +1747,26 @@ class SignalDB:
             cur = self.conn.execute(
                 "INSERT INTO agent_runs(agent, status, summary, payload_json, ts) "
                 "VALUES(?,?,?,?,?)",
-                (agent, status, summary, payload_json, ts))
+                (agent, status, summary, payload_json, ts),
+            )
             self.conn.commit()
             return cur.lastrowid
+
         return self._retry_write(_op)
 
-    def latest_agent_runs(self, limit: int = 10, agent: str | None = None) -> list[dict]:
+    def latest_agent_runs(
+        self, limit: int = 10, agent: str | None = None
+    ) -> list[dict]:
         """Newest agent runs first, optionally filtered by agent name."""
         if agent:
             rows = self.conn.execute(
                 "SELECT * FROM agent_runs WHERE agent=? ORDER BY id DESC LIMIT ?",
-                (agent, limit)).fetchall()
+                (agent, limit),
+            ).fetchall()
         else:
             rows = self.conn.execute(
-                "SELECT * FROM agent_runs ORDER BY id DESC LIMIT ?",
-                (limit,)).fetchall()
+                "SELECT * FROM agent_runs ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
         out = []
         for r in rows:
             d = dict(r)
@@ -1487,8 +1778,14 @@ class SignalDB:
         return out
 
     # ── P18.4 PWA Push Subscriptions ──────────────────────────────────────────
-    def save_push_subscription(self, endpoint: str, p256dh: str, auth: str,
-                                user_id: int | None = None, user_agent: str = "") -> dict:
+    def save_push_subscription(
+        self,
+        endpoint: str,
+        p256dh: str,
+        auth: str,
+        user_id: int | None = None,
+        user_agent: str = "",
+    ) -> dict:
         """Register or update a Web Push subscription."""
         now = int(time.time())
 
@@ -1499,17 +1796,23 @@ class SignalDB:
                 "ON CONFLICT(endpoint) DO UPDATE SET "
                 "p256dh=excluded.p256dh, auth=excluded.auth, user_id=excluded.user_id, "
                 "user_agent=excluded.user_agent, last_active_ts=excluded.last_active_ts",
-                (endpoint, p256dh, auth, user_id, user_agent, now, now))
+                (endpoint, p256dh, auth, user_id, user_agent, now, now),
+            )
             self.conn.commit()
             return {"endpoint": endpoint, "ok": True, "ts": now}
+
         return self._retry_write(_op)
 
     def remove_push_subscription(self, endpoint: str) -> bool:
         """Unregister a Web Push subscription."""
+
         def _op():
-            cur = self.conn.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,))
+            cur = self.conn.execute(
+                "DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,)
+            )
             self.conn.commit()
             return cur.rowcount > 0
+
         return self._retry_write(_op)
 
     def list_push_subscriptions(self) -> list[dict]:
@@ -1521,8 +1824,15 @@ class SignalDB:
         return [dict(r) for r in rows]
 
     # ── W4.3 / Risk Center Veto History ───────────────────────────────────────
-    def record_risk_veto(self, symbol: str, setup: str, action: str, reason: str,
-                         veto_type: str = "desk", detail: dict | None = None) -> dict:
+    def record_risk_veto(
+        self,
+        symbol: str,
+        setup: str,
+        action: str,
+        reason: str,
+        veto_type: str = "desk",
+        detail: dict | None = None,
+    ) -> dict:
         """Log a trade veto event for timeline review."""
         now = int(time.time())
         detail_json = json.dumps(detail or {}, default=str)
@@ -1531,9 +1841,11 @@ class SignalDB:
             cur = self.conn.execute(
                 "INSERT INTO risk_vetoes(ts, symbol, setup, action, reason, veto_type, detail_json) "
                 "VALUES(?,?,?,?,?,?,?)",
-                (now, symbol, setup or "", action, reason, veto_type, detail_json))
+                (now, symbol, setup or "", action, reason, veto_type, detail_json),
+            )
             self.conn.commit()
             return {"id": cur.lastrowid, "ts": now, "symbol": symbol, "reason": reason}
+
         return self._retry_write(_op)
 
     def get_risk_vetoes(self, symbol: str | None = None, limit: int = 50) -> list[dict]:
@@ -1541,11 +1853,12 @@ class SignalDB:
         if symbol:
             rows = self.conn.execute(
                 "SELECT * FROM risk_vetoes WHERE symbol=? ORDER BY ts DESC, id DESC LIMIT ?",
-                (symbol, limit)).fetchall()
+                (symbol, limit),
+            ).fetchall()
         else:
             rows = self.conn.execute(
-                "SELECT * FROM risk_vetoes ORDER BY ts DESC, id DESC LIMIT ?",
-                (limit,)).fetchall()
+                "SELECT * FROM risk_vetoes ORDER BY ts DESC, id DESC LIMIT ?", (limit,)
+            ).fetchall()
         out = []
         for r in rows:
             d = dict(r)

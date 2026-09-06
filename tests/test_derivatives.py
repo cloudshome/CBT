@@ -4,6 +4,7 @@ Milestone deliverable (docs/DATA_INFRASTRUCTURE_ROADMAP.md §9): "series
 queryable; liquidations() proxy renamed honestly". All tests are fully
 offline and deterministic (FakeDerivativesTransport + injected clock).
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -35,7 +36,7 @@ from data.derivatives import (
 EXCH, MARKET, SYMBOL = "binance", "perp", "BTCUSDT"
 START = 1_749_600_000_000  # aligned to hour AND 8h
 HOUR = 3_600_000
-WINDOW = 60 * HOUR                     # 60 hours of hourly mark/index/OI
+WINDOW = 60 * HOUR  # 60 hours of hourly mark/index/OI
 
 
 @pytest.fixture
@@ -45,23 +46,41 @@ def store(tmp_path):
 
 def make_transport(**kw) -> FakeDerivativesTransport:
     kw.setdefault("start_ts", START)
-    kw.setdefault("end_ts", START + WINDOW + HOUR)   # exclusive fake end
+    kw.setdefault("end_ts", START + WINDOW + HOUR)  # exclusive fake end
     return FakeDerivativesTransport(**kw)
 
 
-def collect(store, transport, *, since=None, until=None, metrics=None,
-            dry_run=False, sleep_s=0.0, clock=None):
+def collect(
+    store,
+    transport,
+    *,
+    since=None,
+    until=None,
+    metrics=None,
+    dry_run=False,
+    sleep_s=0.0,
+    clock=None,
+):
     return DerivativesCollector(
-        store, transport, sleep_s=sleep_s,
+        store,
+        transport,
+        sleep_s=sleep_s,
         clock=clock if clock is not None else (lambda: START + WINDOW),
-        sleep_fn=lambda _s: None).collect(
-            SYMBOL, market=MARKET, since=since, until=until,
-            metrics=metrics, dry_run=dry_run)
+        sleep_fn=lambda _s: None,
+    ).collect(
+        SYMBOL,
+        market=MARKET,
+        since=since,
+        until=until,
+        metrics=metrics,
+        dry_run=dry_run,
+    )
 
 
 # --------------------------------------------------------------------------- #
 # Schema / store
 # --------------------------------------------------------------------------- #
+
 
 def test_empty_frame_has_canonical_columns_and_dtypes():
     df = empty_frame()
@@ -83,10 +102,19 @@ def test_coerce_fills_missing_fields():
 
 
 def test_store_round_trip_and_upsert(store):
-    rows = coerce_derivative_frame([{
-        "ts": START, "exchange": EXCH, "market": MARKET, "symbol": SYMBOL,
-        "metric": FUNDING_RATE, "value": 0.0001, "ingested_at": 1_760_000_000_000,
-    }])
+    rows = coerce_derivative_frame(
+        [
+            {
+                "ts": START,
+                "exchange": EXCH,
+                "market": MARKET,
+                "symbol": SYMBOL,
+                "metric": FUNDING_RATE,
+                "value": 0.0001,
+                "ingested_at": 1_760_000_000_000,
+            }
+        ]
+    )
     assert store.write(rows) == 1
     assert store.count(EXCH, MARKET, SYMBOL, FUNDING_RATE) == 1
     # rewrite (venue revision) — upsert, no duplicate
@@ -98,12 +126,30 @@ def test_store_round_trip_and_upsert(store):
 
 
 def test_store_isolates_metrics(store):
-    a = coerce_derivative_frame([{"ts": START, "exchange": EXCH, "market": MARKET,
-                                  "symbol": SYMBOL, "metric": FUNDING_RATE,
-                                  "value": 0.1}])
-    b = coerce_derivative_frame([{"ts": START, "exchange": EXCH, "market": MARKET,
-                                  "symbol": SYMBOL, "metric": OPEN_INTEREST,
-                                  "value": 5.0}])
+    a = coerce_derivative_frame(
+        [
+            {
+                "ts": START,
+                "exchange": EXCH,
+                "market": MARKET,
+                "symbol": SYMBOL,
+                "metric": FUNDING_RATE,
+                "value": 0.1,
+            }
+        ]
+    )
+    b = coerce_derivative_frame(
+        [
+            {
+                "ts": START,
+                "exchange": EXCH,
+                "market": MARKET,
+                "symbol": SYMBOL,
+                "metric": OPEN_INTEREST,
+                "value": 5.0,
+            }
+        ]
+    )
     store.write(a)
     store.write(b)
     assert store.count(EXCH, MARKET, SYMBOL, FUNDING_RATE) == 1
@@ -115,11 +161,18 @@ def test_store_isolates_metrics(store):
 # Basis derivation
 # --------------------------------------------------------------------------- #
 
+
 def test_derive_basis_is_mark_minus_index():
     mark = pd.DataFrame({"ts": [100, 200, 300], "mark_price": [10.0, 12.0, 14.0]})
     index = pd.DataFrame({"ts": [100, 200, 300], "index_price": [9.5, 12.0, 13.0]})
-    basis = derive_basis(mark, index, exchange=EXCH, market=MARKET, symbol=SYMBOL,
-                         ingested_at=1_760_000_000_000)
+    basis = derive_basis(
+        mark,
+        index,
+        exchange=EXCH,
+        market=MARKET,
+        symbol=SYMBOL,
+        ingested_at=1_760_000_000_000,
+    )
     assert basis["metric"].tolist() == [BASIS] * 3
     assert basis["value"].round(6).tolist() == [0.5, 0.0, 1.0]
     assert basis["ts"].tolist() == [100, 200, 300]
@@ -135,6 +188,7 @@ def test_derive_basis_joins_only_common_ts():
 # --------------------------------------------------------------------------- #
 # Fake transport
 # --------------------------------------------------------------------------- #
+
 
 def test_fake_transport_pages_are_well_shaped():
     t = make_transport()
@@ -152,6 +206,7 @@ def test_fake_transport_pages_are_well_shaped():
 # --------------------------------------------------------------------------- #
 # Collector
 # --------------------------------------------------------------------------- #
+
 
 def test_collect_all_metrics_writes_queryable_series(store):
     runs = collect(store, make_transport())
@@ -184,9 +239,9 @@ def test_rerun_adds_zero_rows(store):
 def test_collect_resumes_from_last_stored_ts(store):
     transport = make_transport()
     first = collect(store, transport, until=START + 30 * HOUR)
-    assert store.count(EXCH, MARKET, SYMBOL, MARK_PRICE) == 31   # 0..30h inclusive
+    assert store.count(EXCH, MARKET, SYMBOL, MARK_PRICE) == 31  # 0..30h inclusive
     second = collect(store, transport)
-    assert second[MARK_PRICE].rows_new == 30      # resumes at 31h; 31..60h inclusive
+    assert second[MARK_PRICE].rows_new == 30  # resumes at 31h; 31..60h inclusive
     assert store.count(EXCH, MARKET, SYMBOL, MARK_PRICE) == 61
 
 
@@ -213,7 +268,8 @@ def test_dry_run_writes_nothing(store):
 def test_gold_perp_is_rejected(store):
     with pytest.raises(DerivativesTransportError, match="no Binance perp market"):
         DerivativesCollector(store, make_transport(), sleep_s=0.0).collect(
-            "XAUUSD", market="perp")
+            "XAUUSD", market="perp"
+        )
 
 
 def test_unknown_metric_rejected(store):
@@ -225,19 +281,23 @@ def test_unknown_metric_rejected(store):
 # Transport robustness
 # --------------------------------------------------------------------------- #
 
+
 def test_fake_fault_is_retried(store):
     from data.derivatives import DerivativesTransportError as DTE
+
     t = make_transport(faults={1: DTE("blip")})
     runs = collect(store, t, metrics=[FUNDING_RATE])
-    assert runs[FUNDING_RATE].rows_new > 0       # retry succeeded
+    assert runs[FUNDING_RATE].rows_new > 0  # retry succeeded
 
 
 def test_binance_transport_maps_none_to_honest_error():
     class DownClient:
         def funding_rate_history(self, *a, **k):
             return None
-    t = BinanceDerivativesTransport(DownClient(), backoff_attempts=1,
-                                    sleep_fn=lambda _s: None)
+
+    t = BinanceDerivativesTransport(
+        DownClient(), backoff_attempts=1, sleep_fn=lambda _s: None
+    )
     with pytest.raises(DerivativesTransportError, match="geo-blocked|unreachable"):
         t.funding_rate_page(SYMBOL, None, None, 1000)
 
@@ -255,9 +315,10 @@ def test_default_transport_is_offline_in_demo(monkeypatch):
 # Honest liquidations rename (P10.4 done-when)
 # --------------------------------------------------------------------------- #
 
+
 def test_liquidations_proxy_renamed_honestly():
     client = BinanceClient()
     assert hasattr(client, "liquidation_stats_proxy")
-    assert not hasattr(client, "liquidations")     # no misleading alias
+    assert not hasattr(client, "liquidations")  # no misleading alias
     doc = client.liquidation_stats_proxy.__doc__ or ""
     assert "not liquidation data" in doc or "proxy" in doc

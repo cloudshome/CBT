@@ -20,21 +20,22 @@ Produces exactly the structured output format requested:
       "plans": [ ...multi-condition plans... ]
     }
 """
+
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Optional
 
 import pandas as pd
 
 from data.symbols import normalize_symbol
-from .indicators import add_all_indicators, find_rsi_divergence
-from .structure import analyze_structure
+
 from .features import build_snapshot
-from .scorer import score_bullish, score_bearish, score_neutral, ScoreBreakdown
-from .rules import build_plans, Plan
+from .indicators import add_all_indicators, find_rsi_divergence
 from .regime import classify_market_regime
+from .rules import Plan, build_plans
+from .scorer import ScoreBreakdown, score_bearish, score_bullish, score_neutral
+from .structure import analyze_structure
 
 
 @dataclass
@@ -79,7 +80,9 @@ def _signal_id(symbol: str, ts_ms: int) -> str:
     return f"{symbol.replace('/', '')}_{time.strftime('%Y%m%d_%H%M', time.localtime(ts_ms / 1000))}"
 
 
-def _reason(features: dict, side: str, bull: ScoreBreakdown, bear: ScoreBreakdown) -> str:
+def _reason(
+    features: dict, side: str, bull: ScoreBreakdown, bear: ScoreBreakdown
+) -> str:
     parts = []
     if side == "BUY":
         if (features.get("rsi_divergence") or {}).get("bull"):
@@ -106,9 +109,15 @@ def _reason(features: dict, side: str, bull: ScoreBreakdown, bear: ScoreBreakdow
     return " + ".join(parts[:6])
 
 
-def build_best_signal(features: dict, bull: ScoreBreakdown, bear: ScoreBreakdown,
-                      plans: list[Plan], symbol: str, timeframe: str,
-                      min_confidence: int) -> dict:
+def build_best_signal(
+    features: dict,
+    bull: ScoreBreakdown,
+    bear: ScoreBreakdown,
+    plans: list[Plan],
+    symbol: str,
+    timeframe: str,
+    min_confidence: int,
+) -> dict:
     """Emit the single best actionable signal (or NO TRADE) in the requested
     schema, with entry/SL/TP taken from the top PRIMARY plan when available.
 
@@ -148,17 +157,25 @@ def build_best_signal(features: dict, bull: ScoreBreakdown, bear: ScoreBreakdown
         "timeframe": timeframe,
         "reason": reason,
         "signal_type": signal_type,
-        "note": ("NO TRADE: scores below threshold. Read the 'plans' array for "
-                 "conditional setups to wait for." if signal_type == "MONITOR" else
-                 "Risk advice only — not financial advice. Use stop-losses."),
+        "note": (
+            "NO TRADE: scores below threshold. Read the 'plans' array for "
+            "conditional setups to wait for."
+            if signal_type == "MONITOR"
+            else "Risk advice only — not financial advice. Use stop-losses."
+        ),
     }
 
 
-def analyze_frame(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "15m",
-                  min_confidence: int = 55, default_rr: float = 2.0,
-                  calibration: dict | None = None,
-                  primary_types: set | None = None,
-                  tp_rr_by_type: dict | None = None) -> BrainOutput:
+def analyze_frame(
+    df: pd.DataFrame,
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    min_confidence: int = 55,
+    default_rr: float = 2.0,
+    calibration: dict | None = None,
+    primary_types: set | None = None,
+    tp_rr_by_type: dict | None = None,
+) -> BrainOutput:
     """Run the full brain on one OHLCV frame.
 
     `calibration` is the optional self-improvement profile (plan_type ->
@@ -176,18 +193,32 @@ def analyze_frame(df: pd.DataFrame, symbol: str = "BTCUSDT", timeframe: str = "1
     df.attrs["timeframe"] = timeframe
 
     ind = add_all_indicators(df)
-    return _analyze_at(ind, df, len(df) - 1, symbol, timeframe,
-                       min_confidence=min_confidence, default_rr=default_rr,
-                       calibration=calibration, primary_types=primary_types,
-                       tp_rr_by_type=tp_rr_by_type)
+    return _analyze_at(
+        ind,
+        df,
+        len(df) - 1,
+        symbol,
+        timeframe,
+        min_confidence=min_confidence,
+        default_rr=default_rr,
+        calibration=calibration,
+        primary_types=primary_types,
+        tp_rr_by_type=tp_rr_by_type,
+    )
 
 
-def analyze_frame_at(ind: pd.DataFrame, raw: pd.DataFrame, i: int,
-                     symbol: str = "BTCUSDT", timeframe: str = "15m",
-                     min_confidence: int = 55, default_rr: float = 2.0,
-                     calibration: dict | None = None,
-                     primary_types: set | None = None,
-                     tp_rr_by_type: dict | None = None) -> BrainOutput:
+def analyze_frame_at(
+    ind: pd.DataFrame,
+    raw: pd.DataFrame,
+    i: int,
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    min_confidence: int = 55,
+    default_rr: float = 2.0,
+    calibration: dict | None = None,
+    primary_types: set | None = None,
+    tp_rr_by_type: dict | None = None,
+) -> BrainOutput:
     """Analyse bar ``i`` from precomputed indicators (P13.4 fast walk).
 
     ``ind`` must be ``add_all_indicators(raw)`` over the FULL frame (all
@@ -201,28 +232,46 @@ def analyze_frame_at(ind: pd.DataFrame, raw: pd.DataFrame, i: int,
     keeping the walk behaviour-identical.
     """
     symbol = normalize_symbol(symbol)
-    return _analyze_at(ind, raw, i, symbol, timeframe,
-                       min_confidence=min_confidence, default_rr=default_rr,
-                       calibration=calibration, primary_types=primary_types,
-                       tp_rr_by_type=tp_rr_by_type)
+    return _analyze_at(
+        ind,
+        raw,
+        i,
+        symbol,
+        timeframe,
+        min_confidence=min_confidence,
+        default_rr=default_rr,
+        calibration=calibration,
+        primary_types=primary_types,
+        tp_rr_by_type=tp_rr_by_type,
+    )
 
 
-def _analyze_at(ind: pd.DataFrame, raw: pd.DataFrame, i: int,
-                symbol: str, timeframe: str, min_confidence: int,
-                default_rr: float, calibration: dict | None,
-                primary_types: set | None, tp_rr_by_type: dict | None) -> BrainOutput:
+def _analyze_at(
+    ind: pd.DataFrame,
+    raw: pd.DataFrame,
+    i: int,
+    symbol: str,
+    timeframe: str,
+    min_confidence: int,
+    default_rr: float,
+    calibration: dict | None,
+    primary_types: set | None,
+    tp_rr_by_type: dict | None,
+) -> BrainOutput:
     """Shared analysis for one bar: the exact analyze_frame pipeline applied
     to bar ``i`` with precomputed indicators.  ``raw`` must be positionally
     indexed (0..N-1) and carry the original OHLCV columns."""
     # Structure: only the last STRUCTURE_LOOKBACK rows matter (the detector
     # windows internally), and every bar <= i is identical to the prefix run.
-    tail = raw.iloc[max(0, i - STRUCTURE_LOOKBACK + 1): i + 1]
+    tail = raw.iloc[max(0, i - STRUCTURE_LOOKBACK + 1) : i + 1]
     ms = analyze_structure(tail, lookback=STRUCTURE_LOOKBACK)
     # RSI divergence: tail window over the indicator frame (needs rsi + OHLC).
-    div = find_rsi_divergence(ind.iloc[max(0, i - DIVERGENCE_LOOKBACK + 1): i + 1],
-                              lookback=DIVERGENCE_LOOKBACK)
+    div = find_rsi_divergence(
+        ind.iloc[max(0, i - DIVERGENCE_LOOKBACK + 1) : i + 1],
+        lookback=DIVERGENCE_LOOKBACK,
+    )
     # Snapshot: last two rows for delta features, prefix length for event age.
-    last2 = ind.iloc[max(0, i - 1): i + 1]
+    last2 = ind.iloc[max(0, i - 1) : i + 1]
     last2.attrs["symbol"] = symbol
     last2.attrs["timeframe"] = timeframe
     features = build_snapshot(last2, ms, div, ms.equal_levels, frame_len=i + 1)
@@ -231,8 +280,9 @@ def _analyze_at(ind: pd.DataFrame, raw: pd.DataFrame, i: int,
     # frame shorter than REGIME_MIN_ROWS, so hand it a window that is exactly
     # the prefix when the prefix is short and exactly 20 rows otherwise — the
     # same rows the prefix call would have seen.
-    regime = classify_market_regime(raw.iloc[max(0, i - REGIME_MIN_ROWS + 1): i + 1],
-                                    features)
+    regime = classify_market_regime(
+        raw.iloc[max(0, i - REGIME_MIN_ROWS + 1) : i + 1], features
+    )
     features["regime"] = regime
     features["regime_name"] = regime.get("regime", "RANGING")
     features["regime_label"] = regime.get("label", "Ranging / Neutral")
@@ -245,13 +295,20 @@ def _analyze_at(ind: pd.DataFrame, raw: pd.DataFrame, i: int,
         neutral = score_neutral(features)
         bull, bear = neutral, neutral
 
-    plans = build_plans(features, bull, bear,
-                        min_confidence=min_confidence, default_rr=default_rr,
-                        calibration=calibration, primary_types=primary_types,
-                        tp_rr_by_type=tp_rr_by_type,
-                        regime=features.get("regime_name", ""))
-    best = build_best_signal(features, bull, bear, plans, symbol, timeframe,
-                             min_confidence)
+    plans = build_plans(
+        features,
+        bull,
+        bear,
+        min_confidence=min_confidence,
+        default_rr=default_rr,
+        calibration=calibration,
+        primary_types=primary_types,
+        tp_rr_by_type=tp_rr_by_type,
+        regime=features.get("regime_name", ""),
+    )
+    best = build_best_signal(
+        features, bull, bear, plans, symbol, timeframe, min_confidence
+    )
 
     return BrainOutput(
         features=features,

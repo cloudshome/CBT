@@ -36,21 +36,21 @@ It is intentionally narrower than recursive-state analysis, which remains a
 later extension; it does not claim that a source scan replaces the locked
 walk-forward protocol.
 """
+
 from __future__ import annotations
 
 import ast
 import hashlib
 import json
 import time
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Optional
 
 import pandas as pd
 
-from config import (BACKTEST_HORIZONS, BACKTEST_MIN_BARS, BACKTEST_STEP,
-                    MIN_CONFIDENCE)
-from data.backtester import WIN_SET, _aggregate, run_backtest
+from config import BACKTEST_HORIZONS, BACKTEST_MIN_BARS, BACKTEST_STEP, MIN_CONFIDENCE
+from data.backtester import _aggregate, run_backtest
 from data.simulator import GRADUATION_CRITERIA  # the live graduation bar
 
 WINDOW_NAMES = ("train", "val", "oos", "recent")
@@ -60,8 +60,7 @@ WINDOW_NAMES = ("train", "val", "oos", "recent")
 #: validation-specific sample floor (the gate's CALIBRATE_MIN_N analog).
 VALIDATION_CRITERIA: dict[str, float] = dict(GRADUATION_CRITERIA)
 
-DEFAULT_WINDOW_FRACTIONS = {"train": 0.60, "val": 0.15,
-                            "oos": 0.15, "recent": 0.10}
+DEFAULT_WINDOW_FRACTIONS = {"train": 0.60, "val": 0.15, "oos": 0.15, "recent": 0.10}
 DEFAULT_MIN_DECIDED = 30
 DEFAULT_SEAL_DIR = Path("data/store/validation")  # under gitignored data/store/
 
@@ -82,8 +81,19 @@ class LookaheadViolation(ValueError):
 # by the Freqtrade/Backtrader review); this scanner does not pretend to do it.
 LOOKAHEAD_DEFAULT_PATHS = ("engine", "brain", "data")
 _LOOKAHEAD_SKIP_DIRS = {
-    ".git", ".venv", "__pycache__", "node_modules", "store", "store_demo",
-    ".pytest_cache", ".tox", ".nox", "build", "dist", "out", "target",
+    ".git",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    "store",
+    "store_demo",
+    ".pytest_cache",
+    ".tox",
+    ".nox",
+    "build",
+    "dist",
+    "out",
+    "target",
 }
 
 
@@ -92,7 +102,9 @@ def _validation_repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def _scan_python_files(paths: Iterable[str | Path], root: Path) -> tuple[list[Path], list[dict]]:
+def _scan_python_files(
+    paths: Iterable[str | Path], root: Path
+) -> tuple[list[Path], list[dict]]:
     """Expand scan roots into deterministic Python files and input errors."""
     files: list[Path] = []
     errors: list[dict] = []
@@ -108,8 +120,12 @@ def _scan_python_files(paths: Iterable[str | Path], root: Path) -> tuple[list[Pa
             if path.suffix == ".py":
                 files.append(path)
             else:
-                errors.append({"path": path.as_posix(),
-                               "error": "lookahead scan paths must be Python files or directories"})
+                errors.append(
+                    {
+                        "path": path.as_posix(),
+                        "error": "lookahead scan paths must be Python files or directories",
+                    }
+                )
             continue
         candidates = []
         for candidate in path.rglob("*.py"):
@@ -133,18 +149,22 @@ def _negative_shift_expression(node: ast.AST) -> bool:
     """
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
         return True
-    if (isinstance(node, ast.Constant)
-            and isinstance(node.value, (int, float))
-            and not isinstance(node.value, bool)):
+    if (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, (int, float))
+        and not isinstance(node.value, bool)
+    ):
         return node.value < 0
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Sub):
         return isinstance(node.left, ast.Constant) and node.left.value == 0
     if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mult, ast.Div)):
-        return _negative_shift_expression(node.left) or _negative_shift_expression(node.right)
+        return _negative_shift_expression(node.left) or _negative_shift_expression(
+            node.right
+        )
     return False
 
 
-def _shift_period_expression(call: ast.Call) -> Optional[ast.AST]:
+def _shift_period_expression(call: ast.Call) -> ast.AST | None:
     """Return the row-offset argument of a pandas-like ``shift`` call."""
     if call.args:
         return call.args[0]
@@ -165,27 +185,31 @@ class _LookaheadVisitor(ast.NodeVisitor):
     @staticmethod
     def _is_shift_call(node: ast.Call) -> bool:
         func = node.func
-        return ((isinstance(func, ast.Attribute) and func.attr == "shift")
-                or (isinstance(func, ast.Name) and func.id == "shift"))
+        return (isinstance(func, ast.Attribute) and func.attr == "shift") or (
+            isinstance(func, ast.Name) and func.id == "shift"
+        )
 
-    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802 — ast visitor API
+    def visit_Call(self, node: ast.Call) -> None:
         if self._is_shift_call(node):
             offset = _shift_period_expression(node)
             if offset is not None and _negative_shift_expression(offset):
                 expression = ast.get_source_segment(self.source, node) or "shift(...)"
-                self.violations.append({
-                    "path": self.display_path,
-                    "line": node.lineno,
-                    "column": node.col_offset,
-                    "expression": expression,
-                    "kind": "negative_shift",
-                    "message": "negative shift reads future rows; use only past/current data",
-                })
+                self.violations.append(
+                    {
+                        "path": self.display_path,
+                        "line": node.lineno,
+                        "column": node.col_offset,
+                        "expression": expression,
+                        "kind": "negative_shift",
+                        "message": "negative shift reads future rows; use only past/current data",
+                    }
+                )
         self.generic_visit(node)
 
 
-def scan_lookahead(paths: Optional[Iterable[str | Path]] = None,
-                   root: Optional[str | Path] = None) -> dict:
+def scan_lookahead(
+    paths: Iterable[str | Path] | None = None, root: str | Path | None = None
+) -> dict:
     """Scan first-party feature code for explicit future-looking row shifts.
 
     This is the P12.2 unit/CI form.  A negative pandas-style ``shift``
@@ -213,8 +237,9 @@ def scan_lookahead(paths: Optional[Iterable[str | Path]] = None,
             source = path.read_text(encoding="utf-8")
             tree = ast.parse(source, filename=path.as_posix())
         except (OSError, UnicodeError, SyntaxError) as exc:
-            errors.append({"path": path.as_posix(),
-                           "error": f"{type(exc).__name__}: {exc}"})
+            errors.append(
+                {"path": path.as_posix(), "error": f"{type(exc).__name__}: {exc}"}
+            )
             continue
         try:
             display = path.relative_to(repo_root).as_posix()
@@ -238,20 +263,21 @@ def scan_lookahead(paths: Optional[Iterable[str | Path]] = None,
     }
 
 
-def lookahead_report(paths: Optional[Iterable[str | Path]] = None,
-                     root: Optional[str | Path] = None) -> dict:
+def lookahead_report(
+    paths: Iterable[str | Path] | None = None, root: str | Path | None = None
+) -> dict:
     """Named report alias for callers that prefer the P12 report vocabulary."""
     return scan_lookahead(paths=paths, root=root)
 
 
-def assert_no_lookahead(paths: Optional[Iterable[str | Path]] = None,
-                        root: Optional[str | Path] = None) -> dict:
+def assert_no_lookahead(
+    paths: Iterable[str | Path] | None = None, root: str | Path | None = None
+) -> dict:
     """Raise ``LookaheadViolation`` unless the requested source scan passes."""
     report = scan_lookahead(paths=paths, root=root)
     if not report["ok"]:
         details = [
-            f"{v['path']}:{v['line']} {v['expression']}"
-            for v in report["violations"]
+            f"{v['path']}:{v['line']} {v['expression']}" for v in report["violations"]
         ]
         details.extend(f"{e['path']}: {e['error']}" for e in report["errors"])
         raise LookaheadViolation("lookahead guard failed: " + "; ".join(details))
@@ -262,10 +288,14 @@ def print_lookahead(report: dict) -> None:
     """Print the compact boxed output for ``validate lookahead``."""
     print("=" * 74)
     print("LOOKAHEAD VALIDATION  P12.2")
-    print(f"scanner {report.get('scanner', '?')}  files={report.get('files_scanned', 0)}")
+    print(
+        f"scanner {report.get('scanner', '?')}  files={report.get('files_scanned', 0)}"
+    )
     for violation in report.get("violations", []):
-        print(f"  ❌ {violation['path']}:{violation['line']} "
-              f"{violation['expression']} — {violation['message']}")
+        print(
+            f"  ❌ {violation['path']}:{violation['line']} "
+            f"{violation['expression']} — {violation['message']}"
+        )
     for error in report.get("errors", []):
         print(f"  ❌ {error['path']} — {error['error']}")
     if report.get("ok"):
@@ -279,10 +309,16 @@ def print_lookahead(report: dict) -> None:
 # Window split (locked protocol)
 # ──────────────────────────────────────────────────────────────────────────
 
-def walk_forward_windows(n_bars: int, min_bars: int,
-                         train_frac: float = 0.60, val_frac: float = 0.15,
-                         oos_frac: float = 0.15, recent_frac: float = 0.10,
-                         min_window_bars: int = 1) -> dict[str, tuple[int, int]]:
+
+def walk_forward_windows(
+    n_bars: int,
+    min_bars: int,
+    train_frac: float = 0.60,
+    val_frac: float = 0.15,
+    oos_frac: float = 0.15,
+    recent_frac: float = 0.10,
+    min_window_bars: int = 1,
+) -> dict[str, tuple[int, int]]:
     """Split bar indices ``[min_bars, n_bars)`` into locked windows.
 
     Chronological and contiguous: ``train`` earliest, ``recent`` newest.
@@ -297,14 +333,15 @@ def walk_forward_windows(n_bars: int, min_bars: int,
     usable = n_bars - min_bars
     if usable <= 0:
         raise ValidationWindowError(
-            f"series of {n_bars} bars has nothing beyond min_bars={min_bars}")
+            f"series of {n_bars} bars has nothing beyond min_bars={min_bars}"
+        )
     fracs = (train_frac, val_frac, oos_frac, recent_frac)
     if any(f is None or not (0.0 < f < 1.0) for f in fracs):
-        raise ValidationWindowError(
-            f"window fractions must each be in (0, 1): {fracs}")
+        raise ValidationWindowError(f"window fractions must each be in (0, 1): {fracs}")
     if abs(sum(fracs) - 1.0) > 1e-6:
         raise ValidationWindowError(
-            f"window fractions must sum to 1.0: {fracs} = {sum(fracs):.4f}")
+            f"window fractions must sum to 1.0: {fracs} = {sum(fracs):.4f}"
+        )
     # val/oos/recent get their exact (floored) share; train absorbs the
     # remainder so the split is always contiguous and exact.
     val_n = int(usable * val_frac)
@@ -315,7 +352,8 @@ def walk_forward_windows(n_bars: int, min_bars: int,
     if min(sizes) < min_window_bars:
         raise ValidationWindowError(
             f"usable bars {usable} too short for split {sizes} "
-            f"(min window {min_window_bars})")
+            f"(min window {min_window_bars})"
+        )
     cursor = min_bars
     windows: dict[str, tuple[int, int]] = {}
     for name, size in zip(WINDOW_NAMES, sizes):
@@ -329,8 +367,10 @@ def walk_forward_windows(n_bars: int, min_bars: int,
 # Bucketing + window statistics
 # ──────────────────────────────────────────────────────────────────────────
 
-def bucket_by_window(graded: list, windows: dict[str, tuple[int, int]],
-                     ts_to_index: dict[int, int]) -> dict[str, list]:
+
+def bucket_by_window(
+    graded: list, windows: dict[str, tuple[int, int]], ts_to_index: dict[int, int]
+) -> dict[str, list]:
     """Bucket graded plans by the *signal bar's* window.
 
     The signal's bar index (via its timestamp) decides the window — a plan
@@ -356,25 +396,37 @@ def window_stats(plans: list) -> dict:
     """Decided-trade statistics for one window (primary horizon already
     filtered by the caller). Mirrors `_aggregate` but adds profit factor,
     which the graduation bar needs."""
-    decided = [g for g in plans if g.outcome in ("FULL_WIN", "PARTIAL_WIN",
-                                                 "LOSS")]
+    decided = [g for g in plans if g.outcome in ("FULL_WIN", "PARTIAL_WIN", "LOSS")]
     agg = _aggregate(plans)
     wins_r = sum(g.rr_achieved for g in decided if g.rr_achieved > 0)
     loss_r = abs(sum(g.rr_achieved for g in decided if g.rr_achieved < 0))
-    pf = round(wins_r / loss_r, 3) if loss_r > 0 else (99.0 if wins_r > 0
-                                                       else None)
+    pf = round(wins_r / loss_r, 3) if loss_r > 0 else (99.0 if wins_r > 0 else None)
     # Net profit factor (P12.6)
-    wins_net_r = sum(getattr(g, "rr_net", g.rr_achieved) for g in decided
-                     if getattr(g, "rr_net", g.rr_achieved) > 0)
-    loss_net_r = abs(sum(getattr(g, "rr_net", g.rr_achieved) for g in decided
-                         if getattr(g, "rr_net", g.rr_achieved) <= 0))
-    pf_net = round(wins_net_r / loss_net_r, 3) if loss_net_r > 0 else (99.0 if wins_net_r > 0
-                                                                       else None)
+    wins_net_r = sum(
+        getattr(g, "rr_net", g.rr_achieved)
+        for g in decided
+        if getattr(g, "rr_net", g.rr_achieved) > 0
+    )
+    loss_net_r = abs(
+        sum(
+            getattr(g, "rr_net", g.rr_achieved)
+            for g in decided
+            if getattr(g, "rr_net", g.rr_achieved) <= 0
+        )
+    )
+    pf_net = (
+        round(wins_net_r / loss_net_r, 3)
+        if loss_net_r > 0
+        else (99.0 if wins_net_r > 0 else None)
+    )
     return {**agg, "decided": len(decided), "pf": pf, "pf_net": pf_net}
 
 
-def meets_bar(stats: dict, min_decided: int = DEFAULT_MIN_DECIDED,
-              criteria: Optional[dict[str, float]] = None) -> tuple[bool, list[str]]:
+def meets_bar(
+    stats: dict,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    criteria: dict[str, float] | None = None,
+) -> tuple[bool, list[str]]:
     """Apply the graduation bar to one window's statistics.
 
     Evaluates NET of costs (P12.6): E_net >= +0.50R, WR_net > 55%, PF_net >= 1.5.
@@ -389,24 +441,38 @@ def meets_bar(stats: dict, min_decided: int = DEFAULT_MIN_DECIDED,
         return False, unmet
 
     use_net = "expectancy_net" in stats or "win_rate_net" in stats
-    e = stats.get("expectancy_net", stats.get("expectancy", 0.0)) if use_net else stats.get("expectancy", 0.0)
-    wr = stats.get("win_rate_net", stats.get("win_rate")) if use_net else stats.get("win_rate")
+    e = (
+        stats.get("expectancy_net", stats.get("expectancy", 0.0))
+        if use_net
+        else stats.get("expectancy", 0.0)
+    )
+    wr = (
+        stats.get("win_rate_net", stats.get("win_rate"))
+        if use_net
+        else stats.get("win_rate")
+    )
     pf = stats.get("pf_net", stats.get("pf")) if use_net else stats.get("pf")
 
     label_prefix = "net " if use_net else ""
     if e < criteria["expectancy"]:
-        unmet.append(f"expectancy {label_prefix}{e:+.3f}R < {criteria['expectancy']:+.2f}R")
+        unmet.append(
+            f"expectancy {label_prefix}{e:+.3f}R < {criteria['expectancy']:+.2f}R"
+        )
     if wr is None or wr <= criteria["win_rate"]:
-        unmet.append(f"win_rate {label_prefix}{f'{wr*100:.1f}%' if wr is not None else 'n/a'} "
-                     f"<= {criteria['win_rate']:.0%}")
+        unmet.append(
+            f"win_rate {label_prefix}{f'{wr * 100:.1f}%' if wr is not None else 'n/a'} "
+            f"<= {criteria['win_rate']:.0%}"
+        )
     if pf is None or pf < criteria["pf"]:
-        unmet.append(f"pf {label_prefix}{pf if pf is not None else 'n/a'} "
-                     f"< {criteria['pf']}")
+        unmet.append(
+            f"pf {label_prefix}{pf if pf is not None else 'n/a'} < {criteria['pf']}"
+        )
     return (not unmet), unmet
 
 
-def protocol_verdict(window_results: dict[str, dict],
-                     min_decided: int = DEFAULT_MIN_DECIDED) -> dict:
+def protocol_verdict(
+    window_results: dict[str, dict], min_decided: int = DEFAULT_MIN_DECIDED
+) -> dict:
     """The P12.1 pass rule over per-window results.
 
     - ``INSUFFICIENT_DATA`` — train or val has too few decided trades.
@@ -423,43 +489,65 @@ def protocol_verdict(window_results: dict[str, dict],
     oos = window_results.get("oos")
     recent = window_results.get("recent")
     if not train or not val:
-        return {"protocol_pass": False, "status": "INSUFFICIENT_DATA",
-                "reason": "train and val windows are required", "warnings": []}
+        return {
+            "protocol_pass": False,
+            "status": "INSUFFICIENT_DATA",
+            "reason": "train and val windows are required",
+            "warnings": [],
+        }
     if train["decided"] < min_decided or val["decided"] < min_decided:
-        return {"protocol_pass": False, "status": "INSUFFICIENT_DATA",
-                "reason": f"train decided={train['decided']}, val "
-                          f"decided={val['decided']} (min {min_decided})",
-                "warnings": []}
+        return {
+            "protocol_pass": False,
+            "status": "INSUFFICIENT_DATA",
+            "reason": f"train decided={train['decided']}, val "
+            f"decided={val['decided']} (min {min_decided})",
+            "warnings": [],
+        }
     train_met, train_unmet = train["bar_met"], train["bar_unmet"]
     val_met, val_unmet = val["bar_met"], val["bar_unmet"]
     oos_met = bool(oos and oos["bar_met"])
     recent_met = bool(recent and recent["bar_met"])
     if not (train_met and val_met):
-        reasons = ([f"train: {u}" for u in train_unmet]
-                   + [f"val: {u}" for u in val_unmet])
-        return {"protocol_pass": False, "status": "FAIL",
-                "reason": "; ".join(reasons),
-                "warnings": [],
-                "train_met": train_met, "val_met": val_met,
-                "oos_met": oos_met, "recent_met": recent_met}
+        reasons = [f"train: {u}" for u in train_unmet] + [
+            f"val: {u}" for u in val_unmet
+        ]
+        return {
+            "protocol_pass": False,
+            "status": "FAIL",
+            "reason": "; ".join(reasons),
+            "warnings": [],
+            "train_met": train_met,
+            "val_met": val_met,
+            "oos_met": oos_met,
+            "recent_met": recent_met,
+        }
     warnings: list[str] = []
     if not oos_met:
-        warnings.append("sealed OOS window does not meet the bar "
-                        f"({'; '.join(oos['bar_unmet'])}) — overfit suspicion")
+        warnings.append(
+            "sealed OOS window does not meet the bar "
+            f"({'; '.join(oos['bar_unmet'])}) — overfit suspicion"
+        )
     if not recent_met:
-        warnings.append("sealed recent window does not meet the bar "
-                        f"({'; '.join(recent['bar_unmet'])})")
-    return {"protocol_pass": True,
-            "status": "PASS" if not warnings else "PASS_WITH_WARNINGS",
-            "reason": "train and val meet the graduation bar",
-            "warnings": warnings,
-            "train_met": train_met, "val_met": val_met,
-            "oos_met": oos_met, "recent_met": recent_met}
+        warnings.append(
+            "sealed recent window does not meet the bar "
+            f"({'; '.join(recent['bar_unmet'])})"
+        )
+    return {
+        "protocol_pass": True,
+        "status": "PASS" if not warnings else "PASS_WITH_WARNINGS",
+        "reason": "train and val meet the graduation bar",
+        "warnings": warnings,
+        "train_met": train_met,
+        "val_met": val_met,
+        "oos_met": oos_met,
+        "recent_met": recent_met,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # Sealed OOS envelope (BT6: the final OOS set is sealed)
 # ──────────────────────────────────────────────────────────────────────────
+
 
 def config_fingerprint(config: dict) -> str:
     blob = json.dumps(config, sort_keys=True, default=str)
@@ -471,8 +559,7 @@ def _seal_file(seal_dir: str | Path, seal_key: str) -> Path:
     return Path(seal_dir) / f"{safe}.json"
 
 
-def load_seal(seal_dir: str | Path, seal_key: str,
-              fingerprint: str) -> Optional[dict]:
+def load_seal(seal_dir: str | Path, seal_key: str, fingerprint: str) -> dict | None:
     """Return the stored seal payload iff the config fingerprint matches.
 
     A config mismatch (different windows, symbol, engine settings, …) never
@@ -492,8 +579,13 @@ def load_seal(seal_dir: str | Path, seal_key: str,
     return history[-1].get("payload") if history else None
 
 
-def write_seal(seal_dir: str | Path, seal_key: str, fingerprint: str,
-               payload: dict, reseal: bool = False) -> Path:
+def write_seal(
+    seal_dir: str | Path,
+    seal_key: str,
+    fingerprint: str,
+    payload: dict,
+    reseal: bool = False,
+) -> Path:
     """Persist the sealed result, appending to the seal history.
 
     Every re-opening is recorded with a timestamp — the envelope has a
@@ -507,11 +599,13 @@ def write_seal(seal_dir: str | Path, seal_key: str, fingerprint: str,
     except (OSError, json.JSONDecodeError):
         data = {"fingerprint": fingerprint, "seal_key": seal_key, "history": []}
     data["fingerprint"] = fingerprint
-    data.setdefault("history", []).append({
-        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "reseal": bool(reseal),
-        "payload": payload,
-    })
+    data.setdefault("history", []).append(
+        {
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "reseal": bool(reseal),
+            "payload": payload,
+        }
+    )
     path.write_text(json.dumps(data, indent=2, default=str))
     return path
 
@@ -520,18 +614,24 @@ def write_seal(seal_dir: str | Path, seal_key: str, fingerprint: str,
 # The protocol runner
 # ──────────────────────────────────────────────────────────────────────────
 
-def run_validation(df: pd.DataFrame, symbol: str = "BTCUSDT",
-                   timeframe: str = "15m",
-                   horizons: Optional[list[float]] = None,
-                   min_bars: int = BACKTEST_MIN_BARS,
-                   step: int = BACKTEST_STEP,
-                   min_confidence: int = MIN_CONFIDENCE,
-                   train_frac: float = 0.60, val_frac: float = 0.15,
-                   oos_frac: float = 0.15, recent_frac: float = 0.10,
-                   min_decided: int = DEFAULT_MIN_DECIDED,
-                   seal_dir: Optional[str | Path] = None,
-                   seal_key: Optional[str] = None,
-                   reseal: bool = False) -> dict:
+
+def run_validation(
+    df: pd.DataFrame,
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    horizons: list[float] | None = None,
+    min_bars: int = BACKTEST_MIN_BARS,
+    step: int = BACKTEST_STEP,
+    min_confidence: int = MIN_CONFIDENCE,
+    train_frac: float = 0.60,
+    val_frac: float = 0.15,
+    oos_frac: float = 0.15,
+    recent_frac: float = 0.10,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    seal_dir: str | Path | None = None,
+    seal_key: str | None = None,
+    reseal: bool = False,
+) -> dict:
     """Run the locked train/val/OOS/recent protocol over a candle frame.
 
     One walk-forward pass over the series (engine re-run at every step on
@@ -545,22 +645,33 @@ def run_validation(df: pd.DataFrame, symbol: str = "BTCUSDT",
     horizons = horizons or BACKTEST_HORIZONS
     df = df.reset_index(drop=True).copy()
     if len(df) <= min_bars:
-        return {"ok": False,
-                "error": f"series has {len(df)} bars; need > min_bars="
-                         f"{min_bars} for any validation window"}
+        return {
+            "ok": False,
+            "error": f"series has {len(df)} bars; need > min_bars="
+            f"{min_bars} for any validation window",
+        }
     try:
-        windows = walk_forward_windows(len(df), min_bars, train_frac,
-                                       val_frac, oos_frac, recent_frac)
+        windows = walk_forward_windows(
+            len(df), min_bars, train_frac, val_frac, oos_frac, recent_frac
+        )
     except ValidationWindowError as exc:
         return {"ok": False, "error": str(exc)}
 
-    seal_cfg = {"symbol": symbol, "timeframe": timeframe,
-                "horizons": horizons, "min_bars": min_bars, "step": step,
-                "min_confidence": min_confidence,
-                "train_frac": train_frac, "val_frac": val_frac,
-                "oos_frac": oos_frac, "recent_frac": recent_frac,
-                "min_decided": min_decided, "bars": len(df),
-                "criteria": VALIDATION_CRITERIA}
+    seal_cfg = {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "horizons": horizons,
+        "min_bars": min_bars,
+        "step": step,
+        "min_confidence": min_confidence,
+        "train_frac": train_frac,
+        "val_frac": val_frac,
+        "oos_frac": oos_frac,
+        "recent_frac": recent_frac,
+        "min_decided": min_decided,
+        "bars": len(df),
+        "criteria": VALIDATION_CRITERIA,
+    }
     fingerprint = config_fingerprint(seal_cfg)
     seal_enabled = bool(seal_dir and seal_key)
     if seal_enabled and not reseal:
@@ -570,9 +681,15 @@ def run_validation(df: pd.DataFrame, symbol: str = "BTCUSDT",
             return cached
 
     started = time.time()
-    result = run_backtest(df, symbol=symbol, timeframe=timeframe,
-                          horizons=horizons, min_bars=min_bars, step=step,
-                          min_confidence=min_confidence)
+    result = run_backtest(
+        df,
+        symbol=symbol,
+        timeframe=timeframe,
+        horizons=horizons,
+        min_bars=min_bars,
+        step=step,
+        min_confidence=min_confidence,
+    )
     graded = result["graded"]
     primary = horizons[0]
     primary_graded = [g for g in graded if abs(g.horizon_hours - primary) < 0.01]
@@ -585,12 +702,12 @@ def run_validation(df: pd.DataFrame, symbol: str = "BTCUSDT",
     window_results: dict[str, dict] = {}
     for name in WINDOW_NAMES:
         window_results[name] = window_stats(buckets[name])
-        window_results[name]["bar_met"], window_results[name]["bar_unmet"] = \
-            meets_bar(window_results[name], min_decided)
+        window_results[name]["bar_met"], window_results[name]["bar_unmet"] = meets_bar(
+            window_results[name], min_decided
+        )
         window_results[name]["bars"] = windows[name]
 
-    verdicts: dict[str, dict] = {"ALL": protocol_verdict(window_results,
-                                                         min_decided)}
+    verdicts: dict[str, dict] = {"ALL": protocol_verdict(window_results, min_decided)}
     for ptype in plan_types:
         per_type: dict[str, dict] = {}
         for name in WINDOW_NAMES:
@@ -605,20 +722,31 @@ def run_validation(df: pd.DataFrame, symbol: str = "BTCUSDT",
         "ok": True,
         "meta": {
             **result["report"]["meta"],
-            "window_fractions": {"train": train_frac, "val": val_frac,
-                                 "oos": oos_frac, "recent": recent_frac},
+            "window_fractions": {
+                "train": train_frac,
+                "val": val_frac,
+                "oos": oos_frac,
+                "recent": recent_frac,
+            },
             "min_decided": min_decided,
             "criteria": VALIDATION_CRITERIA,
             "primary_horizon_hours": primary,
             "protocol": "train/val/oos/recent — train+val pass; oos/recent sealed",
         },
-        "windows": {name: {"bars": windows[name],
-                           "signals": len(buckets[name]),
-                           "stats": {k: v for k, v in window_results[name].items()
-                                     if k not in ("bar_met", "bar_unmet")},
-                           "bar_met": window_results[name]["bar_met"],
-                           "bar_unmet": window_results[name]["bar_unmet"]}
-                    for name in WINDOW_NAMES},
+        "windows": {
+            name: {
+                "bars": windows[name],
+                "signals": len(buckets[name]),
+                "stats": {
+                    k: v
+                    for k, v in window_results[name].items()
+                    if k not in ("bar_met", "bar_unmet")
+                },
+                "bar_met": window_results[name]["bar_met"],
+                "bar_unmet": window_results[name]["bar_unmet"],
+            }
+            for name in WINDOW_NAMES
+        },
         "protocol": window_results,
         "verdicts": verdicts,
         "seal": None,
@@ -626,27 +754,35 @@ def run_validation(df: pd.DataFrame, symbol: str = "BTCUSDT",
     if seal_enabled:
         # Set the seal record BEFORE writing it — the stored payload must
         # describe its own envelope (path, fingerprint, reseal flag).
-        report["seal"] = {"path": _seal_file(seal_dir, seal_key).as_posix(),
-                          "fingerprint": fingerprint,
-                          "resealed": bool(reseal)}
+        report["seal"] = {
+            "path": _seal_file(seal_dir, seal_key).as_posix(),
+            "fingerprint": fingerprint,
+            "resealed": bool(reseal),
+        }
         write_seal(seal_dir, seal_key, fingerprint, report, reseal)
     report["meta"]["runtime_seconds"] = round(time.time() - started, 2)
     return report
 
 
-def run_validation_on_store(exchange: str = "binance", market: str = "perp",
-                            symbol: str = "BTCUSDT", timeframe: str = "15m",
-                            bars: int = 2000,
-                            horizons: Optional[list[float]] = None,
-                            min_bars: int = BACKTEST_MIN_BARS,
-                            step: int = 3,
-                            min_confidence: int = MIN_CONFIDENCE,
-                            train_frac: float = 0.60, val_frac: float = 0.15,
-                            oos_frac: float = 0.15, recent_frac: float = 0.10,
-                            min_decided: int = DEFAULT_MIN_DECIDED,
-                            seal_dir: Optional[str | Path] = None,
-                            store_root: Optional[str | Path] = None,
-                            reseal: bool = False) -> dict:
+def run_validation_on_store(
+    exchange: str = "binance",
+    market: str = "perp",
+    symbol: str = "BTCUSDT",
+    timeframe: str = "15m",
+    bars: int = 2000,
+    horizons: list[float] | None = None,
+    min_bars: int = BACKTEST_MIN_BARS,
+    step: int = 3,
+    min_confidence: int = MIN_CONFIDENCE,
+    train_frac: float = 0.60,
+    val_frac: float = 0.15,
+    oos_frac: float = 0.15,
+    recent_frac: float = 0.10,
+    min_decided: int = DEFAULT_MIN_DECIDED,
+    seal_dir: str | Path | None = None,
+    store_root: str | Path | None = None,
+    reseal: bool = False,
+) -> dict:
     """P12.1 over the stored Parquet series (P10.11's data path).
 
     The protocol requires multi-window history, which only the store can
@@ -656,32 +792,49 @@ def run_validation_on_store(exchange: str = "binance", market: str = "perp",
     ``data/store/validation/`` (gitignored).
     """
     from data.store import CandleStore
+
     store = CandleStore(root=store_root) if store_root else CandleStore()
     if seal_dir is None:
         seal_dir = DEFAULT_SEAL_DIR
     df = store.read(exchange, market, symbol, timeframe)
     if df.empty:
-        return {"ok": False,
-                "error": f"No stored candles for {exchange}/{market}/"
-                         f"{symbol}/{timeframe} — run `python main.py "
-                         f"backfill` first"}
+        return {
+            "ok": False,
+            "error": f"No stored candles for {exchange}/{market}/"
+            f"{symbol}/{timeframe} — run `python main.py "
+            f"backfill` first",
+        }
     if len(df) <= min_bars:
-        return {"ok": False,
-                "error": f"Only {len(df)} bars stored (need > min_bars="
-                         f"{min_bars} for a four-window split)",
-                "stored": len(df), "min_bars": min_bars}
+        return {
+            "ok": False,
+            "error": f"Only {len(df)} bars stored (need > min_bars="
+            f"{min_bars} for a four-window split)",
+            "stored": len(df),
+            "min_bars": min_bars,
+        }
     df = df.tail(bars).reset_index(drop=True)
     seal_key = f"{exchange}_{market}_{symbol}_{timeframe}"
-    report = run_validation(df, symbol=symbol, timeframe=timeframe,
-                            horizons=horizons, min_bars=min_bars, step=step,
-                            min_confidence=min_confidence,
-                            train_frac=train_frac, val_frac=val_frac,
-                            oos_frac=oos_frac, recent_frac=recent_frac,
-                            min_decided=min_decided, seal_dir=seal_dir,
-                            seal_key=seal_key, reseal=reseal)
+    report = run_validation(
+        df,
+        symbol=symbol,
+        timeframe=timeframe,
+        horizons=horizons,
+        min_bars=min_bars,
+        step=step,
+        min_confidence=min_confidence,
+        train_frac=train_frac,
+        val_frac=val_frac,
+        oos_frac=oos_frac,
+        recent_frac=recent_frac,
+        min_decided=min_decided,
+        seal_dir=seal_dir,
+        seal_key=seal_key,
+        reseal=reseal,
+    )
     report["store_source"] = True
     report["store_path"] = store._series_dir(
-        exchange, market, symbol, timeframe).as_posix()
+        exchange, market, symbol, timeframe
+    ).as_posix()
     report["bars_read"] = len(df)
     return report
 
@@ -690,6 +843,7 @@ def run_validation_on_store(exchange: str = "binance", market: str = "perp",
 # Boxed protocol report
 # ──────────────────────────────────────────────────────────────────────────
 
+
 def print_verdict(report: dict) -> None:
     if not report.get("ok"):
         print("QUANT VALIDATION — cannot run")
@@ -697,36 +851,46 @@ def print_verdict(report: dict) -> None:
         return
     meta = report["meta"]
     print("=" * 74)
-    print(f"QUANT VALIDATION  {meta['symbol']} {meta['timeframe']}   "
-          f"primary horizon {meta['primary_horizon_hours']}h")
+    print(
+        f"QUANT VALIDATION  {meta['symbol']} {meta['timeframe']}   "
+        f"primary horizon {meta['primary_horizon_hours']}h"
+    )
     fracs = meta["window_fractions"]
-    print(f"windows  train {fracs['train']:.0%} / val {fracs['val']:.0%} / "
-          f"oos {fracs['oos']:.0%} / recent {fracs['recent']:.0%}   "
-          f"min_decided {meta['min_decided']}   "
-          f"bars={meta['bars_total']} plans={meta['plans_generated']} "
-          f"({meta['runtime_seconds']}s)")
+    print(
+        f"windows  train {fracs['train']:.0%} / val {fracs['val']:.0%} / "
+        f"oos {fracs['oos']:.0%} / recent {fracs['recent']:.0%}   "
+        f"min_decided {meta['min_decided']}   "
+        f"bars={meta['bars_total']} plans={meta['plans_generated']} "
+        f"({meta['runtime_seconds']}s)"
+    )
     print("-" * 74)
-    print(f"{'window':<8} {'bars':<22} {'sig':>5} {'dec':>5} {'WR_net':>7} "
-          f"{'E_net':>7} {'PF_net':>7}  bar")
+    print(
+        f"{'window':<8} {'bars':<22} {'sig':>5} {'dec':>5} {'WR_net':>7} "
+        f"{'E_net':>7} {'PF_net':>7}  bar"
+    )
     for name in WINDOW_NAMES:
         w = report["windows"][name]
         s = w["stats"]
         wr = s.get("win_rate_net", s.get("win_rate"))
-        wr_s = f"{wr*100:.0f}%" if wr is not None else "n/a"
+        wr_s = f"{wr * 100:.0f}%" if wr is not None else "n/a"
         pf = s.get("pf_net", s.get("pf"))
         pf_s = f"{pf}" if pf is not None else "n/a"
         exp_net = s.get("expectancy_net", s.get("expectancy", 0.0))
         mark = "met ✅" if w["bar_met"] else "missed ❌"
-        print(f"{name:<8} [{w['bars'][0]:>6},{w['bars'][1]:>6})  "
-              f"{w['signals']:>5} {s['decided']:>5} {wr_s:>7} "
-              f"{exp_net:>+7.2f} {pf_s:>7}  {mark}")
+        print(
+            f"{name:<8} [{w['bars'][0]:>6},{w['bars'][1]:>6})  "
+            f"{w['signals']:>5} {s['decided']:>5} {wr_s:>7} "
+            f"{exp_net:>+7.2f} {pf_s:>7}  {mark}"
+        )
     print("-" * 74)
     verdict = report["verdicts"].get("ALL", {})
-    icon = {"PASS": "🟢", "PASS_WITH_WARNINGS": "🟡",
-            "FAIL": "🔴", "INSUFFICIENT_DATA": "⚪"}.get(
-                verdict.get("status"), "❓")
-    print(f"ENGINE VERDICT  {icon} {verdict.get('status')}  —  "
-          f"{verdict.get('reason')}")
+    icon = {
+        "PASS": "🟢",
+        "PASS_WITH_WARNINGS": "🟡",
+        "FAIL": "🔴",
+        "INSUFFICIENT_DATA": "⚪",
+    }.get(verdict.get("status"), "❓")
+    print(f"ENGINE VERDICT  {icon} {verdict.get('status')}  —  {verdict.get('reason')}")
     for w in verdict.get("warnings", []):
         print(f"  ⚠ {w}")
     print("-" * 74)
@@ -734,18 +898,19 @@ def print_verdict(report: dict) -> None:
     for ptype, v in sorted(report["verdicts"].items()):
         if ptype == "ALL":
             continue
-        print(f"  {ptype:<28} {v.get('status'):<20} "
-              f"train_met={bool(v.get('train_met'))} "
-              f"val_met={bool(v.get('val_met'))} "
-              f"oos_met={bool(v.get('oos_met'))} "
-              f"recent_met={bool(v.get('recent_met'))}")
+        print(
+            f"  {ptype:<28} {v.get('status'):<20} "
+            f"train_met={bool(v.get('train_met'))} "
+            f"val_met={bool(v.get('val_met'))} "
+            f"oos_met={bool(v.get('oos_met'))} "
+            f"recent_met={bool(v.get('recent_met'))}"
+        )
     seal = report.get("seal")
     if seal:
         reuse = " (reused sealed result)" if report.get("sealed_reused") else ""
         resealed = " RESEALED — envelope re-opened!" if seal.get("resealed") else ""
         print("-" * 74)
-        print(f"seal: {seal['path']}  fp={seal['fingerprint']}"
-              f"{reuse}{resealed}")
+        print(f"seal: {seal['path']}  fp={seal['fingerprint']}{reuse}{resealed}")
     else:
         print("-" * 74)
         print("seal: disabled (no seal_dir/seal_key) — OOS NOT sealed")

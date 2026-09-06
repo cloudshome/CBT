@@ -37,11 +37,11 @@ default 0.2 s is fine for V5's 120 requests/5 s per-IP kline budget
 once a backfill is underway). Fully offline in ``DEMO_MODE`` via the
 existing demo fetcher — no network, ever, in tests.
 """
+
 from __future__ import annotations
 
 import threading
 import time
-from typing import Optional
 
 import pandas as pd
 import requests
@@ -53,15 +53,24 @@ BYBIT_HOSTS = ["https://api.bybit.com", "https://api.bytick.com"]
 
 # SKY timeframe → Bybit V5 interval code.
 BYBIT_INTERVALS = {
-    "1m": "1", "3m": "3", "5m": "5", "15m": "15", "30m": "30",
-    "1h": "60", "2h": "120", "4h": "240", "6h": "360", "12h": "720",
-    "1d": "D", "1w": "W",
+    "1m": "1",
+    "3m": "3",
+    "5m": "5",
+    "15m": "15",
+    "30m": "30",
+    "1h": "60",
+    "2h": "120",
+    "4h": "240",
+    "6h": "360",
+    "12h": "720",
+    "1d": "D",
+    "1w": "W",
 }
 
 # SKY market → Bybit V5 category.
 BYBIT_CATEGORY = {"spot": "spot", "perp": "linear"}
 
-RETCODE_RATE_LIMIT = 10006   # "too many visits" — maps to HTTP 429
+RETCODE_RATE_LIMIT = 10006  # "too many visits" — maps to HTTP 429
 
 TIMEOUT = 8
 _RETRIES = 1
@@ -87,50 +96,61 @@ class BybitClient:
 
     # ── transport ────────────────────────────────────────────────────────
     def _get_host_with_headers(
-        self, host: str, path: str, params: dict,
-        timeout: Optional[int] = None, retries: Optional[int] = None,
-    ) -> tuple[Optional[dict], Optional[dict], Optional[int]]:
+        self,
+        host: str,
+        path: str,
+        params: dict,
+        timeout: int | None = None,
+        retries: int | None = None,
+    ) -> tuple[dict | None, dict | None, int | None]:
         """One host: ``(json, headers, status)``, mirroring Binance's seam."""
         timeout = timeout or self.timeout
         retries = self.retries if retries is None else retries
-        last: tuple[Optional[dict], Optional[dict], Optional[int]] = (
-            None, None, None)
+        last: tuple[dict | None, dict | None, int | None] = (None, None, None)
         for attempt in range(retries + 1):
             try:
-                r = self.session.get(f"{host}{path}", params=params,
-                                     timeout=timeout)
+                r = self.session.get(f"{host}{path}", params=params, timeout=timeout)
                 if r.status_code == 200:
                     return r.json(), r.headers, 200
                 if r.status_code in (451, 403, 429):
                     # geo-block / rate-limit — give up; the caller decides
                     # whether (and how long) to back off.
                     return None, r.headers, r.status_code
-                last = (None, r.headers, r.status_code)   # 4xx/5xx — retry
+                last = (None, r.headers, r.status_code)  # 4xx/5xx — retry
             except requests.RequestException:
-                last = (None, None, None)                 # network — retry
+                last = (None, None, None)  # network — retry
             time.sleep(0.3 * (attempt + 1))
         return last
 
     def _get_page_with_headers(
-        self, hosts: list[str], path: str, params: dict,
-        timeout: Optional[int] = None, retries: Optional[int] = None,
-    ) -> tuple[Optional[dict], Optional[dict], Optional[int]]:
+        self,
+        hosts: list[str],
+        path: str,
+        params: dict,
+        timeout: int | None = None,
+        retries: int | None = None,
+    ) -> tuple[dict | None, dict | None, int | None]:
         """First host that returns data; else the last host's failure detail."""
-        last: tuple[Optional[dict], Optional[dict], Optional[int]] = (
-            None, None, None)
+        last: tuple[dict | None, dict | None, int | None] = (None, None, None)
         for host in hosts:
-            res = self._get_host_with_headers(host, path, params,
-                                              timeout=timeout, retries=retries)
+            res = self._get_host_with_headers(
+                host, path, params, timeout=timeout, retries=retries
+            )
             last = res
             if res[0] is not None:
                 return res
         return last
 
     # ── OHLCV (P10.2 transport contract) ─────────────────────────────────
-    def klines_page(self, symbol: str = "BTCUSDT", timeframe: str = "15m",
-                    limit: int = 1000, start_time: Optional[int] = None,
-                    end_time: Optional[int] = None,
-                    market: str = "spot") -> PageResult:
+    def klines_page(
+        self,
+        symbol: str = "BTCUSDT",
+        timeframe: str = "15m",
+        limit: int = 1000,
+        start_time: int | None = None,
+        end_time: int | None = None,
+        market: str = "spot",
+    ) -> PageResult:
         """One raw Bybit V5 klines page, normalised to the P10.2 contract.
 
         Returns a :class:`PageResult` whose ``data`` is a frame with
@@ -154,7 +174,8 @@ class BybitClient:
         if interval is None:
             raise ValueError(
                 f"unsupported timeframe {timeframe!r}: Bybit supports "
-                f"{sorted(BYBIT_INTERVALS)}")
+                f"{sorted(BYBIT_INTERVALS)}"
+            )
         params = {
             "category": BYBIT_CATEGORY[market],
             "symbol": data_symbol,
@@ -166,7 +187,8 @@ class BybitClient:
         if end_time is not None:
             params["end"] = int(end_time)
         payload, headers, status = self._get_page_with_headers(
-            BYBIT_HOSTS, "/v5/market/kline", params)
+            BYBIT_HOSTS, "/v5/market/kline", params
+        )
         if payload is None:
             return PageResult(None, headers, status)
 
@@ -176,11 +198,12 @@ class BybitClient:
             return PageResult(None, headers, mapped)
 
         rows = (payload.get("result") or {}).get("list") or []
-        df = pd.DataFrame(rows, columns=[
-            "ts", "open", "high", "low", "close", "volume", "quote_volume"])
+        df = pd.DataFrame(
+            rows,
+            columns=["ts", "open", "high", "low", "close", "volume", "quote_volume"],
+        )
         if not df.empty:
-            for col in ("open", "high", "low", "close", "volume",
-                        "quote_volume"):
+            for col in ("open", "high", "low", "close", "volume", "quote_volume"):
                 df[col] = df[col].astype(float)
             df["ts"] = df["ts"].astype("int64")
             # V5 returns newest-first; normalise to ascending here so the
@@ -192,30 +215,44 @@ class BybitClient:
         df.attrs["provider"] = "bybit_v5"
         return PageResult(df, headers, 200)
 
-    def klines(self, symbol: str = "BTCUSDT", timeframe: str = "15m",
-               limit: int = 500, start_time: Optional[int] = None,
-               end_time: Optional[int] = None,
-               market: str = "spot") -> pd.DataFrame:
+    def klines(
+        self,
+        symbol: str = "BTCUSDT",
+        timeframe: str = "15m",
+        limit: int = 500,
+        start_time: int | None = None,
+        end_time: int | None = None,
+        market: str = "spot",
+    ) -> pd.DataFrame:
         """BinanceClient-style convenience: the page's data, or raise.
 
         Lets BybitClient stand in anywhere a ``klines()``-shaped client is
         expected (e.g. the backfill's ``--repair`` fetch path).
         """
-        page = self.klines_page(symbol, timeframe, limit=limit,
-                                start_time=start_time, end_time=end_time,
-                                market=market)
+        page = self.klines_page(
+            symbol,
+            timeframe,
+            limit=limit,
+            start_time=start_time,
+            end_time=end_time,
+            market=market,
+        )
         if page.data is None:
             raise ConnectionError(
                 f"Could not fetch Bybit klines for {symbol} {timeframe} "
                 f"[{market}] — status {page.status}; check network or a "
-                f"Bybit-accessible location.")
+                f"Bybit-accessible location."
+            )
         return page.data
 
     # ── Funding history (P10.7 — cross-exchange funding spread) ──────────
-    def funding_history(self, symbol: str = "BTCUSDT",
-                        start_time: Optional[int] = None,
-                        end_time: Optional[int] = None,
-                        limit: int = 200) -> Optional[pd.DataFrame]:
+    def funding_history(
+        self,
+        symbol: str = "BTCUSDT",
+        start_time: int | None = None,
+        end_time: int | None = None,
+        limit: int = 200,
+    ) -> pd.DataFrame | None:
         """Historical USDT-perp funding (``/v5/market/funding/history``).
 
         Returns ``ts`` (fundingRateTimestamp, UTC epoch ms) and
@@ -236,7 +273,8 @@ class BybitClient:
         if end_time is not None:
             params["endTime"] = int(end_time)
         payload, _headers, _status = self._get_page_with_headers(
-            BYBIT_HOSTS, "/v5/market/funding/history", params)
+            BYBIT_HOSTS, "/v5/market/funding/history", params
+        )
         if payload is None:
             return None
         ret = int(payload.get("retCode", -1))
@@ -246,10 +284,9 @@ class BybitClient:
         if not rows:
             return pd.DataFrame(columns=["ts", "funding_rate"])
         df = pd.DataFrame(rows)
-        df = df.rename(columns={"fundingRateTimestamp": "ts",
-                                "fundingRate": "funding_rate"})
+        df = df.rename(
+            columns={"fundingRateTimestamp": "ts", "fundingRate": "funding_rate"}
+        )
         df["ts"] = df["ts"].astype("int64")
         df["funding_rate"] = df["funding_rate"].astype(float)
-        return (df[["ts", "funding_rate"]]
-                .sort_values("ts")
-                .reset_index(drop=True))
+        return df[["ts", "funding_rate"]].sort_values("ts").reset_index(drop=True)

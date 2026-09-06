@@ -5,6 +5,7 @@ The engine itself lives at the repo root (``main.py``, ``brain/``,
 ``import cryptobrain`` and the ``cryptobrain`` console script — the
 smoke-test contract of the P9 wheel-gate.
 """
+
 from config import VERSION
 
 __version__ = VERSION

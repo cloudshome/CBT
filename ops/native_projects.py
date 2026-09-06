@@ -12,6 +12,7 @@ real project trees under ``packaging/windows/SkyCompanion`` and
 Linux CI can run this lint without MSBuild or Gradle. It does **not** compile
 the projects, sign them, or claim a physical-device drill.
 """
+
 from __future__ import annotations
 
 import json
@@ -46,12 +47,18 @@ ANDROID_REQUIRED = (
 
 FORBIDDEN_PATTERNS = (
     (re.compile(r"BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY"), "private key material"),
-    (re.compile(r"/api/v3/order|/fapi/v1/order|signedOrder|placeOrder", re.I),
-     "exchange order endpoint"),
-    (re.compile(r"live_exchange_execution\s*[:=]\s*true", re.I),
-     "live_exchange_execution claimed true"),
-    (re.compile(r"SKY_WINDOWS_CERT_PASSWORD|SKY_ANDROID_KEYSTORE_PASSWORD"),
-     "signing secret name in source"),
+    (
+        re.compile(r"/api/v3/order|/fapi/v1/order|signedOrder|placeOrder", re.IGNORECASE),
+        "exchange order endpoint",
+    ),
+    (
+        re.compile(r"live_exchange_execution\s*[:=]\s*true", re.IGNORECASE),
+        "live_exchange_execution claimed true",
+    ),
+    (
+        re.compile(r"SKY_WINDOWS_CERT_PASSWORD|SKY_ANDROID_KEYSTORE_PASSWORD"),
+        "signing secret name in source",
+    ),
 )
 
 SECRET_SUFFIXES = (".jks", ".keystore", ".p12", ".pfx", ".pem", ".snk")
@@ -102,7 +109,12 @@ def inspect_windows(root: Path | None = None) -> dict[str, Any]:
     issues: list[str] = []
     if root.is_dir():
         for path in root.rglob("*"):
-            if path.is_file() and path.suffix.lower() in {".cs", ".csproj", ".md", ".json"}:
+            if path.is_file() and path.suffix.lower() in {
+                ".cs",
+                ".csproj",
+                ".md",
+                ".json",
+            }:
                 issues.extend(_scan_text(path))
     issues.extend(f"secret file committed: {p}" for p in _secret_files(root))
     present = root.is_dir() and not missing and not issues
@@ -126,7 +138,13 @@ def inspect_android(root: Path | None = None) -> dict[str, Any]:
     if root.is_dir():
         for path in root.rglob("*"):
             if path.is_file() and path.suffix.lower() in {
-                    ".kt", ".kts", ".xml", ".md", ".properties", ".gradle"}:
+                ".kt",
+                ".kts",
+                ".xml",
+                ".md",
+                ".properties",
+                ".gradle",
+            }:
                 issues.extend(_scan_text(path))
     issues.extend(f"secret file committed: {p}" for p in _secret_files(root))
     present = root.is_dir() and not missing and not issues
@@ -150,9 +168,12 @@ def drill_checklist() -> dict[str, Any]:
         "claimed_complete": False,
         "live_exchange_execution": False,
         "steps": [
-            {"id": step, "status": "pending",
-             "evidence": None,
-             "note": "Requires a clean physical Windows/Android target."}
+            {
+                "id": step,
+                "status": "pending",
+                "evidence": None,
+                "note": "Requires a clean physical Windows/Android target.",
+            }
             for step in DRILL_STEPS
         ],
         "note": "Do not mark P22 complete from this checklist remaining pending.",

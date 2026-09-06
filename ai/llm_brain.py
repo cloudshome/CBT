@@ -12,15 +12,21 @@ Providers (LLM_PROVIDER):
 No key? The brain degrades to a deterministic rule-based narrative built from
 the scored conditions, so the output is never empty.
 """
+
 from __future__ import annotations
 
 import json
-from typing import Optional
 
 import requests
 
-from config import (LLM_PROVIDER, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL,
-                      GEMINI_API_KEY, GEMINI_MODEL)
+from config import (
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    LLM_PROVIDER,
+    OPENAI_API_KEY,
+    OPENAI_BASE_URL,
+    OPENAI_MODEL,
+)
 
 
 def _rule_based_narrative(payload: dict) -> str:
@@ -31,15 +37,23 @@ def _rule_based_narrative(payload: dict) -> str:
     lines = []
     action = sig.get("action", "NO TRADE")
     if action == "NO TRADE":
-        lines.append("The engine sees no immediate edge — scores are below the trade threshold.")
+        lines.append(
+            "The engine sees no immediate edge — scores are below the trade threshold."
+        )
     else:
-        lines.append(f"{action} {sig.get('asset')} @ {sig.get('entry')} — confidence {sig.get('confidence')}.")
+        lines.append(
+            f"{action} {sig.get('asset')} @ {sig.get('entry')} — confidence {sig.get('confidence')}."
+        )
         lines.append(f"Setup: {sig.get('reason')}.")
     if feats.get("trend"):
-        lines.append(f"Trend: {feats['trend']} (EMA stack), ADX {feats.get('adx')}, Supertrend {'bull' if feats.get('supertrend_bull') else 'bear'}.")
+        lines.append(
+            f"Trend: {feats['trend']} (EMA stack), ADX {feats.get('adx')}, Supertrend {'bull' if feats.get('supertrend_bull') else 'bear'}."
+        )
     rsi = feats.get("rsi")
     if rsi is not None:
-        lines.append(f"RSI {rsi:.1f} — {'overbought' if rsi >= 70 else 'oversold' if rsi <= 30 else 'neutral'}.")
+        lines.append(
+            f"RSI {rsi:.1f} — {'overbought' if rsi >= 70 else 'oversold' if rsi <= 30 else 'neutral'}."
+        )
     pd_ = feats.get("premium_discount")
     if pd_:
         lines.append(f"Price sits in the {pd_} zone of the dealing range.")
@@ -47,9 +61,13 @@ def _rule_based_narrative(payload: dict) -> str:
     if plans:
         lines.append("Conditional setups to watch:")
         for p in plans[:4]:
-            lines.append(f"  • [{p['action']}] {p['type']} ({p['confidence']}%): {p['condition']}")
+            lines.append(
+                f"  • [{p['action']}] {p['type']} ({p['confidence']}%): {p['condition']}"
+            )
     if scores:
-        lines.append(f"Bull score {scores.get('bull', {}).get('score', 0)}/100 · Bear score {scores.get('bear', {}).get('score', 0)}/100.")
+        lines.append(
+            f"Bull score {scores.get('bull', {}).get('score', 0)}/100 · Bear score {scores.get('bear', {}).get('score', 0)}/100."
+        )
     lines.append("Not financial advice.")
     return "\n".join(lines)
 
@@ -70,16 +88,52 @@ class LLMBrain:
 
     def _prompt(self, payload: dict) -> str:
         slim = {
-            "signal": {k: payload.get("signal", {}).get(k) for k in
-                       ("asset", "action", "entry", "stop_loss", "take_profit", "confidence", "reason")},
-            "plans": [{k: p.get(k) for k in ("type", "action", "condition", "entry", "confidence")}
-                      for p in payload.get("plans", [])],
-            "features": {k: payload.get("snapshot", {}).get("features", {}).get(k) for k in
-                         ("price", "trend", "rsi", "adx", "volume_ratio", "above_vwap",
-                          "premium_discount", "event_kind", "rsi_divergence", "sweep")},
-            "intelligence": {k: payload.get("intelligence", {}).get(k) for k in
-                             ("signal", "confidence", "risk_reward", "news", "scenario_A",
-                              "scenario_B", "scenario_C")},
+            "signal": {
+                k: payload.get("signal", {}).get(k)
+                for k in (
+                    "asset",
+                    "action",
+                    "entry",
+                    "stop_loss",
+                    "take_profit",
+                    "confidence",
+                    "reason",
+                )
+            },
+            "plans": [
+                {
+                    k: p.get(k)
+                    for k in ("type", "action", "condition", "entry", "confidence")
+                }
+                for p in payload.get("plans", [])
+            ],
+            "features": {
+                k: payload.get("snapshot", {}).get("features", {}).get(k)
+                for k in (
+                    "price",
+                    "trend",
+                    "rsi",
+                    "adx",
+                    "volume_ratio",
+                    "above_vwap",
+                    "premium_discount",
+                    "event_kind",
+                    "rsi_divergence",
+                    "sweep",
+                )
+            },
+            "intelligence": {
+                k: payload.get("intelligence", {}).get(k)
+                for k in (
+                    "signal",
+                    "confidence",
+                    "risk_reward",
+                    "news",
+                    "scenario_A",
+                    "scenario_B",
+                    "scenario_C",
+                )
+            },
         }
         return (
             "You are the narrative layer of an AI Trading Intelligence System for "
@@ -90,21 +144,30 @@ class LLMBrain:
             + json.dumps(slim)
         )
 
-    def _call_openai(self, prompt: str) -> Optional[str]:
+    def _call_openai(self, prompt: str) -> str | None:
         r = requests.post(
             f"{OPENAI_BASE_URL.rstrip('/')}/chat/completions",
             headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-            json={"model": OPENAI_MODEL, "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": 400, "temperature": 0.4},
-            timeout=20)
+            json={
+                "model": OPENAI_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 400,
+                "temperature": 0.4,
+            },
+            timeout=20,
+        )
         if r.status_code != 200:
             return None
         return r.json()["choices"][0]["message"]["content"]
 
-    def _call_gemini(self, prompt: str) -> Optional[str]:
+    def _call_gemini(self, prompt: str) -> str | None:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-        r = requests.post(url, params={"key": GEMINI_API_KEY},
-                          json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=20)
+        r = requests.post(
+            url,
+            params={"key": GEMINI_API_KEY},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=20,
+        )
         if r.status_code != 200:
             return None
         try:
@@ -112,7 +175,7 @@ class LLMBrain:
         except (KeyError, IndexError, TypeError):
             return None
 
-    def complete(self, prompt: str, system: Optional[str] = None) -> Optional[str]:
+    def complete(self, prompt: str, system: str | None = None) -> str | None:
         """Direct text completion for arbitrary reasoning prompts."""
         if not self.enabled:
             return None
@@ -134,11 +197,20 @@ class LLMBrain:
             if self.provider in ("openai", "auto"):
                 text = self._call_openai(prompt)
                 if text:
-                    return {"provider": f"openai:{OPENAI_MODEL}", "narrative": text.strip()}
+                    return {
+                        "provider": f"openai:{OPENAI_MODEL}",
+                        "narrative": text.strip(),
+                    }
             if self.provider in ("gemini", "auto"):
                 text = self._call_gemini(prompt)
                 if text:
-                    return {"provider": f"gemini:{GEMINI_MODEL}", "narrative": text.strip()}
-            return {"provider": "offline", "narrative": _rule_based_narrative(payload),
-                    "note": "LLM call failed — fell back to rule-based narrative"}
+                    return {
+                        "provider": f"gemini:{GEMINI_MODEL}",
+                        "narrative": text.strip(),
+                    }
+            return {
+                "provider": "offline",
+                "narrative": _rule_based_narrative(payload),
+                "note": "LLM call failed — fell back to rule-based narrative",
+            }
         return {"provider": "offline", "narrative": _rule_based_narrative(payload)}

@@ -1,9 +1,10 @@
 """Offline tests for the strict paper-operations preflight."""
+
 from __future__ import annotations
 
-import config
 import pytest
 
+import config
 from brain.preflight import FAIL, PASS, WARN, format_preflight, preflight_report
 
 
@@ -21,8 +22,11 @@ def safe_config(monkeypatch):
     monkeypatch.setattr(config, "TELEGRAM_CHAT_ID", "")
     monkeypatch.setattr(config, "DISCORD_ANNOUNCE_WEBHOOK", "")
     for name in (
-        "BINANCE_API_KEY", "BINANCE_SECRET_KEY", "BINANCE_API_SECRET",
-        "EXCHANGE_API_KEY", "EXCHANGE_API_SECRET",
+        "BINANCE_API_KEY",
+        "BINANCE_SECRET_KEY",
+        "BINANCE_API_SECRET",
+        "EXCHANGE_API_KEY",
+        "EXCHANGE_API_SECRET",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -38,23 +42,35 @@ def _health(*, mode="live", ages=None, cross=True):
             "age_seconds": ages.get(symbol),
         }
         for symbol, price in (
-            ("BTCUSDT", 60_000.0), ("ETHUSDT", 3_000.0), ("XAUUSD", 2_300.0)
+            ("BTCUSDT", 60_000.0),
+            ("ETHUSDT", 3_000.0),
+            ("XAUUSD", 2_300.0),
         )
     }
-    cross_payload = {
-        "ok": True,
-        "threshold_pct": 1.0,
-        "exchanges": {
-            "kucoin": {"ok": True, "symbols": {
-                symbol: {"deviation_pct": 0.1, "flag": False}
-                for symbol in probes
-            }},
-            "okx": {"ok": True, "symbols": {
-                symbol: {"deviation_pct": -0.1, "flag": False}
-                for symbol in probes
-            }},
-        },
-    } if cross else {"ok": False, "note": "unavailable"}
+    cross_payload = (
+        {
+            "ok": True,
+            "threshold_pct": 1.0,
+            "exchanges": {
+                "kucoin": {
+                    "ok": True,
+                    "symbols": {
+                        symbol: {"deviation_pct": 0.1, "flag": False}
+                        for symbol in probes
+                    },
+                },
+                "okx": {
+                    "ok": True,
+                    "symbols": {
+                        symbol: {"deviation_pct": -0.1, "flag": False}
+                        for symbol in probes
+                    },
+                },
+            },
+        }
+        if cross
+        else {"ok": False, "note": "unavailable"}
+    )
     return {
         "ok": True,
         "data": {
@@ -102,7 +118,9 @@ def test_demo_requires_explicit_rehearsal_flag(safe_config):
 def test_every_watchlist_feed_is_required(safe_config):
     health = _health()
     health["data"]["probe"]["ETHUSDT"] = {
-        "ok": False, "bars": 0, "error": "network blocked"
+        "ok": False,
+        "bars": 0,
+        "error": "network blocked",
     }
     report = preflight_report(health=health)
     assert report["ready"] is False
@@ -134,11 +152,15 @@ def test_live_database_must_be_durable_and_outside_checkout(safe_config):
 
 
 def test_stale_future_or_unknown_live_candle_blocks_startup(safe_config):
-    report = preflight_report(health=_health(ages={
-        "BTCUSDT": -120,
-        "ETHUSDT": 31 * 60,
-        "XAUUSD": None,
-    }))
+    report = preflight_report(
+        health=_health(
+            ages={
+                "BTCUSDT": -120,
+                "ETHUSDT": 31 * 60,
+                "XAUUSD": None,
+            }
+        )
+    )
     assert report["ready"] is False
     row = _row(report, "candle_freshness")
     assert row["status"] == FAIL
@@ -170,10 +192,12 @@ def test_cross_exchange_deviation_blocks_startup(safe_config):
 
 def test_closed_risk_gate_is_warning_not_monitoring_failure(safe_config):
     health = _health()
-    health["risk_gate"].update({
-        "allowed": False,
-        "blocked_by": ["daily loss limit reached"],
-    })
+    health["risk_gate"].update(
+        {
+            "allowed": False,
+            "blocked_by": ["daily loss limit reached"],
+        }
+    )
     report = preflight_report(health=health)
     assert report["ready"] is True
     assert _row(report, "risk_gate")["status"] == WARN

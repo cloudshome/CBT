@@ -1,14 +1,22 @@
 """tests/test_agents.py — Unit tests for autonomous desk agents and agent runs store."""
-import pytest
-from brain.agents import (MorningBriefAgent, WatchdogAgent, PaperReviewerAgent,
-                          WeeklyReviewAgent, run_agent, run_all_agents)
+
+from brain.agents import (
+    MorningBriefAgent,
+    PaperReviewerAgent,
+    WatchdogAgent,
+    WeeklyReviewAgent,
+    run_agent,
+    run_all_agents,
+)
 from data.database import SignalDB
 
 
 def test_agent_runs_db_recording(tmp_path):
     db_path = tmp_path / "test.db"
     with SignalDB(db_path) as db:
-        run_id = db.record_agent_run("test_agent", "COMPLETED", summary="Test summary", payload={"k": "v"})
+        run_id = db.record_agent_run(
+            "test_agent", "COMPLETED", summary="Test summary", payload={"k": "v"}
+        )
         assert run_id > 0
         latest = db.latest_agent_runs(limit=5)
         assert len(latest) == 1
@@ -74,6 +82,7 @@ def test_run_all_agents(tmp_path):
 def test_next_scheduled_agent_never_run(tmp_path):
     """With an empty agent_runs table, morning_brief is the first recommendation."""
     from brain.agents import next_scheduled_agent
+
     db_path = tmp_path / "test.db"
     with SignalDB(db_path) as db:
         nxt = next_scheduled_agent(db)
@@ -86,7 +95,9 @@ def test_next_scheduled_agent_never_run(tmp_path):
 def test_next_scheduled_agent_picks_most_overdue(tmp_path):
     """A stale weekly_review beats a fresh morning_brief."""
     import time
+
     from brain.agents import next_scheduled_agent
+
     db_path = tmp_path / "test.db"
     now = int(time.time())
     with SignalDB(db_path) as db:

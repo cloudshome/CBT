@@ -18,6 +18,7 @@ Confidence mapping:  >=80 HIGH, >=60 MEDIUM, >=40 LOW, <40 NO TRADE.
 The output keeps the per-condition breakdown so the reason string can cite
 exactly which conditions fired.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -29,8 +30,8 @@ class ScoreBreakdown:
     max_score: int = 100
     confidence: str = "NO TRADE"
     confidence_pct: int = 0
-    conditions: dict = field(default_factory=dict)   # name -> points awarded
-    fired: list = field(default_factory=list)        # human-readable reasons
+    conditions: dict = field(default_factory=dict)  # name -> points awarded
+    fired: list = field(default_factory=list)  # human-readable reasons
 
     def as_dict(self) -> dict:
         return {
@@ -129,7 +130,11 @@ def score_bullish(f: dict) -> ScoreBreakdown:
     mm = 0
     if f.get("rsi_bullish") and 40 <= (f.get("rsi") or 50) <= 68:
         mm += 4
-    if f.get("macd_hist") is not None and f["macd_hist"] > 0 and f.get("macd_hist_rising"):
+    if (
+        f.get("macd_hist") is not None
+        and f["macd_hist"] > 0
+        and f.get("macd_hist_rising")
+    ):
         mm += 4
     if f.get("wt_bull"):
         mm += 2
@@ -221,7 +226,11 @@ def score_bearish(f: dict) -> ScoreBreakdown:
     mm = 0
     if not f.get("rsi_bullish", True) and 32 <= (f.get("rsi") or 50) <= 60:
         mm += 4
-    if f.get("macd_hist") is not None and f["macd_hist"] < 0 and not f.get("macd_hist_rising"):
+    if (
+        f.get("macd_hist") is not None
+        and f["macd_hist"] < 0
+        and not f.get("macd_hist_rising")
+    ):
         mm += 4
     if not f.get("wt_bull", True):
         mm += 2
@@ -251,5 +260,7 @@ def score_neutral(f: dict) -> ScoreBreakdown:
     s.confidence = "NO TRADE"
     s.confidence_pct = max(bull.confidence_pct, bear.confidence_pct)
     s.conditions = {"bull_score": bull.score, "bear_score": bear.score}
-    s.fired = ["No side reaches the trade threshold — market is not offering a clean edge."]
+    s.fired = [
+        "No side reaches the trade threshold — market is not offering a clean edge."
+    ]
     return s

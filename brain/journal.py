@@ -14,18 +14,32 @@ planned R:R, risk %, news environment.
 Post-trade (you record): followed_rules, emotion, mistake, screenshot,
 would_change, notes.
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from data.database import SignalDB
 from data.provenance import LIVE_SOURCE_KEY, describe_source
 
-POST_TRADE_FIELDS = ("followed_rules", "emotion", "mistake", "screenshot_path",
-                     "would_change", "notes")
+POST_TRADE_FIELDS = (
+    "followed_rules",
+    "emotion",
+    "mistake",
+    "screenshot_path",
+    "would_change",
+    "notes",
+)
 
-EMOTIONS = ("calm", "anxious", "euphoric", "fearful", "frustrated", "greedy",
-            "revengeful", "bored", "confident")
+EMOTIONS = (
+    "calm",
+    "anxious",
+    "euphoric",
+    "fearful",
+    "frustrated",
+    "greedy",
+    "revengeful",
+    "bored",
+    "confident",
+)
 
 
 def pre_trade_checklist(payload: dict) -> dict:
@@ -39,33 +53,55 @@ def pre_trade_checklist(payload: dict) -> dict:
         "asset": sig.get("asset") or features.get("symbol"),
         "timeframe": sig.get("timeframe"),
         "regime": features.get("regime_label") or intel.get("regime_label"),
-        "htf_bias": (mtf.get("htf_bias") or {}).get("label") if isinstance(mtf.get("htf_bias"), dict) else mtf.get("htf_bias"),
-        "setup": (payload.get("plans") or [{}])[0].get("type") if payload.get("plans") else None,
+        "htf_bias": (mtf.get("htf_bias") or {}).get("label")
+        if isinstance(mtf.get("htf_bias"), dict)
+        else mtf.get("htf_bias"),
+        "setup": (payload.get("plans") or [{}])[0].get("type")
+        if payload.get("plans")
+        else None,
         "action": sig.get("action"),
         "entry": sig.get("entry"),
         "stop_loss": sig.get("stop_loss"),
         "take_profit": sig.get("take_profit"),
         "planned_rr": sig.get("risk_reward"),
         "news_environment": (ctx.get("macro") or {}).get("label")
-                            or ("high-impact event imminent" if (ctx.get("macro") or {}).get("high_impact_imminent") else "normal"),
+        or (
+            "high-impact event imminent"
+            if (ctx.get("macro") or {}).get("high_impact_imminent")
+            else "normal"
+        ),
         "trade_quality_grade": intel.get("trade_quality_grade"),
     }
 
 
-def get_journal(db: SignalDB, scan_id: int) -> Optional[dict]:
+def get_journal(db: SignalDB, scan_id: int) -> dict | None:
     """Read a scan's stored journal entry (None when not recorded)."""
     return db.get_journal(scan_id)
 
 
-def save_journal(db: SignalDB, scan_id: int, *, followed_rules: Optional[bool] = None,
-                 emotion: str = "", mistake: str = "", screenshot_path: str = "",
-                 would_change: str = "", notes: str = "") -> dict:
+def save_journal(
+    db: SignalDB,
+    scan_id: int,
+    *,
+    followed_rules: bool | None = None,
+    emotion: str = "",
+    mistake: str = "",
+    screenshot_path: str = "",
+    would_change: str = "",
+    notes: str = "",
+) -> dict:
     """Record post-trade journal fields; returns the stored entry."""
     db.save_journal(
         scan_id,
-        followed_rules=(1 if followed_rules else 0) if followed_rules is not None else None,
-        emotion=emotion, mistake=mistake, screenshot_path=screenshot_path,
-        would_change=would_change, notes=notes)
+        followed_rules=(1 if followed_rules else 0)
+        if followed_rules is not None
+        else None,
+        emotion=emotion,
+        mistake=mistake,
+        screenshot_path=screenshot_path,
+        would_change=would_change,
+        notes=notes,
+    )
     return db.get_journal(scan_id)
 
 
@@ -81,11 +117,20 @@ def execution_quality(db: SignalDB, scan_id: int) -> dict:
     if followed and r > 0:
         verdict, quality = "Excellent trade — followed the system and won", "A+"
     elif followed and r <= 0:
-        verdict, quality = "Excellent trade — followed the system; the loss was a predefined unit of risk", "B+"
+        verdict, quality = (
+            "Excellent trade — followed the system; the loss was a predefined unit of risk",
+            "B+",
+        )
     elif not followed and r > 0:
-        verdict, quality = "Terrible trade — rules broken and profit was luck, not skill", "D"
+        verdict, quality = (
+            "Terrible trade — rules broken and profit was luck, not skill",
+            "D",
+        )
     else:
-        verdict, quality = "Terrible trade — rules broken and the loss was deserved", "F"
+        verdict, quality = (
+            "Terrible trade — rules broken and the loss was deserved",
+            "F",
+        )
     return {
         "recorded": True,
         "followed_rules": followed,
@@ -201,11 +246,15 @@ def graduation_discipline(db: SignalDB, source_key: str = LIVE_SOURCE_KEY) -> di
 def describe_discipline(d: dict) -> str:
     """One-line human summary of a :func:`graduation_discipline` payload."""
     if not d or not d.get("eligible"):
-        return ("discipline: unproven — no decided real paper trades on the "
-                "canonical live book yet")
+        return (
+            "discipline: unproven — no decided real paper trades on the "
+            "canonical live book yet"
+        )
     pct = f"{d['compliance'] * 100:.1f}%"
-    line = (f"discipline: {pct} compliance "
-            f"({d['compliant']}/{d['eligible']} real canonical trades)")
+    line = (
+        f"discipline: {pct} compliance "
+        f"({d['compliant']}/{d['eligible']} real canonical trades)"
+    )
     if d.get("missing_journals"):
         line += f" — {d['missing_journals']} missing journal(s) count against you"
     if d.get("violations"):

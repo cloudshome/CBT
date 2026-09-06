@@ -5,6 +5,7 @@ paper book and sweeps position size to expose how expected drawdown,
 ruin probability, longest losing streak and time-to-recovery scale with
 risk %/trade.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -32,20 +33,38 @@ def db():
             "outcome,rr_achieved,close_reason,last_candle_ts,last_price,"
             "checks,error,regime,mae,mfe,sim_key,rr_net) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (sid, "s1", "p1", kw.pop("plan_type", "trend_following"),
-             kw.pop("symbol", "BTCUSDT"), kw.pop("timeframe", "1h"),
-             kw.pop("action", "BUY"),
-             kw.pop("entry", 100.0), kw.pop("stop_loss", 90.0),
-             kw.pop("take_profit", 120.0), kw.pop("risk_reward", 2.0),
-             kw.pop("confidence_pct", 70), kw.pop("status", "CLOSED"),
-             1000, 1100, 2000,
-             kw.pop("entry_price", 100.0), kw.pop("exit_price", 100.0),
-             kw.pop("outcome", "TP_HIT"), kw.pop("rr_achieved", 2.0),
-             kw.pop("close_reason", "slip"),
-             2000, 100.0,
-             counter[0], kw.pop("error", None), kw.pop("regime", ""),
-             kw.pop("mae", None), kw.pop("mfe", None),
-             kw.pop("sim_key", None), kw.pop("rr_net", None)),
+            (
+                sid,
+                "s1",
+                "p1",
+                kw.pop("plan_type", "trend_following"),
+                kw.pop("symbol", "BTCUSDT"),
+                kw.pop("timeframe", "1h"),
+                kw.pop("action", "BUY"),
+                kw.pop("entry", 100.0),
+                kw.pop("stop_loss", 90.0),
+                kw.pop("take_profit", 120.0),
+                kw.pop("risk_reward", 2.0),
+                kw.pop("confidence_pct", 70),
+                kw.pop("status", "CLOSED"),
+                1000,
+                1100,
+                2000,
+                kw.pop("entry_price", 100.0),
+                kw.pop("exit_price", 100.0),
+                kw.pop("outcome", "TP_HIT"),
+                kw.pop("rr_achieved", 2.0),
+                kw.pop("close_reason", "slip"),
+                2000,
+                100.0,
+                counter[0],
+                kw.pop("error", None),
+                kw.pop("regime", ""),
+                kw.pop("mae", None),
+                kw.pop("mfe", None),
+                kw.pop("sim_key", None),
+                kw.pop("rr_net", None),
+            ),
         )
         d.conn.commit()
 
@@ -134,8 +153,20 @@ def test_ruin_table_excludes_sim_samples(db):
 
 def test_ruin_table_accepts_rows_directly():
     rows = [
-        {"rr_achieved": 1.5, "rr_net": 1.3, "action": "BUY", "entry": 100.0, "stop_loss": 90.0},
-        {"rr_achieved": -1.0, "rr_net": -1.1, "action": "BUY", "entry": 100.0, "stop_loss": 90.0},
+        {
+            "rr_achieved": 1.5,
+            "rr_net": 1.3,
+            "action": "BUY",
+            "entry": 100.0,
+            "stop_loss": 90.0,
+        },
+        {
+            "rr_achieved": -1.0,
+            "rr_net": -1.1,
+            "action": "BUY",
+            "entry": 100.0,
+            "stop_loss": 90.0,
+        },
     ]
     r = monte_carlo_ruin_table(rows=rows, samples=300, seed=5)
     assert r["available"] is True

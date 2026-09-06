@@ -25,17 +25,24 @@ from __future__ import annotations
 # One-sided half-spread as a fraction of price, per symbol.  Retail-ish
 # spreads for the execution timeframe; widen for lower-liquidity instruments.
 SPREADS: dict[str, float] = {
-    "BTCUSDT": 0.00020,     # 0.02% half-spread
-    "ETHUSDT": 0.00035,     # 0.035%
-    "XAUUSD":  0.00060,     # 0.06% (tokenised gold / PAXG)
+    "BTCUSDT": 0.00020,  # 0.02% half-spread
+    "ETHUSDT": 0.00035,  # 0.035%
+    "XAUUSD": 0.00060,  # 0.06% (tokenised gold / PAXG)
 }
 
 # Market-impact coefficient: slip grows with relative size and with volatility.
 IMPACT_K = 0.40
 
 
-def slip_amount(symbol: str, side: str, entry: float, volume: float,
-                avg_volume: float, atr_pct: float, model: str = "slip") -> float:
+def slip_amount(
+    symbol: str,
+    side: str,
+    entry: float,
+    volume: float,
+    avg_volume: float,
+    atr_pct: float,
+    model: str = "slip",
+) -> float:
     """One-sided slip in price units (positive).  ``"none"`` -> 0.
 
     ``slip`` / ``impact`` / ``simple`` all enable the fill model; ``none`` (and
@@ -52,8 +59,9 @@ def slip_amount(symbol: str, side: str, entry: float, volume: float,
     return spread_half + impact
 
 
-def realized_rr(side: str, entry: float, sl: float, tp: float, fill_entry: float,
-                outcome: str) -> float:
+def realized_rr(
+    side: str, entry: float, sl: float, tp: float, fill_entry: float, outcome: str
+) -> float:
     """Realised R from the filled entry for a known outcome.
 
     R is measured against the *planned* risk (|entry - sl|).  A winner fills
@@ -64,13 +72,14 @@ def realized_rr(side: str, entry: float, sl: float, tp: float, fill_entry: float
         return 0.0
     if outcome in ("FULL_WIN", "PARTIAL_WIN"):
         pnl = (tp - fill_entry) if side == "BUY" else (fill_entry - tp)
-    else:                                  # LOSS — SL hit
+    else:  # LOSS — SL hit
         pnl = -(fill_entry - sl) if side == "BUY" else -(sl - fill_entry)
     return round(pnl / plan_risk, 3)
 
 
-def adjust_for_slip(gp, plan: dict, df_row: dict, window: pd.DataFrame,
-                    symbol: str, model: str) -> None:
+def adjust_for_slip(
+    gp, plan: dict, df_row: dict, window: pd.DataFrame, symbol: str, model: str
+) -> None:
     """Post-grade slippage adjustment on a GradedPlan (in place).
 
     ``df_row`` is the signal bar; ``window`` is the forward bars used for the
