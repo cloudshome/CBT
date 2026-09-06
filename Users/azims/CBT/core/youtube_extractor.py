@@ -345,6 +345,31 @@ class YouTubeResearchExtractor:
             "is_hyped": len(hype_markers) > 0,
         }
 
+    async def explore_source(
+        self,
+        url_or_handle: str,
+        limit: int = 10,
+        sort_by: str = "recent",
+        force_refresh: bool = False,
+        requested_by: str = "operator",
+        job_id: str | None = None,
+        chat_id: str | int | None = None,
+    ) -> dict[str, Any]:
+        """Delegates multi-video or channel exploration to the YouTube V5 Agent."""
+        from core.youtube.agent import youtube_agent
+
+        res = await youtube_agent.explore(
+            source_url_or_handle=url_or_handle,
+            limit=limit,
+            sort_by=sort_by,
+            force_refresh=force_refresh,
+            requested_by=requested_by,
+            job_id=job_id,
+            chat_id=chat_id,
+        )
+        return res.to_dict()
+
 
 # Master Singleton
 youtube_extractor = YouTubeResearchExtractor()
+

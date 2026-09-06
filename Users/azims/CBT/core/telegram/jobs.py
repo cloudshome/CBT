@@ -168,8 +168,15 @@ class TelegramJobManager:
             logger.error(f"Error querying job {clean_id}: {e}")
         return None
 
-    def format_job_status(self, job: TelegramJob) -> str:
+    def format_job_status(self, job: TelegramJob | str) -> str:
         """Formats an institutional status response for Telegram."""
+        if isinstance(job, str):
+            clean_id = job.strip().upper()
+            found = self.get_job(clean_id)
+            if not found:
+                return f"⚠️ **Job Not Found:** No active or completed task matches `{job}`."
+            job = found
+
         emoji = "⏳" if job.status == "RUNNING" else "✅" if job.status == "COMPLETED" else "❌" if job.status == "FAILED" else "⚪"
         lines = [
             f"{emoji} **SKY ASYNC JOB STATUS**",

@@ -538,6 +538,72 @@ async def handle_job(args: str, chat_id: Any = None, identity: TelegramUserIdent
     return res
 
 
+async def handle_explore(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+    """
+    Autonomous YouTube Channel & Playlist Explorer.
+    Usage: /explore <url or @handle> [limit]
+    Aliases: /playlist, /channel
+    """
+    from core.telegram_bot import telegram_bot
+    from core.youtube.agent import youtube_agent
+
+    clean_args = args.strip()
+    if not clean_args:
+        help_msg = (
+            "📺 **YOUTUBE RESEARCH INTELLIGENCE V5**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🔍 **Usage:** `/explore <url_or_@handle> [limit]`\n"
+            "✨ **Supported Inputs:**\n"
+            "  • Channel Handle: `/explore @TraderTom 5`\n"
+            "  • Playlist URL: `/explore https://youtube.com/playlist?list=PL... 10`\n"
+            "  • Channel URL: `/explore https://youtube.com/@TheTradingChannel 8`\n"
+            "  • Video URL: `/explore https://youtu.be/dQw4w9WgXcQ`\n"
+            "⚡ **Aliases:** `/playlist`, `/channel`\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "💡 _Exploration executes asynchronously. You will receive an instant Job ID._"
+        )
+        if chat_id:
+            await telegram_bot.send_message(help_msg, chat_id=chat_id)
+        return help_msg
+
+    tokens = clean_args.split()
+    target_source = tokens[0]
+    limit = 10
+    if len(tokens) > 1:
+        try:
+            limit = int(tokens[1])
+        except ValueError:
+            limit = 10
+
+    limit = max(1, min(limit, 50))
+    user_label = identity.username or identity.user_id if identity else "telegram_operator"
+
+    job_id = youtube_agent.start_background_exploration(
+        source_url_or_handle=target_source,
+        limit=limit,
+        requested_by=user_label,
+        chat_id=chat_id,
+    )
+
+    receipt = (
+        "⏳ **YOUTUBE RESEARCH EXPLORATION DISPATCHED**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🆔 **Job ID:** `{job_id}`\n"
+        f"🎯 **Target Source:** `{target_source}`\n"
+        f"🔢 **Extraction Cap:** `{limit} videos`\n"
+        f"👤 **Requested By:** `@{user_label}`\n"
+        "📡 **Workflow:** Discovery ──► Deduplication ──► Deconstruction ──► Synthesis\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 _Synthesis notification will be delivered here automatically._\n"
+        f"🔍 _Track progress at any time with `/job {job_id}`._"
+    )
+
+    if chat_id:
+        await telegram_bot.send_message(receipt, chat_id=chat_id)
+
+    return receipt
+
+
 async def handle_pause(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
     """
     Engages authoritative emergency trading halt across all execution paths.
@@ -750,6 +816,14 @@ def register_all_v5_commands() -> None:
             required_role=TelegramRole.ANALYST,
             aliases=["/jobs"],
             argument_schema="[job_id]",
+        ),
+        TelegramCommand(
+            name="/explore",
+            description="Autonomous YouTube Channel & Playlist Research Intelligence Explorer",
+            handler=handle_explore,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/playlist", "/channel"],
+            argument_schema="<url or @handle> [limit]",
         ),
         TelegramCommand(
             name="/pause",

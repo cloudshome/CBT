@@ -1298,7 +1298,34 @@ export const api = {
     );
     return handleResponse<any>(res);
   },
+
+  /**
+   * POST /api/research/youtube/explore (YouTube V5 Autonomous Channel & Playlist Explorer)
+   */
+  async exploreYouTube(params: {
+    source_url_or_handle: string;
+    limit?: number;
+    sort_by?: string;
+    force_refresh?: boolean;
+    requested_by?: string;
+  }): Promise<{ status: string; job_id: string; source: string; limit: number; message: string }> {
+    const res = await authFetch(`${BASE_URL}/api/research/youtube/explore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; job_id: string; source: string; limit: number; message: string }>(res);
+  },
+
+  /**
+   * GET /api/research/youtube/jobs/:job_id
+   */
+  async getYouTubeJob(jobId: string): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/research/youtube/jobs/${encodeURIComponent(jobId)}`);
+    return handleResponse<any>(res);
+  },
 };
+
 
 
 

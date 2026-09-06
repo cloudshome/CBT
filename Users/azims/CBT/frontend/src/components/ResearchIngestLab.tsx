@@ -75,6 +75,14 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   const [backtestingCandidateId, setBacktestingCandidateId] = useState<string | null>(null);
   const [testingHypothesisId, setTestingHypothesisId] = useState<string | null>(null);
 
+  // YouTube Channel & Playlist Explorer State (V5)
+  const [ytExploreInput, setYtExploreInput] = useState<string>('');
+  const [ytExploreLimit, setYtExploreLimit] = useState<number>(10);
+  const [ytExploreLoading, setYtExploreLoading] = useState<boolean>(false);
+  const [ytActiveJobId, setYtActiveJobId] = useState<string | null>(null);
+  const [ytJobData, setYtJobData] = useState<any | null>(null);
+  const [showYtResults, setShowYtResults] = useState<boolean>(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch Vaults, Inbox & Discovery Graph
@@ -99,6 +107,56 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  // YouTube Exploration Job Polling
+  useEffect(() => {
+    if (!ytActiveJobId) return;
+    const interval = setInterval(async () => {
+      try {
+        const job = await api.getYouTubeJob(ytActiveJobId);
+        setYtJobData(job);
+        if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+          clearInterval(interval);
+          setYtExploreLoading(false);
+          if (job.status === 'COMPLETED') {
+            setShowYtResults(true);
+            fetchAllData();
+            if (onNotify) {
+              onNotify('success', 'YouTube Synthesis Complete', `Processed ${job.result?.videos_processed || 0} videos.`);
+            }
+          } else if (job.status === 'FAILED' && onNotify) {
+            onNotify('error', 'YouTube Exploration Failed', job.error_message || 'Task terminated unexpectedly.');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to poll YouTube job:', err);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [ytActiveJobId, fetchAllData, onNotify]);
+
+  const handleStartYouTubeExplore = async () => {
+    const clean = ytExploreInput.trim();
+    if (!clean) return;
+    try {
+      setYtExploreLoading(true);
+      setYtJobData(null);
+      setShowYtResults(false);
+      const res = await api.exploreYouTube({
+        source_url_or_handle: clean,
+        limit: ytExploreLimit,
+      });
+      setYtActiveJobId(res.job_id);
+      if (onNotify) {
+        onNotify('info', 'Exploration Dispatched', `Job ${res.job_id} launched for ${clean}`);
+      }
+    } catch (err: any) {
+      setYtExploreLoading(false);
+      if (onNotify) {
+        onNotify('error', 'Exploration Failed', err?.message || 'Could not dispatch exploration job.');
+      }
+    }
+  };
 
   // Handle Drag & Drop
   const handleDragOver = (e: React.DragEvent) => {
@@ -569,6 +627,249 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* YOUTUBE RESEARCH INTELLIGENCE V5: AUTONOMOUS EXPLORER                      */}
+      {/* ========================================================================= */}
+      <div className="bg-slate-900/90 border border-red-900/40 rounded-xl p-5 flex flex-col gap-4 shadow-xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg">
+              <Youtube className="w-5 h-5 text-red-500" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-100 tracking-wide">
+                  AUTONOMOUS YOUTUBE CHANNEL & PLAYLIST EXPLORER (V5)
+                </h3>
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-red-950 text-red-300 border border-red-800/60 rounded">
+                  RESEARCH AGENT
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Explore channels, playlists or @handles • SMC setups & rule contradiction detection • Strictly quarantined at confidence = 0.0
+              </p>
+            </div>
+          </div>
+
+          {ytJobData?.status === 'COMPLETED' && (
+            <button
+              onClick={() => setShowYtResults(!showYtResults)}
+              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded border border-slate-700 flex items-center gap-1.5 transition-colors"
+            >
+              {showYtResults ? 'Hide Synthesis Dossier' : 'View Synthesis Dossier'}
+            </button>
+          )}
+        </div>
+
+        {/* Input Controls */}
+        <div className="flex flex-col md:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <input
+              type="text"
+              value={ytExploreInput}
+              onChange={(e) => setYtExploreInput(e.target.value)}
+              placeholder="Enter YouTube Channel URL, Playlist URL, @Handle, or Video URL (e.g. @TraderTom, PL...)"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-red-500 transition-colors"
+              disabled={ytExploreLoading}
+            />
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 px-3 py-2 rounded-lg text-xs">
+              <span className="text-slate-400">Cap:</span>
+              <select
+                value={ytExploreLimit}
+                onChange={(e) => setYtExploreLimit(Number(e.target.value))}
+                className="bg-transparent text-slate-200 focus:outline-none cursor-pointer"
+                disabled={ytExploreLoading}
+              >
+                <option value={5} className="bg-slate-900">5 videos</option>
+                <option value={10} className="bg-slate-900">10 videos</option>
+                <option value={20} className="bg-slate-900">20 videos</option>
+                <option value={50} className="bg-slate-900">50 max</option>
+              </select>
+            </div>
+
+            <button
+              onClick={handleStartYouTubeExplore}
+              disabled={ytExploreLoading || !ytExploreInput.trim()}
+              className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-red-950/40 transition-all disabled:opacity-50 whitespace-nowrap flex-1 md:flex-initial"
+            >
+              {ytExploreLoading ? (
+                <>
+                  <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                  <span>EXPLORING...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" />
+                  <span>AUTONOMOUS EXPLORE</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Live Exploration Tracker */}
+        {ytActiveJobId && (
+          <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3.5 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${ytJobData?.status === 'COMPLETED' ? 'bg-emerald-400' : ytJobData?.status === 'FAILED' ? 'bg-red-400' : 'bg-amber-400 animate-ping'}`} />
+                <span className="text-slate-300 font-semibold">Job `{ytActiveJobId}`</span>
+                <span className="text-slate-500">•</span>
+                <span className="text-slate-400">{ytJobData?.status || 'RUNNING'}</span>
+              </div>
+              <span className="font-bold text-red-400">{ytJobData?.progress_pct || 0}%</span>
+            </div>
+
+            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-red-500 to-rose-400 h-full transition-all duration-300"
+                style={{ width: `${ytJobData?.progress_pct || 5}%` }}
+              />
+            </div>
+
+            {ytJobData?.result?.step && (
+              <p className="text-[11px] text-slate-400 italic">
+                Active Phase: <span className="text-slate-200 font-medium">{ytJobData.result.step}</span>
+                {ytJobData.result.current_video && ` — processing "${ytJobData.result.current_video}"`}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Synthesized Exploration Results Dossier */}
+        {showYtResults && ytJobData?.result && (
+          <div className="bg-[#0b101b] border border-red-500/40 rounded-xl p-4 flex flex-col gap-4 animate-fadeIn">
+            {/* Dossier Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <span>📺 Creator Research Dossier:</span>
+                  <span className="text-red-400">{ytJobData.result.creator_profile?.channel_name || ytJobData.result.source?.canonical_url}</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Analyzed {ytJobData.result.videos_processed} videos ({ytJobData.result.videos_skipped} skipped via deduplication sentinel)
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded">
+                  Hype Density: {ytJobData.result.creator_profile?.hype_frequency_pct || 0}%
+                </span>
+                <span className="px-2.5 py-1 text-[11px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded">
+                  Contradictions: {ytJobData.result.contradictions?.length || 0}
+                </span>
+              </div>
+            </div>
+
+            {/* Grid: Recurring Concepts & Rule Contradictions */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Recurring SMC Concepts */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-2">
+                <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Consolidated Technical Setups ({ytJobData.result.recurring_concepts?.length || 0})</span>
+                </h5>
+                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                  {ytJobData.result.recurring_concepts?.map((c: any, i: number) => (
+                    <div key={i} className="p-2 bg-slate-900/60 border border-slate-800/80 rounded text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-200">{c.concept_name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-indigo-950 text-indigo-300 rounded border border-indigo-800">
+                          {c.appearance_count} sessions
+                        </span>
+                      </div>
+                      {c.sample_contexts?.[0] && (
+                        <p className="text-[11px] text-slate-400 italic mt-1 line-clamp-2">
+                          "{c.sample_contexts[0]}"
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Detected Rule Contradictions */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 flex flex-col gap-2">
+                <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Rule Contradictions & Evolutions ({ytJobData.result.contradictions?.length || 0})</span>
+                </h5>
+                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                  {ytJobData.result.contradictions?.length ? (
+                    ytJobData.result.contradictions.map((cont: any, i: number) => (
+                      <div key={i} className="p-2 bg-amber-950/20 border border-amber-900/40 rounded text-xs flex flex-col gap-1">
+                        <span className="font-semibold text-amber-300">{cont.rule_name}</span>
+                        <p className="text-[11px] text-slate-400">
+                          <span className="text-slate-500">Earlier:</span> {cont.earlier_statement}
+                        </p>
+                        <p className="text-[11px] text-slate-300">
+                          <span className="text-amber-400 font-medium">Later Refinement:</span> {cont.later_statement}
+                        </p>
+                        <span className="text-[10px] text-amber-400/90 italic mt-0.5">
+                          ⚠️ {cont.epistemic_warning}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-500 italic py-2">
+                      No internal rule contradictions detected across analyzed sessions.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Quarantined Strategy Candidates */}
+            {ytJobData.result.synthesized_candidates?.length > 0 && (
+              <div className="bg-slate-950/80 border border-purple-900/50 rounded-lg p-3.5 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                    <FlaskConical className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Quarantined Strategy Candidates ({ytJobData.result.synthesized_candidates.length})</span>
+                  </h5>
+                  <span className="text-[10px] px-2 py-0.5 bg-red-950/80 text-red-300 border border-red-700/60 rounded font-bold">
+                    Confidence: 0.0 • UNTESTED
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {ytJobData.result.synthesized_candidates.map((cand: any, i: number) => (
+                    <div key={i} className="p-3 bg-slate-900/80 border border-slate-800 rounded-lg flex flex-col justify-between gap-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-200">{cand.strategy_name}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">{cand.candidate_id}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{cand.hypothesis}</p>
+                        <div className="bg-slate-950 p-2 rounded border border-slate-800/60 text-[10px] text-slate-300 flex flex-col gap-0.5 mt-1 font-mono">
+                          <div><span className="text-indigo-400">Trigger:</span> {cand.entry_rules?.condition}</div>
+                          <div><span className="text-amber-400">Exit:</span> SL {cand.exit_rules?.sl_rule} | TP {cand.exit_rules?.tp_target}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                        <span className="text-[10px] text-slate-500">Citations: {cand.creator_repetition_count} sessions</span>
+                        <button
+                          onClick={() => handleRunBacktest(cand.candidate_id)}
+                          disabled={backtestingCandidateId === cand.candidate_id}
+                          className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/50 rounded text-[11px] font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+                        >
+                          <Play className="w-3 h-3" />
+                          <span>{backtestingCandidateId === cand.candidate_id ? 'TESTING...' : 'TEST IN SANDBOX'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}

@@ -346,6 +346,13 @@ class CompileStrategyRequest(BaseModel):
     source_id: Optional[str] = None
 
 
+class YouTubeExploreRequest(BaseModel):
+    source_url_or_handle: str
+    limit: Optional[int] = 10
+    sort_by: Optional[str] = "recent"
+    force_refresh: Optional[bool] = False
+    requested_by: Optional[str] = "research_lab"
+
 
 # WebSocket Connection Manager with 24/7 Heartbeat Guard
 class ConnectionManager:
@@ -1951,6 +1958,67 @@ async def ingest_research_file(
     except Exception as e:
         logger.error(f"File ingestion error: {e}")
         raise HTTPException(status_code=500, detail=f"File ingestion failed: {str(e)}")
+
+
+@app.post("/api/research/youtube/explore", dependencies=[Depends(require_api_key)])
+async def explore_youtube_source(req: YouTubeExploreRequest):
+    """
+    Triggers YouTube V5 Autonomous Channel & Playlist Exploration.
+    Runs asynchronously and returns an instant Job ID receipt.
+    """
+    from core.youtube.agent import youtube_agent
+
+    clean_src = req.source_url_or_handle.strip()
+    if not clean_src:
+        raise HTTPException(status_code=400, detail="Source URL or handle cannot be empty.")
+
+    limit = max(1, min(req.limit or 10, 50))
+    job_id = youtube_agent.start_background_exploration(
+        source_url_or_handle=clean_src,
+        limit=limit,
+        sort_by=req.sort_by or "recent",
+        force_refresh=bool(req.force_refresh),
+        requested_by=req.requested_by or "research_lab",
+    )
+    return {
+        "status": "ACCEPTED",
+        "job_id": job_id,
+        "source": clean_src,
+        "limit": limit,
+        "message": "YouTube exploration initiated in background.",
+    }
+
+
+@app.get("/api/research/youtube/jobs/{job_id}", dependencies=[Depends(require_api_key)])
+async def get_youtube_exploration_job(job_id: str):
+    """
+    Retrieves status, progress, and synthesized results for a YouTube Exploration job.
+    """
+    from core.telegram.jobs import job_manager
+
+    clean_id = job_id.strip().upper()
+    job = job_manager.get_job(clean_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+
+    res_data = None
+    if job.result_json:
+        try:
+            res_data = json.loads(job.result_json)
+        except Exception:
+            res_data = job.result_json
+
+    return {
+        "job_id": job.job_id,
+        "job_type": job.job_type,
+        "status": job.status,
+        "progress_pct": job.progress_pct,
+        "title": job.title,
+        "created_at": job.created_at,
+        "completed_at": job.completed_at,
+        "error_message": job.error_message,
+        "result": res_data,
+    }
 
 
 @app.get("/api/research/inbox")
