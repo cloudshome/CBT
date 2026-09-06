@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -78,7 +79,10 @@ class AuditBus:
     ) -> AuditEvent:
         """Emits and records an immutable audit event."""
         now = time.time()
-        event_id = f"AUD-{int(now * 1000)}-{event_type[:4]}"
+        # Millisecond timestamp alone collides when two events of the same type
+        # are recorded within 1 ms → UNIQUE violation and a silently DROPPED
+        # audit record. UUID suffix keeps the audit ledger lossless.
+        event_id = f"AUD-{int(now * 1000)}-{event_type[:4]}-{uuid.uuid4().hex[:8]}"
         ev = AuditEvent(
             event_id=event_id,
             timestamp=now,

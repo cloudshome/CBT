@@ -95,7 +95,9 @@ class EventShockEngine:
         if getattr(self, "_emergency_pause", False):
             return EventRiskState(
                 is_event_risk_active=True,
-                nearest_event=MacroEvent("EMERGENCY_LOCK", "OPERATOR EMERGENCY PAUSE", "CRITICAL", 0),
+                nearest_event=MacroEvent(
+                    "EMERGENCY_LOCK", "OPERATOR EMERGENCY PAUSE", "CRITICAL", 0
+                ),
                 minutes_until_event=0.0,
                 ev_hurdle_multiplier=2.0,
                 position_size_multiplier=0.0,

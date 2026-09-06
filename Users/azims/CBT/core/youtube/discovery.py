@@ -16,7 +16,6 @@ import os
 import re
 import time
 import urllib.parse
-from typing import Any, List, Optional
 
 import yt_dlp
 
@@ -70,8 +69,12 @@ class YouTubeDiscoveryEngine:
                     );
                     """
                 )
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_yt_crawl_channel ON youtube_crawl_history (channel_id);")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_yt_crawl_status ON youtube_crawl_history (status);")
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_yt_crawl_channel ON youtube_crawl_history (channel_id);"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_yt_crawl_status ON youtube_crawl_history (status);"
+                )
                 conn.commit()
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.warning(f"Could not initialize youtube_crawl_history table: {e}")
@@ -249,8 +252,12 @@ class YouTubeDiscoveryEngine:
                     return []
 
                 # Capture channel / playlist metadata
-                source.channel_name = info.get("channel") or info.get("uploader") or info.get("title") or ""
-                source.channel_id = info.get("channel_id") or info.get("uploader_id") or source.channel_id
+                source.channel_name = (
+                    info.get("channel") or info.get("uploader") or info.get("title") or ""
+                )
+                source.channel_id = (
+                    info.get("channel_id") or info.get("uploader_id") or source.channel_id
+                )
 
                 entries = info.get("entries") or []
                 for idx, entry in enumerate(entries):
@@ -265,7 +272,9 @@ class YouTubeDiscoveryEngine:
 
                     v_url = f"https://www.youtube.com/watch?v={vid}"
                     title = entry.get("title") or f"YouTube Video ({vid})"
-                    channel_name = entry.get("channel") or entry.get("uploader") or source.channel_name
+                    channel_name = (
+                        entry.get("channel") or entry.get("uploader") or source.channel_name
+                    )
                     duration = int(entry.get("duration") or 0)
                     upload_date = str(entry.get("upload_date") or "")
                     views = int(entry.get("view_count") or 0)
@@ -306,7 +315,16 @@ class YouTubeDiscoveryEngine:
                         (video_id, channel_id, channel_name, title, canonical_url, duration_seconds, upload_date, status, discovered_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, 'DISCOVERED', ?)
                         """,
-                        (v.video_id, v.channel_id, v.channel_name, v.title, v.canonical_url, v.duration_seconds, v.upload_date, v.discovered_at),
+                        (
+                            v.video_id,
+                            v.channel_id,
+                            v.channel_name,
+                            v.title,
+                            v.canonical_url,
+                            v.duration_seconds,
+                            v.upload_date,
+                            v.discovered_at,
+                        ),
                     )
                 conn.commit()
         except Exception as e:  # noqa: BLE001
@@ -331,7 +349,9 @@ class YouTubeDiscoveryEngine:
             with db_manager.get_brain_conn() as conn:
                 ingested_ids = set()
                 # Check crawl memory table
-                cur = conn.execute("SELECT video_id FROM youtube_crawl_history WHERE status = 'INGESTED'")
+                cur = conn.execute(
+                    "SELECT video_id FROM youtube_crawl_history WHERE status = 'INGESTED'"
+                )
                 for r in cur.fetchall():
                     ingested_ids.add(r["video_id"])
 
@@ -345,7 +365,7 @@ class YouTubeDiscoveryEngine:
                         match = re.search(r"watch\?v=([a-zA-Z0-9_-]{11})", uri)
                         if match:
                             ingested_ids.add(match.group(1))
-                except Exception:
+                except Exception:  # noqa: S110,BLE001 — defensive fallback
                     pass
 
                 for v in videos:

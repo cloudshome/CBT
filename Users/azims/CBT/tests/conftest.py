@@ -36,6 +36,7 @@ try:
     db_manager.init_all_schemas()
 
     from core.telegram.rbac import rbac_registry
+
     rbac_registry.reset()
 except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
     pass

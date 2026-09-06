@@ -7,12 +7,8 @@ and emergency circuit breaker controls.
 
 from __future__ import annotations
 
-import asyncio
-import datetime
 import json
 import logging
-import os
-import time
 from typing import Any
 
 from core.database import db_manager
@@ -21,7 +17,6 @@ from core.portfolio_shadow import portfolio_shadow
 from core.provenance_engine import provenance_engine
 from core.sandbox_lab import sandbox_lab
 from core.sky_intelligence import sky_orchestrator
-from core.telegram.audit import telegram_audit
 from core.telegram.callbacks import callback_router
 from core.telegram.charts import telegram_charts
 from core.telegram.commands import TelegramCommand, command_registry
@@ -36,7 +31,9 @@ logger = logging.getLogger("ai_quant_sentinel.telegram.handlers")
 # ==============================================================================
 
 
-async def handle_start_help(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_start_help(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns dynamic role-filtered institutional command help guide."""
     from core.telegram.rbac import rbac_registry
 
@@ -44,7 +41,9 @@ async def handle_start_help(args: str, chat_id: Any = None, identity: TelegramUs
     return command_registry.generate_help_menu(ident)
 
 
-async def handle_signal(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_signal(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """
     Generates a live high-conviction quantitative trade signal.
     Enforces Two-Phase Confirmation: generates a 60s signed ActionToken and
@@ -120,7 +119,9 @@ async def handle_signal(args: str, chat_id: Any = None, identity: TelegramUserId
     return msg
 
 
-async def handle_positions(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_positions(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns active shadow practice positions and attaches quick-management buttons."""
     from core.telegram_bot import telegram_bot
 
@@ -155,7 +156,9 @@ async def handle_positions(args: str, chat_id: Any = None, identity: TelegramUse
     return report
 
 
-async def handle_close(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_close(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Closes an active shadow position by symbol."""
     from core.telegram_bot import telegram_bot
 
@@ -169,7 +172,9 @@ async def handle_close(args: str, chat_id: Any = None, identity: TelegramUserIde
     return res
 
 
-async def handle_debate(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_debate(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Convenes the Tri-Agent Adversarial Debate Council."""
     from core.telegram_bot import telegram_bot
 
@@ -183,7 +188,9 @@ async def handle_debate(args: str, chat_id: Any = None, identity: TelegramUserId
     return res
 
 
-async def handle_decision(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_decision(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Evaluates 12-stage SKY decision matrix."""
     from core.data_streamer import data_streamer
     from core.telegram_bot import telegram_bot
@@ -194,13 +201,15 @@ async def handle_decision(args: str, chat_id: Any = None, identity: TelegramUser
 
     candles = data_streamer.get_candles(sym, "15m", 50)
     out = sky_orchestrator.analyze_market(sym, "15m", candles)
-    dec_emoji = "🟢" if out.decision.value == "LONG" else "🔴" if out.decision.value == "SHORT" else "⚪"
+    dec_emoji = (
+        "🟢" if out.decision.value == "LONG" else "🔴" if out.decision.value == "SHORT" else "⚪"
+    )
     res = (
         f"{dec_emoji} **SKY 12-STAGE DECISION: `{sym}`**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"• **Action:** `{out.decision.value}`\n"
         f"• **Net EV (R):** `{out.net_ev_r:+.2f}R`\n"
-        f"• **Half-Kelly:** `{out.kelly_fraction*100:.2f}%`\n"
+        f"• **Half-Kelly:** `{out.kelly_fraction * 100:.2f}%`\n"
         f"• **Risk Gate:** `{'PASSED ✅' if out.risk_gate_passed else 'REJECTED ❌'}`\n"
         f"• **Reason:** `{out.no_trade_reason or 'Qualified High-EV Setup'}`"
     )
@@ -209,7 +218,9 @@ async def handle_decision(args: str, chat_id: Any = None, identity: TelegramUser
     return res
 
 
-async def handle_autopsy(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_autopsy(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns forensic post-trade loss diagnosis."""
     from core.telegram_bot import telegram_bot
 
@@ -219,7 +230,9 @@ async def handle_autopsy(args: str, chat_id: Any = None, identity: TelegramUserI
     return res
 
 
-async def handle_market(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_market(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns real-time market pulse & order flow metrics."""
     from core.telegram_bot import telegram_bot
 
@@ -240,7 +253,9 @@ async def handle_market(args: str, chat_id: Any = None, identity: TelegramUserId
     return res
 
 
-async def handle_plan(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_plan(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Generates multi-timeframe structural trading roadmap."""
     from core.telegram_bot import telegram_bot
 
@@ -264,14 +279,18 @@ async def handle_plan(args: str, chat_id: Any = None, identity: TelegramUserIden
     return res
 
 
-async def handle_events(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_events(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns macroeconomic sentinel radar and event countdown."""
     from core.telegram_bot import telegram_bot
 
     ev = telegram_bot.generate_event_shock_status()
     mins = ev["minutes_until"]
     hours = mins / 60.0
-    time_display = f"{mins:.0f} mins ({hours:.1f} hours away)" if mins > 90 else f"{mins:.0f} mins away"
+    time_display = (
+        f"{mins:.0f} mins ({hours:.1f} hours away)" if mins > 90 else f"{mins:.0f} mins away"
+    )
     is_active = ev.get("is_risk_active", False)
     lockout = ev.get("trading_lockout", False)
     status = (
@@ -297,7 +316,9 @@ async def handle_events(args: str, chat_id: Any = None, identity: TelegramUserId
     return res
 
 
-async def handle_news(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_news(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns curated crypto alpha and market catalyst headlines."""
     from core.telegram_bot import telegram_bot
 
@@ -309,7 +330,9 @@ async def handle_news(args: str, chat_id: Any = None, identity: TelegramUserIden
     return res
 
 
-async def handle_summary(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_summary(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns latest research literature or video summary from the Provenance Ledger."""
     from core.telegram_bot import telegram_bot
 
@@ -322,7 +345,11 @@ async def handle_summary(args: str, chat_id: Any = None, identity: TelegramUserI
         author = item.get("author_creator", "Author Unknown")
         stype = item.get("source_type", "RESEARCH")
         kid = item.get("knowledge_id", "N/A")
-        excerpt = (item.get("raw_content_preview") or "No excerpt available").replace("\n", " ").strip()[:600]
+        excerpt = (
+            (item.get("raw_content_preview") or "No excerpt available")
+            .replace("\n", " ")
+            .strip()[:600]
+        )
         res = (
             f"📖 *LATEST RESEARCH SUMMARY*\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -341,12 +368,16 @@ async def handle_summary(args: str, chat_id: Any = None, identity: TelegramUserI
     return res
 
 
-async def handle_risk(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_risk(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns risk desk status, circuit breakers, and emergency lockout state."""
     from core.telegram_bot import telegram_bot
 
     ev_state = event_shock_engine.evaluate_risk_state()
-    lockout_status = "EMERGENCY HALT ENGAGED 🛑" if ev_state.trading_lockout else "NORMAL (Active) 🟢"
+    lockout_status = (
+        "EMERGENCY HALT ENGAGED 🛑" if ev_state.trading_lockout else "NORMAL (Active) 🟢"
+    )
 
     res = (
         f"🛡️ **INSTITUTIONAL RISK DESK STATUS**\n"
@@ -365,7 +396,9 @@ async def handle_risk(args: str, chat_id: Any = None, identity: TelegramUserIden
     return res
 
 
-async def handle_status(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_status(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns terminal operational status, health, and active subsystems."""
     from core.telegram_bot import telegram_bot
 
@@ -380,7 +413,9 @@ async def handle_status(args: str, chat_id: Any = None, identity: TelegramUserId
     return res
 
 
-async def handle_candidate(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_candidate(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """
     Inspects strategy candidate(s) in the Research Lab.
     Displays name, formulation stage, epistemic confidence (quarantined 0.0), and rules preview.
@@ -427,8 +462,12 @@ async def handle_candidate(args: str, chat_id: Any = None, identity: TelegramUse
                     "━━━━━━━━━━━━━━━━━━━━━━",
                 ]
                 for r in rows:
-                    lines.append(f"• `{r['candidate_id']}` | **{r.get('strategy_name', 'Candidate')}** | `[{r['validation_stage']}]`")
-                lines.append("\n_Use `/candidate <id>` to inspect details, or `/test <id>` to validate._")
+                    lines.append(
+                        f"• `{r['candidate_id']}` | **{r.get('strategy_name', 'Candidate')}** | `[{r['validation_stage']}]`"
+                    )
+                lines.append(
+                    "\n_Use `/candidate <id>` to inspect details, or `/test <id>` to validate._"
+                )
                 res = "\n".join(lines)
 
     if chat_id:
@@ -436,7 +475,9 @@ async def handle_candidate(args: str, chat_id: Any = None, identity: TelegramUse
     return res
 
 
-async def handle_test(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_test(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """
     Executes walk-forward backtest validation on a Strategy Candidate.
     Evaluates statistical expectancy, 3-tier frictions, and updates validation stage
@@ -462,10 +503,12 @@ async def handle_test(args: str, chat_id: Any = None, identity: TelegramUserIden
     # Fetch candidate name
     cand_name = "Strategy Candidate"
     with db_manager.get_brain_conn() as conn:
-        row = conn.execute("SELECT strategy_name FROM strategy_candidates WHERE candidate_id = ? LIMIT 1;", (cand_id,)).fetchone()
+        row = conn.execute(
+            "SELECT strategy_name FROM strategy_candidates WHERE candidate_id = ? LIMIT 1;",
+            (cand_id,),
+        ).fetchone()
         if row:
             cand_name = row["strategy_name"]
-
 
     # Run backtest via sandbox lab
     symbol = "BTC/USDT"
@@ -496,7 +539,11 @@ async def handle_test(args: str, chat_id: Any = None, identity: TelegramUserIden
         validation_stage=new_stage,
     )
 
-    result_badge = "PASSED ✅ (Qualified for Paper Desk)" if passed else "REJECTED ❌ (Failed Expectancy Hurdle)"
+    result_badge = (
+        "PASSED ✅ (Qualified for Paper Desk)"
+        if passed
+        else "REJECTED ❌ (Failed Expectancy Hurdle)"
+    )
 
     report = (
         f"🧪 **WALK-FORWARD STRATEGY VALIDATION REPORT**\n"
@@ -508,7 +555,7 @@ async def handle_test(args: str, chat_id: Any = None, identity: TelegramUserIden
         f"📈 **New Governance Stage:** `[{new_stage}]`\n\n"
         f"🎯 **Performance Metrics (3-Tier Cost Modeled):**\n"
         f"• **Net Expectancy:** `{expectancy_r:+.2f}R` per trade\n"
-        f"• **Win Rate:** `{rep.win_rate*100:.1f}%` ({rep.total_trades} trades)\n"
+        f"• **Win Rate:** `{rep.win_rate * 100:.1f}%` ({rep.total_trades} trades)\n"
         f"• **Sharpe Ratio:** `{rep.sharpe_ratio:.2f}`\n"
         f"• **Max Drawdown:** `{rep.max_drawdown_pct:.2f}%`\n"
         f"• **Profit Factor:** `{rep.profit_factor:.2f}`\n\n"
@@ -520,14 +567,15 @@ async def handle_test(args: str, chat_id: Any = None, identity: TelegramUserIden
         f"🔬 _Dispatched from SKY Empirical Validation Engine_"
     )
 
-
     if chat_id:
         await telegram_bot.send_message(report, chat_id=chat_id)
 
     return report
 
 
-async def handle_job(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_job(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """Returns async background job status."""
     from core.telegram_bot import telegram_bot
 
@@ -538,7 +586,9 @@ async def handle_job(args: str, chat_id: Any = None, identity: TelegramUserIdent
     return res
 
 
-async def handle_explore(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_explore(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """
     Autonomous YouTube Channel & Playlist Explorer.
     Usage: /explore <url or @handle> [limit]
@@ -604,7 +654,9 @@ async def handle_explore(args: str, chat_id: Any = None, identity: TelegramUserI
     return receipt
 
 
-async def handle_pause(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_pause(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """
     Engages authoritative emergency trading halt across all execution paths.
     Enforces 100% Capital Lockout.
@@ -632,7 +684,9 @@ async def handle_pause(args: str, chat_id: Any = None, identity: TelegramUserIde
     return alert
 
 
-async def handle_resume(args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None) -> str:
+async def handle_resume(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
     """
     Releases emergency trading halt and restores normal execution desk gating.
     Requires SUPER_ADMIN privilege.

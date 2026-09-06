@@ -144,7 +144,14 @@ def test_institutional_alpha_evidence_integrity_gate():
 
     now = int(time.time() * 1000)
     empirical_candles = [
-        {"timestamp": now - (50 - i) * 60000, "open": 88000.0, "high": 88100.0, "low": 87900.0, "close": 88050.0, "volume": 100.0}
+        {
+            "timestamp": now - (50 - i) * 60000,
+            "open": 88000.0,
+            "high": 88100.0,
+            "low": 87900.0,
+            "close": 88050.0,
+            "volume": 100.0,
+        }
         for i in range(50)
     ]
     stamp_records(empirical_candles, EvidenceGrade.EMPIRICAL)

@@ -15,7 +15,7 @@ import hashlib
 import logging
 import time
 from collections import Counter
-from typing import Any, List, Optional
+from typing import Any
 
 from core.youtube.models import (
     CreatorProfile,
@@ -57,7 +57,9 @@ class CrossVideoSynthesizer:
                     concept_map[st]["sample_contexts"].append(s["context"])
 
         # Sort by appearance frequency
-        sorted_concepts = sorted(concept_map.values(), key=lambda x: x["appearance_count"], reverse=True)
+        sorted_concepts = sorted(
+            concept_map.values(), key=lambda x: x["appearance_count"], reverse=True
+        )
         return sorted_concepts
 
     def detect_contradictions(self, atoms: list[VideoResearchAtom]) -> list[RuleContradiction]:
@@ -76,7 +78,11 @@ class CrossVideoSynthesizer:
 
         # Pattern: Compare rules with overlapping topics (e.g. liquidity sweep, fvg entry)
         sweep_rules = [r for r in all_rules if "sweep" in r["rule_text"].lower()]
-        fvg_rules = [r for r in all_rules if "fvg" in r["rule_text"].lower() or "fair value" in r["rule_text"].lower()]
+        fvg_rules = [
+            r
+            for r in all_rules
+            if "fvg" in r["rule_text"].lower() or "fair value" in r["rule_text"].lower()
+        ]
 
         # Sweep contradictions: unconditional vs conditional
         if len(sweep_rules) >= 2:
@@ -86,9 +92,9 @@ class CrossVideoSynthesizer:
                 early_text = early["rule_text"].lower()
                 late_text = late["rule_text"].lower()
                 # If late has added conditions (e.g. htf, confirmation, displacement) not present in early
-                if ("htf" in late_text or "confirm" in late_text or "displace" in late_text) and not (
-                    "htf" in early_text or "confirm" in early_text
-                ):
+                if (
+                    "htf" in late_text or "confirm" in late_text or "displace" in late_text
+                ) and not ("htf" in early_text or "confirm" in early_text):
                     contradictions.append(
                         RuleContradiction(
                             rule_name="Liquidity Sweep Entry Condition",
@@ -127,7 +133,9 @@ class CrossVideoSynthesizer:
 
         return contradictions
 
-    def track_strategy_evolution(self, atoms: list[VideoResearchAtom]) -> list[StrategyEvolutionStep]:
+    def track_strategy_evolution(
+        self, atoms: list[VideoResearchAtom]
+    ) -> list[StrategyEvolutionStep]:
         """Tracks conceptual versioning (v1 -> v2 -> v3) across videos."""
         steps: list[StrategyEvolutionStep] = []
         sorted_atoms = sorted(atoms, key=lambda a: a.ingested_at)
@@ -225,12 +233,14 @@ class CrossVideoSynthesizer:
 
         for c in concepts[:3]:  # Top 3 most frequent concepts
             c_name = c["concept_name"]
-            cand_id = f"CAND_YT_{c_name[:6]}_{hashlib.sha256(c_name.encode()).hexdigest()[:6].upper()}"
+            cand_id = (
+                f"CAND_YT_{c_name[:6]}_{hashlib.sha256(c_name.encode()).hexdigest()[:6].upper()}"
+            )
 
             entry_cond = (
                 f"15m displacement candle close confirming {c_name} mitigation"
                 if c_name in ("FAIR_VALUE_GAP", "ORDER_BLOCK")
-                else f"Sweep of Previous Day High/Low with immediate candle reclaim"
+                else "Sweep of Previous Day High/Low with immediate candle reclaim"
             )
 
             candidate = {

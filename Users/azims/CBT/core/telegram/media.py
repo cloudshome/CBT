@@ -11,10 +11,6 @@ Enforces Sections 13, 14, 15, 16 & 17 of the Master Directive:
 from __future__ import annotations
 
 import logging
-import os
-import re
-import time
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -84,7 +80,9 @@ class TelegramMediaHandler:
                 job_manager.update_job(job_id, status="COMPLETED", progress_pct=100, result=res)
 
             # Format and send executive summary to Telegram
-            summary_msg = bot_dispatcher._format_research_summary_telegram(res, title_override=title)
+            summary_msg = bot_dispatcher._format_research_summary_telegram(
+                res, title_override=title
+            )
             await bot_dispatcher.send_message(summary_msg, chat_id=chat_id)
             return res
 

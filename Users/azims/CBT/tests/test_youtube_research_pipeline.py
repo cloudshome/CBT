@@ -19,8 +19,8 @@ Validates the 12-point research ladder:
 
 from __future__ import annotations
 
-import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 import pytest
 
 from core.database import db_manager
@@ -78,15 +78,31 @@ class TestYouTubeExtractorBasics:
         extractor = YouTubeResearchExtractor()
         raw_snippets = [
             {"text": "Welcome back to the channel.", "start": 0.0, "duration": 5.0},
-            {"text": "Today we are looking at the 15-minute BTC chart.", "start": 5.0, "duration": 10.0},
-            {"text": "Notice this massive liquidity sweep below the Asian session low.", "start": 15.0, "duration": 20.0},
-            {"text": "Once price creates a market structure shift, we look for the FVG entry.", "start": 35.0, "duration": 25.0},
-            {"text": "Target the opposing high for a clean 2 to 1 risk reward ratio.", "start": 60.0, "duration": 20.0},
+            {
+                "text": "Today we are looking at the 15-minute BTC chart.",
+                "start": 5.0,
+                "duration": 10.0,
+            },
+            {
+                "text": "Notice this massive liquidity sweep below the Asian session low.",
+                "start": 15.0,
+                "duration": 20.0,
+            },
+            {
+                "text": "Once price creates a market structure shift, we look for the FVG entry.",
+                "start": 35.0,
+                "duration": 25.0,
+            },
+            {
+                "text": "Target the opposing high for a clean 2 to 1 risk reward ratio.",
+                "start": 60.0,
+                "duration": 20.0,
+            },
         ]
 
         segments = extractor.segment_transcript(raw_snippets, target_chunk_sec=45.0)
         assert len(segments) >= 2
-        
+
         # Verify first chunk attributes
         chunk1 = segments[0]
         assert "Welcome back" in chunk1["text"]
@@ -114,13 +130,6 @@ class TestEpistemicFirewallAndPipeline:
 
     @pytest.mark.asyncio
     async def test_youtube_ingestion_end_to_end_with_temporal_grounding(self):
-        mock_raw_transcript = [
-            {"text": "Hello traders. Let's analyze the algorithmic liquidity delivery.", "start": 10.0, "duration": 15.0},
-            {"text": "When BTC sweeps the previous day high and leaves an unmitigated fair value gap, we enter short.", "start": 25.0, "duration": 30.0},
-            {"text": "This guaranteed secret indicator gives you a 100% win rate and you will never lose!", "start": 60.0, "duration": 30.0},
-            {"text": "Exit strictly at the opposing liquidity pool with half-kelly risk management.", "start": 95.0, "duration": 25.0},
-        ]
-
         mock_payload = {
             "success": True,
             "video_id": "test_vid_123",
@@ -153,7 +162,9 @@ class TestEpistemicFirewallAndPipeline:
             "is_hyped": True,
         }
 
-        with patch.object(youtube_extractor, "extract_full_video_research", return_value=mock_payload):
+        with patch.object(
+            youtube_extractor, "extract_full_video_research", return_value=mock_payload
+        ):
             result = await universal_ingestor.ingest(
                 content="https://www.youtube.com/watch?v=test_vid_123",
                 mode="RESEARCH",

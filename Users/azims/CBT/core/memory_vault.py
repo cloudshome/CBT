@@ -50,15 +50,17 @@ class SemanticVectorStore:
                     );
                     """
                 )
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_vec_created ON semantic_vectors (created_at);")
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_vec_created ON semantic_vectors (created_at);"
+                )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.warning(f"Could not initialize semantic_vectors table: {e}")
 
     def _load(self) -> None:
         """Loads vectors from SQLite, migrating legacy vectors.json if present."""
         legacy_file = self.storage_path / "vectors.json"
-        
+
         # 1. Check if legacy migration is needed
         if legacy_file.exists():
             try:
@@ -67,13 +69,17 @@ class SemanticVectorStore:
                 docs = data.get("documents", [])
                 metas = data.get("metadatas", [])
                 raw_embeds = data.get("embeddings", [])
-                
+
                 if docs:
                     with db_manager.get_brain_conn() as conn:
                         for i, doc_text in enumerate(docs):
                             m = metas[i] if i < len(metas) else {}
                             d_id = m.get("id") or f"doc_{i}"
-                            vec = np.array(raw_embeds[i], dtype=np.float32) if i < len(raw_embeds) else self._embed_text(doc_text)
+                            vec = (
+                                np.array(raw_embeds[i], dtype=np.float32)
+                                if i < len(raw_embeds)
+                                else self._embed_text(doc_text)
+                            )
                             conn.execute(
                                 """
                                 INSERT OR IGNORE INTO semantic_vectors (doc_id, text, metadata_json, embedding, created_at)
@@ -82,12 +88,14 @@ class SemanticVectorStore:
                                 (d_id, doc_text, json.dumps(m), vec.tobytes(), time.time()),
                             )
                         conn.commit()
-                    logger.info(f"Migrated {len(docs)} legacy JSON vectors into SQLite semantic_vectors table.")
-                
+                    logger.info(
+                        f"Migrated {len(docs)} legacy JSON vectors into SQLite semantic_vectors table."
+                    )
+
                 # Archive legacy file
                 migrated_file = self.storage_path / "vectors.json.migrated"
                 legacy_file.rename(migrated_file)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.warning(f"Legacy vector migration notice: {e}")
 
         # 2. Load from SQLite
@@ -96,7 +104,9 @@ class SemanticVectorStore:
         self.embeddings = []
         try:
             with db_manager.get_brain_conn() as conn:
-                cursor = conn.execute("SELECT doc_id, text, metadata_json, embedding FROM semantic_vectors ORDER BY created_at ASC")
+                cursor = conn.execute(
+                    "SELECT doc_id, text, metadata_json, embedding FROM semantic_vectors ORDER BY created_at ASC"
+                )
                 for row in cursor.fetchall():
                     d_id, txt, meta_str, embed_bytes = row
                     meta = json.loads(meta_str) if meta_str else {}
@@ -105,12 +115,12 @@ class SemanticVectorStore:
                     self.documents.append(txt)
                     self.metadatas.append(meta)
                     self.embeddings.append(vec)
-            
+
             if self.embeddings:
                 self.embeddings_matrix = np.vstack(self.embeddings)
             else:
                 self.embeddings_matrix = None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Failed loading vectors from SQLite: {e}")
 
     def save(self) -> None:
@@ -150,7 +160,7 @@ class SemanticVectorStore:
                     (doc_id, text, json.dumps(meta), vec.tobytes(), time.time()),
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Failed persisting vector {doc_id} to SQLite: {e}")
 
         # 2. In-memory index update
@@ -166,15 +176,15 @@ class SemanticVectorStore:
         """Executes ultra-fast vectorized matrix multiplication similarity search."""
         if not self.embeddings or self.embeddings_matrix is None:
             return []
-        
+
         q_vec = self._embed_text(query_text)
-        
+
         # Vectorized BLAS matrix-vector dot product (replaces O(N) Python loop)
         sims = np.dot(self.embeddings_matrix, q_vec)
-        
+
         # Top-k indices
         top_indices = np.argsort(sims)[::-1][:top_k]
-        
+
         results = []
         for idx in top_indices:
             results.append(

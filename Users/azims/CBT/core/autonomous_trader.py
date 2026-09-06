@@ -9,9 +9,9 @@ applies the Half-Kelly Risk Gate, and opens/monitors virtual paper trades in por
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict
 import logging
 import time
+from dataclasses import asdict
 from typing import Any
 
 from core.api_health_guard import api_health_guard
@@ -66,7 +66,7 @@ class AutonomousTrader:
                 # 2. Fetch/Refresh Live MTF Candlesticks from market gateway
                 try:
                     candles_15m = await data_streamer.fetch_external_ohlcv(sym, "15m", limit=60)
-                except Exception as ex:
+                except Exception as ex:  # noqa: BLE001 — defensive fallback
                     logger.debug(f"Falling back to local cache for {sym} 15m: {ex}")
                     candles_15m = data_streamer.get_candles(sym, "15m", limit=60)
 
@@ -100,12 +100,17 @@ class AutonomousTrader:
                 self.last_decisions[sym] = asdict(decision_out)
 
                 # 4. Check Risk Gate & Qualified Setups
-                if decision_out.risk_gate_passed and decision_out.decision in (DecisionAction.LONG, DecisionAction.SHORT):
+                if decision_out.risk_gate_passed and decision_out.decision in (
+                    DecisionAction.LONG,
+                    DecisionAction.SHORT,
+                ):
                     open_positions = portfolio_shadow.get_open_positions()
 
                     # Enforce max open positions limit
                     if len(open_positions) >= self.max_open_positions:
-                        logger.info(f"Skipping {sym} trade: Max open positions ({self.max_open_positions}) reached.")
+                        logger.info(
+                            f"Skipping {sym} trade: Max open positions ({self.max_open_positions}) reached."
+                        )
                         continue
 
                     # Prevent duplicate positions in same symbol
@@ -115,39 +120,67 @@ class AutonomousTrader:
                     # Guard 2: Live Market Price Alignment
                     try:
                         live_price = await data_streamer.get_live_ticker(sym)
-                    except Exception:
+                    except Exception:  # noqa: BLE001 — defensive fallback
                         live_price = float(candles_15m[-1]["close"])
 
                     cur_price = live_price if live_price > 0 else float(candles_15m[-1]["close"])
                     setup = decision_out.setup_qualified
 
                     # If setup entry is missing or divergent (>1.5% away from live price), anchor to live market
-                    if setup and setup.entry_price > 0 and abs(setup.entry_price - cur_price) / cur_price < 0.015:
+                    if (
+                        setup
+                        and setup.entry_price > 0
+                        and abs(setup.entry_price - cur_price) / cur_price < 0.015
+                    ):
                         entry_price = setup.entry_price
                     else:
                         entry_price = cur_price
 
-                    sl = setup.invalidation_sl if setup and setup.invalidation_sl > 0 else (cur_price * (0.985 if decision_out.decision == DecisionAction.LONG else 1.015))
-                    tp = setup.target_tp if setup and setup.target_tp > 0 else (cur_price * (1.03 if decision_out.decision == DecisionAction.LONG else 0.97))
+                    sl = (
+                        setup.invalidation_sl
+                        if setup and setup.invalidation_sl > 0
+                        else (
+                            cur_price
+                            * (0.985 if decision_out.decision == DecisionAction.LONG else 1.015)
+                        )
+                    )
+                    tp = (
+                        setup.target_tp
+                        if setup and setup.target_tp > 0
+                        else (
+                            cur_price
+                            * (1.03 if decision_out.decision == DecisionAction.LONG else 0.97)
+                        )
+                    )
 
                     # Guard 3: Invalidate expired setups where market has already breached target or stop
                     if decision_out.decision == DecisionAction.LONG:
                         if cur_price >= tp:
-                            logger.info(f"Rejecting {sym} LONG setup: Live price ({cur_price:.2f}) is already at/above TP ({tp:.2f}).")
+                            logger.info(
+                                f"Rejecting {sym} LONG setup: Live price ({cur_price:.2f}) is already at/above TP ({tp:.2f})."
+                            )
                             continue
                         if cur_price <= sl:
-                            logger.info(f"Rejecting {sym} LONG setup: Live price ({cur_price:.2f}) has already breached SL ({sl:.2f}).")
+                            logger.info(
+                                f"Rejecting {sym} LONG setup: Live price ({cur_price:.2f}) has already breached SL ({sl:.2f})."
+                            )
                             continue
                     elif decision_out.decision == DecisionAction.SHORT:
                         if cur_price <= tp:
-                            logger.info(f"Rejecting {sym} SHORT setup: Live price ({cur_price:.2f}) is already at/below TP ({tp:.2f}).")
+                            logger.info(
+                                f"Rejecting {sym} SHORT setup: Live price ({cur_price:.2f}) is already at/below TP ({tp:.2f})."
+                            )
                             continue
                         if cur_price >= sl:
-                            logger.info(f"Rejecting {sym} SHORT setup: Live price ({cur_price:.2f}) has already breached SL ({sl:.2f}).")
+                            logger.info(
+                                f"Rejecting {sym} SHORT setup: Live price ({cur_price:.2f}) has already breached SL ({sl:.2f})."
+                            )
                             continue
 
                     # Half-Kelly Position Sizing
-                    pos_size_usd = decision_out.suggested_position_size_usd or (self.account_equity_usd * 0.02)
+                    pos_size_usd = decision_out.suggested_position_size_usd or (
+                        self.account_equity_usd * 0.02
+                    )
                     units = max(0.001, round(pos_size_usd / entry_price, 4))
                     direction_str = decision_out.decision.value
 
@@ -183,16 +216,20 @@ class AutonomousTrader:
                         severity="INFO",
                         payload=action_record,
                     )
-                    logger.info(f"AutonomousTrader executed {direction_str} on {sym}: {pos_id} (Size: {units})")
+                    logger.info(
+                        f"AutonomousTrader executed {direction_str} on {sym}: {pos_id} (Size: {units})"
+                    )
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.error(f"AutonomousTrader scan error for {sym}: {e}")
 
         return executed_actions
 
     async def start_loop(self) -> None:
         """Runs the continuous autonomous trading loop in the background."""
-        logger.info(f"AutonomousTrader background loop online (Interval: {self.scan_interval_sec}s).")
+        logger.info(
+            f"AutonomousTrader background loop online (Interval: {self.scan_interval_sec}s)."
+        )
         while True:
             try:
                 if self.is_running:
@@ -200,7 +237,7 @@ class AutonomousTrader:
             except asyncio.CancelledError:
                 logger.info("AutonomousTrader loop cancelled.")
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.error(f"AutonomousTrader loop uncaught exception: {e}")
             await asyncio.sleep(self.scan_interval_sec)
 

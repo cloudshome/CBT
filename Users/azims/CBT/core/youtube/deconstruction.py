@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, List, Optional
+from typing import Any
 
 from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -81,11 +81,13 @@ class YouTubeDeconstructor:
         """
         # 1. Direct fetch (English variants)
         try:
-            fetched = self._transcript_api.fetch(video_id, languages=("en", "en-US", "en-GB", "auto"))
+            fetched = self._transcript_api.fetch(
+                video_id, languages=("en", "en-US", "en-GB", "auto")
+            )
             raw = fetched.to_raw_data()
             if raw:
                 return raw, "MANUAL_CAPTION"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.debug(f"Direct transcript fetch failed for {video_id}: {e}")
 
         # 2. Transcript list discovery
@@ -94,22 +96,22 @@ class YouTubeDeconstructor:
             try:
                 t_manual = t_list.find_manually_created_transcript(["en", "en-US", "en-GB"])
                 return t_manual.fetch().to_raw_data(), "MANUAL_CAPTION"
-            except Exception:
+            except Exception:  # noqa: S110,BLE001 — defensive fallback
                 pass
 
             try:
                 t_auto = t_list.find_generated_transcript(["en", "en-US", "en-GB"])
                 return t_auto.fetch().to_raw_data(), "AUTO_CAPTION"
-            except Exception:
+            except Exception:  # noqa: S110,BLE001 — defensive fallback
                 pass
 
             # Any available language
             for t in t_list:
                 try:
                     return t.fetch().to_raw_data(), "AUTO_CAPTION"
-                except Exception:
+                except Exception:  # noqa: BLE001 — defensive fallback
                     continue
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.warning(f"Transcript list discovery failed for {video_id}: {e}")
 
         # 3. ASR Fallback placeholder (labels as ASR if external audio pipeline used)
@@ -150,26 +152,30 @@ class YouTubeDeconstructor:
             if (chunk_end - chunk_start) >= chunk_sec:
                 combined = " ".join(current_texts).replace("\n", " ").strip()
                 if combined:
-                    segments.append({
-                        "text": combined,
-                        "start_sec": round(chunk_start, 2),
-                        "end_sec": round(chunk_end, 2),
-                        "timestamp_start": format_tc(chunk_start),
-                        "timestamp_end": format_tc(chunk_end),
-                    })
+                    segments.append(
+                        {
+                            "text": combined,
+                            "start_sec": round(chunk_start, 2),
+                            "end_sec": round(chunk_end, 2),
+                            "timestamp_start": format_tc(chunk_start),
+                            "timestamp_end": format_tc(chunk_end),
+                        }
+                    )
                 current_texts = []
                 is_new = True
 
         if current_texts:
             combined = " ".join(current_texts).replace("\n", " ").strip()
             if combined:
-                segments.append({
-                    "text": combined,
-                    "start_sec": round(chunk_start, 2),
-                    "end_sec": round(chunk_end, 2),
-                    "timestamp_start": format_tc(chunk_start),
-                    "timestamp_end": format_tc(chunk_end),
-                })
+                segments.append(
+                    {
+                        "text": combined,
+                        "start_sec": round(chunk_start, 2),
+                        "end_sec": round(chunk_end, 2),
+                        "timestamp_start": format_tc(chunk_start),
+                        "timestamp_end": format_tc(chunk_end),
+                    }
+                )
 
         return segments
 
@@ -192,7 +198,19 @@ class YouTubeDeconstructor:
             return VideoRelevance.NON_TRADING, "Content identified as non-trading / recreational"
 
         # Trading vocabulary match
-        trading_words = ["trading", "forex", "crypto", "bitcoin", "btc", "smc", "liquidity", "order block", "fvg", "chart", "strategy"]
+        trading_words = [
+            "trading",
+            "forex",
+            "crypto",
+            "bitcoin",
+            "btc",
+            "smc",
+            "liquidity",
+            "order block",
+            "fvg",
+            "chart",
+            "strategy",
+        ]
         has_trading_vocab = any(w in combined for w in trading_words)
 
         if not has_trading_vocab and duration < 60:
@@ -210,7 +228,9 @@ class YouTubeDeconstructor:
         full_text = " ".join(s["text"] for s in segments) if segments else video.description
 
         has_trans = len(segments) > 0
-        relevance, skip_reason = self.classify_relevance(video.title, video.description, video.duration_seconds, has_trans)
+        relevance, skip_reason = self.classify_relevance(
+            video.title, video.description, video.duration_seconds, has_trans
+        )
 
         # 1. Detect Hype Markers
         hype_markers = list(set(HYPE_REGEX.findall(full_text)))
@@ -230,17 +250,18 @@ class YouTubeDeconstructor:
         for seg in segments:
             txt = seg["text"]
             tc_start = seg["timestamp_start"]
-            tc_end = seg["timestamp_end"]
 
             # Check for setups
             for setup_name, pattern in SETUP_PATTERNS.items():
                 if re.search(pattern, txt, re.IGNORECASE):
-                    setups.append({
-                        "setup_type": setup_name,
-                        "timestamp": tc_start,
-                        "context": txt[:180],
-                        "video_id": video.video_id,
-                    })
+                    setups.append(
+                        {
+                            "setup_type": setup_name,
+                            "timestamp": tc_start,
+                            "context": txt[:180],
+                            "video_id": video.video_id,
+                        }
+                    )
 
             # Check for rules
             for r_pat in RULE_PATTERNS:
@@ -248,22 +269,26 @@ class YouTubeDeconstructor:
                 for m in matches:
                     clean_m = m.strip()
                     if len(clean_m) > 10:
-                        rules.append({
-                            "rule_text": clean_m[:150],
-                            "timestamp": tc_start,
-                            "video_id": video.video_id,
-                            "epistemic_status": "UNTESTED_HYPOTHESIS",
-                        })
+                        rules.append(
+                            {
+                                "rule_text": clean_m[:150],
+                                "timestamp": tc_start,
+                                "video_id": video.video_id,
+                                "epistemic_status": "UNTESTED_HYPOTHESIS",
+                            }
+                        )
 
             # Check for qualitative claims
             seg_hypes = HYPE_REGEX.findall(txt)
             for h in seg_hypes:
-                claims.append({
-                    "claim_text": f"Performance assertion '{h}'",
-                    "timestamp": tc_start,
-                    "classification": "PROMOTIONAL / UNVERIFIED",
-                    "video_id": video.video_id,
-                })
+                claims.append(
+                    {
+                        "claim_text": f"Performance assertion '{h}'",
+                        "timestamp": tc_start,
+                        "classification": "PROMOTIONAL / UNVERIFIED",
+                        "video_id": video.video_id,
+                    }
+                )
 
         # Summarize hypotheses
         if setups:
