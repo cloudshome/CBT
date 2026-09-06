@@ -21,6 +21,10 @@ os.environ["MARKET_DB_PATH"] = str(_temp_path / "market_data_test.db")
 os.environ["BRAIN_DB_PATH"] = str(_temp_path / "brain_memory_test.db")
 os.environ["EXPERIMENT_DB_PATH"] = str(_temp_path / "experiment_store_test.db")
 
+# 3. Test credentials isolation: configure sandbox mock Telegram identity
+os.environ["TELEGRAM_CHAT_ID"] = "12345678"
+os.environ["TELEGRAM_TRADER_IDS"] = "12345678"
+
 # Force re-init of db_manager paths if already imported
 try:
     from core.database import db_manager
@@ -30,6 +34,9 @@ try:
     db_manager.brain_db_path = Path(os.environ["BRAIN_DB_PATH"])
     db_manager.experiment_db_path = Path(os.environ["EXPERIMENT_DB_PATH"])
     db_manager.init_all_schemas()
+
+    from core.telegram.rbac import rbac_registry
+    rbac_registry.reset()
 except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
     pass
 

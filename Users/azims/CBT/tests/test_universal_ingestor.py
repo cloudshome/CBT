@@ -116,8 +116,10 @@ async def test_multi_source_summary_synthesis():
 
 def test_telegram_research_summary_dispatch():
     """Verifies POST /api/research/share-telegram endpoint formats and processes telegram dispatch gracefully."""
+    from unittest.mock import AsyncMock, patch
     from starlette.testclient import TestClient
     from app import app
+    from core.telegram_bot import telegram_bot
 
     client = TestClient(app)
     payload = {
@@ -130,14 +132,16 @@ def test_telegram_research_summary_dispatch():
         "epistemic_counts": {"facts": 14, "hypotheses": 5, "rules": 3, "contradictions": 0},
         "candidate_summary": "Inventory Penalized Avellaneda-Stoikov Market Maker",
     }
-    resp = client.post("/api/research/share-telegram", json=payload)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["status"] in ("SENT", "QUEUED_LOCAL")
-    assert "dispatched_text" in data
-    assert "Alvaro Cartea" in data["dispatched_text"]
-    assert "K-TEST-992" in data["dispatched_text"]
-    assert "Inventory Penalized" in data["dispatched_text"]
+    with patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = True
+        resp = client.post("/api/research/share-telegram", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] in ("SENT", "QUEUED_LOCAL")
+        assert "dispatched_text" in data
+        assert "Alvaro Cartea" in data["dispatched_text"]
+        assert "K-TEST-992" in data["dispatched_text"]
+        assert "Inventory Penalized" in data["dispatched_text"]
 
 
 @pytest.mark.asyncio

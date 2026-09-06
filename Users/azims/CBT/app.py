@@ -267,6 +267,8 @@ class ResearchTelegramShareRequest(BaseModel):
 class TelegramWebhookRequest(BaseModel):
     update_id: Optional[int] = None
     message: Optional[Dict[str, Any]] = None
+    callback_query: Optional[Dict[str, Any]] = None
+    model_config = {"extra": "allow"}
 
 
 class PaperTradeRequest(BaseModel):

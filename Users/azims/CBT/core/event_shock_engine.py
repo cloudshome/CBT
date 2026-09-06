@@ -46,6 +46,7 @@ class EventShockEngine:
         self.risk_window_minutes = risk_window_minutes
         self.lockout_window_minutes = lockout_window_minutes
         self._events: list[MacroEvent] = []
+        self._emergency_pause: bool = False
         self._seed_default_calendar()
 
     def _seed_default_calendar(self) -> None:
@@ -79,10 +80,30 @@ class EventShockEngine:
         self._events.append(event)
         self._events.sort(key=lambda x: x.scheduled_timestamp_ms)
 
+    def force_emergency_lockout(self, paused: bool) -> None:
+        """Enforces or releases an authoritative system-wide execution halt."""
+        self._emergency_pause = bool(paused)
+        if paused:
+            logger.critical("AUTHORITATIVE EMERGENCY EXECUTION PAUSE ENGAGED. Order router locked.")
+        else:
+            logger.info("Authoritative emergency execution pause released. Router unlocked.")
+
     def evaluate_risk_state(self, current_time_ms: int | None = None) -> EventRiskState:
         """
         Calculates time distance to nearest upcoming high-impact event and determines risk modifiers.
         """
+        if getattr(self, "_emergency_pause", False):
+            return EventRiskState(
+                is_event_risk_active=True,
+                nearest_event=MacroEvent("EMERGENCY_LOCK", "OPERATOR EMERGENCY PAUSE", "CRITICAL", 0),
+                minutes_until_event=0.0,
+                ev_hurdle_multiplier=2.0,
+                position_size_multiplier=0.0,
+                slippage_multiplier=3.0,
+                mode_name="EMERGENCY_PAUSE",
+                trading_lockout=True,
+            )
+
         now = current_time_ms if current_time_ms is not None else int(time.time() * 1000)
 
         upcoming_events = [

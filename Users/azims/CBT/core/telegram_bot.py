@@ -25,6 +25,15 @@ from typing import Any
 import aiohttp
 from dotenv import load_dotenv
 
+from core.telegram.rbac import TelegramRole, TelegramUserIdentity, rbac_registry
+from core.telegram.idempotency import idempotency_manager
+from core.telegram.audit import telegram_audit
+from core.telegram.commands import TelegramCommand, command_registry
+from core.telegram.callbacks import callback_router
+from core.telegram.charts import telegram_charts
+from core.telegram.jobs import job_manager
+from core.telegram.media import telegram_media
+
 load_dotenv()
 
 logger = logging.getLogger("ai_quant_sentinel.telegram_bot")
@@ -828,7 +837,11 @@ class TelegramBotDispatcher:
         self._command_handlers[command.lower().strip()] = handler
 
     async def send_message(
-        self, text: str, parse_mode: str = "Markdown", chat_id: int | str | None = None
+        self,
+        text: str,
+        parse_mode: str = "Markdown",
+        chat_id: int | str | None = None,
+        reply_markup: dict[str, Any] | None = None,
     ) -> bool:
         """Dispatches text message to the target or configured Telegram chat."""
         token = self.bot_token
@@ -845,6 +858,8 @@ class TelegramBotDispatcher:
             "parse_mode": parse_mode,
             "disable_web_page_preview": True,
         }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -865,6 +880,68 @@ class TelegramBotDispatcher:
                     return True
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Telegram dispatch failed: {e}")
+            return False
+
+    async def send_photo(
+        self,
+        photo_bytes: bytes,
+        caption: str = "",
+        reply_markup: dict[str, Any] | None = None,
+        chat_id: int | str | None = None,
+        filename: str = "chart.png",
+    ) -> bool:
+        """Dispatches an institutional chart or photo directly to Telegram."""
+        token = self.bot_token
+        chat = chat_id or self.chat_id
+        if not token or not chat:
+            logger.info(f"[TELEGRAM LOCAL PHOTO] {caption} ({len(photo_bytes)} bytes)")
+            return False
+
+        url = f"https://api.telegram.org/bot{token}/sendPhoto"
+        data = aiohttp.FormData()
+        data.add_field("chat_id", str(chat))
+        if caption:
+            data.add_field("caption", caption)
+            data.add_field("parse_mode", "Markdown")
+        if reply_markup:
+            import json
+            data.add_field("reply_markup", json.dumps(reply_markup))
+        data.add_field("photo", photo_bytes, filename=filename, content_type="image/png")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        err = await resp.text()
+                        logger.warning(f"Telegram sendPhoto failed ({resp.status}): {err}")
+                        return False
+                    return True
+        except Exception as e:  # noqa: BLE001 — defensive fallback
+            logger.error(f"Telegram sendPhoto exception: {e}")
+            return False
+
+    async def answer_callback_query(
+        self,
+        callback_query_id: str,
+        text: str = "",
+        show_alert: bool = False,
+    ) -> bool:
+        """Acknowledges incoming Telegram callback query to release client UI button spinners."""
+        token = self.bot_token
+        if not token or not callback_query_id:
+            return False
+        url = f"https://api.telegram.org/bot{token}/answerCallbackQuery"
+        payload = {
+            "callback_query_id": callback_query_id,
+            "text": text,
+            "show_alert": show_alert,
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    return resp.status == 200
+        except Exception as e:  # noqa: BLE001 — defensive fallback
+            logger.debug(f"answerCallbackQuery error: {e}")
             return False
 
     # ==============================================================================
@@ -1588,20 +1665,205 @@ class TelegramBotDispatcher:
 
         return {"status": "SKIPPED"}
 
+    async def handle_callback_query(self, callback_query: dict[str, Any]) -> dict[str, Any]:
+        """
+        Handles interactive Telegram callback queries (Section 6, 7 & 9).
+        Verifies User Identity -> Role -> Expiring Action Token -> Live Market/Risk State -> Audit.
+        """
+        cb_id = callback_query.get("id", "")
+        from_user = callback_query.get("from", {})
+        user_id = from_user.get("id", "")
+        msg = callback_query.get("message", {})
+        chat_id = msg.get("chat", {}).get("id", "")
+        data = callback_query.get("data", "").strip()
+
+        # 1. Identity & RBAC Check
+        is_auth, identity = rbac_registry.is_authorized(user_id, chat_id, required_role=TelegramRole.TRADER)
+        if not is_auth:
+            telegram_audit.log_auth_denied(identity, data, TelegramRole.TRADER.value)
+            await self.answer_callback_query(cb_id, "⛔ Access Denied: Action requires TRADER privilege.", show_alert=True)
+            return {"status": "AUTH_DENIED", "user_id": user_id}
+
+        if not data.startswith("act:"):
+            await self.answer_callback_query(cb_id, "Unknown callback action.")
+            return {"status": "UNKNOWN_CALLBACK"}
+
+        token_id = data[4:]
+        token = callback_router.get_action_token(token_id)
+        if not token:
+            await self.answer_callback_query(cb_id, "⚠️ Action Expired or Not Found. Generate a fresh signal.", show_alert=True)
+            return {"status": "EXPIRED_OR_NOT_FOUND"}
+
+        valid, reason = token.is_valid(expected_user=str(user_id))
+        if not valid:
+            await self.answer_callback_query(cb_id, f"⚠️ Action Invalid: {reason}", show_alert=True)
+            return {"status": "INVALID", "reason": reason}
+
+        # Handle Action Types
+        act = token.action_type
+
+        # Phase 1 -> Phase 2: Enter Paper Trade clicked -> Dispatches Two-Phase Confirmation Card
+        if act == "STAGE_CONFIRM_ENTRY":
+            sig = token.payload
+            sym = sig.get("symbol", "BTC/USDT")
+            entry = sig.get("entry_price", 0.0)
+            sl = sig.get("stop_loss", 0.0)
+            kelly = sig.get("kelly_allocation_pct", 2.15)
+            direction = sig.get("direction", "LONG")
+
+            # Create tokens for Phase 2 Confirmation and Cancellation
+            confirm_tok = callback_router.create_action_token("CONFIRM_EXECUTE", user_id, chat_id, sig, ttl_seconds=60)
+            cancel_tok = callback_router.create_action_token("CANCEL_ACTION", user_id, chat_id, {}, ttl_seconds=60)
+            kb = callback_router.build_confirmation_keyboard(confirm_tok.token_id, cancel_tok.token_id)
+
+            conf_msg = (
+                f"⚠️ **TWO-PHASE PAPER EXECUTION CONFIRMATION**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"• **Asset:** `{sym}` ({direction})\n"
+                f"• **Entry Price:** `${entry:,.2f}`\n"
+                f"• **Stop Loss:** `${sl:,.2f}`\n"
+                f"• **Half-Kelly Risk Cap:** `{kelly:.2f}%` equity\n"
+                f"• **Risk Gate State:** `VERIFIED PRE-QUALIFIED`\n\n"
+                f"⚠️ *Confirm atomic virtual execution in Shadow Portfolio?*\n"
+                f"_This confirmation token expires in 60 seconds._"
+            )
+            await self.send_message(conf_msg, chat_id=chat_id, reply_markup=kb)
+            await self.answer_callback_query(cb_id, "Confirmation card dispatched.")
+            return {"status": "CONFIRMATION_DISPATCHED", "token_id": confirm_tok.token_id}
+
+        # Phase 2 -> Phase 3/4: User confirmed execution
+        elif act == "CONFIRM_EXECUTE":
+            exec_res = self.state_mind.auto_execute_paper_trade(token.payload)
+            callback_router.invalidate_token(token_id)
+            telegram_audit.log_callback_action(identity, "CONFIRM_EXECUTE", token_id, exec_res.get("status", "UNKNOWN"), details=exec_res)
+
+            status = exec_res.get("status")
+            if status == "EXECUTED":
+                receipt = (
+                    f"✅ **PAPER EXECUTION CONFIRMED & COMMITTED**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• **Position ID:** `{exec_res['position_id']}`\n"
+                    f"• **Asset:** `{exec_res['symbol']}` ({exec_res['direction']})\n"
+                    f"• **Size:** `{exec_res['size']} contracts` (${exec_res['target_value_usd']:,.0f})\n"
+                    f"• **Breakeven Shield:** Armed at `+1.5R`\n"
+                    f"• **Audit Status:** Logged to SQLite & Shadow Portfolio"
+                )
+            elif status == "SKIPPED":
+                receipt = f"ℹ️ **EXECUTION SKIPPED:** {exec_res.get('reason')}"
+            else:
+                receipt = f"🛑 **BLOCKED BY RISK GATE:** {exec_res.get('reason')}"
+
+            await self.send_message(receipt, chat_id=chat_id)
+            await self.answer_callback_query(cb_id, f"Execution: {status}")
+            return {"status": "EXECUTION_ATTEMPTED", "result": exec_res}
+
+        elif act == "CANCEL_ACTION":
+            callback_router.invalidate_token(token_id)
+            telegram_audit.log_callback_action(identity, "CANCEL_ACTION", token_id, "CANCELLED")
+            await self.send_message("❌ *Execution Cancelled by Operator.*", chat_id=chat_id)
+            await self.answer_callback_query(cb_id, "Execution cancelled.")
+            return {"status": "CANCELLED"}
+
+        elif act == "STAGE_DEBATE":
+            sym = token.payload.get("symbol", "BTC/USDT")
+            debate_text = await self.state_mind.run_debate_council(sym)
+            await self.send_message(debate_text, chat_id=chat_id)
+            await self.answer_callback_query(cb_id, "Debate Council Convened.")
+            return {"status": "DEBATE_EXECUTED"}
+
+        elif act == "STAGE_PLAN":
+            sym = token.payload.get("symbol", "BTC/USDT")
+            plan = await self.generate_trading_plan(sym)
+            plan_text = (
+                f"🗺️ **STRUCTURAL TRADING PLAN: `{plan['symbol']}`**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🧭 **Desk Bias:** `{plan['bias']}`\n"
+                f"🔑 **PDH:** `${plan['pdh']:,.2f}` | **PDL:** `${plan['pdl']:,.2f}`\n"
+                f"📦 **FVG Zone:** `{plan['fvg_zone']}`\n"
+                f"🧱 **Order Block:** `{plan['ob_zone']}`\n\n"
+                f"📈 **Bullish Path:** {plan['bull_scenario']}\n\n"
+                f"📉 **Bearish Path:** {plan['bear_scenario']}"
+            )
+            await self.send_message(plan_text, chat_id=chat_id)
+            await self.answer_callback_query(cb_id, "Structural Plan Dispatched.")
+            return {"status": "PLAN_EXECUTED"}
+
+        elif act == "STAGE_CLOSE_CONFIRM":
+            sym = token.payload.get("symbol", "BTC/USDT")
+            close_text = self.state_mind.close_position_by_symbol(sym)
+            callback_router.invalidate_token(token_id)
+            telegram_audit.log_callback_action(identity, "CLOSE_POSITION", token_id, "EXECUTED", details={"symbol": sym})
+            await self.send_message(close_text, chat_id=chat_id)
+            await self.answer_callback_query(cb_id, "Position closed.")
+            return {"status": "POSITION_CLOSED"}
+
+        elif act == "STAGE_BE_ADJUST":
+            sym = token.payload.get("symbol", "BTC/USDT")
+            from core.portfolio_shadow import portfolio_shadow
+            open_pos = [p for p in portfolio_shadow.get_open_positions() if p.get("symbol") == sym]
+            if open_pos:
+                p = open_pos[0]
+                portfolio_shadow.update_stop_loss(p["position_id"], p["entry_price"])
+                be_msg = f"🛡️ **BREAKEVEN APPLIED:** SL adjusted to entry price (${p['entry_price']:,.2f}) for `{sym}`. Position is now risk-free."
+            else:
+                be_msg = f"⚠️ No active position found for `{sym}` to adjust."
+            await self.send_message(be_msg, chat_id=chat_id)
+            await self.answer_callback_query(cb_id, "Breakeven applied.")
+            return {"status": "BREAKEVEN_APPLIED"}
+
+        return {"status": "UNHANDLED_ACTION", "action": act}
+
     async def handle_webhook_update(self, update: dict[str, Any]) -> dict[str, Any]:
         """
         Parses an incoming Telegram update object. Routes commands to registered handlers,
         reverse-flow links/images to Research Lab, and natural language conversational queries to QuantMentor AI.
         """
+        # 0. Callback Query Handler (Section 6, 7 & 9)
+        callback_query = update.get("callback_query")
+        if callback_query:
+            return await self.handle_callback_query(callback_query)
+
         message = update.get("message", {})
         text = message.get("text", "").strip()
         caption = message.get("caption", "").strip()
         photo = message.get("photo")
         document = message.get("document")
+        voice = message.get("voice") or message.get("audio")
         chat_id = message.get("chat", {}).get("id")
-        from_user = message.get("from", {}).get("first_name") or message.get("from", {}).get("username") or "Telegram User"
+        from_dict = message.get("from", {})
+        user_id = from_dict.get("id") or chat_id
+        username = from_dict.get("username", "")
+        first_name = from_dict.get("first_name", "")
+        from_user = first_name or username or "Telegram User"
+        update_id = update.get("update_id", 0)
 
-        # 1. Reverse Flow: Detect Photo / Document / Links / /research command
+        # 1. Identity & RBAC Resolution
+        identity = rbac_registry.resolve_user(user_id, chat_id, username=username, first_name=first_name)
+
+        # 2. Idempotency Check (Section 8)
+        action_tag = text.split()[0] if text.startswith("/") else ("photo" if photo else ("doc" if document else ("voice" if voice else "msg")))
+        if update_id:
+            idem_key = idempotency_manager.build_key(chat_id or 0, user_id or 0, update_id, action_tag)
+            if not idempotency_manager.check_and_acquire(idem_key):
+                logger.info(f"Idempotency blocked duplicate update {update_id}")
+                return {"status": "SKIPPED", "reason": "DUPLICATE_UPDATE"}
+
+        # 3. Voice Note Ingestion (Section 16 & 17)
+        if voice:
+            file_id = voice.get("file_id")
+            if file_id:
+                await self.send_message("🎙️ *Voice memo received!* Transcribing audio...", chat_id=chat_id)
+                voice_bytes = await self.download_telegram_file(file_id)
+                if voice_bytes:
+                    transcription = await telegram_media.process_voice_memo(voice_bytes, filename="memo.ogg")
+                    if transcription:
+                        await self.send_message(f"📝 *Transcript:* _{transcription}_", chat_id=chat_id)
+                        text = transcription
+                    else:
+                        await self.send_message("⚠️ Could not extract speech from voice note.", chat_id=chat_id)
+                        return {"status": "VOICE_EMPTY"}
+
+        # 4. Reverse Flow: Detect Photo / Document / Links / /research command
         has_url = bool(re.search(r"https?://\S+", text or caption))
         is_research_cmd = text.lower().startswith("/research") or text.lower().startswith("/ingest")
         if photo or document or has_url or is_research_cmd:
@@ -1619,13 +1881,43 @@ class TelegramBotDispatcher:
         if not text:
             return {"status": "IGNORED", "reason": "No text content"}
 
-        # Command Routing
+        # 5. Command Routing
         if text.startswith("/"):
             parts = text.split(maxsplit=1)
             raw_cmd = parts[0].lower()
             cmd = raw_cmd.split("@")[0]  # Strip bot handle if in group
             args = parts[1] if len(parts) > 1 else ""
 
+            # Dynamic Role-Filtered Help & Start (Section 42)
+            if cmd in ("/help", "/start"):
+                help_text = command_registry.generate_help_menu(identity)
+                await self.send_message(help_text, chat_id=chat_id)
+                telegram_audit.log_command_execution(identity, cmd, args, execution_result="HELP_RETURNED")
+                return {"status": "HELP_RETURNED", "text": help_text}
+
+            # Check Typed Command Registry
+            typed_cmd = command_registry.get_command(cmd)
+            if typed_cmd:
+                if not identity.role.can_access(typed_cmd.required_role):
+                    telegram_audit.log_auth_denied(identity, typed_cmd.name, typed_cmd.required_role.value)
+                    denied_msg = f"⛔ **Access Denied:** `{typed_cmd.name}` requires role `{typed_cmd.required_role.value}`, but current privilege is `{identity.role.value}`."
+                    await self.send_message(denied_msg, chat_id=chat_id)
+                    return {"status": "AUTH_DENIED", "command": cmd}
+
+                try:
+                    if asyncio.iscoroutinefunction(typed_cmd.handler):
+                        response_text = await typed_cmd.handler(args, chat_id=chat_id, identity=identity)
+                    else:
+                        response_text = typed_cmd.handler(args, chat_id=chat_id, identity=identity)
+
+                    telegram_audit.log_command_execution(identity, typed_cmd.name, args, execution_result="EXECUTED")
+                    return {"status": "EXECUTED", "command": cmd, "response": response_text}
+                except Exception as e:  # noqa: BLE001 — defensive fallback
+                    logger.error(f"Error handling typed command '{cmd}': {e}")
+                    telegram_audit.log_command_execution(identity, typed_cmd.name, args, execution_result="ERROR", error=str(e))
+                    return {"status": "ERROR", "command": cmd, "error": str(e)}
+
+            # Legacy Command Handlers Fallback
             if cmd in self._command_handlers:
                 try:
                     handler = self._command_handlers[cmd]
@@ -1638,37 +1930,27 @@ class TelegramBotDispatcher:
                         not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id
                     ):
                         await self.send_message(response_text)
+                    telegram_audit.log_command_execution(identity, cmd, args, execution_result="EXECUTED")
                     return {"status": "EXECUTED", "command": cmd, "response": response_text}
                 except Exception as e:  # noqa: BLE001 — defensive fallback
                     logger.error(f"Error handling Telegram command '{cmd}': {e}")
+                    telegram_audit.log_command_execution(identity, cmd, args, execution_result="ERROR", error=str(e))
                     return {"status": "ERROR", "command": cmd, "error": str(e)}
 
             default_reply = (
-                "🤖 **SKY Institutional Quantitative Terminal Bot**\n\n"
-                "Available Institutional Commands:\n"
-                "• `/signal [sym]` — Live SMC signal + Auto Paper Practice\n"
-                "• `/positions` — Active shadow practice positions & PnL\n"
-                "• `/close <sym>` — Close open practice position from Telegram\n"
-                "• `/debate <sym>` — Convene Tri-Agent Adversarial Debate Council\n"
-                "• `/autopsy` — Forensic post-trade loss diagnosis\n"
-                "• `/market` — Real-time market pulse & order flow\n"
-                "• `/plan [sym]` — Multi-timeframe structural trading plan\n"
-                "• `/events` — High-impact macro events & countdown\n"
-                "• `/news` — Breaking crypto alpha wire & ETF flows\n"
-                "• `/decision <sym>` — Full 12-stage SKY decision matrix\n"
-                "• `/risk` — Risk desk status & circuit breakers\n"
-                "• `/status` — Terminal health & live telemetry\n\n"
-                "💬 _Or send ANY message in natural language to chat with QuantMentor!_"
+                "🤖 **SKY Institutional Quantitative Terminal Bot (V5)**\n\n"
+                "Type `/help` to see all available commands authorized for your role."
             )
             if chat_id:
                 await self.send_message(default_reply)
             return {"status": "HELP_RETURNED", "text": default_reply}
 
-        # Natural Language Conversational AI Query
+        # 6. Natural Language Conversational AI Query
         try:
             ai_reply = await self.state_mind.handle_conversational_query(text, chat_id=chat_id)
             if ai_reply and (not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id):
                 await self.send_message(ai_reply)
+            telegram_audit.log_command_execution(identity, "NATURAL_LANGUAGE", text, execution_result="AI_CONVERSATION_EXECUTED")
             return {"status": "AI_CONVERSATION_EXECUTED", "query": text, "response": ai_reply}
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Error processing conversational query: {e}")
@@ -1737,3 +2019,7 @@ class TelegramBotDispatcher:
 desk_state_mind = DeskStateMind()
 telegram_bot = TelegramBotDispatcher()
 telegram_bot.state_mind = desk_state_mind
+
+from core.telegram.handlers import register_all_v5_commands
+register_all_v5_commands()
+
