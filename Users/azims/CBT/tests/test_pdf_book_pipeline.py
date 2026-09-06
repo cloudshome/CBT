@@ -24,12 +24,12 @@ Validates the Book Research Architecture (Article I, Section 1.5):
 from __future__ import annotations
 
 import io
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pytest
 
 from core.database import db_manager
-from core.knowledge_graph_engine import knowledge_graph_engine
 from core.pdf_extractor import (
     PDFBookExtractor,
     pdf_book_extractor,
@@ -39,18 +39,17 @@ from core.universal_ingestor import universal_ingestor
 
 def create_mock_pdf_bytes(pages_text: list[str]) -> bytes:
     """Generates a valid, parseable multi-page PDF binary stream with text."""
-    objects = []
     page_obj_ids = []
-    
+
     # Header
     pdf_buf = io.BytesIO()
     pdf_buf.write(b"%PDF-1.4\n")
-    
+
     # We will build objects dynamically
     # 1: Catalog, 2: Pages tree
     total_pages = len(pages_text)
     kids_refs = []
-    
+
     # Reserve object IDs:
     # 1: Catalog
     # 2: Pages
@@ -58,58 +57,66 @@ def create_mock_pdf_bytes(pages_text: list[str]) -> bytes:
     #   obj 3 + 3*i: Page object
     #   obj 4 + 3*i: Content stream object
     #   obj 5 + 3*i: Font object
-    
+
     font_id = 3 + 3 * total_pages
-    
-    for i, p_text in enumerate(pages_text):
+
+    for i, _p_text in enumerate(pages_text):
         page_id = 3 + 3 * i
         content_id = page_id + 1
         page_obj_ids.append(page_id)
         kids_refs.append(f"{page_id} 0 R")
-    
+
     # 1 0 obj: Catalog
     offsets = {}
     offsets[1] = pdf_buf.tell()
     pdf_buf.write(b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n")
-    
+
     # 2 0 obj: Pages
     offsets[2] = pdf_buf.tell()
     kids_str = " ".join(kids_refs)
-    pdf_buf.write(f"2 0 obj << /Type /Pages /Kids [{kids_str}] /Count {total_pages} >> endobj\n".encode("utf-8"))
-    
+    pdf_buf.write(
+        f"2 0 obj << /Type /Pages /Kids [{kids_str}] /Count {total_pages} >> endobj\n".encode()
+    )
+
     # Pages and Contents
     for i, p_text in enumerate(pages_text):
         page_id = 3 + 3 * i
         content_id = page_id + 1
-        
+
         # Format text stream with simple BT /F1 12 Tf ... ET
         # Escape parentheses
         safe_text = p_text.replace("(", "\\(").replace(")", "\\)").replace("\n", " ")
-        stream_content = f"BT /F1 12 Tf 50 700 Td ({safe_text}) Tj ET".encode("utf-8")
-        
+        stream_content = f"BT /F1 12 Tf 50 700 Td ({safe_text}) Tj ET".encode()
+
         offsets[page_id] = pdf_buf.tell()
-        pdf_buf.write(f"{page_id} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {content_id} 0 R /Resources << /Font << /F1 {font_id} 0 R >> >> >> endobj\n".encode("utf-8"))
-        
+        pdf_buf.write(
+            f"{page_id} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {content_id} 0 R /Resources << /Font << /F1 {font_id} 0 R >> >> >> endobj\n".encode()
+        )
+
         offsets[content_id] = pdf_buf.tell()
-        pdf_buf.write(f"{content_id} 0 obj << /Length {len(stream_content)} >> stream\n".encode("utf-8"))
+        pdf_buf.write(f"{content_id} 0 obj << /Length {len(stream_content)} >> stream\n".encode())
         pdf_buf.write(stream_content)
         pdf_buf.write(b"\nendstream endobj\n")
-    
+
     # Font Object
     offsets[font_id] = pdf_buf.tell()
-    pdf_buf.write(f"{font_id} 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n".encode("utf-8"))
-    
+    pdf_buf.write(
+        f"{font_id} 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n".encode()
+    )
+
     # XREF table
     xref_offset = pdf_buf.tell()
     total_objs = font_id + 1
-    pdf_buf.write(f"xref\n0 {total_objs}\n".encode("utf-8"))
+    pdf_buf.write(f"xref\n0 {total_objs}\n".encode())
     pdf_buf.write(b"0000000000 65535 f \n")
     for obj_i in range(1, total_objs):
         off = offsets.get(obj_i, 0)
-        pdf_buf.write(f"{off:010d} 00000 n \n".encode("utf-8"))
-    
+        pdf_buf.write(f"{off:010d} 00000 n \n".encode())
+
     # Trailer
-    pdf_buf.write(f"trailer << /Size {total_objs} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF".encode("utf-8"))
+    pdf_buf.write(
+        f"trailer << /Size {total_objs} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF".encode()
+    )
     return pdf_buf.getvalue()
 
 
@@ -140,31 +147,73 @@ class TestEpistemicTypologyAndRelevance:
         assert extractor.classify_epistemic_type(research_text) == "REPORTED_RESEARCH"
 
         # 6. UNVERIFIED_CLAIM
-        claim_text = "I believe cyclical market rhythm is the ultimate key to conquering trading fear."
+        claim_text = (
+            "I believe cyclical market rhythm is the ultimate key to conquering trading fear."
+        )
         assert extractor.classify_epistemic_type(claim_text) == "UNVERIFIED_CLAIM"
 
     def test_classify_applicability_domain(self):
         extractor = PDFBookExtractor()
 
         # Crypto Direct
-        assert extractor.classify_applicability_domain("Bitcoin funding rate imbalances trigger short squeezes.") == "CRYPTO_DIRECT"
-        assert extractor.classify_applicability_domain("Perpetual swaps on Binance exhibit negative basis.") == "CRYPTO_DIRECT"
+        assert (
+            extractor.classify_applicability_domain(
+                "Bitcoin funding rate imbalances trigger short squeezes."
+            )
+            == "CRYPTO_DIRECT"
+        )
+        assert (
+            extractor.classify_applicability_domain(
+                "Perpetual swaps on Binance exhibit negative basis."
+            )
+            == "CRYPTO_DIRECT"
+        )
 
         # Market General (Source: traditional equities -> Applicable to Crypto)
-        assert extractor.classify_applicability_domain("Order book depth and bid-ask spread determine institutional slippage.") == "MARKET_GENERAL"
-        assert extractor.classify_applicability_domain("Fair value gaps represent liquidity voids where institutional absorption occurred.") == "MARKET_GENERAL"
+        assert (
+            extractor.classify_applicability_domain(
+                "Order book depth and bid-ask spread determine institutional slippage."
+            )
+            == "MARKET_GENERAL"
+        )
+        assert (
+            extractor.classify_applicability_domain(
+                "Fair value gaps represent liquidity voids where institutional absorption occurred."
+            )
+            == "MARKET_GENERAL"
+        )
 
         # Risk Management
-        assert extractor.classify_applicability_domain("The Kelly criterion dictates half-kelly fractional sizing to avoid risk of ruin.") == "RISK"
+        assert (
+            extractor.classify_applicability_domain(
+                "The Kelly criterion dictates half-kelly fractional sizing to avoid risk of ruin."
+            )
+            == "RISK"
+        )
 
         # Macroeconomics
-        assert extractor.classify_applicability_domain("Federal Reserve rate hikes and M2 money supply contractions diminish market liquidity.") == "MACRO"
+        assert (
+            extractor.classify_applicability_domain(
+                "Federal Reserve rate hikes and M2 money supply contractions diminish market liquidity."
+            )
+            == "MACRO"
+        )
 
         # Psychology
-        assert extractor.classify_applicability_domain("Revenge trading and cognitive bias destroy trader equity faster than bad edge.") == "PSYCHOLOGY"
+        assert (
+            extractor.classify_applicability_domain(
+                "Revenge trading and cognitive bias destroy trader equity faster than bad edge."
+            )
+            == "PSYCHOLOGY"
+        )
 
         # Statistics
-        assert extractor.classify_applicability_domain("Market returns exhibit heavy fat tails and non-Gaussian kurtosis.") == "STATISTICS"
+        assert (
+            extractor.classify_applicability_domain(
+                "Market returns exhibit heavy fat tails and non-Gaussian kurtosis."
+            )
+            == "STATISTICS"
+        )
 
 
 class TestPDFExtractionPipeline:
@@ -194,7 +243,9 @@ class TestPDFExtractionPipeline:
             assert len(claims) >= 2
 
             # Find author reported statistic
-            stat_claims = [c for c in claims if c["pdf_evidence_type"] == "AUTHOR_REPORTED_STATISTIC"]
+            stat_claims = [
+                c for c in claims if c["pdf_evidence_type"] == "AUTHOR_REPORTED_STATISTIC"
+            ]
             assert len(stat_claims) >= 1
             stat_c = stat_claims[0]
             assert stat_c["page_number"] == 3
@@ -215,7 +266,9 @@ class TestUniversalIngestorBookEndToEnd:
 
     @pytest.mark.asyncio
     async def test_pdf_book_ingestion_end_to_end(self):
-        page_1 = "Quantitative Trading Systems. 1st Edition. ISBN 978-1-2345-6789-0. By Howard Bandy."
+        page_1 = (
+            "Quantitative Trading Systems. 1st Edition. ISBN 978-1-2345-6789-0. By Howard Bandy."
+        )
         page_2 = "Chapter 3: Edge Quantification. The Sharpe ratio represents the mean excess return over downside risk."
         page_3 = "Chapter 4: Breakout Directives. If market structure breaks the 20-period swing high, buy long immediately. Historical tests report a 70% win rate."
 
@@ -332,4 +385,3 @@ def test_offline_vision_ocr_graceful_fallback():
     text, provider = extractor.extract_page_with_vision(b"\x00" * 100)
     assert text == ""
     assert provider == "OFFLINE_FALLBACK"
-

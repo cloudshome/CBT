@@ -4,10 +4,10 @@ Prevents redundant multi-layer calculations on identical market state ticks.
 """
 
 import asyncio
-from collections import OrderedDict
 import logging
 import threading
 import time
+from collections import OrderedDict
 from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.ttl_cache")
@@ -70,7 +70,7 @@ class TTLCache:
                     logger.debug(f"TTLCache sweeper purged {purged} expired entries.")
             except asyncio.CancelledError:
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.warning(f"TTLCache sweeper error: {e}")
 
     def clear(self) -> None:
@@ -95,4 +95,3 @@ class TTLCache:
 # Singleton cache instances
 sky_decision_cache = TTLCache(default_ttl_sec=5.0, maxsize=10000)
 market_state_cache = TTLCache(default_ttl_sec=3.0, maxsize=10000)
-

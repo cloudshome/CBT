@@ -17,14 +17,14 @@ from __future__ import annotations
 import ast
 import logging
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any
 
 from core.knowledge_graph_engine import knowledge_graph_engine
 from core.pdf_extractor import pdf_book_extractor
 from core.provenance_engine import provenance_engine
-from core.youtube_extractor import parse_video_id, youtube_extractor
+from core.youtube_extractor import youtube_extractor
 
 logger = logging.getLogger("ai_quant_sentinel.universal_ingestor")
 
@@ -120,20 +120,26 @@ class UniversalIngestor:
             try:
                 pdf_res = pdf_book_extractor.extract_book_research(file_path)
                 if pdf_res.get("success"):
-                    metadata.update({
-                        "book_title": pdf_res["book_title"],
-                        "author_creator": pdf_res["author_creator"],
-                        "isbn": pdf_res["isbn"],
-                        "edition": pdf_res["edition"],
-                        "total_pages": pdf_res["total_pages"],
-                        "is_scanned": pdf_res["is_scanned"],
-                        "pdf_research_payload": pdf_res,
-                    })
+                    metadata.update(
+                        {
+                            "book_title": pdf_res["book_title"],
+                            "author_creator": pdf_res["author_creator"],
+                            "isbn": pdf_res["isbn"],
+                            "edition": pdf_res["edition"],
+                            "total_pages": pdf_res["total_pages"],
+                            "is_scanned": pdf_res["is_scanned"],
+                            "pdf_research_payload": pdf_res,
+                        }
+                    )
                     claim_texts = [
                         f"[{c.get('pdf_evidence_type', 'CLAIM')} · p.{c.get('page_number', '?')}] {c['verbatim']}"
                         for c in pdf_res.get("claims", [])
                     ]
-                    raw_text = "\n\n".join(claim_texts) if claim_texts else f"PDF Book: {pdf_res['book_title']}"
+                    raw_text = (
+                        "\n\n".join(claim_texts)
+                        if claim_texts
+                        else f"PDF Book: {pdf_res['book_title']}"
+                    )
                     return raw_text, metadata
                 else:
                     return f"Error reading PDF: {pdf_res.get('error')}", metadata
@@ -175,22 +181,40 @@ class UniversalIngestor:
         """
         source_type = self.detect_source_type(content, file_name=file_name)
         yt_payload = None
-        
+
         # Intercept PDF Book Inputs
-        if pdf_payload or source_type == "PDF" or (file_name and file_name.lower().endswith(".pdf")):
+        if (
+            pdf_payload
+            or source_type == "PDF"
+            or (file_name and file_name.lower().endswith(".pdf"))
+        ):
             source_type = "PDF_BOOK"
-            inferred_title = title or (pdf_payload.get("book_title") if pdf_payload else None) or (
-                file_name if file_name else f"Research Book ({content[:40]}...)"
+            inferred_title = (
+                title
+                or (pdf_payload.get("book_title") if pdf_payload else None)
+                or (file_name if file_name else f"Research Book ({content[:40]}...)")
             )
-            creator = author_creator or (pdf_payload.get("author_creator") if pdf_payload else None) or "Author Unknown"
+            creator = (
+                author_creator
+                or (pdf_payload.get("author_creator") if pdf_payload else None)
+                or "Author Unknown"
+            )
             uri = source_uri or file_name or "PDF Book Ingestion"
 
         # Intercept YouTube inputs
-        elif source_type == "YOUTUBE" or "youtube.com" in content.lower() or "youtu.be" in content.lower():
+        elif (
+            source_type == "YOUTUBE"
+            or "youtube.com" in content.lower()
+            or "youtu.be" in content.lower()
+        ):
             source_type = "YOUTUBE"
             yt_payload = youtube_extractor.extract_full_video_research(content)
             if yt_payload and yt_payload.get("success"):
-                inferred_title = title or yt_payload.get("title") or f"YouTube Research: {yt_payload.get('video_id')}"
+                inferred_title = (
+                    title
+                    or yt_payload.get("title")
+                    or f"YouTube Research: {yt_payload.get('video_id')}"
+                )
                 creator = author_creator or yt_payload.get("author_creator") or "YouTube Channel"
                 uri = yt_payload.get("video_url") or content
                 if yt_payload.get("full_transcript"):
@@ -200,13 +224,17 @@ class UniversalIngestor:
                     file_name if file_name else f"Research: {source_type} ({content[:40]}...)"
                 )
                 creator = author_creator or "External Contributor"
-                uri = source_uri or (content if content.startswith("http") else file_name or "Direct Input")
+                uri = source_uri or (
+                    content if content.startswith("http") else file_name or "Direct Input"
+                )
         else:
             inferred_title = title or (
                 file_name if file_name else f"Research: {source_type} ({content[:40]}...)"
             )
             creator = author_creator or "External Contributor"
-            uri = source_uri or (content if content.startswith("http") else file_name or "Direct Input")
+            uri = source_uri or (
+                content if content.startswith("http") else file_name or "Direct Input"
+            )
 
         worldview = self.infer_worldview(content, source_type)
 
@@ -378,7 +406,9 @@ class UniversalIngestor:
                 "candidates_queued": len(strategy_candidates),
                 "evidence_saved": len(saved_observations),
                 "rejected_archived": 0,
-                "comprehension_score": 95.0 if yt_payload and yt_payload.get("has_transcript") else 88.0,
+                "comprehension_score": 95.0
+                if yt_payload and yt_payload.get("has_transcript")
+                else 88.0,
             },
             "claims": saved_claims,
             "observations": saved_observations,
@@ -438,11 +468,14 @@ class UniversalIngestor:
         if source_type in ("CODE", "GITHUB"):
             fn_matches = re.findall(r"(?:def|class|function)\s+([A-Za-z0-9_]+)", content)
             indicators = [
-                w for w in ["rsi", "ema", "sma", "macd", "vwap", "bollinger", "atr", "fvg", "ob"]
+                w
+                for w in ["rsi", "ema", "sma", "macd", "vwap", "bollinger", "atr", "fvg", "ob"]
                 if w in content.lower()
             ]
             chap_breakdown = [f"Module/Symbol: {fn}()" for fn in fn_matches[:8]]
-            ind_str = f" Referenced indicators: {', '.join(indicators).upper()}." if indicators else ""
+            ind_str = (
+                f" Referenced indicators: {', '.join(indicators).upper()}." if indicators else ""
+            )
             summary = (
                 f"Algorithmic Source Code Intelligence: '{inferred_title}' by {creator}. "
                 f"Parsed {len(fn_matches)} procedural logic blocks and structures.{ind_str} "
@@ -456,7 +489,9 @@ class UniversalIngestor:
             chap_breakdown = [h.strip()[:60] for h in heading_matches[:8]]
             if not chap_breakdown:
                 paragraphs = [p.strip() for p in content.split("\n\n") if len(p.strip()) > 30]
-                chap_breakdown = [f"Section {i+1}: {p[:50]}..." for i, p in enumerate(paragraphs[:6])]
+                chap_breakdown = [
+                    f"Section {i + 1}: {p[:50]}..." for i, p in enumerate(paragraphs[:6])
+                ]
 
             summary = (
                 f"Research Literature Synthesis: '{inferred_title}' by {creator}. "
@@ -484,7 +519,6 @@ class UniversalIngestor:
         inferred_title: str | None = None,
     ) -> dict[str, Any]:
         """Extracts verbatim claims, observations, and normalized concepts."""
-        lower_text = text.lower()
         claims: list[dict[str, Any]] = []
         observations: list[dict[str, Any]] = []
         concepts: list[dict[str, Any]] = []
@@ -497,8 +531,13 @@ class UniversalIngestor:
                 claims.append(
                     {
                         "verbatim": pc["verbatim"],
-                        "subject": pc.get("subject", f"Literature: {pc.get('chapter_title', 'General')}"),
-                        "direction": pc.get("direction", f"{pc.get('chapter_title', 'Principle')} ──► {pc.get('applicability_domain', 'Market')}"),
+                        "subject": pc.get(
+                            "subject", f"Literature: {pc.get('chapter_title', 'General')}"
+                        ),
+                        "direction": pc.get(
+                            "direction",
+                            f"{pc.get('chapter_title', 'Principle')} ──► {pc.get('applicability_domain', 'Market')}",
+                        ),
                         "object_domain": pc.get("object_domain", "FINANCIAL"),
                         "evidence_type": ep_type,
                         "confidence": 0.0,  # Zero-Fabrication Epistemic Firewall (Article I, Section 1.5)
@@ -551,22 +590,49 @@ class UniversalIngestor:
                 is_hyped = len(hype_markers) > 0
 
                 # Determine topic / concept
-                if any(w in s_lower for w in ["liquidity", "sweep", "fvg", "fair value gap", "order block", "imbalance", "mss"]):
+                if any(
+                    w in s_lower
+                    for w in [
+                        "liquidity",
+                        "sweep",
+                        "fvg",
+                        "fair value gap",
+                        "order block",
+                        "imbalance",
+                        "mss",
+                    ]
+                ):
                     subject = "Smart Money Liquidity Sweep & Imbalance"
                     direction = "Liquidity Pool Sweep ──► Structural Displacement"
                     domain = "FINANCIAL"
                     ev_type = "ANECDOTAL"
-                elif any(w in s_lower for w in ["cycle", "astro", "planetary", "time", "date", "lunar", "equinox"]):
+                elif any(
+                    w in s_lower
+                    for w in ["cycle", "astro", "planetary", "time", "date", "lunar", "equinox"]
+                ):
                     subject = "Temporal / Periodic Cycle"
                     direction = "Time Cycle Alignment ──► Regime Transition"
                     domain = "TEMPORAL_CYCLE"
                     ev_type = "HISTORICAL_OBSERVATION"
-                elif any(w in s_lower for w in ["rsi", "macd", "moving average", "indicator", "divergence", "support", "resistance"]):
+                elif any(
+                    w in s_lower
+                    for w in [
+                        "rsi",
+                        "macd",
+                        "moving average",
+                        "indicator",
+                        "divergence",
+                        "support",
+                        "resistance",
+                    ]
+                ):
                     subject = "Technical Indicator & Momentum Signal"
                     direction = "Indicator Threshold ──► Mean Reversion Probability"
                     domain = "FINANCIAL"
                     ev_type = "ANECDOTAL"
-                elif any(w in s_lower for w in ["war", "conflict", "geopolitic", "sanction", "crisis"]):
+                elif any(
+                    w in s_lower for w in ["war", "conflict", "geopolitic", "sanction", "crisis"]
+                ):
                     subject = "Geopolitical Dislocation"
                     direction = "Geopolitical Event ──► Safe-Haven Capital Flow"
                     domain = "GEOPOLITICAL"

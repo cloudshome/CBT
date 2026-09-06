@@ -117,7 +117,9 @@ async def test_multi_source_summary_synthesis():
 def test_telegram_research_summary_dispatch():
     """Verifies POST /api/research/share-telegram endpoint formats and processes telegram dispatch gracefully."""
     from unittest.mock import AsyncMock, patch
+
     from starlette.testclient import TestClient
+
     from app import app
     from core.telegram_bot import telegram_bot
 
@@ -128,7 +130,11 @@ def test_telegram_research_summary_dispatch():
         "author_creator": "Alvaro Cartea",
         "source_type": "PDF_BOOK",
         "executive_summary": "Quantitative monograph presenting stochastic control models for optimal limit order submission and inventory risk penalization.",
-        "chapter_breakdown": ["Ch 1: Limit Order Books", "Ch 2: Optimal Liquidation", "Ch 3: Market Making"],
+        "chapter_breakdown": [
+            "Ch 1: Limit Order Books",
+            "Ch 2: Optimal Liquidation",
+            "Ch 3: Market Making",
+        ],
         "epistemic_counts": {"facts": 14, "hypotheses": 5, "rules": 3, "contradictions": 0},
         "candidate_summary": "Inventory Penalized Avellaneda-Stoikov Market Maker",
     }
@@ -148,6 +154,7 @@ def test_telegram_research_summary_dispatch():
 async def test_telegram_reverse_flow_link_ingestion():
     """Verifies that dropping a research link into Telegram automatically triggers Research Lab ingestion."""
     from unittest.mock import AsyncMock, patch
+
     from core.telegram_bot import telegram_bot
 
     update = {
@@ -166,7 +173,9 @@ async def test_telegram_reverse_flow_link_ingestion():
         assert res["type"] == "LINK"
         assert res["knowledge_id"].startswith("K-")
         assert mock_send.called
-        any_summary = any("FILED IN SKY RESEARCH LAB" in call.args[0] for call in mock_send.call_args_list)
+        any_summary = any(
+            "FILED IN SKY RESEARCH LAB" in call.args[0] for call in mock_send.call_args_list
+        )
         assert any_summary
 
 
@@ -174,6 +183,7 @@ async def test_telegram_reverse_flow_link_ingestion():
 async def test_telegram_reverse_flow_photo_ingestion():
     """Verifies that dropping a photo into Telegram automatically triggers Vision OCR & Research Lab ingestion."""
     from unittest.mock import AsyncMock, patch
+
     from core.telegram_bot import telegram_bot
 
     update = {
@@ -186,8 +196,12 @@ async def test_telegram_reverse_flow_photo_ingestion():
         },
     }
 
-    with patch.object(telegram_bot, "download_telegram_file", new_callable=AsyncMock) as mock_download, \
-         patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send:
+    with (
+        patch.object(
+            telegram_bot, "download_telegram_file", new_callable=AsyncMock
+        ) as mock_download,
+        patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send,
+    ):
         mock_download.return_value = b"\x89PNG\r\n\x1a\nfake_image_bytes"
         mock_send.return_value = True
         res = await telegram_bot.handle_webhook_update(update)
@@ -195,7 +209,7 @@ async def test_telegram_reverse_flow_photo_ingestion():
         assert res["type"] == "PHOTO"
         assert res["knowledge_id"].startswith("K-")
         assert mock_send.called
-        any_summary = any("FILED IN SKY RESEARCH LAB" in call.args[0] for call in mock_send.call_args_list)
+        any_summary = any(
+            "FILED IN SKY RESEARCH LAB" in call.args[0] for call in mock_send.call_args_list
+        )
         assert any_summary
-
-

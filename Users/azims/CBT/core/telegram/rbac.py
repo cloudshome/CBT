@@ -16,13 +16,13 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.telegram.rbac")
 
 
 class TelegramRole(str, enum.Enum):
     """Hierarchical roles for Telegram V5 command execution."""
+
     UNAUTHORIZED = "UNAUTHORIZED"
     ANALYST = "ANALYST"
     TRADER = "TRADER"
@@ -51,10 +51,10 @@ class TelegramRole(str, enum.Enum):
         return self.level >= required_role.level
 
 
-
 @dataclass
 class TelegramUserIdentity:
     """Immutable Telegram identity profile."""
+
     user_id: int | str
     chat_id: int | str
     username: str = ""
@@ -160,10 +160,11 @@ class TelegramRBACRegistry:
         if role is None and cid_str:
             try:
                 from core.telegram_bot import telegram_bot
+
                 bot_chat = str(getattr(telegram_bot, "chat_id", "") or "")
                 if bot_chat and cid_str == bot_chat:
                     role = TelegramRole.TRADER
-            except Exception:
+            except Exception:  # noqa: S110,BLE001 — defensive fallback
                 pass
 
         # Priority 4: Development/Test sandbox fallback (when no credentials configured in environment)

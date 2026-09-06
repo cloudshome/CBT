@@ -14,14 +14,11 @@ import json
 import logging
 import os
 import time
-
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from core.database import db_manager
-from core.telegram.audit import telegram_audit
-from core.telegram.rbac import TelegramRole, TelegramUserIdentity, rbac_registry
 
 logger = logging.getLogger("ai_quant_sentinel.telegram.callbacks")
 
@@ -33,6 +30,7 @@ DEFAULT_EXPIRY_SECONDS = 60  # 60s hard expiry on execution tokens
 @dataclass
 class ActionToken:
     """Expiring, cryptographically signed action payload."""
+
     token_id: str
     action_type: str  # 'ENTER_PAPER_CONFIRM', 'ENTER_PAPER_EXECUTE', 'CLOSE_POSITION', 'MOVE_TO_BE', 'DEBATE_COUNCIL'
     user_id: str
@@ -51,8 +49,9 @@ class ActionToken:
     def _generate_signature(self) -> str:
         payload_str = json.dumps(self.payload, sort_keys=True) if self.payload else "{}"
         data = f"{self.token_id}:{self.action_type}:{self.user_id}:{self.chat_id}:{self.expires_at}:{payload_str}"
-        return hmac.new(TOKEN_SECRET.encode("utf-8"), data.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
-
+        return hmac.new(
+            TOKEN_SECRET.encode("utf-8"), data.encode("utf-8"), hashlib.sha256
+        ).hexdigest()[:16]
 
     def is_valid(self, expected_user: str) -> tuple[bool, str]:
         """Validates expiry, signature, and user matching."""
@@ -126,6 +125,7 @@ class TelegramCallbackRouter:
         # Persist to SQLite
         try:
             import json
+
             with db_manager.get_trading_conn() as conn:
                 conn.execute(
                     """
@@ -133,7 +133,16 @@ class TelegramCallbackRouter:
                     (token_id, action_type, user_id, chat_id, payload_json, created_at, expires_at, signature)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (token.token_id, token.action_type, token.user_id, token.chat_id, json.dumps(token.payload), token.created_at, token.expires_at, token.signature),
+                    (
+                        token.token_id,
+                        token.action_type,
+                        token.user_id,
+                        token.chat_id,
+                        json.dumps(token.payload),
+                        token.created_at,
+                        token.expires_at,
+                        token.signature,
+                    ),
                 )
                 conn.commit()
         except Exception as e:  # noqa: BLE001 — defensive fallback
@@ -148,6 +157,7 @@ class TelegramCallbackRouter:
 
         try:
             import json
+
             with db_manager.get_trading_conn() as conn:
                 cur = conn.execute(
                     "SELECT * FROM telegram_action_tokens WHERE token_id = ?", (token_id,)
@@ -199,9 +209,17 @@ class TelegramCallbackRouter:
             u_id = str(user_id or "operator")
             c_id = str(chat_id or "default")
             tok_enter = self.create_action_token("STAGE_CONFIRM_ENTRY", u_id, c_id, signal_or_token)
-            tok_debate = self.create_action_token("STAGE_DEBATE", u_id, c_id, {"symbol": signal_or_token.get("symbol", "BTC/USDT")})
-            tok_plan = self.create_action_token("STAGE_PLAN", u_id, c_id, {"symbol": signal_or_token.get("symbol", "BTC/USDT")})
-            enter_id, debate_id, plan_id = tok_enter.token_id, tok_debate.token_id, tok_plan.token_id
+            tok_debate = self.create_action_token(
+                "STAGE_DEBATE", u_id, c_id, {"symbol": signal_or_token.get("symbol", "BTC/USDT")}
+            )
+            tok_plan = self.create_action_token(
+                "STAGE_PLAN", u_id, c_id, {"symbol": signal_or_token.get("symbol", "BTC/USDT")}
+            )
+            enter_id, debate_id, plan_id = (
+                tok_enter.token_id,
+                tok_debate.token_id,
+                tok_plan.token_id,
+            )
         else:
             enter_id = signal_or_token
             debate_id = f"deb_{enter_id[:6]}"
@@ -215,16 +233,21 @@ class TelegramCallbackRouter:
                 ],
                 [
                     {"text": "🗺️ Structural Plan", "callback_data": f"act:{plan_id}"},
-                ]
+                ],
             ]
         }
 
-    def build_confirmation_keyboard(self, confirm_token_id: str, cancel_token_id: str) -> dict[str, Any]:
+    def build_confirmation_keyboard(
+        self, confirm_token_id: str, cancel_token_id: str
+    ) -> dict[str, Any]:
         """Builds Two-Phase confirmation keyboard (Section 9)."""
         return {
             "inline_keyboard": [
                 [
-                    {"text": "✅ YES — CONFIRM EXECUTION", "callback_data": f"act:{confirm_token_id}"},
+                    {
+                        "text": "✅ YES — CONFIRM EXECUTION",
+                        "callback_data": f"act:{confirm_token_id}",
+                    },
                     {"text": "❌ CANCEL", "callback_data": f"act:{cancel_token_id}"},
                 ]
             ]
@@ -241,8 +264,18 @@ class TelegramCallbackRouter:
         if user_id_or_be_token and chat_id is not None:
             u_id = str(user_id_or_be_token)
             c_id = str(chat_id)
-            tok_close = self.create_action_token("STAGE_CLOSE_CONFIRM", u_id, c_id, {"symbol": symbol, "position_id": pos_id_or_close_token})
-            tok_be = self.create_action_token("STAGE_BE_ADJUST", u_id, c_id, {"symbol": symbol, "position_id": pos_id_or_close_token})
+            tok_close = self.create_action_token(
+                "STAGE_CLOSE_CONFIRM",
+                u_id,
+                c_id,
+                {"symbol": symbol, "position_id": pos_id_or_close_token},
+            )
+            tok_be = self.create_action_token(
+                "STAGE_BE_ADJUST",
+                u_id,
+                c_id,
+                {"symbol": symbol, "position_id": pos_id_or_close_token},
+            )
             close_id = tok_close.token_id
             be_id = tok_be.token_id
         else:

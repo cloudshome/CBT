@@ -23,6 +23,7 @@ logger = logging.getLogger("ai_quant_sentinel.telegram.jobs")
 @dataclass
 class TelegramJob:
     """Represents a long-running asynchronous background job."""
+
     job_id: str
     job_type: str  # 'RESEARCH_INGEST', 'WALK_FORWARD_BACKTEST', 'MULTIMODAL_OCR', 'CHART_SNAPSHOT'
     user_id: str
@@ -65,7 +66,9 @@ class TelegramJobManager:
                     )
                     """
                 )
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_tg_jobs_user ON telegram_jobs (user_id);")
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_tg_jobs_user ON telegram_jobs (user_id);"
+                )
                 conn.commit()
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.warning(f"Could not initialize telegram_jobs table: {e}")
@@ -97,7 +100,16 @@ class TelegramJobManager:
                     (job_id, job_type, user_id, chat_id, title, status, progress_pct, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (job.job_id, job.job_type, job.user_id, job.chat_id, job.title, job.status, job.progress_pct, job.created_at),
+                    (
+                        job.job_id,
+                        job.job_type,
+                        job.user_id,
+                        job.chat_id,
+                        job.title,
+                        job.status,
+                        job.progress_pct,
+                        job.created_at,
+                    ),
                 )
                 conn.commit()
         except Exception as e:  # noqa: BLE001 — defensive fallback
@@ -116,7 +128,9 @@ class TelegramJobManager:
         """Updates status, progress, or completion metrics."""
         now = time.time() if status in ("COMPLETED", "FAILED") else None
         res_str = json.dumps(result) if result is not None else None
-        prog = progress_pct if progress_pct is not None else (100 if status == "COMPLETED" else None)
+        prog = (
+            progress_pct if progress_pct is not None else (100 if status == "COMPLETED" else None)
+        )
 
         try:
             with db_manager.get_trading_conn() as conn:
@@ -178,7 +192,15 @@ class TelegramJobManager:
                 return f"⚠️ **Job Not Found:** No active or completed task matches `{job}`."
             job = found
 
-        emoji = "⏳" if job.status == "RUNNING" else "✅" if job.status == "COMPLETED" else "❌" if job.status == "FAILED" else "⚪"
+        emoji = (
+            "⏳"
+            if job.status == "RUNNING"
+            else "✅"
+            if job.status == "COMPLETED"
+            else "❌"
+            if job.status == "FAILED"
+            else "⚪"
+        )
         lines = [
             f"{emoji} **SKY ASYNC JOB STATUS**",
             "━━━━━━━━━━━━━━━━━━━━━━",
@@ -248,11 +270,10 @@ class TelegramJobManager:
                 if reconciled > 0:
                     logger.info(f"Reconciled {reconciled} orphaned jobs to INTERRUPTED.")
                 return reconciled
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.warning(f"Failed reconciling orphaned jobs: {e}")
             return 0
 
 
 # Global Job Manager Singleton
 job_manager = TelegramJobManager()
-

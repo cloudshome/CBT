@@ -33,25 +33,23 @@ docker compose ps
 ```
 
 ### Option B: Linux Native Systemd Service
-> ⚠️ **Mutually exclusive with Option A.** `orion.service` runs uvicorn directly on
-> port 8000, while the Docker stack (`cbt-stack@.service`) also serves that port.
-> Enable **exactly one** of the two deployment modes.
+> ⚠️ **Mutually exclusive with Option A.** The bare-metal unit runs uvicorn
+> directly on port 8000, while the Docker stack (`cbt-stack@.service`) also
+> serves that port. Enable **exactly one** of the two deployment modes.
 
 ```bash
-# 1. Install systemd unit definition
-sudo cp deploy/systemd/orion.service /etc/systemd/system/
-sudo systemctl daemon-reload
+# 1. Install: auto-detects user + project root, builds .venv, creates .env,
+#    renders the unit with YOUR paths, enables & starts it, health-checks.
+bash deploy/install_bare_metal.sh
 
-# 2. Ensure the Docker stack is stopped (port conflict guard)
-sudo systemctl stop cbt-stack@$USER.service || true
-
-# 3. Enable on boot and start service
-sudo systemctl enable orion.service
-sudo systemctl start orion.service
-
-# 4. Inspect live status
-sudo systemctl status orion.service
+# 2. Inspect live status / logs
+systemctl status ai_quant_sentinel.service
+journalctl -u ai_quant_sentinel -f
 ```
+
+> The old `orion.service` was removed (hardcoded `/home/ubuntu/CBT` paths,
+> duplicated `ai_quant_sentinel.service`); this installer supersedes it, per
+> the deployment-hardening recommendation in `REVIEW.md`.
 
 ---
 

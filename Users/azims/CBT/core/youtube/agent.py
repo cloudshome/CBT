@@ -19,17 +19,14 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, List, Optional
 
 from core.telegram.jobs import job_manager
 from core.universal_ingestor import universal_ingestor
 from core.youtube.deconstruction import youtube_deconstructor
 from core.youtube.discovery import youtube_discovery
 from core.youtube.models import (
-    DiscoveredVideo,
     VideoResearchAtom,
     YouTubeExplorationResult,
-    YouTubeSource,
 )
 from core.youtube.synthesis import cross_video_synthesizer
 
@@ -61,9 +58,13 @@ class YouTubeExplorationAgent:
             cp = result.creator_profile
             lines.append(f"👤 **Creator Profile:** {cp.channel_name}")
             lines.append(f"🎯 **Worldviews:** {', '.join(cp.primary_worldviews)}")
-            lines.append(f"🚩 **Hype Level:** {cp.hype_frequency_pct}% of videos contain promotional marketing claims")
+            lines.append(
+                f"🚩 **Hype Level:** {cp.hype_frequency_pct}% of videos contain promotional marketing claims"
+            )
             if cp.contradictions_count > 0:
-                lines.append(f"⚡ **Rule Contradictions / Refinements:** {cp.contradictions_count} detected")
+                lines.append(
+                    f"⚡ **Rule Contradictions / Refinements:** {cp.contradictions_count} detected"
+                )
             lines.append("━━━━━━━━━━━━━━━━━━━━━━")
 
         if result.recurring_concepts:
@@ -76,11 +77,15 @@ class YouTubeExplorationAgent:
             lines.append(f"🧪 **Formulated Candidates ({len(result.synthesized_candidates)}):**")
             for cand in result.synthesized_candidates:
                 lines.append(f"  • `{cand['candidate_id']}`: {cand['strategy_name']}")
-                lines.append(f"    Confidence: `{cand['confidence_score']:.1f}` | Stage: `{cand['validation_stage']}`")
+                lines.append(
+                    f"    Confidence: `{cand['confidence_score']:.1f}` | Stage: `{cand['validation_stage']}`"
+                )
             lines.append("━━━━━━━━━━━━━━━━━━━━━━")
 
         lines.append("⚖️ *Level 1 Epistemic Disclaimer:*")
-        lines.append("_Repeated creator assertions != empirical evidence. All strategy candidates remain quarantined at confidence = 0.0 until Walk-Forward validated._")
+        lines.append(
+            "_Repeated creator assertions != empirical evidence. All strategy candidates remain quarantined at confidence = 0.0 until Walk-Forward validated._"
+        )
 
         return "\n".join(lines)
 
@@ -116,7 +121,7 @@ class YouTubeExplorationAgent:
                 md.append(f"### `{c['concept_name']}` ({c['appearance_count']} Citations)")
                 md.append(f"- **Citations:** {', '.join(c['video_citations'][:6])}")
                 if c.get("sample_contexts"):
-                    md.append(f"- **Sample Excerpt:** *\"{c['sample_contexts'][0]}\"*")
+                    md.append(f'- **Sample Excerpt:** *"{c["sample_contexts"][0]}"*')
                 md.append("")
         else:
             md.append("*No recurring technical concepts detected.*")
@@ -127,7 +132,9 @@ class YouTubeExplorationAgent:
         if result.contradictions:
             for cont in result.contradictions:
                 md.append(f"### ⚡ Contradiction: {cont.rule_name}")
-                md.append(f"- **Earlier Session ({cont.earlier_video_id}):** {cont.earlier_statement}")
+                md.append(
+                    f"- **Earlier Session ({cont.earlier_video_id}):** {cont.earlier_statement}"
+                )
                 md.append(f"- **Later Session ({cont.later_video_id}):** {cont.later_statement}")
                 md.append(f"- **Epistemic Warning:** {cont.epistemic_warning}")
                 md.append("")
@@ -149,9 +156,15 @@ class YouTubeExplorationAgent:
             for cand in result.synthesized_candidates:
                 md.append(f"### 🧪 `{cand['candidate_id']}`: {cand['strategy_name']}")
                 md.append(f"- **Hypothesis:** {cand['hypothesis']}")
-                md.append(f"- **Setup / Trigger:** `{cand['entry_rules']['setup']}` — {cand['entry_rules']['condition']}")
-                md.append(f"- **Risk & Exit:** SL `{cand['exit_rules']['sl_rule']}` | Target `{cand['exit_rules']['tp_target']}`")
-                md.append(f"- **Epistemic Quarantine Status:** `confidence = {cand['confidence_score']:.1f}` | `stage = {cand['validation_stage']}`")
+                md.append(
+                    f"- **Setup / Trigger:** `{cand['entry_rules']['setup']}` — {cand['entry_rules']['condition']}"
+                )
+                md.append(
+                    f"- **Risk & Exit:** SL `{cand['exit_rules']['sl_rule']}` | Target `{cand['exit_rules']['tp_target']}`"
+                )
+                md.append(
+                    f"- **Epistemic Quarantine Status:** `confidence = {cand['confidence_score']:.1f}` | `stage = {cand['validation_stage']}`"
+                )
                 md.append(f"- **Empirical Evidence:** {cand['empirical_evidence']}")
                 md.append("")
         else:
@@ -159,7 +172,9 @@ class YouTubeExplorationAgent:
             md.append("")
 
         md.append("---")
-        md.append("> **Level 1 Constitution Invariant:** YouTube content extraction is observational research. No trading strategy may be traded or promoted to Live/Paper desk without independent walk-forward Monte Carlo validation.")
+        md.append(
+            "> **Level 1 Constitution Invariant:** YouTube content extraction is observational research. No trading strategy may be traded or promoted to Live/Paper desk without independent walk-forward Monte Carlo validation."
+        )
         return "\n".join(md)
 
     async def explore(
@@ -211,7 +226,9 @@ class YouTubeExplorationAgent:
                 res.status = "COMPLETED"
                 res.completed_at = time.time()
                 res.executive_digest = "No videos discovered from the provided source."
-                job_manager.update_job(eff_job_id, status="COMPLETED", progress_pct=100, result=res.to_dict())
+                job_manager.update_job(
+                    eff_job_id, status="COMPLETED", progress_pct=100, result=res.to_dict()
+                )
                 return res
 
             # 3. Stage 2: Deduplication Sentinel
@@ -221,7 +238,9 @@ class YouTubeExplorationAgent:
                 progress_pct=20,
                 result={"step": "DEDUPLICATING", "discovered_count": len(discovered)},
             )
-            to_process, skipped = youtube_discovery.filter_unprocessed(discovered, force_refresh=force_refresh)
+            to_process, skipped = youtube_discovery.filter_unprocessed(
+                discovered, force_refresh=force_refresh
+            )
             res.videos_new = len(to_process)
             res.videos_skipped = len(skipped)
 
@@ -238,7 +257,12 @@ class YouTubeExplorationAgent:
                     eff_job_id,
                     status="RUNNING",
                     progress_pct=prog,
-                    result={"step": "DECONSTRUCTING", "current_video": vid.title, "index": idx + 1, "total": total_to_process},
+                    result={
+                        "step": "DECONSTRUCTING",
+                        "current_video": vid.title,
+                        "index": idx + 1,
+                        "total": total_to_process,
+                    },
                 )
 
                 try:
@@ -247,7 +271,6 @@ class YouTubeExplorationAgent:
                     atoms.append(atom)
 
                     # Feed into Universal Ingestor for Knowledge Graph persistence
-                    trans_text = " ".join(s.get("context", "") for s in atom.setups) or vid.description or vid.title
                     try:
                         await universal_ingestor.ingest(
                             content=vid.canonical_url,
@@ -256,13 +279,15 @@ class YouTubeExplorationAgent:
                             author_creator=vid.channel_name or source.channel_name,
                             source_uri=vid.canonical_url,
                         )
-                    except Exception as ingest_err:
-                        logger.warning(f"Universal Ingestor sub-call error for {vid.video_id}: {ingest_err}")
+                    except Exception as ingest_err:  # noqa: BLE001 — defensive fallback
+                        logger.warning(
+                            f"Universal Ingestor sub-call error for {vid.video_id}: {ingest_err}"
+                        )
 
                     youtube_discovery.mark_video_status(vid.video_id, status="INGESTED")
                     res.videos_processed += 1
 
-                except Exception as vid_err:
+                except Exception as vid_err:  # noqa: BLE001 — defensive fallback
                     logger.error(f"Error deconstructing video {vid.video_id}: {vid_err}")
                     youtube_discovery.mark_video_status(vid.video_id, status="FAILED")
                     res.videos_failed += 1
@@ -277,7 +302,9 @@ class YouTubeExplorationAgent:
                 result={"step": "SYNTHESIZING", "atoms_count": len(atoms)},
             )
 
-            channel_title = source.channel_name or (atoms[0].author_creator if atoms else "YouTube Creator")
+            channel_title = source.channel_name or (
+                atoms[0].author_creator if atoms else "YouTube Creator"
+            )
             profile = cross_video_synthesizer.build_creator_profile(
                 atoms,
                 channel_name=channel_title,
@@ -317,9 +344,10 @@ class YouTubeExplorationAgent:
             if chat_id:
                 try:
                     from core.telegram_bot import telegram_bot
+
                     tg_msg = self.format_telegram_digest(res)
                     await telegram_bot.send_message(tg_msg, chat_id=chat_id)
-                except Exception as tg_err:
+                except Exception as tg_err:  # noqa: BLE001 — defensive fallback
                     logger.warning(f"Could not dispatch Telegram completion alert: {tg_err}")
 
             return res
@@ -333,8 +361,11 @@ class YouTubeExplorationAgent:
             if chat_id:
                 try:
                     from core.telegram_bot import telegram_bot
-                    await telegram_bot.send_message(f"❌ **YouTube Exploration Failed:** `{e}`", chat_id=chat_id)
-                except Exception:
+
+                    await telegram_bot.send_message(
+                        f"❌ **YouTube Exploration Failed:** `{e}`", chat_id=chat_id
+                    )
+                except Exception:  # noqa: S110,BLE001 — defensive fallback
                     pass
             return res
 

@@ -60,9 +60,9 @@ class ClaimNode:
     epistemic_status: str = "UNVERIFIED"  # UNVERIFIED, HYPOTHESIZED, EMPIRICALLY_TESTED, REFUTED
     confidence_score: float = 0.0
     timestamp_start: str | None = None  # e.g. "18:42"
-    timestamp_end: str | None = None    # e.g. "19:17"
+    timestamp_end: str | None = None  # e.g. "19:17"
     timestamp_start_sec: float | None = None  # e.g. 1122.0
-    timestamp_end_sec: float | None = None    # e.g. 1157.0
+    timestamp_end_sec: float | None = None  # e.g. 1157.0
     video_url: str | None = None
     author_creator: str | None = None
     book_title: str | None = None
@@ -72,8 +72,12 @@ class ClaimNode:
     section_title: str | None = None
     page_number: int | None = None
     paragraph_index: int | None = None
-    pdf_evidence_type: str | None = None  # DEFINITION, AUTHOR_REPORTED_STATISTIC, PROPOSED_RULE, HISTORICAL_OBSERVATION, REPORTED_RESEARCH, UNVERIFIED_CLAIM
-    applicability_domain: str | None = None  # CRYPTO_DIRECT, MARKET_GENERAL, MACRO, RISK, PSYCHOLOGY
+    pdf_evidence_type: str | None = (
+        None  # DEFINITION, AUTHOR_REPORTED_STATISTIC, PROPOSED_RULE, HISTORICAL_OBSERVATION, REPORTED_RESEARCH, UNVERIFIED_CLAIM
+    )
+    applicability_domain: str | None = (
+        None  # CRYPTO_DIRECT, MARKET_GENERAL, MACRO, RISK, PSYCHOLOGY
+    )
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
 
     def to_dict(self) -> dict[str, Any]:
@@ -288,7 +292,7 @@ class KnowledgeGraphEngine:
                 try:
                     conn.execute(f"ALTER TABLE research_claims ADD COLUMN {col_name} {col_type};")
                     conn.commit()
-                except Exception:
+                except Exception:  # noqa: S110,BLE001 — defensive fallback
                     pass
 
             logger.info("SKY Knowledge & Discovery Graph schema initialized.")

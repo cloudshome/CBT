@@ -17,39 +17,31 @@ Constitutional Mandate & Invariant Verifications:
 
 from __future__ import annotations
 
-import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
-from core.database import db_manager
 from core.telegram.handlers import handle_explore
-from core.telegram.jobs import job_manager
 from core.youtube.agent import YouTubeExplorationAgent, youtube_agent
 from core.youtube.deconstruction import (
     HYPE_REGEX,
-    SETUP_PATTERNS,
     YouTubeDeconstructor,
     youtube_deconstructor,
 )
 from core.youtube.discovery import (
-    DEFAULT_EXPLORE_LIMIT,
     YOUTUBE_MAX_EXPLORE_VIDEOS,
     YouTubeDiscoveryEngine,
     youtube_discovery,
 )
 from core.youtube.models import (
-    CreatorProfile,
     DiscoveredVideo,
-    RuleContradiction,
-    StrategyEvolutionStep,
     VideoRelevance,
     VideoResearchAtom,
     YouTubeExplorationResult,
-    YouTubeSource,
     YouTubeSourceType,
 )
-from core.youtube.synthesis import CrossVideoSynthesizer, cross_video_synthesizer
+from core.youtube.synthesis import CrossVideoSynthesizer
 
 
 class TestYouTubeV5DiscoveryAndNormalization:
@@ -128,24 +120,46 @@ class TestYouTubeV5DeconstructionAndAntiHype:
     """Tests setup identification, timestamp formatting, and hype claim quarantine."""
 
     def test_hype_detection_firewall(self):
-        hype_text = "This secret strategy has a 100% win rate and you will never lose! Guaranteed profits."
+        hype_text = (
+            "This secret strategy has a 100% win rate and you will never lose! Guaranteed profits."
+        )
         matches = HYPE_REGEX.findall(hype_text)
         assert len(matches) >= 2
 
-        normal_text = "Wait for a market structure shift and fair value gap confluence before entering."
+        normal_text = (
+            "Wait for a market structure shift and fair value gap confluence before entering."
+        )
         assert len(HYPE_REGEX.findall(normal_text)) == 0
 
     def test_deconstruction_setups_and_rules(self):
         deconstructor = YouTubeDeconstructor()
         raw_snippets = [
             {"text": "Welcome to the trading session.", "start": 0.0, "duration": 10.0},
-            {"text": "Notice price formed a clear Fair Value Gap after the liquidity sweep.", "start": 10.0, "duration": 25.0},
-            {"text": "Enter when 15m candle closes confirming displacement through the order block.", "start": 35.0, "duration": 20.0},
-            {"text": "Stop loss is below the swing low wick and take profit is toward opposing highs.", "start": 55.0, "duration": 20.0},
-            {"text": "This guarantees easy money and 100% win rate!", "start": 75.0, "duration": 15.0},
+            {
+                "text": "Notice price formed a clear Fair Value Gap after the liquidity sweep.",
+                "start": 10.0,
+                "duration": 25.0,
+            },
+            {
+                "text": "Enter when 15m candle closes confirming displacement through the order block.",
+                "start": 35.0,
+                "duration": 20.0,
+            },
+            {
+                "text": "Stop loss is below the swing low wick and take profit is toward opposing highs.",
+                "start": 55.0,
+                "duration": 20.0,
+            },
+            {
+                "text": "This guarantees easy money and 100% win rate!",
+                "start": 75.0,
+                "duration": 15.0,
+            },
         ]
 
-        with patch.object(deconstructor, "fetch_subtitles", return_value=(raw_snippets, "MANUAL_CAPTION")):
+        with patch.object(
+            deconstructor, "fetch_subtitles", return_value=(raw_snippets, "MANUAL_CAPTION")
+        ):
             video = DiscoveredVideo(
                 video_id="smc_master_1",
                 canonical_url="https://www.youtube.com/watch?v=smc_master_1",
@@ -191,11 +205,25 @@ class TestYouTubeV5SynthesisAndEpistemicInvariants:
             transcript_method="MANUAL_CAPTION",
             segment_count=10,
             setups=[
-                {"setup_type": "LIQUIDITY_SWEEP", "timestamp": "02:15", "context": "Sweep of the previous day low", "video_id": "vid_early"},
-                {"setup_type": "FAIR_VALUE_GAP", "timestamp": "04:30", "context": "Enter at the FVG immediately", "video_id": "vid_early"},
+                {
+                    "setup_type": "LIQUIDITY_SWEEP",
+                    "timestamp": "02:15",
+                    "context": "Sweep of the previous day low",
+                    "video_id": "vid_early",
+                },
+                {
+                    "setup_type": "FAIR_VALUE_GAP",
+                    "timestamp": "04:30",
+                    "context": "Enter at the FVG immediately",
+                    "video_id": "vid_early",
+                },
             ],
             rules=[
-                {"rule_text": "enter when liquidity sweeps below the previous day low", "timestamp": "02:15", "video_id": "vid_early"},
+                {
+                    "rule_text": "enter when liquidity sweeps below the previous day low",
+                    "timestamp": "02:15",
+                    "video_id": "vid_early",
+                },
             ],
             claims=[],
             ingested_at=time.time() - 86400,
@@ -212,11 +240,25 @@ class TestYouTubeV5SynthesisAndEpistemicInvariants:
             transcript_method="MANUAL_CAPTION",
             segment_count=12,
             setups=[
-                {"setup_type": "LIQUIDITY_SWEEP", "timestamp": "03:10", "context": "Sweep of key liquidity level", "video_id": "vid_late"},
-                {"setup_type": "ORDER_BLOCK", "timestamp": "05:40", "context": "Order block mitigation confirmation", "video_id": "vid_late"},
+                {
+                    "setup_type": "LIQUIDITY_SWEEP",
+                    "timestamp": "03:10",
+                    "context": "Sweep of key liquidity level",
+                    "video_id": "vid_late",
+                },
+                {
+                    "setup_type": "ORDER_BLOCK",
+                    "timestamp": "05:40",
+                    "context": "Order block mitigation confirmation",
+                    "video_id": "vid_late",
+                },
             ],
             rules=[
-                {"rule_text": "enter when liquidity sweeps and wait for HTF displacement confirmation", "timestamp": "03:10", "video_id": "vid_late"},
+                {
+                    "rule_text": "enter when liquidity sweeps and wait for HTF displacement confirmation",
+                    "timestamp": "03:10",
+                    "video_id": "vid_late",
+                },
             ],
             claims=[],
             ingested_at=time.time(),
@@ -258,8 +300,12 @@ class TestYouTubeV5SynthesisAndEpistemicInvariants:
 
         for cand in candidates:
             # STRICT LEVEL 1 CONSTITUTIONAL INVARIANTS:
-            assert cand["confidence_score"] == 0.0, "Epistemic violation: confidence must be strictly 0.0!"
-            assert cand["validation_stage"] == "UNTESTED", "Epistemic violation: stage must be UNTESTED!"
+            assert cand["confidence_score"] == 0.0, (
+                "Epistemic violation: confidence must be strictly 0.0!"
+            )
+            assert cand["validation_stage"] == "UNTESTED", (
+                "Epistemic violation: stage must be UNTESTED!"
+            )
             assert "Awaiting Walk-Forward" in cand["empirical_evidence"]
             assert cand["creator_repetition_count"] >= 1
             assert len(cand["source_citations"]) >= 1
@@ -282,12 +328,24 @@ class TestYouTubeV5AgentAndTelegramCommand:
             ),
         ]
 
-        with patch.object(youtube_discovery, "discover_videos", return_value=mock_discovered), \
-             patch.object(youtube_deconstructor, "fetch_subtitles", return_value=([
-                 {"text": "Look for Fair Value Gap after Market Structure Shift", "start": 10.0, "duration": 20.0}
-             ], "MANUAL_CAPTION")), \
-             patch("core.youtube.agent.universal_ingestor.ingest", new_callable=AsyncMock) as mock_ingest:
-
+        with (
+            patch.object(youtube_discovery, "discover_videos", return_value=mock_discovered),
+            patch.object(
+                youtube_deconstructor,
+                "fetch_subtitles",
+                return_value=(
+                    [
+                        {
+                            "text": "Look for Fair Value Gap after Market Structure Shift",
+                            "start": 10.0,
+                            "duration": 20.0,
+                        }
+                    ],
+                    "MANUAL_CAPTION",
+                ),
+            ),
+            patch("core.youtube.agent.universal_ingestor.ingest", new_callable=AsyncMock),
+        ):
             result = await agent.explore(
                 source_url_or_handle="@QuantMaster",
                 limit=5,
@@ -304,8 +362,15 @@ class TestYouTubeV5AgentAndTelegramCommand:
 
     @pytest.mark.asyncio
     async def test_telegram_explore_command_dispatch(self):
-        with patch("core.telegram_bot.telegram_bot.send_message", new_callable=AsyncMock) as mock_send, \
-             patch("core.youtube.agent.youtube_agent.start_background_exploration", return_value="JOB-MOCK-123"):
+        with (
+            patch(
+                "core.telegram_bot.telegram_bot.send_message", new_callable=AsyncMock
+            ) as mock_send,
+            patch(
+                "core.youtube.agent.youtube_agent.start_background_exploration",
+                return_value="JOB-MOCK-123",
+            ),
+        ):
             # 1. Empty arguments -> returns help guidance
             res_help = await handle_explore("", chat_id="123456")
             assert "YOUTUBE RESEARCH INTELLIGENCE V5" in res_help
@@ -321,6 +386,7 @@ class TestYouTubeV5AgentAndTelegramCommand:
 
     def test_youtube_rest_endpoints(self):
         from fastapi.testclient import TestClient
+
         from app import app
 
         client = TestClient(app)
@@ -344,5 +410,3 @@ class TestYouTubeV5AgentAndTelegramCommand:
             res_job = client.get(f"/api/research/youtube/jobs/{job_id}")
             assert res_job.status_code == 200
             assert res_job.json()["job_id"] == job_id
-
-

@@ -16,23 +16,21 @@ import datetime
 import hashlib
 import logging
 import os
+import re
 import time
 from collections.abc import Callable
 from pathlib import Path
-import re
 from typing import Any
 
 import aiohttp
 from dotenv import load_dotenv
 
-from core.telegram.rbac import TelegramRole, TelegramUserIdentity, rbac_registry
-from core.telegram.idempotency import idempotency_manager
 from core.telegram.audit import telegram_audit
-from core.telegram.commands import TelegramCommand, command_registry
 from core.telegram.callbacks import callback_router
-from core.telegram.charts import telegram_charts
-from core.telegram.jobs import job_manager
+from core.telegram.commands import command_registry
+from core.telegram.idempotency import idempotency_manager
 from core.telegram.media import telegram_media
+from core.telegram.rbac import TelegramRole, rbac_registry
 
 load_dotenv()
 
@@ -905,12 +903,15 @@ class TelegramBotDispatcher:
             data.add_field("parse_mode", "Markdown")
         if reply_markup:
             import json
+
             data.add_field("reply_markup", json.dumps(reply_markup))
         data.add_field("photo", photo_bytes, filename=filename, content_type="image/png")
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                async with session.post(
+                    url, data=data, timeout=aiohttp.ClientTimeout(total=15)
+                ) as resp:
                     if resp.status != 200:
                         err = await resp.text()
                         logger.warning(f"Telegram sendPhoto failed ({resp.status}): {err}")
@@ -938,7 +939,9 @@ class TelegramBotDispatcher:
         }
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                async with session.post(
+                    url, json=payload, timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
                     return resp.status == 200
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.debug(f"answerCallbackQuery error: {e}")
@@ -1477,7 +1480,11 @@ class TelegramBotDispatcher:
         get_file_url = f"https://api.telegram.org/bot{token}/getFile"
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(get_file_url, params={"file_id": file_id}, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                async with session.get(
+                    get_file_url,
+                    params={"file_id": file_id},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
                     if resp.status != 200:
                         logger.error(f"Telegram getFile returned {resp.status}")
                         return None
@@ -1487,23 +1494,31 @@ class TelegramBotDispatcher:
                         return None
 
                 download_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
-                async with session.get(download_url, timeout=aiohttp.ClientTimeout(total=30)) as resp2:
+                async with session.get(
+                    download_url, timeout=aiohttp.ClientTimeout(total=30)
+                ) as resp2:
                     if resp2.status == 200:
                         return await resp2.read()
                     logger.error(f"Telegram file download returned {resp2.status}")
                     return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Failed downloading file from Telegram: {e}")
             return None
 
-    def _format_research_summary_telegram(self, result: dict[str, Any], title_override: str | None = None) -> str:
+    def _format_research_summary_telegram(
+        self, result: dict[str, Any], title_override: str | None = None
+    ) -> str:
         """Formats an institutional Research Lab result into clean Telegram Markdown."""
         source = result.get("source", {})
         source_type = source.get("source_type") or "RESEARCH"
         title = (title_override or source.get("title") or "Research Literature").replace("_", " ")
         author = (source.get("author_creator") or "External Contributor").replace("_", " ")
         kid = result.get("knowledge_id") or "K-UNKNOWN"
-        summary_text = result.get("executive_summary") or result.get("verdict_message") or "Research synthesis completed."
+        summary_text = (
+            result.get("executive_summary")
+            or result.get("verdict_message")
+            or "Research synthesis completed."
+        )
 
         source_emoji = {
             "PDF_BOOK": "📖 [PDF Monograph]",
@@ -1516,7 +1531,9 @@ class TelegramBotDispatcher:
             "IMAGE": "📸 [Vision Ingest]",
         }.get(str(source_type).upper(), "📚 [Research Literature]")
 
-        clean_summary = summary_text.replace("\n\n", "\n").replace("_", " ").replace("*", "").strip()
+        clean_summary = (
+            summary_text.replace("\n\n", "\n").replace("_", " ").replace("*", "").strip()
+        )
         if len(clean_summary) > 900:
             clean_summary = clean_summary[:900] + "..."
 
@@ -1527,7 +1544,7 @@ class TelegramBotDispatcher:
         contra = ep.get("contradictions", 0)
 
         lines = [
-            f"✅ *FILED IN SKY RESEARCH LAB*",
+            "✅ *FILED IN SKY RESEARCH LAB*",
             f"*{source_emoji}*",
             "━━━━━━━━━━━━━━━━━━━━━━━━",
             f"📚 *Title:* {title}",
@@ -1574,12 +1591,15 @@ class TelegramBotDispatcher:
         Two-Way Reverse Flow: Ingests links, images, or documents dropped in Telegram
         directly into the SKY / CBT Research Lab Provenance Ledger & Graph.
         """
-        from core.universal_ingestor import universal_ingestor
         from core.pdf_extractor import pdf_book_extractor
+        from core.universal_ingestor import universal_ingestor
 
         # 1. Handle Photo / Chart Image Ingestion
         if photo:
-            await self.send_message("📸 *Image received!* Running SKY Multimodal Vision OCR & Market Structure extraction...", chat_id=chat_id)
+            await self.send_message(
+                "📸 *Image received!* Running SKY Multimodal Vision OCR & Market Structure extraction...",
+                chat_id=chat_id,
+            )
             file_id = photo[-1].get("file_id")
             if not file_id:
                 await self.send_message("⚠️ Could not resolve image file ID.", chat_id=chat_id)
@@ -1587,7 +1607,9 @@ class TelegramBotDispatcher:
 
             img_bytes = await self.download_telegram_file(file_id)
             if not img_bytes:
-                await self.send_message("⚠️ Failed downloading image from Telegram servers.", chat_id=chat_id)
+                await self.send_message(
+                    "⚠️ Failed downloading image from Telegram servers.", chat_id=chat_id
+                )
                 return {"status": "FAILED", "reason": "Download error"}
 
             prompt = (
@@ -1602,7 +1624,9 @@ class TelegramBotDispatcher:
                 custom_prompt=prompt,
             )
             if not ocr_text:
-                ocr_text = caption or f"Quantitative chart/image uploaded via Telegram by {from_user}."
+                ocr_text = (
+                    caption or f"Quantitative chart/image uploaded via Telegram by {from_user}."
+                )
 
             res = await universal_ingestor.ingest(
                 content=ocr_text,
@@ -1613,19 +1637,28 @@ class TelegramBotDispatcher:
             )
             reply = self._format_research_summary_telegram(res, title_override=caption)
             await self.send_message(reply, chat_id=chat_id)
-            return {"status": "RESEARCH_INGESTED", "type": "PHOTO", "knowledge_id": res.get("knowledge_id")}
+            return {
+                "status": "RESEARCH_INGESTED",
+                "type": "PHOTO",
+                "knowledge_id": res.get("knowledge_id"),
+            }
 
         # 2. Handle Document / PDF Ingestion
         if document:
             doc_name = document.get("file_name", "document.pdf")
-            await self.send_message(f"📄 *Document received (`{doc_name}`)*! Ingesting into Research Lab...", chat_id=chat_id)
+            await self.send_message(
+                f"📄 *Document received (`{doc_name}`)*! Ingesting into Research Lab...",
+                chat_id=chat_id,
+            )
             file_id = document.get("file_id")
             if not file_id:
                 return {"status": "FAILED", "reason": "No file_id"}
 
             doc_bytes = await self.download_telegram_file(file_id)
             if not doc_bytes:
-                await self.send_message("⚠️ Failed downloading document from Telegram.", chat_id=chat_id)
+                await self.send_message(
+                    "⚠️ Failed downloading document from Telegram.", chat_id=chat_id
+                )
                 return {"status": "FAILED", "reason": "Download error"}
 
             uploads_dir = Path(os.getenv("DATA_DIR", "data")) / "uploads"
@@ -1646,13 +1679,22 @@ class TelegramBotDispatcher:
             )
             reply = self._format_research_summary_telegram(res)
             await self.send_message(reply, chat_id=chat_id)
-            return {"status": "RESEARCH_INGESTED", "type": "DOCUMENT", "knowledge_id": res.get("knowledge_id")}
+            return {
+                "status": "RESEARCH_INGESTED",
+                "type": "DOCUMENT",
+                "knowledge_id": res.get("knowledge_id"),
+            }
 
         # 3. Handle Link / URL / /research Command Ingestion
         url_match = re.search(r"https?://\S+", text or caption)
         if url_match or text.lower().startswith("/research") or text.lower().startswith("/ingest"):
-            raw_url = url_match.group(0).rstrip(".,)>]") if url_match else text.split(maxsplit=1)[-1]
-            await self.send_message(f"🔬 *Research Ingestion Triggered!*\n`{raw_url[:60]}...`\nDeconstructing market structure & extracting rules...", chat_id=chat_id)
+            raw_url = (
+                url_match.group(0).rstrip(".,)>]") if url_match else text.split(maxsplit=1)[-1]
+            )
+            await self.send_message(
+                f"🔬 *Research Ingestion Triggered!*\n`{raw_url[:60]}...`\nDeconstructing market structure & extracting rules...",
+                chat_id=chat_id,
+            )
             res = await universal_ingestor.ingest(
                 content=raw_url,
                 mode="RESEARCH",
@@ -1661,7 +1703,11 @@ class TelegramBotDispatcher:
             )
             reply = self._format_research_summary_telegram(res)
             await self.send_message(reply, chat_id=chat_id)
-            return {"status": "RESEARCH_INGESTED", "type": "LINK", "knowledge_id": res.get("knowledge_id")}
+            return {
+                "status": "RESEARCH_INGESTED",
+                "type": "LINK",
+                "knowledge_id": res.get("knowledge_id"),
+            }
 
         return {"status": "SKIPPED"}
 
@@ -1678,10 +1724,14 @@ class TelegramBotDispatcher:
         data = callback_query.get("data", "").strip()
 
         # 1. Identity & RBAC Check
-        is_auth, identity = rbac_registry.is_authorized(user_id, chat_id, required_role=TelegramRole.TRADER)
+        is_auth, identity = rbac_registry.is_authorized(
+            user_id, chat_id, required_role=TelegramRole.TRADER
+        )
         if not is_auth:
             telegram_audit.log_auth_denied(identity, data, TelegramRole.TRADER.value)
-            await self.answer_callback_query(cb_id, "⛔ Access Denied: Action requires TRADER privilege.", show_alert=True)
+            await self.answer_callback_query(
+                cb_id, "⛔ Access Denied: Action requires TRADER privilege.", show_alert=True
+            )
             return {"status": "AUTH_DENIED", "user_id": user_id}
 
         if not data.startswith("act:"):
@@ -1691,7 +1741,9 @@ class TelegramBotDispatcher:
         token_id = data[4:]
         token = callback_router.get_action_token(token_id)
         if not token:
-            await self.answer_callback_query(cb_id, "⚠️ Action Expired or Not Found. Generate a fresh signal.", show_alert=True)
+            await self.answer_callback_query(
+                cb_id, "⚠️ Action Expired or Not Found. Generate a fresh signal.", show_alert=True
+            )
             return {"status": "EXPIRED_OR_NOT_FOUND"}
 
         valid, reason = token.is_valid(expected_user=str(user_id))
@@ -1712,9 +1764,15 @@ class TelegramBotDispatcher:
             direction = sig.get("direction", "LONG")
 
             # Create tokens for Phase 2 Confirmation and Cancellation
-            confirm_tok = callback_router.create_action_token("CONFIRM_EXECUTE", user_id, chat_id, sig, ttl_seconds=60)
-            cancel_tok = callback_router.create_action_token("CANCEL_ACTION", user_id, chat_id, {}, ttl_seconds=60)
-            kb = callback_router.build_confirmation_keyboard(confirm_tok.token_id, cancel_tok.token_id)
+            confirm_tok = callback_router.create_action_token(
+                "CONFIRM_EXECUTE", user_id, chat_id, sig, ttl_seconds=60
+            )
+            cancel_tok = callback_router.create_action_token(
+                "CANCEL_ACTION", user_id, chat_id, {}, ttl_seconds=60
+            )
+            kb = callback_router.build_confirmation_keyboard(
+                confirm_tok.token_id, cancel_tok.token_id
+            )
 
             conf_msg = (
                 f"⚠️ **TWO-PHASE PAPER EXECUTION CONFIRMATION**\n"
@@ -1735,7 +1793,13 @@ class TelegramBotDispatcher:
         elif act == "CONFIRM_EXECUTE":
             exec_res = self.state_mind.auto_execute_paper_trade(token.payload)
             callback_router.invalidate_token(token_id)
-            telegram_audit.log_callback_action(identity, "CONFIRM_EXECUTE", token_id, exec_res.get("status", "UNKNOWN"), details=exec_res)
+            telegram_audit.log_callback_action(
+                identity,
+                "CONFIRM_EXECUTE",
+                token_id,
+                exec_res.get("status", "UNKNOWN"),
+                details=exec_res,
+            )
 
             status = exec_res.get("status")
             if status == "EXECUTED":
@@ -1792,7 +1856,9 @@ class TelegramBotDispatcher:
             sym = token.payload.get("symbol", "BTC/USDT")
             close_text = self.state_mind.close_position_by_symbol(sym)
             callback_router.invalidate_token(token_id)
-            telegram_audit.log_callback_action(identity, "CLOSE_POSITION", token_id, "EXECUTED", details={"symbol": sym})
+            telegram_audit.log_callback_action(
+                identity, "CLOSE_POSITION", token_id, "EXECUTED", details={"symbol": sym}
+            )
             await self.send_message(close_text, chat_id=chat_id)
             await self.answer_callback_query(cb_id, "Position closed.")
             return {"status": "POSITION_CLOSED"}
@@ -1800,6 +1866,7 @@ class TelegramBotDispatcher:
         elif act == "STAGE_BE_ADJUST":
             sym = token.payload.get("symbol", "BTC/USDT")
             from core.portfolio_shadow import portfolio_shadow
+
             open_pos = [p for p in portfolio_shadow.get_open_positions() if p.get("symbol") == sym]
             if open_pos:
                 p = open_pos[0]
@@ -1838,12 +1905,20 @@ class TelegramBotDispatcher:
         update_id = update.get("update_id", 0)
 
         # 1. Identity & RBAC Resolution
-        identity = rbac_registry.resolve_user(user_id, chat_id, username=username, first_name=first_name)
+        identity = rbac_registry.resolve_user(
+            user_id, chat_id, username=username, first_name=first_name
+        )
 
         # 2. Idempotency Check (Section 8)
-        action_tag = text.split()[0] if text.startswith("/") else ("photo" if photo else ("doc" if document else ("voice" if voice else "msg")))
+        action_tag = (
+            text.split()[0]
+            if text.startswith("/")
+            else ("photo" if photo else ("doc" if document else ("voice" if voice else "msg")))
+        )
         if update_id:
-            idem_key = idempotency_manager.build_key(chat_id or 0, user_id or 0, update_id, action_tag)
+            idem_key = idempotency_manager.build_key(
+                chat_id or 0, user_id or 0, update_id, action_tag
+            )
             if not idempotency_manager.check_and_acquire(idem_key):
                 logger.info(f"Idempotency blocked duplicate update {update_id}")
                 return {"status": "SKIPPED", "reason": "DUPLICATE_UPDATE"}
@@ -1852,15 +1927,23 @@ class TelegramBotDispatcher:
         if voice:
             file_id = voice.get("file_id")
             if file_id:
-                await self.send_message("🎙️ *Voice memo received!* Transcribing audio...", chat_id=chat_id)
+                await self.send_message(
+                    "🎙️ *Voice memo received!* Transcribing audio...", chat_id=chat_id
+                )
                 voice_bytes = await self.download_telegram_file(file_id)
                 if voice_bytes:
-                    transcription = await telegram_media.process_voice_memo(voice_bytes, filename="memo.ogg")
+                    transcription = await telegram_media.process_voice_memo(
+                        voice_bytes, filename="memo.ogg"
+                    )
                     if transcription:
-                        await self.send_message(f"📝 *Transcript:* _{transcription}_", chat_id=chat_id)
+                        await self.send_message(
+                            f"📝 *Transcript:* _{transcription}_", chat_id=chat_id
+                        )
                         text = transcription
                     else:
-                        await self.send_message("⚠️ Could not extract speech from voice note.", chat_id=chat_id)
+                        await self.send_message(
+                            "⚠️ Could not extract speech from voice note.", chat_id=chat_id
+                        )
                         return {"status": "VOICE_EMPTY"}
 
         # 4. Reverse Flow: Detect Photo / Document / Links / /research command
@@ -1892,29 +1975,39 @@ class TelegramBotDispatcher:
             if cmd in ("/help", "/start"):
                 help_text = command_registry.generate_help_menu(identity)
                 await self.send_message(help_text, chat_id=chat_id)
-                telegram_audit.log_command_execution(identity, cmd, args, execution_result="HELP_RETURNED")
+                telegram_audit.log_command_execution(
+                    identity, cmd, args, execution_result="HELP_RETURNED"
+                )
                 return {"status": "HELP_RETURNED", "text": help_text}
 
             # Check Typed Command Registry
             typed_cmd = command_registry.get_command(cmd)
             if typed_cmd:
                 if not identity.role.can_access(typed_cmd.required_role):
-                    telegram_audit.log_auth_denied(identity, typed_cmd.name, typed_cmd.required_role.value)
+                    telegram_audit.log_auth_denied(
+                        identity, typed_cmd.name, typed_cmd.required_role.value
+                    )
                     denied_msg = f"⛔ **Access Denied:** `{typed_cmd.name}` requires role `{typed_cmd.required_role.value}`, but current privilege is `{identity.role.value}`."
                     await self.send_message(denied_msg, chat_id=chat_id)
                     return {"status": "AUTH_DENIED", "command": cmd}
 
                 try:
                     if asyncio.iscoroutinefunction(typed_cmd.handler):
-                        response_text = await typed_cmd.handler(args, chat_id=chat_id, identity=identity)
+                        response_text = await typed_cmd.handler(
+                            args, chat_id=chat_id, identity=identity
+                        )
                     else:
                         response_text = typed_cmd.handler(args, chat_id=chat_id, identity=identity)
 
-                    telegram_audit.log_command_execution(identity, typed_cmd.name, args, execution_result="EXECUTED")
+                    telegram_audit.log_command_execution(
+                        identity, typed_cmd.name, args, execution_result="EXECUTED"
+                    )
                     return {"status": "EXECUTED", "command": cmd, "response": response_text}
                 except Exception as e:  # noqa: BLE001 — defensive fallback
                     logger.error(f"Error handling typed command '{cmd}': {e}")
-                    telegram_audit.log_command_execution(identity, typed_cmd.name, args, execution_result="ERROR", error=str(e))
+                    telegram_audit.log_command_execution(
+                        identity, typed_cmd.name, args, execution_result="ERROR", error=str(e)
+                    )
                     return {"status": "ERROR", "command": cmd, "error": str(e)}
 
             # Legacy Command Handlers Fallback
@@ -1930,11 +2023,15 @@ class TelegramBotDispatcher:
                         not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id
                     ):
                         await self.send_message(response_text)
-                    telegram_audit.log_command_execution(identity, cmd, args, execution_result="EXECUTED")
+                    telegram_audit.log_command_execution(
+                        identity, cmd, args, execution_result="EXECUTED"
+                    )
                     return {"status": "EXECUTED", "command": cmd, "response": response_text}
                 except Exception as e:  # noqa: BLE001 — defensive fallback
                     logger.error(f"Error handling Telegram command '{cmd}': {e}")
-                    telegram_audit.log_command_execution(identity, cmd, args, execution_result="ERROR", error=str(e))
+                    telegram_audit.log_command_execution(
+                        identity, cmd, args, execution_result="ERROR", error=str(e)
+                    )
                     return {"status": "ERROR", "command": cmd, "error": str(e)}
 
             default_reply = (
@@ -1950,7 +2047,9 @@ class TelegramBotDispatcher:
             ai_reply = await self.state_mind.handle_conversational_query(text, chat_id=chat_id)
             if ai_reply and (not self.chat_id or str(chat_id) == str(self.chat_id) or not chat_id):
                 await self.send_message(ai_reply)
-            telegram_audit.log_command_execution(identity, "NATURAL_LANGUAGE", text, execution_result="AI_CONVERSATION_EXECUTED")
+            telegram_audit.log_command_execution(
+                identity, "NATURAL_LANGUAGE", text, execution_result="AI_CONVERSATION_EXECUTED"
+            )
             return {"status": "AI_CONVERSATION_EXECUTED", "query": text, "response": ai_reply}
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Error processing conversational query: {e}")
@@ -2020,6 +2119,8 @@ desk_state_mind = DeskStateMind()
 telegram_bot = TelegramBotDispatcher()
 telegram_bot.state_mind = desk_state_mind
 
-from core.telegram.handlers import register_all_v5_commands
-register_all_v5_commands()
+# Deliberate: this import must run AFTER the singletons above are constructed
+# (register_all_v5_commands binds handlers to them).
+from core.telegram.handlers import register_all_v5_commands  # noqa: E402
 
+register_all_v5_commands()
