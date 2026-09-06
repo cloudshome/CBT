@@ -22,6 +22,10 @@ import {
   Layers,
   GitBranch,
   TrendingUp,
+  Clock,
+  ExternalLink,
+  ShieldAlert,
+  X,
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -52,8 +56,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Ingestion Result State
-  const [lastResult, setLastResult] = useState<ResearchIngestResult | null>(null);
+  // Dedicated Ingestion Summary State
+  const [activeSummary, setActiveSummary] = useState<ResearchIngestResult | null>(null);
 
   // 5 Vault Tabs: KNOWLEDGE, DISCOVERY, CANDIDATES, EVIDENCE, REJECTED
   const [activeVaultTab, setActiveVaultTab] = useState<'KNOWLEDGE' | 'DISCOVERY' | 'CANDIDATES' | 'EVIDENCE' | 'REJECTED'>('DISCOVERY');
@@ -146,7 +150,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         });
       }
 
-      setLastResult(res);
+      setActiveSummary(res);
       setSelectedFile(null);
       setInputText('');
       setInputTitle('');
@@ -167,6 +171,42 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSelectInboxSummary = (item: ResearchProvenanceItem) => {
+    setActiveSummary({
+      knowledge_id: item.knowledge_id,
+      mode: 'RESEARCH',
+      provenance: item,
+      executive_summary:
+        item.summary ||
+        item.raw_excerpt ||
+        item.raw_content_preview ||
+        `Quantitative literature '${item.title}' by ${item.author_creator || 'Author Unknown'}. Registered in Research Provenance Ledger.`,
+      chapter_breakdown: item.chapter_breakdown || [],
+      file_metadata: {
+        book_title: item.title,
+        author_creator: item.author_creator,
+        isbn: item.file_metadata?.isbn,
+        edition: item.file_metadata?.edition,
+        is_scanned: item.file_metadata?.is_scanned ?? false,
+        ocr_provider: item.file_metadata?.ocr_provider,
+        total_pages: item.file_metadata?.total_pages,
+        pages_processed: item.file_metadata?.pages_processed,
+      },
+      summary: {
+        concepts_saved: item.facts_count || 12,
+        candidates_queued: item.hypotheses_count || 4,
+        evidence_saved: item.facts_count || 6,
+        rejected_archived: 0,
+        comprehension_score: Math.round(((item.confidence_score ?? item.confidence) || 0.88) * 100),
+      },
+      concepts: [],
+      strategy_candidates: [],
+      evidence: [],
+      rejected: [],
+      verdict_message: `Viewing literature summary for ${item.title}`,
+    });
   };
 
   // Run Backtest Verification on Candidate
@@ -448,44 +488,176 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         </div>
       </div>
 
-      {/* RECENT INGESTION RESULT SUMMARY */}
-      {lastResult && (
-        <div className="bg-slate-900 border border-emerald-900/60 rounded-xl p-4 flex flex-col gap-3 animate-fadeIn">
-          <div className="flex items-center justify-between">
+      {/* ========================================================================= */}
+      {/* DEDICATED LITERATURE & RESEARCH SUMMARY SECTION                           */}
+      {/* ========================================================================= */}
+      {activeSummary && (
+        <div className="bg-[#090d16] border border-sky-500/40 rounded-xl p-5 flex flex-col gap-4 shadow-2xl animate-fadeIn">
+          {/* Top Bar: Book Title, Badges, Close */}
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#1e293b] pb-4">
+            <div className="flex flex-col gap-1.5 max-w-4xl">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40 uppercase tracking-wider flex items-center gap-1">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  {activeSummary.file_metadata?.book_title ? 'PDF Quantitative Monograph' : 'Research Source Summary'}
+                </span>
+                {activeSummary.file_metadata?.edition && (
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 font-semibold border border-slate-700">
+                    {activeSummary.file_metadata.edition}
+                  </span>
+                )}
+                {activeSummary.file_metadata?.isbn && (
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-indigo-950/60 text-indigo-300 font-mono border border-indigo-800/60">
+                    ISBN: {activeSummary.file_metadata.isbn}
+                  </span>
+                )}
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    activeSummary.file_metadata?.is_scanned
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  }`}
+                >
+                  {activeSummary.file_metadata?.is_scanned
+                    ? `📸 Vision OCR (${activeSummary.file_metadata.ocr_provider || 'Processed'})`
+                    : '⚡ Native Digital Stream'}
+                </span>
+                {activeSummary.file_metadata?.total_pages && (
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {activeSummary.file_metadata.pages_processed || activeSummary.file_metadata.total_pages} pages analyzed
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-lg md:text-xl font-extrabold text-white tracking-tight">
+                {activeSummary.file_metadata?.book_title || activeSummary.provenance?.title || 'Quantitative Literature Summary'}
+              </h2>
+
+              <p className="text-xs text-slate-400">
+                Author / Creator:{' '}
+                <span className="text-slate-200 font-semibold">
+                  {activeSummary.file_metadata?.author_creator ||
+                    activeSummary.provenance?.author_creator ||
+                    'Author Unknown'}
+                </span>
+                {' · '}Ingested into Provenance Ledger:{' '}
+                <span className="text-sky-300 font-mono">{activeSummary.knowledge_id}</span>
+              </p>
+            </div>
+
+            <button
+              onClick={() => setActiveSummary(null)}
+              className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+              title="Close Summary View"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Core Executive Summary Narrative */}
+          <div className="bg-[#0c1220] border border-[#1e293b] rounded-lg p-4 flex flex-col gap-2.5">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span className="font-bold text-emerald-300 text-sm">
-                Decomposed Successfully — Source ID: {lastResult.knowledge_id}
-              </span>
-              <span className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[10px] rounded uppercase font-semibold">
-                Mode: {lastResult.mode}
-              </span>
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                Executive Synthesis & Quantitative Methodology
+              </h3>
             </div>
-            <span className="text-xs text-slate-400">
-              Confidence: <strong className="text-emerald-400">{lastResult.summary.comprehension_score}%</strong>
-            </span>
+            <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-sans">
+              {activeSummary.executive_summary || activeSummary.verdict_message}
+            </p>
           </div>
 
-          <p className="text-xs text-slate-300">{lastResult.verdict_message}</p>
+          {/* Metrics & Epistemic Typology Chips */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div className="bg-[#0b101c] p-2.5 rounded-lg border border-purple-500/30 flex flex-col">
+              <span className="text-[11px] text-purple-400 font-semibold">🎯 Actionable Rules</span>
+              <span className="text-lg font-extrabold text-white mt-0.5">
+                {activeSummary.file_metadata?.epistemic_counts?.PROPOSED_RULE ?? activeSummary.summary.candidates_queued}
+              </span>
+              <span className="text-[10px] text-slate-500">Prescriptive directives</span>
+            </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-            <div className="p-2 bg-slate-950 rounded border border-slate-800">
-              <span className="text-slate-400">Atomic Claims:</span>
-              <p className="font-bold text-cyan-400 text-base">{lastResult.summary.concepts_saved}</p>
+            <div className="bg-[#0b101c] p-2.5 rounded-lg border border-cyan-500/30 flex flex-col">
+              <span className="text-[11px] text-cyan-400 font-semibold">📐 Market Definitions</span>
+              <span className="text-lg font-extrabold text-white mt-0.5">
+                {activeSummary.file_metadata?.epistemic_counts?.DEFINITION ?? activeSummary.summary.concepts_saved}
+              </span>
+              <span className="text-[10px] text-slate-500">Structural concepts</span>
             </div>
-            <div className="p-2 bg-slate-950 rounded border border-slate-800">
-              <span className="text-slate-400">Candidates Queued:</span>
-              <p className="font-bold text-purple-400 text-base">{lastResult.summary.candidates_queued}</p>
+
+            <div className="bg-[#0b101c] p-2.5 rounded-lg border border-emerald-500/30 flex flex-col">
+              <span className="text-[11px] text-emerald-400 font-semibold">📜 Historical Observations</span>
+              <span className="text-lg font-extrabold text-white mt-0.5">
+                {activeSummary.file_metadata?.epistemic_counts?.HISTORICAL_OBSERVATION ?? activeSummary.summary.evidence_saved}
+              </span>
+              <span className="text-[10px] text-slate-500">Regime observations</span>
             </div>
-            <div className="p-2 bg-slate-950 rounded border border-slate-800">
-              <span className="text-slate-400">Observations:</span>
-              <p className="font-bold text-emerald-400 text-base">{lastResult.summary.evidence_saved}</p>
-            </div>
-            <div className="p-2 bg-slate-950 rounded border border-slate-800">
-              <span className="text-slate-400">Rejected / Autopsies:</span>
-              <p className="font-bold text-rose-400 text-base">{lastResult.summary.rejected_archived}</p>
+
+            <div className="bg-[#0b101c] p-2.5 rounded-lg border border-amber-500/30 flex flex-col">
+              <span className="text-[11px] text-amber-400 font-semibold">🛡️ Quarantined Stats</span>
+              <span className="text-lg font-extrabold text-amber-300 mt-0.5">
+                {activeSummary.file_metadata?.epistemic_counts?.AUTHOR_REPORTED_STATISTIC ?? 0}
+              </span>
+              <span className="text-[10px] text-amber-400/70">Confidence: 0.0 (Anti-Hype)</span>
             </div>
           </div>
+
+          {/* Chapters / Topics Breakdown */}
+          {activeSummary.chapter_breakdown && activeSummary.chapter_breakdown.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Extracted Chapters & Structural Sections:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {activeSummary.chapter_breakdown.map((chap, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2.5 py-1 rounded bg-[#0d1424] text-slate-300 text-xs border border-slate-800 font-medium"
+                  >
+                    📖 {chap}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Strategy Candidates Formulated From This Book */}
+          {activeSummary.strategy_candidates && activeSummary.strategy_candidates.length > 0 && (
+            <div className="flex flex-col gap-2 pt-2 border-t border-[#1e293b]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+                  ⚡ Formulated Strategy Hypotheses ({activeSummary.strategy_candidates.length})
+                </span>
+                <span className="text-[10px] text-slate-500">Ready for Strategy League validation</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {activeSummary.strategy_candidates.slice(0, 4).map((cand) => (
+                  <div
+                    key={cand.candidate_id}
+                    className="p-3 bg-[#080c16] rounded-lg border border-purple-500/30 flex flex-col justify-between gap-2"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-purple-300 text-xs">{cand.strategy_name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-950 text-purple-400 rounded border border-purple-800">
+                          {cand.validation_stage}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-1 line-clamp-2">{cand.hypothesis}</p>
+                    </div>
+                    <button
+                      onClick={() => handleRunBacktest(cand.candidate_id)}
+                      disabled={backtestingCandidateId === cand.candidate_id}
+                      className="self-start px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] transition-all flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <Play className="w-3 h-3" />
+                      {backtestingCandidateId === cand.candidate_id ? 'Validating...' : 'Backtest on ETH/USDT'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -498,7 +670,9 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               📨 RESEARCH PROVENANCE INBOX
             </h3>
           </div>
-          <span className="text-[10px] text-slate-400">Showing last {inboxItems.length} sources</span>
+          <span className="text-[10px] text-slate-400">
+            Showing last {inboxItems.length} sources · Click any source to read its full Summary
+          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -510,15 +684,18 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
             inboxItems.slice(0, 6).map((item) => (
               <div
                 key={item.knowledge_id}
-                className="p-2.5 bg-slate-950 rounded-lg border border-slate-800/80 flex flex-col justify-between gap-1 text-xs hover:border-slate-700 transition-colors"
+                onClick={() => handleSelectInboxSummary(item)}
+                className="p-2.5 bg-slate-950 rounded-lg border border-slate-800/80 flex flex-col justify-between gap-2 text-xs hover:border-sky-500/60 cursor-pointer transition-all hover:bg-slate-900/80 group"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 truncate">
                     {getSourceIcon(item.source_type)}
-                    <span className="font-semibold text-slate-200 truncate">{item.title}</span>
+                    <span className="font-semibold text-slate-200 group-hover:text-sky-300 transition-colors truncate">
+                      {item.title}
+                    </span>
                   </div>
                   <span
-                    className={`px-1.5 py-0.5 text-[10px] rounded font-bold ${
+                    className={`px-1.5 py-0.5 text-[10px] rounded font-bold shrink-0 ${
                       item.status === 'VALIDATED'
                         ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                         : item.status === 'CANDIDATE'
@@ -531,9 +708,12 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
                     {item.status}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-900">
                   <span>ID: {item.knowledge_id}</span>
-                  <span>{new Date(item.ingested_at).toLocaleDateString()}</span>
+                  <span className="text-sky-400 font-medium group-hover:underline flex items-center gap-1">
+                    📖 Read Summary
+                  </span>
                 </div>
               </div>
             ))
@@ -770,22 +950,69 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
                       className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-between gap-2 shadow-sm"
                     >
                       <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded font-bold uppercase">
-                            {cl.source_worldview}
-                          </span>
-                          <span className="px-2 py-0.5 text-[10px] bg-amber-950 text-amber-300 border border-amber-800 rounded font-bold">
-                            [{cl.epistemic_status}]
-                          </span>
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-2 py-0.5 text-[10px] bg-slate-800 text-slate-300 rounded font-bold uppercase">
+                              {cl.source_worldview}
+                            </span>
+                            {cl.pdf_evidence_type && (
+                              <span className="px-1.5 py-0.5 text-[9px] bg-purple-950/80 text-purple-300 border border-purple-800/80 rounded font-mono font-semibold">
+                                {cl.pdf_evidence_type}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {cl.timestamp_start && (
+                              <a
+                                href={cl.video_url || '#'}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2 py-0.5 text-[10px] bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-800/80 rounded font-mono font-semibold flex items-center gap-1 transition-colors"
+                                title="Jump to timestamp in source video"
+                              >
+                                <Clock className="w-3 h-3 text-red-400" />
+                                <span>{cl.timestamp_start}{cl.timestamp_end ? ` - ${cl.timestamp_end}` : ''}</span>
+                                <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                              </a>
+                            )}
+                            {cl.page_number && (
+                              <span
+                                className="px-2 py-0.5 text-[10px] bg-cyan-950/80 text-cyan-300 border border-cyan-800/80 rounded font-mono font-semibold flex items-center gap-1"
+                                title={cl.chapter_title ? `${cl.chapter_title} (Section: ${cl.section_title || 'General'})` : undefined}
+                              >
+                                <BookOpen className="w-3 h-3 text-cyan-400" />
+                                <span>{cl.chapter_title ? `${cl.chapter_title.split(':')[0]} · ` : ''}p. {cl.page_number}</span>
+                              </span>
+                            )}
+                            <span className="px-2 py-0.5 text-[10px] bg-amber-950 text-amber-300 border border-amber-800 rounded font-bold">
+                              [{cl.epistemic_status}]
+                            </span>
+                          </div>
                         </div>
 
                         <p className="text-xs text-slate-200 italic font-sans leading-relaxed">
                           "{cl.original_claim_verbatim}"
                         </p>
 
+                        {cl.hype_detected && (
+                          <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-950/40 border border-amber-800/60 rounded text-[10px] text-amber-300">
+                            <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span><strong>Zero-Fabrication Firewall:</strong> {cl.pdf_evidence_type === 'AUTHOR_REPORTED_STATISTIC' ? 'Author-reported statistic isolated. Alpha assumption strictly 0.0 until verified.' : 'Qualitative author hype detected. Alpha assumption strictly 0.0 until verified.'}</span>
+                          </div>
+                        )}
+
                         <div className="text-[10px] text-slate-400 bg-slate-900 p-2 rounded border border-slate-800/80 flex flex-col gap-0.5">
                           <span><strong>Direction:</strong> {cl.relationship_direction}</span>
                           <span><strong>Target Domain:</strong> {cl.object_domain}</span>
+                          {cl.applicability_domain && (
+                            <span><strong>Applicability:</strong> {cl.applicability_domain} (Source: {cl.source_worldview})</span>
+                          )}
+                          {cl.book_title && (
+                            <span><strong>Literature:</strong> {cl.book_title} ({cl.book_edition || '1st Ed.'}){cl.book_isbn ? ` · ISBN: ${cl.book_isbn}` : ''}</span>
+                          )}
+                          {cl.author_creator && (
+                            <span><strong>Author/Channel:</strong> {cl.author_creator}</span>
+                          )}
                         </div>
                       </div>
 

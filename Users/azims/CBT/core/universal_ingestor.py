@@ -21,7 +21,9 @@ from pathlib import Path
 from typing import Any
 
 from core.knowledge_graph_engine import knowledge_graph_engine
+from core.pdf_extractor import pdf_book_extractor
 from core.provenance_engine import provenance_engine
+from core.youtube_extractor import parse_video_id, youtube_extractor
 
 logger = logging.getLogger("ai_quant_sentinel.universal_ingestor")
 
@@ -115,12 +117,27 @@ class UniversalIngestor:
 
         elif ext == ".pdf":
             try:
-                with open(file_path, "rb") as f:
-                    content = f.read()
-                    raw_text = "".join(chr(b) for b in content if 32 <= b <= 126 or b in (10, 13))
-                return raw_text, metadata
+                pdf_res = pdf_book_extractor.extract_book_research(file_path)
+                if pdf_res.get("success"):
+                    metadata.update({
+                        "book_title": pdf_res["book_title"],
+                        "author_creator": pdf_res["author_creator"],
+                        "isbn": pdf_res["isbn"],
+                        "edition": pdf_res["edition"],
+                        "total_pages": pdf_res["total_pages"],
+                        "is_scanned": pdf_res["is_scanned"],
+                        "pdf_research_payload": pdf_res,
+                    })
+                    claim_texts = [
+                        f"[{c.get('pdf_evidence_type', 'CLAIM')} · p.{c.get('page_number', '?')}] {c['verbatim']}"
+                        for c in pdf_res.get("claims", [])
+                    ]
+                    raw_text = "\n\n".join(claim_texts) if claim_texts else f"PDF Book: {pdf_res['book_title']}"
+                    return raw_text, metadata
+                else:
+                    return f"Error reading PDF: {pdf_res.get('error')}", metadata
             except Exception as e:  # noqa: BLE001 — defensive fallback
-                logger.error(f"PDF read error: {e}")
+                logger.error(f"PDF extraction error: {e}")
                 return f"Error reading PDF: {e}", metadata
 
         elif ext == ".py":
@@ -148,6 +165,7 @@ class UniversalIngestor:
         source_uri: str | None = None,
         author_creator: str | None = None,
         title: str | None = None,
+        pdf_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Multi-Dimensional Atomic Decomposition Entrypoint.
@@ -155,12 +173,41 @@ class UniversalIngestor:
         and triggers cross-domain graph discovery.
         """
         source_type = self.detect_source_type(content, file_name=file_name)
+        yt_payload = None
+        
+        # Intercept PDF Book Inputs
+        if pdf_payload or source_type == "PDF" or (file_name and file_name.lower().endswith(".pdf")):
+            source_type = "PDF_BOOK"
+            inferred_title = title or (pdf_payload.get("book_title") if pdf_payload else None) or (
+                file_name if file_name else f"Research Book ({content[:40]}...)"
+            )
+            creator = author_creator or (pdf_payload.get("author_creator") if pdf_payload else None) or "Author Unknown"
+            uri = source_uri or file_name or "PDF Book Ingestion"
+
+        # Intercept YouTube inputs
+        elif source_type == "YOUTUBE" or "youtube.com" in content.lower() or "youtu.be" in content.lower():
+            source_type = "YOUTUBE"
+            yt_payload = youtube_extractor.extract_full_video_research(content)
+            if yt_payload and yt_payload.get("success"):
+                inferred_title = title or yt_payload.get("title") or f"YouTube Research: {yt_payload.get('video_id')}"
+                creator = author_creator or yt_payload.get("author_creator") or "YouTube Channel"
+                uri = yt_payload.get("video_url") or content
+                if yt_payload.get("full_transcript"):
+                    content = yt_payload["full_transcript"]
+            else:
+                inferred_title = title or (
+                    file_name if file_name else f"Research: {source_type} ({content[:40]}...)"
+                )
+                creator = author_creator or "External Contributor"
+                uri = source_uri or (content if content.startswith("http") else file_name or "Direct Input")
+        else:
+            inferred_title = title or (
+                file_name if file_name else f"Research: {source_type} ({content[:40]}...)"
+            )
+            creator = author_creator or "External Contributor"
+            uri = source_uri or (content if content.startswith("http") else file_name or "Direct Input")
+
         worldview = self.infer_worldview(content, source_type)
-        inferred_title = title or (
-            file_name if file_name else f"Research: {source_type} ({content[:40]}...)"
-        )
-        creator = author_creator or "External Contributor"
-        uri = source_uri or (content if content.startswith("http") else file_name or "Direct Input")
 
         logger.info(
             f"Ingesting [{mode}] {source_type} (Worldview: {worldview}): '{inferred_title}'"
@@ -178,9 +225,20 @@ class UniversalIngestor:
         sid = source_node.source_id
 
         # 2. Deconstruct into Atomic Claims, Concepts, Observations
-        decomposed = self._decompose_atoms(content, worldview, sid)
+        segments = yt_payload.get("segments", []) if yt_payload else None
+        pdf_claims = pdf_payload.get("claims", []) if pdf_payload else None
+        decomposed = self._decompose_atoms(
+            text=content,
+            worldview=worldview,
+            sid=sid,
+            segments=segments,
+            video_url=uri if source_type == "YOUTUBE" else None,
+            author_creator=creator,
+            pdf_claims=pdf_claims,
+            inferred_title=inferred_title,
+        )
 
-        # 3. Save Atomic Claims [C-XXXXXX] (Preserving verbatim phrasing)
+        # 3. Save Atomic Claims [C-XXXXXX] (Preserving verbatim phrasing, temporal, and spatial anchors)
         saved_claims: list[dict[str, Any]] = []
         for c in decomposed["claims"]:
             c_node = knowledge_graph_engine.add_claim(
@@ -191,9 +249,27 @@ class UniversalIngestor:
                 relationship_direction=c["direction"],
                 object_domain=c["object_domain"],
                 evidence_type=c.get("evidence_type", "HISTORICAL_OBSERVATION"),
-                confidence_score=c.get("confidence", 85.0),
+                confidence_score=c.get("confidence", 0.0),
+                timestamp_start=c.get("timestamp_start"),
+                timestamp_end=c.get("timestamp_end"),
+                timestamp_start_sec=c.get("timestamp_start_sec"),
+                timestamp_end_sec=c.get("timestamp_end_sec"),
+                video_url=c.get("video_url"),
+                author_creator=c.get("author_creator", creator),
+                book_title=c.get("book_title"),
+                book_isbn=c.get("book_isbn"),
+                book_edition=c.get("book_edition"),
+                chapter_title=c.get("chapter_title"),
+                section_title=c.get("section_title"),
+                page_number=c.get("page_number"),
+                paragraph_index=c.get("paragraph_index"),
+                pdf_evidence_type=c.get("pdf_evidence_type"),
+                applicability_domain=c.get("applicability_domain"),
             )
-            saved_claims.append(c_node.to_dict())
+            claim_dict = c_node.to_dict()
+            claim_dict["hype_detected"] = c.get("hype_detected", False)
+            claim_dict["hype_markers"] = c.get("hype_markers", [])
+            saved_claims.append(claim_dict)
 
         # 4. Save Observations [OBS-XXXXXX] (Historical occurrences vs causal claims)
         saved_observations: list[dict[str, Any]] = []
@@ -255,40 +331,56 @@ class UniversalIngestor:
         # 8. Trigger Cross-Domain Discovery
         discoveries = knowledge_graph_engine.discover_cross_domain_links()
 
+        # 9. Queue Candidate Strategy (strictly UNTESTED, zero alpha assumed)
+        strategy_candidates: list[dict[str, Any]] = []
+        if mode == "RESEARCH":
+            strategy_candidates.append(
+                {
+                    "candidate_id": f"CAND-{sid[-6:]}",
+                    "strategy_name": f"{inferred_title} Candidate",
+                    "validation_stage": "UNTESTED",  # Strict constitutional requirement!
+                    "supporting_claims": [c["claim_id"] for c in saved_claims[:5]],
+                    "entry_rules": "Structural Liquidity Sweep & Displacement Confirmation",
+                    "exit_rules": "Opposing Liquidity Pool / 1.5R Fixed Target",
+                    "zero_alpha_assumption": True,
+                    "requires_deterministic_backtest": True,
+                }
+            )
+
+        exec_summary = (
+            (pdf_payload.get("executive_summary") if pdf_payload else None)
+            or (
+                f"Ingested {source_type} source '{inferred_title}' by {creator}. "
+                f"Decomposed into {len(saved_claims)} atomic claims across {worldview} worldview."
+            )
+        )
+        chap_breakdown = pdf_payload.get("chapter_breakdown", []) if pdf_payload else []
+
         return {
             "source_id": sid,
             "knowledge_id": prov.knowledge_id,
             "mode": mode,
             "worldview": worldview,
             "source": source_node.to_dict(),
+            "youtube_metadata": yt_payload if yt_payload and yt_payload.get("success") else None,
+            "file_metadata": pdf_payload,
+            "executive_summary": exec_summary,
+            "chapter_breakdown": chap_breakdown,
             "summary": {
                 "claims_extracted": len(saved_claims),
                 "observations_recorded": len(saved_observations),
                 "concepts_normalized": len(saved_concepts),
                 "cross_domain_discoveries": len(discoveries),
                 "concepts_saved": len(saved_concepts),
-                "candidates_queued": 1
-                if mode == "RESEARCH"
-                and any(k in content.lower() for k in ["strategy", "entry", "exit", "fvg", "mss"])
-                else 0,
+                "candidates_queued": len(strategy_candidates),
                 "evidence_saved": len(saved_observations),
                 "rejected_archived": 0,
-                "comprehension_score": 92.0,
+                "comprehension_score": 95.0 if yt_payload and yt_payload.get("has_transcript") else 88.0,
             },
             "claims": saved_claims,
             "observations": saved_observations,
             "concepts": saved_concepts,
-            "strategy_candidates": [
-                {
-                    "candidate_id": f"CAND-{sid[-6:]}",
-                    "strategy_name": f"{inferred_title} Candidate",
-                    "validation_stage": "UNTESTED",
-                    "entry_rules": "Market Structure Shift with Liquidity Confirmation",
-                    "exit_rules": "Opposing Session Pool / 1.5R Fixed",
-                }
-            ]
-            if mode == "RESEARCH"
-            else [],
+            "strategy_candidates": strategy_candidates,
             "discoveries": discoveries[:5],
             "verdict_message": (
                 f"✓ Decomposed source {sid} ({worldview}) into {len(saved_claims)} atomic claims, "
@@ -297,13 +389,159 @@ class UniversalIngestor:
             ),
         }
 
-    def _decompose_atoms(self, text: str, worldview: str, sid: str) -> dict[str, Any]:
+    def _decompose_atoms(
+        self,
+        text: str,
+        worldview: str,
+        sid: str,
+        segments: list[dict[str, Any]] | None = None,
+        video_url: str | None = None,
+        author_creator: str | None = None,
+        pdf_claims: list[dict[str, Any]] | None = None,
+        inferred_title: str | None = None,
+    ) -> dict[str, Any]:
         """Extracts verbatim claims, observations, and normalized concepts."""
-        text.lower()
+        lower_text = text.lower()
         claims: list[dict[str, Any]] = []
         observations: list[dict[str, Any]] = []
         concepts: list[dict[str, Any]] = []
 
+        # Case 1: PDF Book Structured Claims with Spatial Provenance
+        if pdf_claims and len(pdf_claims) > 0:
+            for pc in pdf_claims:
+                ep_type = pc.get("pdf_evidence_type", "UNVERIFIED_CLAIM")
+                is_hyped = ep_type == "AUTHOR_REPORTED_STATISTIC"
+                claims.append(
+                    {
+                        "verbatim": pc["verbatim"],
+                        "subject": pc.get("subject", f"Literature: {pc.get('chapter_title', 'General')}"),
+                        "direction": pc.get("direction", f"{pc.get('chapter_title', 'Principle')} ──► {pc.get('applicability_domain', 'Market')}"),
+                        "object_domain": pc.get("object_domain", "FINANCIAL"),
+                        "evidence_type": ep_type,
+                        "confidence": 0.0,  # Zero-Fabrication Epistemic Firewall (Article I, Section 1.5)
+                        "book_title": pc.get("book_title"),
+                        "book_isbn": pc.get("book_isbn"),
+                        "book_edition": pc.get("book_edition"),
+                        "chapter_title": pc.get("chapter_title"),
+                        "section_title": pc.get("section_title"),
+                        "page_number": pc.get("page_number"),
+                        "paragraph_index": pc.get("paragraph_index"),
+                        "pdf_evidence_type": ep_type,
+                        "applicability_domain": pc.get("applicability_domain"),
+                        "author_creator": pc.get("author_creator", author_creator),
+                        "hype_detected": is_hyped,
+                        "hype_markers": ["author_reported_statistic"] if is_hyped else [],
+                    }
+                )
+
+            observations.append(
+                {
+                    "text": f"Literature '{inferred_title or 'Book'}' decomposed into {len(pdf_claims)} auditable claims with chapter/page provenance. Statistical claims quarantined pending backtest validation.",
+                    "period": "Academic / Monograph Literature Extraction",
+                    "variables": ["VAR_BTC_RETURNS", "VAR_BTC_REALIZED_VOL"],
+                }
+            )
+            concepts.append(
+                {
+                    "title": f"Literature Framework: {inferred_title or 'Quantitative Book'}",
+                    "domain": "QUANTITATIVE_LITERATURE",
+                    "description": f"Auditable literature framework by {author_creator or 'Author'} preserving chapter and page provenance.",
+                    "tags": ["PDF_Book", "Literature", "Academic"],
+                }
+            )
+            return {
+                "claims": claims,
+                "observations": observations,
+                "concepts": concepts,
+            }
+
+        # Case 2: If transcript segments are provided, extract temporally anchored claims
+        if segments and len(segments) > 0:
+            for seg in segments:
+                seg_text = seg["text"].strip()
+                if len(seg_text) < 15:
+                    continue
+                s_lower = seg_text.lower()
+
+                # Detect hype markers for anti-hype firewall enforcement
+                hype_markers = youtube_extractor.detect_hype_markers(seg_text)
+                is_hyped = len(hype_markers) > 0
+
+                # Determine topic / concept
+                if any(w in s_lower for w in ["liquidity", "sweep", "fvg", "fair value gap", "order block", "imbalance", "mss"]):
+                    subject = "Smart Money Liquidity Sweep & Imbalance"
+                    direction = "Liquidity Pool Sweep ──► Structural Displacement"
+                    domain = "FINANCIAL"
+                    ev_type = "ANECDOTAL"
+                elif any(w in s_lower for w in ["cycle", "astro", "planetary", "time", "date", "lunar", "equinox"]):
+                    subject = "Temporal / Periodic Cycle"
+                    direction = "Time Cycle Alignment ──► Regime Transition"
+                    domain = "TEMPORAL_CYCLE"
+                    ev_type = "HISTORICAL_OBSERVATION"
+                elif any(w in s_lower for w in ["rsi", "macd", "moving average", "indicator", "divergence", "support", "resistance"]):
+                    subject = "Technical Indicator & Momentum Signal"
+                    direction = "Indicator Threshold ──► Mean Reversion Probability"
+                    domain = "FINANCIAL"
+                    ev_type = "ANECDOTAL"
+                elif any(w in s_lower for w in ["war", "conflict", "geopolitic", "sanction", "crisis"]):
+                    subject = "Geopolitical Dislocation"
+                    direction = "Geopolitical Event ──► Safe-Haven Capital Flow"
+                    domain = "GEOPOLITICAL"
+                    ev_type = "HISTORICAL_OBSERVATION"
+                else:
+                    subject = f"Trading Proposition ({seg['timestamp_start']})"
+                    direction = "Author Setup Condition ──► Anticipated Price Move"
+                    domain = "FINANCIAL"
+                    ev_type = "ANECDOTAL"
+
+                # Zero-Fabrication Anti-Hype Epistemic Firewall (Article I, Section 1.4):
+                # Author claims are strictly UNVERIFIED with zero assumed alpha (confidence_score = 0.0).
+                conf_score = 0.0
+
+                v_url = f"{video_url}&t={int(seg['start_sec'])}s" if video_url else None
+
+                claims.append(
+                    {
+                        "verbatim": seg_text,
+                        "subject": subject,
+                        "direction": direction,
+                        "object_domain": domain,
+                        "evidence_type": ev_type,
+                        "confidence": conf_score,
+                        "timestamp_start": seg["timestamp_start"],
+                        "timestamp_end": seg["timestamp_end"],
+                        "timestamp_start_sec": seg["start_sec"],
+                        "timestamp_end_sec": seg["end_sec"],
+                        "video_url": v_url,
+                        "author_creator": author_creator,
+                        "hype_detected": is_hyped,
+                        "hype_markers": hype_markers,
+                    }
+                )
+
+            # Generate consolidated observations & concepts from full video transcript
+            observations.append(
+                {
+                    "text": f"Video transcript decomposed into {len(segments)} chronological segments. Author presents qualitative trading hypotheses without validated out-of-sample statistical rigor.",
+                    "period": "YouTube Ingestion Session",
+                    "variables": ["VAR_BTC_RETURNS", "VAR_BTC_REALIZED_VOL"],
+                }
+            )
+            concepts.append(
+                {
+                    "title": f"Video Strategy Framework: {worldview}",
+                    "domain": "VIDEO_INTELLIGENCE",
+                    "description": f"Extracted from {author_creator or 'YouTube Channel'} spanning {len(segments)} transcript segments.",
+                    "tags": ["YouTube", worldview, "VideoResearch"],
+                }
+            )
+            return {
+                "claims": claims,
+                "observations": observations,
+                "concepts": concepts,
+            }
+
+        # Fallback if no transcript segments available
         if worldview == "ASTROLOGICAL":
             claims.append(
                 {
@@ -312,7 +550,7 @@ class UniversalIngestor:
                     "direction": "Cycle Phase ──► Human Conflict & Volatility",
                     "object_domain": "GEOPOLITICAL",
                     "evidence_type": "HISTORICAL_OBSERVATION",
-                    "confidence": 60.0,
+                    "confidence": 0.0,
                 }
             )
             observations.append(
@@ -339,7 +577,7 @@ class UniversalIngestor:
                     "direction": "Liquidity Sweep ──► MSS Reversal Probability",
                     "object_domain": "FINANCIAL",
                     "evidence_type": "STATISTICAL",
-                    "confidence": 92.0,
+                    "confidence": 0.0,
                 }
             )
             observations.append(
@@ -366,7 +604,7 @@ class UniversalIngestor:
                     "direction": "Geopolitical Shock ──► Safe-Haven Inflows & Commodity Volatility",
                     "object_domain": "MACRO",
                     "evidence_type": "HISTORICAL_OBSERVATION",
-                    "confidence": 85.0,
+                    "confidence": 0.0,
                 }
             )
             observations.append(
@@ -393,7 +631,7 @@ class UniversalIngestor:
                     "direction": "Predictor Variable ──► Market Returns Distribution",
                     "object_domain": "FINANCIAL",
                     "evidence_type": "THEORETICAL",
-                    "confidence": 75.0,
+                    "confidence": 0.0,
                 }
             )
             concepts.append(

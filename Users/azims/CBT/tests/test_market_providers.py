@@ -13,6 +13,7 @@ from core.market_providers import (
     BinanceMarketDataProvider,
     BybitMarketDataProvider,
     CompositeMarketDataGateway,
+    SQLiteCacheProvider,
     SyntheticMarketProvider,
 )
 
@@ -108,3 +109,42 @@ async def test_composite_market_gateway():
     assert "active_provider" in health
     assert "providers" in health
     assert len(health["providers"]) >= 4
+
+
+@pytest.mark.asyncio
+async def test_sqlite_cache_provider_staleness_guard():
+    """Verify SQLiteCacheProvider rejects cached candles older than 15 minutes."""
+    from core.causal_firewall import causal_firewall
+    from core.database import db_manager
+
+    provider = SQLiteCacheProvider()
+    now_ms = causal_firewall.get_current_time_ms()
+
+    with db_manager.get_market_conn() as conn:
+        # Insert a stale candle (2 hours old)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO candles (timestamp, symbol, timeframe, open, high, low, close, volume)
+            VALUES (?, 'TEST_STALE/USDT', '15m', 100.0, 105.0, 95.0, 102.0, 500.0);
+            """,
+            (now_ms - 2 * 3600 * 1000,),
+        )
+        # Insert a fresh candle (2 minutes old)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO candles (timestamp, symbol, timeframe, open, high, low, close, volume)
+            VALUES (?, 'TEST_FRESH/USDT', '15m', 200.0, 205.0, 195.0, 202.0, 500.0);
+            """,
+            (now_ms - 2 * 60 * 1000,),
+        )
+        conn.commit()
+
+    # Stale candle must be rejected
+    stale_ticker = await provider.fetch_live_ticker("TEST_STALE/USDT")
+    assert stale_ticker is None
+
+    # Fresh candle must be accepted
+    fresh_ticker = await provider.fetch_live_ticker("TEST_FRESH/USDT")
+    assert fresh_ticker is not None
+    assert fresh_ticker["price"] == 202.0
+

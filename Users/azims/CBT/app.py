@@ -297,6 +297,17 @@ class PaperCloseRequest(BaseModel):
     exitPrice: Optional[float] = Field(default=None, gt=0)
 
 
+class HalfKellyCalcRequest(BaseModel):
+    symbol: str = "BTC/USDT"
+    entryPrice: float = Field(gt=0)
+    sl: float = Field(gt=0)
+    tp: float = Field(gt=0)
+    equity: Optional[float] = None
+    winProbability: Optional[float] = 0.55
+    historicalSampleSize: Optional[int] = 50
+    currentDrawdownPct: Optional[float] = 0.0
+
+
 class IngestSourceRequest(BaseModel):
     source_type: str  # "URL", "PDF", "AUDIO", "IMAGE", "TEXT", "YOUTUBE"
     content: str
@@ -1147,6 +1158,57 @@ async def get_allocation_sizing(
     return result
 
 
+@app.post("/api/risk/half-kelly-calc")
+async def calculate_half_kelly(req: HalfKellyCalcRequest):
+    """
+    Bayesian Half-Kelly Expectancy Position Sizing & Invalidation Control.
+    Calculates exact mathematical capital allocation f_half, base units, and dollar risk cap.
+    """
+    equity = req.equity
+    if equity is None or equity <= 0:
+        accounting = portfolio_shadow.get_portfolio_accounting(base_balance=100000.0)
+        equity = float(accounting.get("virtual_equity", 100000.0))
+
+    res = half_kelly_position_sizer.calculate_sizing(
+        account_equity=equity,
+        entry_price=req.entryPrice,
+        stop_loss=req.sl,
+        take_profit=req.tp,
+        win_probability=req.winProbability or 0.55,
+        historical_sample_size=req.historicalSampleSize or 50,
+        current_drawdown_pct=req.currentDrawdownPct or 0.0,
+        symbol=req.symbol,
+    )
+    return asdict(res)
+
+
+@app.get("/api/risk/half-kelly-calc")
+async def get_half_kelly_calc(
+    symbol: str = Query("BTC/USDT"),
+    entryPrice: float = Query(...),
+    sl: float = Query(...),
+    tp: float = Query(...),
+    equity: Optional[float] = Query(None),
+    winProbability: Optional[float] = Query(0.55),
+):
+    """
+    Query-based Bayesian Half-Kelly calculator for quick terminal inspections.
+    """
+    if equity is None or equity <= 0:
+        accounting = portfolio_shadow.get_portfolio_accounting(base_balance=100000.0)
+        equity = float(accounting.get("virtual_equity", 100000.0))
+
+    res = half_kelly_position_sizer.calculate_sizing(
+        account_equity=equity,
+        entry_price=entryPrice,
+        stop_loss=sl,
+        take_profit=tp,
+        win_probability=winProbability or 0.55,
+        symbol=symbol,
+    )
+    return asdict(res)
+
+
 @app.get("/api/shadow/positions")
 async def get_shadow_positions():
     open_pos = portfolio_shadow.get_open_positions()
@@ -1386,19 +1448,40 @@ async def get_paper_desk_overview():
         },
     ]
 
-    wins = sum(1 for p in past if p.get("realizedPnlUsd", 0) > 0)
-    total_trades = max(1, len(past))
-    win_rate = round((wins / total_trades) * 100.0, 1)
+    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "100000.0"))
+    accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)
+
+    if accounting["closed_positions_count"] > 0:
+        total_realized = accounting["total_realized_pnl"]
+        win_rate = accounting["win_rate_pct"]
+        pf = accounting["profit_factor"]
+    else:
+        actual_realized = sum(float(p.get("realizedPnlUsd", 0.0)) for p in past)
+        total_realized = round(actual_realized, 2)
+        wins = [p for p in past if float(p.get("realizedPnlUsd", 0.0)) > 0]
+        losses = [p for p in past if float(p.get("realizedPnlUsd", 0.0)) < 0]
+        gp = sum(float(p.get("realizedPnlUsd", 0.0)) for p in wins)
+        gl = abs(sum(float(p.get("realizedPnlUsd", 0.0)) for p in losses))
+        win_rate = round((len(wins) / len(past) * 100.0), 1) if past else 0.0
+        pf = round(gp / gl, 2) if gl > 0 else (round(gp, 2) if gp > 0 else 0.0)
+
+    settled_cash = round(base_balance + total_realized, 2)
+    total_unrealized = accounting["total_unrealized_pnl"]
+    virtual_equity = round(settled_cash + total_unrealized, 2)
 
     return {
         "summary": {
-            "accountBalance": 100000.0,
+            "startingCapital": round(base_balance, 2),
+            "settledCash": settled_cash,
+            "virtualEquity": virtual_equity,
+            "accountBalance": settled_cash,
             "totalRealizedPnl": round(total_realized, 2),
             "totalUnrealizedPnl": round(total_unrealized, 2),
             "winRatePct": win_rate,
-            "profitFactor": 2.45,
+            "profitFactor": pf,
             "openPositionsCount": len(current),
             "closedPositionsCount": len(past),
+            "activeRiskPct": accounting["active_risk_pct"],
             "maxRiskCapPct": 2.50,
             "circuitBreakerStatus": "NORMAL",
         },
@@ -1440,13 +1523,17 @@ async def get_paper_risk_config():
     """
     Returns the active paper desk risk configuration for the Web UI.
     """
+    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "100000.0"))
+    accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)
     return {
         "config": {
-            "accountBalance": 100000.0,
+            "accountBalance": accounting["settled_cash"],
+            "startingCapital": accounting["starting_capital"],
+            "virtualEquity": accounting["virtual_equity"],
             "maxDrawdown": 0.025,
-            "maxOpenTrades": 3,
-            "dailyLossLimit": 2500.0,
-            "maxRiskPerTrade": 0.02,
+            "maxOpenTrades": int(os.getenv("MAX_PAPER_OPEN_POSITIONS", "3")),
+            "dailyLossLimit": round(accounting["settled_cash"] * 0.05, 2),
+            "maxRiskPerTrade": float(os.getenv("MAX_PAPER_RISK_PCT", "0.02")),
         }
     }
 
@@ -1735,8 +1822,9 @@ async def ingest_research_file(
             mode=mode.upper(),
             file_name=original_name,
             source_uri=str(dest_path),
-            author_creator=author_creator or "File Upload",
-            title=title or original_name,
+            author_creator=author_creator or metadata.get("author_creator") or "File Upload",
+            title=title or metadata.get("book_title") or original_name,
+            pdf_payload=metadata.get("pdf_research_payload"),
         )
         result["file_metadata"] = metadata
         return sanitize_numpy(result)

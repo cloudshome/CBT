@@ -10,6 +10,7 @@ import {
   DeskBriefResponse,
   DeskAskResponse,
   SupportedTimeframe,
+  HalfKellySizingResponse,
   SKYIntelligenceResponse,
   VWAPData,
   ResearchIngestMode,
@@ -234,6 +235,26 @@ export const api = {
       body: JSON.stringify({ positionId, exitPrice }),
     });
     return handleResponse<{ status: string; message: string }>(res);
+  },
+
+  /**
+   * POST /api/risk/half-kelly-calc
+   * Bayesian Half-Kelly capital sizing calculator with invalidation guard.
+   */
+  async calculateHalfKelly(params: {
+    symbol: string;
+    entryPrice: number;
+    sl: number;
+    tp: number;
+    equity?: number;
+    winProbability?: number;
+  }): Promise<HalfKellySizingResponse> {
+    const res = await authFetch(`${BASE_URL}/api/risk/half-kelly-calc`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<HalfKellySizingResponse>(res);
   },
 
   /**

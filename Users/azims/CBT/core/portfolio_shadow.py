@@ -166,6 +166,15 @@ class PortfolioShadowManager:
                     is_closed = True
                     close_reason = "STOP_LOSS_HIT"
 
+            exit_fill_price = current_price
+            if is_closed:
+                if close_reason == "TAKE_PROFIT_HIT":
+                    exit_fill_price = tp_p
+                    final_pnl = ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
+                elif close_reason == "STOP_LOSS_HIT":
+                    exit_fill_price = active_sl
+                    final_pnl = ((active_sl - entry_p) * size) if is_long else ((entry_p - active_sl) * size)
+
             # Update database
             with db_manager.get_trading_conn() as conn:
                 if is_closed:
@@ -179,7 +188,7 @@ class PortfolioShadowManager:
                             status = 'CLOSED'
                         WHERE position_id = ?;
                         """,
-                        (now, current_price, final_pnl, pos_id),
+                        (now, exit_fill_price, final_pnl, pos_id),
                     )
                     conn.commit()
 
@@ -190,7 +199,7 @@ class PortfolioShadowManager:
                             trade_id=pos_id,
                             symbol=symbol,
                             entry_price=entry_p,
-                            exit_price=current_price,
+                            exit_price=exit_fill_price,
                             direction=direction,
                             pnl_usd=final_pnl,
                         )
@@ -333,6 +342,73 @@ class PortfolioShadowManager:
             )
             rows = cursor.fetchall()
         return [dict(r) for r in rows]
+
+    def get_portfolio_accounting(self, starting_capital: float = 100000.0) -> dict[str, Any]:
+        """
+        Computes the authoritative accounting ledger for the shadow portfolio.
+        Invariants:
+          settled_cash = starting_capital + total_realized_pnl
+          virtual_equity = settled_cash + total_unrealized_pnl
+        """
+        open_positions = self.get_open_positions()
+        all_positions = self.get_all_positions(limit=500)
+        closed_positions = [p for p in all_positions if p.get("status") == "CLOSED"]
+
+        total_realized_pnl = sum(float(p.get("realized_pnl", 0.0)) for p in closed_positions)
+        total_unrealized_pnl = sum(float(p.get("unrealized_pnl", 0.0)) for p in open_positions)
+
+        settled_cash = starting_capital + total_realized_pnl
+        virtual_equity = settled_cash + total_unrealized_pnl
+
+        # Profit Factor & Win Rate
+        winning_trades = [p for p in closed_positions if float(p.get("realized_pnl", 0.0)) > 0.0]
+        losing_trades = [p for p in closed_positions if float(p.get("realized_pnl", 0.0)) < 0.0]
+
+        gross_profit = sum(float(p.get("realized_pnl", 0.0)) for p in winning_trades)
+        gross_loss = abs(sum(float(p.get("realized_pnl", 0.0)) for p in losing_trades))
+
+        if gross_loss > 0.0:
+            profit_factor = round(gross_profit / gross_loss, 2)
+        elif gross_profit > 0.0:
+            profit_factor = round(gross_profit, 2)
+        else:
+            profit_factor = 0.0
+
+        total_closed = len(closed_positions)
+        win_rate_pct = round((len(winning_trades) / total_closed * 100.0), 1) if total_closed > 0 else 0.0
+
+        # Deterministic Active Risk calculation (Stop-loss capital exposure)
+        total_active_risk_usd = 0.0
+        for p in open_positions:
+            direction = p.get("direction", "LONG").upper()
+            entry_p = float(p.get("entry_price", 0.0))
+            active_sl = float(p.get("trailing_stop") or p.get("stop_loss", 0.0))
+            size = float(p.get("size", 1.0))
+
+            if direction == "LONG":
+                risk_per_unit = max(0.0, entry_p - active_sl)
+            else:
+                risk_per_unit = max(0.0, active_sl - entry_p)
+
+            total_active_risk_usd += risk_per_unit * size
+
+        active_risk_pct = round((total_active_risk_usd / virtual_equity * 100.0), 2) if virtual_equity > 0.0 else 0.0
+
+        return {
+            "starting_capital": round(starting_capital, 2),
+            "settled_cash": round(settled_cash, 2),
+            "virtual_equity": round(virtual_equity, 2),
+            "total_realized_pnl": round(total_realized_pnl, 2),
+            "total_unrealized_pnl": round(total_unrealized_pnl, 2),
+            "gross_profit": round(gross_profit, 2),
+            "gross_loss": round(gross_loss, 2),
+            "profit_factor": profit_factor,
+            "win_rate_pct": win_rate_pct,
+            "open_positions_count": len(open_positions),
+            "closed_positions_count": len(closed_positions),
+            "total_active_risk_usd": round(total_active_risk_usd, 2),
+            "active_risk_pct": active_risk_pct,
+        }
 
 
 # Singleton

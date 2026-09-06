@@ -59,6 +59,21 @@ class ClaimNode:
     evidence_type: str  # HISTORICAL_OBSERVATION, ANECDOTAL, THEORETICAL, STATISTICAL
     epistemic_status: str = "UNVERIFIED"  # UNVERIFIED, HYPOTHESIZED, EMPIRICALLY_TESTED, REFUTED
     confidence_score: float = 0.0
+    timestamp_start: str | None = None  # e.g. "18:42"
+    timestamp_end: str | None = None    # e.g. "19:17"
+    timestamp_start_sec: float | None = None  # e.g. 1122.0
+    timestamp_end_sec: float | None = None    # e.g. 1157.0
+    video_url: str | None = None
+    author_creator: str | None = None
+    book_title: str | None = None
+    book_isbn: str | None = None
+    book_edition: str | None = None
+    chapter_title: str | None = None
+    section_title: str | None = None
+    page_number: int | None = None
+    paragraph_index: int | None = None
+    pdf_evidence_type: str | None = None  # DEFINITION, AUTHOR_REPORTED_STATISTIC, PROPOSED_RULE, HISTORICAL_OBSERVATION, REPORTED_RESEARCH, UNVERIFIED_CLAIM
+    applicability_domain: str | None = None  # CRYPTO_DIRECT, MARKET_GENERAL, MACRO, RISK, PSYCHOLOGY
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
 
     def to_dict(self) -> dict[str, Any]:
@@ -174,6 +189,21 @@ class KnowledgeGraphEngine:
                     evidence_type TEXT NOT NULL,
                     epistemic_status TEXT DEFAULT 'UNVERIFIED',
                     confidence_score REAL DEFAULT 0.0,
+                    timestamp_start TEXT,
+                    timestamp_end TEXT,
+                    timestamp_start_sec REAL,
+                    timestamp_end_sec REAL,
+                    video_url TEXT,
+                    author_creator TEXT,
+                    book_title TEXT,
+                    book_isbn TEXT,
+                    book_edition TEXT,
+                    chapter_title TEXT,
+                    section_title TEXT,
+                    page_number INTEGER,
+                    paragraph_index INTEGER,
+                    pdf_evidence_type TEXT,
+                    applicability_domain TEXT,
                     created_at INTEGER NOT NULL,
                     FOREIGN KEY(source_id) REFERENCES research_provenance_sources(source_id)
                 );
@@ -236,6 +266,31 @@ class KnowledgeGraphEngine:
                 """
             )
             conn.commit()
+
+            # Safe column migration for existing databases
+            for col_name, col_type in [
+                ("timestamp_start", "TEXT"),
+                ("timestamp_end", "TEXT"),
+                ("timestamp_start_sec", "REAL"),
+                ("timestamp_end_sec", "REAL"),
+                ("video_url", "TEXT"),
+                ("author_creator", "TEXT"),
+                ("book_title", "TEXT"),
+                ("book_isbn", "TEXT"),
+                ("book_edition", "TEXT"),
+                ("chapter_title", "TEXT"),
+                ("section_title", "TEXT"),
+                ("page_number", "INTEGER"),
+                ("paragraph_index", "INTEGER"),
+                ("pdf_evidence_type", "TEXT"),
+                ("applicability_domain", "TEXT"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE research_claims ADD COLUMN {col_name} {col_type};")
+                    conn.commit()
+                except Exception:
+                    pass
+
             logger.info("SKY Knowledge & Discovery Graph schema initialized.")
 
     def _seed_standard_variables(self) -> None:
@@ -332,6 +387,21 @@ class KnowledgeGraphEngine:
         object_domain: str,
         evidence_type: str = "HISTORICAL_OBSERVATION",
         confidence_score: float = 0.0,
+        timestamp_start: str | None = None,
+        timestamp_end: str | None = None,
+        timestamp_start_sec: float | None = None,
+        timestamp_end_sec: float | None = None,
+        video_url: str | None = None,
+        author_creator: str | None = None,
+        book_title: str | None = None,
+        book_isbn: str | None = None,
+        book_edition: str | None = None,
+        chapter_title: str | None = None,
+        section_title: str | None = None,
+        page_number: int | None = None,
+        paragraph_index: int | None = None,
+        pdf_evidence_type: str | None = None,
+        applicability_domain: str | None = None,
     ) -> ClaimNode:
         cid = self.generate_id("C")
         now = int(time.time() * 1000)
@@ -342,8 +412,13 @@ class KnowledgeGraphEngine:
                 INSERT INTO research_claims (
                     claim_id, source_id, original_claim_verbatim, source_worldview,
                     subject_concept, relationship_direction, object_domain,
-                    evidence_type, epistemic_status, confidence_score, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'UNVERIFIED', ?, ?);
+                    evidence_type, epistemic_status, confidence_score,
+                    timestamp_start, timestamp_end, timestamp_start_sec, timestamp_end_sec,
+                    video_url, author_creator,
+                    book_title, book_isbn, book_edition, chapter_title, section_title,
+                    page_number, paragraph_index, pdf_evidence_type, applicability_domain,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'UNVERIFIED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     cid,
@@ -355,6 +430,21 @@ class KnowledgeGraphEngine:
                     object_domain.upper(),
                     evidence_type.upper(),
                     float(confidence_score),
+                    timestamp_start,
+                    timestamp_end,
+                    timestamp_start_sec,
+                    timestamp_end_sec,
+                    video_url,
+                    author_creator,
+                    book_title,
+                    book_isbn,
+                    book_edition,
+                    chapter_title,
+                    section_title,
+                    page_number,
+                    paragraph_index,
+                    pdf_evidence_type,
+                    applicability_domain,
                     now,
                 ),
             )
@@ -371,6 +461,21 @@ class KnowledgeGraphEngine:
             evidence_type=evidence_type.upper(),
             epistemic_status="UNVERIFIED",
             confidence_score=confidence_score,
+            timestamp_start=timestamp_start,
+            timestamp_end=timestamp_end,
+            timestamp_start_sec=timestamp_start_sec,
+            timestamp_end_sec=timestamp_end_sec,
+            video_url=video_url,
+            author_creator=author_creator,
+            book_title=book_title,
+            book_isbn=book_isbn,
+            book_edition=book_edition,
+            chapter_title=chapter_title,
+            section_title=section_title,
+            page_number=page_number,
+            paragraph_index=paragraph_index,
+            pdf_evidence_type=pdf_evidence_type,
+            applicability_domain=applicability_domain,
             created_at=now,
         )
 

@@ -351,6 +351,8 @@ class SQLiteCacheProvider(BaseMarketDataProvider):
         return None
 
     async def fetch_live_ticker(self, symbol: str) -> dict[str, Any] | None:
+        max_staleness_ms = 15 * 60 * 1000  # 15-minute staleness guard
+        now_ms = causal_firewall.get_current_time_ms()
         with db_manager.get_market_conn() as conn:
             cursor = conn.execute(
                 """
@@ -361,16 +363,23 @@ class SQLiteCacheProvider(BaseMarketDataProvider):
             )
             row = cursor.fetchone()
             if row:
-                return {
-                    "symbol": symbol,
-                    "price": float(row["close"]),
-                    "change_24h_pct": 1.25,
-                    "high_24h": float(row["close"]) * 1.015,
-                    "low_24h": float(row["close"]) * 0.985,
-                    "volume_24h": 10000.0,
-                    "timestamp": row["timestamp"],
-                    "source": self.provider_name,
-                }
+                candle_time = int(row["timestamp"])
+                if (now_ms - candle_time) <= max_staleness_ms:
+                    return {
+                        "symbol": symbol,
+                        "price": float(row["close"]),
+                        "change_24h_pct": 1.25,
+                        "high_24h": float(row["close"]) * 1.015,
+                        "low_24h": float(row["close"]) * 0.985,
+                        "volume_24h": 10000.0,
+                        "timestamp": candle_time,
+                        "source": self.provider_name,
+                    }
+                logger.warning(
+                    "SQLiteCacheProvider rejecting stale candle for %s (age=%.1f min > 15m).",
+                    symbol,
+                    (now_ms - candle_time) / 60000.0,
+                )
         return None
 
     async def fetch_order_book_depth(self, symbol: str, limit: int = 10) -> dict[str, Any] | None:

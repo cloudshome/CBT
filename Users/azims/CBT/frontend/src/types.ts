@@ -99,6 +99,9 @@ export interface PaperPositionsResponse {
 
 export interface PaperDeskOverviewResponse {
   summary: {
+    startingCapital?: number;
+    settledCash?: number;
+    virtualEquity?: number;
     accountBalance: number;
     totalRealizedPnl: number;
     totalUnrealizedPnl: number;
@@ -106,6 +109,7 @@ export interface PaperDeskOverviewResponse {
     profitFactor: number;
     openPositionsCount: number;
     closedPositionsCount: number;
+    activeRiskPct?: number;
     maxRiskCapPct: number;
     circuitBreakerStatus: string;
   };
@@ -179,6 +183,24 @@ export interface RiskConfig {
   maxOpenTrades: number;
   dailyLossLimit: number;
   maxRiskPerTrade: number;
+}
+
+export interface HalfKellySizingResponse {
+  symbol: string;
+  entry_price: number;
+  stop_loss: number;
+  take_profit: number;
+  risk_reward_ratio: number;
+  raw_kelly_fraction: number;
+  half_kelly_fraction: number;
+  bayesian_shrunk_fraction: number;
+  recommended_risk_pct: number;
+  position_size_usd: number;
+  position_size_base: number;
+  max_dollar_loss: number;
+  invalidation_distance_pct: number;
+  hurdle_passed: boolean;
+  narrative: string;
 }
 
 export interface DeskBriefResponse {
@@ -608,6 +630,22 @@ export interface ResearchProvenanceItem {
   raw_content_preview: string;
   confidence_score: number;
   status: 'PROCESSING' | 'ANALYZED' | 'CANDIDATE' | 'VALIDATED' | 'REJECTED';
+  summary?: string;
+  raw_excerpt?: string;
+  facts_count?: number;
+  hypotheses_count?: number;
+  confidence?: number;
+  chapter_breakdown?: string[];
+  file_metadata?: {
+    book_title?: string;
+    author_creator?: string;
+    isbn?: string;
+    edition?: string;
+    is_scanned?: boolean;
+    ocr_provider?: string;
+    total_pages?: number;
+    pages_processed?: number;
+  };
 }
 
 export interface KnowledgeItem {
@@ -674,8 +712,12 @@ export interface ResearchVaultsResponse {
 
 export interface ResearchIngestResult {
   knowledge_id: string;
+  source_id?: string;
   mode: ResearchIngestMode;
   provenance: ResearchProvenanceItem;
+  executive_summary?: string;
+  chapter_breakdown?: string[];
+  file_metadata?: Record<string, any>;
   summary: {
     concepts_saved: number;
     candidates_queued: number;
@@ -687,6 +729,7 @@ export interface ResearchIngestResult {
   strategy_candidates: StrategyCandidateItem[];
   evidence: EvidenceItem[];
   rejected: RejectedClaimItem[];
+  claims?: ClaimNodeItem[];
   verdict_message: string;
 }
 
@@ -716,6 +759,23 @@ export interface ClaimNodeItem {
   evidence_type: string;
   epistemic_status: 'UNVERIFIED' | 'HYPOTHESIZED' | 'EMPIRICALLY_TESTED' | 'REFUTED';
   confidence_score: number;
+  timestamp_start?: string | null;
+  timestamp_end?: string | null;
+  timestamp_start_sec?: number | null;
+  timestamp_end_sec?: number | null;
+  video_url?: string | null;
+  author_creator?: string | null;
+  hype_detected?: boolean;
+  hype_markers?: string[];
+  book_title?: string | null;
+  book_isbn?: string | null;
+  book_edition?: string | null;
+  chapter_title?: string | null;
+  section_title?: string | null;
+  page_number?: number | null;
+  paragraph_index?: number | null;
+  pdf_evidence_type?: string | null;
+  applicability_domain?: string | null;
   created_at: number;
 }
 

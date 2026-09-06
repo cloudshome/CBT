@@ -13,7 +13,7 @@ import {
   BarChart3,
   X,
 } from 'lucide-react';
-import { PaperDeskOverviewResponse } from '../types';
+import { PaperDeskOverviewResponse, HalfKellySizingResponse } from '../types';
 import { api } from '../services/api';
 
 interface DedicatedPaperTradingDeskProps {
@@ -49,6 +49,45 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
   const [orderTP, setOrderTP] = useState<string>('79800');
   const [orderSize, setOrderSize] = useState<string>('1.0');
   const [orderSubmitting, setOrderSubmitting] = useState<boolean>(false);
+  const [kellyResult, setKellyResult] = useState<HalfKellySizingResponse | null>(null);
+  const [calculatingKelly, setCalculatingKelly] = useState<boolean>(false);
+  const [kellyError, setKellyError] = useState<string | null>(null);
+
+  const handleCalculateHalfKelly = async () => {
+    const entry = parseFloat(orderEntry);
+    const sl = parseFloat(orderSL);
+    const tp = parseFloat(orderTP);
+    if (!entry || !sl || !tp) {
+      setKellyError('Please enter valid Entry, SL, and TP numbers.');
+      return;
+    }
+    setCalculatingKelly(true);
+    setKellyError(null);
+    try {
+      const res = await api.calculateHalfKelly({
+        symbol: orderSymbol,
+        entryPrice: entry,
+        sl: sl,
+        tp: tp,
+        equity: data?.summary?.virtualEquity || 100000.0,
+      });
+      setKellyResult(res);
+      if (res.hurdle_passed && res.position_size_base > 0) {
+        // Auto-suggest the calculated size
+        setOrderSize(res.position_size_base.toString());
+      }
+    } catch (err: any) {
+      setKellyError(err?.message || 'Failed to calculate Half-Kelly sizing');
+    } finally {
+      setCalculatingKelly(false);
+    }
+  };
+
+  const handleApplyHalfKelly = () => {
+    if (kellyResult && kellyResult.position_size_base > 0) {
+      setOrderSize(kellyResult.position_size_base.toString());
+    }
+  };
 
   const fetchDeskOverview = useCallback(async () => {
     setLoading(true);
@@ -121,6 +160,9 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
   };
 
   const summary = data?.summary || {
+    startingCapital: 100000.0,
+    settledCash: 100000.0,
+    virtualEquity: 100000.0,
     accountBalance: 100000.0,
     totalRealizedPnl: 0.0,
     totalUnrealizedPnl: 0.0,
@@ -128,6 +170,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
     profitFactor: 0.0,
     openPositionsCount: 0,
     closedPositionsCount: 0,
+    activeRiskPct: 0.0,
     maxRiskCapPct: 2.50,
     circuitBreakerStatus: 'NORMAL',
   };
@@ -190,10 +233,10 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
           <div className="bg-[#0d1424] border border-[#1e293b] rounded-lg p-3 flex flex-col justify-between">
             <span className="text-[11px] font-mono text-slate-400">VIRTUAL EQUITY</span>
             <div className="text-lg font-mono font-bold text-white mt-1">
-              ${(summary.accountBalance + summary.totalUnrealizedPnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${(summary.virtualEquity ?? ((summary.settledCash ?? summary.accountBalance) + summary.totalUnrealizedPnl)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-[10px] font-mono text-slate-500 mt-1">
-              Base: ${summary.accountBalance.toLocaleString()}
+              Base: ${(summary.startingCapital ?? 100000).toLocaleString()}
             </div>
           </div>
 
@@ -239,7 +282,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
           <div className="bg-[#0d1424] border border-[#1e293b] rounded-lg p-3 flex flex-col justify-between">
             <span className="text-[11px] font-mono text-slate-400">ACTIVE RISK</span>
             <div className="text-lg font-mono font-bold text-amber-300 mt-1">
-              {((summary.openPositionsCount * 0.75)).toFixed(2)}%
+              {(summary.activeRiskPct ?? 0).toFixed(2)}%
             </div>
             <div className="text-[10px] font-mono text-slate-500 mt-1">
               Max Cap: {summary.maxRiskCapPct}%
@@ -758,6 +801,94 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                     required
                   />
                 </div>
+              </div>
+
+              {/* Half-Kelly Sizing Panel */}
+              <div className="bg-[#0b101d] border border-[#1e293b] rounded-lg p-3 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-sky-400 flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-sky-400" />
+                    Bayesian Half-Kelly Sizer
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCalculateHalfKelly}
+                    disabled={calculatingKelly}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 rounded transition-all disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {calculatingKelly ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        Calculating...
+                      </>
+                    ) : (
+                      '⚡ Calculate Sizing'
+                    )}
+                  </button>
+                </div>
+
+                {kellyError && (
+                  <div className="text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded p-1.5">
+                    {kellyError}
+                  </div>
+                )}
+
+                {kellyResult && (
+                  <div className="flex flex-col gap-2 pt-1 border-t border-[#1e293b]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">MATHEMATICAL HURDLE:</span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          kellyResult.hurdle_passed
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                        }`}
+                      >
+                        {kellyResult.hurdle_passed
+                          ? `HURDLE PASSED (+${kellyResult.risk_reward_ratio}R)`
+                          : 'NEGATIVE EXPECTANCY BLOCKED'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                      <div className="bg-[#070a12] p-1.5 rounded border border-[#1e293b]">
+                        <div className="text-slate-500">PAYOFF (R:R)</div>
+                        <div className="font-bold text-slate-200">{kellyResult.risk_reward_ratio}R</div>
+                      </div>
+                      <div className="bg-[#070a12] p-1.5 rounded border border-[#1e293b]">
+                        <div className="text-slate-500">HALF-KELLY RISK</div>
+                        <div className="font-bold text-sky-400">
+                          {(kellyResult.recommended_risk_pct * 100).toFixed(2)}%
+                        </div>
+                      </div>
+                      <div className="bg-[#070a12] p-1.5 rounded border border-[#1e293b]">
+                        <div className="text-slate-500">MAX DOLLAR LOSS</div>
+                        <div className="font-bold text-amber-400">
+                          ${kellyResult.max_dollar_loss.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-sky-950/20 border border-sky-500/30 rounded p-2 text-xs">
+                      <span className="text-sky-300">
+                        Recommended: <strong className="text-white">{kellyResult.position_size_base}</strong> units
+                      </span>
+                      {kellyResult.hurdle_passed && (
+                        <button
+                          type="button"
+                          onClick={handleApplyHalfKelly}
+                          className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 rounded transition-all"
+                        >
+                          Apply to Size
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 italic">
+                      {kellyResult.narrative}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="bg-[#070a12] border border-sky-500/30 rounded p-2 text-[11px] text-sky-300">

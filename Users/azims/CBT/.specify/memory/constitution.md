@@ -27,6 +27,26 @@ SKY is a professional cryptocurrency market-intelligence, trading decision-suppo
    - *Funding / Liquidation Event:* Information available at exchange publication timestamp $t$; earliest execution at $t + \Delta t_{\text{network}}$.
 3. **Confirmation Time vs. Event Time:** Structural milestones (BOS, CHoCH, FVG, Order Blocks, Liquidity Sweeps) must record both `event_timestamp` (origin) and `confirmation_timestamp` (causal qualification).
 
+### 1.4 The Research Lab Epistemic Firewall
+1. **The Research Lab may discover hypotheses; it may NEVER manufacture empirical evidence.**
+2. **A source may propose a mechanism. Only the quantitative research engine may establish whether that mechanism has predictive or trading value.**
+3. **Zero-Fabrication Performance Firewall:** Qualitative author assertions ("works really well", "100% win rate", "never fails", "holy grail") must NEVER be converted into quantitative assumptions ($W = 80\%$, $PF = 2.5$). All statistical parameters originate strictly from out-of-sample backtest trials.
+4. **Temporal Grounding:** Every claim extracted from multimedia sources (YouTube, podcasts, video lessons) must preserve exact temporal anchors (`timestamp_start`, `timestamp_end`) back to the source media.
+
+### 1.5 The Academic & Book Epistemic Firewall
+1. **Statistic Isolation:** Author-reported performance statistics (e.g. "70% win rate", "3.0 Sharpe ratio", "10 to 1 payoff") must be stored strictly as `AUTHOR_REPORTED_STATISTIC` with system confidence $0.0$. They must NEVER be accepted as SKY ground truth without deterministic out-of-sample backtest replication.
+2. **Hierarchical Spatial Provenance:** Every claim extracted from bound literature (PDF books, whitepapers, monographs) must preserve exact spatial provenance: $\{ \text{isbn}, \text{title}, \text{edition}, \text{chapter}, \text{section}, \text{page\_number}, \text{paragraph\_index} \}$. Unanchored claims are rejected by the research gate.
+3. **Epistemic Typology Discrimination:** Literature extracts must be partitioned into strict epistemic types:
+   - `DEFINITION` (formal mathematical/conceptual construct)
+   - `AUTHOR_REPORTED_STATISTIC` (unverified claim of empirical edge)
+   - `PROPOSED_RULE` (prescriptive entry, exit, or sizing directive)
+   - `HISTORICAL_OBSERVATION` (descriptive account of historical market events)
+   - `REPORTED_RESEARCH` (citations to academic studies)
+   - `UNVERIFIED_CLAIM` (qualitative author opinion or hypothesis)
+   - `SKY_EMPIRICAL_RESULT` (statistically verified SKY quantitative backtest)
+4. **Separation of Source Domain vs. Applicability Domain:** Material derived from non-crypto markets (traditional equities, FX, commodities, macroeconomics) must be tagged with its source domain while evaluated against its crypto applicability domain (`CRYPTO_DIRECT`, `MARKET_GENERAL`, `MACRO`, `RISK`, `PSYCHOLOGY`, etc.).
+5. **Raw Immutable Evidence vs. Vault Separation:** Raw book extracts remain immutable evidence artifacts; only concepts and candidates that survive deterministic quantitative backtesting may be promoted into the permanent Knowledge Vault.
+
 ---
 
 ## ARTICLE II — DATA PROVENANCE & EXPERIMENT IMMUTABILITY
