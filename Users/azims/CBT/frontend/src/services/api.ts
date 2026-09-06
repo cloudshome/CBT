@@ -20,6 +20,8 @@ import {
   DiscoveryGraphResponse,
   CrossDomainDiscoveryItem,
   HypothesisNodeItem,
+  ResearchTelegramShareRequest,
+  ResearchTelegramShareResponse,
 } from '../types';
 
 const BASE_URL = '';
@@ -1231,6 +1233,17 @@ export const api = {
       { method: 'POST' }
     );
     return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/research/share-telegram (Dispatch formatted literature / research summary to Telegram)
+   */
+  async sendSummaryToTelegram(payload: ResearchTelegramShareRequest): Promise<ResearchTelegramShareResponse> {
+    const res = await authFetch(`${BASE_URL}/api/research/share-telegram`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ResearchTelegramShareResponse>(res);
   },
 
   // ============================================================================

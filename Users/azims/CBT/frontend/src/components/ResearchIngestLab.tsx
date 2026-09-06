@@ -26,6 +26,7 @@ import {
   ExternalLink,
   ShieldAlert,
   X,
+  Send,
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -58,6 +59,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
 
   // Dedicated Ingestion Summary State
   const [activeSummary, setActiveSummary] = useState<ResearchIngestResult | null>(null);
+  const [sendingTelegram, setSendingTelegram] = useState<boolean>(false);
 
   // 5 Vault Tabs: KNOWLEDGE, DISCOVERY, CANDIDATES, EVIDENCE, REJECTED
   const [activeVaultTab, setActiveVaultTab] = useState<'KNOWLEDGE' | 'DISCOVERY' | 'CANDIDATES' | 'EVIDENCE' | 'REJECTED'>('DISCOVERY');
@@ -207,6 +209,87 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       rejected: [],
       verdict_message: `Viewing literature summary for ${item.title}`,
     });
+  };
+
+  const handleSendSummaryToTelegram = async () => {
+    if (!activeSummary) return;
+    try {
+      setSendingTelegram(true);
+      const title =
+        activeSummary.file_metadata?.book_title ||
+        activeSummary.provenance?.title ||
+        'Quantitative Research Literature';
+      const author =
+        activeSummary.file_metadata?.author_creator ||
+        activeSummary.provenance?.author_creator ||
+        'Author Unknown';
+      const sourceType =
+        activeSummary.provenance?.source_type ||
+        (activeSummary.file_metadata?.book_title ? 'PDF_BOOK' : 'RESEARCH');
+
+      const factsCount =
+        activeSummary.epistemic_counts?.facts ?? activeSummary.summary?.concepts_saved ?? 0;
+      const hypoCount =
+        activeSummary.epistemic_counts?.hypotheses ?? activeSummary.summary?.candidates_queued ?? 0;
+      const rulesCount =
+        activeSummary.epistemic_counts?.rules ?? activeSummary.strategy_candidates?.length ?? 0;
+      const contraCount = activeSummary.epistemic_counts?.contradictions ?? 0;
+
+      const candidateSummary =
+        activeSummary.strategy_candidates?.[0]?.strategy_name ||
+        (activeSummary.summary?.candidates_queued
+          ? `${activeSummary.summary.candidates_queued} Formulated Candidate(s) Queued`
+          : undefined);
+
+      const res = await api.sendSummaryToTelegram({
+        knowledge_id: activeSummary.knowledge_id,
+        title,
+        author_creator: author,
+        source_type: sourceType,
+        executive_summary:
+          activeSummary.executive_summary ||
+          activeSummary.verdict_message ||
+          'Research synthesis from SKY terminal.',
+        chapter_breakdown: activeSummary.chapter_breakdown || [],
+        epistemic_counts: {
+          facts: factsCount,
+          hypotheses: hypoCount,
+          rules: rulesCount,
+          contradictions: contraCount,
+        },
+        candidate_summary: candidateSummary,
+      });
+
+      if (onNotify) {
+        onNotify(
+          res.status === 'SENT' ? 'success' : 'info',
+          res.status === 'SENT' ? 'Telegram Dispatch' : 'Telegram Local Notification',
+          res.message
+        );
+      }
+    } catch (err: any) {
+      console.error('Failed to dispatch summary to Telegram:', err);
+      if (onNotify) {
+        onNotify(
+          'error',
+          'Telegram Dispatch Failed',
+          err?.message || 'Failed to dispatch summary to Telegram.'
+        );
+      }
+    } finally {
+      setSendingTelegram(false);
+    }
+  };
+
+  const getSourceTypeBadge = (summary: ResearchIngestResult) => {
+    const st = (summary.provenance?.source_type || (summary.file_metadata?.book_title ? 'PDF' : '')).toUpperCase();
+    if (st === 'YOUTUBE') return { label: 'YouTube Video Research', icon: Play, color: 'bg-red-500/20 text-red-400 border-red-500/40' };
+    if (st === 'GITHUB') return { label: 'GitHub Repository', icon: GitBranch, color: 'bg-purple-500/20 text-purple-400 border-purple-500/40' };
+    if (st === 'CODE') return { label: 'Algorithmic Code', icon: Tag, color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' };
+    if (st === 'ARTICLE') return { label: 'Quantitative Article', icon: BookOpen, color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' };
+    if (st === 'NOTES') return { label: 'Research Notes', icon: BookOpen, color: 'bg-amber-500/20 text-amber-400 border-amber-500/40' };
+    if (st === 'DATASET') return { label: 'Dataset & Flow', icon: Layers, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' };
+    return { label: summary.file_metadata?.book_title ? 'PDF Quantitative Monograph' : 'Research Source Summary', icon: BookOpen, color: 'bg-sky-500/20 text-sky-400 border-sky-500/40' };
   };
 
   // Run Backtest Verification on Candidate
@@ -497,10 +580,16 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#1e293b] pb-4">
             <div className="flex flex-col gap-1.5 max-w-4xl">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded text-[11px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40 uppercase tracking-wider flex items-center gap-1">
-                  <BookOpen className="w-3.5 h-3.5" />
-                  {activeSummary.file_metadata?.book_title ? 'PDF Quantitative Monograph' : 'Research Source Summary'}
-                </span>
+                {(() => {
+                  const badge = getSourceTypeBadge(activeSummary);
+                  const Icon = badge.icon;
+                  return (
+                    <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${badge.color} uppercase tracking-wider flex items-center gap-1`}>
+                      <Icon className="w-3.5 h-3.5" />
+                      {badge.label}
+                    </span>
+                  );
+                })()}
                 {activeSummary.file_metadata?.edition && (
                   <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 font-semibold border border-slate-700">
                     {activeSummary.file_metadata.edition}
@@ -545,13 +634,25 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               </p>
             </div>
 
-            <button
-              onClick={() => setActiveSummary(null)}
-              className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-              title="Close Summary View"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <button
+                onClick={handleSendSummaryToTelegram}
+                disabled={sendingTelegram}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-xs font-bold transition-all hover:border-sky-400 disabled:opacity-50 shadow-sm"
+                title="Send formatted research summary to Telegram"
+              >
+                <Send className={`w-3.5 h-3.5 ${sendingTelegram ? 'animate-pulse text-sky-200' : ''}`} />
+                {sendingTelegram ? 'Sending to Telegram...' : 'Send to Telegram'}
+              </button>
+
+              <button
+                onClick={() => setActiveSummary(null)}
+                className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                title="Close Summary View"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Core Executive Summary Narrative */}

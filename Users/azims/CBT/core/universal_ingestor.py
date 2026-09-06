@@ -18,6 +18,7 @@ import ast
 import logging
 import os
 from pathlib import Path
+import re
 from typing import Any
 
 from core.knowledge_graph_engine import knowledge_graph_engine
@@ -347,14 +348,16 @@ class UniversalIngestor:
                 }
             )
 
-        exec_summary = (
-            (pdf_payload.get("executive_summary") if pdf_payload else None)
-            or (
-                f"Ingested {source_type} source '{inferred_title}' by {creator}. "
-                f"Decomposed into {len(saved_claims)} atomic claims across {worldview} worldview."
-            )
+        exec_summary, chap_breakdown = self._synthesize_source_summary(
+            source_type=source_type,
+            inferred_title=inferred_title,
+            creator=creator,
+            worldview=worldview,
+            saved_claims=saved_claims,
+            content=content,
+            pdf_payload=pdf_payload,
+            yt_payload=yt_payload,
         )
-        chap_breakdown = pdf_payload.get("chapter_breakdown", []) if pdf_payload else []
 
         return {
             "source_id": sid,
@@ -388,6 +391,86 @@ class UniversalIngestor:
                 f"Generated {len(discoveries)} cross-domain discovery candidates."
             ),
         }
+
+    def _synthesize_source_summary(
+        self,
+        source_type: str,
+        inferred_title: str,
+        creator: str,
+        worldview: str,
+        saved_claims: list[dict[str, Any]],
+        content: str,
+        pdf_payload: dict[str, Any] | None = None,
+        yt_payload: dict[str, Any] | None = None,
+    ) -> tuple[str, list[str]]:
+        """
+        Synthesizes a rich executive summary and chapter/timestamp breakdown across all research sources.
+        """
+        if pdf_payload and pdf_payload.get("executive_summary"):
+            return (
+                pdf_payload["executive_summary"],
+                pdf_payload.get("chapter_breakdown", []),
+            )
+
+        if source_type == "YOUTUBE" and yt_payload and yt_payload.get("success"):
+            segments = yt_payload.get("segments", [])
+            dur_str = yt_payload.get("duration_formatted", "N/A")
+            hype_count = len(yt_payload.get("hype_markers_detected", []))
+            hype_note = (
+                f"Quarantined {hype_count} promotional statement(s) at 0.0 confidence."
+                if hype_count > 0
+                else "Zero marketing hype detected."
+            )
+            summary = (
+                f"YouTube Quantitative Intelligence: '{inferred_title}' by {creator} (Duration: {dur_str}). "
+                f"Spoken discourse segmented into {len(segments)} chronological time-bounded windows. "
+                f"Decomposed {len(saved_claims)} empirical propositions under the {worldview} paradigm. "
+                f"{hype_note} Extracted candidate setups for automated walk-forward backtest verification."
+            )
+            chap_breakdown = []
+            for s in segments[:10]:
+                text_snip = s.get("text", "")[:50].strip()
+                chap_breakdown.append(
+                    f"[{s.get('timestamp_start', '00:00')} - {s.get('timestamp_end', '00:00')}] {text_snip}..."
+                )
+            return summary, chap_breakdown
+
+        if source_type in ("CODE", "GITHUB"):
+            fn_matches = re.findall(r"(?:def|class|function)\s+([A-Za-z0-9_]+)", content)
+            indicators = [
+                w for w in ["rsi", "ema", "sma", "macd", "vwap", "bollinger", "atr", "fvg", "ob"]
+                if w in content.lower()
+            ]
+            chap_breakdown = [f"Module/Symbol: {fn}()" for fn in fn_matches[:8]]
+            ind_str = f" Referenced indicators: {', '.join(indicators).upper()}." if indicators else ""
+            summary = (
+                f"Algorithmic Source Code Intelligence: '{inferred_title}' by {creator}. "
+                f"Parsed {len(fn_matches)} procedural logic blocks and structures.{ind_str} "
+                f"Deconstructed into {len(saved_claims)} candidate rule formulations. "
+                f"All strategy logic quarantined as UNTESTED awaiting deterministic simulation."
+            )
+            return summary, chap_breakdown
+
+        if source_type in ("ARTICLE", "NOTES", "DATASET"):
+            heading_matches = re.findall(r"^(?:#{1,3}\s+|\d+\.\s+)(.+)$", content, re.MULTILINE)
+            chap_breakdown = [h.strip()[:60] for h in heading_matches[:8]]
+            if not chap_breakdown:
+                paragraphs = [p.strip() for p in content.split("\n\n") if len(p.strip()) > 30]
+                chap_breakdown = [f"Section {i+1}: {p[:50]}..." for i, p in enumerate(paragraphs[:6])]
+
+            summary = (
+                f"Research Literature Synthesis: '{inferred_title}' by {creator}. "
+                f"Extracted {len(saved_claims)} causal market propositions under the {worldview} framework. "
+                f"Analyzed conceptual boundaries and isolated structural liquidity, order flow, and risk factors."
+            )
+            return summary, chap_breakdown
+
+        # Generic fallback
+        summary = (
+            f"Ingested {source_type} research source '{inferred_title}' by {creator}. "
+            f"Decomposed into {len(saved_claims)} atomic claims across {worldview} worldview."
+        )
+        return summary, []
 
     def _decompose_atoms(
         self,

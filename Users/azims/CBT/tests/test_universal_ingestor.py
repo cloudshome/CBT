@@ -73,3 +73,69 @@ async def test_provenance_vaults_query():
     assert "rejected" in vaults
     assert vaults["counts"]["knowledge_count"] >= 0
     assert vaults["counts"]["candidates_count"] >= 0
+
+
+@pytest.mark.asyncio
+async def test_multi_source_summary_synthesis():
+    """Verifies executive synthesis narrative and chapter breakdown generation across YouTube, Code, and Notes."""
+    # 1. Code / Algorithmic source
+    code_text = (
+        "class VWAPMeanReversion:\n"
+        "    def calculate_bands(self, df):\n"
+        "        pass\n"
+        "    def check_rsi_divergence(self, rsi, price):\n"
+        "        pass\n"
+    )
+    code_result = await universal_ingestor.ingest(
+        content=code_text,
+        mode="ANALYZE",
+        title="VWAP Divergence Strategy",
+        author_creator="Quant Dev",
+        file_name="vwap_strat.py",
+    )
+    assert "Algorithmic Source Code" in code_result["executive_summary"]
+    assert len(code_result["chapter_breakdown"]) >= 1
+    assert any("calculate_bands" in ch for ch in code_result["chapter_breakdown"])
+
+    # 2. Notes / Research Article
+    notes_text = (
+        "# Liquidity Void Analysis\n\n"
+        "Institutional market makers engineer liquidity voids prior to NY open.\n\n"
+        "## Order Book Imbalance\n\n"
+        "Bids are pulled rapidly when VPIN spikes above 0.35 threshold.\n"
+    )
+    notes_result = await universal_ingestor.ingest(
+        content=notes_text,
+        mode="RESEARCH",
+        title="Order Book Liquidity Voids",
+        author_creator="Market Microstructure Lab",
+    )
+    assert "Research Literature Synthesis" in notes_result["executive_summary"]
+    assert len(notes_result["chapter_breakdown"]) >= 1
+
+
+def test_telegram_research_summary_dispatch():
+    """Verifies POST /api/research/share-telegram endpoint formats and processes telegram dispatch gracefully."""
+    from starlette.testclient import TestClient
+    from app import app
+
+    client = TestClient(app)
+    payload = {
+        "knowledge_id": "K-TEST-992",
+        "title": "Algorithmic Market Making & High-Frequency Trading",
+        "author_creator": "Alvaro Cartea",
+        "source_type": "PDF_BOOK",
+        "executive_summary": "Quantitative monograph presenting stochastic control models for optimal limit order submission and inventory risk penalization.",
+        "chapter_breakdown": ["Ch 1: Limit Order Books", "Ch 2: Optimal Liquidation", "Ch 3: Market Making"],
+        "epistemic_counts": {"facts": 14, "hypotheses": 5, "rules": 3, "contradictions": 0},
+        "candidate_summary": "Inventory Penalized Avellaneda-Stoikov Market Maker",
+    }
+    resp = client.post("/api/research/share-telegram", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] in ("SENT", "QUEUED_LOCAL")
+    assert "dispatched_text" in data
+    assert "Alvaro Cartea" in data["dispatched_text"]
+    assert "K-TEST-992" in data["dispatched_text"]
+    assert "Inventory Penalized" in data["dispatched_text"]
+

@@ -718,6 +718,12 @@ export interface ResearchIngestResult {
   executive_summary?: string;
   chapter_breakdown?: string[];
   file_metadata?: Record<string, any>;
+  epistemic_counts?: {
+    facts?: number;
+    hypotheses?: number;
+    rules?: number;
+    contradictions?: number;
+  };
   summary: {
     concepts_saved: number;
     candidates_queued: number;
@@ -867,5 +873,30 @@ export interface DiscoveryGraphResponse {
     hypotheses_count: number;
   };
 }
+
+export interface ResearchTelegramShareRequest {
+  knowledge_id: string;
+  title: string;
+  author_creator?: string;
+  source_type?: string;
+  executive_summary: string;
+  chapter_breakdown?: string[];
+  epistemic_counts?: {
+    facts?: number;
+    hypotheses?: number;
+    rules?: number;
+    contradictions?: number;
+  };
+  candidate_summary?: string;
+  chat_id?: string;
+}
+
+export interface ResearchTelegramShareResponse {
+  status: 'SENT' | 'QUEUED_LOCAL' | 'FAILED';
+  configured: boolean;
+  message: string;
+  dispatched_text?: string;
+}
+
 
 

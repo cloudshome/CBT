@@ -252,6 +252,18 @@ class TelegramBroadcastRequest(BaseModel):
     parse_mode: Optional[str] = "Markdown"
 
 
+class ResearchTelegramShareRequest(BaseModel):
+    knowledge_id: str
+    title: str
+    author_creator: Optional[str] = "Author Unknown"
+    source_type: Optional[str] = "RESEARCH"
+    executive_summary: str
+    chapter_breakdown: Optional[List[str]] = Field(default_factory=list)
+    epistemic_counts: Optional[Dict[str, int]] = Field(default_factory=dict)
+    candidate_summary: Optional[str] = None
+    chat_id: Optional[str] = None
+
+
 class TelegramWebhookRequest(BaseModel):
     update_id: Optional[int] = None
     message: Optional[Dict[str, Any]] = None
@@ -512,10 +524,35 @@ async def _telegram_debate_cmd(args: str, chat_id=None) -> str:
 def _telegram_autopsy_cmd(args: str, chat_id=None) -> str:
     return telegram_bot.state_mind.get_latest_autopsy()
 
+def _telegram_summary_cmd(args: str, chat_id=None) -> str:
+    inbox = provenance_engine.get_inbox_items(limit=1)
+    if not inbox:
+        return "ℹ️ No research literature or video summaries currently registered in the Provenance Ledger."
+    item = inbox[0]
+    title = item.get("title", "Literature Research")
+    author = item.get("author_creator", "Author Unknown")
+    stype = item.get("source_type", "RESEARCH")
+    kid = item.get("knowledge_id", "N/A")
+    excerpt = (item.get("raw_content_preview") or "No excerpt available").replace("\n", " ").strip()[:600]
+    return (
+        f"📖 *LATEST RESEARCH SUMMARY*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📚 *Title:* {title}\n"
+        f"👤 *Author:* {author}\n"
+        f"🏷️ *Type:* `{stype}`\n"
+        f"🆔 *Ledger ID:* `{kid}`\n\n"
+        f"📝 *Executive Synthesis:*\n"
+        f"{excerpt}...\n\n"
+        f"⚖️ *Epistemic Status:* Strictly quarantined at 0.0 confidence until verified by walk-forward backtest.\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔬 _Dispatched from SKY Terminal Research Lab_"
+    )
+
 telegram_bot.register_command("/start", lambda args, chat_id=None: (
     "🤖 **SKY Institutional Quantitative Terminal Bot**\n\n"
     "Available Commands:\n"
     "• `/signal [sym]` — Live signal + Auto Paper Practice\n"
+    "• `/summary` — Latest literature & YouTube research summary\n"
     "• `/positions` — Active shadow practice positions & PnL\n"
     "• `/close <sym>` — Close open practice position from Telegram\n"
     "• `/debate <sym>` — Tri-Agent Adversarial Debate Council\n"
@@ -532,6 +569,7 @@ telegram_bot.register_command("/start", lambda args, chat_id=None: (
 telegram_bot.register_command("/help", lambda args, chat_id=None: (
     "💡 **SKY Bot Command Guide**\n\n"
     "• `/signal [symbol]` — e.g. `/signal BTC` or `/signal ETH`\n"
+    "• `/summary` — Latest literature, book & YouTube research summary\n"
     "• `/positions` — View active practice positions & PnL\n"
     "• `/close [symbol]` — e.g. `/close BTC`\n"
     "• `/debate [symbol]` — e.g. `/debate BTC`\n"
@@ -558,6 +596,7 @@ telegram_bot.register_command("/plan", _telegram_plan_cmd)
 telegram_bot.register_command("/events", _telegram_events_cmd)
 telegram_bot.register_command("/news", _telegram_news_cmd)
 telegram_bot.register_command("/decision", _telegram_decision_cmd)
+telegram_bot.register_command("/summary", _telegram_summary_cmd)
 
 
 # Background Real-Time Telemetry Broadcaster, Poller & Empirical Accumulator
@@ -1847,6 +1886,85 @@ async def get_all_research_vaults():
     """Returns all data and counts across the 4 Research Vaults (Knowledge, Candidates, Evidence, Rejected)."""
     vault_data = provenance_engine.get_all_vault_data()
     return sanitize_numpy(vault_data)
+
+
+@app.post("/api/research/share-telegram")
+async def share_research_summary_to_telegram(req: ResearchTelegramShareRequest):
+    """
+    Dispatches formatted institutional research summary to configured Telegram chat.
+    """
+    source_emoji = {
+        "PDF_BOOK": "📖 [PDF Monograph]",
+        "PDF": "📄 [PDF Document]",
+        "YOUTUBE": "▶️ [YouTube Video]",
+        "GITHUB": "🐙 [GitHub Repo]",
+        "CODE": "💻 [Source Code]",
+        "ARTICLE": "📰 [Article/Post]",
+        "NOTES": "📝 [Research Notes]",
+    }.get((req.source_type or "RESEARCH").upper(), "📚 [Research Literature]")
+
+    ep = req.epistemic_counts or {}
+    facts = ep.get("facts", 0)
+    hypo = ep.get("hypotheses", 0)
+    rules = ep.get("rules", 0)
+    contra = ep.get("contradictions", 0)
+
+    clean_summary = req.executive_summary.replace("\n\n", "\n").strip()
+    if len(clean_summary) > 1000:
+        clean_summary = clean_summary[:1000] + "..."
+
+    lines = [
+        f"*{source_emoji} RESEARCH SUMMARY*",
+        "━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"📚 *Title:* {req.title}",
+        f"👤 *Author/Creator:* {req.author_creator}",
+        f"🆔 *Ledger ID:* `{req.knowledge_id}`",
+        "",
+        "📝 *Executive Synthesis:*",
+        clean_summary,
+        "",
+        "⚖️ *Epistemic Classification (Quarantined 0.0):*",
+        f"• Facts (Causal): *{facts}*",
+        f"• Hypotheses: *{hypo}*",
+        f"• Proposed Rules: *{rules}*",
+        f"• Contradictions: *{contra}*",
+    ]
+
+    if req.chapter_breakdown:
+        lines.append("")
+        lines.append("📑 *Sections / Chapters:*")
+        for ch in req.chapter_breakdown[:6]:
+            lines.append(f"• {ch}")
+        if len(req.chapter_breakdown) > 6:
+            lines.append(f"• ... and {len(req.chapter_breakdown) - 6} more sections")
+
+    if req.candidate_summary:
+        lines.append("")
+        lines.append("⚡ *Formulated Candidate (UNTESTED):*")
+        lines.append(f"• {req.candidate_summary}")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("🔬 _Dispatched from SKY / CBT Research Terminal_")
+
+    message_text = "\n".join(lines)
+
+    target_chat = req.chat_id or telegram_bot.chat_id
+    if not target_chat or not telegram_bot.bot_token:
+        logger.info(f"[TELEGRAM LOCAL NOTIFICATION]\n{message_text}")
+        return {
+            "status": "QUEUED_LOCAL",
+            "configured": False,
+            "message": "Telegram credentials (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID) not configured in .env. Logged summary locally to terminal.",
+            "dispatched_text": message_text,
+        }
+
+    sent = await telegram_bot.send_message(message_text, parse_mode="Markdown")
+    return {
+        "status": "SENT" if sent else "FAILED",
+        "configured": True,
+        "message": "Research summary dispatched to Telegram successfully!" if sent else "Telegram API delivery failed.",
+        "dispatched_text": message_text,
+    }
 
 
 @app.post("/api/research/candidates/{candidate_id}/backtest", dependencies=[Depends(require_api_key)])
