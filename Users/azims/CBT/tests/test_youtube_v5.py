@@ -319,3 +319,30 @@ class TestYouTubeV5AgentAndTelegramCommand:
             assert "Extraction Cap:" in res_dispatch
             assert "10 videos" in res_dispatch
 
+    def test_youtube_rest_endpoints(self):
+        from fastapi.testclient import TestClient
+        from app import app
+
+        client = TestClient(app)
+
+        with patch.object(youtube_agent, "explore", new_callable=AsyncMock):
+            res = client.post(
+                "/api/research/youtube/explore",
+                json={"source_url_or_handle": "@TraderTom", "limit": 5},
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "ACCEPTED"
+            assert "job_id" in data
+            job_id = data["job_id"]
+
+            res_list = client.get("/api/research/youtube/jobs")
+            assert res_list.status_code == 200
+            jobs = res_list.json()["jobs"]
+            assert any(j["job_id"] == job_id for j in jobs)
+
+            res_job = client.get(f"/api/research/youtube/jobs/{job_id}")
+            assert res_job.status_code == 200
+            assert res_job.json()["job_id"] == job_id
+
+

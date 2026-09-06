@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -21,8 +22,8 @@ logger = logging.getLogger("ai_quant_sentinel.memory_vault")
 
 class SemanticVectorStore:
     """
-    Lightweight, high-performance in-memory vector store with disk persistence.
-    Provides fast cosine similarity retrieval without heavy external dependencies.
+    High-performance vector store with SQLite binary BLOB persistence and vectorized search.
+    Eliminates whole-file JSON rewriting and provides sub-millisecond matrix-multiplication queries.
     """
 
     def __init__(self, storage_path: Path):
@@ -30,40 +31,94 @@ class SemanticVectorStore:
         self.embeddings: list[np.ndarray] = []
         self.documents: list[str] = []
         self.metadatas: list[dict[str, Any]] = []
+        self.embeddings_matrix: np.ndarray | None = None
+        self._init_db()
         self._load()
 
+    def _init_db(self) -> None:
+        """Ensures SQLite persistence table for vectors exists in brain_memory.db."""
+        try:
+            with db_manager.get_brain_conn() as conn:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS semantic_vectors (
+                        doc_id TEXT PRIMARY KEY,
+                        text TEXT NOT NULL,
+                        metadata_json TEXT NOT NULL,
+                        embedding BLOB NOT NULL,
+                        created_at REAL NOT NULL
+                    );
+                    """
+                )
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_vec_created ON semantic_vectors (created_at);")
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Could not initialize semantic_vectors table: {e}")
+
     def _load(self) -> None:
-        file_path = self.storage_path / "vectors.json"
-        if file_path.exists():
+        """Loads vectors from SQLite, migrating legacy vectors.json if present."""
+        legacy_file = self.storage_path / "vectors.json"
+        
+        # 1. Check if legacy migration is needed
+        if legacy_file.exists():
             try:
-                with open(file_path, encoding="utf-8") as f:
+                with open(legacy_file, encoding="utf-8") as f:
                     data = json.load(f)
-                    self.documents = data.get("documents", [])
-                    self.metadatas = data.get("metadatas", [])
-                    raw_embeds = data.get("embeddings", [])
-                    self.embeddings = [np.array(e, dtype=np.float32) for e in raw_embeds]
-            except Exception as e:  # noqa: BLE001 — defensive fallback
-                logger.error(f"Failed loading vector store: {e}")
+                docs = data.get("documents", [])
+                metas = data.get("metadatas", [])
+                raw_embeds = data.get("embeddings", [])
+                
+                if docs:
+                    with db_manager.get_brain_conn() as conn:
+                        for i, doc_text in enumerate(docs):
+                            m = metas[i] if i < len(metas) else {}
+                            d_id = m.get("id") or f"doc_{i}"
+                            vec = np.array(raw_embeds[i], dtype=np.float32) if i < len(raw_embeds) else self._embed_text(doc_text)
+                            conn.execute(
+                                """
+                                INSERT OR IGNORE INTO semantic_vectors (doc_id, text, metadata_json, embedding, created_at)
+                                VALUES (?, ?, ?, ?, ?)
+                                """,
+                                (d_id, doc_text, json.dumps(m), vec.tobytes(), time.time()),
+                            )
+                        conn.commit()
+                    logger.info(f"Migrated {len(docs)} legacy JSON vectors into SQLite semantic_vectors table.")
+                
+                # Archive legacy file
+                migrated_file = self.storage_path / "vectors.json.migrated"
+                legacy_file.rename(migrated_file)
+            except Exception as e:
+                logger.warning(f"Legacy vector migration notice: {e}")
+
+        # 2. Load from SQLite
+        self.documents = []
+        self.metadatas = []
+        self.embeddings = []
+        try:
+            with db_manager.get_brain_conn() as conn:
+                cursor = conn.execute("SELECT doc_id, text, metadata_json, embedding FROM semantic_vectors ORDER BY created_at ASC")
+                for row in cursor.fetchall():
+                    d_id, txt, meta_str, embed_bytes = row
+                    meta = json.loads(meta_str) if meta_str else {}
+                    meta["id"] = d_id
+                    vec = np.frombuffer(embed_bytes, dtype=np.float32)
+                    self.documents.append(txt)
+                    self.metadatas.append(meta)
+                    self.embeddings.append(vec)
+            
+            if self.embeddings:
+                self.embeddings_matrix = np.vstack(self.embeddings)
+            else:
+                self.embeddings_matrix = None
+        except Exception as e:
+            logger.error(f"Failed loading vectors from SQLite: {e}")
 
     def save(self) -> None:
-        self.storage_path.mkdir(parents=True, exist_ok=True)
-        file_path = self.storage_path / "vectors.json"
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "documents": self.documents,
-                    "metadatas": self.metadatas,
-                    "embeddings": [e.tolist() for e in self.embeddings],
-                },
-                f,
-                indent=2,
-            )
+        """No-op kept for backwards-compatibility; writes are persisted incrementally in add_document."""
+        pass
 
     def _embed_text(self, text: str) -> np.ndarray:
-        """
-        Deterministic lightweight feature hash embedding for semantic text vectors.
-        In production, can be upgraded to sentence-transformers or Gemini embeddings.
-        """
+        """Deterministic lightweight feature hash embedding for semantic text vectors."""
         dim = 128
         vec = np.zeros(dim, dtype=np.float32)
         words = text.lower().split()
@@ -74,29 +129,57 @@ class SemanticVectorStore:
         return vec / norm if norm > 0 else vec
 
     def add_document(self, doc_id: str, text: str, metadata: dict[str, Any] | None = None) -> None:
+        """Appends a document atomically to SQLite and in-memory search index."""
         meta = metadata or {}
         meta["id"] = doc_id
         vec = self._embed_text(text)
+
+        # 1. Incremental SQLite write (O(1) write — zero whole-file rewrites)
+        try:
+            with db_manager.get_brain_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO semantic_vectors (doc_id, text, metadata_json, embedding, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(doc_id) DO UPDATE SET
+                        text = excluded.text,
+                        metadata_json = excluded.metadata_json,
+                        embedding = excluded.embedding,
+                        created_at = excluded.created_at;
+                    """,
+                    (doc_id, text, json.dumps(meta), vec.tobytes(), time.time()),
+                )
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Failed persisting vector {doc_id} to SQLite: {e}")
+
+        # 2. In-memory index update
         self.documents.append(text)
         self.metadatas.append(meta)
         self.embeddings.append(vec)
-        self.save()
+        if self.embeddings_matrix is None:
+            self.embeddings_matrix = np.expand_dims(vec, axis=0)
+        else:
+            self.embeddings_matrix = np.vstack([self.embeddings_matrix, vec])
 
     def query(self, query_text: str, top_k: int = 5) -> list[dict[str, Any]]:
-        if not self.embeddings:
+        """Executes ultra-fast vectorized matrix multiplication similarity search."""
+        if not self.embeddings or self.embeddings_matrix is None:
             return []
+        
         q_vec = self._embed_text(query_text)
-        scores = []
-        for i, doc_vec in enumerate(self.embeddings):
-            sim = float(np.dot(q_vec, doc_vec))
-            scores.append((sim, i))
-        scores.sort(key=lambda x: x[0], reverse=True)
-
+        
+        # Vectorized BLAS matrix-vector dot product (replaces O(N) Python loop)
+        sims = np.dot(self.embeddings_matrix, q_vec)
+        
+        # Top-k indices
+        top_indices = np.argsort(sims)[::-1][:top_k]
+        
         results = []
-        for sim, idx in scores[:top_k]:
+        for idx in top_indices:
             results.append(
                 {
-                    "score": sim,
+                    "score": float(sims[idx]),
                     "document": self.documents[idx],
                     "metadata": self.metadatas[idx],
                 }

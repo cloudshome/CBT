@@ -76,11 +76,12 @@ class TelegramJobManager:
         user_id: int | str,
         chat_id: int | str,
         title: str,
+        job_id: str | None = None,
     ) -> TelegramJob:
         """Initializes a tracked background job."""
-        job_id = f"JOB-{uuid.uuid4().hex[:8].upper()}"
+        effective_job_id = job_id or f"JOB-{uuid.uuid4().hex[:8].upper()}"
         job = TelegramJob(
-            job_id=job_id,
+            job_id=effective_job_id,
             job_type=job_type,
             user_id=str(user_id),
             chat_id=str(chat_id),
@@ -193,6 +194,65 @@ class TelegramJobManager:
         lines.append("━━━━━━━━━━━━━━━━━━━━━━")
         return "\n".join(lines)
 
+    def list_jobs(self, job_type: str | None = None, limit: int = 20) -> list[TelegramJob]:
+        """Lists recent background jobs, optionally filtered by job_type."""
+        try:
+            with db_manager.get_trading_conn() as conn:
+                if job_type:
+                    cur = conn.execute(
+                        "SELECT * FROM telegram_jobs WHERE job_type = ? ORDER BY created_at DESC LIMIT ?",
+                        (job_type, limit),
+                    )
+                else:
+                    cur = conn.execute(
+                        "SELECT * FROM telegram_jobs ORDER BY created_at DESC LIMIT ?",
+                        (limit,),
+                    )
+                rows = cur.fetchall()
+                return [
+                    TelegramJob(
+                        job_id=row["job_id"],
+                        job_type=row["job_type"],
+                        user_id=row["user_id"],
+                        chat_id=row["chat_id"],
+                        title=row["title"],
+                        status=row["status"],
+                        progress_pct=row["progress_pct"],
+                        created_at=row["created_at"],
+                        completed_at=row["completed_at"],
+                        result_json=row["result_json"] or "",
+                        error_message=row["error_message"] or "",
+                    )
+                    for row in rows
+                ]
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Error listing jobs: {e}")
+            return []
+
+    def reconcile_orphaned_jobs(self) -> int:
+        """Reconciles any jobs left in 'RUNNING' or 'PENDING' status after server restart."""
+        try:
+            with db_manager.get_trading_conn() as conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE telegram_jobs
+                    SET status = 'INTERRUPTED',
+                        error_message = 'Process terminated while job was running',
+                        completed_at = ?
+                    WHERE status IN ('RUNNING', 'PENDING');
+                    """,
+                    (time.time(),),
+                )
+                conn.commit()
+                reconciled = cursor.rowcount
+                if reconciled > 0:
+                    logger.info(f"Reconciled {reconciled} orphaned jobs to INTERRUPTED.")
+                return reconciled
+        except Exception as e:
+            logger.warning(f"Failed reconciling orphaned jobs: {e}")
+            return 0
+
 
 # Global Job Manager Singleton
 job_manager = TelegramJobManager()
+

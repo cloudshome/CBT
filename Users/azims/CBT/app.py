@@ -19,7 +19,19 @@ import uuid
 
 import numpy as np
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, File, UploadFile, Form
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    File,
+    UploadFile,
+    Form,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -111,6 +123,10 @@ from core.macro_network import macro_network_engine
 from core.genetic_optimizer import genetic_strategy_optimizer
 from core.smart_execution import smart_execution_engine
 from core.autonomous_auditor import autonomous_risk_auditor
+from core.api_health_guard import api_health_guard
+from core.telegram.jobs import job_manager
+from core.autonomous_trader import autonomous_trader
+from core.youtube.agent import youtube_agent
 
 from core.sky_intelligence import (
     sky_orchestrator,
@@ -149,13 +165,22 @@ logger = logging.getLogger("ai_quant_sentinel.app")
 async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
     """Startup/shutdown lifecycle (replaces deprecated @app.on_event)."""
     db_manager.init_all_schemas()
+    # Reconcile any orphaned running jobs on boot
+    job_manager.reconcile_orphaned_jobs()
+    # Check host disk capacity
+    disk_vitals = api_health_guard.check_disk_space()
+    if not disk_vitals.get("is_safe", True):
+        logger.warning(f"CRITICAL DISK WARNING ON STARTUP: Only {disk_vitals.get('free_gb')} GB free disk remaining.")
+
     tasks = [
         asyncio.create_task(telemetry_broadcaster_loop()),
         asyncio.create_task(empirical_accumulator_loop()),
         asyncio.create_task(telegram_bot.start_polling()),
         asyncio.create_task(telegram_bot.start_continuous_broadcaster(interval_seconds=180)),
+        asyncio.create_task(sky_decision_cache.start_sweeper_loop(interval_sec=60)),
+        asyncio.create_task(autonomous_trader.start_loop()),
     ]
-    logger.info("AI Quant Sentinel FastAPI online with Telegram Poller & Continuous Broadcaster.")
+    logger.info("AI Quant Sentinel FastAPI online with Autonomous Trader & Cache Sweeper.")
     try:
         yield
     finally:
@@ -1629,6 +1654,40 @@ async def close_paper_trade(req: PaperCloseRequest):
     return {"status": "SUCCESS", "message": f"Position {req.positionId} closed."}
 
 
+@app.get("/api/trader/status")
+async def get_autonomous_trader_status():
+    """Returns the operational status, scan telemetry, and active decisions of the Autonomous Trader."""
+    return autonomous_trader.get_status()
+
+
+@app.post("/api/trader/toggle", dependencies=[Depends(require_api_key)])
+async def toggle_autonomous_trader(enable: Optional[bool] = None):
+    """Toggles or sets the running state of the Autonomous Trader."""
+    if enable is not None:
+        if enable:
+            autonomous_trader.start()
+        else:
+            autonomous_trader.stop()
+    else:
+        if autonomous_trader.is_running:
+            autonomous_trader.stop()
+        else:
+            autonomous_trader.start()
+    return {"status": "SUCCESS", "is_running": autonomous_trader.is_running}
+
+
+@app.post("/api/trader/scan", dependencies=[Depends(require_api_key)])
+async def force_autonomous_trader_scan():
+    """Forces an immediate multi-asset market scan and executes qualified paper trades."""
+    trades = await autonomous_trader.scan_and_execute()
+    return {
+        "status": "SUCCESS",
+        "executed_trades_count": len(trades),
+        "trades": trades,
+        "trader_status": autonomous_trader.get_status(),
+    }
+
+
 @app.post("/api/command/parse", dependencies=[Depends(require_api_key)])
 async def parse_trade_command(req: CommandParseRequest):
     result = command_executor.parse_and_execute(req.command_text)
@@ -2019,6 +2078,15 @@ async def get_youtube_exploration_job(job_id: str):
         "error_message": job.error_message,
         "result": res_data,
     }
+
+
+@app.get("/api/research/youtube/jobs")
+async def get_youtube_exploration_jobs(limit: int = Query(20, ge=1, le=100)):
+    """Lists recent YouTube exploration background jobs."""
+    from core.telegram.jobs import job_manager
+
+    jobs = job_manager.list_jobs(job_type="YOUTUBE_EXPLORATION", limit=limit)
+    return {"jobs": [j.to_dict() for j in jobs]}
 
 
 @app.get("/api/research/inbox")

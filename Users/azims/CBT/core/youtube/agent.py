@@ -359,6 +359,7 @@ class YouTubeExplorationAgent:
             user_id=requested_by,
             chat_id=str(chat_id or "web"),
             title=f"Explore YouTube: {source_url_or_handle[:50]}",
+            job_id=eff_job_id,
         )
 
         task = asyncio.create_task(
