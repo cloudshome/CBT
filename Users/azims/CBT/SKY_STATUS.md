@@ -1,13 +1,13 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-09-01  
-> **Release Tag:** `v3.2.0-phase15-frontiers-integrated` (ACTIVE 🚀)  
-> **Branch:** `feature/institutional-quant-platform-and-chart-tools`  
+> **Last Updated:** 2026-09-07  
+> **Release Tag:** `v3.5.0-autonomous-trader-hardened` (ACTIVE 🚀)  
+> **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 313 / 313 (191 Pytest, 122 Jest — 100% passing)  
-> **Preflight Status:** ALL 4 QUALITY GATES PASSED (100% GREEN)
+> **Tests Passing:** 447 / 447 (321 Pytest, 126 Jest — 100% passing)  
+> **Preflight Status:** ALL QUALITY GATES PASSED (100% GREEN)
 
 ---
 
@@ -62,6 +62,14 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `5991e82` | feat(core): implement autonomous trader, memory cache hardening, and capacity audit report (18 passing tests) |
+| `934ef80` | feat(youtube): implement YouTube Research Intelligence V5 autonomous channel & playlist explorer (15 passing tests) |
+| `7629c94` | feat(telegram-v5): complete hardened mobile control plane, rbac, 2-phase execution, and emergency controls (35 passing tests) |
+| `60d981e` | feat(telegram): implement automated research dispatch and two-way reverse flow for links, images, and documents (7 passing tests) |
+| `f2f6a09` | feat(research): add youtube and multi-source summary synthesis and telegram summary dispatch (5 passing tests) |
+| `b3ac91d` | feat(research-desk): add scanned pdf vision ocr, literature summary reading section, and half-kelly paper execution rules (32 passing tests) |
+| `4bc9c29` | fix(api): fallback to recent candle close in orderbook imbalance when live depth unavailable |
+| `2c983bd` | feat(evidence-integrity): seal cold-start risk authorization and purge fake strategy league track records (260 passing tests) |
 | `e3a9519` | Fix dynamic live price liquidation clusters strictly relative to current price (228 passing tests) |
 | `dfadbf6` | Implement P7.2 Performance Profiler, P8.1 Staging Burn-In, and P8.2 Production Overrides (227 passing tests) |
 | `2e283df` | Implement P6.2 Strategy League Evaluator and P7.4 API & Environment docs (224 passing tests) |
