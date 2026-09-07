@@ -12,6 +12,8 @@ import {
   Crosshair,
   BarChart3,
   X,
+  ShieldAlert,
+  Bot,
 } from 'lucide-react';
 import { PaperDeskOverviewResponse, HalfKellySizingResponse } from '../types';
 import { api } from '../services/api';
@@ -364,9 +366,34 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
               </h2>
             </div>
             <span className="text-xs font-mono text-slate-400">
-              Auto-Breakeven at +1.5R | Strict Risk Cap: 2.5%
+              Auto-Breakeven at +1.5R | Strict Risk Cap: {summary.maxRiskCapPct}%
             </span>
           </div>
+
+          {/* Portfolio Heat Guard / Risk Gating Banner */}
+          {summary.gatingReason && (
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-[#141b2d] border border-amber-500/30 text-xs font-mono shadow-md">
+              <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-bold text-amber-300 tracking-wide flex items-center gap-1.5">
+                    PORTFOLIO ALLOCATION & RISK GATING
+                  </span>
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      Slots: <strong className="text-white">{currentPositions.length}</strong> / {summary.maxOpenPositions ?? 3} Active
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold">
+                      {summary.openSlotsRemaining ?? 0} Slot(s) Reserved
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-1 text-slate-300 text-[11px] leading-relaxed">
+                  {summary.gatingReason}
+                </p>
+              </div>
+            </div>
+          )}
 
           {currentPositions.length === 0 ? (
             <div className="py-12 text-center flex flex-col items-center justify-center gap-2 border border-dashed border-[#1e293b] rounded-lg bg-[#0d1424]/40">
@@ -381,14 +408,15 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
               <table className="w-full text-left text-xs font-mono">
                 <thead className="bg-[#0d1424] text-slate-400 border-b border-[#1e293b]">
                   <tr>
-                    <th className="py-2.5 px-3">POSITION ID</th>
-                    <th className="py-2.5 px-3">ASSET</th>
+                    <th className="py-2.5 px-3">POSITION &amp; TIME</th>
+                    <th className="py-2.5 px-3">ASSET &amp; HORIZON</th>
                     <th className="py-2.5 px-3">SIDE</th>
-                    <th className="py-2.5 px-3">SIZE</th>
+                    <th className="py-2.5 px-3">SIZE &amp; LEVERAGE</th>
                     <th className="py-2.5 px-3">ENTRY FILL</th>
                     <th className="py-2.5 px-3">CURRENT LIVE</th>
                     <th className="py-2.5 px-3">STOP LOSS</th>
                     <th className="py-2.5 px-3">TAKE PROFIT</th>
+                    <th className="py-2.5 px-3">RISK &amp; R:R</th>
                     <th className="py-2.5 px-3 text-right">UNREALIZED P&amp;L</th>
                     <th className="py-2.5 px-3">AUTOMATION</th>
                     <th className="py-2.5 px-3 text-right">ACTION</th>
@@ -399,67 +427,128 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                     const isLong = pos.side === 'BUY';
                     const pnl = pos.pnlUsd;
                     const sign = pnl >= 0 ? '+' : '';
+                    const openedTimeStr = pos.openedAt
+                      ? new Date(typeof pos.openedAt === 'number' ? pos.openedAt : Number(pos.openedAt)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                      : 'Live';
                     return (
-                      <tr key={pos.id} className="hover:bg-[#0d1424]/60 transition-colors">
-                        <td className="py-3 px-3 text-slate-400 font-bold">
-                          #{pos.id.slice(-10)}
-                        </td>
-                        <td className="py-3 px-3 font-bold text-white text-sm">
-                          {pos.symbol}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                              isLong
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                            }`}
-                          >
-                            {isLong ? '🟢 LONG' : '🔴 SHORT'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-300">
-                          {pos.size} contracts
-                        </td>
-                        <td className="py-3 px-3 text-slate-200 font-bold">
-                          ${pos.entryPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-3 text-white font-bold">
-                          ${pos.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-3 text-rose-400">
-                          ${pos.sl.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-3 text-emerald-400">
-                          ${pos.tp.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-3 text-right font-bold text-sm">
-                          <span className={pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                            {sign}${pnl.toFixed(2)} ({sign}{pos.pnlPct.toFixed(2)}%)
-                          </span>
-                        </td>
-                        <td className="py-3 px-3">
-                          {pos.breakevenTriggered ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/40 font-bold flex items-center gap-1 w-max">
-                              <ShieldCheck className="w-3 h-3 text-sky-400" />
-                              BREAKEVEN ARMED
+                      <React.Fragment key={pos.id}>
+                        <tr className="hover:bg-[#0d1424]/60 transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="text-slate-300 font-bold">#{pos.id.slice(-10)}</div>
+                            <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3 text-slate-500" />
+                              <span>{openedTimeStr}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-white text-sm">{pos.symbol}</span>
+                              {pos.horizon && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold border ${
+                                    pos.horizon === 'SCALP'
+                                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                      : pos.horizon === 'DAY'
+                                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  }`}
+                                >
+                                  {pos.horizon}
+                                </span>
+                              )}
+                            </div>
+                            {pos.agentManager && (
+                              <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                                <Bot className="w-3 h-3 text-slate-500" />
+                                <span>{pos.agentManager}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                isLong
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                              }`}
+                            >
+                              {isLong ? '🟢 LONG' : '🔴 SHORT'}
                             </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              Arming at +1.5R
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="text-slate-200 font-bold">{pos.size} contracts</div>
+                            {pos.notionalUsd && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                ${pos.notionalUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })} ({pos.effectiveLeverage ?? 1}x lev)
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-slate-200 font-bold">
+                            ${pos.entryPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-3 text-white font-bold">
+                            ${pos.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-3 text-rose-400">
+                            ${pos.sl.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-3 text-emerald-400">
+                            ${pos.tp.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-3">
+                            {pos.capitalAtRiskUsd !== undefined ? (
+                              <div>
+                                <span className="text-rose-400 font-bold">-${pos.capitalAtRiskUsd.toFixed(2)}</span>
+                                <div className="text-[10px] text-slate-400 font-mono">
+                                  {pos.riskOfAccountPct}% eq ({pos.riskRewardRatio})
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 font-mono">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right font-bold text-sm">
+                            <span className={pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                              {sign}${pnl.toFixed(2)} ({sign}{pos.pnlPct.toFixed(2)}%)
                             </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            onClick={() => handleClose(pos.id)}
-                            disabled={closingId === pos.id}
-                            className="px-3 py-1 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 font-bold text-xs transition-all disabled:opacity-50 shadow-sm"
-                          >
-                            {closingId === pos.id ? 'CLOSING...' : 'CLOSE TRADE'}
-                          </button>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="py-3 px-3">
+                            {pos.breakevenTriggered ? (
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/40 font-bold flex items-center gap-1 w-max">
+                                <ShieldCheck className="w-3 h-3 text-sky-400" />
+                                BREAKEVEN ARMED
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                Arming at +1.5R
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <button
+                              onClick={() => handleClose(pos.id)}
+                              disabled={closingId === pos.id}
+                              className="px-3 py-1 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 font-bold text-xs transition-all disabled:opacity-50 shadow-sm"
+                            >
+                              {closingId === pos.id ? 'CLOSING...' : 'CLOSE TRADE'}
+                            </button>
+                          </td>
+                        </tr>
+                        {(pos.thesis || pos.strategyName) && (
+                          <tr className="bg-[#0b101d]/80 border-b border-[#1e293b]/70">
+                            <td colSpan={12} className="py-2 px-3 text-[11px] font-mono">
+                              <div className="flex flex-wrap items-center gap-2 text-slate-300">
+                                <span className="px-2 py-0.5 rounded bg-sky-950/80 text-sky-300 border border-sky-800/40 font-bold text-[10px]">
+                                  STRATEGY &amp; THESIS
+                                </span>
+                                <span className="text-slate-200 font-semibold">{pos.strategyName || 'SMC Liquidity Engine'}</span>
+                                <span className="text-slate-500">•</span>
+                                <span className="text-slate-300 text-[11px] leading-tight">{pos.thesis}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>

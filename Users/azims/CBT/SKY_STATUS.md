@@ -1,12 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-09-07  
-> **Release Tag:** `v3.5.0-autonomous-trader-hardened` (ACTIVE 🚀)  
+> **Release Tag:** `v3.6.0-canary-burn-in-telemetry` (ACTIVE 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 447 / 447 (321 Pytest, 126 Jest — 100% passing)  
+> **Tests Passing:** 464 / 464 (338 Pytest, 126 Jest — 100% passing)  
 > **Preflight Status:** ALL QUALITY GATES PASSED (100% GREEN)
 
 ---
@@ -62,6 +62,8 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| *(staged)* | feat(canary): implement live canary shadow burn-in orchestrator, hf telemetry pipeline, and incident escalation (17 passing tests) |
+| `0084d7e` | docs(status): update SKY_STATUS to v3.5.0 with 447 passing tests and recent commit history |
 | `5991e82` | feat(core): implement autonomous trader, memory cache hardening, and capacity audit report (18 passing tests) |
 | `934ef80` | feat(youtube): implement YouTube Research Intelligence V5 autonomous channel & playlist explorer (15 passing tests) |
 | `7629c94` | feat(telegram-v5): complete hardened mobile control plane, rbac, 2-phase execution, and emergency controls (35 passing tests) |

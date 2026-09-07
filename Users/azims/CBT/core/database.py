@@ -284,6 +284,107 @@ class DatabaseManager:
                     reliability_curve_json TEXT NOT NULL
                 );
             """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS burn_in_sessions (
+                    id TEXT PRIMARY KEY,
+                    session_name TEXT NOT NULL,
+                    session_type TEXT NOT NULL,
+                    start_timestamp BIGINT NOT NULL,
+                    end_timestamp BIGINT,
+                    opening_balance REAL DEFAULT 100000.0,
+                    closing_balance REAL,
+                    trade_count INTEGER DEFAULT 0,
+                    winning_trades INTEGER DEFAULT 0,
+                    losing_trades INTEGER DEFAULT 0,
+                    session_pnl REAL DEFAULT 0.0,
+                    session_return REAL DEFAULT 0.0,
+                    max_drawdown REAL DEFAULT 0.0,
+                    sharpe REAL,
+                    profit_factor REAL,
+                    win_rate REAL,
+                    heartbeat_expected INTEGER DEFAULT 0,
+                    heartbeat_received INTEGER DEFAULT 0,
+                    heartbeat_missed INTEGER DEFAULT 0,
+                    status TEXT NOT NULL,
+                    execution_mode TEXT NOT NULL DEFAULT 'SHADOW',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_burn_in_status ON burn_in_sessions (status, start_timestamp DESC);")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS hf_telemetry_records (
+                    id TEXT PRIMARY KEY,
+                    timestamp BIGINT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    exchange TEXT NOT NULL,
+                    execution_mode TEXT NOT NULL DEFAULT 'SHADOW',
+                    t_recv_ns BIGINT NOT NULL,
+                    t_queue_ns BIGINT NOT NULL,
+                    t_decision_ns BIGINT NOT NULL,
+                    t_exec_ns BIGINT NOT NULL,
+                    recv_to_queue_ns BIGINT NOT NULL,
+                    queue_to_decision_ns BIGINT NOT NULL,
+                    decision_to_exec_ns BIGINT NOT NULL,
+                    total_pipeline_latency_ns BIGINT NOT NULL,
+                    bid REAL NOT NULL,
+                    ask REAL NOT NULL,
+                    mid REAL NOT NULL,
+                    spread REAL NOT NULL,
+                    spread_bps REAL NOT NULL,
+                    order_side TEXT NOT NULL,
+                    order_type TEXT NOT NULL,
+                    order_price REAL NOT NULL,
+                    execution_price REAL NOT NULL,
+                    order_size REAL NOT NULL,
+                    visible_depth REAL DEFAULT 0.0,
+                    estimated_volume_ahead REAL DEFAULT 0.0,
+                    estimated_cancel_rate REAL DEFAULT 0.0,
+                    estimated_fill_probability REAL DEFAULT 0.0,
+                    slippage_total REAL DEFAULT 0.0,
+                    slippage_spread REAL DEFAULT 0.0,
+                    slippage_impact REAL DEFAULT 0.0,
+                    slippage_latency REAL DEFAULT 0.0,
+                    telemetry_sequence BIGINT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_hf_telem_ts ON hf_telemetry_records (timestamp DESC);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_hf_telem_sym ON hf_telemetry_records (symbol, timestamp DESC);")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS incident_escalations (
+                    id TEXT PRIMARY KEY,
+                    incident_id TEXT NOT NULL UNIQUE,
+                    timestamp BIGINT NOT NULL,
+                    tier TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    source_engine TEXT NOT NULL,
+                    trigger_type TEXT NOT NULL,
+                    trigger_value REAL,
+                    threshold_value REAL,
+                    description TEXT NOT NULL,
+                    automated_action TEXT NOT NULL,
+                    operator_action TEXT,
+                    confirmation_required INTEGER DEFAULT 0,
+                    confirmation_status TEXT DEFAULT 'NONE',
+                    nonce TEXT,
+                    token_hash TEXT,
+                    issued_at BIGINT,
+                    expires_at BIGINT,
+                    resolved INTEGER DEFAULT 0,
+                    resolved_at BIGINT,
+                    resolved_by TEXT,
+                    execution_mode TEXT NOT NULL DEFAULT 'SHADOW',
+                    metadata_json TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_incident_tier ON incident_escalations (tier, timestamp DESC);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_incident_resolved ON incident_escalations (resolved, timestamp DESC);")
+
             conn.commit()
 
     def _init_experiment_db(self) -> None:

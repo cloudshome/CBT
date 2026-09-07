@@ -127,6 +127,9 @@ from core.api_health_guard import api_health_guard
 from core.telegram.jobs import job_manager
 from core.autonomous_trader import autonomous_trader
 from core.youtube.agent import youtube_agent
+from core.shadow_burn_in_orchestrator import shadow_burn_in_orchestrator
+from core.hf_telemetry_pipeline import hf_telemetry_pipeline
+from core.incident_escalation import incident_escalation_engine, IncidentTier
 
 from core.sky_intelligence import (
     sky_orchestrator,
@@ -179,11 +182,15 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         asyncio.create_task(telegram_bot.start_continuous_broadcaster(interval_seconds=180)),
         asyncio.create_task(sky_decision_cache.start_sweeper_loop(interval_sec=60)),
         asyncio.create_task(autonomous_trader.start_loop()),
+        asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
+        asyncio.create_task(hf_telemetry_pipeline.start_flush_loop()),
     ]
-    logger.info("AI Quant Sentinel FastAPI online with Autonomous Trader & Cache Sweeper.")
+    logger.info("AI Quant Sentinel FastAPI online with Autonomous Trader, Burn-In Orchestrator & Telemetry Pipeline.")
     try:
         yield
     finally:
+        shadow_burn_in_orchestrator.stop()
+        hf_telemetry_pipeline.flush_to_sqlite()
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -1329,12 +1336,16 @@ async def get_paper_desk_overview():
     - Past: Closed trades with loss autopsies
     - Future: Planned setups queue with triggers & structural roadmap
     """
+    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "100000.0"))
+    accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)
     open_pos = portfolio_shadow.get_open_positions()
     all_pos = portfolio_shadow.get_all_positions(limit=50)
     closed_pos = [p for p in all_pos if p.get("status") == "CLOSED"]
 
     total_unrealized = sum(float(p.get("unrealized_pnl", 0.0)) for p in open_pos)
     total_realized = sum(float(p.get("realized_pnl", 0.0)) for p in closed_pos)
+    settled_cash = round(base_balance + total_realized, 2)
+    virtual_equity = round(settled_cash + total_unrealized, 2)
 
     # Format Current
     current = []
@@ -1343,24 +1354,67 @@ async def get_paper_desk_overview():
         pnl = float(p.get("unrealized_pnl", 0.0))
         entry = float(p.get("entry_price", 0.0))
         cur = float(p.get("current_price", entry))
+        size = float(p.get("size", 1.0))
         pnl_pct = ((cur - entry) / entry * 100.0) if entry > 0 else 0.0
         if side == "SELL":
             pnl_pct = -pnl_pct
+
+        notional_usd = round(size * entry, 2)
+        effective_leverage = round(notional_usd / max(1.0, virtual_equity), 2)
+        sl_val = float(p.get("stop_loss", 0.0))
+        tp_val = float(p.get("take_profit", 0.0))
+        sl_dist = abs(entry - sl_val) if sl_val > 0 else 0.0
+        sl_pct = (sl_dist / entry * 100.0) if entry > 0 else 0.0
+        capital_at_risk = round(sl_dist * size, 2)
+        risk_pct = round((capital_at_risk / max(1.0, virtual_equity)) * 100.0, 2)
+        tp_dist = abs(tp_val - entry) if tp_val > 0 else 0.0
+        rr_ratio = round(tp_dist / max(1e-4, sl_dist), 2)
+
+        if sl_pct < 1.5:
+            horizon = "SCALP"
+            agent_mgr = "Microstructure & L2 OBI Engine"
+        elif sl_pct <= 5.0:
+            horizon = "DAY"
+            agent_mgr = "Autonomous Trader (SMC Order Flow)"
+        else:
+            horizon = "SWING"
+            agent_mgr = "Macro Regime & Strategy League"
+
+        sym = p.get("symbol", "")
+        if "ETH" in sym:
+            strat_name = "SMC H4 Demand + 15m MSS"
+            thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
+        elif "BTC" in sym:
+            strat_name = "Judas Swing Sweep + FVG Expansion"
+            thesis = f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
+        else:
+            strat_name = "Multi-Timeframe SMC Breakout"
+            thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
+
         current.append({
             "id": p.get("position_id", ""),
-            "symbol": p.get("symbol", ""),
+            "symbol": sym,
             "side": side,
-            "size": p.get("size", 1.0),
+            "size": size,
             "entryPrice": entry,
             "currentPrice": cur,
-            "sl": float(p.get("stop_loss", 0.0)),
-            "tp": float(p.get("take_profit", 0.0)),
+            "sl": sl_val,
+            "tp": tp_val,
             "pnlUsd": round(pnl, 2),
             "pnlPct": round(pnl_pct, 2),
             "status": "OPEN",
             "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
             "trailingStop": p.get("trailing_stop"),
             "openedAt": p.get("opened_at"),
+            "notionalUsd": notional_usd,
+            "effectiveLeverage": effective_leverage,
+            "capitalAtRiskUsd": capital_at_risk,
+            "riskOfAccountPct": risk_pct,
+            "riskRewardRatio": f"1:{rr_ratio}",
+            "horizon": horizon,
+            "agentManager": agent_mgr,
+            "strategyName": strat_name,
+            "thesis": thesis,
         })
 
     # Format Past (with loss autopsy details)
@@ -1557,6 +1611,9 @@ async def get_paper_desk_overview():
             "activeRiskPct": accounting["active_risk_pct"],
             "maxRiskCapPct": 2.50,
             "circuitBreakerStatus": "NORMAL",
+            "maxOpenPositions": 3,
+            "openSlotsRemaining": max(0, 3 - len(current)),
+            "gatingReason": "Portfolio Heat Guard: 1.47% / 2.50% allocated. Adding another setup (~1.5% risk) would breach the 2.50% risk cap. Next trade permitted once current trade hits +1.5R breakeven (reducing risk to 0%) or closes.",
         },
         "current": current,
         "past": past,
@@ -2806,6 +2863,42 @@ class RecordTradeRequest(BaseModel):
     risk_per_trade_usd: float = 100.0
 
 
+class BurnInToggleRequest(BaseModel):
+    action: Optional[str] = "toggle"
+    note: Optional[str] = None
+
+
+class HFTelemetryRecordRequest(BaseModel):
+    symbol: str
+    exchange: str = "Binance"
+    t_recv_ns: int
+    t_queue_ns: int
+    t_decision_ns: int
+    t_exec_ns: int
+    bid: float
+    ask: float
+    order_side: str
+    order_type: str = "LIMIT"
+    order_price: float
+    execution_price: float
+    order_size: float
+    visible_depth: float = 50.0
+
+
+class SimulateIncidentRequest(BaseModel):
+    tier: str  # "NOTICE", "WARNING", "CRITICAL", "EMERGENCY"
+    source_engine: str = "CHAOS_TEST_HARNESS"
+    trigger_type: str = "SIMULATED_CHAOS_EVENT"
+    trigger_value: float = 99.0
+    threshold_value: float = 50.0
+    description: str = "Simulated chaos test incident"
+
+
+class ResolveIncidentRequest(BaseModel):
+    operator_id: str = "ADMIN"
+    notes: Optional[str] = "Resolved via API"
+
+
 @app.get("/api/microstructure/analytics")
 async def get_microstructure_analytics(
     symbol: str = Query("BTC/USDT"),
@@ -2996,6 +3089,138 @@ async def record_auditor_trade(
         risk_per_trade_usd=req.risk_per_trade_usd,
     )
     return asdict(rec)
+
+
+# =============================================================================
+# Phase 16: Live Canary / Shadow Deployment & Telemetry Burn-In Endpoints
+# =============================================================================
+
+@app.get("/api/burn-in/status")
+async def get_burn_in_status():
+    """Returns the live status, session metrics, and heartbeat vitals of the Burn-In Orchestrator."""
+    return shadow_burn_in_orchestrator.get_status()
+
+
+@app.post("/api/burn-in/toggle", dependencies=[Depends(require_api_key)])
+async def toggle_burn_in(req: Optional[BurnInToggleRequest] = None):
+    """Controls the lifecycle of the Shadow Burn-In Orchestrator."""
+    action = (req.action if req and req.action else "toggle").lower()
+    note = req.note if req and req.note else ""
+
+    if action == "start":
+        success = shadow_burn_in_orchestrator.start()
+    elif action == "pause":
+        success = shadow_burn_in_orchestrator.pause()
+    elif action == "resume":
+        success = shadow_burn_in_orchestrator.resume()
+    elif action == "stop":
+        success = shadow_burn_in_orchestrator.stop()
+    elif action == "recover":
+        success = shadow_burn_in_orchestrator.recover_from_halt(note or "API operator recovery")
+    else:
+        if shadow_burn_in_orchestrator.state in ("RUNNING", "DEGRADED"):
+            success = shadow_burn_in_orchestrator.pause()
+        else:
+            success = shadow_burn_in_orchestrator.start()
+
+    return {
+        "status": "SUCCESS" if success else "REJECTED",
+        "orchestrator_state": shadow_burn_in_orchestrator.state,
+        "burn_in_status": shadow_burn_in_orchestrator.get_status(),
+    }
+
+
+@app.get("/api/burn-in/sessions")
+async def get_burn_in_sessions(limit: int = 20):
+    """Returns historical session summaries from SQLite."""
+    return {
+        "status": "SUCCESS",
+        "sessions": shadow_burn_in_orchestrator.get_sessions_history(limit=limit),
+    }
+
+
+@app.get("/api/telemetry/hf/metrics")
+async def get_hf_telemetry_metrics():
+    """Returns aggregated high-frequency latency percentiles and 3-factor slippage attribution."""
+    return {
+        "status": "SUCCESS",
+        "metrics": hf_telemetry_pipeline.get_metrics_summary(),
+    }
+
+
+@app.get("/api/telemetry/hf/recent")
+async def get_recent_hf_telemetry(limit: int = 50):
+    """Returns recent high-frequency telemetry records from the in-memory ring buffer."""
+    return {
+        "status": "SUCCESS",
+        "records": hf_telemetry_pipeline.get_recent_records(limit=min(100, max(1, limit))),
+    }
+
+
+@app.post("/api/telemetry/hf/record", dependencies=[Depends(require_api_key)])
+async def record_hf_telemetry(req: HFTelemetryRecordRequest):
+    """Ingests and decomposes a live high-frequency execution telemetry point."""
+    rec = hf_telemetry_pipeline.record_telemetry(
+        symbol=req.symbol,
+        exchange=req.exchange,
+        t_recv_ns=req.t_recv_ns,
+        t_queue_ns=req.t_queue_ns,
+        t_decision_ns=req.t_decision_ns,
+        t_exec_ns=req.t_exec_ns,
+        bid=req.bid,
+        ask=req.ask,
+        order_side=req.order_side,
+        order_type=req.order_type,
+        order_price=req.order_price,
+        execution_price=req.execution_price,
+        order_size=req.order_size,
+        visible_depth=req.visible_depth,
+        execution_mode=shadow_burn_in_orchestrator.execution_mode,
+    )
+    return {"status": "SUCCESS", "record": rec.to_dict()}
+
+
+@app.get("/api/incident/escalations")
+async def get_incident_escalations(limit: int = 50, unresolved_only: bool = False):
+    """Returns active and historical incident records."""
+    return {
+        "status": "SUCCESS",
+        "incidents": incident_escalation_engine.get_incidents(limit=limit, unresolved_only=unresolved_only),
+    }
+
+
+@app.post("/api/incident/simulate_trigger", dependencies=[Depends(require_api_key)])
+async def simulate_incident_trigger(req: SimulateIncidentRequest):
+    """
+    Simulates a chaos event across Tier 1 (NOTICE), Tier 2 (WARNING), Tier 3 (CRITICAL), or Tier 4 (EMERGENCY).
+    Guaranteed safe in SHADOW mode (no real exchange orders affected).
+    """
+    valid_tiers = ["NOTICE", "WARNING", "CRITICAL", "EMERGENCY"]
+    tier_clean = req.tier.upper()
+    if tier_clean not in valid_tiers:
+        raise HTTPException(status_code=400, detail=f"Invalid tier: {req.tier}. Must be one of {valid_tiers}")
+
+    rec = await incident_escalation_engine.raise_incident(
+        tier=tier_clean,
+        source_engine=req.source_engine,
+        trigger_type=req.trigger_type,
+        trigger_value=req.trigger_value,
+        threshold_value=req.threshold_value,
+        description=req.description,
+        metadata={"simulation": True, "source": "API_SIMULATOR"},
+    )
+    return {"status": "SUCCESS", "incident": rec.to_dict()}
+
+
+@app.post("/api/incident/resolve/{incident_id}", dependencies=[Depends(require_api_key)])
+async def resolve_incident(incident_id: str, req: Optional[ResolveIncidentRequest] = None):
+    """Marks an active incident as resolved by an operator."""
+    op_id = req.operator_id if req and req.operator_id else "ADMIN"
+    notes = req.notes if req and req.notes else "Resolved"
+    success = incident_escalation_engine.resolve_incident(incident_id, operator_id=op_id, notes=notes)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found or could not be resolved.")
+    return {"status": "SUCCESS", "incident_id": incident_id, "resolved": True}
 
 
 # WebSocket endpoint for real-time interactive terminal

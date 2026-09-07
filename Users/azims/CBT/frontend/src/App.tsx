@@ -20,6 +20,7 @@ import { MicrostructurePanel } from './components/MicrostructurePanel';
 import { MacroNetworkRadar } from './components/MacroNetworkRadar';
 import { GeneticStrategyLab } from './components/GeneticStrategyLab';
 import { AutonomousAuditorHUD } from './components/AutonomousAuditorHUD';
+import { ShadowBurnInHUD } from './components/ShadowBurnInHUD';
 import { ResearchIngestLab } from './components/ResearchIngestLab';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
@@ -95,7 +96,7 @@ export const App: React.FC = () => {
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
   const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB'>('DOSSIER');
-  const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR'>('MICROSTRUCTURE');
+  const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
   // Notifications State
@@ -688,6 +689,16 @@ export const App: React.FC = () => {
                     >
                       5. 24/7 Risk Auditor & CUSUM
                     </button>
+                    <button
+                      onClick={() => setActiveFrontierTab('BURN_IN')}
+                      className={`px-3 py-1 rounded transition-all ${
+                        activeFrontierTab === 'BURN_IN'
+                          ? 'bg-rose-500 text-white font-bold shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      6. Canary Burn-In (Phase 16)
+                    </button>
                   </div>
 
                   {/* Active Frontier Component */}
@@ -705,6 +716,7 @@ export const App: React.FC = () => {
                     />
                   )}
                   {activeFrontierTab === 'AUDITOR' && <AutonomousAuditorHUD />}
+                  {activeFrontierTab === 'BURN_IN' && <ShadowBurnInHUD />}
                 </div>
               ) : (
                 <ResearchIngestLab

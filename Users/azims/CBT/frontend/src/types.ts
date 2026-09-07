@@ -112,6 +112,9 @@ export interface PaperDeskOverviewResponse {
     activeRiskPct?: number;
     maxRiskCapPct: number;
     circuitBreakerStatus: string;
+    maxOpenPositions?: number;
+    openSlotsRemaining?: number;
+    gatingReason?: string;
   };
   current: Array<{
     id: string;
@@ -128,6 +131,15 @@ export interface PaperDeskOverviewResponse {
     breakevenTriggered: boolean;
     trailingStop?: number | null;
     openedAt?: number | string;
+    notionalUsd?: number;
+    effectiveLeverage?: number;
+    capitalAtRiskUsd?: number;
+    riskOfAccountPct?: number;
+    riskRewardRatio?: string;
+    horizon?: 'SCALP' | 'DAY' | 'SWING';
+    agentManager?: string;
+    strategyName?: string;
+    thesis?: string;
   }>;
   past: Array<{
     id: string;

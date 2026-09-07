@@ -1324,7 +1324,231 @@ export const api = {
     const res = await authFetch(`${BASE_URL}/api/research/youtube/jobs/${encodeURIComponent(jobId)}`);
     return handleResponse<any>(res);
   },
+
+  // =========================================================================
+  // Phase 16: Live Canary / Shadow Deployment & Telemetry Burn-In
+  // =========================================================================
+
+  /**
+   * GET /api/burn-in/status
+   */
+  async getBurnInStatus(): Promise<BurnInStatus> {
+    const res = await authFetch(`${BASE_URL}/api/burn-in/status`);
+    return handleResponse<BurnInStatus>(res);
+  },
+
+  /**
+   * POST /api/burn-in/toggle
+   */
+  async toggleBurnIn(action?: string, note?: string): Promise<{ status: string; orchestrator_state: string; burn_in_status: BurnInStatus }> {
+    const res = await authFetch(`${BASE_URL}/api/burn-in/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action || 'toggle', note }),
+    });
+    return handleResponse<{ status: string; orchestrator_state: string; burn_in_status: BurnInStatus }>(res);
+  },
+
+  /**
+   * GET /api/burn-in/sessions
+   */
+  async getBurnInSessions(limit: number = 20): Promise<{ status: string; sessions: BurnInSession[] }> {
+    const res = await authFetch(`${BASE_URL}/api/burn-in/sessions?limit=${limit}`);
+    return handleResponse<{ status: string; sessions: BurnInSession[] }>(res);
+  },
+
+  /**
+   * GET /api/telemetry/hf/metrics
+   */
+  async getHFTelemetryMetrics(): Promise<{ status: string; metrics: HFTelemetryMetrics }> {
+    const res = await authFetch(`${BASE_URL}/api/telemetry/hf/metrics`);
+    return handleResponse<{ status: string; metrics: HFTelemetryMetrics }>(res);
+  },
+
+  /**
+   * GET /api/telemetry/hf/recent
+   */
+  async getRecentHFTelemetry(limit: number = 50): Promise<{ status: string; records: HFTelemetryRecord[] }> {
+    const res = await authFetch(`${BASE_URL}/api/telemetry/hf/recent?limit=${limit}`);
+    return handleResponse<{ status: string; records: HFTelemetryRecord[] }>(res);
+  },
+
+  /**
+   * GET /api/incident/escalations
+   */
+  async getIncidentEscalations(limit: number = 50, unresolvedOnly: boolean = false): Promise<{ status: string; incidents: IncidentEscalation[] }> {
+    const res = await authFetch(`${BASE_URL}/api/incident/escalations?limit=${limit}&unresolved_only=${unresolvedOnly}`);
+    return handleResponse<{ status: string; incidents: IncidentEscalation[] }>(res);
+  },
+
+  /**
+   * POST /api/incident/simulate_trigger
+   */
+  async simulateIncidentTrigger(params: {
+    tier: string;
+    source_engine?: string;
+    trigger_type?: string;
+    trigger_value?: number;
+    threshold_value?: number;
+    description: string;
+  }): Promise<{ status: string; incident: IncidentEscalation }> {
+    const res = await authFetch(`${BASE_URL}/api/incident/simulate_trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; incident: IncidentEscalation }>(res);
+  },
+
+  /**
+   * POST /api/incident/resolve/:incident_id
+   */
+  async resolveIncident(incidentId: string, operatorId: string = 'ADMIN', notes: string = 'Resolved'): Promise<{ status: string; incident_id: string; resolved: boolean }> {
+    const res = await authFetch(`${BASE_URL}/api/incident/resolve/${encodeURIComponent(incidentId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operator_id: operatorId, notes }),
+    });
+    return handleResponse<{ status: string; incident_id: string; resolved: boolean }>(res);
+  },
 };
+
+export interface BurnInStatus {
+  status: string;
+  state: string;
+  execution_mode: 'SHADOW' | 'LIVE';
+  current_session: string;
+  active_sessions: string[];
+  next_session: string;
+  next_session_countdown_sec: number;
+  burn_in_hours: number;
+  burn_in_start_time_ms: number;
+  heartbeat_interval_sec: number;
+  heartbeat_sequence: number;
+  heartbeats_received: number;
+  heartbeats_missed: number;
+  heartbeat_health_pct: number;
+  last_heartbeat_timestamp_ms: number;
+  trader_is_running: boolean;
+  virtual_equity: number;
+  total_realized_pnl: number;
+  open_positions_count: number;
+  closed_positions_count: number;
+  win_rate_pct: number;
+  profit_factor: number;
+}
+
+export interface BurnInSession {
+  id: string;
+  session_name: string;
+  session_type: string;
+  start_timestamp: number;
+  end_timestamp?: number;
+  opening_balance: number;
+  closing_balance?: number;
+  trade_count: number;
+  winning_trades: number;
+  losing_trades: number;
+  session_pnl: number;
+  session_return: number;
+  max_drawdown: number;
+  profit_factor?: number;
+  win_rate?: number;
+  heartbeat_expected: number;
+  heartbeat_received: number;
+  heartbeat_missed: number;
+  status: string;
+  execution_mode: string;
+}
+
+export interface HFTelemetryMetrics {
+  sample_count: number;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
+  latency_p99_ms: number | null;
+  avg_slippage_total_bps: number | null;
+  avg_slippage_spread_bps: number | null;
+  avg_slippage_impact_bps: number | null;
+  avg_slippage_latency_bps: number | null;
+  total_records_ingested: number;
+  ring_buffer_size: number;
+  ring_buffer_occupancy: number;
+  flush_errors: number;
+}
+
+export interface HFTelemetryRecord {
+  id: string;
+  timestamp: number;
+  symbol: string;
+  exchange: string;
+  execution_mode: string;
+  timing: {
+    t_recv_ns: number;
+    t_queue_ns: number;
+    t_decision_ns: number;
+    t_exec_ns: number;
+    recv_to_queue_ns: number;
+    queue_to_decision_ns: number;
+    decision_to_exec_ns: number;
+    total_pipeline_latency_ns: number;
+    total_pipeline_latency_ms: number;
+  };
+  bid: number;
+  ask: number;
+  mid: number;
+  spread: number;
+  spread_bps: number;
+  order_side: string;
+  order_type: string;
+  order_price: number;
+  execution_price: number;
+  order_size: number;
+  queue_estimate: {
+    visible_depth: number;
+    estimated_volume_ahead: number;
+    estimated_cancel_rate: number;
+    estimated_fill_probability: number;
+    confidence: number;
+    model_type: string;
+  };
+  slippage: {
+    slippage_total_bps: number;
+    slippage_spread_bps: number;
+    slippage_impact_bps: number;
+    slippage_latency_bps: number;
+    reference_mid: number;
+    reference_quote: number;
+    execution_price: number;
+  };
+  telemetry_sequence: number;
+  integrity_valid: boolean;
+}
+
+export interface IncidentEscalation {
+  id: string;
+  incident_id: string;
+  timestamp: number;
+  tier: 'NOTICE' | 'WARNING' | 'CRITICAL' | 'EMERGENCY';
+  severity: string;
+  source_engine: string;
+  trigger_type: string;
+  trigger_value: number;
+  threshold_value: number;
+  description: string;
+  automated_action: string;
+  operator_action?: string;
+  confirmation_required: number;
+  confirmation_status: string;
+  nonce?: string;
+  token_hash?: string;
+  issued_at?: number;
+  expires_at?: number;
+  resolved: number;
+  resolved_at?: number;
+  resolved_by?: string;
+  execution_mode: string;
+  metadata_json?: string;
+}
 
 
 
