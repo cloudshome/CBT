@@ -42,6 +42,11 @@ class RiskManager:
             self._last_day_timestamp = day_epoch
             logger.info(f"Daily starting equity benchmarked at ${current_equity:,.2f}")
 
+    def reset_lockout(self) -> None:
+        """Resets active drawdown lockout (used for testing or authorized manual recovery)."""
+        self._lockout_until_ms = None
+        self._daily_starting_equity = None
+
     def evaluate_risk_gate(
         self,
         current_equity: float,

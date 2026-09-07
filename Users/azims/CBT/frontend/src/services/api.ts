@@ -1411,6 +1411,110 @@ export const api = {
     });
     return handleResponse<{ status: string; incident_id: string; resolved: boolean }>(res);
   },
+
+  // ============================================================================
+  // MILESTONE 17: LIVE EXCHANGE EXECUTION & PRIVATE API CREDENTIAL VAULT (CLASS H)
+  // ============================================================================
+
+  /**
+   * GET /api/vault/status
+   */
+  async getVaultStatus(): Promise<VaultStatus> {
+    const res = await authFetch(`${BASE_URL}/api/vault/status`);
+    return handleResponse<VaultStatus>(res);
+  },
+
+  /**
+   * POST /api/vault/configure
+   */
+  async configureVaultCredential(params: {
+    exchange: string;
+    environment: string;
+    api_key: string;
+    api_secret: string;
+    passphrase?: string;
+    is_active?: boolean;
+  }): Promise<{ status: string; message: string; credential: any }> {
+    const res = await authFetch(`${BASE_URL}/api/vault/configure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; message: string; credential: any }>(res);
+  },
+
+  /**
+   * POST /api/execution/live/order
+   */
+  async placeLiveOrder(req: LiveOrderRequest): Promise<{ status: string; receipt: LiveExecutionReceipt }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ status: string; receipt: LiveExecutionReceipt }>(res);
+  },
+
+  /**
+   * POST /api/execution/live/cancel
+   */
+  async cancelLiveOrder(params: {
+    exchange: string;
+    environment: string;
+    symbol: string;
+    exchange_order_id?: string;
+    client_order_id?: string;
+    operator_id?: string;
+  }): Promise<{ status: string; result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; result: any }>(res);
+  },
+
+  /**
+   * GET /api/execution/live/balance
+   */
+  async getLiveBalances(exchange: string = 'BINANCE', environment: string = 'TESTNET'): Promise<LiveBalanceResponse> {
+    const res = await authFetch(
+      `${BASE_URL}/api/execution/live/balance?exchange=${encodeURIComponent(exchange)}&environment=${encodeURIComponent(environment)}`
+    );
+    return handleResponse<LiveBalanceResponse>(res);
+  },
+
+  /**
+   * GET /api/execution/live/orders
+   */
+  async getLiveOrders(limit: number = 50): Promise<{ status: string; orders: any[] }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/orders?limit=${limit}`);
+    return handleResponse<{ status: string; orders: any[] }>(res);
+  },
+
+  /**
+   * POST /api/execution/live/kill-switch
+   */
+  async toggleLiveKillSwitch(action: 'engage' | 'disengage', reason: string, operator_id: string = 'ADMIN'): Promise<any> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/kill-switch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, reason, operator_id }),
+    });
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * POST /api/execution/live/reconcile
+   */
+  async reconcileLiveOrder(client_order_id: string): Promise<{ status: string; result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/reconcile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_order_id }),
+    });
+    return handleResponse<{ status: string; result: any }>(res);
+  },
 };
 
 export interface BurnInStatus {
@@ -1550,7 +1654,78 @@ export interface IncidentEscalation {
   metadata_json?: string;
 }
 
+export interface VaultStatus {
+  status: string;
+  live_execution_enabled: boolean;
+  kill_switch: {
+    is_active: boolean;
+    reason: string;
+    activated_by: string;
+    activated_at: number;
+    source: string;
+  };
+  configured_exchanges: Array<{
+    exchange: string;
+    environment: string;
+    masked_api_key: string;
+    is_active: boolean;
+    has_secret: boolean;
+    has_passphrase: boolean;
+    updated_at: number;
+    error?: string;
+  }>;
+  ambiguous_orders_count: number;
+  timestamp_ms: number;
+}
 
+export interface LiveOrderRequest {
+  exchange: string;
+  environment: string;
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  order_type: 'LIMIT' | 'MARKET';
+  quantity: number;
+  price?: number;
+  stop_loss?: number;
+  take_profit?: number;
+  account_equity_usd?: number;
+  daily_realized_pnl_usd?: number;
+  daily_unrealized_pnl_usd?: number;
+  current_open_positions_count?: number;
+  max_open_positions_cap?: number;
+  client_order_id?: string;
+  correlation_id?: string;
+}
 
+export interface LiveExecutionReceipt {
+  success: boolean;
+  status: string;
+  client_order_id: string;
+  exchange_order_id: string;
+  exchange: string;
+  environment: string;
+  symbol: string;
+  side: string;
+  order_type: string;
+  requested_qty: number;
+  executed_qty: number;
+  executed_price: number;
+  cumulative_quote_qty: number;
+  latency_ms: number;
+  audit_event_id: string;
+  message: string;
+  requires_reconciliation: boolean;
+}
 
-
+export interface LiveBalanceResponse {
+  status: string;
+  exchange: string;
+  environment: string;
+  balances: Array<{
+    asset: string;
+    free: number;
+    locked: number;
+    total: number;
+  }>;
+  timestamp_ms: number;
+}

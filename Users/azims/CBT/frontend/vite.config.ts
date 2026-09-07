@@ -61,6 +61,7 @@ const PYTHON_PREFIXES = [
   '/api/burn-in',
   '/api/telemetry',
   '/api/incident',
+  '/api/vault',
   '/api/chart',
   '/api/memory',
   '/api/ai',

@@ -1,12 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-09-07  
-> **Release Tag:** `v3.6.0-canary-burn-in-telemetry` (ACTIVE 🚀)  
+> **Release Tag:** `v3.7.0-live-execution-vault` (ACTIVE 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 464 / 464 (338 Pytest, 126 Jest — 100% passing)  
+> **Tests Passing:** 490 / 490 (364 Pytest, 126 Jest — 100% passing)  
 > **Preflight Status:** ALL QUALITY GATES PASSED (100% GREEN)
 
 ---
@@ -62,6 +62,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| *pending* | feat(execution): implement live exchange execution router, aes-256-gcm vault, and hmac signers (26 passing tests) |
 | `2b4136f` | feat(canary): implement live canary shadow burn-in orchestrator, hf telemetry pipeline, and incident escalation (17 passing tests) |
 | `0084d7e` | docs(status): update SKY_STATUS to v3.5.0 with 447 passing tests and recent commit history |
 | `5991e82` | feat(core): implement autonomous trader, memory cache hardening, and capacity audit report (18 passing tests) |

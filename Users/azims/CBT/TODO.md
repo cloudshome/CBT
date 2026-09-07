@@ -435,6 +435,49 @@
 
 ---
 
+## 🔐 Milestone 17: Live Exchange Execution & Private API Credential Vault (Class H Live / Paper Boundary) (COMPLETED ✅)
+
+- [x] **Task 17.1: AES-256-GCM Credential Vault & Cryptographic Secret Hygiene (`core/auth/credential_vault.py`)**
+  - Symmetric authenticated encryption (AES-256-GCM AEAD) with PBKDF2 key derivation (HMAC-SHA256, 600,000 iterations, 16-byte cryptographically secure salt).
+  - Centralized secret masking (`mask_secret`: `first4...last4`) and zero-leakage sanitizer (`sanitize_text`, `sanitize_dict`) scrubbing credentials from all error strings, dictionaries, exceptions, and loggers.
+  - Secure in-memory zeroization (`zeroize_bytes`) overwriting raw keys with null bytes.
+
+- [x] **Task 17.2: Canonical Exchange Request Signers (`core/auth/exchange_signers.py`)**
+  - Canonical HMAC-SHA256 request signing for Binance v3 (`timestamp` + alphabetical query sorting) and Bybit V5 (`X-BAPI-TIMESTAMP` + `X-BAPI-API-KEY` + `X-BAPI-RECV-WINDOW` + sorted prehash).
+  - Absolute clock drift tolerance ($\le 1000\text{ms}$) rejecting signed payloads with excessive skew.
+
+- [x] **Task 17.3: Master Kill Switch & Durable Fail-Closed Operational Guard (`core/execution/kill_switch.py`)**
+  - Fail-closed operational kill switch defaulting strictly to engaged if configuration is missing, ambiguous, or empty.
+  - Strict boolean parser: only explicit `"true"` enables live execution; all other values (`"1"`, `"yes"`, `""`, None) fail closed.
+  - Durable SQLite WAL state persistence (`live_kill_switch_state`) recording operator ID, timestamp, reason, and transition audit events.
+
+- [x] **Task 17.4: Idempotency & Ambiguous Order Reconciliation Ledger (`core/execution/idempotency.py`)**
+  - Unique atomic client order ID generator: `CBT_{VENUE}_{TIMESTAMP_MS}_{NONCE}` (strictly $[0-9A-Za-z_-]$, $\le 36$ chars).
+  - Durable SQLite WAL reservation preventing double submission under network latency or process restart.
+  - Ambiguous order state tracking (`AMBIGUOUS_RECONCILIATION_REQUIRED`): network timeouts or unconfirmed dispatches transition order to ambiguous state and require exchange query reconciliation before any retry.
+
+- [x] **Task 17.5: Production / Testnet Exchange Connectors (`core/execution/connectors/`)**
+  - Abstract base connector (`BaseExchangeConnector`) and concrete implementations for Binance Spot (`BinanceSpotConnector`) and Bybit V5 (`BybitV5Connector`).
+  - Strict physical domain separation between `TESTNET` and `PRODUCTION` endpoints.
+  - Sub-millisecond roundtrip latency tracking and HTTP 429 rate limit backoff handling.
+
+- [x] **Task 17.6: Live Execution Router & 20 Pre-Trade Safety Gates (`core/execution/live_router.py`)**
+  - Enforces all 20 non-bypassable pre-trade validation gates in strict order: Master Kill Switch, Global Live Switch, Clock Sanity, Quantity Sanity, Vault Credentials, Preflight Health, Risk Gate (3% max daily drawdown), Half-Kelly sizing, Exposure caps, Order Notional limits, Idempotency reservation, Audit Bus availability, Latency Watchdog (>2000ms triggers Tier 3 incident), and Ambiguous Order reconciliation.
+  - Strict boundary isolation: zero cross-contamination with Paper, Shadow, Simulator, or Kronos research engines.
+
+- [x] **Task 17.7: REST API Endpoints & Production Frontend Proxy**
+  - Registered `/api/vault/status`, `/api/vault/configure`, `/api/execution/live/order`, `/api/execution/live/cancel`, `/api/execution/live/balance`, `/api/execution/live/orders`, `/api/execution/live/kill-switch`, and `/api/execution/live/reconcile` in `app.py`.
+  - Added TypeScript API models and service endpoints in `frontend/src/services/api.ts`.
+  - Configured reverse proxy paths in `frontend/vite.config.ts` and `frontend/nginx.conf`.
+  - Verified frontend production build (`tsc && vite build`) passed with 0 errors.
+
+- [x] **Task 17.8: Class H Comprehensive Test Suite & Quality Gate Verification (490 Tests — 100% GREEN)**
+  - Created `tests/test_live_execution_and_vault.py` (26 tests covering AES-256-GCM roundtrip, tampering detection, key derivation, canonical signing, boundary fail-closed, kill switch override, drawdown limit enforcement, Half-Kelly sizing caps, duplicate idempotency rejection, ambiguous timeout reconciliation, adversarial NaN/Inf injection, clock skew, audit bus failure, and REST endpoints).
+  - Full repository test suites: **490 / 490 passing tests (364 Pytest + 126 Jest — 100% Green)**.
+  - Verified `scripts/system_preflight.py` passing all 4 quality gates with 100% green.
+
+---
+
 ## 📝 Rules for Updating This Document
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.

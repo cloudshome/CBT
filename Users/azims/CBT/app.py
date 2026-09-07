@@ -101,7 +101,35 @@ from core.knowledge_graph_engine import knowledge_graph_engine
 from core.strategy_compiler import strategy_compiler
 from core.audit_bus import audit_bus
 from core.macro_gold_engine import macro_gold_engine
-from core.auth import require_api_key
+from core.auth import (
+    require_api_key,
+    credential_vault,
+    ExchangeCredential,
+    mask_secret,
+    sanitize_dict,
+    sanitize_text,
+)
+from core.execution import (
+    live_execution_router,
+    live_kill_switch,
+    idempotency_store,
+    LiveOrderRequest,
+    OrderStatus,
+    LiveExecutionDisabledError,
+    LiveKillSwitchActiveError,
+    LivePreflightFailedError,
+    LiveRiskRejectedError,
+    LiveSizeRejectedError,
+    LiveCredentialUnavailableError,
+    LiveEnvironmentMismatchError,
+    LiveClockSkewError,
+    LiveExchangeDegradedError,
+    LiveAmbiguousOrderError,
+    ExchangeError,
+    ExchangeRateLimitError,
+    ExchangeAuthenticationError,
+    ExchangeRejectedError,
+)
 from core.models.kronos import (
     kronos_adapter,
     kronos_health_monitor,
@@ -3221,6 +3249,241 @@ async def resolve_incident(incident_id: str, req: Optional[ResolveIncidentReques
     if not success:
         raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found or could not be resolved.")
     return {"status": "SUCCESS", "incident_id": incident_id, "resolved": True}
+
+
+# ===========================================================================
+# Milestone 17: Live Exchange Execution & Private API Credential Vault (Class H)
+# ===========================================================================
+
+class VaultConfigureApiRequest(BaseModel):
+    exchange: str = Field(..., description="Exchange venue: BINANCE or BYBIT")
+    environment: str = Field("TESTNET", description="Environment: TESTNET or PRODUCTION")
+    api_key: str = Field(..., description="Exchange API key")
+    api_secret: str = Field(..., description="Exchange API secret")
+    passphrase: Optional[str] = Field(None, description="Optional passphrase/subaccount")
+    is_active: bool = Field(True, description="Active status")
+
+    @field_validator("exchange")
+    @classmethod
+    def validate_exchange(cls, v: str) -> str:
+        val = v.upper().strip()
+        if val not in ("BINANCE", "BYBIT"):
+            raise ValueError("Supported exchanges are BINANCE and BYBIT")
+        return val
+
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        val = v.upper().strip()
+        if val not in ("TESTNET", "PRODUCTION"):
+            raise ValueError("Supported environments are TESTNET and PRODUCTION")
+        return val
+
+
+class LiveOrderApiRequest(BaseModel):
+    exchange: str = Field(..., description="Exchange venue: BINANCE or BYBIT")
+    environment: str = Field("TESTNET", description="Environment: TESTNET or PRODUCTION")
+    symbol: str = Field(..., description="Symbol format BASE/QUOTE e.g. BTC/USDT")
+    side: str = Field(..., description="BUY or SELL")
+    order_type: str = Field("LIMIT", description="LIMIT or MARKET")
+    quantity: float = Field(..., gt=0.0, description="Order quantity in base units")
+    price: Optional[float] = Field(None, gt=0.0, description="Order price for LIMIT orders")
+    stop_loss: Optional[float] = Field(None, gt=0.0, description="Protective stop loss price")
+    take_profit: Optional[float] = Field(None, gt=0.0, description="Target take profit price")
+    account_equity_usd: float = Field(100000.0, gt=0.0, description="Account equity in USD")
+    daily_realized_pnl_usd: float = Field(0.0, description="Daily realized PnL in USD")
+    daily_unrealized_pnl_usd: float = Field(0.0, description="Daily unrealized PnL in USD")
+    current_open_positions_count: int = Field(0, ge=0, description="Current open positions count")
+    max_open_positions_cap: int = Field(3, ge=1, description="Maximum open positions cap")
+    client_order_id: Optional[str] = Field(None, description="Optional unique client order ID")
+    correlation_id: Optional[str] = Field(None, description="Optional request correlation ID")
+
+
+class LiveCancelApiRequest(BaseModel):
+    exchange: str = Field(..., description="Exchange venue: BINANCE or BYBIT")
+    environment: str = Field("TESTNET", description="Environment: TESTNET or PRODUCTION")
+    symbol: str = Field(..., description="Symbol format BASE/QUOTE e.g. BTC/USDT")
+    exchange_order_id: Optional[str] = Field(None, description="Exchange order ID")
+    client_order_id: Optional[str] = Field(None, description="Client order ID")
+    operator_id: str = Field("OPERATOR", description="Operator identifier")
+
+
+class LiveKillSwitchApiRequest(BaseModel):
+    action: str = Field(..., description="Action: 'engage' or 'disengage'")
+    reason: str = Field(..., description="Reason for kill switch action")
+    operator_id: str = Field("ADMIN", description="Operator identifier")
+
+
+class LiveReconcileApiRequest(BaseModel):
+    client_order_id: str = Field(..., description="Client order ID of ambiguous order to reconcile")
+
+
+@app.get("/api/vault/status")
+async def get_vault_status():
+    """
+    Public / diagnostic status for API credential vault and live execution gates.
+    Strictly free of plaintext API keys, secrets, encryption keys, or headers.
+    """
+    kill_active, kill_state = live_kill_switch.is_active()
+    return {
+        "status": "OPERATIONAL",
+        "live_execution_enabled": live_execution_router.is_live_execution_enabled(),
+        "kill_switch": kill_state.to_dict(),
+        "configured_exchanges": credential_vault.list_credentials(),
+        "ambiguous_orders_count": len(idempotency_store.get_ambiguous_orders()),
+        "timestamp_ms": int(time.time() * 1000),
+    }
+
+
+@app.post("/api/vault/configure", dependencies=[Depends(require_api_key)])
+async def configure_vault_credential(req: VaultConfigureApiRequest):
+    """
+    Encrypts and persists an exchange credential in the AES-256-GCM vault.
+    Never returns or logs plaintext secrets.
+    """
+    cred = ExchangeCredential(
+        exchange=req.exchange,
+        environment=req.environment,
+        api_key=req.api_key.strip(),
+        api_secret=req.api_secret.strip(),
+        passphrase=req.passphrase.strip() if req.passphrase else None,
+        is_active=req.is_active,
+    )
+    credential_vault.store_credential(cred)
+    audit_bus.emit_event(
+        event_type="LIVE_CREDENTIAL_CHANGE",
+        symbol=req.exchange,
+        severity="WARNING",
+        reason=f"Credential updated for {req.exchange} [{req.environment}] (Key: {mask_secret(req.api_key)})",
+        details={"exchange": req.exchange, "environment": req.environment, "is_active": req.is_active},
+    )
+    return {
+        "status": "SUCCESS",
+        "message": f"Credentials securely encrypted and stored for {req.exchange} [{req.environment}].",
+        "credential": cred.to_safe_dict(),
+    }
+
+
+@app.post("/api/execution/live/order", dependencies=[Depends(require_api_key)])
+async def place_live_order(req: LiveOrderApiRequest):
+    """
+    Executes a live spot order across Binance or Bybit through the 20-Gate Pre-Trade Invariant Pipeline.
+    """
+    order_req = LiveOrderRequest(
+        exchange=req.exchange,
+        environment=req.environment,
+        symbol=req.symbol,
+        side=req.side,
+        order_type=req.order_type,
+        quantity=req.quantity,
+        price=req.price,
+        stop_loss=req.stop_loss,
+        take_profit=req.take_profit,
+        account_equity_usd=req.account_equity_usd,
+        daily_realized_pnl_usd=req.daily_realized_pnl_usd,
+        daily_unrealized_pnl_usd=req.daily_unrealized_pnl_usd,
+        current_open_positions_count=req.current_open_positions_count,
+        max_open_positions_cap=req.max_open_positions_cap,
+        client_order_id=req.client_order_id,
+        correlation_id=req.correlation_id,
+    )
+
+    try:
+        receipt = await live_execution_router.execute_live_order(order_req)
+        return {"status": "SUCCESS", "receipt": receipt.to_safe_dict()}
+    except LiveExecutionDisabledError as e:
+        raise HTTPException(status_code=403, detail={"error": "LIVE_EXECUTION_DISABLED", "message": str(e)})
+    except LiveKillSwitchActiveError as e:
+        raise HTTPException(status_code=403, detail={"error": "KILL_SWITCH_ACTIVE", "message": str(e)})
+    except LivePreflightFailedError as e:
+        raise HTTPException(status_code=412, detail={"error": "PREFLIGHT_FAILED", "message": str(e)})
+    except LiveRiskRejectedError as e:
+        raise HTTPException(status_code=422, detail={"error": "RISK_GATE_REJECTED", "message": str(e)})
+    except LiveSizeRejectedError as e:
+        raise HTTPException(status_code=422, detail={"error": "SIZE_REJECTED", "message": str(e)})
+    except LiveCredentialUnavailableError as e:
+        raise HTTPException(status_code=404, detail={"error": "CREDENTIAL_UNAVAILABLE", "message": str(e)})
+    except LiveEnvironmentMismatchError as e:
+        raise HTTPException(status_code=400, detail={"error": "ENVIRONMENT_MISMATCH", "message": str(e)})
+    except LiveClockSkewError as e:
+        raise HTTPException(status_code=400, detail={"error": "CLOCK_SKEW_DETECTED", "message": str(e)})
+    except LiveExchangeDegradedError as e:
+        raise HTTPException(status_code=503, detail={"error": "EXCHANGE_DEGRADED", "message": str(e)})
+    except LiveAmbiguousOrderError as e:
+        raise HTTPException(status_code=504, detail={"error": "AMBIGUOUS_ORDER", "message": str(e)})
+    except ExchangeRateLimitError as e:
+        raise HTTPException(status_code=429, detail={"error": "EXCHANGE_RATE_LIMITED", "message": str(e), "retry_after": e.retry_after_sec})
+    except (ExchangeRejectedError, ExchangeAuthenticationError) as e:
+        raise HTTPException(status_code=400, detail={"error": "EXCHANGE_REJECTED", "message": str(e)})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": "LIVE_ORDER_FAILED", "message": sanitize_text(str(e))})
+
+
+@app.post("/api/execution/live/cancel", dependencies=[Depends(require_api_key)])
+async def cancel_live_order(req: LiveCancelApiRequest):
+    """Cancels an active live order on the exchange."""
+    try:
+        res = await live_execution_router.cancel_live_order(
+            exchange=req.exchange,
+            environment=req.environment,
+            symbol=req.symbol,
+            exchange_order_id=req.exchange_order_id,
+            client_order_id=req.client_order_id,
+            operator_id=req.operator_id,
+        )
+        return {"status": "SUCCESS", "result": res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail={"error": "CANCEL_FAILED", "message": sanitize_text(str(e))})
+
+
+@app.get("/api/execution/live/balance", dependencies=[Depends(require_api_key)])
+async def get_live_balance(
+    exchange: str = Query("BINANCE", description="Exchange venue"),
+    environment: str = Query("TESTNET", description="Environment: TESTNET or PRODUCTION"),
+):
+    """Fetches real-time live asset balances from exchange."""
+    try:
+        balances = await live_execution_router.get_account_balances(exchange, environment)
+        return {
+            "status": "SUCCESS",
+            "exchange": exchange.upper(),
+            "environment": environment.upper(),
+            "balances": [asdict(b) for b in balances],
+            "timestamp_ms": int(time.time() * 1000),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail={"error": "BALANCE_FETCH_FAILED", "message": sanitize_text(str(e))})
+
+
+@app.get("/api/execution/live/orders", dependencies=[Depends(require_api_key)])
+async def get_live_orders(limit: int = Query(50, ge=1, le=200)):
+    """Fetches recent order history from the persistent idempotency ledger."""
+    records = idempotency_store.get_recent_orders(limit=limit)
+    return {"status": "SUCCESS", "orders": records}
+
+
+@app.post("/api/execution/live/kill-switch", dependencies=[Depends(require_api_key)])
+async def toggle_live_kill_switch(req: LiveKillSwitchApiRequest):
+    """Safely engages or disengages the emergency live execution kill switch."""
+    action = req.action.lower().strip()
+    if action in ("engage", "activate", "true"):
+        state = live_kill_switch.activate(reason=req.reason, operator_id=req.operator_id)
+        return {"status": "ENGAGED", "kill_switch": state.to_dict()}
+    elif action in ("disengage", "deactivate", "clear", "false"):
+        state = live_kill_switch.deactivate(reason=req.reason, operator_id=req.operator_id)
+        return {"status": "DISENGAGED", "kill_switch": state.to_dict()}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action: use 'engage' or 'disengage'")
+
+
+@app.post("/api/execution/live/reconcile", dependencies=[Depends(require_api_key)])
+async def reconcile_ambiguous_order(req: LiveReconcileApiRequest):
+    """Reconciles an ambiguous order by querying the exchange matching engine."""
+    try:
+        res = await live_execution_router.reconcile_order(client_order_id=req.client_order_id)
+        return {"status": "SUCCESS", "result": asdict(res)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail={"error": "RECONCILIATION_FAILED", "message": sanitize_text(str(e))})
 
 
 # WebSocket endpoint for real-time interactive terminal
