@@ -14,19 +14,17 @@ Strict Invariants:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from typing import Any
 
 import aiohttp
 
-from core.auth.credential_vault import mask_secret, sanitize_text
+from core.auth.credential_vault import sanitize_text
 from core.auth.exchange_signers import BinanceSigner
 from core.execution.connectors.base import (
     BaseExchangeConnector,
     ExchangeAuthenticationError,
-    ExchangeError,
     ExchangeNetworkError,
     ExchangeRateLimitError,
     ExchangeRejectedError,
@@ -123,10 +121,11 @@ class BinanceSpotConnector(BaseExchangeConnector):
                 )
 
             # Parse JSON
+            import json
+
             try:
-                import json
                 data = json.loads(raw_text)
-            except Exception:
+            except json.JSONDecodeError:
                 data = {"raw_response": sanitize_text(raw_text)}
 
             if status in (401, 403):
@@ -141,7 +140,7 @@ class BinanceSpotConnector(BaseExchangeConnector):
 
             return data, latency_ms
 
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             t_end = time.perf_counter()
             latency_ms = round((t_end - t_start) * 1000.0, 2)
             logger.warning(f"Binance request timed out after {latency_ms}ms on {endpoint}")
@@ -149,7 +148,9 @@ class BinanceSpotConnector(BaseExchangeConnector):
                 f"Binance request timeout after {latency_ms}ms on {endpoint} (outcome ambiguous)"
             ) from e
         except aiohttp.ClientError as e:
-            raise ExchangeNetworkError(f"Binance network connection error: {sanitize_text(str(e))}") from e
+            raise ExchangeNetworkError(
+                f"Binance network connection error: {sanitize_text(str(e))}"
+            ) from e
         finally:
             if own_session:
                 await session.close()
@@ -251,7 +252,9 @@ class BinanceSpotConnector(BaseExchangeConnector):
         elif client_order_id:
             params["origClientOrderId"] = client_order_id
         else:
-            raise ValueError("Either exchange_order_id or client_order_id must be provided to cancel.")
+            raise ValueError(
+                "Either exchange_order_id or client_order_id must be provided to cancel."
+            )
 
         data, latency_ms = await self._send_request("DELETE", "/api/v3/order", params=params)
         return {
@@ -275,7 +278,9 @@ class BinanceSpotConnector(BaseExchangeConnector):
         elif client_order_id:
             params["origClientOrderId"] = client_order_id
         else:
-            raise ValueError("Either exchange_order_id or client_order_id must be provided to query status.")
+            raise ValueError(
+                "Either exchange_order_id or client_order_id must be provided to query status."
+            )
 
         data, latency_ms = await self._send_request("GET", "/api/v3/order", params=params)
 

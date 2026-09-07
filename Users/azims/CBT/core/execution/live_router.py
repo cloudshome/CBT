@@ -30,11 +30,10 @@ from typing import Any
 
 from core.api_health_guard import api_health_guard
 from core.audit_bus import audit_bus
-from core.auth.credential_vault import credential_vault, mask_secret, sanitize_dict, sanitize_text
+from core.auth.credential_vault import credential_vault, sanitize_text
 from core.execution.connectors.base import (
     BaseExchangeConnector,
     ExchangeAuthenticationError,
-    ExchangeError,
     ExchangeNetworkError,
     ExchangeRateLimitError,
     ExchangeRejectedError,
@@ -45,7 +44,6 @@ from core.execution.connectors.base import (
 from core.execution.connectors.binance_connector import BinanceSpotConnector
 from core.execution.connectors.bybit_connector import BybitV5Connector
 from core.execution.idempotency import (
-    DuplicateOrderError,
     OrderStatus,
     generate_client_order_id,
     idempotency_store,
@@ -61,6 +59,7 @@ logger = logging.getLogger("sky.live_execution_router")
 # ---------------------------------------------------------------------------
 # Typed Live Execution Exceptions
 # ---------------------------------------------------------------------------
+
 
 class LiveRouterError(Exception):
     """Base exception for live execution router rejections."""
@@ -110,13 +109,14 @@ class LiveAmbiguousOrderError(LiveRouterError):
 # Data Models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class LiveOrderRequest:
-    exchange: str          # "BINANCE" or "BYBIT"
-    environment: str       # "TESTNET" or "PRODUCTION"
-    symbol: str            # e.g. "BTC/USDT"
-    side: str              # "BUY" or "SELL"
-    order_type: str        # "LIMIT" or "MARKET"
+    exchange: str  # "BINANCE" or "BYBIT"
+    environment: str  # "TESTNET" or "PRODUCTION"
+    symbol: str  # e.g. "BTC/USDT"
+    side: str  # "BUY" or "SELL"
+    order_type: str  # "LIMIT" or "MARKET"
     quantity: float
     price: float | None = None
     stop_loss: float | None = None
@@ -160,6 +160,7 @@ class LiveExecutionReceipt:
 # Master Live Execution Router
 # ---------------------------------------------------------------------------
 
+
 class LiveExecutionRouter:
     """
     Authoritative Execution Router governing all live cryptocurrency orders.
@@ -173,6 +174,7 @@ class LiveExecutionRouter:
         self._preflight_override_for_tests: bool | None = None
         self._cached_reference_time_provider = None
         self._clock_reference_required: bool = False
+        self._background_tasks: set[asyncio.Task] = set()
 
     def is_live_execution_enabled(self) -> bool:
         """
@@ -202,10 +204,14 @@ class LiveExecutionRouter:
             try:
                 ref_ms = self._cached_reference_time_provider()
             except Exception as e:
-                raise LiveClockSkewError(f"CLOCK_REFERENCE_UNAVAILABLE: Failed to obtain trusted reference time: {e}")
+                raise LiveClockSkewError(
+                    f"CLOCK_REFERENCE_UNAVAILABLE: Failed to obtain trusted reference time: {e}"
+                ) from e
 
         if ref_ms is None and self._clock_reference_required:
-            raise LiveClockSkewError("CLOCK_REFERENCE_UNAVAILABLE: Time reference is required but unavailable.")
+            raise LiveClockSkewError(
+                "CLOCK_REFERENCE_UNAVAILABLE: Time reference is required but unavailable."
+            )
 
         if ref_ms is not None:
             drift_ms = abs(now_ms - ref_ms)
@@ -349,8 +355,12 @@ class LiveExecutionRouter:
         # GATE 10: HalfKellySizer Invalidation & Payoff Primacy
         # ---------------------------------------------------------------------
         est_entry = req.price or 1.0
-        est_sl = req.stop_loss or (est_entry * 0.98 if req.side.upper() == "BUY" else est_entry * 1.02)
-        est_tp = req.take_profit or (est_entry * 1.04 if req.side.upper() == "BUY" else est_entry * 0.96)
+        est_sl = req.stop_loss or (
+            est_entry * 0.98 if req.side.upper() == "BUY" else est_entry * 1.02
+        )
+        est_tp = req.take_profit or (
+            est_entry * 1.04 if req.side.upper() == "BUY" else est_entry * 0.96
+        )
 
         sizing_result = half_kelly_position_sizer.calculate_sizing(
             account_equity=req.account_equity_usd,
@@ -444,7 +454,7 @@ class LiveExecutionRouter:
         # GATE 14 & 15: Client Order ID Uniqueness & Idempotency Reservation
         # ---------------------------------------------------------------------
         # Must reserve atomically in SQLite WAL before network packet dispatch
-        idemp_record = idempotency_store.reserve_order(
+        idempotency_store.reserve_order(
             client_order_id=cid,
             exchange=exch_upper,
             environment=env_upper,
@@ -506,8 +516,10 @@ class LiveExecutionRouter:
             # LATENCY WATCHDOG: Check > 2000ms SLA
             # -----------------------------------------------------------------
             if total_latency_ms > 2000.0:
-                logger.warning(f"LATENCY WATCHDOG BREACH: Order {cid} RTT {total_latency_ms}ms > 2000ms.")
-                asyncio.create_task(
+                logger.warning(
+                    f"LATENCY WATCHDOG BREACH: Order {cid} RTT {total_latency_ms}ms > 2000ms."
+                )
+                watchdog_task = asyncio.create_task(
                     incident_escalation_engine.raise_incident(
                         tier=IncidentTier.WARNING,
                         source_engine="LiveExecutionRouter",
@@ -518,6 +530,8 @@ class LiveExecutionRouter:
                         metadata={"client_order_id": cid, "exchange": exch_upper},
                     )
                 )
+                self._background_tasks.add(watchdog_task)
+                watchdog_task.add_done_callback(self._background_tasks.discard)
 
             # Update Idempotency Store with final verified state
             idempotency_store.mark_final(
@@ -529,7 +543,9 @@ class LiveExecutionRouter:
 
             # Record success in Audit Bus
             audit_bus.emit_event(
-                event_type="LIVE_ORDER_FILLED" if order_result.status == "FILLED" else "LIVE_ORDER_ACKNOWLEDGED",
+                event_type="LIVE_ORDER_FILLED"
+                if order_result.status == "FILLED"
+                else "LIVE_ORDER_ACKNOWLEDGED",
                 symbol=req.symbol,
                 severity="INFO",
                 reason=f"Order {cid} confirmed by {exch_upper}: status={order_result.status}, exch_id={order_result.exchange_order_id}",
@@ -593,7 +609,9 @@ class LiveExecutionRouter:
         """Helper to record all rejected attempts to the audit bus."""
         try:
             audit_bus.emit_event(
-                event_type="LIVE_ORDER_RISK_REJECTED" if "RISK" in rejection_code or "KELLY" in rejection_code else "LIVE_ORDER_REJECTED",
+                event_type="LIVE_ORDER_RISK_REJECTED"
+                if "RISK" in rejection_code or "KELLY" in rejection_code
+                else "LIVE_ORDER_REJECTED",
                 symbol=req.symbol,
                 severity="WARNING" if "DISABLED" in rejection_code else "CRITICAL",
                 reason=sanitize_text(reason),
@@ -606,7 +624,7 @@ class LiveExecutionRouter:
                     "price": req.price,
                 },
             )
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001 — best-effort audit emission
             logger.error(f"Failed to emit rejection audit event: {ex}")
 
     async def reconcile_order(
@@ -657,7 +675,6 @@ class LiveExecutionRouter:
         Cancels an active live order on the exchange.
         Requires kill switch check and audit bus recording.
         """
-        cid = client_order_id or "UNKNOWN"
         kill_active, kill_state = live_kill_switch.is_active()
         # Even during kill switch, cancellations may be permitted to reduce risk,
         # but cancellations must be strictly audited.

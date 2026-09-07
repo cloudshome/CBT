@@ -23,7 +23,7 @@ import logging
 import os
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.api_health_guard import api_health_guard
@@ -31,8 +31,11 @@ from core.audit_bus import audit_bus
 from core.autonomous_auditor import autonomous_risk_auditor
 from core.autonomous_trader import autonomous_trader
 from core.database import db_manager
-from core.portfolio_shadow import portfolio_shadow
-from core.shadow_burn_in_orchestrator import ExecutionMode, OrchestratorState, shadow_burn_in_orchestrator
+from core.shadow_burn_in_orchestrator import (
+    ExecutionMode,
+    OrchestratorState,
+    shadow_burn_in_orchestrator,
+)
 
 logger = logging.getLogger("sky.incident_escalation")
 
@@ -41,10 +44,10 @@ DEFAULT_TOKEN_EXPIRY_SEC = 60.0
 
 
 class IncidentTier:
-    NOTICE = "NOTICE"          # Tier 1: Logged to audit bus only
-    WARNING = "WARNING"        # Tier 2: Dispatched to Sentinel Telegram
-    CRITICAL = "CRITICAL"      # Tier 3: High-priority Telegram + 2-Phase Confirmation required
-    EMERGENCY = "EMERGENCY"    # Tier 4: Autonomous Auto-Halt + READ_ONLY + Telegram ADMIN page
+    NOTICE = "NOTICE"  # Tier 1: Logged to audit bus only
+    WARNING = "WARNING"  # Tier 2: Dispatched to Sentinel Telegram
+    CRITICAL = "CRITICAL"  # Tier 3: High-priority Telegram + 2-Phase Confirmation required
+    EMERGENCY = "EMERGENCY"  # Tier 4: Autonomous Auto-Halt + READ_ONLY + Telegram ADMIN page
 
 
 @dataclass
@@ -98,12 +101,15 @@ class IncidentEscalationEngine:
         self._is_emergency_halted: bool = False
         self._halt_lock = asyncio.Lock()
         self._depth_baselines: dict[str, list[float]] = {}  # rolling depth for liquidity anomaly
+        self._background_tasks: set[asyncio.Task] = set()
 
     # -------------------------------------------------------------------------
     # 1. HMAC Token Generator & 2-Phase Confirmation Engine
     # -------------------------------------------------------------------------
 
-    def create_confirmation_token(self, incident_id: str, action: str, operator_id: str = "ADMIN") -> dict[str, Any]:
+    def create_confirmation_token(
+        self, incident_id: str, action: str, operator_id: str = "ADMIN"
+    ) -> dict[str, Any]:
         """
         Creates a single-use cryptographically signed HMAC token for 2-Phase operator confirmation.
         """
@@ -112,7 +118,9 @@ class IncidentEscalationEngine:
         expires_at = now + DEFAULT_TOKEN_EXPIRY_SEC
 
         message = f"{incident_id}:{action}:{nonce}:{operator_id}:{int(expires_at)}"
-        sig = hmac.new(TOKEN_SECRET.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+        sig = hmac.new(
+            TOKEN_SECRET.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
 
         return {
             "incident_id": incident_id,
@@ -149,7 +157,9 @@ class IncidentEscalationEngine:
         # 3. Verify Cryptographic HMAC Signature in Constant Time
         expires_at_sec = int(expires_at_ms / 1000)
         message = f"{incident_id}:{action}:{nonce}:{operator_id}:{expires_at_sec}"
-        expected_sig = hmac.new(TOKEN_SECRET.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+        expected_sig = hmac.new(
+            TOKEN_SECRET.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
 
         if not hmac.compare_digest(token_signature, expected_sig):
             return False, "INVALID_HMAC_SIGNATURE"
@@ -196,14 +206,21 @@ class IncidentEscalationEngine:
             conf_required = True
             token_info = self.create_confirmation_token(inc_id, "QUARANTINE_STRATEGY")
             await self._dispatch_telegram_alert(
-                tier, f"{description}\nAction Required: 2-Phase Confirmation Token Generated", inc_id, token_info
+                tier,
+                f"{description}\nAction Required: 2-Phase Confirmation Token Generated",
+                inc_id,
+                token_info,
             )
 
         elif tier == IncidentTier.EMERGENCY:
             # TIER 4: LOCAL AUTONOMOUS SAFETY ACTION FIRST
-            action_taken = await self.execute_emergency_auto_halt(reason=description, incident_id=inc_id)
+            action_taken = await self.execute_emergency_auto_halt(
+                reason=description, incident_id=inc_id
+            )
             # Best-effort notification second
-            await self._dispatch_telegram_alert(tier, f"🚨 EMERGENCY AUTO-HALT EXECUTED: {description}", inc_id)
+            await self._dispatch_telegram_alert(
+                tier, f"🚨 EMERGENCY AUTO-HALT EXECUTED: {description}", inc_id
+            )
 
         record = IncidentRecord(
             incident_id=inc_id,
@@ -233,7 +250,9 @@ class IncidentEscalationEngine:
             event_type=f"INCIDENT_{tier}",
             symbol="SYSTEM",
             reason=f"[{tier}] {source_engine}: {trigger_type} ({trigger_value:.2f} >= {threshold_value:.2f})",
-            severity="CRITICAL" if tier in (IncidentTier.CRITICAL, IncidentTier.EMERGENCY) else "WARNING",
+            severity="CRITICAL"
+            if tier in (IncidentTier.CRITICAL, IncidentTier.EMERGENCY)
+            else "WARNING",
             details=record.to_dict(),
         )
 
@@ -255,20 +274,30 @@ class IncidentEscalationEngine:
                 return "ALREADY_HALTED_IDEMPOTENT"
 
             self._is_emergency_halted = True
-            logger.critical(f"Executing Tier 4 EMERGENCY AUTO-HALT: {reason} [Incident: {incident_id}]")
+            logger.critical(
+                f"Executing Tier 4 EMERGENCY AUTO-HALT: {reason} [Incident: {incident_id}]"
+            )
 
             # 1. Stop Autonomous Trader Loop
             autonomous_trader.stop()
 
             # 2. Transition Burn-In Orchestrator to HALTED and then READ_ONLY
-            shadow_burn_in_orchestrator.transition_to(OrchestratorState.HALTING, f"Emergency halt: {reason}")
-            shadow_burn_in_orchestrator.transition_to(OrchestratorState.HALTED, f"Trader stopped: {reason}")
-            shadow_burn_in_orchestrator.transition_to(OrchestratorState.READ_ONLY, "System quarantined to READ_ONLY")
+            shadow_burn_in_orchestrator.transition_to(
+                OrchestratorState.HALTING, f"Emergency halt: {reason}"
+            )
+            shadow_burn_in_orchestrator.transition_to(
+                OrchestratorState.HALTED, f"Trader stopped: {reason}"
+            )
+            shadow_burn_in_orchestrator.transition_to(
+                OrchestratorState.READ_ONLY, "System quarantined to READ_ONLY"
+            )
 
             # 3. Shadow Execution Isolation Guarantee
             # In SHADOW mode: close virtual positions or lock from opening new trades
             if shadow_burn_in_orchestrator.execution_mode == ExecutionMode.SHADOW:
-                logger.info("Emergency Halt: SHADOW mode active. Virtual paper execution frozen. No real broker orders touched.")
+                logger.info(
+                    "Emergency Halt: SHADOW mode active. Virtual paper execution frozen. No real broker orders touched."
+                )
             else:
                 logger.warning("Emergency Halt: LIVE mode active. Emergency protocol dispatched.")
 
@@ -317,7 +346,9 @@ class IncidentEscalationEngine:
             )
         return None
 
-    async def evaluate_liquidity_anomaly(self, symbol: str, current_l2_depth: float) -> IncidentRecord | None:
+    async def evaluate_liquidity_anomaly(
+        self, symbol: str, current_l2_depth: float
+    ) -> IncidentRecord | None:
         """
         Evaluates liquidity evaporation relative to rolling depth baseline.
         Requires >= 10 baseline observations to prevent false alarms.
@@ -343,7 +374,11 @@ class IncidentEscalationEngine:
                 trigger_value=withdrawal_ratio,
                 threshold_value=self.liquidity_withdrawal_threshold,
                 description=f"Sudden {withdrawal_ratio * 100.0:.1f}% liquidity withdrawal detected on {symbol} (Depth: {current_l2_depth:.2f} vs Baseline: {baseline:.2f}).",
-                metadata={"symbol": symbol, "current_depth": current_l2_depth, "baseline": baseline},
+                metadata={
+                    "symbol": symbol,
+                    "current_depth": current_l2_depth,
+                    "baseline": baseline,
+                },
             )
         return None
 
@@ -364,13 +399,16 @@ class IncidentEscalationEngine:
         """
         try:
             from core.telegram_bot import telegram_bot
+
             alert_text = f"🚨 *SKY INCIDENT [{tier}]*\n\n{message}\n\n`Incident ID: {incident_id}`"
             if token_info:
                 alert_text += f"\n`Nonce: {token_info.get('nonce')}`\n`Expiry: 60s`"
             # Asynchronously send without blocking
-            asyncio.create_task(telegram_bot.broadcast_trade_alert(alert_text))
+            alert_task = asyncio.create_task(telegram_bot.broadcast_trade_alert(alert_text))
+            self._background_tasks.add(alert_task)
+            alert_task.add_done_callback(self._background_tasks.discard)
             return True
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001 — alert delivery must never break safety actions
             logger.debug(f"Telegram alert delivery skipped (safe degradation): {ex}")
             return False
 
@@ -416,7 +454,7 @@ class IncidentEscalationEngine:
                     ),
                 )
                 conn.commit()
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001 — best-effort incident persistence
             logger.error(f"Failed to persist incident {rec.incident_id}: {ex}")
 
     def resolve_incident(self, incident_id: str, operator_id: str, notes: str = "") -> bool:
@@ -452,7 +490,7 @@ class IncidentEscalationEngine:
                 details={"incident_id": incident_id, "resolved_by": operator_id},
             )
             return True
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001 — resolution status must not crash the caller
             logger.error(f"Failed to resolve incident {incident_id}: {ex}")
             return False
 

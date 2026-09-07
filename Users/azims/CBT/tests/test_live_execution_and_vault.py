@@ -19,14 +19,7 @@ Strict Verification Gates:
 
 from __future__ import annotations
 
-import asyncio
-import base64
 import json
-import logging
-import math
-import os
-import time
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -36,8 +29,6 @@ from app import app
 from core.auth.credential_vault import (
     CredentialVault,
     ExchangeCredential,
-    VaultConfigurationError,
-    VaultDecryptionError,
     VaultIntegrityError,
     credential_vault,
     mask_secret,
@@ -45,42 +36,27 @@ from core.auth.credential_vault import (
     sanitize_text,
     zeroize_bytes,
 )
-from core.auth.exchange_signers import BinanceSigner, BybitV5Signer, SigningError
+from core.auth.exchange_signers import BinanceSigner, BybitV5Signer
 from core.execution.connectors.base import (
-    ExchangeAuthenticationError,
-    ExchangeError,
-    ExchangeNetworkError,
-    ExchangeRateLimitError,
-    ExchangeRejectedError,
     ExchangeTimeoutError,
-    NormalizedBalance,
     NormalizedOrderResult,
 )
 from core.execution.connectors.binance_connector import BinanceSpotConnector
 from core.execution.connectors.bybit_connector import BybitV5Connector
 from core.execution.idempotency import (
     DuplicateOrderError,
-    OrderStatus,
     generate_client_order_id,
     idempotency_store,
 )
 from core.execution.kill_switch import (
-    LiveKillSwitch,
     live_kill_switch,
-    parse_strict_bool,
 )
 from core.execution.live_router import (
     LiveAmbiguousOrderError,
     LiveClockSkewError,
-    LiveCredentialUnavailableError,
-    LiveEnvironmentMismatchError,
-    LiveExchangeDegradedError,
     LiveExecutionDisabledError,
-    LiveExecutionReceipt,
-    LiveExecutionRouter,
     LiveKillSwitchActiveError,
     LiveOrderRequest,
-    LivePreflightFailedError,
     LiveRiskRejectedError,
     LiveSizeRejectedError,
     live_execution_router,
@@ -110,6 +86,7 @@ def test_vault(tmp_path, monkeypatch):
 # ===========================================================================
 # 1. VAULT CRYPTOGRAPHY & SANITIZATION TESTS
 # ===========================================================================
+
 
 def test_vault_aes_256_gcm_roundtrip(test_vault):
     """Verifies encryption and decryption round-trip with AES-256-GCM."""
@@ -220,6 +197,7 @@ def test_in_memory_zeroize_bytes():
 # 2. CANONICAL EXCHANGE SIGNER TESTS
 # ===========================================================================
 
+
 def test_binance_signer_canonical_serialization():
     """Verifies Binance v3 canonical query sorting and HMAC calculation."""
     api_key = "test_binance_key"
@@ -283,6 +261,7 @@ def test_bybit_v5_signer_post_and_get():
 # 3. LIVE / PAPER BOUNDARY TESTS
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_live_execution_disabled_by_default(monkeypatch):
     """
@@ -317,6 +296,7 @@ async def test_live_execution_disabled_by_default(monkeypatch):
 # ===========================================================================
 # 4. EMERGENCY KILL SWITCH TESTS
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_emergency_kill_switch_overrides_everything(monkeypatch):
@@ -364,6 +344,7 @@ async def test_operational_kill_switch_toggle():
 # ===========================================================================
 # 5. PRE-TRADE RISK PRIMACY & HALF-KELLY SIZING TESTS
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_risk_gate_drawdown_limit_enforced(monkeypatch):
@@ -701,6 +682,7 @@ async def test_single_trade_loss_limit_matrix(monkeypatch):
 # 6. IDEMPOTENCY & AMBIGUOUS RECONCILIATION TESTS
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_duplicate_client_order_id_rejected():
     """Verifies that duplicate client order ID reservation fails atomically."""
@@ -818,6 +800,7 @@ async def test_ambiguous_order_reconciliation():
 # 7. SUCCESSFUL DISPATCH & RECEIPT GENERATION
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_successful_order_execution_roundtrip(monkeypatch):
     """Verifies the complete happy path order dispatch and receipt generation."""
@@ -868,6 +851,7 @@ async def test_successful_order_execution_roundtrip(monkeypatch):
 # ===========================================================================
 # 8. ADVERSARIAL BYPASS TESTS
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_adversarial_nan_infinity_quantities(monkeypatch):
@@ -1054,7 +1038,10 @@ async def test_adversarial_audit_bus_failure_fails_closed(monkeypatch):
     )
 
     from core.audit_bus import audit_bus
-    with patch.object(audit_bus, "emit_event", side_effect=RuntimeError("Simulated DB audit crash")):
+
+    with patch.object(
+        audit_bus, "emit_event", side_effect=RuntimeError("Simulated DB audit crash")
+    ):
         with patch.object(live_execution_router, "_get_connector") as mock_conn:
             with pytest.raises(Exception, match="AUDIT_BUS_UNAVAILABLE"):
                 await live_execution_router.execute_live_order(req)
@@ -1065,6 +1052,7 @@ async def test_adversarial_audit_bus_failure_fails_closed(monkeypatch):
 # ===========================================================================
 # 9. REST API ENDPOINTS & ZERO CREDENTIAL LEAKAGE
 # ===========================================================================
+
 
 def test_rest_api_vault_status():
     """Verifies GET /api/vault/status returns public diagnostic information without secrets."""

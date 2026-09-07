@@ -8,39 +8,32 @@ Comprehensive Test Suite for Phase 16:
 - Chaos & Resilience Scenarios (DB Concurrency, Integrity Checks, Safety Locks)
 """
 
-import asyncio
-from datetime import datetime, timezone
 import time
 import uuid
+from datetime import UTC, datetime
+
 import pytest
 
-from core.shadow_burn_in_orchestrator import (
-    ShadowBurnInOrchestrator,
-    OrchestratorState,
-    ExecutionMode,
-    shadow_burn_in_orchestrator,
-)
+from core.database import db_manager
 from core.hf_telemetry_pipeline import (
     HFTelemetryPipeline,
     TelemetryTiming,
-    QueuePositionEstimate,
-    SlippageAttribution,
-    HFTelemetryRecord,
-    hf_telemetry_pipeline,
 )
 from core.incident_escalation import (
     IncidentEscalationEngine,
     IncidentTier,
-    IncidentRecord,
-    incident_escalation_engine,
 )
-from core.database import db_manager
-from core.audit_bus import audit_bus
-
+from core.shadow_burn_in_orchestrator import (
+    ExecutionMode,
+    OrchestratorState,
+    ShadowBurnInOrchestrator,
+    shadow_burn_in_orchestrator,
+)
 
 # =============================================================================
 # 1. SHADOW BURN-IN ORCHESTRATOR TESTS
 # =============================================================================
+
 
 class TestShadowBurnInOrchestrator:
     """Tests the state machine, UTC market sessions, heartbeats, and restart recovery."""
@@ -75,21 +68,21 @@ class TestShadowBurnInOrchestrator:
         orch = ShadowBurnInOrchestrator()
 
         # 03:00 UTC -> Asia only
-        dt_asia = datetime(2026, 9, 7, 3, 0, 0, tzinfo=timezone.utc)
+        dt_asia = datetime(2026, 9, 7, 3, 0, 0, tzinfo=UTC)
         sessions_asia = orch.get_active_sessions(dt_asia)
         assert "ASIA" in sessions_asia
         assert "LONDON" not in sessions_asia
         assert orch.get_primary_session_name(sessions_asia) == "ASIA"
 
         # 09:00 UTC -> London
-        dt_london = datetime(2026, 9, 7, 9, 0, 0, tzinfo=timezone.utc)
+        dt_london = datetime(2026, 9, 7, 9, 0, 0, tzinfo=UTC)
         sessions_london = orch.get_active_sessions(dt_london)
         assert "LONDON" in sessions_london
         assert "NEW_YORK" not in sessions_london
         assert orch.get_primary_session_name(sessions_london) == "LONDON"
 
         # 14:30 UTC -> London & NY Overlap
-        dt_overlap = datetime(2026, 9, 7, 14, 30, 0, tzinfo=timezone.utc)
+        dt_overlap = datetime(2026, 9, 7, 14, 30, 0, tzinfo=UTC)
         sessions_overlap = orch.get_active_sessions(dt_overlap)
         assert "LONDON" in sessions_overlap
         assert "NEW_YORK" in sessions_overlap
@@ -97,21 +90,21 @@ class TestShadowBurnInOrchestrator:
         assert orch.get_primary_session_name(sessions_overlap) == "LONDON_NEW_YORK_OVERLAP"
 
         # 19:00 UTC -> New York only
-        dt_ny = datetime(2026, 9, 7, 19, 0, 0, tzinfo=timezone.utc)
+        dt_ny = datetime(2026, 9, 7, 19, 0, 0, tzinfo=UTC)
         sessions_ny = orch.get_active_sessions(dt_ny)
         assert "NEW_YORK" in sessions_ny
         assert "LONDON" not in sessions_ny
         assert orch.get_primary_session_name(sessions_ny) == "NEW_YORK"
 
         # 23:00 UTC -> Off Peak Pacific
-        dt_offpeak = datetime(2026, 9, 7, 23, 0, 0, tzinfo=timezone.utc)
+        dt_offpeak = datetime(2026, 9, 7, 23, 0, 0, tzinfo=UTC)
         sessions_off = orch.get_active_sessions(dt_offpeak)
         assert "OFF_PEAK_PACIFIC" in sessions_off
 
     def test_session_countdown_calculation(self):
         orch = ShadowBurnInOrchestrator()
         # Test at 05:00 UTC: next session is London at 07:00 (2 hours away)
-        dt_test = datetime(2026, 9, 7, 5, 0, 0, tzinfo=timezone.utc)
+        dt_test = datetime(2026, 9, 7, 5, 0, 0, tzinfo=UTC)
         countdown = orch.get_next_session_countdown(dt_test)
         assert countdown["next_session"] == "LONDON"
         assert countdown["hours_until_open"] == 2.0
@@ -152,8 +145,21 @@ class TestShadowBurnInOrchestrator:
                     status, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP);
                 """,
-                (test_session_id, "LONDON", "LONDON", ExecutionMode.SHADOW, int(time.time() * 1000),
-                 100000.0, 5, -250.0, 1.2, 10, 10, 0, OrchestratorState.HALTED)
+                (
+                    test_session_id,
+                    "LONDON",
+                    "LONDON",
+                    ExecutionMode.SHADOW,
+                    int(time.time() * 1000),
+                    100000.0,
+                    5,
+                    -250.0,
+                    1.2,
+                    10,
+                    10,
+                    0,
+                    OrchestratorState.HALTED,
+                ),
             )
 
         new_orch = ShadowBurnInOrchestrator()
@@ -165,6 +171,7 @@ class TestShadowBurnInOrchestrator:
 # =============================================================================
 # 2. HIGH-FREQUENCY TELEMETRY PIPELINE TESTS
 # =============================================================================
+
 
 class TestHFTelemetryPipeline:
     """Tests monotonic latency decomposition, ring buffer, queue estimator, and slippage attribution."""
@@ -281,6 +288,7 @@ class TestHFTelemetryPipeline:
 # =============================================================================
 # 3. INCIDENT ESCALATION ENGINE & SAFETY TESTS
 # =============================================================================
+
 
 class TestIncidentEscalationEngine:
     """Tests 4-tier incident handling, HMAC 2-phase tokens, replay attack defense, and auto-halt."""
@@ -411,7 +419,9 @@ class TestIncidentEscalationEngine:
         assert orch.state == OrchestratorState.READ_ONLY
 
         # IDEMPOTENCY: Re-triggering emergency halt must not crash, throw, or storm
-        second_action = await engine.execute_emergency_auto_halt("Second panic signal", "INC_SECOND")
+        second_action = await engine.execute_emergency_auto_halt(
+            "Second panic signal", "INC_SECOND"
+        )
         assert second_action == "ALREADY_HALTED_IDEMPOTENT"
 
         # Operator recovery
@@ -444,6 +454,7 @@ class TestIncidentEscalationEngine:
 # =============================================================================
 # 4. CHAOS & INTEGRITY TESTS
 # =============================================================================
+
 
 class TestChaosAndIntegrity:
     """Tests SQLite concurrency, bad data integrity rejection, and execution isolation."""
@@ -508,5 +519,7 @@ class TestChaosAndIntegrity:
 
         # Query database directly using sandboxed conn
         with db_manager.get_trading_conn() as conn:
-            row = conn.execute("SELECT COUNT(*) FROM hf_telemetry_records WHERE symbol = 'SOL/USDT';").fetchone()
+            row = conn.execute(
+                "SELECT COUNT(*) FROM hf_telemetry_records WHERE symbol = 'SOL/USDT';"
+            ).fetchone()
             assert row[0] >= 200

@@ -15,11 +15,9 @@ Implements Phase 16.1 of the SKY Quantitative Platform:
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
-import json
 import logging
-import math
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 from core.api_health_guard import api_health_guard
@@ -85,10 +83,30 @@ class ShadowBurnInOrchestrator:
         """Determines valid deterministic state transitions."""
         valid_map = {
             OrchestratorState.STOPPED: [OrchestratorState.STARTING, OrchestratorState.READ_ONLY],
-            OrchestratorState.STARTING: [OrchestratorState.RUNNING, OrchestratorState.HALTED, OrchestratorState.STOPPED],
-            OrchestratorState.RUNNING: [OrchestratorState.DEGRADED, OrchestratorState.PAUSED, OrchestratorState.HALTING, OrchestratorState.HALTED, OrchestratorState.STOPPED],
-            OrchestratorState.DEGRADED: [OrchestratorState.RUNNING, OrchestratorState.PAUSED, OrchestratorState.HALTING, OrchestratorState.HALTED],
-            OrchestratorState.PAUSED: [OrchestratorState.RUNNING, OrchestratorState.HALTING, OrchestratorState.HALTED, OrchestratorState.STOPPED],
+            OrchestratorState.STARTING: [
+                OrchestratorState.RUNNING,
+                OrchestratorState.HALTED,
+                OrchestratorState.STOPPED,
+            ],
+            OrchestratorState.RUNNING: [
+                OrchestratorState.DEGRADED,
+                OrchestratorState.PAUSED,
+                OrchestratorState.HALTING,
+                OrchestratorState.HALTED,
+                OrchestratorState.STOPPED,
+            ],
+            OrchestratorState.DEGRADED: [
+                OrchestratorState.RUNNING,
+                OrchestratorState.PAUSED,
+                OrchestratorState.HALTING,
+                OrchestratorState.HALTED,
+            ],
+            OrchestratorState.PAUSED: [
+                OrchestratorState.RUNNING,
+                OrchestratorState.HALTING,
+                OrchestratorState.HALTED,
+                OrchestratorState.STOPPED,
+            ],
             OrchestratorState.HALTING: [OrchestratorState.HALTED],
             OrchestratorState.HALTED: [OrchestratorState.READ_ONLY, OrchestratorState.RECOVERING],
             OrchestratorState.RECOVERING: [OrchestratorState.RUNNING, OrchestratorState.HALTED],
@@ -111,7 +129,9 @@ class ShadowBurnInOrchestrator:
             event_type="ORCHESTRATOR_STATE_TRANSITION",
             symbol="SYSTEM",
             reason=f"Transitioned from {old_state} to {target_state}: {reason}",
-            severity="INFO" if target_state in (OrchestratorState.RUNNING, OrchestratorState.PAUSED) else "WARNING",
+            severity="INFO"
+            if target_state in (OrchestratorState.RUNNING, OrchestratorState.PAUSED)
+            else "WARNING",
             details={
                 "previous_state": old_state,
                 "new_state": target_state,
@@ -119,7 +139,9 @@ class ShadowBurnInOrchestrator:
                 "reason": reason,
             },
         )
-        logger.info(f"BurnInOrchestrator state transition: {old_state} -> {target_state} [{reason}]")
+        logger.info(
+            f"BurnInOrchestrator state transition: {old_state} -> {target_state} [{reason}]"
+        )
         return True
 
     # -------------------------------------------------------------------------
@@ -132,7 +154,7 @@ class ShadowBurnInOrchestrator:
         Derives active market session labels from UTC time.
         Non-mutually exclusive: handles overlaps as derived intersections.
         """
-        now_utc = dt or datetime.now(timezone.utc)
+        now_utc = dt or datetime.now(UTC)
         hour = now_utc.hour + (now_utc.minute / 60.0)
 
         sessions = []
@@ -169,7 +191,7 @@ class ShadowBurnInOrchestrator:
 
     def get_next_session_countdown(self, dt: datetime | None = None) -> dict[str, Any]:
         """Calculates time remaining until next major session open."""
-        now_utc = dt or datetime.now(timezone.utc)
+        now_utc = dt or datetime.now(UTC)
         hour = now_utc.hour + (now_utc.minute / 60.0) + (now_utc.second / 3600.0)
 
         checkpoints = [
@@ -267,8 +289,14 @@ class ShadowBurnInOrchestrator:
                         end_time_ms,
                         close_bal,
                         accounting["closed_positions_count"],
-                        int(accounting["closed_positions_count"] * (accounting["win_rate_pct"] / 100.0)),
-                        int(accounting["closed_positions_count"] * (1.0 - (accounting["win_rate_pct"] / 100.0))),
+                        int(
+                            accounting["closed_positions_count"]
+                            * (accounting["win_rate_pct"] / 100.0)
+                        ),
+                        int(
+                            accounting["closed_positions_count"]
+                            * (1.0 - (accounting["win_rate_pct"] / 100.0))
+                        ),
                         sess_pnl,
                         sess_ret,
                         0.0,
@@ -279,7 +307,7 @@ class ShadowBurnInOrchestrator:
                 )
                 conn.commit()
             logger.info(f"Closed burn-in session {session_id} (PnL: ${sess_pnl:+,.2f})")
-        except Exception as ex:
+        except Exception as ex:  # noqa: BLE001 — best-effort session persistence
             logger.error(f"Error closing session record {session_id}: {ex}")
 
     def _recover_state_from_disk(self) -> None:
@@ -298,7 +326,11 @@ class ShadowBurnInOrchestrator:
                 start_ts = row["start_timestamp"]
 
                 # CRITICAL SAFETY LAW: If last state was HALTED, READ_ONLY, or HALTING, do NOT resume RUNNING
-                if last_status in (OrchestratorState.HALTED, OrchestratorState.READ_ONLY, OrchestratorState.HALTING):
+                if last_status in (
+                    OrchestratorState.HALTED,
+                    OrchestratorState.READ_ONLY,
+                    OrchestratorState.HALTING,
+                ):
                     self.state = OrchestratorState.HALTED
                     self.current_session_id = last_id
                     self.current_session_name = row["session_name"]
@@ -316,8 +348,10 @@ class ShadowBurnInOrchestrator:
                     self.heartbeats_expected = int(row["heartbeat_expected"] or 0)
                     self.state = OrchestratorState.RUNNING
                     autonomous_trader.start()
-                    logger.info(f"BurnInOrchestrator: Seamlessly recovered active session {last_id} from disk.")
-        except Exception as ex:
+                    logger.info(
+                        f"BurnInOrchestrator: Seamlessly recovered active session {last_id} from disk."
+                    )
+        except Exception as ex:  # noqa: BLE001 — recovery must degrade to cold start
             logger.error(f"Failed to recover burn-in state from disk: {ex}")
 
     # -------------------------------------------------------------------------
@@ -382,10 +416,15 @@ class ShadowBurnInOrchestrator:
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?;
                         """,
-                        (self.heartbeats_expected, self.heartbeats_received, self.heartbeats_missed, self.current_session_id),
+                        (
+                            self.heartbeats_expected,
+                            self.heartbeats_received,
+                            self.heartbeats_missed,
+                            self.current_session_id,
+                        ),
                     )
                     conn.commit()
-            except Exception as ex:
+            except Exception as ex:  # noqa: BLE001 — heartbeats are best-effort telemetry
                 logger.debug(f"Could not persist heartbeat counts: {ex}")
 
         audit_bus.emit_event(
@@ -404,7 +443,9 @@ class ShadowBurnInOrchestrator:
 
     async def start_loop(self) -> None:
         """Continuous background orchestrator loop."""
-        logger.info(f"ShadowBurnInOrchestrator background supervisor online (Heartbeat: {self.heartbeat_interval_sec}s).")
+        logger.info(
+            f"ShadowBurnInOrchestrator background supervisor online (Heartbeat: {self.heartbeat_interval_sec}s)."
+        )
         if self.state == OrchestratorState.STOPPED:
             self.transition_to(OrchestratorState.STARTING, "Supervisor startup initialized")
             self._ensure_session_active()
@@ -430,7 +471,9 @@ class ShadowBurnInOrchestrator:
 
     def start(self) -> bool:
         if self.state in (OrchestratorState.HALTED, OrchestratorState.READ_ONLY):
-            logger.warning("Cannot start directly from HALTED/READ_ONLY state. Call recover() first.")
+            logger.warning(
+                "Cannot start directly from HALTED/READ_ONLY state. Call recover() first."
+            )
             return False
         autonomous_trader.start()
         return self.transition_to(OrchestratorState.RUNNING, "User/API start requested")
@@ -453,7 +496,9 @@ class ShadowBurnInOrchestrator:
         if self.state not in (OrchestratorState.HALTED, OrchestratorState.READ_ONLY):
             return False
 
-        self.transition_to(OrchestratorState.RECOVERING, f"Admin recovery initiated: {operator_note}")
+        self.transition_to(
+            OrchestratorState.RECOVERING, f"Admin recovery initiated: {operator_note}"
+        )
         self._ensure_session_active()
         autonomous_trader.start()
         return self.transition_to(OrchestratorState.RUNNING, "Recovery verified complete")

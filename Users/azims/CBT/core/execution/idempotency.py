@@ -120,10 +120,14 @@ class LiveOrderIdempotencyStore:
                     )
                     """
                 )
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_idemp_exch_id ON live_order_idempotency(exchange_order_id)")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_idemp_status ON live_order_idempotency(status)")
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_idemp_exch_id ON live_order_idempotency(exchange_order_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_idemp_status ON live_order_idempotency(status)"
+                )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — best-effort schema init
             logger.error(f"Failed to initialize live_order_idempotency table: {e}")
 
     def reserve_order(
@@ -273,7 +277,14 @@ class LiveOrderIdempotencyStore:
                     error_message = ?, reconciled_at = ?, updated_at = ?
                 WHERE client_order_id = ?
                 """,
-                (resolved_status, exchange_order_id, sanitize_text(notes), now_ms, now_ms, client_order_id),
+                (
+                    resolved_status,
+                    exchange_order_id,
+                    sanitize_text(notes),
+                    now_ms,
+                    now_ms,
+                    client_order_id,
+                ),
             )
             conn.commit()
 

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sqlite3
 import time
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -84,7 +83,7 @@ class LiveKillSwitch:
                     """
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — best-effort schema init
             logger.error(f"Failed to initialize live_kill_switch_state schema: {e}")
 
     def is_active(self) -> tuple[bool, KillSwitchState]:
@@ -139,9 +138,11 @@ class LiveKillSwitch:
                         activated_at=int(row["activated_at"]),
                         source="PERSISTENT_DB",
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — must fail closed on any DB error
             # FAIL CLOSED: If DB read fails, treat kill switch as ACTIVE
-            logger.critical(f"FAIL CLOSED: Kill switch DB inspection error: {e}. Engaging safety halt.")
+            logger.critical(
+                f"FAIL CLOSED: Kill switch DB inspection error: {e}. Engaging safety halt."
+            )
             return True, KillSwitchState(
                 is_active=True,
                 reason=f"FAIL_CLOSED: Database inspection error: {e}",
@@ -153,6 +154,7 @@ class LiveKillSwitch:
         # 4. Check Incident Escalation Engine Auto-Halt state
         try:
             from core.incident_escalation import incident_escalation_engine
+
             if getattr(incident_escalation_engine, "_is_emergency_halted", False):
                 return True, KillSwitchState(
                     is_active=True,
@@ -192,7 +194,7 @@ class LiveKillSwitch:
                     (reason, operator_id, now_ms),
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — best-effort persistence
             logger.error(f"Error persisting kill switch activation to DB: {e}")
 
         audit_bus.emit_event(
@@ -232,7 +234,7 @@ class LiveKillSwitch:
                     (reason, operator_id, now_ms),
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — best-effort persistence
             logger.error(f"Error persisting kill switch deactivation to DB: {e}")
 
         audit_bus.emit_event(

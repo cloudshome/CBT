@@ -21,8 +21,6 @@ import time
 import urllib.parse
 from typing import Any
 
-from core.auth.credential_vault import mask_secret, sanitize_text
-
 logger = logging.getLogger("sky.exchange_signers")
 
 DEFAULT_RECV_WINDOW = 5000
@@ -123,7 +121,9 @@ class BybitV5Signer:
         if http_method in ("GET", "DELETE"):
             # Query string sorted
             if data:
-                payload_str = urllib.parse.urlencode(sorted((k, v) for k, v in data.items() if v is not None))
+                payload_str = urllib.parse.urlencode(
+                    sorted((k, v) for k, v in data.items() if v is not None)
+                )
             else:
                 payload_str = ""
             prehash = f"{str_ts}{api_key}{str_window}{payload_str}"

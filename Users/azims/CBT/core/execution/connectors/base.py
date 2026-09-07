@@ -17,7 +17,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from core.auth.credential_vault import mask_secret, sanitize_text
+from core.auth.credential_vault import sanitize_text
 
 logger = logging.getLogger("sky.exchange_connectors")
 
@@ -32,6 +32,7 @@ class ExchangeAuthenticationError(ExchangeError):
 
 class ExchangeRateLimitError(ExchangeError):
     """Raised when exchange returns HTTP 429 rate limit."""
+
     def __init__(self, message: str, retry_after_sec: float = 10.0):
         super().__init__(sanitize_text(message))
         self.retry_after_sec = retry_after_sec
@@ -95,7 +96,9 @@ class BaseExchangeConnector(abc.ABC):
         self.timeout_sec = timeout_sec
 
         if self.environment not in ("TESTNET", "PRODUCTION"):
-            raise ValueError(f"Invalid environment: '{self.environment}'. Must be 'TESTNET' or 'PRODUCTION'.")
+            raise ValueError(
+                f"Invalid environment: '{self.environment}'. Must be 'TESTNET' or 'PRODUCTION'."
+            )
 
     @abc.abstractmethod
     async def get_balances(self) -> list[NormalizedBalance]:
