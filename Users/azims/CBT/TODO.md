@@ -476,6 +476,28 @@
   - Full repository test suites: **490 / 490 passing tests (364 Pytest + 126 Jest — 100% Green)**.
   - Verified `scripts/system_preflight.py` passing all 4 quality gates with 100% green.
 
+- [x] **Task 17.9: Milestone 17.1 Boss-Level Remediation & Adversarial Re-Audit (493 Tests — 100% GREEN)**
+  - Remediated M17.1-FINDING-01: Clamped `core/half_kelly_sizer.py` risk ceiling from 2.5% to constitutional 1.5% and added independent Gate 12 in `LiveExecutionRouter` enforcing $|P_{\text{entry}} - P_{\text{stop}}| \times Q \le \text{Equity} \times 0.015 (+ 10^{-6})$.
+  - Remediated M17.1-FINDING-02: Implemented dynamic clock drift verification in Gate 3 & Gate 17 ($|t_{\text{local}} - t_{\text{ref}}| \le 1000\text{ms}$) with fail-closed semantics if reference is required but unavailable.
+  - Remediated M17.1-FINDING-03: Formally minted and verified Git release tag `v3.7.0-live-execution-vault`.
+  - Added 3 extensive adversarial test suites in `tests/test_live_execution_and_vault.py` covering 11 single-trade risk cases and 7 clock drift cases with zero network calls on all rejections.
+  - Full repository test suites: **493 / 493 passing tests (367 Pytest + 126 Jest — 100% Green)**.
+  - Reconciled with `origin/main` via clean git merge.
+
+---
+
+## 🔮 Phase 18: Multi-Venue Smart Execution & Microsecond Fill Reconciliation (Upcoming Pipeline)
+
+- [ ] **Task 18.1: Multi-Venue Smart Order Routing (SOR)**
+  - Dynamic liquidity-weighted order splitting across Binance Spot and Bybit V5 based on real-time top-of-book depth and fee tier schedules.
+- [ ] **Task 18.2: Almgren-Chriss Optimal Execution Schedule Engine**
+  - Trajectory optimizer balancing market risk vs execution price impact under volatility and liquidity drift.
+- [ ] **Task 18.3: Sub-Millisecond Fill Reconciliation & Slippage Ledger**
+  - Persistent SQLite WAL ledger (`reconciliation_ledger.db`) auditing expected vs realized fill price, exchange fee attribution, and post-trade venue latency.
+- [ ] **Task 18.4: Production Live-Order Terminal UI Controls**
+  - Controlled Live Execution interface in `frontend/src/components/RiskFirstOrderDesk.tsx` guarded by dual-confirmation modal and credential status indicator.
+- [ ] **Task 18.5: Pre-Merge Quality Gate & System Preflight Suite Expansion (500+ Tests Target)**
+
 ---
 
 ## 📝 Rules for Updating This Document

@@ -6,7 +6,7 @@
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 490 / 490 (364 Pytest, 126 Jest — 100% passing)  
+> **Tests Passing:** 493 / 493 (367 Pytest, 126 Jest — 100% passing)  
 > **Preflight Status:** ALL QUALITY GATES PASSED (100% GREEN)
 
 ---
@@ -62,6 +62,8 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `d41fa1b` | Merge remote-tracking branch 'origin/main' into main |
+| `33417b4` | fix(execution): enforce 1.5% single-trade risk ceiling and dynamic clock drift validation (29 passing tests) |
 | `3d50dda` | feat(execution): implement live exchange execution router, aes-256-gcm vault, and hmac signers (26 passing tests) |
 | `2b4136f` | feat(canary): implement live canary shadow burn-in orchestrator, hf telemetry pipeline, and incident escalation (17 passing tests) |
 | `0084d7e` | docs(status): update SKY_STATUS to v3.5.0 with 447 passing tests and recent commit history |
@@ -168,33 +170,25 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 ---
 
-## What Was Completed This Session (2026-08-29)
+## What Was Completed This Session (2026-09-07)
 
-1. **Phase 16 — Live Voice Interface (STT & TTS)**:
-   - Upgraded `core/voice_interface.py` with Gemini Multimodal audio transcription and audio MP3 synthesis.
-   - Added `POST /api/voice/transcribe` and `POST /api/voice/synthesize` endpoints in `app.py`.
-   - Added live microphone recording (STT) and "Read Brief" (TTS) audio synthesis in `frontend/src/components/GeminiDeskCopilot.tsx`.
-   - Routed `/api/voice` in `vite.config.ts` and `nginx.conf`.
-2. **Phase 17 — Telegram Bot Integration**:
-   - Upgraded `core/telegram_bot.py` with interactive command routing (`/status`, `/risk`, `/brief`, `/decision`, `/approve`).
-   - Added `POST /api/telegram/webhook`, `POST /api/telegram/broadcast`, and `GET /api/telegram/status` endpoints in `app.py`.
-   - Wired live telemetry broadcaster loop to dispatch instant Telegram position alerts on TP/SL hits and circuit breaker triggers.
-   - Added quick Telegram broadcast trigger in `frontend/src/components/Header.tsx`.
-3. **Continuous Empirical Accumulator & Walk-Forward Validator**:
-   - Created `core/empirical_accumulator.py` to continuously replay historical setups across market regimes into SQLite `experiments.db`.
-   - Started background accumulator loop in `app.py` startup event.
-   - Added `GET /api/lab/empirical-status` endpoint for real-time statistical sample tracking ($N \ge 100$).
-4. **Phase 18 — Universal Provenance Engine & Immutable Research Store**:
-   - Implemented `core/provenance_engine.py` with SHA-256 cryptographic content hashing and duplicate detection.
-   - Added `POST /api/ingest/source`, `GET /api/ingest/provenance`, and `GET /api/ingest/provenance/{source_id}` in `app.py`.
-5. **Phase 19 — Formal Strategy Compiler & Genome Validator**:
-   - Implemented `core/strategy_compiler.py` with fail-closed validation (`STATUS = NOT_BACKTESTABLE` for underspecified rules).
-   - Added `POST /api/strategy/compile` and `GET /api/strategy/genomes` in `app.py`.
-   - Wired newly compiled valid strategies into Tier 1 of `core/strategy_league.py`.
-6. **Task Board & Test Suite**:
-   - Created `TODO.md` as the master single source of truth for ongoing and upcoming prioritized tasks.
-   - Added `tests/test_provenance_and_compiler.py` (107 passing tests in pytest).
-
+1. **Milestone 17 — Live Exchange Execution & Private API Credential Vault (Class H)**:
+   - Built `core/auth/credential_vault.py`: AES-256-GCM AEAD encryption with PBKDF2 key derivation (600,000 rounds) and zero-leakage secret sanitizer.
+   - Built `core/auth/exchange_signers.py`: Deterministic HMAC-SHA256 request signers for Binance v3 and Bybit V5 with strict millisecond timestamps and $\le 1000$ms clock drift protection.
+   - Built `core/execution/kill_switch.py`: Durable fail-closed master kill switch with SQLite WAL persistence and strict boolean parsing.
+   - Built `core/execution/idempotency.py`: Atomic SQLite WAL reservation ledger with ambiguous order state machine and reconciliation protection.
+   - Built `core/execution/connectors/`: Abstract base and concrete Binance and Bybit live connectors with sub-millisecond latency telemetry.
+   - Built `core/execution/live_router.py`: 20 pre-trade validation gates preceding network dispatch.
+   - Registered 8 REST endpoints in `app.py` with reverse proxy routes in `frontend/vite.config.ts` and `frontend/nginx.conf`.
+2. **Milestone 17.1 — Boss-Level Remediation & Adversarial Re-Audit (FAIL → PASS)**:
+   - Remediated M17.1-FINDING-01: Clamped `core/half_kelly_sizer.py` risk ceiling from 2.5% down to constitutional 1.5% and added independent Gate 12 in `LiveExecutionRouter` enforcing $|P_{\text{entry}} - P_{\text{stop}}| \times Q \le \text{Equity} \times 0.015 (+ 10^{-6})$.
+   - Remediated M17.1-FINDING-02: Implemented dynamic clock drift verification in Gate 3 & Gate 17 ($|t_{\text{local}} - t_{\text{ref}}| \le 1000\text{ms}$) with fail-closed semantics if reference is required but unavailable.
+   - Remediated M17.1-FINDING-03: Formally minted and verified Git release tag `v3.7.0-live-execution-vault`.
+   - Expanded adversarial test suite to 29 tests covering 11 risk cases and 7 clock drift cases with zero network calls on all rejections.
+   - Full repository test pass: **493 / 493 tests passing (367 Pytest + 126 Jest — 100% Green)**.
+   - Verified clean preflight scorecard: ALL 4 QUALITY GATES PASSED.
+3. **Remote Main Reconciliation**:
+   - Reconciled with `origin/main` via clean git merge (0 conflicts).
 
 ---
 
@@ -223,16 +217,16 @@ docker-compose up --build
 
 ---
 
-## Next Session Plan & Objectives
+## Next in the Pipeline: Milestone 18 (Multi-Venue Smart Execution & Microsecond Fill Reconciliation)
 
 Detailed step-by-step tasks and acceptance criteria are documented in [`docs/NEXT_SESSION_PLAN.md`](file:///c:/Users/azims/CBT/docs/NEXT_SESSION_PLAN.md).
 
-### Sprint K-UI Immediate Objectives:
-1. **Task K-UI.1:** Add `KRONOS` forecast trajectory path & probability cone overlay to `frontend/src/components/TradingViewChart.tsx`.
-2. **Task K-UI.2:** Add live advisory shadow confirmation/divergence pill to `frontend/src/components/RiskFirstOrderDesk.tsx`.
-3. **Task K-UI.3:** Setup Vitest + `@testing-library/react` and write frontend component tests in `frontend/src/components/__tests__/`.
-4. **Task K-UI.4:** Implement Playwright E2E critical path tests (place trade $\to$ reconcile $\to$ verify risk).
-5. **Task K-UI.5:** Compile release scorecard and submit PR to `main`.
+### Milestone 18 Pipeline Objectives:
+1. **Task 18.1:** Real-Time Multi-Venue Smart Order Routing (SOR) between Binance Spot and Bybit V5 with automated liquidity splits.
+2. **Task 18.2:** Almgren-Chriss Optimal Execution Schedule Engine with nonlinear market impact simulation.
+3. **Task 18.3:** Sub-Millisecond Fill Reconciliation & Slippage Attribution Ledger (`reconciliation_ledger.db`).
+4. **Task 18.4:** Production Live-Order Terminal UI Controls in `frontend/src/components/RiskFirstOrderDesk.tsx` (Live toggle behind dual-confirmation modal).
+5. **Task 18.5:** Pre-Merge Quality Gate & System Preflight Suite Expansion (500+ tests target).
 
 ---
 

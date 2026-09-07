@@ -1,9 +1,9 @@
 # SKY — Next Session Execution Plan & Institutional Roadmap
 
-> **Document Version:** 2.0.0 (Frontier Systems Handoff)  
-> **Date:** 2026-09-01  
-> **Release Baseline:** `v3.1.0-frontier-systems-ready` (Active Baseline 🚀)  
-> **Test Suite Health:** 289 / 289 passing (100% GREEN) — 191 Pytest, 98 Jest  
+> **Document Version:** 3.7.0 (Live Execution & Private API Vault Handoff)  
+> **Date:** 2026-09-07  
+> **Release Baseline:** `v3.7.0-live-execution-vault` (Active Baseline 🚀)  
+> **Test Suite Health:** 493 / 493 passing (100% GREEN) — 367 Pytest, 126 Jest  
 > **Preflight Quality Gates:** ALL 4 QUALITY GATES PASSED (100% GREEN)  
 > **Governance Architecture:** 3-Tier Hierarchy (`AGENTS.md` + `.specify/memory/constitution.md` + `docs/QUANT_RESEARCH_PROTOCOL.md`)  
 
@@ -11,66 +11,59 @@
 
 ## 1. Executive Summary
 
-This document establishes the formal engineering and quantitative roadmap for **Phase 15: Visual Frontier HUDs & Autonomous Live Sandbox Dashboard**.
+Milestones 16, 17, and 17.1 have established institutional-grade paper shadow burn-in telemetry and a fully authenticated live exchange execution boundary:
+- **Private API Credential Vault:** AES-256-GCM authenticated encryption with PBKDF2 key derivation and zero-leakage secret masking.
+- **Fail-Closed Live Router:** 20 pre-trade validation gates enforcing strict invariants before network packet transmission (kill switch, constitutional 1.5% single-trade loss limit, $\le 1000$ms dynamic clock drift SLA, and atomic idempotency reservation).
+- **Adversarial Security Audit:** 100% green verification across 493 tests, with zero network leakages on rejections.
 
-All Phase 14 backend engines (Microstructure, Macro Network, Genetic Optimizer, Smart Execution, and Autonomous Auditor) are fully implemented, equipped with API key guards in `app.py`, typed in `frontend/src/services/api.ts`, and verified with 100% green test suites.
-
-The upcoming session focuses on **institutional visualization, realtime interactive terminal integration, and autonomous paper burn-in controls**.
+The upcoming pipeline focuses on **Milestone 18: Multi-Venue Smart Execution, Almgren-Chriss Slicing, and Microsecond Fill Reconciliation**.
 
 ---
 
-## 2. Phase 15 Sprint Breakdown: Visual Frontier Terminal
+## 2. Milestone 18 Sprint Breakdown: Multi-Venue Smart Execution
 
 ```mermaid
 graph TD
-    A[Start Session] --> B[Task 15.1: Microstructure & L2/L3 Depth Elasticity HUD]
-    B --> C[Task 15.2: Multi-Asset Macro Lead-Lag Spillover Radar]
-    C --> D[Task 15.3: Genetic Strategy Optimizer & WRC Permutation Lab UI]
-    D --> E[Task 15.4: Smart Execution Slicer & Impact Simulator in Desk]
-    E --> F[Task 15.5: Autonomous Risk Auditor & CUSUM Expectancy HUD]
-    F --> G[Task 15.6: Pre-Merge Quality Gate & System Preflight 300+ Tests]
+    A[Start Milestone 18] --> B[Task 18.1: Multi-Venue Smart Order Routing SOR Engine]
+    B --> C[Task 18.2: Almgren-Chriss Optimal Trajectory Slicer]
+    C --> D[Task 18.3: Microsecond Fill Reconciliation & Slippage Ledger]
+    D --> E[Task 18.4: Live Terminal UI Controls in RiskFirstOrderDesk]
+    E --> F[Task 18.5: Pre-Merge Quality Gate 500+ Tests]
 ```
 
-### Task 15.1: Microstructure & L2/L3 Depth Elasticity Visualizer
-* **Target File:** `frontend/src/components/MicrostructurePanel.tsx`
+### Task 18.1: Multi-Venue Smart Order Routing (SOR) Engine
+* **Target File:** `core/execution/smart_order_router.py`
 * **Specification:**
-  - Connect to `/api/microstructure/analytics` and `/api/microstructure/toxicity`.
-  - Render dynamic depth tier imbalance bars ($L_1, L_5, L_{10}, L_{20}, L_{50}$).
-  - Display Slope Elasticity gauge ($\frac{\Delta Q}{\Delta P}$ Bid vs Ask stiffness).
-  - Real-time VPIN toxicity meter, Kyle's Lambda impact score, and Iceberg footprint alerts.
-* **Acceptance Criteria:**
-  - Zero-Shake UI: updates incrementally without re-rendering parent layouts.
+  - Ingest real-time L2 order book depth from Binance Spot and Bybit V5.
+  - Dynamically split parent orders across venues to minimize weighted average execution cost.
+  - Account for VIP exchange maker/taker fee tiers and venue liquidity depth.
 
-### Task 15.2: Multi-Asset Macro Cross-Correlation & Lead-Lag Spillover Radar
-* **Target File:** `frontend/src/components/MacroNetworkRadar.tsx`
+### Task 18.2: Almgren-Chriss Optimal Execution Schedule Engine
+* **Target File:** `core/execution/almgren_chriss.py`
 * **Specification:**
-  - Connect to `/api/macro/network` and `/api/macro/spillover`.
-  - Render interactive $N \times N$ correlation heatmap across Core Crypto (BTC, ETH, SOL), Macro Gold (PAXG), and Yield proxies.
-  - Display PCA Systemic Absorption Ratio gauge ($> 75\%$ Risk-Off Contagion alert).
-  - Render directional Lead-Lag Granger Causality network arrows indicating information flow.
+  - Implement the classical Almgren-Chriss discrete execution model balancing risk aversion vs market impact.
+  - Generate discrete child-order trading trajectories ($n$ slices over time horizon $T$).
+  - Calculate instantaneous non-linear price impact $I = Y \cdot \sigma \cdot \sqrt{\frac{V}{\text{ADV}}}$.
 
-### Task 15.3: Genetic Strategy Optimizer & WRC Permutation Lab UI
-* **Target File:** `frontend/src/components/GeneticStrategyLab.tsx`
+### Task 18.3: Sub-Millisecond Fill Reconciliation & Slippage Ledger
+* **Target File:** `core/execution/reconciliation_ledger.py`
 * **Specification:**
-  - Connect to `/api/strategy/optimize/genetic` and `/api/strategy/optimize/results`.
-  - Interactive parameter evolution controls (population size, generation counter, mutation rate).
-  - Real-time fitness convergence charts (Best vs Average fitness per generation).
-  - Out-of-Sample Deflated Sharpe Ratio (DSR) & White's Reality Check bootstrap $p$-value cards.
+  - Record expected vs realized fill prices, exchange fees, and venue roundtrip latencies.
+  - Persist records in SQLite WAL `reconciliation_ledger.db`.
+  - Expose forensic reconciliation endpoint `GET /api/execution/reconciliation/report`.
 
-### Task 15.4: Smart Order Routing (SOR) & Almgren-Chriss Slicer in Order Desk
+### Task 18.4: Production Live-Order Terminal UI Controls
 * **Target File:** `frontend/src/components/RiskFirstOrderDesk.tsx`
 * **Specification:**
-  - Integrate `/api/execution/slice` and `/api/execution/simulate_impact`.
-  - Add Execution Algorithm selector (`PASSIVE_LIMIT`, `TWAP`, `VWAP`, `ALMGREN_CHRISS`, `IOC_SWEEP`).
-  - Render interactive child order schedule timeline and non-linear market impact preview.
+  - Add explicit "LIVE EXECUTION" toggle behind master kill switch guard.
+  - Render dual-confirmation authorization modal displaying exact stop-loss distance, dollar risk, and 1.5% equity cap check.
+  - Live status indicator displaying vault connection state and clock drift SLA.
 
-### Task 15.5: 24/7 Autonomous Risk Auditor & CUSUM Expectancy Drift HUD
-* **Target File:** `frontend/src/components/AutonomousAuditorHUD.tsx`
+### Task 18.5: Pre-Merge Quality Gate Expansion
+* **Target File:** `tests/test_smart_order_router.py`, `scripts/system_preflight.py`
 * **Specification:**
-  - Connect to `/api/auditor/telemetry` and `/api/auditor/drift`.
-  - Display real-time telemetry metrics: fill latency, slippage distribution, peak drawdown.
-  - Regime-conditional expectancy breakdown card ($E[R \mid \text{Regime}]$ vs historical baseline).
-  - Live forensic loss autopsy feed and Strategy Quarantine circuit status indicator.
+  - Expand test suite to target 500+ tests passing 100% green.
+  - Validate zero-network behavior on all rejection paths.
 
 ---
 
@@ -80,15 +73,16 @@ graph TD
 # 1. Inspect repository state & baseline
 git status
 git log -n 3 --oneline
+git tag --list
 
-# 2. Run test suites to verify 100% green baseline (289 passing tests)
+# 2. Run test suites to verify 100% green baseline (493 passing tests)
 .venv\Scripts\pytest
 npm test
 
-# 3. Execute System Preflight Verification
-python scripts/system_preflight.py
+# 3. Execute System Preflight Verification (4/4 gates green)
+.venv\Scripts\python.exe scripts/system_preflight.py
 
-# 4. Start local development servers
+# 4. Start local development servers (3 terminals)
 # Terminal 1: Python FastAPI (:8000)
 .venv\Scripts\uvicorn app:app --host 0.0.0.0 --port 8000
 
@@ -102,8 +96,10 @@ npm --prefix frontend run dev
 ---
 
 ## 4. Quality Gate Checklist (Pre-Session Target)
-- [x] 289 / 289 tests green (191 Pytest, 98 Jest).
+- [x] 493 / 493 tests green (367 Pytest, 126 Jest).
+- [x] Milestone 17.1 Class H Remediation & Adversarial Re-Audit PASSED.
+- [x] Tag `v3.7.0-live-execution-vault` minted and verified.
 - [x] 3-Tier Governance Architecture locked (`AGENTS.md`, `constitution.md`, `QUANT_RESEARCH_PROTOCOL.md`).
-- [x] 5 Institutional Frontier engines active and verified.
-- [ ] Phase 15 Visual Frontier HUDs built and integrated into `localhost:5173`.
-- [ ] Preflight verification suite passing with 300+ total tests.
+- [ ] Milestone 18 Smart Order Routing & Execution Slicing implemented.
+- [ ] Preflight verification suite passing with 500+ total tests.
+
