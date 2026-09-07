@@ -15,12 +15,12 @@ Implements Phase 16.2 of the SKY Quantitative Platform:
 from __future__ import annotations
 
 import asyncio
-from collections import deque
-from dataclasses import asdict, dataclass, field
 import logging
 import math
 import sqlite3
 import time
+from collections import deque
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.database import db_manager
@@ -59,6 +59,7 @@ class TelemetryTiming:
 @dataclass
 class QueuePositionEstimate:
     """Explicitly labeled ESTIMATED order-book queue simulation metrics."""
+
     visible_depth: float
     estimated_volume_ahead: float
     estimated_cancel_rate: float
@@ -70,6 +71,7 @@ class QueuePositionEstimate:
 @dataclass
 class SlippageAttribution:
     """3-Factor Slippage Decomposition."""
+
     slippage_total_bps: float
     slippage_spread_bps: float
     slippage_impact_bps: float
@@ -277,11 +279,15 @@ class HFTelemetryPipeline:
         self._total_records_ingested += 1
 
         # Enforce monotonic timing constraints
-        has_clock_inversion = (t_queue_ns < t_recv_ns) or (t_decision_ns < t_queue_ns) or (t_exec_ns < t_decision_ns)
+        has_clock_inversion = (
+            (t_queue_ns < t_recv_ns) or (t_decision_ns < t_queue_ns) or (t_exec_ns < t_decision_ns)
+        )
         t_q = max(t_recv_ns, t_queue_ns)
         t_d = max(t_q, t_decision_ns)
         t_e = max(t_d, t_exec_ns)
-        timing = TelemetryTiming(t_recv_ns=t_recv_ns, t_queue_ns=t_q, t_decision_ns=t_d, t_exec_ns=t_e)
+        timing = TelemetryTiming(
+            t_recv_ns=t_recv_ns, t_queue_ns=t_q, t_decision_ns=t_d, t_exec_ns=t_e
+        )
 
         mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else order_price
         spread = max(0.0, ask - bid)
@@ -305,7 +311,12 @@ class HFTelemetryPipeline:
 
         # Integrity Validation
         integrity_valid = True
-        if has_clock_inversion or timing.total_pipeline_latency_ns < 0 or queue_est.estimated_fill_probability < 0 or slippage.slippage_total_bps < 0:
+        if (
+            has_clock_inversion
+            or timing.total_pipeline_latency_ns < 0
+            or queue_est.estimated_fill_probability < 0
+            or slippage.slippage_total_bps < 0
+        ):
             integrity_valid = False
 
         record_id = f"TELEM_{symbol.replace('/', '_')}_{seq}_{now_ms}"
@@ -423,7 +434,9 @@ class HFTelemetryPipeline:
 
     async def start_flush_loop(self) -> None:
         """Runs periodic micro-batched flush loop in the background."""
-        logger.info(f"HFTelemetryPipeline background flush worker online ({self.batch_flush_interval_sec}s).")
+        logger.info(
+            f"HFTelemetryPipeline background flush worker online ({self.batch_flush_interval_sec}s)."
+        )
         while True:
             try:
                 await asyncio.sleep(self.batch_flush_interval_sec)
@@ -432,7 +445,7 @@ class HFTelemetryPipeline:
                 self.flush_to_sqlite()
                 logger.info("HFTelemetryPipeline flush worker cancelled cleanly.")
                 break
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — worker must survive and keep looping
                 logger.error(f"HFTelemetryPipeline flush worker uncaught error: {e}")
 
     # -------------------------------------------------------------------------

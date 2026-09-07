@@ -14,7 +14,6 @@ Strict Invariants:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
@@ -22,12 +21,11 @@ from typing import Any
 
 import aiohttp
 
-from core.auth.credential_vault import mask_secret, sanitize_text
+from core.auth.credential_vault import sanitize_text
 from core.auth.exchange_signers import BybitV5Signer
 from core.execution.connectors.base import (
     BaseExchangeConnector,
     ExchangeAuthenticationError,
-    ExchangeError,
     ExchangeNetworkError,
     ExchangeRateLimitError,
     ExchangeRejectedError,
@@ -128,7 +126,7 @@ class BybitV5Connector(BaseExchangeConnector):
 
             try:
                 data = json.loads(raw_text)
-            except Exception:
+            except json.JSONDecodeError:
                 data = {"raw_response": sanitize_text(raw_text)}
 
             # Bybit specific retCode verification
@@ -149,7 +147,7 @@ class BybitV5Connector(BaseExchangeConnector):
 
             return data, latency_ms
 
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             t_end = time.perf_counter()
             latency_ms = round((t_end - t_start) * 1000.0, 2)
             logger.warning(f"Bybit request timed out after {latency_ms}ms on {endpoint}")
@@ -157,14 +155,18 @@ class BybitV5Connector(BaseExchangeConnector):
                 f"Bybit request timeout after {latency_ms}ms on {endpoint} (outcome ambiguous)"
             ) from e
         except aiohttp.ClientError as e:
-            raise ExchangeNetworkError(f"Bybit network connection error: {sanitize_text(str(e))}") from e
+            raise ExchangeNetworkError(
+                f"Bybit network connection error: {sanitize_text(str(e))}"
+            ) from e
         finally:
             if own_session:
                 await session.close()
 
     async def get_balances(self) -> list[NormalizedBalance]:
         """Fetches account wallet balance from /v5/account/wallet-balance."""
-        data, _ = await self._send_request("GET", "/v5/account/wallet-balance", {"accountType": "UNIFIED"})
+        data, _ = await self._send_request(
+            "GET", "/v5/account/wallet-balance", {"accountType": "UNIFIED"}
+        )
         balances: list[NormalizedBalance] = []
         result = data.get("result", {})
         account_list = result.get("list", [])
@@ -251,7 +253,9 @@ class BybitV5Connector(BaseExchangeConnector):
         elif client_order_id:
             body["orderLinkId"] = client_order_id
         else:
-            raise ValueError("Either exchange_order_id or client_order_id must be provided to cancel.")
+            raise ValueError(
+                "Either exchange_order_id or client_order_id must be provided to cancel."
+            )
 
         data, latency_ms = await self._send_request("POST", "/v5/order/cancel", params_or_body=body)
         res = data.get("result", {})
@@ -279,13 +283,19 @@ class BybitV5Connector(BaseExchangeConnector):
         elif client_order_id:
             params["orderLinkId"] = client_order_id
         else:
-            raise ValueError("Either exchange_order_id or client_order_id must be provided to query status.")
+            raise ValueError(
+                "Either exchange_order_id or client_order_id must be provided to query status."
+            )
 
-        data, latency_ms = await self._send_request("GET", "/v5/order/realtime", params_or_body=params)
+        data, latency_ms = await self._send_request(
+            "GET", "/v5/order/realtime", params_or_body=params
+        )
         res = data.get("result", {})
         order_list = res.get("list", [])
         if not order_list:
-            raise ExchangeRejectedError(f"Order not found on Bybit: {symbol} {exchange_order_id or client_order_id}")
+            raise ExchangeRejectedError(
+                f"Order not found on Bybit: {symbol} {exchange_order_id or client_order_id}"
+            )
 
         item = order_list[0]
         raw_status = item.get("orderStatus", "UNKNOWN")

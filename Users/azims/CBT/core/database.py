@@ -312,7 +312,9 @@ class DatabaseManager:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_burn_in_status ON burn_in_sessions (status, start_timestamp DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_burn_in_status ON burn_in_sessions (status, start_timestamp DESC);"
+            )
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS hf_telemetry_records (
@@ -351,8 +353,12 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_hf_telem_ts ON hf_telemetry_records (timestamp DESC);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_hf_telem_sym ON hf_telemetry_records (symbol, timestamp DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_hf_telem_ts ON hf_telemetry_records (timestamp DESC);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_hf_telem_sym ON hf_telemetry_records (symbol, timestamp DESC);"
+            )
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS incident_escalations (
@@ -382,8 +388,12 @@ class DatabaseManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_incident_tier ON incident_escalations (tier, timestamp DESC);")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_incident_resolved ON incident_escalations (resolved, timestamp DESC);")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_incident_tier ON incident_escalations (tier, timestamp DESC);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_incident_resolved ON incident_escalations (resolved, timestamp DESC);"
+            )
 
             conn.commit()
 

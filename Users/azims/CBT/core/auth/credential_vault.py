@@ -23,10 +23,8 @@ import json
 import logging
 import os
 import re
-import sqlite3
 import time
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -42,8 +40,12 @@ KEY_LENGTH_BYTES = 32
 
 # Centralized regex patterns for redacting credentials from logs and error strings
 SECRET_PATTERNS = [
-    re.compile(r"(?i)(api[_-]?secret|api[_-]?key|secret|password|signature|private[_-]?key|token)\s*[:=]\s*['\"]?([^'\"&\s,]+)['\"]?"),
-    re.compile(r"(?i)(X-MBX-APIKEY|X-BAPI-API-KEY|X-BAPI-SIGN|Authorization)\s*[:=]\s*['\"]?([^'\"&\s,]+)['\"]?"),
+    re.compile(
+        r"(?i)(api[_-]?secret|api[_-]?key|secret|password|signature|private[_-]?key|token)\s*[:=]\s*['\"]?([^'\"&\s,]+)['\"]?"
+    ),
+    re.compile(
+        r"(?i)(X-MBX-APIKEY|X-BAPI-API-KEY|X-BAPI-SIGN|Authorization)\s*[:=]\s*['\"]?([^'\"&\s,]+)['\"]?"
+    ),
     re.compile(r"(?i)(signature=)([a-f0-9]{64})"),
 ]
 
@@ -102,8 +104,18 @@ def sanitize_dict(data: dict[str, Any], extra_secrets: set[str] | None = None) -
     Recursively masks sensitive dictionary keys (keys containing 'secret', 'key', 'token', etc.).
     """
     sensitive_keys = {
-        "api_secret", "secret", "api_key", "password", "token", "signature",
-        "private_key", "passphrase", "x-mbx-apikey", "x-bapi-api-key", "x-bapi-sign", "authorization"
+        "api_secret",
+        "secret",
+        "api_key",
+        "password",
+        "token",
+        "signature",
+        "private_key",
+        "passphrase",
+        "x-mbx-apikey",
+        "x-bapi-api-key",
+        "x-bapi-sign",
+        "authorization",
     }
     result: dict[str, Any] = {}
     for k, v in data.items():
@@ -117,8 +129,13 @@ def sanitize_dict(data: dict[str, Any], extra_secrets: set[str] | None = None) -
             result[k] = sanitize_dict(v, extra_secrets)
         elif isinstance(v, list):
             result[k] = [
-                sanitize_dict(item, extra_secrets) if isinstance(item, dict)
-                else (mask_secret(item) if isinstance(item, str) and any(s in k_lower for s in sensitive_keys) else item)
+                sanitize_dict(item, extra_secrets)
+                if isinstance(item, dict)
+                else (
+                    mask_secret(item)
+                    if isinstance(item, str) and any(s in k_lower for s in sensitive_keys)
+                    else item
+                )
                 for item in v
             ]
         elif isinstance(v, str):
@@ -139,8 +156,8 @@ def zeroize_bytes(buffer: bytearray) -> None:
 
 @dataclass
 class ExchangeCredential:
-    exchange: str         # "BINANCE" or "BYBIT"
-    environment: str      # "TESTNET" or "PRODUCTION"
+    exchange: str  # "BINANCE" or "BYBIT"
+    environment: str  # "TESTNET" or "PRODUCTION"
     api_key: str
     api_secret: str
     passphrase: str | None = None
@@ -186,7 +203,7 @@ class CredentialVault:
                     """
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — best-effort schema init
             logger.error(f"Could not initialize vault_credentials table: {e}")
 
     def _derive_key(self, salt: bytes) -> bytes:
@@ -195,7 +212,9 @@ class CredentialVault:
         """
         if self._explicit_master_key:
             if len(self._explicit_master_key) != KEY_LENGTH_BYTES:
-                raise VaultConfigurationError(f"Master key must be exactly {KEY_LENGTH_BYTES} bytes (256-bit).")
+                raise VaultConfigurationError(
+                    f"Master key must be exactly {KEY_LENGTH_BYTES} bytes (256-bit)."
+                )
             return self._explicit_master_key
 
         # 1. Check direct 32-byte master key
@@ -212,8 +231,10 @@ class CredentialVault:
                 decoded = base64.b64decode(env_master)
                 if len(decoded) == KEY_LENGTH_BYTES:
                     return decoded
-            except Exception:
-                pass
+            except ValueError:
+                logger.debug(
+                    "VAULT_MASTER_KEY was not valid base64; treating it as a raw passphrase."
+                )
             # Raw string: derive via SHA-256
             return hashlib.sha256(env_master.encode("utf-8")).digest()
 
@@ -274,8 +295,15 @@ class CredentialVault:
         except Exception as e:
             raise VaultIntegrityError("Malformed vault payload: Invalid JSON.") from e
 
-        if not isinstance(payload, dict) or "nonce" not in payload or "ciphertext" not in payload or "salt" not in payload:
-            raise VaultIntegrityError("Malformed vault payload: Missing required AEAD envelope fields.")
+        if (
+            not isinstance(payload, dict)
+            or "nonce" not in payload
+            or "ciphertext" not in payload
+            or "salt" not in payload
+        ):
+            raise VaultIntegrityError(
+                "Malformed vault payload: Missing required AEAD envelope fields."
+            )
 
         try:
             salt = bytes.fromhex(payload["salt"])
@@ -285,7 +313,9 @@ class CredentialVault:
             raise VaultIntegrityError("Malformed vault payload: Hex decoding failed.") from e
 
         if len(nonce) != NONCE_LENGTH_BYTES:
-            raise VaultIntegrityError(f"Invalid nonce length ({len(nonce)} != {NONCE_LENGTH_BYTES}).")
+            raise VaultIntegrityError(
+                f"Invalid nonce length ({len(nonce)} != {NONCE_LENGTH_BYTES})."
+            )
 
         derived_key = self._derive_key(salt)
         aesgcm = AESGCM(derived_key)
@@ -295,7 +325,9 @@ class CredentialVault:
             return plaintext
         except Exception as e:
             # Cryptography raises InvalidTag when authentication tag does not match
-            raise VaultIntegrityError("AEAD Tag Verification Failed: Ciphertext has been tampered with or master key is incorrect.") from e
+            raise VaultIntegrityError(
+                "AEAD Tag Verification Failed: Ciphertext has been tampered with or master key is incorrect."
+            ) from e
 
     def store_credential(self, credential: ExchangeCredential) -> None:
         """
@@ -333,7 +365,9 @@ class CredentialVault:
             )
             conn.commit()
 
-        logger.info(f"Credential securely stored in vault for {exch} [{env}] (API Key: {mask_secret(credential.api_key)})")
+        logger.info(
+            f"Credential securely stored in vault for {exch} [{env}] (API Key: {mask_secret(credential.api_key)})"
+        )
 
     def get_credential(self, exchange: str, environment: str) -> ExchangeCredential | None:
         """
@@ -390,7 +424,9 @@ class CredentialVault:
         """
         with db_manager.get_trading_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT exchange, environment, encrypted_payload, updated_at FROM vault_credentials")
+            cursor.execute(
+                "SELECT exchange, environment, encrypted_payload, updated_at FROM vault_credentials"
+            )
             rows = cursor.fetchall()
 
         results: list[dict[str, Any]] = []
@@ -398,24 +434,28 @@ class CredentialVault:
             try:
                 decrypted_bytes = self.decrypt(r["encrypted_payload"])
                 data = json.loads(decrypted_bytes.decode("utf-8"))
-                results.append({
-                    "exchange": r["exchange"],
-                    "environment": r["environment"],
-                    "masked_api_key": mask_secret(data.get("api_key")),
-                    "is_active": data.get("is_active", True),
-                    "has_secret": bool(data.get("api_secret")),
-                    "has_passphrase": bool(data.get("passphrase")),
-                    "updated_at": r["updated_at"],
-                })
-            except Exception as e:
-                results.append({
-                    "exchange": r["exchange"],
-                    "environment": r["environment"],
-                    "masked_api_key": "CORRUPTED_CIPHERTEXT",
-                    "is_active": False,
-                    "error": str(e),
-                    "updated_at": r["updated_at"],
-                })
+                results.append(
+                    {
+                        "exchange": r["exchange"],
+                        "environment": r["environment"],
+                        "masked_api_key": mask_secret(data.get("api_key")),
+                        "is_active": data.get("is_active", True),
+                        "has_secret": bool(data.get("api_secret")),
+                        "has_passphrase": bool(data.get("passphrase")),
+                        "updated_at": r["updated_at"],
+                    }
+                )
+            except Exception as e:  # noqa: BLE001 — per-credential corruption guard
+                results.append(
+                    {
+                        "exchange": r["exchange"],
+                        "environment": r["environment"],
+                        "masked_api_key": "CORRUPTED_CIPHERTEXT",
+                        "is_active": False,
+                        "error": str(e),
+                        "updated_at": r["updated_at"],
+                    }
+                )
         return results
 
 
