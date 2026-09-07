@@ -21,12 +21,11 @@ Constitutional Mandate (Article I, Section 1.5):
 
 from __future__ import annotations
 
-import io
 import logging
 import os
-from pathlib import Path
 import re
-from typing import Any, List, Optional, Tuple
+from pathlib import Path
+from typing import Any
 
 import pypdf
 
@@ -100,33 +99,109 @@ REGEX_RESEARCH = re.compile("|".join(PATTERNS_RESEARCH), re.IGNORECASE)
 
 # Crypto Relevance Keywords
 CRYPTO_DIRECT_KEYWORDS = [
-    "bitcoin", "btc", "ethereum", "eth", "crypto", "cryptocurrency", "blockchain",
-    "satoshi", "perpetual", "funding rate", "binance", "bybit", "solana", "altcoin"
+    "bitcoin",
+    "btc",
+    "ethereum",
+    "eth",
+    "crypto",
+    "cryptocurrency",
+    "blockchain",
+    "satoshi",
+    "perpetual",
+    "funding rate",
+    "binance",
+    "bybit",
+    "solana",
+    "altcoin",
 ]
 MARKET_GENERAL_KEYWORDS = [
-    "market structure", "order flow", "orderbook", "liquidity", "bid-ask", "spread",
-    "fvg", "fair value gap", "order block", "slippage", "depth", "imbalance", "sweep",
-    "limit order", "market order", "absorption", "delta", "cvd", "vpin"
+    "market structure",
+    "order flow",
+    "orderbook",
+    "liquidity",
+    "bid-ask",
+    "spread",
+    "fvg",
+    "fair value gap",
+    "order block",
+    "slippage",
+    "depth",
+    "imbalance",
+    "sweep",
+    "limit order",
+    "market order",
+    "absorption",
+    "delta",
+    "cvd",
+    "vpin",
 ]
 TRADING_GENERAL_KEYWORDS = [
-    "trendline", "moving average", "rsi", "macd", "support and resistance", "breakout",
-    "pullback", "candlestick", "reversal", "bollinger", "stochastic", "momentum"
+    "trendline",
+    "moving average",
+    "rsi",
+    "macd",
+    "support and resistance",
+    "breakout",
+    "pullback",
+    "candlestick",
+    "reversal",
+    "bollinger",
+    "stochastic",
+    "momentum",
 ]
 MACRO_KEYWORDS = [
-    "federal reserve", "central bank", "interest rate", "inflation", "cpi", "m2", "yield curve",
-    "quantitative easing", "treasury", "dxy", "dollar index", "sovereign", "macroeconomic"
+    "federal reserve",
+    "central bank",
+    "interest rate",
+    "inflation",
+    "cpi",
+    "m2",
+    "yield curve",
+    "quantitative easing",
+    "treasury",
+    "dxy",
+    "dollar index",
+    "sovereign",
+    "macroeconomic",
 ]
 PSYCHOLOGY_KEYWORDS = [
-    "discipline", "emotion", "fomo", "fear", "greed", "cognitive bias", "psychology",
-    "overtrading", "revenge trading", "mental state", "patience"
+    "discipline",
+    "emotion",
+    "fomo",
+    "fear",
+    "greed",
+    "cognitive bias",
+    "psychology",
+    "overtrading",
+    "revenge trading",
+    "mental state",
+    "patience",
 ]
 RISK_KEYWORDS = [
-    "position size", "position sizing", "kelly criterion", "half-kelly", "value at risk",
-    "var", "drawdown", "risk of ruin", "money management", "stop loss", "leverage"
+    "position size",
+    "position sizing",
+    "kelly criterion",
+    "half-kelly",
+    "value at risk",
+    "var",
+    "drawdown",
+    "risk of ruin",
+    "money management",
+    "stop loss",
+    "leverage",
 ]
 STATISTICS_KEYWORDS = [
-    "probability distribution", "fat tail", "kurtosis", "skewness", "stationarity",
-    "cointegration", "hypothesis test", "p-value", "monte carlo", "variance", "standard deviation"
+    "probability distribution",
+    "fat tail",
+    "kurtosis",
+    "skewness",
+    "stationarity",
+    "cointegration",
+    "hypothesis test",
+    "p-value",
+    "monte carlo",
+    "variance",
+    "standard deviation",
 ]
 
 
@@ -158,7 +233,7 @@ class PDFBookExtractor:
                 res = self.vision_transcriber_override(image_bytes, mime_type)
                 if res:
                     return str(res).strip(), "VISION_OVERRIDE"
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.warning(f"Vision transcriber override failed: {e}")
 
         if not image_bytes:
@@ -184,7 +259,7 @@ class PDFBookExtractor:
                 text = (response.text or "").strip()
                 if text:
                     return text, "GEMINI_VISION"
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.warning(f"Gemini Vision OCR extraction failed: {e}")
 
         return "", "OFFLINE_FALLBACK"
@@ -194,14 +269,24 @@ class PDFBookExtractor:
     ) -> dict[str, Any]:
         """Extracts ISBN, edition, title, author, and page count."""
         info = reader.metadata or {}
-        
+
         # 1. Title
-        raw_title = info.get("/Title") or info.get("title") if isinstance(info, dict) else getattr(info, "title", None)
+        raw_title = (
+            info.get("/Title") or info.get("title")
+            if isinstance(info, dict)
+            else getattr(info, "title", None)
+        )
         title = str(raw_title).strip() if raw_title and len(str(raw_title).strip()) > 2 else None
-        
+
         # 2. Author
-        raw_author = info.get("/Author") or info.get("author") if isinstance(info, dict) else getattr(info, "author", None)
-        author = str(raw_author).strip() if raw_author and len(str(raw_author).strip()) > 2 else None
+        raw_author = (
+            info.get("/Author") or info.get("author")
+            if isinstance(info, dict)
+            else getattr(info, "author", None)
+        )
+        author = (
+            str(raw_author).strip() if raw_author and len(str(raw_author).strip()) > 2 else None
+        )
 
         # 3. ISBN scan from front matter / copyright pages
         isbn = None
@@ -215,10 +300,18 @@ class PDFBookExtractor:
         if edition_match:
             edition = edition_match.group(0).strip()
 
-        raw_producer = info.get("/Producer") or info.get("producer") if isinstance(info, dict) else getattr(info, "producer", "")
+        raw_producer = (
+            info.get("/Producer") or info.get("producer")
+            if isinstance(info, dict)
+            else getattr(info, "producer", "")
+        )
         producer = str(raw_producer or "")
 
-        raw_creation_date = info.get("/CreationDate") or info.get("creation_date") if isinstance(info, dict) else getattr(info, "creation_date", "")
+        raw_creation_date = (
+            info.get("/CreationDate") or info.get("creation_date")
+            if isinstance(info, dict)
+            else getattr(info, "creation_date", "")
+        )
         creation_date = str(raw_creation_date or "")
 
         return {
@@ -282,6 +375,7 @@ class PDFBookExtractor:
         try:
             outline = reader.outline
             if outline:
+
                 def _traverse(items):
                     for it in items:
                         if isinstance(it, list):
@@ -290,14 +384,17 @@ class PDFBookExtractor:
                             page_num = 1
                             try:
                                 page_num = reader.get_destination_page_number(it) + 1
-                            except Exception:
+                            except Exception:  # noqa: S110,BLE001 — defensive fallback
                                 pass
-                            toc_items.append({
-                                "title": str(it.title),
-                                "page_number": page_num,
-                            })
+                            toc_items.append(
+                                {
+                                    "title": str(it.title),
+                                    "page_number": page_num,
+                                }
+                            )
+
                 _traverse(outline)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.debug(f"Could not extract outline TOC: {e}")
 
         return toc_items
@@ -321,7 +418,7 @@ class PDFBookExtractor:
 
         try:
             reader = pypdf.PdfReader(str(file_path))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"pypdf reader failed for {file_path}: {e}")
             return {"error": f"Corrupted or invalid PDF: {e}", "success": False}
 
@@ -335,7 +432,7 @@ class PDFBookExtractor:
             try:
                 t = reader.pages[i].extract_text() or ""
                 front_matter_texts.append(t)
-            except Exception:
+            except Exception:  # noqa: S110,BLE001 — defensive fallback
                 pass
         raw_front_matter = "\n".join(front_matter_texts)
 
@@ -367,7 +464,7 @@ class PDFBookExtractor:
             page_obj = reader.pages[page_idx]
             try:
                 page_text = page_obj.extract_text() or ""
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — defensive fallback
                 logger.debug(f"Error extracting page {page_num}: {e}")
                 page_text = ""
 
@@ -378,19 +475,27 @@ class PDFBookExtractor:
                 if page_images and len(page_images) > 0:
                     try:
                         # Find largest image in the page (representing scanned raster)
-                        largest_img = max(page_images, key=lambda img: len(getattr(img, "data", b"")))
+                        largest_img = max(
+                            page_images, key=lambda img: len(getattr(img, "data", b""))
+                        )
                         img_bytes = getattr(largest_img, "data", b"")
                         if len(img_bytes) > 256:
-                            ext = os.path.splitext(getattr(largest_img, "name", "page.png"))[1].lower()
+                            ext = os.path.splitext(getattr(largest_img, "name", "page.png"))[
+                                1
+                            ].lower()
                             mime = "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png"
-                            ocr_text, prov = self.extract_page_with_vision(img_bytes, mime_type=mime)
+                            ocr_text, prov = self.extract_page_with_vision(
+                                img_bytes, mime_type=mime
+                            )
                             if ocr_text:
                                 page_text = ocr_text
                                 page_is_ocr = True
                                 ocr_pages_recovered += 1
                                 ocr_provider_used = prov
-                    except Exception as img_err:
-                        logger.debug(f"Could not extract scanned image from page {page_num}: {img_err}")
+                    except Exception as img_err:  # noqa: BLE001 — defensive fallback
+                        logger.debug(
+                            f"Could not extract scanned image from page {page_num}: {img_err}"
+                        )
 
             raw_full_chars += len(page_text)
 
@@ -408,12 +513,14 @@ class PDFBookExtractor:
             if sec_match:
                 current_section = sec_match.group(1).strip()
 
-            extracted_pages.append({
-                "page_number": page_num,
-                "chapter": current_chapter,
-                "section": current_section,
-                "character_count": len(page_text),
-            })
+            extracted_pages.append(
+                {
+                    "page_number": page_num,
+                    "chapter": current_chapter,
+                    "section": current_section,
+                    "character_count": len(page_text),
+                }
+            )
 
             # Paragraph splitting
             paragraphs = [p.strip() for p in page_text.split("\n\n") if len(p.strip()) > 35]
@@ -428,13 +535,39 @@ class PDFBookExtractor:
                 relevance_domain = self.classify_applicability_domain(clean_para)
 
                 # Skip completely administrative/boilerplate text
-                if any(w in clean_para.lower() for w in ["all rights reserved", "printed in the united states", "library of congress cataloging", "typeset in"]):
+                if any(
+                    w in clean_para.lower()
+                    for w in [
+                        "all rights reserved",
+                        "printed in the united states",
+                        "library of congress cataloging",
+                        "typeset in",
+                    ]
+                ):
                     continue
 
                 # Only extract paragraphs with substantial trading/quantitative substance
-                is_substantive = (
-                    ep_type in ["PROPOSED_RULE", "AUTHOR_REPORTED_STATISTIC", "DEFINITION", "HISTORICAL_OBSERVATION", "REPORTED_RESEARCH"]
-                    or any(k in clean_para.lower() for k in ["liquidity", "order", "price", "market", "volatility", "risk", "edge", "trade", "trend", "fvg", "drawdown"])
+                is_substantive = ep_type in [
+                    "PROPOSED_RULE",
+                    "AUTHOR_REPORTED_STATISTIC",
+                    "DEFINITION",
+                    "HISTORICAL_OBSERVATION",
+                    "REPORTED_RESEARCH",
+                ] or any(
+                    k in clean_para.lower()
+                    for k in [
+                        "liquidity",
+                        "order",
+                        "price",
+                        "market",
+                        "volatility",
+                        "risk",
+                        "edge",
+                        "trade",
+                        "trend",
+                        "fvg",
+                        "drawdown",
+                    ]
                 )
 
                 if is_substantive:
@@ -443,25 +576,27 @@ class PDFBookExtractor:
                     confidence = 0.0
                     claim_status = "UNVERIFIED"
 
-                    extracted_claims.append({
-                        "verbatim": clean_para[:500],
-                        "subject": f"{relevance_domain}: {current_chapter[:35]}",
-                        "direction": f"{current_chapter} ──► {relevance_domain} Market Dynamics",
-                        "object_domain": relevance_domain,
-                        "pdf_evidence_type": ep_type,
-                        "epistemic_status": claim_status,
-                        "confidence_score": confidence,
-                        "book_title": meta["title"],
-                        "book_isbn": meta["isbn"],
-                        "book_edition": meta["edition"],
-                        "chapter_title": current_chapter,
-                        "section_title": current_section,
-                        "page_number": page_num,
-                        "paragraph_index": p_idx + 1,
-                        "applicability_domain": relevance_domain,
-                        "author_creator": meta["author"],
-                        "is_ocr": page_is_ocr,
-                    })
+                    extracted_claims.append(
+                        {
+                            "verbatim": clean_para[:500],
+                            "subject": f"{relevance_domain}: {current_chapter[:35]}",
+                            "direction": f"{current_chapter} ──► {relevance_domain} Market Dynamics",
+                            "object_domain": relevance_domain,
+                            "pdf_evidence_type": ep_type,
+                            "epistemic_status": claim_status,
+                            "confidence_score": confidence,
+                            "book_title": meta["title"],
+                            "book_isbn": meta["isbn"],
+                            "book_edition": meta["edition"],
+                            "chapter_title": current_chapter,
+                            "section_title": current_section,
+                            "page_number": page_num,
+                            "paragraph_index": p_idx + 1,
+                            "applicability_domain": relevance_domain,
+                            "author_creator": meta["author"],
+                            "is_ocr": page_is_ocr,
+                        }
+                    )
 
                     # Cap maximum claims per page to maintain high signal density
                     if len(extracted_claims) >= 120:
@@ -474,31 +609,59 @@ class PDFBookExtractor:
         is_scanned = (avg_chars < 40.0) or (ocr_pages_recovered > 0)
 
         # Observations from book
-        extracted_observations.append({
-            "text": f"Literature '{meta['title']}' by {meta['author']} ({meta['edition']}). Parsed {pages_processed} pages across {len(set(p['chapter'] for p in extracted_pages))} chapters.",
-            "period": f"Monograph Publication ({meta['creation_date'][:10] or 'Contemporary'})",
-            "variables": ["VAR_BTC_RETURNS", "VAR_BTC_REALIZED_VOL"],
-        })
+        extracted_observations.append(
+            {
+                "text": f"Literature '{meta['title']}' by {meta['author']} ({meta['edition']}). Parsed {pages_processed} pages across {len(set(p['chapter'] for p in extracted_pages))} chapters.",
+                "period": f"Monograph Publication ({meta['creation_date'][:10] or 'Contemporary'})",
+                "variables": ["VAR_BTC_RETURNS", "VAR_BTC_REALIZED_VOL"],
+            }
+        )
 
         # Concepts from book
-        extracted_concepts.append({
-            "title": f"Literature Framework: {meta['title']}",
-            "domain": "QUANTITATIVE_LITERATURE",
-            "description": f"Formal conceptual framework by {meta['author']} addressing {len(extracted_claims)} auditable claims.",
-            "tags": ["PDF_Book", "Literature", meta["edition"]],
-        })
+        extracted_concepts.append(
+            {
+                "title": f"Literature Framework: {meta['title']}",
+                "domain": "QUANTITATIVE_LITERATURE",
+                "description": f"Formal conceptual framework by {meta['author']} addressing {len(extracted_claims)} auditable claims.",
+                "tags": ["PDF_Book", "Literature", meta["edition"]],
+            }
+        )
 
         # Synthesize Executive Summary Narrative & Chapter Breakdown
-        rule_count = sum(1 for c in extracted_claims if c.get("pdf_evidence_type") == "PROPOSED_RULE")
-        stat_count = sum(1 for c in extracted_claims if c.get("pdf_evidence_type") == "AUTHOR_REPORTED_STATISTIC")
+        rule_count = sum(
+            1 for c in extracted_claims if c.get("pdf_evidence_type") == "PROPOSED_RULE"
+        )
+        stat_count = sum(
+            1 for c in extracted_claims if c.get("pdf_evidence_type") == "AUTHOR_REPORTED_STATISTIC"
+        )
         def_count = sum(1 for c in extracted_claims if c.get("pdf_evidence_type") == "DEFINITION")
-        hist_count = sum(1 for c in extracted_claims if c.get("pdf_evidence_type") == "HISTORICAL_OBSERVATION")
-        research_count = sum(1 for c in extracted_claims if c.get("pdf_evidence_type") == "REPORTED_RESEARCH")
+        hist_count = sum(
+            1 for c in extracted_claims if c.get("pdf_evidence_type") == "HISTORICAL_OBSERVATION"
+        )
+        research_count = sum(
+            1 for c in extracted_claims if c.get("pdf_evidence_type") == "REPORTED_RESEARCH"
+        )
 
-        distinct_chaps = sorted(list(set(p['chapter'] for p in extracted_pages if p['chapter'] not in ["Front Matter", "General"])))
+        distinct_chaps = sorted(
+            list(
+                set(
+                    p["chapter"]
+                    for p in extracted_pages
+                    if p["chapter"] not in ["Front Matter", "General"]
+                )
+            )
+        )
         chapter_list = distinct_chaps if distinct_chaps else ["Foundational Market Structure"]
 
-        domains = sorted(list(set(c["applicability_domain"] for c in extracted_claims if c.get("applicability_domain"))))
+        domains = sorted(
+            list(
+                set(
+                    c["applicability_domain"]
+                    for c in extracted_claims
+                    if c.get("applicability_domain")
+                )
+            )
+        )
         domain_list = domains if domains else ["MARKET_GENERAL"]
 
         exec_summary = (

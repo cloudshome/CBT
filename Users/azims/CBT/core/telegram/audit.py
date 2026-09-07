@@ -7,9 +7,7 @@ Delegates to core/audit_bus.py (SQLite system_audit_events).
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
-import time
 from typing import Any
 
 from core.audit_bus import AuditEvent, audit_bus

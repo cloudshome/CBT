@@ -73,13 +73,14 @@ class APIHealthGuard:
     def check_disk_space(self, min_free_gb: float = 1.0) -> dict[str, Any]:
         """Checks host disk space for data directory to prevent catastrophic full-disk failure."""
         import os
-        from pathlib import Path
         import shutil
+        from pathlib import Path
+
         data_path = Path(os.getenv("DATA_DIR", "data")).resolve()
         total, used, free = shutil.disk_usage(data_path)
-        free_gb = free / (1024 ** 3)
-        total_gb = total / (1024 ** 3)
-        used_gb = used / (1024 ** 3)
+        free_gb = free / (1024**3)
+        total_gb = total / (1024**3)
+        used_gb = used / (1024**3)
         is_safe = free_gb >= min_free_gb
         return {
             "is_safe": is_safe,
@@ -93,4 +94,3 @@ class APIHealthGuard:
 
 # Singleton
 api_health_guard = APIHealthGuard()
-

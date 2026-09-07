@@ -1,4 +1,4 @@
-﻿"""
+"""
 Cold-Start Inertness & Zero-Risk Authorization Regression Tests.
 
 Ensures that on a cold system (empty cache, unpopulated database, offline/synthetic market feeds):
@@ -10,6 +10,7 @@ Ensures that on a cold system (empty cache, unpopulated database, offline/synthe
 """
 
 from types import SimpleNamespace
+
 import pytest
 
 from core.analogue_engine import analogue_engine

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -54,7 +55,10 @@ class PortfolioShadowManager:
         take_profit: float,
     ) -> str:
         now = int(time.time() * 1000)
-        pos_id = f"POS_{symbol.replace('/', '_')}_{now}"
+        # Millisecond timestamp alone collides when two same-symbol positions are
+        # opened within 1 ms (e.g. autonomous-trader retries) → UNIQUE violation
+        # and a lost trade. UUID suffix makes the ID collision-proof.
+        pos_id = f"POS_{symbol.replace('/', '_')}_{now}_{uuid.uuid4().hex[:8]}"
 
         with db_manager.get_trading_conn() as conn:
             conn.execute(
@@ -173,7 +177,11 @@ class PortfolioShadowManager:
                     final_pnl = ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
                 elif close_reason == "STOP_LOSS_HIT":
                     exit_fill_price = active_sl
-                    final_pnl = ((active_sl - entry_p) * size) if is_long else ((entry_p - active_sl) * size)
+                    final_pnl = (
+                        ((active_sl - entry_p) * size)
+                        if is_long
+                        else ((entry_p - active_sl) * size)
+                    )
 
             # Update database
             with db_manager.get_trading_conn() as conn:
@@ -375,7 +383,9 @@ class PortfolioShadowManager:
             profit_factor = 0.0
 
         total_closed = len(closed_positions)
-        win_rate_pct = round((len(winning_trades) / total_closed * 100.0), 1) if total_closed > 0 else 0.0
+        win_rate_pct = (
+            round((len(winning_trades) / total_closed * 100.0), 1) if total_closed > 0 else 0.0
+        )
 
         # Deterministic Active Risk calculation (Stop-loss capital exposure)
         total_active_risk_usd = 0.0
@@ -392,7 +402,11 @@ class PortfolioShadowManager:
 
             total_active_risk_usd += risk_per_unit * size
 
-        active_risk_pct = round((total_active_risk_usd / virtual_equity * 100.0), 2) if virtual_equity > 0.0 else 0.0
+        active_risk_pct = (
+            round((total_active_risk_usd / virtual_equity * 100.0), 2)
+            if virtual_equity > 0.0
+            else 0.0
+        )
 
         return {
             "starting_capital": round(starting_capital, 2),

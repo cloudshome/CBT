@@ -17,7 +17,9 @@ from typing import Any
 class PurePythonPNGCanvas:
     """Minimal, fast, zero-dependency RGBA PNG rasterizer."""
 
-    def __init__(self, width: int = 640, height: int = 360, bg_color: tuple[int, int, int] = (15, 23, 42)):
+    def __init__(
+        self, width: int = 640, height: int = 360, bg_color: tuple[int, int, int] = (15, 23, 42)
+    ):
         self.width = width
         self.height = height
         # Initialize buffer: height rows of (1 filter byte + width * 4 bytes RGBA)
@@ -45,7 +47,11 @@ class PurePythonPNGCanvas:
                 self.buffer[offset + 2] = color[2]
                 self.buffer[offset + 3] = 255
             elif src_a > 0.01:
-                dst_r, dst_g, dst_b = self.buffer[offset], self.buffer[offset + 1], self.buffer[offset + 2]
+                dst_r, dst_g, dst_b = (
+                    self.buffer[offset],
+                    self.buffer[offset + 1],
+                    self.buffer[offset + 2],
+                )
                 self.buffer[offset] = int(color[0] * src_a + dst_r * (1 - src_a))
                 self.buffer[offset + 1] = int(color[1] * src_a + dst_g * (1 - src_a))
                 self.buffer[offset + 2] = int(color[2] * src_a + dst_b * (1 - src_a))
@@ -127,7 +133,7 @@ class TelegramChartGenerator:
         # Factor in levels to ensure all key markers fit in the frame
         all_vals = list(highs + lows)
         for lv in levels.values():
-            if isinstance(lv, (int, float)) and lv > 0:
+            if isinstance(lv, int | float) and lv > 0:
                 all_vals.append(lv)
 
         min_val = min(all_vals) * 0.998
@@ -157,8 +163,8 @@ class TelegramChartGenerator:
         col_w = plot_w / n
         body_w = max(2, int(col_w * 0.65))
 
-        green = (16, 185, 129, 255)   # #10B981 Bullish
-        red = (244, 63, 94, 255)       # #F43F5E Bearish
+        green = (16, 185, 129, 255)  # #10B981 Bullish
+        red = (244, 63, 94, 255)  # #F43F5E Bearish
 
         for i, bar in enumerate(plot_candles):
             cx = int(pad_left + i * col_w + col_w / 2)
@@ -208,8 +214,9 @@ class TelegramChartGenerator:
     ) -> bytes:
         """Convenience method generating a chart with Entry, SL, and TP1 overlays."""
         levels = {"entry": float(entry), "sl": float(sl), "tp1": float(tp1)}
-        return cls.render_candlestick_chart(candles, symbol=symbol, levels=levels, width=width, height=height)
+        return cls.render_candlestick_chart(
+            candles, symbol=symbol, levels=levels, width=width, height=height
+        )
 
 
 telegram_charts = TelegramChartGenerator()
-

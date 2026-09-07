@@ -12,11 +12,12 @@ Tests all constitutional invariants and functional requirements:
 """
 
 import time
+
 import pytest
+
 from core.database import db_manager
 from core.event_shock_engine import event_shock_engine
 from core.portfolio_shadow import portfolio_shadow
-from core.provenance_engine import provenance_engine
 from core.telegram.audit import telegram_audit
 from core.telegram.callbacks import callback_router
 from core.telegram.charts import telegram_charts
@@ -218,7 +219,9 @@ async def test_webhook_idempotency_replay_defense():
 def test_action_token_hmac_verification_and_expiry():
     """Verifies cryptographic signature generation, expiry, and tampering detection."""
     payload = {"symbol": "BTC/USDT", "size": 0.5, "direction": "LONG"}
-    tok = callback_router.create_action_token("STAGE_CONFIRM_ENTRY", "user_1", "chat_1", payload, ttl_seconds=2)
+    tok = callback_router.create_action_token(
+        "STAGE_CONFIRM_ENTRY", "user_1", "chat_1", payload, ttl_seconds=2
+    )
 
     # 1. Valid token succeeds
     valid, reason = tok.is_valid(expected_user="user_1")
@@ -245,7 +248,6 @@ def test_action_token_hmac_verification_and_expiry():
     assert "EXPIRED" in reason
 
 
-
 # ==============================================================================
 # 4. TWO-PHASE CONFIRMATION & ATOMIC EXECUTION TESTS
 # ==============================================================================
@@ -269,7 +271,9 @@ async def test_two_phase_confirmation_lifecycle():
     }
 
     # Step 1: Create initial Phase 1 token
-    tok_enter = callback_router.create_action_token("STAGE_CONFIRM_ENTRY", user_id, chat_id, sig, ttl_seconds=60)
+    tok_enter = callback_router.create_action_token(
+        "STAGE_CONFIRM_ENTRY", user_id, chat_id, sig, ttl_seconds=60
+    )
 
     # Step 2: Operator clicks "Enter Paper Trade" button -> handle_callback_query
     cb_phase1 = {
@@ -386,7 +390,15 @@ async def test_walk_forward_strategy_validation_command():
             (knowledge_id, source_type, title, author_creator, ingested_at, confidence_score, status)
             VALUES (?, ?, ?, ?, ?, ?, ?);
             """,
-            ("K-TEST-1", "RESEARCH", "Mean Reversion Study", "Quant Researcher", int(time.time() * 1000), 0.0, "QUARANTINED"),
+            (
+                "K-TEST-1",
+                "RESEARCH",
+                "Mean Reversion Study",
+                "Quant Researcher",
+                int(time.time() * 1000),
+                0.0,
+                "QUARANTINED",
+            ),
         )
         conn.execute(
             """
@@ -409,8 +421,6 @@ async def test_walk_forward_strategy_validation_command():
         )
         conn.commit()
 
-
-
     update = {
         "update_id": int(time.time() * 1000) + 888,
         "message": {"text": f"/test {cand_id}", "chat": {"id": 12345}, "from": {"id": trader_id}},
@@ -424,7 +434,9 @@ async def test_walk_forward_strategy_validation_command():
 
     # Verify stage updated in SQLite
     with db_manager.get_brain_conn() as conn:
-        row = conn.execute("SELECT validation_stage FROM strategy_candidates WHERE candidate_id = ?", (cand_id,)).fetchone()
+        row = conn.execute(
+            "SELECT validation_stage FROM strategy_candidates WHERE candidate_id = ?", (cand_id,)
+        ).fetchone()
         assert row is not None
         assert row["validation_stage"] in ("WALK_FORWARD_TESTED", "REJECTED")
 
@@ -436,10 +448,14 @@ async def test_walk_forward_strategy_validation_command():
 
 def test_telegram_audit_logging_to_sqlite():
     """Verifies that commands, auth denials, and callbacks are recorded in SQLite audit ledger."""
-    identity = TelegramUserIdentity(user_id="user_audit_test", chat_id="chat_1", role=TelegramRole.TRADER)
+    identity = TelegramUserIdentity(
+        user_id="user_audit_test", chat_id="chat_1", role=TelegramRole.TRADER
+    )
 
     # Log command execution
-    telegram_audit.log_command_execution(identity, "/signal", "BTC/USDT", execution_result="EXECUTED")
+    telegram_audit.log_command_execution(
+        identity, "/signal", "BTC/USDT", execution_result="EXECUTED"
+    )
 
     # Log denial
     telegram_audit.log_auth_denied(identity, "/pause", "RISK_ADMIN")

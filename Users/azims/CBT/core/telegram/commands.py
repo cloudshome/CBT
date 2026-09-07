@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from core.telegram.rbac import TelegramRole, TelegramUserIdentity, rbac_registry
+from core.telegram.rbac import TelegramRole, TelegramUserIdentity
 
 logger = logging.getLogger("ai_quant_sentinel.telegram.commands")
 
@@ -19,6 +19,7 @@ logger = logging.getLogger("ai_quant_sentinel.telegram.commands")
 @dataclass
 class TelegramCommand:
     """Typed metadata and execution definition for a Telegram command."""
+
     name: str
     description: str
     handler: Callable[..., Any]

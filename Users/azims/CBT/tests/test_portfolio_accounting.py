@@ -9,6 +9,7 @@ Verifies:
 """
 
 import pytest
+
 from core.portfolio_shadow import portfolio_shadow
 
 
@@ -41,7 +42,7 @@ def test_zero_trades_baseline():
 
 def test_open_trade_unrealized_pnl():
     """Invariant: Open trade moves Virtual Equity while Settled Cash remains unchanged."""
-    pos_id = portfolio_shadow.open_position(
+    portfolio_shadow.open_position(
         symbol="BTC/USDT",
         direction="LONG",
         size=1.0,
@@ -214,7 +215,7 @@ def test_active_risk_deterministic_calculation():
 def test_breakeven_risk_elimination():
     """Invariant: When a position reaches +1.5R, SL moves to breakeven and active risk drops to 0."""
     # LONG 1.0 units @ 100.0, SL 90.0 (Risk = $10.0, +1.5R milestone = 115.0)
-    pos_id = portfolio_shadow.open_position("CCC/USDT", "LONG", 1.0, 100.0, 90.0, 130.0)
+    portfolio_shadow.open_position("CCC/USDT", "LONG", 1.0, 100.0, 90.0, 130.0)
 
     acct1 = portfolio_shadow.get_portfolio_accounting(starting_capital=100000.0)
     assert acct1["total_active_risk_usd"] == 10.0
@@ -235,7 +236,7 @@ def test_portfolio_reset_invariants():
     p1 = portfolio_shadow.open_position("BTC/USDT", "LONG", 1.0, 70000.0, 69000.0, 75000.0)
     portfolio_shadow.close_position(p1, exit_price=71000.0)
 
-    p2 = portfolio_shadow.open_position("ETH/USDT", "SHORT", 2.0, 2500.0, 2600.0, 2400.0)
+    portfolio_shadow.open_position("ETH/USDT", "SHORT", 2.0, 2500.0, 2600.0, 2400.0)
 
     portfolio_shadow.reset_all_positions()
 
@@ -269,7 +270,7 @@ def test_take_profit_fill_at_limit_price():
     assert tp_events[0]["realized_pnl"] == 165.0
 
     all_pos = portfolio_shadow.get_all_positions()
-    closed = [p for p in all_pos if p["position_id"] == pos_id][0]
+    closed = next(p for p in all_pos if p["position_id"] == pos_id)
     assert closed["status"] == "CLOSED"
     assert closed["current_price"] == 2520.0  # Recorded exit price is the limit TP!
     assert closed["realized_pnl"] == 165.0
@@ -278,6 +279,7 @@ def test_take_profit_fill_at_limit_price():
 def test_half_kelly_api_sizing():
     """Validates that POST /api/risk/half-kelly-calc returns positive expectancy sizing."""
     from fastapi.testclient import TestClient
+
     from app import app
 
     client = TestClient(app)
@@ -304,6 +306,7 @@ def test_half_kelly_api_sizing():
 def test_half_kelly_negative_expectancy_rejection():
     """Validates that negative expectancy trades are rejected with hurdle_passed=False and 0 sizing."""
     from fastapi.testclient import TestClient
+
     from app import app
 
     client = TestClient(app)
@@ -328,6 +331,7 @@ def test_half_kelly_negative_expectancy_rejection():
 def test_risk_gate_half_kelly_order_execution():
     """Validates that orders sized within Half-Kelly limits execute cleanly while oversized orders are rejected."""
     from fastapi.testclient import TestClient
+
     from app import app
 
     client = TestClient(app)
@@ -366,5 +370,3 @@ def test_risk_gate_half_kelly_order_execution():
     )
     assert resp2.status_code == 422
     assert "Risk Gate Rejection" in resp2.json()["detail"]
-
-

@@ -159,16 +159,24 @@ docker compose logs -f
 ### Option C: Turnkey Production Service (systemd)
 
 ```bash
-# Copy systemd service unit
-sudo cp deploy/ai_quant_sentinel.service /etc/systemd/system/
+# One command: detects your user + checkout path, guards the Python-version
+# trap (3.11–3.13 required), builds .venv, creates .env, installs the systemd
+# unit with YOUR paths, enables it on boot, and health-checks the result.
+bash deploy/install_bare_metal.sh
 
-# Reload systemd and start 24/7 daemon
-sudo systemctl daemon-reload
-sudo systemctl enable --now ai_quant_sentinel.service
-
-# Check service status
-sudo systemctl status ai_quant_sentinel.service
+# Check service status / follow live logs
+systemctl status ai_quant_sentinel.service
+journalctl -u ai_quant_sentinel -f
 ```
+
+> ⚠️ **Never `cp` the unit template directly.**
+> `deploy/systemd/ai_quant_sentinel.service` contains `__CBT_USER__` /
+> `__CBT_WORKDIR__` placeholders — a raw copy produces a unit pointing at
+> `/root/CBT` that fails with `Result: resources`. Always install via
+> `deploy/install_bare_metal.sh`.
+>
+> The bare-metal unit binds port 8000 and is **mutually exclusive** with the
+> Docker Compose stack (Option B above) — run exactly one of the two.
 
 ---
 
@@ -359,7 +367,11 @@ CBT/
 │   └── test_system_integration.py
 │
 └── deploy/                             # 24/7 Production Deployment Assets
-    ├── ai_quant_sentinel.service       # Linux systemd service configuration
+    ├── systemd/                        # Unit templates (__CBT_USER__/__CBT_WORKDIR__ placeholders)
+    │   ├── ai_quant_sentinel.service   # Bare-metal systemd unit (install via install_bare_metal.sh)
+    │   └── cbt-stack@.service          # Docker Compose stack unit (install via ubuntu_install.sh)
+    ├── install_bare_metal.sh           # Path-agnostic bare-metal systemd installer
+    ├── ubuntu_install.sh               # One-command Docker stack installer
     ├── install_deps.sh                 # Turnkey environment dependency installer
     └── run.sh                          # Production startup script with pre-flight checks
 ```

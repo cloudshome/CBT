@@ -12,7 +12,7 @@ from __future__ import annotations
 import enum
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, List, Optional
+from typing import Any
 
 
 class YouTubeSourceType(str, enum.Enum):
@@ -33,6 +33,7 @@ class VideoRelevance(str, enum.Enum):
 @dataclass
 class YouTubeSource:
     """Normalized, canonicalized YouTube research source representation."""
+
     source_type: YouTubeSourceType
     canonical_url: str
     channel_id: str = ""
@@ -52,6 +53,7 @@ class YouTubeSource:
 @dataclass
 class DiscoveredVideo:
     """Metadata-only capture of an enumerated YouTube video from a channel/playlist."""
+
     video_id: str
     canonical_url: str
     title: str
@@ -75,6 +77,7 @@ class DiscoveredVideo:
 @dataclass
 class VideoResearchAtom:
     """Structured extraction payload from a single video transcript."""
+
     video_id: str
     title: str
     canonical_url: str
@@ -101,6 +104,7 @@ class VideoResearchAtom:
 @dataclass
 class StrategyEvolutionStep:
     """Tracks how a specific rule or setup condition evolved across creator uploads."""
+
     concept_name: str
     version: str  # "v1", "v2", "v3"
     earlier_video_id: str
@@ -119,6 +123,7 @@ class StrategyEvolutionStep:
 @dataclass
 class RuleContradiction:
     """Identifies conflicting instructions across videos from the same creator."""
+
     rule_name: str
     earlier_video_id: str
     earlier_upload_date: str
@@ -127,7 +132,9 @@ class RuleContradiction:
     later_upload_date: str
     later_statement: str
     severity: str  # "DIRECT_CONFLICT", "CONDITIONAL_REFINEMENT"
-    epistemic_warning: str = "Internal contradiction detected. Unverified until empirical validation."
+    epistemic_warning: str = (
+        "Internal contradiction detected. Unverified until empirical validation."
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -136,6 +143,7 @@ class RuleContradiction:
 @dataclass
 class CreatorProfile:
     """Longitudinal research profile describing a creator's methodology."""
+
     channel_id: str
     channel_name: str
     channel_handle: str
@@ -148,9 +156,7 @@ class CreatorProfile:
     contradictions_count: int = 0
     strategy_evolutions: list[StrategyEvolutionStep] = field(default_factory=list)
     profile_summary: str = ""
-    epistemic_disclaimer: str = (
-        "This profile describes the creator's qualitative content. It does NOT constitute empirical validation or endorsement."
-    )
+    epistemic_disclaimer: str = "This profile describes the creator's qualitative content. It does NOT constitute empirical validation or endorsement."
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -159,6 +165,7 @@ class CreatorProfile:
 @dataclass
 class YouTubeExplorationResult:
     """Comprehensive multi-video synthesis and discovery report."""
+
     job_id: str
     source: YouTubeSource
     status: str  # "COMPLETED", "PARTIAL", "FAILED"

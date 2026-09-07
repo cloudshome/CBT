@@ -78,9 +78,7 @@ class TelegramIdempotencyManager:
         try:
             with db_manager.get_trading_conn() as conn:
                 # Clean up expired keys periodically
-                conn.execute(
-                    "DELETE FROM telegram_idempotency_keys WHERE expires_at < ?", (now,)
-                )
+                conn.execute("DELETE FROM telegram_idempotency_keys WHERE expires_at < ?", (now,))
 
                 # Attempt atomic insert
                 cursor = conn.execute(

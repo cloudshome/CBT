@@ -15,11 +15,11 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Iterable, List, Optional
 import urllib.parse
+from typing import Any
 
-from youtube_transcript_api import YouTubeTranscriptApi
 import yt_dlp
+from youtube_transcript_api import YouTubeTranscriptApi
 
 logger = logging.getLogger("ai_quant_sentinel.youtube_extractor")
 
@@ -87,11 +87,13 @@ def parse_video_id(url_or_id: str) -> str | None:
                 cand = cand.split("?")[0]
                 if len(cand) == 11:
                     return cand
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — defensive fallback
         logger.debug(f"Failed to parse URL '{url_or_id}': {e}")
 
     # Fallback regex extraction across the string
-    match = re.search(r"(?:v=|\/embed\/|\/shorts\/|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]{11})", cleaned)
+    match = re.search(
+        r"(?:v=|\/embed\/|\/shorts\/|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]{11})", cleaned
+    )
     if match:
         return match.group(1)
 
@@ -121,7 +123,7 @@ def timecode_to_seconds(tc: str) -> float:
             return float(int(parts[0]) * 60 + float(parts[1]))
         elif len(parts) == 1:
             return float(parts[0])
-    except Exception:
+    except Exception:  # noqa: BLE001 — defensive fallback
         return 0.0
     return 0.0
 
@@ -174,7 +176,7 @@ class YouTubeResearchExtractor:
                     meta["description"] = (info.get("description") or "")[:2000]
                     meta["view_count"] = int(info.get("view_count") or 0)
                     meta["upload_date"] = str(info.get("upload_date") or "")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.warning(f"yt-dlp metadata extraction failed for {video_id}: {e}")
 
         return meta
@@ -192,7 +194,7 @@ class YouTubeResearchExtractor:
             raw = fetched.to_raw_data()
             if raw and len(raw) > 0:
                 return raw
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.debug(f"Direct transcript fetch failed for {video_id}: {e}")
 
         # 2. Attempt via transcript list discovery
@@ -202,24 +204,26 @@ class YouTubeResearchExtractor:
             try:
                 t = transcript_list.find_manually_created_transcript(["en", "en-US", "en-GB"])
                 return t.fetch().to_raw_data()
-            except Exception:
+            except Exception:  # noqa: S110,BLE001 — defensive fallback
                 pass
 
             # Find generated transcript
             try:
                 t = transcript_list.find_generated_transcript(["en", "en-US", "en-GB"])
                 return t.fetch().to_raw_data()
-            except Exception:
+            except Exception:  # noqa: S110,BLE001 — defensive fallback
                 pass
 
             # Any available transcript
             for t in transcript_list:
                 try:
                     return t.fetch().to_raw_data()
-                except Exception:
+                except Exception:  # noqa: BLE001 — defensive fallback
                     continue
-        except Exception as e:
-            logger.warning(f"youtube-transcript-api could not retrieve transcript for {video_id}: {e}")
+        except Exception as e:  # noqa: BLE001 — defensive fallback
+            logger.warning(
+                f"youtube-transcript-api could not retrieve transcript for {video_id}: {e}"
+            )
 
         return []
 
@@ -268,13 +272,15 @@ class YouTubeResearchExtractor:
             if (chunk_end - chunk_start) >= target_chunk_sec:
                 combined = " ".join(current_texts).replace("\n", " ").strip()
                 if combined:
-                    segments.append({
-                        "text": combined,
-                        "start_sec": round(chunk_start, 2),
-                        "end_sec": round(chunk_end, 2),
-                        "timestamp_start": format_timecode(chunk_start),
-                        "timestamp_end": format_timecode(chunk_end),
-                    })
+                    segments.append(
+                        {
+                            "text": combined,
+                            "start_sec": round(chunk_start, 2),
+                            "end_sec": round(chunk_end, 2),
+                            "timestamp_start": format_timecode(chunk_start),
+                            "timestamp_end": format_timecode(chunk_end),
+                        }
+                    )
                 current_texts = []
                 is_new_chunk = True
 
@@ -282,13 +288,15 @@ class YouTubeResearchExtractor:
         if current_texts:
             combined = " ".join(current_texts).replace("\n", " ").strip()
             if combined:
-                segments.append({
-                    "text": combined,
-                    "start_sec": round(chunk_start, 2),
-                    "end_sec": round(chunk_end, 2),
-                    "timestamp_start": format_timecode(chunk_start),
-                    "timestamp_end": format_timecode(chunk_end),
-                })
+                segments.append(
+                    {
+                        "text": combined,
+                        "start_sec": round(chunk_start, 2),
+                        "end_sec": round(chunk_end, 2),
+                        "timestamp_start": format_timecode(chunk_start),
+                        "timestamp_end": format_timecode(chunk_end),
+                    }
+                )
 
         return segments
 
@@ -323,7 +331,11 @@ class YouTubeResearchExtractor:
         segments = self.segment_transcript(raw_transcript, target_chunk_sec=45.0)
 
         # Build full transcript text
-        full_transcript = " ".join(seg["text"] for seg in segments) if segments else metadata.get("description", "")
+        full_transcript = (
+            " ".join(seg["text"] for seg in segments)
+            if segments
+            else metadata.get("description", "")
+        )
 
         # Detect total hype markers across the transcript
         hype_markers = self.detect_hype_markers(full_transcript)
@@ -372,4 +384,3 @@ class YouTubeResearchExtractor:
 
 # Master Singleton
 youtube_extractor = YouTubeResearchExtractor()
-

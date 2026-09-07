@@ -147,4 +147,3 @@ async def test_sqlite_cache_provider_staleness_guard():
     fresh_ticker = await provider.fetch_live_ticker("TEST_FRESH/USDT")
     assert fresh_ticker is not None
     assert fresh_ticker["price"] == 202.0
-
