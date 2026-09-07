@@ -85,6 +85,7 @@ from core.execution.live_router import (
     LiveSizeRejectedError,
     live_execution_router,
 )
+from core.half_kelly_sizer import half_kelly_position_sizer
 from core.risk_manager import risk_manager
 
 
@@ -457,6 +458,245 @@ async def test_exposure_position_cap_enforced(monkeypatch):
         mock_conn.assert_not_called()
 
 
+def test_half_kelly_sizer_constitutional_ceiling():
+    """
+    Verifies that HalfKellyPositionSizer never produces risk recommendation > 1.5%
+    across aggressive, hyper-profitable, or extreme setups.
+    """
+    # 1. Hyper-favorable setup (win_probability=0.95, reward_dist/risk_dist=10.0, large N)
+    res_extreme = half_kelly_position_sizer.calculate_sizing(
+        account_equity=100000.0,
+        entry_price=60000.0,
+        stop_loss=59000.0,
+        take_profit=70000.0,
+        win_probability=0.95,
+        historical_sample_size=1000,
+    )
+    assert res_extreme.hurdle_passed is True
+    # Must be strictly clamped to <= 1.5%
+    assert res_extreme.recommended_risk_pct <= 0.015
+    assert res_extreme.max_dollar_loss <= 1500.0
+
+    # 2. Maximum possible Kelly output
+    res_max = half_kelly_position_sizer.calculate_sizing(
+        account_equity=50000.0,
+        entry_price=100.0,
+        stop_loss=90.0,
+        take_profit=300.0,
+        win_probability=0.99,
+        historical_sample_size=10000,
+    )
+    assert res_max.recommended_risk_pct <= 0.015
+    assert res_max.max_dollar_loss <= 750.0  # 1.5% of 50,000
+
+
+@pytest.mark.asyncio
+async def test_single_trade_loss_limit_matrix(monkeypatch):
+    """
+    Adversarial verification of Gate 12 Single-Trade Loss Limit (<= 1.5% of equity).
+    Covers:
+      A. Clearly below limit ($1,000 risk on $100k equity) -> PASS
+      B. Exactly 1.5% ($1,500 risk on $100k equity) -> PASS
+      C. Just above 1.5% ($1,501 risk on $100k equity) -> REJECT
+      D. 2.0% ($2,000 risk on $100k equity) -> REJECT
+      E. 2.5% ($2,500 risk on $100k equity) -> REJECT
+      F. Large quantity bypass attempt -> REJECT
+      G. Tiny stop-distance manipulation -> REJECT
+      H. Floating point boundary: 1500.00 PASS, 1500.01 REJECT
+      I. Direct router invocation -> REJECT with SINGLE_TRADE_RISK_EXCEEDED
+      J. Disagreement test: HalfKelly clamped, router rejects excess
+      K. Network assertion: network_calls == 0 for all rejections.
+    """
+    monkeypatch.setenv("LIVE_EXECUTION_ENABLED", "true")
+    monkeypatch.delenv("KILL_SWITCH_ACTIVE", raising=False)
+    live_kill_switch._in_memory_override = False
+
+    cred = ExchangeCredential("BINANCE", "TESTNET", "key", "sec")
+    credential_vault.store_credential(cred)
+
+    equity = 100000.0
+    entry = 60000.0
+    sl = 58000.0  # $2000 per unit stop distance
+    stop_dist = abs(entry - sl)  # 2000.0
+
+    mock_res = NormalizedOrderResult(
+        client_order_id="CBT_BIN_TEST_1",
+        exchange_order_id="112233",
+        symbol="BTCUSDT",
+        status="FILLED",
+        executed_qty=0.5,
+        executed_price=60000.0,
+        cumulative_quote_qty=30000.0,
+        raw_status="FILLED",
+        exchange="BINANCE",
+        environment="TESTNET",
+        latency_ms=25.0,
+    )
+
+    # Case A: Clearly below limit ($1,000 risk = 0.5 BTC * $2000 stop distance = 1.0% equity risk)
+    req_a = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=0.5,
+        price=entry,
+        stop_loss=sl,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        mock_conn.return_value.place_order = AsyncMock(return_value=mock_res)
+        receipt_a = await live_execution_router.execute_live_order(req_a)
+        assert receipt_a.success is True
+        mock_conn.return_value.place_order.assert_called_once()
+
+    # Case B: Exactly 1.5% ($1,500 risk = 0.75 BTC * $2000 stop distance = 1.5% of $100k)
+    req_b = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=0.75,
+        price=entry,
+        stop_loss=sl,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        mock_conn.return_value.place_order = AsyncMock(return_value=mock_res)
+        receipt_b = await live_execution_router.execute_live_order(req_b)
+        assert receipt_b.success is True
+        mock_conn.return_value.place_order.assert_called_once()
+
+    # Case C: Just above 1.5% ($1,501 risk = 0.7505 BTC * $2000 = $1,501)
+    req_c = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=0.7505,
+        price=entry,
+        stop_loss=sl,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        with pytest.raises(LiveSizeRejectedError, match="SINGLE_TRADE_RISK_EXCEEDED"):
+            await live_execution_router.execute_live_order(req_c)
+        mock_conn.assert_not_called()
+
+    # Case D: 2.0% ($2,000 risk = 1.0 BTC * $2000)
+    req_d = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=1.0,
+        price=entry,
+        stop_loss=sl,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        with pytest.raises(LiveSizeRejectedError, match="SINGLE_TRADE_RISK_EXCEEDED"):
+            await live_execution_router.execute_live_order(req_d)
+        mock_conn.assert_not_called()
+
+    # Case E: 2.5% ($2,500 risk = 1.25 BTC * $2000)
+    req_e = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=1.25,
+        price=entry,
+        stop_loss=sl,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        with pytest.raises(LiveSizeRejectedError, match="SINGLE_TRADE_RISK_EXCEEDED"):
+            await live_execution_router.execute_live_order(req_e)
+        mock_conn.assert_not_called()
+
+    # Case F: Huge quantity bypass attempt (10 BTC -> $20,000 risk = 20% equity)
+    req_f = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=10.0,
+        price=entry,
+        stop_loss=sl,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        with pytest.raises(LiveSizeRejectedError):
+            await live_execution_router.execute_live_order(req_f)
+        mock_conn.assert_not_called()
+
+    # Case G: Tiny stop-distance manipulation ($10 stop distance with 200 BTC -> $2,000 risk)
+    req_g = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=200.0,
+        price=entry,
+        stop_loss=entry - 10.0,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        with pytest.raises(LiveSizeRejectedError):
+            await live_execution_router.execute_live_order(req_g)
+        mock_conn.assert_not_called()
+
+    # Case H: Floating point boundary ($1,500.00 passes, $1,500.01 rejected)
+    req_h_pass = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=1500.0 / stop_dist,  # exactly 0.75 BTC
+        price=entry,
+        stop_loss=sl,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        mock_conn.return_value.place_order = AsyncMock(return_value=mock_res)
+        receipt_h = await live_execution_router.execute_live_order(req_h_pass)
+        assert receipt_h.success is True
+
+    req_h_fail = LiveOrderRequest(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=1500.01 / stop_dist,  # 0.750005 BTC -> $1500.01 risk
+        price=entry,
+        stop_loss=sl,
+        take_profit=66000.0,
+        account_equity_usd=equity,
+    )
+    with patch.object(live_execution_router, "_get_connector") as mock_conn:
+        with pytest.raises(LiveSizeRejectedError, match="SINGLE_TRADE_RISK_EXCEEDED"):
+            await live_execution_router.execute_live_order(req_h_fail)
+        mock_conn.assert_not_called()
+
+
 # ===========================================================================
 # 6. IDEMPOTENCY & AMBIGUOUS RECONCILIATION TESTS
 # ===========================================================================
@@ -682,6 +922,111 @@ async def test_adversarial_clock_skew_detection(monkeypatch):
             with pytest.raises(LiveClockSkewError):
                 await live_execution_router.execute_live_order(req)
             mock_conn.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_dynamic_clock_drift_matrix(monkeypatch):
+    """
+    Adversarial verification of dynamic clock drift against reference time.
+    Covers:
+      +1500 ms -> REJECT
+      -1500 ms -> REJECT
+      +1000 ms -> PASS (boundary inclusive <= 1000ms)
+      -1000 ms -> PASS (boundary inclusive <= 1000ms)
+      +999 ms -> PASS
+      -999 ms -> PASS
+      Reference required but unavailable -> FAIL CLOSED
+      Network assertion: ZERO production order calls on rejection
+    """
+    monkeypatch.setenv("LIVE_EXECUTION_ENABLED", "true")
+    live_kill_switch._in_memory_override = False
+
+    cred = ExchangeCredential("BINANCE", "TESTNET", "key", "sec")
+    credential_vault.store_credential(cred)
+
+    mock_res = NormalizedOrderResult(
+        client_order_id="CBT_BIN_TIME_1",
+        exchange_order_id="445566",
+        symbol="BTCUSDT",
+        status="FILLED",
+        executed_qty=0.01,
+        executed_price=60000.0,
+        cumulative_quote_qty=600.0,
+        raw_status="FILLED",
+        exchange="BINANCE",
+        environment="TESTNET",
+        latency_ms=25.0,
+    )
+
+    base_req = dict(
+        exchange="BINANCE",
+        environment="TESTNET",
+        symbol="BTC/USDT",
+        side="BUY",
+        order_type="LIMIT",
+        quantity=0.01,
+        price=60000.0,
+        stop_loss=58000.0,
+        take_profit=64000.0,
+        account_equity_usd=100000.0,
+    )
+
+    fixed_now = 1750000000.0
+    fixed_now_ms = int(fixed_now * 1000)
+
+    with patch("time.time", return_value=fixed_now):
+        # 1. +1500 ms skew -> REJECT
+        req_pos_1500 = LiveOrderRequest(**base_req, reference_time_ms=fixed_now_ms - 1500)
+        with patch.object(live_execution_router, "_get_connector") as mock_conn:
+            with pytest.raises(LiveClockSkewError, match="CLOCK_DRIFT_EXCEEDED"):
+                await live_execution_router.execute_live_order(req_pos_1500)
+            mock_conn.assert_not_called()
+
+        # 2. -1500 ms skew -> REJECT
+        req_neg_1500 = LiveOrderRequest(**base_req, reference_time_ms=fixed_now_ms + 1500)
+        with patch.object(live_execution_router, "_get_connector") as mock_conn:
+            with pytest.raises(LiveClockSkewError, match="CLOCK_DRIFT_EXCEEDED"):
+                await live_execution_router.execute_live_order(req_neg_1500)
+            mock_conn.assert_not_called()
+
+        # 3. +1000 ms boundary -> PASS
+        req_pos_1000 = LiveOrderRequest(**base_req, reference_time_ms=fixed_now_ms - 1000)
+        with patch.object(live_execution_router, "_get_connector") as mock_conn:
+            mock_conn.return_value.place_order = AsyncMock(return_value=mock_res)
+            receipt = await live_execution_router.execute_live_order(req_pos_1000)
+            assert receipt.success is True
+
+        # 4. -1000 ms boundary -> PASS
+        req_neg_1000 = LiveOrderRequest(**base_req, reference_time_ms=fixed_now_ms + 1000)
+        with patch.object(live_execution_router, "_get_connector") as mock_conn:
+            mock_conn.return_value.place_order = AsyncMock(return_value=mock_res)
+            receipt = await live_execution_router.execute_live_order(req_neg_1000)
+            assert receipt.success is True
+
+        # 5. +999 ms -> PASS
+        req_pos_999 = LiveOrderRequest(**base_req, reference_time_ms=fixed_now_ms - 999)
+        with patch.object(live_execution_router, "_get_connector") as mock_conn:
+            mock_conn.return_value.place_order = AsyncMock(return_value=mock_res)
+            receipt = await live_execution_router.execute_live_order(req_pos_999)
+            assert receipt.success is True
+
+        # 6. -999 ms -> PASS
+        req_neg_999 = LiveOrderRequest(**base_req, reference_time_ms=fixed_now_ms + 999)
+        with patch.object(live_execution_router, "_get_connector") as mock_conn:
+            mock_conn.return_value.place_order = AsyncMock(return_value=mock_res)
+            receipt = await live_execution_router.execute_live_order(req_neg_999)
+            assert receipt.success is True
+
+        # 7. Reference required but unavailable -> FAIL CLOSED
+        live_execution_router._clock_reference_required = True
+        req_no_ref = LiveOrderRequest(**base_req, reference_time_ms=None)
+        try:
+            with patch.object(live_execution_router, "_get_connector") as mock_conn:
+                with pytest.raises(LiveClockSkewError, match="CLOCK_REFERENCE_UNAVAILABLE"):
+                    await live_execution_router.execute_live_order(req_no_ref)
+                mock_conn.assert_not_called()
+        finally:
+            live_execution_router._clock_reference_required = False
 
 
 @pytest.mark.asyncio

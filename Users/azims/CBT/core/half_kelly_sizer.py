@@ -132,8 +132,8 @@ class HalfKellyPositionSizer:
         # Drawdown penalty throttling: if current drawdown > 1.5%, throttle risk
         dd_factor = max(0.3, 1.0 - (current_drawdown_pct * 10.0))
         final_risk_pct = max(
-            0.002, min(0.025, shrunk_kelly * dd_factor)
-        )  # Cap between 0.2% and 2.5%
+            0.002, min(0.015, shrunk_kelly * dd_factor)
+        )  # Constitutional Cap: Maximum 1.5% single-trade equity risk ceiling (0.2% - 1.5%)
 
         # Sizing calculations
         risk_dollar_cap = account_equity * final_risk_pct

@@ -128,6 +128,7 @@ class LiveOrderRequest:
     max_open_positions_cap: int = 3
     client_order_id: str | None = None
     correlation_id: str | None = None
+    reference_time_ms: int | None = None
 
 
 @dataclass
@@ -170,6 +171,8 @@ class LiveExecutionRouter:
         self._min_order_notional_usd = 10.0
         self._max_order_notional_usd = 250_000.0
         self._preflight_override_for_tests: bool | None = None
+        self._cached_reference_time_provider = None
+        self._clock_reference_required: bool = False
 
     def is_live_execution_enabled(self) -> bool:
         """
@@ -180,14 +183,36 @@ class LiveExecutionRouter:
         val = os.getenv("LIVE_EXECUTION_ENABLED")
         return parse_strict_bool(val, default=False)
 
-    def _verify_clock_sanity(self) -> None:
+    def _verify_clock_sanity(self, reference_time_ms: int | None = None) -> None:
         """
         Validates that system time is sane and not drifting significantly.
+        Enforces:
+          1. System wall clock must be >= 1700000000.0 (year 2023+).
+          2. Dynamic clock drift against reference_time_ms must be <= 1000ms.
+          3. If reference time is explicitly required and unavailable, fail closed.
         """
         t_wall = time.time()
-        t_perf = time.perf_counter()
         if t_wall <= 1700000000.0:  # Before 2023 -> invalid system clock
             raise LiveClockSkewError(f"System clock invalid: {t_wall} is in the past.")
+
+        now_ms = int(t_wall * 1000)
+
+        ref_ms = reference_time_ms
+        if ref_ms is None and self._cached_reference_time_provider is not None:
+            try:
+                ref_ms = self._cached_reference_time_provider()
+            except Exception as e:
+                raise LiveClockSkewError(f"CLOCK_REFERENCE_UNAVAILABLE: Failed to obtain trusted reference time: {e}")
+
+        if ref_ms is None and self._clock_reference_required:
+            raise LiveClockSkewError("CLOCK_REFERENCE_UNAVAILABLE: Time reference is required but unavailable.")
+
+        if ref_ms is not None:
+            drift_ms = abs(now_ms - ref_ms)
+            if drift_ms > 1000:
+                raise LiveClockSkewError(
+                    f"CLOCK_DRIFT_EXCEEDED: Clock skew of {drift_ms}ms exceeds 1000ms SLA (local={now_ms}, ref={ref_ms})."
+                )
 
     def _get_connector(
         self,
@@ -256,9 +281,9 @@ class LiveExecutionRouter:
             raise LiveExecutionDisabledError(msg)
 
         # ---------------------------------------------------------------------
-        # GATE 3: System Clock Sanity
+        # GATE 3: System Clock Sanity & Dynamic Drift Verification
         # ---------------------------------------------------------------------
-        self._verify_clock_sanity()
+        self._verify_clock_sanity(reference_time_ms=req.reference_time_ms)
 
         # ---------------------------------------------------------------------
         # GATE 4: Order Quantity / Math Sanity (NaN, Inf, negative, zero)
@@ -353,6 +378,22 @@ class LiveExecutionRouter:
             raise LiveSizeRejectedError(msg)
 
         # ---------------------------------------------------------------------
+        # GATE 12: Single-Trade Loss Limit (<= 1.5% of Account Equity)
+        # ---------------------------------------------------------------------
+        # The constitutional maximum risk for any single trade is 1.5% of equity.
+        # This is enforced strictly and independently of Half-Kelly sizer calculations.
+        max_risk_allowed_usd = req.account_equity_usd * 0.015
+        order_risk_usd = abs(est_entry - est_sl) * req.quantity
+        if order_risk_usd > (max_risk_allowed_usd + 1e-6):
+            msg = (
+                f"SINGLE_TRADE_RISK_EXCEEDED: Single-trade risk ${order_risk_usd:.2f} exceeds "
+                f"constitutional 1.5% limit (${max_risk_allowed_usd:.2f}) on ${req.account_equity_usd:,.2f} equity."
+            )
+            logger.warning(msg)
+            self._emit_rejection_audit(cid, req, "SINGLE_TRADE_RISK_EXCEEDED", msg)
+            raise LiveSizeRejectedError(msg)
+
+        # ---------------------------------------------------------------------
         # GATE 13: Order Notional Limits
         # ---------------------------------------------------------------------
         est_notional = req.quantity * (req.price or est_entry)
@@ -376,9 +417,9 @@ class LiveExecutionRouter:
             raise LiveSizeRejectedError(msg)
 
         # ---------------------------------------------------------------------
-        # GATE 17: System Clock Sanity
+        # GATE 17: Gateway Clock Sanity & Pre-Dispatch Skew Verification
         # ---------------------------------------------------------------------
-        self._verify_clock_sanity()
+        self._verify_clock_sanity(reference_time_ms=req.reference_time_ms)
 
         # ---------------------------------------------------------------------
         # GATE 18: Exchange Endpoint Health

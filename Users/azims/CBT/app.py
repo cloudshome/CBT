@@ -3297,6 +3297,7 @@ class LiveOrderApiRequest(BaseModel):
     max_open_positions_cap: int = Field(3, ge=1, description="Maximum open positions cap")
     client_order_id: Optional[str] = Field(None, description="Optional unique client order ID")
     correlation_id: Optional[str] = Field(None, description="Optional request correlation ID")
+    reference_time_ms: Optional[int] = Field(None, description="Optional external UTC reference timestamp for clock skew validation")
 
 
 class LiveCancelApiRequest(BaseModel):
@@ -3386,6 +3387,7 @@ async def place_live_order(req: LiveOrderApiRequest):
         max_open_positions_cap=req.max_open_positions_cap,
         client_order_id=req.client_order_id,
         correlation_id=req.correlation_id,
+        reference_time_ms=req.reference_time_ms,
     )
 
     try:
