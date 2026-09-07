@@ -62,7 +62,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
-| *(staged)* | feat(canary): implement live canary shadow burn-in orchestrator, hf telemetry pipeline, and incident escalation (17 passing tests) |
+| `2b4136f` | feat(canary): implement live canary shadow burn-in orchestrator, hf telemetry pipeline, and incident escalation (17 passing tests) |
 | `0084d7e` | docs(status): update SKY_STATUS to v3.5.0 with 447 passing tests and recent commit history |
 | `5991e82` | feat(core): implement autonomous trader, memory cache hardening, and capacity audit report (18 passing tests) |
 | `934ef80` | feat(youtube): implement YouTube Research Intelligence V5 autonomous channel & playlist explorer (15 passing tests) |
