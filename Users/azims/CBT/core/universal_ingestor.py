@@ -347,6 +347,23 @@ class UniversalIngestor:
             )
 
         # 7. Legacy Provenance Ledger Bridge
+        has_trading_rules = source_type in ["CODE", "TRADINGVIEW"] or any(
+            kw in content.lower()
+            for kw in [
+                "entry rule",
+                "exit rule",
+                "stop loss",
+                "take profit",
+                "strategy name",
+                "fair value gap",
+                "judas sweep",
+                "order block",
+            ]
+        )
+        should_queue_candidate = (mode == "RESEARCH") or (
+            mode in ["AUTO", "AUTO_DETECT"] and has_trading_rules
+        )
+
         prov = provenance_engine.register_provenance(
             source_type=source_type,
             source_uri=uri,
@@ -354,7 +371,7 @@ class UniversalIngestor:
             author_creator=creator,
             raw_content_preview=content[:2000],
             confidence_score=88.0,
-            status="CANDIDATE" if mode == "RESEARCH" else "ANALYZED",
+            status="CANDIDATE" if should_queue_candidate else "ANALYZED",
         )
 
         # 8. Trigger Cross-Domain Discovery
@@ -362,7 +379,7 @@ class UniversalIngestor:
 
         # 9. Queue Candidate Strategy (strictly UNTESTED, zero alpha assumed)
         strategy_candidates: list[dict[str, Any]] = []
-        if mode == "RESEARCH":
+        if should_queue_candidate:
             strategy_candidates.append(
                 {
                     "candidate_id": f"CAND-{sid[-6:]}",

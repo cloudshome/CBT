@@ -121,7 +121,8 @@ def test_upload_traversal_is_stored_under_uuid_name(authed_client, monkeypatch, 
 
 def test_upload_too_large_rejected(authed_client, monkeypatch, tmp_path):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    big = b"x" * (26 * 1024 * 1024)
+    monkeypatch.setattr("app.MAX_UPLOAD_BYTES", 1024)
+    big = b"x" * 2048
     resp = authed_client.post(
         "/api/research/ingest-file",
         data={"mode": "ANALYZE"},

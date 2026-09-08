@@ -514,7 +514,8 @@ class LiveExecutionRouter:
                     details=asdict(status_result),
                 )
                 return LiveExecutionReceipt(
-                    success=status_result.status in ("FILLED", "PARTIALLY_FILLED", "NEW", "ACKNOWLEDGED"),
+                    success=status_result.status
+                    in ("FILLED", "PARTIALLY_FILLED", "NEW", "ACKNOWLEDGED"),
                     status=status_result.status,
                     client_order_id=cid,
                     exchange_order_id=status_result.exchange_order_id,
@@ -543,9 +544,13 @@ class LiveExecutionRouter:
                 if is_not_found:
                     logger.info(f"Order {cid} proven not to exist on exchange. Marking rejected.")
                     idempotency_store.mark_final(
-                        cid, OrderStatus.REJECTED, error_message="Order not found on exchange upon retry check."
+                        cid,
+                        OrderStatus.REJECTED,
+                        error_message="Order not found on exchange upon retry check.",
                     )
-                    raise LiveOrderNotFoundError(f"Order {cid} was not found on {exch_upper} matching engine.") from ex
+                    raise LiveOrderNotFoundError(
+                        f"Order {cid} was not found on {exch_upper} matching engine."
+                    ) from ex
                 logger.error(f"Cannot verify exchange state for duplicate retry of {cid}: {ex}")
                 raise LiveAmbiguousOrderError(
                     f"Duplicate order retry cannot verify exchange state for {cid}: {ex}"

@@ -746,8 +746,12 @@ class TestMilestone18RestApi:
         slicer = AlmgrenChrissSlicer()
         base_price = 50000.0
 
-        sched_buy = slicer.generate_execution_schedule("BTC/USDT", "BUY", 5.0, base_price, num_intervals=4)
-        sched_sell = slicer.generate_execution_schedule("BTC/USDT", "SELL", 5.0, base_price, num_intervals=4)
+        sched_buy = slicer.generate_execution_schedule(
+            "BTC/USDT", "BUY", 5.0, base_price, num_intervals=4
+        )
+        sched_sell = slicer.generate_execution_schedule(
+            "BTC/USDT", "SELL", 5.0, base_price, num_intervals=4
+        )
 
         for s in sched_buy.slices:
             assert s.expected_slice_price >= base_price

@@ -170,15 +170,25 @@ class ReconciliationLedger:
                 cursor = conn.execute("PRAGMA table_info(execution_reconciliation_records);")
                 existing_cols = {row[1] for row in cursor.fetchall()}
                 if "execution_id" not in existing_cols:
-                    conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN execution_id TEXT NOT NULL DEFAULT '';")
+                    conn.execute(
+                        "ALTER TABLE execution_reconciliation_records ADD COLUMN execution_id TEXT NOT NULL DEFAULT '';"
+                    )
                 if "dispatch_monotonic_ns" not in existing_cols:
-                    conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN dispatch_monotonic_ns INTEGER NOT NULL DEFAULT 0;")
+                    conn.execute(
+                        "ALTER TABLE execution_reconciliation_records ADD COLUMN dispatch_monotonic_ns INTEGER NOT NULL DEFAULT 0;"
+                    )
                 if "ack_monotonic_ns" not in existing_cols:
-                    conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN ack_monotonic_ns INTEGER NOT NULL DEFAULT 0;")
+                    conn.execute(
+                        "ALTER TABLE execution_reconciliation_records ADD COLUMN ack_monotonic_ns INTEGER NOT NULL DEFAULT 0;"
+                    )
                 if "fill_monotonic_ns" not in existing_cols:
-                    conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN fill_monotonic_ns INTEGER NOT NULL DEFAULT 0;")
+                    conn.execute(
+                        "ALTER TABLE execution_reconciliation_records ADD COLUMN fill_monotonic_ns INTEGER NOT NULL DEFAULT 0;"
+                    )
                 if "roundtrip_ns" not in existing_cols:
-                    conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN roundtrip_ns INTEGER NOT NULL DEFAULT 0;")
+                    conn.execute(
+                        "ALTER TABLE execution_reconciliation_records ADD COLUMN roundtrip_ns INTEGER NOT NULL DEFAULT 0;"
+                    )
 
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_rec_symbol ON execution_reconciliation_records(symbol);"
@@ -235,7 +245,9 @@ class ReconciliationLedger:
                 details=details,
             )
         except Exception as e:  # noqa: BLE001 — audit bus failure fallback
-            logger.critical(f"Audit bus failed to emit {event_type} for {symbol}: {e}. Record persisted to WAL.")
+            logger.critical(
+                f"Audit bus failed to emit {event_type} for {symbol}: {e}. Record persisted to WAL."
+            )
 
     def record_fill(
         self,
@@ -286,7 +298,9 @@ class ReconciliationLedger:
         # 2. Compute nanosecond durations if provided
         calc_roundtrip_ns = roundtrip_ns
         if calc_roundtrip_ns == 0 and dispatch_monotonic_ns > 0 and fill_monotonic_ns > 0:
-            calc_roundtrip_ns = compute_monotonic_duration_ns(dispatch_monotonic_ns, fill_monotonic_ns)
+            calc_roundtrip_ns = compute_monotonic_duration_ns(
+                dispatch_monotonic_ns, fill_monotonic_ns
+            )
 
         # 3. Classify status
         qty_diff = abs(executed_qty - requested_qty)
@@ -400,19 +414,23 @@ class ReconciliationLedger:
             None,
         )
         if existing_fill is not None:
-            logger.info(f"Duplicate fill {execution_id} ignored in order stream for {client_order_id}")
+            logger.info(
+                f"Duplicate fill {execution_id} ignored in order stream for {client_order_id}"
+            )
             rec = self.get_record_by_fill(exchange, exchange_order_id, execution_id)
             if rec is not None:
                 return rec, order_state
 
         # Register fill event
-        order_state.fills.append({
-            "execution_id": execution_id,
-            "qty": fill_qty,
-            "price": fill_price,
-            "fee_usd": fee_paid_usd,
-            "fill_monotonic_ns": fill_monotonic_ns,
-        })
+        order_state.fills.append(
+            {
+                "execution_id": execution_id,
+                "qty": fill_qty,
+                "price": fill_price,
+                "fee_usd": fee_paid_usd,
+                "fill_monotonic_ns": fill_monotonic_ns,
+            }
+        )
         order_state.fill_count += 1
         order_state.total_fee_usd += fee_paid_usd
 
@@ -479,7 +497,9 @@ class ReconciliationLedger:
         if order_id in self._cumulative_orders and self._cumulative_orders[order_id].is_halted:
             return True
         for state in self._cumulative_orders.values():
-            if (state.parent_order_id == order_id or state.client_order_id == order_id) and state.is_halted:
+            if (
+                state.parent_order_id == order_id or state.client_order_id == order_id
+            ) and state.is_halted:
                 return True
         return False
 
@@ -665,4 +685,3 @@ class ReconciliationLedger:
 
 # Global authoritative instance
 reconciliation_ledger = ReconciliationLedger()
-
