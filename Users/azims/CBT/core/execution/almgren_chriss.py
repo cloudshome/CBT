@@ -192,16 +192,32 @@ class AlmgrenChrissSlicer:
                 f"current_price must be finite and > 0, got {current_price}."
             )
 
-        if time_horizon_sec <= 0:
+        if not math.isfinite(time_horizon_sec) or time_horizon_sec <= 0:
             raise InvalidSlicingParametersError(
-                f"time_horizon_sec must be > 0, got {time_horizon_sec}."
+                f"time_horizon_sec must be finite and > 0, got {time_horizon_sec}."
             )
 
         if num_intervals < 1:
             raise InvalidSlicingParametersError(f"num_intervals must be >= 1, got {num_intervals}.")
 
-        if risk_aversion_lambda < 0:
-            raise InvalidSlicingParametersError("risk_aversion_lambda cannot be negative.")
+        if not math.isfinite(annualized_volatility) or annualized_volatility < 0:
+            raise InvalidSlicingParametersError(
+                f"annualized_volatility must be finite and >= 0, got {annualized_volatility}."
+            )
+
+        if not math.isfinite(risk_aversion_lambda) or risk_aversion_lambda < 0:
+            raise InvalidSlicingParametersError(
+                f"risk_aversion_lambda must be finite and >= 0, got {risk_aversion_lambda}."
+            )
+
+        if adv_usd is not None and (not math.isfinite(adv_usd) or adv_usd <= 0):
+            raise InvalidSlicingParametersError(f"adv_usd must be finite and > 0, got {adv_usd}.")
+
+        if gamma is not None and (not math.isfinite(gamma) or gamma < 0):
+            raise InvalidSlicingParametersError(f"gamma must be finite and >= 0, got {gamma}.")
+
+        if eta is not None and (not math.isfinite(eta) or eta <= 0):
+            raise InvalidSlicingParametersError(f"eta must be finite and > 0, got {eta}.")
 
         # Parameters
         N = num_intervals
@@ -212,16 +228,17 @@ class AlmgrenChrissSlicer:
         h = eta if eta is not None else self.default_eta
         adv = adv_usd if adv_usd is not None else self.default_adv_usd
 
-        # Compute per-interval volatility sigma
+        # Compute per-interval volatility sigma and daily volatility for square-root impact
         sec_in_year = 365.0 * 86400.0
         sigma_per_sec = annualized_volatility / math.sqrt(sec_in_year)
         sigma = sigma_per_sec * math.sqrt(tau)
+        daily_volatility = annualized_volatility / math.sqrt(365.0)
 
         # Holdings vector x of length N + 1 where x[0] = X and x[N] = 0
         x = [0.0] * (N + 1)
         x[0] = X
 
-        is_linear_twap = risk_aversion_lambda == 0.0
+        is_linear_twap = risk_aversion_lambda == 0.0 or annualized_volatility == 0.0
 
         if is_linear_twap:
             # Linear TWAP
@@ -267,7 +284,7 @@ class AlmgrenChrissSlicer:
 
             slice_notional = n_j * current_price
             instant_impact_bps = self.calculate_nonlinear_price_impact(
-                slice_notional, adv, annualized_volatility
+                slice_notional, adv, daily_volatility
             )
 
             # Directional expected price impact
@@ -293,6 +310,14 @@ class AlmgrenChrissSlicer:
             total_notional_traded += n_j * expected_price
             sum_nj_sq_over_tau += (n_j**2) / tau
             sum_xj_sq_tau += (x[j] ** 2) * tau
+
+        # Enforce exact conservation of quantity to lot-size tolerance (sum(n_j) == X)
+        total_allocated = sum(s.slice_qty for s in slices)
+        residual = X - total_allocated
+        if abs(residual) > 1e-9 and slices:
+            slices[-1].slice_qty += residual
+            slices[-1].remaining_qty_after = 0.0
+            slices[-1].fraction_of_total = slices[-1].slice_qty / X if X > 0 else 0.0
 
         # Compute theoretical expected cost and variance
         # E[x] = 0.5 * gamma * X^2 + eta * sum(n_j^2 / tau)

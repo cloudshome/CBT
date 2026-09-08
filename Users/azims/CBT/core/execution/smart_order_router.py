@@ -9,8 +9,10 @@ Enforces optimal child order distribution across Binance Spot and Bybit V5
 by walking live L2 order book depth profiles and minimizing the total effective
 execution cost (VWAP + maker/taker fees + slippage impact).
 
-Supports dynamic venue fee schedules, stale/degraded book detection, circuit
-breaker isolation, and fail-closed liquidity protection.
+Supports dynamic venue fee schedules, venue trading rules (step size, lot size,
+minimum notional), strict book validation, stale/degraded book detection,
+fail-closed liquidity protection, parent-level 1.5% equity risk gates, and
+a multi-venue parent order state machine.
 =============================================================================
 """
 
@@ -19,13 +21,18 @@ from __future__ import annotations
 import logging
 import math
 import time
+import uuid
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 from core.audit_bus import audit_bus
+from core.execution.kill_switch import live_kill_switch
 from core.execution.live_router import (
     LiveExecutionReceipt,
+    LiveKillSwitchActiveError,
     LiveOrderRequest,
+    LiveSizeRejectedError,
     live_execution_router,
 )
 
@@ -53,6 +60,42 @@ class InvalidOrderParametersError(SmartOrderRouterError):
     """Raised when order parameters are non-finite, non-positive, or missing."""
 
 
+class VenueConstraintBreachError(SmartOrderRouterError):
+    """Raised when an order allocation breaches venue lot size, step size, or minimum notional."""
+
+
+# ---------------------------------------------------------------------------
+# Enums & Trading Rules
+# ---------------------------------------------------------------------------
+
+
+class ParentOrderState(str, Enum):
+    """Authoritative state machine for multi-venue parent orders."""
+
+    PLANNED = "PLANNED"
+    DISPATCHING = "DISPATCHING"
+    EXECUTING = "EXECUTING"
+    PARTIALLY_EXECUTED = "PARTIALLY_EXECUTED"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+    CANCEL_PENDING = "CANCEL_PENDING"
+    CANCELLED = "CANCELLED"
+    RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
+    HALTED = "HALTED"
+
+
+@dataclass
+class VenueTradingRules:
+    """Exchange-specific order sizing and notional constraint rules."""
+
+    exchange: str
+    min_qty: float = 0.00001
+    max_qty: float = 10000.0
+    step_size: float = 0.00001  # Lot size rounding quantum
+    tick_size: float = 0.01  # Price rounding quantum
+    min_notional_usd: float = 5.0  # e.g. Binance Spot $5, Bybit V5 $5
+
+
 # ---------------------------------------------------------------------------
 # Data Models
 # ---------------------------------------------------------------------------
@@ -74,6 +117,12 @@ class VenueFeeSchedule:
     def calculate_maker_fee(self, notional_usd: float) -> float:
         """Calculates maker fee in USD given traded notional."""
         return notional_usd * (self.maker_fee_bps / 10000.0)
+
+    def calculate_fee(self, notional_usd: float, execution_style: str = "TAKER") -> float:
+        """Calculates fee based on explicit execution style."""
+        if execution_style.upper().strip() == "MAKER":
+            return self.calculate_maker_fee(notional_usd)
+        return self.calculate_taker_fee(notional_usd)
 
 
 @dataclass
@@ -97,9 +146,55 @@ class VenueOrderBook:
     max_stale_age_ms: int = 5000
 
     def is_stale(self, current_time_ms: int | None = None) -> bool:
-        """Determines whether order book depth exceeds staleness threshold."""
+        """
+        Determines whether order book depth exceeds staleness threshold.
+        Exact boundary: stale if elapsed age >= max_stale_age_ms (5000ms).
+        """
         now_ms = current_time_ms if current_time_ms is not None else int(time.time() * 1000)
-        return (now_ms - self.timestamp_ms) > self.max_stale_age_ms
+        return (now_ms - self.timestamp_ms) >= self.max_stale_age_ms
+
+    def validate(self, current_time_ms: int | None = None) -> tuple[bool, str]:
+        """
+        Performs strict fail-closed market data validation:
+        - Must have at least one bid and ask
+        - No non-finite, zero, or negative prices/sizes
+        - No crossed books (best bid >= best ask)
+        - Timestamp must be positive and not in the distant future
+        - Must not be marked degraded or stale
+        """
+        now_ms = current_time_ms if current_time_ms is not None else int(time.time() * 1000)
+
+        if self.is_degraded:
+            return False, f"Venue {self.exchange} is marked degraded"
+        if self.timestamp_ms <= 0:
+            return False, f"Venue {self.exchange} has missing or non-positive timestamp ({self.timestamp_ms})"
+        if self.timestamp_ms > (now_ms + 1000):
+            return False, f"Venue {self.exchange} timestamp is in the future ({self.timestamp_ms} > {now_ms + 1000})"
+        if self.is_stale(now_ms):
+            age = now_ms - self.timestamp_ms
+            return False, f"Venue {self.exchange} is stale (age {age}ms >= {self.max_stale_age_ms}ms)"
+        if not self.bids and not self.asks:
+            return False, f"Venue {self.exchange} has empty bids and asks"
+
+        for i, b in enumerate(self.bids):
+            if not math.isfinite(b.price) or b.price <= 0:
+                return False, f"Venue {self.exchange} invalid bid price at index {i}: {b.price}"
+            if not math.isfinite(b.size) or b.size <= 0:
+                return False, f"Venue {self.exchange} invalid bid size at index {i}: {b.size}"
+
+        for i, a in enumerate(self.asks):
+            if not math.isfinite(a.price) or a.price <= 0:
+                return False, f"Venue {self.exchange} invalid ask price at index {i}: {a.price}"
+            if not math.isfinite(a.size) or a.size <= 0:
+                return False, f"Venue {self.exchange} invalid ask size at index {i}: {a.size}"
+
+        if self.bids and self.asks and self.bids[0].price > self.asks[0].price:
+            return False, (
+                f"Venue {self.exchange} book is crossed (best bid {self.bids[0].price} "
+                f"> best ask {self.asks[0].price})"
+            )
+
+        return True, "OK"
 
 
 @dataclass
@@ -140,6 +235,7 @@ class SmartOrderRouteQuote:
     total_slippage_bps: float
     splits: list[VenueSplitQuote]
     routing_reason: str
+    execution_style: str = "TAKER"
     timestamp_ms: int = field(default_factory=lambda: int(time.time() * 1000))
 
     def to_dict(self) -> dict[str, Any]:
@@ -152,9 +248,40 @@ class SmartOrderRouteQuote:
             "total_fee_usd": round(self.total_fee_usd, 4),
             "total_effective_cost_usd": round(self.total_effective_cost_usd, 4),
             "total_slippage_bps": round(self.total_slippage_bps, 2),
+            "execution_style": self.execution_style,
             "splits": [s.to_dict() for s in self.splits],
             "routing_reason": self.routing_reason,
             "timestamp_ms": self.timestamp_ms,
+        }
+
+
+@dataclass
+class ParentOrderExecutionRecord:
+    """Authoritative audit record of a multi-venue parent order execution lifecycle."""
+
+    parent_order_id: str
+    symbol: str
+    side: str
+    total_qty: float
+    state: ParentOrderState
+    splits: list[VenueSplitQuote]
+    receipts: list[LiveExecutionReceipt] = field(default_factory=list)
+    errors: list[dict[str, Any]] = field(default_factory=list)
+    created_at_ms: int = field(default_factory=lambda: int(time.time() * 1000))
+    updated_at_ms: int = field(default_factory=lambda: int(time.time() * 1000))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "parent_order_id": self.parent_order_id,
+            "symbol": self.symbol,
+            "side": self.side,
+            "total_qty": self.total_qty,
+            "state": self.state.value,
+            "splits": [s.to_dict() for s in self.splits],
+            "receipts": [r.to_safe_dict() for r in self.receipts],
+            "errors": self.errors,
+            "created_at_ms": self.created_at_ms,
+            "updated_at_ms": self.updated_at_ms,
         }
 
 
@@ -167,6 +294,7 @@ class SmartOrderRouter:
     """
     Multi-Venue Smart Order Router.
     Calculates cost-optimal parent order splits across Binance Spot and Bybit V5.
+    Enforces venue trading constraints, fee schedules, and pre-trade parent risk gates.
     """
 
     def __init__(self) -> None:
@@ -174,6 +302,12 @@ class SmartOrderRouter:
             "BINANCE": VenueFeeSchedule(exchange="BINANCE", maker_fee_bps=7.5, taker_fee_bps=10.0),
             "BYBIT": VenueFeeSchedule(exchange="BYBIT", maker_fee_bps=2.0, taker_fee_bps=5.5),
         }
+        self.default_trading_rules: dict[str, VenueTradingRules] = {
+            "BINANCE": VenueTradingRules(exchange="BINANCE", min_qty=0.00001, step_size=0.00001, min_notional_usd=5.0),
+            "BYBIT": VenueTradingRules(exchange="BYBIT", min_qty=0.0001, step_size=0.0001, min_notional_usd=5.0),
+        }
+        # In-memory parent order registry
+        self.parent_orders: dict[str, ParentOrderExecutionRecord] = {}
 
     def _walk_single_book(
         self,
@@ -213,9 +347,8 @@ class SmartOrderRouter:
     ) -> SmartOrderRouteQuote:
         """
         Solves the cost-minimization problem across available venues.
-
         Evaluates marginal price impact across venues in discrete steps
-        to find the optimal allocation (q1, q2) that minimizes:
+        to find the optimal allocation that minimizes:
             Cost(BUY) = Sum(Notional_v + Fee_v)
             Proceeds(SELL) = Sum(Notional_v - Fee_v)
         """
@@ -232,14 +365,12 @@ class SmartOrderRouter:
 
         fees = venue_fees or self.default_fee_schedules
 
-        # Filter active, non-degraded, non-stale books
+        # Filter active, non-degraded, valid, non-stale books
         healthy_venues: dict[str, VenueOrderBook] = {}
         for ex, book in venue_books.items():
-            if book.is_degraded:
-                logger.warning(f"Excluding venue {ex} from SOR: marked degraded.")
-                continue
-            if book.is_stale(current_time_ms):
-                logger.warning(f"Excluding venue {ex} from SOR: order book is stale.")
+            valid, reason = book.validate(current_time_ms)
+            if not valid:
+                logger.warning(f"Excluding venue {ex} from SOR: {reason}")
                 continue
             healthy_venues[ex] = book
 
@@ -262,8 +393,6 @@ class SmartOrderRouter:
             raise InsufficientLiquidityError(f"No price levels available for symbol {symbol}.")
 
         reference_mid_price = sum(mids) / len(mids)
-
-        # Optimization: Discretize total_qty into 100 allocation steps across venues
         venue_names = sorted(healthy_venues.keys())
 
         # Single venue edge case
@@ -277,6 +406,12 @@ class SmartOrderRouter:
             if filled < total_qty * 0.9999:
                 raise InsufficientLiquidityError(
                     f"Venue {ex} liquidity ({filled:.4f}) insufficient for requested size {total_qty:.4f}."
+                )
+
+            rules = self.default_trading_rules.get(ex)
+            if rules and notional < rules.min_notional_usd:
+                raise VenueConstraintBreachError(
+                    f"Order notional ${notional:.2f} on {ex} is below minimum notional ${rules.min_notional_usd:.2f}."
                 )
 
             vwap = notional / filled if filled > 0 else reference_mid_price
@@ -314,6 +449,7 @@ class SmartOrderRouter:
                 total_slippage_bps=slippage_bps,
                 splits=[split],
                 routing_reason=f"Sole operational venue: {ex}",
+                execution_style="TAKER",
             )
 
         # Multi-venue optimization (2 venues: e.g. BINANCE and BYBIT)
@@ -324,13 +460,34 @@ class SmartOrderRouter:
         fee1 = fees.get(v1, VenueFeeSchedule(exchange=v1))
         fee2 = fees.get(v2, VenueFeeSchedule(exchange=v2))
 
+        rules1 = self.default_trading_rules.get(v1, VenueTradingRules(exchange=v1))
+        rules2 = self.default_trading_rules.get(v2, VenueTradingRules(exchange=v2))
+
         best_cost = float("inf") if is_buy else float("-inf")
         best_allocation: tuple[float, float, float, float, float, float] | None = None
 
         steps = 100
         for i in range(steps + 1):
-            q1 = total_qty * (i / steps)
-            q2 = total_qty - q1
+            raw_q1 = total_qty * (i / steps)
+
+            # Quantize quantities to venue step sizes
+            step1 = rules1.step_size
+            step2 = rules2.step_size
+            q1 = round(round(raw_q1 / step1) * step1, 8) if raw_q1 > 0 else 0.0
+            q2 = round(round((total_qty - q1) / step2) * step2, 8)
+            if q2 < 0:
+                q2 = 0.0
+
+            # Verify minimum notional constraints
+            notional_est1 = q1 * reference_mid_price
+            notional_est2 = q2 * reference_mid_price
+
+            if 0 < q1 < rules1.min_qty or (0 < notional_est1 < rules1.min_notional_usd):
+                # Violates venue 1 min notional/qty -> skip split allocation
+                continue
+            if 0 < q2 < rules2.min_qty or (0 < notional_est2 < rules2.min_notional_usd):
+                # Violates venue 2 min notional/qty -> skip split allocation
+                continue
 
             f1, notional1, fee_usd1 = self._walk_single_book(levels1, q1, fee1, is_buy)
             f2, notional2, fee_usd2 = self._walk_single_book(levels2, q2, fee2, is_buy)
@@ -353,7 +510,8 @@ class SmartOrderRouter:
 
         if best_allocation is None:
             raise InsufficientLiquidityError(
-                f"Combined liquidity across {v1} and {v2} insufficient for order quantity {total_qty:.4f}."
+                f"Combined liquidity across {v1} and {v2} insufficient for order quantity {total_qty:.4f} "
+                f"or order size violates venue min notional."
             )
 
         q1, q2, notional1, notional2, fee_usd1, fee_usd2 = best_allocation
@@ -374,6 +532,11 @@ class SmartOrderRouter:
 
         splits: list[VenueSplitQuote] = []
         if q1 > 0:
+            rules1 = self.default_trading_rules.get(v1)
+            if rules1 and notional1 < rules1.min_notional_usd:
+                raise VenueConstraintBreachError(
+                    f"Allocated notional ${notional1:.2f} on {v1} is below minimum notional ${rules1.min_notional_usd:.2f}."
+                )
             vwap1 = notional1 / q1
             slip1 = (
                 ((vwap1 - reference_mid_price) / reference_mid_price) * 10000.0
@@ -393,6 +556,11 @@ class SmartOrderRouter:
             )
 
         if q2 > 0:
+            rules2 = self.default_trading_rules.get(v2)
+            if rules2 and notional2 < rules2.min_notional_usd:
+                raise VenueConstraintBreachError(
+                    f"Allocated notional ${notional2:.2f} on {v2} is below minimum notional ${rules2.min_notional_usd:.2f}."
+                )
             vwap2 = notional2 / q2
             slip2 = (
                 ((vwap2 - reference_mid_price) / reference_mid_price) * 10000.0
@@ -428,6 +596,7 @@ class SmartOrderRouter:
             total_slippage_bps=total_slippage_bps,
             splits=splits,
             routing_reason=reason,
+            execution_style="TAKER",
         )
 
     async def execute_smart_order(
@@ -435,11 +604,56 @@ class SmartOrderRouter:
         quote: SmartOrderRouteQuote,
         environment: str = "TESTNET",
         account_equity_usd: float = 100_000.0,
+        stop_loss: float | None = None,
         parent_correlation_id: str | None = None,
     ) -> list[LiveExecutionReceipt]:
         """
         Dispatches split child orders through the LiveExecutionRouter 20-Gate Pre-Trade Invariant Pipeline.
+        Enforces parent-level risk clearance BEFORE child order splitting and manages parent order state.
         """
+        parent_id = f"PARENT_{uuid.uuid4().hex[:12].upper()}"
+        now_ms = int(time.time() * 1000)
+
+        # ---------------------------------------------------------------------
+        # PARENT RISK GATE 1: Master Kill Switch Check
+        # ---------------------------------------------------------------------
+        kill_active, kill_state = live_kill_switch.is_active()
+        if kill_active:
+            msg = f"KILL_SWITCH_ACTIVE: Master kill switch engaged ({kill_state.reason})."
+            logger.critical(msg)
+            raise LiveKillSwitchActiveError(msg)
+
+        # ---------------------------------------------------------------------
+        # PARENT RISK GATE 2: Constitutional 1.5% Single-Trade Equity Cap Check
+        # ---------------------------------------------------------------------
+        est_entry = quote.weighted_vwap or quote.reference_mid_price
+        est_sl = stop_loss or (
+            est_entry * 0.99 if quote.side.upper() == "BUY" else est_entry * 1.01
+        )
+        max_allowed_risk_usd = account_equity_usd * 0.015
+        total_parent_risk_usd = abs(est_entry - est_sl) * quote.total_qty
+
+        if total_parent_risk_usd > (max_allowed_risk_usd + 1e-6):
+            msg = (
+                f"SINGLE_TRADE_RISK_EXCEEDED: Aggregate parent order risk ${total_parent_risk_usd:.2f} "
+                f"exceeds constitutional 1.5% limit (${max_allowed_risk_usd:.2f}) on ${account_equity_usd:,.2f} equity."
+            )
+            logger.warning(msg)
+            raise LiveSizeRejectedError(msg)
+
+        # Initialize Parent Order Tracking Record
+        parent_record = ParentOrderExecutionRecord(
+            parent_order_id=parent_id,
+            symbol=quote.symbol,
+            side=quote.side,
+            total_qty=quote.total_qty,
+            state=ParentOrderState.DISPATCHING,
+            splits=quote.splits,
+            created_at_ms=now_ms,
+            updated_at_ms=now_ms,
+        )
+        self.parent_orders[parent_id] = parent_record
+
         receipts: list[LiveExecutionReceipt] = []
 
         for split in quote.splits:
@@ -451,21 +665,43 @@ class SmartOrderRouter:
                 order_type="MARKET",
                 quantity=split.allocated_qty,
                 price=split.expected_vwap,
+                stop_loss=est_sl,
                 account_equity_usd=account_equity_usd,
-                correlation_id=parent_correlation_id,
+                correlation_id=parent_correlation_id or parent_id,
             )
             logger.info(
                 f"SOR dispatching child order: {split.exchange} {quote.side} {split.allocated_qty} {quote.symbol}"
             )
-            receipt = await live_execution_router.execute_live_order(req)
-            receipts.append(receipt)
+            try:
+                receipt = await live_execution_router.execute_live_order(req)
+                receipts.append(receipt)
+                parent_record.receipts.append(receipt)
+            except Exception as e:
+                logger.error(f"SOR child order dispatch failed on {split.exchange}: {e}")
+                parent_record.errors.append({"exchange": split.exchange, "error": str(e)})
+                if receipts:
+                    parent_record.state = ParentOrderState.PARTIALLY_EXECUTED
+                    audit_bus.emit_event(
+                        event_type="SOR_PARTIAL_EXECUTION_FAILURE",
+                        symbol=quote.symbol,
+                        severity="CRITICAL",
+                        reason=f"Partial venue failure: {split.exchange} failed while previous leg(s) executed.",
+                        details=parent_record.to_dict(),
+                    )
+                else:
+                    parent_record.state = ParentOrderState.FAILED
+                parent_record.updated_at_ms = int(time.time() * 1000)
+                raise
+
+        parent_record.state = ParentOrderState.COMPLETE
+        parent_record.updated_at_ms = int(time.time() * 1000)
 
         audit_bus.emit_event(
             event_type="SOR_EXECUTION_COMPLETED",
             symbol=quote.symbol,
             severity="INFO",
             reason=f"SOR executed {len(receipts)} split legs across venues for {quote.total_qty} {quote.symbol}",
-            details={"quote": quote.to_dict(), "receipts_count": len(receipts)},
+            details={"quote": quote.to_dict(), "parent_id": parent_id, "receipts_count": len(receipts)},
         )
 
         return receipts

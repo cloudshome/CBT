@@ -513,10 +513,13 @@
   - Dual-confirmation modal enforcing constitutional 1.5% single-trade equity cap with explicit dollar-risk verification.
   - Registered REST endpoints: `POST /api/execution/sor/route-quote`, `POST /api/execution/slicer/almgren-chriss`, `GET /api/execution/reconciliation/report`, and `GET /api/execution/reconciliation/records`.
 
-- [x] **Task 18.5: Pre-Merge Quality Gate & System Preflight Verification (520 Tests — 100% GREEN)**
-  - Created `tests/test_milestone18_sor_and_slicing.py` with 27 comprehensive tests.
-  - Verified 100% green test suite: **520 / 520 passing tests (394 Pytest + 126 Jest)**.
-  - Verified `scripts/system_preflight.py` passing all 4 quality gates.
+- [x] **Task 18.5: Boss-Level Adversarial Remediation & Production Certification (603 Tests — 100% GREEN, PRODUCTION PASS)**
+  - Authored `tests/test_milestone18_boss_adversarial.py` containing 83 tests across all 10 mandated categories (Unit, Integration, Property, Failure Injection, Concurrency, Crash Recovery, Exchange Replay, Security, Risk, Timing).
+  - Hardened database duplicate fill prevention via composite unique index `(exchange, exchange_order_id, execution_id)`.
+  - Implemented monotonic nanosecond duration math (`compute_monotonic_duration_ns`) immune to negative NTP adjustments.
+  - Enforced parent-level single-trade risk clearance (1.5% equity cap) and master kill switch fail-closed prior to child order splitting.
+  - Formally certified **PRODUCTION PASS** in [`docs/audits/M18_BOSS_LEVEL_AUDIT.md`](file:///c:/Users/azims/CBT/docs/audits/M18_BOSS_LEVEL_AUDIT.md).
+  - Verified 100% green test suite: **603 / 603 passing tests (477 Pytest + 126 Jest)** and all 4 system preflight quality gates.
 
 ---
 
