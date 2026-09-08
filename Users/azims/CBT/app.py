@@ -98,6 +98,14 @@ from core.ttl_cache import sky_decision_cache, market_state_cache
 from core.provenance_engine import provenance_engine
 from core.universal_ingestor import universal_ingestor
 from core.knowledge_graph_engine import knowledge_graph_engine
+from core.autonomous_research.pipeline import autonomous_research_pipeline
+from core.autonomous_research.empirical_tester import empirical_tester
+from core.autonomous_research.failure_memory import failure_memory
+from core.autonomous_research.practice_engine import practice_engine
+from core.autonomous_research.priority_engine import priority_engine
+from core.autonomous_research.promotion_engine import promotion_engine
+from core.autonomous_research.provenance_tracker import provenance_tracker
+from core.autonomous_research.storage import research_storage
 from core.strategy_compiler import strategy_compiler
 from core.audit_bus import audit_bus
 from core.macro_gold_engine import macro_gold_engine
@@ -2463,50 +2471,215 @@ async def run_candidate_backtest(
     candidate_id: str, symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")
 ):
     """
-    Executes a formal backtest and walk-forward verification on a Strategy Candidate.
-    Updates candidate validation_stage to WALK_FORWARD or REJECTED based on statistical expectancy.
+    Executes a formal 9-gate empirical test on a Strategy Candidate.
+    Strictly enforces Invariant 1 (Synthetic Data Prohibition):
+    Synthetic candles are forbidden from qualifying hypotheses or promoting knowledge.
+    If real data is insufficient, returns STATUS = DATA_INSUFFICIENT.
     """
-    candles = data_streamer.get_candles(symbol, timeframe, limit=500)
-    if not candles:
-        raise HTTPException(status_code=404, detail=f"No candles found for {symbol} ({timeframe})")
+    with db_manager.get_brain_conn() as conn:
+        cand_row = conn.execute(
+            "SELECT * FROM strategy_candidates WHERE candidate_id = ?", (candidate_id,)
+        ).fetchone()
 
-    # Run backtest via sandbox lab
-    rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
+    params = {}
+    if cand_row and cand_row["parameter_bounds"]:
+        try:
+            params = json.loads(cand_row["parameter_bounds"])
+        except Exception:
+            params = {}
 
-    # Statistical criteria for progression
-    is_positive_ev = rep.expectancy_r > 0.15
-    is_stable = rep.win_rate >= 0.45 and rep.sharpe_ratio >= 1.0
+    hypo = {
+        "hypothesis_id": f"HYP-{candidate_id}",
+        "title": cand_row["strategy_name"] if cand_row else f"Candidate {candidate_id}",
+        "alt_hypothesis": cand_row["hypothesis"] if cand_row else "Candidate Strategy",
+        "parameters": params,
+        "selection_method": "PRE_REGISTERED",
+    }
 
-    new_stage = "WALK_FORWARD" if (is_positive_ev and is_stable) else "REJECTED"
+    test_res = empirical_tester.run_empirical_test(
+        hypothesis=hypo,
+        symbol=symbol,
+        timeframe=timeframe,
+        candidate_id=candidate_id,
+    )
+
+    if test_res.get("status") == "DATA_INSUFFICIENT":
+        provenance_engine.update_candidate_backtest_result(
+            candidate_id=candidate_id,
+            expectancy=0.0,
+            sharpe=0.0,
+            win_rate=0.0,
+            validation_stage="DATA_INSUFFICIENT",
+        )
+        return sanitize_numpy(
+            {
+                "candidate_id": candidate_id,
+                "validation_stage": "DATA_INSUFFICIENT",
+                "status": "DATA_INSUFFICIENT",
+                "reason": test_res["reason"],
+                "real_candle_count": test_res.get("real_candle_count", 0),
+                "verdict": "DATA_INSUFFICIENT",
+            }
+        )
+
+    is_qualified = test_res.get("qualified", False)
+    new_stage = "PAPER_TEST" if is_qualified else "REJECTED"
 
     provenance_engine.update_candidate_backtest_result(
         candidate_id=candidate_id,
-        expectancy=rep.expectancy_r,
-        sharpe=rep.sharpe_ratio,
-        win_rate=rep.win_rate,
+        expectancy=test_res["metrics"]["expectancy_r"],
+        sharpe=test_res["metrics"]["sharpe_ratio"],
+        win_rate=test_res["metrics"]["win_rate"],
         validation_stage=new_stage,
     )
 
-    # If rejected, record failure autopsy into Rejected Claims Vault
-    if new_stage == "REJECTED":
-        provenance_engine.save_rejected_claim(
-            knowledge_id=candidate_id,
-            rejected_claim=f"Strategy Candidate {candidate_id} on {symbol} {timeframe}",
-            failure_reason="INSUFFICIENT_EXPECTANCY" if not is_positive_ev else "HIGH_VOLATILITY",
-            historical_occurrences_tested=rep.total_trades,
-            rejection_autopsy=f"Backtest failed hurdle: Win Rate={rep.win_rate * 100:.1f}%, Sharpe={rep.sharpe_ratio:.2f}, EV={rep.expectancy_r:.2f}R.",
+    if is_qualified and cand_row:
+        promotion_engine.promote_qualified_candidate(
+            candidate_id=candidate_id,
+            base_knowledge_id=cand_row["knowledge_id"],
+            title=cand_row["strategy_name"],
+            concept_domain="SMC_QUANT",
+            empirical_report=test_res,
+            provenance_chain=[cand_row["knowledge_id"], candidate_id],
         )
 
     return sanitize_numpy(
         {
             "candidate_id": candidate_id,
             "validation_stage": new_stage,
-            "backtest_report": rep.to_dict(),
-            "verdict": "PROMOTED_TO_WALK_FORWARD"
-            if new_stage == "WALK_FORWARD"
-            else "ARCHIVED_AS_REJECTED",
+            "empirical_test": test_res,
+            "backtest_report": test_res.get("backtest_report", {}),
+            "verdict": "PROMOTED_TO_PAPER_DESK" if is_qualified else "ARCHIVED_AS_REJECTED",
         }
     )
+
+
+# ==============================================================================
+# SKY AUTONOMOUS KNOWLEDGE LEARNING & RESEARCH PIPELINE REST APIS
+# ==============================================================================
+
+
+class AutonomousIngestRequest(BaseModel):
+    content: str
+    source_type: Optional[str] = None
+    title: Optional[str] = None
+    author_creator: Optional[str] = None
+    source_uri: Optional[str] = None
+    auto_advance: bool = True
+
+
+@app.post("/api/research/autonomous/ingest", dependencies=[Depends(require_api_key)])
+async def autonomous_research_ingest(req: AutonomousIngestRequest):
+    """
+    Executes the complete autonomous knowledge acquisition, decomposition,
+    contradiction checking, hypothesis formulation, empirical testing, deliberate practice,
+    and paper desk promotion cycle.
+    """
+    if not req.content or not req.content.strip():
+        raise HTTPException(status_code=400, detail="Content cannot be empty.")
+    res = await autonomous_research_pipeline.ingest_and_process(
+        content=req.content,
+        source_type=req.source_type,
+        title=req.title,
+        author_creator=req.author_creator,
+        source_uri=req.source_uri,
+        auto_advance=req.auto_advance,
+    )
+    return sanitize_numpy(res)
+
+
+@app.get("/api/research/pipeline/status")
+async def get_autonomous_pipeline_status():
+    """Returns active telemetry and counts across all autonomous research queues and databases."""
+    with db_manager.get_brain_conn() as conn:
+        src_cnt = conn.execute("SELECT COUNT(*) FROM immutable_sources").fetchone()[0]
+        kv_cnt = conn.execute("SELECT COUNT(*) FROM knowledge_versions").fetchone()[0]
+        conf_cnt = conn.execute("SELECT COUNT(*) FROM research_conflicts WHERE status = 'UNRESOLVED'").fetchone()[0]
+        fail_cnt = conn.execute("SELECT COUNT(*) FROM failure_memory").fetchone()[0]
+        prac_cnt = conn.execute("SELECT COUNT(*) FROM research_practice_sessions").fetchone()[0]
+        task_cnt = conn.execute("SELECT COUNT(*) FROM autonomous_research_tasks WHERE status = 'PENDING'").fetchone()[0]
+
+    return {
+        "status": "ONLINE",
+        "immutable_sources_preserved": src_cnt,
+        "knowledge_versions_active": kv_cnt,
+        "unresolved_conflicts": conf_cnt,
+        "failures_archived": fail_cnt,
+        "practice_sessions_completed": prac_cnt,
+        "pending_autonomous_tasks": task_cnt,
+        "invariants_enforced": 10,
+    }
+
+
+@app.get("/api/research/provenance/{knowledge_id}")
+async def get_knowledge_provenance_dossier(knowledge_id: str):
+    """Returns the comprehensive 5-tier causal provenance tree ('Why does SKY believe this?')."""
+    dossier = provenance_tracker.get_full_provenance_tree(knowledge_id)
+    return sanitize_numpy(dossier)
+
+
+@app.get("/api/research/conflicts")
+async def get_research_conflicts(limit: int = Query(50)):
+    """Returns unresolved research contradictions and directional clashes."""
+    conflicts = research_storage.get_unresolved_conflicts(limit=limit)
+    return sanitize_numpy([c.to_dict() for c in conflicts])
+
+
+@app.post("/api/research/conflicts/{conflict_id}/resolve", dependencies=[Depends(require_api_key)])
+async def resolve_research_conflict(
+    conflict_id: str,
+    resolution_hypothesis_id: str = Query(...),
+    notes: str = Query("Resolved via empirical arbitration"),
+):
+    """Resolves an existing research conflict."""
+    research_storage.resolve_conflict(
+        conflict_id=conflict_id,
+        resolution_hypothesis_id=resolution_hypothesis_id,
+        resolution_notes=notes,
+    )
+    return {"status": "RESOLVED", "conflict_id": conflict_id}
+
+
+@app.get("/api/research/failures")
+async def search_failure_memory(
+    query: Optional[str] = Query(None),
+    symbol: Optional[str] = Query(None),
+    limit: int = Query(20),
+):
+    """Searches the first-class failure memory archive for past negative-EV claims and autopsies."""
+    failures = research_storage.search_failures(query=query, target_symbol=symbol, limit=limit)
+    return sanitize_numpy([f.to_dict() for f in failures])
+
+
+@app.get("/api/research/practice/{knowledge_id}")
+async def get_practice_calibration_score(knowledge_id: str):
+    """Returns AI calibration metrics and practice drill history for a knowledge concept."""
+    calib = practice_engine.get_practice_calibration(knowledge_id)
+    return sanitize_numpy(calib)
+
+
+@app.post("/api/research/practice/{knowledge_id}/drill", dependencies=[Depends(require_api_key)])
+async def trigger_practice_drill(
+    knowledge_id: str,
+    symbol: str = Query("BTC/USDT"),
+    timeframe: str = Query("15m"),
+):
+    """Executes an active AI practice drill against historical real market data."""
+    res = practice_engine.generate_and_evaluate_exercise(
+        knowledge_id=knowledge_id,
+        concept_title=f"Practice Drill for {knowledge_id}",
+        target_symbol=symbol,
+        timeframe=timeframe,
+    )
+    res_dict = res.to_dict() if hasattr(res, "to_dict") else res
+    return sanitize_numpy(res_dict)
+
+
+@app.get("/api/research/priority")
+async def get_next_research_priorities(limit: int = Query(5)):
+    """Returns the next highest-priority autonomous research tasks generated by the priority engine."""
+    tasks = priority_engine.scan_and_generate_next_tasks(max_tasks=limit)
+    return sanitize_numpy(tasks)
 
 
 # ==============================================================================

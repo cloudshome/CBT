@@ -520,12 +520,21 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       setBacktestingCandidateId(candidateId);
       const res = await api.backtestResearchCandidate(candidateId, selectedSymbol, selectedTimeframe);
       if (onNotify) {
-        const isPromoted = res.validation_stage === 'WALK_FORWARD';
-        onNotify(
-          isPromoted ? 'success' : 'warning',
-          isPromoted ? 'Candidate Promoted!' : 'Candidate Rejected',
-          `Backtest result for ${candidateId}: ${res.verdict}`
-        );
+        const isPromoted = res.validation_stage === 'WALK_FORWARD' || res.validation_stage === 'PAPER_TEST';
+        const isDataInsufficient = res.validation_stage === 'DATA_INSUFFICIENT';
+        if (isDataInsufficient) {
+          onNotify(
+            'warning',
+            'Data Insufficient (Invariant 1)',
+            res.reason || 'Insufficient real market data to qualify candidate without synthetic fabrication.'
+          );
+        } else {
+          onNotify(
+            isPromoted ? 'success' : 'warning',
+            isPromoted ? 'Candidate Qualified & Promoted!' : 'Candidate Archived as Rejected',
+            `Backtest result for ${candidateId}: ${res.verdict || res.validation_stage}`
+          );
+        }
       }
       await fetchAllData();
     } catch (err: any) {
@@ -1750,14 +1759,20 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
                     <div className="flex items-center justify-between">
                       <span
                         className={`px-2 py-0.5 text-[10px] rounded font-bold ${
-                          c.validation_stage === 'WALK_FORWARD' || c.validation_stage === 'PROMOTED'
+                          c.validation_stage === 'WALK_FORWARD' || c.validation_stage === 'PROMOTED' || c.validation_stage === 'PAPER_TEST'
                             ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                            : c.validation_stage === 'DATA_INSUFFICIENT'
+                            ? 'bg-amber-950 text-amber-300 border border-amber-700'
                             : c.validation_stage === 'REJECTED'
                             ? 'bg-rose-950 text-rose-300 border border-rose-700'
                             : 'bg-purple-950 text-purple-300 border border-purple-800'
                         }`}
                       >
-                        STAGE: {c.validation_stage}
+                        {c.validation_stage === 'PAPER_TEST'
+                          ? '✅ QUALIFIED & IN PAPER DESK'
+                          : c.validation_stage === 'DATA_INSUFFICIENT'
+                          ? '⚠️ DATA_INSUFFICIENT'
+                          : `STAGE: ${c.validation_stage}`}
                       </span>
                       <span className="text-[10px] text-slate-500">ID: {c.candidate_id}</span>
                     </div>

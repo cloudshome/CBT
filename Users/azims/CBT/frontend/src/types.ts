@@ -680,7 +680,7 @@ export interface StrategyCandidateItem {
   parameter_bounds: Record<string, any>;
   timeframe: string;
   required_indicators: string[];
-  validation_stage: 'UNTESTED' | 'BACKTESTING' | 'WALK_FORWARD' | 'PAPER_TEST' | 'REJECTED' | 'PROMOTED';
+  validation_stage: 'UNTESTED' | 'BACKTESTING' | 'WALK_FORWARD' | 'PAPER_TEST' | 'DATA_INSUFFICIENT' | 'REJECTED' | 'PROMOTED';
   backtest_expectancy?: number;
   backtest_sharpe?: number;
   backtest_win_rate?: number;

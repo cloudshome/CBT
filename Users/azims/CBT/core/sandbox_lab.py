@@ -44,10 +44,20 @@ class BacktestReport:
     net_pnl_usd: float
     trades: list[BacktestTrade]
     return_series: list[float]
+    is_synthetic: bool = False
+
+    @property
+    def expectancy_r(self) -> float:
+        """Calculates mean R-multiple across trades or synthetic win-rate expectancy."""
+        if self.trades:
+            return round(sum(t.rr_ratio for t in self.trades) / len(self.trades), 2)
+        return round((self.win_rate * 2.0) - ((1.0 - self.win_rate) * 1.0), 2)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["trades"] = [asdict(t) for t in self.trades]
+        d["expectancy_r"] = self.expectancy_r
+        d["is_synthetic"] = self.is_synthetic
         return d
 
 
