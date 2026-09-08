@@ -168,17 +168,37 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     setIsDragging(false);
   };
 
+  const MAX_FILE_SIZE_MB = 150;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setSelectedFile(e.dataTransfer.files[0]);
+      const file = e.dataTransfer.files[0];
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+        if (onNotify) {
+          onNotify('error', 'File Too Large', `File is ${sizeMb} MB. Maximum allowed upload size is ${MAX_FILE_SIZE_MB} MB.`);
+        }
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+        if (onNotify) {
+          onNotify('error', 'File Too Large', `File is ${sizeMb} MB. Maximum allowed upload size is ${MAX_FILE_SIZE_MB} MB.`);
+        }
+        e.target.value = '';
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
@@ -186,6 +206,14 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   const handleIngest = async (mode: ResearchIngestMode) => {
     if (!selectedFile && !inputText.trim()) {
       if (onNotify) onNotify('warning', 'Empty Input', 'Please drag a file or paste a URL / text to ingest.');
+      return;
+    }
+
+    if (selectedFile && selectedFile.size > MAX_FILE_SIZE_BYTES) {
+      const sizeMb = (selectedFile.size / (1024 * 1024)).toFixed(1);
+      if (onNotify) {
+        onNotify('error', 'File Too Large', `File is ${sizeMb} MB. Maximum allowed upload size is ${MAX_FILE_SIZE_MB} MB.`);
+      }
       return;
     }
 
@@ -533,7 +561,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               <>
                 <FileText className="w-10 h-10 text-emerald-400 animate-bounce" />
                 <p className="text-sm font-semibold text-emerald-300">
-                  Selected File: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                  Selected File: {selectedFile.name} ({selectedFile.size >= 1024 * 1024 ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : `${(selectedFile.size / 1024).toFixed(1)} KB`})
                 </p>
                 <p className="text-xs text-slate-400">Click or drag another file to replace</p>
               </>

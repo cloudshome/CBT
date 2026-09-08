@@ -2080,10 +2080,12 @@ async def ingest_research_file(
     """
     try:
         content_bytes = await file.read()
-        if len(content_bytes) > MAX_UPLOAD_BYTES:
+        file_size = len(content_bytes)
+        if file_size > MAX_UPLOAD_BYTES:
+            size_mb = round(file_size / (1024 * 1024), 2)
             raise HTTPException(
                 status_code=413,
-                detail=f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).",
+                detail=f"File exceeds upload limit ({size_mb} MB > {MAX_UPLOAD_MB} MB max).",
             )
         safe_name, original_name = safe_upload_filename(file.filename)
         dest_path = Path(os.getenv("DATA_DIR", "data")) / "uploads" / safe_name
@@ -2404,7 +2406,8 @@ def sanitize_numpy(obj: Any) -> Any:
 # SECURITY GUARD HELPERS
 # ==============================================================================
 
-MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "150"))
+MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024  # Configurable upload ceiling (default 150 MB)
 MAX_VOICE_BYTES = 15 * 1024 * 1024  # 15 MB base64-decoded
 ALLOWED_UPLOAD_EXTENSIONS = {
     ".pdf", ".py", ".pine", ".mq4", ".mq5", ".json", ".csv", ".txt", ".md",

@@ -75,7 +75,20 @@ async function handleResponse<T>(res: Response): Promise<T> {
   const data = isJson ? await res.json() : null;
 
   if (!res.ok) {
-    const errorMsg = data?.error || res.statusText || 'API request failed';
+    let errorMsg = res.statusText || 'API request failed';
+    if (data) {
+      if (typeof data.detail === 'string') {
+        errorMsg = data.detail;
+      } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+        errorMsg = data.detail
+          .map((d: any) => (typeof d === 'string' ? d : d.msg || JSON.stringify(d)))
+          .join(', ');
+      } else if (typeof data.error === 'string') {
+        errorMsg = data.error;
+      } else if (typeof data.message === 'string') {
+        errorMsg = data.message;
+      }
+    }
     throw new ApiError(errorMsg, res.status, data);
   }
 
