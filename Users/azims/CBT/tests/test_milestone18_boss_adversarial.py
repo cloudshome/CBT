@@ -220,9 +220,7 @@ class TestM18UnitInvariants:
 
         # Non-finite inputs
         with pytest.raises(InvalidSlicingParametersError, match="current_price"):
-            slicer.generate_execution_schedule(
-                "BTC/USDT", "BUY", 1.0, float("nan")
-            )
+            slicer.generate_execution_schedule("BTC/USDT", "BUY", 1.0, float("nan"))
 
 
 # =============================================================================

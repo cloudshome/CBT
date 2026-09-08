@@ -347,21 +347,18 @@ class UniversalIngestor:
             )
 
         # 7. Legacy Provenance Ledger Bridge
-        has_trading_rules = (
-            source_type in ["CODE", "TRADINGVIEW"]
-            or any(
-                kw in content.lower()
-                for kw in [
-                    "entry rule",
-                    "exit rule",
-                    "stop loss",
-                    "take profit",
-                    "strategy name",
-                    "fair value gap",
-                    "judas sweep",
-                    "order block",
-                ]
-            )
+        has_trading_rules = source_type in ["CODE", "TRADINGVIEW"] or any(
+            kw in content.lower()
+            for kw in [
+                "entry rule",
+                "exit rule",
+                "stop loss",
+                "take profit",
+                "strategy name",
+                "fair value gap",
+                "judas sweep",
+                "order block",
+            ]
         )
         should_queue_candidate = (mode == "RESEARCH") or (
             mode in ["AUTO", "AUTO_DETECT"] and has_trading_rules

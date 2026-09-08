@@ -430,15 +430,25 @@ class DatabaseManager:
             cursor = conn.execute("PRAGMA table_info(execution_reconciliation_records);")
             existing_cols = {row[1] for row in cursor.fetchall()}
             if "execution_id" not in existing_cols:
-                conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN execution_id TEXT NOT NULL DEFAULT '';")
+                conn.execute(
+                    "ALTER TABLE execution_reconciliation_records ADD COLUMN execution_id TEXT NOT NULL DEFAULT '';"
+                )
             if "dispatch_monotonic_ns" not in existing_cols:
-                conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN dispatch_monotonic_ns INTEGER NOT NULL DEFAULT 0;")
+                conn.execute(
+                    "ALTER TABLE execution_reconciliation_records ADD COLUMN dispatch_monotonic_ns INTEGER NOT NULL DEFAULT 0;"
+                )
             if "ack_monotonic_ns" not in existing_cols:
-                conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN ack_monotonic_ns INTEGER NOT NULL DEFAULT 0;")
+                conn.execute(
+                    "ALTER TABLE execution_reconciliation_records ADD COLUMN ack_monotonic_ns INTEGER NOT NULL DEFAULT 0;"
+                )
             if "fill_monotonic_ns" not in existing_cols:
-                conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN fill_monotonic_ns INTEGER NOT NULL DEFAULT 0;")
+                conn.execute(
+                    "ALTER TABLE execution_reconciliation_records ADD COLUMN fill_monotonic_ns INTEGER NOT NULL DEFAULT 0;"
+                )
             if "roundtrip_ns" not in existing_cols:
-                conn.execute("ALTER TABLE execution_reconciliation_records ADD COLUMN roundtrip_ns INTEGER NOT NULL DEFAULT 0;")
+                conn.execute(
+                    "ALTER TABLE execution_reconciliation_records ADD COLUMN roundtrip_ns INTEGER NOT NULL DEFAULT 0;"
+                )
 
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_rec_symbol ON execution_reconciliation_records(symbol);"

@@ -81,8 +81,12 @@ def clean_test_state(monkeypatch):
     """Guarantees a clean, unhalted state with test credentials before each test."""
     live_kill_switch.deactivate(reason="Test Setup", operator_id="ADMIN")
     monkeypatch.setenv("LIVE_EXECUTION_ENABLED", "true")
-    cred_binance = ExchangeCredential("BINANCE", "TESTNET", "test_api_key_binance", "test_api_secret_binance")
-    cred_bybit = ExchangeCredential("BYBIT", "TESTNET", "test_api_key_bybit", "test_api_secret_bybit")
+    cred_binance = ExchangeCredential(
+        "BINANCE", "TESTNET", "test_api_key_binance", "test_api_secret_binance"
+    )
+    cred_bybit = ExchangeCredential(
+        "BYBIT", "TESTNET", "test_api_key_bybit", "test_api_secret_bybit"
+    )
     credential_vault.store_credential(cred_binance)
     credential_vault.store_credential(cred_bybit)
     yield
@@ -126,7 +130,7 @@ class TestGate1DestructiveCrashRecovery:
             routing_reason="Optimal",
         )
 
-        parent_id = f"PARENT_CRASH_P1_{int(time.time()*1000)}"
+        parent_id = f"PARENT_CRASH_P1_{int(time.time() * 1000)}"
         rec = ParentOrderExecutionRecord(
             parent_order_id=parent_id,
             symbol=quote.symbol,
@@ -237,8 +241,10 @@ class TestGate1DestructiveCrashRecovery:
             client_order_id=cid,
         )
 
-        with patch.object(live_execution_router, "_get_connector", return_value=mock_connector), \
-             patch.object(live_execution_router, "is_live_execution_enabled", return_value=True):
+        with (
+            patch.object(live_execution_router, "_get_connector", return_value=mock_connector),
+            patch.object(live_execution_router, "is_live_execution_enabled", return_value=True),
+        ):
             receipt = await live_execution_router.execute_live_order(req)
             assert receipt.success is True
             assert receipt.status == "FILLED"
@@ -296,8 +302,10 @@ class TestGate1DestructiveCrashRecovery:
             message="Already filled",
         )
 
-        with patch.object(live_execution_router, "_get_connector", return_value=mock_connector), \
-             patch.object(live_execution_router, "is_live_execution_enabled", return_value=True):
+        with (
+            patch.object(live_execution_router, "_get_connector", return_value=mock_connector),
+            patch.object(live_execution_router, "is_live_execution_enabled", return_value=True),
+        ):
             receipt = await live_execution_router.execute_live_order(req)
             assert receipt.success is True
             assert receipt.exchange_order_id == "EXCH_ACK_404"
@@ -307,8 +315,8 @@ class TestGate1DestructiveCrashRecovery:
     async def test_gate1_point5_and_6_fill_commit_durability(self):
         """Points 5 & 6: Fill receipt committed to SQLite survives restart; uncommitted rolled back."""
         ledger = ReconciliationLedger()
-        parent_id = f"PARENT_FILL_{int(time.time()*1000)}"
-        cid = f"CID_FILL_{int(time.time()*1000)}"
+        parent_id = f"PARENT_FILL_{int(time.time() * 1000)}"
+        cid = f"CID_FILL_{int(time.time() * 1000)}"
 
         # Point 6: Committed fill
         rec, state = ledger.record_fill_event(
@@ -379,7 +387,7 @@ class TestGate1DestructiveCrashRecovery:
     async def test_gate1_point8_crash_during_multi_venue_execution(self):
         """Point 8: Leg 1 executes on Binance, process crashes before Bybit leg. Parent order recovers as PARTIALLY_EXECUTED."""
         router = SmartOrderRouter()
-        parent_id = f"PARENT_P8_{int(time.time()*1000)}"
+        parent_id = f"PARENT_P8_{int(time.time() * 1000)}"
         quote = SmartOrderRouteQuote(
             symbol="BTC/USDT",
             side="BUY",
@@ -478,7 +486,9 @@ class TestGate2PowerLossDurability:
         # Verify uncommitted record did NOT leak into database
         with db_manager.get_trading_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM execution_reconciliation_records WHERE reconciliation_id = 'UNCOMMITTED_REC_01'")
+            cursor.execute(
+                "SELECT * FROM execution_reconciliation_records WHERE reconciliation_id = 'UNCOMMITTED_REC_01'"
+            )
             assert cursor.fetchone() is None
             cursor.execute("PRAGMA integrity_check;")
             assert cursor.fetchone()[0] == "ok"
@@ -512,7 +522,9 @@ class TestGate3LostAckIdempotentSubmission:
 
         mock_connector = AsyncMock()
         # First call: exchange accepts but timeout occurs on client side
-        mock_connector.place_order.side_effect = ExchangeTimeoutError("Gateway timeout receiving ACK")
+        mock_connector.place_order.side_effect = ExchangeTimeoutError(
+            "Gateway timeout receiving ACK"
+        )
         # Second call (retry status query): exchange proves order exists and is FILLED
         mock_connector.get_order_status.return_value = NormalizedOrderResult(
             client_order_id=cid,
@@ -529,9 +541,10 @@ class TestGate3LostAckIdempotentSubmission:
             message="Order accepted on exchange before timeout",
         )
 
-        with patch.object(live_execution_router, "_get_connector", return_value=mock_connector), \
-             patch.object(live_execution_router, "is_live_execution_enabled", return_value=True):
-
+        with (
+            patch.object(live_execution_router, "_get_connector", return_value=mock_connector),
+            patch.object(live_execution_router, "is_live_execution_enabled", return_value=True),
+        ):
             # Attempt 1: Fails with Ambiguous Order due to timeout
             with pytest.raises(LiveAmbiguousOrderError):
                 await live_execution_router.execute_live_order(req)
@@ -566,11 +579,14 @@ class TestGate3LostAckIdempotentSubmission:
 
         mock_connector = AsyncMock()
         mock_connector.place_order.side_effect = ExchangeTimeoutError("Pre-dispatch network drop")
-        mock_connector.get_order_status.side_effect = ExchangeRejectedError("Binance error -2013: Order does not exist.")
+        mock_connector.get_order_status.side_effect = ExchangeRejectedError(
+            "Binance error -2013: Order does not exist."
+        )
 
-        with patch.object(live_execution_router, "_get_connector", return_value=mock_connector), \
-             patch.object(live_execution_router, "is_live_execution_enabled", return_value=True):
-
+        with (
+            patch.object(live_execution_router, "_get_connector", return_value=mock_connector),
+            patch.object(live_execution_router, "is_live_execution_enabled", return_value=True),
+        ):
             with pytest.raises(LiveAmbiguousOrderError):
                 await live_execution_router.execute_live_order(req)
 
@@ -605,9 +621,10 @@ class TestGate4KillSwitchBypassAudit:
         live_kill_switch.activate(reason="Boss-Level Kill Switch Audit", operator_id="AUDITOR")
         mock_connector = AsyncMock()
 
-        with patch.object(live_execution_router, "_get_connector", return_value=mock_connector), \
-             patch.object(live_execution_router, "is_live_execution_enabled", return_value=True):
-
+        with (
+            patch.object(live_execution_router, "_get_connector", return_value=mock_connector),
+            patch.object(live_execution_router, "is_live_execution_enabled", return_value=True),
+        ):
             # Path 1: Direct LiveExecutionRouter call
             req = LiveOrderRequest(
                 exchange="BINANCE",
@@ -697,8 +714,12 @@ class TestGate5RiskBypassAudit:
                 total_effective_cost_usd=qty * entry_price + 10.0,
                 total_slippage_bps=1.0,
                 splits=[
-                    VenueSplitQuote("BINANCE", qty * 0.6, qty * 0.6 * entry_price, entry_price, 6.0, 1.0, 60.0),
-                    VenueSplitQuote("BYBIT", qty * 0.4, qty * 0.4 * entry_price, entry_price, 4.0, 1.0, 40.0),
+                    VenueSplitQuote(
+                        "BINANCE", qty * 0.6, qty * 0.6 * entry_price, entry_price, 6.0, 1.0, 60.0
+                    ),
+                    VenueSplitQuote(
+                        "BYBIT", qty * 0.4, qty * 0.4 * entry_price, entry_price, 4.0, 1.0, 40.0
+                    ),
                 ],
                 routing_reason="Boundary Test",
             )
@@ -719,9 +740,10 @@ class TestGate5RiskBypassAudit:
             message="OK",
         )
 
-        with patch.object(live_execution_router, "_get_connector", return_value=mock_connector), \
-             patch.object(live_execution_router, "is_live_execution_enabled", return_value=True):
-
+        with (
+            patch.object(live_execution_router, "_get_connector", return_value=mock_connector),
+            patch.object(live_execution_router, "is_live_execution_enabled", return_value=True),
+        ):
             # 1.4999% ($1,499.90) -> Passes parent risk check
             q_under = make_quote(1499.90)
             receipts_under = await router.execute_smart_order(
@@ -739,13 +761,17 @@ class TestGate5RiskBypassAudit:
             # 1.5001% ($1,500.10) -> Fails closed
             q_over = make_quote(1500.10)
             with pytest.raises(LiveSizeRejectedError) as exc_over:
-                await router.execute_smart_order(q_over, account_equity_usd=account_equity, stop_loss=stop_loss)
+                await router.execute_smart_order(
+                    q_over, account_equity_usd=account_equity, stop_loss=stop_loss
+                )
             assert "SINGLE_TRADE_RISK_EXCEEDED" in str(exc_over.value)
 
             # 2.0% ($2,000.00) -> Fails closed
             q_huge = make_quote(2000.00)
             with pytest.raises(LiveSizeRejectedError) as exc_huge:
-                await router.execute_smart_order(q_huge, account_equity_usd=account_equity, stop_loss=stop_loss)
+                await router.execute_smart_order(
+                    q_huge, account_equity_usd=account_equity, stop_loss=stop_loss
+                )
             assert "SINGLE_TRADE_RISK_EXCEEDED" in str(exc_huge.value)
 
 
@@ -791,8 +817,8 @@ class TestGate6RealisticMultiVenueEventReplay:
 
         for p_idx, perm in enumerate(permutations):
             ledger = ReconciliationLedger()
-            parent_id = f"PARENT_PERM_{p_idx}_{int(time.time()*1000)}"
-            client_id = f"CID_PERM_{p_idx}_{int(time.time()*1000)}"
+            parent_id = f"PARENT_PERM_{p_idx}_{int(time.time() * 1000)}"
+            client_id = f"CID_PERM_{p_idx}_{int(time.time() * 1000)}"
 
             for fill in perm:
                 ledger.record_fill_event(
@@ -832,9 +858,9 @@ class TestGate7DuplicateFillConcurrency:
     async def test_gate7_concurrent_duplicate_fill_ingestion(self):
         """Runs 10 concurrent tasks ingesting the exact same fill record."""
         ledger = ReconciliationLedger()
-        parent_id = f"PARENT_CONCUR_{int(time.time()*1000)}"
-        client_id = f"CID_CONCUR_{int(time.time()*1000)}"
-        exec_id = f"EXEC_CONCUR_{int(time.time()*1000)}"
+        parent_id = f"PARENT_CONCUR_{int(time.time() * 1000)}"
+        client_id = f"CID_CONCUR_{int(time.time() * 1000)}"
+        exec_id = f"EXEC_CONCUR_{int(time.time() * 1000)}"
 
         async def ingest():
             return ledger.record_fill_event(
@@ -891,7 +917,7 @@ class TestGate8OverfillHalt:
     async def test_gate8_overfill_halts_smart_order_router(self):
         """When overfill occurs on child split 1, subsequent splits are aborted with OverfillHaltedError."""
         router = SmartOrderRouter()
-        parent_id = f"PARENT_OVERFILL_{int(time.time()*1000)}"
+        parent_id = f"PARENT_OVERFILL_{int(time.time() * 1000)}"
 
         quote = SmartOrderRouteQuote(
             symbol="BTC/USDT",
@@ -944,9 +970,10 @@ class TestGate8OverfillHalt:
             message="OK",
         )
 
-        with patch.object(live_execution_router, "_get_connector", return_value=mock_connector), \
-             patch.object(live_execution_router, "is_live_execution_enabled", return_value=True):
-
+        with (
+            patch.object(live_execution_router, "_get_connector", return_value=mock_connector),
+            patch.object(live_execution_router, "is_live_execution_enabled", return_value=True),
+        ):
             # Dispatch via SmartOrderRouter with halted parent order ID
             with pytest.raises(OverfillHaltedError) as exc_sor:
                 await router.execute_smart_order(quote, parent_correlation_id=parent_id)
@@ -1090,7 +1117,9 @@ class TestGate12AlmgrenChrissInvariants:
 
     @pytest.mark.parametrize("risk_lambda", [0.0, 1e-8, 1e-4, 1.0, 100.0])
     @pytest.mark.parametrize("intervals", [1, 2, 10, 50])
-    def test_gate12_conservation_of_quantity_and_boundaries(self, risk_lambda: float, intervals: int):
+    def test_gate12_conservation_of_quantity_and_boundaries(
+        self, risk_lambda: float, intervals: int
+    ):
         """sum(child_slices) == parent_quantity within 10^-9 numerical tolerance."""
         slicer = AlmgrenChrissSlicer()
         parent_qty = 10.0

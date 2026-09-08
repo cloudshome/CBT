@@ -174,12 +174,21 @@ class VenueOrderBook:
         if self.is_degraded:
             return False, f"Venue {self.exchange} is marked degraded"
         if self.timestamp_ms <= 0:
-            return False, f"Venue {self.exchange} has missing or non-positive timestamp ({self.timestamp_ms})"
+            return (
+                False,
+                f"Venue {self.exchange} has missing or non-positive timestamp ({self.timestamp_ms})",
+            )
         if self.timestamp_ms > (now_ms + 1000):
-            return False, f"Venue {self.exchange} timestamp is in the future ({self.timestamp_ms} > {now_ms + 1000})"
+            return (
+                False,
+                f"Venue {self.exchange} timestamp is in the future ({self.timestamp_ms} > {now_ms + 1000})",
+            )
         if self.is_stale(now_ms):
             age = now_ms - self.timestamp_ms
-            return False, f"Venue {self.exchange} is stale (age {age}ms >= {self.max_stale_age_ms}ms)"
+            return (
+                False,
+                f"Venue {self.exchange} is stale (age {age}ms >= {self.max_stale_age_ms}ms)",
+            )
         if not self.bids and not self.asks:
             return False, f"Venue {self.exchange} has empty bids and asks"
 
@@ -359,8 +368,12 @@ class SmartOrderRouter:
             "BYBIT": VenueFeeSchedule(exchange="BYBIT", maker_fee_bps=2.0, taker_fee_bps=5.5),
         }
         self.default_trading_rules: dict[str, VenueTradingRules] = {
-            "BINANCE": VenueTradingRules(exchange="BINANCE", min_qty=0.00001, step_size=0.00001, min_notional_usd=5.0),
-            "BYBIT": VenueTradingRules(exchange="BYBIT", min_qty=0.0001, step_size=0.0001, min_notional_usd=5.0),
+            "BINANCE": VenueTradingRules(
+                exchange="BINANCE", min_qty=0.00001, step_size=0.00001, min_notional_usd=5.0
+            ),
+            "BYBIT": VenueTradingRules(
+                exchange="BYBIT", min_qty=0.0001, step_size=0.0001, min_notional_usd=5.0
+            ),
         }
         # In-memory parent order registry
         self.parent_orders: dict[str, ParentOrderExecutionRecord] = {}
@@ -455,7 +468,11 @@ class SmartOrderRouter:
                     recovered.append(rec)
                     if reconciliation_ledger.is_order_halted(pid):
                         rec.state = ParentOrderState.HALTED
-                    elif len(rec.receipts) == len(rec.splits) and len(rec.splits) > 0 and all(r.success for r in rec.receipts):
+                    elif (
+                        len(rec.receipts) == len(rec.splits)
+                        and len(rec.splits) > 0
+                        and all(r.success for r in rec.receipts)
+                    ):
                         rec.state = ParentOrderState.COMPLETE
                     elif len(rec.receipts) > 0:
                         rec.state = ParentOrderState.PARTIALLY_EXECUTED
@@ -838,7 +855,10 @@ class SmartOrderRouter:
             # -----------------------------------------------------------------
             # GATE 8: Overfill Circuit Breaker Halt Check
             # -----------------------------------------------------------------
-            if reconciliation_ledger.is_order_halted(parent_id) or parent_record.state == ParentOrderState.HALTED:
+            if (
+                reconciliation_ledger.is_order_halted(parent_id)
+                or parent_record.state == ParentOrderState.HALTED
+            ):
                 parent_record.state = ParentOrderState.HALTED
                 parent_record.updated_at_ms = int(time.time() * 1000)
                 self._persist_parent_order(parent_record)
@@ -894,7 +914,11 @@ class SmartOrderRouter:
             symbol=quote.symbol,
             severity="INFO",
             reason=f"SOR executed {len(receipts)} split legs across venues for {quote.total_qty} {quote.symbol}",
-            details={"quote": quote.to_dict(), "parent_id": parent_id, "receipts_count": len(receipts)},
+            details={
+                "quote": quote.to_dict(),
+                "parent_id": parent_id,
+                "receipts_count": len(receipts),
+            },
         )
 
         return receipts
