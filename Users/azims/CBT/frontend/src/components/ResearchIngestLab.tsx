@@ -56,6 +56,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [selectedMode, setSelectedMode] = useState<ResearchIngestMode>('AUTO');
 
   // Dedicated Ingestion Summary State
   const [activeSummary, setActiveSummary] = useState<ResearchIngestResult | null>(null);
@@ -202,8 +203,143 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     }
   };
 
-  // Submit Ingestion (Modes: ANALYZE, RESEARCH, SAVE_KNOWLEDGE)
-  const handleIngest = async (mode: ResearchIngestMode) => {
+  // Real-time Content & Intent Auto-Detection
+  const autoDetectContent = useCallback(() => {
+    if (selectedFile) {
+      const ext = selectedFile.name.split('.').pop()?.toLowerCase() || '';
+      if (['pdf'].includes(ext)) {
+        return {
+          type: 'PDF Quantitative Monograph / Book',
+          badgeColor: 'bg-red-500/20 text-red-400 border-red-500/40',
+          icon: BookOpen,
+          hasRules: false,
+          recommendedAction: 'Extract chapters, structural claims & normalize into Knowledge Vault',
+          destination: 'Knowledge Vault + Cross-Domain Graph',
+        };
+      }
+      if (['py', 'pine', 'mq4', 'mq5', 'cpp', 'ts', 'js'].includes(ext)) {
+        return {
+          type: 'Algorithmic Strategy Source Code',
+          badgeColor: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
+          icon: Tag,
+          hasRules: true,
+          recommendedAction: 'Extract programmatic logic & queue candidate for backtesting',
+          destination: 'Candidate Strategy Queue (UNTESTED)',
+        };
+      }
+      if (['csv', 'json', 'parquet'].includes(ext)) {
+        return {
+          type: 'Structured Quantitative Dataset',
+          badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+          icon: Layers,
+          hasRules: false,
+          recommendedAction: 'Parse schema, record statistical observations & link variables',
+          destination: 'Observation Vault + Market Variables',
+        };
+      }
+      if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+        return {
+          type: 'Market Chart / Technical Diagram',
+          badgeColor: 'bg-pink-500/20 text-pink-400 border-pink-500/40',
+          icon: FileText,
+          hasRules: false,
+          recommendedAction: 'Analyze market structure, price action & liquidity sweeps',
+          destination: 'Visual Market Graph',
+        };
+      }
+      return {
+        type: 'Research Document / Paper',
+        badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
+        icon: FileText,
+        hasRules: false,
+        recommendedAction: 'Decompose into atomic claims & mental models',
+        destination: 'Knowledge Vault',
+      };
+    }
+
+    if (inputText.trim()) {
+      const raw = inputText.trim();
+      const lower = raw.toLowerCase();
+      const isUrl = lower.startsWith('http://') || lower.startsWith('https://');
+
+      if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
+        return {
+          type: 'YouTube Video Lecture / Masterclass',
+          badgeColor: 'bg-red-500/20 text-red-400 border-red-500/40',
+          icon: Youtube,
+          hasRules: lower.includes('rule') || lower.includes('strategy') || lower.includes('fvg') || lower.includes('order block'),
+          recommendedAction: 'Extract verbatim transcript, detect bias & decompose claims',
+          destination: 'YouTube Intel Engine + Knowledge Graph',
+        };
+      }
+      if (lower.includes('instagram.com/reel') || lower.includes('tiktok.com')) {
+        return {
+          type: 'Short-Form Social Trading Reel',
+          badgeColor: 'bg-pink-500/20 text-pink-400 border-pink-500/40',
+          icon: Film,
+          hasRules: false,
+          recommendedAction: 'Analyze transcript, flag hype markers & preserve provenance',
+          destination: 'Social Media Quarantine & Knowledge Vault',
+        };
+      }
+      if (lower.includes('github.com')) {
+        return {
+          type: 'GitHub Quantitative Repository',
+          badgeColor: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
+          icon: GitBranch,
+          hasRules: true,
+          recommendedAction: 'Clone repo, inspect algorithms & queue strategy candidate',
+          destination: 'Algorithmic Vault + Candidate Queue',
+        };
+      }
+      if (lower.includes('tradingview.com')) {
+        return {
+          type: 'TradingView PineScript / Setup',
+          badgeColor: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40',
+          icon: TrendingUp,
+          hasRules: true,
+          recommendedAction: 'Parse trading logic, entry/exit criteria & queue candidate',
+          destination: 'Candidate Strategy Queue',
+        };
+      }
+
+      // Check for trading rules keywords
+      const ruleKeywords = [
+        'entry rule', 'exit rule', 'stop loss', 'take profit', 'risk reward',
+        'fair value gap', 'judas sweep', 'order block', 'liquidity sweep',
+        'break of structure', 'market structure shift', 'breaker block',
+        'strategy', 'pinescript', 'indicator', 'long condition', 'short condition',
+      ];
+      const foundRule = ruleKeywords.some((kw) => lower.includes(kw));
+
+      if (foundRule) {
+        return {
+          type: 'Actionable Trading Setup / Rules',
+          badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+          icon: Sparkles,
+          hasRules: true,
+          recommendedAction: 'Extract entry/exit rules & queue candidate for backtesting',
+          destination: 'Candidate Strategy Queue (Zero Alpha Assumed)',
+        };
+      }
+
+      return {
+        type: isUrl ? 'Web Literature / Article' : 'Quantitative Research Text',
+        badgeColor: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40',
+        icon: FileText,
+        hasRules: false,
+        recommendedAction: 'Extract core hypotheses, citations & cross-domain links',
+        destination: 'Knowledge Vault + Cross-Domain Graph',
+      };
+    }
+
+    return null;
+  }, [selectedFile, inputText]);
+
+  const detected = autoDetectContent();
+
+  // Submit Ingestion (Modes: AUTO, ANALYZE, RESEARCH, SAVE_KNOWLEDGE)
+  const handleIngest = async (mode: ResearchIngestMode = selectedMode) => {
     if (!selectedFile && !inputText.trim()) {
       if (onNotify) onNotify('warning', 'Empty Input', 'Please drag a file or paste a URL / text to ingest.');
       return;
@@ -616,42 +752,140 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           </div>
         </div>
 
-        {/* The 3 Action Ingestion Buttons */}
+        {/* Real-time Content Auto-Detection Preview Card */}
+        {detected && (
+          <div className="bg-slate-950/80 border border-indigo-500/30 rounded-xl p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs shadow-inner">
+            <div className="flex items-start md:items-center gap-3">
+              <div className={`p-2 rounded-lg border ${detected.badgeColor} shrink-0 mt-0.5 md:mt-0`}>
+                <detected.icon className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-slate-100">{detected.type}</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Auto-Detected
+                  </span>
+                  {detected.hasRules ? (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/40">
+                      ⚡ Strategy Rules Detected
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800/80 text-slate-400 border border-slate-700">
+                      Conceptual Literature
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400">{detected.recommendedAction}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 self-end md:self-center shrink-0">
+              <span className="text-slate-500">Target Destination:</span>
+              <span className="font-medium text-slate-300 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
+                {detected.destination}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Unified Ingestion Action Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
           <div className="text-xs text-slate-400 flex items-center gap-2">
-            <Shield className="w-4 h-4 text-emerald-400" />
-            <span>Epistemic Separation: Source Worldview Preserved • Claims Unverified by Default</span>
+            <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Epistemic Separation: Source Worldview Preserved • Zero Alpha Assumed Prior to Backtest</span>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => handleIngest('ANALYZE')}
-              disabled={isSubmitting}
-              className="px-3.5 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
-              title="Extract claims & concepts without queueing a strategy"
-            >
-              <Sparkles className="w-4 h-4 text-blue-400" />
-              <span>🔬 ANALYZE</span>
-            </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Mode Override Selector */}
+            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setSelectedMode('AUTO')}
+                className={`px-2.5 py-1.5 rounded-md font-medium transition-all ${
+                  selectedMode === 'AUTO'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Auto-Detect: Automatically routes and deconstructs content based on file & text rules"
+              >
+                ⚡ Auto-Detect
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedMode('ANALYZE')}
+                className={`px-2.5 py-1.5 rounded-md font-medium transition-all ${
+                  selectedMode === 'ANALYZE'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Analyze Only: Extract claims & concepts without queueing a strategy candidate"
+              >
+                🔬 Analyze
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedMode('SAVE_KNOWLEDGE')}
+                className={`px-2.5 py-1.5 rounded-md font-medium transition-all ${
+                  selectedMode === 'SAVE_KNOWLEDGE'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Save Knowledge: Store directly into Knowledge Vault"
+              >
+                📚 Knowledge
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedMode('RESEARCH')}
+                className={`px-2.5 py-1.5 rounded-md font-medium transition-all ${
+                  selectedMode === 'RESEARCH'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Deep Research: Full atomic deconstruction and force strategy candidate queueing"
+              >
+                🔭 Deep Research
+              </button>
+            </div>
 
+            {/* Single Unified Primary Action Button */}
             <button
-              onClick={() => handleIngest('SAVE_KNOWLEDGE')}
-              disabled={isSubmitting}
-              className="px-3.5 py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
-              title="Store conceptual knowledge directly into the Knowledge Vault"
+              onClick={() => handleIngest(selectedMode)}
+              disabled={isSubmitting || (!selectedFile && !inputText.trim())}
+              className="px-5 py-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              title={
+                selectedMode === 'AUTO'
+                  ? 'Automatically detect content and execute ingestion pipeline'
+                  : `Execute ingestion in ${selectedMode} mode`
+              }
             >
-              <BookOpen className="w-4 h-4 text-cyan-400" />
-              <span>📚 SAVE KNOWLEDGE</span>
-            </button>
-
-            <button
-              onClick={() => handleIngest('RESEARCH')}
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-purple-900/30 transition-all disabled:opacity-50"
-              title="Deconstruct into atomic atoms and trigger Cross-Domain Discovery Graph"
-            >
-              <Compass className="w-4 h-4" />
-              <span>{isSubmitting ? 'DECOMPOSING...' : '🔭 RESEARCH & DISCOVER'}</span>
+              {isSubmitting ? (
+                <>
+                  <RotateCcw className="w-4 h-4 animate-spin text-indigo-300" />
+                  <span>DECOMPOSING & INGESTING...</span>
+                </>
+              ) : selectedMode === 'AUTO' ? (
+                <>
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>⚡ AUTO INGEST & DECONSTRUCT</span>
+                </>
+              ) : selectedMode === 'ANALYZE' ? (
+                <>
+                  <Sparkles className="w-4 h-4 text-blue-300" />
+                  <span>🔬 RUN ANALYSIS</span>
+                </>
+              ) : selectedMode === 'SAVE_KNOWLEDGE' ? (
+                <>
+                  <BookOpen className="w-4 h-4 text-cyan-300" />
+                  <span>📚 SAVE TO VAULT</span>
+                </>
+              ) : (
+                <>
+                  <Compass className="w-4 h-4 text-purple-300" />
+                  <span>🔭 RESEARCH & DISCOVER</span>
+                </>
+              )}
             </button>
           </div>
         </div>

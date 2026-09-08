@@ -630,7 +630,7 @@ export interface UniversalAssetDossier {
 // ==============================================================================
 
 export type ResearchSourceType = 'YOUTUBE' | 'GITHUB' | 'PDF' | 'REEL' | 'ARTICLE' | 'NOTES' | 'CODE' | 'DATASET' | 'TRADINGVIEW';
-export type ResearchIngestMode = 'ANALYZE' | 'RESEARCH' | 'SAVE_KNOWLEDGE';
+export type ResearchIngestMode = 'ANALYZE' | 'RESEARCH' | 'SAVE_KNOWLEDGE' | 'AUTO';
 
 export interface ResearchProvenanceItem {
   knowledge_id: string;

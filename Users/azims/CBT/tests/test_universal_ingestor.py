@@ -213,3 +213,39 @@ async def test_telegram_reverse_flow_photo_ingestion():
             "FILED IN SKY RESEARCH LAB" in call.args[0] for call in mock_send.call_args_list
         )
         assert any_summary
+
+
+@pytest.mark.asyncio
+async def test_universal_ingestor_auto_mode():
+    """Verify that AUTO mode auto-detects trading rules vs conceptual literature."""
+    # 1. Pure conceptual literature without trading rules: should NOT queue candidate
+    lit_text = (
+        "Macroeconomic cycles and sovereign debt crises: historical analysis of "
+        "interest rate policy and liquidity regimes from 1945 to 1980."
+    )
+    res_lit = await universal_ingestor.ingest(
+        content=lit_text,
+        mode="AUTO",
+        title="Macroeconomic Debt Regimes",
+    )
+    assert res_lit["mode"] == "AUTO"
+    assert len(res_lit["strategy_candidates"]) == 0
+    assert res_lit["summary"]["candidates_queued"] == 0
+
+    # 2. Setup with explicit trading rules: SHOULD queue candidate
+    strategy_text = (
+        "ICT Liquidity Sweep Model: Entry rule triggers on 15m Fair Value Gap "
+        "following a Judas sweep of the Asian session high. Stop loss placed 2 ticks below swing low, "
+        "take profit at opposing liquidity pool with 1.5R minimum target."
+    )
+    res_strat = await universal_ingestor.ingest(
+        content=strategy_text,
+        mode="AUTO",
+        title="ICT Judas Sweep 15m Model",
+    )
+    assert res_strat["mode"] == "AUTO"
+    assert len(res_strat["strategy_candidates"]) == 1
+    assert res_strat["summary"]["candidates_queued"] == 1
+    cand = res_strat["strategy_candidates"][0]
+    assert cand["validation_stage"] == "UNTESTED"
+    assert cand["zero_alpha_assumption"] is True
