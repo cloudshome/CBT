@@ -211,10 +211,12 @@ class AutonomousTrader:
                     executed_actions.append(action_record)
 
                     # 6. Audit & Log
-                    audit_bus.record_event(
+                    audit_bus.emit_event(
                         event_type="AUTONOMOUS_PAPER_TRADE_OPENED",
+                        symbol=sym,
+                        reason=f"Opened {direction_str} paper trade {pos_id}",
                         severity="INFO",
-                        payload=action_record,
+                        details=action_record,
                     )
                     logger.info(
                         f"AutonomousTrader executed {direction_str} on {sym}: {pos_id} (Size: {units})"
