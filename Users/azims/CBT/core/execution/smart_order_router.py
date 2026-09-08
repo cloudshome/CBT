@@ -18,6 +18,7 @@ a multi-venue parent order state machine.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import time
@@ -27,6 +28,7 @@ from enum import Enum
 from typing import Any
 
 from core.audit_bus import audit_bus
+from core.database import db_manager
 from core.execution.kill_switch import live_kill_switch
 from core.execution.live_router import (
     LiveExecutionReceipt,
@@ -35,6 +37,7 @@ from core.execution.live_router import (
     LiveSizeRejectedError,
     live_execution_router,
 )
+from core.execution.reconciliation_ledger import reconciliation_ledger
 
 logger = logging.getLogger("sky.smart_order_router")
 
@@ -62,6 +65,10 @@ class InvalidOrderParametersError(SmartOrderRouterError):
 
 class VenueConstraintBreachError(SmartOrderRouterError):
     """Raised when an order allocation breaches venue lot size, step size, or minimum notional."""
+
+
+class OverfillHaltedError(SmartOrderRouterError):
+    """Raised when further child order dispatch is blocked due to an overfill circuit breaker."""
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +291,55 @@ class ParentOrderExecutionRecord:
             "updated_at_ms": self.updated_at_ms,
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ParentOrderExecutionRecord:
+        splits = [
+            VenueSplitQuote(
+                exchange=s["exchange"],
+                allocated_qty=float(s["allocated_qty"]),
+                allocated_notional=float(s["allocated_notional"]),
+                expected_vwap=float(s["expected_vwap"]),
+                expected_fee_usd=float(s["expected_fee_usd"]),
+                expected_slippage_bps=float(s["expected_slippage_bps"]),
+                percentage=float(s["percentage"]),
+            )
+            for s in d.get("splits", [])
+        ]
+        receipts = [
+            LiveExecutionReceipt(
+                success=bool(r.get("success", True)),
+                status=r.get("status", ""),
+                client_order_id=r.get("client_order_id", ""),
+                exchange_order_id=r.get("exchange_order_id", ""),
+                exchange=r.get("exchange", ""),
+                environment=r.get("environment", "TESTNET"),
+                symbol=r.get("symbol", ""),
+                side=r.get("side", ""),
+                order_type=r.get("order_type", "MARKET"),
+                requested_qty=float(r.get("requested_qty", 0.0)),
+                executed_qty=float(r.get("executed_qty", 0.0)),
+                executed_price=float(r.get("executed_price", 0.0)),
+                cumulative_quote_qty=float(r.get("cumulative_quote_qty", 0.0)),
+                latency_ms=float(r.get("latency_ms", 0.0)),
+                audit_event_id=r.get("audit_event_id", ""),
+                message=r.get("message", ""),
+                requires_reconciliation=bool(r.get("requires_reconciliation", False)),
+            )
+            for r in d.get("receipts", [])
+        ]
+        return cls(
+            parent_order_id=d["parent_order_id"],
+            symbol=d["symbol"],
+            side=d["side"],
+            total_qty=float(d["total_qty"]),
+            state=ParentOrderState(d["state"]),
+            splits=splits,
+            receipts=receipts,
+            errors=d.get("errors", []),
+            created_at_ms=int(d.get("created_at_ms", 0)),
+            updated_at_ms=int(d.get("updated_at_ms", 0)),
+        )
+
 
 # ---------------------------------------------------------------------------
 # Smart Order Router Engine
@@ -308,6 +364,116 @@ class SmartOrderRouter:
         }
         # In-memory parent order registry
         self.parent_orders: dict[str, ParentOrderExecutionRecord] = {}
+
+    def _persist_parent_order(self, record: ParentOrderExecutionRecord) -> None:
+        """Persists parent order execution record to SQLite database for crash durability."""
+        try:
+            splits_json = json.dumps([s.to_dict() for s in record.splits])
+            receipts_json = json.dumps([r.to_safe_dict() for r in record.receipts])
+            errors_json = json.dumps(record.errors)
+            with db_manager.get_trading_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO parent_order_execution_records (
+                        parent_order_id, symbol, side, total_qty, state,
+                        splits_json, receipts_json, errors_json, created_at_ms, updated_at_ms
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(parent_order_id) DO UPDATE SET
+                        state=excluded.state,
+                        receipts_json=excluded.receipts_json,
+                        errors_json=excluded.errors_json,
+                        updated_at_ms=excluded.updated_at_ms
+                    """,
+                    (
+                        record.parent_order_id,
+                        record.symbol,
+                        record.side,
+                        record.total_qty,
+                        record.state.value,
+                        splits_json,
+                        receipts_json,
+                        errors_json,
+                        record.created_at_ms,
+                        record.updated_at_ms,
+                    ),
+                )
+                conn.commit()
+        except Exception as e:  # noqa: BLE001 — best-effort parent order persistence
+            logger.error(f"Failed to persist parent order {record.parent_order_id}: {e}")
+
+    def _load_parent_order(self, parent_order_id: str) -> ParentOrderExecutionRecord | None:
+        """Loads parent order record from SQLite database."""
+        try:
+            with db_manager.get_trading_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM parent_order_execution_records WHERE parent_order_id = ?",
+                    (parent_order_id,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                data = dict(row)
+                data["splits"] = json.loads(data.get("splits_json", "[]"))
+                data["receipts"] = json.loads(data.get("receipts_json", "[]"))
+                data["errors"] = json.loads(data.get("errors_json", "[]"))
+                rec = ParentOrderExecutionRecord.from_dict(data)
+                self.parent_orders[parent_order_id] = rec
+                return rec
+        except Exception as e:  # noqa: BLE001 — best-effort parent order load
+            logger.error(f"Failed to load parent order {parent_order_id}: {e}")
+            return None
+
+    def get_parent_order(self, parent_order_id: str) -> ParentOrderExecutionRecord | None:
+        """Retrieves parent order record from memory or durable SQLite database."""
+        if parent_order_id in self.parent_orders:
+            return self.parent_orders[parent_order_id]
+        return self._load_parent_order(parent_order_id)
+
+    def recover_active_parent_orders(self) -> list[ParentOrderExecutionRecord]:
+        """
+        Scans durable SQLite store for active parent orders after process restart.
+        Reconciles child execution status and handles crash recovery.
+        """
+        recovered: list[ParentOrderExecutionRecord] = []
+        try:
+            with db_manager.get_trading_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT parent_order_id FROM parent_order_execution_records
+                    WHERE state IN ('PLANNED', 'DISPATCHING', 'EXECUTING', 'PARTIALLY_EXECUTED', 'RECONCILIATION_REQUIRED', 'HALTED')
+                    ORDER BY created_at_ms ASC
+                    """
+                )
+                rows = cursor.fetchall()
+                parent_ids = [row["parent_order_id"] for row in rows]
+
+            for pid in parent_ids:
+                rec = self._load_parent_order(pid)
+                if rec:
+                    recovered.append(rec)
+                    if reconciliation_ledger.is_order_halted(pid):
+                        rec.state = ParentOrderState.HALTED
+                    elif len(rec.receipts) == len(rec.splits) and len(rec.splits) > 0 and all(r.success for r in rec.receipts):
+                        rec.state = ParentOrderState.COMPLETE
+                    elif len(rec.receipts) > 0:
+                        rec.state = ParentOrderState.PARTIALLY_EXECUTED
+                    else:
+                        rec.state = ParentOrderState.RECONCILIATION_REQUIRED
+                    rec.updated_at_ms = int(time.time() * 1000)
+                    self._persist_parent_order(rec)
+                    audit_bus.emit_event(
+                        event_type="SOR_PARENT_ORDER_RECOVERED",
+                        symbol=rec.symbol,
+                        severity="WARNING" if rec.state != ParentOrderState.COMPLETE else "INFO",
+                        reason=f"Recovered active parent order {pid} in state {rec.state.value} after restart.",
+                        details=rec.to_dict(),
+                    )
+        except Exception as e:  # noqa: BLE001 — best-effort active order recovery
+            logger.error(f"Failed to recover active parent orders: {e}")
+
+        return recovered
 
     def _walk_single_book(
         self,
@@ -394,6 +560,17 @@ class SmartOrderRouter:
 
         reference_mid_price = sum(mids) / len(mids)
         venue_names = sorted(healthy_venues.keys())
+
+        # Enforce venue minimum notional across all healthy candidate venues
+        min_venue_notional = min(
+            self.default_trading_rules.get(v, VenueTradingRules(exchange=v)).min_notional_usd
+            for v in healthy_venues.keys()
+        )
+        est_total_notional = total_qty * reference_mid_price
+        if est_total_notional < min_venue_notional:
+            raise VenueConstraintBreachError(
+                f"Order notional ${est_total_notional:.2f} on {symbol} is below minimum notional ${min_venue_notional:.2f}."
+            )
 
         # Single venue edge case
         if len(venue_names) == 1:
@@ -611,7 +788,7 @@ class SmartOrderRouter:
         Dispatches split child orders through the LiveExecutionRouter 20-Gate Pre-Trade Invariant Pipeline.
         Enforces parent-level risk clearance BEFORE child order splitting and manages parent order state.
         """
-        parent_id = f"PARENT_{uuid.uuid4().hex[:12].upper()}"
+        parent_id = parent_correlation_id or f"PARENT_{uuid.uuid4().hex[:12].upper()}"
         now_ms = int(time.time() * 1000)
 
         # ---------------------------------------------------------------------
@@ -653,10 +830,22 @@ class SmartOrderRouter:
             updated_at_ms=now_ms,
         )
         self.parent_orders[parent_id] = parent_record
+        self._persist_parent_order(parent_record)
 
         receipts: list[LiveExecutionReceipt] = []
 
         for split in quote.splits:
+            # -----------------------------------------------------------------
+            # GATE 8: Overfill Circuit Breaker Halt Check
+            # -----------------------------------------------------------------
+            if reconciliation_ledger.is_order_halted(parent_id) or parent_record.state == ParentOrderState.HALTED:
+                parent_record.state = ParentOrderState.HALTED
+                parent_record.updated_at_ms = int(time.time() * 1000)
+                self._persist_parent_order(parent_record)
+                msg = f"OVERFILL_HALTED: Execution halted on parent order {parent_id} due to overfill circuit breaker."
+                logger.critical(msg)
+                raise OverfillHaltedError(msg)
+
             req = LiveOrderRequest(
                 exchange=split.exchange,
                 environment=environment,
@@ -676,6 +865,8 @@ class SmartOrderRouter:
                 receipt = await live_execution_router.execute_live_order(req)
                 receipts.append(receipt)
                 parent_record.receipts.append(receipt)
+                parent_record.updated_at_ms = int(time.time() * 1000)
+                self._persist_parent_order(parent_record)
             except Exception as e:
                 logger.error(f"SOR child order dispatch failed on {split.exchange}: {e}")
                 parent_record.errors.append({"exchange": split.exchange, "error": str(e)})
@@ -691,10 +882,12 @@ class SmartOrderRouter:
                 else:
                     parent_record.state = ParentOrderState.FAILED
                 parent_record.updated_at_ms = int(time.time() * 1000)
+                self._persist_parent_order(parent_record)
                 raise
 
         parent_record.state = ParentOrderState.COMPLETE
         parent_record.updated_at_ms = int(time.time() * 1000)
+        self._persist_parent_order(parent_record)
 
         audit_bus.emit_event(
             event_type="SOR_EXECUTION_COMPLETED",

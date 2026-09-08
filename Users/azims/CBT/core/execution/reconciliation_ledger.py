@@ -96,15 +96,16 @@ class CumulativeFillState:
     client_order_id: str
     exchange_order_id: str
     exchange: str
-    symbol: str
-    side: str
     requested_qty: float
-    executed_qty: float
-    remaining_qty: float
-    weighted_executed_price: float
-    total_fee_usd: float
-    status: str  # "NEW", "PARTIAL_FILL", "COMPLETE", "OVERFILL", "CANCELLED"
-    fill_count: int
+    executed_qty: float = 0.0
+    remaining_qty: float = 0.0
+    weighted_executed_price: float = 0.0
+    total_fee_usd: float = 0.0
+    status: str = "NEW"  # "NEW", "PARTIAL_FILL", "COMPLETE", "OVERFILL", "CANCELLED"
+    fill_count: int = 0
+    parent_order_id: str = ""
+    symbol: str = ""
+    side: str = ""
     fills: list[dict[str, Any]] = field(default_factory=list)
     is_halted: bool = False
 
@@ -378,6 +379,7 @@ class ReconciliationLedger:
                 client_order_id=client_order_id,
                 exchange_order_id=exchange_order_id,
                 exchange=exchange,
+                parent_order_id=parent_order_id,
                 symbol=symbol,
                 side=side.upper(),
                 requested_qty=requested_qty,
@@ -469,6 +471,17 @@ class ReconciliationLedger:
     def get_order_cumulative_state(self, client_order_id: str) -> CumulativeFillState | None:
         """Returns in-memory cumulative fill state for an order if tracked."""
         return self._cumulative_orders.get(client_order_id)
+
+    def is_order_halted(self, order_id: str) -> bool:
+        """Returns whether execution is halted for an order or parent order due to overfill circuit breaker."""
+        if not order_id:
+            return False
+        if order_id in self._cumulative_orders and self._cumulative_orders[order_id].is_halted:
+            return True
+        for state in self._cumulative_orders.values():
+            if (state.parent_order_id == order_id or state.client_order_id == order_id) and state.is_halted:
+                return True
+        return False
 
     def get_record_by_fill(
         self,

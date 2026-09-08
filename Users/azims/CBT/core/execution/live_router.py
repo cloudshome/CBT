@@ -44,11 +44,13 @@ from core.execution.connectors.base import (
 from core.execution.connectors.binance_connector import BinanceSpotConnector
 from core.execution.connectors.bybit_connector import BybitV5Connector
 from core.execution.idempotency import (
+    DuplicateOrderError,
     OrderStatus,
     generate_client_order_id,
     idempotency_store,
 )
 from core.execution.kill_switch import live_kill_switch, parse_strict_bool
+from core.execution.reconciliation_ledger import reconciliation_ledger
 from core.half_kelly_sizer import half_kelly_position_sizer
 from core.incident_escalation import IncidentTier, incident_escalation_engine
 from core.risk_manager import risk_manager
@@ -103,6 +105,10 @@ class LiveExchangeDegradedError(LiveRouterError):
 
 class LiveAmbiguousOrderError(LiveRouterError):
     """Raised when an order result is indeterminate and requires reconciliation query."""
+
+
+class LiveOrderNotFoundError(LiveRouterError):
+    """Raised when an order being reconciled is confirmed not to exist on the exchange matching engine."""
 
 
 # ---------------------------------------------------------------------------
@@ -451,20 +457,99 @@ class LiveExecutionRouter:
             raise LiveKillSwitchActiveError(msg)
 
         # ---------------------------------------------------------------------
-        # GATE 14 & 15: Client Order ID Uniqueness & Idempotency Reservation
+        # GATE 13: Overfill Circuit Breaker Halt Check (FAIL CLOSED)
         # ---------------------------------------------------------------------
-        # Must reserve atomically in SQLite WAL before network packet dispatch
-        idempotency_store.reserve_order(
-            client_order_id=cid,
-            exchange=exch_upper,
-            environment=env_upper,
-            symbol=req.symbol,
-            side=req.side,
-            order_type=req.order_type,
-            quantity=req.quantity,
-            price=req.price,
-            audit_payload={"operator_id": operator_id, "sizing": asdict(sizing_result)},
-        )
+        check_id = req.correlation_id or cid
+        if reconciliation_ledger.is_order_halted(check_id):
+            msg = f"OVERFILL_HALTED: Order {check_id} is halted due to overfill circuit breaker."
+            logger.critical(msg)
+            self._emit_rejection_audit(cid, req, "OVERFILL_HALTED", msg)
+            raise LiveKillSwitchActiveError(msg)
+
+        # ---------------------------------------------------------------------
+        # GATE 14 & 15: Client Order ID Uniqueness & Lost-ACK Idempotency Clearance
+        # ---------------------------------------------------------------------
+        # Must reserve atomically in SQLite WAL before network packet dispatch.
+        # If client_order_id already exists, query exchange status to guarantee
+        # ONE INTENDED ORDER NEVER BECOMES TWO LIVE ORDERS.
+        try:
+            idempotency_store.reserve_order(
+                client_order_id=cid,
+                exchange=exch_upper,
+                environment=env_upper,
+                symbol=req.symbol,
+                side=req.side,
+                order_type=req.order_type,
+                quantity=req.quantity,
+                price=req.price,
+                audit_payload={"operator_id": operator_id, "sizing": asdict(sizing_result)},
+            )
+        except DuplicateOrderError:
+            existing = idempotency_store.get_order_record(cid)
+            if not existing:
+                raise
+
+            logger.warning(
+                f"IDEMPOTENT RETRY DETECTED for {cid} (status={existing.status}). "
+                f"Querying venue state before taking any execution action."
+            )
+            connector = self._get_connector(exch_upper, env_upper)
+            try:
+                status_result = await connector.get_order_status(
+                    symbol=req.symbol,
+                    client_order_id=cid,
+                )
+                # Authoritative state recovered directly from exchange!
+                idempotency_store.mark_reconciled(
+                    client_order_id=cid,
+                    resolved_status=status_result.status,
+                    exchange_order_id=status_result.exchange_order_id,
+                    notes=f"Idempotent retry reconciliation: status={status_result.status}",
+                )
+                audit_bus.emit_event(
+                    event_type="LIVE_ORDER_IDEMPOTENT_RECOVERED",
+                    symbol=req.symbol,
+                    severity="INFO",
+                    reason=f"Order {cid} recovered on retry without duplicate venue submission: status={status_result.status}",
+                    details=asdict(status_result),
+                )
+                return LiveExecutionReceipt(
+                    success=status_result.status in ("FILLED", "PARTIALLY_FILLED", "NEW", "ACKNOWLEDGED"),
+                    status=status_result.status,
+                    client_order_id=cid,
+                    exchange_order_id=status_result.exchange_order_id,
+                    exchange=exch_upper,
+                    environment=env_upper,
+                    symbol=req.symbol,
+                    side=req.side,
+                    order_type=req.order_type,
+                    requested_qty=req.quantity,
+                    executed_qty=status_result.executed_qty,
+                    executed_price=status_result.executed_price,
+                    cumulative_quote_qty=status_result.cumulative_quote_qty,
+                    latency_ms=0.0,
+                    audit_event_id=f"RECOVERED_{cid}",
+                    message="Authoritative order recovered from exchange without duplicate submission.",
+                    requires_reconciliation=False,
+                )
+            except Exception as ex:
+                err_str = str(ex).lower()
+                is_not_found = (
+                    "-2013" in err_str
+                    or "order not found" in err_str
+                    or "order does not exist" in err_str
+                    or "110001" in err_str
+                )
+                if is_not_found:
+                    logger.info(f"Order {cid} proven not to exist on exchange. Marking rejected.")
+                    idempotency_store.mark_final(
+                        cid, OrderStatus.REJECTED, error_message="Order not found on exchange upon retry check."
+                    )
+                    raise LiveOrderNotFoundError(f"Order {cid} was not found on {exch_upper} matching engine.") from ex
+                logger.error(f"Cannot verify exchange state for duplicate retry of {cid}: {ex}")
+                raise LiveAmbiguousOrderError(
+                    f"Duplicate order retry cannot verify exchange state for {cid}: {ex}"
+                ) from ex
 
         # ---------------------------------------------------------------------
         # GATE 16: Audit Bus Availability (FAIL CLOSED)

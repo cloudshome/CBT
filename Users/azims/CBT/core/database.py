@@ -456,6 +456,30 @@ class DatabaseManager:
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_rec_unique_fill ON execution_reconciliation_records(exchange, exchange_order_id, execution_id);"
             )
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS parent_order_execution_records (
+                    parent_order_id TEXT PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    total_qty REAL NOT NULL,
+                    state TEXT NOT NULL,
+                    splits_json TEXT NOT NULL,
+                    receipts_json TEXT NOT NULL DEFAULT '[]',
+                    errors_json TEXT NOT NULL DEFAULT '[]',
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL
+                );
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_parent_order_symbol ON parent_order_execution_records(symbol);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_parent_order_state ON parent_order_execution_records(state);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_parent_order_created ON parent_order_execution_records(created_at_ms);"
+            )
+
             conn.commit()
 
     def _init_experiment_db(self) -> None:
