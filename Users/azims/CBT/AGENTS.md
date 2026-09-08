@@ -154,3 +154,24 @@ To ensure robust autonomous operation without regressions or data destruction:
 5. **No Silent Architectural Shifts:**
    - Never silently change system architecture or dilute risk primacy (e.g. routing forecasting models directly to execution without Half-Kelly clearance).
    - If a prompt conflicts with quantitative rules or causal firewalls, stop and trigger **The Golden Conflict Protocol** immediately.
+
+---
+
+## 10. MILESTONE 18 CERTIFIED SURFACE AREA & INVALIDATION RULE
+
+Milestone 18 (*Multi-Venue Smart Execution & High-Resolution Fill Reconciliation*) has achieved **PRODUCTION PASS** across all 14 gates at certified commit `c9cc1cad780453b81032f6b1b1b81117d41c060f` (149 passing tests).
+
+> **The M18 Certified Surface Invalidation Rule:**
+> **Any code modification touching a certified Milestone 18 execution, risk, order router, connector, or reconciliation path automatically INVALIDATES the Milestone 18 Production Pass certification until all 14 adversarial certification gates are rerun and green.**
+
+The certified surface area is frozen in:
+- Manifest: [`core/execution/m18_certification_manifest.json`](file:///c:/Users/azims/CBT/core/execution/m18_certification_manifest.json)
+- Reference: [`docs/certification/M18_CERTIFICATION_MANIFEST.md`](file:///c:/Users/azims/CBT/docs/certification/M18_CERTIFICATION_MANIFEST.md)
+- Integrity Verifier: `python scripts/verify_m18_certification.py`
+
+Any future milestone (e.g., Milestone 19 or 20) modifying any of the 14 certified files MUST re-run:
+```bash
+.venv\Scripts\pytest tests/test_milestone18_sor_and_slicing.py tests/test_milestone18_boss_adversarial.py tests/test_milestone18_final_certification.py -v
+```
+and verify 149/149 passing tests before declaring execution readiness.
+

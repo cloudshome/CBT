@@ -1,0 +1,167 @@
+{
+  "M18_CERTIFIED_COMMIT": "c9cc1cad780453b81032f6b1b1b81117d41c060f",
+  "M18_CERTIFIED_TIMESTAMP": "2026-09-08T12:16:54+06:00",
+  "M18_CERTIFICATION_VERDICT": "PRODUCTION PASS",
+  "M18_CERTIFIED_TEST_COUNT": {
+    "milestone18_sor_and_slicing": 27,
+    "milestone18_boss_adversarial": 83,
+    "milestone18_final_certification": 39,
+    "total_m18_tests": 149,
+    "total_repository_pytest": 516,
+    "total_repository_jest": 126
+  },
+  "M18_CERTIFIED_FILES": [
+    "core/execution/live_router.py",
+    "core/execution/smart_order_router.py",
+    "core/execution/reconciliation_ledger.py",
+    "core/execution/almgren_chriss.py",
+    "core/execution/idempotency.py",
+    "core/execution/kill_switch.py",
+    "core/execution/connectors/base.py",
+    "core/execution/connectors/binance_connector.py",
+    "core/execution/connectors/bybit_connector.py",
+    "core/database.py",
+    "app.py",
+    "tests/test_milestone18_sor_and_slicing.py",
+    "tests/test_milestone18_boss_adversarial.py",
+    "tests/test_milestone18_final_certification.py"
+  ],
+  "M18_CERTIFIED_RISK_INVARIANTS": {
+    "master_kill_switch": {
+      "rule": "Hardware/server-side fail closed. Blocks all live order placement and smart order routing with HTTP 403 / LiveKillSwitchActiveError.",
+      "guarantee": "Venue connector place_order call count strictly 0."
+    },
+    "parent_level_equity_cap": {
+      "rule": "Aggregate parent order risk limited to <= 1.5% of account equity before child splitting.",
+      "guarantee": "Single-trade risk evaluated on parent order; multi-leg slicing cannot circumvent limit."
+    },
+    "lost_ack_idempotency": {
+      "rule": "ONE INTENDED ORDER NEVER BECOMES TWO LIVE ORDERS.",
+      "guarantee": "Retries with duplicate client_order_id query venue matching engine status; 0 duplicate orders placed."
+    },
+    "database_fill_uniqueness": {
+      "rule": "Enforced by SQLite UNIQUE(exchange, exchange_order_id, execution_id).",
+      "guarantee": "Concurrent duplicate fill ingestion results in exactly 1 record and 1 cumulative addition."
+    },
+    "overfill_circuit_breaker": {
+      "rule": "Fills cumulatively exceeding target quantity trip is_halted=True and status=OVERFILL.",
+      "guarantee": "Subsequent child splits in SmartOrderRouter aborted with OverfillHaltedError; LiveExecutionRouter dispatches fail closed."
+    },
+    "clamped_monotonic_timing": {
+      "rule": "Local execution durations calculated via time.monotonic_ns() with non-negative clamping.",
+      "guarantee": "NTP backward adjustments and negative wall-clock jumps cannot corrupt durations."
+    },
+    "venue_trading_rules": {
+      "rule": "Step-size quantization, minimum quantity, and minimum notional (.00) enforced pre-dispatch.",
+      "guarantee": "Orders below .00 notional fail closed with VenueConstraintBreachError before connector dispatch."
+    },
+    "order_book_staleness": {
+      "rule": "Order books with age >= 5000ms, crossed prices, or non-finite numbers fail validation.",
+      "guarantee": "Fails closed with VenueDegradedError if healthy books are unavailable."
+    },
+    "almgren_chriss_conservation": {
+      "rule": "Discrete child order slice quantities strictly conserve parent quantity: sum(slice_qty) == total_qty.",
+      "guarantee": "Satisfied within 10^-9 tolerance across all risk aversion (lambda in [0, 100]) and intervals (N in [1, 50])."
+    }
+  },
+  "M18_CERTIFIED_DATABASE_SCHEMA": {
+    "execution_reconciliation_records": {
+      "unique_index": "CREATE UNIQUE INDEX idx_rec_unique_fill ON execution_reconciliation_records(exchange, exchange_order_id, execution_id);",
+      "timing_columns": [
+        "dispatch_monotonic_ns",
+        "ack_monotonic_ns",
+        "fill_monotonic_ns",
+        "roundtrip_ns"
+      ]
+    },
+    "parent_order_execution_records": {
+      "primary_key": "parent_order_id",
+      "state_tracking": [
+        "PLANNED",
+        "DISPATCHING",
+        "EXECUTING",
+        "COMPLETE",
+        "PARTIALLY_EXECUTED",
+        "FAILED",
+        "HALTED",
+        "RECONCILIATION_REQUIRED"
+      ],
+      "json_fields": [
+        "splits_json",
+        "receipts_json",
+        "errors_json"
+      ]
+    },
+    "live_order_idempotency": {
+      "primary_key": "client_order_id",
+      "lifecycle_states": [
+        "RESERVED",
+        "SUBMITTED",
+        "ACKNOWLEDGED",
+        "PARTIALLY_FILLED",
+        "FILLED",
+        "REJECTED",
+        "CANCELLED",
+        "EXPIRED",
+        "AMBIGUOUS"
+      ]
+    }
+  },
+  "M18_CERTIFIED_VENUE_RULES": {
+    "BINANCE": {
+      "min_qty": 1e-05,
+      "step_size": 1e-05,
+      "min_notional_usd": 5.0,
+      "maker_fee_bps": 7.5,
+      "taker_fee_bps": 10.0
+    },
+    "BYBIT": {
+      "min_qty": 0.0001,
+      "step_size": 0.0001,
+      "min_notional_usd": 5.0,
+      "maker_fee_bps": 2.0,
+      "taker_fee_bps": 5.5
+    }
+  },
+  "M18_CERTIFIED_API_SURFACE": [
+    "POST /api/execution/live/order",
+    "POST /api/execution/live/cancel",
+    "POST /api/execution/live/kill-switch",
+    "POST /api/execution/live/reconcile",
+    "POST /api/execution/sor/route-quote",
+    "POST /api/execution/slicer/almgren-chriss",
+    "GET /api/execution/reconciliation/report",
+    "GET /api/execution/reconciliation/records"
+  ],
+  "M18_CERTIFIED_EXECUTION_STATE_MACHINE": {
+    "ParentOrderState": [
+      "PLANNED",
+      "DISPATCHING",
+      "EXECUTING",
+      "COMPLETE",
+      "PARTIALLY_EXECUTED",
+      "FAILED",
+      "HALTED",
+      "RECONCILIATION_REQUIRED"
+    ],
+    "OrderStatus": [
+      "RESERVED",
+      "SUBMITTED",
+      "ACKNOWLEDGED",
+      "PARTIALLY_FILLED",
+      "FILLED",
+      "REJECTED",
+      "CANCELLED",
+      "EXPIRED",
+      "AMBIGUOUS"
+    ],
+    "CumulativeFillState": [
+      "NEW",
+      "PARTIAL_FILL",
+      "COMPLETE",
+      "OVERFILL",
+      "CANCELLED"
+    ]
+  },
+  "INVALIDATION_RULE": "Any modification touching a certified M18 execution/risk/reconciliation path automatically invalidates the M18 certification until the 14 adversarial certification gates are rerun and green."
+}

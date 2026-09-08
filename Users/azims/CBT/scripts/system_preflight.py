@@ -91,6 +91,21 @@ def check_frontend_build():
     assert res.returncode == 0, f"Frontend build failed:\n{res.stdout}\n{res.stderr}"
 
 
+def check_m18_certification():
+    verify_script = PROJECT_ROOT / "scripts" / "verify_m18_certification.py"
+    if not verify_script.exists():
+        return
+    res = subprocess.run(
+        [sys.executable, str(verify_script)],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert res.returncode == 0, f"M18 Certification Check Failed:\n{res.stdout}\n{res.stderr}"
+
+
 def main():
     print("=" * 60)
     print("SKY / CTB PREFLIGHT SYSTEM VERIFICATION & PRE-MERGE SCORECARD")
@@ -98,6 +113,7 @@ def main():
 
     checks = [
         ("Database Schema Integrity", check_db_integrity),
+        ("M18 Certification Integrity", check_m18_certification),
         ("Pytest Quantitative Test Suite", check_pytest),
         ("Jest Desk & Backend Test Suite", check_jest),
         ("Frontend Vite Production Build", check_frontend_build),
@@ -110,7 +126,7 @@ def main():
 
     print("=" * 60)
     if all_passed:
-        print(">>> ALL 4 PREFLIGHT QUALITY GATES PASSED (100% GREEN) <<<")
+        print(">>> ALL 5 PREFLIGHT QUALITY GATES PASSED (100% GREEN) <<<")
         print(">>> BRANCH READY FOR MAIN PULL REQUEST MERGE <<<")
         sys.exit(0)
     else:
