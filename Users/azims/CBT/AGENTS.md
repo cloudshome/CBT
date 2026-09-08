@@ -164,6 +164,18 @@ Milestone 18 (*Multi-Venue Smart Execution & High-Resolution Fill Reconciliation
 > **The M18 Certified Surface Invalidation Rule:**
 > **Any code modification touching a certified Milestone 18 execution, risk, order router, connector, or reconciliation path automatically INVALIDATES the Milestone 18 Production Pass certification until all 14 adversarial certification gates are rerun and green.**
 
+The M18 certification automatically invalidates if:
+1. Any certified file changes.
+2. Any certified file is renamed or deleted.
+3. Any M18 database schema or index (`idx_rec_unique_fill`) changes.
+4. Any certified connector dependency changes.
+5. Any import or dependency feeding the certified execution path changes.
+6. Any `ParentOrderState`, `OrderStatus`, or `CumulativeFillState` enum changes.
+7. Any certified REST endpoint contract or routing behavior changes.
+8. Any certified risk invariant (kill switch, 1.5% equity cap, overfill halt) changes.
+9. The certified commit (`c9cc1cad`) is no longer an ancestor of `HEAD`.
+10. The M18 test suites are modified, removed, skipped, xfailed, deselected, or their cryptographic test identity SHA-256 deviates from `2acbff25f391249cb1881bd40a4440384cecdd7682c6f83b91487d8744d0b57b`.
+
 The certified surface area is frozen in:
 - Manifest: [`core/execution/m18_certification_manifest.json`](file:///c:/Users/azims/CBT/core/execution/m18_certification_manifest.json)
 - Reference: [`docs/certification/M18_CERTIFICATION_MANIFEST.md`](file:///c:/Users/azims/CBT/docs/certification/M18_CERTIFICATION_MANIFEST.md)

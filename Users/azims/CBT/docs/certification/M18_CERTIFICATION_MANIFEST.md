@@ -7,13 +7,21 @@
 
 ---
 
-## AUTOMATIC INVALIDATION RULE
+## AUTOMATIC INVALIDATION RULE & 10 INVARIANTS
 
 > **ANY modification touching a certified Milestone 18 execution, risk, order router, connector, or reconciliation path automatically INVALIDATES the Milestone 18 Production Pass certification until all 14 adversarial certification gates are rerun and green.**
-> 
-> *Milestone 19, Milestone 20, or any subsequent feature branch touching files within this manifest MUST re-execute:*  
-> `.venv\Scripts\pytest tests/test_milestone18_sor_and_slicing.py tests/test_milestone18_boss_adversarial.py tests/test_milestone18_final_certification.py -v`  
-> *and verify 149/149 passing tests before declaring execution readiness.*
+
+Milestone 18 certification automatically **INVALIDATES** if:
+1. **Certified File Change**: Any of the 14 certified files is modified.
+2. **File Mutation / Deletion**: Any certified file is renamed, moved, or deleted.
+3. **Database Schema Drift**: Any M18 database table, column, or index (`idx_rec_unique_fill`) changes.
+4. **Connector Dependency Drift**: Any certified exchange connector interface or adapter logic changes.
+5. **Import Path Mutation**: Any import or dependency feeding the certified execution path is altered.
+6. **State Machine Drift**: Any `ParentOrderState`, `OrderStatus`, or `CumulativeFillState` enum or transition changes.
+7. **REST Endpoint Behavior**: Any certified execution REST endpoint contract, route, or response structure changes.
+8. **Risk Invariant Violation**: Any core risk control (kill switch, 1.5% parent cap, overfill halt) is modified or bypassed.
+9. **History Decoupling**: The certified commit `c9cc1cad780453b81032f6b1b1b81117d41c060f` is no longer an ancestor of `HEAD`.
+10. **Test Identity Mutation**: The M18 test suites are modified, removed, skipped, xfailed, or their cryptographic test identity hash deviates from `2acbff25f391249cb1881bd40a4440384cecdd7682c6f83b91487d8744d0b57b`.
 
 ---
 
@@ -24,11 +32,13 @@
 
 ---
 
-## 2. M18_CERTIFIED_TEST_COUNT
+## 2. M18_CERTIFIED_TEST_COUNT & CRYPTOGRAPHIC TEST IDENTITY
 - **Original Milestone 18 Suite** (`tests/test_milestone18_sor_and_slicing.py`): **27 tests**
 - **Milestone 18 Boss Adversarial Suite** (`tests/test_milestone18_boss_adversarial.py`): **83 tests**
 - **Milestone 18 Final Certification Gate Suite** (`tests/test_milestone18_final_certification.py`): **39 tests**
 - **Total Milestone 18 Certified Tests**: **149 tests (100% green)**
+- **Certified Test Identity SHA-256**: `2acbff25f391249cb1881bd40a4440384cecdd7682c6f83b91487d8744d0b57b`  
+  *(Cryptographic digest of 149 sorted test node IDs to guarantee zero test substitution, deletion, or weakening)*
 - **Repository Pytest Suite**: **516 tests (100% green)**
 - **Repository Jest Desk Suite**: **126 tests across 21 test suites (100% green)**
 
