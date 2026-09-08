@@ -66,6 +66,16 @@ class ProvenanceTracker:
                     if r:
                         imm_src = self.storage.get_immutable_source(r["source_id"])
 
+            # 3b. Archive Manifest Record (Section 13: Archive-Aware Provenance)
+            arch_record = None
+            if imm_src:
+                try:
+                    from core.autonomous_research.storage.storage_manifest import storage_manifest
+
+                    arch_record = storage_manifest.get_by_content_hash(imm_src.content_hash)
+                except Exception:  # noqa: BLE001
+                    arch_record = None
+
             # 4. Strategy Candidates
             candidates = conn.execute(
                 "SELECT * FROM strategy_candidates WHERE knowledge_id = ?", (knowledge_id,)
@@ -122,6 +132,10 @@ class ProvenanceTracker:
                 "content_hash_sha256": imm_src.content_hash if imm_src else "NO_IMMUTABLE_HASH",
                 "exact_citation_pointers": imm_src.exact_pointers if imm_src else {},
                 "raw_claim_verbatim": src_row["raw_content_preview"] if src_row else "N/A",
+                "archive_status": arch_record.archive_status if arch_record else "LOCAL_ONLY",
+                "storage_tier": arch_record.storage_tier if arch_record else "HOT",
+                "drive_file_id": arch_record.drive_file_id if arch_record else None,
+                "drive_path": arch_record.drive_path if arch_record else None,
             },
             "tier_2_what_sky_infers": {
                 "concept_id": k_row["id"] if k_row else knowledge_id,

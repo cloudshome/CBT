@@ -404,9 +404,42 @@ class UniversalIngestor:
             yt_payload=yt_payload,
         )
 
+        # 10. Automatic Archival into SKY 15-TB Architecture (Google Drive Tier)
+        archive_info = None
+        try:
+            from core.autonomous_research.storage.storage_manager import storage_manager
+
+            file_target = None
+            if source_uri and Path(source_uri).exists():
+                file_target = Path(source_uri)
+            elif file_name and (self.upload_dir / file_name).exists():
+                file_target = self.upload_dir / file_name
+
+            if file_target:
+                arch_res = storage_manager.ingest_and_archive(
+                    file_path_or_bytes=file_target,
+                    source_type=source_type,
+                    filename=file_target.name,
+                    source_id=sid,
+                    metadata={"title": inferred_title, "author": creator, "worldview": worldview},
+                )
+                archive_info = arch_res.to_dict()
+            else:
+                arch_res = storage_manager.ingest_and_archive(
+                    file_path_or_bytes=content.encode("utf-8"),
+                    source_type=source_type,
+                    filename=f"{sid}.txt",
+                    source_id=sid,
+                    metadata={"title": inferred_title, "author": creator, "worldview": worldview},
+                )
+                archive_info = arch_res.to_dict()
+        except Exception as e:  # noqa: BLE001 — defensive fallback
+            logger.warning(f"Storage archival notice during universal ingestion: {e}")
+
         return {
             "source_id": sid,
             "knowledge_id": prov.knowledge_id,
+            "archive": archive_info,
             "mode": mode,
             "worldview": worldview,
             "source": source_node.to_dict(),

@@ -6,121 +6,75 @@ Multiplexes real-time WebSocket streams and comprehensive REST APIs across all 1
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
-from dataclasses import asdict, dataclass
 import hmac
 import json
 import logging
 import os
-from pathlib import Path
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import asdict
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import Any
 
 import numpy as np
-
 from fastapi import (
-    BackgroundTasks,
     Depends,
     FastAPI,
+    File,
+    Form,
     HTTPException,
     Query,
     Request,
+    UploadFile,
     WebSocket,
     WebSocketDisconnect,
-    File,
-    UploadFile,
-    Form,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-# Core Quantitative Engines
-from core.database import db_manager
-from core.market_providers import market_gateway
-from core.data_streamer import data_streamer
-from core.data_quality_gate import data_quality_gate
-from core.venue_dislocation import venue_dislocation_monitor
-from core.causal_firewall import causal_firewall
-from core.market_state import market_state_compiler
-from core.smc_engine import smc_engine
-from core.pattern_engine import pattern_engine
-from core.regime_transition import regime_transition_detector
-from core.cvd_absorption import cvd_absorption_engine
-from core.lead_lag_correlator import lead_lag_correlator
-from core.judas_sweep_hunter import judas_sweep_hunter
-from core.orderbook_imbalance import orderbook_imbalance_engine
-from core.oi_funding_squeeze import oi_funding_squeeze_engine
-from core.fractal_harmonics import fractal_harmonics_engine
-from core.half_kelly_sizer import half_kelly_position_sizer
-from core.institutional_alpha import institutional_alpha_engine
-from core.event_shock_engine import event_shock_engine
-from core.macro_sentinel import macro_sentinel
-from core.sentiment_engine import sentiment_engine
-from core.asset_dossier_engine import asset_dossier_engine
 from core.analogue_engine import analogue_engine
-from core.scenario_engine import scenario_engine
-from core.scenario_monitor import scenario_monitor
-from core.path_simulator import path_simulator
-from core.probability_calibrator import probability_calibrator
-from core.prediction_ladder import prediction_ladder_engine
-from core.prediction_ledger import prediction_ledger
-from core.uncertainty_engine import uncertainty_engine
-from core.ev_engine import ev_engine
-from core.conservative_kelly import conservative_kelly
-from core.debate_committee import debate_committee
-from core.portfolio_risk_matrix import portfolio_risk_matrix
-from core.risk_manager import risk_manager
-from core.dynamic_hedger import dynamic_hedger
-from core.tail_risk_engine import tail_risk_engine
-from core.psychology_shield import psychology_shield
-from core.strategy_league import strategy_league_manager
-from core.loss_autopsy import loss_autopsy_engine
-from core.counterfactual_engine import counterfactual_engine
-from core.alpha_attribution import alpha_attribution_engine
-from core.portfolio_shadow import portfolio_shadow
-from core.quant_mentor import quant_mentor
-from core.command_executor import command_executor
-from core.execution_gateway import execution_gateway
-from core.drift_monitor import drift_monitor
-from core.system_evolver import system_evolver
 from core.api_health_guard import api_health_guard
-from core.patch_governor import patch_governor
-from core.sandbox_lab import sandbox_lab
-from core.walk_forward_engine import walk_forward_engine
-from core.monte_carlo_stress import monte_carlo_stress_tester
-from core.voice_interface import voice_interface
-from core.telegram_bot import telegram_bot
-from core.empirical_accumulator import empirical_accumulator
-from core.ttl_cache import sky_decision_cache, market_state_cache
-from core.provenance_engine import provenance_engine
-from core.universal_ingestor import universal_ingestor
-from core.knowledge_graph_engine import knowledge_graph_engine
-from core.autonomous_research.pipeline import autonomous_research_pipeline
+from core.asset_dossier_engine import asset_dossier_engine
+from core.audit_bus import audit_bus
+from core.auth import (
+    ExchangeCredential,
+    credential_vault,
+    mask_secret,
+    require_api_key,
+    sanitize_text,
+)
+from core.autonomous_auditor import autonomous_risk_auditor
 from core.autonomous_research.empirical_tester import empirical_tester
-from core.autonomous_research.failure_memory import failure_memory
+from core.autonomous_research.pipeline import autonomous_research_pipeline
 from core.autonomous_research.practice_engine import practice_engine
 from core.autonomous_research.priority_engine import priority_engine
 from core.autonomous_research.promotion_engine import promotion_engine
 from core.autonomous_research.provenance_tracker import provenance_tracker
 from core.autonomous_research.storage import research_storage
-from core.strategy_compiler import strategy_compiler
-from core.audit_bus import audit_bus
-from core.macro_gold_engine import macro_gold_engine
-from core.auth import (
-    require_api_key,
-    credential_vault,
-    ExchangeCredential,
-    mask_secret,
-    sanitize_dict,
-    sanitize_text,
-)
+from core.autonomous_research.storage.storage_manager import storage_manager
+from core.autonomous_research.storage.storage_manifest import storage_manifest
+from core.autonomous_trader import autonomous_trader
+from core.command_executor import command_executor
+from core.conservative_kelly import conservative_kelly
+from core.cvd_absorption import cvd_absorption_engine
+from core.data_quality_gate import data_quality_gate
+from core.data_streamer import data_streamer
+
+# Core Quantitative Engines
+from core.database import db_manager
+from core.debate_committee import debate_committee
+from core.drift_monitor import drift_monitor
+from core.empirical_accumulator import empirical_accumulator
+from core.ev_engine import ev_engine
+from core.event_shock_engine import event_shock_engine
 from core.execution import (
     AlmgrenChrissError,
     ExchangeAuthenticationError,
-    ExchangeError,
     ExchangeRateLimitError,
     ExchangeRejectedError,
     InsufficientLiquidityError,
@@ -136,7 +90,6 @@ from core.execution import (
     LivePreflightFailedError,
     LiveRiskRejectedError,
     LiveSizeRejectedError,
-    OrderStatus,
     SmartOrderRouterError,
     VenueOrderBook,
     almgren_chriss_slicer,
@@ -146,53 +99,79 @@ from core.execution import (
     reconciliation_ledger,
     smart_order_router,
 )
-from core.models.kronos import (
-    kronos_adapter,
-    kronos_health_monitor,
-)
-from core.models.kronos.persistence import (
-    freeze_kronos_forecast,
-    get_kronos_forecasts,
-)
-from core.models.kronos.ablation_benchmark import kronos_ablation_benchmark
-from core.models.kronos.walk_forward import kronos_walk_forward_engine
-from core.models.kronos.calibration import kronos_probability_calibrator
-from core.models.kronos.advisory_engine import kronos_advisory_engine
-from core.rate_limiter import RateLimitMiddleware, fastapi_rate_limiter
+from core.genetic_optimizer import genetic_strategy_optimizer
+from core.half_kelly_sizer import half_kelly_position_sizer
+from core.hf_telemetry_pipeline import hf_telemetry_pipeline
+from core.incident_escalation import incident_escalation_engine
+from core.institutional_alpha import institutional_alpha_engine
+from core.knowledge_graph_engine import knowledge_graph_engine
+from core.macro_gold_engine import macro_gold_engine
+from core.macro_network import macro_network_engine
+from core.macro_sentinel import macro_sentinel
+from core.market_providers import market_gateway
+from core.market_state import market_state_compiler
 from core.metrics import generate_prometheus_metrics
 
 # Frontier Quantitative Engines (Phase 14)
 from core.microstructure_engine import microstructure_engine
-from core.macro_network import macro_network_engine
-from core.genetic_optimizer import genetic_strategy_optimizer
-from core.smart_execution import smart_execution_engine
-from core.autonomous_auditor import autonomous_risk_auditor
-from core.api_health_guard import api_health_guard
-from core.telegram.jobs import job_manager
-from core.autonomous_trader import autonomous_trader
-from core.youtube.agent import youtube_agent
+from core.models.kronos import (
+    kronos_adapter,
+    kronos_health_monitor,
+)
+from core.models.kronos.ablation_benchmark import kronos_ablation_benchmark
+from core.models.kronos.advisory_engine import kronos_advisory_engine
+from core.models.kronos.calibration import kronos_probability_calibrator
+from core.models.kronos.persistence import (
+    freeze_kronos_forecast,
+    get_kronos_forecasts,
+)
+from core.monte_carlo_stress import monte_carlo_stress_tester
+from core.orderbook_imbalance import orderbook_imbalance_engine
+from core.patch_governor import patch_governor
+from core.path_simulator import path_simulator
+from core.pattern_engine import pattern_engine
+from core.portfolio_shadow import portfolio_shadow
+from core.prediction_ladder import prediction_ladder_engine
+from core.prediction_ledger import prediction_ledger
+from core.probability_calibrator import probability_calibrator
+from core.provenance_engine import provenance_engine
+from core.quant_mentor import quant_mentor
+from core.rate_limiter import RateLimitMiddleware
+from core.regime_transition import regime_transition_detector
+from core.sandbox_lab import sandbox_lab
+from core.scenario_engine import scenario_engine
+from core.scenario_monitor import scenario_monitor
+from core.sentiment_engine import sentiment_engine
 from core.shadow_burn_in_orchestrator import shadow_burn_in_orchestrator
-from core.hf_telemetry_pipeline import hf_telemetry_pipeline
-from core.incident_escalation import incident_escalation_engine, IncidentTier
-
 from core.sky_intelligence import (
-    sky_orchestrator,
-    market_structure_engine,
+    derivatives_engine,
+    displacement_engine,
+    expectancy_engine,
+    fvg_engine,
     liquidity_engine,
+    market_regime_engine,
+    market_structure_engine,
+    multi_timeframe_engine,
+    order_block_engine,
+    setup_engine,
+    sky_orchestrator,
     volatility_engine,
     volume_engine,
-    derivatives_engine,
-    fvg_engine,
-    order_block_engine,
-    displacement_engine,
-    multi_timeframe_engine,
-    market_regime_engine,
-    setup_engine,
-    expectancy_engine,
     vwap_engine,
 )
-
-from logging.handlers import RotatingFileHandler
+from core.smart_execution import smart_execution_engine
+from core.smc_engine import smc_engine
+from core.strategy_compiler import strategy_compiler
+from core.strategy_league import strategy_league_manager
+from core.system_evolver import system_evolver
+from core.telegram.jobs import job_manager
+from core.telegram_bot import telegram_bot
+from core.ttl_cache import market_state_cache, sky_decision_cache
+from core.uncertainty_engine import uncertainty_engine
+from core.universal_ingestor import universal_ingestor
+from core.voice_interface import voice_interface
+from core.walk_forward_engine import walk_forward_engine
+from core.youtube.agent import youtube_agent
 
 log_dir = Path(os.getenv("DATA_DIR", "data")) / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
@@ -284,9 +263,9 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # Pydantic Request Models
 class AskDeskRequest(BaseModel):
     message: str
-    symbol: Optional[str] = "BTC/USDT"
-    timeframe: Optional[str] = "15m"
-    language: Optional[str] = "auto"
+    symbol: str | None = "BTC/USDT"
+    timeframe: str | None = "15m"
+    language: str | None = "auto"
 
 
 class CommandParseRequest(BaseModel):
@@ -304,53 +283,53 @@ class TradeOrderRequest(BaseModel):
 
 class ParameterApprovalRequest(BaseModel):
     proposal_id: str
-    operator_name: Optional[str] = "HUMAN_OPERATOR"
+    operator_name: str | None = "HUMAN_OPERATOR"
 
 
 class PositionCloseRequest(BaseModel):
     position_id: str
-    exit_price: Optional[float] = None
+    exit_price: float | None = None
 
 
 class ChartMemorySaveRequest(BaseModel):
     symbol: str
     timeframe: str
-    drawings: List[Dict[str, Any]] = []
-    indicators: Dict[str, Any] = {}
-    chart_config: Dict[str, Any] = {}
+    drawings: list[dict[str, Any]] = []
+    indicators: dict[str, Any] = {}
+    chart_config: dict[str, Any] = {}
 
 
 class VoiceTranscribeRequest(BaseModel):
     audio_base64: str
-    filename: Optional[str] = "memo.webm"
+    filename: str | None = "memo.webm"
 
 
 class VoiceSynthesizeRequest(BaseModel):
     text: str
-    filename: Optional[str] = "desk_brief.mp3"
+    filename: str | None = "desk_brief.mp3"
 
 
 class TelegramBroadcastRequest(BaseModel):
     text: str
-    parse_mode: Optional[str] = "Markdown"
+    parse_mode: str | None = "Markdown"
 
 
 class ResearchTelegramShareRequest(BaseModel):
     knowledge_id: str
     title: str
-    author_creator: Optional[str] = "Author Unknown"
-    source_type: Optional[str] = "RESEARCH"
+    author_creator: str | None = "Author Unknown"
+    source_type: str | None = "RESEARCH"
     executive_summary: str
-    chapter_breakdown: Optional[List[str]] = Field(default_factory=list)
-    epistemic_counts: Optional[Dict[str, int]] = Field(default_factory=dict)
-    candidate_summary: Optional[str] = None
-    chat_id: Optional[str] = None
+    chapter_breakdown: list[str] | None = Field(default_factory=list)
+    epistemic_counts: dict[str, int] | None = Field(default_factory=dict)
+    candidate_summary: str | None = None
+    chat_id: str | None = None
 
 
 class TelegramWebhookRequest(BaseModel):
-    update_id: Optional[int] = None
-    message: Optional[Dict[str, Any]] = None
-    callback_query: Optional[Dict[str, Any]] = None
+    update_id: int | None = None
+    message: dict[str, Any] | None = None
+    callback_query: dict[str, Any] | None = None
     model_config = {"extra": "allow"}
 
 
@@ -360,7 +339,7 @@ class PaperTradeRequest(BaseModel):
     entryPrice: float = Field(gt=0)
     sl: float = Field(gt=0)
     tp: float = Field(gt=0)
-    size: Optional[float] = Field(default=1.0, gt=0, le=1_000_000)
+    size: float | None = Field(default=1.0, gt=0, le=1_000_000)
 
     @field_validator("symbol")
     @classmethod
@@ -391,7 +370,7 @@ class PaperTradeRequest(BaseModel):
 
 class PaperCloseRequest(BaseModel):
     positionId: str = Field(min_length=1, max_length=128)
-    exitPrice: Optional[float] = Field(default=None, gt=0)
+    exitPrice: float | None = Field(default=None, gt=0)
 
 
 class HalfKellyCalcRequest(BaseModel):
@@ -399,48 +378,48 @@ class HalfKellyCalcRequest(BaseModel):
     entryPrice: float = Field(gt=0)
     sl: float = Field(gt=0)
     tp: float = Field(gt=0)
-    equity: Optional[float] = None
-    winProbability: Optional[float] = 0.55
-    historicalSampleSize: Optional[int] = 50
-    currentDrawdownPct: Optional[float] = 0.0
+    equity: float | None = None
+    winProbability: float | None = 0.55
+    historicalSampleSize: int | None = 50
+    currentDrawdownPct: float | None = 0.0
 
 
 class IngestSourceRequest(BaseModel):
     source_type: str  # "URL", "PDF", "AUDIO", "IMAGE", "TEXT", "YOUTUBE"
     content: str
-    title: Optional[str] = "Untitled Research Source"
-    source_url: Optional[str] = None
-    parser: Optional[str] = "api_ingestor"
-    confidence: Optional[float] = 0.90
-    language: Optional[str] = "en"
-    extracted_facts: Optional[List[Dict[str, Any]]] = None
-    extracted_hypotheses: Optional[List[Dict[str, Any]]] = None
+    title: str | None = "Untitled Research Source"
+    source_url: str | None = None
+    parser: str | None = "api_ingestor"
+    confidence: float | None = 0.90
+    language: str | None = "en"
+    extracted_facts: list[dict[str, Any]] | None = None
+    extracted_hypotheses: list[dict[str, Any]] | None = None
 
 
 class CompileStrategyRequest(BaseModel):
     name: str
     description: str
-    assets: Optional[List[str]] = None
-    timeframes: Optional[Dict[str, str]] = None
-    entry_rules: Optional[List[Dict[str, Any]]] = None
-    invalidation_rules: Optional[List[Dict[str, Any]]] = None
-    exit_rules: Optional[List[Dict[str, Any]]] = None
-    risk_model: Optional[Dict[str, Any]] = None
-    source_id: Optional[str] = None
+    assets: list[str] | None = None
+    timeframes: dict[str, str] | None = None
+    entry_rules: list[dict[str, Any]] | None = None
+    invalidation_rules: list[dict[str, Any]] | None = None
+    exit_rules: list[dict[str, Any]] | None = None
+    risk_model: dict[str, Any] | None = None
+    source_id: str | None = None
 
 
 class YouTubeExploreRequest(BaseModel):
     source_url_or_handle: str
-    limit: Optional[int] = 10
-    sort_by: Optional[str] = "recent"
-    force_refresh: Optional[bool] = False
-    requested_by: Optional[str] = "research_lab"
+    limit: int | None = 10
+    sort_by: str | None = "recent"
+    force_refresh: bool | None = False
+    requested_by: str | None = "research_lab"
 
 
 # WebSocket Connection Manager with 24/7 Heartbeat Guard
 class ConnectionManager:
     def __init__(self, timeout_sec: float = 60.0):
-        self.active_connections: Dict[WebSocket, float] = {}
+        self.active_connections: dict[WebSocket, float] = {}
         self.timeout_sec = timeout_sec
 
     async def connect(self, websocket: WebSocket):
@@ -459,7 +438,7 @@ class ConnectionManager:
         if websocket in self.active_connections:
             self.active_connections[websocket] = time.time()
 
-    async def broadcast(self, message: Dict[str, Any]):
+    async def broadcast(self, message: dict[str, Any]):
         dead = []
         for connection in list(self.active_connections.keys()):
             try:
@@ -1122,7 +1101,7 @@ async def scan_smc_patterns(symbol: str = Query("BTC/USDT"), timeframe: str = Qu
 async def get_sky_decision(
     symbol: str = Query("BTC/USDT"),
     timeframe: str = Query("15m"),
-    limit: Optional[int] = Query(100),
+    limit: int | None = Query(100),
 ):
     """
     Executes the full 12-stage SKY Market Intelligence Decision Pipeline:
@@ -1306,8 +1285,8 @@ async def get_scenarios(symbol: str = Query("BTC/USDT")):
 @app.get("/api/path-simulation")
 async def get_path_simulation(
     symbol: str = Query("BTC/USDT"),
-    tp: Optional[float] = Query(None),
-    sl: Optional[float] = Query(None),
+    tp: float | None = Query(None),
+    sl: float | None = Query(None),
 ):
     candles = data_streamer.get_candles(symbol, "15m", limit=100)
     cur_p = candles[-1]["close"] if candles else 88500.0
@@ -1439,8 +1418,8 @@ async def get_half_kelly_calc(
     entryPrice: float = Query(...),
     sl: float = Query(...),
     tp: float = Query(...),
-    equity: Optional[float] = Query(None),
-    winProbability: Optional[float] = Query(0.55),
+    equity: float | None = Query(None),
+    winProbability: float | None = Query(0.55),
 ):
     """
     Query-based Bayesian Half-Kelly calculator for quick terminal inspections.
@@ -1903,7 +1882,7 @@ async def get_autonomous_trader_status():
 
 
 @app.post("/api/trader/toggle", dependencies=[Depends(require_api_key)])
-async def toggle_autonomous_trader(enable: Optional[bool] = None):
+async def toggle_autonomous_trader(enable: bool | None = None):
     """Toggles or sets the running state of the Autonomous Trader."""
     if enable is not None:
         if enable:
@@ -2123,9 +2102,9 @@ async def run_lab_stress_test(symbol: str = Query("BTC/USDT"), timeframe: str = 
 class ResearchIngestRequest(BaseModel):
     content: str
     mode: str = "RESEARCH"  # ANALYZE, RESEARCH, SAVE_KNOWLEDGE
-    source_uri: Optional[str] = None
-    author_creator: Optional[str] = None
-    title: Optional[str] = None
+    source_uri: str | None = None
+    author_creator: str | None = None
+    title: str | None = None
 
 
 async def auto_dispatch_telegram_summary(result: dict[str, Any]) -> None:
@@ -2177,7 +2156,7 @@ async def auto_dispatch_telegram_summary(result: dict[str, Any]) -> None:
         contra = ep.get("contradictions", 0)
 
         lines = [
-            f"⚡ *AUTOMATIC RESEARCH INGESTION*",
+            "⚡ *AUTOMATIC RESEARCH INGESTION*",
             f"*{source_emoji}*",
             "━━━━━━━━━━━━━━━━━━━━━━━━",
             f"📚 *Title:* {title}",
@@ -2246,8 +2225,8 @@ async def ingest_research_text(req: ResearchIngestRequest):
 async def ingest_research_file(
     file: UploadFile = File(...),
     mode: str = Form("RESEARCH"),
-    author_creator: Optional[str] = Form(None),
-    title: Optional[str] = Form(None),
+    author_creator: str | None = Form(None),
+    title: str | None = Form(None),
 ):
     """
     Uploads and parses a physical document (.pdf, .py, .pine, .mq5, .json, .csv, .txt, .md).
@@ -2285,7 +2264,7 @@ async def ingest_research_file(
         raise
     except Exception as e:
         logger.error(f"File ingestion error: {e}")
-        raise HTTPException(status_code=500, detail=f"File ingestion failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"File ingestion failed: {e!s}")
 
 
 @app.post("/api/research/youtube/explore", dependencies=[Depends(require_api_key)])
@@ -2294,7 +2273,6 @@ async def explore_youtube_source(req: YouTubeExploreRequest):
     Triggers YouTube V5 Autonomous Channel & Playlist Exploration.
     Runs asynchronously and returns an instant Job ID receipt.
     """
-    from core.youtube.agent import youtube_agent
 
     clean_src = req.source_url_or_handle.strip()
     if not clean_src:
@@ -2561,10 +2539,10 @@ async def run_candidate_backtest(
 
 class AutonomousIngestRequest(BaseModel):
     content: str
-    source_type: Optional[str] = None
-    title: Optional[str] = None
-    author_creator: Optional[str] = None
-    source_uri: Optional[str] = None
+    source_type: str | None = None
+    title: str | None = None
+    author_creator: str | None = None
+    source_uri: str | None = None
     auto_advance: bool = True
 
 
@@ -2594,10 +2572,14 @@ async def get_autonomous_pipeline_status():
     with db_manager.get_brain_conn() as conn:
         src_cnt = conn.execute("SELECT COUNT(*) FROM immutable_sources").fetchone()[0]
         kv_cnt = conn.execute("SELECT COUNT(*) FROM knowledge_versions").fetchone()[0]
-        conf_cnt = conn.execute("SELECT COUNT(*) FROM research_conflicts WHERE status = 'UNRESOLVED'").fetchone()[0]
+        conf_cnt = conn.execute(
+            "SELECT COUNT(*) FROM research_conflicts WHERE status = 'UNRESOLVED'"
+        ).fetchone()[0]
         fail_cnt = conn.execute("SELECT COUNT(*) FROM failure_memory").fetchone()[0]
         prac_cnt = conn.execute("SELECT COUNT(*) FROM research_practice_sessions").fetchone()[0]
-        task_cnt = conn.execute("SELECT COUNT(*) FROM autonomous_research_tasks WHERE status = 'PENDING'").fetchone()[0]
+        task_cnt = conn.execute(
+            "SELECT COUNT(*) FROM autonomous_research_tasks WHERE status = 'PENDING'"
+        ).fetchone()[0]
 
     return {
         "status": "ONLINE",
@@ -2642,8 +2624,8 @@ async def resolve_research_conflict(
 
 @app.get("/api/research/failures")
 async def search_failure_memory(
-    query: Optional[str] = Query(None),
-    symbol: Optional[str] = Query(None),
+    query: str | None = Query(None),
+    symbol: str | None = Query(None),
     limit: int = Query(20),
 ):
     """Searches the first-class failure memory archive for past negative-EV claims and autopsies."""
@@ -2683,6 +2665,57 @@ async def get_next_research_priorities(limit: int = Query(5)):
 
 
 # ==============================================================================
+# SKY 15-TB KNOWLEDGE STORAGE & ARCHIVE TELEMETRY REST APIS
+# ==============================================================================
+
+
+@app.get("/api/research/storage/telemetry")
+async def get_storage_dashboard_telemetry():
+    """Returns real-time host disk capacity, Google Drive status, and manifest tier metrics."""
+    telemetry = storage_manager.get_telemetry_dashboard()
+    return sanitize_numpy(telemetry)
+
+
+@app.post("/api/research/storage/reconcile", dependencies=[Depends(require_api_key)])
+async def trigger_archive_reconciliation():
+    """Triggers 3-way reconciliation: SQLite database vs Archive Manifest vs Google Drive."""
+    report = storage_manager.run_reconciliation()
+    return sanitize_numpy(
+        asdict(report)
+        if hasattr(report, "to_dict") or hasattr(report, "__dataclass_fields__")
+        else report
+    )
+
+
+@app.post("/api/research/storage/snapshot", dependencies=[Depends(require_api_key)])
+async def create_system_knowledge_snapshot(tag: str | None = Query(None)):
+    """Creates a point-in-time snapshot of the knowledge graph and manifest state and uploads to Drive."""
+    snap = storage_manager.create_snapshot(tag=tag)
+    return sanitize_numpy(snap.to_dict())
+
+
+@app.post("/api/research/storage/pressure/relieve", dependencies=[Depends(require_api_key)])
+async def trigger_storage_pressure_relief():
+    """Triggers verification-gated LRU cache eviction under disk pressure."""
+    summary = storage_manager.relieve_pressure()
+    return sanitize_numpy(summary)
+
+
+@app.get("/api/research/storage/manifest")
+async def list_archive_manifest_records(
+    tier: str | None = Query(None),
+    status: str | None = Query(None),
+    limit: int = Query(100),
+    offset: int = Query(0),
+):
+    """Lists records from the archive_manifest table."""
+    records = storage_manifest.list_records(
+        storage_tier=tier, archive_status=status, limit=limit, offset=offset
+    )
+    return sanitize_numpy([r.to_dict() for r in records])
+
+
+# ==============================================================================
 # SKY KNOWLEDGE & DISCOVERY GRAPH REST APIS
 # ==============================================================================
 
@@ -2693,10 +2726,10 @@ class CreateHypothesisRequest(BaseModel):
     alt_hypothesis: str
     independent_variable: str
     dependent_variable: str
-    claim_id: Optional[str] = None
+    claim_id: str | None = None
     target_symbol: str = "BTC/USDT"
     test_method: str = "VOLATILITY_EVENT_STUDY"
-    control_variables: Optional[List[str]] = None
+    control_variables: list[str] | None = None
 
 
 @app.get("/api/research/graph")
@@ -2785,7 +2818,7 @@ ALLOWED_UPLOAD_EXTENSIONS = {
 }
 
 
-def safe_upload_filename(filename: Optional[str]) -> Tuple[str, str]:
+def safe_upload_filename(filename: str | None) -> tuple[str, str]:
     """
     Returns (safe_storage_name, original_name) for an uploaded file.
 
@@ -3118,7 +3151,7 @@ async def get_strategy_genomes():
 @app.get("/api/audit/events")
 async def get_system_audit_events(
     limit: int = Query(50),
-    event_type: Optional[str] = Query(None),
+    event_type: str | None = Query(None),
 ):
     """
     Retrieves immutable structured audit log events (trade closures, loss autopsies, risk gate events).
@@ -3129,10 +3162,10 @@ async def get_system_audit_events(
 
 @app.get("/api/macro/gold")
 async def get_gold_macro_telemetry(
-    gold_price: Optional[float] = Query(None),
-    paxg_price: Optional[float] = Query(None),
-    dxy: Optional[float] = Query(None),
-    real_yield: Optional[float] = Query(None),
+    gold_price: float | None = Query(None),
+    paxg_price: float | None = Query(None),
+    dxy: float | None = Query(None),
+    real_yield: float | None = Query(None),
 ):
     """
     Returns dedicated institutional macro telemetry for Gold (XAUUSD / PAXGUSDT)
@@ -3202,8 +3235,8 @@ async def get_kronos_health():
 
 @app.get("/api/kronos/history")
 async def get_kronos_history(
-    symbol: Optional[str] = Query(None),
-    timeframe: Optional[str] = Query(None),
+    symbol: str | None = Query(None),
+    timeframe: str | None = Query(None),
     limit: int = Query(20),
 ):
     """Retrieves immutable frozen forecast records from SQLite experiment_store.db."""
@@ -3299,8 +3332,8 @@ class RecordTradeRequest(BaseModel):
 
 
 class BurnInToggleRequest(BaseModel):
-    action: Optional[str] = "toggle"
-    note: Optional[str] = None
+    action: str | None = "toggle"
+    note: str | None = None
 
 
 class HFTelemetryRecordRequest(BaseModel):
@@ -3331,7 +3364,7 @@ class SimulateIncidentRequest(BaseModel):
 
 class ResolveIncidentRequest(BaseModel):
     operator_id: str = "ADMIN"
-    notes: Optional[str] = "Resolved via API"
+    notes: str | None = "Resolved via API"
 
 
 @app.get("/api/microstructure/analytics")
@@ -3377,7 +3410,7 @@ async def get_microstructure_toxicity(
 async def get_macro_network():
     """Returns multi-asset cross-correlation matrix, PCA systemic absorption ratio, and Granger causality."""
     universe = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "PAXG/USDT"]
-    returns_data: Dict[str, List[float]] = {}
+    returns_data: dict[str, list[float]] = {}
     for sym in universe:
         candles = data_streamer.generate_synthetic_candles(sym, "1h", count=80)
         closes = np.array([float(c.get("close", 100.0)) for c in candles])
@@ -3548,7 +3581,7 @@ async def get_burn_in_status():
 
 
 @app.post("/api/burn-in/toggle", dependencies=[Depends(require_api_key)])
-async def toggle_burn_in(req: Optional[BurnInToggleRequest] = None):
+async def toggle_burn_in(req: BurnInToggleRequest | None = None):
     """Controls the lifecycle of the Shadow Burn-In Orchestrator."""
     action = (req.action if req and req.action else "toggle").lower()
     note = req.note if req and req.note else ""
@@ -3663,7 +3696,7 @@ async def simulate_incident_trigger(req: SimulateIncidentRequest):
 
 
 @app.post("/api/incident/resolve/{incident_id}", dependencies=[Depends(require_api_key)])
-async def resolve_incident(incident_id: str, req: Optional[ResolveIncidentRequest] = None):
+async def resolve_incident(incident_id: str, req: ResolveIncidentRequest | None = None):
     """Marks an active incident as resolved by an operator."""
     op_id = req.operator_id if req and req.operator_id else "ADMIN"
     notes = req.notes if req and req.notes else "Resolved"
@@ -3687,7 +3720,7 @@ class VaultConfigureApiRequest(BaseModel):
     environment: str = Field("TESTNET", description="Environment: TESTNET or PRODUCTION")
     api_key: str = Field(..., description="Exchange API key")
     api_secret: str = Field(..., description="Exchange API secret")
-    passphrase: Optional[str] = Field(None, description="Optional passphrase/subaccount")
+    passphrase: str | None = Field(None, description="Optional passphrase/subaccount")
     is_active: bool = Field(True, description="Active status")
 
     @field_validator("exchange")
@@ -3714,17 +3747,17 @@ class LiveOrderApiRequest(BaseModel):
     side: str = Field(..., description="BUY or SELL")
     order_type: str = Field("LIMIT", description="LIMIT or MARKET")
     quantity: float = Field(..., gt=0.0, description="Order quantity in base units")
-    price: Optional[float] = Field(None, gt=0.0, description="Order price for LIMIT orders")
-    stop_loss: Optional[float] = Field(None, gt=0.0, description="Protective stop loss price")
-    take_profit: Optional[float] = Field(None, gt=0.0, description="Target take profit price")
+    price: float | None = Field(None, gt=0.0, description="Order price for LIMIT orders")
+    stop_loss: float | None = Field(None, gt=0.0, description="Protective stop loss price")
+    take_profit: float | None = Field(None, gt=0.0, description="Target take profit price")
     account_equity_usd: float = Field(100000.0, gt=0.0, description="Account equity in USD")
     daily_realized_pnl_usd: float = Field(0.0, description="Daily realized PnL in USD")
     daily_unrealized_pnl_usd: float = Field(0.0, description="Daily unrealized PnL in USD")
     current_open_positions_count: int = Field(0, ge=0, description="Current open positions count")
     max_open_positions_cap: int = Field(3, ge=1, description="Maximum open positions cap")
-    client_order_id: Optional[str] = Field(None, description="Optional unique client order ID")
-    correlation_id: Optional[str] = Field(None, description="Optional request correlation ID")
-    reference_time_ms: Optional[int] = Field(
+    client_order_id: str | None = Field(None, description="Optional unique client order ID")
+    correlation_id: str | None = Field(None, description="Optional request correlation ID")
+    reference_time_ms: int | None = Field(
         None, description="Optional external UTC reference timestamp for clock skew validation"
     )
 
@@ -3733,8 +3766,8 @@ class LiveCancelApiRequest(BaseModel):
     exchange: str = Field(..., description="Exchange venue: BINANCE or BYBIT")
     environment: str = Field("TESTNET", description="Environment: TESTNET or PRODUCTION")
     symbol: str = Field(..., description="Symbol format BASE/QUOTE e.g. BTC/USDT")
-    exchange_order_id: Optional[str] = Field(None, description="Exchange order ID")
-    client_order_id: Optional[str] = Field(None, description="Client order ID")
+    exchange_order_id: str | None = Field(None, description="Exchange order ID")
+    client_order_id: str | None = Field(None, description="Client order ID")
     operator_id: str = Field("OPERATOR", description="Operator identifier")
 
 
