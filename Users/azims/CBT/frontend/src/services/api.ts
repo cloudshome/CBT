@@ -55,6 +55,9 @@ function authHeaders(extraHeaders?: HeadersInit): HeadersInit {
 
 async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = authHeaders(init?.headers);
+  if (init?.body && typeof init.body === 'string' && !(headers as Headers).has('Content-Type')) {
+    (headers as Headers).set('Content-Type', 'application/json');
+  }
   return fetch(input, { ...init, headers });
 }
 
@@ -1254,6 +1257,7 @@ export const api = {
   async sendSummaryToTelegram(payload: ResearchTelegramShareRequest): Promise<ResearchTelegramShareResponse> {
     const res = await authFetch(`${BASE_URL}/api/research/share-telegram`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     return handleResponse<ResearchTelegramShareResponse>(res);

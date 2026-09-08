@@ -834,28 +834,79 @@ class TelegramBotDispatcher:
         """Registers an interactive command handler (e.g. '/signal', '/status', '/plan')."""
         self._command_handlers[command.lower().strip()] = handler
 
-    async def send_message(
+    @staticmethod
+    def _split_message_chunks(text: str, max_chars: int = 4000) -> list[str]:
+        """
+        Splits text into clean sequential chunks respecting Telegram's 4096-character limit.
+        Splits preferentially on paragraph breaks (\n\n), line breaks (\n), or word boundaries.
+        """
+        if len(text) <= max_chars:
+            return [text]
+
+        chunks: list[str] = []
+        current = ""
+
+        # Break text into paragraphs first
+        paragraphs = text.split("\n\n")
+        for para in paragraphs:
+            para_with_break = f"{current}\n\n{para}" if current else para
+            if len(para_with_break) <= max_chars:
+                current = para_with_break
+            else:
+                if current:
+                    chunks.append(current)
+                    current = ""
+                if len(para) <= max_chars:
+                    current = para
+                else:
+                    lines = para.split("\n")
+                    for line in lines:
+                        line_with_break = f"{current}\n{line}" if current else line
+                        if len(line_with_break) <= max_chars:
+                            current = line_with_break
+                        else:
+                            if current:
+                                chunks.append(current)
+                                current = ""
+                            if len(line) <= max_chars:
+                                current = line
+                            else:
+                                words = line.split(" ")
+                                for word in words:
+                                    word_with_space = f"{current} {word}" if current else word
+                                    if len(word_with_space) <= max_chars:
+                                        current = word_with_space
+                                    else:
+                                        if current:
+                                            chunks.append(current)
+                                            current = ""
+                                        while len(word) > max_chars:
+                                            chunks.append(word[:max_chars])
+                                            word = word[max_chars:]
+                                        current = word
+
+        if current:
+            chunks.append(current)
+
+        return chunks if chunks else [text[:max_chars]]
+
+    async def _send_single_payload(
         self,
         text: str,
-        parse_mode: str = "Markdown",
-        chat_id: int | str | None = None,
+        parse_mode: str | None = "Markdown",
+        chat: int | str = "",
         reply_markup: dict[str, Any] | None = None,
     ) -> bool:
-        """Dispatches text message to the target or configured Telegram chat."""
+        """Dispatches a single HTTP payload to Telegram with error fallbacks."""
         token = self.bot_token
-        chat = chat_id or self.chat_id
-        if not token or not chat:
-            logger.debug("Telegram credentials not configured; logging message locally.")
-            logger.info(f"[TELEGRAM LOCAL NOTIFICATION]\n{text}")
-            return False
-
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {
+        payload: dict[str, Any] = {
             "chat_id": chat,
             "text": text,
-            "parse_mode": parse_mode,
             "disable_web_page_preview": True,
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         if reply_markup:
             payload["reply_markup"] = reply_markup
 
@@ -874,11 +925,68 @@ class TelegramBotDispatcher:
                                 url, json=payload, timeout=aiohttp.ClientTimeout(total=5)
                             ) as resp2:
                                 return resp2.status == 200
+                        # Fallback if message is too long (emergency split)
+                        if "message is too long" in err_body:
+                            mid = len(text) // 2
+                            p1 = text[:mid]
+                            p2 = text[mid:]
+                            s1 = await self._send_single_payload(p1, parse_mode=None, chat=chat)
+                            s2 = await self._send_single_payload(
+                                p2, parse_mode=None, chat=chat, reply_markup=reply_markup
+                            )
+                            return s1 and s2
                         return False
                     return True
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.error(f"Telegram dispatch failed: {e}")
             return False
+
+    async def send_message(
+        self,
+        text: str,
+        parse_mode: str = "Markdown",
+        chat_id: int | str | None = None,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        Dispatches text message to the target or configured Telegram chat.
+        Enforces strict Telegram character limit (safe 4000-char splitting and rate control).
+        """
+        token = self.bot_token
+        chat = chat_id or self.chat_id
+        if not token or not chat:
+            logger.debug("Telegram credentials not configured; logging message locally.")
+            logger.info(f"[TELEGRAM LOCAL NOTIFICATION]\n{text}")
+            return False
+
+        chunks = self._split_message_chunks(text, max_chars=4000)
+        if len(chunks) == 1:
+            return await self._send_single_payload(
+                text=chunks[0],
+                parse_mode=parse_mode,
+                chat=chat,
+                reply_markup=reply_markup,
+            )
+
+        # Multi-part message dispatch
+        all_sent = True
+        total = len(chunks)
+        for idx, chunk in enumerate(chunks, 1):
+            header = f"📑 *[Part {idx}/{total}]*\n"
+            part_text = f"{header}{chunk}" if idx > 1 else chunk
+            # Attach keyboard only to final chunk
+            markup = reply_markup if idx == total else None
+            success = await self._send_single_payload(
+                text=part_text,
+                parse_mode=parse_mode,
+                chat=chat,
+                reply_markup=markup,
+            )
+            if not success:
+                all_sent = False
+            await asyncio.sleep(0.15)  # Telegram burst rate-limit defense
+
+        return all_sent
 
     async def send_photo(
         self,
@@ -1544,38 +1652,47 @@ class TelegramBotDispatcher:
         contra = ep.get("contradictions", 0)
 
         lines = [
+            f"🧠 *SKY AI QUANT INTEL | {source_emoji}*",
             "✅ *FILED IN SKY RESEARCH LAB*",
-            f"*{source_emoji}*",
             "━━━━━━━━━━━━━━━━━━━━━━━━",
             f"📚 *Title:* {title}",
             f"👤 *Author/Creator:* {author}",
             f"🆔 *Ledger ID:* `{kid}`",
+            "🔬 *Epistemic Verification:* `0.00 (Quarantined Invariant)`",
             "",
-            "📝 *Executive Synthesis:*",
+            "📝 *AI Executive Synthesis:*",
             clean_summary,
             "",
-            "⚖️ *Epistemic Classification (Quarantined 0.0):*",
-            f"• Facts (Causal): *{facts}*",
-            f"• Hypotheses: *{hypo}*",
-            f"• Proposed Rules: *{rules}*",
-            f"• Contradictions: *{contra}*",
+            "⚖️ *Epistemic Classification Rigor:*",
+            f"• Causal Facts: *{facts}*",
+            f"• Testable Hypotheses: *{hypo}*",
+            f"• Proposed Strategy Rules: *{rules}*",
+            f"• Invalidation Contradictions: *{contra}*",
         ]
 
         chap_breakdown = result.get("chapter_breakdown", [])
         if chap_breakdown:
             lines.append("")
-            lines.append("📑 *Sections / Chapters:*")
-            for ch in chap_breakdown[:4]:
-                lines.append(f"• {ch}")
+            lines.append("📑 *Deconstructed Sections / Chapters:*")
+            for ch in chap_breakdown[:6]:
+                safe_ch = str(ch).replace("*", "")
+                lines.append(f"• {safe_ch}")
+            if len(chap_breakdown) > 6:
+                lines.append(f"• ... and {len(chap_breakdown) - 6} more sections")
 
         cands = result.get("strategy_candidates", [])
         if cands:
+            cand_name = (
+                str(cands[0].get("strategy_name", "Candidate")).replace("*", "").replace("`", "")
+            )
             lines.append("")
-            lines.append("⚡ *Candidate Queued (UNTESTED):*")
-            lines.append(f"• `{cands[0].get('strategy_name', 'Candidate')}`")
+            lines.append("⚡ *Formulated Strategy Candidate:*")
+            lines.append(f"• `{cand_name}`")
+            lines.append("• *Governance Stage:* `[UNTESTED / QUARANTINED]`")
+            lines.append("• *Action:* Run walk-forward backtest verification before paper routing")
 
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
-        lines.append("🌐 _View full graph & backtest at http://localhost:5173_")
+        lines.append("🔬 _Dispatched from SKY / CBT Research Lab_")
         return "\n".join(lines)
 
     async def handle_telegram_research_ingest(

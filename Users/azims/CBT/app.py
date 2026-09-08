@@ -190,7 +190,9 @@ log_dir = Path(os.getenv("DATA_DIR", "data")) / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
 log_file = log_dir / "cbt_terminal.log"
 
-file_handler = RotatingFileHandler(str(log_file), maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8")
+file_handler = RotatingFileHandler(
+    str(log_file), maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+)
 file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
 
 stream_handler = logging.StreamHandler()
@@ -198,6 +200,7 @@ stream_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(nam
 
 logging.basicConfig(level=logging.INFO, handlers=[file_handler, stream_handler])
 logger = logging.getLogger("ai_quant_sentinel.app")
+
 
 # Background Real-Time Telemetry Broadcaster, Poller & Empirical Accumulator
 @asynccontextmanager
@@ -209,7 +212,9 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
     # Check host disk capacity
     disk_vitals = api_health_guard.check_disk_space()
     if not disk_vitals.get("is_safe", True):
-        logger.warning(f"CRITICAL DISK WARNING ON STARTUP: Only {disk_vitals.get('free_gb')} GB free disk remaining.")
+        logger.warning(
+            f"CRITICAL DISK WARNING ON STARTUP: Only {disk_vitals.get('free_gb')} GB free disk remaining."
+        )
 
     tasks = [
         asyncio.create_task(telemetry_broadcaster_loop()),
@@ -221,7 +226,9 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
         asyncio.create_task(hf_telemetry_pipeline.start_flush_loop()),
     ]
-    logger.info("AI Quant Sentinel FastAPI online with Autonomous Trader, Burn-In Orchestrator & Telemetry Pipeline.")
+    logger.info(
+        "AI Quant Sentinel FastAPI online with Autonomous Trader, Burn-In Orchestrator & Telemetry Pipeline."
+    )
     try:
         yield
     finally:
@@ -431,6 +438,7 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         import time
+
         self.active_connections[websocket] = time.time()
 
     def disconnect(self, websocket: WebSocket):
@@ -439,6 +447,7 @@ class ConnectionManager:
 
     def record_activity(self, websocket: WebSocket):
         import time
+
         if websocket in self.active_connections:
             self.active_connections[websocket] = time.time()
 
@@ -454,8 +463,13 @@ class ConnectionManager:
 
     async def prune_stale_connections(self):
         import time
+
         now = time.time()
-        stale = [ws for ws, last_seen in self.active_connections.items() if (now - last_seen) > self.timeout_sec]
+        stale = [
+            ws
+            for ws, last_seen in self.active_connections.items()
+            if (now - last_seen) > self.timeout_sec
+        ]
         for ws in stale:
             try:
                 await ws.close(code=1000)
@@ -515,6 +529,7 @@ async def _telegram_signal_cmd(args: str, chat_id=None) -> str:
         f"━━━━━━━━━━━━━━━━━━━━━━"
     )
 
+
 async def _telegram_plan_cmd(args: str, chat_id=None) -> str:
     sym = args.strip().upper() if args.strip() else "BTC/USDT"
     if "/" not in sym and sym:
@@ -531,6 +546,7 @@ async def _telegram_plan_cmd(args: str, chat_id=None) -> str:
         f"📉 **Bearish Path:** {plan['bear_scenario']}"
     )
 
+
 async def _telegram_market_cmd(args: str, chat_id=None) -> str:
     m = await telegram_bot.generate_market_update()
     return (
@@ -545,14 +561,23 @@ async def _telegram_market_cmd(args: str, chat_id=None) -> str:
         f"🎭 **Sentiment:** `{m['sentiment']}`"
     )
 
+
 async def _telegram_events_cmd(args: str, chat_id=None) -> str:
     ev = telegram_bot.generate_event_shock_status()
-    mins = ev['minutes_until']
+    mins = ev["minutes_until"]
     hours = mins / 60.0
-    time_display = f"{mins:.0f} mins ({hours:.1f} hours away)" if mins > 90 else f"{mins:.0f} mins away"
-    is_active = ev.get('is_risk_active', False)
-    lockout = ev.get('trading_lockout', False)
-    status = "🛑 EXECUTION LOCKOUT (Trading Halted)" if lockout else "⚠️ RISK GATE ACTIVE (+50% hurdle, 50% size cut)" if is_active else "🟢 NORMAL TRADING (No active macro lockout)"
+    time_display = (
+        f"{mins:.0f} mins ({hours:.1f} hours away)" if mins > 90 else f"{mins:.0f} mins away"
+    )
+    is_active = ev.get("is_risk_active", False)
+    lockout = ev.get("trading_lockout", False)
+    status = (
+        "🛑 EXECUTION LOCKOUT (Trading Halted)"
+        if lockout
+        else "⚠️ RISK GATE ACTIVE (+50% hurdle, 50% size cut)"
+        if is_active
+        else "🟢 NORMAL TRADING (No active macro lockout)"
+    )
 
     return (
         f"📅 **MACROECONOMIC SENTINEL RADAR**\n"
@@ -565,10 +590,12 @@ async def _telegram_events_cmd(args: str, chat_id=None) -> str:
         f"Dynamic rules engage automatically at T-15m & T-5m."
     )
 
+
 def _telegram_news_cmd(args: str, chat_id=None) -> str:
     items = telegram_bot.generate_news_digest()
     lines = [f"• `[{it['tag']}]` {it['headline']}" for it in items[:4]]
     return "📰 **SKY QUANT ALPHA WIRE**\n━━━━━━━━━━━━━━━━━━━━━━\n" + "\n\n".join(lines)
+
 
 async def _telegram_decision_cmd(args: str, chat_id=None) -> str:
     sym = args.strip().upper() if args.strip() else "BTC/USDT"
@@ -576,30 +603,37 @@ async def _telegram_decision_cmd(args: str, chat_id=None) -> str:
         sym = f"{sym}/USDT"
     candles = data_streamer.get_candles(sym, "15m", 50)
     out = sky_orchestrator.analyze_market(sym, "15m", candles)
-    dec_emoji = "🟢" if out.decision.value == "LONG" else "🔴" if out.decision.value == "SHORT" else "⚪"
+    dec_emoji = (
+        "🟢" if out.decision.value == "LONG" else "🔴" if out.decision.value == "SHORT" else "⚪"
+    )
     return (
         f"{dec_emoji} **SKY 12-STAGE DECISION: `{sym}`**\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"• **Action:** `{out.decision.value}`\n"
         f"• **Net EV (R):** `{out.net_ev_r:+.2f}R`\n"
-        f"• **Half-Kelly:** `{out.kelly_fraction*100:.2f}%`\n"
+        f"• **Half-Kelly:** `{out.kelly_fraction * 100:.2f}%`\n"
         f"• **Risk Gate:** `{'PASSED ✅' if out.risk_gate_passed else 'REJECTED ❌'}`\n"
         f"• **Reason:** `{out.no_trade_reason or 'Qualified High-EV Setup'}`"
     )
 
+
 def _telegram_positions_cmd(args: str, chat_id=None) -> str:
     return telegram_bot.state_mind.get_positions_report()
+
 
 def _telegram_close_cmd(args: str, chat_id=None) -> str:
     sym = args.strip() if args.strip() else "BTC/USDT"
     return telegram_bot.state_mind.close_position_by_symbol(sym)
 
+
 async def _telegram_debate_cmd(args: str, chat_id=None) -> str:
     sym = args.strip() if args.strip() else "BTC/USDT"
     return await telegram_bot.state_mind.run_debate_council(sym)
 
+
 def _telegram_autopsy_cmd(args: str, chat_id=None) -> str:
     return telegram_bot.state_mind.get_latest_autopsy()
+
 
 def _telegram_summary_cmd(args: str, chat_id=None) -> str:
     inbox = provenance_engine.get_inbox_items(limit=1)
@@ -610,7 +644,9 @@ def _telegram_summary_cmd(args: str, chat_id=None) -> str:
     author = item.get("author_creator", "Author Unknown")
     stype = item.get("source_type", "RESEARCH")
     kid = item.get("knowledge_id", "N/A")
-    excerpt = (item.get("raw_content_preview") or "No excerpt available").replace("\n", " ").strip()[:600]
+    excerpt = (
+        (item.get("raw_content_preview") or "No excerpt available").replace("\n", " ").strip()[:600]
+    )
     return (
         f"📖 *LATEST RESEARCH SUMMARY*\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -625,41 +661,56 @@ def _telegram_summary_cmd(args: str, chat_id=None) -> str:
         f"🔬 _Dispatched from SKY Terminal Research Lab_"
     )
 
-telegram_bot.register_command("/start", lambda args, chat_id=None: (
-    "🤖 **SKY Institutional Quantitative Terminal Bot**\n\n"
-    "Available Commands:\n"
-    "• `/signal [sym]` — Live signal + Auto Paper Practice\n"
-    "• `/summary` — Latest literature & YouTube research summary\n"
-    "• `/positions` — Active shadow practice positions & PnL\n"
-    "• `/close <sym>` — Close open practice position from Telegram\n"
-    "• `/debate <sym>` — Tri-Agent Adversarial Debate Council\n"
-    "• `/autopsy` — Forensic post-trade loss diagnosis\n"
-    "• `/market` — Real-time market state & CVD pulse\n"
-    "• `/plan [sym]` — Multi-timeframe structural trading plan\n"
-    "• `/events` — High-impact macro events & countdown\n"
-    "• `/news` — Breaking crypto alpha wire & ETF flows\n"
-    "• `/decision <sym>` — Live 12-stage SKY decision matrix\n"
-    "• `/risk` — Risk desk status & daily loss limits\n"
-    "• `/status` — Terminal health & live telemetry\n\n"
-    "💬 _Or send ANY message in natural language to chat with QuantMentor AI!_"
-))
-telegram_bot.register_command("/help", lambda args, chat_id=None: (
-    "💡 **SKY Bot Command Guide**\n\n"
-    "• `/signal [symbol]` — e.g. `/signal BTC` or `/signal ETH`\n"
-    "• `/summary` — Latest literature, book & YouTube research summary\n"
-    "• `/positions` — View active practice positions & PnL\n"
-    "• `/close [symbol]` — e.g. `/close BTC`\n"
-    "• `/debate [symbol]` — e.g. `/debate BTC`\n"
-    "• `/autopsy` — Review root cause of recent stop-outs\n"
-    "• `/plan [symbol]` — e.g. `/plan BTC`\n"
-    "• `/decision [symbol]` — e.g. `/decision SOL`\n"
-    "• `/market` or `/brief` — Instant desk overview\n"
-    "• `/events` — Upcoming macroeconomic catalysts\n"
-    "• `/news` — Top alpha news headlines\n"
-    "• `/risk` — Risk limits & circuit breaker"
-))
-telegram_bot.register_command("/status", lambda args, chat_id=None: f"✅ **SKY Terminal Operational**\n• Health: OK\n• Active WS: {len(ws_manager.active_connections)}\n• Mode: Zero-Lookahead Empirical")
-telegram_bot.register_command("/risk", lambda args, chat_id=None: "🛡️ **Risk Gate Status**\n• Circuit Breaker: NORMAL\n• Max Drawdown Limit: 2.50%\n• Active Exposure: Controlled\n• Half-Kelly Cap: 2.50%")
+
+telegram_bot.register_command(
+    "/start",
+    lambda args, chat_id=None: (
+        "🤖 **SKY Institutional Quantitative Terminal Bot**\n\n"
+        "Available Commands:\n"
+        "• `/signal [sym]` — Live signal + Auto Paper Practice\n"
+        "• `/summary` — Latest literature & YouTube research summary\n"
+        "• `/positions` — Active shadow practice positions & PnL\n"
+        "• `/close <sym>` — Close open practice position from Telegram\n"
+        "• `/debate <sym>` — Tri-Agent Adversarial Debate Council\n"
+        "• `/autopsy` — Forensic post-trade loss diagnosis\n"
+        "• `/market` — Real-time market state & CVD pulse\n"
+        "• `/plan [sym]` — Multi-timeframe structural trading plan\n"
+        "• `/events` — High-impact macro events & countdown\n"
+        "• `/news` — Breaking crypto alpha wire & ETF flows\n"
+        "• `/decision <sym>` — Live 12-stage SKY decision matrix\n"
+        "• `/risk` — Risk desk status & daily loss limits\n"
+        "• `/status` — Terminal health & live telemetry\n\n"
+        "💬 _Or send ANY message in natural language to chat with QuantMentor AI!_"
+    ),
+)
+telegram_bot.register_command(
+    "/help",
+    lambda args, chat_id=None: (
+        "💡 **SKY Bot Command Guide**\n\n"
+        "• `/signal [symbol]` — e.g. `/signal BTC` or `/signal ETH`\n"
+        "• `/summary` — Latest literature, book & YouTube research summary\n"
+        "• `/positions` — View active practice positions & PnL\n"
+        "• `/close [symbol]` — e.g. `/close BTC`\n"
+        "• `/debate [symbol]` — e.g. `/debate BTC`\n"
+        "• `/autopsy` — Review root cause of recent stop-outs\n"
+        "• `/plan [symbol]` — e.g. `/plan BTC`\n"
+        "• `/decision [symbol]` — e.g. `/decision SOL`\n"
+        "• `/market` or `/brief` — Instant desk overview\n"
+        "• `/events` — Upcoming macroeconomic catalysts\n"
+        "• `/news` — Top alpha news headlines\n"
+        "• `/risk` — Risk limits & circuit breaker"
+    ),
+)
+telegram_bot.register_command(
+    "/status",
+    lambda args,
+    chat_id=None: f"✅ **SKY Terminal Operational**\n• Health: OK\n• Active WS: {len(ws_manager.active_connections)}\n• Mode: Zero-Lookahead Empirical",
+)
+telegram_bot.register_command(
+    "/risk",
+    lambda args,
+    chat_id=None: "🛡️ **Risk Gate Status**\n• Circuit Breaker: NORMAL\n• Max Drawdown Limit: 2.50%\n• Active Exposure: Controlled\n• Half-Kelly Cap: 2.50%",
+)
 telegram_bot.register_command("/brief", _telegram_market_cmd)
 telegram_bot.register_command("/market", _telegram_market_cmd)
 telegram_bot.register_command("/signal", _telegram_signal_cmd)
@@ -682,6 +733,7 @@ async def telemetry_broadcaster_loop():
     while True:
         try:
             import time
+
             now_ms = int(time.time() * 1000)
             for sym in ["BTC/USDT", "ETH/USDT", "XAU/USD"]:
                 cur_price = await data_streamer.get_live_ticker(sym)
@@ -698,7 +750,9 @@ async def telemetry_broadcaster_loop():
                         "autopsy": ev.get("autopsy"),
                         "message": ev.get("message", ""),
                     }
-                    asyncio.create_task(telegram_bot.send_position_alert(ev.get("event", "FILL"), alert_details))
+                    asyncio.create_task(
+                        telegram_bot.send_position_alert(ev.get("event", "FILL"), alert_details)
+                    )
 
                 # Macro snapshot
                 macro = macro_sentinel.get_macro_snapshot()
@@ -731,6 +785,7 @@ async def empirical_accumulator_loop():
 # UI ROUTE
 # ==============================================================================
 
+
 @app.get("/")
 async def root_view():
     index_path = STATIC_DIR / "index.html"
@@ -742,6 +797,7 @@ async def root_view():
 # ==============================================================================
 # REST API ENDPOINTS
 # ==============================================================================
+
 
 @app.get("/health")
 @app.get("/api/health")
@@ -794,14 +850,36 @@ async def get_tickers_alias():
     t_eth = await market_gateway.get_ticker("ETH/USDT")
     t_paxg = await market_gateway.get_ticker("PAXG/USDT")
     t_xau = await market_gateway.get_ticker("XAU/USD")
-    return sanitize_numpy({
-        "tickers": [
-            {"symbol": "BTCUSDT", "price": t_btc.get("price", 88500.0), "change24h": t_btc.get("change24h", 1.2), "volume24h": 14280.0},
-            {"symbol": "ETHUSDT", "price": t_eth.get("price", 2680.0), "change24h": t_eth.get("change24h", -0.5), "volume24h": 8540.0},
-            {"symbol": "PAXGUSDT", "price": t_paxg.get("price", 2678.0), "change24h": t_paxg.get("change24h", 0.8), "volume24h": 1200.0},
-            {"symbol": "XAUUSDT", "price": t_xau.get("price", 2678.5), "change24h": t_xau.get("change24h", 0.7), "volume24h": 3400.0},
-        ]
-    })
+    return sanitize_numpy(
+        {
+            "tickers": [
+                {
+                    "symbol": "BTCUSDT",
+                    "price": t_btc.get("price", 88500.0),
+                    "change24h": t_btc.get("change24h", 1.2),
+                    "volume24h": 14280.0,
+                },
+                {
+                    "symbol": "ETHUSDT",
+                    "price": t_eth.get("price", 2680.0),
+                    "change24h": t_eth.get("change24h", -0.5),
+                    "volume24h": 8540.0,
+                },
+                {
+                    "symbol": "PAXGUSDT",
+                    "price": t_paxg.get("price", 2678.0),
+                    "change24h": t_paxg.get("change24h", 0.8),
+                    "volume24h": 1200.0,
+                },
+                {
+                    "symbol": "XAUUSDT",
+                    "price": t_xau.get("price", 2678.5),
+                    "change24h": t_xau.get("change24h", 0.7),
+                    "volume24h": 3400.0,
+                },
+            ]
+        }
+    )
 
 
 @app.get("/api/mtf")
@@ -833,19 +911,21 @@ async def get_mtf_alias(
             ema_list.append({"time": time_val, "value": cl})
             rsi_list.append({"time": time_val, "value": 50.0 + (6.0 if t15 > 0 else -6.0)})
 
-    return sanitize_numpy({
-        "symbol": symbol,
-        "timeframe": timeframe,
-        "trend": trend_val,
-        "indicators": {
-            "ema": ema_list,
-            "rsi": rsi_list,
-        },
-        "ema": {"ema20": 88200.0, "ema50": 87800.0, "ema200": 86500.0},
-        "rsi": 54.2,
-        "support": [86500.0, 87800.0],
-        "resistance": [89200.0, 90500.0],
-    })
+    return sanitize_numpy(
+        {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "trend": trend_val,
+            "indicators": {
+                "ema": ema_list,
+                "rsi": rsi_list,
+            },
+            "ema": {"ema20": 88200.0, "ema50": 87800.0, "ema200": 86500.0},
+            "rsi": 54.2,
+            "support": [86500.0, 87800.0],
+            "resistance": [89200.0, 90500.0],
+        }
+    )
 
 
 @app.get("/api/scan")
@@ -857,40 +937,64 @@ async def get_scan_alias(
     norm_sym = symbol.replace("USDT", "/USDT") if "/" not in symbol else symbol
     candles = data_streamer.get_candles(norm_sym, timeframe, limit=limit)
     reg_res = regime_transition_detector.classify_regime(candles)
-    patterns = smc_engine.scan(norm_sym, timeframe, candles, current_regime=reg_res.current_regime.value)
+    patterns = smc_engine.scan(
+        norm_sym, timeframe, candles, current_regime=reg_res.current_regime.value
+    )
 
     last_price = 0.0
     high_price = 0.0
     low_price = 0.0
     if candles:
         last_c = candles[-1]
-        last_price = float(last_c[4] if isinstance(last_c, (list, tuple)) else last_c.get("close", 0))
-        highs = [float(c[2] if isinstance(c, (list, tuple)) else c.get("high", 0)) for c in candles[-50:]]
-        lows = [float(c[3] if isinstance(c, (list, tuple)) else c.get("low", 0)) for c in candles[-50:]]
+        last_price = float(
+            last_c[4] if isinstance(last_c, (list, tuple)) else last_c.get("close", 0)
+        )
+        highs = [
+            float(c[2] if isinstance(c, (list, tuple)) else c.get("high", 0)) for c in candles[-50:]
+        ]
+        lows = [
+            float(c[3] if isinstance(c, (list, tuple)) else c.get("low", 0)) for c in candles[-50:]
+        ]
         high_price = max(highs) if highs else last_price
         low_price = min(lows) if lows else last_price
 
-    fvg_list = [asdict(p) for p in patterns if "FVG" in getattr(p, "type", "") or "GAP" in getattr(p, "type", "")]
-    ob_list = [asdict(p) for p in patterns if "BLOCK" in getattr(p, "type", "") or "OB" in getattr(p, "type", "")]
+    fvg_list = [
+        asdict(p)
+        for p in patterns
+        if "FVG" in getattr(p, "type", "") or "GAP" in getattr(p, "type", "")
+    ]
+    ob_list = [
+        asdict(p)
+        for p in patterns
+        if "BLOCK" in getattr(p, "type", "") or "OB" in getattr(p, "type", "")
+    ]
 
-    return sanitize_numpy({
-        "symbol": symbol,
-        "timeframe": timeframe,
-        "regime": reg_res.current_regime.value,
-        "smc_patterns": [asdict(p) for p in patterns],
-        "fvg": fvg_list,
-        "fvgs": fvg_list,
-        "order_blocks": ob_list,
-        "orderBlocks": ob_list,
-        "setup_suggestions": [],
-        "setups": [],
-        "stats": {
-            "lastPrice": last_price,
-            "highPrice": high_price,
-            "lowPrice": low_price,
-            "trend": "BULLISH" if reg_res.current_regime.value in ["TRENDING_UP", "BULL"] else ("BEARISH" if reg_res.current_regime.value in ["TRENDING_DOWN", "BEAR"] else "CONSOLIDATION"),
-        },
-    })
+    return sanitize_numpy(
+        {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "regime": reg_res.current_regime.value,
+            "smc_patterns": [asdict(p) for p in patterns],
+            "fvg": fvg_list,
+            "fvgs": fvg_list,
+            "order_blocks": ob_list,
+            "orderBlocks": ob_list,
+            "setup_suggestions": [],
+            "setups": [],
+            "stats": {
+                "lastPrice": last_price,
+                "highPrice": high_price,
+                "lowPrice": low_price,
+                "trend": "BULLISH"
+                if reg_res.current_regime.value in ["TRENDING_UP", "BULL"]
+                else (
+                    "BEARISH"
+                    if reg_res.current_regime.value in ["TRENDING_DOWN", "BEAR"]
+                    else "CONSOLIDATION"
+                ),
+            },
+        }
+    )
 
 
 @app.get("/api/market/orderbook")
@@ -927,8 +1031,13 @@ async def save_chart_memory(req: ChartMemorySaveRequest):
     drawings_json = json.dumps(req.drawings)
     indicators_json = json.dumps(req.indicators)
     chart_config_json = json.dumps(req.chart_config)
-    db_manager.save_chart_memory(req.symbol, req.timeframe, drawings_json, indicators_json, chart_config_json)
-    return {"status": "SUCCESS", "message": f"Chart memory saved for {req.symbol} [{req.timeframe}]"}
+    db_manager.save_chart_memory(
+        req.symbol, req.timeframe, drawings_json, indicators_json, chart_config_json
+    )
+    return {
+        "status": "SUCCESS",
+        "message": f"Chart memory saved for {req.symbol} [{req.timeframe}]",
+    }
 
 
 @app.delete("/api/chart/memory", dependencies=[Depends(require_api_key)])
@@ -982,7 +1091,9 @@ async def get_market_state(symbol: str = Query("BTC/USDT")):
 async def scan_smc_patterns(symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
     candles = data_streamer.get_candles(symbol, timeframe, limit=80)
     reg_res = regime_transition_detector.classify_regime(candles)
-    patterns = smc_engine.scan(symbol, timeframe, candles, current_regime=reg_res.current_regime.value)
+    patterns = smc_engine.scan(
+        symbol, timeframe, candles, current_regime=reg_res.current_regime.value
+    )
     formations = pattern_engine.scan_patterns(candles, symbol=symbol)
     return {
         "symbol": symbol,
@@ -996,6 +1107,7 @@ async def scan_smc_patterns(symbol: str = Query("BTC/USDT"), timeframe: str = Qu
 # ============================================================================
 # SKY PROFESSIONAL MARKET INTELLIGENCE REST ENDPOINTS
 # ============================================================================
+
 
 @app.get("/api/sky/decision")
 @app.get("/api/sky/intelligence")
@@ -1022,7 +1134,9 @@ async def get_sky_decision(
         "5m": data_streamer.get_candles(symbol, "5m", limit=30),
         "1m": data_streamer.get_candles(symbol, "1m", limit=30),
     }
-    decision_out = sky_orchestrator.analyze_market(symbol=symbol, timeframe=timeframe, candles=candles, candles_by_tf=tf_map)
+    decision_out = sky_orchestrator.analyze_market(
+        symbol=symbol, timeframe=timeframe, candles=candles, candles_by_tf=tf_map
+    )
     result = asdict(decision_out)
     sky_decision_cache.set(cache_key, result)
     return result
@@ -1035,7 +1149,9 @@ async def get_sky_structure(symbol: str = Query("BTC/USDT"), timeframe: str = Qu
     """
     candles = data_streamer.get_candles(symbol, timeframe, limit=100)
     vol_state = volatility_engine.compute_volatility(candles)
-    swings, events = market_structure_engine.analyze_structure(candles, timeframe=timeframe, atr=vol_state.atr)
+    swings, events = market_structure_engine.analyze_structure(
+        candles, timeframe=timeframe, atr=vol_state.atr
+    )
     return {
         "symbol": symbol,
         "timeframe": timeframe,
@@ -1055,7 +1171,9 @@ async def get_sky_liquidity(symbol: str = Query("BTC/USDT"), timeframe: str = Qu
     vol_state = volatility_engine.compute_volatility(candles)
     swings = market_structure_engine.detect_swings(candles, timeframe=timeframe)
     pools = liquidity_engine.identify_liquidity_pools(symbol, timeframe, candles, swings=swings)
-    sweeps = liquidity_engine.detect_sweeps(symbol, timeframe, candles, pools=pools, atr=vol_state.atr)
+    sweeps = liquidity_engine.detect_sweeps(
+        symbol, timeframe, candles, pools=pools, atr=vol_state.atr
+    )
     return {
         "symbol": symbol,
         "timeframe": timeframe,
@@ -1071,16 +1189,24 @@ async def get_sky_setups(symbol: str = Query("BTC/USDT"), timeframe: str = Query
     """
     candles = data_streamer.get_candles(symbol, timeframe, limit=100)
     vol_state = volatility_engine.compute_volatility(candles)
-    swings, structure_events = market_structure_engine.analyze_structure(candles, timeframe=timeframe, atr=vol_state.atr)
+    swings, structure_events = market_structure_engine.analyze_structure(
+        candles, timeframe=timeframe, atr=vol_state.atr
+    )
     pools = liquidity_engine.identify_liquidity_pools(symbol, timeframe, candles, swings=swings)
-    sweeps = liquidity_engine.detect_sweeps(symbol, timeframe, candles, pools=pools, atr=vol_state.atr)
+    sweeps = liquidity_engine.detect_sweeps(
+        symbol, timeframe, candles, pools=pools, atr=vol_state.atr
+    )
     fvgs = fvg_engine.detect_fvgs(symbol, timeframe, candles, atr=vol_state.atr)
-    obs = order_block_engine.detect_candidate_order_blocks(symbol, timeframe, candles, atr=vol_state.atr)
+    obs = order_block_engine.detect_candidate_order_blocks(
+        symbol, timeframe, candles, atr=vol_state.atr
+    )
     disp = displacement_engine.calculate_displacement(candles, atr=vol_state.atr)
     vol_feat = volume_engine.analyze_volume(candles)
     vwap_feat = vwap_engine.compute_vwap(candles)
     curr_close = float(candles[-1]["close"]) if candles else 88400.0
-    derivs = derivatives_engine.analyze_derivatives(symbol, curr_close, 0.5, 50000.0, 49000.0, 0.0001)
+    derivs = derivatives_engine.analyze_derivatives(
+        symbol, curr_close, 0.5, 50000.0, 49000.0, 0.0001
+    )
     tf_map = {timeframe: candles}
     mtf = multi_timeframe_engine.compile_mtf_context(tf_map)
     regime = market_regime_engine.classify_regime(candles, vol_state)
@@ -1157,7 +1283,6 @@ async def get_sky_statistics(
     return result
 
 
-
 @app.get("/api/scenarios")
 async def get_scenarios(symbol: str = Query("BTC/USDT")):
     candles_15m = data_streamer.get_candles(symbol, "15m", limit=60)
@@ -1227,7 +1352,9 @@ async def get_decision_council(symbol: str = Query("BTC/USDT")):
     u_budget = uncertainty_engine.compute_budget(dq, analogues, cone, reg_res, event_st)
 
     # Net EV
-    ev_res = ev_engine.calculate_net_ev(cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget)
+    ev_res = ev_engine.calculate_net_ev(
+        cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget
+    )
 
     macro = macro_sentinel.get_macro_snapshot()
     decision = debate_committee.convene_council(
@@ -1363,6 +1490,7 @@ async def reset_shadow_positions():
 # UI PAPER TRADING ADAPTER (Bridges Web UI to Python portfolio_shadow)
 # ------------------------------------------------------------------------------
 
+
 @app.get("/api/paper/desk-overview")
 async def get_paper_desk_overview():
     """
@@ -1422,36 +1550,40 @@ async def get_paper_desk_overview():
             thesis = f"Bullish expansion targeting ${tp_val:,.2f} liquidity pool. Invalidation strictly below ${sl_val:,.2f} swing low."
         elif "BTC" in sym:
             strat_name = "Judas Swing Sweep + FVG Expansion"
-            thesis = f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
+            thesis = (
+                f"Long liquidity run towards ${tp_val:,.2f}. Breakeven arms automatically at +1.5R."
+            )
         else:
             strat_name = "Multi-Timeframe SMC Breakout"
             thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
 
-        current.append({
-            "id": p.get("position_id", ""),
-            "symbol": sym,
-            "side": side,
-            "size": size,
-            "entryPrice": entry,
-            "currentPrice": cur,
-            "sl": sl_val,
-            "tp": tp_val,
-            "pnlUsd": round(pnl, 2),
-            "pnlPct": round(pnl_pct, 2),
-            "status": "OPEN",
-            "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
-            "trailingStop": p.get("trailing_stop"),
-            "openedAt": p.get("opened_at"),
-            "notionalUsd": notional_usd,
-            "effectiveLeverage": effective_leverage,
-            "capitalAtRiskUsd": capital_at_risk,
-            "riskOfAccountPct": risk_pct,
-            "riskRewardRatio": f"1:{rr_ratio}",
-            "horizon": horizon,
-            "agentManager": agent_mgr,
-            "strategyName": strat_name,
-            "thesis": thesis,
-        })
+        current.append(
+            {
+                "id": p.get("position_id", ""),
+                "symbol": sym,
+                "side": side,
+                "size": size,
+                "entryPrice": entry,
+                "currentPrice": cur,
+                "sl": sl_val,
+                "tp": tp_val,
+                "pnlUsd": round(pnl, 2),
+                "pnlPct": round(pnl_pct, 2),
+                "status": "OPEN",
+                "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
+                "trailingStop": p.get("trailing_stop"),
+                "openedAt": p.get("opened_at"),
+                "notionalUsd": notional_usd,
+                "effectiveLeverage": effective_leverage,
+                "capitalAtRiskUsd": capital_at_risk,
+                "riskOfAccountPct": risk_pct,
+                "riskRewardRatio": f"1:{rr_ratio}",
+                "horizon": horizon,
+                "agentManager": agent_mgr,
+                "strategyName": strat_name,
+                "thesis": thesis,
+            }
+        )
 
     # Format Past (with loss autopsy details)
     past = []
@@ -1471,63 +1603,69 @@ async def get_paper_desk_overview():
         else:
             autopsy_cat = "LIQUIDITY_FAILURE"
             autopsy_cause = "Liquidity sweep fakeout & volatility spike prior to expansion."
-            autopsy_rec = "Widen invalidation boundary below swing low; await 15m displacement candle close."
+            autopsy_rec = (
+                "Widen invalidation boundary below swing low; await 15m displacement candle close."
+            )
 
-        past.append({
-            "id": p.get("position_id", ""),
-            "symbol": p.get("symbol", ""),
-            "side": side,
-            "size": p.get("size", 1.0),
-            "entryPrice": entry,
-            "exitPrice": exit_p,
-            "sl": float(p.get("stop_loss", 0.0)),
-            "tp": float(p.get("take_profit", 0.0)),
-            "realizedPnlUsd": round(pnl, 2),
-            "realizedPnlPct": round(pnl_pct, 2),
-            "openedAt": p.get("opened_at"),
-            "closedAt": p.get("closed_at"),
-            "autopsyCategory": autopsy_cat,
-            "autopsyCause": autopsy_cause,
-            "autopsyRecommendation": autopsy_rec,
-        })
+        past.append(
+            {
+                "id": p.get("position_id", ""),
+                "symbol": p.get("symbol", ""),
+                "side": side,
+                "size": p.get("size", 1.0),
+                "entryPrice": entry,
+                "exitPrice": exit_p,
+                "sl": float(p.get("stop_loss", 0.0)),
+                "tp": float(p.get("take_profit", 0.0)),
+                "realizedPnlUsd": round(pnl, 2),
+                "realizedPnlPct": round(pnl_pct, 2),
+                "openedAt": p.get("opened_at"),
+                "closedAt": p.get("closed_at"),
+                "autopsyCategory": autopsy_cat,
+                "autopsyCause": autopsy_cause,
+                "autopsyRecommendation": autopsy_rec,
+            }
+        )
 
     if len(past) == 0:
-        past.extend([
-            {
-                "id": "POS_BTC_HIST_01",
-                "symbol": "BTC/USDT",
-                "side": "BUY",
-                "size": 0.025,
-                "entryPrice": 76500.0,
-                "exitPrice": 78200.0,
-                "sl": 75800.0,
-                "tp": 78200.0,
-                "realizedPnlUsd": 42.50,
-                "realizedPnlPct": 2.22,
-                "openedAt": int(time.time() * 1000) - 86400000,
-                "closedAt": int(time.time() * 1000) - 43200000,
-                "autopsyCategory": "VALIDATED_PROFIT",
-                "autopsyCause": "Fair Value Gap fill with continuous bullish CVD delta.",
-                "autopsyRecommendation": "Take-Profit 1 executed; runner trailed to breakeven.",
-            },
-            {
-                "id": "POS_ETH_HIST_02",
-                "symbol": "ETH/USDT",
-                "side": "BUY",
-                "size": 0.85,
-                "entryPrice": 2420.0,
-                "exitPrice": 2385.0,
-                "sl": 2385.0,
-                "tp": 2490.0,
-                "realizedPnlUsd": -29.75,
-                "realizedPnlPct": -1.45,
-                "openedAt": int(time.time() * 1000) - 172800000,
-                "closedAt": int(time.time() * 1000) - 129600000,
-                "autopsyCategory": "LIQUIDITY_FAILURE",
-                "autopsyCause": "Asian session high sweep triggered sudden mean-reversion selloff.",
-                "autopsyRecommendation": "Avoid initiating longs into unmitigated H4 supply wicks.",
-            },
-        ])
+        past.extend(
+            [
+                {
+                    "id": "POS_BTC_HIST_01",
+                    "symbol": "BTC/USDT",
+                    "side": "BUY",
+                    "size": 0.025,
+                    "entryPrice": 76500.0,
+                    "exitPrice": 78200.0,
+                    "sl": 75800.0,
+                    "tp": 78200.0,
+                    "realizedPnlUsd": 42.50,
+                    "realizedPnlPct": 2.22,
+                    "openedAt": int(time.time() * 1000) - 86400000,
+                    "closedAt": int(time.time() * 1000) - 43200000,
+                    "autopsyCategory": "VALIDATED_PROFIT",
+                    "autopsyCause": "Fair Value Gap fill with continuous bullish CVD delta.",
+                    "autopsyRecommendation": "Take-Profit 1 executed; runner trailed to breakeven.",
+                },
+                {
+                    "id": "POS_ETH_HIST_02",
+                    "symbol": "ETH/USDT",
+                    "side": "BUY",
+                    "size": 0.85,
+                    "entryPrice": 2420.0,
+                    "exitPrice": 2385.0,
+                    "sl": 2385.0,
+                    "tp": 2490.0,
+                    "realizedPnlUsd": -29.75,
+                    "realizedPnlPct": -1.45,
+                    "openedAt": int(time.time() * 1000) - 172800000,
+                    "closedAt": int(time.time() * 1000) - 129600000,
+                    "autopsyCategory": "LIQUIDITY_FAILURE",
+                    "autopsyCause": "Asian session high sweep triggered sudden mean-reversion selloff.",
+                    "autopsyRecommendation": "Avoid initiating longs into unmitigated H4 supply wicks.",
+                },
+            ]
+        )
 
     future_queue = [
         {
@@ -1657,6 +1795,7 @@ async def get_paper_desk_overview():
         "tradingPlans": trading_plans,
     }
 
+
 @app.get("/api/paper/positions")
 async def get_paper_positions():
     """
@@ -1667,20 +1806,22 @@ async def get_paper_positions():
     for p in open_pos:
         side = "BUY" if p.get("direction") == "LONG" else "SELL"
         pnl = float(p.get("unrealized_pnl", 0.0))
-        mapped.append({
-            "id": p.get("position_id", ""),
-            "symbol": p.get("symbol", ""),
-            "side": side,
-            "entryPrice": p.get("entry_price", 0.0),
-            "currentPrice": p.get("current_price", p.get("entry_price", 0.0)),
-            "sl": p.get("stop_loss", 0.0),
-            "tp": p.get("take_profit", 0.0),
-            "size": p.get("size", 1.0),
-            "status": p.get("status", "OPEN"),
-            "pnl": round(pnl, 2),
-            "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
-            "createdAt": str(p.get("opened_at", "")),
-        })
+        mapped.append(
+            {
+                "id": p.get("position_id", ""),
+                "symbol": p.get("symbol", ""),
+                "side": side,
+                "entryPrice": p.get("entry_price", 0.0),
+                "currentPrice": p.get("current_price", p.get("entry_price", 0.0)),
+                "sl": p.get("stop_loss", 0.0),
+                "tp": p.get("take_profit", 0.0),
+                "size": p.get("size", 1.0),
+                "status": p.get("status", "OPEN"),
+                "pnl": round(pnl, 2),
+                "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
+                "createdAt": str(p.get("opened_at", "")),
+            }
+        )
     return {"positions": mapped, "count": len(mapped)}
 
 
@@ -1804,7 +1945,9 @@ async def ask_desk_copilot(req: AskDeskRequest):
         reg_res = regime_transition_detector.classify_regime(candles)
         event_st = event_shock_engine.evaluate_risk_state()
         u_budget = uncertainty_engine.compute_budget(dq, analogues, cone, reg_res, event_st)
-        ev_res = ev_engine.calculate_net_ev(cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget)
+        ev_res = ev_engine.calculate_net_ev(
+            cur_p, cur_p * 1.025, cur_p * 0.988, analogues.p_tp_hit, u_budget
+        )
         macro = macro_sentinel.get_macro_snapshot()
         council = debate_committee.convene_council(
             sym, state, ev_res, u_budget, macro.macro_regime, analogues=analogues
@@ -1812,7 +1955,9 @@ async def ask_desk_copilot(req: AskDeskRequest):
         council_decision = council.final_decision
         net_ev_r = round(float(ev_res.net_ev_r), 2)
         confluence_score = round(float(getattr(council, "confluence_score", 0.0)), 1)
-        regime_label = reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "UNKNOWN"
+        regime_label = (
+            reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "UNKNOWN"
+        )
     except Exception as e:
         logger.warning(f"Desk ask: live council failed ({e}), using quick estimate")
         council_decision = "NO_TRADE"
@@ -1850,7 +1995,9 @@ async def get_memory_similarity(
     c_map = {timeframe: candles}
     state = market_state_compiler.compile_state(sym, candles_by_tf=c_map)
     reg_res = regime_transition_detector.classify_regime(candles)
-    active_reg = reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "TRENDING_BULL"
+    active_reg = (
+        reg_res.current_regime.value if hasattr(reg_res, "current_regime") else "TRENDING_BULL"
+    )
 
     analogues = analogue_engine.find_analogues(state, active_regime=active_reg)
     return {
@@ -1913,7 +2060,6 @@ async def get_live_ai_narrative(
     return {"symbol": sym, "narrative": narrative, "telemetry": telemetry}
 
 
-
 @app.get("/api/league/leaderboard")
 async def get_strategy_leaderboard():
     leaderboard = strategy_league_manager.get_leaderboard()
@@ -1928,10 +2074,15 @@ async def get_governance_proposals():
 
 @app.post("/api/governance/approve", dependencies=[Depends(require_api_key)])
 async def approve_parameter_patch(req: ParameterApprovalRequest):
-    success = patch_governor.execute_hot_reload(req.proposal_id, req.operator_name or "HUMAN_OPERATOR")
+    success = patch_governor.execute_hot_reload(
+        req.proposal_id, req.operator_name or "HUMAN_OPERATOR"
+    )
     if not success:
         raise HTTPException(status_code=400, detail="Failed to hot-reload proposal.")
-    return {"status": "SUCCESS", "message": f"Proposal {req.proposal_id} approved and hot-reloaded."}
+    return {
+        "status": "SUCCESS",
+        "message": f"Proposal {req.proposal_id} approved and hot-reloaded.",
+    }
 
 
 @app.post("/api/lab/backtest", dependencies=[Depends(require_api_key)])
@@ -1960,9 +2111,10 @@ async def run_lab_stress_test(symbol: str = Query("BTC/USDT"), timeframe: str = 
 # UNIVERSAL RESEARCH & KNOWLEDGE LAB REST ENDPOINTS
 # ==============================================================================
 
+
 class ResearchIngestRequest(BaseModel):
     content: str
-    mode: str = "RESEARCH"               # ANALYZE, RESEARCH, SAVE_KNOWLEDGE
+    mode: str = "RESEARCH"  # ANALYZE, RESEARCH, SAVE_KNOWLEDGE
     source_uri: Optional[str] = None
     author_creator: Optional[str] = None
     title: Optional[str] = None
@@ -1976,10 +2128,22 @@ async def auto_dispatch_telegram_summary(result: dict[str, Any]) -> None:
 
         source = result.get("source", {})
         source_type = source.get("source_type") or "RESEARCH"
-        title = (source.get("title") or result.get("file_metadata", {}).get("book_title") or "Research Literature").replace("_", " ")
-        author = (source.get("author_creator") or result.get("file_metadata", {}).get("author_creator") or "External Contributor").replace("_", " ")
+        title = (
+            source.get("title")
+            or result.get("file_metadata", {}).get("book_title")
+            or "Research Literature"
+        ).replace("_", " ")
+        author = (
+            source.get("author_creator")
+            or result.get("file_metadata", {}).get("author_creator")
+            or "External Contributor"
+        ).replace("_", " ")
         kid = result.get("knowledge_id") or "K-UNKNOWN"
-        summary_text = result.get("executive_summary") or result.get("verdict_message") or "Research synthesis completed."
+        summary_text = (
+            result.get("executive_summary")
+            or result.get("verdict_message")
+            or "Research synthesis completed."
+        )
 
         source_emoji = {
             "PDF_BOOK": "📖 [PDF Monograph]",
@@ -1992,7 +2156,9 @@ async def auto_dispatch_telegram_summary(result: dict[str, Any]) -> None:
             "IMAGE": "📸 [Vision Ingest]",
         }.get(str(source_type).upper(), "📚 [Research Literature]")
 
-        clean_summary = summary_text.replace("\n\n", "\n").replace("_", " ").replace("*", "").strip()
+        clean_summary = (
+            summary_text.replace("\n\n", "\n").replace("_", " ").replace("*", "").strip()
+        )
         if len(clean_summary) > 950:
             clean_summary = clean_summary[:950] + "..."
 
@@ -2056,7 +2222,7 @@ async def ingest_research_text(req: ResearchIngestRequest):
         raise HTTPException(status_code=400, detail="Content cannot be empty.")
     if len(req.content) > 2_000_000:
         raise HTTPException(status_code=413, detail="Content too large (max 2 MB).")
-    
+
     result = await universal_ingestor.ingest(
         content=req.content,
         mode=req.mode.upper(),
@@ -2094,7 +2260,7 @@ async def ingest_research_file(
             f.write(content_bytes)
 
         text_content, metadata = universal_ingestor.extract_text_from_file(dest_path)
-        
+
         result = await universal_ingestor.ingest(
             content=text_content,
             mode=mode.upper(),
@@ -2201,7 +2367,8 @@ async def get_all_research_vaults():
 @app.post("/api/research/share-telegram")
 async def share_research_summary_to_telegram(req: ResearchTelegramShareRequest):
     """
-    Dispatches formatted institutional research summary to configured Telegram chat.
+    Dispatches formatted institutional AI-powered research intelligence to configured Telegram chat.
+    Enforces Telegram character limits (4096-char ceiling, safe 4000-char splitting).
     """
     source_emoji = {
         "PDF_BOOK": "📖 [PDF Monograph]",
@@ -2219,42 +2386,52 @@ async def share_research_summary_to_telegram(req: ResearchTelegramShareRequest):
     rules = ep.get("rules", 0)
     contra = ep.get("contradictions", 0)
 
-    clean_summary = req.executive_summary.replace("\n\n", "\n").strip()
-    if len(clean_summary) > 1000:
-        clean_summary = clean_summary[:1000] + "..."
+    # Sanitize title and author for safe Markdown presentation
+    safe_title = (req.title or "Untitled Research").replace("*", "").replace("`", "'")
+    safe_author = (req.author_creator or "External Contributor").replace("*", "").replace("`", "'")
+    clean_summary = req.executive_summary.replace("\n\n", "\n\n").strip()
+
+    # Cap executive summary safely if exceptionally large to keep primary message cohesive
+    if len(clean_summary) > 2000:
+        clean_summary = clean_summary[:1950] + " ... [Truncated for Telegram limit]"
 
     lines = [
-        f"*{source_emoji} RESEARCH SUMMARY*",
+        f"🧠 *SKY AI QUANT INTEL | {source_emoji}*",
         "━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"📚 *Title:* {req.title}",
-        f"👤 *Author/Creator:* {req.author_creator}",
+        f"📚 *Title:* {safe_title}",
+        f"👤 *Author/Creator:* {safe_author}",
         f"🆔 *Ledger ID:* `{req.knowledge_id}`",
+        "🔬 *Epistemic Verification:* `0.00 (Quarantined Invariant)`",
         "",
-        "📝 *Executive Synthesis:*",
+        "📝 *AI Executive Synthesis:*",
         clean_summary,
         "",
-        "⚖️ *Epistemic Classification (Quarantined 0.0):*",
-        f"• Facts (Causal): *{facts}*",
-        f"• Hypotheses: *{hypo}*",
-        f"• Proposed Rules: *{rules}*",
-        f"• Contradictions: *{contra}*",
+        "⚖️ *Epistemic Classification Rigor:*",
+        f"• Causal Facts: *{facts}*",
+        f"• Testable Hypotheses: *{hypo}*",
+        f"• Proposed Strategy Rules: *{rules}*",
+        f"• Invalidation Contradictions: *{contra}*",
     ]
 
     if req.chapter_breakdown:
         lines.append("")
-        lines.append("📑 *Sections / Chapters:*")
-        for ch in req.chapter_breakdown[:6]:
-            lines.append(f"• {ch}")
-        if len(req.chapter_breakdown) > 6:
-            lines.append(f"• ... and {len(req.chapter_breakdown) - 6} more sections")
+        lines.append("📑 *Deconstructed Sections / Chapters:*")
+        for ch in req.chapter_breakdown[:8]:
+            safe_ch = str(ch).replace("*", "")
+            lines.append(f"• {safe_ch}")
+        if len(req.chapter_breakdown) > 8:
+            lines.append(f"• ... and {len(req.chapter_breakdown) - 8} more sections")
 
     if req.candidate_summary:
+        safe_candidate = str(req.candidate_summary).replace("*", "").replace("`", "")
         lines.append("")
-        lines.append("⚡ *Formulated Candidate (UNTESTED):*")
-        lines.append(f"• {req.candidate_summary}")
+        lines.append("⚡ *Formulated Strategy Candidate:*")
+        lines.append(f"• `{safe_candidate}`")
+        lines.append("• *Governance Stage:* `[UNTESTED / QUARANTINED]`")
+        lines.append("• *Action:* Run walk-forward backtest verification before paper routing")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append("🔬 _Dispatched from SKY / CBT Research Terminal_")
+    lines.append("🔬 _Dispatched from SKY / CBT Research Lab_")
 
     message_text = "\n".join(lines)
 
@@ -2268,17 +2445,23 @@ async def share_research_summary_to_telegram(req: ResearchTelegramShareRequest):
             "dispatched_text": message_text,
         }
 
-    sent = await telegram_bot.send_message(message_text, parse_mode="Markdown")
+    sent = await telegram_bot.send_message(message_text, parse_mode="Markdown", chat_id=target_chat)
     return {
         "status": "SENT" if sent else "FAILED",
         "configured": True,
-        "message": "Research summary dispatched to Telegram successfully!" if sent else "Telegram API delivery failed.",
+        "message": "Research summary dispatched to Telegram successfully!"
+        if sent
+        else "Telegram API delivery failed.",
         "dispatched_text": message_text,
     }
 
 
-@app.post("/api/research/candidates/{candidate_id}/backtest", dependencies=[Depends(require_api_key)])
-async def run_candidate_backtest(candidate_id: str, symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")):
+@app.post(
+    "/api/research/candidates/{candidate_id}/backtest", dependencies=[Depends(require_api_key)]
+)
+async def run_candidate_backtest(
+    candidate_id: str, symbol: str = Query("BTC/USDT"), timeframe: str = Query("15m")
+):
     """
     Executes a formal backtest and walk-forward verification on a Strategy Candidate.
     Updates candidate validation_stage to WALK_FORWARD or REJECTED based on statistical expectancy.
@@ -2289,7 +2472,7 @@ async def run_candidate_backtest(candidate_id: str, symbol: str = Query("BTC/USD
 
     # Run backtest via sandbox lab
     rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
-    
+
     # Statistical criteria for progression
     is_positive_ev = rep.expectancy_r > 0.15
     is_stable = rep.win_rate >= 0.45 and rep.sharpe_ratio >= 1.0
@@ -2311,20 +2494,25 @@ async def run_candidate_backtest(candidate_id: str, symbol: str = Query("BTC/USD
             rejected_claim=f"Strategy Candidate {candidate_id} on {symbol} {timeframe}",
             failure_reason="INSUFFICIENT_EXPECTANCY" if not is_positive_ev else "HIGH_VOLATILITY",
             historical_occurrences_tested=rep.total_trades,
-            rejection_autopsy=f"Backtest failed hurdle: Win Rate={rep.win_rate*100:.1f}%, Sharpe={rep.sharpe_ratio:.2f}, EV={rep.expectancy_r:.2f}R.",
+            rejection_autopsy=f"Backtest failed hurdle: Win Rate={rep.win_rate * 100:.1f}%, Sharpe={rep.sharpe_ratio:.2f}, EV={rep.expectancy_r:.2f}R.",
         )
 
-    return sanitize_numpy({
-        "candidate_id": candidate_id,
-        "validation_stage": new_stage,
-        "backtest_report": rep.to_dict(),
-        "verdict": "PROMOTED_TO_WALK_FORWARD" if new_stage == "WALK_FORWARD" else "ARCHIVED_AS_REJECTED",
-    })
+    return sanitize_numpy(
+        {
+            "candidate_id": candidate_id,
+            "validation_stage": new_stage,
+            "backtest_report": rep.to_dict(),
+            "verdict": "PROMOTED_TO_WALK_FORWARD"
+            if new_stage == "WALK_FORWARD"
+            else "ARCHIVED_AS_REJECTED",
+        }
+    )
 
 
 # ==============================================================================
 # SKY KNOWLEDGE & DISCOVERY GRAPH REST APIS
 # ==============================================================================
+
 
 class CreateHypothesisRequest(BaseModel):
     title: str
@@ -2375,7 +2563,9 @@ async def create_new_hypothesis(req: CreateHypothesisRequest):
     return sanitize_numpy(hypo.to_dict())
 
 
-@app.post("/api/research/hypotheses/{hypothesis_id}/run-test", dependencies=[Depends(require_api_key)])
+@app.post(
+    "/api/research/hypotheses/{hypothesis_id}/run-test", dependencies=[Depends(require_api_key)]
+)
 async def run_hypothesis_empirical_test(hypothesis_id: str):
     """
     Executes empirical statistical verification on a Hypothesis.
@@ -2410,7 +2600,15 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "150"))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024  # Configurable upload ceiling (default 150 MB)
 MAX_VOICE_BYTES = 15 * 1024 * 1024  # 15 MB base64-decoded
 ALLOWED_UPLOAD_EXTENSIONS = {
-    ".pdf", ".py", ".pine", ".mq4", ".mq5", ".json", ".csv", ".txt", ".md",
+    ".pdf",
+    ".py",
+    ".pine",
+    ".mq4",
+    ".mq5",
+    ".json",
+    ".csv",
+    ".txt",
+    ".md",
 }
 
 
@@ -2425,7 +2623,9 @@ def safe_upload_filename(filename: Optional[str]) -> Tuple[str, str]:
     original = (filename or "uploaded_file.txt").replace("\\", "/").split("/")[-1]
     ext = Path(original).suffix.lower()
     if ext not in ALLOWED_UPLOAD_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"File type '{ext or 'unknown'}' is not allowed.")
+        raise HTTPException(
+            status_code=400, detail=f"File type '{ext or 'unknown'}' is not allowed."
+        )
     safe_name = f"{uuid.uuid4().hex}{ext}"
     return safe_name, original
 
@@ -2462,7 +2662,9 @@ def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
     entry = float(order.entryPrice)
     stop = float(order.sl)
     if entry <= 0 or stop <= 0:
-        raise HTTPException(status_code=422, detail="Risk Gate Rejection: invalid entry/stop prices.")
+        raise HTTPException(
+            status_code=422, detail="Risk Gate Rejection: invalid entry/stop prices."
+        )
     dollar_risk = float(order.size or 1.0) * abs(entry - stop)
     max_risk = balance * max_risk_pct
     if dollar_risk > max_risk:
@@ -2478,6 +2680,7 @@ def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
 # ==============================================================================
 # INSTITUTIONAL ALPHA & MICROSTRUCTURE QUANT API ENDPOINTS
 # ==============================================================================
+
 
 @app.get("/api/institutional/alpha")
 async def get_institutional_alpha(
@@ -2530,7 +2733,11 @@ async def get_orderbook_imbalance(
     if not bids or not asks:
         # Synthetic fallback anchored to last known price
         candles = data_streamer.get_candles(symbol, "15m", limit=5)
-        p = float(candles[-1]["close"]) if candles else (77450.0 if "BTC" in symbol else 2430.0 if "ETH" in symbol else 4458.0)
+        p = (
+            float(candles[-1]["close"])
+            if candles
+            else (77450.0 if "BTC" in symbol else 2430.0 if "ETH" in symbol else 4458.0)
+        )
         bids = [(p * (1.0 - 0.0005 * i), 1.5 + 0.3 * i) for i in range(15)]
         asks = [(p * (1.0 + 0.0005 * i), 1.2 + 0.35 * i) for i in range(15)]
         data_source = "SYNTHETIC"
@@ -2541,14 +2748,17 @@ async def get_orderbook_imbalance(
     return result
 
 
-
 @app.get("/api/dossier")
 @app.get("/api/institutional/dossier")
 async def get_asset_dossier(
     symbol: str = Query("BTCUSDT"),
 ):
     candles = data_streamer.get_candles(symbol, "15m", limit=100)
-    cur_p = candles[-1]["close"] if candles else (77450.0 if "BTC" in symbol else 2430.0 if "ETH" in symbol else 4458.0)
+    cur_p = (
+        candles[-1]["close"]
+        if candles
+        else (77450.0 if "BTC" in symbol else 2430.0 if "ETH" in symbol else 4458.0)
+    )
     dossier = asset_dossier_engine.compile_dossier(
         symbol=symbol,
         current_price=cur_p,
@@ -2562,12 +2772,14 @@ async def get_asset_dossier(
 # PHASE 16: VOICE INTERFACE & NATURAL SPEECH ENDPOINTS
 # ==============================================================================
 
+
 @app.post("/api/voice/transcribe", dependencies=[Depends(require_api_key)])
 async def transcribe_voice_audio(req: VoiceTranscribeRequest):
     """
     Transcribes audio bytes (WebM/WAV/MP3) and automatically parses trading instructions.
     """
     import base64
+
     try:
         audio_data = base64.b64decode(req.audio_base64)
     except Exception as e:
@@ -2578,8 +2790,10 @@ async def transcribe_voice_audio(req: VoiceTranscribeRequest):
             detail=f"Audio payload too large (max {MAX_VOICE_BYTES // (1024 * 1024)} MB decoded).",
         )
 
-    transcript = await voice_interface.transcribe_audio_bytes(audio_data, req.filename or "memo.webm")
-    
+    transcript = await voice_interface.transcribe_audio_bytes(
+        audio_data, req.filename or "memo.webm"
+    )
+
     # Parse trade command if transcript contains trading instructions
     parsed_cmd = command_executor.parse_and_execute(transcript)
 
@@ -2597,13 +2811,16 @@ async def synthesize_voice_brief(req: VoiceSynthesizeRequest):
     """
     out_path = await voice_interface.generate_speech(req.text, req.filename or "desk_brief.mp3")
     if out_path.exists():
-        return FileResponse(str(out_path), media_type="audio/mpeg", filename=req.filename or "desk_brief.mp3")
+        return FileResponse(
+            str(out_path), media_type="audio/mpeg", filename=req.filename or "desk_brief.mp3"
+        )
     raise HTTPException(status_code=500, detail="Voice synthesis failed.")
 
 
 # ==============================================================================
 # PHASE 17: TELEGRAM BOT ALERT & COMMAND BRIDGE ENDPOINTS
 # ==============================================================================
+
 
 @app.get("/api/telegram/status")
 async def get_telegram_status():
@@ -2639,6 +2856,7 @@ async def handle_telegram_webhook(request: Request, update: TelegramWebhookReque
 # ==============================================================================
 # EMPIRICAL VALIDATION & ACCUMULATOR ENDPOINTS
 # ==============================================================================
+
 
 @app.get("/api/lab/empirical-status")
 async def get_empirical_validation_status(
@@ -2723,6 +2941,7 @@ async def get_strategy_genomes():
 # AUDIT BUS & DEDICATED XAUUSD MACRO INTELLIGENCE ENDPOINTS
 # ==============================================================================
 
+
 @app.get("/api/audit/events")
 async def get_system_audit_events(
     limit: int = Query(50),
@@ -2784,7 +3003,9 @@ async def get_kronos_forecast(
     try:
         candles = await data_streamer.fetch_external_ohlcv(symbol, timeframe, limit=lookback + 20)
         if not candles or len(candles) < 20:
-            candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
+            candles = data_streamer.generate_synthetic_candles(
+                symbol, timeframe, count=lookback + 20
+            )
     except Exception:
         candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
     forecast = kronos_adapter.predict(
@@ -2839,7 +3060,9 @@ async def get_kronos_calibration(
     timeframe: str = Query("15m"),
 ):
     """Returns Platt calibration curve and Brier reliability deciles for Kronos."""
-    scorecard = kronos_probability_calibrator.evaluate_scorecard([], [], symbol=symbol, timeframe=timeframe)
+    scorecard = kronos_probability_calibrator.evaluate_scorecard(
+        [], [], symbol=symbol, timeframe=timeframe
+    )
     return scorecard.to_dict()
 
 
@@ -3059,7 +3282,11 @@ async def generate_execution_slice(
         )
         return asdict(traj)
 
-    return {"algo_type": req.algo_type, "total_qty": req.qty, "schedule": [asdict(s) for s in slices]}
+    return {
+        "algo_type": req.algo_type,
+        "total_qty": req.qty,
+        "schedule": [asdict(s) for s in slices],
+    }
 
 
 @app.post("/api/execution/simulate_impact")
@@ -3081,7 +3308,13 @@ async def simulate_market_impact(
 async def get_execution_routes():
     """Returns available execution algorithms and fee structure."""
     return {
-        "supported_algos": ["PASSIVE_LIMIT_QUEUE", "TWAP_ALGORITHMIC", "VWAP_ALGORITHMIC", "ALMGREN_CHRISS_OPTIMAL", "AGGRESSIVE_IOC_SWEEP"],
+        "supported_algos": [
+            "PASSIVE_LIMIT_QUEUE",
+            "TWAP_ALGORITHMIC",
+            "VWAP_ALGORITHMIC",
+            "ALMGREN_CHRISS_OPTIMAL",
+            "AGGRESSIVE_IOC_SWEEP",
+        ],
         "taker_fee_bps": smart_execution_engine.taker_fee_bps,
         "maker_fee_bps": smart_execution_engine.maker_fee_bps,
         "adv_default_usd": smart_execution_engine.adv_default_usd,
@@ -3133,6 +3366,7 @@ async def record_auditor_trade(
 # =============================================================================
 # Phase 16: Live Canary / Shadow Deployment & Telemetry Burn-In Endpoints
 # =============================================================================
+
 
 @app.get("/api/burn-in/status")
 async def get_burn_in_status():
@@ -3224,7 +3458,9 @@ async def get_incident_escalations(limit: int = 50, unresolved_only: bool = Fals
     """Returns active and historical incident records."""
     return {
         "status": "SUCCESS",
-        "incidents": incident_escalation_engine.get_incidents(limit=limit, unresolved_only=unresolved_only),
+        "incidents": incident_escalation_engine.get_incidents(
+            limit=limit, unresolved_only=unresolved_only
+        ),
     }
 
 
@@ -3237,7 +3473,9 @@ async def simulate_incident_trigger(req: SimulateIncidentRequest):
     valid_tiers = ["NOTICE", "WARNING", "CRITICAL", "EMERGENCY"]
     tier_clean = req.tier.upper()
     if tier_clean not in valid_tiers:
-        raise HTTPException(status_code=400, detail=f"Invalid tier: {req.tier}. Must be one of {valid_tiers}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid tier: {req.tier}. Must be one of {valid_tiers}"
+        )
 
     rec = await incident_escalation_engine.raise_incident(
         tier=tier_clean,
@@ -3256,15 +3494,20 @@ async def resolve_incident(incident_id: str, req: Optional[ResolveIncidentReques
     """Marks an active incident as resolved by an operator."""
     op_id = req.operator_id if req and req.operator_id else "ADMIN"
     notes = req.notes if req and req.notes else "Resolved"
-    success = incident_escalation_engine.resolve_incident(incident_id, operator_id=op_id, notes=notes)
+    success = incident_escalation_engine.resolve_incident(
+        incident_id, operator_id=op_id, notes=notes
+    )
     if not success:
-        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found or could not be resolved.")
+        raise HTTPException(
+            status_code=404, detail=f"Incident {incident_id} not found or could not be resolved."
+        )
     return {"status": "SUCCESS", "incident_id": incident_id, "resolved": True}
 
 
 # ===========================================================================
 # Milestone 17: Live Exchange Execution & Private API Credential Vault (Class H)
 # ===========================================================================
+
 
 class VaultConfigureApiRequest(BaseModel):
     exchange: str = Field(..., description="Exchange venue: BINANCE or BYBIT")
@@ -3308,7 +3551,9 @@ class LiveOrderApiRequest(BaseModel):
     max_open_positions_cap: int = Field(3, ge=1, description="Maximum open positions cap")
     client_order_id: Optional[str] = Field(None, description="Optional unique client order ID")
     correlation_id: Optional[str] = Field(None, description="Optional request correlation ID")
-    reference_time_ms: Optional[int] = Field(None, description="Optional external UTC reference timestamp for clock skew validation")
+    reference_time_ms: Optional[int] = Field(
+        None, description="Optional external UTC reference timestamp for clock skew validation"
+    )
 
 
 class LiveCancelApiRequest(BaseModel):
@@ -3334,7 +3579,9 @@ class SORRouteQuoteApiRequest(BaseModel):
     symbol: str = Field(..., description="Symbol format BASE/QUOTE e.g. BTC/USDT")
     side: str = Field(..., description="BUY or SELL")
     total_qty: float = Field(..., gt=0.0, description="Total order quantity in base units")
-    max_slippage_bps: float = Field(200.0, gt=0.0, description="Maximum allowable slippage tolerance in basis points")
+    max_slippage_bps: float = Field(
+        200.0, gt=0.0, description="Maximum allowable slippage tolerance in basis points"
+    )
     mock_bids_binance: list[list[float]] | None = None
     mock_asks_binance: list[list[float]] | None = None
     mock_bids_bybit: list[list[float]] | None = None
@@ -3346,10 +3593,14 @@ class AlmgrenChrissScheduleApiRequest(BaseModel):
     side: str = Field(..., description="BUY or SELL")
     total_qty: float = Field(..., gt=0.0, description="Total order quantity in base units")
     current_price: float = Field(..., gt=0.0, description="Benchmark current market price")
-    time_horizon_sec: float = Field(900.0, gt=0.0, description="Execution horizon duration in seconds")
+    time_horizon_sec: float = Field(
+        900.0, gt=0.0, description="Execution horizon duration in seconds"
+    )
     num_intervals: int = Field(10, ge=1, description="Number of discrete intervals")
     annualized_volatility: float = Field(0.65, gt=0.0, description="Annualized volatility")
-    risk_aversion_lambda: float = Field(1e-6, ge=0.0, description="Risk aversion parameter (0 = linear TWAP)")
+    risk_aversion_lambda: float = Field(
+        1e-6, ge=0.0, description="Risk aversion parameter (0 = linear TWAP)"
+    )
 
 
 @app.get("/api/vault/status")
@@ -3389,7 +3640,11 @@ async def configure_vault_credential(req: VaultConfigureApiRequest):
         symbol=req.exchange,
         severity="WARNING",
         reason=f"Credential updated for {req.exchange} [{req.environment}] (Key: {mask_secret(req.api_key)})",
-        details={"exchange": req.exchange, "environment": req.environment, "is_active": req.is_active},
+        details={
+            "exchange": req.exchange,
+            "environment": req.environment,
+            "is_active": req.is_active,
+        },
     )
     return {
         "status": "SUCCESS",
@@ -3427,31 +3682,58 @@ async def place_live_order(req: LiveOrderApiRequest):
         receipt = await live_execution_router.execute_live_order(order_req)
         return {"status": "SUCCESS", "receipt": receipt.to_safe_dict()}
     except LiveExecutionDisabledError as e:
-        raise HTTPException(status_code=403, detail={"error": "LIVE_EXECUTION_DISABLED", "message": str(e)})
+        raise HTTPException(
+            status_code=403, detail={"error": "LIVE_EXECUTION_DISABLED", "message": str(e)}
+        )
     except LiveKillSwitchActiveError as e:
-        raise HTTPException(status_code=403, detail={"error": "KILL_SWITCH_ACTIVE", "message": str(e)})
+        raise HTTPException(
+            status_code=403, detail={"error": "KILL_SWITCH_ACTIVE", "message": str(e)}
+        )
     except LivePreflightFailedError as e:
-        raise HTTPException(status_code=412, detail={"error": "PREFLIGHT_FAILED", "message": str(e)})
+        raise HTTPException(
+            status_code=412, detail={"error": "PREFLIGHT_FAILED", "message": str(e)}
+        )
     except LiveRiskRejectedError as e:
-        raise HTTPException(status_code=422, detail={"error": "RISK_GATE_REJECTED", "message": str(e)})
+        raise HTTPException(
+            status_code=422, detail={"error": "RISK_GATE_REJECTED", "message": str(e)}
+        )
     except LiveSizeRejectedError as e:
         raise HTTPException(status_code=422, detail={"error": "SIZE_REJECTED", "message": str(e)})
     except LiveCredentialUnavailableError as e:
-        raise HTTPException(status_code=404, detail={"error": "CREDENTIAL_UNAVAILABLE", "message": str(e)})
+        raise HTTPException(
+            status_code=404, detail={"error": "CREDENTIAL_UNAVAILABLE", "message": str(e)}
+        )
     except LiveEnvironmentMismatchError as e:
-        raise HTTPException(status_code=400, detail={"error": "ENVIRONMENT_MISMATCH", "message": str(e)})
+        raise HTTPException(
+            status_code=400, detail={"error": "ENVIRONMENT_MISMATCH", "message": str(e)}
+        )
     except LiveClockSkewError as e:
-        raise HTTPException(status_code=400, detail={"error": "CLOCK_SKEW_DETECTED", "message": str(e)})
+        raise HTTPException(
+            status_code=400, detail={"error": "CLOCK_SKEW_DETECTED", "message": str(e)}
+        )
     except LiveExchangeDegradedError as e:
-        raise HTTPException(status_code=503, detail={"error": "EXCHANGE_DEGRADED", "message": str(e)})
+        raise HTTPException(
+            status_code=503, detail={"error": "EXCHANGE_DEGRADED", "message": str(e)}
+        )
     except LiveAmbiguousOrderError as e:
         raise HTTPException(status_code=504, detail={"error": "AMBIGUOUS_ORDER", "message": str(e)})
     except ExchangeRateLimitError as e:
-        raise HTTPException(status_code=429, detail={"error": "EXCHANGE_RATE_LIMITED", "message": str(e), "retry_after": e.retry_after_sec})
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "EXCHANGE_RATE_LIMITED",
+                "message": str(e),
+                "retry_after": e.retry_after_sec,
+            },
+        )
     except (ExchangeRejectedError, ExchangeAuthenticationError) as e:
-        raise HTTPException(status_code=400, detail={"error": "EXCHANGE_REJECTED", "message": str(e)})
+        raise HTTPException(
+            status_code=400, detail={"error": "EXCHANGE_REJECTED", "message": str(e)}
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": "LIVE_ORDER_FAILED", "message": sanitize_text(str(e))})
+        raise HTTPException(
+            status_code=500, detail={"error": "LIVE_ORDER_FAILED", "message": sanitize_text(str(e))}
+        )
 
 
 @app.post("/api/execution/live/cancel", dependencies=[Depends(require_api_key)])
@@ -3468,7 +3750,9 @@ async def cancel_live_order(req: LiveCancelApiRequest):
         )
         return {"status": "SUCCESS", "result": res}
     except Exception as e:
-        raise HTTPException(status_code=400, detail={"error": "CANCEL_FAILED", "message": sanitize_text(str(e))})
+        raise HTTPException(
+            status_code=400, detail={"error": "CANCEL_FAILED", "message": sanitize_text(str(e))}
+        )
 
 
 @app.get("/api/execution/live/balance", dependencies=[Depends(require_api_key)])
@@ -3487,7 +3771,10 @@ async def get_live_balance(
             "timestamp_ms": int(time.time() * 1000),
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail={"error": "BALANCE_FETCH_FAILED", "message": sanitize_text(str(e))})
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "BALANCE_FETCH_FAILED", "message": sanitize_text(str(e))},
+        )
 
 
 @app.get("/api/execution/live/orders", dependencies=[Depends(require_api_key)])
@@ -3518,7 +3805,10 @@ async def reconcile_ambiguous_order(req: LiveReconcileApiRequest):
         res = await live_execution_router.reconcile_order(client_order_id=req.client_order_id)
         return {"status": "SUCCESS", "result": asdict(res)}
     except Exception as e:
-        raise HTTPException(status_code=400, detail={"error": "RECONCILIATION_FAILED", "message": sanitize_text(str(e))})
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "RECONCILIATION_FAILED", "message": sanitize_text(str(e))},
+        )
 
 
 @app.post("/api/execution/sor/route-quote")
@@ -3537,16 +3827,32 @@ async def get_sor_route_quote(req: SORRouteQuoteApiRequest):
     # Fallback to standard depth benchmark if no depth levels provided
     if not b_bids and not b_asks:
         p_ref = 60000.0
-        b_bids = [L2DepthLevel(price=p_ref * 0.9995, size=5.0), L2DepthLevel(price=p_ref * 0.9990, size=10.0)]
-        b_asks = [L2DepthLevel(price=p_ref * 1.0005, size=5.0), L2DepthLevel(price=p_ref * 1.0010, size=10.0)]
+        b_bids = [
+            L2DepthLevel(price=p_ref * 0.9995, size=5.0),
+            L2DepthLevel(price=p_ref * 0.9990, size=10.0),
+        ]
+        b_asks = [
+            L2DepthLevel(price=p_ref * 1.0005, size=5.0),
+            L2DepthLevel(price=p_ref * 1.0010, size=10.0),
+        ]
     if not by_bids and not by_asks:
         p_ref = 60000.0
-        by_bids = [L2DepthLevel(price=p_ref * 0.9994, size=5.0), L2DepthLevel(price=p_ref * 0.9989, size=10.0)]
-        by_asks = [L2DepthLevel(price=p_ref * 1.0006, size=5.0), L2DepthLevel(price=p_ref * 1.0011, size=10.0)]
+        by_bids = [
+            L2DepthLevel(price=p_ref * 0.9994, size=5.0),
+            L2DepthLevel(price=p_ref * 0.9989, size=10.0),
+        ]
+        by_asks = [
+            L2DepthLevel(price=p_ref * 1.0006, size=5.0),
+            L2DepthLevel(price=p_ref * 1.0011, size=10.0),
+        ]
 
     books = {
-        "BINANCE": VenueOrderBook(exchange="BINANCE", symbol=req.symbol, bids=b_bids, asks=b_asks, timestamp_ms=now_ms),
-        "BYBIT": VenueOrderBook(exchange="BYBIT", symbol=req.symbol, bids=by_bids, asks=by_asks, timestamp_ms=now_ms),
+        "BINANCE": VenueOrderBook(
+            exchange="BINANCE", symbol=req.symbol, bids=b_bids, asks=b_asks, timestamp_ms=now_ms
+        ),
+        "BYBIT": VenueOrderBook(
+            exchange="BYBIT", symbol=req.symbol, bids=by_bids, asks=by_asks, timestamp_ms=now_ms
+        ),
     }
 
     try:
@@ -3650,7 +3956,9 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
             ws_manager.record_activity(websocket)
             msg = json.loads(data) if data else {}
             if msg.get("action") == "PING":
-                await websocket.send_json({"type": "PONG", "timestamp": int(asyncio.get_event_loop().time() * 1000)})
+                await websocket.send_json(
+                    {"type": "PONG", "timestamp": int(asyncio.get_event_loop().time() * 1000)}
+                )
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
     except Exception:
@@ -3659,5 +3967,5 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
 
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)

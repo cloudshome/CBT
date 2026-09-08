@@ -473,3 +473,42 @@ def test_telegram_audit_logging_to_sqlite():
         assert "TELEGRAM_COMMAND" in events
         assert "TELEGRAM_AUTH_DENIED" in events
         assert "TELEGRAM_CALLBACK" in events
+
+
+# ==============================================================================
+# 9. TELEGRAM CHARACTER LIMIT & CHUNKING TESTS
+# ==============================================================================
+
+
+@pytest.mark.asyncio
+async def test_telegram_message_chunking_and_limits():
+    """Verifies that messages exceeding the 4000-character safe ceiling are automatically chunked."""
+    from unittest.mock import AsyncMock, patch
+
+    # 1. Short text stays as single chunk
+    short_text = "Quantitative Market Intelligence Analysis"
+    chunks = telegram_bot._split_message_chunks(short_text, max_chars=4000)
+    assert len(chunks) == 1
+    assert chunks[0] == short_text
+
+    # 2. Long text (>4000 chars) is split into clean chunks <= 4000 chars
+    long_para = "SMC liquidity sweep and orderbook imbalance analysis. " * 100  # ~5500 chars
+    assert len(long_para) > 4000
+    chunks = telegram_bot._split_message_chunks(long_para, max_chars=4000)
+    assert len(chunks) >= 2
+    for c in chunks:
+        assert len(c) <= 4000
+
+    # 3. send_message sends sequential chunks when text exceeds limit
+    with patch.object(telegram_bot, "_send_single_payload", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = True
+        sent = await telegram_bot.send_message(
+            text=long_para,
+            parse_mode="Markdown",
+            chat_id=12345,
+        )
+        assert sent is True
+        assert mock_send.call_count >= 2
+        # Final chunk should contain Part 2
+        call_args_list = mock_send.call_args_list
+        assert any("[Part 2/" in str(call) for call in call_args_list)
