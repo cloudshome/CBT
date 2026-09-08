@@ -395,6 +395,44 @@ class DatabaseManager:
                 "CREATE INDEX IF NOT EXISTS idx_incident_resolved ON incident_escalations (resolved, timestamp DESC);"
             )
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS execution_reconciliation_records (
+                    reconciliation_id TEXT PRIMARY KEY,
+                    parent_order_id TEXT NOT NULL,
+                    client_order_id TEXT NOT NULL,
+                    exchange_order_id TEXT NOT NULL,
+                    exchange TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    requested_qty REAL NOT NULL,
+                    executed_qty REAL NOT NULL,
+                    expected_price REAL NOT NULL,
+                    executed_price REAL NOT NULL,
+                    slippage_bps REAL NOT NULL,
+                    fee_paid_usd REAL NOT NULL,
+                    fee_asset TEXT NOT NULL,
+                    route_venue TEXT NOT NULL,
+                    transit_latency_ms REAL NOT NULL,
+                    exchange_ack_latency_ms REAL NOT NULL,
+                    total_roundtrip_ms REAL NOT NULL,
+                    reconciliation_status TEXT NOT NULL,
+                    created_at_ms INTEGER NOT NULL,
+                    reconciled_at_ms INTEGER NOT NULL
+                );
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rec_symbol ON execution_reconciliation_records(symbol);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rec_exchange ON execution_reconciliation_records(exchange);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rec_status ON execution_reconciliation_records(reconciliation_status);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rec_created ON execution_reconciliation_records(created_at_ms);"
+            )
+
             conn.commit()
 
     def _init_experiment_db(self) -> None:

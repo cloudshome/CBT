@@ -1,12 +1,12 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-09-07  
-> **Release Tag:** `v3.7.0-live-execution-vault` (ACTIVE 🚀)  
+> **Last Updated:** 2026-09-08  
+> **Release Tag:** `v3.8.0-smart-order-router` (ACTIVE 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 493 / 493 (367 Pytest, 126 Jest — 100% passing)  
+> **Tests Passing:** 520 / 520 (394 Pytest, 126 Jest — 100% passing)  
 > **Preflight Status:** ALL QUALITY GATES PASSED (100% GREEN)
 
 ---
@@ -62,6 +62,8 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `c738d8f` | Merge pull request #49 from cloudshome/arena/01a07d0a-ctb (clear ruff debt in M17 execution/auth/vault) |
+| `8ecae25` | docs(pipeline): update SKY_STATUS, roadmap, and next session plan to v3.7.0 and Milestone 18 |
 | `d41fa1b` | Merge remote-tracking branch 'origin/main' into main |
 | `33417b4` | fix(execution): enforce 1.5% single-trade risk ceiling and dynamic clock drift validation (29 passing tests) |
 | `3d50dda` | feat(execution): implement live exchange execution router, aes-256-gcm vault, and hmac signers (26 passing tests) |

@@ -1515,6 +1515,78 @@ export const api = {
     });
     return handleResponse<{ status: string; result: any }>(res);
   },
+
+  /**
+   * POST /api/execution/sor/route-quote
+   */
+  async getSORRouteQuote(req: {
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    total_qty: number;
+    max_slippage_bps?: number;
+  }): Promise<{ status: string; quote: SORRouteQuote }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/sor/route-quote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ status: string; quote: SORRouteQuote }>(res);
+  },
+
+  /**
+   * POST /api/execution/slicer/almgren-chriss
+   */
+  async getAlmgrenChrissSchedule(req: {
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    total_qty: number;
+    current_price: number;
+    time_horizon_sec?: number;
+    num_intervals?: number;
+    annualized_volatility?: number;
+    risk_aversion_lambda?: number;
+  }): Promise<{ status: string; schedule: AlmgrenChrissSchedule }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/slicer/almgren-chriss`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ status: string; schedule: AlmgrenChrissSchedule }>(res);
+  },
+
+  /**
+   * GET /api/execution/reconciliation/report
+   */
+  async getReconciliationReport(
+    symbol?: string,
+    exchange?: string,
+    window_hours: number = 24
+  ): Promise<{ status: string; report: ReconciliationReport }> {
+    const params = new URLSearchParams();
+    if (symbol) params.append('symbol', symbol);
+    if (exchange) params.append('exchange', exchange);
+    params.append('window_hours', window_hours.toString());
+    const res = await authFetch(`${BASE_URL}/api/execution/reconciliation/report?${params.toString()}`);
+    return handleResponse<{ status: string; report: ReconciliationReport }>(res);
+  },
+
+  /**
+   * GET /api/execution/reconciliation/records
+   */
+  async getReconciliationRecords(
+    limit: number = 50,
+    symbol?: string,
+    exchange?: string,
+    status?: string
+  ): Promise<{ status: string; records: ReconciliationRecord[] }> {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    if (symbol) params.append('symbol', symbol);
+    if (exchange) params.append('exchange', exchange);
+    if (status) params.append('status', status);
+    const res = await authFetch(`${BASE_URL}/api/execution/reconciliation/records?${params.toString()}`);
+    return handleResponse<{ status: string; records: ReconciliationRecord[] }>(res);
+  },
 };
 
 export interface BurnInStatus {
@@ -1728,4 +1800,92 @@ export interface LiveBalanceResponse {
     total: number;
   }>;
   timestamp_ms: number;
+}
+
+export interface VenueSplitQuote {
+  exchange: string;
+  allocated_qty: number;
+  allocated_notional: number;
+  expected_vwap: number;
+  expected_fee_usd: number;
+  expected_slippage_bps: number;
+  percentage: number;
+}
+
+export interface SORRouteQuote {
+  symbol: string;
+  side: string;
+  total_qty: number;
+  reference_mid_price: number;
+  weighted_vwap: number;
+  total_fee_usd: number;
+  total_effective_cost_usd: number;
+  total_slippage_bps: number;
+  splits: VenueSplitQuote[];
+  routing_reason: string;
+  timestamp_ms: number;
+}
+
+export interface AlmgrenChrissSlice {
+  interval_index: number;
+  scheduled_offset_sec: number;
+  slice_qty: number;
+  remaining_qty_after: number;
+  fraction_of_total: number;
+  instantaneous_impact_bps: number;
+  expected_slice_price: number;
+}
+
+export interface AlmgrenChrissSchedule {
+  symbol: string;
+  side: string;
+  total_qty: number;
+  current_price: number;
+  time_horizon_sec: number;
+  num_intervals: number;
+  interval_duration_sec: number;
+  risk_aversion_lambda: number;
+  volatility: number;
+  expected_total_cost_usd: number;
+  variance_cost_usd: number;
+  expected_slippage_bps: number;
+  is_linear_twap: boolean;
+  slices: AlmgrenChrissSlice[];
+  created_at_ms: number;
+}
+
+export interface ReconciliationReport {
+  window_hours: number;
+  total_reconciled_orders: number;
+  fill_rate_pct: number;
+  status_breakdown: Record<string, number>;
+  average_slippage_bps: number;
+  max_adverse_slippage_bps: number;
+  total_fees_usd: number;
+  average_roundtrip_latency_ms: number;
+  venue_distribution: Record<string, number>;
+}
+
+export interface ReconciliationRecord {
+  reconciliation_id: string;
+  parent_order_id: string;
+  client_order_id: string;
+  exchange_order_id: string;
+  exchange: string;
+  symbol: string;
+  side: string;
+  requested_qty: number;
+  executed_qty: number;
+  expected_price: number;
+  executed_price: number;
+  slippage_bps: number;
+  fee_paid_usd: number;
+  fee_asset: string;
+  route_venue: string;
+  transit_latency_ms: number;
+  exchange_ack_latency_ms: number;
+  total_roundtrip_ms: number;
+  reconciliation_status: string;
+  created_at_ms: number;
+  reconciled_at_ms: number;
 }

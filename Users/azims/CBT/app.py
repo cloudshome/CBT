@@ -110,25 +110,33 @@ from core.auth import (
     sanitize_text,
 )
 from core.execution import (
-    live_execution_router,
-    live_kill_switch,
-    idempotency_store,
-    LiveOrderRequest,
-    OrderStatus,
+    AlmgrenChrissError,
+    ExchangeAuthenticationError,
+    ExchangeError,
+    ExchangeRateLimitError,
+    ExchangeRejectedError,
+    InsufficientLiquidityError,
+    L2DepthLevel,
+    LiveAmbiguousOrderError,
+    LiveClockSkewError,
+    LiveCredentialUnavailableError,
+    LiveEnvironmentMismatchError,
+    LiveExchangeDegradedError,
     LiveExecutionDisabledError,
     LiveKillSwitchActiveError,
+    LiveOrderRequest,
     LivePreflightFailedError,
     LiveRiskRejectedError,
     LiveSizeRejectedError,
-    LiveCredentialUnavailableError,
-    LiveEnvironmentMismatchError,
-    LiveClockSkewError,
-    LiveExchangeDegradedError,
-    LiveAmbiguousOrderError,
-    ExchangeError,
-    ExchangeRateLimitError,
-    ExchangeAuthenticationError,
-    ExchangeRejectedError,
+    OrderStatus,
+    SmartOrderRouterError,
+    VenueOrderBook,
+    almgren_chriss_slicer,
+    idempotency_store,
+    live_execution_router,
+    live_kill_switch,
+    reconciliation_ledger,
+    smart_order_router,
 )
 from core.models.kronos import (
     kronos_adapter,
@@ -3319,6 +3327,28 @@ class LiveReconcileApiRequest(BaseModel):
     client_order_id: str = Field(..., description="Client order ID of ambiguous order to reconcile")
 
 
+class SORRouteQuoteApiRequest(BaseModel):
+    symbol: str = Field(..., description="Symbol format BASE/QUOTE e.g. BTC/USDT")
+    side: str = Field(..., description="BUY or SELL")
+    total_qty: float = Field(..., gt=0.0, description="Total order quantity in base units")
+    max_slippage_bps: float = Field(200.0, gt=0.0, description="Maximum allowable slippage tolerance in basis points")
+    mock_bids_binance: list[list[float]] | None = None
+    mock_asks_binance: list[list[float]] | None = None
+    mock_bids_bybit: list[list[float]] | None = None
+    mock_asks_bybit: list[list[float]] | None = None
+
+
+class AlmgrenChrissScheduleApiRequest(BaseModel):
+    symbol: str = Field(..., description="Symbol format BASE/QUOTE e.g. BTC/USDT")
+    side: str = Field(..., description="BUY or SELL")
+    total_qty: float = Field(..., gt=0.0, description="Total order quantity in base units")
+    current_price: float = Field(..., gt=0.0, description="Benchmark current market price")
+    time_horizon_sec: float = Field(900.0, gt=0.0, description="Execution horizon duration in seconds")
+    num_intervals: int = Field(10, ge=1, description="Number of discrete intervals")
+    annualized_volatility: float = Field(0.65, gt=0.0, description="Annualized volatility")
+    risk_aversion_lambda: float = Field(1e-6, ge=0.0, description="Risk aversion parameter (0 = linear TWAP)")
+
+
 @app.get("/api/vault/status")
 async def get_vault_status():
     """
@@ -3486,6 +3516,123 @@ async def reconcile_ambiguous_order(req: LiveReconcileApiRequest):
         return {"status": "SUCCESS", "result": asdict(res)}
     except Exception as e:
         raise HTTPException(status_code=400, detail={"error": "RECONCILIATION_FAILED", "message": sanitize_text(str(e))})
+
+
+@app.post("/api/execution/sor/route-quote")
+async def get_sor_route_quote(req: SORRouteQuoteApiRequest):
+    """
+    Computes optimal multi-venue volume distribution and expected execution cost across Binance and Bybit.
+    """
+    now_ms = int(time.time() * 1000)
+
+    # Construct books: Use provided live/mock depths or synthetic depth ladders from current ticker
+    b_bids = [L2DepthLevel(price=p, size=s) for p, s in (req.mock_bids_binance or [])]
+    b_asks = [L2DepthLevel(price=p, size=s) for p, s in (req.mock_asks_binance or [])]
+    by_bids = [L2DepthLevel(price=p, size=s) for p, s in (req.mock_bids_bybit or [])]
+    by_asks = [L2DepthLevel(price=p, size=s) for p, s in (req.mock_asks_bybit or [])]
+
+    # Fallback to standard depth benchmark if no depth levels provided
+    if not b_bids and not b_asks:
+        p_ref = 60000.0
+        b_bids = [L2DepthLevel(price=p_ref * 0.9995, size=5.0), L2DepthLevel(price=p_ref * 0.9990, size=10.0)]
+        b_asks = [L2DepthLevel(price=p_ref * 1.0005, size=5.0), L2DepthLevel(price=p_ref * 1.0010, size=10.0)]
+    if not by_bids and not by_asks:
+        p_ref = 60000.0
+        by_bids = [L2DepthLevel(price=p_ref * 0.9994, size=5.0), L2DepthLevel(price=p_ref * 0.9989, size=10.0)]
+        by_asks = [L2DepthLevel(price=p_ref * 1.0006, size=5.0), L2DepthLevel(price=p_ref * 1.0011, size=10.0)]
+
+    books = {
+        "BINANCE": VenueOrderBook(exchange="BINANCE", symbol=req.symbol, bids=b_bids, asks=b_asks, timestamp_ms=now_ms),
+        "BYBIT": VenueOrderBook(exchange="BYBIT", symbol=req.symbol, bids=by_bids, asks=by_asks, timestamp_ms=now_ms),
+    }
+
+    try:
+        quote = smart_order_router.calculate_optimal_split(
+            symbol=req.symbol,
+            side=req.side,
+            total_qty=req.total_qty,
+            venue_books=books,
+            max_slippage_bps=req.max_slippage_bps,
+            current_time_ms=now_ms,
+        )
+        return {"status": "SUCCESS", "quote": quote.to_dict()}
+    except InsufficientLiquidityError as e:
+        raise HTTPException(
+            status_code=422, detail={"error": "INSUFFICIENT_LIQUIDITY", "message": str(e)}
+        ) from e
+    except SmartOrderRouterError as e:
+        raise HTTPException(
+            status_code=400, detail={"error": "SOR_QUOTE_FAILED", "message": sanitize_text(str(e))}
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail={"error": "SOR_QUOTE_FAILED", "message": sanitize_text(str(e))}
+        ) from e
+
+
+@app.post("/api/execution/slicer/almgren-chriss")
+async def get_almgren_chriss_schedule(req: AlmgrenChrissScheduleApiRequest):
+    """
+    Computes classical discrete Almgren-Chriss (2000) optimal trajectory schedule and child slices.
+    """
+    try:
+        schedule = almgren_chriss_slicer.generate_execution_schedule(
+            symbol=req.symbol,
+            side=req.side,
+            total_qty=req.total_qty,
+            current_price=req.current_price,
+            time_horizon_sec=req.time_horizon_sec,
+            num_intervals=req.num_intervals,
+            annualized_volatility=req.annualized_volatility,
+            risk_aversion_lambda=req.risk_aversion_lambda,
+        )
+        return {"status": "SUCCESS", "schedule": schedule.to_dict()}
+    except AlmgrenChrissError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "SLICER_SCHEDULE_FAILED", "message": sanitize_text(str(e))},
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "SLICER_SCHEDULE_FAILED", "message": sanitize_text(str(e))},
+        ) from e
+
+
+@app.get("/api/execution/reconciliation/report", dependencies=[Depends(require_api_key)])
+async def get_reconciliation_report(
+    symbol: str | None = Query(None, description="Optional symbol filter"),
+    exchange: str | None = Query(None, description="Optional exchange filter"),
+    window_hours: int = Query(24, ge=1, le=168, description="Time window in hours"),
+):
+    """
+    Returns aggregate execution quality statistics, average slippage in bps, fee breakdown, and latency distribution.
+    """
+    summary = reconciliation_ledger.get_reconciliation_summary(
+        symbol=symbol,
+        exchange=exchange,
+        window_hours=window_hours,
+    )
+    return {"status": "SUCCESS", "report": summary}
+
+
+@app.get("/api/execution/reconciliation/records", dependencies=[Depends(require_api_key)])
+async def get_reconciliation_records(
+    limit: int = Query(50, ge=1, le=200, description="Max records to return"),
+    symbol: str | None = Query(None, description="Optional symbol filter"),
+    exchange: str | None = Query(None, description="Optional exchange filter"),
+    status: str | None = Query(None, description="Optional reconciliation status filter"),
+):
+    """
+    Returns paginated forensic execution reconciliation records.
+    """
+    records = reconciliation_ledger.list_records(
+        limit=limit,
+        symbol=symbol,
+        exchange=exchange,
+        status=status,
+    )
+    return {"status": "SUCCESS", "records": records}
 
 
 # WebSocket endpoint for real-time interactive terminal

@@ -2,6 +2,13 @@
 Master Execution Package for Crypto Brain Terminal.
 """
 
+from core.execution.almgren_chriss import (
+    AlmgrenChrissError,
+    AlmgrenChrissSchedule,
+    AlmgrenChrissSlice,
+    AlmgrenChrissSlicer,
+    almgren_chriss_slicer,
+)
 from core.execution.connectors.base import (
     BaseExchangeConnector,
     ExchangeAuthenticationError,
@@ -48,8 +55,28 @@ from core.execution.live_router import (
     LiveSizeRejectedError,
     live_execution_router,
 )
+from core.execution.reconciliation_ledger import (
+    ExecutionReconciliationRecord,
+    ReconciliationLedger,
+    reconciliation_ledger,
+)
+from core.execution.smart_order_router import (
+    InsufficientLiquidityError,
+    L2DepthLevel,
+    SmartOrderRouteQuote,
+    SmartOrderRouter,
+    SmartOrderRouterError,
+    VenueFeeSchedule,
+    VenueOrderBook,
+    VenueSplitQuote,
+    smart_order_router,
+)
 
 __all__ = [
+    "AlmgrenChrissError",
+    "AlmgrenChrissSchedule",
+    "AlmgrenChrissSlice",
+    "AlmgrenChrissSlicer",
     "AmbiguousOrderError",
     "BaseExchangeConnector",
     "BinanceSpotConnector",
@@ -61,9 +88,12 @@ __all__ = [
     "ExchangeRateLimitError",
     "ExchangeRejectedError",
     "ExchangeTimeoutError",
+    "ExecutionReconciliationRecord",
     "IdempotencyError",
     "IdempotencyRecord",
+    "InsufficientLiquidityError",
     "KillSwitchState",
+    "L2DepthLevel",
     "LiveAmbiguousOrderError",
     "LiveClockSkewError",
     "LiveCredentialUnavailableError",
@@ -83,9 +113,19 @@ __all__ = [
     "NormalizedBalance",
     "NormalizedOrderResult",
     "OrderStatus",
+    "ReconciliationLedger",
+    "SmartOrderRouteQuote",
+    "SmartOrderRouter",
+    "SmartOrderRouterError",
+    "VenueFeeSchedule",
+    "VenueOrderBook",
+    "VenueSplitQuote",
+    "almgren_chriss_slicer",
     "generate_client_order_id",
     "idempotency_store",
     "live_execution_router",
     "live_kill_switch",
     "parse_strict_bool",
+    "reconciliation_ledger",
+    "smart_order_router",
 ]
