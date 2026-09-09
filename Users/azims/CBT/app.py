@@ -844,7 +844,7 @@ async def get_tickers_alias():
             "tickers": [
                 {
                     "symbol": "BTCUSDT",
-                    "price": t_btc.get("price", 88500.0),
+                    "price": t_btc.get("price", data_streamer._last_known_prices.get("BTC/USDT", 79000.0)),
                     "change24h": t_btc.get("change24h", 1.2),
                     "volume24h": 14280.0,
                 },
@@ -1275,7 +1275,11 @@ async def get_sky_statistics(
 @app.get("/api/scenarios")
 async def get_scenarios(symbol: str = Query("BTC/USDT")):
     candles_15m = data_streamer.get_candles(symbol, "15m", limit=60)
-    cur_p = candles_15m[-1]["close"] if candles_15m else 88500.0
+    cur_p = (
+        candles_15m[-1]["close"]
+        if candles_15m
+        else data_streamer._last_known_prices.get(symbol, 79000.0 if "BTC" in symbol else 2500.0)
+    )
     c_map = {"15m": candles_15m, "1h": data_streamer.get_candles(symbol, "1h", limit=30)}
     state = market_state_compiler.compile_state(symbol, candles_by_tf=c_map)
     analogues = analogue_engine.find_analogues(state)
@@ -1291,7 +1295,11 @@ async def get_path_simulation(
     sl: float | None = Query(None),
 ):
     candles = data_streamer.get_candles(symbol, "15m", limit=100)
-    cur_p = candles[-1]["close"] if candles else 88500.0
+    cur_p = (
+        candles[-1]["close"]
+        if candles
+        else data_streamer._last_known_prices.get(symbol, 79000.0 if "BTC" in symbol else 2500.0)
+    )
     tp_p = tp or (cur_p * 1.025)
     sl_p = sl or (cur_p * 0.988)
     cone = path_simulator.simulate_paths(cur_p, candles, tp_p, sl_p)
@@ -1328,7 +1336,11 @@ async def get_calibration_scorecard(symbol: str = Query("BTC/USDT")):
 @app.get("/api/decision/council")
 async def get_decision_council(symbol: str = Query("BTC/USDT")):
     candles_15m = data_streamer.get_candles(symbol, "15m", limit=60)
-    cur_p = candles_15m[-1]["close"] if candles_15m else 88500.0
+    cur_p = (
+        candles_15m[-1]["close"]
+        if candles_15m
+        else data_streamer._last_known_prices.get(symbol, 79000.0 if "BTC" in symbol else 2500.0)
+    )
     c_map = {"15m": candles_15m, "1h": data_streamer.get_candles(symbol, "1h", limit=30)}
     state = market_state_compiler.compile_state(symbol, candles_by_tf=c_map)
     analogues = analogue_engine.find_analogues(state)
@@ -1362,7 +1374,11 @@ async def get_allocation_sizing(
     equity: float = Query(100000.0),
 ):
     candles = data_streamer.get_candles(symbol, "15m", limit=50)
-    cur_p = candles[-1]["close"] if candles else 88500.0
+    cur_p = (
+        candles[-1]["close"]
+        if candles
+        else data_streamer._last_known_prices.get(symbol, 79000.0 if "BTC" in symbol else 2500.0)
+    )
     sl_p = cur_p * 0.988
     tp_p = cur_p * 1.025
 
@@ -1922,7 +1938,11 @@ async def ask_desk_copilot(req: AskDeskRequest):
     sym = req.symbol or "BTC/USDT"
     tf = req.timeframe or "15m"
     candles = data_streamer.get_candles(sym, tf, limit=60)
-    cur_p = candles[-1]["close"] if candles else 88450.0
+    cur_p = (
+        candles[-1]["close"]
+        if candles
+        else data_streamer._last_known_prices.get(sym, 79000.0 if "BTC" in sym else 2500.0)
+    )
 
     # --- Live council decision from the debate committee ---
     try:

@@ -162,14 +162,34 @@ class DataStreamer:
 
         return results
 
+    async def get_live_ticker_payload(self, symbol: str) -> dict[str, Any]:
+        """
+        Fetches sub-second live price tick with full provenance, evidence grade, and synthetic markers.
+        """
+        data = await market_gateway.get_ticker(symbol)
+        price = float(data.get("price", self._last_known_prices.get(symbol, 79000.0)))
+        if (
+            data.get("evidence_grade") == EvidenceGrade.EMPIRICAL.label
+            and not data.get("is_synthetic")
+            and not data.get("data_unavailable")
+        ):
+            self._last_known_prices[symbol] = price
+        return data
+
     async def get_live_ticker(self, symbol: str) -> float:
         """
         Fetches sub-second live price tick from Composite Market Gateway (Binance -> Bybit -> SQLite -> Synthetic).
         """
-        data = await market_gateway.get_ticker(symbol)
-        price = float(data.get("price", 79850.0))
-        self._last_known_prices[symbol] = price
-        return price
+        data = await self.get_live_ticker_payload(symbol)
+        # If synthetic fallback, prefer returning the last known empirical price if available
+        if (
+            data.get("is_synthetic")
+            or data.get("data_unavailable")
+            or data.get("evidence_grade") == EvidenceGrade.FABRICATED.label
+        ):
+            if symbol in self._last_known_prices:
+                return self._last_known_prices[symbol]
+        return float(data.get("price", self._last_known_prices.get(symbol, 79000.0)))
 
     async def fetch_external_ohlcv(
         self, symbol: str, timeframe: str, limit: int = 100

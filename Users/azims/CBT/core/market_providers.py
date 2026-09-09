@@ -184,6 +184,9 @@ class BinanceMarketDataProvider(BaseMarketDataProvider):
                         "volume_24h": float(d["volume"]),
                         "timestamp": int(d["closeTime"]),
                         "source": self.provider_name,
+                        "evidence_grade": EvidenceGrade.EMPIRICAL.label,
+                        "is_synthetic": 0,
+                        "data_unavailable": False,
                     }
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.debug(f"Binance Ticker failed for {symbol}: {e}")
@@ -274,6 +277,9 @@ class BybitMarketDataProvider(BaseMarketDataProvider):
                             "volume_24h": float(item.get("volume24h", "0")),
                             "timestamp": int(time.time() * 1000),
                             "source": self.provider_name,
+                            "evidence_grade": EvidenceGrade.EMPIRICAL.label,
+                            "is_synthetic": 0,
+                            "data_unavailable": False,
                         }
         except Exception as e:  # noqa: BLE001 — defensive fallback
             logger.debug(f"Bybit Ticker failed for {symbol}: {e}")
@@ -374,6 +380,9 @@ class SQLiteCacheProvider(BaseMarketDataProvider):
                         "volume_24h": 10000.0,
                         "timestamp": candle_time,
                         "source": self.provider_name,
+                        "evidence_grade": EvidenceGrade.EMPIRICAL.label,
+                        "is_synthetic": 0,
+                        "data_unavailable": False,
                     }
                 logger.warning(
                     "SQLiteCacheProvider rejecting stale candle for %s (age=%.1f min > 15m).",
@@ -409,8 +418,8 @@ class SyntheticMarketProvider(BaseMarketDataProvider):
 
     def __init__(self):
         self.base_prices: dict[str, float] = {
-            "BTC/USDT": 88450.0,
-            "ETH/USDT": 2720.0,
+            "BTC/USDT": 79000.0,
+            "ETH/USDT": 2500.0,
             "SOL/USDT": 188.5,
             "BNB/USDT": 625.0,
             "XRP/USDT": 0.62,
@@ -443,7 +452,7 @@ class SyntheticMarketProvider(BaseMarketDataProvider):
         during an outage. Explicitly graded FABRICATED and jitter-free — a
         random walk would imply live movement that is not happening.
         """
-        price = self.base_prices.get(symbol, 88450.0)
+        price = self.base_prices.get(symbol, 79000.0)
         return {
             "symbol": symbol,
             "price": price,
@@ -539,11 +548,16 @@ class CompositeMarketDataGateway:
                     return data
             except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
                 pass
-        return await SyntheticMarketProvider().fetch_live_ticker(symbol) or {
+        fallback = await SyntheticMarketProvider().fetch_live_ticker(symbol)
+        if fallback:
+            return fallback
+        return {
             "symbol": symbol,
-            "price": 88450.0,
+            "price": 79000.0 if "BTC" in symbol else 2500.0,
             "evidence_grade": EvidenceGrade.FABRICATED.label,
+            "is_synthetic": 1,
             "data_unavailable": True,
+            "source": "UNAVAILABLE_SENTINEL",
         }
 
     async def get_order_book(self, symbol: str, limit: int = 10) -> dict[str, Any]:

@@ -236,7 +236,11 @@ class DeskStateMind:
                 sym = f"{sym}/USDT"
 
             candles_15m = data_streamer.get_candles(sym, "15m", limit=60)
-            cur_p = candles_15m[-1]["close"] if candles_15m else 88500.0
+            cur_p = (
+                candles_15m[-1]["close"]
+                if candles_15m
+                else data_streamer._last_known_prices.get(sym, 79000.0 if "BTC" in sym else 2500.0)
+            )
             c_map = {"15m": candles_15m, "1h": data_streamer.get_candles(sym, "1h", limit=30)}
             state = market_state_compiler.compile_state(sym, candles_by_tf=c_map)
             analogues = analogue_engine.find_analogues(state)
@@ -682,13 +686,30 @@ class SmartBrainNotificationEngine:
     async def check_volatility_expansion(self) -> None:
         """
         Monitors for sudden price surges or flushes (>= 2.0% in 1h).
+        Strictly ignores synthetic, fabricated, or unavailable fallback data.
         """
         try:
             from core.data_streamer import data_streamer
+            from core.evidence_integrity import EvidenceGrade
             from core.macro_sentinel import macro_sentinel
 
             for sym in ["BTC/USDT", "ETH/USDT"]:
-                cur = await data_streamer.get_live_ticker(sym)
+                ticker = await data_streamer.get_live_ticker_payload(sym)
+                # FAIL-CLOSED: Never trigger alerts on synthetic or fallback data
+                if (
+                    ticker.get("is_synthetic")
+                    or ticker.get("data_unavailable")
+                    or ticker.get("evidence_grade") != EvidenceGrade.EMPIRICAL.label
+                ):
+                    logger.debug(
+                        "SmartNotifier: Skipping volatility check for %s (non-empirical tick).", sym
+                    )
+                    continue
+
+                cur = float(ticker.get("price", 0.0))
+                if cur <= 0:
+                    continue
+
                 last = self._last_price_tracker.get(sym, cur)
                 if last <= 0:
                     self._last_price_tracker[sym] = cur
@@ -768,12 +789,17 @@ class SmartBrainNotificationEngine:
         self._is_monitoring = True
         logger.info(f"SmartBrainNotificationEngine active (heartbeat: {check_interval_seconds}s).")
 
-        # Seed initial prices
+        # Seed initial prices (empirical only)
         try:
             from core.data_streamer import data_streamer
+            from core.evidence_integrity import EvidenceGrade
 
-            self._last_price_tracker["BTC/USDT"] = await data_streamer.get_live_ticker("BTC/USDT")
-            self._last_price_tracker["ETH/USDT"] = await data_streamer.get_live_ticker("ETH/USDT")
+            for sym in ["BTC/USDT", "ETH/USDT"]:
+                ticker = await data_streamer.get_live_ticker_payload(sym)
+                if ticker.get("evidence_grade") == EvidenceGrade.EMPIRICAL.label and not ticker.get(
+                    "is_synthetic"
+                ):
+                    self._last_price_tracker[sym] = float(ticker.get("price", 0.0))
         except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
             pass
 
@@ -1397,7 +1423,9 @@ class TelegramBotDispatcher:
 
             price = await data_streamer.get_live_ticker(symbol)
         except Exception:  # noqa: BLE001 — defensive fallback
-            price = 89450.0 if "BTC" in symbol else 2720.0
+            price = data_streamer._last_known_prices.get(
+                symbol, 79000.0 if "BTC" in symbol else 2500.0
+            )
 
         if "BTC" in symbol:
             entry = round(price, 2)
@@ -1458,9 +1486,11 @@ class TelegramBotDispatcher:
             dxy = macro.dxy_price
             gri = macro.global_risk_index
         except Exception:  # noqa: BLE001 — defensive fallback
-            btc = 89450.0
-            eth = 2720.0
-            xau = 2678.5
+            from core.data_streamer import data_streamer
+
+            btc = data_streamer._last_known_prices.get("BTC/USDT", 79000.0)
+            eth = data_streamer._last_known_prices.get("ETH/USDT", 2500.0)
+            xau = data_streamer._last_known_prices.get("XAU/USD", 2678.5)
             dxy = 104.18
             gri = 72.0
 
@@ -1489,7 +1519,11 @@ class TelegramBotDispatcher:
 
             cur_price = await data_streamer.get_live_ticker(symbol)
         except Exception:  # noqa: BLE001 — defensive fallback
-            cur_price = 89450.0 if "BTC" in symbol else 2720.0
+            from core.data_streamer import data_streamer
+
+            cur_price = data_streamer._last_known_prices.get(
+                symbol, 79000.0 if "BTC" in symbol else 2500.0
+            )
 
         pdh = round(cur_price * 1.025, 2)
         pdl = round(cur_price * 0.978, 2)
