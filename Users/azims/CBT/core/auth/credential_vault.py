@@ -181,11 +181,20 @@ class ExchangeCredential:
 
 class CredentialVault:
     """
-    Authenticated AES-256-GCM Private API Credential Store.
+    Authenticated AES-256-GCM Private API Credential Store with optional Cloud KMS / HSM Enclave.
     """
 
-    def __init__(self, master_key: bytes | None = None):
+    def __init__(self, master_key: bytes | None = None, kms_enclave: Any | None = None):
         self._explicit_master_key: bytes | None = master_key
+        if kms_enclave is not None:
+            self.kms_enclave = kms_enclave
+        else:
+            try:
+                from core.auth.kms_enclave import create_kms_enclave
+
+                self.kms_enclave = create_kms_enclave()
+            except Exception:  # noqa: BLE001
+                self.kms_enclave = None
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
@@ -267,8 +276,28 @@ class CredentialVault:
 
     def encrypt(self, plaintext_bytes: bytes) -> str:
         """
-        Encrypts plaintext bytes with AES-256-GCM and returns formatted JSON ciphertext.
+        Encrypts plaintext bytes with AES-256-GCM.
+        If KMS Enclave is active, uses envelope encryption (Version 2).
+        Otherwise uses PBKDF2/VAULT_MASTER_KEY (Version 1).
         """
+        if self.kms_enclave is not None:
+            dek, encrypted_dek = self.kms_enclave.generate_dek()
+            nonce = os.urandom(NONCE_LENGTH_BYTES)
+            try:
+                aesgcm = AESGCM(bytes(dek))
+                ciphertext_with_tag = aesgcm.encrypt(nonce, plaintext_bytes, associated_data=None)
+                payload = {
+                    "version": 2,
+                    "kdf": f"kms_envelope_{self.kms_enclave.provider_name.lower()}",
+                    "key_id": self.kms_enclave.key_id,
+                    "encrypted_dek": encrypted_dek.hex(),
+                    "nonce": nonce.hex(),
+                    "ciphertext": ciphertext_with_tag.hex(),
+                }
+                return json.dumps(payload)
+            finally:
+                self.kms_enclave.safe_zeroize(dek)
+
         salt = os.urandom(SALT_LENGTH_BYTES)
         nonce = os.urandom(NONCE_LENGTH_BYTES)
         derived_key = self._derive_key(salt)
@@ -288,21 +317,65 @@ class CredentialVault:
 
     def decrypt(self, encrypted_json_str: str) -> bytes:
         """
-        Decrypts JSON ciphertext, verifying authentication tag. Tampering raises VaultIntegrityError.
+        Decrypts JSON ciphertext, verifying authentication tag.
+        Handles both Version 1 (PBKDF2) and Version 2 (KMS Envelope) payloads.
+        Tampering raises VaultIntegrityError.
         """
         try:
             payload = json.loads(encrypted_json_str)
         except Exception as e:
             raise VaultIntegrityError("Malformed vault payload: Invalid JSON.") from e
 
-        if (
-            not isinstance(payload, dict)
-            or "nonce" not in payload
-            or "ciphertext" not in payload
-            or "salt" not in payload
-        ):
+        if not isinstance(payload, dict) or "nonce" not in payload or "ciphertext" not in payload:
             raise VaultIntegrityError(
                 "Malformed vault payload: Missing required AEAD envelope fields."
+            )
+
+        # Version 2: KMS Envelope
+        if payload.get("version") == 2 and "encrypted_dek" in payload:
+            enclave = self.kms_enclave
+            if enclave is None:
+                try:
+                    from core.auth.kms_enclave import create_kms_enclave
+
+                    enclave = create_kms_enclave()
+                except Exception as e:
+                    raise VaultDecryptionError(
+                        f"Failed to create KMS Enclave for decryption: {e}"
+                    ) from e
+
+            if enclave is None:
+                raise VaultDecryptionError(
+                    "Payload encrypted under Cloud KMS Envelope, but no KMS Enclave provider is configured."
+                )
+
+            try:
+                ciphertext_dek = bytes.fromhex(payload["encrypted_dek"])
+                nonce = bytes.fromhex(payload["nonce"])
+                ciphertext_with_tag = bytes.fromhex(payload["ciphertext"])
+            except Exception as e:
+                raise VaultIntegrityError("Malformed vault payload: Hex decoding failed.") from e
+
+            if len(nonce) != NONCE_LENGTH_BYTES:
+                raise VaultIntegrityError(
+                    f"Invalid nonce length ({len(nonce)} != {NONCE_LENGTH_BYTES})."
+                )
+
+            dek = enclave.decrypt_dek(ciphertext_dek)
+            try:
+                aesgcm = AESGCM(bytes(dek))
+                return aesgcm.decrypt(nonce, ciphertext_with_tag, associated_data=None)
+            except Exception as e:
+                raise VaultIntegrityError(
+                    "AEAD Tag Verification Failed: KMS-encrypted ciphertext has been tampered with."
+                ) from e
+            finally:
+                enclave.safe_zeroize(dek)
+
+        # Version 1: PBKDF2 / Master Key
+        if "salt" not in payload:
+            raise VaultIntegrityError(
+                "Malformed vault payload: Missing 'salt' in Version 1 envelope."
             )
 
         try:
