@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -11,9 +11,19 @@ import {
   CheckCircle,
   Clock,
   Radio,
+  Lock,
+  Cpu,
+  Activity,
+  RefreshCw,
 } from 'lucide-react';
 import { PrecisionMath } from '../core/precision/decimalMath';
-import { SetupSuggestion } from '../types';
+import {
+  SetupSuggestion,
+  KMSEnclaveStatus,
+  SORBenchmarkSuite,
+  WSReconciliationTelemetry,
+  WSNormalizedFill,
+} from '../types';
 import { api, VaultStatus, SORRouteQuote, AlmgrenChrissSchedule } from '../services/api';
 
 interface RiskFirstOrderDeskProps {
@@ -58,6 +68,68 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
   const [sorQuote, setSorQuote] = useState<SORRouteQuote | null>(null);
   const [almgrenSchedule, setAlmgrenSchedule] = useState<AlmgrenChrissSchedule | null>(null);
+
+  // Phase 19: KMS Enclave, Micro-Benchmarks & Real-Time WS Stream
+  const [kmsStatus, setKmsStatus] = useState<KMSEnclaveStatus | null>(null);
+  const [sorBenchmarks, setSorBenchmarks] = useState<SORBenchmarkSuite | null>(null);
+  const [benchmarkRunning, setBenchmarkRunning] = useState<boolean>(false);
+  const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
+  const [wsTelemetry, setWsTelemetry] = useState<WSReconciliationTelemetry | null>(null);
+  const [recentFills, setRecentFills] = useState<WSNormalizedFill[]>([]);
+  const [showBenchmarkHUD, setShowBenchmarkHUD] = useState<boolean>(false);
+  const [showWSFeedDrawer, setShowWSFeedDrawer] = useState<boolean>(false);
+
+  // Poll KMS Enclave Status
+  useEffect(() => {
+    let isMounted = true;
+    const fetchKMS = () => {
+      api.getKMSStatus().then((res) => {
+        if (isMounted && res) setKmsStatus(res);
+      }).catch(() => {});
+    };
+    fetchKMS();
+    const interval = setInterval(fetchKMS, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Poll Real-Time WebSocket Telemetry & Recent Fills
+  useEffect(() => {
+    let isMounted = true;
+    const fetchWSTelemetry = () => {
+      api.getWSReconciliationTelemetry().then((res) => {
+        if (isMounted && res?.telemetry) setWsTelemetry(res.telemetry);
+      }).catch(() => {});
+      api.getWSReconciliationRecent(10).then((res) => {
+        if (isMounted && res?.recent_fills) setRecentFills(res.recent_fills);
+      }).catch(() => {});
+    };
+    fetchWSTelemetry();
+    const interval = setInterval(fetchWSTelemetry, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Interactive Micro-Benchmark Runner
+  const handleRunBenchmarks = useCallback(async () => {
+    if (benchmarkRunning) return;
+    setBenchmarkRunning(true);
+    setBenchmarkError(null);
+    try {
+      const res = await api.getSORBenchmarks(100);
+      if (res && res.benchmark) {
+        setSorBenchmarks(res.benchmark);
+      }
+    } catch (err: any) {
+      setBenchmarkError(err?.message || 'Benchmark execution failed');
+    } finally {
+      setBenchmarkRunning(false);
+    }
+  }, [benchmarkRunning]);
 
   // Poll Vault & Kill Switch Status
   useEffect(() => {
@@ -253,6 +325,222 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
           <span className="text-[10px] text-slate-400">Equity: ${accountEquity.toLocaleString()}</span>
         </div>
       </div>
+
+      {/* Cloud KMS / HSM Enclave Security Badge */}
+      <div className="px-2 py-1.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between text-[10px]">
+        <div className="flex items-center gap-1.5 text-slate-300">
+          <Lock className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="text-slate-400 font-semibold">ENCLAVE:</span>
+          <span className={`font-bold ${
+            kmsStatus?.kms_enabled
+              ? 'text-cyan-300'
+              : 'text-amber-400'
+          }`}>
+            {kmsStatus ? `V${kmsStatus.envelope_version} (${kmsStatus.provider})` : 'CHECKING...'}
+          </span>
+          {kmsStatus?.key_id && kmsStatus.key_id !== 'N/A' && (
+            <span className="text-[9px] text-slate-400 font-mono">[{kmsStatus.key_id}]</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 border border-slate-700 text-emerald-400">
+            DEK: {kmsStatus?.zeroization_guarantee ? 'ZEROIZED' : 'STANDARD'}
+          </span>
+          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+            kmsStatus?.kill_switch_active
+              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50'
+              : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+          }`}>
+            {kmsStatus?.kill_switch_active ? 'KS: LOCKED' : 'KS: ARMED'}
+          </span>
+        </div>
+      </div>
+
+      {/* Telemetry HUD & Feed Toggles */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setShowBenchmarkHUD(!showBenchmarkHUD)}
+          className={`py-1 px-2 rounded text-[10px] font-bold border transition flex items-center justify-between ${
+            showBenchmarkHUD
+              ? 'bg-cyan-950/60 border-cyan-500 text-cyan-200'
+              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span className="flex items-center gap-1.5">
+            <Cpu className="w-3 h-3 text-cyan-400" />
+            <span>SOR Benchmarks</span>
+          </span>
+          {sorBenchmarks ? (
+            <span className={`px-1 py-0.2 rounded text-[9px] ${
+              sorBenchmarks.overall_sla_passed
+                ? 'bg-emerald-500/20 text-emerald-300'
+                : 'bg-amber-500/20 text-amber-300'
+            }`}>
+              {sorBenchmarks.overall_sla_passed ? '<2.5ms PASS' : 'SLA SLOW'}
+            </span>
+          ) : (
+            <span className="text-[9px] text-slate-400">P95 &mu;s</span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowWSFeedDrawer(!showWSFeedDrawer)}
+          className={`py-1 px-2 rounded text-[10px] font-bold border transition flex items-center justify-between ${
+            showWSFeedDrawer
+              ? 'bg-emerald-950/60 border-emerald-500 text-emerald-200'
+              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span className="flex items-center gap-1.5">
+            <Activity className="w-3 h-3 text-emerald-400" />
+            <span>WS Reconciler</span>
+          </span>
+          <span className="px-1 py-0.2 rounded text-[9px] bg-slate-800 text-slate-300">
+            {wsTelemetry?.total_fills_recorded ?? 0} fills
+          </span>
+        </button>
+      </div>
+
+      {/* Sub-Millisecond Micro-Benchmark Panel */}
+      {showBenchmarkHUD && (
+        <div className="p-2.5 rounded bg-slate-950/90 border border-cyan-800/60 flex flex-col gap-2 text-[10px]">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-bold text-slate-200">Sub-Millisecond SOR Profiler</span>
+            </div>
+            <button
+              type="button"
+              disabled={benchmarkRunning}
+              onClick={handleRunBenchmarks}
+              className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 border border-cyan-700/60 transition flex items-center gap-1 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${benchmarkRunning ? 'animate-spin' : ''}`} />
+              <span>{benchmarkRunning ? 'PROFILING...' : 'RUN BENCHMARK'}</span>
+            </button>
+          </div>
+
+          {benchmarkError && (
+            <div className="p-1 rounded bg-rose-950/50 border border-rose-800 text-rose-300 text-[9px]">
+              {benchmarkError}
+            </div>
+          )}
+
+          {sorBenchmarks ? (
+            <div className="grid grid-cols-3 gap-1.5">
+              {/* Depth Ladder Walk */}
+              <div className="p-1.5 rounded bg-slate-900 border border-slate-800 flex flex-col gap-0.5">
+                <span className="text-[9px] text-slate-400 font-semibold truncate">L2 Depth Walk</span>
+                <div className="text-xs font-bold text-cyan-300">
+                  {sorBenchmarks.benchmarks.depth_ladder_walk_20_levels?.p95_us ?? '--'} &mu;s
+                </div>
+                <span className="text-[8px] text-slate-400">
+                  Target: &le; 50 &mu;s
+                </span>
+                <span className={`text-[8px] font-bold mt-0.5 ${
+                  sorBenchmarks.benchmarks.depth_ladder_walk_20_levels?.sla_passed
+                    ? 'text-emerald-400'
+                    : 'text-amber-400'
+                }`}>
+                  {sorBenchmarks.benchmarks.depth_ladder_walk_20_levels?.sla_passed ? '✓ PASSED' : '⚠ SLOW'}
+                </span>
+              </div>
+
+              {/* Almgren-Chriss Slicer */}
+              <div className="p-1.5 rounded bg-slate-900 border border-slate-800 flex flex-col gap-0.5">
+                <span className="text-[9px] text-slate-400 font-semibold truncate">AC Slicer (20)</span>
+                <div className="text-xs font-bold text-cyan-300">
+                  {sorBenchmarks.benchmarks.almgren_chriss_slicer_20_intervals?.p95_us ?? '--'} &mu;s
+                </div>
+                <span className="text-[8px] text-slate-400">
+                  Target: &le; 75 &mu;s
+                </span>
+                <span className={`text-[8px] font-bold mt-0.5 ${
+                  sorBenchmarks.benchmarks.almgren_chriss_slicer_20_intervals?.sla_passed
+                    ? 'text-emerald-400'
+                    : 'text-amber-400'
+                }`}>
+                  {sorBenchmarks.benchmarks.almgren_chriss_slicer_20_intervals?.sla_passed ? '✓ PASSED' : '⚠ SLOW'}
+                </span>
+              </div>
+
+              {/* Multi-Venue SOR Route Quote */}
+              <div className="p-1.5 rounded bg-slate-900 border border-slate-800 flex flex-col gap-0.5">
+                <span className="text-[9px] text-slate-400 font-semibold truncate">SOR Route Split</span>
+                <div className="text-xs font-bold text-cyan-300">
+                  {sorBenchmarks.benchmarks.sor_multi_venue_optimal_route
+                    ? `${(sorBenchmarks.benchmarks.sor_multi_venue_optimal_route.p95_us / 1000).toFixed(2)} ms`
+                    : '--'}
+                </div>
+                <span className="text-[8px] text-slate-400">
+                  Target: &le; 2.5 ms
+                </span>
+                <span className={`text-[8px] font-bold mt-0.5 ${
+                  sorBenchmarks.benchmarks.sor_multi_venue_optimal_route?.sla_passed
+                    ? 'text-emerald-400'
+                    : 'text-amber-400'
+                }`}>
+                  {sorBenchmarks.benchmarks.sor_multi_venue_optimal_route?.sla_passed ? '✓ PASSED' : '⚠ SLOW'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-2 text-slate-400 text-[10px]">
+              Click &apos;RUN BENCHMARK&apos; to measure sub-millisecond execution hotpaths.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Real-Time WebSocket Execution Stream Drawer */}
+      {showWSFeedDrawer && (
+        <div className="p-2.5 rounded bg-slate-950/90 border border-emerald-800/60 flex flex-col gap-2 text-[10px]">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="font-bold text-slate-200">Private WS Execution Stream</span>
+            </div>
+            <div className="flex items-center gap-2 text-[9px] text-slate-400">
+              <span>Msgs: <strong className="text-slate-200">{wsTelemetry?.total_messages_received ?? 0}</strong></span>
+              <span>Fills: <strong className="text-emerald-300">{wsTelemetry?.total_fills_recorded ?? 0}</strong></span>
+              <span>Dups: <strong className="text-amber-300">{wsTelemetry?.total_duplicates_filtered ?? 0}</strong></span>
+            </div>
+          </div>
+
+          {/* Recent Normalized Fills List */}
+          {recentFills.length > 0 ? (
+            <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
+              {recentFills.slice(0, 5).map((fill, idx) => (
+                <div
+                  key={`${fill.execution_id || fill.client_order_id}-${idx}`}
+                  className="p-1 rounded bg-slate-900 border border-slate-800/80 flex items-center justify-between text-[9px] font-mono"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400 font-bold">{fill.exchange}</span>
+                    <span className={fill.side === 'BUY' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                      {fill.side}
+                    </span>
+                    <span className="text-slate-200">{fill.symbol}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-300">{fill.fill_qty.toFixed(4)} @ ${fill.fill_price.toFixed(2)}</span>
+                    <span className="text-slate-400">{fill.fee_amount > 0 ? `${fill.fee_amount} ${fill.fee_currency}` : '0 FEE'}</span>
+                    <span className="text-[8px] text-cyan-400">
+                      &Delta;t: +{(fill.received_monotonic_ns % 1000000000 / 1000000).toFixed(1)}ms
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-2 text-slate-400 text-[10px]">
+              Awaiting real-time exchange fills on WebSocket stream...
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Live Pre-Trade Safety Status Banner */}
       {isLiveMode && (

@@ -22,6 +22,10 @@ import {
   HypothesisNodeItem,
   ResearchTelegramShareRequest,
   ResearchTelegramShareResponse,
+  KMSEnclaveStatus,
+  SORBenchmarkSuite,
+  WSReconciliationTelemetry,
+  WSNormalizedFill,
 } from '../types';
 
 const BASE_URL = '';
@@ -1603,6 +1607,38 @@ export const api = {
     if (status) params.append('status', status);
     const res = await authFetch(`${BASE_URL}/api/execution/reconciliation/records?${params.toString()}`);
     return handleResponse<{ status: string; records: ReconciliationRecord[] }>(res);
+  },
+
+  /**
+   * GET /api/vault/kms/status
+   */
+  async getKMSStatus(): Promise<KMSEnclaveStatus> {
+    const res = await authFetch(`${BASE_URL}/api/vault/kms/status`);
+    return handleResponse<KMSEnclaveStatus>(res);
+  },
+
+  /**
+   * GET /api/execution/sor/benchmark
+   */
+  async getSORBenchmarks(iterations: number = 100): Promise<{ status: string; benchmark: SORBenchmarkSuite }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/sor/benchmark?iterations=${iterations}`);
+    return handleResponse<{ status: string; benchmark: SORBenchmarkSuite }>(res);
+  },
+
+  /**
+   * GET /api/execution/ws-reconciliation/telemetry
+   */
+  async getWSReconciliationTelemetry(): Promise<{ status: string; telemetry: WSReconciliationTelemetry; timestamp_ms: number }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/ws-reconciliation/telemetry`);
+    return handleResponse<{ status: string; telemetry: WSReconciliationTelemetry; timestamp_ms: number }>(res);
+  },
+
+  /**
+   * GET /api/execution/ws-reconciliation/recent
+   */
+  async getWSReconciliationRecent(limit: number = 20): Promise<{ status: string; limit: number; recent_fills: WSNormalizedFill[]; timestamp_ms: number }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/ws-reconciliation/recent?limit=${limit}`);
+    return handleResponse<{ status: string; limit: number; recent_fills: WSNormalizedFill[]; timestamp_ms: number }>(res);
   },
 };
 

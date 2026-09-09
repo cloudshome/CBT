@@ -99,6 +99,8 @@ from core.execution import (
     reconciliation_ledger,
     smart_order_router,
 )
+from core.execution.sor_benchmarks import run_sor_microbenchmarks
+from core.execution.ws_reconciliation import ws_reconciliation_stream
 from core.genetic_optimizer import genetic_strategy_optimizer
 from core.half_kelly_sizer import half_kelly_position_sizer
 from core.hf_telemetry_pipeline import hf_telemetry_pipeline
@@ -3826,6 +3828,40 @@ async def get_vault_status():
     }
 
 
+@app.get("/api/vault/kms/status")
+async def get_vault_kms_status():
+    """
+    Public / diagnostic status for Cloud KMS / HSM Enclave envelope encryption.
+    Strictly free of plaintext keys, DEKs, KEKs, tokens, or credentials.
+    """
+    enclave = credential_vault.kms_enclave
+    kill_active, _ = live_kill_switch.is_active()
+
+    if enclave is not None:
+        provider = enclave.provider_name
+        masked_key = mask_secret(enclave.key_id)
+        kms_enabled = True
+        envelope_version = 2
+        zeroization_guarantee = True
+    else:
+        provider = "DISABLED"
+        masked_key = "N/A"
+        kms_enabled = False
+        envelope_version = 1
+        zeroization_guarantee = False
+
+    return {
+        "status": "OPERATIONAL",
+        "kms_enabled": kms_enabled,
+        "provider": provider,
+        "key_id": masked_key,
+        "envelope_version": envelope_version,
+        "zeroization_guarantee": zeroization_guarantee,
+        "kill_switch_active": kill_active,
+        "timestamp_ms": int(time.time() * 1000),
+    }
+
+
 @app.post("/api/vault/configure", dependencies=[Depends(require_api_key)])
 async def configure_vault_credential(req: VaultConfigureApiRequest):
     """
@@ -4148,6 +4184,56 @@ async def get_reconciliation_records(
         status=status,
     )
     return {"status": "SUCCESS", "records": records}
+
+
+@app.get("/api/execution/sor/benchmark")
+async def get_sor_benchmarks(
+    iterations: int = Query(100, ge=10, le=1000, description="Benchmark iterations per test (10 to 1000)"),
+):
+    """
+    Runs sub-millisecond execution micro-benchmarks across:
+    1. Depth ladder book walking (20 levels)
+    2. Almgren-Chriss optimal trajectory slicer (20 intervals)
+    3. Multi-venue liquidity split optimal route quote
+    Strictly bounded iterations to protect CPU and trading path.
+    """
+    try:
+        results = run_sor_microbenchmarks(iterations=iterations)
+        return {"status": "SUCCESS", "benchmark": results}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "SOR_BENCHMARK_FAILED", "message": sanitize_text(str(e))},
+        ) from e
+
+
+@app.get("/api/execution/ws-reconciliation/telemetry")
+async def get_ws_reconciliation_telemetry():
+    """
+    Returns real-time operational statistics for the private WebSocket execution stream.
+    Strictly free of exchange credentials, API keys, or private payload headers.
+    """
+    return {
+        "status": "SUCCESS",
+        "telemetry": ws_reconciliation_stream.get_telemetry(),
+        "timestamp_ms": int(time.time() * 1000),
+    }
+
+
+@app.get("/api/execution/ws-reconciliation/recent")
+async def get_ws_reconciliation_recent(
+    limit: int = Query(20, ge=1, le=100, description="Max recent fills to return (1-100)"),
+):
+    """
+    Returns recent normalized fills ingested via the private WebSocket stream.
+    Preserves exact monotonic and exchange timestamps.
+    """
+    return {
+        "status": "SUCCESS",
+        "limit": limit,
+        "recent_fills": ws_reconciliation_stream.get_recent_fills(limit=limit),
+        "timestamp_ms": int(time.time() * 1000),
+    }
 
 
 # WebSocket endpoint for real-time interactive terminal

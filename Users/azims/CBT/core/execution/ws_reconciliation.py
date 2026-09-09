@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from collections import deque
 from dataclasses import asdict, dataclass
@@ -31,6 +32,7 @@ from core.execution.reconciliation_ledger import (
     ExecutionReconciliationRecord,
     ReconciliationLedger,
     compute_monotonic_duration_ns,
+    reconciliation_ledger,
 )
 
 logger = logging.getLogger("sky.ws_reconciliation")
@@ -156,6 +158,7 @@ class WebSocketReconciliationStream:
     ):
         self.ledger = ledger or ReconciliationLedger()
         self.max_buffer_size = max_buffer_size
+        self._lock = threading.Lock()
         self._history: deque[NormalizedFillEvent] = deque(maxlen=max_buffer_size)
         self.total_messages_received: int = 0
         self.total_fills_processed: int = 0
@@ -173,7 +176,8 @@ class WebSocketReconciliationStream:
         Ingests a raw WebSocket payload, parses all contained fills,
         and records them into the ReconciliationLedger.
         """
-        self.total_messages_received += 1
+        with self._lock:
+            self.total_messages_received += 1
         recv_ns = time.monotonic_ns()
 
         if isinstance(raw_message, str | bytes):
@@ -209,48 +213,67 @@ class WebSocketReconciliationStream:
             return []
 
         records: list[ExecutionReconciliationRecord] = []
-        for fill in fills:
-            self.total_fills_processed += 1
-            self._history.append(fill)
+        with self._lock:
+            for fill in fills:
+                # Check for duplicate fill in database
+                existing_rec = self.ledger.get_record_by_fill(
+                    fill.exchange, fill.exchange_order_id, fill.execution_id
+                )
+                if existing_rec is not None:
+                    self.total_duplicates_filtered += 1
+                    records.append(existing_rec)
+                    continue
 
-            disp_ns = dispatch_monotonic_ns if dispatch_monotonic_ns is not None else recv_ns
-            roundtrip_ns = compute_monotonic_duration_ns(disp_ns, recv_ns)
+                self.total_fills_processed += 1
+                self._history.append(fill)
 
-            rec = self.ledger.record_fill(
-                parent_order_id=f"PARENT_{fill.client_order_id}",
-                client_order_id=fill.client_order_id,
-                exchange_order_id=fill.exchange_order_id,
-                exchange=fill.exchange,
-                execution_id=fill.execution_id,
-                symbol=fill.symbol,
-                side=fill.side,
-                requested_qty=expected_qty or fill.fill_qty,
-                executed_qty=fill.fill_qty,
-                expected_price=expected_price or fill.fill_price,
-                executed_price=fill.fill_price,
-                fee_paid_usd=fill.fee_amount,
-                fee_asset=fill.fee_currency or "USDT",
-                route_venue=fill.exchange,
-                dispatch_monotonic_ns=disp_ns,
-                ack_monotonic_ns=disp_ns,
-                fill_monotonic_ns=recv_ns,
-                roundtrip_ns=roundtrip_ns,
-            )
-            records.append(rec)
-            self.total_fills_recorded += 1
+                disp_ns = dispatch_monotonic_ns if dispatch_monotonic_ns is not None else recv_ns
+                roundtrip_ns = compute_monotonic_duration_ns(disp_ns, recv_ns)
+
+                rec = self.ledger.record_fill(
+                    parent_order_id=f"PARENT_{fill.client_order_id}",
+                    client_order_id=fill.client_order_id,
+                    exchange_order_id=fill.exchange_order_id,
+                    exchange=fill.exchange,
+                    execution_id=fill.execution_id,
+                    symbol=fill.symbol,
+                    side=fill.side,
+                    requested_qty=expected_qty or fill.fill_qty,
+                    executed_qty=fill.fill_qty,
+                    expected_price=expected_price or fill.fill_price,
+                    executed_price=fill.fill_price,
+                    fee_paid_usd=fill.fee_amount,
+                    fee_asset=fill.fee_currency or "USDT",
+                    route_venue=fill.exchange,
+                    dispatch_monotonic_ns=disp_ns,
+                    ack_monotonic_ns=disp_ns,
+                    fill_monotonic_ns=recv_ns,
+                    roundtrip_ns=roundtrip_ns,
+                )
+                records.append(rec)
+                self.total_fills_recorded += 1
 
         return records
 
     def get_recent_fills(self, limit: int = 50) -> list[dict[str, Any]]:
         """Returns the most recent normalized fill events from memory."""
-        lim = min(limit, len(self._history))
-        return [self._history[-i].to_dict() for i in range(1, lim + 1)]
+        with self._lock:
+            lim = min(limit, len(self._history))
+            return [self._history[-i].to_dict() for i in range(1, lim + 1)]
 
     def get_telemetry(self) -> dict[str, Any]:
         """Returns stream reconciliation telemetry metrics."""
-        return {
-            "total_messages_received": self.total_messages_received,
-            "total_fills_processed": self.total_fills_processed,
-            "total_fills_recorded": self.total_fills_recorded,
-            "buffered_events_count": len(self._history),
-        }
+        with self._lock:
+            return {
+                "status": "ACTIVE",
+                "total_messages_received": self.total_messages_received,
+                "total_fills_processed": self.total_fills_processed,
+                "total_fills_recorded": self.total_fills_recorded,
+                "total_duplicates_filtered": self.total_duplicates_filtered,
+                "buffered_events_count": len(self._history),
+                "max_buffer_size": self.max_buffer_size,
+            }
+
+
+# Thread-safe global singleton for live WebSocket stream reconciliation
+ws_reconciliation_stream = WebSocketReconciliationStream(ledger=reconciliation_ledger)

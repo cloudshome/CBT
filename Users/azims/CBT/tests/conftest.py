@@ -25,6 +25,10 @@ os.environ["EXPERIMENT_DB_PATH"] = str(_temp_path / "experiment_store_test.db")
 os.environ["TELEGRAM_CHAT_ID"] = "12345678"
 os.environ["TELEGRAM_TRADER_IDS"] = "12345678"
 
+# 4. Rate limiter test isolation: raise limit so full test suite is not throttled
+os.environ["RATE_LIMIT_MAX"] = "100000"
+os.environ["RATE_LIMIT_AUTH_MAX"] = "100000"
+
 # Force re-init of db_manager paths if already imported
 try:
     from core.database import db_manager

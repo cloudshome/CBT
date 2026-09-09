@@ -910,5 +910,68 @@ export interface ResearchTelegramShareResponse {
   dispatched_text?: string;
 }
 
+// Phase 19: Cloud KMS / HSM Enclave & Execution Telemetry Types
 
+export interface KMSEnclaveStatus {
+  status: string;
+  kms_enabled: boolean;
+  provider: 'MOCK' | 'MOCK_HSM' | 'AWS_KMS' | 'GCP_KMS' | 'DISABLED';
+  key_id: string;
+  envelope_version: number;
+  zeroization_guarantee: boolean;
+  kill_switch_active: boolean;
+  timestamp_ms: number;
+}
 
+export interface SORBenchmarkMetric {
+  name: string;
+  iterations: number;
+  mean_us: number;
+  median_us: number;
+  p90_us: number;
+  p95_us: number;
+  p99_us: number;
+  min_us: number;
+  max_us: number;
+  ops_per_sec: number;
+  sla_target_us: number;
+  sla_passed: boolean;
+}
+
+export interface SORBenchmarkSuite {
+  timestamp_ms: number;
+  iterations_per_test: number;
+  overall_sla_passed: boolean;
+  benchmarks: {
+    depth_ladder_walk_20_levels?: SORBenchmarkMetric;
+    almgren_chriss_slicer_20_intervals?: SORBenchmarkMetric;
+    sor_multi_venue_optimal_route?: SORBenchmarkMetric;
+    [key: string]: SORBenchmarkMetric | undefined;
+  };
+}
+
+export interface WSReconciliationTelemetry {
+  status: string;
+  total_messages_received: number;
+  total_fills_processed: number;
+  total_fills_recorded: number;
+  total_duplicates_filtered: number;
+  buffered_events_count: number;
+  max_buffer_size: number;
+}
+
+export interface WSNormalizedFill {
+  exchange: string;
+  client_order_id: string;
+  exchange_order_id: string;
+  execution_id: string;
+  symbol: string;
+  side: string;
+  fill_price: number;
+  fill_qty: number;
+  fee_currency: string;
+  fee_amount: number;
+  is_maker: boolean;
+  trade_time_ms: number;
+  received_monotonic_ns: number;
+}
