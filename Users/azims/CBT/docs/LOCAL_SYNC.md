@@ -94,20 +94,22 @@ GitHub **every hour**, starts automatically after a reboot / power outage, and
 catches up any run that was missed while the machine was down
 (`Persistent=true`). Run it as root (it installs systemd units):
 
-> **URL gotcha:** the branch name `arena/01a087d1-ctb` contains a slash, so the
-> plain raw URL (`.../CTB/arena/01a087d1-ctb/...`) is ambiguous and returns
-> **404**. Always use the `refs/heads/` form below (which disambiguates a
-> slashed branch), or pin to a commit SHA.
+> **URL gotcha:** the branch name `arena/01a087d1-ctb` contains a slash, and
+> `raw.githubusercontent.com` does **not** resolve it (returns **404**) for
+> either the plain or `refs/heads/` form. The file is present on the branch —
+> it just isn't reachable over `raw`. **Use the GitHub API form below**
+> (verified working) instead of `raw`.
 
 ```bash
-sudo bash <(curl -fsSL "https://raw.githubusercontent.com/cloudshome/CTB/refs/heads/arena/01a087d1-ctb/Users/azims/CBT/scripts/install_auto_sync.sh") \
+sudo bash <(curl -fsSL "https://api.github.com/repos/cloudshome/CTB/contents/Users/azims/CBT/scripts/install_auto_sync.sh?ref=arena/01a087d1-ctb" | python3 -c "import sys,json,base64;print(base64.b64decode(json.load(sys.stdin)['content']).decode())") \
   --repo https://github.com/cloudshome/CTB.git \
   --target /home/st/SKY/CTB \
   --interval 1h
 ```
 
-> The same file also pinned to a commit SHA (equally reliable, no branch
-> ambiguity): `https://raw.githubusercontent.com/cloudshome/CTB/158e5209c61323ef127dd73b54d4c5a82a3fea89/Users/azims/CBT/scripts/install_auto_sync.sh`.
+> Requires `python3` (present on most systems). The whole pipeline is one
+> command; the script downloads through `api.github.com`, decodes the base64
+> body, and immediately runs the installer with the given options.
 
 - `--target` is the **repo root** (e.g. `/home/st/SKY/CTB`); the project then
   lives at `/home/st/SKY/CTB/Users/azims/CBT`.
