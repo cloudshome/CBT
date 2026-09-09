@@ -351,7 +351,7 @@ class PortfolioShadowManager:
             rows = cursor.fetchall()
         return [dict(r) for r in rows]
 
-    def get_portfolio_accounting(self, starting_capital: float = 100000.0) -> dict[str, Any]:
+    def get_portfolio_accounting(self, starting_capital: float = 10000.0) -> dict[str, Any]:
         """
         Computes the authoritative accounting ledger for the shadow portfolio.
         Invariants:

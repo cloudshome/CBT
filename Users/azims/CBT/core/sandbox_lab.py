@@ -70,7 +70,7 @@ class SandboxLab:
         timeframe: str,
         candles: list[dict[str, Any]],
         strategy_logic_fn: Callable[[dict[str, Any], int], dict[str, Any] | None] | None = None,
-        starting_capital: float = 100000.0,
+        starting_capital: float = 10000.0,
         risk_per_trade_pct: float = 0.01,
         taker_fee_bps: float = 5.0,
         slippage_bps: float = 3.0,

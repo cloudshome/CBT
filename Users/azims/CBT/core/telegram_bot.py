@@ -130,11 +130,13 @@ class DeskStateMind:
         from core.portfolio_shadow import portfolio_shadow
 
         open_positions = portfolio_shadow.get_open_positions()
+        accounting = portfolio_shadow.get_portfolio_accounting()
+        equity_str = f"${accounting['virtual_equity']:,.2f}"
         if not open_positions:
             return (
                 "📭 **PAPER DESK: NO ACTIVE OPEN POSITIONS**\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "• All capital is preserved in virtual USD ($100,000.00).\n"
+                f"• All capital is preserved in virtual USD ({equity_str}).\n"
                 "• Send `/signal` to scan and auto-execute a new high-EV setup."
             )
 

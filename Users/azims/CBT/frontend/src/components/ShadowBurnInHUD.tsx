@@ -214,7 +214,7 @@ export const ShadowBurnInHUD: React.FC = () => {
             <Shield className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="text-base font-bold text-white">
-            ${(status?.virtual_equity || 100000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${(status?.virtual_equity || 10000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <div className={`text-[10px] mt-1 font-semibold ${(status?.total_realized_pnl || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             Realized PnL: ${(status?.total_realized_pnl || 0) >= 0 ? '+' : ''}{(status?.total_realized_pnl || 0).toFixed(2)}

@@ -352,12 +352,16 @@ class QuantMentor:
             "account",
         ]
         if any(w in msg_lower for w in position_triggers):
+            from core.portfolio_shadow import portfolio_shadow
+
+            accounting = portfolio_shadow.get_portfolio_accounting()
+            equity_val = accounting["virtual_equity"]
             if not open_positions:
                 return (
                     "💼 **SHADOW PAPER TRADING DESK STATUS**\n"
                     "━━━━━━━━━━━━━━━━━━━━━━\n"
                     "🟢 **Open Positions:** `0 Active Trades`\n"
-                    "💰 **Virtual Equity:** `$100,000.00`\n"
+                    f"💰 **Virtual Equity:** `${equity_val:,.2f}`\n"
                     "🛡️ **Active Risk Exposure:** `0.00%` (Risk Cap: 2.50%)\n"
                     "⚡ **Queue:** 3 high-probability setups queued awaiting trigger conditions.\n\n"
                     "Use `/signal` to scan for execution or check the Web UI Paper Desk tab!"

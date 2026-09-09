@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -55,11 +56,16 @@ class ShadowBurnInOrchestrator:
     def __init__(
         self,
         heartbeat_interval_sec: float = 30.0,
-        starting_capital_usd: float = 100_000.0,
+        starting_capital_usd: float | None = None,
         execution_mode: str = ExecutionMode.SHADOW,
     ):
         self.heartbeat_interval_sec = heartbeat_interval_sec
-        self.starting_capital_usd = starting_capital_usd
+        if starting_capital_usd is not None:
+            self.starting_capital_usd = float(starting_capital_usd)
+        else:
+            self.starting_capital_usd = float(
+                os.getenv("MAX_PAPER_ACCOUNT_BALANCE", os.getenv("STARTING_CAPITAL", "10000.0"))
+            )
         self.execution_mode = execution_mode
         self.state = OrchestratorState.STOPPED
         self.burn_in_start_time_ms: int = int(time.time() * 1000)

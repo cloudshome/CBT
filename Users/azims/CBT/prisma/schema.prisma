@@ -44,7 +44,7 @@ model PaperTrade {
 
 model RiskConfig {
   id              Int      @id @default(autoincrement())
-  accountBalance  Float    @default(100000.0)
+  accountBalance  Float    @default(10000.0)
   maxDrawdown     Float    @default(0.10)
   maxOpenTrades   Int      @default(3)
   dailyLossLimit  Float    @default(0.05)

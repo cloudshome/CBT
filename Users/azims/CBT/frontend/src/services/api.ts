@@ -539,7 +539,7 @@ export const api = {
    */
   async getAllocationSizing(
     symbol: string,
-    equity = 100000
+    equity = 10000
   ): Promise<Record<string, unknown>> {
     const res = await authFetch(
       `${BASE_URL}/api/decision/allocation?symbol=${encodeURIComponent(symbol)}&equity=${equity}`

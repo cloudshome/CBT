@@ -179,10 +179,10 @@ export async function riskGate(
   const normalizedSymbol = cleanSymbol.endsWith('USDT') ? cleanSymbol : `${cleanSymbol}USDT`;
 
   try {
-    // 3. Retrieve active Risk Configuration (default $100k balance, 3 open trades, 2% risk)
+    // 3. Retrieve active Risk Configuration (default $10k balance, 3 open trades, 2% risk)
     const config =
       (await prisma.riskConfig.findFirst({ orderBy: { id: 'desc' } })) || {
-        accountBalance: 100000.0,
+        accountBalance: 10000.0,
         maxOpenTrades: 3,
         maxRiskPerTrade: 0.02,
         maxDrawdown: 0.1,

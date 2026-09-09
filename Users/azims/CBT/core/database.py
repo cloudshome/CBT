@@ -292,7 +292,7 @@ class DatabaseManager:
                     session_type TEXT NOT NULL,
                     start_timestamp BIGINT NOT NULL,
                     end_timestamp BIGINT,
-                    opening_balance REAL DEFAULT 100000.0,
+                    opening_balance REAL DEFAULT 10000.0,
                     closing_balance REAL,
                     trade_count INTEGER DEFAULT 0,
                     winning_trades INTEGER DEFAULT 0,

@@ -14,6 +14,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Ensure repository root is on sys.path
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Ensure Windows consoles don't crash on UTF-8 test output characters (bullets, ticks, etc.)
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 def run_check(name, fn):
     print(f"[*] Running: {name}...", end=" ", flush=True)
@@ -23,7 +30,10 @@ def run_check(name, fn):
         return True
     # A preflight failure must not prevent the remaining independent gates from running.
     except Exception as e:  # noqa: BLE001
-        print(f"[FAIL] -> {e}")
+        err_msg = str(e).encode(sys.stdout.encoding or "utf-8", errors="replace").decode(
+            sys.stdout.encoding or "utf-8", errors="replace"
+        )
+        print(f"[FAIL] -> {err_msg}")
         return False
 
 

@@ -1371,7 +1371,7 @@ async def get_decision_council(symbol: str = Query("BTC/USDT")):
 @app.get("/api/decision/allocation")
 async def get_allocation_sizing(
     symbol: str = Query("BTC/USDT"),
-    equity: float = Query(100000.0),
+    equity: float = Query(10000.0),
 ):
     candles = data_streamer.get_candles(symbol, "15m", limit=50)
     cur_p = (
@@ -1414,8 +1414,8 @@ async def calculate_half_kelly(req: HalfKellyCalcRequest):
     """
     equity = req.equity
     if equity is None or equity <= 0:
-        accounting = portfolio_shadow.get_portfolio_accounting(base_balance=100000.0)
-        equity = float(accounting.get("virtual_equity", 100000.0))
+        accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=10000.0)
+        equity = float(accounting.get("virtual_equity", 10000.0))
 
     res = half_kelly_position_sizer.calculate_sizing(
         account_equity=equity,
@@ -1443,8 +1443,8 @@ async def get_half_kelly_calc(
     Query-based Bayesian Half-Kelly calculator for quick terminal inspections.
     """
     if equity is None or equity <= 0:
-        accounting = portfolio_shadow.get_portfolio_accounting(base_balance=100000.0)
-        equity = float(accounting.get("virtual_equity", 100000.0))
+        accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=10000.0)
+        equity = float(accounting.get("virtual_equity", 10000.0))
 
     res = half_kelly_position_sizer.calculate_sizing(
         account_equity=equity,
@@ -1505,7 +1505,7 @@ async def get_paper_desk_overview():
     - Past: Closed trades with loss autopsies
     - Future: Planned setups queue with triggers & structural roadmap
     """
-    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "100000.0"))
+    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "10000.0"))
     accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)
     open_pos = portfolio_shadow.get_open_positions()
     all_pos = portfolio_shadow.get_all_positions(limit=50)
@@ -1754,7 +1754,7 @@ async def get_paper_desk_overview():
         },
     ]
 
-    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "100000.0"))
+    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "10000.0"))
     accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)
 
     if accounting["closed_positions_count"] > 0:
@@ -1835,7 +1835,7 @@ async def get_paper_risk_config():
     """
     Returns the active paper desk risk configuration for the Web UI.
     """
-    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "100000.0"))
+    base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "10000.0"))
     accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)
     return {
         "config": {
@@ -2893,7 +2893,7 @@ def enforce_paper_risk_gate(order: PaperTradeRequest) -> None:
             detail=f"Risk Gate Rejection: {open_count} open positions — maximum {max_open} reached.",
         )
 
-    balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "100000"))
+    balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "10000"))
     max_risk_pct = float(os.getenv("MAX_PAPER_RISK_PCT", "0.02"))
     entry = float(order.entryPrice)
     stop = float(order.sl)
@@ -3780,7 +3780,7 @@ class LiveOrderApiRequest(BaseModel):
     price: float | None = Field(None, gt=0.0, description="Order price for LIMIT orders")
     stop_loss: float | None = Field(None, gt=0.0, description="Protective stop loss price")
     take_profit: float | None = Field(None, gt=0.0, description="Target take profit price")
-    account_equity_usd: float = Field(100000.0, gt=0.0, description="Account equity in USD")
+    account_equity_usd: float = Field(10000.0, gt=0.0, description="Account equity in USD")
     daily_realized_pnl_usd: float = Field(0.0, description="Daily realized PnL in USD")
     daily_unrealized_pnl_usd: float = Field(0.0, description="Daily unrealized PnL in USD")
     current_open_positions_count: int = Field(0, ge=0, description="Current open positions count")

@@ -162,10 +162,10 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
   };
 
   const summary = data?.summary || {
-    startingCapital: 100000.0,
-    settledCash: 100000.0,
-    virtualEquity: 100000.0,
-    accountBalance: 100000.0,
+    startingCapital: 10000.0,
+    settledCash: 10000.0,
+    virtualEquity: 10000.0,
+    accountBalance: 10000.0,
     totalRealizedPnl: 0.0,
     totalUnrealizedPnl: 0.0,
     winRatePct: 0.0,
@@ -238,7 +238,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
               ${(summary.virtualEquity ?? ((summary.settledCash ?? summary.accountBalance) + summary.totalUnrealizedPnl)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-[10px] font-mono text-slate-500 mt-1">
-              Base: ${(summary.startingCapital ?? 100000).toLocaleString()}
+              Base: ${(summary.startingCapital ?? 10000).toLocaleString()}
             </div>
           </div>
 

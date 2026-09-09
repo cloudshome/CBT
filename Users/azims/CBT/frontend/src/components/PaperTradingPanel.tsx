@@ -65,8 +65,8 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
   const numSL = parseFloat(sl) || 0;
   const numSize = parseFloat(size) || 1.0;
 
-  const accountBalance = riskConfig?.accountBalance || 100000.0;
-  const maxRiskDollar = accountBalance * (riskConfig?.maxRiskPerTrade || 0.02); // $2,000
+  const accountBalance = riskConfig?.accountBalance || 10000.0;
+  const maxRiskDollar = accountBalance * (riskConfig?.maxRiskPerTrade || 0.02); // $200
 
   const dollarRisk = Math.abs(numEntry - numSL) * numSize;
   const riskPct = accountBalance > 0 ? (dollarRisk / accountBalance) * 100 : 0;

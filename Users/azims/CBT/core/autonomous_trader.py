@@ -34,7 +34,7 @@ class AutonomousTrader:
         self,
         active_symbols: list[str] | None = None,
         scan_interval_sec: float = 60.0,
-        account_equity_usd: float = 100_000.0,
+        account_equity_usd: float = 10_000.0,
         max_open_positions: int = 3,
     ):
         self.active_symbols = active_symbols or ["BTC/USDT", "ETH/USDT", "XAU/USD"]

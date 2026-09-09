@@ -37,6 +37,7 @@ describe('Express Server Hardening & Convergence (Option 2)', () => {
         entryPrice: 65000,
         sl: 64000,
         tp: 68000,
+        size: 0.1,
         evidenceGrade: 'EMPIRICAL',
       });
 

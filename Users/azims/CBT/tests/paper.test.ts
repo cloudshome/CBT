@@ -246,6 +246,7 @@ describe('Paper Trading & Risk Gate Endpoints (/api/paper)', () => {
         entryPrice: 65000,
         sl: 64000,
         tp: 68000,
+        size: 0.1,
         evidenceGrade: 'EMPIRICAL',
       });
       expect(res.status).toBe(201);
@@ -260,6 +261,7 @@ describe('Paper Trading & Risk Gate Endpoints (/api/paper)', () => {
         entryPrice: 65000,
         sl: 64000,
         tp: 68000,
+        size: 0.1,
       });
       expect(res.status).toBe(201);
       expect(res.body.trade).toHaveProperty('id');

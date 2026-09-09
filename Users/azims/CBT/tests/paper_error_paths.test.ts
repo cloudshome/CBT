@@ -126,7 +126,7 @@ describe('Paper Trading Error Paths & Edge Cases (P1 Coverage)', () => {
       await prisma.riskConfig.deleteMany({});
       const res = await request(app).get('/api/paper/config');
       expect(res.status).toBe(200);
-      expect(res.body.config).toHaveProperty('accountBalance', 100000);
+      expect(res.body.config).toHaveProperty('accountBalance', 10000);
     });
   });
 });

@@ -78,7 +78,7 @@ router.get('/config', async (_req: Request, res: Response): Promise<void> => {
   try {
     const config =
       (await prisma.riskConfig.findFirst({ orderBy: { id: 'desc' } })) || {
-        accountBalance: 100000.0,
+        accountBalance: 10000.0,
         maxDrawdown: 0.1,
         maxOpenTrades: 3,
         dailyLossLimit: 0.05,
