@@ -157,6 +157,23 @@ echo "==> Wrote self-contained sync script: $SYNC_SCRIPT"
 OWNER="$(stat -c '%U' "$TARGET" 2>/dev/null || echo root)"
 GROUP="$(stat -c '%G' "$TARGET" 2>/dev/null || echo root)"
 echo "==> Running the sync as user '$OWNER' (owner of the clone)."
+
+# --- Persistent git credentials for a PRIVATE repo -----------------------
+# A systemd service has no TTY, so git cannot prompt for a password and will
+# fail (status 1) unless credentials are stored for the owning user. Install
+# the 'store' credential helper for that user and prime it with one
+# interactive login from a terminal. The stored username + PAT then let every
+# non-interactive run authenticate. (For a public repo this is harmless.)
+OWNER_HOME="$(getent passwd "$OWNER" 2>/dev/null | cut -d: -f6 || echo "/home/$OWNER")"
+runuser -u "$OWNER" -- git config --global credential.helper store 2>/dev/null \
+  || sudo -u "$OWNER" git config --global credential.helper store 2>/dev/null \
+  || git config --file "$OWNER_HOME/.gitconfig" credential.helper store 2>/dev/null \
+  || true
+echo "==> Configured git credential helper 'store' for user '$OWNER'."
+echo "    If the repo is PRIVATE, run ONE interactive fetch as $OWNER"
+echo "    (you will be prompted once for username + PAT) so the daemon can"
+echo "    authenticate later. e.g.:  sudo -u $OWNER -i git -C $TARGET fetch --prune origin"
+
 # Make sure the log file exists and is writable by that user.
 : > "$CLEAN_LOG" 2>/dev/null || true
 chown "$OWNER:$GROUP" "$CLEAN_LOG" 2>/dev/null || true
