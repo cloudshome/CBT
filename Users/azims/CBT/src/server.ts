@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import candlesRouter from './routes/candles';
@@ -36,7 +36,19 @@ export function createApp(): Express {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: !!corsOrigin && !allowWildcard,
   }));
-  app.use(express.json());
+
+  // Enforce explicit body limits to mitigate DoS / memory exhaustion
+  app.use(express.json({ limit: '100kb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+  // Architectural Convergence Middleware:
+  // Clarify Express service tiering vs authoritative Python FastAPI surface
+  app.use((_req: Request, res: Response, next: () => void) => {
+    res.setHeader('X-Backend-Service', 'CTB-Express-Legacy');
+    res.setHeader('X-Authoritative-Backend', 'Python-FastAPI');
+    res.setHeader('X-Convergence-Status', 'Legacy-Fallback-Route');
+    next();
+  });
 
   // Metrics endpoints (Prometheus /metrics and /api/metrics/json)
   app.use(metricsRouter);
@@ -84,6 +96,18 @@ export function createApp(): Express {
   app.use('/api/paper', apiKeyAuth, paperRouter);
   app.use('/api/desk', apiKeyAuth, deskRouter);
   app.use('/api/institutional', apiKeyAuth, institutionalRouter);
+
+  // Payload too large error handler (HTTP 413)
+  app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+    const error = err as { type?: string; status?: number } | null | undefined;
+    if (error && (error.type === 'entity.too.large' || error.status === 413)) {
+      res.status(413).json({
+        error: 'Payload too large. Maximum allowed size is 100kb',
+      });
+      return;
+    }
+    next(err);
+  });
 
   // 404 handler
   app.use((_req: Request, res: Response) => {

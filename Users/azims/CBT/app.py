@@ -1970,6 +1970,14 @@ async def ask_desk_copilot(req: AskDeskRequest):
     return {"reply": reply, "telemetry": telemetry}
 
 
+def _canonical_symbol(symbol: str) -> str:
+    """Normalizes symbol to uppercase standard pairing, e.g. BTCUSDT -> BTC/USDT."""
+    s = symbol.strip().upper()
+    if "/" not in s and s.endswith("USDT"):
+        return f"{s[:-4]}/USDT"
+    return s
+
+
 @app.get("/api/memory/similarity")
 async def get_memory_similarity(
     symbol: str = Query("BTC/USDT"),

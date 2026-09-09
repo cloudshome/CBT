@@ -138,5 +138,41 @@ class KronosProbabilityCalibrator:
             reliability_bins=bins,
         )
 
+    def detect_drift(
+        self,
+        recent_scorecard: KronosCalibrationScorecard,
+        baseline_brier: float = 0.20,
+        max_drift_delta: float = 0.05,
+    ) -> dict[str, Any]:
+        """
+        Detects statistical calibration drift on Kronos forecast probabilities.
+        Compares Brier score against baseline and flags significant divergence.
+        """
+        brier_delta = recent_scorecard.brier_score - baseline_brier
+        is_drifted = bool(
+            not recent_scorecard.is_well_calibrated
+            or brier_delta > max_drift_delta
+            or recent_scorecard.brier_score > 0.25
+        )
+
+        status = "DRIFT_DETECTED" if is_drifted else "CALIBRATED_STABLE"
+        rec = (
+            "Recalibrate Platt parameters immediately; accuracy decaying."
+            if is_drifted
+            else "Calibration parameters within acceptable tolerance."
+        )
+
+        return {
+            "symbol": recent_scorecard.symbol,
+            "timeframe": recent_scorecard.timeframe,
+            "is_drifted": is_drifted,
+            "status": status,
+            "brier_score": round(recent_scorecard.brier_score, 4),
+            "baseline_brier": round(baseline_brier, 4),
+            "brier_delta": round(brier_delta, 4),
+            "max_drift_threshold": round(max_drift_delta, 4),
+            "recommendation": rec,
+        }
+
 
 kronos_probability_calibrator = KronosProbabilityCalibrator()

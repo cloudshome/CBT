@@ -1,0 +1,76 @@
+name: SKY Platform CI & Preflight Quality Gates
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight-gates:
+    name: All 7 Preflight Quality Gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Install Node Dependencies
+        run: |
+          npm ci || npm install
+          npm --prefix frontend ci || npm --prefix frontend install
+
+      - name: Gate 1 — Database Schema Integrity
+        run: |
+          python -c "from scripts.system_preflight import check_db_integrity; check_db_integrity()"
+
+      - name: Gate 2 — M18 Institutional Certification Integrity
+        run: |
+          python scripts/verify_m18_certification.py
+
+      - name: Gate 3 — Python Linter & Formatter (Ruff)
+        run: |
+          python -m ruff check core/ tests/
+          python -m ruff format --check core/ tests/
+
+      - name: Gate 4 — TypeScript Linter (ESLint)
+        run: |
+          npm run lint
+
+      - name: Gate 5 — Pytest Quantitative Test Suite
+        run: |
+          python -m pytest -q
+
+      - name: Gate 6 — Jest Desk & Backend Test Suite
+        run: |
+          npm test
+
+      - name: Gate 7 — Frontend Vite Production Build
+        run: |
+          npm --prefix frontend run build
+
+      - name: Unified Preflight Scorecard Verification
+        run: |
+          python scripts/system_preflight.py
