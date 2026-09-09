@@ -124,6 +124,12 @@ What it installs:
 | `ctb-sync.timer` | triggers the service every `--interval`, `Persistent=true`, enabled at boot |
 | `ctb-sync.log`   | append log of every run |
 
+The service runs **as the owner of the clone** (not root). This is important:
+if the repo is private, `git` credentials live in that user's environment, and a
+root-run daemon would have no credentials and fail to fetch. Because the timer
+runs non-interactively, the sync script sets `GIT_TERMINAL_PROMPT=0` so it fails
+fast instead of hanging on a prompt.
+
 Useful commands:
 
 ```bash

@@ -76,6 +76,7 @@ cat > "$SYNC_SCRIPT" <<'SYNCEOF'
 #!/usr/bin/env bash
 # Self-contained CTB GitHub sync. Written by install_auto_sync.sh.
 set -uo pipefail
+export GIT_TERMINAL_PROMPT=0   # never hang asking for credentials in a daemon
 REMOTE="${CTB_REMOTE:-origin}"
 BRANCH="${CTB_BRANCH:-main}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -107,6 +108,17 @@ SYNCEOF
 chmod +x "$SYNC_SCRIPT"
 echo "==> Wrote self-contained sync script: $SYNC_SCRIPT"
 
+# --- Run as the repo owner, NOT root. Root has no GitHub credentials in
+# --- non-interactive systemd runs, so git fetch would prompt and fail.
+# --- Determine the owner/group of the target dir and use it for the unit.
+OWNER="$(stat -c '%U' "$TARGET" 2>/dev/null || echo root)"
+GROUP="$(stat -c '%G' "$TARGET" 2>/dev/null || echo root)"
+echo "==> Running the sync as user '$OWNER' (owner of the clone)."
+# Make sure the log file exists and is writable by that user.
+: > "$CLEAN_LOG" 2>/dev/null || true
+chown "$OWNER:$GROUP" "$CLEAN_LOG" 2>/dev/null || true
+chmod 664 "$CLEAN_LOG" 2>/dev/null || true
+
 # --- 3. Install auto-runner (systemd preferred, cron fallback) ------------
 UNIT_PREFIX="ctb-sync"
 SYSTEMD=0
@@ -124,9 +136,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+User=$OWNER
+Group=$GROUP
 ExecStart=/bin/bash $SYNC_SCRIPT
 WorkingDirectory=$TARGET
 Environment=CTB_BRANCH=$BRANCH
+Environment=GIT_TERMINAL_PROMPT=0
 StandardOutput=append:$CLEAN_LOG
 StandardError=append:$CLEAN_LOG
 EOF
@@ -162,14 +177,15 @@ else
   printf '%s\n' \
     "# CTB GitHub auto-sync — every hour on the hour" \
     "CTB_BRANCH=$BRANCH" \
-    "0 * * * * root /bin/bash $SYNC_SCRIPT >> $CLEAN_LOG 2>&1" > "/etc/cron.d/$UNIT_PREFIX"
+    "GIT_TERMINAL_PROMPT=0" \
+    "0 * * * * $OWNER /usr/bin/env HOME=/home/$OWNER GIT_TERMINAL_PROMPT=0 /bin/bash $SYNC_SCRIPT >> $CLEAN_LOG 2>&1" > "/etc/cron.d/$UNIT_PREFIX"
   chmod 644 "/etc/cron.d/$UNIT_PREFIX"
   echo "==> Installed cron job.  Run log: $CLEAN_LOG"
 fi
 
 echo
 echo "==> First sync (immediate) ..."
-CTB_BRANCH="$BRANCH" bash "$SYNC_SCRIPT" || true
+runuser -u "$OWNER" -- env CTB_BRANCH="$BRANCH" bash "$SYNC_SCRIPT" || true
 
 echo
 echo "==> DONE. Setup summary:"
