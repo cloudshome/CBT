@@ -101,6 +101,15 @@ class InstitutionalAlphaEngine:
             "has_macro_shock": any(abs(s.shock_zscore) >= 2.0 for s in lead_signals),
         }
 
+        # Thread lead-lag evidence grade into the composite — weakest-link semantics.
+        # LeadSignal already carries ev_grade as a string label; convert to EvidenceGrade
+        # so we can compare with the candle grade. If any signal is FABRICATED (synthetic
+        # macro baseline), the composite is FABRICATED regardless of candle quality.
+        if lead_signals:
+            lead_grade = min(EvidenceGrade[s.evidence_grade] for s in lead_signals)
+            ev_grade = min(ev_grade, lead_grade)
+            is_tradeable = ev_grade.is_tradeable
+
         # 2. Order Flow CVD Hidden Absorption
         cvd_res = cvd_absorption_engine.analyze_orderflow(candles, symbol=symbol)
         cvd_data = cvd_res.__dict__

@@ -58,12 +58,33 @@ class StrategySelectionGuard:
         N = trials_count if trials_count is not None else self._total_trials_count
         N = max(1, N)
 
-        T = max(30, len(observed_returns))
-        returns_arr = (
-            np.array(observed_returns)
-            if len(observed_returns) >= 30
-            else np.random.normal(0.0005, 0.01, 100)
-        )
+        # Evidence gate: insufficient sample -> hard rejection, no fabrication.
+        if len(observed_returns) < 30:
+            logger.warning(
+                "DSR evaluation blocked for %s: only %d observed returns supplied "
+                "(minimum 30 required). Promotion rejected — accumulate real forward "
+                "trades before re-evaluating.",
+                strategy_id,
+                len(observed_returns),
+            )
+            return SelectionGuardReport(
+                strategy_id=strategy_id,
+                total_trials_tested=N,
+                observed_sharpe=round(annualized_sharpe, 2),
+                expected_max_null_sharpe=0.0,
+                deflated_sharpe_ratio=0.0,
+                p_value=1.0,
+                is_statistically_significant=False,
+                verdict="SELECTION_BIAS_REJECTED",
+                rationale=(
+                    f"Insufficient observed returns: {len(observed_returns)} supplied, "
+                    f"30 required for statistically valid DSR. Promotion blocked until "
+                    f"real forward-trade history meets the minimum sample threshold."
+                ),
+            )
+
+        T = len(observed_returns)
+        returns_arr = np.array(observed_returns)
 
         # Higher statistical moments: Skewness & Kurtosis
         mean = float(np.mean(returns_arr))
