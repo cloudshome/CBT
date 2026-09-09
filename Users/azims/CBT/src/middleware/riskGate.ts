@@ -19,7 +19,98 @@ export async function riskGate(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const { symbol, side, entryPrice, sl, tp, size } = req.body;
+  // 0. Live Trading Lockout
+  // Express backend is strictly a paper-trading simulated path.
+  // Live capital execution is outside the Express perimeter and belongs to the certified Python execution vault.
+  const rawBodyLive = req.body?.isLiveTrading;
+  const rawHeaderLive = req.headers['x-live-trading'];
+
+  const parseLiveFlag = (val: unknown): boolean | 'UNKNOWN' => {
+    if (val === undefined || val === null) return false;
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'string') {
+      const s = val.trim().toLowerCase();
+      if (s === 'true') return true;
+      if (s === 'false') return false;
+      return 'UNKNOWN';
+    }
+    return 'UNKNOWN';
+  };
+
+  const isLiveBody = parseLiveFlag(rawBodyLive);
+  const isLiveHeader = parseLiveFlag(rawHeaderLive);
+
+  if (
+    isLiveBody === 'UNKNOWN' ||
+    isLiveHeader === 'UNKNOWN' ||
+    isLiveBody === true ||
+    isLiveHeader === true
+  ) {
+    res.status(403).json({
+      error:
+        'Risk Gate Rejection: Live trading is strictly prohibited via Express backend. Live capital execution must be routed through the certified Python execution vault (/api/execution).',
+    });
+    return;
+  }
+
+  // 1. Evidence Grade Validation
+  // Supported canonical evidence grades: FABRICATED, SIMULATED, IMPUTED, EMPIRICAL
+  const CANONICAL_EVIDENCE_GRADES = ['FABRICATED', 'SIMULATED', 'IMPUTED', 'EMPIRICAL'] as const;
+  type CanonicalGrade = (typeof CANONICAL_EVIDENCE_GRADES)[number];
+
+  const rawBodyGrade = req.body?.evidenceGrade;
+  const rawHeaderGrade = req.headers['x-evidence-grade'];
+
+  const normalizeGrade = (val: unknown): string | null => {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') {
+      const trimmed = val.trim().toUpperCase();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+    return 'UNKNOWN_TYPE';
+  };
+
+  const bodyGrade = normalizeGrade(rawBodyGrade);
+  const headerGrade = normalizeGrade(rawHeaderGrade);
+
+  let resolvedGrade: string;
+
+  if (bodyGrade !== null && headerGrade !== null) {
+    // Both supplied: normalize both. If they disagree -> HTTP 403
+    if (bodyGrade !== headerGrade) {
+      res.status(403).json({
+        error: `Risk Gate Rejection: Conflicting evidence grades supplied in body ('${bodyGrade}') and header ('${headerGrade}'). Disagreement fails closed.`,
+      });
+      return;
+    }
+    resolvedGrade = bodyGrade;
+  } else if (bodyGrade !== null) {
+    resolvedGrade = bodyGrade;
+  } else if (headerGrade !== null) {
+    resolvedGrade = headerGrade;
+  } else {
+    // Neither supplied -> preserve established paper-mode compatibility behavior (missing -> EMPIRICAL)
+    resolvedGrade = 'EMPIRICAL';
+  }
+
+  // Unknown/unrecognized evidence grades MUST NOT default to EMPIRICAL; fail closed with 403
+  if (!CANONICAL_EVIDENCE_GRADES.includes(resolvedGrade as CanonicalGrade)) {
+    res.status(403).json({
+      error: `Risk Gate Rejection: Unknown or invalid evidence grade '${resolvedGrade}'. Must be one of: ${CANONICAL_EVIDENCE_GRADES.join(', ')}.`,
+    });
+    return;
+  }
+
+  // Enforce evidence integrity: Only EMPIRICAL may pass this boundary
+  if (resolvedGrade !== 'EMPIRICAL') {
+    res.status(403).json({
+      error: `Risk Gate Rejection: Evidence grade '${resolvedGrade}' is non-empirical and cannot authorize trade sizing. Only EMPIRICAL evidence is tradeable.`,
+      evidenceGrade: resolvedGrade,
+    });
+    return;
+  }
+
+  const { symbol, side, entryPrice, sl, tp, size } = req.body || {};
 
   // 1. Basic field presence and type validation
   if (!symbol || typeof symbol !== 'string' || symbol.trim() === '') {

@@ -176,6 +176,204 @@ describe('Paper Trading & Risk Gate Endpoints (/api/paper)', () => {
     });
   });
 
+  describe('Evidence Grade & Live Trading Lockout Enforcement', () => {
+    beforeEach(async () => {
+      await prisma.paperTrade.deleteMany({});
+      await prisma.riskConfig.deleteMany({});
+    });
+
+    // 1. Evidence rejection: FABRICATED -> 403
+    it('should return 403 when evidenceGrade is FABRICATED', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        evidenceGrade: 'FABRICATED',
+      });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('non-empirical and cannot authorize trade sizing');
+    });
+
+    // 2. Evidence rejection: SIMULATED -> 403
+    it('should return 403 when evidenceGrade is SIMULATED', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        evidenceGrade: 'SIMULATED',
+      });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('non-empirical and cannot authorize trade sizing');
+    });
+
+    // 3. Evidence rejection: IMPUTED -> 403
+    it('should return 403 when evidenceGrade is IMPUTED', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        evidenceGrade: 'IMPUTED',
+      });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('non-empirical and cannot authorize trade sizing');
+    });
+
+    // 4. Evidence rejection: unknown grade -> 403
+    it('should return 403 when evidenceGrade is unknown/unrecognized', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        evidenceGrade: 'GUESSWORK',
+      });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Unknown or invalid evidence grade');
+    });
+
+    // 5. Valid behavior: EMPIRICAL -> 201
+    it('should allow trade when evidenceGrade is explicitly EMPIRICAL', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        evidenceGrade: 'EMPIRICAL',
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.trade).toHaveProperty('id');
+    });
+
+    // 6. Valid behavior: omitted evidenceGrade -> defaults to EMPIRICAL (201)
+    it('should allow trade when evidenceGrade is omitted (paper-mode compatibility)', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.trade).toHaveProperty('id');
+    });
+
+    // 7. Body/header conflict: body SIMULATED, header EMPIRICAL -> 403
+    it('should return 403 when body is SIMULATED and header is EMPIRICAL', async () => {
+      const res = await request(app)
+        .post('/api/paper/trade')
+        .set('X-Evidence-Grade', 'EMPIRICAL')
+        .send({
+          symbol: 'BTCUSDT',
+          side: 'BUY',
+          entryPrice: 65000,
+          sl: 64000,
+          tp: 68000,
+          evidenceGrade: 'SIMULATED',
+        });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Conflicting evidence grades');
+    });
+
+    // 8. Body/header conflict: body EMPIRICAL, header SIMULATED -> 403
+    it('should return 403 when body is EMPIRICAL and header is SIMULATED', async () => {
+      const res = await request(app)
+        .post('/api/paper/trade')
+        .set('X-Evidence-Grade', 'SIMULATED')
+        .send({
+          symbol: 'BTCUSDT',
+          side: 'BUY',
+          entryPrice: 65000,
+          sl: 64000,
+          tp: 68000,
+          evidenceGrade: 'EMPIRICAL',
+        });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Conflicting evidence grades');
+    });
+
+    // 9. Live lockout: body isLiveTrading: true -> 403
+    it('should return 403 when body declares isLiveTrading: true', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        isLiveTrading: true,
+      });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Live trading is strictly prohibited via Express backend');
+    });
+
+    // 10. Live lockout: header X-Live-Trading: true -> 403
+    it('should return 403 when header declares X-Live-Trading: true', async () => {
+      const res = await request(app)
+        .post('/api/paper/trade')
+        .set('X-Live-Trading', 'true')
+        .send({
+          symbol: 'BTCUSDT',
+          side: 'BUY',
+          entryPrice: 65000,
+          sl: 64000,
+          tp: 68000,
+        });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Live trading is strictly prohibited via Express backend');
+    });
+
+    // 11. Live lockout: live flag + EMPIRICAL -> still 403
+    it('should return 403 when isLiveTrading is true even with EMPIRICAL grade', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        evidenceGrade: 'EMPIRICAL',
+        isLiveTrading: true,
+      });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Live trading is strictly prohibited via Express backend');
+    });
+
+    // 12. Live lockout: live flag + SIMULATED -> still 403
+    it('should return 403 when isLiveTrading is true with SIMULATED grade', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        evidenceGrade: 'SIMULATED',
+        isLiveTrading: true,
+      });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Live trading is strictly prohibited via Express backend');
+    });
+
+    // 13. Live lockout: invalid live flag string -> 403 fail closed
+    it('should fail closed (403) on uncanonical live trading flag values', async () => {
+      const res = await request(app).post('/api/paper/trade').send({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        entryPrice: 65000,
+        sl: 64000,
+        tp: 68000,
+        isLiveTrading: 'maybe-live',
+      });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain('Live trading is strictly prohibited via Express backend');
+    });
+  });
+
   describe('GET /api/paper/positions', () => {
     it('should return list of all active open positions', async () => {
       await prisma.paperTrade.create({

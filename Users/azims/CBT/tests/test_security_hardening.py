@@ -225,7 +225,11 @@ def test_paper_trade_valid_passes_gate_and_round_trips(authed_client, monkeypatc
 # ==============================================================================
 
 
-def _build_request(forwarded: str | None = None, authorization: str | None = None) -> Request:
+def _build_request(
+    forwarded: str | None = None,
+    authorization: str | None = None,
+    client_ip: str = "9.9.9.9",
+) -> Request:
     headers = []
     if forwarded:
         headers.append((b"x-forwarded-for", forwarded.encode()))
@@ -238,7 +242,7 @@ def _build_request(forwarded: str | None = None, authorization: str | None = Non
             "path": "/api/test",
             "headers": headers,
             "server": ("test", 80),
-            "client": ("9.9.9.9", 12345),
+            "client": (client_ip, 12345),
         }
     )
 
@@ -251,7 +255,9 @@ def test_rate_limiter_ignores_xff_by_default(monkeypatch):
 
 def test_rate_limiter_honours_xff_when_trusted(monkeypatch):
     monkeypatch.setenv("TRUST_PROXY_XFF", "true")
-    key, _is_auth = fastapi_rate_limiter._resolve_client(_build_request("1.2.3.4"))
+    key, _is_auth = fastapi_rate_limiter._resolve_client(
+        _build_request("1.2.3.4", client_ip="127.0.0.1")
+    )
     assert key == "ip:1.2.3.4"
 
 

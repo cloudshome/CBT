@@ -30,6 +30,8 @@ class KronosAdvisoryVerdict:
     advisory_recommendation: str  # "CONFIRM_TRADE", "DIVERGENCE_CAUTION", "VETO_TRADE", "NEUTRAL"
     sizing_multiplier: float  # [0.0, 1.25]
     narrative: str
+    evidence_grade: str = "SIMULATED"
+    is_tradeable: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -44,6 +46,8 @@ class KronosAdvisoryVerdict:
             "advisory_recommendation": self.advisory_recommendation,
             "sizing_multiplier": round(self.sizing_multiplier, 2),
             "narrative": self.narrative,
+            "evidence_grade": self.evidence_grade,
+            "is_tradeable": self.is_tradeable,
         }
 
 

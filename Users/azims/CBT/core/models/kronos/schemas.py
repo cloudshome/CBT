@@ -108,6 +108,8 @@ class KronosForecast:
     status: KronosStatus
     error_code: str | None = None
     created_at_ms: int = field(default_factory=lambda: int(time.time() * 1000))
+    evidence_grade: str = "SIMULATED"
+    is_tradeable: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -118,6 +120,8 @@ class KronosForecast:
             "lookback_bars": self.lookback_bars,
             "prediction_horizon": self.prediction_horizon,
             "current_price": self.current_price,
+            "evidence_grade": self.evidence_grade,
+            "is_tradeable": self.is_tradeable,
             "paths": [p.to_dict() for p in self.paths],
             "sky_derived_metrics": {
                 "expected_return_pct": round(self.expected_return_pct, 4),

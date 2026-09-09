@@ -11,6 +11,7 @@ Features:
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import math
 import os
 import time
@@ -19,6 +20,51 @@ from dataclasses import dataclass
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+
+DEFAULT_TRUSTED_PROXY_CIDRS = (
+    "127.0.0.0/8",
+    "::1/128",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+)
+
+
+def parse_trusted_proxy_cidrs(
+    cidrs_str: str | None = None,
+) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+    """
+    Parses configured CIDR strings into IP network objects.
+    Fails closed (raises ValueError) if any configured CIDR is malformed.
+    """
+    if cidrs_str is None:
+        cidrs_str = os.getenv("TRUSTED_PROXY_CIDRS")
+
+    if not cidrs_str or not cidrs_str.strip():
+        raw_list = DEFAULT_TRUSTED_PROXY_CIDRS
+    else:
+        raw_list = tuple(c.strip() for c in cidrs_str.split(",") if c.strip())
+
+    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for raw in raw_list:
+        try:
+            networks.append(ipaddress.ip_network(raw, strict=False))
+        except ValueError as exc:
+            raise ValueError(
+                f"Malformed CIDR in TRUSTED_PROXY_CIDRS configuration: '{raw}'"
+            ) from exc
+    return networks
+
+
+def is_ip_in_networks(
+    ip_str: str, networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network]
+) -> bool:
+    """Safely checks if an IP string belongs to any of the trusted networks."""
+    try:
+        addr = ipaddress.ip_address(ip_str.strip())
+    except ValueError:
+        return False
+    return any(addr in net for net in networks)
 
 
 @dataclass
@@ -33,12 +79,16 @@ class RateLimiter:
         window_seconds: int = 60,
         public_max: int = 60,
         auth_max: int = 180,
+        trusted_proxy_cidrs: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ):
         self.window_seconds = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", window_seconds))
         self.public_max = int(os.getenv("RATE_LIMIT_MAX", public_max))
         self.auth_max = int(os.getenv("RATE_LIMIT_AUTH_MAX", auth_max))
         self._buckets: dict[str, ClientBucket] = {}
         self._last_prune = time.time()
+        self._trusted_proxy_cidrs = (
+            trusted_proxy_cidrs if trusted_proxy_cidrs is not None else parse_trusted_proxy_cidrs()
+        )
 
     def _resolve_client(self, request: Request) -> tuple[str, bool]:
         """Extracts client identity (hashed API key or client IP)."""
@@ -56,20 +106,54 @@ class RateLimiter:
             return f"auth:{key_hash}", True
 
         # Fall back to client IP.
-        # X-Forwarded-For is ONLY trusted when TRUST_PROXY_XFF=true (i.e. the service
-        # is reachable exclusively behind a reverse proxy that overwrites the header).
-        # Otherwise an attacker can spoof the header to rotate identities and bypass
-        # the per-IP limit.
-        trust_proxy = os.getenv("TRUST_PROXY_XFF", "").strip().lower() in ("1", "true", "yes")
-        forwarded = request.headers.get("x-forwarded-for") if trust_proxy else None
-        if forwarded:
-            ip = forwarded.split(",")[0].strip()
-        elif request.client and request.client.host:
-            ip = request.client.host
-        else:
-            ip = "127.0.0.1"
+        peer_ip = request.client.host if request.client and request.client.host else "127.0.0.1"
+        trust_proxy = os.getenv("TRUST_PROXY_XFF", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
 
-        return f"ip:{ip}", False
+        # When XFF trust is disabled, ignore X-Forwarded-For completely
+        if not trust_proxy:
+            return f"ip:{peer_ip}", False
+
+        # Step 2: Determine whether that socket peer belongs to a configured trusted proxy CIDR.
+        trusted_nets = getattr(self, "_trusted_proxy_cidrs", None) or parse_trusted_proxy_cidrs()
+        if not is_ip_in_networks(peer_ip, trusted_nets):
+            # Untrusted socket peer attempting to spoof XFF -> ignore header, use socket peer
+            return f"ip:{peer_ip}", False
+
+        # Step 3: Peer is trusted. Parse XFF chain walking right-to-left.
+        forwarded = request.headers.get("x-forwarded-for")
+        if not forwarded:
+            return f"ip:{peer_ip}", False
+
+        tokens = [t.strip() for t in forwarded.split(",") if t.strip()]
+        if not tokens:
+            return f"ip:{peer_ip}", False
+
+        resolved_client_ip: str | None = None
+
+        # Walk the chain from proxy-facing (right) toward original client (left).
+        # The first IP that is NOT in the trusted proxy CIDR set is the true external client.
+        for token in reversed(tokens):
+            try:
+                addr = ipaddress.ip_address(token)
+            except ValueError:
+                # Malformed token encountered: stop traversing, fail safely
+                break
+
+            if not any(addr in net for net in trusted_nets):
+                resolved_client_ip = str(addr)
+                break
+
+        if not resolved_client_ip:
+            # If all valid hops were trusted proxies, use leftmost valid hop or peer_ip
+            resolved_client_ip = (
+                tokens[0] if is_ip_in_networks(tokens[0], trusted_nets) else peer_ip
+            )
+
+        return f"ip:{resolved_client_ip}", False
 
     def _prune_expired(self, now: float) -> None:
         """Removes expired buckets periodically."""
