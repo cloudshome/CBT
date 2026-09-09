@@ -89,6 +89,55 @@ git checkout arena/01a087d1-ctb && git pull --ff-only origin arena/01a087d1-ctb
 
 ## 6. AUTO-SYNC — runs 24/7, every hour, survives reboots & power outages
 
+### 6.0 Fresh install on Ubuntu (from scratch, recommended)
+
+Runs the app **24/7** (Docker stack, auto-starts at boot, watchdog) **and**
+re-syncs from GitHub **every hour** (catches up after a reboot / power outage).
+Run this from a terminal on the machine:
+
+```bash
+REPO=https://github.com/cloudshome/CTB.git
+TARGET=/home/st/SKY/CTB
+
+# 1. Clone fresh into the repo root (project lands at $TARGET/Users/azims/CBT)
+git clone "$REPO" "$TARGET"
+cd "$TARGET"
+
+# 2. See ALL branches, then use the branch that carries the sync tooling
+git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+git fetch --prune origin
+git switch arena/01a087d1-ctb      # contains install_auto_sync.sh + ctb-sync
+
+# 3. Persist git credentials so the non-interactive daemon can authenticate
+#    (PRIVATE repo). You'll be prompted once for username + a PAT.
+git config --global credential.helper store
+git pull --ff-only origin arena/01a087d1-ctb    # <-- enter creds once here
+
+# 4. Run the app 24/7 (Docker + systemd boot persistence + watchdog + crons)
+bash Users/azims/CBT/deploy/ubuntu_install.sh
+
+# 5. Install the GitHub auto-sync (every 1h, boot + power-outage recovery)
+sudo bash Users/azims/CBT/scripts/install_auto_sync.sh \
+  --repo "$REPO" --target "$TARGET" --interval 1h
+```
+
+After step 5 the installer prints a summary and the timer is armed. Verify:
+
+```bash
+systemctl list-timers ctb-sync.timer   # ~1h cadence
+systemctl status cbt-stack@$USER.service   # app stack 24/7 at boot
+cat "$TARGET/ctb-sync.log"
+```
+
+> **Why `credential.helper store` matters:** systemd services have no TTY, so
+> `git` cannot prompt for a password and the sync fails (status 1) on a private
+> repo. Storing credentials (username + PAT) once with the `store` helper lets
+> every non-interactive run authenticate. It stores plaintext in
+> `~/.git-credentials`; a PAT is preferred over your account password. The
+> installer also prints a one-time `git fetch` to prime it.
+
+### 6.1 The sync installer (already installed on this deployment)
+
 One command sets up a `systemd` service + timer that re-syncs this clone from
 GitHub **every hour**, starts automatically after a reboot / power outage, and
 catches up any run that was missed while the machine was down
