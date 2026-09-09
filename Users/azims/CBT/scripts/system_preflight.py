@@ -106,6 +106,35 @@ def check_m18_certification():
     assert res.returncode == 0, f"M18 Certification Check Failed:\n{res.stdout}\n{res.stderr}"
 
 
+def check_ruff():
+    # 1. Ruff lint check on core/ and tests/ matching CI
+    res_lint = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "core/", "tests/"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert res_lint.returncode == 0, f"Ruff lint check failed:\n{res_lint.stdout}\n{res_lint.stderr}"
+
+    # 2. Ruff formatting check on core/ and tests/ matching CI
+    res_fmt = subprocess.run(
+        [sys.executable, "-m", "ruff", "format", "--check", "core/", "tests/"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert res_fmt.returncode == 0, f"Ruff formatting check failed:\n{res_fmt.stdout}\n{res_fmt.stderr}"
+
+
+def check_eslint():
+    res = run_npm("run", "lint")
+    assert res.returncode == 0, f"ESLint check failed:\n{res.stdout}\n{res.stderr}"
+
+
 def main():
     print("=" * 60)
     print("SKY / CTB PREFLIGHT SYSTEM VERIFICATION & PRE-MERGE SCORECARD")
@@ -114,6 +143,8 @@ def main():
     checks = [
         ("Database Schema Integrity", check_db_integrity),
         ("M18 Certification Integrity", check_m18_certification),
+        ("Python Linter & Formatter (Ruff)", check_ruff),
+        ("TypeScript Linter (ESLint)", check_eslint),
         ("Pytest Quantitative Test Suite", check_pytest),
         ("Jest Desk & Backend Test Suite", check_jest),
         ("Frontend Vite Production Build", check_frontend_build),
@@ -126,7 +157,7 @@ def main():
 
     print("=" * 60)
     if all_passed:
-        print(">>> ALL 5 PREFLIGHT QUALITY GATES PASSED (100% GREEN) <<<")
+        print(f">>> ALL {len(checks)} PREFLIGHT QUALITY GATES PASSED (100% GREEN) <<<")
         print(">>> BRANCH READY FOR MAIN PULL REQUEST MERGE <<<")
         sys.exit(0)
     else:
