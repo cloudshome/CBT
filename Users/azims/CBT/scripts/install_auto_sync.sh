@@ -62,6 +62,8 @@ else
   git clone "$REPO" "$TARGET"
   cd "$TARGET"
 fi
+# Trust the clone machine-wide so systemd (as root) can operate on it.
+git config --system --add safe.directory "$TARGET" 2>/dev/null || true
 git config --global --add safe.directory "$TARGET" 2>/dev/null || true
 
 # --- 2. Write a self-contained sync script at the repo root ---------------
@@ -77,6 +79,8 @@ set -uo pipefail
 REMOTE="${CTB_REMOTE:-origin}"
 BRANCH="${CTB_BRANCH:-main}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+# Trust the repo machine-wide (HOME-independent, works under systemd as any user)
+git config --system --add safe.directory "$ROOT" 2>/dev/null || true
 git config --global --add safe.directory "$ROOT" 2>/dev/null || true
 log() { printf '[ctb-sync %s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 cd "$ROOT" || { log "ERROR: no such dir $ROOT"; exit 1; }

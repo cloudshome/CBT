@@ -33,7 +33,9 @@ fi
 cd "$ROOT"
 
 # Allow this repo to be owned by another user / run as root (systemd), so git
-# does not reject it as an unsafe directory.
+# does not reject it as an unsafe directory. Use --system (HOME-independent)
+# so it works even when run by systemd as a different user.
+git config --system --add safe.directory "$ROOT" 2>/dev/null || true
 git config --global --add safe.directory "$ROOT" 2>/dev/null || true
 
 log() { printf '[ctb-sync %s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
