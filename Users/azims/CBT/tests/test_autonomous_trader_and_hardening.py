@@ -146,3 +146,73 @@ async def test_autonomous_trader_candle_deduplication():
         ]
         trades = await trader.scan_and_execute()
         assert trades == []  # Guard prevented trade on same candle bar
+
+
+@pytest.mark.asyncio
+async def test_autonomous_trader_emits_open_event():
+    """Verifies that an executed paper trade is persisted through the audit bus API."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from core.autonomous_trader import AutonomousTrader
+    from core.sky_intelligence.types import DecisionAction, DecisionOutput
+
+    candles = [
+        {
+            "timestamp": 1788696900000,
+            "close": 100.0,
+            "open": 99.0,
+            "high": 101.0,
+            "low": 98.0,
+            "volume": 100.0,
+        }
+        for _ in range(20)
+    ]
+    decision = DecisionOutput(
+        decision=DecisionAction.LONG,
+        symbol="BTC/USDT",
+        timestamp=1788696900000,
+        setup_qualified=SimpleNamespace(
+            entry_price=100.0,
+            invalidation_sl=95.0,
+            target_tp=110.0,
+        ),
+        net_ev_r=1.0,
+        kelly_fraction=0.01,
+        suggested_position_size_usd=1000.0,
+        risk_gate_passed=True,
+        explanation_dossier={},
+    )
+    trader = AutonomousTrader(active_symbols=["BTC/USDT"], max_open_positions=3)
+
+    with (
+        patch(
+            "core.autonomous_trader.api_health_guard.check_disk_space",
+            return_value={"is_safe": True},
+        ),
+        patch(
+            "core.autonomous_trader.data_streamer.fetch_external_ohlcv",
+            new_callable=AsyncMock,
+        ) as mock_fetch,
+        patch("core.autonomous_trader.data_streamer.get_candles", return_value=candles),
+        patch(
+            "core.autonomous_trader.data_streamer.get_live_ticker", new_callable=AsyncMock
+        ) as mock_ticker,
+        patch("core.autonomous_trader.sky_orchestrator.analyze_market", return_value=decision),
+        patch("core.autonomous_trader.portfolio_shadow.get_open_positions", return_value=[]),
+        patch("core.autonomous_trader.portfolio_shadow.open_position", return_value="POS-TEST"),
+        patch("core.autonomous_trader.audit_bus.emit_event") as mock_emit,
+    ):
+        mock_fetch.return_value = candles
+        mock_ticker.return_value = 100.0
+
+        trades = await trader.scan_and_execute()
+
+    assert len(trades) == 1
+    mock_emit.assert_called_once_with(
+        event_type="AUTONOMOUS_PAPER_TRADE_OPENED",
+        symbol="BTC/USDT",
+        reason="Opened LONG paper trade POS-TEST",
+        severity="INFO",
+        details=trades[0],
+    )
