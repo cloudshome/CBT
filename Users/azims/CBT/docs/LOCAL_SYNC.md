@@ -112,9 +112,15 @@ sudo bash <(curl -fsSL "https://api.github.com/repos/cloudshome/CTB/contents/Use
 > body, and immediately runs the installer with the given options.
 
 - `--target` is the **repo root** (e.g. `/home/st/SKY/CTB`); the project then
-  lives at `/home/st/SKY/CTB/Users/azims/CBT`.
+  lives at `/home/st/SKY/CTB/Users/azims/CBT`. If you already have a clone,
+  point this at its root and the installer will reuse it instead of cloning.
 - `--interval` controls frequency (default `1h`, i.e. every hour).
 - `--branch` is the branch kept checked out (default `main`).
+- `--restart-cmd` (optional) overrides how the app stack is restarted after a
+  real pull. Default (empty) auto-detects and runs
+  `docker compose up -d --remove-orphans --build` in the project root. Set it
+  to e.g. `'systemctl --user restart ctb-backend ctb-node ctb-frontend'` if your
+  services differ.
 
 What it installs:
 
@@ -143,6 +149,13 @@ The installer writes its **own self-contained** `ctb-sync.sh` into the repo
 root, so auto-sync works even if the current GitHub `main` has not yet got the
 script. If the machine has no systemd, it installs an equivalent `/etc/cron.d/`
 job instead.
+
+`ctb-sync.sh` only restarts the app stack **when the pull actually moved code**
+(a real `git` fast-forward). If `main` was already up to date it logs
+`no code change; restart not needed` and does nothing. This turns the timer
+into the single **pull → (rebuild/restart) on change** mechanism, so you don't
+need a separate ad-hoc updater. If no docker-compose stack is found, it logs a
+warning and exits cleanly (the git pull still happened).
 
 > Note: timing depends on the machine being powered on. `Persistent=true`
 > means the *first* thing it does after boot is run whatever sync was missed

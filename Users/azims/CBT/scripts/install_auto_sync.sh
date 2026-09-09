@@ -25,18 +25,23 @@ REPO="https://github.com/cloudshome/CTB.git"
 TARGET=""
 INTERVAL="1h"
 BRANCH="main"
+# Optional command to run after a real code pull when a change is detected.
+# Empty = auto-detect and restart the docker-compose stack. Set to override,
+# e.g.  --restart-cmd 'systemctl --user restart ctb-backend ctb-node ctb-frontend'
+RESTART_CMD=""
 QUIET=0
 
 usage() { sed -n 's/^#   //p' "$0"; exit 0; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --repo)     REPO="$2"; shift 2 ;;
-    --target)   TARGET="$2"; shift 2 ;;
-    --interval) INTERVAL="$2"; shift 2 ;;
-    --branch)   BRANCH="$2"; shift 2 ;;
-    --quiet)    QUIET=1; shift ;;
-    -h|--help)  usage ;;
+    --repo)        REPO="$2"; shift 2 ;;
+    --target)      TARGET="$2"; shift 2 ;;
+    --interval)    INTERVAL="$2"; shift 2 ;;
+    --branch)      BRANCH="$2"; shift 2 ;;
+    --restart-cmd) RESTART_CMD="$2"; shift 2 ;;
+    --quiet)       QUIET=1; shift ;;
+    -h|--help)     usage ;;
     *) echo "Unknown option: $1" >&2; usage ;;
   esac
 done
@@ -90,17 +95,55 @@ git config remote."$REMOTE".fetch '+refs/heads/*:refs/remotes/'"$REMOTE"'/*'
 if ! git fetch --prune "$REMOTE"; then
   log "ERROR: fetch failed"; exit 1
 fi
+
+# --- Fast-forward the requested branch + main; track whether we MOVED ------
+CHANGED=0
 for b in "$BRANCH" main; do
   if git show-ref --verify --quiet "refs/remotes/$REMOTE/$b"; then
     git switch "$b" 2>/dev/null || git checkout "$b" 2>/dev/null || true
-    if git merge --ff-only "refs/remotes/$REMOTE/$b"; then
-      log "updated '$b' -> $(git rev-parse --short HEAD)"
+    BEFORE="$(git rev-parse HEAD 2>/dev/null)"
+    if git merge --ff-only "refs/remotes/$REMOTE/$b" 2>/dev/null; then
+      AFTER="$(git rev-parse HEAD 2>/dev/null)"
+      if [ "$BEFORE" != "$AFTER" ]; then
+        log "updated '$b' -> $(git rev-parse --short HEAD)"
+        CHANGED=1
+      else
+        log "'$b' already up to date"
+      fi
     else
       log "WARN: could not fast-forward '$b' (diverged/uncommitted). Left as-is."
     fi
   fi
 done
 git switch "$BRANCH" 2>/dev/null || git checkout "$BRANCH" 2>/dev/null || true
+
+# --- Restart the app stack ONLY if the pull moved code ---------------------
+restart_stack() {
+  COMPOSE_DIR="$ROOT"
+  if [ -f "$ROOT/Users/azims/CBT/docker-compose.yml" ]; then
+    COMPOSE_DIR="$ROOT/Users/azims/CBT"
+  elif [ -f "$ROOT/docker-compose.yml" ]; then
+    COMPOSE_DIR="$ROOT"
+  fi
+  if command -v docker >/dev/null 2>&1 && [ -f "$COMPOSE_DIR/docker-compose.yml" ]; then
+    log "restarting compose stack in $COMPOSE_DIR (code changed)"
+    ( cd "$COMPOSE_DIR" && docker compose up -d --remove-orphans --build ) \
+      || log "WARN: stack restart failed (exit $?)"
+  else
+    log "WARN: docker compose stack not found under $ROOT; nothing to restart."
+  fi
+}
+
+if [ "$CHANGED" -eq 1 ]; then
+  if [ -n "${CTB_RESTART_CMD:-}" ]; then
+    log "code changed -> running custom restart: $CTB_RESTART_CMD"
+    eval "$CTB_RESTART_CMD" || log "WARN: custom restart failed (exit $?)"
+  else
+    restart_stack
+  fi
+else
+  log "no code change; restart not needed"
+fi
 log "done."
 SYNCEOF
 
@@ -142,6 +185,7 @@ ExecStart=/bin/bash $SYNC_SCRIPT
 WorkingDirectory=$TARGET
 Environment=CTB_BRANCH=$BRANCH
 Environment=GIT_TERMINAL_PROMPT=0
+Environment=CTB_RESTART_CMD=$RESTART_CMD
 StandardOutput=append:$CLEAN_LOG
 StandardError=append:$CLEAN_LOG
 EOF
@@ -178,6 +222,7 @@ else
     "# CTB GitHub auto-sync — every hour on the hour" \
     "CTB_BRANCH=$BRANCH" \
     "GIT_TERMINAL_PROMPT=0" \
+    "CTB_RESTART_CMD=$RESTART_CMD" \
     "0 * * * * $OWNER /usr/bin/env HOME=/home/$OWNER GIT_TERMINAL_PROMPT=0 /bin/bash $SYNC_SCRIPT >> $CLEAN_LOG 2>&1" > "/etc/cron.d/$UNIT_PREFIX"
   chmod 644 "/etc/cron.d/$UNIT_PREFIX"
   echo "==> Installed cron job.  Run log: $CLEAN_LOG"
@@ -194,4 +239,9 @@ echo "    Script:   $SYNC_SCRIPT"
 echo "    Interval: $INTERVAL"
 echo "    Log:      $CLEAN_LOG"
 echo "    Boot/power-outage recovery: $([ $SYSTEMD -eq 1 ] && echo 'yes (systemd timer, Persistent=true)' || echo 'yes (cron on boot)')"
+if [ -n "$RESTART_CMD" ]; then
+  echo "    Restart on change: custom -> $RESTART_CMD"
+else
+  echo "    Restart on change: auto (docker-compose up -d --build when code changes)"
+fi
 echo "    Next run: $([ $SYSTEMD -eq 1 ] && systemctl list-timers "$UNIT_PREFIX.timer" --no-pager 2>/dev/null | grep -q "$UNIT_PREFIX" && echo 'scheduled (see systemctl list-timers)' || echo 'on the hour')"
