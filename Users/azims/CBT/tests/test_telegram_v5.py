@@ -500,7 +500,10 @@ async def test_telegram_message_chunking_and_limits():
         assert len(c) <= 4000
 
     # 3. send_message sends sequential chunks when text exceeds limit
-    with patch.object(telegram_bot, "_send_single_payload", new_callable=AsyncMock) as mock_send:
+    with (
+        patch.object(telegram_bot, "_send_single_payload", new_callable=AsyncMock) as mock_send,
+        patch.object(telegram_bot, "bot_token", "123456:mock_token_for_ci"),
+    ):
         mock_send.return_value = True
         sent = await telegram_bot.send_message(
             text=long_para,
