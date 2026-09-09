@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+#
+# install_auto_sync.sh — ONE-COMMAND setup: keep a local CTB clone in sync
+# with GitHub, automatically, forever.
+#
+# Sets up:
+#   * clones (or updates) the repo at --target
+#   * writes a self-contained sync script ctb-sync.sh into the repo root
+#     (so it works even if the default GitHub branch is ahead of the file)
+#   * a systemd SERVICE (ctb-sync.service) that runs that script
+#   * a systemd TIMER   (ctb-sync.timer)   that runs it every --interval,
+#     enabled at boot, with Persistent=true so a run missed during a reboot
+#     / power outage is caught up automatically
+#   * falls back to a cron job if systemd is unavailable
+#
+# THE ONE COMMAND YOU RUN (as root / sudo):
+#   sudo bash <(curl -fsSL https://raw.githubusercontent.com/cloudshome/CTB/arena/01a087d1-ctb/Users/azims/CBT/scripts/install_auto_sync.sh) \
+#     --repo https://github.com/cloudshome/CTB.git \
+#     --target /home/st/SKY/CTB \
+#     --interval 1h
+set -uo pipefail
+
+# --- defaults -------------------------------------------------------------
+REPO="https://github.com/cloudshome/CTB.git"
+TARGET=""
+INTERVAL="1h"
+BRANCH="main"
+QUIET=0
+
+usage() { sed -n 's/^#   //p' "$0"; exit 0; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo)     REPO="$2"; shift 2 ;;
+    --target)   TARGET="$2"; shift 2 ;;
+    --interval) INTERVAL="$2"; shift 2 ;;
+    --branch)   BRANCH="$2"; shift 2 ;;
+    --quiet)    QUIET=1; shift ;;
+    -h|--help)  usage ;;
+    *) echo "Unknown option: $1" >&2; usage ;;
+  esac
+done
+
+if [ -z "$TARGET" ]; then
+  echo "ERROR: --target is required (the directory to clone into)." >&2
+  usage
+fi
+
+echo "==> Repo:      $REPO"
+echo "==> Target:    $TARGET"
+echo "==> Interval:  $INTERVAL"
+echo "==> Branch:    $BRANCH"
+echo
+
+# --- 1. Obtain the repo ---------------------------------------------------
+if [ -d "$TARGET/.git" ]; then
+  echo "==> Repo already present at $TARGET — using it."
+  cd "$TARGET"
+else
+  echo "==> Cloning $REPO into $TARGET ..."
+  mkdir -p "$TARGET"
+  git clone "$REPO" "$TARGET"
+  cd "$TARGET"
+fi
+git config --global --add safe.directory "$TARGET" 2>/dev/null || true
+
+# --- 2. Write a self-contained sync script at the repo root ---------------
+# This is deliberately written out by the installer so the auto-sync does NOT
+# depend on the file already existing in the cloned default branch.
+SYNC_SCRIPT="$TARGET/ctb-sync.sh"
+CLEAN_LOG="$TARGET/ctb-sync.log"
+
+cat > "$SYNC_SCRIPT" <<'SYNCEOF'
+#!/usr/bin/env bash
+# Self-contained CTB GitHub sync. Written by install_auto_sync.sh.
+set -uo pipefail
+REMOTE="${CTB_REMOTE:-origin}"
+BRANCH="${CTB_BRANCH:-main}"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+git config --global --add safe.directory "$ROOT" 2>/dev/null || true
+log() { printf '[ctb-sync %s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
+cd "$ROOT" || { log "ERROR: no such dir $ROOT"; exit 1; }
+log "repo=$ROOT remote=$REMOTE branch=$BRANCH"
+git config remote."$REMOTE".fetch '+refs/heads/*:refs/remotes/'"$REMOTE"'/*'
+if ! git fetch --prune "$REMOTE"; then
+  log "ERROR: fetch failed"; exit 1
+fi
+for b in "$BRANCH" main; do
+  if git show-ref --verify --quiet "refs/remotes/$REMOTE/$b"; then
+    git switch "$b" 2>/dev/null || git checkout "$b" 2>/dev/null || true
+    if git merge --ff-only "refs/remotes/$REMOTE/$b"; then
+      log "updated '$b' -> $(git rev-parse --short HEAD)"
+    else
+      log "WARN: could not fast-forward '$b' (diverged/uncommitted). Left as-is."
+    fi
+  fi
+done
+git switch "$BRANCH" 2>/dev/null || git checkout "$BRANCH" 2>/dev/null || true
+log "done."
+SYNCEOF
+
+[ "$QUIET" -eq 1 ] || sed -i 's/^set -uo pipefail$/set -uo pipefail\nCTB_REMOTE="${CTB_REMOTE:-origin}"\nCTB_BRANCH="${CTB_BRANCH:-main}"/' "$SYNC_SCRIPT" 2>/dev/null || true
+chmod +x "$SYNC_SCRIPT"
+echo "==> Wrote self-contained sync script: $SYNC_SCRIPT"
+
+# --- 3. Install auto-runner (systemd preferred, cron fallback) ------------
+UNIT_PREFIX="ctb-sync"
+SYSTEMD=0
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+  SYSTEMD=1
+fi
+
+if [ "$SYSTEMD" -eq 1 ]; then
+  echo "==> Installing systemd units ($UNIT_PREFIX.service + $UNIT_PREFIX.timer) ..."
+  cat > "/etc/systemd/system/$UNIT_PREFIX.service" <<EOF
+[Unit]
+Description=CTB GitHub auto-sync ($TARGET)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $SYNC_SCRIPT
+WorkingDirectory=$TARGET
+Environment=CTB_BRANCH=$BRANCH
+StandardOutput=append:$CLEAN_LOG
+StandardError=append:$CLEAN_LOG
+EOF
+
+  cat > "/etc/systemd/system/$UNIT_PREFIX.timer" <<EOF
+[Unit]
+Description=Run CTB GitHub auto-sync every $INTERVAL
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=$INTERVAL
+OnCalendar=hourly
+Persistent=true
+Unit=$UNIT_PREFIX.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable --now "$UNIT_PREFIX.timer"
+
+  echo "==> Service installed & timer enabled."
+  echo "    Run log : $CLEAN_LOG"
+  echo "    Status  : systemctl status $UNIT_PREFIX.timer"
+  echo "    Manual  : systemctl start $UNIT_PREFIX.service"
+  echo
+  echo "==> Running once immediately to verify ..."
+  systemctl start "$UNIT_PREFIX.service" || true
+  systemctl status "$UNIT_PREFIX.service" --no-pager || true
+else
+  echo "==> systemd not detected — falling back to cron (/etc/cron.d/$UNIT_PREFIX)."
+  printf '%s\n' \
+    "# CTB GitHub auto-sync — every hour on the hour" \
+    "CTB_BRANCH=$BRANCH" \
+    "0 * * * * root /bin/bash $SYNC_SCRIPT >> $CLEAN_LOG 2>&1" > "/etc/cron.d/$UNIT_PREFIX"
+  chmod 644 "/etc/cron.d/$UNIT_PREFIX"
+  echo "==> Installed cron job.  Run log: $CLEAN_LOG"
+fi
+
+echo
+echo "==> First sync (immediate) ..."
+CTB_BRANCH="$BRANCH" bash "$SYNC_SCRIPT" || true
+
+echo
+echo "==> DONE. Setup summary:"
+echo "    Repo:     $TARGET"
+echo "    Script:   $SYNC_SCRIPT"
+echo "    Interval: $INTERVAL"
+echo "    Log:      $CLEAN_LOG"
+echo "    Boot/power-outage recovery: $([ $SYSTEMD -eq 1 ] && echo 'yes (systemd timer, Persistent=true)' || echo 'yes (cron on boot)')"
+echo "    Next run: $([ $SYSTEMD -eq 1 ] && systemctl list-timers "$UNIT_PREFIX.timer" --no-pager 2>/dev/null | grep -q "$UNIT_PREFIX" && echo 'scheduled (see systemctl list-timers)' || echo 'on the hour')"

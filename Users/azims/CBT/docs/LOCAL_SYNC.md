@@ -87,12 +87,61 @@ git checkout arena/01a087d1-ctb && git pull --ff-only origin arena/01a087d1-ctb
 
 ---
 
-## What this repo does NOT do
+## 6. AUTO-SYNC — runs 24/7, every hour, survives reboots & power outages
 
-- It does **not** auto-push or auto-pull. Sync is manual (or via CI on GitHub).
-- It treats GitHub as authoritative. Any manual edit in a local clone (that is
-  not pushed) is not "the repo" and can be lost.
-- It deliberately requires a PR + human review before anything reaches `main`.
+One command sets up a `systemd` service + timer that re-syncs this clone from
+GitHub **every hour**, starts automatically after a reboot / power outage, and
+catches up any run that was missed while the machine was down
+(`Persistent=true`). Run it as root (it installs systemd units):
 
-A convenience script (same commands, one shot) lives at
+```bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/cloudshome/CTB/arena/01a087d1-ctb/Users/azims/CBT/scripts/install_auto_sync.sh) \
+  --repo https://github.com/cloudshome/CTB.git \
+  --target /home/st/SKY/CTB \
+  --interval 1h
+```
+
+- `--target` is the **repo root** (e.g. `/home/st/SKY/CTB`); the project then
+  lives at `/home/st/SKY/CTB/Users/azims/CBT`.
+- `--interval` controls frequency (default `1h`, i.e. every hour).
+- `--branch` is the branch kept checked out (default `main`).
+
+What it installs:
+
+| Component | Purpose |
+|---|---|
+| `ctb-sync.service` | one-shot: runs the sync script (`/home/st/SKY/CTB/ctb-sync.sh`) |
+| `ctb-sync.timer` | triggers the service every `--interval`, `Persistent=true`, enabled at boot |
+| `ctb-sync.log`   | append log of every run |
+
+Useful commands:
+
+```bash
+systemctl status ctb-sync.timer        # is it active/armed?
+systemctl list-timers ctb-sync.timer   # when is the next run?
+systemctl start ctb-sync.service       # run once immediately (manual)
+journalctl -u ctb-sync.service         # or tail -f /home/st/SKY/CTB/ctb-sync.log
+```
+
+The installer writes its **own self-contained** `ctb-sync.sh` into the repo
+root, so auto-sync works even if the current GitHub `main` has not yet got the
+script. If the machine has no systemd, it installs an equivalent `/etc/cron.d/`
+job instead.
+
+> Note: timing depends on the machine being powered on. `Persistent=true`
+> means the *first* thing it does after boot is run whatever sync was missed
+> while the machine was off — no manual catch-up needed.
+
+---
+
+## Notes
+
+- The sync is **pull-only** (fast-forward). It never pushes and never opens PRs.
+- `sync_local.sh` (one-shot, manual) and `ctb-sync.sh` (written by the
+  installer, used by the timer) are equivalent; use whichever is present.
+- It treats GitHub as authoritative. Any un-pushed local edit is not "the
+  repo" and can be lost on the next sync.
+- `main` still requires a PR + human review before anything lands there.
+
+Manual convenience script (same commands as `sync_local.sh`, one shot):
 `scripts/sync_local.sh`.
