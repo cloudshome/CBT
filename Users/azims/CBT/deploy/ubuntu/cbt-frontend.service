@@ -1,0 +1,25 @@
+﻿[Unit]
+Description=CBT React Frontend (Vite Preview)
+Documentation=https://github.com/cloudshome/CTB
+After=network-online.target cbt-express.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cbt
+Group=cbt
+WorkingDirectory=/home/cbt/CBT/frontend
+EnvironmentFile=/home/cbt/CBT/.env
+ExecStart=/usr/bin/npx vite preview --host 0.0.0.0 --port 5173
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-frontend
+
+# Crash recovery
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

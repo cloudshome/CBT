@@ -1,0 +1,11 @@
+﻿[Unit]
+Description=CBT GitHub Auto-Sync Timer (every 5 minutes)
+Requires=cbt-sync.service
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

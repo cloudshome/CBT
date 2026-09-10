@@ -1,0 +1,25 @@
+﻿[Unit]
+Description=CBT FastAPI Quantitative Backend
+Documentation=https://github.com/cloudshome/CTB
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cbt
+Group=cbt
+WorkingDirectory=/home/cbt/CBT
+EnvironmentFile=/home/cbt/CBT/.env
+ExecStart=/home/cbt/CBT/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-fastapi
+
+# Crash recovery
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

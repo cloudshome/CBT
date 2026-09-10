@@ -1,0 +1,25 @@
+﻿[Unit]
+Description=CBT Express API Backend
+Documentation=https://github.com/cloudshome/CTB
+After=network-online.target cbt-fastapi.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cbt
+Group=cbt
+WorkingDirectory=/home/cbt/CBT
+EnvironmentFile=/home/cbt/CBT/.env
+ExecStart=/usr/bin/node dist/server.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-express
+
+# Crash recovery
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

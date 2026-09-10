@@ -1,0 +1,15 @@
+﻿[Unit]
+Description=CBT GitHub Auto-Sync (pull + restart on new commits)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=cbt
+Group=cbt
+WorkingDirectory=/home/cbt/CBT
+EnvironmentFile=/home/cbt/CBT/.env
+ExecStart=/usr/local/bin/cbt-sync.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-sync
