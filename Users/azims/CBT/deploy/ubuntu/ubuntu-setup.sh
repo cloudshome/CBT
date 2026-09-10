@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # =============================================================================
 #  ubuntu-setup.sh  —  CBT Ubuntu 24H Server — One-Shot Setup
 #
@@ -130,12 +130,17 @@ sudo -u "$CBT_USER" bash -c "cd $REPO_DIR && npx prisma migrate deploy" || \
 ok "Prisma DB ready"
 
 # --------------------------------------------------------------------------- #
-# STEP 8 — Install sync script
+# STEP 8 — Install sync script + deploy command
 # --------------------------------------------------------------------------- #
 log "Installing cbt-sync.sh ..."
 cp "$REPO_DIR/deploy/ubuntu/cbt-sync.sh" "$SYNC_SCRIPT"
 chmod +x "$SYNC_SCRIPT"
 ok "Sync script → $SYNC_SCRIPT"
+
+log "Installing cbt-deploy command ..."
+cp "$REPO_DIR/deploy/ubuntu/cbt-deploy" "/usr/local/bin/cbt-deploy"
+chmod +x "/usr/local/bin/cbt-deploy"
+ok "Deploy command → /usr/local/bin/cbt-deploy  (usage: sudo cbt-deploy)"
 
 # --------------------------------------------------------------------------- #
 # STEP 9 — Install systemd units
@@ -189,11 +194,13 @@ echo "    Express   → http://localhost:3000"
 echo "    FastAPI   → http://localhost:8000"
 echo ""
 echo "  Useful commands:"
-echo "    sudo journalctl -fu cbt-fastapi      # FastAPI logs"
-echo "    sudo journalctl -fu cbt-express      # Express logs"
-echo "    sudo journalctl -fu cbt-frontend     # Frontend logs"
-echo "    sudo journalctl -fu cbt-sync         # Sync logs"
-echo "    sudo systemctl list-timers cbt-sync  # Check timer"
+echo "    sudo cbt-deploy                      # ← Deploy now after a git push"
+echo "    sudo cbt-health                      # ← Full health check"
+echo "    sudo journalctl -fu cbt-fastapi      # FastAPI live logs"
+echo "    sudo journalctl -fu cbt-express      # Express live logs"
+echo "    sudo journalctl -fu cbt-sync         # Sync history"
+echo ""
+echo "  Auto-sync: daily at midnight (auto) + sudo cbt-deploy (manual anytime)"
 echo ""
 echo "  ⚠️  Remember to fill in $REPO_DIR/.env with your real secrets!"
 echo ""
