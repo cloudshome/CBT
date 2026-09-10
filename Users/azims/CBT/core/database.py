@@ -91,6 +91,7 @@ class DatabaseManager:
         self._init_brain_db()
         self._init_trading_db()
         self._init_experiment_db()
+        self._init_automation_tables()
         logger.info(
             f"All 4 database schemas initialized and version-locked (v{CURRENT_SCHEMA_VERSION}) with WAL mode."
         )
@@ -633,6 +634,48 @@ class DatabaseManager:
             """)
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_kronos_sym_tf ON kronos_forecast_ledger (symbol, timeframe, timestamp DESC);"
+            )
+            conn.commit()
+
+    def _init_automation_tables(self) -> None:
+        """Creates Zero-Touch Research Automation tables in brain_memory.db."""
+        with self.get_brain_conn() as conn:
+            # Watched YouTube channels for auto-crawl pipeline
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS research_automation_channels (
+                    channel_id TEXT PRIMARY KEY,
+                    url TEXT NOT NULL UNIQUE,
+                    label TEXT NOT NULL,
+                    crawl_interval_hours INTEGER NOT NULL DEFAULT 72,
+                    max_videos_per_crawl INTEGER NOT NULL DEFAULT 10,
+                    last_crawled_at INTEGER,
+                    total_videos_crawled INTEGER DEFAULT 0,
+                    is_active INTEGER DEFAULT 1,
+                    added_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_automation_channels_active ON research_automation_channels (is_active, last_crawled_at);"
+            )
+
+            # Audit log for every pipeline run
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS automation_run_log (
+                    run_id TEXT PRIMARY KEY,
+                    pipeline TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    items_processed INTEGER DEFAULT 0,
+                    items_promoted INTEGER DEFAULT 0,
+                    items_rejected INTEGER DEFAULT 0,
+                    detail_json TEXT,
+                    error_message TEXT,
+                    started_at INTEGER NOT NULL,
+                    completed_at INTEGER
+                );
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_automation_log_pipeline ON automation_run_log (pipeline, started_at DESC);"
             )
             conn.commit()
 
