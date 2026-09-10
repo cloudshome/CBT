@@ -27,6 +27,11 @@ import {
   ShieldAlert,
   X,
   Send,
+  GraduationCap,
+  Map,
+  Award,
+  ShieldCheck,
+  Cpu,
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -37,6 +42,21 @@ import {
   DiscoveryGraphResponse,
   CrossDomainDiscoveryItem,
 } from '../types';
+import {
+  ProjectBrainDesk,
+  HumanBrainTeacher,
+  KnowledgeMapAndGaps,
+  LearningPathDesk,
+  KnowledgeAuditDesk,
+} from './knowledge_os';
+
+export type KosNavigationTab =
+  | 'RESEARCH_LAB'
+  | 'PROJECT_BRAIN'
+  | 'HUMAN_BRAIN'
+  | 'KNOWLEDGE_MAP'
+  | 'LEARNING_PATH'
+  | 'KNOWLEDGE_AUDIT';
 
 interface ResearchIngestLabProps {
   onNotify?: (type: 'success' | 'error' | 'info' | 'warning', title: string, msg: string) => void;
@@ -49,6 +69,9 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   selectedSymbol = 'BTC/USDT',
   selectedTimeframe = '15m',
 }) => {
+  // Knowledge Operating System Active Workspace Tab
+  const [activeKosTab, setActiveKosTab] = useState<KosNavigationTab>('RESEARCH_LAB');
+
   // Ingest Form State
   const [inputText, setInputText] = useState<string>('');
   const [inputTitle, setInputTitle] = useState<string>('');
@@ -675,8 +698,111 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         </div>
       </div>
 
-      {/* UNIVERSAL INGESTION DROP ZONE */}
-      <div className="bg-slate-900/90 border border-indigo-900/50 rounded-xl p-4 flex flex-col gap-4 shadow-inner relative overflow-hidden">
+      {/* SKY Knowledge Operating System Navigation Bar */}
+      <div className="flex items-center gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl overflow-x-auto">
+        <button
+          onClick={() => setActiveKosTab('RESEARCH_LAB')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+            activeKosTab === 'RESEARCH_LAB'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <UploadCloud className="w-4 h-4" />
+          Research Ingest & Vaults
+        </button>
+
+        <button
+          onClick={() => setActiveKosTab('PROJECT_BRAIN')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+            activeKosTab === 'PROJECT_BRAIN'
+              ? 'bg-cyan-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <Cpu className="w-4 h-4 text-cyan-200" />
+          Project Brain Context
+        </button>
+
+        <button
+          onClick={() => setActiveKosTab('HUMAN_BRAIN')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+            activeKosTab === 'HUMAN_BRAIN'
+              ? 'bg-purple-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4 text-purple-200" />
+          Human Brain Tutor
+        </button>
+
+        <button
+          onClick={() => setActiveKosTab('KNOWLEDGE_MAP')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+            activeKosTab === 'KNOWLEDGE_MAP'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <Map className="w-4 h-4 text-amber-200" />
+          Knowledge Map & Gaps
+        </button>
+
+        <button
+          onClick={() => setActiveKosTab('LEARNING_PATH')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+            activeKosTab === 'LEARNING_PATH'
+              ? 'bg-emerald-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <Award className="w-4 h-4 text-emerald-200" />
+          Personal Learning Path
+        </button>
+
+        <button
+          onClick={() => setActiveKosTab('KNOWLEDGE_AUDIT')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+            activeKosTab === 'KNOWLEDGE_AUDIT'
+              ? 'bg-rose-700 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 text-rose-200" />
+          Quality & Integrity Audit
+        </button>
+      </div>
+
+      {/* Sub-Desks */}
+      {activeKosTab === 'PROJECT_BRAIN' && (
+        <ProjectBrainDesk
+          selectedSymbol={selectedSymbol}
+          selectedTimeframe={selectedTimeframe}
+          onNotify={onNotify}
+        />
+      )}
+
+      {activeKosTab === 'HUMAN_BRAIN' && (
+        <HumanBrainTeacher onNotify={onNotify} />
+      )}
+
+      {activeKosTab === 'KNOWLEDGE_MAP' && (
+        <KnowledgeMapAndGaps onNotify={onNotify} />
+      )}
+
+      {activeKosTab === 'LEARNING_PATH' && (
+        <LearningPathDesk onNotify={onNotify} />
+      )}
+
+      {activeKosTab === 'KNOWLEDGE_AUDIT' && (
+        <KnowledgeAuditDesk onNotify={onNotify} />
+      )}
+
+      {/* Primary Research Ingest Lab View */}
+      {activeKosTab === 'RESEARCH_LAB' && (
+        <>
+          {/* UNIVERSAL INGESTION DROP ZONE */}
+          <div className="bg-slate-900/90 border border-indigo-900/50 rounded-xl p-4 flex flex-col gap-4 shadow-inner relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
         {/* Drag and Drop Box */}
@@ -1890,6 +2016,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };

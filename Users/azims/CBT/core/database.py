@@ -220,6 +220,98 @@ class DatabaseManager:
                     PRIMARY KEY (symbol, timeframe)
                 );
             """)
+
+            # SKY KNOWLEDGE OPERATING SYSTEM SCHEMA (PROJECT BRAIN + HUMAN BRAIN)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS personal_learning_graph (
+                    concept_id TEXT PRIMARY KEY,
+                    concept_title TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    exposure_count INTEGER DEFAULT 0,
+                    sources_read INTEGER DEFAULT 0,
+                    explanations_seen INTEGER DEFAULT 0,
+                    quiz_attempts INTEGER DEFAULT 0,
+                    correct_answers INTEGER DEFAULT 0,
+                    incorrect_answers INTEGER DEFAULT 0,
+                    confidence REAL DEFAULT 0.0,
+                    mastery_estimate REAL DEFAULT 0.0,
+                    misconceptions TEXT DEFAULT '[]',
+                    prerequisite_concepts TEXT DEFAULT '[]',
+                    dependent_concepts TEXT DEFAULT '[]',
+                    last_reviewed INTEGER,
+                    next_review INTEGER,
+                    updated_at INTEGER NOT NULL
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS human_quiz_history (
+                    quiz_id TEXT PRIMARY KEY,
+                    concept_id TEXT NOT NULL,
+                    question_text TEXT NOT NULL,
+                    options_json TEXT NOT NULL,
+                    correct_answer_index INTEGER NOT NULL,
+                    user_answer_index INTEGER,
+                    is_correct INTEGER,
+                    misconception_flag TEXT,
+                    timestamp INTEGER NOT NULL
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS book_ingestion_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    file_path TEXT NOT NULL,
+                    file_name TEXT NOT NULL,
+                    file_size_bytes INTEGER DEFAULT 0,
+                    sha256_hash TEXT NOT NULL,
+                    total_pages INTEGER DEFAULT 0,
+                    processed_pages INTEGER DEFAULT 0,
+                    current_chapter TEXT,
+                    status TEXT NOT NULL,
+                    claims_count INTEGER DEFAULT 0,
+                    concepts_count INTEGER DEFAULT 0,
+                    checkpoint_data TEXT,
+                    error_log TEXT,
+                    started_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS knowledge_supersessions (
+                    id TEXT PRIMARY KEY,
+                    superseded_node_id TEXT NOT NULL,
+                    superseding_node_id TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    difference_summary TEXT NOT NULL,
+                    created_at INTEGER NOT NULL
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS knowledge_audits (
+                    audit_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    checks_json TEXT NOT NULL,
+                    created_at INTEGER NOT NULL
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS project_decisions (
+                    decision_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    subsystem TEXT NOT NULL,
+                    rationale TEXT NOT NULL,
+                    evidence_ids TEXT DEFAULT '[]',
+                    concept_ids TEXT DEFAULT '[]',
+                    risk_boundaries TEXT DEFAULT '{}',
+                    status TEXT NOT NULL,
+                    created_at INTEGER NOT NULL
+                );
+            """)
             conn.commit()
 
     def _init_trading_db(self) -> None:

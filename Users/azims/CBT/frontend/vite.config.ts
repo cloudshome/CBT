@@ -33,6 +33,7 @@ const PYTHON_PREFIXES = [
   '/api/mtf',
   '/api/scan',
   '/api/research',
+  '/api/knowledge',
   '/api/desk',
   '/api/paper',
   '/api/institutional',

@@ -584,6 +584,118 @@ class KnowledgeGraphEngine:
             created_at=now,
         )
 
+    def register_source_node(self, node: SourceNode) -> SourceNode:
+        with db_manager.get_brain_conn() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO research_provenance_sources (
+                    source_id, source_type, source_uri, title, author_creator,
+                    original_worldview, ingested_at, raw_content_preview
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    node.source_id,
+                    node.source_type.upper(),
+                    node.source_uri,
+                    node.title,
+                    node.author_creator,
+                    node.original_worldview.upper(),
+                    node.ingested_at,
+                    node.raw_content_preview[:2000] if node.raw_content_preview else "",
+                ),
+            )
+            conn.commit()
+        return node
+
+    def register_claim_node(self, claim: ClaimNode) -> ClaimNode:
+        with db_manager.get_brain_conn() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO research_claims (
+                    claim_id, source_id, original_claim_verbatim, source_worldview,
+                    subject_concept, relationship_direction, object_domain,
+                    evidence_type, epistemic_status, confidence_score,
+                    timestamp_start, timestamp_end, timestamp_start_sec, timestamp_end_sec,
+                    video_url, author_creator,
+                    book_title, book_isbn, book_edition, chapter_title, section_title,
+                    page_number, paragraph_index, pdf_evidence_type, applicability_domain,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    claim.claim_id,
+                    claim.source_id,
+                    claim.original_claim_verbatim,
+                    claim.source_worldview.upper(),
+                    claim.subject_concept,
+                    claim.relationship_direction,
+                    claim.object_domain.upper(),
+                    claim.evidence_type.upper(),
+                    claim.epistemic_status,
+                    float(claim.confidence_score),
+                    claim.timestamp_start,
+                    claim.timestamp_end,
+                    claim.timestamp_start_sec,
+                    claim.timestamp_end_sec,
+                    claim.video_url,
+                    claim.author_creator,
+                    claim.book_title,
+                    claim.book_isbn,
+                    claim.book_edition,
+                    claim.chapter_title,
+                    claim.section_title,
+                    claim.page_number,
+                    claim.paragraph_index,
+                    claim.pdf_evidence_type,
+                    claim.applicability_domain,
+                    claim.created_at,
+                ),
+            )
+            conn.commit()
+        return claim
+
+    def register_concept_node(self, concept: ConceptNode) -> ConceptNode:
+        with db_manager.get_brain_conn() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO research_concepts (concept_id, title, domain, normalized_description, tags, created_at)
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    concept.concept_id,
+                    concept.title,
+                    concept.domain.upper(),
+                    concept.normalized_description,
+                    json.dumps(concept.tags),
+                    concept.created_at,
+                ),
+            )
+            conn.commit()
+        return concept
+
+    def register_graph_edge(self, edge: GraphEdge) -> GraphEdge:
+        with db_manager.get_brain_conn() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO knowledge_graph_edges (
+                    edge_id, source_node_id, target_node_id, relationship_type,
+                    edge_nature, strength_weight, empirical_status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    edge.edge_id,
+                    edge.source_node_id,
+                    edge.target_node_id,
+                    edge.relationship_type.upper(),
+                    edge.edge_nature.upper(),
+                    float(edge.strength_weight),
+                    edge.empirical_status,
+                    edge.created_at,
+                ),
+            )
+            conn.commit()
+        return edge
+
     def create_hypothesis(
         self,
         title: str,

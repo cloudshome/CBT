@@ -26,6 +26,17 @@ import {
   SORBenchmarkSuite,
   WSReconciliationTelemetry,
   WSNormalizedFill,
+  KnowledgeAskMode,
+  HumanQuestionMode,
+  KnowledgeAskResponse,
+  ProjectKnowledgeContext,
+  PersonalLearningGraphResponse,
+  QuizSubmissionResult,
+  ResearchAdvisorResponse,
+  LibraryStatsResponse,
+  BookIngestionJob,
+  ResearchGapItem,
+  KnowledgeAuditReport,
 } from '../types';
 
 const BASE_URL = '';
@@ -1344,6 +1355,113 @@ export const api = {
   async getYouTubeJob(jobId: string): Promise<any> {
     const res = await authFetch(`${BASE_URL}/api/research/youtube/jobs/${encodeURIComponent(jobId)}`);
     return handleResponse<any>(res);
+  },
+
+  // =========================================================================
+  // SKY KNOWLEDGE OPERATING SYSTEM APIS (PROJECT BRAIN + HUMAN BRAIN)
+  // =========================================================================
+
+  /**
+   * POST /api/knowledge/ask (Universal Human & Project Brain Query Interface)
+   */
+  async askKnowledgeOS(params: {
+    question: string;
+    mode?: KnowledgeAskMode;
+    domain?: string;
+    depth?: string;
+    human_mode?: HumanQuestionMode;
+    target_symbol?: string;
+    timeframe?: string;
+    include_sources?: boolean;
+    include_evidence?: boolean;
+    include_contradictions?: boolean;
+  }): Promise<KnowledgeAskResponse> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<KnowledgeAskResponse>(res);
+  },
+
+  /**
+   * POST /api/knowledge/project/context (Quantitative Research Context Package)
+   */
+  async getProjectKnowledgeContext(query: string, symbol: string = 'BTC/USDT', timeframe: string = '15m'): Promise<ProjectKnowledgeContext> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/project/context`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, target_symbol: symbol, timeframe }),
+    });
+    return handleResponse<ProjectKnowledgeContext>(res);
+  },
+
+  /**
+   * GET /api/knowledge/human/learning-graph (Personal Curriculum & Mastery Graph)
+   */
+  async getPersonalLearningGraph(): Promise<PersonalLearningGraphResponse> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/human/learning-graph`);
+    return handleResponse<PersonalLearningGraphResponse>(res);
+  },
+
+  /**
+   * POST /api/knowledge/human/quiz/submit (Self-test evaluation & spaced review)
+   */
+  async submitQuizAnswer(params: {
+    quiz_id: string;
+    concept_id: string;
+    selected_option_index: number;
+    correct_option_index: number;
+    question_text?: string;
+    options?: string[];
+    misconception_trap?: string;
+  }): Promise<QuizSubmissionResult> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/human/quiz/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<QuizSubmissionResult>(res);
+  },
+
+  /**
+   * GET /api/knowledge/human/advisor (Right Path Personalized Advisor)
+   */
+  async getResearchAdvisor(): Promise<ResearchAdvisorResponse> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/human/advisor`);
+    return handleResponse<ResearchAdvisorResponse>(res);
+  },
+
+  /**
+   * GET /api/knowledge/library/stats (Consolidated Volume Across 7 Tiers)
+   */
+  async getLibraryStats(): Promise<LibraryStatsResponse> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/library/stats`);
+    return handleResponse<LibraryStatsResponse>(res);
+  },
+
+  /**
+   * GET /api/knowledge/library/jobs (Streaming Ingestion Progress)
+   */
+  async getLibraryJobs(): Promise<{ jobs: BookIngestionJob[]; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/library/jobs`);
+    return handleResponse<{ jobs: BookIngestionJob[]; count: number }>(res);
+  },
+
+  /**
+   * GET /api/knowledge/gaps (High Talk vs Zero Evidence Deficit Scanner)
+   */
+  async getResearchGaps(): Promise<{ gaps: ResearchGapItem[]; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/gaps`);
+    return handleResponse<{ gaps: ResearchGapItem[]; count: number }>(res);
+  },
+
+  /**
+   * GET /api/knowledge/audit (7-Invariant Integrity & Provenance Audit)
+   */
+  async runKnowledgeAudit(): Promise<KnowledgeAuditReport> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/audit`);
+    return handleResponse<KnowledgeAuditReport>(res);
   },
 
   // =========================================================================

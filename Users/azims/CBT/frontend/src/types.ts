@@ -967,6 +967,201 @@ export interface WSNormalizedFill {
   execution_id: string;
   symbol: string;
   side: string;
+  relationship_direction: string;
+  object_domain: string;
+  evidence_type: string;
+  epistemic_status: 'UNVERIFIED' | 'HYPOTHESIZED' | 'EMPIRICALLY_TESTED' | 'REFUTED';
+  confidence_score: number;
+  timestamp_start?: string | null;
+  timestamp_end?: string | null;
+  timestamp_start_sec?: number | null;
+  timestamp_end_sec?: number | null;
+  video_url?: string | null;
+  author_creator?: string | null;
+  hype_detected?: boolean;
+  hype_markers?: string[];
+  book_title?: string | null;
+  book_isbn?: string | null;
+  book_edition?: string | null;
+  chapter_title?: string | null;
+  section_title?: string | null;
+  page_number?: number | null;
+  paragraph_index?: number | null;
+  pdf_evidence_type?: string | null;
+  applicability_domain?: string | null;
+  created_at: number;
+}
+
+export interface ConceptNodeItem {
+  concept_id: string;
+  title: string;
+  domain: string;
+  normalized_description: string;
+  tags: string[];
+  created_at: number;
+}
+
+export interface VariableNodeItem {
+  variable_id: string;
+  name: string;
+  category: string;
+  observable_symbol: string;
+  timeframe: string;
+}
+
+export interface ObservationNodeItem {
+  observation_id: string;
+  source_id: string;
+  observation_text: string;
+  period_context: string;
+  observed_variables: string[];
+  created_at: number;
+}
+
+export interface GraphEdgeItem {
+  edge_id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relationship_type: string;
+  edge_nature: 'SAME_DOMAIN' | 'CROSS_DOMAIN' | 'CONTRADICTION';
+  strength_weight: number;
+  empirical_status: 'UNTESTED' | 'TESTING' | 'SUPPORTED' | 'REFUTED';
+  created_at: number;
+}
+
+export interface HypothesisNodeItem {
+  hypothesis_id: string;
+  claim_id?: string;
+  title: string;
+  null_hypothesis: string;
+  alt_hypothesis: string;
+  independent_variable: string;
+  dependent_variable: string;
+  target_symbol: string;
+  test_method: string;
+  control_variables: string[];
+  validation_status: 'QUEUED' | 'TESTING' | 'SUPPORTED' | 'REJECTED' | 'INCONCLUSIVE';
+  p_value?: number;
+  effect_size?: number;
+  test_result_summary?: string;
+  created_at: number;
+}
+
+export interface CrossDomainDiscoveryItem {
+  discovery_id: string;
+  source_claim_id: string;
+  source_worldview: string;
+  premise: string;
+  cross_domain_candidate: string;
+  target_variable: string;
+  target_symbol: string;
+  status: 'UNTESTED' | 'HYPOTHESIS_FORMULATED';
+  proposed_hypothesis: string;
+}
+
+export interface DiscoveryGraphResponse {
+  nodes: {
+    sources: SourceNodeItem[];
+    claims: ClaimNodeItem[];
+    concepts: ConceptNodeItem[];
+    variables: VariableNodeItem[];
+    observations: ObservationNodeItem[];
+  };
+  edges: GraphEdgeItem[];
+  hypotheses: HypothesisNodeItem[];
+  discoveries: CrossDomainDiscoveryItem[];
+  counts: {
+    sources_count: number;
+    claims_count: number;
+    concepts_count: number;
+    variables_count: number;
+    observations_count: number;
+    edges_count: number;
+    hypotheses_count: number;
+  };
+}
+
+export interface ResearchTelegramShareRequest {
+  knowledge_id: string;
+  title: string;
+  author_creator?: string;
+  source_type?: string;
+  executive_summary: string;
+  chapter_breakdown?: string[];
+  epistemic_counts?: {
+    facts?: number;
+    hypotheses?: number;
+    rules?: number;
+    contradictions?: number;
+  };
+  candidate_summary?: string;
+  chat_id?: string;
+}
+
+export interface ResearchTelegramShareResponse {
+  status: 'SENT' | 'QUEUED_LOCAL' | 'FAILED';
+  configured: boolean;
+  message: string;
+  dispatched_text?: string;
+}
+
+// Phase 19: Cloud KMS / HSM Enclave & Execution Telemetry Types
+
+export interface KMSEnclaveStatus {
+  status: string;
+  kms_enabled: boolean;
+  provider: 'MOCK' | 'MOCK_HSM' | 'AWS_KMS' | 'GCP_KMS' | 'DISABLED';
+  key_id: string;
+  envelope_version: number;
+  zeroization_guarantee: boolean;
+  kill_switch_active: boolean;
+  timestamp_ms: number;
+}
+
+export interface SORBenchmarkMetric {
+  name: string;
+  iterations: number;
+  mean_us: number;
+  median_us: number;
+  p90_us: number;
+  p95_us: number;
+  p99_us: number;
+  min_us: number;
+  max_us: number;
+  ops_per_sec: number;
+  sla_target_us: number;
+  sla_passed: boolean;
+}
+
+export interface SORBenchmarkSuite {
+  timestamp_ms: number;
+  iterations_per_test: number;
+  overall_sla_passed: boolean;
+  benchmarks: {
+    depth_ladder_walk_20_levels?: SORBenchmarkMetric;
+    almgren_chriss_slicer_20_intervals?: SORBenchmarkMetric;
+    sor_multi_venue_optimal_route?: SORBenchmarkMetric;
+    [key: string]: SORBenchmarkMetric | undefined;
+  };
+}
+
+export interface WSReconciliationTelemetry {
+  status: string;
+  total_messages_received: number;
+  total_fills_processed: number;
+  total_fills_recorded: number;
+  total_duplicates_filtered: number;
+  buffered_events_count: number;
+  max_buffer_size: number;
+}
+
+export interface WSNormalizedFill {
+  exchange: string;
+  client_order_id: string;
+  exchange_order_id: string;
+  execution_id: string;
+  symbol: string;
+  side: string;
   fill_price: number;
   fill_qty: number;
   fee_currency: string;
@@ -974,4 +1169,212 @@ export interface WSNormalizedFill {
   is_maker: boolean;
   trade_time_ms: number;
   received_monotonic_ns: number;
+}
+
+// ==============================================================================
+// SKY KNOWLEDGE OPERATING SYSTEM (PROJECT BRAIN + HUMAN BRAIN) TYPES
+// ==============================================================================
+
+export type KnowledgeAskMode = 'HUMAN' | 'PROJECT';
+export type HumanQuestionMode =
+  | 'EXPLAIN'
+  | 'TEACH'
+  | 'COMPARE'
+  | 'CHALLENGE_ME'
+  | 'QUIZ_ME'
+  | 'PRACTICAL_EXERCISE'
+  | 'RESEARCH_DEEP_DIVE'
+  | 'WHAT_SHOULD_I_LEARN_NEXT';
+
+export interface EpistemicCitation {
+  source: string;
+  author: string;
+  location: string;
+  status: string;
+  quote?: string;
+  node_id?: string;
+  title?: string;
+  citation?: string;
+}
+
+export interface EpistemicBreakdown {
+  simple_explanation: string;
+  source_knowledge: string[];
+  cross_source_synthesis: string[];
+  empirical_evidence: string[];
+  sky_project_knowledge: string[];
+  model_inference: string[];
+  unknown_or_unestablished: string[];
+}
+
+export interface QuizItem {
+  quiz_id: string;
+  concept_id: string;
+  question: string;
+  options: string[];
+  correct_option_index: number;
+  explanation: string;
+  misconception_trap: string;
+}
+
+export interface QuizSubmissionResult {
+  quiz_id: string;
+  is_correct: boolean;
+  selected_option_index: number;
+  correct_option_index: number;
+  feedback: string;
+  updated_mastery: number;
+  next_review_days: number;
+}
+
+export interface HumanAnswerData {
+  mode: string;
+  primary_concept: string;
+  missing_prerequisites: string[];
+  answer_breakdown: EpistemicBreakdown;
+  citations: EpistemicCitation[];
+  quiz?: QuizItem;
+  learn_next: Array<{ concept_id: string; title: string; domain: string }>;
+  timestamp: number;
+}
+
+export interface ProjectKnowledgeContext {
+  query: string;
+  concepts: Array<Record<string, any>>;
+  source_claims: Array<Record<string, any>>;
+  competing_definitions: Array<Record<string, any>>;
+  empirical_evidence: Array<Record<string, any>>;
+  autopsy_failures: Array<Record<string, any>>;
+  contradictions: Array<Record<string, any>>;
+  current_sky_assumptions: string[];
+  risk_boundary_warnings: string[];
+  provenance_citations: EpistemicCitation[];
+  recommendation: string;
+  proposed_test_plan: string[];
+  epistemic_summary: {
+    total_relevant_claims: number;
+    empirical_proofs_found: number;
+    known_failures_autopsied: number;
+    active_contradictions: number;
+    highest_epistemic_tier: string;
+    has_rejection_precedent: boolean;
+  };
+  safety_disclaimer: string;
+  generated_at: number;
+}
+
+export interface KnowledgeAskResponse {
+  mode: KnowledgeAskMode;
+  question: string;
+  answer_data?: HumanAnswerData;
+  project_context?: ProjectKnowledgeContext;
+  recommendation?: string;
+  provenance_citations?: EpistemicCitation[];
+  epistemic_summary?: Record<string, any>;
+  safety_disclaimer: string;
+}
+
+export interface PersonalLearningGraphNode {
+  concept_id: string;
+  concept_title: string;
+  domain: string;
+  exposure_count: number;
+  sources_read: number;
+  explanations_seen: number;
+  quiz_attempts: number;
+  correct_answers: number;
+  incorrect_answers: number;
+  confidence: number;
+  mastery_estimate: number;
+  misconceptions: string[];
+  prerequisite_concepts: string[];
+  dependent_concepts: string[];
+  last_reviewed?: number;
+  next_review?: number;
+  updated_at: number;
+}
+
+export interface PersonalLearningGraphResponse {
+  concepts: PersonalLearningGraphNode[];
+  summary: {
+    total_concepts: number;
+    mastered_count: number;
+    in_progress_count: number;
+    unstarted_count: number;
+    overall_curriculum_progress_pct: number;
+  };
+}
+
+export interface ResearchAdvisorResponse {
+  recommended_concept_id: string;
+  recommended_title: string;
+  domain: string;
+  current_mastery: number;
+  rationale: string;
+  suggested_actions: string[];
+}
+
+export interface BookIngestionJob {
+  job_id: string;
+  file_path: string;
+  file_name: string;
+  file_size_bytes: number;
+  sha256_hash: string;
+  total_pages: number;
+  processed_pages: number;
+  progress_pct: number;
+  current_chapter: string;
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'RESUMED';
+  claims_count: number;
+  concepts_count: number;
+  error_log?: string;
+  started_at: number;
+  updated_at: number;
+}
+
+export interface LibraryStatsResponse {
+  books_count: number;
+  sources_count: number;
+  pages_processed: number;
+  claims_count: number;
+  concepts_count: number;
+  hypotheses_count: number;
+  evidence_count: number;
+  rejected_count: number;
+  graph_edges_count: number;
+  jobs_active: number;
+  top_domains: Array<{ domain: string; count: number }>;
+}
+
+export interface ResearchGapItem {
+  gap_id: string;
+  concept_title: string;
+  domain: string;
+  claims_count: number;
+  empirical_tests_count: number;
+  gap_type: 'HIGH_TALK_ZERO_EVIDENCE' | 'CONFLICTING_DEFINITIONS' | 'UNTESTED_HYPOTHESIS' | 'KNOWLEDGE_BLIND_SPOT';
+  priority_score: number;
+  description: string;
+  suggested_hypothesis: string;
+  created_at: number;
+}
+
+export interface KnowledgeAuditCheck {
+  check_name: string;
+  status: 'PASS' | 'WARN' | 'FAIL';
+  count: number;
+  details: string;
+  remediation: string;
+}
+
+export interface KnowledgeAuditReport {
+  audit_id: string;
+  overall_status: 'PASS' | 'WARN' | 'FAIL';
+  summary: string;
+  checks: KnowledgeAuditCheck[];
+  total_sources: number;
+  total_claims: number;
+  total_evidence: number;
+  total_autopsies: number;
+  created_at: number;
 }

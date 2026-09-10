@@ -58,6 +58,7 @@ from core.autonomous_research.provenance_tracker import provenance_tracker
 from core.autonomous_research.storage import research_storage
 from core.autonomous_research.storage.storage_manager import storage_manager
 from core.autonomous_research.storage.storage_manifest import storage_manifest
+from core.knowledge_os.routes import router as knowledge_os_router
 from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
 from core.conservative_kelly import conservative_kelly
@@ -235,6 +236,8 @@ app = FastAPI(
     version="3.0.0",
     lifespan=lifespan_ctx,
 )
+
+app.include_router(knowledge_os_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()
