@@ -107,9 +107,11 @@ class ResearchGapEngine:
             )
 
             for cr in conflict_rows:
-                claim_a = cr["claim_id_a"] if "claim_id_a" in cr.keys() else cr.get("claim_a_id", "")
-                claim_b = cr["claim_id_b"] if "claim_id_b" in cr.keys() else cr.get("claim_b_id", "")
-                desc = cr["description"] if "description" in cr.keys() else cr.get("conflict_reason", "")
+                keys = cr.keys()
+                claim_a = cr["claim_id_a"] if "claim_id_a" in keys else ""
+                claim_b = cr["claim_id_b"] if "claim_id_b" in keys else ""
+                desc = cr["description"] if "description" in keys else ""
+                resolution_notes = cr["resolution_notes"] if "resolution_notes" in keys else None
                 gaps.append(
                     ResearchGapItem(
                         gap_id=f"GAP_CONFLICT_{cr['conflict_id'][-6:]}",
@@ -120,7 +122,7 @@ class ResearchGapEngine:
                         gap_type="CONFLICTING_DEFINITIONS",
                         priority_score=0.85,
                         description=f"Direct clash between {claim_a} and {claim_b}: {desc}",
-                        suggested_hypothesis=cr.get("resolution_notes") or "H1: Strategy A significantly outperforms Strategy B under high volatility regimes.",
+                        suggested_hypothesis=resolution_notes or "H1: Strategy A significantly outperforms Strategy B under high volatility regimes.",
                     )
                 )
 

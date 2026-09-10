@@ -2,6 +2,17 @@
 Strategy Genome Compiler & Formal Validation Engine.
 Converts unstructured trading hypotheses into deterministic, machine-testable execution specifications.
 Enforces zero ambiguity: fails closed with STATUS = NOT_BACKTESTABLE if critical parameters are missing.
+
+Knowledge OS Integration (read-only):
+  Before compilation, the compiler requests a ProjectKnowledgeContext from the
+  Project Brain. This context is used to:
+    1. Emit CAUTION warnings when matching autopsy failures exist in the Failure Vault.
+    2. Boost confidence when verified empirical evidence supports the setup.
+    3. Attach the full context package to CompiledStrategy.knowledge_context for
+       downstream UI, league manager, and audit trail — for inspection ONLY.
+
+  Constitutional guarantee: Project Brain NEVER mutates risk limits, execution
+  parameters, or quarantine tier decisions. Autopsy warnings are advisory only.
 """
 
 from __future__ import annotations
@@ -16,6 +27,16 @@ from typing import Any, ClassVar
 from core.strategy_league import QuarantineTier, StrategyGenome, strategy_league_manager
 
 logger = logging.getLogger("ai_quant_sentinel.strategy_compiler")
+
+
+def _get_project_brain():
+    """Lazy import to avoid circular imports at module load time."""
+    try:
+        from core.knowledge_os.project_brain import project_brain  # noqa: PLC0415
+        return project_brain
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Knowledge OS not available — compiling without brain context: %s", exc)
+        return None
 
 
 class RuleOrigin(StrEnum):
@@ -60,6 +81,8 @@ class CompiledStrategy:
     confidence: float
     status: CompilationStatus
     missing_requirements: list[str] = field(default_factory=list)
+    # Knowledge OS: read-only advisory context from Project Brain (never mutates risk params)
+    knowledge_context: dict[str, Any] | None = None
     created_at: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict[str, Any]:
@@ -98,6 +121,10 @@ class StrategyCompiler:
         """
         Compiles and formally verifies a trading strategy specification.
         Checks for missing parameters and rejects vague hypotheses.
+
+        Knowledge OS: Before compilation, Project Brain is queried for matching
+        autopsy failures and empirical evidence. Findings are advisory only —
+        they never block a READY_FOR_BACKTEST status or modify risk parameters.
         """
         now = time.time()
         strat_id_hash = hashlib.sha256(f"{name}_{raw_description}_{now}".encode()).hexdigest()[:8]
@@ -106,6 +133,53 @@ class StrategyCompiler:
         target_assets = assets or ["BTCUSDT", "ETHUSDT"]
         tf_map = timeframes or {"bias": "4h", "setup": "1h", "entry": "15m"}
         missing: list[str] = []
+
+        # ── Knowledge OS: Advisory pre-flight scan ────────────────────────────
+        knowledge_context_dict: dict[str, Any] | None = None
+        brain_autopsy_count = 0
+        brain_evidence_count = 0
+        try:
+            brain = _get_project_brain()
+            if brain is not None:
+                ctx = brain.build_project_context(
+                    query=f"{name} {raw_description}",
+                    target_symbol=(target_assets[0] if target_assets else "BTC/USDT"),
+                )
+                knowledge_context_dict = ctx.to_dict()
+                brain_autopsy_count = len(ctx.autopsy_failures)
+                brain_evidence_count = len(ctx.empirical_evidence)
+
+                # Surface autopsy warnings as advisory missing_requirements notes
+                if brain_autopsy_count > 0:
+                    failure_reasons = [
+                        af.get("metadata", {}).get("failure_reason", "UNKNOWN")
+                        for af in ctx.autopsy_failures[:3]
+                    ]
+                    missing.append(
+                        f"[KNOWLEDGE OS CAUTION] {brain_autopsy_count} similar setup(s) found in Autopsy Vault. "
+                        f"Known failure modes: {', '.join(failure_reasons)}. "
+                        "Review autopsy details before parameterization."
+                    )
+                    logger.warning(
+                        "Knowledge OS: %d autopsy failure(s) match hypothesis '%s'. "
+                        "CAUTION notes appended to compilation report.",
+                        brain_autopsy_count,
+                        name,
+                    )
+
+                logger.info(
+                    "Knowledge OS context attached: %d concepts, %d claims, "
+                    "%d evidence, %d autopsies for '%s'",
+                    len(ctx.concepts),
+                    len(ctx.source_claims),
+                    brain_evidence_count,
+                    brain_autopsy_count,
+                    name,
+                )
+        except Exception as exc:
+            logger.warning("Knowledge OS pre-flight skipped (non-fatal): %s", exc)
+        # ── End Knowledge OS scan ─────────────────────────────────────────────
+
 
         # 1. Asset verification
         invalid_assets = [
@@ -226,12 +300,17 @@ class StrategyCompiler:
         }
 
         # 7. Compile Status
-        if missing:
+        # Separate hard errors from Knowledge OS advisory CAUTION notes
+        hard_missing = [m for m in missing if not m.startswith("[KNOWLEDGE OS CAUTION]")]
+        if hard_missing:
             status = CompilationStatus.NOT_BACKTESTABLE
             confidence = 0.0
         else:
             status = CompilationStatus.READY_FOR_BACKTEST
-            confidence = 0.85
+            # Knowledge OS evidence boost: +0.01 per verified evidence proof, capped at 0.90
+            base_confidence = 0.85
+            evidence_boost = min(brain_evidence_count * 0.01, 0.05)
+            confidence = min(base_confidence + evidence_boost, 0.90)
 
         sources = [source_id] if source_id else []
 
@@ -253,6 +332,7 @@ class StrategyCompiler:
             confidence=confidence,
             status=status,
             missing_requirements=missing,
+            knowledge_context=knowledge_context_dict,
             created_at=now,
         )
 
