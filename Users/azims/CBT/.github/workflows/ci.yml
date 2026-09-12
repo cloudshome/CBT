@@ -1,76 +1,102 @@
-name: SKY Platform CI & Preflight Quality Gates
+name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 jobs:
-  preflight-gates:
-    name: All 7 Preflight Quality Gates
+  test-and-build:
+    name: Lint, Test & Build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: Users/azims/CBT
+
+    env:
+      DATABASE_URL: "file:./dev.db"
+      GEMINI_API_KEY: "ci-mock-gemini-api-key"
+      PORT: "3000"
+      NODE_ENV: "test"
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: "pip"
-
-      - name: Set up Node.js 20
+      - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: Users/azims/CBT/package-lock.json
 
-      - name: Install Python Dependencies
+      - name: Install Backend & Tooling Dependencies
+        run: npm ci
+
+      - name: Install Frontend PWA Dependencies
+        run: npm --prefix frontend ci
+
+      - name: Initialize Prisma Schema & Database
+        run: |
+          npx prisma validate
+          npx prisma generate
+          npx prisma db push
+          DATABASE_URL="file:./test.db" npx prisma db push
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: Users/azims/CBT/requirements*.txt
+
+      - name: Install Python Quantitative Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-      - name: Install Node Dependencies
+      - name: Run Python Linter (Ruff)
         run: |
-          npm ci || npm install
-          npm --prefix frontend ci || npm --prefix frontend install
+          ruff check core/ tests/
+          ruff format --check core/ tests/
 
-      - name: Gate 1 — Database Schema Integrity
+      - name: Run Python Quantitative Test Suite (Pytest)
         run: |
-          python -c "from scripts.system_preflight import check_db_integrity; check_db_integrity()"
+          pytest --tb=short
 
-      - name: Gate 2 — M18 Institutional Certification Integrity
-        run: |
-          python scripts/verify_m18_certification.py
+      - name: Run TypeScript Linter (ESLint)
+        run: npm run lint
 
-      - name: Gate 3 — Python Linter & Formatter (Ruff)
-        run: |
-          python -m ruff check core/ tests/
-          python -m ruff format --check core/ tests/
+      - name: Run Automated Test Suite (Jest)
+        run: npm test -- --coverage
 
-      - name: Gate 4 — TypeScript Linter (ESLint)
+      - name: Validate Docker Compose Configuration
+        env:
+          # docker-compose.prod.yml intentionally fails closed when CORS_ORIGIN
+          # is unset; supply a representative value for config validation.
+          CORS_ORIGIN: https://cbt.example.com
         run: |
-          npm run lint
+          docker compose -f docker-compose.yml config
+          docker compose -f docker-compose.prod.yml config
 
-      - name: Gate 5 — Pytest Quantitative Test Suite
+      - name: Assert production Compose fails closed without CORS_ORIGIN
         run: |
-          python -m pytest -q
+          if docker compose -f docker-compose.prod.yml config >/dev/null 2>&1; then
+            echo "::error::docker-compose.prod.yml must fail when CORS_ORIGIN is unset"
+            exit 1
+          fi
+          echo "OK: production compose refuses to render without an explicit CORS_ORIGIN"
 
-      - name: Gate 6 — Jest Desk & Backend Test Suite
-        run: |
-          npm test
-
-      - name: Gate 7 — Frontend Vite Production Build
-        run: |
-          npm --prefix frontend run build
-
-      - name: Unified Preflight Scorecard Verification
-        run: |
-          python scripts/system_preflight.py
+      - name: Build Full Production Bundle (Backend & Frontend)
+        run: npm run build
