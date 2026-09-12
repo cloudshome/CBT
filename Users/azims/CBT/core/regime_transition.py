@@ -170,6 +170,27 @@ class RegimeTransitionDetector:
             summary=summary,
         )
 
+    def evaluate_market_state(
+        self,
+        symbol: str,
+        prices: list[float],
+        volumes: list[float] | None = None,
+    ) -> dict[str, Any]:
+        """Backward-compatible market state evaluation from price and volume sequences."""
+        if not prices:
+            return {"regime": MarketRegime.RANGING_CONSOLIDATION.value, "confidence": 0.5}
+        candles = [
+            {"open": p, "high": p, "low": p, "close": p, "volume": volumes[i] if volumes and i < len(volumes) else 1.0}
+            for i, p in enumerate(prices)
+        ]
+        res = self.classify_regime(candles)
+        return {
+            "regime": res.current_regime.value,
+            "confidence": res.confidence,
+            "active_transition": res.active_transition.value,
+            "summary": res.summary,
+        }
+
 
 # Singleton
 regime_transition_detector = RegimeTransitionDetector()
