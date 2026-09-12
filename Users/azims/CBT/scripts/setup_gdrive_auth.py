@@ -148,8 +148,13 @@ def run_oauth_login() -> None:
 
     Path(token_file).parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"[*] Starting OAuth2 flow using {client_secret_file}...")
-    print(f"[*] Please log in with '{DEFAULT_TARGET_EMAIL}' in the browser window that opens.")
+    print("\n" + "=" * 65)
+    print("OAUTH AUTHORIZATION GUIDE:")
+    print("1. Your browser will open the Google Sign-in page.")
+    print("2. Choose 'ypelectronics11@gmail.com'.")
+    print("3. If you see 'Google hasn't verified this app':")
+    print("   Click 'Advanced' (bottom left) -> Click 'Go to CTB Storage (unsafe)' -> 'Continue'.")
+    print("=" * 65 + "\n")
 
     flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES)
     creds = flow.run_local_server(port=0)
