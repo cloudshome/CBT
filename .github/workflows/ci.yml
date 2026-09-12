@@ -51,6 +51,10 @@ jobs:
           npx prisma validate
           npx prisma generate
           npx prisma db push
+          DATABASE_URL="file:./test.db" npx prisma db push
+          cp -f prisma/*.db . 2>/dev/null || true
+          cp -f prisma/dev.db test.db 2>/dev/null || true
+          cp -f prisma/dev.db prisma/test.db 2>/dev/null || true
 
       - name: Setup Python 3.13
         uses: actions/setup-python@v5
