@@ -122,12 +122,19 @@ sudo -u "$CBT_USER" bash -c "cd $REPO_DIR && npm run frontend:build --silent"
 ok "Frontend built → frontend/dist/"
 
 # --------------------------------------------------------------------------- #
-# STEP 7 — Prisma DB
+# STEP 7 — Prisma DB & SDCC Identity
 # --------------------------------------------------------------------------- #
-log "Applying Prisma migrations ..."
-sudo -u "$CBT_USER" bash -c "cd $REPO_DIR && npx prisma migrate deploy" || \
-    warn "Prisma migrate failed — run manually: cd $REPO_DIR && npx prisma migrate deploy"
+log "Setting up Prisma DB schema ..."
+sudo -u "$CBT_USER" bash -c "cd $REPO_DIR && npx prisma generate && npx prisma db push --skip-generate" || \
+    warn "Prisma db push failed — run manually: cd $REPO_DIR && npx prisma db push"
 ok "Prisma DB ready"
+
+if [ ! -f "$REPO_DIR/data/collective/node/node_identity.json" ]; then
+    log "Initializing SDCC Cluster Node Identity (UBUNTU-01) ..."
+    sudo -u "$CBT_USER" bash -c "cd $REPO_DIR && .venv/bin/python scripts/sky_cluster_sync.py --init --node-id UBUNTU-01 --role RESEARCH_WORKER" || \
+        warn "SDCC node init skipped — run manually: python scripts/sky_cluster_sync.py --init --node-id UBUNTU-01"
+    ok "SDCC Node Identity initialized"
+fi
 
 # --------------------------------------------------------------------------- #
 # STEP 8 — Install sync script + deploy command

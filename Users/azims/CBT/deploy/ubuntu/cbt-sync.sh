@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # =============================================================================
 #  cbt-sync.sh  —  CBT GitHub Auto-Sync Script
 #  Runs every 5 minutes via systemd timer.
@@ -50,10 +50,10 @@ if git diff --name-only "$LOCAL" "$REMOTE" | grep -q "^frontend/"; then
     npm run frontend:build --silent
 fi
 
-# --- Apply Prisma migrations ---
+# --- Apply Prisma schema ---
 if git diff --name-only "$LOCAL" "$REMOTE" | grep -q "prisma/"; then
-    log "Prisma schema changed — applying migrations ..."
-    npx prisma migrate deploy
+    log "Prisma schema changed — updating database schema ..."
+    npx prisma generate && npx prisma db push --skip-generate
 fi
 
 # --- Restart all 3 services ---
