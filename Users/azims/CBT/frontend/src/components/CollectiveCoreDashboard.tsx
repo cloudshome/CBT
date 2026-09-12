@@ -51,16 +51,25 @@ export const CollectiveCoreDashboard: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       const [resStatus, resNodes, resConflicts, resKnowledge] = await Promise.all([
-        fetch('/api/collective/status').then((r) => r.json()),
-        fetch('/api/collective/nodes').then((r) => r.json()),
-        fetch('/api/collective/conflicts').then((r) => r.json()),
-        fetch('/api/collective/knowledge').then((r) => r.json()),
+        fetch('/api/collective/status').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/collective/nodes').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/collective/conflicts').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch('/api/collective/knowledge').then((r) => (r.ok ? r.json() : null)).catch(() => null),
       ]);
 
-      setStatus(resStatus);
-      setNodes(resNodes);
-      setConflicts(resConflicts.conflicts || []);
-      setKnowledge(resKnowledge);
+      if (resStatus && !resStatus.message) setStatus(resStatus);
+      if (resNodes && !resNodes.message) {
+        setNodes({
+          local_node: resNodes.local_node,
+          peer_nodes: Array.isArray(resNodes.peer_nodes) ? resNodes.peer_nodes : [],
+        });
+      }
+      if (resConflicts && Array.isArray(resConflicts.conflicts)) {
+        setConflicts(resConflicts.conflicts);
+      } else {
+        setConflicts([]);
+      }
+      if (resKnowledge && !resKnowledge.message) setKnowledge(resKnowledge);
     } catch (err) {
       console.error('Error loading collective status:', err);
     }
@@ -178,7 +187,7 @@ export const CollectiveCoreDashboard: React.FC = () => {
         <div className="bg-[#121722] border border-slate-800/80 rounded-lg p-3">
           <div className="text-[11px] text-slate-400 font-medium">Cluster Nodes</div>
           <div className="text-xl font-bold text-white mt-1">
-            {(nodes?.peer_nodes.length || 0) + 1}
+            {(nodes?.peer_nodes?.length || 0) + 1}
             <span className="text-xs text-slate-500 font-normal ml-1">nodes</span>
           </div>
           <div className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
@@ -190,7 +199,7 @@ export const CollectiveCoreDashboard: React.FC = () => {
         <div className="bg-[#121722] border border-slate-800/80 rounded-lg p-3">
           <div className="text-[11px] text-slate-400 font-medium">Total Canonical Events</div>
           <div className="text-xl font-bold text-indigo-400 mt-1">
-            {status?.total_events.toLocaleString() || 0}
+            {(status?.total_events ?? 0).toLocaleString()}
           </div>
           <div className="text-[10px] text-slate-500 mt-1">Append-only ledger</div>
         </div>
@@ -265,7 +274,7 @@ export const CollectiveCoreDashboard: React.FC = () => {
             )}
 
             {/* Peer Nodes */}
-            {nodes?.peer_nodes.map((peer) => (
+            {(nodes?.peer_nodes || []).map((peer) => (
               <div key={peer.node_id} className="bg-[#181f2e]/60 border border-slate-800 rounded p-2.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs text-slate-200 flex items-center gap-1.5">
@@ -344,17 +353,17 @@ export const CollectiveCoreDashboard: React.FC = () => {
               <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
               Conflict Center & Zero Data Loss
             </span>
-            <span className="text-[10px] text-slate-500 font-mono">{conflicts.length} recorded</span>
+            <span className="text-[10px] text-slate-500 font-mono">{(conflicts || []).length} recorded</span>
           </div>
 
           <div className="space-y-2 overflow-y-auto max-h-[300px]">
-            {conflicts.length === 0 ? (
+            {(conflicts || []).length === 0 ? (
               <div className="p-4 text-center text-xs text-slate-500">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500/50 mx-auto mb-1" />
                 No active conflicts. All peer contributions reconciled cleanly.
               </div>
             ) : (
-              conflicts.map((c) => (
+              (conflicts || []).map((c) => (
                 <div key={c.conflict_id} className="bg-[#181f2e] border border-amber-500/20 rounded p-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-amber-300">{c.conflict_type}</span>
