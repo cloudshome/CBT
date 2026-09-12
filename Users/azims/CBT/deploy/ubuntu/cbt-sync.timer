@@ -1,4 +1,4 @@
-﻿[Unit]
+[Unit]
 Description=CBT GitHub Auto-Sync Timer (daily at midnight)
 Requires=cbt-sync.service
 
