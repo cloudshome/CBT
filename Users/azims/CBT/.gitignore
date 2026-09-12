@@ -11,3 +11,6 @@ dist/
 coverage/
 __pycache__/
 .pytest_cache/
+node_identity.json
+*.key
+*.pem

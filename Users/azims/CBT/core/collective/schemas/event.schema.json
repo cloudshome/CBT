@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SDCCCanonicalEvent",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "schema_version",
+    "protocol_version",
+    "node_id",
+    "sequence",
+    "created_at",
+    "entity_type",
+    "entity_id",
+    "payload",
+    "provenance",
+    "integrity"
+  ],
+  "properties": {
+    "event_id": { "type": "string" },
+    "event_type": { "type": "string" },
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "protocol_version": { "type": "integer", "minimum": 1 },
+    "node_id": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "entity_type": { "type": "string" },
+    "entity_id": { "type": "string" },
+    "causation_id": { "type": ["string", "null"] },
+    "correlation_id": { "type": ["string", "null"] },
+    "payload": { "type": "object" },
+    "provenance": {
+      "type": "object",
+      "required": ["source_type", "node_id"],
+      "properties": {
+        "source_type": { "type": "string" },
+        "node_id": { "type": "string" },
+        "source_id": { "type": ["string", "null"] },
+        "code_version": { "type": ["string", "null"] },
+        "dataset_id": { "type": ["string", "null"] },
+        "strategy_id": { "type": ["string", "null"] },
+        "config_hash": { "type": ["string", "null"] },
+        "run_id": { "type": ["string", "null"] }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["payload_sha256", "event_sha256"],
+      "properties": {
+        "payload_sha256": { "type": "string" },
+        "event_sha256": { "type": "string" }
+      }
+    }
+  }
+}

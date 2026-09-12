@@ -22,6 +22,7 @@ import { GeneticStrategyLab } from './components/GeneticStrategyLab';
 import { AutonomousAuditorHUD } from './components/AutonomousAuditorHUD';
 import { ShadowBurnInHUD } from './components/ShadowBurnInHUD';
 import { ResearchIngestLab } from './components/ResearchIngestLab';
+import { CollectiveCoreDashboard } from './components/CollectiveCoreDashboard';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
 import {
@@ -51,6 +52,7 @@ import {
   Sparkles,
   Zap,
   Brain,
+  Server,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -95,7 +97,7 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB'>('DOSSIER');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE'>('DOSSIER');
   const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
@@ -601,6 +603,17 @@ export const App: React.FC = () => {
                   <Brain size={13} className={activeBottomTab === 'RESEARCH_LAB' ? 'text-white animate-pulse' : 'text-indigo-400'} />
                   <span>🧠 Research Lab</span>
                 </button>
+                <button
+                  onClick={() => setActiveBottomTab('COLLECTIVE')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'COLLECTIVE'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold shadow-md shadow-emerald-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Server size={13} className={activeBottomTab === 'COLLECTIVE' ? 'text-white animate-pulse' : 'text-emerald-400'} />
+                  <span>🌐 Collective Core</span>
+                </button>
               </div>
             </div>
 
@@ -718,12 +731,14 @@ export const App: React.FC = () => {
                   {activeFrontierTab === 'AUDITOR' && <AutonomousAuditorHUD />}
                   {activeFrontierTab === 'BURN_IN' && <ShadowBurnInHUD />}
                 </div>
-              ) : (
+              ) : activeBottomTab === 'RESEARCH_LAB' ? (
                 <ResearchIngestLab
                   onNotify={(type: 'success' | 'error' | 'info' | 'warning', title: string, msg: string) => addToast(type, title, msg)}
                   selectedSymbol={symbol}
                   selectedTimeframe={timeframe}
                 />
+              ) : (
+                <CollectiveCoreDashboard />
               )}
             </div>
           </div>
