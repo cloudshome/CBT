@@ -14,3 +14,7 @@ __pycache__/
 node_identity.json
 *.key
 *.pem
+credentials/
+*service_account*.json
+*token*.json
+client_secret*.json

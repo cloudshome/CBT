@@ -645,7 +645,13 @@ class ResearchAutomationOrchestrator:
                         logger.warning("Drive sync: failed to archive %s: %s", src_file.name, exc)
                         errors += 1
 
-        mode = "live Google Drive" if backend.check_connectivity() else "local simulated archive"
+        is_live = getattr(backend, "is_live", False) and backend.check_connectivity()
+        if is_live:
+            account = getattr(backend, "get_connected_account", lambda: None)()
+            mode = f"live Google Drive ({account})" if account else "live Google Drive"
+        else:
+            mode = "local simulated archive (live Drive not connected)"
+
         await self._notify(
             f"☁️ *Drive Archive Sync Complete*\n"
             f"• Files synced: {files_synced}\n"

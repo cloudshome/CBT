@@ -355,26 +355,39 @@ class GoogleDriveAPIBackend:
 
     def _init_client(self) -> None:
         creds_json = os.getenv("GDRIVE_SERVICE_ACCOUNT_JSON")
-        creds_file = os.getenv("GDRIVE_SERVICE_ACCOUNT_FILE") or os.getenv(
-            "GDRIVE_CREDENTIALS_FILE"
+        creds_file = (
+            os.getenv("GDRIVE_SERVICE_ACCOUNT_FILE")
+            or os.getenv("GDRIVE_CREDENTIALS_FILE")
+            or "credentials/gdrive_service_account.json"
+            if Path("credentials/gdrive_service_account.json").exists()
+            else None
+        )
+        token_file = (
+            os.getenv("GDRIVE_OAUTH_TOKEN_FILE")
+            or "credentials/gdrive_token.json"
+            if Path("credentials/gdrive_token.json").exists()
+            else None
         )
 
-        if not creds_json and not creds_file:
+        if not creds_json and not creds_file and not token_file:
             logger.info(
                 "No live Google Drive credentials configured; using sandboxed simulated storage."
             )
             return
 
         try:
-            # Check if google-auth and google-api-client are installed
-            from google.oauth2 import service_account
             from googleapiclient.discovery import build
-
             scopes = ["https://www.googleapis.com/auth/drive"]
-            if creds_json:
+
+            if token_file and Path(token_file).exists():
+                from google.oauth2.credentials import Credentials
+                creds = Credentials.from_authorized_user_file(token_file, scopes=scopes)
+            elif creds_json:
+                from google.oauth2 import service_account
                 info = json.loads(creds_json)
                 creds = service_account.Credentials.from_service_account_info(info, scopes=scopes)
             elif creds_file and Path(creds_file).exists():
+                from google.oauth2 import service_account
                 creds = service_account.Credentials.from_service_account_file(
                     creds_file, scopes=scopes
                 )
@@ -390,6 +403,10 @@ class GoogleDriveAPIBackend:
             )
             self._initialized = False
 
+    @property
+    def is_live(self) -> bool:
+        return self._initialized and self.service is not None
+
     def check_connectivity(self) -> bool:
         if self._initialized and self.service:
             try:
@@ -397,12 +414,47 @@ class GoogleDriveAPIBackend:
                 return True
             except Exception:  # noqa: BLE001
                 return False
-        return self._sim_fallback.check_connectivity()
+        return False
+
+    def get_connected_account(self) -> str | None:
+        if self._initialized and self.service:
+            try:
+                res = self.service.about().get(fields="user(emailAddress,displayName)").execute()
+                user = res.get("user", {})
+                email = user.get("emailAddress")
+                if email:
+                    return email
+                name = user.get("displayName")
+                if name:
+                    return name
+            except Exception:  # noqa: BLE001
+                pass
+        return os.getenv("GDRIVE_USER_EMAIL")
+
+    def _resolve_or_create_remote_folder(self, folder_path: str, parent_id: str | None = None) -> str | None:
+        if not self.service:
+            return parent_id
+        parts = [p for p in folder_path.strip("/\\").split("/") if p]
+        curr_parent = parent_id
+        for part in parts:
+            query = f"name = '{part}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+            if curr_parent:
+                query += f" and '{curr_parent}' in parents"
+            res = self.service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
+            files = res.get("files", [])
+            if files:
+                curr_parent = files[0]["id"]
+            else:
+                meta = {"name": part, "mimeType": "application/vnd.google-apps.folder"}
+                if curr_parent:
+                    meta["parents"] = [curr_parent]
+                f = self.service.files().create(body=meta, fields="id").execute()
+                curr_parent = f["id"]
+        return curr_parent
 
     def ensure_directory_tree(self, root_prefix: str = "SKY") -> dict[str, str]:
         if not self._initialized:
             return self._sim_fallback.ensure_directory_tree(root_prefix)
-        # For production live API: locate or create root SKY folder and subfolders
         return self._sim_fallback.ensure_directory_tree(root_prefix)
 
     def upload_file(
@@ -412,9 +464,45 @@ class GoogleDriveAPIBackend:
         filename: str | None = None,
         resumable: bool = True,
     ) -> DriveFileMetadata:
-        if not self._initialized:
+        if not self._initialized or not self.service:
             return self._sim_fallback.upload_file(local_path, drive_folder, filename, resumable)
-        return self._sim_fallback.upload_file(local_path, drive_folder, filename, resumable)
+
+        try:
+            from googleapiclient.http import MediaFileUpload
+
+            p = Path(local_path).resolve()
+            upload_name = filename or p.name
+
+            root_parent = os.getenv("GDRIVE_ROOT_FOLDER_ID")
+            folder_id = self._resolve_or_create_remote_folder(drive_folder, root_parent)
+
+            file_metadata = {"name": upload_name}
+            if folder_id:
+                file_metadata["parents"] = [folder_id]
+
+            media = MediaFileUpload(str(p), resumable=resumable)
+            file_item = (
+                self.service.files()
+                .create(body=file_metadata, media_body=media, fields="id, name, size, md5Checksum")
+                .execute()
+            )
+
+            file_size = int(file_item.get("size", p.stat().st_size))
+            hash_res = content_hasher.hash_file_stream(p)
+            meta = DriveFileMetadata(
+                drive_file_id=file_item["id"],
+                name=upload_name,
+                drive_path=f"{drive_folder}/{upload_name}".strip("/"),
+                file_size=file_size,
+                mime_type="application/octet-stream",
+                content_hash=hash_res.content_hash,
+                md5_checksum=file_item.get("md5Checksum"),
+            )
+            logger.info("Uploaded %s to live Google Drive (ID: %s)", upload_name, file_item["id"])
+            return meta
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Live Google Drive upload failed (%s); falling back to simulated storage.", exc)
+            return self._sim_fallback.upload_file(local_path, drive_folder, filename, resumable)
 
     def download_file(
         self, drive_file_id: str, dest_path: Path | str, chunk_size: int = 8 * 1024 * 1024
