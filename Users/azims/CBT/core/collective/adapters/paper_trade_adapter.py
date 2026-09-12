@@ -121,7 +121,9 @@ class PaperTradeEventAdapter:
         )
 
         self.store.append_event(event)
-        logger.info(f"Emitted {event.event_id} for closed paper position {position_id} (PnL: {realized_pnl})")
+        logger.info(
+            f"Emitted {event.event_id} for closed paper position {position_id} (PnL: {realized_pnl})"
+        )
         return event.event_id
 
     def emit_risk_rejected(
@@ -151,7 +153,7 @@ class PaperTradeEventAdapter:
             sequence=seq,
             event_type=CollectiveEventType.PAPER_RISK_REJECTED,
             entity_type="risk_rejection",
-            entity_id=f"REJ-{int(time.time()*1000)}",
+            entity_id=f"REJ-{int(time.time() * 1000)}",
             payload=payload,
             provenance=prov,
         )

@@ -22,8 +22,6 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from core.database import db_manager
-from core.knowledge_os.epistemic_system import EpistemicStatus
 from core.knowledge_os.hybrid_retriever import hybrid_retriever
 
 logger = logging.getLogger("ai_quant_sentinel.knowledge_os.project_brain")
@@ -133,7 +131,9 @@ class ProjectBrainContextEngine:
 
         # Standard SKY architecture assumptions & risk constraints for query context
         sky_assumptions = self._get_relevant_sky_assumptions(query)
-        risk_warnings = self._get_risk_boundary_warnings(query, empirical_evidence, autopsy_failures)
+        risk_warnings = self._get_risk_boundary_warnings(
+            query, empirical_evidence, autopsy_failures
+        )
 
         # Synthesize recommendation
         recommendation = self._synthesize_recommendation(
@@ -151,9 +151,7 @@ class ProjectBrainContextEngine:
             "known_failures_autopsied": len(autopsy_failures),
             "active_contradictions": len(contradictions),
             "highest_epistemic_tier": (
-                "TIER_4_EMPIRICAL_EVIDENCE"
-                if empirical_evidence
-                else "TIER_1_EXTRACTED_UNVERIFIED"
+                "TIER_4_EMPIRICAL_EVIDENCE" if empirical_evidence else "TIER_1_EXTRACTED_UNVERIFIED"
             ),
             "has_rejection_precedent": len(autopsy_failures) > 0,
         }
@@ -182,11 +180,17 @@ class ProjectBrainContextEngine:
             "Synthetic or fabricated price data is strictly quarantined from alpha validation.",
         ]
         if "volatility" in q_lower or "regime" in q_lower:
-            assumptions.append("Current volatility classifier partitions into LOW_VOL, TREND_EXPANSION, and CHOP_COMPRESSION.")
+            assumptions.append(
+                "Current volatility classifier partitions into LOW_VOL, TREND_EXPANSION, and CHOP_COMPRESSION."
+            )
         if "fvg" in q_lower or "liquidity" in q_lower or "sweep" in q_lower:
-            assumptions.append("SMC structures are treated as liquidity attraction pools, NOT guaranteed turning points.")
+            assumptions.append(
+                "SMC structures are treated as liquidity attraction pools, NOT guaranteed turning points."
+            )
         if "stop" in q_lower or "risk" in q_lower:
-            assumptions.append("Position sizing is constrained by Half-Kelly (max 2% portfolio equity per trade).")
+            assumptions.append(
+                "Position sizing is constrained by Half-Kelly (max 2% portfolio equity per trade)."
+            )
         return assumptions
 
     def _get_risk_boundary_warnings(
@@ -200,9 +204,13 @@ class ProjectBrainContextEngine:
             "Constitutional Rule: New strategy logic must undergo walk-forward validation before shadow paper promotion.",
         ]
         if not evidence:
-            warnings.append("WARNING: No peer-reviewed or internally verified backtest evidence exists for this concept in the Evidence Vault.")
+            warnings.append(
+                "WARNING: No peer-reviewed or internally verified backtest evidence exists for this concept in the Evidence Vault."
+            )
         if autopsies:
-            warnings.append(f"CAUTION: {len(autopsies)} historically failed backtests or autopsies match this setup. Inspect failure reasons to avoid repeat drawdowns.")
+            warnings.append(
+                f"CAUTION: {len(autopsies)} historically failed backtests or autopsies match this setup. Inspect failure reasons to avoid repeat drawdowns."
+            )
         return warnings
 
     def _synthesize_recommendation(

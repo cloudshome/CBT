@@ -8,7 +8,6 @@ Section 28: Simultaneous Paper Trading is valid and preserves node attribution.
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.adapters.paper_trade_adapter import PaperTradeEventAdapter
 from core.collective.event_store import EventStore
 from core.collective.identity import NodeIdentityManager

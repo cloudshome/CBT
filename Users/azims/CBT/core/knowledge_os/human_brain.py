@@ -20,15 +20,12 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import time
-import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Any
 
 from core.database import db_manager
-from core.knowledge_os.epistemic_system import EpistemicStatus
 from core.knowledge_os.hybrid_retriever import hybrid_retriever
 
 logger = logging.getLogger("ai_quant_sentinel.knowledge_os.human_brain")
@@ -175,9 +172,15 @@ class HumanLearningEngine:
             result = []
             for r in rows:
                 d = dict(r)
-                d["misconceptions"] = json.loads(d["misconceptions"]) if d.get("misconceptions") else []
-                d["prerequisite_concepts"] = json.loads(d["prerequisite_concepts"]) if d.get("prerequisite_concepts") else []
-                d["dependent_concepts"] = json.loads(d["dependent_concepts"]) if d.get("dependent_concepts") else []
+                d["misconceptions"] = (
+                    json.loads(d["misconceptions"]) if d.get("misconceptions") else []
+                )
+                d["prerequisite_concepts"] = (
+                    json.loads(d["prerequisite_concepts"]) if d.get("prerequisite_concepts") else []
+                )
+                d["dependent_concepts"] = (
+                    json.loads(d["dependent_concepts"]) if d.get("dependent_concepts") else []
+                )
                 result.append(d)
             return result
 
@@ -192,7 +195,9 @@ class HumanLearningEngine:
                 return None
             d = dict(row)
             d["misconceptions"] = json.loads(d["misconceptions"]) if d.get("misconceptions") else []
-            d["prerequisite_concepts"] = json.loads(d["prerequisite_concepts"]) if d.get("prerequisite_concepts") else []
+            d["prerequisite_concepts"] = (
+                json.loads(d["prerequisite_concepts"]) if d.get("prerequisite_concepts") else []
+            )
             return d
 
     def answer_human_question(
@@ -229,13 +234,15 @@ class HumanLearningEngine:
 
         for item in retrieved:
             cite_str = f"[{item.source_title or 'Source'}, {item.location_citation or 'p.1'}]"
-            citations.append({
-                "source": item.source_title or "Research Vault",
-                "author": item.author or "Author",
-                "location": item.location_citation or "",
-                "status": item.epistemic_status,
-                "quote": item.content[:160] + "...",
-            })
+            citations.append(
+                {
+                    "source": item.source_title or "Research Vault",
+                    "author": item.author or "Author",
+                    "location": item.location_citation or "",
+                    "status": item.epistemic_status,
+                    "quote": item.content[:160] + "...",
+                }
+            )
 
             if item.node_type == "CLAIM":
                 source_claims.append(f"{item.content} — {cite_str}")
@@ -272,10 +279,20 @@ class HumanLearningEngine:
 
         breakdown = HumanAnswerBreakdown(
             simple_explanation=simple_explanation,
-            source_knowledge=source_claims[:4] if source_claims else ["No direct book quote found matching exact terminology."],
-            cross_source_synthesis=cross_synthesis[:3] if cross_synthesis else ["Literature generally treats this as an institutional footprint."],
-            empirical_evidence=empirical_evidence[:3] if empirical_evidence else ["UNTESTED IN SKY: No verified backtest evidence exists in the Evidence Vault."],
-            sky_project_knowledge=sky_project_knowledge[:3] if sky_project_knowledge else ["SKY currently treats this as an unverified candidate requiring walk-forward proof."],
+            source_knowledge=source_claims[:4]
+            if source_claims
+            else ["No direct book quote found matching exact terminology."],
+            cross_source_synthesis=cross_synthesis[:3]
+            if cross_synthesis
+            else ["Literature generally treats this as an institutional footprint."],
+            empirical_evidence=empirical_evidence[:3]
+            if empirical_evidence
+            else ["UNTESTED IN SKY: No verified backtest evidence exists in the Evidence Vault."],
+            sky_project_knowledge=sky_project_knowledge[:3]
+            if sky_project_knowledge
+            else [
+                "SKY currently treats this as an unverified candidate requiring walk-forward proof."
+            ],
             model_inference=model_inference,
             unknown_or_unestablished=unknowns,
         )
@@ -337,10 +354,14 @@ class HumanLearningEngine:
                 ).fetchone()
                 if not row or row["mastery_estimate"] < 0.50:
                     prereq_title = CORE_CONCEPT_TAXONOMY.get(prereq, {}).get("title", prereq)
-                    missing.append(f"{prereq_title} (Current mastery: {row['mastery_estimate'] if row else 0.0:.0%})")
+                    missing.append(
+                        f"{prereq_title} (Current mastery: {row['mastery_estimate'] if row else 0.0:.0%})"
+                    )
         return missing
 
-    def _build_simple_explanation(self, question: str, concept_id: str, mode: HumanQuestionMode) -> str:
+    def _build_simple_explanation(
+        self, question: str, concept_id: str, mode: HumanQuestionMode
+    ) -> str:
         """Builds plain-language pedagogical explanation."""
         info = CORE_CONCEPT_TAXONOMY.get(concept_id, {})
         title = info.get("title", "Market Concept")
@@ -417,9 +438,17 @@ class HumanLearningEngine:
         recommendations = []
         for cid, info in CORE_CONCEPT_TAXONOMY.items():
             if current_concept_id in info["prerequisites"]:
-                recommendations.append({"concept_id": cid, "title": info["title"], "domain": info["domain"]})
+                recommendations.append(
+                    {"concept_id": cid, "title": info["title"], "domain": info["domain"]}
+                )
         if not recommendations:
-            recommendations.append({"concept_id": "POSITION_SIZING", "title": "Position Sizing & Kelly Criterion", "domain": "RISK_ENGINEERING"})
+            recommendations.append(
+                {
+                    "concept_id": "POSITION_SIZING",
+                    "title": "Position Sizing & Kelly Criterion",
+                    "domain": "RISK_ENGINEERING",
+                }
+            )
         return recommendations[:3]
 
     def _record_concept_exposure(self, concept_id: str) -> None:
@@ -570,7 +599,11 @@ class HumanLearningEngine:
             if prereq_mastered:
                 ready_to_learn.append(c)
 
-        recommended = ready_to_learn[0] if ready_to_learn else (weak_concepts[0] if weak_concepts else graph[0])
+        recommended = (
+            ready_to_learn[0]
+            if ready_to_learn
+            else (weak_concepts[0] if weak_concepts else graph[0])
+        )
 
         return {
             "recommended_concept_id": recommended["concept_id"],

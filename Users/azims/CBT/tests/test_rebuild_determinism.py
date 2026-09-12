@@ -8,11 +8,10 @@ import random
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.event import build_canonical_event
 from core.collective.event_types import CollectiveEventType
-from core.collective.reducer import CollectiveReducer, causal_sort_events
 from core.collective.reconciler import CollectiveReconciler
+from core.collective.reducer import CollectiveReducer
 
 
 def test_deterministic_reduction_invariant():
@@ -28,7 +27,14 @@ def test_deterministic_reduction_invariant():
         event_type=CollectiveEventType.PAPER_POSITION_OPENED,
         entity_type="paper_trade",
         entity_id="PT-001",
-        payload={"symbol": "BTCUSDT", "direction": "LONG", "size": 1.0, "entry_price": 60000.0, "stop_loss": 59000.0, "take_profit": 62000.0},
+        payload={
+            "symbol": "BTCUSDT",
+            "direction": "LONG",
+            "size": 1.0,
+            "entry_price": 60000.0,
+            "stop_loss": 59000.0,
+            "take_profit": 62000.0,
+        },
         provenance={"source_type": "PAPER_ENGINE", "node_id": "HOME-01", "strategy_id": "SMC_01"},
         created_at="2026-09-12T10:00:00Z",
     )
@@ -106,6 +112,7 @@ def test_reconciler_rebuilds_projections():
         trading_db = tmp_path / "trading_logs.db"
 
         from core.collective.event_store import EventStore
+
         store = EventStore(base_dir=tmp_path)
 
         # Append events
@@ -115,7 +122,14 @@ def test_reconciler_rebuilds_projections():
             event_type=CollectiveEventType.PAPER_POSITION_OPENED,
             entity_type="paper_trade",
             entity_id="PT-OPEN-001",
-            payload={"symbol": "ETHUSDT", "direction": "BUY", "size": 2.0, "entry_price": 3000.0, "stop_loss": 2900.0, "take_profit": 3200.0},
+            payload={
+                "symbol": "ETHUSDT",
+                "direction": "BUY",
+                "size": 2.0,
+                "entry_price": 3000.0,
+                "stop_loss": 2900.0,
+                "take_profit": 3200.0,
+            },
             provenance={"source_type": "PAPER_ENGINE", "node_id": "HOME-01"},
         )
         store.append_event(ev)

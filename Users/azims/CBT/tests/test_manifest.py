@@ -7,13 +7,12 @@ Unit tests for SDCC signed manifest creation, vector checkpoints, and delta dete
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.checkpoint import VectorCheckpoint
 from core.collective.event import build_canonical_event
 from core.collective.event_store import EventStore
 from core.collective.event_types import CollectiveEventType
 from core.collective.identity import NodeIdentityManager
-from core.collective.manifest import build_node_manifest, EventManifest
+from core.collective.manifest import EventManifest, build_node_manifest
 
 
 def test_manifest_creation_signing_and_verification():

@@ -34,7 +34,7 @@ class QuarantineManager:
         actual_hash: str | None = None,
     ) -> Path:
         """Quarantines an invalid event or artifact and writes an incident dossier."""
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
         safe_id = item_id.replace(":", "_").replace("/", "_")
         filename = f"quarantine_{safe_id}.json"
         target_path = self.quarantine_dir / filename
@@ -63,9 +63,9 @@ class QuarantineManager:
 
         for p in self.quarantine_dir.glob("quarantine_*.json"):
             try:
-                with open(p, "r", encoding="utf-8") as f:
+                with open(p, encoding="utf-8") as f:
                     items.append(json.load(f))
-            except Exception as exc:
+            except (OSError, json.JSONDecodeError) as exc:
                 logger.error(f"Error reading quarantine file {p}: {exc}")
 
         items.sort(key=lambda x: x.get("quarantined_at", ""), reverse=True)

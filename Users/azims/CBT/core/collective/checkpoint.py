@@ -10,7 +10,6 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger("sky.collective.checkpoint")
 
@@ -31,10 +30,10 @@ class VectorCheckpoint:
 
     def _load(self) -> dict[str, int]:
         try:
-            with open(self.checkpoint_file, "r", encoding="utf-8") as f:
+            with open(self.checkpoint_file, encoding="utf-8") as f:
                 data = json.load(f)
                 return {k: int(v) for k, v in data.items()}
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
             logger.warning(f"Could not load vector checkpoint from {self.checkpoint_file}: {exc}")
             return {}
 

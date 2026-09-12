@@ -14,9 +14,7 @@ Constitutional Mandates:
 from __future__ import annotations
 
 import logging
-import math
-import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Any
 
@@ -160,9 +158,15 @@ def validate_status_transition(
         if not evidence_present:
             return False, "EMPIRICALLY_SUPPORTED requires confirmed empirical backtest evidence."
         if sample_size < 30:
-            return False, f"Sample size ({sample_size}) too small for empirical support (minimum 30)."
+            return (
+                False,
+                f"Sample size ({sample_size}) too small for empirical support (minimum 30).",
+            )
         if p_value is not None and p_value > 0.05:
-            return False, f"Statistical p-value ({p_value:.4f}) exceeds significance threshold 0.05."
+            return (
+                False,
+                f"Statistical p-value ({p_value:.4f}) exceeds significance threshold 0.05.",
+            )
 
     return True, "Transition authorized"
 

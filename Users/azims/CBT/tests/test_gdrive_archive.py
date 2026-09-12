@@ -7,7 +7,6 @@ Unit tests for Tier 3 Google Drive cold archive creation and disaster recovery r
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.autonomous_research.storage.drive_backend import SimulatedDriveBackend
 from core.collective.event import build_canonical_event
 from core.collective.event_store import EventStore
@@ -43,7 +42,9 @@ def test_gdrive_archive_export_and_restore():
             store_source.append_event(ev)
 
         # 2. Export archive to Google Drive
-        rec = archive_mgr.create_and_upload_archive(node_id="HOME-01", from_sequence=1, to_sequence=5)
+        rec = archive_mgr.create_and_upload_archive(
+            node_id="HOME-01", from_sequence=1, to_sequence=5
+        )
         assert rec.event_count == 5
         assert rec.drive_file_id is not None
 

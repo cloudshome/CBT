@@ -8,17 +8,15 @@ Prefix: /api/knowledge
 from __future__ import annotations
 
 import logging
-import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
-from core.knowledge_os.epistemic_system import EpistemicStatus
 from core.knowledge_os.human_brain import HumanQuestionMode, human_brain
-from core.knowledge_os.hybrid_retriever import hybrid_retriever
 from core.knowledge_os.knowledge_audit import knowledge_audit_engine
 from core.knowledge_os.library_ingestor import library_ingestor
 from core.knowledge_os.project_brain import project_brain
@@ -36,8 +34,13 @@ class KnowledgeAskRequest(BaseModel):
     question: str = Field(..., min_length=2, max_length=2000)
     mode: str = Field(default="HUMAN", description="HUMAN or PROJECT")
     domain: str = Field(default="TRADING")
-    depth: str = Field(default="INTERMEDIATE", description="BEGINNER, INTERMEDIATE, ADVANCED, EXPERT")
-    human_mode: str = Field(default="EXPLAIN", description="EXPLAIN, TEACH, COMPARE, CHALLENGE_ME, QUIZ_ME, PRACTICAL_EXERCISE, RESEARCH_DEEP_DIVE, WHAT_SHOULD_I_LEARN_NEXT")
+    depth: str = Field(
+        default="INTERMEDIATE", description="BEGINNER, INTERMEDIATE, ADVANCED, EXPERT"
+    )
+    human_mode: str = Field(
+        default="EXPLAIN",
+        description="EXPLAIN, TEACH, COMPARE, CHALLENGE_ME, QUIZ_ME, PRACTICAL_EXERCISE, RESEARCH_DEEP_DIVE, WHAT_SHOULD_I_LEARN_NEXT",
+    )
     target_symbol: str = Field(default="BTC/USDT")
     timeframe: str = Field(default="15m")
     include_sources: bool = True
@@ -142,7 +145,9 @@ async def get_personal_learning_graph() -> dict[str, Any]:
             "mastered_count": mastered,
             "in_progress_count": in_progress,
             "unstarted_count": unstarted,
-            "overall_curriculum_progress_pct": round((mastered / total_concepts) * 100.0, 1) if total_concepts else 0.0,
+            "overall_curriculum_progress_pct": round((mastered / total_concepts) * 100.0, 1)
+            if total_concepts
+            else 0.0,
         },
     }
 
@@ -173,7 +178,7 @@ async def get_research_advisor() -> dict[str, Any]:
 # -----------------------------------------------------------------------------
 @router.post("/library/ingest-book")
 async def ingest_book(
-    file: UploadFile = File(...),
+    file: UploadFile = File(...),  # noqa: B008
     max_pages: int = Query(default=1500, ge=1, le=5000),
 ) -> dict[str, Any]:
     """
@@ -188,7 +193,7 @@ async def ingest_book(
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed writing uploaded file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed writing uploaded file: {e}") from e
 
     # Process streaming generator
     last_update = {}
@@ -197,7 +202,7 @@ async def ingest_book(
             last_update = update
     except Exception as e:
         logger.error(f"Streaming ingestion error on {file.filename}: {e}")
-        raise HTTPException(status_code=500, detail=f"Book ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Book ingestion failed: {e}") from e
 
     return {
         "status": last_update.get("status", "COMPLETED"),
@@ -254,17 +259,23 @@ async def run_knowledge_audit() -> dict[str, Any]:
 # ZERO-TOUCH RESEARCH AUTOMATION ENDPOINTS
 # -----------------------------------------------------------------------------
 
+
 class AutomationChannelRequest(BaseModel):
     url: str = Field(..., description="YouTube channel URL, @handle, or playlist URL")
     label: str = Field(..., min_length=1, max_length=120, description="Human-readable channel name")
     crawl_interval_hours: int = Field(default=72, ge=1, le=720, description="Hours between crawls")
-    max_videos_per_crawl: int = Field(default=10, ge=1, le=50, description="Max videos per crawl run")
+    max_videos_per_crawl: int = Field(
+        default=10, ge=1, le=50, description="Max videos per crawl run"
+    )
 
 
 @router.get("/automation/status")
 async def get_automation_status() -> dict[str, Any]:
     """Returns live status of all 5 zero-touch automation pipelines."""
-    from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator  # noqa: PLC0415
+    from core.knowledge_os.research_automation_orchestrator import (
+        research_automation_orchestrator,
+    )
+
     return {
         "pipelines": research_automation_orchestrator.get_status(),
         "pipeline_count": 5,
@@ -281,8 +292,17 @@ async def get_automation_status() -> dict[str, Any]:
 @router.post("/automation/trigger/{pipeline_name}")
 async def trigger_automation_pipeline(pipeline_name: str) -> dict[str, Any]:
     """Manually triggers a named pipeline immediately."""
-    from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator  # noqa: PLC0415
-    valid = {"hypothesis_backtest", "quiz_reminder", "youtube_crawler", "knowledge_audit", "drive_sync"}
+    from core.knowledge_os.research_automation_orchestrator import (
+        research_automation_orchestrator,
+    )
+
+    valid = {
+        "hypothesis_backtest",
+        "quiz_reminder",
+        "youtube_crawler",
+        "knowledge_audit",
+        "drive_sync",
+    }
     if pipeline_name not in valid:
         raise HTTPException(status_code=400, detail=f"Unknown pipeline. Valid: {sorted(valid)}")
     result = await research_automation_orchestrator.trigger_pipeline(pipeline_name)
@@ -292,7 +312,8 @@ async def trigger_automation_pipeline(pipeline_name: str) -> dict[str, Any]:
 @router.get("/automation/channels")
 async def list_automation_channels() -> dict[str, Any]:
     """Lists all watched YouTube channels for the auto-crawler pipeline."""
-    from core.database import db_manager  # noqa: PLC0415
+    from core.database import db_manager
+
     with db_manager.get_brain_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM research_automation_channels ORDER BY added_at DESC;"
@@ -304,10 +325,12 @@ async def list_automation_channels() -> dict[str, Any]:
 @router.post("/automation/channels")
 async def add_automation_channel(req: AutomationChannelRequest) -> dict[str, Any]:
     """Adds a YouTube channel to the auto-crawler watch list."""
-    import hashlib as _hl  # noqa: PLC0415
-    from core.database import db_manager  # noqa: PLC0415
+    import hashlib as _hl
+
+    from core.database import db_manager
+
     channel_id = f"CH_{_hl.sha256(req.url.encode()).hexdigest()[:12].upper()}"
-    now_ms = int(__import__('time').time() * 1000)
+    now_ms = int(__import__("time").time() * 1000)
     try:
         with db_manager.get_brain_conn() as conn:
             conn.execute(
@@ -323,8 +346,15 @@ async def add_automation_channel(req: AutomationChannelRequest) -> dict[str, Any
                     is_active = 1,
                     updated_at = excluded.updated_at;
                 """,
-                (channel_id, req.url, req.label,
-                 req.crawl_interval_hours, req.max_videos_per_crawl, now_ms, now_ms),
+                (
+                    channel_id,
+                    req.url,
+                    req.label,
+                    req.crawl_interval_hours,
+                    req.max_videos_per_crawl,
+                    now_ms,
+                    now_ms,
+                ),
             )
             conn.commit()
         return {
@@ -341,8 +371,9 @@ async def add_automation_channel(req: AutomationChannelRequest) -> dict[str, Any
 @router.delete("/automation/channels/{channel_id}")
 async def remove_automation_channel(channel_id: str) -> dict[str, Any]:
     """Deactivates a watched channel (soft delete)."""
-    from core.database import db_manager  # noqa: PLC0415
-    now_ms = int(__import__('time').time() * 1000)
+    from core.database import db_manager
+
+    now_ms = int(__import__("time").time() * 1000)
     with db_manager.get_brain_conn() as conn:
         conn.execute(
             "UPDATE research_automation_channels SET is_active = 0, updated_at = ? WHERE channel_id = ?;",
@@ -358,7 +389,8 @@ async def get_automation_run_log(
     limit: int = Query(default=50, ge=1, le=200),
 ) -> dict[str, Any]:
     """Returns the automation run audit log, optionally filtered by pipeline."""
-    from core.database import db_manager  # noqa: PLC0415
+    from core.database import db_manager
+
     with db_manager.get_brain_conn() as conn:
         if pipeline:
             rows = conn.execute(

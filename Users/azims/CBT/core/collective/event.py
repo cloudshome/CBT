@@ -7,7 +7,7 @@ Canonical Event Envelope and Factory for SDCC.
 from __future__ import annotations
 
 import datetime
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.collective.event_hash import compute_event_hash, compute_payload_hash
@@ -117,7 +117,7 @@ def build_canonical_event(
     """
     Constructs an immutable CanonicalEvent with computed SHA-256 hashes and formatted event_id.
     """
-    now_iso = created_at or datetime.datetime.now(datetime.timezone.utc).isoformat()
+    now_iso = created_at or datetime.datetime.now(datetime.UTC).isoformat()
     prov_dict = provenance.to_dict() if isinstance(provenance, EventProvenance) else provenance
 
     # Ensure node_id in provenance

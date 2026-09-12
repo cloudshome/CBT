@@ -7,7 +7,6 @@ Unit tests for SDCC event store idempotency, range retrieval, and duplicate prot
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.event import build_canonical_event
 from core.collective.event_store import EventStore
 from core.collective.event_types import CollectiveEventType

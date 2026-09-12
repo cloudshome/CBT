@@ -32,9 +32,10 @@ logger = logging.getLogger("ai_quant_sentinel.strategy_compiler")
 def _get_project_brain():
     """Lazy import to avoid circular imports at module load time."""
     try:
-        from core.knowledge_os.project_brain import project_brain  # noqa: PLC0415
+        from core.knowledge_os.project_brain import project_brain
+
         return project_brain
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:  # noqa: BLE001 # pragma: no cover
         logger.warning("Knowledge OS not available — compiling without brain context: %s", exc)
         return None
 
@@ -176,10 +177,9 @@ class StrategyCompiler:
                     brain_autopsy_count,
                     name,
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("Knowledge OS pre-flight skipped (non-fatal): %s", exc)
         # ── End Knowledge OS scan ─────────────────────────────────────────────
-
 
         # 1. Asset verification
         invalid_assets = [

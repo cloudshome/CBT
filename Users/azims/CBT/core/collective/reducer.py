@@ -11,14 +11,12 @@ Core Invariant (Section 40 & 64):
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
-import sqlite3
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from core.collective.event import CanonicalEvent
-from core.collective.event_hash import canonical_json_bytes, canonical_json_str
+from core.collective.event_hash import canonical_json_bytes
 from core.collective.event_types import CollectiveEventType
 
 logger = logging.getLogger("sky.collective.reducer")
@@ -33,7 +31,7 @@ def causal_sort_events(events: list[CanonicalEvent]) -> list[CanonicalEvent]:
     """
     # Map event_id to event
     by_id: dict[str, CanonicalEvent] = {e.event_id: e for e in events}
-    
+
     # Build graph: parent -> list of children
     children_map: dict[str, list[str]] = {e.event_id: [] for e in events}
     in_degree: dict[str, int] = {e.event_id: 0 for e in events}

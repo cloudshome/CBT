@@ -4,12 +4,10 @@ tests/test_collective_identity.py
 Unit tests for SDCC Node Identity, Ed25519 signing, verification, and persistence.
 """
 
-import json
 import tempfile
 from pathlib import Path
 
-import pytest
-from core.collective.identity import NodeIdentityManager, NodeIdentity
+from core.collective.identity import NodeIdentityManager
 
 
 def test_node_identity_creation_and_persistence():
@@ -47,7 +45,10 @@ def test_cryptographic_signing_and_verification():
 
         # Verification with another node's public key fails
         other_node = manager.create_identity(node_id="OFFICE-01")
-        assert identity.verify(payload, signature_hex, public_key_hex=other_node.public_key_hex) is False
+        assert (
+            identity.verify(payload, signature_hex, public_key_hex=other_node.public_key_hex)
+            is False
+        )
 
 
 def test_public_dict_does_not_leak_private_key():

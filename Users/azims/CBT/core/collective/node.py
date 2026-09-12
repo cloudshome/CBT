@@ -12,8 +12,6 @@ from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
 
-from core.collective.identity import NodeIdentity
-
 logger = logging.getLogger("sky.collective.node")
 
 
@@ -61,7 +59,7 @@ class NodeRegistry:
         metadata: dict[str, Any] | None = None,
     ) -> PeerNodeInfo:
         """Registers a newly discovered peer or updates known sequence numbers."""
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
         if node_id in self._peers:
             peer = self._peers[node_id]
             peer.last_seen_at = now_iso

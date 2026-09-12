@@ -87,6 +87,7 @@ class PortfolioShadowManager:
         logger.info(f"Opened shadow position {pos_id}: {direction} {size} {symbol} @ {entry_price}")
         try:
             from core.collective.adapters.paper_trade_adapter import paper_trade_adapter
+
             paper_trade_adapter.emit_position_opened(
                 position_id=pos_id,
                 symbol=symbol,
@@ -96,7 +97,7 @@ class PortfolioShadowManager:
                 stop_loss=stop_loss,
                 take_profit=take_profit,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.debug(f"SDCC open event emission deferred: {exc}")
         return pos_id
 
@@ -341,13 +342,14 @@ class PortfolioShadowManager:
             logger.info(f"Closed shadow position {position_id} with PnL ${pnl:+,.2f}")
             try:
                 from core.collective.adapters.paper_trade_adapter import paper_trade_adapter
+
                 paper_trade_adapter.emit_position_closed(
                     position_id=position_id,
                     symbol=row["symbol"],
                     exit_price=float(p_price),
                     realized_pnl=float(pnl),
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.debug(f"SDCC close event emission deferred: {exc}")
             return True
 

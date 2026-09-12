@@ -13,7 +13,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from core.collective.event import CanonicalEvent
 from core.collective.event_hash import canonical_json_str

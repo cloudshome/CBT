@@ -15,7 +15,6 @@ Combines 6 complementary retrieval dimensions:
 from __future__ import annotations
 
 import logging
-import math
 import re
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -23,7 +22,6 @@ from typing import Any
 
 from core.autonomous_research.storage import research_storage
 from core.database import db_manager
-from core.knowledge_graph_engine import knowledge_graph_engine
 from core.knowledge_os.epistemic_system import (
     EpistemicStatus,
     RankingScoreVector,
@@ -65,9 +63,30 @@ class HybridKnowledgeRetriever:
         clean = re.sub(r"[^\w\s]", " ", text.lower())
         tokens = clean.split()
         stopwords = {
-            "the", "and", "for", "with", "from", "that", "this", "are", "was",
-            "were", "will", "what", "how", "why", "when", "where", "which",
-            "about", "into", "over", "after", "before", "between", "under",
+            "the",
+            "and",
+            "for",
+            "with",
+            "from",
+            "that",
+            "this",
+            "are",
+            "was",
+            "were",
+            "will",
+            "what",
+            "how",
+            "why",
+            "when",
+            "where",
+            "which",
+            "about",
+            "into",
+            "over",
+            "after",
+            "before",
+            "between",
+            "under",
         }
         return [t for t in tokens if len(t) >= 3 and t not in stopwords]
 
@@ -177,7 +196,11 @@ class HybridKnowledgeRetriever:
                 citation = ", ".join(loc_parts) if loc_parts else "Source Archive"
 
                 prov_quality = 0.95 if r["page_number"] or r["timestamp_start"] else 0.60
-                app_score = 0.90 if r["applicability_domain"] in ("CRYPTO_DIRECT", "MARKET_GENERAL", "RISK") else 0.60
+                app_score = (
+                    0.90
+                    if r["applicability_domain"] in ("CRYPTO_DIRECT", "MARKET_GENERAL", "RISK")
+                    else 0.60
+                )
 
                 ranking = RankingScoreVector(
                     relevance_score=relevance,

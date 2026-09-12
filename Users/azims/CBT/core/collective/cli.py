@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from core.collective.checkpoint import vector_checkpoint
@@ -37,26 +36,28 @@ def run_collective_cli(args: list[str]) -> int:
     p_status.add_argument("--json", action="store_true", help="Output in JSON format")
 
     # sync
-    p_sync = subparsers.add_parser("sync", help="Run synchronization cycle")
+    subparsers.add_parser("sync", help="Run synchronization cycle")
 
     # verify
-    p_verify = subparsers.add_parser("verify", help="Verify event integrity and hashes")
+    subparsers.add_parser("verify", help="Verify event integrity and hashes")
 
     # rebuild
-    p_rebuild = subparsers.add_parser("rebuild", help="Rebuild local projections from canonical events")
+    subparsers.add_parser("rebuild", help="Rebuild local projections from canonical events")
 
     # reconcile
-    p_reconcile = subparsers.add_parser("reconcile", help="Reconcile knowledge and state")
+    subparsers.add_parser("reconcile", help="Reconcile knowledge and state")
 
     # conflicts
     p_conflicts = subparsers.add_parser("conflicts", help="List conflicts")
-    p_conflicts.add_argument("--unresolved-only", action="store_true", help="Show only unresolved conflicts")
+    p_conflicts.add_argument(
+        "--unresolved-only", action="store_true", help="Show only unresolved conflicts"
+    )
 
     # nodes
-    p_nodes = subparsers.add_parser("nodes", help="List known cluster nodes")
+    subparsers.add_parser("nodes", help="List known cluster nodes")
 
     # export
-    p_export = subparsers.add_parser("export", help="Export sync package to outbox")
+    subparsers.add_parser("export", help="Export sync package to outbox")
 
     # import
     p_import = subparsers.add_parser("import", help="Import sync package from directory")
@@ -110,7 +111,9 @@ def run_collective_cli(args: list[str]) -> int:
         receipts = sync_engine.run_sync_cycle()
         print(f"[SDCC] Sync cycle complete. Generated {len(receipts)} receipts.")
         for r in receipts:
-            print(f"  - Received from {r.received_from}: {r.events_imported} imported, {r.events_duplicate} duplicates")
+            print(
+                f"  - Received from {r.received_from}: {r.events_imported} imported, {r.events_duplicate} duplicates"
+            )
         return 0
 
     elif parsed.subcommand == "verify":
@@ -125,7 +128,9 @@ def run_collective_cli(args: list[str]) -> int:
                 corrupt += 1
                 print(f"[CORRUPT] {e.event_id}: {err}")
         if corrupt == 0:
-            print(f"[SDCC] VERIFY PASS: All {len(events)} events have valid cryptographic integrity.")
+            print(
+                f"[SDCC] VERIFY PASS: All {len(events)} events have valid cryptographic integrity."
+            )
             return 0
         else:
             print(f"[SDCC] VERIFY FAIL: {corrupt} events corrupted or tampered.")
@@ -134,7 +139,9 @@ def run_collective_cli(args: list[str]) -> int:
     elif parsed.subcommand == "rebuild":
         print("[SDCC] Rebuilding projections from canonical events...")
         res = collective_reconciler.rebuild_projections()
-        print(f"[SDCC] Rebuild complete: State Hash {res['state_hash'][:16]}, {res['events_reduced']} events reduced.")
+        print(
+            f"[SDCC] Rebuild complete: State Hash {res['state_hash'][:16]}, {res['events_reduced']} events reduced."
+        )
         print(f"  - Open positions: {res['open_positions']}")
         print(f"  - Sources rebuilt: {res['sources_rebuilt']}")
         return 0
@@ -177,7 +184,9 @@ def run_collective_cli(args: list[str]) -> int:
             print(f"[SDCC] Error: Package directory {pkg_dir} does not exist.")
             return 1
         rcp = sync_engine.import_sync_package(pkg_dir)
-        print(f"[SDCC] Imported package from {rcp.received_from}: {rcp.events_imported} new, {rcp.events_duplicate} dupes.")
+        print(
+            f"[SDCC] Imported package from {rcp.received_from}: {rcp.events_imported} new, {rcp.events_duplicate} dupes."
+        )
         return 0
 
     return 0

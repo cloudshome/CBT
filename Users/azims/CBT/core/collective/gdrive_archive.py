@@ -18,11 +18,10 @@ from typing import Any
 
 from core.autonomous_research.storage.drive_backend import (
     DriveBackendProtocol,
-    SimulatedDriveBackend,
     get_default_drive_backend,
 )
 from core.collective.artifact_store import ArtifactStore, artifact_store
-from core.collective.event_hash import canonical_json_bytes, canonical_json_str, sha256_digest
+from core.collective.event_hash import canonical_json_str, sha256_digest
 from core.collective.event_store import EventStore, event_store
 
 logger = logging.getLogger("sky.collective.gdrive_archive")
@@ -73,7 +72,9 @@ class GDriveArchiveManager:
         """
         events = self.store.get_events(node_id, from_sequence, to_sequence)
         if not events:
-            raise ValueError(f"No events found for node {node_id} in range [{from_sequence}..{to_sequence}]")
+            raise ValueError(
+                f"No events found for node {node_id} in range [{from_sequence}..{to_sequence}]"
+            )
 
         last_seq = events[-1].sequence
         archive_id = f"ARCH-{node_id}-{from_sequence:06d}-{last_seq:06d}"
@@ -96,7 +97,7 @@ class GDriveArchiveManager:
             filename=archive_filename,
         )
 
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
         rec = ArchivePackageRecord(
             archive_id=archive_id,
             created_at=now_iso,
@@ -144,6 +145,7 @@ class GDriveArchiveManager:
 
         imported = 0
         from core.collective.event import CanonicalEvent
+
         with gzip.open(dest_local_path, "rt", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()

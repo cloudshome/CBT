@@ -16,7 +16,6 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from core.collective.event import CanonicalEvent
 from core.collective.event_store import EventStore, event_store
 from core.collective.reducer import CollectiveReducer, CollectiveState, collective_reducer
 

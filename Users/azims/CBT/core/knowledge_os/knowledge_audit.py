@@ -78,10 +78,14 @@ class KnowledgeQualityAuditEngine:
         warn_count = 0
 
         with db_manager.get_brain_conn() as conn:
-            total_sources = conn.execute("SELECT COUNT(*) FROM research_provenance_sources;").fetchone()[0]
+            total_sources = conn.execute(
+                "SELECT COUNT(*) FROM research_provenance_sources;"
+            ).fetchone()[0]
             total_claims = conn.execute("SELECT COUNT(*) FROM research_claims;").fetchone()[0]
             total_evidence = conn.execute("SELECT COUNT(*) FROM evidence_vault;").fetchone()[0]
-            total_autopsies = conn.execute("SELECT COUNT(*) FROM rejected_claims_vault;").fetchone()[0]
+            total_autopsies = conn.execute(
+                "SELECT COUNT(*) FROM rejected_claims_vault;"
+            ).fetchone()[0]
 
             # CHECK 1: Orphaned claims
             orphans = conn.execute(

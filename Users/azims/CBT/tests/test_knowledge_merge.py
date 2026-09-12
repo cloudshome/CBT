@@ -7,7 +7,6 @@ Unit tests for multi-node knowledge synthesis and provenance preservation.
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.adapters.research_adapter import ResearchEventAdapter
 from core.collective.event_store import EventStore
 from core.collective.identity import NodeIdentityManager

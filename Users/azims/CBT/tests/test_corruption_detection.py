@@ -10,7 +10,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.checkpoint import VectorCheckpoint
 from core.collective.event import build_canonical_event
 from core.collective.event_hash import canonical_json_str
@@ -126,7 +125,13 @@ def test_clock_drift_resilience():
         event_type=CollectiveEventType.PAPER_POSITION_OPENED,
         entity_type="paper_trade",
         entity_id="PT-DRIFT",
-        payload={"symbol": "BTCUSDT", "size": 1.0, "entry_price": 60000.0, "stop_loss": 59000.0, "take_profit": 62000.0},
+        payload={
+            "symbol": "BTCUSDT",
+            "size": 1.0,
+            "entry_price": 60000.0,
+            "stop_loss": 59000.0,
+            "take_profit": 62000.0,
+        },
         provenance={"source_type": "PAPER_ENGINE", "node_id": "NODE-A"},
         created_at="2026-09-12T10:00:00Z",
     )

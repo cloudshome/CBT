@@ -14,14 +14,12 @@ Validates:
 5. Deterministic epistemic strength scoring across all 14 statuses.
 """
 
-import pytest
 from core.knowledge_os.epistemic_system import (
     EpistemicStatus,
     KnowledgeTier,
     RankingScoreVector,
-    VALID_TRANSITIONS,
-    validate_status_transition,
     compute_epistemic_strength,
+    validate_status_transition,
 )
 
 
@@ -104,12 +102,16 @@ def test_epistemic_transition_illegal_jumps_rejected():
     Unverified claims can NEVER jump directly to project applied or empirically supported without evidence.
     """
     # Direct jump from UNVERIFIED to PROJECT_APPLIED is ILLEGAL
-    ok, msg = validate_status_transition(EpistemicStatus.UNVERIFIED, EpistemicStatus.PROJECT_APPLIED)
+    ok, msg = validate_status_transition(
+        EpistemicStatus.UNVERIFIED, EpistemicStatus.PROJECT_APPLIED
+    )
     assert not ok
     assert "Illegal transition" in msg
 
     # Direct jump from UNVERIFIED to EMPIRICALLY_SUPPORTED is ILLEGAL
-    ok, msg = validate_status_transition(EpistemicStatus.UNVERIFIED, EpistemicStatus.EMPIRICALLY_SUPPORTED)
+    ok, msg = validate_status_transition(
+        EpistemicStatus.UNVERIFIED, EpistemicStatus.EMPIRICALLY_SUPPORTED
+    )
     assert not ok
     assert "Illegal transition" in msg
 

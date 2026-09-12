@@ -4,9 +4,12 @@ tests/test_event_integrity.py
 Unit tests for SDCC canonical event construction, deterministic hashing, and integrity verification.
 """
 
-import pytest
-from core.collective.event import build_canonical_event, EventProvenance
-from core.collective.event_hash import verify_event_integrity, compute_payload_hash, canonical_json_bytes
+from core.collective.event import EventProvenance, build_canonical_event
+from core.collective.event_hash import (
+    canonical_json_bytes,
+    compute_payload_hash,
+    verify_event_integrity,
+)
 from core.collective.event_types import CollectiveEventType
 
 

@@ -6,27 +6,24 @@ Test suite for the Zero-Touch Research Automation Orchestrator.
 Covers all 5 pipelines with mocked external dependencies so tests run
 hermetically (no real backtests, no real Telegram, no real YouTube crawl).
 """
+
 from __future__ import annotations
 
-import asyncio
-import json
 import time
 import uuid
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from core.database import db_manager
 from core.knowledge_os.research_automation_orchestrator import (
-    MAX_HYPOTHESES_PER_RUN,
     ResearchAutomationOrchestrator,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def init_schemas():
@@ -48,6 +45,7 @@ def _now_ms() -> int:
 # ---------------------------------------------------------------------------
 # Helper: insert a queued hypothesis
 # ---------------------------------------------------------------------------
+
 
 def _insert_queued_hypothesis(title: str = "Test Hypothesis") -> str:
     hyp_id = f"HYP_TEST_{uuid.uuid4().hex[:8].upper()}"
@@ -78,11 +76,14 @@ def _insert_queued_hypothesis(title: str = "Test Hypothesis") -> str:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', ?);
             """,
             (
-                hyp_id, title,
+                hyp_id,
+                title,
                 "H0: No edge",
                 "H1: Positive edge after friction",
-                "FVG signal", "PnL after friction",
-                "BTC/USDT", "WALK_FORWARD",
+                "FVG signal",
+                "PnL after friction",
+                "BTC/USDT",
+                "WALK_FORWARD",
                 _now_ms(),
             ),
         )
@@ -94,14 +95,13 @@ def _insert_queued_hypothesis(title: str = "Test Hypothesis") -> str:
 # Test 1: DB tables were created
 # ---------------------------------------------------------------------------
 
+
 def test_automation_tables_exist():
     """research_automation_channels and automation_run_log must exist."""
     with db_manager.get_brain_conn() as conn:
         tables = {
             r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table';"
-            ).fetchall()
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
         }
     assert "research_automation_channels" in tables, "research_automation_channels table missing"
     assert "automation_run_log" in tables, "automation_run_log table missing"
@@ -110,6 +110,7 @@ def test_automation_tables_exist():
 # ---------------------------------------------------------------------------
 # Test 2: get_status returns all 5 pipelines
 # ---------------------------------------------------------------------------
+
 
 def test_orchestrator_get_status(orch):
     status = orch.get_status()
@@ -130,6 +131,7 @@ def test_orchestrator_get_status(orch):
 # ---------------------------------------------------------------------------
 # Test 3: Pipeline 1 — hypothesis_backtest (qualified path → PROMOTED)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_pipeline_hypothesis_backtest_promotes(orch):
@@ -186,6 +188,7 @@ async def test_pipeline_hypothesis_backtest_promotes(orch):
 # ---------------------------------------------------------------------------
 # Test 4: Pipeline 1 — hypothesis_backtest (failed path → AUTOPSY)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_pipeline_hypothesis_backtest_rejects(orch):
@@ -249,13 +252,15 @@ async def test_pipeline_hypothesis_backtest_rejects(orch):
 # Test 5: Pipeline 2 — quiz_reminder sends quiz for due concepts
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_pipeline_quiz_reminder_sends_due_quizzes(orch):
     """Quiz reminder fires for concepts with next_review <= now."""
     # Insert a due concept directly into learning graph
     past_review = _now_ms() - 86400000  # 24h ago
     with db_manager.get_brain_conn() as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO personal_learning_graph
                 (concept_id, concept_title, domain, exposure_count,
                  sources_read, explanations_seen, quiz_attempts,
@@ -264,7 +269,9 @@ async def test_pipeline_quiz_reminder_sends_due_quizzes(orch):
                  dependent_concepts, last_reviewed, next_review, updated_at)
             VALUES ('SMC_BASICS', 'Smart Money Concepts', 'SMC', 1, 0, 1,
                     0, 0, 0, 0.0, 0.3, '[]', '[]', '[]', ?, ?, ?);
-        """, (_now_ms() - 172800000, past_review, _now_ms()))
+        """,
+            (_now_ms() - 172800000, past_review, _now_ms()),
+        )
         conn.commit()
 
     mock_quiz = {
@@ -298,6 +305,7 @@ async def test_pipeline_quiz_reminder_sends_due_quizzes(orch):
 # Test 6: Pipeline 3 — youtube_crawler triggers crawl for due channels
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_pipeline_youtube_crawler_crawls_due_channels(orch):
     """YouTube crawler fires for channels whose last_crawled_at is past due."""
@@ -305,13 +313,16 @@ async def test_pipeline_youtube_crawler_crawls_due_channels(orch):
     ch_id = f"CH_TEST_{uuid.uuid4().hex[:8].upper()}"
     past_crawl = _now_ms() - (100 * 3600 * 1000)  # crawled 100h ago (> 72h interval)
     with db_manager.get_brain_conn() as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO research_automation_channels
                 (channel_id, url, label, crawl_interval_hours,
                  max_videos_per_crawl, last_crawled_at, is_active, added_at, updated_at)
             VALUES (?, 'https://www.youtube.com/@TestChannel', 'Test Channel',
                     72, 5, ?, 1, ?, ?);
-        """, (ch_id, past_crawl, _now_ms(), _now_ms()))
+        """,
+            (ch_id, past_crawl, _now_ms(), _now_ms()),
+        )
         conn.commit()
 
     with patch(
@@ -337,6 +348,7 @@ async def test_pipeline_youtube_crawler_crawls_due_channels(orch):
 # Test 7: Pipeline 4 — knowledge_audit fires Telegram on warnings
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_pipeline_knowledge_audit_notifies_on_warnings(orch):
     """Knowledge audit sends Telegram when checks have WARN or FAIL status."""
@@ -346,7 +358,11 @@ async def test_pipeline_knowledge_audit_notifies_on_warnings(orch):
         "overall_status": "WARN",
         "checks": [
             {"check_name": "Orphan Claims", "status": "PASS", "message": "OK"},
-            {"check_name": "Zero Alpha Default", "status": "WARN", "message": "3 claims with confidence > 0"},
+            {
+                "check_name": "Zero Alpha Default",
+                "status": "WARN",
+                "message": "3 claims with confidence > 0",
+            },
             {"check_name": "Evidence Vault Anchoring", "status": "PASS", "message": "OK"},
             {"check_name": "Contradiction Resolution Rate", "status": "PASS", "message": "OK"},
             {"check_name": "Graph Edge Integrity", "status": "WARN", "message": "2 stale edges"},
@@ -357,7 +373,8 @@ async def test_pipeline_knowledge_audit_notifies_on_warnings(orch):
     mock_report = MagicMock()
     mock_report.to_dict.return_value = mock_audit_dict
 
-    from core.knowledge_os import knowledge_audit as _ka_mod  # noqa: PLC0415
+    from core.knowledge_os import knowledge_audit as _ka_mod
+
     with patch.object(_ka_mod.knowledge_audit_engine, "run_audit", return_value=mock_report):
         with patch.object(orch, "_notify", new_callable=AsyncMock) as mock_notify:
             result = await orch._run_knowledge_audit()
@@ -374,6 +391,7 @@ async def test_pipeline_knowledge_audit_notifies_on_warnings(orch):
 # ---------------------------------------------------------------------------
 # Test 8: Pipeline 5 — drive_sync archives and notifies
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_pipeline_drive_sync_archives(orch):
@@ -400,11 +418,13 @@ async def test_pipeline_drive_sync_archives(orch):
 # Test 9: trigger_pipeline dispatches correct runner
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_trigger_pipeline_dispatches_correctly(orch):
     """trigger_pipeline('drive_sync') runs drive_sync and returns result dict."""
     with patch.object(
-        orch, "_run_drive_sync",
+        orch,
+        "_run_drive_sync",
         new_callable=AsyncMock,
         return_value={"items_processed": 1, "files_synced": 1, "errors": 0},
     ) as mock_runner:
@@ -424,6 +444,7 @@ async def test_trigger_pipeline_unknown_returns_error(orch):
 # ---------------------------------------------------------------------------
 # Test 10: automation_run_log persists run record
 # ---------------------------------------------------------------------------
+
 
 def test_run_log_persisted(orch):
     """_log_run stores a record in automation_run_log."""
@@ -451,6 +472,7 @@ def test_run_log_persisted(orch):
 # Test 11: Channels CRUD (add, list, deactivate)
 # ---------------------------------------------------------------------------
 
+
 def test_channel_crud():
     """Channels can be inserted, listed, and soft-deleted in the DB."""
     ch_url = f"https://youtube.com/@TestCRUD_{uuid.uuid4().hex[:6]}"
@@ -458,12 +480,15 @@ def test_channel_crud():
     now_ms = _now_ms()
 
     with db_manager.get_brain_conn() as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO research_automation_channels
                 (channel_id, url, label, crawl_interval_hours,
                  max_videos_per_crawl, is_active, added_at, updated_at)
             VALUES (?, ?, 'CRUD Test', 48, 5, 1, ?, ?);
-        """, (ch_id, ch_url, now_ms, now_ms))
+        """,
+            (ch_id, ch_url, now_ms, now_ms),
+        )
         conn.commit()
 
     # List — should appear

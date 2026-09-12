@@ -7,7 +7,6 @@ Unit tests for SDCC peer sync protocol: package export, transfer, import, and re
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.checkpoint import VectorCheckpoint
 from core.collective.event import build_canonical_event
 from core.collective.event_store import EventStore

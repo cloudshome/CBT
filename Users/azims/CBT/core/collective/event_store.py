@@ -17,7 +17,7 @@ import logging
 import os
 import sqlite3
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from core.collective.event import CanonicalEvent
 from core.collective.event_hash import canonical_json_str, verify_event_integrity
@@ -230,7 +230,9 @@ class EventStore:
         """Fetches all events ordered by causal / chronological sequence."""
         conn = self._get_connection()
         try:
-            cur = conn.execute("SELECT raw_json FROM collective_event_index ORDER BY created_at ASC, sequence ASC")
+            cur = conn.execute(
+                "SELECT raw_json FROM collective_event_index ORDER BY created_at ASC, sequence ASC"
+            )
             rows = cur.fetchall()
             return [CanonicalEvent.from_dict(json.loads(r["raw_json"])) for r in rows]
         finally:

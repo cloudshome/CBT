@@ -180,7 +180,13 @@ class RegimeTransitionDetector:
         if not prices:
             return {"regime": MarketRegime.RANGING_CONSOLIDATION.value, "confidence": 0.5}
         candles = [
-            {"open": p, "high": p, "low": p, "close": p, "volume": volumes[i] if volumes and i < len(volumes) else 1.0}
+            {
+                "open": p,
+                "high": p,
+                "low": p,
+                "close": p,
+                "volume": volumes[i] if volumes and i < len(volumes) else 1.0,
+            }
             for i, p in enumerate(prices)
         ]
         res = self.classify_regime(candles)

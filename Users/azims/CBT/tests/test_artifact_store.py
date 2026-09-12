@@ -8,7 +8,6 @@ import hashlib
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.artifact_store import ArtifactStore
 
 
@@ -41,7 +40,9 @@ def test_content_addressed_deduplication():
         obj_path = store.get_artifact_path(expected_hash)
         assert obj_path is not None
         assert obj_path.exists()
-        assert f"objects\\{expected_hash[:2]}\\{expected_hash[2:4]}\\{expected_hash}" in str(obj_path) or f"objects/{expected_hash[:2]}/{expected_hash[2:4]}/{expected_hash}" in str(obj_path)
+        assert f"objects\\{expected_hash[:2]}\\{expected_hash[2:4]}\\{expected_hash}" in str(
+            obj_path
+        ) or f"objects/{expected_hash[:2]}/{expected_hash[2:4]}/{expected_hash}" in str(obj_path)
 
         # Integrity verification
         assert store.verify_artifact(expected_hash) is True
@@ -52,7 +53,9 @@ def test_garbage_collection_rule():
         store = ArtifactStore(base_dir=Path(tmpdir))
 
         # Artifact with reference
-        hash_pinned = store.store_bytes(b"Pinned content", "pinned.txt", "HOME-01", reference_id="EXP-01")
+        hash_pinned = store.store_bytes(
+            b"Pinned content", "pinned.txt", "HOME-01", reference_id="EXP-01"
+        )
         # Artifact without reference
         hash_orphan = store.store_bytes(b"Orphan content", "temp.txt", "HOME-01", reference_id=None)
 

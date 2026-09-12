@@ -39,28 +39,21 @@ from core.knowledge_os.epistemic_system import (
     validate_status_transition,
 )
 from core.knowledge_os.human_brain import (
-    HumanLearningEngine,
     HumanQuestionMode,
     human_brain,
 )
-from core.knowledge_os.hybrid_retriever import hybrid_retriever
 from core.knowledge_os.knowledge_audit import (
     KnowledgeAuditReport,
     KnowledgeQualityAuditEngine,
 )
 from core.knowledge_os.library_ingestor import (
-    LibraryIngestor,
     library_ingestor,
 )
 from core.knowledge_os.project_brain import (
-    ProjectBrainContextEngine,
     ProjectKnowledgeContext,
     project_brain,
 )
 from core.provenance_engine import provenance_engine
-
-
-import io
 from tests.test_knowledge_library_and_dedup import create_minimal_pdf
 
 
@@ -375,7 +368,13 @@ def test_boss_level_knowledge_os_full_lifecycle(setup_knowledge_os):
                 (knowledge_id, source_type, source_uri, title, author_creator, ingested_at, raw_content_preview, confidence_score, status)
                 VALUES (?, 'BOOK', ?, ?, 'Dr. Quant Boss', ?, ?, 0.88, 'EMPIRICALLY_VERIFIED');
                 """,
-                (claim_a_id, f"file:///{book_path.name}", book_title, ts, "RSI values below 30 indicate short-term oversold conditions..."),
+                (
+                    claim_a_id,
+                    f"file:///{book_path.name}",
+                    book_title,
+                    ts,
+                    "RSI values below 30 indicate short-term oversold conditions...",
+                ),
             )
             conn.execute(
                 """
@@ -440,7 +439,13 @@ def test_boss_level_knowledge_os_full_lifecycle(setup_knowledge_os):
                 (knowledge_id, source_type, source_uri, title, author_creator, ingested_at, raw_content_preview, confidence_score, status)
                 VALUES (?, 'BOOK', ?, ?, 'Dr. Quant Boss', ?, ?, 0.0, 'REJECTED');
                 """,
-                (falsified_claim_id, f"file:///{book_path.name}", book_title, ts, "RSI < 30 unconditionally generates positive alpha..."),
+                (
+                    falsified_claim_id,
+                    f"file:///{book_path.name}",
+                    book_title,
+                    ts,
+                    "RSI < 30 unconditionally generates positive alpha...",
+                ),
             )
             conn.execute(
                 """
@@ -487,7 +492,10 @@ def test_boss_level_knowledge_os_full_lifecycle(setup_knowledge_os):
         # Check autopsy recall prevents rediscovering known failures
         assert len(context_pkg.autopsy_failures) >= 1
         assert any(
-            "Falsified" in str(w) or "NAIVE" in str(w) or "Severe drawdown" in str(w) or "alpha" in str(w)
+            "Falsified" in str(w)
+            or "NAIVE" in str(w)
+            or "Severe drawdown" in str(w)
+            or "alpha" in str(w)
             for w in context_pkg.autopsy_failures
         )
 
@@ -588,9 +596,7 @@ def test_boss_level_knowledge_os_full_lifecycle(setup_knowledge_os):
         assert unsupported_check.count == 0
 
         # Invariant: Graph edge integrity
-        edge_check = next(
-            c for c in audit_report.checks if c.check_name == "Graph Edge Integrity"
-        )
+        edge_check = next(c for c in audit_report.checks if c.check_name == "Graph Edge Integrity")
         assert edge_check.status == "PASS"
         assert edge_check.count == 0
 

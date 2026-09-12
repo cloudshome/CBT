@@ -8,7 +8,6 @@ Section 30: "A number without provenance is not trustworthy evidence."
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from core.collective.event import CanonicalEvent
 

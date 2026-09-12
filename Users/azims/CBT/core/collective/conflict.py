@@ -11,7 +11,7 @@ import json
 import logging
 import os
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -82,8 +82,10 @@ class ConflictManager:
         target_entity_id: str | None = None,
     ) -> ConflictRecord:
         """Persists a new conflict record to data/collective/conflicts/."""
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        conflict_id = f"CONF-{int(datetime.datetime.now().timestamp()*1000)}-{uuid.uuid4().hex[:8]}"
+        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
+        conflict_id = (
+            f"CONF-{int(datetime.datetime.now().timestamp() * 1000)}-{uuid.uuid4().hex[:8]}"
+        )
 
         rec = ConflictRecord(
             conflict_id=conflict_id,
@@ -98,7 +100,9 @@ class ConflictManager:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(rec.to_dict(), f, indent=2)
 
-        logger.warning(f"Recorded collective conflict [{conflict_type}] for entity {target_entity_id}: {conflict_id}")
+        logger.warning(
+            f"Recorded collective conflict [{conflict_type}] for entity {target_entity_id}: {conflict_id}"
+        )
         return rec
 
     def create_knowledge_contradiction_set(
@@ -139,7 +143,7 @@ class ConflictManager:
 
         for p in self.conflicts_dir.glob("CONF-*.json"):
             try:
-                with open(p, "r", encoding="utf-8") as f:
+                with open(p, encoding="utf-8") as f:
                     data = json.load(f)
                 rec = ConflictRecord.from_dict(data)
                 if conflict_type and rec.conflict_type != conflict_type:
@@ -147,7 +151,7 @@ class ConflictManager:
                 if unresolved_only and rec.resolved:
                     continue
                 records.append(rec)
-            except Exception as exc:
+            except (OSError, json.JSONDecodeError, KeyError) as exc:
                 logger.error(f"Error reading conflict file {p}: {exc}")
 
         records.sort(key=lambda x: x.detected_at, reverse=True)
@@ -159,11 +163,11 @@ class ConflictManager:
         if not path.exists():
             return False
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
         data["resolved"] = True
-        data["resolved_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        data["resolved_at"] = datetime.datetime.now(datetime.UTC).isoformat()
         data["resolution_notes"] = notes
 
         with open(path, "w", encoding="utf-8") as f:

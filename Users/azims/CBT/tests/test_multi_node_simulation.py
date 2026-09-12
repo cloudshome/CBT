@@ -9,7 +9,6 @@ paper trading, outbox exports, mesh package deliveries, and eventual convergence
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.adapters.paper_trade_adapter import PaperTradeEventAdapter
 from core.collective.adapters.research_adapter import ResearchEventAdapter
 from core.collective.checkpoint import VectorCheckpoint
@@ -51,17 +50,19 @@ def test_10_node_simulation_convergence():
             radapt = ResearchEventAdapter(identity=identity, store=store)
             tadapt = PaperTradeEventAdapter(identity=identity, store=store)
 
-            nodes.append({
-                "id": node_id,
-                "identity": identity,
-                "store": store,
-                "checkpoint": checkpoint,
-                "transport": transport,
-                "engine": engine,
-                "radapt": radapt,
-                "tadapt": tadapt,
-                "dir": node_dir,
-            })
+            nodes.append(
+                {
+                    "id": node_id,
+                    "identity": identity,
+                    "store": store,
+                    "checkpoint": checkpoint,
+                    "transport": transport,
+                    "engine": engine,
+                    "radapt": radapt,
+                    "tadapt": tadapt,
+                    "dir": node_dir,
+                }
+            )
 
         # 2. Each node independently creates research sources, claims, and paper trades
         for idx, n in enumerate(nodes):
@@ -110,7 +111,9 @@ def test_10_node_simulation_convergence():
         for sender in nodes:
             for receiver in nodes:
                 if sender["id"] != receiver["id"]:
-                    sender["transport"].deliver_package(sender["id"], receiver["transport"].inbox_dir)
+                    sender["transport"].deliver_package(
+                        sender["id"], receiver["transport"].inbox_dir
+                    )
 
         # 5. Every node runs sync cycle to ingest all peer packages
         for receiver in nodes:

@@ -15,7 +15,6 @@ Validates:
 from __future__ import annotations
 
 import time
-import pytest
 
 from core.database import db_manager
 from core.knowledge_graph_engine import (
@@ -25,14 +24,11 @@ from core.knowledge_graph_engine import (
     knowledge_graph_engine,
 )
 from core.knowledge_os.knowledge_audit import (
-    KnowledgeQualityAuditEngine,
     KnowledgeAuditReport,
-    knowledge_audit_engine,
+    KnowledgeQualityAuditEngine,
 )
 from core.knowledge_os.research_gaps import (
     ResearchGapEngine,
-    ResearchGapItem,
-    research_gap_engine,
 )
 from core.provenance_engine import provenance_engine
 
@@ -52,7 +48,7 @@ def test_research_gap_detection_high_talk_zero_evidence():
     engine = ResearchGapEngine()
 
     # Seed a concept with 6 claims and 0 empirical evidence records
-    cid = f"K-GAP-TEST-{str(int(time.time()*1000))[-4:]}"
+    cid = f"K-GAP-TEST-{str(int(time.time() * 1000))[-4:]}"
     concept_title = "Wyckoff Spring Accumulation"
     domain = "SMC"
 
@@ -108,7 +104,10 @@ def test_research_gap_detection_high_talk_zero_evidence():
     assert target_gap["claims_count"] >= 5
     assert target_gap["empirical_tests_count"] == 0
     assert target_gap["priority_score"] >= 0.5
-    assert "H0:" in target_gap["suggested_hypothesis"] or "Hypothesis" in target_gap["suggested_hypothesis"]
+    assert (
+        "H0:" in target_gap["suggested_hypothesis"]
+        or "Hypothesis" in target_gap["suggested_hypothesis"]
+    )
 
 
 def test_knowledge_quality_audit_engine_seven_invariants():

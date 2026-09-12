@@ -16,13 +16,11 @@ import io
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from core.database import db_manager
 from core.knowledge_os.library_ingestor import (
+    PROMPT_INJECTION_PATTERNS,
     LibraryIngestor,
     sanitize_research_text,
-    PROMPT_INJECTION_PATTERNS,
 )
 
 
@@ -53,7 +51,9 @@ def create_minimal_pdf(pages_text: list[str]) -> bytes:
     # Object 2: Pages tree
     offsets.append(pdf_buf.tell())
     kids_str = " ".join(kids_refs)
-    pdf_buf.write(f"2 0 obj\n<< /Type /Pages /Kids [{kids_str}] /Count {total_pages} >>\nendobj\n".encode())
+    pdf_buf.write(
+        f"2 0 obj\n<< /Type /Pages /Kids [{kids_str}] /Count {total_pages} >>\nendobj\n".encode()
+    )
 
     # Build each page
     for i, txt in enumerate(pages_text):
@@ -142,7 +142,6 @@ def test_multi_tier_deduplication():
 
     dummy_hash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
     dummy_title = "The Quantitative Volatility Paradigm"
-    dummy_isbn = "978-0123456789"
 
     # Insert a record into research_provenance_sources
     with db_manager.get_brain_conn() as conn:

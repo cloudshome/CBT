@@ -18,7 +18,6 @@ Validates:
 from __future__ import annotations
 
 import time
-import pytest
 
 from core.database import db_manager
 from core.knowledge_graph_engine import (
@@ -34,7 +33,6 @@ from core.knowledge_os.human_brain import (
 from core.knowledge_os.project_brain import (
     ProjectBrainContextEngine,
     ProjectKnowledgeContext,
-    project_brain,
 )
 from core.provenance_engine import provenance_engine
 
@@ -68,7 +66,7 @@ def test_project_brain_context_engine():
     )
     knowledge_graph_engine.register_source_node(source)
 
-    cid = f"C-PRJ-{str(int(time.time()*1000))[-4:]}"
+    cid = f"C-PRJ-{str(int(time.time() * 1000))[-4:]}"
     claim = ClaimNode(
         claim_id=cid,
         source_id=sid,
@@ -96,7 +94,10 @@ def test_project_brain_context_engine():
     assert pkg.query == "volatility cones and skew"
     assert "RESEARCH KNOWLEDGE ONLY" in pkg.safety_disclaimer
     assert len(pkg.risk_boundary_warnings) >= 1
-    assert any("Constitutional" in w or "walk-forward" in w or "WARNING" in w for w in pkg.risk_boundary_warnings)
+    assert any(
+        "Constitutional" in w or "walk-forward" in w or "WARNING" in w
+        for w in pkg.risk_boundary_warnings
+    )
     assert len(pkg.current_sky_assumptions) >= 1
     assert pkg.generated_at > 0
 

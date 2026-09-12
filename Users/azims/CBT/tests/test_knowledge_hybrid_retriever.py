@@ -15,17 +15,14 @@ Validates:
 from __future__ import annotations
 
 import time
-import pytest
 
 from core.database import db_manager
 from core.knowledge_graph_engine import (
     ClaimNode,
-    ConceptNode,
     knowledge_graph_engine,
 )
 from core.knowledge_os.hybrid_retriever import (
     HybridKnowledgeRetriever,
-    RetrievedKnowledgeItem,
 )
 from core.provenance_engine import provenance_engine
 
@@ -87,6 +84,7 @@ def test_hybrid_retrieval_and_autopsy_recall():
     # Register source first to satisfy foreign key constraint
     sid = "S-TEST-001"
     from core.knowledge_graph_engine import SourceNode
+
     source = SourceNode(
         source_id=sid,
         source_type="BOOK",
@@ -100,7 +98,7 @@ def test_hybrid_retrieval_and_autopsy_recall():
     knowledge_graph_engine.register_source_node(source)
 
     # Seed a claim
-    cid = f"C-TEST-{str(int(time.time()*1000))[-4:]}"
+    cid = f"C-TEST-{str(int(time.time() * 1000))[-4:]}"
     claim = ClaimNode(
         claim_id=cid,
         source_id=sid,
@@ -167,5 +165,7 @@ def test_hybrid_retrieval_and_autopsy_recall():
     autopsy_item = next((it for it in results if it.node_type == "AUTOPSY"), None)
     if autopsy_item:
         assert "NEGATIVE_EXPECTANCY_POST_FEES" in autopsy_item.title
-        assert "10,000" in autopsy_item.content or "10000" in autopsy_item.metadata.get("autopsy_report", "")
+        assert "10,000" in autopsy_item.content or "10000" in autopsy_item.metadata.get(
+            "autopsy_report", ""
+        )
         assert autopsy_item.ranking.composite_rank > 0.0

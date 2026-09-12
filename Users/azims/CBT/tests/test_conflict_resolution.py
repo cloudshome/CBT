@@ -7,7 +7,6 @@ Unit tests for SDCC conflict management, contradiction sets, and provenance vali
 import tempfile
 from pathlib import Path
 
-import pytest
 from core.collective.conflict import ConflictManager, ConflictType
 from core.collective.event import build_canonical_event
 from core.collective.event_types import CollectiveEventType

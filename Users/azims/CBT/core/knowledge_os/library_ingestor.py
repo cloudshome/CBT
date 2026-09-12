@@ -24,13 +24,12 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import re
 import time
-import uuid
-from dataclasses import asdict, dataclass, field
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, AsyncIterator, Iterator
+from typing import Any
 
 import pypdf
 
@@ -42,7 +41,7 @@ from core.knowledge_graph_engine import (
     SourceNode,
     knowledge_graph_engine,
 )
-from core.knowledge_os.epistemic_system import EpistemicStatus, KnowledgeTier
+from core.knowledge_os.epistemic_system import EpistemicStatus
 from core.pdf_extractor import pdf_book_extractor
 
 logger = logging.getLogger("ai_quant_sentinel.knowledge_os.library_ingestor")
@@ -129,7 +128,10 @@ class LibraryIngestor:
                 (f"%{file_sha256}%",),
             ).fetchone()
             if row:
-                return True, f"Duplicate detected by exact file hash (Source ID: {row['source_id']}, '{row['title']}')"
+                return (
+                    True,
+                    f"Duplicate detected by exact file hash (Source ID: {row['source_id']}, '{row['title']}')",
+                )
 
             # 2. ISBN check
             if isbn:
@@ -138,7 +140,10 @@ class LibraryIngestor:
                     (isbn,),
                 ).fetchone()
                 if row_isbn:
-                    return True, f"Duplicate detected by ISBN {isbn} (Source ID: {row_isbn['source_id']}, '{row_isbn['book_title']}')"
+                    return (
+                        True,
+                        f"Duplicate detected by ISBN {isbn} (Source ID: {row_isbn['source_id']}, '{row_isbn['book_title']}')",
+                    )
 
             # 3. Exact normalized title check
             if title and len(title.strip()) > 5:
@@ -148,7 +153,10 @@ class LibraryIngestor:
                     (norm_title,),
                 ).fetchone()
                 if row_title:
-                    return True, f"Duplicate detected by book title '{title}' (Source ID: {row_title['source_id']})"
+                    return (
+                        True,
+                        f"Duplicate detected by book title '{title}' (Source ID: {row_title['source_id']})",
+                    )
 
         return False, None
 
@@ -200,7 +208,7 @@ class LibraryIngestor:
             try:
                 reader = pypdf.PdfReader(str(file_path))
                 total_pages = len(reader.pages)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 total_pages = 0
                 logger.error(f"Cannot read PDF structure for {file_path}: {e}")
 
@@ -273,7 +281,7 @@ class LibraryIngestor:
 
         try:
             reader = pypdf.PdfReader(str(file_path))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self._fail_job(job.job_id, f"Malformed PDF file: {e}")
             yield {"job_id": job.job_id, "status": "FAILED", "error": str(e)}
             return
@@ -286,8 +294,8 @@ class LibraryIngestor:
         for i in range(min(10, total_pages)):
             try:
                 front_pages.append(reader.pages[i].extract_text() or "")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001
+                logger.debug("Failed extracting front page %d: %s", i, e)
         front_text = "\n".join(front_pages)
         meta = pdf_book_extractor.extract_metadata_and_isbn(reader, front_text)
         if meta["title"] == "Untitled Quantitative Literature":
@@ -336,15 +344,21 @@ class LibraryIngestor:
             try:
                 page_obj = reader.pages[page_idx]
                 raw_page_text = page_obj.extract_text() or ""
-            except Exception as e:
-                logger.warning(f"Failed extracting text on page {page_num} of {file_path.name}: {e}")
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    f"Failed extracting text on page {page_num} of {file_path.name}: {e}"
+                )
                 raw_page_text = ""
 
             # Neutralize instruction injections
             sanitized_text = sanitize_research_text(raw_page_text)
 
             # Detect chapter title
-            chap_match = re.search(r"^(?:CHAPTER|Chapter)\s+[0-9IVXLCDM]+[:\s\.\-]+([^\n\r]+)", sanitized_text, re.MULTILINE)
+            chap_match = re.search(
+                r"^(?:CHAPTER|Chapter)\s+[0-9IVXLCDM]+[:\s\.\-]+([^\n\r]+)",
+                sanitized_text,
+                re.MULTILINE,
+            )
             if chap_match:
                 current_chapter = chap_match.group(0).strip()[:100]
 
@@ -395,7 +409,11 @@ class LibraryIngestor:
                         title=concept_title[:80],
                         domain=applicability,
                         normalized_description=para[:400],
-                        tags=[applicability.lower(), "book_literature", meta["author"].lower()[:20]],
+                        tags=[
+                            applicability.lower(),
+                            "book_literature",
+                            meta["author"].lower()[:20],
+                        ],
                     )
                     knowledge_graph_engine.register_concept_node(concept)
                     extracted_concepts_count += 1
@@ -462,7 +480,9 @@ class LibraryIngestor:
                     "current_chapter": current_chapter,
                 }
 
-        logger.info(f"Book ingestion completed for {file_path.name}: {extracted_claims_count} claims, {extracted_concepts_count} concepts.")
+        logger.info(
+            f"Book ingestion completed for {file_path.name}: {extracted_claims_count} claims, {extracted_concepts_count} concepts."
+        )
 
     def _fail_job(self, job_id: str, error_msg: str) -> None:
         with db_manager.get_brain_conn() as conn:
@@ -518,6 +538,7 @@ class LibraryIngestor:
     def get_library_statistics(self) -> dict[str, Any]:
         """Returns consolidated library telemetry across all 7 knowledge tiers."""
         with db_manager.get_brain_conn() as conn:
+
             def _cnt(table: str, where: str = "") -> int:
                 exists = conn.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?;", (table,)
@@ -552,7 +573,9 @@ class LibraryIngestor:
 
             # Top recurring concept domains
             top_domains = []
-            if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='research_concepts';").fetchone():
+            if conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='research_concepts';"
+            ).fetchone():
                 domain_rows = conn.execute(
                     "SELECT domain, COUNT(*) as count FROM research_concepts GROUP BY domain ORDER BY count DESC LIMIT 5;"
                 ).fetchall()

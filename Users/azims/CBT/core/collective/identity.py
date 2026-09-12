@@ -17,7 +17,7 @@ import logging
 import os
 import platform
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +69,7 @@ class NodeIdentity:
             data = message.encode("utf-8") if isinstance(message, str) else message
             pub_key.verify(sig_bytes, data)
             return True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.debug(f"Signature verification failed: {exc}")
             return False
 
@@ -132,17 +132,12 @@ class NodeIdentityManager:
         priv_key = ed25519.Ed25519PrivateKey.generate()
         pub_key = priv_key.public_key()
 
-        priv_bytes = priv_key.private_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PrivateFormat.Raw,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
         pub_bytes = pub_key.public_bytes(
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw,
         )
 
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
         installation_id = str(uuid.uuid4())
 
         metadata = {
@@ -167,7 +162,9 @@ class NodeIdentityManager:
         with open(self.identity_file, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
 
-        logger.info(f"Generated new permanent node identity for '{node_id}' at {self.identity_file}")
+        logger.info(
+            f"Generated new permanent node identity for '{node_id}' at {self.identity_file}"
+        )
         return identity
 
     def load_identity(self) -> NodeIdentity | None:
@@ -176,7 +173,7 @@ class NodeIdentityManager:
             return None
 
         try:
-            with open(self.identity_file, "r", encoding="utf-8") as f:
+            with open(self.identity_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             priv_key = None
@@ -194,7 +191,7 @@ class NodeIdentityManager:
                 metadata=data.get("metadata", {}),
                 _private_key=priv_key,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.error(f"Failed to load node identity from {self.identity_file}: {exc}")
             return None
 

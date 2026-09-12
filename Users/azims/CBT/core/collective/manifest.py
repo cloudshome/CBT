@@ -7,8 +7,7 @@ Signed event manifest generation and verification for SDCC sync packages.
 from __future__ import annotations
 
 import datetime
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.collective.checkpoint import VectorCheckpoint
@@ -107,14 +106,16 @@ def build_node_manifest(
     effective_to = to_sequence or highest_seq
     effective_from = min(from_sequence, effective_to) if effective_to > 0 else 0
 
-    events = event_store.get_events(identity.node_id, from_sequence=effective_from, to_sequence=effective_to)
+    events = event_store.get_events(
+        identity.node_id, from_sequence=effective_from, to_sequence=effective_to
+    )
     event_count = len(events)
 
     # Compute content SHA-256 over all event bytes
     all_event_hashes = "".join(e.integrity["event_sha256"] for e in events)
     content_sha256 = sha256_digest(all_event_hashes)
 
-    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    now_iso = datetime.datetime.now(datetime.UTC).isoformat()
     clock = checkpoint.get_vector_clock()
     clock[identity.node_id] = highest_seq
 

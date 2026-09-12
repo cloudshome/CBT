@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from core.collective.checkpoint import vector_checkpoint
@@ -20,7 +20,6 @@ from core.collective.identity import node_identity_manager
 from core.collective.node import node_registry
 from core.collective.quarantine import quarantine_manager
 from core.collective.reconciler import collective_reconciler
-from core.collective.reducer import collective_reducer
 from core.collective.sync_engine import sync_engine
 
 logger = logging.getLogger("sky.collective.api")

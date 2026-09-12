@@ -20,9 +20,8 @@ from typing import Any
 
 from core.collective.checkpoint import VectorCheckpoint, vector_checkpoint
 from core.collective.event import CanonicalEvent
-from core.collective.event_hash import canonical_json_str
 from core.collective.event_store import EventStore, event_store
-from core.collective.identity import NodeIdentity, NodeIdentityManager, node_identity_manager
+from core.collective.identity import NodeIdentity, node_identity_manager
 from core.collective.manifest import EventManifest, build_node_manifest
 from core.collective.node import NodeRegistry, node_registry
 from core.collective.sync_transport import FilesystemSyncTransport, SyncTransport
@@ -45,7 +44,7 @@ class SyncReceipt:
     conflicts_created: int = 0
     projection_rebuilt: bool = False
     completed_at: str = field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
+        default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat()
     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -85,7 +84,9 @@ class SyncEngine:
             from_sequence=1,
             to_sequence=effective_to,
         )
-        events = self.store.get_events(self.identity.node_id, from_sequence=1, to_sequence=effective_to)
+        events = self.store.get_events(
+            self.identity.node_id, from_sequence=1, to_sequence=effective_to
+        )
         return self.transport.export_package(
             node_id=self.identity.node_id,
             manifest=manifest,
@@ -101,12 +102,12 @@ class SyncEngine:
         Processes an incoming sync package from peer.
         Executes stages: Validate Manifest -> Extract Events -> Verify Hashes -> Ingest -> Checkpoint -> Receipt.
         """
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
         manifest_file = package_dir / "manifest.json"
         if not manifest_file.exists():
             raise FileNotFoundError(f"Missing manifest.json in package {package_dir}")
 
-        with open(manifest_file, "r", encoding="utf-8") as f:
+        with open(manifest_file, encoding="utf-8") as f:
             manifest_dict = json.load(f)
         manifest = EventManifest.from_dict(manifest_dict)
         peer_node_id = manifest.node_id
@@ -120,7 +121,9 @@ class SyncEngine:
 
         if pub_key:
             if not manifest.verify_signature(pub_key):
-                raise PermissionError(f"Cryptographic signature check failed for peer {peer_node_id}")
+                raise PermissionError(
+                    f"Cryptographic signature check failed for peer {peer_node_id}"
+                )
 
         # Register peer in registry
         if pub_key:
@@ -144,7 +147,7 @@ class SyncEngine:
             # Fallback to plain jsonl
             plain_file = package_dir / "events" / "events.jsonl"
             if plain_file.exists():
-                with open(plain_file, "r", encoding="utf-8") as f:
+                with open(plain_file, encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
                         if line:
@@ -174,7 +177,7 @@ class SyncEngine:
             self.registry.update_imported_sequence(peer_node_id, max_imported_seq)
 
         # 5. Create receipt
-        receipt_id = f"RCP-{int(datetime.datetime.now().timestamp()*1000)}-{uuid.uuid4().hex[:8]}"
+        receipt_id = f"RCP-{int(datetime.datetime.now().timestamp() * 1000)}-{uuid.uuid4().hex[:8]}"
         receipt = SyncReceipt(
             receipt_id=receipt_id,
             node_id=self.identity.node_id,
@@ -204,17 +207,17 @@ class SyncEngine:
         """
         receipts: list[SyncReceipt] = []
         inbox_pkgs = self.transport.list_inbox_packages()
-        for peer_node_id, pkg_dir in inbox_pkgs:
+        for _peer_node_id, pkg_dir in inbox_pkgs:
             try:
                 rcp = self.import_sync_package(pkg_dir)
                 receipts.append(rcp)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.error(f"Failed to import sync package from {pkg_dir}: {exc}")
 
         # Export local outbox
         try:
             self.export_sync_package()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.error(f"Failed to export sync package: {exc}")
 
         return receipts

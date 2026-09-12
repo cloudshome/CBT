@@ -122,7 +122,8 @@ class ResearchGapEngine:
                         gap_type="CONFLICTING_DEFINITIONS",
                         priority_score=0.85,
                         description=f"Direct clash between {claim_a} and {claim_b}: {desc}",
-                        suggested_hypothesis=resolution_notes or "H1: Strategy A significantly outperforms Strategy B under high volatility regimes.",
+                        suggested_hypothesis=resolution_notes
+                        or "H1: Strategy A significantly outperforms Strategy B under high volatility regimes.",
                     )
                 )
 

@@ -11,12 +11,9 @@ import hashlib
 import json
 import logging
 import os
-import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
-
-from core.autonomous_research.storage.content_hasher import content_hasher
 
 logger = logging.getLogger("sky.collective.artifact_store")
 
@@ -56,9 +53,9 @@ class ArtifactStore:
 
     def _load_index(self) -> dict[str, dict[str, Any]]:
         try:
-            with open(self.index_file, "r", encoding="utf-8") as f:
+            with open(self.index_file, encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             return {}
 
     def _save_index(self, data: dict[str, Any]) -> None:
@@ -87,7 +84,9 @@ class ArtifactStore:
         if not obj_path.exists():
             with open(obj_path, "wb") as f:
                 f.write(content)
-            logger.info(f"Stored new content-addressed artifact {content_hash[:12]} ({original_name})")
+            logger.info(
+                f"Stored new content-addressed artifact {content_hash[:12]} ({original_name})"
+            )
         else:
             logger.debug(f"Artifact {content_hash[:12]} already present; deduplicated.")
 
@@ -96,12 +95,13 @@ class ArtifactStore:
         meta_dict = index.get(content_hash)
         if not meta_dict:
             import datetime
+
             meta = ArtifactMetadata(
                 content_hash=content_hash,
                 original_name=original_name,
                 file_size=len(content),
                 source_node=source_node,
-                registered_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                registered_at=datetime.datetime.now(datetime.UTC).isoformat(),
                 references=[reference_id] if reference_id else [],
             )
             index[content_hash] = meta.to_dict()

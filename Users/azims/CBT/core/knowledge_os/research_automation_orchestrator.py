@@ -38,8 +38,7 @@ import json
 import logging
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.database import db_manager
@@ -50,11 +49,11 @@ logger = logging.getLogger("ai_quant_sentinel.knowledge_os.automation")
 # ---------------------------------------------------------------------------
 # Pipeline interval constants (seconds)
 # ---------------------------------------------------------------------------
-INTERVAL_HYPOTHESIS_BACKTEST = 30 * 60       # 30 minutes
-INTERVAL_QUIZ_REMINDER       = 60 * 60       # 1 hour
-INTERVAL_YOUTUBE_CRAWLER     = 6  * 60 * 60  # 6 hours
-INTERVAL_KNOWLEDGE_AUDIT     = 24 * 60 * 60  # 24 hours
-INTERVAL_DRIVE_SYNC          = 6  * 60 * 60  # 6 hours
+INTERVAL_HYPOTHESIS_BACKTEST = 30 * 60  # 30 minutes
+INTERVAL_QUIZ_REMINDER = 60 * 60  # 1 hour
+INTERVAL_YOUTUBE_CRAWLER = 6 * 60 * 60  # 6 hours
+INTERVAL_KNOWLEDGE_AUDIT = 24 * 60 * 60  # 24 hours
+INTERVAL_DRIVE_SYNC = 6 * 60 * 60  # 6 hours
 
 # How many queued hypotheses to process per run (avoid thundering-herd)
 MAX_HYPOTHESES_PER_RUN = 5
@@ -88,10 +87,10 @@ class ResearchAutomationOrchestrator:
         self._tasks: list[asyncio.Task] = []
         self.pipeline_status: dict[str, PipelineStatus] = {
             "hypothesis_backtest": PipelineStatus("hypothesis_backtest"),
-            "quiz_reminder":       PipelineStatus("quiz_reminder"),
-            "youtube_crawler":     PipelineStatus("youtube_crawler"),
-            "knowledge_audit":     PipelineStatus("knowledge_audit"),
-            "drive_sync":          PipelineStatus("drive_sync"),
+            "quiz_reminder": PipelineStatus("quiz_reminder"),
+            "youtube_crawler": PipelineStatus("youtube_crawler"),
+            "knowledge_audit": PipelineStatus("knowledge_audit"),
+            "drive_sync": PipelineStatus("drive_sync"),
         }
 
     # ------------------------------------------------------------------
@@ -103,11 +102,25 @@ class ResearchAutomationOrchestrator:
         self._running = True
         logger.info("ResearchAutomationOrchestrator: All 5 zero-touch pipelines starting.")
         self._tasks = [
-            asyncio.create_task(self._loop("hypothesis_backtest", INTERVAL_HYPOTHESIS_BACKTEST, self._run_hypothesis_backtest)),
-            asyncio.create_task(self._loop("quiz_reminder",       INTERVAL_QUIZ_REMINDER,       self._run_quiz_reminder)),
-            asyncio.create_task(self._loop("youtube_crawler",     INTERVAL_YOUTUBE_CRAWLER,     self._run_youtube_crawler)),
-            asyncio.create_task(self._loop("knowledge_audit",     INTERVAL_KNOWLEDGE_AUDIT,     self._run_knowledge_audit)),
-            asyncio.create_task(self._loop("drive_sync",          INTERVAL_DRIVE_SYNC,          self._run_drive_sync)),
+            asyncio.create_task(
+                self._loop(
+                    "hypothesis_backtest",
+                    INTERVAL_HYPOTHESIS_BACKTEST,
+                    self._run_hypothesis_backtest,
+                )
+            ),
+            asyncio.create_task(
+                self._loop("quiz_reminder", INTERVAL_QUIZ_REMINDER, self._run_quiz_reminder)
+            ),
+            asyncio.create_task(
+                self._loop("youtube_crawler", INTERVAL_YOUTUBE_CRAWLER, self._run_youtube_crawler)
+            ),
+            asyncio.create_task(
+                self._loop("knowledge_audit", INTERVAL_KNOWLEDGE_AUDIT, self._run_knowledge_audit)
+            ),
+            asyncio.create_task(
+                self._loop("drive_sync", INTERVAL_DRIVE_SYNC, self._run_drive_sync)
+            ),
         ]
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
@@ -121,10 +134,10 @@ class ResearchAutomationOrchestrator:
         """Manually triggers a named pipeline immediately (for API endpoint)."""
         runners = {
             "hypothesis_backtest": self._run_hypothesis_backtest,
-            "quiz_reminder":       self._run_quiz_reminder,
-            "youtube_crawler":     self._run_youtube_crawler,
-            "knowledge_audit":     self._run_knowledge_audit,
-            "drive_sync":          self._run_drive_sync,
+            "quiz_reminder": self._run_quiz_reminder,
+            "youtube_crawler": self._run_youtube_crawler,
+            "knowledge_audit": self._run_knowledge_audit,
+            "drive_sync": self._run_drive_sync,
         }
         if name not in runners:
             return {"error": f"Unknown pipeline: {name}"}
@@ -143,10 +156,10 @@ class ResearchAutomationOrchestrator:
         # Stagger startup to avoid all pipelines hitting DB simultaneously
         stagger = {
             "hypothesis_backtest": 10,
-            "quiz_reminder":       25,
-            "youtube_crawler":     40,
-            "knowledge_audit":     60,
-            "drive_sync":          80,
+            "quiz_reminder": 25,
+            "youtube_crawler": 40,
+            "knowledge_audit": 60,
+            "drive_sync": 80,
         }.get(name, 30)
         await asyncio.sleep(stagger)
 
@@ -168,12 +181,14 @@ class ResearchAutomationOrchestrator:
 
             except asyncio.CancelledError:
                 break
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 ps.last_run_status = "ERROR"
                 ps.last_error = str(exc)
                 self._log_run(run_id, name, "ERROR", {}, started_at, error=str(exc))
                 logger.error("Pipeline [%s] error (non-fatal): %s", name, exc, exc_info=True)
-                await self._notify(f"⚠️ *Automation Pipeline Error*\nPipeline: `{name}`\nError: `{exc}`")
+                await self._notify(
+                    f"⚠️ *Automation Pipeline Error*\nPipeline: `{name}`\nError: `{exc}`"
+                )
             finally:
                 ps.is_running = False
                 ps.last_run_at = int(time.time() * 1000)
@@ -192,9 +207,9 @@ class ResearchAutomationOrchestrator:
         - Archives to rejected_claims_vault (autopsy)
         Never lowers the empirical bar. Full state machine enforced.
         """
-        from core.autonomous_research.empirical_tester import empirical_tester  # noqa: PLC0415
-        from core.database import db_manager  # noqa: PLC0415
-        from core.knowledge_os.epistemic_system import validate_status_transition  # noqa: PLC0415
+        from core.autonomous_research.empirical_tester import empirical_tester
+        from core.database import db_manager
+        from core.knowledge_os.epistemic_system import validate_status_transition
 
         promoted = 0
         rejected = 0
@@ -215,7 +230,12 @@ class ResearchAutomationOrchestrator:
             ).fetchall()
 
         if not rows:
-            return {"items_processed": 0, "promoted": 0, "rejected": 0, "message": "No queued hypotheses."}
+            return {
+                "items_processed": 0,
+                "promoted": 0,
+                "rejected": 0,
+                "message": "No queued hypotheses.",
+            }
 
         for row in rows:
             hyp = dict(row)
@@ -269,7 +289,9 @@ class ResearchAutomationOrchestrator:
                         now_ms = int(time.time() * 1000)
                         with db_manager.get_brain_conn() as conn:
                             # Anchor in provenance ledger (correct schema with NOT NULL status & content preview)
-                            preview = str(hyp.get("alt_hypothesis") or hyp.get("title") or "")[:2000]
+                            preview = str(hyp.get("alt_hypothesis") or hyp.get("title") or "")[
+                                :2000
+                            ]
                             conn.execute(
                                 """
                                 INSERT OR REPLACE INTO research_provenance_ledger
@@ -321,8 +343,13 @@ class ResearchAutomationOrchestrator:
 
                 else:
                     # Archive to autopsy vault
-                    failure_reason = result.get("primary_failure_reason") or result.get("status", "FAILED")
-                    autopsy_text = result.get("autopsy") or f"Failed {result.get('gates_passed',0)}/{result.get('total_gates',9)} gates."
+                    failure_reason = result.get("primary_failure_reason") or result.get(
+                        "status", "FAILED"
+                    )
+                    autopsy_text = (
+                        result.get("autopsy")
+                        or f"Failed {result.get('gates_passed', 0)}/{result.get('total_gates', 9)} gates."
+                    )
                     knowledge_id = f"KNW_REJ_{hyp_id}_{uuid.uuid4().hex[:6]}"
                     now_ms = int(time.time() * 1000)
                     with db_manager.get_brain_conn() as conn:
@@ -392,7 +419,7 @@ class ResearchAutomationOrchestrator:
         Finds concepts due for review (next_review <= now_ms),
         generates a quiz, and sends it via Telegram.
         """
-        from core.knowledge_os.human_brain import human_brain  # noqa: PLC0415
+        from core.knowledge_os.human_brain import human_brain
 
         now_ms = int(time.time() * 1000)
         reminded = 0
@@ -425,12 +452,12 @@ class ResearchAutomationOrchestrator:
                     f"🧠 *Spaced Repetition Quiz*\n"
                     f"━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"📚 Concept: *{concept_title}*\n"
-                    f"📊 Mastery: `{mastery_bar}` {mastery*100:.0f}%\n\n"
+                    f"📊 Mastery: `{mastery_bar}` {mastery * 100:.0f}%\n\n"
                     f"❓ *{quiz.get('question', 'Review this concept')}*\n\n"
                 )
                 for i, opt in enumerate(quiz.get("options", [])):
-                    msg += f"  {chr(65+i)}) {opt}\n"
-                msg += f"\n_Answer when ready in the Knowledge OS Human Brain desk._"
+                    msg += f"  {chr(65 + i)}) {opt}\n"
+                msg += "\n_Answer when ready in the Knowledge OS Human Brain desk._"
 
                 await self._notify(msg)
                 reminded += 1
@@ -449,7 +476,7 @@ class ResearchAutomationOrchestrator:
         Reads research_automation_channels, crawls any channel whose
         last_crawled_at is older than crawl_interval_hours.
         """
-        from core.youtube.agent import YouTubeExplorationAgent  # noqa: PLC0415
+        from core.youtube.agent import YouTubeExplorationAgent
 
         youtube_agent = YouTubeExplorationAgent()
         now_ms = int(time.time() * 1000)
@@ -524,7 +551,7 @@ class ResearchAutomationOrchestrator:
         Runs the 7-invariant KnowledgeAuditEngine and pushes report
         to Telegram if any check is WARN or FAIL.
         """
-        from core.knowledge_os.knowledge_audit import knowledge_audit_engine  # noqa: PLC0415
+        from core.knowledge_os.knowledge_audit import knowledge_audit_engine
 
         audit_report = await asyncio.get_event_loop().run_in_executor(
             None, knowledge_audit_engine.run_audit
@@ -538,7 +565,9 @@ class ResearchAutomationOrchestrator:
 
         if warnings or failures:
             lines = ["🔍 *Daily Knowledge Audit Report*", "━━━━━━━━━━━━━━━━━━━━━━"]
-            lines.append(f"✅ Passed: {result.get('passed_checks', 0)} / {result.get('total_checks', 7)}")
+            lines.append(
+                f"✅ Passed: {result.get('passed_checks', 0)} / {result.get('total_checks', 7)}"
+            )
             if failures:
                 lines.append(f"\n🔴 *FAILURES ({len(failures)}):*")
                 for f in failures:
@@ -570,8 +599,10 @@ class ResearchAutomationOrchestrator:
         Also uploads any source files sitting in the 00_INBOX folder.
         Falls back to local simulated archive if credentials not configured.
         """
-        from core.autonomous_research.storage.drive_backend import get_default_drive_backend  # noqa: PLC0415
-        from core.database import BRAIN_DB_PATH, DATA_DIR  # noqa: PLC0415
+        from core.autonomous_research.storage.drive_backend import (
+            get_default_drive_backend,
+        )
+        from core.database import BRAIN_DB_PATH, DATA_DIR
 
         backend = get_default_drive_backend()
         files_synced = 0
@@ -622,7 +653,11 @@ class ResearchAutomationOrchestrator:
             f"• Backend: {mode}"
         )
 
-        return {"items_processed": files_synced + errors, "files_synced": files_synced, "errors": errors}
+        return {
+            "items_processed": files_synced + errors,
+            "files_synced": files_synced,
+            "errors": errors,
+        }
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -631,7 +666,8 @@ class ResearchAutomationOrchestrator:
     async def _notify(self, message: str) -> None:
         """Sends a Telegram notification. Silently logs if bot not configured."""
         try:
-            from core.telegram_bot import telegram_bot  # noqa: PLC0415
+            from core.telegram_bot import telegram_bot
+
             await telegram_bot.send_message(message, parse_mode="Markdown")
         except Exception as exc:  # noqa: BLE001
             logger.info("[AUTOMATION NOTIFY] %s | (Telegram unavailable: %s)", message[:120], exc)
@@ -674,10 +710,7 @@ class ResearchAutomationOrchestrator:
 
     def get_status(self) -> dict[str, Any]:
         """Returns full pipeline status snapshot for the API endpoint."""
-        return {
-            name: ps.to_dict()
-            for name, ps in self.pipeline_status.items()
-        }
+        return {name: ps.to_dict() for name, ps in self.pipeline_status.items()}
 
 
 # Singleton
