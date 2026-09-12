@@ -19,6 +19,22 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
+try:
+    import dotenv
+    dotenv.load_dotenv(ROOT_DIR / ".env")
+except ImportError:
+    pass
+
+
+def _clean_folder_id(val: str | None) -> str | None:
+    if not val:
+        return None
+    val = val.strip()
+    if "folders/" in val:
+        val = val.split("folders/")[-1].split("?")[0].split("/")[0]
+    return val or None
+
+
 SCOPES = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/drive.file",
@@ -48,7 +64,7 @@ def check_status() -> None:
         os.getenv("GDRIVE_CLIENT_SECRET_FILE")
         or "credentials/gdrive_client_secret.json"
     )
-    root_folder_id = os.getenv("GDRIVE_ROOT_FOLDER_ID", "(not set - will use root)")
+    root_folder_id = _clean_folder_id(os.getenv("GDRIVE_ROOT_FOLDER_ID")) or "(not set - will use root)"
 
     print(f"[*] Root Folder ID       : {root_folder_id}")
     print(f"[*] Service Account File : {service_account_file} -> {'EXISTS' if Path(service_account_file).exists() else 'NOT FOUND'}")

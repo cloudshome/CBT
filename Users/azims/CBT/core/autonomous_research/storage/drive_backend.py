@@ -22,7 +22,22 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from core.autonomous_research.storage.content_hasher import content_hasher
 
+try:
+    import dotenv
+    dotenv.load_dotenv()
+except ImportError:
+    pass
+
 logger = logging.getLogger("ai_quant_sentinel.storage.drive_backend")
+
+
+def _clean_folder_id(val: str | None) -> str | None:
+    if not val:
+        return None
+    val = val.strip()
+    if "folders/" in val:
+        val = val.split("folders/")[-1].split("?")[0].split("/")[0]
+    return val or None
 
 
 @dataclass
@@ -381,7 +396,15 @@ class GoogleDriveAPIBackend:
 
             if token_file and Path(token_file).exists():
                 from google.oauth2.credentials import Credentials
+                from google.auth.transport.requests import Request
                 creds = Credentials.from_authorized_user_file(token_file, scopes=scopes)
+                if creds.expired and creds.refresh_token:
+                    try:
+                        creds.refresh(Request())
+                        with open(token_file, "w", encoding="utf-8") as f:
+                            f.write(creds.to_json())
+                    except Exception as ref_err:
+                        logger.warning("OAuth token refresh failed: %s", ref_err)
             elif creds_json:
                 from google.oauth2 import service_account
                 info = json.loads(creds_json)
@@ -473,7 +496,7 @@ class GoogleDriveAPIBackend:
             p = Path(local_path).resolve()
             upload_name = filename or p.name
 
-            root_parent = os.getenv("GDRIVE_ROOT_FOLDER_ID")
+            root_parent = _clean_folder_id(os.getenv("GDRIVE_ROOT_FOLDER_ID"))
             folder_id = self._resolve_or_create_remote_folder(drive_folder, root_parent)
 
             file_metadata = {"name": upload_name}
