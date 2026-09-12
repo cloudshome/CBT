@@ -23,6 +23,7 @@ import { AutonomousAuditorHUD } from './components/AutonomousAuditorHUD';
 import { ShadowBurnInHUD } from './components/ShadowBurnInHUD';
 import { ResearchIngestLab } from './components/ResearchIngestLab';
 import { CollectiveCoreDashboard } from './components/CollectiveCoreDashboard';
+import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
 import {
@@ -92,8 +93,8 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
-  // Main Screen View Switcher: Terminal Cockpit vs Dedicated Shadow Paper Trading Desk
-  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'PAPER_DESK'>('TERMINAL');
+  // Main Screen View Switcher: Terminal Cockpit vs Master Cockpit vs Dedicated Shadow Paper Trading Desk
+  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK'>('MASTER_COCKPIT');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -433,10 +434,20 @@ export const App: React.FC = () => {
         openPositionsCount={positions.length}
       />
 
-      {/* Primary View Routing: Dedicated Shadow Paper Desk vs Full Terminal Cockpit */}
+      {/* Primary View Routing: Dedicated Shadow Paper Desk vs Master Cockpit vs Classic Terminal */}
       {activeMainView === 'PAPER_DESK' ? (
         <DedicatedPaperTradingDesk
           onClosePosition={handleClosePosition}
+        />
+      ) : activeMainView === 'MASTER_COCKPIT' ? (
+        <InstitutionalMasterTerminal
+          initialSymbol={symbol}
+          initialTimeframe={timeframe}
+          onDeployToOrderDesk={(setup) => {
+            setSelectedSetup(setup);
+            addToast('info', 'Setup Loaded', `Transferred ${setup.type} order to Order Desk.`);
+          }}
+          addToast={addToast}
         />
       ) : (
         <>

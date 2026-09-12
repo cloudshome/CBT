@@ -37,6 +37,11 @@ import {
   BookIngestionJob,
   ResearchGapItem,
   KnowledgeAuditReport,
+  MasterTerminalTelemetry,
+  ProvenanceGraphData,
+  ReplaySnapshotData,
+  SMCGlossaryItem,
+  SignalBlotterRecord,
 } from '../types';
 
 const BASE_URL = '';
@@ -1757,6 +1762,66 @@ export const api = {
   async getWSReconciliationRecent(limit: number = 20): Promise<{ status: string; limit: number; recent_fills: WSNormalizedFill[]; timestamp_ms: number }> {
     const res = await authFetch(`${BASE_URL}/api/execution/ws-reconciliation/recent?limit=${limit}`);
     return handleResponse<{ status: string; limit: number; recent_fills: WSNormalizedFill[]; timestamp_ms: number }>(res);
+  },
+
+  /**
+   * GET /api/terminal/telemetry
+   * Master Institutional Command Cockpit Unified Telemetry
+   */
+  async getMasterTerminalTelemetry(
+    symbol: string = 'BTCUSDT',
+    timeframe: SupportedTimeframe = '15m'
+  ): Promise<MasterTerminalTelemetry> {
+    const res = await authFetch(
+      `${BASE_URL}/api/terminal/telemetry?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`
+    );
+    return handleResponse<MasterTerminalTelemetry>(res);
+  },
+
+  /**
+   * POST /api/terminal/approval-action
+   * Signal Lifecycle Execution & Transition
+   */
+  async updateSignalApproval(
+    signalId: string,
+    action: 'APPROVE' | 'REJECT' | 'EXECUTE' | 'CLOSE',
+    notes?: string
+  ): Promise<{ success: boolean; signalId: string; newState: string; updatedSignal: SignalBlotterRecord }> {
+    const res = await authFetch(`${BASE_URL}/api/terminal/approval-action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signalId, action, notes }),
+    });
+    return handleResponse<{ success: boolean; signalId: string; newState: string; updatedSignal: SignalBlotterRecord }>(res);
+  },
+
+  /**
+   * GET /api/terminal/provenance
+   * Traceable audit graph from raw market data to final thesis
+   */
+  async getTerminalProvenance(thesisId?: string): Promise<ProvenanceGraphData> {
+    const query = thesisId ? `?thesisId=${encodeURIComponent(thesisId)}` : '';
+    const res = await authFetch(`${BASE_URL}/api/terminal/provenance${query}`);
+    return handleResponse<ProvenanceGraphData>(res);
+  },
+
+  /**
+   * GET /api/terminal/replay
+   * Historical Snapshot for Market Replay Time-Scrubbing
+   */
+  async getTerminalReplay(offset: string = 'NOW'): Promise<ReplaySnapshotData> {
+    const res = await authFetch(`${BASE_URL}/api/terminal/replay?offset=${encodeURIComponent(offset)}`);
+    return handleResponse<ReplaySnapshotData>(res);
+  },
+
+  /**
+   * GET /api/terminal/glossary
+   * Searchable SMC & Quantitative Glossary
+   */
+  async getSMCGlossary(query?: string): Promise<{ totalCount: number; query: string; items: SMCGlossaryItem[] }> {
+    const q = query ? `?q=${encodeURIComponent(query)}` : '';
+    const res = await authFetch(`${BASE_URL}/api/terminal/glossary${q}`);
+    return handleResponse<{ totalCount: number; query: string; items: SMCGlossaryItem[] }>(res);
   },
 };
 

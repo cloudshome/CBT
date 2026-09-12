@@ -9,6 +9,7 @@ import deskRouter from './routes/desk';
 import skyRouter from './routes/sky';
 import tickersRouter from './routes/tickers';
 import { institutionalRouter } from './routes/institutional';
+import { terminalRouter } from './routes/terminal';
 import { metricsRouter } from './routes/metrics';
 import { apiKeyAuth } from './middleware/apiKeyAuth';
 
@@ -96,6 +97,7 @@ export function createApp(): Express {
   app.use('/api/paper', apiKeyAuth, paperRouter);
   app.use('/api/desk', apiKeyAuth, deskRouter);
   app.use('/api/institutional', apiKeyAuth, institutionalRouter);
+  app.use('/api/terminal', terminalRouter);
 
   // Payload too large error handler (HTTP 413)
   app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {

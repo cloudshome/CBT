@@ -1378,3 +1378,372 @@ export interface KnowledgeAuditReport {
   total_autopsies: number;
   created_at: number;
 }
+
+
+// ============================================================================
+// Institutional Master Command Cockpit (CTB Level 0 - Level 7)
+// ============================================================================
+
+export type TerminalDensityMode = 'COMMAND' | 'ANALYSIS' | 'REVIEW';
+
+export interface MTFHeatmapRow {
+  timeframe: string;
+  label: string;
+  isHTF: boolean;
+  bias: string;
+  structure: string;
+  trend: string;
+  rsi: number;
+  vwapSigma: number;
+  smcPattern: string;
+  score: number;
+  statusColor: 'emerald' | 'cyan' | 'amber' | 'rose';
+}
+
+export interface VolumeProfileBin {
+  price: number;
+  volume: number;
+  percentage: number;
+  isValueArea: boolean;
+  isPOC: boolean;
+}
+
+export interface VolumeProfileData {
+  vpoc: number;
+  vah: number;
+  val: number;
+  hvnLevels: number[];
+  lvnLevels: number[];
+  bins: VolumeProfileBin[];
+}
+
+export interface LiquidationCluster {
+  priceLevel: number;
+  estimatedVolumeUsd: number;
+  distancePct: number;
+  leverageTier: string;
+  clusterIntensity: number;
+  label: string;
+}
+
+export interface LiquidationMapData {
+  shortClusters: LiquidationCluster[];
+  longClusters: LiquidationCluster[];
+}
+
+export interface MarketRegimeData {
+  classification: 'TRENDING_EXPANSION' | 'COMPRESSION_COILING' | 'LIQUIDITY_HARVESTING' | 'DISTRIBUTION_PRESSURE' | 'MACRO_CHOP_UNCERTAIN';
+  confidence: number;
+  trendScore: number;
+  volatilityScore: number;
+  liquidityScore: number;
+  momentumScore: number;
+  correlationScore: number;
+  preferredSetups: string[];
+  avoidSetups: string[];
+  summary: string;
+}
+
+export interface MarketDecisionData {
+  primaryAction: 'LONG' | 'SHORT' | 'WAIT';
+  edgeScore: number;
+  alignmentScore: number;
+  riskTier: string;
+  stateLabel: string;
+  narrative: string;
+}
+
+export interface ScorecardFactorWeight {
+  name: string;
+  weightPct: number;
+  score: number;
+  max: number;
+  rationale: string;
+}
+
+export interface InstitutionalConfluenceData {
+  qualityScore: number;
+  qualityBadge: 'A+' | 'A' | 'B' | 'C';
+  factorWeights: ScorecardFactorWeight[];
+  confluenceRadar: {
+    structure: number;
+    trend: number;
+    flow: number;
+    macro: number;
+    riskReward: number;
+    derivatives: number;
+  };
+  qualityScoreHistory: number[];
+}
+
+export interface StyleSignalPlan {
+  style: 'SCALP' | 'DAY' | 'SWING' | 'MOMENTUM' | 'POSITION';
+  side: 'LONG' | 'SHORT';
+  timeframe: string;
+  entryZone: [number, number];
+  invalidationPrice: number;
+  stopLoss: number;
+  tp1: number;
+  tp2: number;
+  tp3: number;
+  riskRewardRatio: number;
+  suggestedRiskPct: number;
+  notionalUsd: number;
+  halfKellyMultiplier: number;
+  score: number;
+  confidence: number;
+  stableDurationSecs: number;
+  reaffirmsCount: number;
+  cooldownRemainingSecs: number;
+  thesis: string;
+}
+
+export interface SignalBlotterRecord {
+  id: string;
+  symbol: string;
+  style: 'SCALP' | 'DAY' | 'SWING' | 'MOMENTUM' | 'POSITION';
+  side: 'LONG' | 'SHORT';
+  score: number;
+  qualityBadge: 'A+' | 'A' | 'B' | 'C';
+  entryPrice: number;
+  entryZone: [number, number];
+  invalidationPrice: number;
+  stopLoss: number;
+  tpLadder: { tp1: number; tp2: number; tp3: number };
+  riskRewardRatio: number;
+  suggestedRiskPct: number;
+  notionalUsd: number;
+  halfKellyMultiplier: number;
+  state: 'PENDING' | 'APPROVED' | 'EXECUTED' | 'CLOSED' | 'REJECTED';
+  stableDurationSecs: number;
+  reaffirmsCount: number;
+  cooldownRemainingSecs: number;
+  thesis: string;
+  createdAt: number;
+  approvedAt?: number;
+  executedAt?: number;
+  closedAt?: number;
+  realizedPnlUsd?: number;
+  realizedR?: number;
+}
+
+export interface PaperPortfolioCockpitData {
+  equityUsd: number;
+  todayPnlUsd: number;
+  todayPnlPct: number;
+  realizedPnlUsd: number;
+  unrealizedPnlUsd: number;
+  winRatePct: number;
+  profitFactor: number;
+  expectancyR: number;
+  maxDrawdownPct: number;
+  openPositionsCount: number;
+  blotter: SignalBlotterRecord[];
+  equityCurve: { time: string; equity: number }[];
+  rDistribution: { rBucket: string; count: number }[];
+  calibrationLab: {
+    setupType: string;
+    winRatePct: number;
+    profitFactor: number;
+    expectancyR: number;
+    sizingMultiplier: number;
+    status: string;
+  }[];
+}
+
+export interface PolymarketIntelItem {
+  question: string;
+  previousProbPct: number;
+  currentProbPct: number;
+  deltaPct: number;
+  bias: string;
+}
+
+export interface MacroCalendarEvent {
+  event: string;
+  impact: string;
+  countdown: string;
+  policyWarning: string;
+}
+
+export interface MacroCockpitRadarData {
+  fearAndGreed: {
+    score: number;
+    classification: string;
+    previousClose: number;
+    historicalAvg7d: number;
+  };
+  marketDominance: {
+    btcD: number;
+    ethD: number;
+    usdtD: number;
+    othersD: number;
+  };
+  crossAssetCorrelation: {
+    assets: string[];
+    matrix: number[][];
+  };
+  polymarketIntelligence: PolymarketIntelItem[];
+  macroCalendar: MacroCalendarEvent[];
+  onChainVitals: {
+    exchangeNetFlow24hUsd: number;
+    exchangeFlowSentiment: string;
+    whaleTransfers24hCount: number;
+    whaleNetToExchangeCount: number;
+    whaleNetToColdStorageCount: number;
+    mempoolCongestionPct: number;
+    medianGasSatVb: number;
+  };
+}
+
+export interface PreTradeGateCheckItem {
+  id: string;
+  label: string;
+  checked: boolean;
+  required: boolean;
+}
+
+export interface AICoachCockpitData {
+  currentThesis: string;
+  supportingFactors: string[];
+  threatFactors: string[];
+  verdict: string;
+  whyNotTradeEngine: {
+    isTradingAllowed: boolean;
+    primaryBlocker: string;
+    activeBlockers: string[];
+    capitalPreservationAdvice: string;
+  };
+  preTradeGateChecklist: PreTradeGateCheckItem[];
+  behavioralTiltShield: {
+    consecutiveLosses: number;
+    recentTradeFrequencyPerHour: number;
+    isTiltAlertActive: boolean;
+    cooldownRemainingMinutes: number;
+    advisoryMessage: string;
+  };
+}
+
+export interface ProvenanceNodeItem {
+  id: string;
+  step?: string;
+  source?: string;
+  layer?: string;
+  name?: string;
+  algorithm?: string;
+  idOrType?: string;
+  classification?: string;
+  check?: string;
+  model?: string;
+  latencyMs?: number;
+  latency?: string;
+  status: string;
+  confidence: number;
+  details?: string;
+}
+
+export interface ProvenanceGraphData {
+  thesisId: string;
+  timestamp: number;
+  nodes: ProvenanceNodeItem[];
+}
+
+export interface MasterTerminalTelemetry {
+  symbol: string;
+  timeframe: string;
+  currentPrice: number;
+  priceChange24hPct: number;
+  system: {
+    service: string;
+    version: string;
+    timestamp: number;
+    serverClockUtc: string;
+    activeSession: string;
+    marketDataLatencyMs: number;
+    orderBookLatencyMs: number;
+    derivativesLatencyMs: number;
+    onChainLatencyMs: number;
+    macroLatencyMs: number;
+    aiLatencyMs: number;
+    riskPerimeter: {
+      status: 'ARMED';
+      dailyLossPct: number;
+      maxDailyLossPct: number;
+      openRiskPct: number;
+      maxOpenRiskPct: number;
+      killSwitchReady: boolean;
+    };
+  };
+  market: {
+    mtfMatrix: MTFHeatmapRow[];
+    regime: MarketRegimeData;
+    marketDecision: MarketDecisionData;
+    volumeProfile: VolumeProfileData;
+    liquidationMap: LiquidationMapData;
+    premiumDiscount: {
+      currentZone: 'PREMIUM' | 'DISCOUNT';
+      fib05Equilibrium: number;
+      high50: number;
+      low50: number;
+    };
+    smcStructures: {
+      fvgList: FVGItem[];
+      orderBlocks: OrderBlockItem[];
+      bosList: unknown[];
+      swings: unknown[];
+    };
+  };
+  orderFlow: {
+    currentCvd: number;
+    cvdDeltaPct: number;
+    divergenceAlert: {
+      type: 'BULLISH_ABSORPTION' | 'BEARISH_EXHAUSTION';
+      title: string;
+      description: string;
+      strengthScore: number;
+      confidence: string;
+    };
+    derivativesVitals: {
+      openInterestUsd: number;
+      oiDelta1hPct: number;
+      oiDelta24hPct: number;
+      oiPriceTriadClassification: string;
+      predictedFundingRate8hPct: number;
+      fundingRateAnnualizedPct: number;
+      longShortRatioTopTraders: number;
+      longShortRatioGlobalAccounts: number;
+      l2DepthImbalancePct: number;
+      bidsPercentage: number;
+      asksPercentage: number;
+      liquidityWalls: {
+        side: 'BID' | 'ASK';
+        price: number;
+        volumeUsd: number;
+        distancePct: number;
+      }[];
+    };
+  };
+  confluence: InstitutionalConfluenceData;
+  styleSignals: StyleSignalPlan[];
+  executionAndRisk: PaperPortfolioCockpitData;
+  macroAndContext: MacroCockpitRadarData;
+  learningAndCoach: AICoachCockpitData;
+  provenance: ProvenanceGraphData;
+}
+
+export interface SMCGlossaryItem {
+  term: string;
+  category: string;
+  definition: string;
+  rule: string;
+  visualCue: string;
+}
+
+export interface ReplaySnapshotData {
+  offset: string;
+  timestamp: number;
+  replayPrice: number;
+  replayScore: number;
+  replayAlignment: number;
+  whatChanged: string;
+}

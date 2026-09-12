@@ -16,8 +16,8 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
-  activeView?: 'TERMINAL' | 'PAPER_DESK';
-  onViewChange?: (view: 'TERMINAL' | 'PAPER_DESK') => void;
+  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK';
+  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK') => void;
   openPositionsCount?: number;
 }
 
@@ -84,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
           <button
             onClick={() => onViewChange?.('TERMINAL')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
               activeView === 'TERMINAL'
                 ? 'bg-sky-500 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
@@ -92,6 +92,17 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Activity size={14} />
             <span>Terminal</span>
+          </button>
+          <button
+            onClick={() => onViewChange?.('MASTER_COCKPIT')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all font-bold ${
+              activeView === 'MASTER_COCKPIT'
+                ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-sm shadow-cyan-500/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Zap size={14} className={activeView === 'MASTER_COCKPIT' ? 'text-white' : 'text-cyan-400'} />
+            <span>Master Cockpit</span>
           </button>
           <button
             onClick={() => onViewChange?.('PAPER_DESK')}
