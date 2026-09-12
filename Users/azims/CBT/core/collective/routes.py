@@ -16,7 +16,9 @@ from pydantic import BaseModel
 from core.collective.checkpoint import vector_checkpoint
 from core.collective.conflict import conflict_manager
 from core.collective.event_store import event_store
+from core.collective.gdrive_mesh import gdrive_cluster_mesh
 from core.collective.identity import node_identity_manager
+from core.collective.lease_manager import lease_manager
 from core.collective.node import node_registry
 from core.collective.quarantine import quarantine_manager
 from core.collective.reconciler import collective_reconciler
@@ -52,9 +54,14 @@ def get_collective_status() -> dict[str, Any]:
     conflicts = conflict_manager.list_conflicts(unresolved_only=True)
     quarantined = quarantine_manager.get_quarantine_count()
     vector_clock = vector_checkpoint.get_vector_clock()
+    mesh_status = gdrive_cluster_mesh.get_cluster_status()
+    lease = lease_manager.get_current_lease()
 
     return {
         "node_id": identity.node_id,
+        "node_epoch": identity.node_epoch,
+        "node_role": identity.node_role,
+        "software_version": identity.software_version,
         "protocol_version": identity.protocol_version,
         "schema_version": identity.schema_version,
         "status": "ONLINE",
@@ -65,6 +72,17 @@ def get_collective_status() -> dict[str, Any]:
         "quarantined_events": quarantined,
         "vector_clock": vector_clock,
         "installation_id": identity.installation_id,
+        "cloud_mesh": {
+            "connected": mesh_status.cloud_backend_live,
+            "account": mesh_status.cloud_account,
+            "hub": "SKY/09_CLUSTER_MESH/",
+        },
+        "lease": {
+            "active": lease.is_valid() if lease else False,
+            "fencing_token": lease.fencing_token if lease else 0,
+            "owner": lease.node_id if lease else None,
+            "expires_at": lease.expires_at if lease else None,
+        },
     }
 
 

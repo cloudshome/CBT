@@ -125,8 +125,17 @@ export const SystemCommandStrip: React.FC<SystemCommandStripProps> = ({
         </div>
       </div>
 
-      {/* Right: Risk Perimeter & Density Mode Switcher */}
+      {/* Right: Risk Perimeter, SDCC Mesh Badge & Density Mode Switcher */}
       <div className="flex items-center gap-3">
+        {/* SDCC Collective Cluster Badge */}
+        <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0b1324] border border-cyan-500/30 text-[10px]" title="SDCC Distributed Mesh: Connected to Google Drive Cloud Hub">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+          <span className="text-cyan-400 font-bold">OFFICE-01</span>
+          <span className="px-1 py-0.2 rounded bg-cyan-950 text-cyan-300 font-semibold text-[9px]">E1 • PRIMARY</span>
+          <span className="text-slate-500">|</span>
+          <span className="text-emerald-400 font-semibold">☁️ 5TB SYNC</span>
+        </div>
+
         {/* Risk Perimeter Status */}
         <div className="flex items-center gap-2 bg-[#0d1322] border border-[#1e293b] rounded px-2.5 py-1 text-[10px]">
           <ShieldAlert size={12} className="text-emerald-400" />

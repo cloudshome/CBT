@@ -7,7 +7,7 @@ Canonical Event Envelope and Factory for SDCC.
 from __future__ import annotations
 
 import datetime
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from core.collective.event_hash import compute_event_hash, compute_payload_hash
@@ -63,24 +63,32 @@ class CanonicalEvent:
     integrity: dict[str, str]
     causation_id: str | None = None
     correlation_id: str | None = None
+    node_epoch: int = 1
+    vector_clock: dict[str, int] = field(default_factory=dict)
+    signature: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d = {
             "event_id": self.event_id,
             "event_type": self.event_type,
             "schema_version": self.schema_version,
             "protocol_version": self.protocol_version,
             "node_id": self.node_id,
+            "node_epoch": self.node_epoch,
             "sequence": self.sequence,
             "created_at": self.created_at,
             "entity_type": self.entity_type,
             "entity_id": self.entity_id,
             "causation_id": self.causation_id,
             "correlation_id": self.correlation_id,
+            "vector_clock": self.vector_clock,
             "payload": self.payload,
             "provenance": self.provenance,
             "integrity": self.integrity,
         }
+        if self.signature:
+            d["signature"] = self.signature
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CanonicalEvent:
@@ -99,6 +107,9 @@ class CanonicalEvent:
             payload=data["payload"],
             provenance=data["provenance"],
             integrity=data["integrity"],
+            node_epoch=data.get("node_epoch", 1),
+            vector_clock=data.get("vector_clock", {}),
+            signature=data.get("signature"),
         )
 
 
@@ -113,6 +124,9 @@ def build_canonical_event(
     causation_id: str | None = None,
     correlation_id: str | None = None,
     created_at: str | None = None,
+    node_epoch: int = 1,
+    vector_clock: dict[str, int] | None = None,
+    signature: str | None = None,
 ) -> CanonicalEvent:
     """
     Constructs an immutable CanonicalEvent with computed SHA-256 hashes and formatted event_id.
@@ -138,12 +152,14 @@ def build_canonical_event(
         "schema_version": CURRENT_EVENT_SCHEMA_VERSION,
         "protocol_version": CURRENT_PROTOCOL_VERSION,
         "node_id": node_id,
+        "node_epoch": node_epoch,
         "sequence": sequence,
         "created_at": now_iso,
         "entity_type": entity_type,
         "entity_id": entity_id,
         "causation_id": causation_id,
         "correlation_id": correlation_id,
+        "vector_clock": vector_clock or {node_id: sequence},
         "payload": payload,
         "provenance": prov_dict,
     }
@@ -171,4 +187,7 @@ def build_canonical_event(
         payload=payload,
         provenance=prov_dict,
         integrity=integrity_dict,
+        node_epoch=node_epoch,
+        vector_clock=vector_clock or {node_id: sequence},
+        signature=signature,
     )
