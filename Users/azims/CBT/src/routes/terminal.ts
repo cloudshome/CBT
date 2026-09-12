@@ -327,6 +327,31 @@ function computeMTFHeatmap(_curP: number, isBull: boolean) {
 }
 
 /**
+ * Calibrates signal blotter prices dynamically to match the current live market price of the asset
+ */
+function calibrateBlotterForPrice(symbol: string, curP: number) {
+  const btcItem = signalBlotter.find((s) => s.id === 'SIG-BTC-SWING-01');
+  if (btcItem && (btcItem.symbol !== symbol || Math.abs(btcItem.entryPrice - curP) / curP > 0.03)) {
+    const scaleRatio = curP / btcItem.entryPrice;
+    for (const item of signalBlotter) {
+      item.entryPrice = Number((item.entryPrice * scaleRatio).toFixed(2));
+      item.entryZone = [
+        Number((item.entryZone[0] * scaleRatio).toFixed(2)),
+        Number((item.entryZone[1] * scaleRatio).toFixed(2)),
+      ];
+      item.invalidationPrice = Number((item.invalidationPrice * scaleRatio).toFixed(2));
+      item.stopLoss = Number((item.stopLoss * scaleRatio).toFixed(2));
+      item.tpLadder = {
+        tp1: Number((item.tpLadder.tp1 * scaleRatio).toFixed(2)),
+        tp2: Number((item.tpLadder.tp2 * scaleRatio).toFixed(2)),
+        tp3: Number((item.tpLadder.tp3 * scaleRatio).toFixed(2)),
+      };
+      item.symbol = symbol;
+    }
+  }
+}
+
+/**
  * GET /api/terminal/telemetry
  * Master Cockpit Unified Telemetry Aggregator
  */
@@ -342,7 +367,9 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
     const candles = parseAndNormalizeCandles(marketData.candles);
     const quant = runQuantDetection(candles);
 
-    const curP = candles.length > 0 ? candles[candles.length - 1].close : 88450.0;
+    const curP = candles.length > 0 ? candles[candles.length - 1].close : 77350.0;
+    calibrateBlotterForPrice(symbol, curP);
+
     const prevClose = candles.length > 1 ? candles[candles.length - 2].close : curP * 0.995;
     const priceChange24hPct = Number((((curP - prevClose) / prevClose) * 100).toFixed(2));
 
@@ -700,7 +727,7 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
         'FOMC meeting approaching in 2 days.',
         'Local 25x short liquidation magnet at +1.8% could induce sharp mean-reversion.',
       ],
-      verdict: 'WAIT FOR 5m BOS OR EXECUTE ON PULLBACK TO $88,250 DEMAND BLOCK',
+      verdict: `WAIT FOR 5m BOS OR EXECUTE ON PULLBACK TO $${Number((curP * 0.994).toFixed(0)).toLocaleString()} DEMAND BLOCK`,
       whyNotTradeEngine: {
         isTradingAllowed: alignmentScore >= 55,
         primaryBlocker: alignmentScore < 55 ? 'HTF / LTF structural conflict. Sub-hurdle edge score.' : 'None. All structural and risk gates passed.',
@@ -734,7 +761,7 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
 
     // Full Provenance Graph
     const provenanceGraph = {
-      thesisId: 'THESIS-BTC-88450',
+      thesisId: `THESIS-${symbol}-${Math.round(curP)}`,
       timestamp: Date.now(),
       nodes: [
         { id: 'node_1', step: 'Market Feed', source: marketData.source, latencyMs: 14, status: 'VERIFIED', confidence: 100 },
@@ -973,16 +1000,34 @@ terminalRouter.get('/provenance', async (req: Request, res: Response): Promise<v
  */
 terminalRouter.get('/replay', async (req: Request, res: Response): Promise<void> => {
   const timeOffset = (req.query.offset as string) || 'NOW';
+  const symbol = (req.query.symbol as string) || 'BTCUSDT';
+
+  let basePrice = 77350;
+  try {
+    const marketData = await fetchCandlesWithFallback(symbol, '15m', 5);
+    const candles = parseAndNormalizeCandles(marketData.candles);
+    if (candles.length > 0) {
+      basePrice = candles[candles.length - 1].close;
+    }
+  } catch {
+    // fallback
+  }
+
+  const p60 = Number((basePrice * 0.994).toFixed(2));
+  const p30 = Number((basePrice * 0.997).toFixed(2));
+  const p10 = Number((basePrice * 0.999).toFixed(2));
+  const pNow = Number(basePrice.toFixed(2));
+
   res.json({
     offset: timeOffset,
     timestamp: Date.now(),
-    replayPrice: timeOffset === 'T-60m' ? 87920 : timeOffset === 'T-30m' ? 88150 : timeOffset === 'T-10m' ? 88380 : 88450,
+    replayPrice: timeOffset === 'T-60m' ? p60 : timeOffset === 'T-30m' ? p30 : timeOffset === 'T-10m' ? p10 : pNow,
     replayScore: timeOffset === 'T-60m' ? 68 : timeOffset === 'T-30m' ? 74 : timeOffset === 'T-10m' ? 81 : 84,
     replayAlignment: timeOffset === 'T-60m' ? 42 : timeOffset === 'T-30m' ? 58 : timeOffset === 'T-10m' ? 69 : 72,
     whatChanged: timeOffset === 'T-60m'
       ? 'Initial Asian session low sweep; CVD delta turning flat.'
       : timeOffset === 'T-30m'
-      ? '15m Bullish Absorption confirmed; L2 bid wall entered at $88,250.'
+      ? `15m Bullish Absorption confirmed; L2 bid wall entered at $${Math.round(basePrice * 0.995).toLocaleString()}.`
       : timeOffset === 'T-10m'
       ? '5m BOS validated above session VWAP; Quality score crossed 80 hurdle.'
       : 'Full institutional confluence; Swing Long setup queued in Approval blotter.',
