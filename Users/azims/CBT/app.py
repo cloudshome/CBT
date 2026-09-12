@@ -175,6 +175,7 @@ from core.universal_ingestor import universal_ingestor
 from core.voice_interface import voice_interface
 from core.walk_forward_engine import walk_forward_engine
 from core.youtube.agent import youtube_agent
+from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
 
 log_dir = Path(os.getenv("DATA_DIR", "data")) / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
@@ -215,14 +216,17 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         asyncio.create_task(autonomous_trader.start_loop()),
         asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
         asyncio.create_task(hf_telemetry_pipeline.start_flush_loop()),
+        asyncio.create_task(research_automation_orchestrator.start_loop()),
     ]
     logger.info(
-        "AI Quant Sentinel FastAPI online with Autonomous Trader, Burn-In Orchestrator & Telemetry Pipeline."
+        "AI Quant Sentinel FastAPI online with Autonomous Trader, Burn-In Orchestrator, "
+        "Telemetry Pipeline & Zero-Touch Research Automation Orchestrator."
     )
     try:
         yield
     finally:
         shadow_burn_in_orchestrator.stop()
+        research_automation_orchestrator.stop()
         hf_telemetry_pipeline.flush_to_sqlite()
         for task in tasks:
             task.cancel()

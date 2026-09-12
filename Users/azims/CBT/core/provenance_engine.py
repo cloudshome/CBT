@@ -568,11 +568,12 @@ class ProvenanceEngine:
     # BACKWARD COMPATIBILITY BRIDGE (For Telemetry Metrics & Compiler Tests)
     # =========================================================================
 
-    def compute_sha256(self, content: str) -> str:
+    def compute_sha256(self, content: str | None) -> str:
         """Deterministic SHA-256 hash of raw content."""
         import hashlib
 
-        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+        text = content or ""
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def register_source(
         self,
@@ -641,7 +642,7 @@ class ProvenanceEngine:
             ).fetchone()
             if row:
                 d = dict(row)
-                content = d.get("raw_content_preview", "")
+                content = d.get("raw_content_preview") or ""
                 return ProvenanceRecord(
                     source_id=source_id
                     if source_id.startswith("SRC-")
@@ -666,7 +667,7 @@ class ProvenanceEngine:
             ).fetchall()
             for r in rows:
                 d = dict(r)
-                content = d.get("raw_content_preview", "")
+                content = d.get("raw_content_preview") or ""
                 if self.compute_sha256(content) == content_hash:
                     return ProvenanceRecord(
                         source_id=f"SRC-{d['knowledge_id'][2:]}",

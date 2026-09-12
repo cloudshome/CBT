@@ -248,3 +248,126 @@ async def run_knowledge_audit() -> dict[str, Any]:
     """Runs the 7-invariant database integrity and provenance audit."""
     report = knowledge_audit_engine.run_audit()
     return report.to_dict()
+
+
+# -----------------------------------------------------------------------------
+# ZERO-TOUCH RESEARCH AUTOMATION ENDPOINTS
+# -----------------------------------------------------------------------------
+
+class AutomationChannelRequest(BaseModel):
+    url: str = Field(..., description="YouTube channel URL, @handle, or playlist URL")
+    label: str = Field(..., min_length=1, max_length=120, description="Human-readable channel name")
+    crawl_interval_hours: int = Field(default=72, ge=1, le=720, description="Hours between crawls")
+    max_videos_per_crawl: int = Field(default=10, ge=1, le=50, description="Max videos per crawl run")
+
+
+@router.get("/automation/status")
+async def get_automation_status() -> dict[str, Any]:
+    """Returns live status of all 5 zero-touch automation pipelines."""
+    from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator  # noqa: PLC0415
+    return {
+        "pipelines": research_automation_orchestrator.get_status(),
+        "pipeline_count": 5,
+        "pipelines_list": [
+            "hypothesis_backtest (every 30m)",
+            "quiz_reminder (every 60m)",
+            "youtube_crawler (every 6h)",
+            "knowledge_audit (every 24h)",
+            "drive_sync (every 6h)",
+        ],
+    }
+
+
+@router.post("/automation/trigger/{pipeline_name}")
+async def trigger_automation_pipeline(pipeline_name: str) -> dict[str, Any]:
+    """Manually triggers a named pipeline immediately."""
+    from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator  # noqa: PLC0415
+    valid = {"hypothesis_backtest", "quiz_reminder", "youtube_crawler", "knowledge_audit", "drive_sync"}
+    if pipeline_name not in valid:
+        raise HTTPException(status_code=400, detail=f"Unknown pipeline. Valid: {sorted(valid)}")
+    result = await research_automation_orchestrator.trigger_pipeline(pipeline_name)
+    return result
+
+
+@router.get("/automation/channels")
+async def list_automation_channels() -> dict[str, Any]:
+    """Lists all watched YouTube channels for the auto-crawler pipeline."""
+    from core.database import db_manager  # noqa: PLC0415
+    with db_manager.get_brain_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM research_automation_channels ORDER BY added_at DESC;"
+        ).fetchall()
+    channels = [dict(r) for r in rows]
+    return {"channels": channels, "count": len(channels)}
+
+
+@router.post("/automation/channels")
+async def add_automation_channel(req: AutomationChannelRequest) -> dict[str, Any]:
+    """Adds a YouTube channel to the auto-crawler watch list."""
+    import hashlib as _hl  # noqa: PLC0415
+    from core.database import db_manager  # noqa: PLC0415
+    channel_id = f"CH_{_hl.sha256(req.url.encode()).hexdigest()[:12].upper()}"
+    now_ms = int(__import__('time').time() * 1000)
+    try:
+        with db_manager.get_brain_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO research_automation_channels
+                    (channel_id, url, label, crawl_interval_hours, max_videos_per_crawl,
+                     is_active, added_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+                ON CONFLICT(url) DO UPDATE SET
+                    label = excluded.label,
+                    crawl_interval_hours = excluded.crawl_interval_hours,
+                    max_videos_per_crawl = excluded.max_videos_per_crawl,
+                    is_active = 1,
+                    updated_at = excluded.updated_at;
+                """,
+                (channel_id, req.url, req.label,
+                 req.crawl_interval_hours, req.max_videos_per_crawl, now_ms, now_ms),
+            )
+            conn.commit()
+        return {
+            "status": "added",
+            "channel_id": channel_id,
+            "url": req.url,
+            "label": req.label,
+            "crawl_interval_hours": req.crawl_interval_hours,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.delete("/automation/channels/{channel_id}")
+async def remove_automation_channel(channel_id: str) -> dict[str, Any]:
+    """Deactivates a watched channel (soft delete)."""
+    from core.database import db_manager  # noqa: PLC0415
+    now_ms = int(__import__('time').time() * 1000)
+    with db_manager.get_brain_conn() as conn:
+        conn.execute(
+            "UPDATE research_automation_channels SET is_active = 0, updated_at = ? WHERE channel_id = ?;",
+            (now_ms, channel_id),
+        )
+        conn.commit()
+    return {"status": "deactivated", "channel_id": channel_id}
+
+
+@router.get("/automation/log")
+async def get_automation_run_log(
+    pipeline: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    """Returns the automation run audit log, optionally filtered by pipeline."""
+    from core.database import db_manager  # noqa: PLC0415
+    with db_manager.get_brain_conn() as conn:
+        if pipeline:
+            rows = conn.execute(
+                "SELECT * FROM automation_run_log WHERE pipeline = ? ORDER BY started_at DESC LIMIT ?;",
+                (pipeline, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM automation_run_log ORDER BY started_at DESC LIMIT ?;",
+                (limit,),
+            ).fetchall()
+    return {"log": [dict(r) for r in rows], "count": len(rows)}
