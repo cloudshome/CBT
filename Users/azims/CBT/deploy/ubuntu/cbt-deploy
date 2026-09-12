@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # =============================================================================
 #  cbt-deploy  —  CBT Manual Deploy Command
 #
@@ -17,10 +17,36 @@ echo -e "${CYAN}╔════════════════════�
 echo -e "${CYAN}║       CBT Manual Deploy              ║${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
 echo -e "  Time: $(date '+%Y-%m-%d %H:%M:%S')"
+
+# Show which checkout we are about to deploy from. The CTB repo nests the app
+# below the repo root (Users/<name>/CBT), so printing both avoids the classic
+# "wrong directory" confusion. Paths come from /etc/cbt/cbt.env when present.
+CBT_CONFIG="${CBT_CONFIG:-/etc/cbt/cbt.env}"
+# shellcheck disable=SC1090
+[ -f "$CBT_CONFIG" ] && . "$CBT_CONFIG"
+if [ -n "${CBT_PROJECT_DIR:-}" ]; then
+    echo -e "  Repo: ${CBT_REPO_DIR:-unknown}"
+    echo -e "  App : ${CBT_PROJECT_DIR}"
+else
+    echo -e "  ${YELLOW}(/etc/cbt/cbt.env not found — cbt-sync.sh will fall back to its own location)${NC}"
+fi
 echo ""
 
 # Run the sync script
-/usr/local/bin/cbt-sync.sh
+SYNC_BIN="/usr/local/bin/cbt-sync.sh"
+if [ ! -x "$SYNC_BIN" ]; then
+    # Not installed system-wide yet — fall back to the copy beside this script
+    # (i.e. when cbt-deploy is run straight from the repo checkout).
+    HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -x "$HERE/cbt-sync.sh" ]; then
+        SYNC_BIN="$HERE/cbt-sync.sh"
+    else
+        echo -e "  ${RED}$SYNC_BIN not found.${NC}"
+        echo -e "  Install it first:  sudo bash <app-root>/deploy/ubuntu/ubuntu-setup.sh"
+        exit 1
+    fi
+fi
+"$SYNC_BIN"
 
 # Show final service status
 echo ""

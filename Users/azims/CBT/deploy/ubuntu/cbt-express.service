@@ -1,4 +1,7 @@
-﻿[Unit]
+# Rendered by deploy/ubuntu/ubuntu-setup.sh — the path placeholders below are
+# substituted with this machine's real user/app-root paths at install time.
+# Do not copy this file to /etc/systemd/system by hand; run the setup script.
+[Unit]
 Description=CBT Express API Backend
 Documentation=https://github.com/cloudshome/CTB
 After=network-online.target cbt-fastapi.service
@@ -6,11 +9,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=cbt
-Group=cbt
-WorkingDirectory=/home/cbt/CBT
-EnvironmentFile=/home/cbt/CBT/.env
-ExecStart=/usr/bin/node dist/server.js
+User=__CBT_USER__
+Group=__CBT_USER__
+WorkingDirectory=__CBT_PROJECT_DIR__
+EnvironmentFile=__CBT_PROJECT_DIR__/.env
+ExecStart=__NODE_BIN__ __CBT_PROJECT_DIR__/dist/server.js
 Restart=always
 RestartSec=10
 StandardOutput=journal

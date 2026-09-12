@@ -1,4 +1,7 @@
-﻿[Unit]
+# Rendered by deploy/ubuntu/ubuntu-setup.sh — the path placeholders below are
+# substituted with this machine's real user/app-root paths at install time.
+# Do not copy this file to /etc/systemd/system by hand; run the setup script.
+[Unit]
 Description=CBT React Frontend (Vite Preview)
 Documentation=https://github.com/cloudshome/CTB
 After=network-online.target cbt-express.service
@@ -6,11 +9,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=cbt
-Group=cbt
-WorkingDirectory=/home/cbt/CBT/frontend
-EnvironmentFile=/home/cbt/CBT/.env
-ExecStart=/usr/bin/npx vite preview --host 0.0.0.0 --port 5173
+User=__CBT_USER__
+Group=__CBT_USER__
+WorkingDirectory=__CBT_PROJECT_DIR__/frontend
+EnvironmentFile=__CBT_PROJECT_DIR__/.env
+ExecStart=__NPX_BIN__ vite preview --host 0.0.0.0 --port 5173
 Restart=always
 RestartSec=10
 StandardOutput=journal

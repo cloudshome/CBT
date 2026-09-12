@@ -1,15 +1,26 @@
-﻿[Unit]
-Description=CBT GitHub Auto-Sync (pull + restart on new commits)
+# Rendered by deploy/ubuntu/ubuntu-setup.sh — the path placeholders below are
+# substituted with this machine's real user/app-root paths at install time.
+#
+# NOTE: this unit intentionally runs as ROOT. cbt-sync.sh must be able to
+# `systemctl restart cbt-fastapi cbt-express cbt-frontend` after a successful
+# pull+rebuild; running it as __CBT_USER__ makes those restarts fail with
+# "Access denied". The script drops back to __CBT_USER__ for every git / npm /
+# npx / pip step so build artifacts stay owned by the app user.
+[Unit]
+Description=CBT GitHub Auto-Sync (pull + rebuild + restart on new commits)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=cbt
-Group=cbt
-WorkingDirectory=/home/cbt/CBT
-EnvironmentFile=/home/cbt/CBT/.env
+WorkingDirectory=__CBT_PROJECT_DIR__
+# Optional: the sync itself needs no secrets, and a missing .env must not
+# block deploys (the '-' prefix makes systemd tolerate its absence).
+EnvironmentFile=-__CBT_PROJECT_DIR__/.env
 ExecStart=/usr/local/bin/cbt-sync.sh
+# Never let a credential prompt wedge the unit open.
+Environment=GIT_TERMINAL_PROMPT=0
+TimeoutStartSec=900
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=cbt-sync
