@@ -11,14 +11,10 @@ Validates:
 5. Safe projection rebuilding without raw SQLite file sharing.
 """
 
-import datetime
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from core.collective.event import EventProvenance, build_canonical_event
-from core.collective.event_hash import canonical_json_str, sha256_digest
 from core.collective.event_types import CollectiveEventType
 from core.collective.identity import NodeIdentityManager
 from core.collective.lease_manager import ExecutionLease, LeaseManager
@@ -77,6 +73,7 @@ def test_canonical_event_with_vector_clock_and_epoch():
     # Test roundtrip serialization
     d = event.to_dict()
     from core.collective.event import CanonicalEvent
+
     restored = CanonicalEvent.from_dict(d)
     assert restored.node_epoch == 12
     assert restored.vector_clock == clock

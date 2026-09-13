@@ -24,6 +24,7 @@ from core.autonomous_research.storage.content_hasher import content_hasher
 
 try:
     import dotenv
+
     dotenv.load_dotenv()
 except ImportError:
     pass
@@ -378,8 +379,7 @@ class GoogleDriveAPIBackend:
             else None
         )
         token_file = (
-            os.getenv("GDRIVE_OAUTH_TOKEN_FILE")
-            or "credentials/gdrive_token.json"
+            os.getenv("GDRIVE_OAUTH_TOKEN_FILE") or "credentials/gdrive_token.json"
             if Path("credentials/gdrive_token.json").exists()
             else None
         )
@@ -392,25 +392,29 @@ class GoogleDriveAPIBackend:
 
         try:
             from googleapiclient.discovery import build
+
             scopes = ["https://www.googleapis.com/auth/drive"]
 
             if token_file and Path(token_file).exists():
-                from google.oauth2.credentials import Credentials
                 from google.auth.transport.requests import Request
+                from google.oauth2.credentials import Credentials
+
                 creds = Credentials.from_authorized_user_file(token_file, scopes=scopes)
                 if creds.expired and creds.refresh_token:
                     try:
                         creds.refresh(Request())
                         with open(token_file, "w", encoding="utf-8") as f:
                             f.write(creds.to_json())
-                    except Exception as ref_err:
+                    except Exception as ref_err:  # noqa: BLE001
                         logger.warning("OAuth token refresh failed: %s", ref_err)
             elif creds_json:
                 from google.oauth2 import service_account
+
                 info = json.loads(creds_json)
                 creds = service_account.Credentials.from_service_account_info(info, scopes=scopes)
             elif creds_file and Path(creds_file).exists():
                 from google.oauth2 import service_account
+
                 creds = service_account.Credentials.from_service_account_file(
                     creds_file, scopes=scopes
                 )
@@ -450,11 +454,13 @@ class GoogleDriveAPIBackend:
                 name = user.get("displayName")
                 if name:
                     return name
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Failed to fetch connected account from Drive: %s", exc)
         return os.getenv("GDRIVE_USER_EMAIL")
 
-    def _resolve_or_create_remote_folder(self, folder_path: str, parent_id: str | None = None) -> str | None:
+    def _resolve_or_create_remote_folder(
+        self, folder_path: str, parent_id: str | None = None
+    ) -> str | None:
         if not self.service:
             return parent_id
         parts = [p for p in folder_path.strip("/\\").split("/") if p]
@@ -463,7 +469,11 @@ class GoogleDriveAPIBackend:
             query = f"name = '{part}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
             if curr_parent:
                 query += f" and '{curr_parent}' in parents"
-            res = self.service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
+            res = (
+                self.service.files()
+                .list(q=query, spaces="drive", fields="files(id, name)")
+                .execute()
+            )
             files = res.get("files", [])
             if files:
                 curr_parent = files[0]["id"]
@@ -524,7 +534,9 @@ class GoogleDriveAPIBackend:
             logger.info("Uploaded %s to live Google Drive (ID: %s)", upload_name, file_item["id"])
             return meta
         except Exception as exc:  # noqa: BLE001
-            logger.error("Live Google Drive upload failed (%s); falling back to simulated storage.", exc)
+            logger.error(
+                "Live Google Drive upload failed (%s); falling back to simulated storage.", exc
+            )
             return self._sim_fallback.upload_file(local_path, drive_folder, filename, resumable)
 
     def download_file(
