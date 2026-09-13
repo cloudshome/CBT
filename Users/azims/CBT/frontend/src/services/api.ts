@@ -1943,6 +1943,79 @@ export const api = {
     const res = await authFetch(`${BASE_URL}/api/mbo/toxicity?symbol=${encodeURIComponent(symbol)}&venue=${encodeURIComponent(venue)}`);
     return handleResponse<MBOToxicityResponse>(res);
   },
+
+  // ============================================================================
+  // PHASE 21: LIVE EXCHANGE TRADING LAUNCH GATEKEEPER & READINESS
+  // ============================================================================
+
+  async getAccountReadiness(environment: string = 'PRODUCTION'): Promise<AccountReadinessStatus> {
+    const res = await authFetch(`${BASE_URL}/api/execution/account-readiness?environment=${encodeURIComponent(environment)}`);
+    return handleResponse<AccountReadinessStatus>(res);
+  },
+
+  async evaluateGatekeeperCheck(exchange: string, notional: number, environment: string = 'PRODUCTION'): Promise<GatekeeperCheckResult> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live-gatekeeper/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exchange, order_notional_usd: notional, environment }),
+    });
+    return handleResponse<GatekeeperCheckResult>(res);
+  },
+
+  async runLiveCanaryOrder(params: {
+    exchange: string;
+    symbol: string;
+    notional_usd: number;
+    side?: string;
+    order_type?: string;
+    price?: number;
+    environment?: string;
+    is_dry_run?: boolean;
+  }): Promise<CanaryRunResult> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live-canary/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<CanaryRunResult>(res);
+  },
+
+  async getLiveCanaryStatus(): Promise<{
+    status: string;
+    min_canary_notional_usd: number;
+    max_canary_notional_usd: number;
+    vault_unlocked: boolean;
+    is_ready_for_canary: boolean;
+    single_trade_cap_usd: number;
+    reasons: string[];
+    timestamp_ms: number;
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live-canary/status`);
+    return handleResponse<any>(res);
+  },
+
+  async getTelegramLiveStatus(): Promise<{
+    status: string;
+    bot_configured: boolean;
+    bd_time_str: string;
+    is_ready_for_canary: boolean;
+    single_trade_cap_usd: number;
+    active_exchanges: string[];
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/telegram/live-status`);
+    return handleResponse<any>(res);
+  },
+
+  async triggerTelegramBriefing(briefingType: string = 'WHAT_AI_LEARNED'): Promise<{
+    status: string;
+    briefing_type: string;
+    text_preview: string;
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/telegram/trigger-briefing?briefing_type=${encodeURIComponent(briefingType)}`, {
+      method: 'POST',
+    });
+    return handleResponse<any>(res);
+  },
 };
 
 export interface BurnInStatus {
@@ -2581,6 +2654,71 @@ export interface MBOToxicityResponse {
   status: string;
   toxicity: MBOToxicityData;
 }
+
+// ============================================================================
+// PHASE 21: LIVE READINESS & GATEKEEPER INTERFACES
+// ============================================================================
+
+export interface AccountReadinessStatus {
+  status: string;
+  timestamp_ms: number;
+  vault_unlocked: boolean;
+  total_portfolio_equity_usd: number;
+  total_free_cash_usd: number;
+  single_trade_equity_cap_usd: number;
+  max_portfolio_heat_usd: number;
+  active_exchanges: string[];
+  exchange_statuses: Record<string, {
+    exchange: string;
+    environment: string;
+    is_connected: boolean;
+    latency_ms: number;
+    total_equity_usd: number;
+    free_cash_usd: number;
+    locked_margin_usd: number;
+    error_message?: string | null;
+    balances_count: number;
+  }>;
+  is_ready_for_canary_trade: boolean;
+  reasons: string[];
+}
+
+export interface GatekeeperCheckResult {
+  status: string;
+  verdict: {
+    passed: boolean;
+    timestamp_ms: number;
+    exchange: string;
+    requested_notional_usd: number;
+    max_allowed_notional_usd: number;
+    checks: Record<string, boolean>;
+    rejection_reasons: string[];
+    audit_event_id?: string | null;
+  };
+}
+
+export interface CanaryRunResult {
+  status: string;
+  result: {
+    success: boolean;
+    is_dry_run: boolean;
+    exchange: string;
+    symbol: string;
+    notional_usd: number;
+    client_order_id: string;
+    exchange_order_id?: string | null;
+    executed_qty: number;
+    executed_price: number;
+    slippage_bps: number;
+    roundtrip_latency_ms: number;
+    gatekeeper_verdict: any;
+    reconciliation_id?: string | null;
+    status: string;
+    message: string;
+    timestamp_ms: number;
+  };
+}
+
 
 
 

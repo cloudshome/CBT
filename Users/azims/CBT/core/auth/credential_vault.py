@@ -215,6 +215,22 @@ class CredentialVault:
         except Exception as e:  # noqa: BLE001 — best-effort schema init
             logger.error(f"Could not initialize vault_credentials table: {e}")
 
+    def is_unlocked(self) -> bool:
+        """
+        Checks if the vault can derive a valid master key or decrypt credentials.
+        Returns True if an explicit master key is provided, KMS enclave is active,
+        or VAULT_MASTER_KEY / VAULT_PASSPHRASE is configured in environment.
+        In non-production environments, returns True if fallback key derivation is operational.
+        """
+        if self._explicit_master_key is not None:
+            return True
+        if self.kms_enclave is not None:
+            return True
+        if os.getenv("VAULT_MASTER_KEY") or os.getenv("VAULT_PASSPHRASE"):
+            return True
+        app_env = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).lower()
+        return app_env != "production"
+
     def _derive_key(self, salt: bytes) -> bytes:
         """
         Derives 256-bit encryption key using master secret or PBKDF2.
@@ -442,7 +458,7 @@ class CredentialVault:
             f"Credential securely stored in vault for {exch} [{env}] (API Key: {mask_secret(credential.api_key)})"
         )
 
-    def get_credential(self, exchange: str, environment: str) -> ExchangeCredential | None:
+    def get_credential(self, exchange: str, environment: str = "PRODUCTION") -> ExchangeCredential | None:
         """
         Retrieves and decrypts an exchange credential. Returns None if not found or inactive.
         """

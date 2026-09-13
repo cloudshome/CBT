@@ -766,6 +766,107 @@ async def handle_macro(
     return report_text
 
 
+async def handle_live_status(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    Displays multi-exchange live balance probe, free margin, 1.5% equity cap,
+    and 6-point constitutional pre-flight gatekeeper scorecard.
+    """
+    from core.telegram_bot import telegram_bot
+    from core.telegram_live_desk import telegram_live_desk
+
+    env = "PRODUCTION"
+    if args and "test" in args.lower():
+        env = "TESTNET"
+
+    report_text = await telegram_live_desk.format_live_readiness_report(environment=env)
+    if chat_id:
+        await telegram_bot.send_message(report_text, chat_id=chat_id)
+    return report_text
+
+
+async def handle_live_preflight(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    Evaluates an order against all 6 constitutional trading safety gates.
+    Usage: /live_preflight [exchange] [notional_usd]
+    """
+    from core.execution.live_gatekeeper import live_gatekeeper
+    from core.telegram_bot import telegram_bot
+
+    parts = args.strip().split()
+    exchange = parts[0].upper() if len(parts) > 0 else "BINANCE"
+    notional = float(parts[1]) if len(parts) > 1 and parts[1].replace(".", "", 1).isdigit() else 10.0
+
+    verdict = await live_gatekeeper.evaluate_order_clearance(
+        exchange=exchange,
+        order_notional_usd=notional,
+    )
+
+    verdict_emoji = "🟢 CLEARED" if verdict.passed else "🔴 REJECTED"
+    lines = [
+        f"🏛️ **CONSTITUTIONAL PRE-FLIGHT VERDICT ({exchange})**",
+        f"• **Outcome:** `{verdict_emoji}`",
+        f"• **Requested Notional:** `${verdict.requested_notional_usd:.2f}`",
+        f"• **Max Allowed (1.5% Cap):** `${verdict.max_allowed_notional_usd:.2f}`",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "📋 **6-Gate Verification Breakdown:**",
+    ]
+    for check_name, passed in verdict.checks.items():
+        icon = "🟢" if passed else "🔴"
+        lines.append(f"  {icon} `{check_name}`: {'PASS' if passed else 'FAIL'}")
+
+    if not verdict.passed:
+        lines.append("\n⚠️ **Rejection Reasons:**")
+        for r in verdict.rejection_reasons:
+            lines.append(f"  • {r}")
+
+    report_text = "\n".join(lines)
+    if chat_id:
+        await telegram_bot.send_message(report_text, chat_id=chat_id)
+    return report_text
+
+
+async def handle_live_canary(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    Executes or dry-runs a micro-notional live canary order ($10 - $25).
+    Usage: /live_canary [exchange] [symbol] [notional] [--live]
+    """
+    from core.telegram_bot import telegram_bot
+    from core.telegram_live_desk import telegram_live_desk
+
+    parts = args.strip().split()
+    exchange = "BINANCE"
+    symbol = "BTC/USDT"
+    notional = 10.0
+    is_dry_run = True
+
+    for p in parts:
+        if p.upper() in ("BINANCE", "BYBIT"):
+            exchange = p.upper()
+        elif "/" in p or p.upper() in ("BTC", "ETH", "SOL"):
+            symbol = p.upper()
+        elif p.replace(".", "", 1).isdigit():
+            notional = float(p)
+        elif p.lower() in ("--live", "live", "-l"):
+            is_dry_run = False
+
+    report_text = await telegram_live_desk.handle_live_canary_command(
+        exchange=exchange,
+        symbol=symbol,
+        notional_usd=notional,
+        is_dry_run=is_dry_run,
+    )
+    if chat_id:
+        await telegram_bot.send_message(report_text, chat_id=chat_id)
+    return report_text
+
+
+
 async def handle_schedule(
     args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
 ) -> str:
@@ -1018,7 +1119,7 @@ def register_all_v5_commands() -> None:
             description="What AI Learned Today: Nightly research, YouTube V5, and SMC concept digest",
             handler=handle_learned,
             required_role=TelegramRole.ANALYST,
-            aliases=["/daily", "/whatilearned", "/study"],
+            aliases=["/daily", "/whatilearned", "/study", "/ai_learned"],
             argument_schema="",
         ),
         TelegramCommand(
@@ -1026,7 +1127,7 @@ def register_all_v5_commands() -> None:
             description="Macro Catalyst Flash: CPI, FOMC, NFP results and market impact report",
             handler=handle_macro,
             required_role=TelegramRole.ANALYST,
-            aliases=["/cpi", "/fomc", "/nfp", "/catalyst"],
+            aliases=["/cpi", "/fomc", "/nfp", "/catalyst", "/macro_flash"],
             argument_schema="[event_name]",
         ),
         TelegramCommand(
@@ -1036,6 +1137,31 @@ def register_all_v5_commands() -> None:
             required_role=TelegramRole.ANALYST,
             aliases=["/sessions", "/bdtime", "/briefings"],
             argument_schema="",
+        ),
+        TelegramCommand(
+            name="/live_status",
+            description="Phase 21 Live Exchange Trading Readiness & 6-Point Gatekeeper Scorecard",
+            handler=handle_live_status,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/live_readiness", "/readiness", "/live"],
+            argument_schema="[production|testnet]",
+        ),
+        TelegramCommand(
+            name="/live_preflight",
+            description="Pre-flight order clearance against all 6 constitutional safety gates",
+            handler=handle_live_preflight,
+            required_role=TelegramRole.RISK_ADMIN,
+            aliases=["/preflight"],
+            argument_schema="<exchange> <notional_usd>",
+        ),
+        TelegramCommand(
+            name="/live_canary",
+            description="Execute or dry-run a micro-notional live canary order ($10-$25)",
+            handler=handle_live_canary,
+            required_role=TelegramRole.SUPER_ADMIN,
+            aliases=["/canary", "/microtrade"],
+            argument_schema="<exchange> <symbol> <notional> [--live]",
+            risk_level="HIGH",
         ),
     ]
 

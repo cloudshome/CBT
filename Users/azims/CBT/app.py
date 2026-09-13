@@ -63,6 +63,7 @@ from core.volatility import volatility_router
 from core.collective.routes import router as collective_router
 from core.arbitrage.routes import router as arbitrage_router
 from core.mbo.routes import router as mbo_router
+from core.execution.live_routes import router as live_execution_router_api
 from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
 from core.conservative_kelly import conservative_kelly
@@ -250,6 +251,7 @@ app.include_router(collective_router)
 app.include_router(volatility_router)
 app.include_router(arbitrage_router)
 app.include_router(mbo_router)
+app.include_router(live_execution_router_api)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()
@@ -3102,6 +3104,51 @@ async def handle_telegram_webhook(request: Request, update: TelegramWebhookReque
     verify_telegram_secret(request)
     res = await telegram_bot.handle_webhook_update(update.dict())
     return res
+
+
+@app.get("/api/telegram/live-status")
+async def get_telegram_live_status():
+    """Returns Telegram Live Trading Commander operational status and schedule."""
+    from core.daily_learning_reporter import daily_learning_reporter
+    from core.execution.account_probe import account_probe
+    readiness = await account_probe.get_portfolio_readiness()
+    return {
+        "status": "OPERATIONAL",
+        "bot_configured": bool(telegram_bot.bot_token and telegram_bot.chat_id),
+        "bd_time_str": daily_learning_reporter.get_current_bd_datetime().strftime("%I:%M %p BST"),
+        "is_ready_for_canary": readiness.is_ready_for_canary_trade,
+        "single_trade_cap_usd": readiness.single_trade_equity_cap_usd,
+        "active_exchanges": readiness.active_exchanges,
+    }
+
+
+@app.post("/api/telegram/trigger-briefing", dependencies=[Depends(require_api_key)])
+async def trigger_telegram_briefing(
+    briefing_type: str = Query("WHAT_AI_LEARNED", description="WHAT_AI_LEARNED, MORNING, MIDDAY, US_SESSION, MACRO_FLASH")
+):
+    """Manually triggers any of the 4 daily briefings or macro flash to Telegram."""
+    from core.telegram_live_desk import telegram_live_desk
+    b_type = briefing_type.upper().strip()
+    if b_type in ("WHAT_AI_LEARNED", "LEARNED"):
+        text = telegram_live_desk.get_what_ai_learned_today_report()
+    elif b_type in ("MACRO_FLASH", "CPI", "MACRO"):
+        text = telegram_live_desk.get_latest_macro_flash_report()
+    elif b_type == "MORNING":
+        text = await telegram_bot.generate_morning_briefing_text()
+    elif b_type == "MIDDAY":
+        text = await telegram_bot.generate_midday_pulse_text()
+    elif b_type == "US_SESSION":
+        text = await telegram_bot.generate_us_session_watch_text()
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown briefing type: {briefing_type}")
+
+    sent = await telegram_bot.send_message(text, parse_mode="Markdown")
+    return {
+        "status": "DISPATCHED" if sent else "QUEUED_LOCAL",
+        "briefing_type": b_type,
+        "text_preview": text[:200] + "...",
+    }
+
 
 
 # ==============================================================================
