@@ -65,6 +65,8 @@ class NodeRegistry:
             peer.last_seen_at = now_iso
             peer.status = NodeOperationalState.ONLINE
             peer.highest_known_sequence = max(peer.highest_known_sequence, highest_sequence)
+            if public_key_hex:
+                peer.public_key_hex = public_key_hex
             if metadata:
                 peer.metadata.update(metadata)
         else:

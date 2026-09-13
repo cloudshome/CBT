@@ -44,10 +44,30 @@ class RebuildResponse(BaseModel):
     evidence_rebuilt: int
 
 
+def _sync_registry_with_mesh_nodes(local_node_id: str) -> None:
+    """Discovers peers registered in Google Drive cloud mesh or local cache and registers them."""
+    try:
+        discovered = gdrive_cluster_mesh.list_cluster_nodes()
+        for m in discovered:
+            nid = m.get("node_id")
+            if nid and nid != local_node_id:
+                node_registry.register_or_update_peer(
+                    node_id=nid,
+                    public_key_hex=m.get("public_key") or m.get("public_key_hex") or "",
+                    highest_sequence=m.get("highest_known_sequence", 0),
+                    protocol_version=m.get("protocol_version", 1),
+                    schema_version=m.get("schema_version", 1),
+                    metadata=m.get("metadata", {}),
+                )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Mesh node discovery error: %s", exc)
+
+
 @router.get("/status")
 def get_collective_status() -> dict[str, Any]:
-    """Returns comprehensive health, node, event, and conflict statistics."""
+    """Returns comprehensive node and cluster health telemetry."""
     identity = node_identity_manager.get_or_create_identity()
+    _sync_registry_with_mesh_nodes(identity.node_id)
     peers = node_registry.list_peers()
     total_events = event_store.get_total_count()
     highest_seq = event_store.get_highest_sequence(identity.node_id)
@@ -90,6 +110,7 @@ def get_collective_status() -> dict[str, Any]:
 def get_collective_nodes() -> dict[str, Any]:
     """Returns list of all cluster nodes, last seen timestamps, and sequence progress."""
     identity = node_identity_manager.get_or_create_identity()
+    _sync_registry_with_mesh_nodes(identity.node_id)
     peers = [p.to_dict() for p in node_registry.list_peers()]
     local_info = {
         "node_id": identity.node_id,
@@ -118,8 +139,23 @@ def get_sync_status() -> dict[str, Any]:
 
 @router.post("/sync")
 def trigger_sync() -> dict[str, Any]:
-    """Forces an immediate synchronization cycle."""
+    """Forces an immediate synchronization cycle across local transport and cloud mesh."""
+    try:
+        gdrive_cluster_mesh.pull_and_reconcile()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Cloud mesh pull failed during sync: %s", exc)
+
     receipts = sync_engine.run_sync_cycle()
+
+    try:
+        gdrive_cluster_mesh.export_and_push()
+        gdrive_cluster_mesh.publish_node_profile()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Cloud mesh push failed during sync: %s", exc)
+
+    identity = node_identity_manager.get_or_create_identity()
+    _sync_registry_with_mesh_nodes(identity.node_id)
+
     return {
         "status": "SUCCESS",
         "receipts": [r.to_dict() for r in receipts],

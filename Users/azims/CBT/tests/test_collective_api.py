@@ -55,3 +55,11 @@ def test_trigger_verify_and_rebuild(client):
     data_r = res_r.json()
     assert data_r["status"] == "SUCCESS"
     assert "state_hash" in data_r
+
+
+def test_trigger_sync(client):
+    res = client.post("/api/collective/sync")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "SUCCESS"
+    assert "receipts" in data

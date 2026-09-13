@@ -73,22 +73,28 @@ class GDriveClusterMesh:
         self.inbox_dir = self.base_dir / "inbox"
         self.outbox_dir = self.base_dir / "outbox"
         self.archive_dir = self.base_dir / "archives"
+        self.profiles_dir = self.base_dir / "profiles"
         self.inbox_dir.mkdir(parents=True, exist_ok=True)
         self.outbox_dir.mkdir(parents=True, exist_ok=True)
         self.archive_dir.mkdir(parents=True, exist_ok=True)
+        self.profiles_dir.mkdir(parents=True, exist_ok=True)
 
         self.drive_backend = drive_backend or get_default_drive_backend()
         self.store = store or event_store
         self.reconciler = reconciler or collective_reconciler
 
     def publish_node_profile(self, identity: NodeIdentity | None = None) -> dict[str, Any]:
-        """Uploads the local PC profile to Google Drive."""
+        """Uploads the local PC profile to Google Drive and caches locally."""
         ident = identity or node_identity_manager.get_or_create_identity()
         profile_data = ident.to_public_dict()
         profile_data["published_at"] = datetime.datetime.now(datetime.UTC).isoformat()
 
         temp_path = self.outbox_dir / f"{ident.node_id}.profile.json"
         with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(profile_data, f, indent=2)
+
+        local_cache_path = self.profiles_dir / f"{ident.node_id}.json"
+        with open(local_cache_path, "w", encoding="utf-8") as f:
             json.dump(profile_data, f, indent=2)
 
         try:
@@ -105,42 +111,75 @@ class GDriveClusterMesh:
 
     def list_cluster_nodes(self) -> list[dict[str, Any]]:
         """Discovers registered cluster PC profiles from Google Drive or local cache."""
-        nodes: list[dict[str, Any]] = []
+        nodes: dict[str, dict[str, Any]] = {}
         local_ident = node_identity_manager.get_or_create_identity()
-        nodes.append(local_ident.to_public_dict())
+        nodes[local_ident.node_id] = local_ident.to_public_dict()
 
-        if not getattr(self.drive_backend, "is_live", False):
-            return nodes
+        # 1. Load cached peer profiles from local disk (offline-first resilience)
+        if hasattr(self, "profiles_dir") and self.profiles_dir.exists():
+            for p_file in self.profiles_dir.glob("*.json"):
+                if p_file.stem != local_ident.node_id:
+                    try:
+                        with open(p_file, encoding="utf-8") as f:
+                            p_data = json.load(f)
+                            if isinstance(p_data, dict) and "node_id" in p_data:
+                                p_data["status"] = p_data.get("status", "CACHED_PEER")
+                                nodes[p_data["node_id"]] = p_data
+                    except Exception as err:  # noqa: BLE001
+                        logger.debug("Error reading cached peer profile %s: %s", p_file.name, err)
 
-        try:
-            service = getattr(self.drive_backend, "service", None)
-            if service and hasattr(self.drive_backend, "_resolve_or_create_remote_folder"):
-                root_parent = os.getenv("GDRIVE_ROOT_FOLDER_ID")
-                nodes_folder_id = self.drive_backend._resolve_or_create_remote_folder(
-                    f"{CLOUD_MESH_ROOT}/nodes", root_parent
-                )
-                if nodes_folder_id:
-                    query = f"'{nodes_folder_id}' in parents and name contains '.json' and trashed = false"
-                    res = (
-                        service.files()
-                        .list(q=query, spaces="drive", fields="files(id, name)")
-                        .execute()
+        # 2. If Google Drive is live, query remote SKY/09_CLUSTER_MESH/nodes/
+        if getattr(self.drive_backend, "is_live", False):
+            try:
+                service = getattr(self.drive_backend, "service", None)
+                if service and hasattr(self.drive_backend, "_resolve_or_create_remote_folder"):
+                    root_parent = os.getenv("GDRIVE_ROOT_FOLDER_ID")
+                    nodes_folder_id = self.drive_backend._resolve_or_create_remote_folder(
+                        f"{CLOUD_MESH_ROOT}/nodes", root_parent
                     )
-                    for item in res.get("files", []):
-                        if item["name"].endswith(".json") and not item["name"].startswith(
-                            local_ident.node_id
-                        ):
-                            nodes.append(
-                                {
-                                    "node_id": item["name"].replace(".json", ""),
-                                    "file_id": item["id"],
-                                    "status": "DISCOVERED_IN_CLOUD",
-                                }
-                            )
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("Listing cloud nodes fallback: %s", exc)
+                    if nodes_folder_id:
+                        query = f"'{nodes_folder_id}' in parents and name contains '.json' and trashed = false"
+                        res = (
+                            service.files()
+                            .list(q=query, spaces="drive", fields="files(id, name)")
+                            .execute()
+                        )
+                        for item in res.get("files", []):
+                            if item["name"].endswith(".json") and not item["name"].startswith(
+                                local_ident.node_id
+                            ):
+                                peer_id = item["name"].replace(".json", "")
+                                peer_node = nodes.get(
+                                    peer_id,
+                                    {
+                                        "node_id": peer_id,
+                                        "file_id": item["id"],
+                                        "status": "ONLINE",
+                                    },
+                                )
+                                peer_node["file_id"] = item["id"]
+                                peer_node["status"] = "ONLINE"
+                                # Fetch remote JSON profile content
+                                try:
+                                    content = (
+                                        service.files().get_media(fileId=item["id"]).execute()
+                                    )
+                                    parsed = json.loads(content.decode("utf-8"))
+                                    if isinstance(parsed, dict):
+                                        peer_node.update(parsed)
+                                        peer_node["status"] = "ONLINE"
+                                        # Save to local cache
+                                        cache_f = self.profiles_dir / f"{peer_id}.json"
+                                        with open(cache_f, "w", encoding="utf-8") as f:
+                                            json.dump(parsed, f, indent=2)
+                                except Exception as dl_err:  # noqa: BLE001
+                                    logger.debug("Error reading peer %s profile: %s", peer_id, dl_err)
 
-        return nodes
+                                nodes[peer_id] = peer_node
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Listing cloud nodes fallback: %s", exc)
+
+        return list(nodes.values())
 
     def export_and_push(
         self,
