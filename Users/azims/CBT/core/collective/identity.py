@@ -292,7 +292,9 @@ class NodeIdentityManager:
             identity.sync_policy.update(sync_policy)
         identity.last_heartbeat = datetime.datetime.now(datetime.UTC).isoformat()
         self.save_identity(identity)
-        logger.info(f"Updated node identity: {identity.node_id} (epoch {identity.node_epoch}, role {identity.node_role})")
+        logger.info(
+            f"Updated node identity: {identity.node_id} (epoch {identity.node_epoch}, role {identity.node_role})"
+        )
         return identity
 
     def record_heartbeat(self) -> str:

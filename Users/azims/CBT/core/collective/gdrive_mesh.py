@@ -18,8 +18,7 @@ import json
 import logging
 import os
 import shutil
-import tempfile
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +32,6 @@ from core.collective.event import CanonicalEvent
 from core.collective.event_hash import canonical_json_str, sha256_digest
 from core.collective.event_store import EventStore, event_store
 from core.collective.identity import NodeIdentity, node_identity_manager
-from core.collective.lease_manager import ExecutionLease, lease_manager
 from core.collective.reconciler import CollectiveReconciler, collective_reconciler
 
 logger = logging.getLogger("sky.collective.gdrive_mesh")
@@ -100,7 +98,7 @@ class GDriveClusterMesh:
                 filename=f"{ident.node_id}.json",
             )
             logger.info("Published PC profile for '%s' to Google Drive mesh.", ident.node_id)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("Could not upload PC profile to Drive: %s", exc)
 
         return profile_data
@@ -123,15 +121,23 @@ class GDriveClusterMesh:
                 )
                 if nodes_folder_id:
                     query = f"'{nodes_folder_id}' in parents and name contains '.json' and trashed = false"
-                    res = service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
+                    res = (
+                        service.files()
+                        .list(q=query, spaces="drive", fields="files(id, name)")
+                        .execute()
+                    )
                     for item in res.get("files", []):
-                        if item["name"].endswith(".json") and not item["name"].startswith(local_ident.node_id):
-                            nodes.append({
-                                "node_id": item["name"].replace(".json", ""),
-                                "file_id": item["id"],
-                                "status": "DISCOVERED_IN_CLOUD",
-                            })
-        except Exception as exc:
+                        if item["name"].endswith(".json") and not item["name"].startswith(
+                            local_ident.node_id
+                        ):
+                            nodes.append(
+                                {
+                                    "node_id": item["name"].replace(".json", ""),
+                                    "file_id": item["id"],
+                                    "status": "DISCOVERED_IN_CLOUD",
+                                }
+                            )
+        except Exception as exc:  # noqa: BLE001
             logger.debug("Listing cloud nodes fallback: %s", exc)
 
         return nodes
@@ -224,7 +230,7 @@ class GDriveClusterMesh:
         Discovers peer packages from Google Drive, downloads them into inbox,
         verifies signatures & hashes, ingests events, and rebuilds local projections.
         """
-        ident = identity or node_identity_manager.get_or_create_identity()
+        _ = identity or node_identity_manager.get_or_create_identity()
         imported_events = 0
         packages_processed = 0
 
@@ -262,7 +268,7 @@ class GDriveClusterMesh:
                 if manifest_file.exists():
                     shutil.move(str(manifest_file), str(self.archive_dir / manifest_file.name))
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.error("Failed to process peer package %s: %s", pkg_file.name, exc)
 
         # Rebuild local projection if new events arrived

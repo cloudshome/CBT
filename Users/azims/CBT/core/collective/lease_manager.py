@@ -50,7 +50,7 @@ class ExecutionLease:
         try:
             exp = datetime.datetime.fromisoformat(self.expires_at)
             return now < exp
-        except Exception:
+        except (ValueError, TypeError):
             return False
 
     def to_dict(self) -> dict[str, Any]:
@@ -87,7 +87,7 @@ class LeaseManager:
             with open(self.lease_file, encoding="utf-8") as f:
                 data = json.load(f)
             return ExecutionLease.from_dict(data)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to load execution lease: %s", exc)
             return None
 
@@ -184,16 +184,28 @@ class LeaseManager:
             return False, f"FAIL_CLOSED: Execution lease expired at {lease.expires_at}."
 
         if lease.node_id != node_id:
-            return False, f"FAIL_CLOSED: Lease owner is '{lease.node_id}', requested by '{node_id}'."
+            return (
+                False,
+                f"FAIL_CLOSED: Lease owner is '{lease.node_id}', requested by '{node_id}'.",
+            )
 
         if lease.lease_id != lease_id:
-            return False, f"FAIL_CLOSED: Lease ID mismatch (expected '{lease.lease_id}', got '{lease_id}')."
+            return (
+                False,
+                f"FAIL_CLOSED: Lease ID mismatch (expected '{lease.lease_id}', got '{lease_id}').",
+            )
 
         if lease.node_epoch != node_epoch:
-            return False, f"FAIL_CLOSED: Node epoch mismatch (active {lease.node_epoch}, request {node_epoch})."
+            return (
+                False,
+                f"FAIL_CLOSED: Node epoch mismatch (active {lease.node_epoch}, request {node_epoch}).",
+            )
 
         if fencing_token < lease.fencing_token:
-            return False, f"FAIL_CLOSED: Stale fencing token {fencing_token} < active {lease.fencing_token}."
+            return (
+                False,
+                f"FAIL_CLOSED: Stale fencing token {fencing_token} < active {lease.fencing_token}.",
+            )
 
         return True, "AUTHORIZED"
 
