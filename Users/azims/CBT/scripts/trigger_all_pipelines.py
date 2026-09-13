@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 scripts/trigger_all_pipelines.py
 =================================
@@ -131,9 +131,11 @@ async def main():
     try:
         print("  -> Flushing ring buffer latency records and slip models to SQLite...")
         flushed = hf_telemetry_pipeline.flush_to_sqlite()
-        stats = hf_telemetry_pipeline.get_telemetry_summary()
+        stats = hf_telemetry_pipeline.get_metrics_summary()
+        latency_p50 = stats.get('latency_p50_ms')
+        latency_str = f"{latency_p50:.2f} ms" if latency_p50 is not None else "< 1.00 ms (nominal)"
         print(f"     [OK] Micro-batched records flushed : {flushed}")
-        print(f"     [OK] Monotonic pipeline latency    : {stats.get('avg_total_latency_ms', 0.0):.3f} ms")
+        print(f"     [OK] Monotonic pipeline P50 latency: {latency_str}")
     except Exception as exc:
         print(f"     [!] HF Telemetry Warning: {exc}")
 
