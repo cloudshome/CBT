@@ -62,6 +62,7 @@ from core.knowledge_os.routes import router as knowledge_os_router
 from core.volatility import volatility_router
 from core.collective.routes import router as collective_router
 from core.arbitrage.routes import router as arbitrage_router
+from core.mbo.routes import router as mbo_router
 from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
 from core.conservative_kelly import conservative_kelly
@@ -248,6 +249,7 @@ app.include_router(knowledge_os_router)
 app.include_router(collective_router)
 app.include_router(volatility_router)
 app.include_router(arbitrage_router)
+app.include_router(mbo_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()

@@ -1909,6 +1909,40 @@ export const api = {
     const res = await authFetch(`${BASE_URL}/api/arbitrage/provenance/${encodeURIComponent(opportunityId)}`);
     return handleResponse<ArbitrageProvenanceResponse>(res);
   },
+
+  /**
+   * TASK 20.2: L3 MARKET BY ORDER (MBO) LIQUIDITY DEPTH RECONSTRUCTION
+   */
+  async getMBODepth(symbol: string = 'BTCUSDT', venue: string = 'BINANCE_SPOT'): Promise<MBODepthResponse> {
+    const res = await authFetch(`${BASE_URL}/api/mbo/depth?symbol=${encodeURIComponent(symbol)}&venue=${encodeURIComponent(venue)}`);
+    return handleResponse<MBODepthResponse>(res);
+  },
+
+  async getMBOQueueEstimate(
+    symbol: string = 'BTCUSDT',
+    venue: string = 'BINANCE_SPOT',
+    side: 'BID' | 'ASK' = 'BID',
+    price: number = 65000,
+    qty: number = 0.5,
+    targetOrderId?: string
+  ): Promise<MBOQueueEstimateResponse> {
+    let url = `${BASE_URL}/api/mbo/queue-estimate?symbol=${encodeURIComponent(symbol)}&venue=${encodeURIComponent(venue)}&side=${side}&price=${price}&qty=${qty}`;
+    if (targetOrderId) url += `&target_order_id=${encodeURIComponent(targetOrderId)}`;
+    const res = await authFetch(url);
+    return handleResponse<MBOQueueEstimateResponse>(res);
+  },
+
+  async getMBOIcebergs(symbol?: string): Promise<MBOIcebergsResponse> {
+    let url = `${BASE_URL}/api/mbo/icebergs`;
+    if (symbol) url += `?symbol=${encodeURIComponent(symbol)}`;
+    const res = await authFetch(url);
+    return handleResponse<MBOIcebergsResponse>(res);
+  },
+
+  async getMBOToxicity(symbol: string = 'BTCUSDT', venue: string = 'BINANCE_SPOT'): Promise<MBOToxicityResponse> {
+    const res = await authFetch(`${BASE_URL}/api/mbo/toxicity?symbol=${encodeURIComponent(symbol)}&venue=${encodeURIComponent(venue)}`);
+    return handleResponse<MBOToxicityResponse>(res);
+  },
 };
 
 export interface BurnInStatus {
@@ -2453,5 +2487,100 @@ export interface ArbitrageProvenanceResponse {
   integrity_verified: boolean;
   envelope: any;
 }
+
+/**
+ * TASK 20.2: L3 MBO INTERFACES
+ */
+export interface MBOOrderSummary {
+  order_id: string;
+  size: number;
+  priority_index: number;
+  timestamp_ns: number;
+}
+
+export interface MBOPriceLevelSummary {
+  price: number;
+  total_size: number;
+  order_count: number;
+  orders: MBOOrderSummary[];
+}
+
+export interface MBODepthResponse {
+  status: string;
+  symbol: string;
+  venue: string;
+  timestamp_ms: number;
+  total_bid_depth_usd: number;
+  total_ask_depth_usd: number;
+  microstructure_imbalance: number;
+  bids: MBOPriceLevelSummary[];
+  asks: MBOPriceLevelSummary[];
+  iceberg_count: number;
+}
+
+export interface MBOQueueEstimate {
+  symbol: string;
+  venue: string;
+  side: string;
+  price: number;
+  simulated_order_qty: number;
+  queue_ahead_qty: number;
+  queue_ahead_orders: number;
+  queue_behind_qty: number;
+  total_level_qty: number;
+  relative_queue_position_pct: number;
+  expected_wait_seconds: number;
+  fill_probability_30s: number;
+  fill_probability_60s: number;
+  fill_probability_300s: number;
+  adverse_selection_risk_score: number;
+  estimated_depletion_rate_qty_per_sec: number;
+}
+
+export interface MBOQueueEstimateResponse {
+  status: string;
+  estimate: MBOQueueEstimate;
+}
+
+export interface MBOIcebergItem {
+  iceberg_id: string;
+  symbol: string;
+  venue: string;
+  side: string;
+  price: number;
+  initial_displayed_size: number;
+  cumulative_executed_size: number;
+  estimated_reload_size: number;
+  estimated_total_hidden_qty: number;
+  total_estimated_size: number;
+  confidence_score: number;
+  reload_count: number;
+  is_active: boolean;
+}
+
+export interface MBOIcebergsResponse {
+  status: string;
+  count: number;
+  icebergs: MBOIcebergItem[];
+}
+
+export interface MBOToxicityData {
+  symbol: string;
+  venue: string;
+  timestamp_ms: number;
+  vpin_mbo: number;
+  cancel_to_trade_ratio: number;
+  depletion_velocity_usd_per_sec: number;
+  order_arrival_intensity: number;
+  mean_order_lifetime_ms: number;
+  toxicity_regime: string;
+  adverse_selection_bias_bps: number;
+}
+
+export interface MBOToxicityResponse {
+  status: string;
+  toxicity: MBOToxicityData;
+}
+
 
 

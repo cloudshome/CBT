@@ -543,22 +543,14 @@
 ---
 
 ## 🔮 Phase 20: Next-Generation Institutional Alpha & High-Frequency Risk (Active Pipeline)
-- [x] **Task 20.1: Cross-Exchange Arbitrage & Funding Rate Dislocation Sentinel (COMPLETED ✅)**
-  - **Structural Safety Guard (`core/arbitrage/models.py`, `sentinel.py`)**: Strict `ArbitrageExecutionPermission.RESEARCH_ONLY` invariant. Zero live order hooks or execution capabilities. Preserves RiskGate, EvidenceGrade, and Master Kill-Switch perimeters.
-  - **Canonical Instrument Mapper (`core/arbitrage/instrument_mapper.py`)**: Multi-venue registry resolving Binance Spot/Perp, Bybit Linear, OKX Spot/Perp across BTC, ETH, SOL, and PAXG/Gold with tick size, lot size, and contract multiplier specifications.
-  - **Data Quality Firewall (`core/arbitrage/data_firewall.py`)**: Rigorous rejection gatekeeper checking clock drift (<1000ms), quote staleness (<3000ms), crossed order books ($Bid \ge Ask$), non-monotonic depth ladders, sequence discontinuities, and duplicate messages with deterministic `RejectionCode`.
-  - **Sign-Aware Funding Rate Matrix (`core/arbitrage/funding_matrix.py`)**: Evaluates pairwise cross-venue perpetual funding rate divergence. Directional cashflow physics: Long Perp Leg pays $-F_{\text{long}} \cdot Notional$, Short Perp Leg receives $+F_{\text{short}} \cdot Notional$. Net cashflow = $(F_{\text{short}} - F_{\text{long}}) \cdot Notional$. Countdown timer and drift uncertainty modeling.
-  - **Spot-Perp Basis Dynamics & Z-Score Engine (`core/arbitrage/basis_engine.py`)**: Rolling 120-window basis statistics, Z-score computation, structural regime classification (`CONTANGO_EXTREME`, `NORMAL_CONTANGO`, `NEUTRAL_BASIS`, `NORMAL_BACKWARDATION`, `BACKWARDATION_EXTREME`), and 3-sigma candidate trigger.
-  - **Quantity-Aware Executable Spread Engine (`core/arbitrage/spread_engine.py`)**: Walks L2 order book depth ladders to calculate executable VWAP for identical quantity $Q$ crossing the books simultaneously (Buy Ask on Leg A, Sell Bid on Leg B), eliminating top-of-book headline liquidity illusions.
-  - **Deterministic Multi-Scenario Net-EV Engine (`core/arbitrage/ev_engine.py`)**: Model `EVM_v20.1_PROD` computing Base, Conservative, and Stress Net-EV. Deducts entry taker fees, expected exit taker fees, order book slippage, hedge synchronization costs, latency drift adverse moves, borrow costs, and safety buffers.
-  - **Liquidity Capacity Depth Curve (`core/arbitrage/capacity_engine.py`)**: Evaluates executable capacity curve across institutional tiers ($1k, $5k, $10k, $25k, $50k, $100k) to determine maximum economically viable notional size $V^*$ above 5.0 bps hurdle.
-  - **5-State Qualification State Machine (`core/arbitrage/classifier.py`)**: Rigorous lifecycle (`OBSERVE` $\to$ `CANDIDATE` $\to$ `VALIDATING` $\to$ `ECONOMICALLY_VIABLE` $\to$ `QUALIFIED`). Enforces minimum persistence duration ($\ge 400$ms) and consecutive observations ($\ge 2$).
-  - **Asynchronous Two-Leg Shadow Simulator (`core/arbitrage/shadow_validator.py`)**: Independent two-leg simulated market entry modeling partial fill ratios (90-100%), unhedged residual exposure, inter-exchange network transit latency, and synthetic realized P&L recorded to SQLite `arbitrage_shadow_ledger`.
-  - **Immutable Provenance Envelopes (`core/arbitrage/provenance.py`)**: Wraps complete decision context (quotes, depth snapshots, funding rates, model versions, classifier decisions) into canonical JSON, sealed with cryptographic SHA-256 hash and indexed into `arbitrage_provenance_records`.
-  - **REST API Routes (`core/arbitrage/routes.py`, `app.py`)**: Mounted `/api/arbitrage/dislocations`, `/api/arbitrage/funding-matrix`, `/api/arbitrage/opportunities`, `/api/arbitrage/history`, `/api/arbitrage/health`, and `/api/arbitrage/provenance/{id}`.
-  - **Institutional Zero-Shake Frontend (`frontend/src/components/ArbitrageRadar.tsx`, `App.tsx`, `api.ts`)**: Interactive cockpit with Top KPI cards, Funding Rate Divergence Matrix, Spot-Perp Basis Radar, Multi-Scenario EV Waterfall, Depth Capacity Curve, Two-Leg Shadow Execution Ledger, and Cryptographic Provenance Drilldown Modal.
-  - **Verification Suite (`tests/test_task20_arbitrage_sentinel.py`)**: 12/12 unit and integration tests passing 100% green; zero TypeScript errors on `npm run build`.
-- [ ] **Task 20.2: L3 Market By Order (MBO) Liquidity Depth Reconstruction**
+- [x] **Task 20.2: L3 Market By Order (MBO) Liquidity Depth Reconstruction (COMPLETED ✅)**
+  - **Discrete L3 Order Book Engine (`core/mbo/order_book_l3.py`)**: Reconstructs individual order identities and discrete price queues with nanosecond timestamps. Enforces price-time priority: size reductions retain queue priority, while size increases or price modifications forfeit priority to the queue tail. Matches market orders across depth with partial fill tracking.
+  - **Institutional Iceberg & Reload Detector (`core/mbo/iceberg_detector.py`)**: Identifies hidden institutional liquidity walls by detecting repeated replenishment exceeding the $1.8\times$ baseline displayed depth without price slippage. Estimates reload size, total hidden volume, and confidence scores.
+  - **Queue Priority & Fill Probability Engine (`core/mbo/queue_priority_engine.py`)**: Calculates exact volume ahead ($Q_A$), orders ahead ($N_A$), and relative queue position percentage. Solves theoretical fill probabilities over 30s, 60s, and 300s horizons using queue clearance velocity ($v_{\text{clear}} = \lambda_{\text{market}} + \mu_{\text{cancel}}$) adjusted for directional flow imbalance. Evaluates toxic adverse selection risk.
+  - **High-Frequency Feed Adapter (`core/mbo/feed_adapter.py`)**: Multi-venue discrete order simulator modeling Poisson arrivals, cancellations, and aggressive sweeps. Calculates VPIN, cancel-to-trade ratios, and classifies toxicity regimes (`LOW`, `MODERATE`, `ELEVATED`, `TOXIC`).
+  - **REST API Routes (`core/mbo/routes.py`, `app.py`)**: Mounted `/api/mbo/depth`, `/api/mbo/queue-estimate`, `/api/mbo/icebergs`, and `/api/mbo/toxicity`.
+  - **Institutional Frontend Terminal (`frontend/src/components/MBODepthTerminal.tsx`, `App.tsx`, `api.ts`)**: Interactive L3 queue depth visualization, interactive queue priority & fill probability calculator, active iceberg radar table, and toxic flow / VPIN gauge.
+  - **Verification Suite (`tests/test_task20_mbo_reconstruction.py`)**: 7/7 unit and integration tests passing 100% green; zero TypeScript errors on `npm run build`.
 - [x] **Task 20.3: Automated Volatility Surface & Skew Term Structure Model (COMPLETED ✅)**
   - **Black-76 & Greeks Engine** (`core/volatility/black_scholes.py`): Analytical Black-76 pricer, closed-form Greeks ($\Delta, \Gamma, \nu, \Theta$), and Newton-Raphson implied volatility inverter with bisection boundary fallbacks.
   - **Deribit Options Feed** (`core/volatility/options_feed.py`): Unauthenticated public options book summary ingestion (`get_book_summary_by_currency`), instrument string regex parser (`BTC-25DEC26-104000-C`), and calibrated fallback chain generator.
@@ -570,6 +562,21 @@
   - **REST API Routes** (`core/volatility/routes.py`, `app.py`): Mounted `/api/volatility/summary`, `/api/volatility/surface`, `/api/volatility/skew`, `/api/volatility/term-structure`, and `/api/volatility/gex`.
   - **Frontend Institutional Desk** (`frontend/src/components/VolatilitySurfaceDesk.tsx`, `frontend/src/App.tsx`, `frontend/src/services/api.ts`): Interactive cockpit with KPI metrics, term structure curve, 2D surface heatmap, 25-delta skew table, and GEX/Max Pain strike distribution.
   - **Verification & Tests** (`tests/test_task20_volatility_surface.py`): 22/22 unit and integration tests passing 100% green; zero TypeScript errors on `npm run build`.
+
+---
+
+## 🚀 Phase 21: Live Exchange Trading Launch Gatekeeper & Real-Money Readiness Checklist (Active Milestone)
+- [ ] **Task 21.1: Multi-Exchange Live Balance & Account Readiness Probe (`core/execution/account_probe.py`)**
+  - Live query of spot and perpetual margin balances on Binance and Bybit via authenticated signers.
+  - Free equity verification, leverage tier bounds, and currency conversion normalization.
+- [ ] **Task 21.2: Constitutional Pre-Flight Safety Lock & Live Key Vault Validator (`core/execution/live_gatekeeper.py`)**
+  - Strict multi-checkpoint unlock sequence: (1) Vault Master Key derived via KMS/HSM, (2) Master Kill-Switch armed and operational, (3) Clock drift $< 500$ms on both exchanges, (4) Daily drawdown counter at 0.0%, (5) 1.5% single-trade equity cap hard-enforced.
+- [ ] **Task 21.3: Real-Time Telegram Live Trading Commander & Event Alerting (`core/telegram_live_desk.py`)**
+  - 4-times daily automated reporting adapted to Bangladesh Standard Time (BST / UTC+6).
+  - High-priority macro alerts for major market events (CPI, FOMC, NFP) with instant market reaction and portfolio impact summaries.
+  - Dual-confirmation interactive Telegram buttons for any manual live trading permission changes.
+- [ ] **Task 21.4: Live Canary Dry-Run with Micro-Notional Orders ($10 - $25)**
+  - Execute real micro-order round trips on Binance and Bybit to verify HMAC-SHA256 signatures, order ACK latency, WebSocket fill delivery, and reconciliation ledger recording.
 
 ---
 

@@ -25,6 +25,7 @@ import { ResearchIngestLab } from './components/ResearchIngestLab';
 import { CollectiveCoreDashboard } from './components/CollectiveCoreDashboard';
 import { VolatilitySurfaceDesk } from './components/VolatilitySurfaceDesk';
 import { ArbitrageRadar } from './components/ArbitrageRadar';
+import { MBODepthTerminal } from './components/MBODepthTerminal';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
@@ -101,8 +102,8 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE'>('DOSSIER');
-  const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN' | 'ARBITRAGE_RADAR'>('MICROSTRUCTURE');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH'>('DOSSIER');
+  const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN' | 'ARBITRAGE_RADAR' | 'MBO_DEPTH'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
   // Notifications State
@@ -650,6 +651,17 @@ export const App: React.FC = () => {
                   <Scale size={13} className={activeBottomTab === 'ARBITRAGE' ? 'text-slate-950' : 'text-amber-400'} />
                   <span>⚖️ Arbitrage Radar</span>
                 </button>
+                <button
+                  onClick={() => setActiveBottomTab('MBO_DEPTH')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'MBO_DEPTH'
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold shadow-md shadow-cyan-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Layers size={13} className={activeBottomTab === 'MBO_DEPTH' ? 'text-white' : 'text-cyan-400'} />
+                  <span>🌊 L3 MBO Depth</span>
+                </button>
               </div>
             </div>
 
@@ -758,6 +770,16 @@ export const App: React.FC = () => {
                     >
                       7. Arbitrage Radar (Task 20.1)
                     </button>
+                    <button
+                      onClick={() => setActiveFrontierTab('MBO_DEPTH')}
+                      className={`px-3 py-1 rounded transition-all ${
+                        activeFrontierTab === 'MBO_DEPTH'
+                          ? 'bg-cyan-500 text-slate-950 font-bold shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      8. L3 MBO Depth (Task 20.2)
+                    </button>
                   </div>
 
                   {/* Active Frontier Component */}
@@ -782,6 +804,12 @@ export const App: React.FC = () => {
                       onNotify={(type, title, msg) => addToast(type, title, msg)}
                     />
                   )}
+                  {activeFrontierTab === 'MBO_DEPTH' && (
+                    <MBODepthTerminal
+                      currentSymbol={symbol}
+                      onNotify={(type, title, msg) => addToast(type, title, msg)}
+                    />
+                  )}
                 </div>
               ) : activeBottomTab === 'RESEARCH_LAB' ? (
                 <ResearchIngestLab
@@ -796,6 +824,11 @@ export const App: React.FC = () => {
                 />
               ) : activeBottomTab === 'ARBITRAGE' ? (
                 <ArbitrageRadar
+                  currentSymbol={symbol}
+                  onNotify={(type, title, msg) => addToast(type, title, msg)}
+                />
+              ) : activeBottomTab === 'MBO_DEPTH' ? (
+                <MBODepthTerminal
                   currentSymbol={symbol}
                   onNotify={(type, title, msg) => addToast(type, title, msg)}
                 />
