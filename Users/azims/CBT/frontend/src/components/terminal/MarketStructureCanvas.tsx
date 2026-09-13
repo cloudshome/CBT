@@ -7,6 +7,11 @@ import {
   EyeOff,
   Maximize2,
   Minimize2,
+  ChevronDown,
+  ChevronUp,
+  X,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
 import { TradingViewChart } from '../../core/engine/TradingViewChart';
 import {
@@ -56,11 +61,88 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
   const [showLiquidity, setShowLiquidity] = useState(true);
   const [showLiquidationMap, setShowLiquidationMap] = useState(true);
   const [showExecutionLadder, setShowExecutionLadder] = useState(true);
+  const [isLadderMinimized, setIsLadderMinimized] = useState(false);
+  const [isLadderDocked, setIsLadderDocked] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Derive Buy-Side & Sell-Side Liquidity Pool Estimates
   const buySideLiquidityPrice = Number((currentPrice * 1.018).toFixed(2));
   const sellSideLiquidityPrice = Number((currentPrice * 0.982).toFixed(2));
+
+  // Shared Execution Ladder Component (used in both floating HUD and docked sidebar)
+  const renderLadderContent = (docked: boolean) => {
+    if (!selectedSignalPlan) return null;
+    return (
+      <div className={`text-xs font-mono select-none ${docked ? 'p-2 border-b border-[#1e293b] bg-[#090e1c]/70' : ''}`}>
+        <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-indigo-500/30">
+          <div className="flex items-center gap-1.5">
+            <Target size={12} className="text-indigo-400" />
+            <span className="font-bold text-white text-[10px] tracking-wider">
+              {selectedSignalPlan.style} {selectedSignalPlan.side}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-emerald-400 font-bold text-[10px] mr-1">
+              R:R {selectedSignalPlan.riskRewardRatio}:1
+            </span>
+            {!docked && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsLadderMinimized(true); }}
+                className="p-0.5 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                title="Minimize Ladder"
+              >
+                <ChevronDown size={11} />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsLadderDocked(!docked); }}
+              className="p-0.5 text-slate-400 hover:text-cyan-300 rounded hover:bg-slate-800 transition-colors hidden md:block"
+              title={docked ? 'Undock to Floating HUD' : 'Dock to Right Sidebar'}
+            >
+              {docked ? <PanelRightClose size={11} /> : <PanelRightOpen size={11} />}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowExecutionLadder(false); }}
+              className="p-0.5 text-slate-500 hover:text-rose-400 rounded hover:bg-slate-800 transition-colors"
+              title="Hide Ladder Overlay"
+            >
+              <X size={11} />
+            </button>
+          </div>
+        </div>
+
+        {/* Vertical Execution Ladder */}
+        <div className="space-y-1 text-[10px]">
+          <div className="flex justify-between items-center text-emerald-400">
+            <span>TP3 (+6.2R):</span>
+            <span className="font-bold">${selectedSignalPlan.tp3.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center text-emerald-400">
+            <span>TP2 (+3.1R):</span>
+            <span className="font-bold">${selectedSignalPlan.tp2.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center text-emerald-300">
+            <span>TP1 (+1.5R):</span>
+            <span className="font-bold">${selectedSignalPlan.tp1.toLocaleString()}</span>
+          </div>
+
+          <div className="my-1 py-0.5 px-1.5 bg-indigo-950/80 border border-indigo-500/50 rounded flex justify-between items-center text-white font-bold">
+            <span>ENTRY:</span>
+            <span className="text-[9px]">${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}</span>
+          </div>
+
+          <div className="flex justify-between items-center text-rose-400">
+            <span>STOP LOSS:</span>
+            <span className="font-bold">${selectedSignalPlan.stopLoss.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center text-rose-500 text-[9px]">
+            <span>INVALIDATION:</span>
+            <span className="font-bold">${selectedSignalPlan.invalidationPrice.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={`flex flex-col bg-[#070a13] border border-[#1e293b] rounded-lg overflow-hidden transition-all ${
@@ -152,30 +234,30 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
 
       {/* Liquidity Streamer Bar (Buy-side above, Sell-side below) */}
       {showLiquidity && (
-        <div className="flex items-center justify-between px-3 py-1 bg-[#090d18] border-b border-[#1e293b]/60 text-[10px] font-mono select-none">
-          <div className="flex items-center gap-2">
-            <span className="text-amber-400 font-semibold">BUY-SIDE LIQUIDITY:</span>
+        <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-[#090d18] border-b border-[#1e293b]/60 text-[10px] font-mono select-none gap-x-3 gap-y-1">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-amber-400 font-semibold text-[10px]">BUY LIQ:</span>
             <span className="text-white font-bold">${buySideLiquidityPrice.toLocaleString()}</span>
-            <span className="px-1.5 py-0.2 rounded bg-amber-950/70 border border-amber-500/30 text-amber-300 text-[9px]">
-              +1.8% (Resting Buy Stops)
+            <span className="px-1.5 py-0.5 rounded bg-amber-950/70 border border-amber-500/30 text-amber-300 text-[9px] whitespace-nowrap">
+              +1.8% (Stops)
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-500">EQUILIBRIUM (0.5 FIB):</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1">
+              <span className="text-slate-500">EQ (0.5 FIB):</span>
               <span className="text-slate-300 font-semibold">${fib05Equilibrium.toLocaleString()}</span>
             </div>
-            <span className={`px-1.5 py-0.2 rounded font-bold text-[9px] ${
+            <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] whitespace-nowrap ${
               currentZone === 'DISCOUNT' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40' : 'bg-rose-950 text-rose-400 border border-rose-500/40'
             }`}>
               {currentZone} ZONE
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-emerald-400 font-semibold">SELL-SIDE LIQUIDITY:</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-emerald-400 font-semibold text-[10px]">SELL LIQ:</span>
             <span className="text-white font-bold">${sellSideLiquidityPrice.toLocaleString()}</span>
-            <span className="px-1.5 py-0.2 rounded bg-emerald-950/70 border border-emerald-500/30 text-emerald-300 text-[9px]">
-              -1.8% (Resting Sell Stops)
+            <span className="px-1.5 py-0.5 rounded bg-emerald-950/70 border border-emerald-500/30 text-emerald-300 text-[9px] whitespace-nowrap">
+              -1.8% (Stops)
             </span>
           </div>
         </div>
@@ -195,56 +277,37 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
             loading={loading}
           />
 
-          {/* Execution Ladder Floating HUD Overlay */}
-          {showExecutionLadder && selectedSignalPlan && (
-            <div className="absolute top-3 left-3 bg-[#0a0f1e]/90 border border-indigo-500/40 backdrop-blur-md rounded-lg p-2.5 text-xs font-mono shadow-xl z-20 max-w-[260px] select-none">
-              <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-indigo-500/30">
-                <div className="flex items-center gap-1.5">
-                  <Target size={12} className="text-indigo-400" />
-                  <span className="font-bold text-white text-[10px] tracking-wider">
-                    {selectedSignalPlan.style} {selectedSignalPlan.side}
-                  </span>
-                </div>
+          {/* Execution Ladder Floating HUD Overlay (Positioned bottom-left to avoid blocking top toolbar/OHLC) */}
+          {showExecutionLadder && selectedSignalPlan && !isLadderDocked && (
+            isLadderMinimized ? (
+              <div
+                onClick={() => setIsLadderMinimized(false)}
+                className="absolute bottom-4 left-14 bg-[#0a0f1e]/90 border border-indigo-500/40 backdrop-blur-md rounded-lg px-2.5 py-1 text-xs font-mono shadow-xl z-20 flex items-center gap-2 select-none hover:border-indigo-400 transition-all cursor-pointer group"
+                title="Click to expand Execution Ladder"
+              >
+                <Target size={12} className="text-indigo-400" />
+                <span className="font-bold text-white text-[10px]">
+                  {selectedSignalPlan.style} {selectedSignalPlan.side}
+                </span>
                 <span className="text-emerald-400 font-bold text-[10px]">
                   R:R {selectedSignalPlan.riskRewardRatio}:1
                 </span>
+                <ChevronUp size={12} className="text-slate-400 group-hover:text-white transition-colors" />
               </div>
-
-              {/* Vertical Execution Ladder */}
-              <div className="space-y-1 text-[10px]">
-                <div className="flex justify-between items-center text-emerald-400">
-                  <span>TP3 (+6.2R):</span>
-                  <span className="font-bold">${selectedSignalPlan.tp3.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-emerald-400">
-                  <span>TP2 (+3.1R):</span>
-                  <span className="font-bold">${selectedSignalPlan.tp2.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-emerald-300">
-                  <span>TP1 (+1.5R):</span>
-                  <span className="font-bold">${selectedSignalPlan.tp1.toLocaleString()}</span>
-                </div>
-
-                <div className="my-1 py-0.5 px-1.5 bg-indigo-950/80 border border-indigo-500/50 rounded flex justify-between items-center text-white font-bold">
-                  <span>ENTRY ZONE:</span>
-                  <span>${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}</span>
-                </div>
-
-                <div className="flex justify-between items-center text-rose-400">
-                  <span>STOP LOSS:</span>
-                  <span className="font-bold">${selectedSignalPlan.stopLoss.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-rose-500 text-[9px]">
-                  <span>INVALIDATION:</span>
-                  <span className="font-bold">${selectedSignalPlan.invalidationPrice.toLocaleString()}</span>
-                </div>
+            ) : (
+              <div className="absolute bottom-4 left-14 bg-[#0a0f1e]/95 border border-indigo-500/40 backdrop-blur-md rounded-lg p-2 text-xs font-mono shadow-2xl z-20 w-[240px] select-none">
+                {renderLadderContent(false)}
               </div>
-            </div>
+            )
           )}
         </div>
 
         {/* Right Sidebar Overlay: Volume Profile & Liquidation Map Strip */}
-        <div className="w-[180px] hidden md:flex flex-col border-l border-[#1e293b] bg-[#070b16] select-none text-xs font-mono">
+        <div className="w-[190px] hidden md:flex flex-col border-l border-[#1e293b] bg-[#070b16] select-none text-xs font-mono overflow-y-auto max-h-[520px]">
+          {/* Docked Execution Ladder (when user docks to sidebar) */}
+          {showExecutionLadder && selectedSignalPlan && isLadderDocked && (
+            renderLadderContent(true)
+          )}
           {/* Volume Profile Section */}
           {showVolumeProfile && (
             <div className="p-2 border-b border-[#1e293b] flex flex-col">
