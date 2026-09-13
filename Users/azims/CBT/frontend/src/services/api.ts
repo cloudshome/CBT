@@ -1876,6 +1876,39 @@ export const api = {
     const res = await authFetch(`${BASE_URL}/api/volatility/gex?symbol=${encodeURIComponent(symbol)}`);
     return handleResponse<VolatilityGEXResponse>(res);
   },
+
+  /**
+   * TASK 20.1: ARBITRAGE & FUNDING DISLOCATION SENTINEL
+   */
+  async getArbitrageDislocations(symbol: string = 'BTCUSDT'): Promise<ArbitrageDislocationsResponse> {
+    const res = await authFetch(`${BASE_URL}/api/arbitrage/dislocations?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<ArbitrageDislocationsResponse>(res);
+  },
+
+  async getFundingMatrix(symbol: string = 'BTCUSDT'): Promise<FundingMatrixResponse> {
+    const res = await authFetch(`${BASE_URL}/api/arbitrage/funding-matrix?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<FundingMatrixResponse>(res);
+  },
+
+  async getArbitrageOpportunities(symbol: string = 'BTCUSDT'): Promise<ArbitrageOpportunitiesResponse> {
+    const res = await authFetch(`${BASE_URL}/api/arbitrage/opportunities?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<ArbitrageOpportunitiesResponse>(res);
+  },
+
+  async getArbitrageHistory(limit: number = 50): Promise<ArbitrageHistoryResponse> {
+    const res = await authFetch(`${BASE_URL}/api/arbitrage/history?limit=${limit}`);
+    return handleResponse<ArbitrageHistoryResponse>(res);
+  },
+
+  async getArbitrageHealth(): Promise<ArbitrageHealthResponse> {
+    const res = await authFetch(`${BASE_URL}/api/arbitrage/health`);
+    return handleResponse<ArbitrageHealthResponse>(res);
+  },
+
+  async getArbitrageProvenance(opportunityId: string): Promise<ArbitrageProvenanceResponse> {
+    const res = await authFetch(`${BASE_URL}/api/arbitrage/provenance/${encodeURIComponent(opportunityId)}`);
+    return handleResponse<ArbitrageProvenanceResponse>(res);
+  },
 };
 
 export interface BurnInStatus {
@@ -2263,4 +2296,162 @@ export interface VolatilitySummaryResponse {
     risk_flags: string[];
   };
 }
+
+export interface ArbitrageDislocationsResponse {
+  status: string;
+  symbol: string;
+  timestamp_ms: number;
+  basis_metrics: {
+    spot_venue: string;
+    perp_venue: string;
+    spot_price: number;
+    perp_price: number;
+    raw_basis_bps: number;
+    rolling_mean_bps: number;
+    rolling_std_bps: number;
+    zscore: number;
+    regime: string;
+    candidate_trigger: boolean;
+    duration_outside_threshold_ms: number;
+  } | null;
+  active_dislocations_count: number;
+}
+
+export interface FundingMatrixItem {
+  pair_id: string;
+  canonical_symbol: string;
+  venue_a: string;
+  venue_b: string;
+  rate_a_pct: number;
+  rate_b_pct: number;
+  raw_divergence_bps: number;
+  annualized_divergence_pct: number;
+  time_to_funding_sec: number;
+  estimated_capture_bps: number;
+  confidence: number;
+  data_freshness_ms: number;
+  proposed_long_leg: string;
+  proposed_short_leg: string;
+}
+
+export interface FundingMatrixResponse {
+  status: string;
+  symbol: string;
+  timestamp_ms: number;
+  count: number;
+  matrix: FundingMatrixItem[];
+}
+
+export interface CapacityTierItem {
+  notional_usd: number;
+  executable_qty: number;
+  vwap_long: number;
+  vwap_short: number;
+  slippage_bps: number;
+  net_ev_usd: number;
+  net_ev_bps: number;
+  viable: boolean;
+}
+
+export interface ArbitrageOpportunityItem {
+  opportunity_id: string;
+  detected_at_ms: number;
+  canonical_symbol: string;
+  opportunity_type: string;
+  long_venue: string;
+  short_venue: string;
+  classification: string;
+  rejection_code: string;
+  rejection_reason: string;
+  executable_spread: {
+    vwap_long_ask: number;
+    vwap_short_bid: number;
+    theoretical_spread_bps: number;
+    executable_spread_bps: number;
+    gross_spread_usd: number;
+  } | null;
+  multi_scenario_ev: {
+    base_net_ev_usd: number;
+    base_net_ev_bps: number;
+    conservative_net_ev_usd: number;
+    conservative_net_ev_bps: number;
+    stress_net_ev_usd: number;
+    stress_net_ev_bps: number;
+    cost_breakdown: {
+      entry_fee_long_usd: number;
+      entry_fee_short_usd: number;
+      exit_fee_long_usd: number;
+      exit_fee_short_usd: number;
+      orderbook_slippage_long_usd: number;
+      orderbook_slippage_short_usd: number;
+      hedge_cost_usd: number;
+      latency_cost_usd: number;
+      funding_cashflow_usd: number;
+      borrow_cost_usd: number;
+      safety_buffer_usd: number;
+      model_version: string;
+    } | null;
+  } | null;
+  capacity_tiers: CapacityTierItem[];
+  max_viable_notional_usd: number;
+  persistence_observations: number;
+  persistence_duration_ms: number;
+  data_freshness_ms: number;
+  confidence_score: number;
+  provenance_hash: string;
+  permission: string;
+}
+
+export interface ArbitrageOpportunitiesResponse {
+  status: string;
+  symbol: string;
+  timestamp_ms: number;
+  count: number;
+  opportunities: ArbitrageOpportunityItem[];
+}
+
+export interface ShadowTradeRecord {
+  opportunity_id: string;
+  canonical_symbol: string;
+  opportunity_type: string;
+  long_venue: string;
+  short_venue: string;
+  target_notional_usd: number;
+  predicted_net_ev_usd: number;
+  realized_reference_ev_usd: number | null;
+  opportunity_duration_ms: number;
+  unhedged_residual_qty: number;
+  funding_realized_usd: number;
+  model_attribution_error_usd: number;
+  status: string;
+  detected_at: number;
+  qualified_at: number;
+  expired_at: number | null;
+}
+
+export interface ArbitrageHistoryResponse {
+  status: string;
+  timestamp_ms: number;
+  count: number;
+  shadow_records: ShadowTradeRecord[];
+}
+
+export interface ArbitrageHealthResponse {
+  status: string;
+  timestamp_ms: number;
+  permission: string;
+  active_venues: string[];
+  clock_drift_sla_ms: number;
+  staleness_threshold_ms: number;
+  model_versions: Record<string, string>;
+  live_trading_guard: string;
+}
+
+export interface ArbitrageProvenanceResponse {
+  status: string;
+  opportunity_id: string;
+  integrity_verified: boolean;
+  envelope: any;
+}
+
 

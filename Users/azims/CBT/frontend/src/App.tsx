@@ -24,6 +24,7 @@ import { ShadowBurnInHUD } from './components/ShadowBurnInHUD';
 import { ResearchIngestLab } from './components/ResearchIngestLab';
 import { CollectiveCoreDashboard } from './components/CollectiveCoreDashboard';
 import { VolatilitySurfaceDesk } from './components/VolatilitySurfaceDesk';
+import { ArbitrageRadar } from './components/ArbitrageRadar';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
@@ -100,8 +101,8 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE'>('DOSSIER');
-  const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN'>('MICROSTRUCTURE');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE'>('DOSSIER');
+  const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN' | 'ARBITRAGE_RADAR'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
   // Notifications State
@@ -638,6 +639,17 @@ export const App: React.FC = () => {
                   <Activity size={13} className={activeBottomTab === 'VOLATILITY_SURFACE' ? 'text-white animate-pulse' : 'text-amber-400'} />
                   <span>⚡ Volatility Surface</span>
                 </button>
+                <button
+                  onClick={() => setActiveBottomTab('ARBITRAGE')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'ARBITRAGE'
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-bold shadow-md shadow-amber-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Scale size={13} className={activeBottomTab === 'ARBITRAGE' ? 'text-slate-950' : 'text-amber-400'} />
+                  <span>⚖️ Arbitrage Radar</span>
+                </button>
               </div>
             </div>
 
@@ -736,6 +748,16 @@ export const App: React.FC = () => {
                     >
                       6. Canary Burn-In (Phase 16)
                     </button>
+                    <button
+                      onClick={() => setActiveFrontierTab('ARBITRAGE_RADAR')}
+                      className={`px-3 py-1 rounded transition-all ${
+                        activeFrontierTab === 'ARBITRAGE_RADAR'
+                          ? 'bg-amber-500 text-slate-950 font-bold shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      7. Arbitrage Radar (Task 20.1)
+                    </button>
                   </div>
 
                   {/* Active Frontier Component */}
@@ -754,6 +776,12 @@ export const App: React.FC = () => {
                   )}
                   {activeFrontierTab === 'AUDITOR' && <AutonomousAuditorHUD />}
                   {activeFrontierTab === 'BURN_IN' && <ShadowBurnInHUD />}
+                  {activeFrontierTab === 'ARBITRAGE_RADAR' && (
+                    <ArbitrageRadar
+                      currentSymbol={symbol}
+                      onNotify={(type, title, msg) => addToast(type, title, msg)}
+                    />
+                  )}
                 </div>
               ) : activeBottomTab === 'RESEARCH_LAB' ? (
                 <ResearchIngestLab
@@ -765,6 +793,11 @@ export const App: React.FC = () => {
                 <VolatilitySurfaceDesk
                   currentSymbol={symbol}
                   onNotify={(type: 'success' | 'error' | 'info' | 'warning', title: string, msg: string) => addToast(type, title, msg)}
+                />
+              ) : activeBottomTab === 'ARBITRAGE' ? (
+                <ArbitrageRadar
+                  currentSymbol={symbol}
+                  onNotify={(type, title, msg) => addToast(type, title, msg)}
                 />
               ) : (
                 <CollectiveCoreDashboard />

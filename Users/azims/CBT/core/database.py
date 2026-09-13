@@ -583,6 +583,54 @@ class DatabaseManager:
                 "CREATE INDEX IF NOT EXISTS idx_parent_order_created ON parent_order_execution_records(created_at_ms);"
             )
 
+            # TASK 20.1: ARBITRAGE PROVENANCE & SHADOW LEDGER TABLES
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS arbitrage_provenance_records (
+                    opportunity_id TEXT PRIMARY KEY,
+                    observation_timestamp_ms INTEGER NOT NULL,
+                    canonical_symbol TEXT NOT NULL,
+                    decision TEXT NOT NULL,
+                    rejection_code TEXT NOT NULL,
+                    software_build_sha TEXT NOT NULL,
+                    envelope_json TEXT NOT NULL,
+                    canonical_envelope_hash TEXT NOT NULL,
+                    created_at_epoch REAL NOT NULL
+                );
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_arb_prov_hash ON arbitrage_provenance_records(canonical_envelope_hash);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_arb_prov_decision ON arbitrage_provenance_records(decision);"
+            )
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS arbitrage_shadow_ledger (
+                    opportunity_id TEXT PRIMARY KEY,
+                    canonical_symbol TEXT NOT NULL,
+                    opportunity_type TEXT NOT NULL,
+                    long_venue TEXT NOT NULL,
+                    short_venue TEXT NOT NULL,
+                    target_notional_usd REAL NOT NULL,
+                    predicted_net_ev_usd REAL NOT NULL,
+                    realized_reference_ev_usd REAL,
+                    opportunity_duration_ms REAL,
+                    unhedged_residual_qty REAL,
+                    funding_realized_usd REAL,
+                    model_attribution_error_usd REAL,
+                    status TEXT NOT NULL,
+                    detected_at REAL NOT NULL,
+                    qualified_at REAL NOT NULL,
+                    expired_at REAL
+                );
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_arb_shadow_symbol ON arbitrage_shadow_ledger(canonical_symbol);"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_arb_shadow_status ON arbitrage_shadow_ledger(status);"
+            )
+
             conn.commit()
 
     def _init_experiment_db(self) -> None:
