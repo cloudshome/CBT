@@ -1362,6 +1362,14 @@ export const api = {
     return handleResponse<any>(res);
   },
 
+  /**
+   * GET /api/research/youtube/jobs
+   */
+  async listYouTubeJobs(limit: number = 10): Promise<{ jobs: any[] }> {
+    const res = await authFetch(`${BASE_URL}/api/research/youtube/jobs?limit=${limit}`);
+    return handleResponse<{ jobs: any[] }>(res);
+  },
+
   // =========================================================================
   // SKY KNOWLEDGE OPERATING SYSTEM APIS (PROJECT BRAIN + HUMAN BRAIN)
   // =========================================================================
@@ -1823,6 +1831,51 @@ export const api = {
     const res = await authFetch(`${BASE_URL}/api/terminal/glossary${q}`);
     return handleResponse<{ totalCount: number; query: string; items: SMCGlossaryItem[] }>(res);
   },
+
+  /**
+   * GET /api/volatility/summary
+   * Returns high-level volatility intelligence summary (Skew, Term Structure, GEX, Tail-Risk Multiplier).
+   */
+  async getVolatilitySummary(symbol: string = 'BTC'): Promise<VolatilitySummaryResponse> {
+    const res = await authFetch(`${BASE_URL}/api/volatility/summary?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<VolatilitySummaryResponse>(res);
+  },
+
+  /**
+   * GET /api/volatility/surface
+   * Returns 2D regularized volatility surface matrix (Moneyness vs Tenors).
+   */
+  async getVolatilitySurface(symbol: string = 'BTC'): Promise<VolatilitySurfaceResponse> {
+    const res = await authFetch(`${BASE_URL}/api/volatility/surface?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<VolatilitySurfaceResponse>(res);
+  },
+
+  /**
+   * GET /api/volatility/skew
+   * Returns 25-Delta skew parameters and risk reversals across tenors.
+   */
+  async getVolatilitySkew(symbol: string = 'BTC'): Promise<VolatilitySkewResponse> {
+    const res = await authFetch(`${BASE_URL}/api/volatility/skew?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<VolatilitySkewResponse>(res);
+  },
+
+  /**
+   * GET /api/volatility/term-structure
+   * Returns constant-maturity ATM term structure curve and Contango/Backwardation state.
+   */
+  async getVolatilityTermStructure(symbol: string = 'BTC'): Promise<VolatilityTermStructureResponse> {
+    const res = await authFetch(`${BASE_URL}/api/volatility/term-structure?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<VolatilityTermStructureResponse>(res);
+  },
+
+  /**
+   * GET /api/volatility/gex
+   * Returns Net Dealer Gamma Exposure (GEX) profile and Options Max Pain.
+   */
+  async getVolatilityGEX(symbol: string = 'BTC'): Promise<VolatilityGEXResponse> {
+    const res = await authFetch(`${BASE_URL}/api/volatility/gex?symbol=${encodeURIComponent(symbol)}`);
+    return handleResponse<VolatilityGEXResponse>(res);
+  },
 };
 
 export interface BurnInStatus {
@@ -2125,3 +2178,89 @@ export interface ReconciliationRecord {
   created_at_ms: number;
   reconciled_at_ms: number;
 }
+
+export interface VolatilityTenorSkewPoint {
+  tenor_days: number;
+  expiry_timestamp_ms: number;
+  time_to_expiry_years: number;
+  atm_iv: number;
+  put_25d_iv: number;
+  call_25d_iv: number;
+  twenty_five_delta_skew: number;
+  relative_skew_pct: number;
+  put_25d_strike: number;
+  call_25d_strike: number;
+  atm_strike: number;
+  regime: string;
+}
+
+export interface VolatilitySkewResponse {
+  symbol: string;
+  underlying_price: number;
+  timestamp_ms: number;
+  dominant_regime: string;
+  average_skew_25d: number;
+  tail_risk_multiplier: number;
+  tenor_points: VolatilityTenorSkewPoint[];
+}
+
+export interface VolatilityTermStructurePoint {
+  tenor_days: number;
+  atm_iv: number;
+  annualized_iv_pct: number;
+  sample_count: number;
+}
+
+export interface VolatilityTermStructureResponse {
+  symbol: string;
+  timestamp_ms: number;
+  underlying_price: number;
+  regime: string;
+  slope_90d_minus_7d: number;
+  curve: VolatilityTermStructurePoint[];
+}
+
+export interface VolatilitySurfaceResponse {
+  symbol: string;
+  timestamp_ms: number;
+  underlying_price: number;
+  moneyness_levels: number[];
+  tenors_days: number[];
+  surface_matrix: number[][];
+}
+
+export interface VolatilityGEXResponse {
+  symbol: string;
+  timestamp_ms: number;
+  underlying_price: number;
+  net_gamma_usd_per_1pct: number;
+  regime: string;
+  max_pain_strike: number;
+  zero_gamma_strike: number | null;
+  strikes: number[];
+  call_gex_by_strike: number[];
+  put_gex_by_strike: number[];
+  net_gex_by_strike: number[];
+}
+
+export interface VolatilitySummaryResponse {
+  symbol: string;
+  underlying_price: number;
+  timestamp_ms: number;
+  contracts_count: number;
+  skew: VolatilitySkewResponse;
+  term_structure: VolatilityTermStructureResponse;
+  gex: VolatilityGEXResponse;
+  tail_risk: {
+    tail_risk_multiplier: number;
+    dominant_skew_regime: string;
+    term_structure_regime: string;
+    dealer_gex_regime: string;
+    average_skew_25d: number;
+    term_slope: number;
+    net_gex_usd: number;
+    max_pain_strike: number;
+    risk_flags: string[];
+  };
+}
+

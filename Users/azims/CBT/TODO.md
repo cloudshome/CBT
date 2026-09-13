@@ -542,10 +542,20 @@
 
 ---
 
-## 🔮 Phase 20: Next-Generation Institutional Alpha & High-Frequency Risk (Upcoming Pipeline)
+## 🔮 Phase 20: Next-Generation Institutional Alpha & High-Frequency Risk (Active Pipeline)
 - [ ] **Task 20.1: Cross-Exchange Arbitrage & Funding Rate Dislocation Sentinel**
 - [ ] **Task 20.2: L3 Market By Order (MBO) Liquidity Depth Reconstruction**
-- [ ] **Task 20.3: Automated Volatility Surface & Skew Term Structure Model**
+- [x] **Task 20.3: Automated Volatility Surface & Skew Term Structure Model (COMPLETED ✅)**
+  - **Black-76 & Greeks Engine** (`core/volatility/black_scholes.py`): Analytical Black-76 pricer, closed-form Greeks ($\Delta, \Gamma, \nu, \Theta$), and Newton-Raphson implied volatility inverter with bisection boundary fallbacks.
+  - **Deribit Options Feed** (`core/volatility/options_feed.py`): Unauthenticated public options book summary ingestion (`get_book_summary_by_currency`), instrument string regex parser (`BTC-25DEC26-104000-C`), and calibrated fallback chain generator.
+  - **25-Delta Skew Engine** (`core/volatility/skew_engine.py`): Multi-tenor 25-delta put and call IV solver, absolute and relative skew calculation, and 4-state structural regime classifier (`DEEP_PUT_SKEW`, `MODERATE_PUT_SKEW`, `NEUTRAL_SKEW`, `CALL_SKEW_PREMIUM`).
+  - **Constant-Maturity Term Structure** (`core/volatility/term_structure.py`): Interpolated ATM IV curve across standard tenors (7d, 14d, 30d, 60d, 90d, 180d) and slope metric for `CONTANGO`, `FLAT`, or `BACKWARDATION` identification.
+  - **2D Volatility Surface Grid** (`core/volatility/surface_engine.py`): Regularized 2D matrix ($Moneyness \in [0.70, 1.30]$ vs. Tenor Days) with bilinear surface interpolation.
+  - **Net Dealer GEX & Max Pain** (`core/volatility/gex_engine.py`): Dealer gamma exposure profile per strike, dollar gamma per 1% move, regime classification (`POSITIVE_PINNING` vs `NEGATIVE_EXPLOSIVE`), and options Max Pain strike solver.
+  - **Risk Engine Integration** (`core/volatility/risk_integrator.py`): Dynamic tail-risk multiplier $M_{\text{tail}} \in [0.40, 1.05]$ seamlessly scaling Half-Kelly sizing to safeguard against volatility shocks and put skew spikes.
+  - **REST API Routes** (`core/volatility/routes.py`, `app.py`): Mounted `/api/volatility/summary`, `/api/volatility/surface`, `/api/volatility/skew`, `/api/volatility/term-structure`, and `/api/volatility/gex`.
+  - **Frontend Institutional Desk** (`frontend/src/components/VolatilitySurfaceDesk.tsx`, `frontend/src/App.tsx`, `frontend/src/services/api.ts`): Interactive cockpit with KPI metrics, term structure curve, 2D surface heatmap, 25-delta skew table, and GEX/Max Pain strike distribution.
+  - **Verification & Tests** (`tests/test_task20_volatility_surface.py`): 22/22 unit and integration tests passing 100% green; zero TypeScript errors on `npm run build`.
 
 ---
 

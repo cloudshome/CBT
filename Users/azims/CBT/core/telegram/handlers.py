@@ -714,6 +714,122 @@ async def handle_resume(
     return alert
 
 
+async def handle_learned(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    Generates the comprehensive daily learning dossier: "What AI Learned Today".
+    Aggregates multi-source literature, YouTube explorations, extracted SMC concepts,
+    claims, contradictions, knowledge graph delta, and daily paper desk metrics.
+    """
+    from core.daily_learning_reporter import daily_learning_reporter
+    from core.telegram_bot import telegram_bot
+
+    report = daily_learning_reporter.generate_what_ai_learned_today_report()
+    if chat_id:
+        await telegram_bot.send_message(report, chat_id=chat_id)
+    return report
+
+
+async def handle_macro(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    Macro Catalyst & Economic Indicator Result and Impact Engine.
+    Reports Actual vs Forecast vs Previous for US CPI, Core CPI, FOMC, NFP, etc.,
+    computes Surprise Delta, and analyzes market impact on BTC/ETH, IV crush %,
+    FVG liquidity zones, and tactical risk desk directives.
+    """
+    from core.macro_event_reporter import macro_event_reporter
+    from core.telegram_bot import telegram_bot
+
+    query = args.strip().upper() if args else ""
+    recent_releases = macro_event_reporter.get_recent_releases(limit=5)
+
+    if not recent_releases:
+        pending = macro_event_reporter.check_and_generate_pending_releases()
+        if pending:
+            report_text = pending[0].get("formatted_report", "")
+        else:
+            report_text = "No recent macroeconomic releases recorded in the audit database."
+    else:
+        selected_release = recent_releases[0]
+        if query:
+            for r in recent_releases:
+                if query in r.get("event_name", "").upper() or query in r.get("event_id", "").upper():
+                    selected_release = r
+                    break
+        report_text = macro_event_reporter.format_event_flash_report(selected_release)
+
+    if chat_id:
+        await telegram_bot.send_message(report_text, chat_id=chat_id)
+    return report_text
+
+
+async def handle_schedule(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    Displays the institutional 4-times-a-day briefing schedule adjusted to Bangladesh Standard Time (BST = UTC+6).
+    Shows current BD time, active trading session, and upcoming automated dispatch windows.
+    """
+    import datetime
+    from core.telegram_bot import BD_TZ, telegram_bot
+
+    now_bd = datetime.datetime.now(BD_TZ)
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    current_hour = now_bd.hour
+
+    briefings = [
+        ("08:00 AM BST", "02:00 UTC", "Morning Desk Briefing & Asian/Global Macro Radar", 8),
+        ("02:00 PM BST", "08:00 UTC", "Midday Market Pulse & European Session Open", 14),
+        ("08:00 PM BST", "14:00 UTC", "US Session Open & Critical Catalyst Watch", 20),
+        ("10:00 PM BST", "16:00 UTC", "What AI Learned Today & Nightly Terminal Dossier", 22),
+    ]
+
+    next_briefing = None
+    for b_time, _, desc, target_h in briefings:
+        if current_hour < target_h:
+            diff_h = target_h - current_hour
+            diff_m = 60 - now_bd.minute if now_bd.minute > 0 else 0
+            if now_bd.minute > 0:
+                diff_h -= 1
+            next_briefing = f"{desc} in ~{diff_h}h {diff_m}m ({b_time})"
+            break
+    if not next_briefing:
+        next_briefing = "Tomorrow 08:00 AM BST: Morning Desk Briefing & Asian Radar"
+
+    schedule_text = (
+        "🕒 **INSTITUTIONAL BRIEFING SCHEDULE • BANGLADESH TIME (UTC+6)**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🇧🇩 **Current BD Time:** `{now_bd.strftime('%Y-%m-%d %I:%M:%S %p')} BST`\n"
+        f"🌐 **Current UTC:** `{now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC`\n"
+        f"⏳ **Next Automated Dispatch:** `{next_briefing}`\n\n"
+        "📅 **The 4 Daily Automated Intelligence Briefings:**\n"
+        "1. 🌅 **08:00 AM BST (02:00 UTC)**\n"
+        "   • Morning Desk Briefing & Asian/Global Macro Radar\n"
+        "   • Overnight CVD delta, Asian range boundaries, daily game plan\n\n"
+        "2. ☀️ **02:00 PM BST (08:00 UTC)**\n"
+        "   • Midday Market Pulse & European/London Open\n"
+        "   • London Judas swing sweeps, active shadow positions & PnL\n\n"
+        "3. 🌆 **08:00 PM BST (14:00 UTC)**\n"
+        "   • US Session Open & Critical Catalyst Watch\n"
+        "   • New York volume inflows, pre-catalyst risk gates & locks\n\n"
+        "4. 🧠 **10:00 PM BST (16:00 UTC)**\n"
+        "   • **What AI Learned Today** & Nightly Terminal Dossier\n"
+        "   • Multi-source YouTube & PDF research, SMC concepts, claims, paper PnL\n\n"
+        "🔴 **Real-Time Catalyst Shocks (Instant Flash):**\n"
+        "• Auto-dispatched the second US CPI, FOMC, or NFP results drop!\n"
+        "• Delivers Actual vs Forecast vs Previous, Surprise Delta & Volatility Impact.\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🤖 _Institutional Quant Desk Copilot • Autonomous 24/7 Surveillance_"
+    )
+
+    if chat_id:
+        await telegram_bot.send_message(schedule_text, chat_id=chat_id)
+    return schedule_text
+
+
 # ==============================================================================
 # CENTRAL V5 COMMAND REGISTRATION
 # ==============================================================================
@@ -896,6 +1012,30 @@ def register_all_v5_commands() -> None:
             aliases=["/unpause"],
             argument_schema="",
             risk_level="CRITICAL",
+        ),
+        TelegramCommand(
+            name="/learned",
+            description="What AI Learned Today: Nightly research, YouTube V5, and SMC concept digest",
+            handler=handle_learned,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/daily", "/whatilearned", "/study"],
+            argument_schema="",
+        ),
+        TelegramCommand(
+            name="/macro",
+            description="Macro Catalyst Flash: CPI, FOMC, NFP results and market impact report",
+            handler=handle_macro,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/cpi", "/fomc", "/nfp", "/catalyst"],
+            argument_schema="[event_name]",
+        ),
+        TelegramCommand(
+            name="/schedule",
+            description="4 daily briefings in Bangladesh Time (BST = UTC+6) and active sessions",
+            handler=handle_schedule,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/sessions", "/bdtime", "/briefings"],
+            argument_schema="",
         ),
     ]
 

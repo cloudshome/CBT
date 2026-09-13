@@ -68,6 +68,10 @@ class TelegramCommandRegistry:
 
         return None
 
+    def get(self, trigger: str) -> TelegramCommand | None:
+        """Alias for get_command."""
+        return self.get_command(trigger)
+
     def list_commands(self) -> list[TelegramCommand]:
         """Returns all registered unique commands."""
         return list(self._commands.values())

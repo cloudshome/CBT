@@ -105,6 +105,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   const [ytExploreLoading, setYtExploreLoading] = useState<boolean>(false);
   const [ytActiveJobId, setYtActiveJobId] = useState<string | null>(null);
   const [ytJobData, setYtJobData] = useState<any | null>(null);
+  const [recentYtJobs, setRecentYtJobs] = useState<any[]>([]);
   const [showYtResults, setShowYtResults] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,14 +114,16 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   const fetchAllData = useCallback(async () => {
     try {
       setLoadingVaults(true);
-      const [vData, inData, gData] = await Promise.all([
+      const [vData, inData, gData, ytJobs] = await Promise.all([
         api.getResearchVaults(),
         api.getResearchInbox(15),
         api.getDiscoveryGraph(),
+        api.listYouTubeJobs(10).catch(() => ({ jobs: [] })),
       ]);
       setVaultData(vData);
       setInboxItems(inData.items || []);
       setGraphData(gData);
+      setRecentYtJobs(ytJobs.jobs || []);
     } catch (err: any) {
       console.error('Failed to load research vault data:', err);
     } finally {
@@ -131,6 +134,20 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  // Restore latest active YouTube job on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('cbt_active_yt_job') || 'YT-EXP-0086081D';
+    if (saved && !ytActiveJobId) {
+      setYtActiveJobId(saved);
+      api.getYouTubeJob(saved).then((job) => {
+        setYtJobData(job);
+        if (job.status === 'COMPLETED') {
+          setShowYtResults(true);
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   // YouTube Exploration Job Polling
   useEffect(() => {
@@ -171,6 +188,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         limit: ytExploreLimit,
       });
       setYtActiveJobId(res.job_id);
+      localStorage.setItem('cbt_active_yt_job', res.job_id);
+      fetchAllData();
       if (onNotify) {
         onNotify('info', 'Exploration Dispatched', `Job ${res.job_id} launched for ${clean}`);
       }
@@ -179,6 +198,20 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       if (onNotify) {
         onNotify('error', 'Exploration Failed', err?.message || 'Could not dispatch exploration job.');
       }
+    }
+  };
+
+  const handleSelectPastJob = async (jobId: string) => {
+    try {
+      setYtActiveJobId(jobId);
+      localStorage.setItem('cbt_active_yt_job', jobId);
+      const job = await api.getYouTubeJob(jobId);
+      setYtJobData(job);
+      if (job.status === 'COMPLETED') {
+        setShowYtResults(true);
+      }
+    } catch (err: any) {
+      console.error('Failed to load past YouTube job:', err);
     }
   };
 
@@ -1109,6 +1142,28 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           </div>
         </div>
 
+        {/* Recent Explorations History Bar */}
+        {recentYtJobs.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/60 text-[11px]">
+            <span className="text-slate-500 font-medium">Recent Sessions:</span>
+            {recentYtJobs.slice(0, 4).map((j: any) => (
+              <button
+                key={j.job_id}
+                onClick={() => handleSelectPastJob(j.job_id)}
+                className={`px-2.5 py-1 rounded border transition-all flex items-center gap-1.5 ${
+                  ytActiveJobId === j.job_id
+                    ? 'bg-red-950/70 border-red-500/50 text-red-300 font-semibold shadow-sm'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${j.status === 'COMPLETED' ? 'bg-emerald-400' : j.status === 'FAILED' ? 'bg-red-400' : 'bg-amber-400'}`} />
+                <span className="truncate max-w-[200px]">{j.title.replace('Explore YouTube: ', '')}</span>
+                <span className="font-mono text-[10px] text-slate-500">{j.status === 'COMPLETED' ? '✓' : `${j.progress_pct}%`}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Live Exploration Tracker */}
         {ytActiveJobId && (
           <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3.5 flex flex-col gap-2">
@@ -1118,6 +1173,9 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
                 <span className="text-slate-300 font-semibold">Job `{ytActiveJobId}`</span>
                 <span className="text-slate-500">•</span>
                 <span className="text-slate-400">{ytJobData?.status || 'RUNNING'}</span>
+                {ytJobData?.status === 'COMPLETED' && (
+                  <span className="text-emerald-400 font-medium text-[11px]">✓ Synthesis Complete</span>
+                )}
               </div>
               <span className="font-bold text-red-400">{ytJobData?.progress_pct || 0}%</span>
             </div>
@@ -1129,10 +1187,23 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               />
             </div>
 
-            {ytJobData?.result?.step && (
+            {ytJobData?.result?.message ? (
+              <p className="text-[11px] text-slate-300">
+                <span className="text-red-400 font-mono font-semibold">[{ytJobData.result.step || 'RUNNING'}]</span>{' '}
+                {ytJobData.result.message}
+              </p>
+            ) : ytJobData?.result?.step ? (
               <p className="text-[11px] text-slate-400 italic">
                 Active Phase: <span className="text-slate-200 font-medium">{ytJobData.result.step}</span>
                 {ytJobData.result.current_video && ` — processing "${ytJobData.result.current_video}"`}
+              </p>
+            ) : ytJobData?.status === 'COMPLETED' ? (
+              <p className="text-[11px] text-emerald-400">
+                Processed {ytJobData.result?.videos_processed || 0} videos. View synthesis dossier below.
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-400 italic">
+                {ytExploreLoading ? 'Dispatching research agent & discovering playlist videos...' : 'Job registered.'}
               </p>
             )}
           </div>

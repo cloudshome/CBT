@@ -209,16 +209,20 @@ class YouTubeExplorationAgent:
         )
 
         try:
-            # Update Job Tracker
+            # Update Job Tracker - Step 1
             job_manager.update_job(
                 eff_job_id,
                 status="RUNNING",
-                progress_pct=10,
-                result={"step": "DISCOVERING", "url": source.canonical_url},
+                progress_pct=5,
+                result={
+                    "step": "DISCOVERING",
+                    "url": source.canonical_url,
+                    "message": "Querying playlist / channel metadata via yt-dlp...",
+                },
             )
 
-            # 2. Stage 1: Flat Discovery
-            discovered = youtube_discovery.discover_videos(source)
+            # 2. Stage 1: Flat Discovery (run in worker thread to prevent event loop blocking)
+            discovered = await asyncio.to_thread(youtube_discovery.discover_videos, source)
             res.videos_discovered = len(discovered)
             res.video_inventory = discovered
 
@@ -235,8 +239,12 @@ class YouTubeExplorationAgent:
             job_manager.update_job(
                 eff_job_id,
                 status="RUNNING",
-                progress_pct=20,
-                result={"step": "DEDUPLICATING", "discovered_count": len(discovered)},
+                progress_pct=15,
+                result={
+                    "step": "DEDUPLICATING",
+                    "discovered_count": len(discovered),
+                    "message": f"Discovered {len(discovered)} videos. Checking deduplication ledger...",
+                },
             )
             to_process, skipped = youtube_discovery.filter_unprocessed(
                 discovered, force_refresh=force_refresh
@@ -252,7 +260,7 @@ class YouTubeExplorationAgent:
             total_to_process = len(to_process)
 
             for idx, vid in enumerate(to_process):
-                prog = 25 + int((idx / max(1, total_to_process)) * 50)
+                prog = 20 + int(((idx + 1) / max(1, total_to_process)) * 60)
                 job_manager.update_job(
                     eff_job_id,
                     status="RUNNING",
@@ -262,12 +270,13 @@ class YouTubeExplorationAgent:
                         "current_video": vid.title,
                         "index": idx + 1,
                         "total": total_to_process,
+                        "message": f"Deconstructing ({idx + 1}/{total_to_process}): {vid.title[:50]}...",
                     },
                 )
 
                 try:
-                    # Deconstruct video
-                    atom = youtube_deconstructor.deconstruct_video(vid)
+                    # Deconstruct video in worker thread to avoid blocking loop during network transcript fetch
+                    atom = await asyncio.to_thread(youtube_deconstructor.deconstruct_video, vid)
                     atoms.append(atom)
 
                     # Feed into Universal Ingestor for Knowledge Graph persistence
@@ -298,14 +307,19 @@ class YouTubeExplorationAgent:
             job_manager.update_job(
                 eff_job_id,
                 status="RUNNING",
-                progress_pct=80,
-                result={"step": "SYNTHESIZING", "atoms_count": len(atoms)},
+                progress_pct=85,
+                result={
+                    "step": "SYNTHESIZING",
+                    "atoms_count": len(atoms),
+                    "message": "Synthesizing cross-video concept clusters and rule contradictions...",
+                },
             )
 
             channel_title = source.channel_name or (
                 atoms[0].author_creator if atoms else "YouTube Creator"
             )
-            profile = cross_video_synthesizer.build_creator_profile(
+            profile = await asyncio.to_thread(
+                cross_video_synthesizer.build_creator_profile,
                 atoms,
                 channel_name=channel_title,
                 channel_id=source.channel_id,

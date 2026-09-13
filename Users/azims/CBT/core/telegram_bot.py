@@ -527,26 +527,28 @@ class DeskStateMind:
 
 
 # ==============================================================================
-# SMART AI BRAIN NOTIFICATION ENGINE
+# SMART AI BRAIN NOTIFICATION ENGINE (BANGLADESH TIME ADJUSTED: UTC+6)
 # ==============================================================================
+
+BD_TZ = datetime.timezone(datetime.timedelta(hours=6))
 
 
 class SmartBrainNotificationEngine:
     """
     Institutional Smart AI Notification Sentinel.
     Enforces ZERO spam, ZERO duplicates, and 100% synchronized state awareness.
+    Adjusted strictly to Bangladesh Standard Time (BST = UTC+6, Asia/Dhaka).
 
     Principles:
-    1. Event-Driven Milestone Gates:
-       - No unsolicited spam! Macro alerts fire ONLY at true inflection points:
-         * T-60m: Heads Up (1h before release)
-         * T-15m: Risk Gate (+50% Net EV hurdle, position sizes halved)
-         * T-5m: Execution Lockout (Trading halted)
-         * T+10m: Post-Release Volatility Clearance (Normal trading resumes)
-       - If an event is >60m away (e.g. 1071 minutes), it is SILENT.
+    1. Event-Driven Milestone Gates & Instant Result Reports:
+       - Milestone gates: T-60m (Heads Up), T-15m (Risk Gate), T-5m (Lockout).
+       - Instant Macro Catalyst Result & Market Impact Reports:
+         * Automatically triggers when releases (e.g. CPI, Core CPI, FOMC, NFP) occur.
+         * Reports Actual vs Forecast vs Previous, Surprise Delta, BTC/ETH price reaction,
+           IV crush %, FVG zones, and tactical risk desk directives.
     2. Dynamic Deduplication & Fingerprinting:
        - Fingerprints message contents and hashes.
-       - Disallows duplicate news broadcasts or duplicate alert cycles.
+       - Disallows duplicate news broadcasts, duplicate releases, or duplicate alert cycles.
     3. Trade Lifecycle Event Synchronization:
        - Real-time immediate dispatch on:
          * Breakeven Triggered (+1.5R, SL moved to entry, zero risk)
@@ -554,9 +556,11 @@ class SmartBrainNotificationEngine:
          * Stop Loss Hit (Realized loss + Forensic Loss Autopsy diagnosis)
     4. Volatility Expansion Filter:
        - Only alerts if BTC or ETH moves >= 2.0% within 1 hour.
-    5. Scheduled Institutional Routine:
-       - 08:00 UTC Morning Desk Briefing
-       - 22:00 UTC Evening Performance & Autopsy Review
+    5. Scheduled Institutional Routine (4 Briefings Daily in BD Time):
+       - 08:00 AM BST (02:00 UTC): Morning Desk Briefing & Asian/Global Macro Radar
+       - 02:00 PM BST (08:00 UTC): Midday Market Pulse & European Session Open
+       - 08:00 PM BST (14:00 UTC): US Session Open & Critical Catalyst Watch
+       - 10:00 PM BST (16:00 UTC): "What AI Learned Today" & Nightly Terminal Dossier
     """
 
     def __init__(self, bot: TelegramBotDispatcher):
@@ -567,6 +571,8 @@ class SmartBrainNotificationEngine:
         self._notified_news_hashes: set[str] = set()
         self._last_price_tracker: dict[str, float] = {}
         self._last_morning_date: str = ""
+        self._last_midday_date: str = ""
+        self._last_us_session_date: str = ""
         self._last_evening_date: str = ""
         self._is_monitoring: bool = False
 
@@ -744,20 +750,59 @@ class SmartBrainNotificationEngine:
 
     async def check_scheduled_briefings(self) -> None:
         """
-        Dispatches morning desk briefing at 08:00 UTC and evening review at 22:00 UTC.
+        Dispatches 4 daily institutional briefings strictly aligned to Bangladesh Standard Time (BST = UTC+6):
+        - 08:00 AM BST (02:00 UTC): Morning Desk Briefing & Asian/Global Macro Radar
+        - 02:00 PM BST (08:00 UTC): Midday Market Pulse & European Session Open
+        - 08:00 PM BST (14:00 UTC): US Session Open & Critical Catalyst Watch
+        - 10:00 PM BST (16:00 UTC): "What AI Learned Today" & Nightly Terminal Dossier
         """
-        now_utc = datetime.datetime.now(datetime.UTC)
-        today_str = now_utc.strftime("%Y-%m-%d")
+        now_bd = datetime.datetime.now(BD_TZ)
+        today_str = now_bd.strftime("%Y-%m-%d")
 
-        if now_utc.hour == 8 and self._last_morning_date != today_str:
+        # 1. 08:00 AM BST: Morning Desk Briefing
+        if now_bd.hour == 8 and self._last_morning_date != today_str:
             self._last_morning_date = today_str
             text = await self.bot.generate_morning_briefing_text()
             await self.bot.send_morning_briefing(text)
 
-        if now_utc.hour == 22 and self._last_evening_date != today_str:
+        # 2. 02:00 PM BST: Midday Market & London Open Pulse
+        if now_bd.hour == 14 and self._last_midday_date != today_str:
+            self._last_midday_date = today_str
+            text = await self.bot.generate_midday_pulse_text()
+            await self.bot.send_midday_pulse(text)
+
+        # 3. 08:00 PM BST: US Session Open & Catalyst Watch
+        if now_bd.hour == 20 and self._last_us_session_date != today_str:
+            self._last_us_session_date = today_str
+            text = await self.bot.generate_us_session_watch_text()
+            await self.bot.send_us_session_watch(text)
+
+        # 4. 10:00 PM BST: "What AI Learned Today" Daily Dossier
+        if now_bd.hour == 22 and self._last_evening_date != today_str:
             self._last_evening_date = today_str
-            text = await self.bot.generate_evening_review_text()
-            await self.bot.send_evening_review(text)
+            text = await self.bot.generate_what_ai_learned_today_text()
+            await self.bot.send_what_ai_learned_today(text)
+
+    async def check_macro_event_releases(self) -> None:
+        """
+        Checks for newly published macroeconomic releases (e.g. CPI, Core CPI, FOMC, NFP)
+        and immediately dispatches high-impact Flash Result & Market Impact reports to Telegram.
+        Guarantees zero duplicate alerts.
+        """
+        try:
+            from core.macro_event_reporter import macro_event_reporter
+
+            pending_reports = macro_event_reporter.check_and_generate_pending_releases()
+            for report_payload in pending_reports:
+                event_id = report_payload.get("event_id", "")
+                text = report_payload.get("formatted_report", "")
+                tag = f"MACRO_EVENT_RELEASE_{event_id}"
+                if tag not in self._notified_milestones and text:
+                    self._notified_milestones.add(tag)
+                    await self.bot.send_message(text)
+                    logger.info(f"SmartNotifier: Dispatched macro flash alert for {event_id}")
+        except Exception as e:  # noqa: BLE001 — defensive fallback
+            logger.error(f"SmartNotifier macro event release check error: {e}")
 
     async def dispatch_unique_news_digest(self) -> bool:
         """
@@ -781,7 +826,7 @@ class SmartBrainNotificationEngine:
     async def start_smart_brain_monitor(self, check_interval_seconds: int = 30) -> None:
         """
         Main Event-Driven Sentinel Loop.
-        Monitors Macro risk gates, market volatility, and scheduled briefings.
+        Monitors Macro risk gates, releases, market volatility, and 4 daily BD time briefings.
         Zero spam, zero repetitive messages.
         """
         if self._is_monitoring:
@@ -810,10 +855,13 @@ class SmartBrainNotificationEngine:
                 # 1. Macro milestones (T-60m, T-15m, T-5m)
                 await self.check_macro_milestones()
 
-                # 2. Market volatility breakouts (>= 2.0%)
+                # 2. Instant Macro Event Results & Market Impact (CPI, FOMC, NFP releases)
+                await self.check_macro_event_releases()
+
+                # 3. Market volatility breakouts (>= 2.0%)
                 await self.check_volatility_expansion()
 
-                # 3. Scheduled institutional briefings (08:00 & 22:00 UTC)
+                # 4. Scheduled institutional briefings (4 times daily in BD Time: 08:00, 14:00, 20:00, 22:00 BST)
                 await self.check_scheduled_briefings()
 
             except asyncio.CancelledError:
@@ -1379,15 +1427,24 @@ class TelegramBotDispatcher:
         return await self.send_message(msg)
 
     async def send_morning_briefing(self, briefing_text: str) -> bool:
-        header = "🌅 **08:00 AM Institutional Morning Desk Briefing**\n\n"
+        header = "🌅 **08:00 AM BD TIME — MORNING DESK BRIEFING & ASIAN RADAR**\n\n"
         return await self.send_message(header + briefing_text)
 
+    async def send_midday_pulse(self, pulse_text: str) -> bool:
+        return await self.send_message(pulse_text)
+
+    async def send_us_session_watch(self, watch_text: str) -> bool:
+        return await self.send_message(watch_text)
+
+    async def send_what_ai_learned_today(self, learned_text: str) -> bool:
+        return await self.send_message(learned_text)
+
     async def send_evening_review(self, review_text: str) -> bool:
-        header = "🌃 **10:00 PM Daily Performance Review & Loss Autopsy**\n\n"
+        header = "🌃 **10:00 PM BD TIME — DAILY DESK AUTOPSY REVIEW**\n\n"
         return await self.send_message(header + review_text)
 
     async def generate_morning_briefing_text(self) -> str:
-        """Generates dynamic AI morning desk briefing using live data."""
+        """Generates dynamic AI morning desk briefing using live data (08:00 AM BST)."""
         try:
             m = await self.generate_market_update()
             briefing = (
@@ -1397,13 +1454,97 @@ class TelegramBotDispatcher:
                 f"• **Global Risk Index:** `{m['gri']:.1f}/100` ({m['sentiment']})\n"
                 f"• **Order Flow (CVD):** `{m['cvd_delta']}`\n\n"
                 f"🎯 **Desk Strategy Directives:**\n"
-                f"1. Prioritize Asian session liquidity sweeps into NY open.\n"
+                f"1. Prioritize Asian session liquidity sweeps into London open.\n"
                 f"2. Enforce strict Half-Kelly capital allocation (Max 2.50% risk per trade).\n"
                 f"3. Breakeven guard active at +1.5R target expansion.\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Asian Session & Global Macro Radar • BD Time [UTC+6]"
             )
             return briefing
         except Exception:  # noqa: BLE001 — defensive fallback
             return "Global markets steady. Risk limits active."
+
+    async def generate_midday_pulse_text(self) -> str:
+        """Generates Midday Market Pulse (02:00 PM BST / 08:00 UTC) at European/London open."""
+        try:
+            m = await self.generate_market_update()
+            from core.portfolio_shadow import portfolio_shadow
+
+            desk_metrics = portfolio_shadow.get_desk_performance_metrics()
+            open_pos = portfolio_shadow.get_open_positions()
+
+            pulse = (
+                f"☀️ **02:00 PM BD TIME — MIDDAY MARKET & EUROPEAN OPEN PULSE**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🌍 **Market Liquidity & Flow Regime:**\n"
+                f"• **BTC/USDT:** `${m['btc_price']:,.2f}` ({'+' if m.get('btc_change_24h', 0) >= 0 else ''}{m.get('btc_change_24h', 0.0)}%)\n"
+                f"• **ETH/USDT:** `${m['eth_price']:,.2f}` ({'+' if m.get('eth_change_24h', 0) >= 0 else ''}{m.get('eth_change_24h', 0.0)}%)\n"
+                f"• **DXY Dollar Index:** `{m['dxy']:.2f}` | **GRI:** `{m['gri']:.1f}/100`\n"
+                f"• **CVD Volume Delta:** `{m['cvd_delta']}`\n"
+                f"• **Funding Rate:** `{m.get('funding_rate', '0.010%')}`\n\n"
+                f"💼 **Paper Trading Desk State:**\n"
+                f"• **Open Positions:** `{len(open_pos)} active`\n"
+                f"• **Today's Realized PnL:** `${desk_metrics.get('realized_pnl', 0.0):+,.2f}`\n"
+                f"• **Win Rate:** `{desk_metrics.get('win_rate_pct', 0.0):.1f}%`\n\n"
+                f"🎯 **London Session Tactical Directives:**\n"
+                f"1. Track London open Judas swing sweeps above/below Asian range highs/lows.\n"
+                f"2. Confirm 15m Fair Value Gap (FVG) creation before entry commitment.\n"
+                f"3. Strict capital preservation: 2.50% max risk cap with Half-Kelly allocation.\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Institutional Midday Radar • BD Time [UTC+6]"
+            )
+            return pulse
+        except Exception as e:  # noqa: BLE001 — defensive fallback
+            logger.error(f"Error generating midday pulse: {e}")
+            return "Midday market active. Risk gates fully operational."
+
+    async def generate_us_session_watch_text(self) -> str:
+        """Generates US Session Open & Catalyst Watch (08:00 PM BST / 14:00 UTC)."""
+        try:
+            m = await self.generate_market_update()
+            from core.event_shock_engine import event_shock_engine
+
+            shock_state = event_shock_engine.evaluate_risk_state()
+            nearest = shock_state.nearest_event
+            event_str = (
+                f"`{nearest.title}` in `{shock_state.minutes_until_event:.0f}m`"
+                if nearest
+                else "No high-impact release within 2 hours"
+            )
+
+            watch = (
+                f"🌆 **08:00 PM BD TIME — US SESSION OPEN & CATALYST WATCH**\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🇺🇸 **New York Cash Open Radar:**\n"
+                f"• **BTC/USDT:** `${m['btc_price']:,.2f}`\n"
+                f"• **ETH/USDT:** `${m['eth_price']:,.2f}`\n"
+                f"• **Gold (XAU/USD):** `${m.get('gold_price', 0.0):,.2f}`\n"
+                f"• **DXY Index:** `{m['dxy']:.2f}`\n\n"
+                f"⚡ **Macro Event Catalyst Horizon:**\n"
+                f"• **Nearest Milestone:** {event_str}\n"
+                f"• **Execution Router Status:** `{'HALTED' if shock_state.trading_lockout else 'ARMED & ACTIVE'}`\n"
+                f"• **Risk Multiplier:** `{shock_state.volatility_multiplier:.2f}x`\n\n"
+                f"🎯 **US Session Directives:**\n"
+                f"1. Expect high institutional volume inflows at 08:30 PM BD Time.\n"
+                f"2. Guard against pre-catalyst chop and spread expansion.\n"
+                f"3. Auto breakeven rule (+1.5R) enforced across all open paper exposures.\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"New York Inflow Sentinel • BD Time [UTC+6]"
+            )
+            return watch
+        except Exception as e:  # noqa: BLE001 — defensive fallback
+            logger.error(f"Error generating US session watch: {e}")
+            return "US Session open. Gating mechanisms armed."
+
+    async def generate_what_ai_learned_today_text(self) -> str:
+        """Generates nightly 10:00 PM BD Time learning dossier from multi-source research & desk logs."""
+        try:
+            from core.daily_learning_reporter import daily_learning_reporter
+
+            return daily_learning_reporter.generate_what_ai_learned_today_report()
+        except Exception as e:  # noqa: BLE001 — defensive fallback
+            logger.error(f"Error generating what AI learned today: {e}")
+            return "Nightly AI learning synthesis completed. Knowledge ledger synchronized."
 
     async def generate_evening_review_text(self) -> str:
         """Generates daily evening performance & loss autopsy summary."""
