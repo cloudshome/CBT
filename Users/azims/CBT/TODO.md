@@ -587,6 +587,23 @@
   - Safe dry-run simulation mode computing simulated quantities, reference prices, and ACK latency without placing real capital at risk.
   - Live execution mode transmits micro-orders to Binance/Bybit, times network roundtrip, and audits fills into `ReconciliationLedger` (`trading_logs.db`).
   - Comprehensive unit and API test suite in `tests/test_phase21_live_gatekeeper.py` (19/19 tests passing 100% green).
+- [x] **Task 21.5: Frontend Live Launchpad Desk & Canary Operator Panel (`frontend/src/components/LiveLaunchpadDesk.tsx`, `frontend/src/App.tsx`)**
+  - Integrated dedicated `🛡️ Live Launchpad` tab in terminal bottom navigation.
+  - Interactive multi-venue balance scorecard (Binance + Bybit + aggregate equity + free cash).
+  - 6-Point Constitutional Safety Lock visual checklist with real-time status indicators.
+  - Interactive Micro-Canary Launcher ($5 - $25) supporting dry-run simulation and authorized live order transmission.
+  - Bangladesh Standard Time (BST = UTC+6) automated briefing schedule monitors and manual test dispatchers.
+
+---
+
+## 🚀 Phase 22: Live Production Exchange Integration & Real-Money Canary Burn-In (Next Milestone)
+- [ ] **Task 22.1: Production Exchange API Credential Provisioning (`core/auth/credential_vault.py`)**
+  - Securely inject Binance Spot and Bybit V5 Live API keys into AES-256 Vault via `/api/vault/configure`.
+- [ ] **Task 22.2: First Live Exchange Micro-Notional Canary Order Verification ($10 - $25 USD)**
+  - Execute first live micro-order ($10.00) on exchange matching engine.
+  - Audit ACK transit latency and verify fill in `trading_logs.db`.
+- [ ] **Task 22.3: 24/7 Autonomous Paper-to-Live Capital Escalation Protocol**
+  - Continuous live PnL reconciliation, 30-day walk-forward governance, and graduated position sizing.
 
 ---
 
