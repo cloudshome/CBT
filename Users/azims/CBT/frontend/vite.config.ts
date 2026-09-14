@@ -69,6 +69,8 @@ const PYTHON_PREFIXES = [
   '/api/kronos',
   '/api/collective',
   '/api/volatility',
+  '/api/arbitrage',
+  '/api/mbo',
   '/ws',
 ];
 
