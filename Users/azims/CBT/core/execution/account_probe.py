@@ -82,7 +82,7 @@ class AccountReadinessProbe:
                 error_message="Credential vault is locked. Unlock vault to query live balances.",
             )
 
-        cred = credential_vault.get_credential(exchange_upper)
+        cred = credential_vault.get_credential(exchange_upper, environment=environment)
         if not cred or not cred.api_key:
             return ExchangeAccountStatus(
                 exchange=exchange_upper,

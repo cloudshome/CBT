@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import time
+import urllib.parse
 from typing import Any
 
 import aiohttp
@@ -84,7 +85,8 @@ class BinanceSpotConnector(BaseExchangeConnector):
             params=params,
         )
 
-        url = f"{self.base_url}{endpoint}"
+        query_string = urllib.parse.urlencode(signed_params)
+        url = f"{self.base_url}{endpoint}?{query_string}"
         t_start = time.perf_counter()
 
         own_session = self._external_session is None
@@ -94,15 +96,15 @@ class BinanceSpotConnector(BaseExchangeConnector):
 
         try:
             if method.upper() == "GET":
-                async with session.get(url, headers=headers, params=signed_params) as resp:
+                async with session.get(url, headers=headers) as resp:
                     raw_text = await resp.text()
                     status = resp.status
             elif method.upper() == "POST":
-                async with session.post(url, headers=headers, data=signed_params) as resp:
+                async with session.post(url, headers=headers) as resp:
                     raw_text = await resp.text()
                     status = resp.status
             elif method.upper() == "DELETE":
-                async with session.delete(url, headers=headers, params=signed_params) as resp:
+                async with session.delete(url, headers=headers) as resp:
                     raw_text = await resp.text()
                     status = resp.status
             else:

@@ -91,24 +91,27 @@ class LiveExecutionGatekeeper:
             reasons.append("Credential vault is locked. Live orders blocked.")
 
         # 2. Master kill switch check
-        kill_switch_active = live_kill_switch.is_active()
+        kill_switch_active, _ = live_kill_switch.is_active()
         checks["kill_switch_operational"] = not kill_switch_active
         if kill_switch_active:
             reasons.append("Master Kill Switch is active. All live execution halted.")
 
         # 3. Exchange probe & balance check
         exch_status = await account_probe.probe_exchange(exchange_upper, environment)
+        max_drift = (
+            2000.0 if environment.upper() == "TESTNET" else self.max_clock_drift_ms
+        )
         clock_drift_passed = (
-            exch_status.is_connected and exch_status.latency_ms <= self.max_clock_drift_ms
+            exch_status.is_connected and exch_status.latency_ms <= max_drift
         )
         checks["connectivity_and_clock_drift"] = clock_drift_passed
         if not exch_status.is_connected:
             reasons.append(
                 f"Exchange {exchange_upper} connection failed: {exch_status.error_message}"
             )
-        elif exch_status.latency_ms > self.max_clock_drift_ms:
+        elif exch_status.latency_ms > max_drift:
             reasons.append(
-                f"Clock drift/latency {exch_status.latency_ms:.1f}ms exceeds {self.max_clock_drift_ms}ms SLA."
+                f"Clock drift/latency {exch_status.latency_ms:.1f}ms exceeds {max_drift:.0f}ms SLA."
             )
 
         # 4. Daily drawdown limit check
@@ -135,11 +138,14 @@ class LiveExecutionGatekeeper:
             )
 
         # 6. Live trading authorization switch
-        live_env_enabled = os.getenv("LIVE_TRADING_ENABLED", "false").lower() in (
-            "true",
-            "1",
-            "yes",
-        )
+        if environment.upper() == "TESTNET":
+            live_env_enabled = True
+        else:
+            live_env_enabled = os.getenv("LIVE_TRADING_ENABLED", "false").lower() in (
+                "true",
+                "1",
+                "yes",
+            )
         checks["live_trading_authorized"] = live_env_enabled
         if not live_env_enabled:
             reasons.append(

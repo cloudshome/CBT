@@ -62,9 +62,8 @@ class BinanceSigner:
         req_params["timestamp"] = now_ms
 
         # Canonical query serialization: sorted keys
-        canonical_query = urllib.parse.urlencode(
-            sorted((k, v) for k, v in req_params.items() if v is not None)
-        )
+        sorted_params = dict(sorted((k, v) for k, v in req_params.items() if v is not None))
+        canonical_query = urllib.parse.urlencode(sorted_params)
 
         signature = hmac.new(
             api_secret.encode("utf-8"),
@@ -72,14 +71,14 @@ class BinanceSigner:
             hashlib.sha256,
         ).hexdigest()
 
-        req_params["signature"] = signature
+        sorted_params["signature"] = signature
 
         headers = {
             "X-MBX-APIKEY": api_key,
             "Content-Type": "application/x-www-form-urlencoded",
         }
 
-        return headers, req_params
+        return headers, sorted_params
 
 
 class BybitV5Signer:

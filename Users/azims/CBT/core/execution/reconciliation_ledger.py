@@ -251,16 +251,16 @@ class ReconciliationLedger:
 
     def record_fill(
         self,
-        parent_order_id: str,
-        client_order_id: str,
-        exchange_order_id: str,
-        exchange: str,
-        symbol: str,
-        side: str,
-        requested_qty: float,
-        executed_qty: float,
-        expected_price: float,
-        executed_price: float,
+        parent_order_id: str | ExecutionReconciliationRecord,
+        client_order_id: str = "",
+        exchange_order_id: str = "",
+        exchange: str = "",
+        symbol: str = "",
+        side: str = "",
+        requested_qty: float = 0.0,
+        executed_qty: float = 0.0,
+        expected_price: float = 0.0,
+        executed_price: float = 0.0,
         fee_paid_usd: float = 0.0,
         fee_asset: str = "USDT",
         route_venue: str = "",
@@ -278,8 +278,30 @@ class ReconciliationLedger:
         """
         Ingests an executed order or fill, computes slippage, classifies reconciliation status,
         persists to SQLite with database-level uniqueness, and emits audit alerts if anomalies are found.
-        Idempotently ignores duplicate fills.
+        Idempotently ignores duplicate fills. Supports receiving either parameters or an ExecutionReconciliationRecord.
         """
+        if isinstance(parent_order_id, ExecutionReconciliationRecord):
+            rec = parent_order_id
+            return self.record_fill(
+                parent_order_id=rec.parent_order_id,
+                client_order_id=rec.client_order_id,
+                exchange_order_id=rec.exchange_order_id,
+                exchange=rec.exchange,
+                symbol=rec.symbol,
+                side=rec.side,
+                requested_qty=rec.requested_qty,
+                executed_qty=rec.executed_qty,
+                expected_price=rec.expected_price,
+                executed_price=rec.executed_price,
+                fee_paid_usd=rec.fee_paid_usd,
+                fee_asset=rec.fee_asset,
+                route_venue=rec.route_venue,
+                transit_latency_ms=rec.transit_latency_ms,
+                exchange_ack_latency_ms=rec.exchange_ack_latency_ms,
+                total_roundtrip_ms=rec.total_roundtrip_ms,
+                created_at_ms=rec.created_at_ms,
+                execution_id=getattr(rec, "execution_id", ""),
+            )
         now_ms = int(time.time() * 1000)
         c_ms = created_at_ms if created_at_ms is not None else now_ms
         eff_exec_id = execution_id or exchange_order_id or f"EXEC_{uuid.uuid4().hex[:8].upper()}"

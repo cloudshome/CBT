@@ -86,7 +86,7 @@ class LiveCanaryRunner:
         t_start = time.perf_counter()
         exchange_upper = req.exchange.upper().strip()
         sym = req.symbol.strip().upper()
-        if "/" not in sym:
+        if "/" not in sym and not sym.endswith("USDT"):
             sym = f"{sym}/USDT"
 
         client_order_id = f"CANARY_{exchange_upper[:3]}_{now_ms}_{uuid.uuid4().hex[:6].upper()}"
@@ -196,7 +196,7 @@ class LiveCanaryRunner:
             )
 
         # 5. Execute via Live Connector
-        cred = credential_vault.get_credential(exchange_upper)
+        cred = credential_vault.get_credential(exchange_upper, environment=req.environment)
         if not cred:
             return CanaryRunResult(
                 success=False,
@@ -237,33 +237,45 @@ class LiveCanaryRunner:
             else:
                 raise ValueError(f"Unsupported connector: {exchange_upper}")
 
+            ref_price = req.price or account_probe.reference_prices.get("BTC", 65000.0)
+            effective_price = req.price if req.price and req.price > 0 else ref_price
+            order_qty = max(0.00001, round(req.notional_usd / effective_price, 5))
+
             # Reserve idempotency key
             idempotency_store.reserve_order(
                 client_order_id=client_order_id,
                 exchange=exchange_upper,
+                environment=req.environment,
                 symbol=sym,
                 side=req.side,
-                requested_qty=req.notional_usd,
-                price=req.price or 0.0,
+                order_type=req.order_type,
+                quantity=order_qty,
+                price=effective_price if req.order_type.upper() == "LIMIT" else None,
             )
 
             # Transmit order
-            ref_price = req.price or account_probe.reference_prices.get("BTC", 65000.0)
-            order_qty = round(req.notional_usd / ref_price, 6)
-
             resp = await connector.place_order(
                 symbol=sym.replace("/", ""),
                 side=req.side,
                 order_type=req.order_type,
                 quantity=order_qty,
-                price=req.price,
+                price=effective_price if req.order_type.upper() == "LIMIT" else None,
                 client_order_id=client_order_id,
             )
 
             latency_ms = (time.perf_counter() - t_start) * 1000.0
-            exchange_order_id = resp.get("orderId") or resp.get("order_id") or "UNKNOWN"
-            exec_price = float(resp.get("price") or ref_price)
-            exec_qty = float(resp.get("executedQty") or order_qty)
+            if hasattr(resp, "exchange_order_id"):
+                exchange_order_id = resp.exchange_order_id or "UNKNOWN"
+                exec_price = float(resp.executed_price or ref_price)
+                exec_qty = float(resp.executed_qty or order_qty)
+            elif isinstance(resp, dict):
+                exchange_order_id = resp.get("orderId") or resp.get("order_id") or "UNKNOWN"
+                exec_price = float(resp.get("price") or ref_price)
+                exec_qty = float(resp.get("executedQty") or order_qty)
+            else:
+                exchange_order_id = getattr(resp, "orderId", getattr(resp, "order_id", "UNKNOWN"))
+                exec_price = float(getattr(resp, "price", ref_price))
+                exec_qty = float(getattr(resp, "executedQty", order_qty))
 
             # Record in reconciliation ledger
             rec_record = ExecutionReconciliationRecord(
@@ -289,19 +301,31 @@ class LiveCanaryRunner:
                 created_at_ms=now_ms,
                 reconciled_at_ms=int(time.time() * 1000),
             )
-            reconciliation_ledger.record_fill(rec_record)
+            rec_record = reconciliation_ledger.record_fill(rec_record)
+            try:
+                idempotency_store.mark_final(
+                    client_order_id=client_order_id,
+                    status=getattr(resp, "status", "FILLED"),
+                    exchange_order_id=str(exchange_order_id),
+                )
+            except Exception as _e:  # noqa: BLE001
+                logger.debug(f"Idempotency mark_final error: {_e}")
 
-            audit_id = audit_bus.publish_event(
-                event_type="LIVE_CANARY_FILLED",
-                payload={
-                    "exchange": exchange_upper,
-                    "symbol": sym,
-                    "client_order_id": client_order_id,
-                    "exchange_order_id": exchange_order_id,
-                    "notional_usd": req.notional_usd,
-                    "latency_ms": latency_ms,
-                },
-            )
+            audit_id = None
+            try:
+                audit_id = audit_bus.publish_event(
+                    event_type="LIVE_CANARY_FILLED",
+                    payload={
+                        "exchange": exchange_upper,
+                        "symbol": sym,
+                        "client_order_id": client_order_id,
+                        "exchange_order_id": exchange_order_id,
+                        "notional_usd": req.notional_usd,
+                        "latency_ms": latency_ms,
+                    },
+                )
+            except Exception as _e:  # noqa: BLE001
+                logger.debug(f"Audit event logging error: {_e}")
 
             return CanaryRunResult(
                 success=True,

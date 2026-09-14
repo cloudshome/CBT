@@ -117,7 +117,7 @@ class TelegramLiveTradingDesk:
 
         # Checks mapping
         chk_vault = "🟢 UNLOCKED" if summary.vault_unlocked else "🔴 LOCKED (Master Key Required)"
-        kill_active = live_kill_switch.is_active()
+        kill_active, _ = live_kill_switch.is_active()
         chk_kill = "🔴 ACTIVE (Halted)" if kill_active else "🟢 CLEAR (Operational)"
         chk_drift = (
             "🟢 PASS (<500ms)"

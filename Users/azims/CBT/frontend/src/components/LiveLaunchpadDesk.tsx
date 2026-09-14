@@ -15,6 +15,8 @@ import {
   Clock,
   DollarSign,
   AlertOctagon,
+  Key,
+  X,
 } from 'lucide-react';
 import {
   api,
@@ -50,6 +52,18 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
   const [triggeringBriefing, setTriggeringBriefing] = useState<boolean>(false);
   const [briefingPreview, setBriefingPreview] = useState<string | null>(null);
 
+  // Environment Mode: TESTNET vs PRODUCTION
+  const [envMode, setEnvMode] = useState<'TESTNET' | 'PRODUCTION'>('TESTNET');
+
+  // Vault Configuration Modal State
+  const [showVaultModal, setShowVaultModal] = useState<boolean>(false);
+  const [modalExchange, setModalExchange] = useState<'BINANCE' | 'BYBIT'>('BINANCE');
+  const [modalEnv, setModalEnv] = useState<'TESTNET' | 'PRODUCTION'>('TESTNET');
+  const [modalApiKey, setModalApiKey] = useState<string>('');
+  const [modalSecretKey, setModalSecretKey] = useState<string>('');
+  const [modalPassphrase, setModalPassphrase] = useState<string>('');
+  const [savingVault, setSavingVault] = useState<boolean>(false);
+
   const onNotifyRef = useRef(onNotify);
   useEffect(() => {
     onNotifyRef.current = onNotify;
@@ -59,7 +73,7 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
   const fetchData = useCallback(async () => {
     try {
       const [readinessRes, tgRes, canaryRes] = await Promise.all([
-        api.getAccountReadiness('PRODUCTION'),
+        api.getAccountReadiness(envMode),
         api.getTelegramLiveStatus().catch(() => null),
         api.getLiveCanaryStatus().catch(() => null),
       ]);
@@ -74,7 +88,7 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [envMode]);
 
   useEffect(() => {
     setLoading(true);
@@ -87,10 +101,10 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
   const handlePreflightCheck = async () => {
     setEvaluatingPreflight(true);
     try {
-      const res = await api.evaluateGatekeeperCheck(exchange, notional, 'PRODUCTION');
+      const res = await api.evaluateGatekeeperCheck(exchange, notional, envMode);
       setPreflightVerdict(res);
       if (res.verdict.passed) {
-        onNotifyRef.current?.('success', 'Pre-Flight Passed', `All 6 safety gates cleared for ${exchange} ($${notional}).`);
+        onNotifyRef.current?.('success', 'Pre-Flight Passed', `All 6 safety gates cleared for ${exchange} [${envMode}] ($${notional}).`);
       } else {
         onNotifyRef.current?.('warning', 'Pre-Flight Blocked', `Gatekeeper blocked order: ${res.verdict.rejection_reasons[0] || 'Safety criteria not met'}`);
       }
@@ -98,6 +112,35 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
       onNotifyRef.current?.('error', 'Gatekeeper Evaluation Error', err.message || 'Error communicating with live gatekeeper.');
     } finally {
       setEvaluatingPreflight(false);
+    }
+  };
+
+  // Save Vault Credentials
+  const handleSaveVault = async () => {
+    if (!modalApiKey.trim() || !modalSecretKey.trim()) {
+      onNotifyRef.current?.('error', 'Missing Keys', 'Both API Key and Secret Key are required.');
+      return;
+    }
+    setSavingVault(true);
+    try {
+      const res = await api.configureVaultCredential({
+        exchange: modalExchange,
+        environment: modalEnv,
+        api_key: modalApiKey.trim(),
+        api_secret: modalSecretKey.trim(),
+        passphrase: modalPassphrase.trim() || undefined,
+        is_active: true,
+      });
+      onNotifyRef.current?.('success', 'Vault Updated', res.message || `Credentials securely encrypted for ${modalExchange} [${modalEnv}].`);
+      setShowVaultModal(false);
+      setModalApiKey('');
+      setModalSecretKey('');
+      setModalPassphrase('');
+      fetchData();
+    } catch (err: any) {
+      onNotifyRef.current?.('error', 'Vault Save Failed', err.message || 'Could not encrypt credentials.');
+    } finally {
+      setSavingVault(false);
     }
   };
 
@@ -116,7 +159,7 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
         notional_usd: notional,
         side,
         is_dry_run: isDryRun,
-        environment: 'PRODUCTION',
+        environment: envMode,
       });
       setCanaryResult(res);
 
@@ -178,6 +221,30 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
         </div>
 
         <div className="flex items-center space-x-3">
+          {/* Environment Switcher */}
+          <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg p-0.5 text-xs font-semibold">
+            <button
+              onClick={() => setEnvMode('TESTNET')}
+              className={`px-3 py-1.5 rounded-md transition flex items-center space-x-1.5 ${
+                envMode === 'TESTNET'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>🧪 Testnet (Paper)</span>
+            </button>
+            <button
+              onClick={() => setEnvMode('PRODUCTION')}
+              className={`px-3 py-1.5 rounded-md transition flex items-center space-x-1.5 ${
+                envMode === 'PRODUCTION'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>🔴 Live Mainnet</span>
+            </button>
+          </div>
+
           <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-slate-900/80 border border-slate-800 rounded-lg text-xs">
             <span className="text-slate-400">Canary Limit:</span>
             <span className="font-mono font-semibold text-cyan-300">
@@ -280,9 +347,20 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
             <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
               <span className="font-bold text-sm text-white">Binance Spot & Margin</span>
-              <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded text-slate-400">PRODUCTION</span>
+              <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded text-amber-400 border border-amber-500/20 font-mono font-semibold">{envMode}</span>
             </div>
-            <div className="flex items-center space-x-1 text-xs">
+            <div className="flex items-center space-x-2 text-xs">
+              <button
+                onClick={() => {
+                  setModalExchange('BINANCE');
+                  setModalEnv(envMode);
+                  setShowVaultModal(true);
+                }}
+                className="flex items-center space-x-1 px-2.5 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 rounded text-xs font-semibold transition"
+              >
+                <Key className="w-3 h-3" />
+                <span>Configure Keys</span>
+              </button>
               {binanceStatus?.is_connected ? (
                 <span className="flex items-center text-emerald-400 font-semibold space-x-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -332,9 +410,20 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
             <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
               <span className="font-bold text-sm text-white">Bybit V5 Linear Futures</span>
-              <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded text-slate-400">PRODUCTION</span>
+              <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded text-cyan-400 border border-cyan-500/20 font-mono font-semibold">{envMode}</span>
             </div>
-            <div className="flex items-center space-x-1 text-xs">
+            <div className="flex items-center space-x-2 text-xs">
+              <button
+                onClick={() => {
+                  setModalExchange('BYBIT');
+                  setModalEnv(envMode);
+                  setShowVaultModal(true);
+                }}
+                className="flex items-center space-x-1 px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded text-xs font-semibold transition"
+              >
+                <Key className="w-3 h-3" />
+                <span>Configure Keys</span>
+              </button>
               {bybitStatus?.is_connected ? (
                 <span className="flex items-center text-emerald-400 font-semibold space-x-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -771,6 +860,147 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
           </div>
         )}
       </div>
+
+      {/* VAULT CREDENTIAL CONFIGURATION MODAL */}
+      {showVaultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-[#10141e] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white">Configure Exchange Key Vault</h3>
+                  <p className="text-[11px] text-slate-400">AES-256-GCM Secure Enclave Storage</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowVaultModal(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <div className="p-5 space-y-4 text-xs">
+              {/* Target Exchange & Environment */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold block mb-1">Exchange</label>
+                  <select
+                    value={modalExchange}
+                    onChange={(e) => setModalExchange(e.target.value as 'BINANCE' | 'BYBIT')}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value="BINANCE">Binance Spot</option>
+                    <option value="BYBIT">Bybit Futures</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold block mb-1">Environment</label>
+                  <select
+                    value={modalEnv}
+                    onChange={(e) => setModalEnv(e.target.value as 'TESTNET' | 'PRODUCTION')}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value="TESTNET">Testnet (Paper / Sandbox)</option>
+                    <option value="PRODUCTION">Production (Real Mainnet)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* API Key Input */}
+              <div>
+                <label className="text-[11px] text-slate-300 font-semibold block mb-1">
+                  API Key
+                </label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={modalApiKey}
+                  onChange={(e) => setModalApiKey(e.target.value)}
+                  placeholder="Paste your exchange API key"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-500 focus:outline-none placeholder-slate-600"
+                />
+              </div>
+
+              {/* Secret Key Input */}
+              <div>
+                <label className="text-[11px] text-slate-300 font-semibold block mb-1">
+                  Secret Key
+                </label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={modalSecretKey}
+                  onChange={(e) => setModalSecretKey(e.target.value)}
+                  placeholder="Paste your exchange Secret key"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-amber-500 focus:outline-none placeholder-slate-600"
+                />
+              </div>
+
+              {/* Passphrase (for Bybit / optional) */}
+              {modalExchange === 'BYBIT' && (
+                <div>
+                  <label className="text-[11px] text-slate-400 font-semibold block mb-1">
+                    Passphrase (Optional)
+                  </label>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={modalPassphrase}
+                    onChange={(e) => setModalPassphrase(e.target.value)}
+                    placeholder="API passphrase (if configured)"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-cyan-500 focus:outline-none placeholder-slate-600"
+                  />
+                </div>
+              )}
+
+              {/* Security Banner */}
+              <div className="p-3 bg-slate-900/80 border border-slate-800 rounded-lg space-y-1.5">
+                <div className="flex items-center space-x-1.5 text-emerald-400 font-semibold text-[11px]">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Hardware & Enclave Grade Security</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Keys are immediately encrypted via <strong>AES-256-GCM AEAD</strong> using a 600,000-iteration PBKDF2 derived key. Plaintext is never logged or exposed in client responses.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+                <button
+                  onClick={() => setShowVaultModal(false)}
+                  disabled={savingVault}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveVault}
+                  disabled={savingVault || !modalApiKey.trim() || !modalSecretKey.trim()}
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold rounded-lg shadow-lg shadow-amber-950/40 transition flex items-center space-x-2 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {savingVault ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Encrypting & Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Save into Vault</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

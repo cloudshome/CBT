@@ -125,6 +125,27 @@ class AuditBus:
         logger.info(f"Audit [{ev.severity}] {ev.event_type} on {ev.symbol}: {ev.reason}")
         return ev
 
+    def publish_event(
+        self,
+        event_type: str,
+        payload: dict[str, Any] | None = None,
+        symbol: str = "SYSTEM",
+        severity: str = "INFO",
+        reason: str = "",
+    ) -> str:
+        """Publishes an event from a payload dictionary and returns the event_id."""
+        p = payload or {}
+        sym = symbol if symbol != "SYSTEM" else p.get("symbol", "SYSTEM")
+        r = reason or p.get("reason", p.get("message", event_type))
+        ev = self.emit_event(
+            event_type=event_type,
+            symbol=sym,
+            reason=r,
+            severity=severity,
+            details=p,
+        )
+        return ev.event_id
+
     def get_recent_events(self, limit: int = 50, event_type: str | None = None) -> list[AuditEvent]:
         """Retrieves recent audit events."""
         events = []
