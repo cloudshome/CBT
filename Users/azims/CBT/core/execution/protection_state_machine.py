@@ -180,7 +180,9 @@ class ProtectedEntryStateMachine:
             audit_bus.emit_event(
                 event_type=f"STATE_{new_state.value}",
                 symbol=ctx.symbol,
-                severity="CRITICAL" if new_state in (EntryState.EMERGENCY_FLATTEN, EntryState.FAILED) else "INFO",
+                severity="CRITICAL"
+                if new_state in (EntryState.EMERGENCY_FLATTEN, EntryState.FAILED)
+                else "INFO",
                 reason=reason or f"Transition to {new_state.value}",
                 details={
                     "trade_id": ctx.trade_id,
@@ -215,7 +217,9 @@ class ProtectedEntryStateMachine:
         ctx.entry_client_order_id = client_entry_id
 
         try:
-            self.transition(ctx, EntryState.ENTRY_SUBMITTED, reason="Submitting entry order to exchange")
+            self.transition(
+                ctx, EntryState.ENTRY_SUBMITTED, reason="Submitting entry order to exchange"
+            )
             entry_res = await connector.place_order(
                 symbol=ctx.symbol,
                 side=ctx.side,
@@ -249,7 +253,9 @@ class ProtectedEntryStateMachine:
                 )
             else:
                 # NEW status: For LIMIT orders, wait briefly for fill in live market
-                logger.info(f"[StateMachine] Order {entry_res.exchange_order_id} is NEW. Awaiting fill...")
+                logger.info(
+                    f"[StateMachine] Order {entry_res.exchange_order_id} is NEW. Awaiting fill..."
+                )
                 for _ in range(5):
                     await asyncio.sleep(0.4)
                     try:
@@ -297,7 +303,9 @@ class ProtectedEntryStateMachine:
         # Step 2: Protection Placement (Fail-Closed Perimeter)
         protect_qty = ctx.executed_qty
         if protect_qty <= 0.0:
-            logger.warning(f"[StateMachine] No filled inventory to protect for trade {ctx.trade_id}")
+            logger.warning(
+                f"[StateMachine] No filled inventory to protect for trade {ctx.trade_id}"
+            )
             return ctx
 
         self.transition(
@@ -331,7 +339,9 @@ class ProtectedEntryStateMachine:
             ctx.error_message = f"Protection placement timed out after {protection_timeout_sec}s"
         except Exception as exc:  # noqa: BLE001
             msg = sanitize_text(str(exc))
-            logger.critical(f"[StateMachine] 🚨 Exception placing protection bracket for {ctx.symbol}: {msg}")
+            logger.critical(
+                f"[StateMachine] 🚨 Exception placing protection bracket for {ctx.symbol}: {msg}"
+            )
             ctx.error_message = f"Protection placement exception: {msg}"
 
         if protection_success and prot_res:
@@ -363,7 +373,9 @@ class ProtectedEntryStateMachine:
         # FAIL-CLOSED ESCALATION:
         # Position was filled, but protection could NOT be placed!
         # Do not return error to UI and leave real capital naked. Trigger EMERGENCY_FLATTEN!
-        flatten_reason = ctx.error_message or (prot_res.error_message if prot_res else "Protection rejected")
+        flatten_reason = ctx.error_message or (
+            prot_res.error_message if prot_res else "Protection rejected"
+        )
         logger.critical(
             f"[StateMachine] 🚨 INITIATING EMERGENCY FLATTEN for trade {ctx.trade_id} on {ctx.symbol}: {flatten_reason}"
         )

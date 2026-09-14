@@ -72,6 +72,7 @@ def mock_bybit_conn():
 # 1. BINANCE SPOT OCO ADAPTER & ZERO-GAP AMENDMENT
 # =====================================================================
 
+
 @pytest.mark.asyncio
 async def test_binance_oco_bracket_placement_success(mock_binance_conn):
     mock_binance_conn.create_oco_bracket = AsyncMock(
@@ -111,7 +112,9 @@ async def test_binance_oco_bracket_placement_success(mock_binance_conn):
 @pytest.mark.asyncio
 async def test_binance_oco_rejection_fails_closed(mock_binance_conn):
     mock_binance_conn.create_oco_bracket = AsyncMock(
-        side_effect=ExchangeRejectedError("Binance Order Rejected [Code -2010]: Account has insufficient balance")
+        side_effect=ExchangeRejectedError(
+            "Binance Order Rejected [Code -2010]: Account has insufficient balance"
+        )
     )
 
     adapter = BinanceSpotProtectionAdapter(mock_binance_conn)
@@ -215,6 +218,7 @@ async def test_binance_oco_breakeven_failure_keeps_old_protection(mock_binance_c
 # 2. BYBIT LINEAR FUTURES TRADING STOP ADAPTER
 # =====================================================================
 
+
 @pytest.mark.asyncio
 async def test_bybit_linear_trading_stop_bracket(mock_bybit_conn):
     mock_bybit_conn.set_trading_stop = AsyncMock(
@@ -244,6 +248,7 @@ async def test_bybit_linear_trading_stop_bracket(mock_bybit_conn):
 # =====================================================================
 # 3. INDEPENDENT EMERGENCY PANIC CLOSE ENGINE
 # =====================================================================
+
 
 @pytest.mark.asyncio
 async def test_panic_close_multi_step_workflow(mock_binance_conn):
@@ -320,6 +325,7 @@ async def test_panic_close_already_flat_detection(mock_binance_conn):
 # =====================================================================
 # 4. FAIL-CLOSED PROTECTED-ENTRY STATE MACHINE
 # =====================================================================
+
 
 @pytest.mark.asyncio
 async def test_state_machine_happy_path(mock_binance_conn):
@@ -458,6 +464,7 @@ async def test_state_machine_fail_closed_emergency_flatten_on_rejection(mock_bin
 # 5. CRYPTOGRAPHIC EXECUTION PROVENANCE LEDGER
 # =====================================================================
 
+
 def test_execution_provenance_cryptographic_integrity():
     tracker = ExecutionProvenanceTracker()
     exec_id = f"TEST_EXEC_{int(time.time() * 1000)}"
@@ -497,6 +504,7 @@ def test_execution_provenance_cryptographic_integrity():
 # 6. CANONICAL EXECUTION RECONCILER & UNPROTECTED BADGE DETECTION
 # =====================================================================
 
+
 @pytest.mark.asyncio
 async def test_reconciler_flags_unprotected_exposure(mock_binance_conn):
     """
@@ -528,6 +536,7 @@ async def test_reconciler_flags_unprotected_exposure(mock_binance_conn):
 # =====================================================================
 # 7. FASTAPI REST API ENDPOINTS
 # =====================================================================
+
 
 @pytest.fixture
 def api_client():

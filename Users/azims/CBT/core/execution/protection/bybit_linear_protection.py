@@ -55,7 +55,9 @@ class BybitLinearProtectionAdapter(BaseProtectionAdapter):
         Sets position-level TP and SL on Bybit Linear Perpetual contract.
         """
         clean_symbol = self._normalize_symbol(symbol)
-        bracket_uuid = bracket_id or f"BRK_BYB_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6].upper()}"
+        bracket_uuid = (
+            bracket_id or f"BRK_BYB_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6].upper()}"
+        )
 
         t_start = time.perf_counter()
         try:
@@ -149,9 +151,7 @@ class BybitLinearProtectionAdapter(BaseProtectionAdapter):
         except Exception as exc:  # noqa: BLE001
             latency_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
             msg = sanitize_text(str(exc))
-            logger.error(
-                f"[BybitProtection] Failed to amend SL for {bracket.bracket_id}: {msg}"
-            )
+            logger.error(f"[BybitProtection] Failed to amend SL for {bracket.bracket_id}: {msg}")
             return ProtectionResult(
                 success=False,
                 bracket_id=bracket.bracket_id,

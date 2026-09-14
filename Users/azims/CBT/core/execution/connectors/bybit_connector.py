@@ -381,7 +381,9 @@ class BybitV5Connector(BaseExchangeConnector):
             body["stopLoss"] = f"{stop_loss:.4f}".rstrip("0").rstrip(".")
             body["slTriggerBy"] = "LastPrice"
 
-        data, latency_ms = await self._send_request("POST", "/v5/position/trading-stop", params_or_body=body)
+        data, latency_ms = await self._send_request(
+            "POST", "/v5/position/trading-stop", params_or_body=body
+        )
         if isinstance(data, dict):
             data["latency_ms"] = latency_ms
         return data

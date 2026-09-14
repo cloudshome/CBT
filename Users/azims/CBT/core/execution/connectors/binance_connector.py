@@ -403,7 +403,9 @@ class BinanceSpotConnector(BaseExchangeConnector):
         elif list_client_order_id:
             params["listClientOrderId"] = list_client_order_id
         else:
-            raise ValueError("Either order_list_id or list_client_order_id must be provided to cancel OCO.")
+            raise ValueError(
+                "Either order_list_id or list_client_order_id must be provided to cancel OCO."
+            )
 
         data, latency_ms = await self._send_request("DELETE", "/api/v3/orderList", params=params)
         if isinstance(data, dict):

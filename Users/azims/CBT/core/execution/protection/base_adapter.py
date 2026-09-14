@@ -105,7 +105,9 @@ class BaseProtectionAdapter(abc.ABC):
         self.exchange = exchange.upper().strip()
         self.environment = environment.upper().strip()
         if self.environment not in ("TESTNET", "PRODUCTION"):
-            raise ValueError(f"Invalid environment: '{self.environment}'. Must be TESTNET or PRODUCTION.")
+            raise ValueError(
+                f"Invalid environment: '{self.environment}'. Must be TESTNET or PRODUCTION."
+            )
 
     @abc.abstractmethod
     async def place_bracket(

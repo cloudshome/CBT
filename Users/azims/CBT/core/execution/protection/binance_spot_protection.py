@@ -57,7 +57,9 @@ class BinanceSpotProtectionAdapter(BaseProtectionAdapter):
         Dispatches POST /api/v3/orderList/oco for Binance Spot.
         """
         clean_symbol = self._normalize_symbol(symbol)
-        bracket_uuid = bracket_id or f"BRK_BIN_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6].upper()}"
+        bracket_uuid = (
+            bracket_id or f"BRK_BIN_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6].upper()}"
+        )
 
         # If we entered BUY (Long), our protection order is SELL.
         # If we entered SELL (Short), our protection order is BUY.
@@ -198,7 +200,9 @@ class BinanceSpotProtectionAdapter(BaseProtectionAdapter):
                     symbol=symbol,
                     order_list_id=old_list_id,
                 )
-                logger.info(f"[BinanceProtection] Successfully cancelled superseded OCO {old_list_id}")
+                logger.info(
+                    f"[BinanceProtection] Successfully cancelled superseded OCO {old_list_id}"
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     f"[BinanceProtection] Could not cancel old OCO {old_list_id} after new OCO ACKed: {exc}"
@@ -215,7 +219,9 @@ class BinanceSpotProtectionAdapter(BaseProtectionAdapter):
         Cancels working OCO orders for this bracket.
         """
         if not bracket.exchange_order_list_id:
-            logger.warning(f"[BinanceProtection] Cannot cancel bracket {bracket.bracket_id}: missing orderListId")
+            logger.warning(
+                f"[BinanceProtection] Cannot cancel bracket {bracket.bracket_id}: missing orderListId"
+            )
             return False
 
         try:
@@ -225,7 +231,9 @@ class BinanceSpotProtectionAdapter(BaseProtectionAdapter):
             )
             bracket.status = ProtectionStatus.CANCELLED
             bracket.updated_at_ms = int(time.time() * 1000)
-            logger.info(f"[BinanceProtection] Cancelled OCO {bracket.exchange_order_list_id} for {bracket.symbol}")
+            logger.info(
+                f"[BinanceProtection] Cancelled OCO {bracket.exchange_order_list_id} for {bracket.symbol}"
+            )
             return True
         except Exception as exc:  # noqa: BLE001
             logger.error(

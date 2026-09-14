@@ -169,7 +169,9 @@ class LiveBracketManager:
         bracket = canonical_reconciler.get_bracket(clean_symbol)
 
         if not bracket:
-            logger.error(f"[BracketManager] Cannot move to BE: No active tracked bracket for {clean_symbol}")
+            logger.error(
+                f"[BracketManager] Cannot move to BE: No active tracked bracket for {clean_symbol}"
+            )
             return ProtectionResult(
                 success=False,
                 bracket_id="",

@@ -98,12 +98,8 @@ class LiveExecutionGatekeeper:
 
         # 3. Exchange probe & balance check
         exch_status = await account_probe.probe_exchange(exchange_upper, environment)
-        max_drift = (
-            2000.0 if environment.upper() == "TESTNET" else self.max_clock_drift_ms
-        )
-        clock_drift_passed = (
-            exch_status.is_connected and exch_status.latency_ms <= max_drift
-        )
+        max_drift = 2000.0 if environment.upper() == "TESTNET" else self.max_clock_drift_ms
+        clock_drift_passed = exch_status.is_connected and exch_status.latency_ms <= max_drift
         checks["connectivity_and_clock_drift"] = clock_drift_passed
         if not exch_status.is_connected:
             reasons.append(

@@ -34,7 +34,9 @@ class LivePositionState:
     mark_price: float
     unrealized_pnl_usd: float
     risk_r: float
-    protection_status: str  # "PROTECTED", "UNPROTECTED", "BREAKEVEN_ACTIVE", "PROTECTION_PENDING", "FLATTENING"
+    protection_status: (
+        str  # "PROTECTED", "UNPROTECTED", "BREAKEVEN_ACTIVE", "PROTECTION_PENDING", "FLATTENING"
+    )
     stop_loss_price: float | None = None
     take_profit_price: float | None = None
     bracket_id: str | None = None
@@ -156,7 +158,10 @@ class CanonicalExecutionReconciler:
                 positions=[],
                 orders=[],
                 active_brackets=[],
-                risk_state={"vault_unlocked": False, "kill_switch_active": live_kill_switch.is_active()},
+                risk_state={
+                    "vault_unlocked": False,
+                    "kill_switch_active": live_kill_switch.is_active(),
+                },
                 timestamp_ms=now_ms,
             )
 
@@ -291,7 +296,6 @@ class CanonicalExecutionReconciler:
 
                     # Filter out tiny dust (< $5 or negligible fraction)
                     if (notional >= 5.0 or curr_qty >= 0.0001) and curr_qty > 0.00001:
-
                         # Check if any open order is a stop loss or limit maker
                         has_sl_order = any(
                             wo.symbol == sym and wo.order_type in ("STOP_LOSS_LIMIT", "STOP_LOSS")
@@ -309,7 +313,9 @@ class CanonicalExecutionReconciler:
                         else:
                             prot_status = "UNPROTECTED"
 
-                        upnl = round((mk_px - entry_px) * curr_qty, 4) if mk_px and entry_px else 0.0
+                        upnl = (
+                            round((mk_px - entry_px) * curr_qty, 4) if mk_px and entry_px else 0.0
+                        )
                         risk_r = 0.0
                         if sl_px and entry_px > 0 and abs(entry_px - sl_px) > 0:
                             risk_r = round((mk_px - entry_px) / abs(entry_px - sl_px), 2)
@@ -340,9 +346,7 @@ class CanonicalExecutionReconciler:
         else:
             overall_status = "PROTECTED"
 
-        active_brackets_list = [
-            b.to_dict() for b in self._brackets.values() if b.is_active
-        ]
+        active_brackets_list = [b.to_dict() for b in self._brackets.values() if b.is_active]
 
         return LiveExecutionSnapshot(
             exchange=ex_norm,

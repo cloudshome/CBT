@@ -167,12 +167,16 @@ class PanicCloseEngine:
 
         # Step 1: Cancel all working orders & open brackets
         try:
-            logger.warning(f"[PanicClose] Step 1: Cancelling all working orders on {ex_norm} for {clean_symbol}")
+            logger.warning(
+                f"[PanicClose] Step 1: Cancelling all working orders on {ex_norm} for {clean_symbol}"
+            )
             cancelled_res = await conn.cancel_all_orders(clean_symbol)
             cancelled_count = len(cancelled_res) if isinstance(cancelled_res, list) else 1
             steps.append(f"CANCELLED_ORDERS_{cancelled_count}")
         except Exception as exc:  # noqa: BLE001
-            logger.warning(f"[PanicClose] Error during cancel_all_orders (proceeding to balance check): {exc}")
+            logger.warning(
+                f"[PanicClose] Error during cancel_all_orders (proceeding to balance check): {exc}"
+            )
             steps.append("CANCEL_ORDERS_WARNING")
 
         # Step 2: Query actual exchange position / balance
@@ -181,7 +185,9 @@ class PanicCloseEngine:
         pos_side = "BUY"  # Default assumption: holding long spot inventory
 
         try:
-            logger.info(f"[PanicClose] Step 2: Querying actual exchange inventory for {base_asset} ({clean_symbol})")
+            logger.info(
+                f"[PanicClose] Step 2: Querying actual exchange inventory for {base_asset} ({clean_symbol})"
+            )
             if ex_norm == "BYBIT":
                 # Check futures position first
                 positions = await conn.get_positions(symbol=clean_symbol, category="linear")
@@ -310,7 +316,9 @@ class PanicCloseEngine:
             )
 
         # Step 4: Verification loop (poll balance to ensure position is flat)
-        logger.info("[PanicClose] Step 4: Reconciling post-execution balance to verify flat state...")
+        logger.info(
+            "[PanicClose] Step 4: Reconciling post-execution balance to verify flat state..."
+        )
         remaining_qty = pos_qty
         verified = False
 
@@ -337,7 +345,9 @@ class PanicCloseEngine:
                     verified = True
                     break
             except Exception as exc:  # noqa: BLE001
-                logger.warning(f"[PanicClose] Error checking post-flatten balance round #{check_round}: {exc}")
+                logger.warning(
+                    f"[PanicClose] Error checking post-flatten balance round #{check_round}: {exc}"
+                )
 
         latency_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
         exec_price = market_res.executed_price if market_res else 0.0
