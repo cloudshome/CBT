@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Activity,
   Calculator,
@@ -46,9 +46,13 @@ export const MBODepthTerminal: React.FC<MBODepthTerminalProps> = ({
   const [loadingEstimate, setLoadingEstimate] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
+  const onNotifyRef = useRef(onNotify);
+  useEffect(() => {
+    onNotifyRef.current = onNotify;
+  }, [onNotify]);
+
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
       const [depthRes, iceRes, toxRes] = await Promise.all([
         api.getMBODepth(symbol, venue),
         api.getMBOIcebergs(symbol),
@@ -68,13 +72,14 @@ export const MBODepthTerminal: React.FC<MBODepthTerminalProps> = ({
       }
     } catch (err: any) {
       console.error('Failed fetching MBO depth data:', err);
-      onNotify?.('error', 'MBO Depth Error', err.message || 'Could not connect to L3 MBO stream.');
+      onNotifyRef.current?.('error', 'MBO Depth Error', err.message || 'Could not connect to L3 MBO stream.');
     } finally {
       setLoading(false);
     }
-  }, [symbol, venue, onNotify]);
+  }, [symbol, venue, calcSide]);
 
   useEffect(() => {
+    setLoading(true);
     fetchData();
     const interval = setInterval(fetchData, 8000); // 8s auto-refresh
     return () => clearInterval(interval);
@@ -87,11 +92,11 @@ export const MBODepthTerminal: React.FC<MBODepthTerminalProps> = ({
       const res = await api.getMBOQueueEstimate(symbol, venue, calcSide, calcPrice, calcQty);
       setQueueEstimate(res.estimate);
     } catch (err: any) {
-      onNotify?.('warning', 'Queue Calc Failed', err.message || 'Error computing queue position.');
+      onNotifyRef.current?.('warning', 'Queue Calc Failed', err.message || 'Error computing queue position.');
     } finally {
       setLoadingEstimate(false);
     }
-  }, [symbol, venue, calcSide, calcPrice, calcQty, onNotify]);
+  }, [symbol, venue, calcSide, calcPrice, calcQty]);
 
   useEffect(() => {
     if (depthData) {

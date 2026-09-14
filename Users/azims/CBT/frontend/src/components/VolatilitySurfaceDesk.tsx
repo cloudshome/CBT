@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -34,9 +34,13 @@ export const VolatilitySurfaceDesk: React.FC<VolatilitySurfaceDeskProps> = ({
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState<'SUMMARY' | 'SURFACE' | 'SKEW' | 'GEX'>('SUMMARY');
 
+  const onNotifyRef = useRef(onNotify);
+  useEffect(() => {
+    onNotifyRef.current = onNotify;
+  }, [onNotify]);
+
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
       const [sumData, surfData] = await Promise.all([
         api.getVolatilitySummary(symbol),
         api.getVolatilitySurface(symbol),
@@ -46,13 +50,14 @@ export const VolatilitySurfaceDesk: React.FC<VolatilitySurfaceDeskProps> = ({
       setLastUpdated(new Date());
     } catch (err: any) {
       console.error('Failed to fetch volatility data:', err);
-      onNotify?.('error', 'Volatility Feed Error', err.message || 'Failed loading options data.');
+      onNotifyRef.current?.('error', 'Volatility Feed Error', err.message || 'Failed loading options data.');
     } finally {
       setLoading(false);
     }
-  }, [symbol, onNotify]);
+  }, [symbol]);
 
   useEffect(() => {
+    setLoading(true);
     fetchData();
     const timer = setInterval(fetchData, 30000); // 30s auto-refresh
     return () => clearInterval(timer);

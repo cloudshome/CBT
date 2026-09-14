@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Activity,
   Clock,
@@ -49,9 +49,13 @@ export const ArbitrageRadar: React.FC<ArbitrageRadarProps> = ({
     'OVERVIEW'
   );
 
+  const onNotifyRef = useRef(onNotify);
+  useEffect(() => {
+    onNotifyRef.current = onNotify;
+  }, [onNotify]);
+
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
       const [dislocRes, fundRes, oppsRes, histRes, healthRes] = await Promise.all([
         api.getArbitrageDislocations(symbol),
         api.getFundingMatrix(symbol),
@@ -68,13 +72,14 @@ export const ArbitrageRadar: React.FC<ArbitrageRadarProps> = ({
       setLastUpdated(new Date());
     } catch (err: any) {
       console.error('Failed fetching arbitrage sentinel data:', err);
-      onNotify?.('error', 'Arbitrage Sentinel Error', err.message || 'Failed connecting to arbitrage endpoints.');
+      onNotifyRef.current?.('error', 'Arbitrage Sentinel Error', err.message || 'Failed connecting to arbitrage endpoints.');
     } finally {
       setLoading(false);
     }
-  }, [symbol, onNotify]);
+  }, [symbol]);
 
   useEffect(() => {
+    setLoading(true);
     fetchData();
     const interval = setInterval(fetchData, 10000); // 10s auto-refresh
     return () => clearInterval(interval);

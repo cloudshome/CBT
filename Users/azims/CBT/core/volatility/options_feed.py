@@ -6,6 +6,7 @@ Empirical Deribit Options Market Data Feed & Parser.
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 import re
@@ -69,6 +70,14 @@ class OptionsDataFeed:
         self._cached_contracts: dict[str, list[OptionContract]] = {}
         self._cached_timestamps: dict[str, int] = {}
         self._cache_ttl_sec: float = 30.0
+        self._lock = asyncio.Lock()
+        self._shared_session: aiohttp.ClientSession | None = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        if self._shared_session is None or self._shared_session.closed:
+            connector = aiohttp.TCPConnector(limit=10, ttl_dns_cache=300)
+            self._shared_session = aiohttp.ClientSession(connector=connector)
+        return self._shared_session
 
     async def fetch_options_chain(
         self,
@@ -84,45 +93,49 @@ class OptionsDataFeed:
 
         now_ms = int(time.time() * 1000)
 
-        # Check memory cache
+        # Fast path: check memory cache without lock
         cached = self._cached_contracts.get(currency)
         cached_ts = self._cached_timestamps.get(currency, 0)
         if cached and (now_ms - cached_ts) < (self._cache_ttl_sec * 1000):
             return cached
 
-        url = f"{DERIBIT_BASE_URL}/get_book_summary_by_currency?currency={currency}&kind=option"
-        close_session = False
-        if session is None:
-            session = aiohttp.ClientSession()
-            close_session = True
+        async with self._lock:
+            # Re-check under lock (double-checked locking)
+            now_ms = int(time.time() * 1000)
+            cached = self._cached_contracts.get(currency)
+            cached_ts = self._cached_timestamps.get(currency, 0)
+            if cached and (now_ms - cached_ts) < (self._cache_ttl_sec * 1000):
+                return cached
 
-        contracts: list[OptionContract] = []
-        try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5.0)) as resp:
-                if resp.status == 200:
-                    payload = await resp.json()
-                    items = payload.get("result", [])
-                    contracts = self._parse_deribit_items(items, currency, now_ms)
-                    if contracts:
-                        self._cached_contracts[currency] = contracts
-                        self._cached_timestamps[currency] = now_ms
-                        logger.info(
-                            "Parsed %d live options contracts for %s from Deribit.",
-                            len(contracts),
-                            currency,
-                        )
-                        return contracts
-        except Exception as exc:
-            logger.warning("Deribit live options feed failed for %s: %s", currency, exc)
-        finally:
-            if close_session:
-                await session.close()
+            url = f"{DERIBIT_BASE_URL}/get_book_summary_by_currency?currency={currency}&kind=option"
+            http_session = session or await self._get_session()
 
-        # If live fetch failed, return cached if available, else synthetic calibrated fallback
-        if cached:
-            return cached
+            try:
+                async with http_session.get(url, timeout=aiohttp.ClientTimeout(total=5.0)) as resp:
+                    if resp.status == 200:
+                        payload = await resp.json()
+                        items = payload.get("result", [])
+                        contracts = self._parse_deribit_items(items, currency, now_ms)
+                        if contracts:
+                            self._cached_contracts[currency] = contracts
+                            self._cached_timestamps[currency] = now_ms
+                            logger.info(
+                                "Parsed %d live options contracts for %s from Deribit.",
+                                len(contracts),
+                                currency,
+                            )
+                            return contracts
+            except Exception as exc:
+                logger.warning("Deribit live options feed failed for %s: %s", currency, exc)
 
-        return self._generate_calibrated_baseline_chain(currency, now_ms)
+            # If live fetch failed, return cached if available, else synthetic calibrated fallback
+            if cached:
+                return cached
+
+            fallback = self._generate_calibrated_baseline_chain(currency, now_ms)
+            self._cached_contracts[currency] = fallback
+            self._cached_timestamps[currency] = now_ms
+            return fallback
 
     def _parse_deribit_items(
         self,

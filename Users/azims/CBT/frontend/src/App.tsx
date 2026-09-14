@@ -807,30 +807,30 @@ export const App: React.FC = () => {
                   {activeFrontierTab === 'MBO_DEPTH' && (
                     <MBODepthTerminal
                       currentSymbol={symbol}
-                      onNotify={(type, title, msg) => addToast(type, title, msg)}
+                      onNotify={addToast}
                     />
                   )}
                 </div>
               ) : activeBottomTab === 'RESEARCH_LAB' ? (
                 <ResearchIngestLab
-                  onNotify={(type: 'success' | 'error' | 'info' | 'warning', title: string, msg: string) => addToast(type, title, msg)}
+                  onNotify={addToast}
                   selectedSymbol={symbol}
                   selectedTimeframe={timeframe}
                 />
               ) : activeBottomTab === 'VOLATILITY_SURFACE' ? (
                 <VolatilitySurfaceDesk
                   currentSymbol={symbol}
-                  onNotify={(type: 'success' | 'error' | 'info' | 'warning', title: string, msg: string) => addToast(type, title, msg)}
+                  onNotify={addToast}
                 />
               ) : activeBottomTab === 'ARBITRAGE' ? (
                 <ArbitrageRadar
                   currentSymbol={symbol}
-                  onNotify={(type, title, msg) => addToast(type, title, msg)}
+                  onNotify={addToast}
                 />
               ) : activeBottomTab === 'MBO_DEPTH' ? (
                 <MBODepthTerminal
                   currentSymbol={symbol}
-                  onNotify={(type, title, msg) => addToast(type, title, msg)}
+                  onNotify={addToast}
                 />
               ) : (
                 <CollectiveCoreDashboard />
