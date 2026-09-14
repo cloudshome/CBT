@@ -11,10 +11,9 @@ iceberg detection, and toxic order flow analytics.
 from __future__ import annotations
 
 import time
-from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any
 
 
 class MBOSide(str, Enum):
@@ -40,6 +39,7 @@ class ToxicityRegime(str, Enum):
 @dataclass
 class MBOOrder:
     """Represents an individual discrete order in the L3 order book queue."""
+
     order_id: str
     venue: str
     symbol: str
@@ -50,22 +50,23 @@ class MBOOrder:
     timestamp_ns: int
     priority_index: int
     is_iceberg_child: bool = False
-    parent_iceberg_id: Optional[str] = None
+    parent_iceberg_id: str | None = None
 
 
 @dataclass
 class MBOPriceLevel:
     """A discrete price level containing an ordered FIFO queue of individual orders."""
+
     price: float
     side: MBOSide
     total_size: float = 0.0
     order_count: int = 0
-    orders: List[MBOOrder] = field(default_factory=list)
+    orders: list[MBOOrder] = field(default_factory=list)
     cumulative_executed_qty: float = 0.0
     cumulative_canceled_qty: float = 0.0
     last_update_ns: int = field(default_factory=lambda: int(time.time() * 1e9))
 
-    def to_summary_dict(self) -> Dict[str, Any]:
+    def to_summary_dict(self) -> dict[str, Any]:
         return {
             "price": self.price,
             "side": self.side.value,
@@ -80,6 +81,7 @@ class MBOPriceLevel:
 @dataclass
 class QueuePositionEstimate:
     """Estimated position and fill dynamics of a passive limit order in the queue."""
+
     symbol: str
     venue: str
     side: MBOSide
@@ -101,6 +103,7 @@ class QueuePositionEstimate:
 @dataclass
 class IcebergDetection:
     """Identified hidden reload / algorithmic iceberg order at a price level."""
+
     iceberg_id: str
     symbol: str
     venue: str
@@ -121,27 +124,29 @@ class IcebergDetection:
 @dataclass
 class ToxicFlowMetric:
     """Microstructure order flow toxicity and depletion velocity metrics."""
+
     symbol: str
     venue: str
     timestamp_ms: int
-    vpin_mbo: float                       # Volume-synchronized probability of toxicity
-    cancel_to_trade_ratio: float          # High ratio indicates algorithmic spoofing/flicker
-    depletion_velocity_usd_per_sec: float # Speed at which liquidity is swept
-    order_arrival_intensity: float       # Orders per second
+    vpin_mbo: float  # Volume-synchronized probability of toxicity
+    cancel_to_trade_ratio: float  # High ratio indicates algorithmic spoofing/flicker
+    depletion_velocity_usd_per_sec: float  # Speed at which liquidity is swept
+    order_arrival_intensity: float  # Orders per second
     mean_order_lifetime_ms: float
     toxicity_regime: ToxicityRegime
-    adverse_selection_bias_bps: float     # Expected slippage if filled passively
+    adverse_selection_bias_bps: float  # Expected slippage if filled passively
 
 
 @dataclass
 class MBODepthSnapshot:
     """High-level snapshot of reconstructed L3 depth, icebergs, and toxicity."""
+
     symbol: str
     venue: str
     timestamp_ms: int
-    bid_levels: List[MBOPriceLevel]
-    ask_levels: List[MBOPriceLevel]
-    detected_icebergs: List[IcebergDetection]
+    bid_levels: list[MBOPriceLevel]
+    ask_levels: list[MBOPriceLevel]
+    detected_icebergs: list[IcebergDetection]
     toxic_flow: ToxicFlowMetric
     total_bid_depth_usd: float
     total_ask_depth_usd: float

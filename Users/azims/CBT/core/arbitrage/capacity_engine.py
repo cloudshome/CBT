@@ -14,7 +14,6 @@ Principles:
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Tuple
 
 from core.arbitrage.ev_engine import ev_engine
 from core.arbitrage.models import (
@@ -41,14 +40,14 @@ class CapacityEngine:
         canonical_symbol: str,
         book_a: OrderBookSnapshot,
         book_b: OrderBookSnapshot,
-        funding_records: Dict[Venue, FundingRateRecord],
-        tiers: List[float] = STANDARD_CAPACITY_TIERS,
-    ) -> Tuple[List[CapacityTier], float]:
+        funding_records: dict[Venue, FundingRateRecord],
+        tiers: list[float] = STANDARD_CAPACITY_TIERS,
+    ) -> tuple[list[CapacityTier], float]:
         """
         Generates the discrete Net-EV capacity curve across institutional notionals.
         Returns: (capacity_tiers, max_viable_notional_usd)
         """
-        results: List[CapacityTier] = []
+        results: list[CapacityTier] = []
         max_viable = 0.0
 
         for notional in tiers:

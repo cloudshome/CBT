@@ -13,8 +13,13 @@ import pytest
 from core.daily_learning_reporter import daily_learning_reporter
 from core.macro_event_reporter import MacroEventRelease, macro_event_reporter
 from core.telegram.commands import command_registry
-from core.telegram.handlers import handle_learned, handle_macro, handle_schedule, register_all_v5_commands
-from core.telegram_bot import BD_TZ, SmartBrainNotificationEngine, telegram_bot
+from core.telegram.handlers import (
+    handle_learned,
+    handle_macro,
+    handle_schedule,
+    register_all_v5_commands,
+)
+from core.telegram_bot import BD_TZ, SmartBrainNotificationEngine
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +68,7 @@ def test_macro_event_reporter_dovish_cpi():
         event_id="TEST_CPI_DOVISH",
         event_name="US Consumer Price Index (CPI YoY)",
         currency="USD",
-        release_time_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        release_time_utc=datetime.datetime.now(datetime.UTC).isoformat(),
         actual=2.9,
         forecast=3.1,
         previous=3.2,
@@ -88,7 +93,7 @@ def test_macro_event_reporter_hawkish_cpi():
         event_id="TEST_CPI_HAWKISH",
         event_name="US Core CPI (MoM)",
         currency="USD",
-        release_time_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        release_time_utc=datetime.datetime.now(datetime.UTC).isoformat(),
         actual=0.4,
         forecast=0.2,
         previous=0.2,
@@ -107,7 +112,7 @@ def test_macro_event_record_and_query():
     macro_event_reporter.record_release(
         event_id=unique_id,
         event_name="FOMC Interest Rate Decision",
-        release_time_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        release_time_utc=datetime.datetime.now(datetime.UTC).isoformat(),
         actual=5.25,
         forecast=5.25,
         previous=5.50,
@@ -126,7 +131,7 @@ def test_macro_event_pending_and_marking():
     macro_event_reporter.record_release(
         event_id=unique_id,
         event_name="US Non-Farm Payrolls (NFP)",
-        release_time_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        release_time_utc=datetime.datetime.now(datetime.UTC).isoformat(),
         actual=142.0,
         forecast=165.0,
         previous=114.0,
@@ -153,7 +158,8 @@ def test_macro_event_pending_and_marking():
 @pytest.mark.asyncio
 async def test_smart_notifier_bd_time_briefings():
     """Verifies that SmartBrainNotificationEngine fires briefings strictly according to BD Time (BST = UTC+6)."""
-    notifier = SmartBrainNotificationEngine(telegram_bot)
+    mock_bot = AsyncMock()
+    notifier = SmartBrainNotificationEngine(mock_bot)
     notifier.bot.send_morning_briefing = AsyncMock(return_value=True)
     notifier.bot.send_midday_pulse = AsyncMock(return_value=True)
     notifier.bot.send_us_session_watch = AsyncMock(return_value=True)
@@ -162,7 +168,9 @@ async def test_smart_notifier_bd_time_briefings():
     # 1. Simulate 08:00 AM BD Time (02:00 UTC)
     mock_0800_bd = datetime.datetime(2026, 9, 13, 8, 5, 0, tzinfo=BD_TZ)
     with patch("datetime.datetime") as mock_dt:
-        mock_dt.now.side_effect = lambda tz=None: mock_0800_bd if tz == BD_TZ else mock_0800_bd.astimezone(datetime.timezone.utc)
+        mock_dt.now.side_effect = (
+            lambda tz=None: mock_0800_bd if tz == BD_TZ else mock_0800_bd.astimezone(datetime.UTC)
+        )
         await notifier.check_scheduled_briefings()
         notifier.bot.send_morning_briefing.assert_called_once()
         assert notifier._last_morning_date == "2026-09-13"
@@ -170,7 +178,9 @@ async def test_smart_notifier_bd_time_briefings():
     # 2. Simulate 02:00 PM BD Time (08:00 UTC)
     mock_1400_bd = datetime.datetime(2026, 9, 13, 14, 2, 0, tzinfo=BD_TZ)
     with patch("datetime.datetime") as mock_dt:
-        mock_dt.now.side_effect = lambda tz=None: mock_1400_bd if tz == BD_TZ else mock_1400_bd.astimezone(datetime.timezone.utc)
+        mock_dt.now.side_effect = (
+            lambda tz=None: mock_1400_bd if tz == BD_TZ else mock_1400_bd.astimezone(datetime.UTC)
+        )
         await notifier.check_scheduled_briefings()
         notifier.bot.send_midday_pulse.assert_called_once()
         assert notifier._last_midday_date == "2026-09-13"
@@ -178,7 +188,9 @@ async def test_smart_notifier_bd_time_briefings():
     # 3. Simulate 08:00 PM BD Time (14:00 UTC)
     mock_2000_bd = datetime.datetime(2026, 9, 13, 20, 10, 0, tzinfo=BD_TZ)
     with patch("datetime.datetime") as mock_dt:
-        mock_dt.now.side_effect = lambda tz=None: mock_2000_bd if tz == BD_TZ else mock_2000_bd.astimezone(datetime.timezone.utc)
+        mock_dt.now.side_effect = (
+            lambda tz=None: mock_2000_bd if tz == BD_TZ else mock_2000_bd.astimezone(datetime.UTC)
+        )
         await notifier.check_scheduled_briefings()
         notifier.bot.send_us_session_watch.assert_called_once()
         assert notifier._last_us_session_date == "2026-09-13"
@@ -186,7 +198,9 @@ async def test_smart_notifier_bd_time_briefings():
     # 4. Simulate 10:00 PM BD Time (16:00 UTC)
     mock_2200_bd = datetime.datetime(2026, 9, 13, 22, 1, 0, tzinfo=BD_TZ)
     with patch("datetime.datetime") as mock_dt:
-        mock_dt.now.side_effect = lambda tz=None: mock_2200_bd if tz == BD_TZ else mock_2200_bd.astimezone(datetime.timezone.utc)
+        mock_dt.now.side_effect = (
+            lambda tz=None: mock_2200_bd if tz == BD_TZ else mock_2200_bd.astimezone(datetime.UTC)
+        )
         await notifier.check_scheduled_briefings()
         notifier.bot.send_what_ai_learned_today.assert_called_once()
         assert notifier._last_evening_date == "2026-09-13"
@@ -195,14 +209,15 @@ async def test_smart_notifier_bd_time_briefings():
 @pytest.mark.asyncio
 async def test_macro_event_release_auto_dispatch():
     """Verifies that unnotified macro releases trigger an instant telegram dispatch."""
-    notifier = SmartBrainNotificationEngine(telegram_bot)
+    mock_bot = AsyncMock()
+    notifier = SmartBrainNotificationEngine(mock_bot)
     notifier.bot.send_message = AsyncMock(return_value=True)
 
     unique_event_id = f"CPI_AUTO_DISPATCH_{int(datetime.datetime.now().timestamp())}"
     macro_event_reporter.record_release(
         event_id=unique_event_id,
         event_name="US CPI YoY",
-        release_time_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        release_time_utc=datetime.datetime.now(datetime.UTC).isoformat(),
         actual=2.8,
         forecast=3.0,
         previous=3.1,

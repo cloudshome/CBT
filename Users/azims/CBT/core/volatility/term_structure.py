@@ -88,7 +88,9 @@ class TermStructureEngine:
 
         # Term slope: 90d - 7d
         iv_7d = next((p.atm_iv for p in curve_points if p.tenor_days == 7), curve_points[0].atm_iv)
-        iv_90d = next((p.atm_iv for p in curve_points if p.tenor_days == 90), curve_points[-1].atm_iv)
+        iv_90d = next(
+            (p.atm_iv for p in curve_points if p.tenor_days == 90), curve_points[-1].atm_iv
+        )
         slope = iv_90d - iv_7d
 
         # Regime classification

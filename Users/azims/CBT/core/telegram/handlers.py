@@ -756,7 +756,10 @@ async def handle_macro(
         selected_release = recent_releases[0]
         if query:
             for r in recent_releases:
-                if query in r.get("event_name", "").upper() or query in r.get("event_id", "").upper():
+                if (
+                    query in r.get("event_name", "").upper()
+                    or query in r.get("event_id", "").upper()
+                ):
                     selected_release = r
                     break
         report_text = macro_event_reporter.format_event_flash_report(selected_release)
@@ -798,7 +801,9 @@ async def handle_live_preflight(
 
     parts = args.strip().split()
     exchange = parts[0].upper() if len(parts) > 0 else "BINANCE"
-    notional = float(parts[1]) if len(parts) > 1 and parts[1].replace(".", "", 1).isdigit() else 10.0
+    notional = (
+        float(parts[1]) if len(parts) > 1 and parts[1].replace(".", "", 1).isdigit() else 10.0
+    )
 
     verdict = await live_gatekeeper.evaluate_order_clearance(
         exchange=exchange,
@@ -866,7 +871,6 @@ async def handle_live_canary(
     return report_text
 
 
-
 async def handle_schedule(
     args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
 ) -> str:
@@ -875,10 +879,11 @@ async def handle_schedule(
     Shows current BD time, active trading session, and upcoming automated dispatch windows.
     """
     import datetime
+
     from core.telegram_bot import BD_TZ, telegram_bot
 
     now_bd = datetime.datetime.now(BD_TZ)
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    now_utc = datetime.datetime.now(datetime.UTC)
     current_hour = now_bd.hour
 
     briefings = [

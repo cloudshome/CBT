@@ -18,38 +18,35 @@ from __future__ import annotations
 
 import math
 import time
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import app
 from core.volatility.black_scholes import (
-    black76_price,
     black76_greeks,
+    black76_price,
     implied_volatility,
-    compute_d1_d2,
-    norm_cdf,
-    norm_pdf,
 )
+from core.volatility.gex_engine import GEXEngine
 from core.volatility.models import (
-    OptionContract,
+    GEXSnapshot,
     OptionType,
     SkewRegime,
-    TermStructureRegime,
     SkewSnapshot,
     TermStructureCurve,
-    GEXSnapshot,
+    TermStructureRegime,
 )
 from core.volatility.options_feed import (
     OptionsDataFeed,
     options_feed,
-    parse_deribit_instrument,
     parse_deribit_expiry,
+    parse_deribit_instrument,
 )
-from core.volatility.skew_engine import SkewEngine, skew_engine
-from core.volatility.term_structure import TermStructureEngine, term_structure_engine
-from core.volatility.surface_engine import VolatilitySurfaceEngine, surface_engine
-from core.volatility.gex_engine import GEXEngine, gex_engine
-from core.volatility.risk_integrator import VolatilityRiskIntegrator, volatility_risk_integrator
+from core.volatility.risk_integrator import VolatilityRiskIntegrator
+from core.volatility.skew_engine import SkewEngine
+from core.volatility.surface_engine import VolatilitySurfaceEngine
+from core.volatility.term_structure import TermStructureEngine
 
 
 @pytest.fixture
@@ -60,6 +57,7 @@ def client():
 # ============================================================================
 # 1. Black-76 Pricer & Greeks Test Suite
 # ============================================================================
+
 
 class TestBlack76Analytics:
     """Rigorous analytical tests for Black-76 pricer, Greeks, and IV solver."""
@@ -176,6 +174,7 @@ class TestBlack76Analytics:
 # 2. Options Feed & Deribit Instrument Parser
 # ============================================================================
 
+
 class TestOptionsFeed:
     """Verify Deribit contract parsing and fallback options generation."""
 
@@ -226,6 +225,7 @@ class TestOptionsFeed:
 # 3. 25-Delta Skew Engine Test Suite
 # ============================================================================
 
+
 class TestSkewEngine:
     """Verify 25-Delta Skew calculation and structural regime classification."""
 
@@ -269,6 +269,7 @@ class TestSkewEngine:
 # 4. Constant-Maturity Term Structure Engine Test Suite
 # ============================================================================
 
+
 class TestTermStructureEngine:
     """Verify constant-maturity ATM term structure interpolation and slope."""
 
@@ -298,6 +299,7 @@ class TestTermStructureEngine:
 # 5. 2D Volatility Surface Engine Test Suite
 # ============================================================================
 
+
 class TestVolatilitySurfaceEngine:
     """Verify 2D volatility matrix interpolation across moneyness and tenors."""
 
@@ -323,6 +325,7 @@ class TestVolatilitySurfaceEngine:
 # ============================================================================
 # 6. Net Dealer GEX & Max Pain Engine Test Suite
 # ============================================================================
+
 
 class TestGEXEngine:
     """Verify Net Dealer Gamma Exposure profile and Max Pain strike solver."""
@@ -351,6 +354,7 @@ class TestGEXEngine:
 # ============================================================================
 # 7. Volatility Risk Integrator & Half-Kelly Scaling Test Suite
 # ============================================================================
+
 
 class TestVolatilityRiskIntegrator:
     """Verify dynamic tail-risk multiplier computation for Half-Kelly sizing."""
@@ -424,6 +428,7 @@ class TestVolatilityRiskIntegrator:
 # ============================================================================
 # 8. FastAPI Endpoints Integration Test Suite
 # ============================================================================
+
 
 class TestFastAPIVolatilityRoutes:
     """Verify HTTP contracts for all /api/volatility/* endpoints."""

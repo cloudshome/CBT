@@ -9,9 +9,8 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict
-from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from core.auth import require_api_key
@@ -36,14 +35,14 @@ class CanaryExecuteRequest(BaseModel):
     notional_usd: float = Field(default=10.0, ge=5.0, le=25.0, description="Canary size in USD")
     side: str = Field(default="BUY", description="BUY or SELL")
     order_type: str = Field(default="LIMIT", description="LIMIT or MARKET")
-    price: Optional[float] = Field(default=None, description="Optional limit price")
+    price: float | None = Field(default=None, description="Optional limit price")
     environment: str = Field(default="PRODUCTION", description="PRODUCTION or TESTNET")
     is_dry_run: bool = Field(default=True, description="Safe dry-run simulation mode")
 
 
 @router.get("/account-readiness")
 async def get_account_readiness(
-    environment: str = Query("PRODUCTION", description="PRODUCTION or TESTNET")
+    environment: str = Query("PRODUCTION", description="PRODUCTION or TESTNET"),
 ):
     """
     Returns real-time multi-exchange balance probe, free margin,

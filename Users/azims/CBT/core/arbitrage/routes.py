@@ -15,20 +15,21 @@ Endpoints:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
 from core.arbitrage.provenance import provenance_engine
 from core.arbitrage.sentinel import arbitrage_sentinel
-from core.arbitrage.shadow_validator import shadow_validator
 from core.database import db_manager
 
 router = APIRouter(prefix="/api/arbitrage", tags=["arbitrage"])
 
 
 @router.get("/dislocations")
-async def get_dislocations(symbol: str = Query("BTCUSDT", description="Canonical symbol")) -> Dict[str, Any]:
+async def get_dislocations(
+    symbol: str = Query("BTCUSDT", description="Canonical symbol"),
+) -> dict[str, Any]:
     """Returns active basis and spread dislocations for the requested symbol."""
     scan_result = await arbitrage_sentinel.scan_symbol(symbol)
     basis = scan_result.get("basis_metrics")
@@ -58,7 +59,9 @@ async def get_dislocations(symbol: str = Query("BTCUSDT", description="Canonical
 
 
 @router.get("/funding-matrix")
-async def get_funding_matrix(symbol: str = Query("BTCUSDT", description="Canonical symbol")) -> Dict[str, Any]:
+async def get_funding_matrix(
+    symbol: str = Query("BTCUSDT", description="Canonical symbol"),
+) -> dict[str, Any]:
     """Returns cross-venue funding rate matrix, divergence, and estimated capture yields."""
     scan_result = await arbitrage_sentinel.scan_symbol(symbol)
     matrix = scan_result.get("funding_matrix", [])
@@ -93,7 +96,9 @@ async def get_funding_matrix(symbol: str = Query("BTCUSDT", description="Canonic
 
 
 @router.get("/opportunities")
-async def get_opportunities(symbol: str = Query("BTCUSDT", description="Canonical symbol")) -> Dict[str, Any]:
+async def get_opportunities(
+    symbol: str = Query("BTCUSDT", description="Canonical symbol"),
+) -> dict[str, Any]:
     """Returns active opportunities with multi-scenario EV, capacity curves, and provenance."""
     scan_result = await arbitrage_sentinel.scan_symbol(symbol)
     opportunities = scan_result.get("opportunities", [])
@@ -118,8 +123,12 @@ async def get_opportunities(symbol: str = Query("BTCUSDT", description="Canonica
                 "executable_spread": {
                     "vwap_long_ask": round(spread.vwap_long_ask, 2) if spread else 0.0,
                     "vwap_short_bid": round(spread.vwap_short_bid, 2) if spread else 0.0,
-                    "theoretical_spread_bps": round(spread.theoretical_spread_bps, 2) if spread else 0.0,
-                    "executable_spread_bps": round(spread.executable_spread_bps, 2) if spread else 0.0,
+                    "theoretical_spread_bps": round(spread.theoretical_spread_bps, 2)
+                    if spread
+                    else 0.0,
+                    "executable_spread_bps": round(spread.executable_spread_bps, 2)
+                    if spread
+                    else 0.0,
                     "gross_spread_usd": round(spread.gross_spread_usd, 2) if spread else 0.0,
                 }
                 if spread
@@ -127,17 +136,27 @@ async def get_opportunities(symbol: str = Query("BTCUSDT", description="Canonica
                 "multi_scenario_ev": {
                     "base_net_ev_usd": round(multi_ev.base_net_ev_usd, 2) if multi_ev else 0.0,
                     "base_net_ev_bps": round(multi_ev.base_net_ev_bps, 2) if multi_ev else 0.0,
-                    "conservative_net_ev_usd": round(multi_ev.conservative_net_ev_usd, 2) if multi_ev else 0.0,
-                    "conservative_net_ev_bps": round(multi_ev.conservative_net_ev_bps, 2) if multi_ev else 0.0,
+                    "conservative_net_ev_usd": round(multi_ev.conservative_net_ev_usd, 2)
+                    if multi_ev
+                    else 0.0,
+                    "conservative_net_ev_bps": round(multi_ev.conservative_net_ev_bps, 2)
+                    if multi_ev
+                    else 0.0,
                     "stress_net_ev_usd": round(multi_ev.stress_net_ev_usd, 2) if multi_ev else 0.0,
                     "stress_net_ev_bps": round(multi_ev.stress_net_ev_bps, 2) if multi_ev else 0.0,
                     "cost_breakdown": {
                         "entry_fee_long_usd": round(cb.entry_fee_long_usd, 2) if cb else 0.0,
                         "entry_fee_short_usd": round(cb.entry_fee_short_usd, 2) if cb else 0.0,
                         "exit_fee_long_usd": round(cb.expected_exit_fee_long_usd, 2) if cb else 0.0,
-                        "exit_fee_short_usd": round(cb.expected_exit_fee_short_usd, 2) if cb else 0.0,
-                        "orderbook_slippage_long_usd": round(cb.orderbook_slippage_long_usd, 2) if cb else 0.0,
-                        "orderbook_slippage_short_usd": round(cb.orderbook_slippage_short_usd, 2) if cb else 0.0,
+                        "exit_fee_short_usd": round(cb.expected_exit_fee_short_usd, 2)
+                        if cb
+                        else 0.0,
+                        "orderbook_slippage_long_usd": round(cb.orderbook_slippage_long_usd, 2)
+                        if cb
+                        else 0.0,
+                        "orderbook_slippage_short_usd": round(cb.orderbook_slippage_short_usd, 2)
+                        if cb
+                        else 0.0,
                         "hedge_cost_usd": round(cb.hedge_cost_usd, 2) if cb else 0.0,
                         "latency_cost_usd": round(cb.latency_cost_usd, 2) if cb else 0.0,
                         "funding_cashflow_usd": round(cb.funding_cashflow_usd, 2) if cb else 0.0,
@@ -184,8 +203,8 @@ async def get_opportunities(symbol: str = Query("BTCUSDT", description="Canonica
 
 @router.get("/history")
 async def get_history(
-    limit: int = Query(50, description="Max records to return", ge=1, le=200)
-) -> Dict[str, Any]:
+    limit: int = Query(50, description="Max records to return", ge=1, le=200),
+) -> dict[str, Any]:
     """Returns stored historical opportunities and shadow trades from SQLite."""
     shadow_records = []
     try:
@@ -206,7 +225,7 @@ async def get_history(
             )
             for row in cursor.fetchall():
                 shadow_records.append(dict(row))
-    except Exception as e:
+    except Exception:  # noqa: BLE001
         shadow_records = []
 
     return {
@@ -218,7 +237,7 @@ async def get_history(
 
 
 @router.get("/health")
-async def get_health() -> Dict[str, Any]:
+async def get_health() -> dict[str, Any]:
     """Returns feed connectivity status, clock drift SLA, and data firewall metrics."""
     return {
         "status": "HEALTHY",
@@ -239,7 +258,7 @@ async def get_health() -> Dict[str, Any]:
 
 
 @router.get("/provenance/{opportunity_id}")
-async def get_provenance_envelope(opportunity_id: str) -> Dict[str, Any]:
+async def get_provenance_envelope(opportunity_id: str) -> dict[str, Any]:
     """Returns the complete verified decision envelope for audit reconstruction."""
     envelope = provenance_engine.get_provenance_by_id(opportunity_id)
     if not envelope:

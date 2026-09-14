@@ -22,8 +22,18 @@ logger = logging.getLogger("ai_quant_sentinel.volatility.options_feed")
 
 DERIBIT_BASE_URL = "https://www.deribit.com/api/v2/public"
 MONTH_MAP = {
-    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
-    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+    "JAN": 1,
+    "FEB": 2,
+    "MAR": 3,
+    "APR": 4,
+    "MAY": 5,
+    "JUN": 6,
+    "JUL": 7,
+    "AUG": 8,
+    "SEP": 9,
+    "OCT": 10,
+    "NOV": 11,
+    "DEC": 12,
 }
 
 
@@ -42,7 +52,7 @@ def parse_deribit_expiry(expiry_str: str) -> int:
     if not month:
         raise ValueError(f"Unknown month name: {month_name}")
 
-    dt = datetime.datetime(year, month, day, 8, 0, 0, tzinfo=datetime.timezone.utc)
+    dt = datetime.datetime(year, month, day, 8, 0, 0, tzinfo=datetime.UTC)
     return int(dt.timestamp() * 1000)
 
 
@@ -125,7 +135,7 @@ class OptionsDataFeed:
                                 currency,
                             )
                             return contracts
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.warning("Deribit live options feed failed for %s: %s", currency, exc)
 
             # If live fetch failed, return cached if available, else synthetic calibrated fallback
@@ -148,7 +158,7 @@ class OptionsDataFeed:
             name = item.get("instrument_name", "")
             try:
                 base, expiry_ms, strike, opt_type = parse_deribit_instrument(name)
-            except Exception:
+            except (ValueError, IndexError):
                 continue
 
             ms_to_expiry = expiry_ms - now_ms
@@ -156,7 +166,9 @@ class OptionsDataFeed:
                 continue
 
             t_years = ms_to_expiry / (365.25 * 86400 * 1000)
-            underlying = float(item.get("underlying_price") or item.get("estimated_delivery_price") or 0.0)
+            underlying = float(
+                item.get("underlying_price") or item.get("estimated_delivery_price") or 0.0
+            )
             if underlying <= 0.0:
                 continue
 

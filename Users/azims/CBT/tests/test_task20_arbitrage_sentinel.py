@@ -16,16 +16,22 @@ Strict Boss-Level Verification Suite across all 12 institutional criteria:
 """
 
 import time
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import app
+from core.arbitrage.basis_engine import BasisEngine
+from core.arbitrage.capacity_engine import CapacityEngine
+from core.arbitrage.classifier import OpportunityClassifier
+from core.arbitrage.data_firewall import DataQualityFirewall
+from core.arbitrage.ev_engine import DeterministicEVEngine
+from core.arbitrage.funding_matrix import FundingMatrixEngine
+from core.arbitrage.instrument_mapper import InstrumentMapper
 from core.arbitrage.models import (
     ArbitrageExecutionPermission,
     ArbitrageOpportunity,
-    BasisMetrics,
     BasisRegime,
-    CapacityTier,
     ContractType,
     ExecutableSpread,
     FundingRateRecord,
@@ -39,17 +45,10 @@ from core.arbitrage.models import (
     SourceHealth,
     Venue,
 )
-from core.arbitrage.instrument_mapper import InstrumentMapper
-from core.arbitrage.data_firewall import DataQualityFirewall
-from core.arbitrage.funding_matrix import FundingMatrixEngine
-from core.arbitrage.basis_engine import BasisEngine
-from core.arbitrage.spread_engine import SpreadEngine
-from core.arbitrage.ev_engine import DeterministicEVEngine
-from core.arbitrage.capacity_engine import CapacityEngine
-from core.arbitrage.classifier import OpportunityClassifier
 from core.arbitrage.provenance import ProvenanceEngine
-from core.arbitrage.shadow_validator import ShadowValidator
 from core.arbitrage.sentinel import ArbitrageSentinel
+from core.arbitrage.shadow_validator import ShadowValidator
+from core.arbitrage.spread_engine import SpreadEngine
 
 
 @pytest.fixture
@@ -95,7 +94,9 @@ def test_instrument_mapper_resolution():
 # 2. Data Quality Firewall Tests
 # -----------------------------------------------------------------------------
 def test_data_quality_firewall_rejections():
-    firewall = DataQualityFirewall(max_quote_age_ms=3000.0, max_clock_drift_ms=1000.0, max_book_age_ms=3000.0)
+    firewall = DataQualityFirewall(
+        max_quote_age_ms=3000.0, max_clock_drift_ms=1000.0, max_book_age_ms=3000.0
+    )
     now_ms = int(time.time() * 1000)
 
     # 1. Valid Quote
@@ -194,7 +195,10 @@ def test_data_quality_firewall_rejections():
     corrupt_book = OrderBookSnapshot(
         venue=Venue.BINANCE_SPOT,
         symbol="BTCUSDT",
-        bids=[OrderBookLevel(price=65000.0, size=1.0), OrderBookLevel(price=65050.0, size=2.0)],  # Non-descending!
+        bids=[
+            OrderBookLevel(price=65000.0, size=1.0),
+            OrderBookLevel(price=65050.0, size=2.0),
+        ],  # Non-descending!
         asks=[OrderBookLevel(price=65010.0, size=1.0), OrderBookLevel(price=65020.0, size=1.5)],
         timestamp_ms=now_ms - 100,
         sequence_id=201,

@@ -31,8 +31,14 @@ class VolatilitySurfaceEngine:
         if not contracts:
             underlying = 77000.0
             matrix = [
-                [round((0.45 + 0.10 * (t / 180.0) + 0.35 * (m - 1.0) ** 2 - 0.08 * (m - 1.0)) * 100.0, 1)
-                 for m in MONEYNESS_LEVELS]
+                [
+                    round(
+                        (0.45 + 0.10 * (t / 180.0) + 0.35 * (m - 1.0) ** 2 - 0.08 * (m - 1.0))
+                        * 100.0,
+                        1,
+                    )
+                    for m in MONEYNESS_LEVELS
+                ]
                 for t in SURFACE_TENORS_DAYS
             ]
             return VolatilitySurfaceGrid(

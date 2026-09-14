@@ -15,13 +15,14 @@ Covers:
 """
 
 import time
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import app
-from core.mbo.feed_adapter import MBOFeedAdapter, mbo_feed_adapter
+from core.mbo.feed_adapter import MBOFeedAdapter
 from core.mbo.iceberg_detector import IcebergDetector
-from core.mbo.models import MBOAction, MBOSide, ToxicityRegime
+from core.mbo.models import MBOSide, ToxicityRegime
 from core.mbo.order_book_l3 import L3OrderBook
 from core.mbo.queue_priority_engine import QueuePriorityEngine
 
@@ -39,9 +40,9 @@ def test_l3_orderbook_fifo_priority():
     now_ns = int(time.time() * 1e9)
 
     # Add three orders at the same price: 65,000.0
-    o1 = book.add_order("ORD_1", MBOSide.BID, 65000.0, 1.0, timestamp_ns=now_ns)
-    o2 = book.add_order("ORD_2", MBOSide.BID, 65000.0, 2.0, timestamp_ns=now_ns + 1000)
-    o3 = book.add_order("ORD_3", MBOSide.BID, 65000.0, 3.0, timestamp_ns=now_ns + 2000)
+    book.add_order("ORD_1", MBOSide.BID, 65000.0, 1.0, timestamp_ns=now_ns)
+    book.add_order("ORD_2", MBOSide.BID, 65000.0, 2.0, timestamp_ns=now_ns + 1000)
+    book.add_order("ORD_3", MBOSide.BID, 65000.0, 3.0, timestamp_ns=now_ns + 2000)
 
     assert book.best_bid == 65000.0
     level = book._bids[65000.0]
@@ -50,18 +51,24 @@ def test_l3_orderbook_fifo_priority():
     assert [o.order_id for o in level.orders] == ["ORD_1", "ORD_2", "ORD_3"]
 
     # Check queue ahead for ORD_1 (at front: 0 ahead)
-    ahead_qty, ahead_cnt, total = book.get_queue_ahead(MBOSide.BID, 65000.0, target_order_id="ORD_1")
+    ahead_qty, ahead_cnt, total = book.get_queue_ahead(
+        MBOSide.BID, 65000.0, target_order_id="ORD_1"
+    )
     assert ahead_qty == 0.0
     assert ahead_cnt == 0
     assert total == 6.0
 
     # Check queue ahead for ORD_2 (1.0 ahead)
-    ahead_qty, ahead_cnt, total = book.get_queue_ahead(MBOSide.BID, 65000.0, target_order_id="ORD_2")
+    ahead_qty, ahead_cnt, total = book.get_queue_ahead(
+        MBOSide.BID, 65000.0, target_order_id="ORD_2"
+    )
     assert ahead_qty == 1.0
     assert ahead_cnt == 1
 
     # Check queue ahead for ORD_3 (3.0 ahead)
-    ahead_qty, ahead_cnt, total = book.get_queue_ahead(MBOSide.BID, 65000.0, target_order_id="ORD_3")
+    ahead_qty, ahead_cnt, total = book.get_queue_ahead(
+        MBOSide.BID, 65000.0, target_order_id="ORD_3"
+    )
     assert ahead_qty == 3.0
     assert ahead_cnt == 2
 
@@ -137,18 +144,44 @@ def test_iceberg_detector_logic():
     now_ns = int(time.time() * 1e9)
 
     # 1. Register baseline depth of 1.0 BTC at 65,000.0
-    detector.register_initial_depth("BTCUSDT", "BINANCE_SPOT", MBOSide.BID, 65000.0, displayed_size=1.0, timestamp_ns=now_ns)
+    detector.register_initial_depth(
+        "BTCUSDT", "BINANCE_SPOT", MBOSide.BID, 65000.0, displayed_size=1.0, timestamp_ns=now_ns
+    )
 
     # 2. First execution: 0.8 BTC (cumulative = 0.8, ratio = 0.8 < 1.8 -> no detection)
-    det1 = detector.record_execution("BTCUSDT", "BINANCE_SPOT", MBOSide.BID, 65000.0, executed_qty=0.8, remaining_displayed_qty=0.8, timestamp_ns=now_ns + 100)
+    det1 = detector.record_execution(
+        "BTCUSDT",
+        "BINANCE_SPOT",
+        MBOSide.BID,
+        65000.0,
+        executed_qty=0.8,
+        remaining_displayed_qty=0.8,
+        timestamp_ns=now_ns + 100,
+    )
     assert det1 is None
 
     # 3. Second execution: 0.8 BTC (cumulative = 1.6, ratio = 1.6 < 1.8 -> no detection)
-    det2 = detector.record_execution("BTCUSDT", "BINANCE_SPOT", MBOSide.BID, 65000.0, executed_qty=0.8, remaining_displayed_qty=0.6, timestamp_ns=now_ns + 200)
+    det2 = detector.record_execution(
+        "BTCUSDT",
+        "BINANCE_SPOT",
+        MBOSide.BID,
+        65000.0,
+        executed_qty=0.8,
+        remaining_displayed_qty=0.6,
+        timestamp_ns=now_ns + 200,
+    )
     assert det2 is None
 
     # 4. Third execution: 0.8 BTC (cumulative = 2.4, ratio = 2.4 >= 1.8, reloads >= 2 -> ICEBERG CONFIRMED!)
-    det3 = detector.record_execution("BTCUSDT", "BINANCE_SPOT", MBOSide.BID, 65000.0, executed_qty=0.8, remaining_displayed_qty=0.8, timestamp_ns=now_ns + 300)
+    det3 = detector.record_execution(
+        "BTCUSDT",
+        "BINANCE_SPOT",
+        MBOSide.BID,
+        65000.0,
+        executed_qty=0.8,
+        remaining_displayed_qty=0.8,
+        timestamp_ns=now_ns + 300,
+    )
     assert det3 is not None
     assert det3.confidence_score >= 0.70
     assert det3.reload_count >= 2
@@ -206,7 +239,12 @@ def test_toxic_flow_metrics():
     assert 0.0 < metric.vpin_mbo < 1.0
     assert metric.cancel_to_trade_ratio >= 0.0
     assert metric.depletion_velocity_usd_per_sec > 0.0
-    assert metric.toxicity_regime in [ToxicityRegime.LOW, ToxicityRegime.MODERATE, ToxicityRegime.ELEVATED, ToxicityRegime.TOXIC]
+    assert metric.toxicity_regime in [
+        ToxicityRegime.LOW,
+        ToxicityRegime.MODERATE,
+        ToxicityRegime.ELEVATED,
+        ToxicityRegime.TOXIC,
+    ]
 
 
 # -----------------------------------------------------------------------------
@@ -224,7 +262,9 @@ def test_mbo_api_endpoints(test_client):
     assert "orders" in depth_json["bids"][0]
 
     # 2. Queue Priority Estimate
-    queue_resp = test_client.get("/api/mbo/queue-estimate?symbol=BTCUSDT&side=BID&price=65000&qty=0.5")
+    queue_resp = test_client.get(
+        "/api/mbo/queue-estimate?symbol=BTCUSDT&side=BID&price=65000&qty=0.5"
+    )
     assert queue_resp.status_code == 200
     queue_json = queue_resp.json()
     assert queue_json["status"] == "success"

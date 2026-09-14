@@ -37,10 +37,7 @@ class DailyLearningReporter:
     """
 
     def __init__(self):
-        try:
-            from core.knowledge_graph_engine import knowledge_graph_engine
-        except Exception as e:
-            logger.debug(f"Knowledge graph engine init check: {e}")
+        pass
 
     def get_current_bd_datetime(self) -> datetime.datetime:
         """Returns current datetime in Bangladesh Standard Time (UTC+6)."""
@@ -114,17 +111,21 @@ class DailyLearningReporter:
 
                 for r in rows:
                     stype = r["source_type"] or "RESEARCH"
-                    telemetry["source_type_counts"][stype] = telemetry["source_type_counts"].get(stype, 0) + 1
+                    telemetry["source_type_counts"][stype] = (
+                        telemetry["source_type_counts"].get(stype, 0) + 1
+                    )
                     author = r["author_creator"]
                     if author and author not in ("Unknown", "Unknown Author", "Operator"):
                         telemetry["creators_analyzed"].add(author)
 
-                    telemetry["sources_ingested"].append({
-                        "id": r["source_id"],
-                        "type": stype,
-                        "title": r["title"] or "Untitled Research Document",
-                        "author": author or "Anonymous",
-                    })
+                    telemetry["sources_ingested"].append(
+                        {
+                            "id": r["source_id"],
+                            "type": stype,
+                            "title": r["title"] or "Untitled Research Document",
+                            "author": author or "Anonymous",
+                        }
+                    )
 
                 # Total Claims added
                 cur_claims = conn.execute(
@@ -139,8 +140,7 @@ class DailyLearningReporter:
                     (start_ms,),
                 )
                 telemetry["concepts_count"] = cur_concepts.fetchone()[0]
-
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error querying brain telemetry: {e}")
 
         # Convert set to sorted list
@@ -180,16 +180,20 @@ class DailyLearningReporter:
                     if ytr["result_json"]:
                         try:
                             res_obj = json.loads(ytr["result_json"])
-                        except Exception:
+                        except (json.JSONDecodeError, TypeError):
                             pass
 
-                    telemetry["youtube_jobs"].append({
-                        "job_id": ytr["job_id"],
-                        "title": ytr["title"],
-                        "status": ytr["status"],
-                        "videos_processed": res_obj.get("videos_processed", 0),
-                        "channel_name": res_obj.get("creator_profile", {}).get("channel_name", ""),
-                    })
+                    telemetry["youtube_jobs"].append(
+                        {
+                            "job_id": ytr["job_id"],
+                            "title": ytr["title"],
+                            "status": ytr["status"],
+                            "videos_processed": res_obj.get("videos_processed", 0),
+                            "channel_name": res_obj.get("creator_profile", {}).get(
+                                "channel_name", ""
+                            ),
+                        }
+                    )
 
                     # Extract contradictions and strategy evolutions
                     for evo in res_obj.get("strategy_evolutions", []):
@@ -202,16 +206,19 @@ class DailyLearningReporter:
                 all_pos = cur_pos.fetchall()
                 telemetry["open_positions_count"] = sum(1 for p in all_pos if p["status"] == "OPEN")
                 closed_today = [
-                    p for p in all_pos
+                    p
+                    for p in all_pos
                     if p["status"] == "CLOSED" and (p["closed_at"] or 0) >= start_sec
                 ]
                 telemetry["paper_trades_count"] = len(closed_today)
                 if closed_today:
                     wins = sum(1 for p in closed_today if (p["realized_pnl"] or 0) > 0)
                     telemetry["paper_win_rate_pct"] = round((wins / len(closed_today)) * 100.0, 1)
-                    telemetry["paper_pnl_usd"] = round(sum((p["realized_pnl"] or 0) for p in closed_today), 2)
+                    telemetry["paper_pnl_usd"] = round(
+                        sum((p["realized_pnl"] or 0) for p in closed_today), 2
+                    )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error querying trading logs: {e}")
 
         return telemetry
@@ -245,14 +252,23 @@ class DailyLearningReporter:
 
         # 1. Research Ingestion Metrics
         total_sources = len(t["sources_ingested"])
-        type_summary = ", ".join(f"{count} {stype.lower()}s" for stype, count in t["source_type_counts"].items()) or "Direct Research Sessions"
+        type_summary = (
+            ", ".join(
+                f"{count} {stype.lower()}s" for stype, count in t["source_type_counts"].items()
+            )
+            or "Direct Research Sessions"
+        )
         lines.append("📚 **RESEARCH LITERATURE & MEDIA PROVENANCE:**")
         lines.append(f"  • **Knowledge Ingestion:** `{total_sources}` sources ({type_summary})")
-        lines.append(f"  • **Knowledge Graph Growth:** `{t['claims_count']}` atomic claims | `{t['concepts_count']}` normalized concepts")
+        lines.append(
+            f"  • **Knowledge Graph Growth:** `{t['claims_count']}` atomic claims | `{t['concepts_count']}` normalized concepts"
+        )
 
         # 2. Creators / Channels Explored
         if t["creators_analyzed"]:
-            lines.append(f"  • **Creators & Authors Studied:** {', '.join(f'`{a}`' for a in t['creators_analyzed'][:6])}")
+            lines.append(
+                f"  • **Creators & Authors Studied:** {', '.join(f'`{a}`' for a in t['creators_analyzed'][:6])}"
+            )
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         # 3. Autonomous YouTube Explorations
@@ -260,9 +276,13 @@ class DailyLearningReporter:
         if t["youtube_jobs"]:
             for yj in t["youtube_jobs"][:3]:
                 chan = yj["channel_name"] or yj["title"].replace("Explore YouTube: ", "")
-                lines.append(f"  • **{chan[:36]}**: `{yj['videos_processed']} videos` analyzed & deconstructed ({yj['status']})")
+                lines.append(
+                    f"  • **{chan[:36]}**: `{yj['videos_processed']} videos` analyzed & deconstructed ({yj['status']})"
+                )
         else:
-            lines.append("  • **Continuous Sentinel:** Autonomous video extraction & deduplication active.")
+            lines.append(
+                "  • **Continuous Sentinel:** Autonomous video extraction & deduplication active."
+            )
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         # 4. Quantitative SMC Concepts & Strategy Evolution
@@ -274,13 +294,19 @@ class DailyLearningReporter:
                 lines.append(f"  • `{c_name}`: {exp}")
         else:
             lines.append("  • `Fair Value Gaps (FVG)`: Displaced institutional imbalances mapped.")
-            lines.append("  • `Order Block Mitigation`: Multi-timeframe confluence required prior to entry.")
-            lines.append("  • `Liquidity Sweeps`: Judas swing manipulation identified at session boundaries.")
+            lines.append(
+                "  • `Order Block Mitigation`: Multi-timeframe confluence required prior to entry."
+            )
+            lines.append(
+                "  • `Liquidity Sweeps`: Judas swing manipulation identified at session boundaries."
+            )
 
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         lines.append("⚡ **CONTRADICTIONS & FALSIFICATION RADAR:**")
         if t["contradictions"]:
-            lines.append(f"  • `{len(t['contradictions'])}` internal rule contradictions detected and quarantined.")
+            lines.append(
+                f"  • `{len(t['contradictions'])}` internal rule contradictions detected and quarantined."
+            )
         else:
             lines.append("  • ✅ Zero internal rule contradictions detected across sessions.")
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -288,8 +314,12 @@ class DailyLearningReporter:
         # 5. Paper Trading & Capital Preservation Audit
         lines.append("💼 **TODAY'S PAPER DESK PERFORMANCE:**")
         pnl_symbol = "+" if t["paper_pnl_usd"] >= 0 else ""
-        lines.append(f"  • **Closed Trades:** `{t['paper_trades_count']}` | **Win Rate:** `{t['paper_win_rate_pct']}%`")
-        lines.append(f"  • **Realized PnL:** `{pnl_symbol}${t['paper_pnl_usd']:,.2f}` | **Open Positions:** `{t['open_positions_count']}`")
+        lines.append(
+            f"  • **Closed Trades:** `{t['paper_trades_count']}` | **Win Rate:** `{t['paper_win_rate_pct']}%`"
+        )
+        lines.append(
+            f"  • **Realized PnL:** `{pnl_symbol}${t['paper_pnl_usd']:,.2f}` | **Open Positions:** `{t['open_positions_count']}`"
+        )
         lines.append("  • **Risk Envelope:** Half-Kelly active, sovereign kill-switch armable.")
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
@@ -299,7 +329,9 @@ class DailyLearningReporter:
         lines.append("  2. Monitor Asian session liquidity sweeps at 08:00 AM BST.")
         lines.append("  3. Screen high-impact macroeconomic announcements (CPI / FOMC).")
         lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        lines.append("⚖️ *Level 1 Epistemic Invariant: Observational learning remains quarantined at confidence = 0.0 until empirical Walk-Forward certified.*")
+        lines.append(
+            "⚖️ *Level 1 Epistemic Invariant: Observational learning remains quarantined at confidence = 0.0 until empirical Walk-Forward certified.*"
+        )
 
         return "\n".join(lines)
 

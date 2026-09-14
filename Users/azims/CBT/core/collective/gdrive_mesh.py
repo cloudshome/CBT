@@ -161,9 +161,7 @@ class GDriveClusterMesh:
                                 peer_node["status"] = "ONLINE"
                                 # Fetch remote JSON profile content
                                 try:
-                                    content = (
-                                        service.files().get_media(fileId=item["id"]).execute()
-                                    )
+                                    content = service.files().get_media(fileId=item["id"]).execute()
                                     parsed = json.loads(content.decode("utf-8"))
                                     if isinstance(parsed, dict):
                                         peer_node.update(parsed)
@@ -173,7 +171,9 @@ class GDriveClusterMesh:
                                         with open(cache_f, "w", encoding="utf-8") as f:
                                             json.dump(parsed, f, indent=2)
                                 except Exception as dl_err:  # noqa: BLE001
-                                    logger.debug("Error reading peer %s profile: %s", peer_id, dl_err)
+                                    logger.debug(
+                                        "Error reading peer %s profile: %s", peer_id, dl_err
+                                    )
 
                                 nodes[peer_id] = peer_node
             except Exception as exc:  # noqa: BLE001

@@ -11,10 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 
 from core.auth.credential_vault import credential_vault
 from core.execution.connectors.base import NormalizedBalance
@@ -33,8 +31,8 @@ class ExchangeAccountStatus:
     total_equity_usd: float
     free_cash_usd: float
     locked_margin_usd: float
-    balances: List[NormalizedBalance] = field(default_factory=list)
-    error_message: Optional[str] = None
+    balances: list[NormalizedBalance] = field(default_factory=list)
+    error_message: str | None = None
 
 
 @dataclass
@@ -44,18 +42,18 @@ class PortfolioReadinessSummary:
     total_portfolio_equity_usd: float
     total_free_cash_usd: float
     single_trade_equity_cap_usd: float  # Exactly 1.5% of total equity
-    max_portfolio_heat_usd: float       # Exactly 6.0% total concurrent risk
-    active_exchanges: List[str]
-    exchange_statuses: Dict[str, ExchangeAccountStatus]
+    max_portfolio_heat_usd: float  # Exactly 6.0% total concurrent risk
+    active_exchanges: list[str]
+    exchange_statuses: dict[str, ExchangeAccountStatus]
     is_ready_for_canary_trade: bool
-    reasons: List[str]
+    reasons: list[str]
 
 
 class AccountReadinessProbe:
     """Probes live balances and computes constitutional sizing limits."""
 
     def __init__(self) -> None:
-        self.reference_prices: Dict[str, float] = {
+        self.reference_prices: dict[str, float] = {
             "BTC": 65000.0,
             "ETH": 3500.0,
             "SOL": 150.0,
@@ -65,7 +63,9 @@ class AccountReadinessProbe:
             "PAXG": 2400.0,
         }
 
-    async def probe_exchange(self, exchange: str, environment: str = "PRODUCTION") -> ExchangeAccountStatus:
+    async def probe_exchange(
+        self, exchange: str, environment: str = "PRODUCTION"
+    ) -> ExchangeAccountStatus:
         """Probes a specific exchange connector for live balances."""
         exchange_upper = exchange.upper().strip()
         t_start = time.perf_counter()
@@ -143,7 +143,7 @@ class AccountReadinessProbe:
                 locked_margin_usd=round(locked_usd, 2),
                 balances=balances,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             latency_ms = (time.perf_counter() - t_start) * 1000.0
             logger.warning(f"Error querying live balance for {exchange_upper}: {e}")
             return ExchangeAccountStatus(
@@ -157,7 +157,9 @@ class AccountReadinessProbe:
                 error_message=str(e),
             )
 
-    async def get_portfolio_readiness(self, environment: str = "PRODUCTION") -> PortfolioReadinessSummary:
+    async def get_portfolio_readiness(
+        self, environment: str = "PRODUCTION"
+    ) -> PortfolioReadinessSummary:
         """Evaluates live account readiness and constitutional risk boundaries."""
         now_ms = int(time.time() * 1000)
         vault_unlocked = credential_vault.is_unlocked()

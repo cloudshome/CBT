@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import logging
 import math
-import time
-from typing import Optional
 
 from core.mbo.models import MBOSide, QueuePositionEstimate
 from core.mbo.order_book_l3 import L3OrderBook
@@ -36,8 +34,8 @@ class QueuePriorityEngine:
         side: MBOSide,
         price: float,
         order_qty: float,
-        target_order_id: Optional[str] = None,
-        observed_depletion_rate: Optional[float] = None,
+        target_order_id: str | None = None,
+        observed_depletion_rate: float | None = None,
         imbalance_score: float = 0.0,
     ) -> QueuePositionEstimate:
         """
@@ -52,11 +50,7 @@ class QueuePriorityEngine:
         qty_behind = max(0.0, total_with_order - qty_ahead - order_qty)
 
         # Relative queue position (0.0 = front of queue, 1.0 = tail)
-        relative_pos = (
-            qty_ahead / max(0.0001, total_with_order)
-            if total_with_order > 0
-            else 0.0
-        )
+        relative_pos = qty_ahead / max(0.0001, total_with_order) if total_with_order > 0 else 0.0
 
         # Effective clearance rate (market order trades + cancel velocity)
         depletion_rate = (
@@ -96,7 +90,7 @@ class QueuePriorityEngine:
             0.95,
             0.20
             + (0.35 * (1.0 - relative_pos))  # Near the front receives trades first
-            + (0.30 * abs(imbalance_score)) # Strong directional imbalance
+            + (0.30 * abs(imbalance_score))  # Strong directional imbalance
             + (0.15 * min(1.0, depletion_rate / 0.5)),
         )
 

@@ -17,10 +17,9 @@ Coordinates:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.arbitrage.basis_engine import basis_engine
 from core.arbitrage.capacity_engine import capacity_engine
@@ -51,30 +50,30 @@ class ArbitrageSentinel:
     """Master institutional controller for Task 20.1 Sentinel."""
 
     def __init__(self) -> None:
-        self._latest_opportunities: Dict[str, ArbitrageOpportunity] = {}
-        self._latest_funding_matrix: List[Any] = []
-        self._latest_basis_metrics: Dict[str, Any] = {}
-        self._latest_quotes: Dict[str, List[NormalizedMarketQuote]] = {}
-        self._latest_books: Dict[str, Dict[Venue, OrderBookSnapshot]] = {}
+        self._latest_opportunities: dict[str, ArbitrageOpportunity] = {}
+        self._latest_funding_matrix: list[Any] = []
+        self._latest_basis_metrics: dict[str, Any] = {}
+        self._latest_quotes: dict[str, list[NormalizedMarketQuote]] = {}
+        self._latest_books: dict[str, dict[Venue, OrderBookSnapshot]] = {}
         self._last_scan_timestamp_ms: int = 0
 
     @property
     def execution_permission(self) -> ArbitrageExecutionPermission:
         return ArbitrageExecutionPermission.RESEARCH_ONLY
 
-    async def scan_symbol(self, canonical_symbol: str = "BTCUSDT") -> Dict[str, Any]:
+    async def scan_symbol(self, canonical_symbol: str = "BTCUSDT") -> dict[str, Any]:
         """Performs a complete quantitative scan cycle for a canonical symbol."""
         now_ms = int(time.time() * 1000)
         self._last_scan_timestamp_ms = now_ms
 
         # 1. Ingest quotes, funding rates, and books across all venues
         data = await arbitrage_feed.poll_all_venues(canonical_symbol)
-        raw_quotes: List[NormalizedMarketQuote] = data["quotes"]
-        funding_records: List[FundingRateRecord] = data["funding"]
-        books: List[OrderBookSnapshot] = data["books"]
+        raw_quotes: list[NormalizedMarketQuote] = data["quotes"]
+        funding_records: list[FundingRateRecord] = data["funding"]
+        books: list[OrderBookSnapshot] = data["books"]
 
         # 2. Apply Data Quality Firewall
-        valid_quotes: List[NormalizedMarketQuote] = []
+        valid_quotes: list[NormalizedMarketQuote] = []
         for q in raw_quotes:
             v = data_firewall.validate_quote(q)
             if v.passed:
@@ -82,19 +81,19 @@ class ArbitrageSentinel:
             else:
                 logger.debug(f"Firewall rejected quote {q.venue} {q.symbol}: {v.reason}")
 
-        valid_books: Dict[Venue, OrderBookSnapshot] = {}
+        valid_books: dict[Venue, OrderBookSnapshot] = {}
         for b in books:
             vb = data_firewall.validate_order_book(b)
             if vb.passed:
                 valid_books[b.venue] = b
 
-        valid_funding: List[FundingRateRecord] = []
+        valid_funding: list[FundingRateRecord] = []
         for f in funding_records:
             vf = data_firewall.validate_funding(f)
             if vf.passed:
                 valid_funding.append(f)
 
-        funding_map: Dict[Venue, FundingRateRecord] = {f.venue: f for f in valid_funding}
+        funding_map: dict[Venue, FundingRateRecord] = {f.venue: f for f in valid_funding}
 
         self._latest_quotes[canonical_symbol] = valid_quotes
         self._latest_books[canonical_symbol] = valid_books
@@ -119,7 +118,7 @@ class ArbitrageSentinel:
             self._latest_basis_metrics[canonical_symbol] = basis_metrics
 
         # 5. Evaluate Opportunities across valid books
-        opportunities: List[ArbitrageOpportunity] = []
+        opportunities: list[ArbitrageOpportunity] = []
         venue_list = list(valid_books.keys())
 
         for i in range(len(venue_list)):
@@ -130,8 +129,11 @@ class ArbitrageSentinel:
 
                 # Determine structure type
                 is_spot_perp = (
-                    (v1 in (Venue.BINANCE_SPOT, Venue.OKX_SPOT) and v2 not in (Venue.BINANCE_SPOT, Venue.OKX_SPOT))
-                    or (v2 in (Venue.BINANCE_SPOT, Venue.OKX_SPOT) and v1 not in (Venue.BINANCE_SPOT, Venue.OKX_SPOT))
+                    v1 in (Venue.BINANCE_SPOT, Venue.OKX_SPOT)
+                    and v2 not in (Venue.BINANCE_SPOT, Venue.OKX_SPOT)
+                ) or (
+                    v2 in (Venue.BINANCE_SPOT, Venue.OKX_SPOT)
+                    and v1 not in (Venue.BINANCE_SPOT, Venue.OKX_SPOT)
                 )
                 opp_type = (
                     OpportunityType.SPOT_PERP_BASIS
@@ -153,7 +155,9 @@ class ArbitrageSentinel:
                     multi_ev = ev_engine.evaluate_multi_scenario_ev(
                         spread=spread,
                         funding_records=funding_map,
-                        basis_volatility_bps=basis_metrics.rolling_std_bps if basis_metrics else 2.5,
+                        basis_volatility_bps=basis_metrics.rolling_std_bps
+                        if basis_metrics
+                        else 2.5,
                     )
 
                 # Capacity Curve ($1k -> $100k)
@@ -220,7 +224,7 @@ class ArbitrageSentinel:
             "funding_matrix": f_matrix,
         }
 
-    def format_telegram_alert(self, opportunity: ArbitrageOpportunity) -> Optional[str]:
+    def format_telegram_alert(self, opportunity: ArbitrageOpportunity) -> str | None:
         """
         Formats research-oriented telegram notification strictly avoiding live execution phrasing.
         Only generates alert for QUALIFIED opportunities.
@@ -260,13 +264,13 @@ class ArbitrageSentinel:
         ]
         return "\n".join(lines)
 
-    def get_active_opportunities(self) -> List[ArbitrageOpportunity]:
+    def get_active_opportunities(self) -> list[ArbitrageOpportunity]:
         return list(self._latest_opportunities.values())
 
-    def get_funding_matrix(self) -> List[Any]:
+    def get_funding_matrix(self) -> list[Any]:
         return self._latest_funding_matrix
 
-    def get_basis_metrics(self, canonical_symbol: str = "BTCUSDT") -> Optional[Any]:
+    def get_basis_metrics(self, canonical_symbol: str = "BTCUSDT") -> Any | None:
         return self._latest_basis_metrics.get(canonical_symbol)
 
 

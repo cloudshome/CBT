@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from core.mbo.models import MBOAction, MBOOrder, MBOPriceLevel, MBOSide
+from core.mbo.models import MBOOrder, MBOPriceLevel, MBOSide
 
 logger = logging.getLogger("sky.mbo.order_book_l3")
 
@@ -24,27 +24,27 @@ class L3OrderBook:
         self.symbol = symbol
         self.venue = venue
         # Fast lookup: order_id -> MBOOrder
-        self._orders: Dict[str, MBOOrder] = {}
+        self._orders: dict[str, MBOOrder] = {}
         # Price levels: price -> MBOPriceLevel
-        self._bids: Dict[float, MBOPriceLevel] = {}
-        self._asks: Dict[float, MBOPriceLevel] = {}
+        self._bids: dict[float, MBOPriceLevel] = {}
+        self._asks: dict[float, MBOPriceLevel] = {}
         self._sequence_counter: int = 0
         self._last_update_ns: int = int(time.time() * 1e9)
 
     @property
-    def best_bid(self) -> Optional[float]:
+    def best_bid(self) -> float | None:
         if not self._bids:
             return None
         return max(self._bids.keys())
 
     @property
-    def best_ask(self) -> Optional[float]:
+    def best_ask(self) -> float | None:
         if not self._asks:
             return None
         return min(self._asks.keys())
 
     @property
-    def mid_price(self) -> Optional[float]:
+    def mid_price(self) -> float | None:
         bid = self.best_bid
         ask = self.best_ask
         if bid is not None and ask is not None:
@@ -57,9 +57,9 @@ class L3OrderBook:
         side: MBOSide,
         price: float,
         size: float,
-        timestamp_ns: Optional[int] = None,
+        timestamp_ns: int | None = None,
         is_iceberg_child: bool = False,
-        parent_iceberg_id: Optional[str] = None,
+        parent_iceberg_id: str | None = None,
     ) -> MBOOrder:
         """Adds a discrete order to the tail of the FIFO queue at the specified price level."""
         now_ns = timestamp_ns or int(time.time() * 1e9)
@@ -97,9 +97,9 @@ class L3OrderBook:
     def cancel_order(
         self,
         order_id: str,
-        cancel_size: Optional[float] = None,
-        timestamp_ns: Optional[int] = None,
-    ) -> Optional[MBOOrder]:
+        cancel_size: float | None = None,
+        timestamp_ns: int | None = None,
+    ) -> MBOOrder | None:
         """Cancels a specific order or reduces its size."""
         if order_id not in self._orders:
             return None
@@ -140,8 +140,8 @@ class L3OrderBook:
         order_id: str,
         new_price: float,
         new_size: float,
-        timestamp_ns: Optional[int] = None,
-    ) -> Optional[MBOOrder]:
+        timestamp_ns: int | None = None,
+    ) -> MBOOrder | None:
         """
         Modifies order.
         Rule:
@@ -180,8 +180,8 @@ class L3OrderBook:
         self,
         order_id: str,
         executed_size: float,
-        timestamp_ns: Optional[int] = None,
-    ) -> Tuple[Optional[MBOOrder], float]:
+        timestamp_ns: int | None = None,
+    ) -> tuple[MBOOrder | None, float]:
         """Executes against an existing order in the book."""
         if order_id not in self._orders:
             return None, 0.0
@@ -219,23 +219,25 @@ class L3OrderBook:
         self,
         side: MBOSide,
         market_qty: float,
-        timestamp_ns: Optional[int] = None,
-    ) -> List[Tuple[str, float, float]]:
+        timestamp_ns: int | None = None,
+    ) -> list[tuple[str, float, float]]:
         """
         Executes a market order against the opposing book according to strict FIFO priority.
         Returns: list of (filled_order_id, filled_price, filled_qty).
         """
-        fills: List[Tuple[str, float, float]] = []
+        fills: list[tuple[str, float, float]] = []
         remaining = market_qty
         # A buy market order matches against asks (lowest price first)
         # A sell market order matches against bids (highest price first)
-        is_buy = (side == MBOSide.BID)
+        is_buy = side == MBOSide.BID
         level_map = self._asks if is_buy else self._bids
 
         if not level_map:
             return fills
 
-        sorted_prices = sorted(level_map.keys()) if is_buy else sorted(level_map.keys(), reverse=True)
+        sorted_prices = (
+            sorted(level_map.keys()) if is_buy else sorted(level_map.keys(), reverse=True)
+        )
 
         for price in sorted_prices:
             if remaining <= 1e-9:
@@ -260,8 +262,8 @@ class L3OrderBook:
         self,
         side: MBOSide,
         price: float,
-        target_order_id: Optional[str] = None,
-    ) -> Tuple[float, int, float]:
+        target_order_id: str | None = None,
+    ) -> tuple[float, int, float]:
         """
         Returns: (queue_ahead_qty, queue_ahead_orders_count, total_level_qty).
         If target_order_id is None, assumes placing a NEW order at the tail of the level.
@@ -292,7 +294,7 @@ class L3OrderBook:
 
         return qty_ahead, orders_ahead, level.total_size
 
-    def export_l2_summary(self, max_depth: int = 20) -> Dict[str, Any]:
+    def export_l2_summary(self, max_depth: int = 20) -> dict[str, Any]:
         """Exports aggregated L2 depth view with L3 queue metadata."""
         sorted_bids = sorted(self._bids.keys(), reverse=True)[:max_depth]
         sorted_asks = sorted(self._asks.keys())[:max_depth]

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Any
 
 from core.mbo.models import IcebergDetection, MBOSide
 
@@ -31,8 +31,8 @@ class IcebergDetector:
         self.decay_window_sec = decay_window_sec
 
         # Tracking state: (symbol, venue, side, price) -> state dict
-        self._level_states: Dict[Tuple[str, str, MBOSide, float], Dict[str, Any]] = {}
-        self._detected_icebergs: Dict[str, IcebergDetection] = {}
+        self._level_states: dict[tuple[str, str, MBOSide, float], dict[str, Any]] = {}
+        self._detected_icebergs: dict[str, IcebergDetection] = {}
 
     def register_initial_depth(
         self,
@@ -41,7 +41,7 @@ class IcebergDetector:
         side: MBOSide,
         price: float,
         displayed_size: float,
-        timestamp_ns: Optional[int] = None,
+        timestamp_ns: int | None = None,
     ) -> None:
         """Registers the baseline displayed size for a price level."""
         now_ns = timestamp_ns or int(time.time() * 1e9)
@@ -74,8 +74,8 @@ class IcebergDetector:
         price: float,
         executed_qty: float,
         remaining_displayed_qty: float,
-        timestamp_ns: Optional[int] = None,
-    ) -> Optional[IcebergDetection]:
+        timestamp_ns: int | None = None,
+    ) -> IcebergDetection | None:
         """
         Records an execution event at a price level.
         Detects if executed quantity repeatedly replenishes beyond initial displayed size.
@@ -84,7 +84,9 @@ class IcebergDetector:
         key = (symbol, venue, side, price)
 
         if key not in self._level_states:
-            self.register_initial_depth(symbol, venue, side, price, remaining_displayed_qty + executed_qty, now_ns)
+            self.register_initial_depth(
+                symbol, venue, side, price, remaining_displayed_qty + executed_qty, now_ns
+            )
 
         state = self._level_states[key]
         state["cumulative_executed"] += executed_qty
@@ -103,7 +105,10 @@ class IcebergDetector:
             state["reload_sizes"].append(executed_qty)
 
         # Trigger iceberg detection
-        if ratio >= self.execution_to_displayed_threshold and state["reloads"] >= self.min_reload_count:
+        if (
+            ratio >= self.execution_to_displayed_threshold
+            and state["reloads"] >= self.min_reload_count
+        ):
             iceberg_id = f"ICE_{symbol}_{venue}_{side.value}_{int(price)}_{state['first_seen_ns']}"
 
             # Calculate metrics
@@ -141,10 +146,10 @@ class IcebergDetector:
 
         return None
 
-    def get_active_icebergs(self, symbol: Optional[str] = None) -> List[IcebergDetection]:
+    def get_active_icebergs(self, symbol: str | None = None) -> list[IcebergDetection]:
         """Returns currently active detected icebergs within the decay window."""
         now_ns = int(time.time() * 1e9)
-        active: List[IcebergDetection] = []
+        active: list[IcebergDetection] = []
 
         for iceberg in self._detected_icebergs.values():
             if symbol and iceberg.symbol != symbol:

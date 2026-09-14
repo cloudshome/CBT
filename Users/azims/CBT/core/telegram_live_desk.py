@@ -21,7 +21,6 @@ Features:
 
 from __future__ import annotations
 
-import asyncio
 import datetime
 import hashlib
 import hmac
@@ -29,11 +28,9 @@ import logging
 import os
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Any
 
-from core.audit_bus import audit_bus
-from core.auth.credential_vault import credential_vault
 from core.daily_learning_reporter import daily_learning_reporter
 from core.execution.account_probe import account_probe
 from core.execution.kill_switch import live_kill_switch
@@ -54,7 +51,7 @@ class HmacActionToken:
     nonce: str
     created_at: float
     expires_at: float
-    payload: Dict[str, Any] = field(default_factory=dict)
+    payload: dict[str, Any] = field(default_factory=dict)
     consumed: bool = False
 
 
@@ -63,15 +60,15 @@ class TelegramLiveTradingDesk:
 
     def __init__(self) -> None:
         self._secret = os.getenv("JWT_SECRET", "sky_tele_live_secret_key_2026").encode("utf-8")
-        self._active_tokens: Dict[str, HmacActionToken] = {}
+        self._active_tokens: dict[str, HmacActionToken] = {}
 
     def generate_action_token(
-        self, action: str, payload: Dict[str, Any], ttl_seconds: float = 60.0
+        self, action: str, payload: dict[str, Any], ttl_seconds: float = 60.0
     ) -> HmacActionToken:
         """Generates a cryptographically signed single-use HMAC token."""
         now = time.time()
         nonce = uuid.uuid4().hex[:8]
-        raw = f"{action}:{nonce}:{now}".encode("utf-8")
+        raw = f"{action}:{nonce}:{now}".encode()
         token_str = hmac.new(self._secret, raw, hashlib.sha256).hexdigest()[:16]
 
         act_token = HmacActionToken(
@@ -86,7 +83,7 @@ class TelegramLiveTradingDesk:
         self._active_tokens[token_str] = act_token
         return act_token
 
-    def validate_and_consume_token(self, token_str: str) -> Optional[HmacActionToken]:
+    def validate_and_consume_token(self, token_str: str) -> HmacActionToken | None:
         """Validates and atomically consumes a single-use action token."""
         now = time.time()
         # Prune expired tokens
@@ -122,12 +119,30 @@ class TelegramLiveTradingDesk:
         chk_vault = "🟢 UNLOCKED" if summary.vault_unlocked else "🔴 LOCKED (Master Key Required)"
         kill_active = live_kill_switch.is_active()
         chk_kill = "🔴 ACTIVE (Halted)" if kill_active else "🟢 CLEAR (Operational)"
-        chk_drift = "🟢 PASS (<500ms)" if verdict.checks.get("connectivity_and_clock_drift") else "🔴 FAILED / DISCONNECTED"
-        chk_drawdown = "🟢 PASS (<3.0%)" if verdict.checks.get("daily_drawdown_safe") else "🔴 CIRCUIT BREAKER TRIPPED"
-        chk_cap = "🟢 CONFORMED" if verdict.checks.get("single_trade_cap_conformed") else "🔴 EXCEEDED"
-        chk_live = "🟢 AUTHORIZED" if verdict.checks.get("live_trading_authorized") else "🟡 DRY-RUN / DISABLED"
+        chk_drift = (
+            "🟢 PASS (<500ms)"
+            if verdict.checks.get("connectivity_and_clock_drift")
+            else "🔴 FAILED / DISCONNECTED"
+        )
+        chk_drawdown = (
+            "🟢 PASS (<3.0%)"
+            if verdict.checks.get("daily_drawdown_safe")
+            else "🔴 CIRCUIT BREAKER TRIPPED"
+        )
+        chk_cap = (
+            "🟢 CONFORMED" if verdict.checks.get("single_trade_cap_conformed") else "🔴 EXCEEDED"
+        )
+        chk_live = (
+            "🟢 AUTHORIZED"
+            if verdict.checks.get("live_trading_authorized")
+            else "🟡 DRY-RUN / DISABLED"
+        )
 
-        status_emoji = "🟢 ALL CHECKS PASS — CANARY READY" if verdict.passed else "🛡️ FAIL-CLOSED SAFETY LOCK ENGAGED"
+        status_emoji = (
+            "🟢 ALL CHECKS PASS — CANARY READY"
+            if verdict.passed
+            else "🛡️ FAIL-CLOSED SAFETY LOCK ENGAGED"
+        )
 
         lines = [
             "⚡ **SKY LIVE EXCHANGE TRADING COMMANDER (PHASE 21)**",
@@ -156,16 +171,18 @@ class TelegramLiveTradingDesk:
             for r in verdict.rejection_reasons:
                 lines.append(f"  • `{r}`")
 
-        lines.extend([
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "💡 **Available Operator Directives:**",
-            "  • `/live_preflight <venue> <size>` — Validate an order against all 6 gates.",
-            "  • `/live_canary <venue> <sym> <size>` — Run $10-$25 micro-canary order.",
-            "  • `/ai_learned` — Review today's 10:00 PM AI learning synthesis.",
-            "  • `/macro_flash` — Review latest CPI / FOMC event release & impact.",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "🛡️ *Invariant: Real-money orders require explicit vault unlock & LIVE_TRADING_ENABLED=true.*",
-        ])
+        lines.extend(
+            [
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                "💡 **Available Operator Directives:**",
+                "  • `/live_preflight <venue> <size>` — Validate an order against all 6 gates.",
+                "  • `/live_canary <venue> <sym> <size>` — Run $10-$25 micro-canary order.",
+                "  • `/ai_learned` — Review today's 10:00 PM AI learning synthesis.",
+                "  • `/macro_flash` — Review latest CPI / FOMC event release & impact.",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                "🛡️ *Invariant: Real-money orders require explicit vault unlock & LIVE_TRADING_ENABLED=true.*",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -185,7 +202,9 @@ class TelegramLiveTradingDesk:
         )
         res = await live_canary_runner.execute_canary_order(req)
 
-        mode_badge = "🧪 DRY-RUN CANARY SIMULATION" if res.is_dry_run else "🚨 REAL-MONEY LIVE CANARY"
+        mode_badge = (
+            "🧪 DRY-RUN CANARY SIMULATION" if res.is_dry_run else "🚨 REAL-MONEY LIVE CANARY"
+        )
         result_emoji = "✅ SUCCESS" if res.success else "🛑 BLOCKED / FAILED"
 
         lines = [

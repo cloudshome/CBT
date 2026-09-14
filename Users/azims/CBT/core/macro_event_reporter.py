@@ -18,7 +18,7 @@ from __future__ import annotations
 import datetime
 import logging
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.database import db_manager
@@ -68,7 +68,7 @@ class MacroReleaseRecord:
             self.event_name = self.title
 
         # Normalize numeric representations if passed as float/int
-        if isinstance(self.actual, (int, float)):
+        if isinstance(self.actual, int | float):
             self.actual_num = float(self.actual)
             self.actual = f"{self.actual}{self.unit}"
         elif self.actual_num is None and self.actual:
@@ -76,10 +76,10 @@ class MacroReleaseRecord:
                 clean_act = "".join(c for c in str(self.actual) if c.isdigit() or c in ".-")
                 if clean_act:
                     self.actual_num = float(clean_act)
-            except Exception:
+            except (ValueError, TypeError):
                 pass
 
-        if isinstance(self.forecast, (int, float)):
+        if isinstance(self.forecast, int | float):
             self.forecast_num = float(self.forecast)
             self.forecast = f"{self.forecast}{self.unit}"
         elif self.forecast_num is None and self.forecast:
@@ -87,10 +87,10 @@ class MacroReleaseRecord:
                 clean_fc = "".join(c for c in str(self.forecast) if c.isdigit() or c in ".-")
                 if clean_fc:
                     self.forecast_num = float(clean_fc)
-            except Exception:
+            except (ValueError, TypeError):
                 pass
 
-        if isinstance(self.previous, (int, float)):
+        if isinstance(self.previous, int | float):
             self.previous_num = float(self.previous)
             self.previous = f"{self.previous}{self.unit}"
         elif self.previous_num is None and self.previous:
@@ -98,16 +98,24 @@ class MacroReleaseRecord:
                 clean_pr = "".join(c for c in str(self.previous) if c.isdigit() or c in ".-")
                 if clean_pr:
                     self.previous_num = float(clean_pr)
-            except Exception:
+            except (ValueError, TypeError):
                 pass
 
         # Calculate surprise deviation and direction if numbers exist
-        if self.actual_num is not None and self.forecast_num is not None and self.surprise_deviation == 0.0:
+        if (
+            self.actual_num is not None
+            and self.forecast_num is not None
+            and self.surprise_deviation == 0.0
+        ):
             self.surprise_deviation = round(self.actual_num - self.forecast_num, 2)
             if self.surprise_deviation < 0:
-                self.surprise_direction = "DOVISH_SURPRISE" if self.category == "INFLATION" else "BEARISH_SURPRISE"
+                self.surprise_direction = (
+                    "DOVISH_SURPRISE" if self.category == "INFLATION" else "BEARISH_SURPRISE"
+                )
             elif self.surprise_deviation > 0:
-                self.surprise_direction = "HAWKISH_SURPRISE" if self.category == "INFLATION" else "BULLISH_SURPRISE"
+                self.surprise_direction = (
+                    "HAWKISH_SURPRISE" if self.category == "INFLATION" else "BULLISH_SURPRISE"
+                )
             else:
                 self.surprise_direction = "IN_LINE"
 
@@ -138,7 +146,11 @@ class MacroReleaseRecord:
             self.iv_crush_pct = -4.5
 
         if not self.fvg_zone_usd:
-            self.fvg_zone_usd = "$68,100 — $68,750 (15m Bullish FVG)" if self.btc_change_pct >= 0 else "$66,800 — $67,400 (15m Bearish FVG)"
+            self.fvg_zone_usd = (
+                "$68,100 — $68,750 (15m Bullish FVG)"
+                if self.btc_change_pct >= 0
+                else "$66,800 — $67,400 (15m Bearish FVG)"
+            )
 
         if not self.market_impact_summary:
             if "DOVISH" in self.surprise_direction:
@@ -206,7 +218,7 @@ class MacroEventReporter:
                     "CREATE INDEX IF NOT EXISTS idx_macro_rel_sched ON macro_event_releases (scheduled_timestamp_ms);"
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Could not initialize macro_event_releases table: {e}")
 
     def _seed_default_macro_releases(self) -> None:
@@ -314,18 +326,35 @@ class MacroEventReporter:
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                         """,
                         (
-                            rec.event_id, rec.title, rec.country, rec.category,
-                            rec.scheduled_timestamp_ms, rec.released_timestamp_ms,
-                            rec.actual, rec.forecast, rec.previous,
-                            rec.actual_num, rec.forecast_num, rec.previous_num, rec.unit,
-                            rec.surprise_direction, rec.surprise_deviation, rec.market_impact_summary,
-                            rec.btc_price_before, rec.btc_price_after, rec.btc_change_pct,
-                            rec.eth_price_before, rec.eth_price_after, rec.eth_change_pct,
-                            rec.iv_crush_pct, rec.fvg_zone_usd, 1 if rec.is_dispatched else 0,
+                            rec.event_id,
+                            rec.title,
+                            rec.country,
+                            rec.category,
+                            rec.scheduled_timestamp_ms,
+                            rec.released_timestamp_ms,
+                            rec.actual,
+                            rec.forecast,
+                            rec.previous,
+                            rec.actual_num,
+                            rec.forecast_num,
+                            rec.previous_num,
+                            rec.unit,
+                            rec.surprise_direction,
+                            rec.surprise_deviation,
+                            rec.market_impact_summary,
+                            rec.btc_price_before,
+                            rec.btc_price_after,
+                            rec.btc_change_pct,
+                            rec.eth_price_before,
+                            rec.eth_price_after,
+                            rec.eth_change_pct,
+                            rec.iv_crush_pct,
+                            rec.fvg_zone_usd,
+                            1 if rec.is_dispatched else 0,
                         ),
                     )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error seeding macro releases: {e}")
 
     def get_latest_released_event(self) -> MacroReleaseRecord | None:
@@ -343,7 +372,7 @@ class MacroEventReporter:
                 row = cur.fetchone()
                 if row:
                     return self._row_to_record(row)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error fetching latest macro release: {e}")
         return None
 
@@ -364,7 +393,7 @@ class MacroEventReporter:
                 row = cur.fetchone()
                 if row:
                     return self._row_to_record(row)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error fetching upcoming macro release: {e}")
         return None
 
@@ -381,11 +410,13 @@ class MacroEventReporter:
                     (limit,),
                 )
                 return [self._row_to_record(r) for r in cur.fetchall()]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error listing macro releases: {e}")
             return []
 
-    def format_event_flash_report(self, rec: MacroReleaseRecord | dict[str, Any] | None = None) -> str:
+    def format_event_flash_report(
+        self, rec: MacroReleaseRecord | dict[str, Any] | None = None
+    ) -> str:
         """
         Compiles an institutional Macro Flash & Market Impact report for Telegram delivery.
         """
@@ -398,7 +429,9 @@ class MacroEventReporter:
             return "📊 **Macro Catalyst Sentinel:** No recent high-impact event data recorded."
 
         # Convert release timestamp to BD Time
-        rel_ts = record.released_timestamp_ms or record.scheduled_timestamp_ms or int(time.time() * 1000)
+        rel_ts = (
+            record.released_timestamp_ms or record.scheduled_timestamp_ms or int(time.time() * 1000)
+        )
         dt_bd = datetime.datetime.fromtimestamp(rel_ts / 1000.0, tz=BD_TZ)
         time_str = dt_bd.strftime("%d %b %Y, %I:%M %p BST")
 
@@ -417,24 +450,24 @@ class MacroEventReporter:
             f"🔴 **MACRO CATALYST FLASH & MARKET IMPACT REPORT: {record.title}**",
             f"📅 *Released:* `{time_str}` (Bangladesh Time)",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"📊 **Economic Release Breakdown:**",
+            "📊 **Economic Release Breakdown:**",
             f"  • **Actual:** `{record.actual}`",
             f"  • **Forecast:** `{record.forecast}` (Consensus)",
             f"  • **Previous:** `{record.previous}`",
             f"  • **Surprise Delta:** `{record.surprise_deviation:+0.2f}{record.unit}` ({surprise_badge})",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"📈 **Immediate Asset & Volatility Impact:**",
+            "📈 **Immediate Asset & Volatility Impact:**",
             f"  • **BTC/USDT Price Displacement:** `${record.btc_price_before:,.0f}` ➔ `${record.btc_price_after:,.0f}` (`{btc_sign}{record.btc_change_pct:.2f}%`)",
             f"  • **ETH/USDT Price Displacement:** `${record.eth_price_before:,.0f}` ➔ `${record.eth_price_after:,.0f}` (`{eth_sign}{record.eth_change_pct:.2f}%`)",
             f"  • **IV Crush (Implied Volatility):** `{record.iv_crush_pct:+.1f}%` Post-announcement IV crush",
             f"  • **Fair Value Gap (FVG) Liquidity Zone:** `{record.fvg_zone_usd}`",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"🧠 **Desk Macro Intelligence:**",
+            "🧠 **Desk Macro Intelligence:**",
             f"  _{record.market_impact_summary}_",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            f"🛡️ **Desk Directives & Kelly Allocation:**",
-            f"  1. Macro Execution Lockout: **DEACTIVATED** (normal routing restored).",
-            f"  2. Half-Kelly Capital Sizing: **Restored to standard envelope (Max 2.50%)**.",
+            "🛡️ **Desk Directives & Kelly Allocation:**",
+            "  1. Macro Execution Lockout: **DEACTIVATED** (normal routing restored).",
+            "  2. Half-Kelly Capital Sizing: **Restored to standard envelope (Max 2.50%)**.",
             f"  3. SMC Defense Level: Invalidation set below `{record.fvg_zone_usd.split('—')[0].strip() if '—' in record.fvg_zone_usd else 'recent swing low'}`.",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
             "⚖️ *Institutional Directive: Never trade release spikes blindly. Confirm 15m candle close and FVG mitigation.*",
@@ -445,8 +478,12 @@ class MacroEventReporter:
         if upcoming and upcoming.event_id != record.event_id:
             now_ms = int(time.time() * 1000)
             hours_away = max(0.0, (upcoming.scheduled_timestamp_ms - now_ms) / (3600.0 * 1000.0))
-            up_dt_bd = datetime.datetime.fromtimestamp(upcoming.scheduled_timestamp_ms / 1000.0, tz=BD_TZ)
-            lines.append(f"\n⏳ **Next Major Catalyst:** `{upcoming.title}` in ~`{hours_away:.1f} hours` ({up_dt_bd.strftime('%d %b %I:%M %p BST')})")
+            up_dt_bd = datetime.datetime.fromtimestamp(
+                upcoming.scheduled_timestamp_ms / 1000.0, tz=BD_TZ
+            )
+            lines.append(
+                f"\n⏳ **Next Major Catalyst:** `{upcoming.title}` in ~`{hours_away:.1f} hours` ({up_dt_bd.strftime('%d %b %I:%M %p BST')})"
+            )
 
         return "\n".join(lines)
 
@@ -525,7 +562,7 @@ class MacroEventReporter:
             fvg_zone_usd=fvg_zone_usd,
             is_dispatched=is_dispatched,
             event_name=event_name,
-            release_time_utc=release_time_utc or datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            release_time_utc=release_time_utc or datetime.datetime.now(datetime.UTC).isoformat(),
             impact_tier=impact_tier,
             currency=currency,
         )
@@ -545,18 +582,35 @@ class MacroEventReporter:
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """,
                     (
-                        rec.event_id, rec.title, rec.country, rec.category,
-                        rec.scheduled_timestamp_ms, rec.released_timestamp_ms,
-                        rec.actual, rec.forecast, rec.previous,
-                        rec.actual_num, rec.forecast_num, rec.previous_num, rec.unit,
-                        rec.surprise_direction, rec.surprise_deviation, rec.market_impact_summary,
-                        rec.btc_price_before, rec.btc_price_after, rec.btc_change_pct,
-                        rec.eth_price_before, rec.eth_price_after, rec.eth_change_pct,
-                        rec.iv_crush_pct, rec.fvg_zone_usd, 1 if rec.is_dispatched else 0,
+                        rec.event_id,
+                        rec.title,
+                        rec.country,
+                        rec.category,
+                        rec.scheduled_timestamp_ms,
+                        rec.released_timestamp_ms,
+                        rec.actual,
+                        rec.forecast,
+                        rec.previous,
+                        rec.actual_num,
+                        rec.forecast_num,
+                        rec.previous_num,
+                        rec.unit,
+                        rec.surprise_direction,
+                        rec.surprise_deviation,
+                        rec.market_impact_summary,
+                        rec.btc_price_before,
+                        rec.btc_price_after,
+                        rec.btc_change_pct,
+                        rec.eth_price_before,
+                        rec.eth_price_after,
+                        rec.eth_change_pct,
+                        rec.iv_crush_pct,
+                        rec.fvg_zone_usd,
+                        1 if rec.is_dispatched else 0,
                     ),
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error recording macro release: {e}")
 
         return rec
@@ -577,13 +631,15 @@ class MacroEventReporter:
                 for row in rows:
                     rec = self._row_to_record(row)
                     report = self.format_event_flash_report(rec)
-                    pending.append({
-                        "event_id": rec.event_id,
-                        "title": rec.title,
-                        "formatted_report": report,
-                        "record": rec,
-                    })
-        except Exception as e:
+                    pending.append(
+                        {
+                            "event_id": rec.event_id,
+                            "title": rec.title,
+                            "formatted_report": report,
+                            "record": rec,
+                        }
+                    )
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error checking pending macro releases: {e}")
         return pending
 
@@ -593,10 +649,10 @@ class MacroEventReporter:
             with db_manager.get_trading_conn() as conn:
                 conn.execute(
                     "UPDATE macro_event_releases SET is_dispatched = 1 WHERE event_id = ?",
-                    (event_id,)
+                    (event_id,),
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error marking macro release as notified: {e}")
 
     def get_recent_releases(self, limit: int = 5) -> list[dict[str, Any]]:

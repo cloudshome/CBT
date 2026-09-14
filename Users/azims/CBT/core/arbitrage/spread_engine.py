@@ -14,12 +14,10 @@ Core Principles:
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple
 
 from core.arbitrage.models import (
     ExecutableSpread,
     OrderBookSnapshot,
-    Venue,
 )
 
 logger = logging.getLogger("ai_quant_sentinel.arbitrage.spread_engine")
@@ -34,7 +32,7 @@ class SpreadEngine:
         book_a: OrderBookSnapshot,
         book_b: OrderBookSnapshot,
         target_notional_usd: float = 10000.0,
-    ) -> Optional[ExecutableSpread]:
+    ) -> ExecutableSpread | None:
         """
         Walks depth ladders on both venues for equivalent notional target.
         Evaluates both directions: (Buy A / Sell B) and (Buy B / Sell A).
@@ -101,7 +99,7 @@ class SpreadEngine:
             gross_spread_usd=gross_spread_usd,
         )
 
-    def _walk_asks(self, book: OrderBookSnapshot, target_qty: float) -> Tuple[float, float]:
+    def _walk_asks(self, book: OrderBookSnapshot, target_qty: float) -> tuple[float, float]:
         """Walks ask depth from lowest to highest price to calculate VWAP for target quantity."""
         accum_qty = 0.0
         accum_cost = 0.0
@@ -112,10 +110,14 @@ class SpreadEngine:
             accum_cost += take * level.price
             if accum_qty >= target_qty:
                 break
-        vwap = (accum_cost / accum_qty) if accum_qty > 0 else (book.asks[0].price if book.asks else 0.0)
+        vwap = (
+            (accum_cost / accum_qty)
+            if accum_qty > 0
+            else (book.asks[0].price if book.asks else 0.0)
+        )
         return vwap, accum_qty
 
-    def _walk_bids(self, book: OrderBookSnapshot, target_qty: float) -> Tuple[float, float]:
+    def _walk_bids(self, book: OrderBookSnapshot, target_qty: float) -> tuple[float, float]:
         """Walks bid depth from highest to lowest price to calculate VWAP for target quantity."""
         accum_qty = 0.0
         accum_cost = 0.0
@@ -126,7 +128,11 @@ class SpreadEngine:
             accum_cost += take * level.price
             if accum_qty >= target_qty:
                 break
-        vwap = (accum_cost / accum_qty) if accum_qty > 0 else (book.bids[0].price if book.bids else 0.0)
+        vwap = (
+            (accum_cost / accum_qty)
+            if accum_qty > 0
+            else (book.bids[0].price if book.bids else 0.0)
+        )
         return vwap, accum_qty
 
 

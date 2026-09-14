@@ -61,7 +61,7 @@ class GEXEngine:
         for c in filtered_contracts:
             # Multiplier: gamma * S^2 * 0.01 * OI
             # (assuming Market Makers are Long Calls when retail buys, or short customer inventory)
-            gex_val = c.gamma * (underlying ** 2) * 0.01 * c.open_interest
+            gex_val = c.gamma * (underlying**2) * 0.01 * c.open_interest
             if c.option_type == OptionType.CALL:
                 call_gex_map[c.strike] = call_gex_map.get(c.strike, 0.0) + gex_val
             else:

@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.arbitrage.models import (
     ArbitrageOpportunity,
@@ -21,7 +21,6 @@ from core.arbitrage.models import (
     FundingRateRecord,
     NormalizedMarketQuote,
     OrderBookSnapshot,
-    RejectionCode,
 )
 from core.database import db_manager
 
@@ -77,29 +76,25 @@ class ProvenanceEngine:
                     "CREATE INDEX IF NOT EXISTS idx_arb_prov_decision ON arbitrage_provenance_records(decision);"
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Could not initialize arbitrage_provenance_records schema: {e}")
 
     def create_envelope(
         self,
         opportunity: ArbitrageOpportunity,
-        quotes: List[NormalizedMarketQuote],
-        books: List[OrderBookSnapshot],
-        funding_records: List[FundingRateRecord],
-        config_dict: Optional[Dict[str, Any]] = None,
+        quotes: list[NormalizedMarketQuote],
+        books: list[OrderBookSnapshot],
+        funding_records: list[FundingRateRecord],
+        config_dict: dict[str, Any] | None = None,
     ) -> ArbitrageProvenanceEnvelope:
         """Constructs and cryptographically seals the complete decision envelope."""
         now_ms = opportunity.detected_at_ms
 
         # 1. Source timestamps
-        source_timestamps = {
-            f"{q.venue.value}_{q.symbol}": q.exchange_timestamp_ms for q in quotes
-        }
+        source_timestamps = {f"{q.venue.value}_{q.symbol}": q.exchange_timestamp_ms for q in quotes}
 
         # 2. Exchange sequence IDs
-        exchange_sequence_ids = {
-            f"{q.venue.value}_{q.symbol}": q.sequence_id for q in quotes
-        }
+        exchange_sequence_ids = {f"{q.venue.value}_{q.symbol}": q.sequence_id for q in quotes}
 
         # 3. Normalized quotes representation
         norm_quotes_repr = [
@@ -242,10 +237,10 @@ class ProvenanceEngine:
                     ),
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to persist provenance record: {e}")
 
-    def get_provenance_by_id(self, opportunity_id: str) -> Optional[Dict[str, Any]]:
+    def get_provenance_by_id(self, opportunity_id: str) -> dict[str, Any] | None:
         """Retrieves and decodes stored provenance record by opportunity ID."""
         try:
             with db_manager.get_trading_conn() as conn:
@@ -261,11 +256,11 @@ class ProvenanceEngine:
                 row = cursor.fetchone()
                 if row:
                     return json.loads(row["envelope_json"])
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Error querying provenance record {opportunity_id}: {e}")
         return None
 
-    def verify_envelope_integrity(self, envelope_dict: Dict[str, Any]) -> bool:
+    def verify_envelope_integrity(self, envelope_dict: dict[str, Any]) -> bool:
         """Reconstructs and verifies the canonical SHA-256 envelope digest."""
         stored_hash = envelope_dict.get("canonical_envelope_hash", "")
         raw_canonical = canonical_json_dumps(

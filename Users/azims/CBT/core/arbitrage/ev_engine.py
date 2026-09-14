@@ -27,7 +27,6 @@ Opportunities with Base Net EV <= 0 can NEVER be classified as QUALIFIED.
 from __future__ import annotations
 
 import logging
-from typing import Dict, Tuple
 
 from core.arbitrage.models import (
     EVCostBreakdown,
@@ -42,12 +41,12 @@ logger = logging.getLogger("ai_quant_sentinel.arbitrage.ev_engine")
 MODEL_VERSION = "EVM_v20.1_PROD"
 
 # Standard institutional VIP0/default fee schedules (in basis points)
-VENUE_TAKER_FEES_BPS: Dict[Venue, float] = {
-    Venue.BINANCE_SPOT: 10.0,   # 0.10%
-    Venue.BINANCE_PERP: 5.0,    # 0.05%
-    Venue.BYBIT_LINEAR: 5.5,    # 0.055%
-    Venue.OKX_PERP: 5.0,        # 0.05%
-    Venue.OKX_SPOT: 10.0,       # 0.10%
+VENUE_TAKER_FEES_BPS: dict[Venue, float] = {
+    Venue.BINANCE_SPOT: 10.0,  # 0.10%
+    Venue.BINANCE_PERP: 5.0,  # 0.05%
+    Venue.BYBIT_LINEAR: 5.5,  # 0.055%
+    Venue.OKX_PERP: 5.0,  # 0.05%
+    Venue.OKX_SPOT: 10.0,  # 0.10%
 }
 
 ANNUAL_BORROW_RATE_SPOT: float = 0.08  # 8% annual for spot margin borrowing
@@ -69,12 +68,11 @@ class DeterministicEVEngine:
     def evaluate_multi_scenario_ev(
         self,
         spread: ExecutableSpread,
-        funding_records: Dict[Venue, FundingRateRecord],
+        funding_records: dict[Venue, FundingRateRecord],
         basis_volatility_bps: float = 2.5,
         execution_latency_ms: float = 65.0,
     ) -> MultiScenarioEV:
         """Computes Base, Conservative, and Stress Net EV for the given executable spread."""
-        notional = spread.notional_usd
 
         # -------------------------------------------------------------
         # 1. Base Scenario
@@ -128,7 +126,7 @@ class DeterministicEVEngine:
     def _compute_single_scenario(
         self,
         spread: ExecutableSpread,
-        funding_records: Dict[Venue, FundingRateRecord],
+        funding_records: dict[Venue, FundingRateRecord],
         basis_volatility_bps: float,
         latency_ms: float,
         slippage_multiplier: float,
@@ -181,7 +179,9 @@ class DeterministicEVEngine:
         # F. Borrow Cost (if shorting on spot venue, margin interest applies)
         is_spot_short = spread.short_venue in (Venue.BINANCE_SPOT, Venue.OKX_SPOT)
         if is_spot_short:
-            borrow_cost_usd = notional * (ANNUAL_BORROW_RATE_SPOT * (self.expected_hold_hours / 8760.0))
+            borrow_cost_usd = notional * (
+                ANNUAL_BORROW_RATE_SPOT * (self.expected_hold_hours / 8760.0)
+            )
         else:
             borrow_cost_usd = 0.0
 

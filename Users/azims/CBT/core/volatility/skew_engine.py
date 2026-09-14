@@ -70,7 +70,10 @@ class SkewEngine:
         # 30-day tenor or first 3 tenors average
         weights = [1.0 / (idx + 1) for idx in range(len(tenor_points))]
         total_w = sum(weights)
-        avg_skew = sum(pt.twenty_five_delta_skew * w for pt, w in zip(tenor_points, weights)) / total_w
+        avg_skew = (
+            sum(pt.twenty_five_delta_skew * w for pt, w in zip(tenor_points, weights, strict=False))
+            / total_w
+        )
 
         # Dominant regime determination based on 30d/front tenors
         dominant_regime = self._classify_regime(avg_skew)

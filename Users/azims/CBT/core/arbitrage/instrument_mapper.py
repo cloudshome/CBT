@@ -13,7 +13,6 @@ high-confidence instrument identities on both legs.
 from __future__ import annotations
 
 import logging
-from typing import Dict, Tuple
 
 from core.arbitrage.models import ContractType, InstrumentIdentity, MarketType, Venue
 
@@ -24,8 +23,8 @@ class InstrumentMapper:
     """Canonical registry and resolver for multi-venue tradeable instruments."""
 
     def __init__(self) -> None:
-        self._registry: Dict[Tuple[Venue, str], InstrumentIdentity] = {}
-        self._canonical_to_venue: Dict[Tuple[str, Venue], InstrumentIdentity] = {}
+        self._registry: dict[tuple[Venue, str], InstrumentIdentity] = {}
+        self._canonical_to_venue: dict[tuple[str, Venue], InstrumentIdentity] = {}
         self._initialize_canonical_registry()
 
     def _register(self, identity: InstrumentIdentity) -> None:
@@ -328,7 +327,7 @@ class InstrumentMapper:
 
     def resolve_pair(
         self, canonical_symbol: str, venue_a: Venue, venue_b: Venue
-    ) -> Tuple[InstrumentIdentity, InstrumentIdentity] | None:
+    ) -> tuple[InstrumentIdentity, InstrumentIdentity] | None:
         """Resolves both legs of a cross-venue pair. Rejects if either leg is unverified."""
         clean = canonical_symbol.strip().upper()
         id_a = self._canonical_to_venue.get((clean, venue_a))
@@ -339,7 +338,9 @@ class InstrumentMapper:
             )
             return None
         if id_a.mapping_confidence < 1.0 or id_b.mapping_confidence < 1.0:
-            logger.warning(f"Rejected unverified mapping confidence for {clean} across {venue_a} and {venue_b}")
+            logger.warning(
+                f"Rejected unverified mapping confidence for {clean} across {venue_a} and {venue_b}"
+            )
             return None
         return id_a, id_b
 

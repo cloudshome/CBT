@@ -458,7 +458,9 @@ class CredentialVault:
             f"Credential securely stored in vault for {exch} [{env}] (API Key: {mask_secret(credential.api_key)})"
         )
 
-    def get_credential(self, exchange: str, environment: str = "PRODUCTION") -> ExchangeCredential | None:
+    def get_credential(
+        self, exchange: str, environment: str = "PRODUCTION"
+    ) -> ExchangeCredential | None:
         """
         Retrieves and decrypts an exchange credential. Returns None if not found or inactive.
         """

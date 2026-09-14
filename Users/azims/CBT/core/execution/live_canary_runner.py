@@ -10,20 +10,17 @@ Measures exchange ACK latency, fills, and audits into ReconciliationLedger.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import os
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from core.audit_bus import audit_bus
 from core.auth.credential_vault import credential_vault
 from core.execution.account_probe import account_probe
 from core.execution.idempotency import idempotency_store
-from core.execution.kill_switch import live_kill_switch
-from core.execution.live_gatekeeper import GatekeeperVerdict, live_gatekeeper
+from core.execution.live_gatekeeper import live_gatekeeper
 from core.execution.reconciliation_ledger import (
     ExecutionReconciliationRecord,
     reconciliation_ledger,
@@ -39,7 +36,7 @@ class CanaryRunRequest:
     notional_usd: float = 10.0
     side: str = "BUY"
     order_type: str = "LIMIT"
-    price: Optional[float] = None
+    price: float | None = None
     environment: str = "PRODUCTION"
     is_dry_run: bool = True  # Defaults to safe dry-run
 
@@ -52,19 +49,19 @@ class CanaryRunResult:
     symbol: str
     notional_usd: float
     client_order_id: str
-    exchange_order_id: Optional[str]
+    exchange_order_id: str | None
     executed_qty: float
     executed_price: float
     slippage_bps: float
     roundtrip_latency_ms: float
-    gatekeeper_verdict: Dict[str, Any]
-    reconciliation_id: Optional[str]
-    audit_event_id: Optional[str]
+    gatekeeper_verdict: dict[str, Any]
+    reconciliation_id: str | None
+    audit_event_id: str | None
     status: str
     message: str
     timestamp_ms: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -95,7 +92,10 @@ class LiveCanaryRunner:
         client_order_id = f"CANARY_{exchange_upper[:3]}_{now_ms}_{uuid.uuid4().hex[:6].upper()}"
 
         # 1. Notional Bounds Check
-        if req.notional_usd < self.min_canary_notional_usd or req.notional_usd > self.max_canary_notional_usd:
+        if (
+            req.notional_usd < self.min_canary_notional_usd
+            or req.notional_usd > self.max_canary_notional_usd
+        ):
             return CanaryRunResult(
                 success=False,
                 is_dry_run=req.is_dry_run,
@@ -143,7 +143,7 @@ class LiveCanaryRunner:
                         "gatekeeper_checks": verdict.checks,
                     },
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"Audit bus logging error: {e}")
 
             msg = (
@@ -323,7 +323,7 @@ class LiveCanaryRunner:
                 timestamp_ms=now_ms,
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             latency_ms = (time.perf_counter() - t_start) * 1000.0
             logger.error(f"Live canary execution failed: {e}")
             return CanaryRunResult(
@@ -342,7 +342,7 @@ class LiveCanaryRunner:
                 reconciliation_id=None,
                 audit_event_id=None,
                 status="EXECUTION_ERROR",
-                message=f"Live canary execution error: {str(e)}",
+                message=f"Live canary execution error: {e!s}",
                 timestamp_ms=now_ms,
             )
 

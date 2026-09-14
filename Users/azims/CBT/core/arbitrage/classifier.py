@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Dict, Optional, Tuple
+from typing import Any
 
 from core.arbitrage.models import (
     ArbitrageExecutionPermission,
@@ -53,7 +53,7 @@ class OpportunityClassifier:
         self.max_quote_age_ms = max_quote_age_ms
 
         # State tracking: key = (canonical_symbol, long_venue, short_venue)
-        self._active_lifecycles: Dict[Tuple[str, Venue, Venue], Dict[str, Any]] = {}
+        self._active_lifecycles: dict[tuple[str, Venue, Venue], dict[str, Any]] = {}
 
     def classify_opportunity(
         self,
@@ -61,9 +61,9 @@ class OpportunityClassifier:
         opportunity_type: OpportunityType,
         long_venue: Venue,
         short_venue: Venue,
-        basis_metrics: Optional[BasisMetrics],
-        spread: Optional[ExecutableSpread],
-        multi_ev: Optional[MultiScenarioEV],
+        basis_metrics: BasisMetrics | None,
+        spread: ExecutableSpread | None,
+        multi_ev: MultiScenarioEV | None,
         capacity_tiers: list[CapacityTier],
         max_viable_notional: float,
         data_freshness_ms: float,
@@ -298,9 +298,9 @@ class OpportunityClassifier:
         classification: OpportunityClassification,
         rejection_code: RejectionCode,
         rejection_reason: str,
-        basis_metrics: Optional[BasisMetrics],
-        spread: Optional[ExecutableSpread],
-        multi_ev: Optional[MultiScenarioEV],
+        basis_metrics: BasisMetrics | None,
+        spread: ExecutableSpread | None,
+        multi_ev: MultiScenarioEV | None,
         capacity_tiers: list[CapacityTier],
         max_viable_notional: float,
         obs_count: int,
@@ -334,7 +334,9 @@ class OpportunityClassifier:
         """Prunes stale tracked lifecycles that haven't been observed recently."""
         now_ms = int(time.time() * 1000)
         cutoff_ms = now_ms - int(max_idle_sec * 1000)
-        expired_keys = [k for k, v in self._active_lifecycles.items() if v["last_seen_ms"] < cutoff_ms]
+        expired_keys = [
+            k for k, v in self._active_lifecycles.items() if v["last_seen_ms"] < cutoff_ms
+        ]
         for k in expired_keys:
             self._active_lifecycles.pop(k, None)
 

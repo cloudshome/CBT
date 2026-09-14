@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 import aiohttp
 
@@ -44,23 +44,24 @@ class ArbitrageMarketFeed:
 
     def __init__(self, simulation_mode: bool = False) -> None:
         self.simulation_mode = simulation_mode
-        self._sequence_counter: Dict[Venue, int] = {v: 1 for v in Venue}
+        self._sequence_counter: dict[Venue, int] = {v: 1 for v in Venue}
         # In-memory caches for rapid retrieval
-        self._quotes_cache: Dict[tuple[Venue, str], NormalizedMarketQuote] = {}
-        self._books_cache: Dict[tuple[Venue, str], OrderBookSnapshot] = {}
-        self._funding_cache: Dict[tuple[Venue, str], FundingRateRecord] = {}
+        self._quotes_cache: dict[tuple[Venue, str], NormalizedMarketQuote] = {}
+        self._books_cache: dict[tuple[Venue, str], OrderBookSnapshot] = {}
+        self._funding_cache: dict[tuple[Venue, str], FundingRateRecord] = {}
 
     def _next_sequence(self, venue: Venue) -> int:
         seq = self._sequence_counter[venue]
         self._sequence_counter[venue] = seq + 1
         return seq
 
-    async def fetch_binance_spot_quote(self, canonical_symbol: str = "BTCUSDT") -> NormalizedMarketQuote | None:
+    async def fetch_binance_spot_quote(
+        self, canonical_symbol: str = "BTCUSDT"
+    ) -> NormalizedMarketQuote | None:
         identity = instrument_mapper.get_identity(Venue.BINANCE_SPOT, canonical_symbol)
         if not identity:
             return None
 
-        t_start = time.time()
         url = f"https://api.binance.com/api/v3/ticker/bookTicker?symbol={identity.venue_symbol}"
         try:
             session = await HttpSessionManager.get_session()
@@ -92,14 +93,18 @@ class ArbitrageMarketFeed:
                     )
                     self._quotes_cache[(Venue.BINANCE_SPOT, canonical_symbol)] = quote
                     return quote
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Live Binance Spot quote fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
-            return self._generate_simulated_quote(Venue.BINANCE_SPOT, canonical_symbol, MarketType.SPOT, base_price=96500.0)
+            return self._generate_simulated_quote(
+                Venue.BINANCE_SPOT, canonical_symbol, MarketType.SPOT, base_price=96500.0
+            )
         return None
 
-    async def fetch_binance_perp_quote(self, canonical_symbol: str = "BTCUSDT") -> NormalizedMarketQuote | None:
+    async def fetch_binance_perp_quote(
+        self, canonical_symbol: str = "BTCUSDT"
+    ) -> NormalizedMarketQuote | None:
         identity = instrument_mapper.get_identity(Venue.BINANCE_PERP, canonical_symbol)
         if not identity:
             return None
@@ -135,14 +140,18 @@ class ArbitrageMarketFeed:
                     )
                     self._quotes_cache[(Venue.BINANCE_PERP, canonical_symbol)] = quote
                     return quote
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Live Binance Perp quote fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
-            return self._generate_simulated_quote(Venue.BINANCE_PERP, canonical_symbol, MarketType.PERPETUAL, base_price=96525.0)
+            return self._generate_simulated_quote(
+                Venue.BINANCE_PERP, canonical_symbol, MarketType.PERPETUAL, base_price=96525.0
+            )
         return None
 
-    async def fetch_bybit_linear_quote(self, canonical_symbol: str = "BTCUSDT") -> NormalizedMarketQuote | None:
+    async def fetch_bybit_linear_quote(
+        self, canonical_symbol: str = "BTCUSDT"
+    ) -> NormalizedMarketQuote | None:
         identity = instrument_mapper.get_identity(Venue.BYBIT_LINEAR, canonical_symbol)
         if not identity:
             return None
@@ -181,14 +190,18 @@ class ArbitrageMarketFeed:
                         )
                         self._quotes_cache[(Venue.BYBIT_LINEAR, canonical_symbol)] = quote
                         return quote
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Live Bybit quote fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
-            return self._generate_simulated_quote(Venue.BYBIT_LINEAR, canonical_symbol, MarketType.PERPETUAL, base_price=96540.0)
+            return self._generate_simulated_quote(
+                Venue.BYBIT_LINEAR, canonical_symbol, MarketType.PERPETUAL, base_price=96540.0
+            )
         return None
 
-    async def fetch_okx_perp_quote(self, canonical_symbol: str = "BTCUSDT") -> NormalizedMarketQuote | None:
+    async def fetch_okx_perp_quote(
+        self, canonical_symbol: str = "BTCUSDT"
+    ) -> NormalizedMarketQuote | None:
         identity = instrument_mapper.get_identity(Venue.OKX_PERP, canonical_symbol)
         if not identity:
             return None
@@ -226,14 +239,18 @@ class ArbitrageMarketFeed:
                         )
                         self._quotes_cache[(Venue.OKX_PERP, canonical_symbol)] = quote
                         return quote
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Live OKX quote fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
-            return self._generate_simulated_quote(Venue.OKX_PERP, canonical_symbol, MarketType.PERPETUAL, base_price=96515.0)
+            return self._generate_simulated_quote(
+                Venue.OKX_PERP, canonical_symbol, MarketType.PERPETUAL, base_price=96515.0
+            )
         return None
 
-    async def fetch_binance_funding(self, canonical_symbol: str = "BTCUSDT") -> FundingRateRecord | None:
+    async def fetch_binance_funding(
+        self, canonical_symbol: str = "BTCUSDT"
+    ) -> FundingRateRecord | None:
         identity = instrument_mapper.get_identity(Venue.BINANCE_PERP, canonical_symbol)
         if not identity:
             return None
@@ -257,14 +274,16 @@ class ArbitrageMarketFeed:
                     )
                     self._funding_cache[(Venue.BINANCE_PERP, canonical_symbol)] = record
                     return record
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Binance funding fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
             return self._generate_simulated_funding(Venue.BINANCE_PERP, canonical_symbol, 0.00015)
         return None
 
-    async def fetch_bybit_funding(self, canonical_symbol: str = "BTCUSDT") -> FundingRateRecord | None:
+    async def fetch_bybit_funding(
+        self, canonical_symbol: str = "BTCUSDT"
+    ) -> FundingRateRecord | None:
         identity = instrument_mapper.get_identity(Venue.BYBIT_LINEAR, canonical_symbol)
         if not identity:
             return None
@@ -283,21 +302,25 @@ class ArbitrageMarketFeed:
                             symbol=identity.venue_symbol,
                             canonical_symbol=canonical_symbol,
                             funding_rate=float(item.get("fundingRate", 0.0001)),
-                            next_funding_time_ms=int(item.get("nextFundingTime", t_recv_ms + 14400000)),
+                            next_funding_time_ms=int(
+                                item.get("nextFundingTime", t_recv_ms + 14400000)
+                            ),
                             interval_hours=8,
                             exchange_timestamp_ms=t_recv_ms - 20,
                             local_receipt_ms=t_recv_ms,
                         )
                         self._funding_cache[(Venue.BYBIT_LINEAR, canonical_symbol)] = record
                         return record
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Bybit funding fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
             return self._generate_simulated_funding(Venue.BYBIT_LINEAR, canonical_symbol, 0.00030)
         return None
 
-    async def fetch_okx_funding(self, canonical_symbol: str = "BTCUSDT") -> FundingRateRecord | None:
+    async def fetch_okx_funding(
+        self, canonical_symbol: str = "BTCUSDT"
+    ) -> FundingRateRecord | None:
         identity = instrument_mapper.get_identity(Venue.OKX_PERP, canonical_symbol)
         if not identity:
             return None
@@ -323,7 +346,7 @@ class ArbitrageMarketFeed:
                         )
                         self._funding_cache[(Venue.OKX_PERP, canonical_symbol)] = record
                         return record
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"OKX funding fetch failed for {canonical_symbol}: {e}")
 
         if self.simulation_mode:
@@ -346,9 +369,22 @@ class ArbitrageMarketFeed:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.0)) as resp:
                     if resp.status == 200:
                         d = await resp.json()
-                        bids = [OrderBookLevel(price=float(b[0]), size=float(b[1])) for b in d.get("bids", [])]
-                        asks = [OrderBookLevel(price=float(a[0]), size=float(a[1])) for a in d.get("asks", [])]
-                        snap = OrderBookSnapshot(venue, identity.venue_symbol, bids, asks, now_ms, self._next_sequence(venue))
+                        bids = [
+                            OrderBookLevel(price=float(b[0]), size=float(b[1]))
+                            for b in d.get("bids", [])
+                        ]
+                        asks = [
+                            OrderBookLevel(price=float(a[0]), size=float(a[1]))
+                            for a in d.get("asks", [])
+                        ]
+                        snap = OrderBookSnapshot(
+                            venue,
+                            identity.venue_symbol,
+                            bids,
+                            asks,
+                            now_ms,
+                            self._next_sequence(venue),
+                        )
                         self._books_cache[(venue, canonical_symbol)] = snap
                         return snap
             elif venue == Venue.BINANCE_PERP:
@@ -356,9 +392,22 @@ class ArbitrageMarketFeed:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=2.0)) as resp:
                     if resp.status == 200:
                         d = await resp.json()
-                        bids = [OrderBookLevel(price=float(b[0]), size=float(b[1])) for b in d.get("bids", [])]
-                        asks = [OrderBookLevel(price=float(a[0]), size=float(a[1])) for a in d.get("asks", [])]
-                        snap = OrderBookSnapshot(venue, identity.venue_symbol, bids, asks, now_ms, self._next_sequence(venue))
+                        bids = [
+                            OrderBookLevel(price=float(b[0]), size=float(b[1]))
+                            for b in d.get("bids", [])
+                        ]
+                        asks = [
+                            OrderBookLevel(price=float(a[0]), size=float(a[1]))
+                            for a in d.get("asks", [])
+                        ]
+                        snap = OrderBookSnapshot(
+                            venue,
+                            identity.venue_symbol,
+                            bids,
+                            asks,
+                            now_ms,
+                            self._next_sequence(venue),
+                        )
                         self._books_cache[(venue, canonical_symbol)] = snap
                         return snap
             elif venue == Venue.BYBIT_LINEAR:
@@ -367,12 +416,25 @@ class ArbitrageMarketFeed:
                     if resp.status == 200:
                         d = await resp.json()
                         res = d.get("result", {})
-                        bids = [OrderBookLevel(price=float(b[0]), size=float(b[1])) for b in res.get("b", [])]
-                        asks = [OrderBookLevel(price=float(a[0]), size=float(a[1])) for a in res.get("a", [])]
-                        snap = OrderBookSnapshot(venue, identity.venue_symbol, bids, asks, now_ms, self._next_sequence(venue))
+                        bids = [
+                            OrderBookLevel(price=float(b[0]), size=float(b[1]))
+                            for b in res.get("b", [])
+                        ]
+                        asks = [
+                            OrderBookLevel(price=float(a[0]), size=float(a[1]))
+                            for a in res.get("a", [])
+                        ]
+                        snap = OrderBookSnapshot(
+                            venue,
+                            identity.venue_symbol,
+                            bids,
+                            asks,
+                            now_ms,
+                            self._next_sequence(venue),
+                        )
                         self._books_cache[(venue, canonical_symbol)] = snap
                         return snap
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Live book fetch failed for {venue} {canonical_symbol}: {e}")
 
         # Fallback to realistic synthetic depth book
@@ -451,7 +513,7 @@ class ArbitrageMarketFeed:
         self._books_cache[(venue, canonical_symbol)] = snap
         return snap
 
-    async def poll_all_venues(self, canonical_symbol: str = "BTCUSDT") -> Dict[str, Any]:
+    async def poll_all_venues(self, canonical_symbol: str = "BTCUSDT") -> dict[str, Any]:
         """Polls quotes, order books, and funding rates across all venues in parallel."""
         q_tasks = [
             self.fetch_binance_spot_quote(canonical_symbol),

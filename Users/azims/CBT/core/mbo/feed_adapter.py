@@ -8,24 +8,20 @@ granular discrete order queues, tracking order cancellations and flow toxicity.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import math
 import random
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.mbo.iceberg_detector import IcebergDetector
 from core.mbo.models import (
     MBODepthSnapshot,
-    MBOOrder,
-    MBOPriceLevel,
     MBOSide,
     ToxicFlowMetric,
     ToxicityRegime,
 )
 from core.mbo.order_book_l3 import L3OrderBook
-from core.mbo.queue_priority_engine import queue_priority_engine
 
 logger = logging.getLogger("sky.mbo.feed_adapter")
 
@@ -36,13 +32,15 @@ class MBOFeedAdapter:
     def __init__(self, rng_seed: int = 101) -> None:
         self._rng = random.Random(rng_seed)
         # (symbol, venue) -> L3OrderBook
-        self._books: Dict[Tuple[str, str], L3OrderBook] = {}
+        self._books: dict[tuple[str, str], L3OrderBook] = {}
         self.iceberg_detector = IcebergDetector()
-        self._trade_history: Dict[str, List[Dict[str, Any]]] = {}
-        self._cancel_events: Dict[str, int] = {}
-        self._trade_events: Dict[str, int] = {}
+        self._trade_history: dict[str, list[dict[str, Any]]] = {}
+        self._cancel_events: dict[str, int] = {}
+        self._trade_events: dict[str, int] = {}
 
-    def get_or_create_book(self, symbol: str = "BTCUSDT", venue: str = "BINANCE_SPOT") -> L3OrderBook:
+    def get_or_create_book(
+        self, symbol: str = "BTCUSDT", venue: str = "BINANCE_SPOT"
+    ) -> L3OrderBook:
         key = (symbol, venue)
         if key not in self._books:
             self._books[key] = L3OrderBook(symbol=symbol, venue=venue)
@@ -89,9 +87,13 @@ class MBOFeedAdapter:
 
         # Register initial depths with iceberg detector
         for p, level in book._bids.items():
-            self.iceberg_detector.register_initial_depth(book.symbol, book.venue, MBOSide.BID, p, level.total_size)
+            self.iceberg_detector.register_initial_depth(
+                book.symbol, book.venue, MBOSide.BID, p, level.total_size
+            )
         for p, level in book._asks.items():
-            self.iceberg_detector.register_initial_depth(book.symbol, book.venue, MBOSide.ASK, p, level.total_size)
+            self.iceberg_detector.register_initial_depth(
+                book.symbol, book.venue, MBOSide.ASK, p, level.total_size
+            )
 
     def simulate_tick_activity(self, symbol: str = "BTCUSDT", venue: str = "BINANCE_SPOT") -> None:
         """Simulates incoming high-frequency arrivals, cancellations, and market order fills."""
@@ -136,12 +138,14 @@ class MBOFeedAdapter:
             price = best_bid if side == MBOSide.BID else best_ask
             size = round(max(0.05, self._rng.lognormvariate(-1.0, 0.5)), 4)
             order_id = f"REPL_{symbol[:3]}_{int(now_ns % 1000000)}_{self._rng.randint(100, 999)}"
-            book.add_order(order_id=order_id, side=side, price=price, size=size, timestamp_ns=now_ns)
+            book.add_order(
+                order_id=order_id, side=side, price=price, size=size, timestamp_ns=now_ns
+            )
 
     def calculate_toxic_flow(self, symbol: str, venue: str) -> ToxicFlowMetric:
         """Calculates VPIN, cancel-to-trade ratio, and depletion velocity."""
         now_ms = int(time.time() * 1000)
-        book = self.get_or_create_book(symbol, venue)
+        _book = self.get_or_create_book(symbol, venue)
 
         cancels = self._cancel_events.get(symbol, 12)
         trades = max(1, self._trade_events.get(symbol, 8))
@@ -151,7 +155,9 @@ class MBOFeedAdapter:
         depletion_velocity = round(cancels * 1500.0 + trades * 4500.0, 2)
 
         # VPIN proxy
-        vpin = min(0.92, max(0.08, 0.25 + (0.15 * math.sin(now_ms / 10000.0)) + (0.05 * cancel_ratio)))
+        vpin = min(
+            0.92, max(0.08, 0.25 + (0.15 * math.sin(now_ms / 10000.0)) + (0.05 * cancel_ratio))
+        )
 
         if vpin >= 0.70 or cancel_ratio > 4.0:
             regime = ToxicityRegime.TOXIC
@@ -175,7 +181,9 @@ class MBOFeedAdapter:
             adverse_selection_bias_bps=round(vpin * 4.5, 2),
         )
 
-    def get_snapshot(self, symbol: str = "BTCUSDT", venue: str = "BINANCE_SPOT") -> MBODepthSnapshot:
+    def get_snapshot(
+        self, symbol: str = "BTCUSDT", venue: str = "BINANCE_SPOT"
+    ) -> MBODepthSnapshot:
         """Generates comprehensive high-resolution L3 snapshot."""
         book = self.get_or_create_book(symbol, venue)
         self.simulate_tick_activity(symbol, venue)

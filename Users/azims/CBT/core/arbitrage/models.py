@@ -18,6 +18,7 @@ from typing import Any
 
 class ArbitrageExecutionPermission(str, Enum):
     """Structural research-only guard. Live execution is impossible through this system."""
+
     RESEARCH_ONLY = "RESEARCH_ONLY"
 
 
@@ -85,30 +86,31 @@ class RejectionCode(str, Enum):
 
 
 class BasisRegime(str, Enum):
-    CONTANGO_EXTREME = "CONTANGO_EXTREME"          # Z >= 2.5
-    NORMAL_CONTANGO = "NORMAL_CONTANGO"            # 0.5 <= Z < 2.5
-    NEUTRAL_BASIS = "NEUTRAL_BASIS"                # -0.5 <= Z < 0.5
+    CONTANGO_EXTREME = "CONTANGO_EXTREME"  # Z >= 2.5
+    NORMAL_CONTANGO = "NORMAL_CONTANGO"  # 0.5 <= Z < 2.5
+    NEUTRAL_BASIS = "NEUTRAL_BASIS"  # -0.5 <= Z < 0.5
     NORMAL_BACKWARDATION = "NORMAL_BACKWARDATION"  # -2.5 < Z <= -0.5
-    BACKWARDATION_EXTREME = "BACKWARDATION_EXTREME" # Z <= -2.5
+    BACKWARDATION_EXTREME = "BACKWARDATION_EXTREME"  # Z <= -2.5
 
 
 @dataclass(frozen=True)
 class InstrumentIdentity:
     """Verified canonical instrument mapping across venues."""
-    canonical_symbol: str          # e.g., "BTCUSDT"
-    venue_symbol: str              # e.g., "BTC-USDT-SWAP", "BTCUSDT"
+
+    canonical_symbol: str  # e.g., "BTCUSDT"
+    venue_symbol: str  # e.g., "BTC-USDT-SWAP", "BTCUSDT"
     venue: Venue
-    canonical_asset: str           # e.g., "BTC"
-    quote_asset: str               # e.g., "USDT"
-    instrument_family: str         # e.g., "BTC_USDT"
+    canonical_asset: str  # e.g., "BTC"
+    quote_asset: str  # e.g., "USDT"
+    instrument_family: str  # e.g., "BTC_USDT"
     market_type: MarketType
     contract_type: ContractType
-    contract_multiplier: float     # e.g., 1.0 or 0.01 for OKX
-    contract_size: float           # e.g., 1.0 or 100
-    settlement_asset: str          # e.g., "USDT"
-    tick_size: float               # e.g., 0.10
-    lot_size: float                # e.g., 0.001
-    min_notional: float            # e.g., 5.0 USD
+    contract_multiplier: float  # e.g., 1.0 or 0.01 for OKX
+    contract_size: float  # e.g., 1.0 or 100
+    settlement_asset: str  # e.g., "USDT"
+    tick_size: float  # e.g., 0.10
+    lot_size: float  # e.g., 0.001
+    min_notional: float  # e.g., 5.0 USD
     mapping_confidence: float = 1.0
 
 
@@ -177,13 +179,13 @@ class FundingEstimate:
 
 @dataclass
 class FundingMatrixEntry:
-    pair_id: str                      # e.g. "BINANCE_PERP::BYBIT_LINEAR::BTCUSDT"
+    pair_id: str  # e.g. "BINANCE_PERP::BYBIT_LINEAR::BTCUSDT"
     canonical_symbol: str
     venue_a: Venue
     venue_b: Venue
     rate_a: float
     rate_b: float
-    raw_divergence: float             # rate_a - rate_b
+    raw_divergence: float  # rate_a - rate_b
     raw_divergence_bps: float
     annualized_divergence_pct: float
     time_to_funding_sec: float
@@ -201,13 +203,13 @@ class BasisMetrics:
     perp_venue: Venue
     spot_price: float
     perp_price: float
-    raw_basis_bps: float              # (perp - spot) / spot * 10000
+    raw_basis_bps: float  # (perp - spot) / spot * 10000
     rolling_mean_bps: float
     rolling_std_bps: float
     zscore: float
     regime: BasisRegime
     duration_outside_threshold_ms: float
-    candidate_trigger: bool           # True if |Z| >= 3.0
+    candidate_trigger: bool  # True if |Z| >= 3.0
 
 
 @dataclass
@@ -220,8 +222,8 @@ class ExecutableSpread:
     vwap_long_ask: float
     vwap_short_bid: float
     mid_price_reference: float
-    theoretical_spread_bps: float     # Mid-to-mid
-    executable_spread_bps: float      # Crossing the book: (bid_short - ask_long) / mid * 10000
+    theoretical_spread_bps: float  # Mid-to-mid
+    executable_spread_bps: float  # Crossing the book: (bid_short - ask_long) / mid * 10000
     gross_spread_usd: float
 
 
@@ -236,7 +238,7 @@ class EVCostBreakdown:
     orderbook_slippage_short_usd: float
     hedge_cost_usd: float
     latency_cost_usd: float
-    funding_cashflow_usd: float       # Positive if net received, negative if paid
+    funding_cashflow_usd: float  # Positive if net received, negative if paid
     borrow_cost_usd: float
     safety_buffer_usd: float
     net_ev_usd: float
@@ -270,9 +272,9 @@ class CapacityTier:
 
 @dataclass
 class FillSimulation:
-    leg: str                          # "LEG_A" or "LEG_B"
+    leg: str  # "LEG_A" or "LEG_B"
     venue: Venue
-    side: str                         # "BUY" or "SELL"
+    side: str  # "BUY" or "SELL"
     requested_qty: float
     filled_qty: float
     fill_ratio: float
@@ -301,7 +303,7 @@ class ShadowOpportunity:
     unhedged_residual_qty: float = 0.0
     funding_realized_usd: float = 0.0
     model_attribution_error_usd: float = 0.0
-    status: str = "OPEN"               # "OPEN", "RESOLVED", "EXPIRED"
+    status: str = "OPEN"  # "OPEN", "RESOLVED", "EXPIRED"
 
 
 @dataclass

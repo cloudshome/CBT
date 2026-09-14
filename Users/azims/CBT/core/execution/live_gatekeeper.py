@@ -12,8 +12,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from core.audit_bus import audit_bus
 from core.auth.credential_vault import credential_vault
@@ -34,9 +33,9 @@ class GatekeeperVerdict:
     exchange: str
     requested_notional_usd: float
     max_allowed_notional_usd: float
-    checks: Dict[str, bool]
-    rejection_reasons: List[str]
-    audit_event_id: Optional[str] = None
+    checks: dict[str, bool]
+    rejection_reasons: list[str]
+    audit_event_id: str | None = None
 
 
 class LiveExecutionGatekeeper:
@@ -82,8 +81,8 @@ class LiveExecutionGatekeeper:
         """
         now_ms = int(time.time() * 1000)
         exchange_upper = exchange.upper().strip()
-        reasons: List[str] = []
-        checks: Dict[str, bool] = {}
+        reasons: list[str] = []
+        checks: dict[str, bool] = {}
 
         # 1. Vault unlocked check
         vault_unlocked = credential_vault.is_unlocked()
@@ -99,12 +98,18 @@ class LiveExecutionGatekeeper:
 
         # 3. Exchange probe & balance check
         exch_status = await account_probe.probe_exchange(exchange_upper, environment)
-        clock_drift_passed = exch_status.is_connected and exch_status.latency_ms <= self.max_clock_drift_ms
+        clock_drift_passed = (
+            exch_status.is_connected and exch_status.latency_ms <= self.max_clock_drift_ms
+        )
         checks["connectivity_and_clock_drift"] = clock_drift_passed
         if not exch_status.is_connected:
-            reasons.append(f"Exchange {exchange_upper} connection failed: {exch_status.error_message}")
+            reasons.append(
+                f"Exchange {exchange_upper} connection failed: {exch_status.error_message}"
+            )
         elif exch_status.latency_ms > self.max_clock_drift_ms:
-            reasons.append(f"Clock drift/latency {exch_status.latency_ms:.1f}ms exceeds {self.max_clock_drift_ms}ms SLA.")
+            reasons.append(
+                f"Clock drift/latency {exch_status.latency_ms:.1f}ms exceeds {self.max_clock_drift_ms}ms SLA."
+            )
 
         # 4. Daily drawdown limit check
         total_equity = exch_status.total_equity_usd if exch_status.total_equity_usd > 0 else 1000.0
@@ -119,7 +124,9 @@ class LiveExecutionGatekeeper:
 
         # 5. Single trade constitutional 1.5% equity cap check
         max_allowed_notional = total_equity * self.single_trade_equity_cap_pct
-        sizing_passed = order_notional_usd <= max_allowed_notional * 1.05  # 5% buffer for market moves
+        sizing_passed = (
+            order_notional_usd <= max_allowed_notional * 1.05
+        )  # 5% buffer for market moves
         checks["single_trade_cap_conformed"] = sizing_passed
         if not sizing_passed:
             reasons.append(
@@ -128,10 +135,16 @@ class LiveExecutionGatekeeper:
             )
 
         # 6. Live trading authorization switch
-        live_env_enabled = os.getenv("LIVE_TRADING_ENABLED", "false").lower() in ("true", "1", "yes")
+        live_env_enabled = os.getenv("LIVE_TRADING_ENABLED", "false").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
         checks["live_trading_authorized"] = live_env_enabled
         if not live_env_enabled:
-            reasons.append("LIVE_TRADING_ENABLED environment flag is not set to true. Execution blocked.")
+            reasons.append(
+                "LIVE_TRADING_ENABLED environment flag is not set to true. Execution blocked."
+            )
 
         all_passed = all(checks.values())
 
@@ -149,7 +162,7 @@ class LiveExecutionGatekeeper:
                     "reasons": reasons,
                 },
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Audit bus logging error: {e}")
 
         return GatekeeperVerdict(

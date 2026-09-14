@@ -11,7 +11,6 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass
-from typing import Dict, Tuple
 
 from core.arbitrage.models import (
     FundingRateRecord,
@@ -44,8 +43,8 @@ class DataQualityFirewall:
         self.max_clock_drift_ms = max_clock_drift_ms
         self.max_book_age_ms = max_book_age_ms
         # State tracking for sequence continuity and duplicate defense
-        self._last_sequence: Dict[Tuple[Venue, str], int] = {}
-        self._last_msg_hash: Dict[Tuple[Venue, str], str] = {}
+        self._last_sequence: dict[tuple[Venue, str], int] = {}
+        self._last_msg_hash: dict[tuple[Venue, str], str] = {}
 
     def validate_quote(self, quote: NormalizedMarketQuote) -> FirewallVerdict:
         now_ms = int(time.time() * 1000)

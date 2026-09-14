@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Dict, List, Tuple
 
 from core.arbitrage.models import (
     FundingEstimate,
@@ -34,15 +33,13 @@ class FundingMatrixEngine:
     def __init__(self, min_divergence_bps: float = 2.0) -> None:
         self.min_divergence_bps = min_divergence_bps
 
-    def compute_funding_matrix(
-        self, records: List[FundingRateRecord]
-    ) -> List[FundingMatrixEntry]:
+    def compute_funding_matrix(self, records: list[FundingRateRecord]) -> list[FundingMatrixEntry]:
         """Evaluates all pairwise perpetual funding combinations for a given asset."""
         now_ms = int(time.time() * 1000)
-        matrix: List[FundingMatrixEntry] = []
+        matrix: list[FundingMatrixEntry] = []
 
         # Deduplicate records by venue + symbol
-        venue_records: Dict[Venue, FundingRateRecord] = {r.venue: r for r in records}
+        venue_records: dict[Venue, FundingRateRecord] = {r.venue: r for r in records}
         venues = list(venue_records.keys())
 
         for i in range(len(venues)):
@@ -112,9 +109,7 @@ class FundingMatrixEngine:
         matrix.sort(key=lambda m: m.estimated_capture_bps, reverse=True)
         return matrix
 
-    def estimate_funding_uncertainty(
-        self, record: FundingRateRecord
-    ) -> FundingEstimate:
+    def estimate_funding_uncertainty(self, record: FundingRateRecord) -> FundingEstimate:
         """Models funding rate volatility and worst-case cashflow expectations."""
         now_ms = int(time.time() * 1000)
         time_to_pay_sec = max(0.0, (record.next_funding_time_ms - now_ms) / 1000.0)
@@ -145,8 +140,8 @@ class FundingMatrixEngine:
         long_venue: Venue,
         short_venue: Venue,
         notional_usd: float,
-        funding_records: Dict[Venue, FundingRateRecord],
-    ) -> Tuple[float, float, float]:
+        funding_records: dict[Venue, FundingRateRecord],
+    ) -> tuple[float, float, float]:
         """
         Calculates exact signed funding cashflows for a designated two-leg hedge:
         Returns: (long_cashflow_usd, short_cashflow_usd, net_cashflow_usd)

@@ -15,7 +15,6 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -35,8 +34,8 @@ class BasisEngine:
         self.window_size = window_size
         self.zscore_candidate_threshold = zscore_candidate_threshold
         # Key: (canonical_symbol, spot_venue, perp_venue) -> deque of basis_bps
-        self._history: Dict[Tuple[str, Venue, Venue], deque[float]] = {}
-        self._breach_start_time: Dict[Tuple[str, Venue, Venue], float] = {}
+        self._history: dict[tuple[str, Venue, Venue], deque[float]] = {}
+        self._breach_start_time: dict[tuple[str, Venue, Venue], float] = {}
 
     def compute_basis(
         self,

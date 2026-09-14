@@ -14,10 +14,8 @@ Principles:
 from __future__ import annotations
 
 import logging
-import math
 import random
 import time
-from typing import Dict, List, Optional
 
 from core.arbitrage.models import (
     ArbitrageOpportunity,
@@ -37,7 +35,7 @@ class ShadowValidator:
 
     def __init__(self, rng_seed: int = 42) -> None:
         self._rng = random.Random(rng_seed)
-        self._active_shadows: Dict[str, ShadowOpportunity] = {}
+        self._active_shadows: dict[str, ShadowOpportunity] = {}
         self._init_db_schema()
 
     def _init_db_schema(self) -> None:
@@ -73,7 +71,7 @@ class ShadowValidator:
                     "CREATE INDEX IF NOT EXISTS idx_arb_shadow_status ON arbitrage_shadow_ledger(status);"
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Could not initialize arbitrage_shadow_ledger schema: {e}")
 
     def simulate_entry_execution(
@@ -114,8 +112,10 @@ class ShadowValidator:
 
         # Leg B: Short Order Dispatch (arrives after inter-leg network lag)
         # Exposure to price drift during inter_leg_latency_ms
-        adverse_drift_factor = 1.0 - (0.00015 * (inter_leg_latency_ms / 50.0) * self._rng.uniform(0.5, 2.0))
-        vwap_price_b = (book_short.bids[0].price * adverse_drift_factor)
+        adverse_drift_factor = 1.0 - (
+            0.00015 * (inter_leg_latency_ms / 50.0) * self._rng.uniform(0.5, 2.0)
+        )
+        vwap_price_b = book_short.bids[0].price * adverse_drift_factor
 
         # Short leg fill ratio (can experience partial fill exhaustion)
         fill_ratio_b = self._rng.uniform(0.85, 1.0)
@@ -139,9 +139,7 @@ class ShadowValidator:
         unhedged_qty = abs(filled_qty_a - filled_qty_b)
 
         predicted_ev = (
-            opportunity.multi_scenario_ev.base_net_ev_usd
-            if opportunity.multi_scenario_ev
-            else 0.0
+            opportunity.multi_scenario_ev.base_net_ev_usd if opportunity.multi_scenario_ev else 0.0
         )
 
         shadow_opp = ShadowOpportunity(
@@ -174,9 +172,9 @@ class ShadowValidator:
         opportunity_id: str,
         current_book_long: OrderBookSnapshot,
         current_book_short: OrderBookSnapshot,
-        funding_records: Dict[Venue, FundingRateRecord],
+        funding_records: dict[Venue, FundingRateRecord],
         exit_holding_duration_sec: float = 3600.0,
-    ) -> Optional[ShadowOpportunity]:
+    ) -> ShadowOpportunity | None:
         """Simulates synthetic position exit and reconciles predicted vs realized EV."""
         shadow = self._active_shadows.get(opportunity_id)
         if not shadow or shadow.status != "OPEN":
@@ -266,10 +264,10 @@ class ShadowValidator:
                     ),
                 )
                 conn.commit()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Failed to persist shadow record for {shadow.opportunity_id}: {e}")
 
-    def list_active_shadows(self) -> List[ShadowOpportunity]:
+    def list_active_shadows(self) -> list[ShadowOpportunity]:
         return list(self._active_shadows.values())
 
 

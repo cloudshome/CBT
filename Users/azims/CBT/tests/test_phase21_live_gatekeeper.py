@@ -10,22 +10,19 @@ Milestone 21 Verification Suite:
 
 from __future__ import annotations
 
-import asyncio
 import os
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from core.auth.credential_vault import ExchangeCredential, credential_vault
+from core.auth.credential_vault import credential_vault
 from core.execution.account_probe import AccountReadinessProbe, ExchangeAccountStatus, account_probe
 from core.execution.connectors.base import NormalizedBalance
 from core.execution.kill_switch import live_kill_switch
 from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
-from core.execution.live_gatekeeper import LiveExecutionGatekeeper, live_gatekeeper
+from core.execution.live_gatekeeper import LiveExecutionGatekeeper
 from core.macro_event_reporter import macro_event_reporter
 from core.telegram_live_desk import telegram_live_desk
-
 
 # ==============================================================================
 # 1. TASK 21.1: ACCOUNT READINESS PROBE TESTS
@@ -78,8 +75,10 @@ async def test_account_readiness_probe_equity_and_caps():
         ],
     )
 
-    with patch.object(credential_vault, "is_unlocked", return_value=True), \
-         patch.object(probe, "probe_exchange", side_effect=[mock_binance_status, mock_bybit_status]):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(probe, "probe_exchange", side_effect=[mock_binance_status, mock_bybit_status]),
+    ):
         readiness = await probe.get_portfolio_readiness()
 
         assert readiness.vault_unlocked
@@ -102,8 +101,10 @@ async def test_account_readiness_probe_equity_and_caps():
 async def test_live_gatekeeper_vault_locked():
     """Gate 1: Rejection if vault is locked."""
     gatekeeper = LiveExecutionGatekeeper()
-    with patch.object(credential_vault, "is_unlocked", return_value=False), \
-         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=False),
+        patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
+    ):
         verdict = await gatekeeper.evaluate_order_clearance("BINANCE", order_notional_usd=10.0)
         assert not verdict.passed
         assert not verdict.checks["vault_unlocked"]
@@ -114,9 +115,11 @@ async def test_live_gatekeeper_vault_locked():
 async def test_live_gatekeeper_kill_switch_active():
     """Gate 2: Rejection if master kill switch is engaged."""
     gatekeeper = LiveExecutionGatekeeper()
-    with patch.object(credential_vault, "is_unlocked", return_value=True), \
-         patch.object(live_kill_switch, "is_active", return_value=True), \
-         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(live_kill_switch, "is_active", return_value=True),
+        patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
+    ):
         verdict = await gatekeeper.evaluate_order_clearance("BINANCE", order_notional_usd=10.0)
         assert not verdict.passed
         assert not verdict.checks["kill_switch_operational"]
@@ -136,10 +139,12 @@ async def test_live_gatekeeper_clock_drift_exceeded():
         free_cash_usd=5000.0,
         locked_margin_usd=0.0,
     )
-    with patch.object(credential_vault, "is_unlocked", return_value=True), \
-         patch.object(live_kill_switch, "is_active", return_value=False), \
-         patch.object(account_probe, "probe_exchange", return_value=mock_status), \
-         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(live_kill_switch, "is_active", return_value=False),
+        patch.object(account_probe, "probe_exchange", return_value=mock_status),
+        patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
+    ):
         verdict = await gatekeeper.evaluate_order_clearance("BINANCE", order_notional_usd=10.0)
         assert not verdict.passed
         assert not verdict.checks["connectivity_and_clock_drift"]
@@ -162,10 +167,12 @@ async def test_live_gatekeeper_daily_drawdown_stop():
     )
     gatekeeper.record_trade_result(-10.0)  # Breached!
 
-    with patch.object(credential_vault, "is_unlocked", return_value=True), \
-         patch.object(live_kill_switch, "is_active", return_value=False), \
-         patch.object(account_probe, "probe_exchange", return_value=mock_status), \
-         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(live_kill_switch, "is_active", return_value=False),
+        patch.object(account_probe, "probe_exchange", return_value=mock_status),
+        patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
+    ):
         verdict = await gatekeeper.evaluate_order_clearance("BINANCE", order_notional_usd=2.0)
         assert not verdict.passed
         assert not verdict.checks["daily_drawdown_safe"]
@@ -185,15 +192,20 @@ async def test_live_gatekeeper_single_trade_cap():
         free_cash_usd=1000.0,
         locked_margin_usd=0.0,
     )
-    with patch.object(credential_vault, "is_unlocked", return_value=True), \
-         patch.object(live_kill_switch, "is_active", return_value=False), \
-         patch.object(account_probe, "probe_exchange", return_value=mock_status), \
-         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(live_kill_switch, "is_active", return_value=False),
+        patch.object(account_probe, "probe_exchange", return_value=mock_status),
+        patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
+    ):
         # Request $50 notional on $1000 equity (exceeds $15.00 cap)
         verdict = await gatekeeper.evaluate_order_clearance("BINANCE", order_notional_usd=50.0)
         assert not verdict.passed
         assert not verdict.checks["single_trade_cap_conformed"]
-        assert any("breaches constitutional 1.5% equity cap" in r.lower() for r in verdict.rejection_reasons)
+        assert any(
+            "breaches constitutional 1.5% equity cap" in r.lower()
+            for r in verdict.rejection_reasons
+        )
 
 
 @pytest.mark.asyncio
@@ -209,10 +221,12 @@ async def test_live_gatekeeper_live_env_flag_disabled():
         free_cash_usd=1000.0,
         locked_margin_usd=0.0,
     )
-    with patch.object(credential_vault, "is_unlocked", return_value=True), \
-         patch.object(live_kill_switch, "is_active", return_value=False), \
-         patch.object(account_probe, "probe_exchange", return_value=mock_status), \
-         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "false"}):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(live_kill_switch, "is_active", return_value=False),
+        patch.object(account_probe, "probe_exchange", return_value=mock_status),
+        patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "false"}),
+    ):
         verdict = await gatekeeper.evaluate_order_clearance("BINANCE", order_notional_usd=10.0)
         assert not verdict.passed
         assert not verdict.checks["live_trading_authorized"]
@@ -232,10 +246,12 @@ async def test_live_gatekeeper_all_checks_cleared():
         free_cash_usd=1000.0,
         locked_margin_usd=0.0,
     )
-    with patch.object(credential_vault, "is_unlocked", return_value=True), \
-         patch.object(live_kill_switch, "is_active", return_value=False), \
-         patch.object(account_probe, "probe_exchange", return_value=mock_status), \
-         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(live_kill_switch, "is_active", return_value=False),
+        patch.object(account_probe, "probe_exchange", return_value=mock_status),
+        patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
+    ):
         verdict = await gatekeeper.evaluate_order_clearance("BINANCE", order_notional_usd=10.0)
         assert verdict.passed
         assert all(verdict.checks.values())
@@ -250,15 +266,11 @@ async def test_live_gatekeeper_all_checks_cleared():
 @pytest.mark.asyncio
 async def test_live_canary_bounds_check():
     """Canary runner rejects notionals outside [$5, $25]."""
-    res_under = await live_canary_runner.execute_canary_order(
-        CanaryRunRequest(notional_usd=2.0)
-    )
+    res_under = await live_canary_runner.execute_canary_order(CanaryRunRequest(notional_usd=2.0))
     assert not res_under.success
     assert res_under.status == "NOTIONAL_OUT_OF_BOUNDS"
 
-    res_over = await live_canary_runner.execute_canary_order(
-        CanaryRunRequest(notional_usd=50.0)
-    )
+    res_over = await live_canary_runner.execute_canary_order(CanaryRunRequest(notional_usd=50.0))
     assert not res_over.success
     assert res_over.status == "NOTIONAL_OUT_OF_BOUNDS"
 
@@ -275,10 +287,12 @@ async def test_live_canary_dry_run():
         free_cash_usd=2000.0,
         locked_margin_usd=0.0,
     )
-    with patch.object(credential_vault, "is_unlocked", return_value=True), \
-         patch.object(live_kill_switch, "is_active", return_value=False), \
-         patch.object(account_probe, "probe_exchange", return_value=mock_status), \
-         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}):
+    with (
+        patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(live_kill_switch, "is_active", return_value=False),
+        patch.object(account_probe, "probe_exchange", return_value=mock_status),
+        patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
+    ):
         req = CanaryRunRequest(
             exchange="BINANCE",
             symbol="BTC/USDT",
@@ -361,6 +375,7 @@ def test_macro_event_reporter_flash_format():
 def test_api_account_readiness_endpoint():
     """GET /api/execution/account-readiness returns structured readiness."""
     from fastapi.testclient import TestClient
+
     from app import app
 
     client = TestClient(app)
@@ -376,6 +391,7 @@ def test_api_account_readiness_endpoint():
 def test_api_live_gatekeeper_check_endpoint():
     """POST /api/execution/live-gatekeeper/check evaluates all 6 gates."""
     from fastapi.testclient import TestClient
+
     from app import app
 
     client = TestClient(app)
@@ -399,6 +415,7 @@ def test_api_live_gatekeeper_check_endpoint():
 def test_api_live_canary_dry_run_endpoint():
     """POST /api/execution/live-canary/run executes dry-run simulation."""
     from fastapi.testclient import TestClient
+
     from app import app
 
     client = TestClient(app)
@@ -424,6 +441,7 @@ def test_api_live_canary_dry_run_endpoint():
 def test_api_telegram_live_status_endpoint():
     """GET /api/telegram/live-status returns live commander status."""
     from fastapi.testclient import TestClient
+
     from app import app
 
     client = TestClient(app)
@@ -433,4 +451,3 @@ def test_api_telegram_live_status_endpoint():
     assert data["status"] == "OPERATIONAL"
     assert "bd_time_str" in data
     assert "BST" in data["bd_time_str"]
-

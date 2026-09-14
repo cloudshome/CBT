@@ -7,6 +7,7 @@ Analytical Black-76 pricer, Greeks engine, and Newton-Raphson IV solver.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any, Literal
 
 SQRT_2PI = math.sqrt(2.0 * math.pi)
@@ -152,9 +153,6 @@ def find_implied_volatility(
         else:
             low = sigma
     return round(sigma, 6)
-
-
-from dataclasses import dataclass
 
 
 @dataclass

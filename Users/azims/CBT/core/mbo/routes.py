@@ -7,10 +7,9 @@ L3 Market By Order (MBO) Liquidity Depth Reconstruction & Queue Priority Simulat
 
 from __future__ import annotations
 
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from core.mbo.feed_adapter import mbo_feed_adapter
 from core.mbo.models import MBOSide
@@ -23,7 +22,7 @@ router = APIRouter(prefix="/api/mbo", tags=["mbo"])
 async def get_mbo_depth(
     symbol: str = Query("BTCUSDT", description="Canonical ticker"),
     venue: str = Query("BINANCE_SPOT", description="Exchange venue"),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Returns reconstructed L3 depth ladders, individual order count, and liquidity imbalance."""
     snapshot = mbo_feed_adapter.get_snapshot(symbol=symbol, venue=venue)
 
@@ -80,8 +79,10 @@ async def get_queue_estimate(
     side: str = Query("BID", description="BID or ASK"),
     price: float = Query(65000.0, description="Order limit price"),
     qty: float = Query(0.5, description="Order quantity"),
-    target_order_id: Optional[str] = Query(None, description="Existing order ID if tracking active order"),
-) -> Dict[str, Any]:
+    target_order_id: str | None = Query(
+        None, description="Existing order ID if tracking active order"
+    ),
+) -> dict[str, Any]:
     """Calculates instantaneous FIFO queue priority, fill probability, and toxic adverse selection risk."""
     book = mbo_feed_adapter.get_or_create_book(symbol, venue)
     mbo_side = MBOSide.BID if side.upper() in ["BID", "BUY"] else MBOSide.ASK
@@ -120,8 +121,8 @@ async def get_queue_estimate(
 
 @router.get("/icebergs")
 async def get_detected_icebergs(
-    symbol: Optional[str] = Query(None, description="Filter by canonical symbol"),
-) -> Dict[str, Any]:
+    symbol: str | None = Query(None, description="Filter by canonical symbol"),
+) -> dict[str, Any]:
     """Returns all active detected institutional iceberg reload orders."""
     icebergs = mbo_feed_adapter.iceberg_detector.get_active_icebergs(symbol)
 
@@ -153,7 +154,7 @@ async def get_detected_icebergs(
 async def get_toxic_flow(
     symbol: str = Query("BTCUSDT", description="Canonical ticker"),
     venue: str = Query("BINANCE_SPOT", description="Exchange venue"),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Returns microstructure toxic order flow, VPIN, and cancellation metrics."""
     toxicity = mbo_feed_adapter.calculate_toxic_flow(symbol=symbol, venue=venue)
 
