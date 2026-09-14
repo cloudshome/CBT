@@ -59,7 +59,14 @@ class LiveBracketManager:
     ) -> tuple[Any, BaseProtectionAdapter]:
         ex_norm = exchange.upper().strip()
         env_norm = environment.upper().strip()
-        cred = credential_vault.get_credential(ex_norm, env_norm)
+        try:
+            cred = credential_vault.get_credential(ex_norm, env_norm)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                f"[BracketManager] Could not retrieve credential for {ex_norm} {env_norm}: {exc}"
+            )
+            cred = None
+
         if not cred:
             raise RuntimeError(f"No API credentials configured for {ex_norm} {env_norm}.")
 

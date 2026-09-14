@@ -91,7 +91,8 @@ class LiveExecutionGatekeeper:
             reasons.append("Credential vault is locked. Live orders blocked.")
 
         # 2. Master kill switch check
-        kill_switch_active, _ = live_kill_switch.is_active()
+        ks_res = live_kill_switch.is_active()
+        kill_switch_active = ks_res[0] if isinstance(ks_res, tuple) else bool(ks_res)
         checks["kill_switch_operational"] = not kill_switch_active
         if kill_switch_active:
             reasons.append("Master Kill Switch is active. All live execution halted.")
@@ -107,7 +108,7 @@ class LiveExecutionGatekeeper:
             )
         elif exch_status.latency_ms > max_drift:
             reasons.append(
-                f"Clock drift/latency {exch_status.latency_ms:.1f}ms exceeds {max_drift:.0f}ms SLA."
+                f"Clock drift/latency {exch_status.latency_ms:.1f}ms exceeds {max_drift:.1f}ms SLA."
             )
 
         # 4. Daily drawdown limit check

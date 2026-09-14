@@ -115,7 +115,14 @@ class CanonicalExecutionReconciler:
     async def _get_connector(self, exchange: str, environment: str):
         ex_norm = exchange.upper().strip()
         env_norm = environment.upper().strip()
-        cred = credential_vault.get_credential(ex_norm, env_norm)
+        try:
+            cred = credential_vault.get_credential(ex_norm, env_norm)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                f"[Reconciler] Could not retrieve credential for {ex_norm} {env_norm}: {exc}"
+            )
+            return None
+
         if not cred:
             return None
 

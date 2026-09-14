@@ -81,7 +81,14 @@ class PanicCloseEngine:
     async def _get_connector(self, exchange: str, environment: str):
         ex_norm = exchange.upper().strip()
         env_norm = environment.upper().strip()
-        cred = credential_vault.get_credential(ex_norm, env_norm)
+        try:
+            cred = credential_vault.get_credential(ex_norm, env_norm)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                f"[PanicClose] Could not retrieve credential for {ex_norm} {env_norm}: {exc}"
+            )
+            cred = None
+
         if not cred:
             raise RuntimeError(
                 f"Cannot execute panic close: No credentials configured in vault for {ex_norm} {env_norm}."

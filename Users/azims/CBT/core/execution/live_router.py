@@ -271,9 +271,12 @@ class LiveExecutionRouter:
         # ---------------------------------------------------------------------
         # GATE 1: Emergency Kill Switch & Incident Lockout (Overrides everything)
         # ---------------------------------------------------------------------
-        kill_active, kill_state = live_kill_switch.is_active()
+        ks_res = live_kill_switch.is_active()
+        kill_active = ks_res[0] if isinstance(ks_res, tuple) else bool(ks_res)
+        kill_state = ks_res[1] if isinstance(ks_res, tuple) else None
         if kill_active:
-            msg = f"KILL_SWITCH_ACTIVE: Master kill switch engaged ({kill_state.reason})."
+            reason_str = getattr(kill_state, "reason", "Master kill switch engaged.")
+            msg = f"KILL_SWITCH_ACTIVE: Master kill switch engaged ({reason_str})."
             logger.critical(msg)
             self._emit_rejection_audit(cid, req, "KILL_SWITCH_ACTIVE", msg)
             raise LiveKillSwitchActiveError(msg)
@@ -765,7 +768,7 @@ class LiveExecutionRouter:
         Cancels an active live order on the exchange.
         Requires kill switch check and audit bus recording.
         """
-        kill_active, kill_state = live_kill_switch.is_active()
+        _ = live_kill_switch.is_active()
         # Even during kill switch, cancellations may be permitted to reduce risk,
         # but cancellations must be strictly audited.
 
