@@ -2016,6 +2016,103 @@ export const api = {
     });
     return handleResponse<any>(res);
   },
+
+  // ============================================================================
+  // PHASE 22: LIVE PROTECTION & POSITION CONTROL COCKPIT
+  // ============================================================================
+
+  async getLiveExecutionState(
+    exchange: string = 'BINANCE',
+    environment: string = 'TESTNET',
+    symbol?: string
+  ): Promise<{ status: string; snapshot: LiveExecutionSnapshot }> {
+    let url = `${BASE_URL}/api/execution/live/state?exchange=${encodeURIComponent(exchange)}&environment=${encodeURIComponent(environment)}`;
+    if (symbol) url += `&symbol=${encodeURIComponent(symbol)}`;
+    const res = await authFetch(url);
+    return handleResponse<{ status: string; snapshot: LiveExecutionSnapshot }>(res);
+  },
+
+  async executeLivePanicClose(
+    exchange: string,
+    symbol: string,
+    environment: string = 'TESTNET',
+    reason: string = 'OPERATOR_PANIC'
+  ): Promise<PanicCloseResponse> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/panic-close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exchange, symbol, environment, reason }),
+    });
+    return handleResponse<PanicCloseResponse>(res);
+  },
+
+  async moveBracketToBreakeven(
+    exchange: string,
+    symbol: string,
+    environment: string = 'TESTNET'
+  ): Promise<{ status: string; result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/bracket/breakeven`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exchange, symbol, environment }),
+    });
+    return handleResponse<{ status: string; result: any }>(res);
+  },
+
+  async cancelLiveWorkingOrder(
+    exchange: string,
+    symbol: string,
+    orderId: string,
+    clientOrderId?: string,
+    environment: string = 'TESTNET'
+  ): Promise<{ status: string; result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/order/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        exchange,
+        symbol,
+        order_id: orderId,
+        client_order_id: clientOrderId,
+        environment,
+      }),
+    });
+    return handleResponse<{ status: string; result: any }>(res);
+  },
+
+  async cancelAllLiveWorkingOrders(
+    exchange: string,
+    symbol: string,
+    environment: string = 'TESTNET'
+  ): Promise<{ status: string; result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/orders/cancel-all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exchange, symbol, environment }),
+    });
+    return handleResponse<{ status: string; result: any }>(res);
+  },
+
+  async submitProtectedLiveOrder(params: {
+    exchange: string;
+    symbol: string;
+    side: string;
+    quantity: number;
+    tp_price: number;
+    sl_price: number;
+    sl_limit_price?: number;
+    price?: number;
+    order_type?: string;
+    environment?: string;
+    strategy_id?: string;
+  }): Promise<{ status: string; context: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/live/protected-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; context: any }>(res);
+  },
 };
 
 export interface BurnInStatus {
@@ -2716,6 +2813,73 @@ export interface CanaryRunResult {
     status: string;
     message: string;
     timestamp_ms: number;
+  };
+}
+
+// ============================================================================
+// PHASE 22: LIVE PROTECTION & POSITION CONTROL INTERFACES
+// ============================================================================
+
+export interface LivePositionState {
+  symbol: string;
+  side: 'LONG' | 'SHORT';
+  quantity: number;
+  entry_price: number;
+  mark_price: number;
+  unrealized_pnl_usd: number;
+  risk_r: number;
+  protection_status: 'PROTECTED' | 'UNPROTECTED' | 'BREAKEVEN_ACTIVE' | 'PROTECTION_PENDING' | 'FLATTENING' | 'CLOSED';
+  stop_loss_price?: number | null;
+  take_profit_price?: number | null;
+  bracket_id?: string | null;
+}
+
+export interface WorkingOrderSummary {
+  order_id: string;
+  client_order_id: string;
+  symbol: string;
+  side: string;
+  order_type: string;
+  price: number;
+  quantity: number;
+  executed_qty: number;
+  status: string;
+  stop_price?: number | null;
+  created_at_ms: number;
+}
+
+export interface LiveExecutionSnapshot {
+  exchange: string;
+  environment: string;
+  overall_protection_status: 'PROTECTED' | 'UNPROTECTED' | 'NO_EXPOSURE';
+  positions: LivePositionState[];
+  orders: WorkingOrderSummary[];
+  active_brackets: any[];
+  risk_state: {
+    vault_unlocked: boolean;
+    kill_switch_active: boolean;
+  };
+  timestamp_ms: number;
+}
+
+export interface PanicCloseResponse {
+  status: string;
+  result: {
+    success: boolean;
+    symbol: string;
+    exchange: string;
+    environment: string;
+    initial_position_qty: number;
+    closed_qty: number;
+    remaining_position_qty: number;
+    cancelled_orders_count: number;
+    market_order_id?: string | null;
+    execution_price: number;
+    latency_ms: number;
+    status: string;
+    audit_event_id: string;
+    error_message?: string;
+    steps_completed: string[];
   };
 }
 

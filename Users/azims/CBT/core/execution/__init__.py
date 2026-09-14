@@ -9,6 +9,10 @@ from core.execution.almgren_chriss import (
     AlmgrenChrissSlicer,
     almgren_chriss_slicer,
 )
+from core.execution.bracket_manager import (
+    LiveBracketManager,
+    live_bracket_manager,
+)
 from core.execution.connectors.base import (
     BaseExchangeConnector,
     ExchangeAuthenticationError,
@@ -22,6 +26,11 @@ from core.execution.connectors.base import (
 )
 from core.execution.connectors.binance_connector import BinanceSpotConnector
 from core.execution.connectors.bybit_connector import BybitV5Connector
+from core.execution.execution_provenance import (
+    ExecutionProvenanceRecord,
+    ExecutionProvenanceTracker,
+    execution_provenance_tracker,
+)
 from core.execution.idempotency import (
     AmbiguousOrderError,
     DuplicateOrderError,
@@ -55,6 +64,32 @@ from core.execution.live_router import (
     LiveSizeRejectedError,
     live_execution_router,
 )
+from core.execution.order_reconciliation import (
+    CanonicalExecutionReconciler,
+    LiveExecutionSnapshot,
+    LivePositionState,
+    WorkingOrderSummary,
+    canonical_reconciler,
+)
+from core.execution.panic_close import (
+    PanicCloseEngine,
+    PanicCloseResult,
+    panic_close_engine,
+)
+from core.execution.protection.base_adapter import (
+    BaseProtectionAdapter,
+    ProtectionBracket,
+    ProtectionResult,
+    ProtectionStatus,
+)
+from core.execution.protection.binance_spot_protection import BinanceSpotProtectionAdapter
+from core.execution.protection.bybit_linear_protection import BybitLinearProtectionAdapter
+from core.execution.protection_state_machine import (
+    EntryState,
+    ProtectedEntryStateMachine,
+    ProtectedTradeContext,
+    protected_state_machine,
+)
 from core.execution.reconciliation_ledger import (
     CumulativeFillState,
     ExecutionReconciliationRecord,
@@ -85,16 +120,23 @@ __all__ = [
     "AlmgrenChrissSlicer",
     "AmbiguousOrderError",
     "BaseExchangeConnector",
+    "BaseProtectionAdapter",
     "BinanceSpotConnector",
+    "BinanceSpotProtectionAdapter",
+    "BybitLinearProtectionAdapter",
     "BybitV5Connector",
+    "CanonicalExecutionReconciler",
     "CumulativeFillState",
     "DuplicateOrderError",
+    "EntryState",
     "ExchangeAuthenticationError",
     "ExchangeError",
     "ExchangeNetworkError",
     "ExchangeRateLimitError",
     "ExchangeRejectedError",
     "ExchangeTimeoutError",
+    "ExecutionProvenanceRecord",
+    "ExecutionProvenanceTracker",
     "ExecutionReconciliationRecord",
     "IdempotencyError",
     "IdempotencyRecord",
@@ -102,6 +144,7 @@ __all__ = [
     "KillSwitchState",
     "L2DepthLevel",
     "LiveAmbiguousOrderError",
+    "LiveBracketManager",
     "LiveClockSkewError",
     "LiveCredentialUnavailableError",
     "LiveEnvironmentMismatchError",
@@ -109,10 +152,12 @@ __all__ = [
     "LiveExecutionDisabledError",
     "LiveExecutionReceipt",
     "LiveExecutionRouter",
+    "LiveExecutionSnapshot",
     "LiveKillSwitch",
     "LiveKillSwitchActiveError",
     "LiveOrderIdempotencyStore",
     "LiveOrderRequest",
+    "LivePositionState",
     "LivePreflightFailedError",
     "LiveRiskRejectedError",
     "LiveRouterError",
@@ -120,8 +165,15 @@ __all__ = [
     "NormalizedBalance",
     "NormalizedOrderResult",
     "OrderStatus",
+    "PanicCloseEngine",
+    "PanicCloseResult",
     "ParentOrderExecutionRecord",
     "ParentOrderState",
+    "ProtectedEntryStateMachine",
+    "ProtectedTradeContext",
+    "ProtectionBracket",
+    "ProtectionResult",
+    "ProtectionStatus",
     "ReconciliationLedger",
     "SmartOrderRouteQuote",
     "SmartOrderRouter",
@@ -131,13 +183,19 @@ __all__ = [
     "VenueOrderBook",
     "VenueSplitQuote",
     "VenueTradingRules",
+    "WorkingOrderSummary",
     "almgren_chriss_slicer",
+    "canonical_reconciler",
     "compute_monotonic_duration_ns",
+    "execution_provenance_tracker",
     "generate_client_order_id",
     "idempotency_store",
+    "live_bracket_manager",
     "live_execution_router",
     "live_kill_switch",
+    "panic_close_engine",
     "parse_strict_bool",
+    "protected_state_machine",
     "reconciliation_ledger",
     "smart_order_router",
 ]

@@ -326,3 +326,78 @@ class BybitV5Connector(BaseExchangeConnector):
             latency_ms=latency_ms,
             message="Status retrieved from Bybit V5 Spot API.",
         )
+
+    async def get_open_orders(
+        self,
+        symbol: str | None = None,
+        category: str = "spot",
+    ) -> list[dict[str, Any]]:
+        """Queries active open orders via GET /v5/order/realtime."""
+        params: dict[str, Any] = {"category": category}
+        if symbol:
+            params["symbol"] = self._normalize_symbol(symbol)
+
+        data, _ = await self._send_request("GET", "/v5/order/realtime", params_or_body=params)
+        res = data.get("result", {})
+        return res.get("list", []) if isinstance(res, dict) else []
+
+    async def cancel_all_orders(
+        self,
+        symbol: str,
+        category: str = "spot",
+    ) -> list[dict[str, Any]]:
+        """Cancels all active orders via POST /v5/order/cancel-all."""
+        body: dict[str, Any] = {
+            "category": category,
+            "symbol": self._normalize_symbol(symbol),
+        }
+        data, _ = await self._send_request("POST", "/v5/order/cancel-all", params_or_body=body)
+        res = data.get("result", {})
+        if isinstance(res, dict):
+            return res.get("list", [res])
+        return []
+
+    async def set_trading_stop(
+        self,
+        symbol: str,
+        take_profit: float | None = None,
+        stop_loss: float | None = None,
+        category: str = "linear",
+        position_idx: int = 0,
+    ) -> dict[str, Any]:
+        """
+        Sets position-level TP and SL via POST /v5/position/trading-stop.
+        Atomic in-place amendment without creating an unprotected gap.
+        """
+        body: dict[str, Any] = {
+            "category": category,
+            "symbol": self._normalize_symbol(symbol),
+            "positionIdx": position_idx,
+        }
+        if take_profit is not None and take_profit > 0:
+            body["takeProfit"] = f"{take_profit:.4f}".rstrip("0").rstrip(".")
+            body["tpTriggerBy"] = "LastPrice"
+        if stop_loss is not None and stop_loss > 0:
+            body["stopLoss"] = f"{stop_loss:.4f}".rstrip("0").rstrip(".")
+            body["slTriggerBy"] = "LastPrice"
+
+        data, latency_ms = await self._send_request("POST", "/v5/position/trading-stop", params_or_body=body)
+        if isinstance(data, dict):
+            data["latency_ms"] = latency_ms
+        return data
+
+    async def get_positions(
+        self,
+        symbol: str | None = None,
+        category: str = "linear",
+    ) -> list[dict[str, Any]]:
+        """Queries active futures positions via GET /v5/position/list."""
+        params: dict[str, Any] = {"category": category}
+        if symbol:
+            params["symbol"] = self._normalize_symbol(symbol)
+        else:
+            params["settleCoin"] = "USDT"
+
+        data, _ = await self._send_request("GET", "/v5/position/list", params_or_body=params)
+        res = data.get("result", {})
+        return res.get("list", []) if isinstance(res, dict) else []

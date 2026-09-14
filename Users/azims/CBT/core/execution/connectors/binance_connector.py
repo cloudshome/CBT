@@ -74,7 +74,7 @@ class BinanceSpotConnector(BaseExchangeConnector):
         method: str,
         endpoint: str,
         params: dict[str, Any] | None = None,
-    ) -> tuple[dict[str, Any], float]:
+    ) -> tuple[Any, float]:
         """
         Signs and dispatches authenticated HTTP request to Binance.
         Measures precise round-trip latency.
@@ -136,8 +136,12 @@ class BinanceSpotConnector(BaseExchangeConnector):
                 )
 
             if status >= 400:
-                msg = sanitize_text(str(data.get("msg", data)))
-                code = data.get("code", status)
+                if isinstance(data, dict):
+                    msg = sanitize_text(str(data.get("msg", data)))
+                    code = data.get("code", status)
+                else:
+                    msg = sanitize_text(str(data))
+                    code = status
                 raise ExchangeRejectedError(f"Binance Order Rejected [Code {code}]: {msg}")
 
             return data, latency_ms
@@ -315,3 +319,98 @@ class BinanceSpotConnector(BaseExchangeConnector):
             latency_ms=latency_ms,
             message="Status retrieved from Binance Spot API.",
         )
+
+    async def get_open_orders(
+        self,
+        symbol: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Queries all open orders via GET /api/v3/openOrders."""
+        params: dict[str, Any] = {}
+        if symbol:
+            params["symbol"] = self._normalize_symbol(symbol)
+
+        data, _ = await self._send_request("GET", "/api/v3/openOrders", params=params)
+        return data if isinstance(data, list) else []
+
+    async def cancel_all_orders(
+        self,
+        symbol: str,
+    ) -> list[dict[str, Any]]:
+        """Cancels all active open orders on a symbol via DELETE /api/v3/openOrders."""
+        params: dict[str, Any] = {"symbol": self._normalize_symbol(symbol)}
+        data, _ = await self._send_request("DELETE", "/api/v3/openOrders", params=params)
+        return data if isinstance(data, list) else [data] if data else []
+
+    async def create_oco_bracket(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        stop_price: float,
+        stop_limit_price: float | None = None,
+        list_client_order_id: str | None = None,
+        limit_client_order_id: str | None = None,
+        stop_client_order_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Submits an OCO (One-Cancels-the-Other) order pair via POST /api/v3/orderList/oco.
+        Leg 1: LIMIT_MAKER take-profit at `price`.
+        Leg 2: STOP_LOSS_LIMIT stop-loss triggered at `stop_price` with execution at `stop_limit_price`.
+        """
+        clean_symbol = self._normalize_symbol(symbol)
+        side_norm = side.upper().strip()
+
+        if stop_limit_price is None or stop_limit_price <= 0:
+            # Safe default: 0.1% buffer beyond trigger price to ensure immediate fill upon activation
+            if side_norm == "SELL":
+                stop_limit_price = round(stop_price * 0.999, 2)
+            else:
+                stop_limit_price = round(stop_price * 1.001, 2)
+
+        params: dict[str, Any] = {
+            "symbol": clean_symbol,
+            "side": side_norm,
+            "quantity": f"{quantity:.6f}".rstrip("0").rstrip("."),
+            "price": f"{price:.2f}".rstrip("0").rstrip("."),
+            "stopPrice": f"{stop_price:.2f}".rstrip("0").rstrip("."),
+            "stopLimitPrice": f"{stop_limit_price:.2f}".rstrip("0").rstrip("."),
+            "stopLimitTimeInForce": "GTC",
+        }
+
+        if list_client_order_id:
+            params["listClientOrderId"] = list_client_order_id
+        if limit_client_order_id:
+            params["limitClientOrderId"] = limit_client_order_id
+        if stop_client_order_id:
+            params["stopClientOrderId"] = stop_client_order_id
+
+        data, latency_ms = await self._send_request("POST", "/api/v3/orderList/oco", params=params)
+        if isinstance(data, dict):
+            data["latency_ms"] = latency_ms
+        return data
+
+    async def cancel_order_list(
+        self,
+        symbol: str,
+        order_list_id: int | str | None = None,
+        list_client_order_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Cancels an entire OCO order list via DELETE /api/v3/orderList."""
+        params: dict[str, Any] = {"symbol": self._normalize_symbol(symbol)}
+        if order_list_id is not None:
+            params["orderListId"] = str(order_list_id)
+        elif list_client_order_id:
+            params["listClientOrderId"] = list_client_order_id
+        else:
+            raise ValueError("Either order_list_id or list_client_order_id must be provided to cancel OCO.")
+
+        data, latency_ms = await self._send_request("DELETE", "/api/v3/orderList", params=params)
+        if isinstance(data, dict):
+            data["latency_ms"] = latency_ms
+        return data
+
+    async def get_open_order_list(self) -> list[dict[str, Any]]:
+        """Queries all open OCO order lists via GET /api/v3/openOrderList."""
+        data, _ = await self._send_request("GET", "/api/v3/openOrderList")
+        return data if isinstance(data, list) else []

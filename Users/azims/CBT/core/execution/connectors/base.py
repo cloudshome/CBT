@@ -133,3 +133,17 @@ class BaseExchangeConnector(abc.ABC):
         client_order_id: str | None = None,
     ) -> NormalizedOrderResult:
         """Queries order status for reconciliation."""
+
+    @abc.abstractmethod
+    async def get_open_orders(
+        self,
+        symbol: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Queries all currently active open orders."""
+
+    @abc.abstractmethod
+    async def cancel_all_orders(
+        self,
+        symbol: str,
+    ) -> list[dict[str, Any]]:
+        """Cancels all active open orders for a given symbol."""
