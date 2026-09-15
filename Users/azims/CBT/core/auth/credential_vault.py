@@ -212,7 +212,6 @@ class Web3WalletCredential:
         }
 
 
-
 @dataclass
 class CredentialPermissionProfile:
     read: bool
@@ -572,7 +571,6 @@ class CredentialVault:
         except Exception as e:  # noqa: BLE001 — best-effort schema init
             logger.error(f"Could not initialize vault_credentials table: {e}")
 
-
     def is_unlocked(self) -> bool:
         """
         Checks if the vault can derive a valid master key or decrypt credentials.
@@ -873,7 +871,6 @@ class CredentialVault:
             )
             conn.commit()
             return cursor.rowcount > 0
-
 
     def get_credential(
         self, exchange: str, environment: str = "PRODUCTION"
@@ -1207,7 +1204,7 @@ class CredentialVault:
                             else f"0x{cred.api_secret}"
                         )
                         Account.from_key(key)
-                    except Exception as err:
+                    except Exception as err:  # noqa: BLE001
                         return False, 0.0, {}, f"Invalid Hyperliquid Agent Private Key: {err}"
 
                 user_address = cred.api_key
@@ -1264,15 +1261,16 @@ class CredentialVault:
                 path = "/0/private/Balance"
                 nonce = str(int(time.time() * 1000))
                 postdata = f"nonce={nonce}"
-                message = path.encode("utf-8") + hashlib.sha256(
-                    (nonce + postdata).encode("utf-8")
-                ).digest()
+                message = (
+                    path.encode("utf-8")
+                    + hashlib.sha256((nonce + postdata).encode("utf-8")).digest()
+                )
                 try:
                     secret_bytes = base64.b64decode(cred.api_secret)
                     sig = base64.b64encode(
                         hmac.new(secret_bytes, message, hashlib.sha512).digest()
                     ).decode("utf-8")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     return False, 0.0, {}, f"Invalid Kraken secret encoding: {exc}"
                 headers = {
                     "API-Key": cred.api_key,
@@ -1342,7 +1340,12 @@ class CredentialVault:
                                 data,
                                 f"KuCoin authenticated ({latency_ms:.1f}ms)",
                             )
-                        return False, latency_ms, {}, f"KuCoin code {data.get('code')}: {data.get('msg')}"
+                        return (
+                            False,
+                            latency_ms,
+                            {},
+                            f"KuCoin code {data.get('code')}: {data.get('msg')}",
+                        )
                     return False, latency_ms, {}, f"KuCoin authentication rejected ({status})"
 
             else:

@@ -7,10 +7,9 @@ Adversarial and functional test suite for Native Hyperliquid Perpetual Futures L
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, patch
 
-from core.execution.connectors.hyperliquid_connector import HyperliquidPerpConnector
 from core.execution.connectors.base import ExchangeAuthenticationError
+from core.execution.connectors.hyperliquid_connector import HyperliquidPerpConnector
 
 
 def test_hyperliquid_initialization_validation():

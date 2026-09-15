@@ -13,7 +13,6 @@ Supports:
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging
@@ -26,11 +25,10 @@ import aiohttp
 from eth_account import Account
 from eth_account.messages import encode_typed_data
 
-from core.auth.credential_vault import mask_secret, sanitize_text
+from core.auth.credential_vault import sanitize_text
 from core.execution.connectors.base import (
     BaseExchangeConnector,
     ExchangeAuthenticationError,
-    ExchangeError,
     ExchangeNetworkError,
     ExchangeRateLimitError,
     ExchangeRejectedError,
@@ -115,7 +113,7 @@ class HyperliquidConnector(BaseExchangeConnector):
                 acct = Account.from_key(pk_clean)
                 self.agent_address = acct.address
                 self._agent_account = acct
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.warning("Could not derive agent address from private key: %s", exc)
 
     def sign_l1_action(self, action: dict[str, Any], nonce: int) -> dict[str, Any]:
@@ -144,7 +142,9 @@ class HyperliquidConnector(BaseExchangeConnector):
                 }
             self._last_meta_time = now
 
-    async def _post_info(self, payload: dict[str, Any], session: aiohttp.ClientSession | None = None) -> Any:
+    async def _post_info(
+        self, payload: dict[str, Any], session: aiohttp.ClientSession | None = None
+    ) -> Any:
         """Executes a POST request against /info with error classification."""
         url = f"{self.base_url}/info"
         should_close = False
@@ -153,15 +153,19 @@ class HyperliquidConnector(BaseExchangeConnector):
             should_close = True
 
         try:
-            async with session.post(url, json=payload, headers={"Content-Type": "application/json"}) as resp:
+            async with session.post(
+                url, json=payload, headers={"Content-Type": "application/json"}
+            ) as resp:
                 if resp.status == 429:
                     text = await resp.text()
                     raise ExchangeRateLimitError(f"Hyperliquid 429: {text}")
                 if resp.status != 200:
                     text = await resp.text()
-                    raise ExchangeRejectedError(f"Hyperliquid info error {resp.status}: {sanitize_text(text)}")
+                    raise ExchangeRejectedError(
+                        f"Hyperliquid info error {resp.status}: {sanitize_text(text)}"
+                    )
                 return await resp.json()
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise ExchangeTimeoutError(f"Hyperliquid /info request timed out: {exc}") from exc
         except aiohttp.ClientError as exc:
             raise ExchangeNetworkError(f"Hyperliquid /info network error: {exc}") from exc
@@ -217,7 +221,9 @@ class HyperliquidConnector(BaseExchangeConnector):
             liq_px = float(liq_px_str) if liq_px_str is not None else None
             margin_used = float(pos_dict.get("marginUsed", 0.0))
             leverage_dict = pos_dict.get("leverage", {})
-            leverage_val = float(leverage_dict.get("value", 1.0)) if isinstance(leverage_dict, dict) else 1.0
+            leverage_val = (
+                float(leverage_dict.get("value", 1.0)) if isinstance(leverage_dict, dict) else 1.0
+            )
 
             results.append(
                 HyperliquidPosition(
@@ -251,7 +257,9 @@ class HyperliquidConnector(BaseExchangeConnector):
             "mark_price": float(ctx.get("markPx", 0.0)) if ctx.get("markPx") else None,
             "oracle_price": float(ctx.get("oraclePx", 0.0)) if ctx.get("oraclePx") else None,
             "funding_rate": float(ctx.get("funding", 0.0)) if ctx.get("funding") else 0.0,
-            "open_interest": float(ctx.get("openInterest", 0.0)) if ctx.get("openInterest") else 0.0,
+            "open_interest": float(ctx.get("openInterest", 0.0))
+            if ctx.get("openInterest")
+            else 0.0,
         }
 
     def _sign_eip712_action(self, action: dict[str, Any], nonce: int) -> dict[str, Any]:
@@ -262,7 +270,11 @@ class HyperliquidConnector(BaseExchangeConnector):
         if not self.agent_private_key:
             raise ExchangeAuthenticationError("Agent private key required to sign order dispatch.")
 
-        pk_clean = self.agent_private_key if self.agent_private_key.startswith("0x") else f"0x{self.agent_private_key}"
+        pk_clean = (
+            self.agent_private_key
+            if self.agent_private_key.startswith("0x")
+            else f"0x{self.agent_private_key}"
+        )
 
         # 1. Compute deterministic action hash
         action_json = json.dumps(action, sort_keys=True, separators=(",", ":"))
@@ -326,7 +338,9 @@ class HyperliquidConnector(BaseExchangeConnector):
         # Format price and size
         formatted_qty = round(quantity, sz_decimals)
         if formatted_qty <= 0:
-            raise ExchangeRejectedError(f"Quantity {quantity} rounds to 0 at {sz_decimals} decimals.")
+            raise ExchangeRejectedError(
+                f"Quantity {quantity} rounds to 0 at {sz_decimals} decimals."
+            )
 
         # Determine limit price: if market order, fetch best bid/ask and set aggressive threshold
         limit_price = price
@@ -369,14 +383,20 @@ class HyperliquidConnector(BaseExchangeConnector):
 
         url = f"{self.base_url}/exchange"
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout_sec)) as session:
-                async with session.post(url, json=payload, headers={"Content-Type": "application/json"}) as resp:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout_sec)
+            ) as session:
+                async with session.post(
+                    url, json=payload, headers={"Content-Type": "application/json"}
+                ) as resp:
                     latency_ms = (time.monotonic_ns() - start_ns) / 1_000_000.0
                     if resp.status == 429:
                         raise ExchangeRateLimitError("Hyperliquid 429: Rate limit breached.")
                     if resp.status != 200:
                         err_text = await resp.text()
-                        raise ExchangeRejectedError(f"Hyperliquid order rejected ({resp.status}): {sanitize_text(err_text)}")
+                        raise ExchangeRejectedError(
+                            f"Hyperliquid order rejected ({resp.status}): {sanitize_text(err_text)}"
+                        )
 
                     res_json = await resp.json()
                     status_response = res_json.get("response", {})
@@ -386,7 +406,9 @@ class HyperliquidConnector(BaseExchangeConnector):
 
                     # Check for errors in status
                     if "error" in order_status:
-                        raise ExchangeRejectedError(f"Hyperliquid execution error: {order_status['error']}")
+                        raise ExchangeRejectedError(
+                            f"Hyperliquid execution error: {order_status['error']}"
+                        )
 
                     # Extract fill or resting status
                     if "resting" in order_status:
@@ -420,7 +442,7 @@ class HyperliquidConnector(BaseExchangeConnector):
                         latency_ms=latency_ms,
                     )
 
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise ExchangeTimeoutError(f"Hyperliquid order dispatch timed out: {exc}") from exc
         except aiohttp.ClientError as exc:
             raise ExchangeNetworkError(f"Hyperliquid network error: {exc}") from exc
@@ -435,7 +457,9 @@ class HyperliquidConnector(BaseExchangeConnector):
         await self._ensure_metadata()
         coin = symbol.split("/")[0].split("-")[0].replace("USDT", "").replace("USDC", "").upper()
         if coin not in self._asset_map or not exchange_order_id:
-            raise ExchangeRejectedError(f"Valid asset and exchange_order_id required to cancel on Hyperliquid.")
+            raise ExchangeRejectedError(
+                "Valid asset and exchange_order_id required to cancel on Hyperliquid."
+            )
 
         asset_idx = self._asset_map[coin]
         nonce = int(time.time() * 1000)
@@ -458,11 +482,17 @@ class HyperliquidConnector(BaseExchangeConnector):
         }
 
         url = f"{self.base_url}/exchange"
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout_sec)) as session:
-            async with session.post(url, json=payload, headers={"Content-Type": "application/json"}) as resp:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=self.timeout_sec)
+        ) as session:
+            async with session.post(
+                url, json=payload, headers={"Content-Type": "application/json"}
+            ) as resp:
                 if resp.status != 200:
                     err = await resp.text()
-                    raise ExchangeRejectedError(f"Hyperliquid cancel error ({resp.status}): {sanitize_text(err)}")
+                    raise ExchangeRejectedError(
+                        f"Hyperliquid cancel error ({resp.status}): {sanitize_text(err)}"
+                    )
                 return await resp.json()
 
     async def get_open_orders(self, symbol: str | None = None) -> list[dict[str, Any]]:
@@ -471,7 +501,9 @@ class HyperliquidConnector(BaseExchangeConnector):
         if not isinstance(data, list):
             return []
         if symbol:
-            coin = symbol.split("/")[0].split("-")[0].replace("USDT", "").replace("USDC", "").upper()
+            coin = (
+                symbol.split("/")[0].split("-")[0].replace("USDT", "").replace("USDC", "").upper()
+            )
             return [o for o in data if o.get("coin", "").upper() == coin]
         return data
 
@@ -574,7 +606,7 @@ class HyperliquidConnector(BaseExchangeConnector):
                 "withdrawal_allowed": False,  # POSITIVE INVARIANT: Hyperliquid Agent keys cannot withdraw funds on L1
                 "status": "PASS",
             }
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return {
                 "verified": False,
                 "reason": f"Hyperliquid L1 verification failed: {sanitize_text(str(exc))}",

@@ -6,14 +6,10 @@ Automated Test Suite for First-Run Configuration Wizard, Web3 Wallets, and Auto-
 
 from __future__ import annotations
 
-import json
-from unittest.mock import AsyncMock, patch, MagicMock
-
 import pytest
 from fastapi.testclient import TestClient
 
 from app import app
-from core.auth.credential_vault import credential_vault, Web3WalletCredential
 
 
 @pytest.fixture

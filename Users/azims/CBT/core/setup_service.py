@@ -12,14 +12,11 @@ Provides REST endpoints for:
 
 from __future__ import annotations
 
-import asyncio
 import datetime
-import hashlib
 import json
 import logging
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -132,7 +129,7 @@ def _write_env_safely(new_entries: dict[str, str]) -> None:
         try:
             with open(ENV_FILE_PATH, encoding="utf-8") as f:
                 existing_lines = f.readlines()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to read existing .env: {e}")
 
     updated_lines: list[str] = []
@@ -165,7 +162,7 @@ def _write_env_safely(new_entries: dict[str, str]) -> None:
         if temp_env.exists():
             try:
                 temp_env.unlink()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
 
@@ -200,7 +197,7 @@ async def get_setup_status() -> dict[str, Any]:
                             "updated_at": cred.updated_at,
                         }
                     )
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
     wallets = [w.to_safe_dict() for w in credential_vault.get_web3_wallets()]
@@ -239,9 +236,7 @@ async def verify_gemini_api_key(req: GeminiVerifyRequest) -> dict[str, Any]:
     t_start = time.perf_counter()
 
     try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=6.0)
-        ) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=6.0)) as session:
             async with session.get(probe_url) as resp:
                 raw_text = await resp.text()
                 status_code = resp.status
@@ -267,7 +262,7 @@ async def verify_gemini_api_key(req: GeminiVerifyRequest) -> dict[str, Any]:
                         "status_code": status_code,
                         "message": "Google rejected the API key or quota exceeded.",
                     }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         latency_ms = (time.perf_counter() - t_start) * 1000.0
         return {
             "valid": False,
@@ -310,7 +305,7 @@ async def verify_exchange_credentials(req: ExchangeVerifyRequest) -> dict[str, A
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Exchange verification probe exception: {sanitize_text(str(exc))}",
-        )
+        ) from exc
 
     res_dict = result.to_safe_dict()
     if result.withdrawal_enabled:
@@ -351,7 +346,7 @@ async def verify_hyperliquid_credentials(req: HyperliquidVerifyRequest) -> dict[
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid Hyperliquid Agent Private Key: {sanitize_text(str(exc))}",
-        )
+        ) from exc
 
     cred = ExchangeCredential(
         exchange="HYPERLIQUID",
@@ -506,16 +501,15 @@ def _run_git_command(args: list[str]) -> tuple[int, str, str]:
     """Runs a git command in REPO_ROOT and returns (returncode, stdout, stderr)."""
     try:
         res = subprocess.run(
-            ["git"] + args,
+            ["git", *args],
             cwd=str(REPO_ROOT),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=15,
             check=False,
         )
         return res.returncode, res.stdout.strip(), res.stderr.strip()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return -1, "", str(e)
 
 
@@ -605,7 +599,6 @@ async def apply_software_update(req: ApplyUpdateRequest) -> dict[str, Any]:
     """
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
     snapshot_id = f"snapshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    snapshot_path = BACKUPS_DIR / snapshot_id
 
     # 1. Capture current commit
     ret_curr, pre_commit, _ = _run_git_command(["rev-parse", "HEAD"])
@@ -631,7 +624,7 @@ async def apply_software_update(req: ApplyUpdateRequest) -> dict[str, Any]:
         }
         with open(BACKUPS_DIR / f"{snapshot_id}.json", "w", encoding="utf-8") as f:
             json.dump(snapshot_meta, f, indent=2)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"Could not write snapshot metadata: {e}")
 
     # 4. Pull changes
@@ -694,7 +687,7 @@ async def rollback_software_update(snapshot_id: str) -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to read snapshot file: {exc}",
-        )
+        ) from exc
 
     if not target_commit:
         raise HTTPException(
