@@ -52,6 +52,17 @@ class LiveExecutionGatekeeper:
         self.single_trade_equity_cap_pct = single_trade_equity_cap_pct
         self._daily_realized_loss_usd: float = 0.0
         self._last_reset_epoch: float = time.time()
+        self._revocation_log: list[tuple[str, str, int]] = []
+        try:
+            credential_vault.register_revocation_listener(self._handle_credential_revocation)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Could not register revocation listener: %s", exc)
+
+    def _handle_credential_revocation(self, exchange: str, environment: str) -> None:
+        logger.warning(
+            f"LiveExecutionGatekeeper notified: Credential revoked for {exchange} [{environment}]."
+        )
+        self._revocation_log.append((exchange, environment, int(time.time() * 1000)))
 
     def record_trade_result(self, pnl_usd: float) -> None:
         """Records realized PnL to track cumulative daily drawdown."""
@@ -76,6 +87,7 @@ class LiveExecutionGatekeeper:
         """
         Executes exhaustive 7-point constitutional clearance evaluation:
         1. Vault unlocked with valid key derivation.
+        1b. Credential Capability Firewall (Positive Withdrawal Prohibition).
         2. Master Kill Switch operational.
         3. Exchange connectivity & Clock Drift within 500ms SLA.
         4. Daily drawdown below 3.0% threshold.
@@ -93,6 +105,20 @@ class LiveExecutionGatekeeper:
         checks["vault_unlocked"] = vault_unlocked
         if not vault_unlocked:
             reasons.append("Credential vault is locked. Live orders blocked.")
+
+        # 1b. Credential Capability Firewall & Positive Withdrawal Prohibition Check
+        capability = credential_vault.get_credential_capability(exchange_upper, environment)
+        is_withdrawal_prohibited = not capability.withdrawal_allowed
+        checks["withdrawal_prohibited"] = is_withdrawal_prohibited
+        if capability.withdrawal_allowed:
+            reasons.append(
+                f"SECURITY_VIOLATION_WITHDRAWAL_ENABLED: API key for {exchange_upper} [{environment}] "
+                "has withdrawal capability enabled or lacks positive proof of prohibition. Live execution DENIED."
+            )
+        elif capability.verification_status == "SECURITY_VIOLATION":
+            reasons.append(
+                f"SECURITY_VIOLATION: Credential verification failed: {capability.error_message}"
+            )
 
         # 2. Master kill switch check
         ks_res = live_kill_switch.is_active()

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.auth import require_api_key
+from core.auth.credential_vault import credential_vault
 from core.execution.account_probe import account_probe
 from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner
 from core.execution.live_gatekeeper import live_gatekeeper
@@ -36,8 +37,14 @@ class CanaryExecuteRequest(BaseModel):
     side: str = Field(default="BUY", description="BUY or SELL")
     order_type: str = Field(default="LIMIT", description="LIMIT or MARKET")
     price: float | None = Field(default=None, description="Optional limit price")
+    stop_loss_price: float | None = Field(
+        default=None, description="Optional stop-loss price for risk ceiling calculation"
+    )
     environment: str = Field(default="PRODUCTION", description="PRODUCTION or TESTNET")
     is_dry_run: bool = Field(default=True, description="Safe dry-run simulation mode")
+    strategy_id: str = Field(
+        default="STRAT_SMC_INSTITUTIONAL", description="Strategy identifier for Gate 7 clearance"
+    )
 
 
 @router.get("/account-readiness")
@@ -112,13 +119,55 @@ async def run_live_canary_order(req: CanaryExecuteRequest):
         side=req.side,
         order_type=req.order_type,
         price=req.price,
+        stop_loss_price=req.stop_loss_price,
         environment=req.environment,
         is_dry_run=req.is_dry_run,
+        strategy_id=req.strategy_id,
     )
     res = await live_canary_runner.execute_canary_order(canary_req)
     return {
         "status": "SUCCESS" if res.success else "GATED",
         "result": res.to_dict(),
+    }
+
+
+class VaultVerifyRequest(BaseModel):
+    exchange: str = Field(default="BINANCE", description="BINANCE or BYBIT")
+    environment: str = Field(default="PRODUCTION", description="PRODUCTION or TESTNET")
+
+
+class VaultRevokeRequest(BaseModel):
+    exchange: str = Field(default="BINANCE", description="BINANCE or BYBIT")
+    environment: str = Field(default="PRODUCTION", description="PRODUCTION or TESTNET")
+
+
+@router.post("/vault/verify", dependencies=[Depends(require_api_key)])
+async def verify_vault_credential_endpoint(req: VaultVerifyRequest):
+    """
+    Authenticated multi-tier probe validating API key connectivity, signing, and permissions.
+    Asserts positive proof that withdrawals are strictly disabled.
+    Never returns raw exchange response bodies or secrets.
+    """
+    res = await credential_vault.verify_credential_connectivity(
+        exchange=req.exchange, environment=req.environment
+    )
+    return {
+        "status": "SUCCESS" if res.status == "PASS" else "FAILED",
+        "verification": res.to_safe_dict(),
+    }
+
+
+@router.delete("/vault/credential", dependencies=[Depends(require_api_key)])
+async def revoke_vault_credential_endpoint(req: VaultRevokeRequest):
+    """
+    Revokes an exchange credential:
+    Flushes database, invalidates in-memory capability cache, and closes active connector sessions.
+    """
+    deleted = credential_vault.revoke_credential(req.exchange, req.environment)
+    return {
+        "status": "SUCCESS" if deleted else "NOT_FOUND",
+        "message": f"Credential for {req.exchange} [{req.environment}] revoked and capabilities invalidated.",
+        "deleted": deleted,
     }
 
 

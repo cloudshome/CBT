@@ -3811,6 +3811,48 @@ class VaultConfigureApiRequest(BaseModel):
         return val
 
 
+class VaultVerifyApiRequest(BaseModel):
+    exchange: str = Field("BINANCE", description="Exchange venue: BINANCE or BYBIT")
+    environment: str = Field("PRODUCTION", description="Environment: TESTNET or PRODUCTION")
+
+    @field_validator("exchange")
+    @classmethod
+    def validate_exchange(cls, v: str) -> str:
+        val = v.upper().strip()
+        if val not in ("BINANCE", "BYBIT"):
+            raise ValueError("Supported exchanges are BINANCE and BYBIT")
+        return val
+
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        val = v.upper().strip()
+        if val not in ("TESTNET", "PRODUCTION"):
+            raise ValueError("Supported environments are TESTNET and PRODUCTION")
+        return val
+
+
+class VaultRevokeApiRequest(BaseModel):
+    exchange: str = Field(..., description="Exchange venue: BINANCE or BYBIT")
+    environment: str = Field("PRODUCTION", description="Environment: TESTNET or PRODUCTION")
+
+    @field_validator("exchange")
+    @classmethod
+    def validate_exchange(cls, v: str) -> str:
+        val = v.upper().strip()
+        if val not in ("BINANCE", "BYBIT"):
+            raise ValueError("Supported exchanges are BINANCE and BYBIT")
+        return val
+
+    @field_validator("environment")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
+        val = v.upper().strip()
+        if val not in ("TESTNET", "PRODUCTION"):
+            raise ValueError("Supported environments are TESTNET and PRODUCTION")
+        return val
+
+
 class LiveOrderApiRequest(BaseModel):
     exchange: str = Field(..., description="Exchange venue: BINANCE or BYBIT")
     environment: str = Field("TESTNET", description="Environment: TESTNET or PRODUCTION")
@@ -3961,6 +4003,36 @@ async def configure_vault_credential(req: VaultConfigureApiRequest):
         "status": "SUCCESS",
         "message": f"Credentials securely encrypted and stored for {req.exchange} [{req.environment}].",
         "credential": cred.to_safe_dict(),
+    }
+
+
+@app.post("/api/vault/verify", dependencies=[Depends(require_api_key)])
+async def verify_vault_credential(req: VaultVerifyApiRequest):
+    """
+    Authenticated multi-tier probe validating API key connectivity, signing, and permissions.
+    Asserts positive proof that withdrawals are strictly disabled.
+    Never returns raw exchange response bodies or secrets.
+    """
+    res = await credential_vault.verify_credential_connectivity(
+        exchange=req.exchange, environment=req.environment
+    )
+    return {
+        "status": "SUCCESS" if res.status == "PASS" else "FAILED",
+        "verification": res.to_safe_dict(),
+    }
+
+
+@app.delete("/api/vault/credential", dependencies=[Depends(require_api_key)])
+async def revoke_vault_credential(req: VaultRevokeApiRequest):
+    """
+    Revokes an exchange credential:
+    Flushes database, invalidates in-memory capability cache, and closes active connector sessions.
+    """
+    deleted = credential_vault.revoke_credential(req.exchange, req.environment)
+    return {
+        "status": "SUCCESS" if deleted else "NOT_FOUND",
+        "message": f"Credential for {req.exchange} [{req.environment}] revoked and capabilities invalidated.",
+        "deleted": deleted,
     }
 
 

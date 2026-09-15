@@ -64,7 +64,18 @@ class UniversalIngestor:
             return "REEL"
         elif "twitter.com" in lower or "x.com" in lower:
             return "REEL"
-        elif any(kw in lower for kw in ["talk show", "cnbc", "bloomberg", "fed chair", "jerome powell", "rate cut", "inflation print"]):
+        elif any(
+            kw in lower
+            for kw in [
+                "talk show",
+                "cnbc",
+                "bloomberg",
+                "fed chair",
+                "jerome powell",
+                "rate cut",
+                "inflation print",
+            ]
+        ):
             return "TALK_SHOW"
         elif "github.com" in lower:
             return "GITHUB"
@@ -176,13 +187,18 @@ class UniversalIngestor:
 
         elif ext in [".mp4", ".mov", ".webm", ".m4v", ".mp3", ".m4a", ".wav", ".ogg"]:
             metadata["is_media_file"] = True
-            metadata["media_type"] = "VIDEO" if ext in [".mp4", ".mov", ".webm", ".m4v"] else "AUDIO"
+            metadata["media_type"] = (
+                "VIDEO" if ext in [".mp4", ".mov", ".webm", ".m4v"] else "AUDIO"
+            )
             api_key = os.getenv("GEMINI_API_KEY", "").strip()
             if api_key:
                 try:
                     from google import genai
+
                     client = genai.Client(api_key=api_key)
-                    logger.info(f"Uploading media file {file_path.name} to Gemini Files API for transcription...")
+                    logger.info(
+                        f"Uploading media file {file_path.name} to Gemini Files API for transcription..."
+                    )
                     uploaded_file = client.files.upload(file=str(file_path))
                     resp = client.models.generate_content(
                         model="gemini-2.5-flash",
@@ -281,7 +297,10 @@ class UniversalIngestor:
             )
 
         worldview = self.infer_worldview(content, source_type)
-        if source_type in ("REEL", "MEDIA_REEL", "TALK_SHOW") and worldview == "QUANTITATIVE_FINANCE":
+        if (
+            source_type in ("REEL", "MEDIA_REEL", "TALK_SHOW")
+            and worldview == "QUANTITATIVE_FINANCE"
+        ):
             worldview = "MACROECONOMIC"
 
         logger.info(
@@ -622,8 +641,16 @@ class UniversalIngestor:
                 f"Causal Transmission: {c.get('cause', 'Catalyst')[:35]} -> {c.get('crypto_consequence', 'Crypto Impact')[:40]}"
                 for c in chains[:6]
             ]
-            regime = macro_state.get("macro_regime", {}).get("regime_name", "Macroeconomic Regime") if macro_state else "Macro Regime"
-            policy = macro_state.get("macro_regime", {}).get("monetary_stance", "NEUTRAL") if macro_state else "NEUTRAL"
+            regime = (
+                macro_state.get("macro_regime", {}).get("regime_name", "Macroeconomic Regime")
+                if macro_state
+                else "Macro Regime"
+            )
+            policy = (
+                macro_state.get("macro_regime", {}).get("monetary_stance", "NEUTRAL")
+                if macro_state
+                else "NEUTRAL"
+            )
             summary = (
                 f"Economic Talk Show & Reel Synthesis: '{inferred_title}' by {creator}. "
                 f"Diagnosed state as '{regime}' with {policy.lower()} monetary posture. "
@@ -695,7 +722,12 @@ class UniversalIngestor:
                     {
                         "text": f"Catalyst [{cat.urgency}]: {cat.event_name}. Impact: {cat.expected_impact}. Invalidation: {cat.invalidation_notes}",
                         "period": "Macro Economic Horizon",
-                        "variables": ["VAR_BTC_RETURNS", "VAR_BTC_REALIZED_VOL", "VAR_10Y_YIELD", "VAR_DXY"],
+                        "variables": [
+                            "VAR_BTC_RETURNS",
+                            "VAR_BTC_REALIZED_VOL",
+                            "VAR_10Y_YIELD",
+                            "VAR_DXY",
+                        ],
                     }
                 )
 

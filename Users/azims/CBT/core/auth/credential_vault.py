@@ -24,11 +24,15 @@ import logging
 import os
 import re
 import time
+import urllib.parse
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+import aiohttp
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from core.auth.exchange_signers import BinanceSigner, BybitV5Signer
 from core.database import db_manager
 
 logger = logging.getLogger("sky.credential_vault")
@@ -179,6 +183,312 @@ class ExchangeCredential:
         }
 
 
+@dataclass
+class CredentialPermissionProfile:
+    read: bool
+    spot_trade: bool
+    derivatives_trade: bool
+    withdrawal: bool
+    internal_transfer: bool
+    universal_transfer: bool
+    subaccount_transfer: bool
+    unknown_permissions: list[str] = field(default_factory=list)
+    raw_restrictions: dict[str, Any] = field(default_factory=dict)
+
+    def is_strictly_safe_for_trading(self) -> tuple[bool, str]:
+        """
+        Enforces positive proof:
+        - withdrawal == False (strictly)
+        - len(unknown_permissions) == 0 (zero unverified capabilities)
+        - spot_trade or derivatives_trade == True
+        """
+        if self.withdrawal:
+            return (
+                False,
+                "SECURITY_VIOLATION_WITHDRAWAL_ENABLED: Trading keys must never have withdrawal permissions.",
+            )
+        if self.unknown_permissions:
+            return (
+                False,
+                f"SECURITY_VIOLATION_UNKNOWN_PERMISSIONS: Unknown exchange permissions detected: {self.unknown_permissions}",
+            )
+        if not (self.spot_trade or self.derivatives_trade):
+            return (
+                False,
+                "TRADING_DISABLED: Key does not have spot or derivatives trading enabled.",
+            )
+        return True, "SAFE"
+
+
+@dataclass
+class CredentialCapability:
+    exchange: str
+    environment: str
+    credential_id: str
+    masked_api_key: str
+    trading_allowed: bool
+    withdrawal_allowed: bool
+    transfer_allowed: bool
+    permissions_verified_at: int
+    verification_status: str  # "VERIFIED_SAFE", "SECURITY_VIOLATION", "UNVERIFIED", "REVOKED"
+    profile: CredentialPermissionProfile | None = None
+    error_message: str | None = None
+
+    def to_safe_dict(self) -> dict[str, Any]:
+        return {
+            "exchange": self.exchange,
+            "environment": self.environment,
+            "credential_id": self.credential_id,
+            "masked_api_key": self.masked_api_key,
+            "trading_allowed": self.trading_allowed,
+            "withdrawal_allowed": self.withdrawal_allowed,
+            "transfer_allowed": self.transfer_allowed,
+            "permissions_verified_at": self.permissions_verified_at,
+            "verification_status": self.verification_status,
+            "error_message": self.error_message,
+        }
+
+
+@dataclass
+class CredentialVerificationResult:
+    exchange: str
+    environment: str
+    masked_api_key: str
+    authenticated: bool
+    trading_enabled: bool
+    withdrawal_enabled: bool
+    unknown_permissions: list[str]
+    connectivity_latency_ms: float
+    account_latency_ms: float
+    permission_latency_ms: float
+    total_latency_ms: float
+    verified_at: int
+    status: str  # "PASS", "FAIL_AUTH", "SECURITY_VIOLATION_WITHDRAWAL_ENABLED", "FAIL_UNKNOWN_PERMISSIONS", "FAIL_CONNECTIVITY"
+    message: str
+
+    def to_safe_dict(self) -> dict[str, Any]:
+        return {
+            "exchange": self.exchange,
+            "environment": self.environment,
+            "masked_api_key": self.masked_api_key,
+            "authenticated": self.authenticated,
+            "trading_enabled": self.trading_enabled,
+            "withdrawal_enabled": self.withdrawal_enabled,
+            "unknown_permissions": self.unknown_permissions,
+            "connectivity_latency_ms": round(self.connectivity_latency_ms, 2),
+            "account_latency_ms": round(self.account_latency_ms, 2),
+            "permission_latency_ms": round(self.permission_latency_ms, 2),
+            "total_latency_ms": round(self.total_latency_ms, 2),
+            "verified_at": self.verified_at,
+            "status": self.status,
+            "message": self.message,
+        }
+
+
+def normalize_binance_permissions(raw: dict[str, Any]) -> CredentialPermissionProfile:
+    """
+    Normalizes Binance API key restrictions or account permissions into a standard profile.
+    Enforces positive proof: 'enableWithdrawals' (or 'canWithdraw') MUST be explicitly present and False.
+    If missing, non-boolean, or True -> withdrawal is marked True (FAIL CLOSED).
+    """
+    if not isinstance(raw, dict) or not raw:
+        return CredentialPermissionProfile(
+            read=False,
+            spot_trade=False,
+            derivatives_trade=False,
+            withdrawal=True,  # Fail closed
+            internal_transfer=False,
+            universal_transfer=False,
+            subaccount_transfer=False,
+            unknown_permissions=["MISSING_OR_EMPTY_PAYLOAD"],
+            raw_restrictions={},
+        )
+
+    # 1. /sapi/v1/account/apiRestrictions format
+    if "enableWithdrawals" in raw or "enableSpotAndMarginTrading" in raw:
+        known_keys = {
+            "ipRestrict",
+            "createTime",
+            "enableReading",
+            "enableSpotAndMarginTrading",
+            "enableWithdrawals",
+            "enableInternalTransfer",
+            "permitsUniversalTransfer",
+            "enableVanillaOptions",
+            "enableFutures",
+            "enableMargin",
+            "enableFixApiTrade",
+            "enableFixReadOnly",
+        }
+        unknown = [k for k, v in raw.items() if k not in known_keys and bool(v)]
+
+        w_val = raw.get("enableWithdrawals")
+        withdrawal_flag = True if (w_val is not False) else False
+
+        read_flag = bool(raw.get("enableReading", False))
+        spot_flag = bool(raw.get("enableSpotAndMarginTrading", False))
+        derivatives_flag = bool(
+            raw.get("enableFutures", False) or raw.get("enableVanillaOptions", False)
+        )
+        internal_xfer = bool(raw.get("enableInternalTransfer", False))
+        univ_xfer = bool(raw.get("permitsUniversalTransfer", False))
+
+        return CredentialPermissionProfile(
+            read=read_flag,
+            spot_trade=spot_flag,
+            derivatives_trade=derivatives_flag,
+            withdrawal=withdrawal_flag,
+            internal_transfer=internal_xfer,
+            universal_transfer=univ_xfer,
+            subaccount_transfer=False,
+            unknown_permissions=unknown,
+            raw_restrictions={k: raw[k] for k in raw if k in known_keys},
+        )
+
+    # 2. /api/v3/account format fallback
+    if "canTrade" in raw or "canWithdraw" in raw:
+        known_account_keys = {
+            "makerCommission",
+            "takerCommission",
+            "buyerCommission",
+            "sellerCommission",
+            "canTrade",
+            "canWithdraw",
+            "canDeposit",
+            "brokered",
+            "requireSelfTradePrevention",
+            "preventSor",
+            "updateTime",
+            "accountType",
+            "balances",
+            "permissions",
+            "uid",
+        }
+        unknown = [k for k, v in raw.items() if k not in known_account_keys and bool(v)]
+        w_val = raw.get("canWithdraw")
+        withdrawal_flag = True if (w_val is not False) else False
+        spot_flag = bool(raw.get("canTrade", False))
+        read_flag = True
+
+        perms = raw.get("permissions", [])
+        derivatives_flag = "FUTURES" in perms or "LEVERAGED" in perms
+
+        return CredentialPermissionProfile(
+            read=read_flag,
+            spot_trade=spot_flag,
+            derivatives_trade=derivatives_flag,
+            withdrawal=withdrawal_flag,
+            internal_transfer=False,
+            universal_transfer=False,
+            subaccount_transfer=False,
+            unknown_permissions=unknown,
+            raw_restrictions={"canTrade": spot_flag, "canWithdraw": w_val, "permissions": perms},
+        )
+
+    return CredentialPermissionProfile(
+        read=False,
+        spot_trade=False,
+        derivatives_trade=False,
+        withdrawal=True,  # Fail closed
+        internal_transfer=False,
+        universal_transfer=False,
+        subaccount_transfer=False,
+        unknown_permissions=["UNRECOGNIZED_BINANCE_PERMISSION_SCHEMA"],
+        raw_restrictions={},
+    )
+
+
+def normalize_bybit_permissions(raw: dict[str, Any]) -> CredentialPermissionProfile:
+    """
+    Normalizes Bybit V5 /v5/user/query-api response into standard profile.
+    In Bybit V5:
+      result.permissions contains dict of permission categories (e.g. Spot, ContractTrade, Wallet).
+    Positive check:
+      Wallet permissions must NOT contain 'Withdraw' or 'SubMemberTransfer'.
+      If permissions dict is missing or empty -> FAIL CLOSED (withdrawal = True).
+    """
+    if not isinstance(raw, dict) or not raw:
+        return CredentialPermissionProfile(
+            read=False,
+            spot_trade=False,
+            derivatives_trade=False,
+            withdrawal=True,
+            internal_transfer=False,
+            universal_transfer=False,
+            subaccount_transfer=False,
+            unknown_permissions=["MISSING_OR_EMPTY_PAYLOAD"],
+            raw_restrictions={},
+        )
+
+    result = raw.get("result", raw)
+    permissions = result.get("permissions") if isinstance(result, dict) else None
+
+    if not isinstance(permissions, dict) or not permissions:
+        return CredentialPermissionProfile(
+            read=False,
+            spot_trade=False,
+            derivatives_trade=False,
+            withdrawal=True,  # Fail closed: cannot positively prove withdrawal disabled
+            internal_transfer=False,
+            universal_transfer=False,
+            subaccount_transfer=False,
+            unknown_permissions=["MISSING_PERMISSIONS_DICT"],
+            raw_restrictions={},
+        )
+
+    known_categories = {
+        "ContractTrade",
+        "Spot",
+        "Wallet",
+        "Options",
+        "Derivatives",
+        "CopyTrading",
+        "BlockTrade",
+        "Exchange",
+        "NFT",
+    }
+    unknown = [k for k in permissions if k not in known_categories and bool(permissions[k])]
+
+    wallet_perms = permissions.get("Wallet", [])
+    if isinstance(wallet_perms, str):
+        wallet_perms = [wallet_perms]
+    elif not isinstance(wallet_perms, list):
+        wallet_perms = []
+
+    wallet_str = " ".join(str(p).lower() for p in wallet_perms)
+    withdrawal_flag = "withdraw" in wallet_str
+    subaccount_flag = (
+        "submember" in wallet_str or "subaccount" in wallet_str or "transfer" in wallet_str
+    )
+
+    spot_perms = permissions.get("Spot", [])
+    if isinstance(spot_perms, str):
+        spot_perms = [spot_perms]
+    spot_flag = any("spot" in str(p).lower() or "trade" in str(p).lower() for p in spot_perms)
+
+    contract_perms = permissions.get("ContractTrade", []) + permissions.get("Derivatives", [])
+    derivatives_flag = any(
+        "order" in str(p).lower() or "position" in str(p).lower() for p in contract_perms
+    )
+
+    read_only = bool(result.get("readOnly", 0) == 1)
+    if read_only:
+        spot_flag = False
+        derivatives_flag = False
+
+    return CredentialPermissionProfile(
+        read=True,
+        spot_trade=spot_flag,
+        derivatives_trade=derivatives_flag,
+        withdrawal=withdrawal_flag,
+        internal_transfer=subaccount_flag,
+        universal_transfer=False,
+        subaccount_transfer=subaccount_flag,
+        unknown_permissions=unknown,
+        raw_restrictions=permissions,
+    )
+
+
 class CredentialVault:
     """
     Authenticated AES-256-GCM Private API Credential Store with optional Cloud KMS / HSM Enclave.
@@ -186,6 +496,8 @@ class CredentialVault:
 
     def __init__(self, master_key: bytes | None = None, kms_enclave: Any | None = None):
         self._explicit_master_key: bytes | None = master_key
+        self._capability_cache: dict[tuple[str, str], CredentialCapability] = {}
+        self._revocation_listeners: list[Callable[[str, str], None]] = []
         if kms_enclave is not None:
             self.kms_enclave = kms_enclave
         else:
@@ -493,12 +805,80 @@ class CredentialVault:
             updated_at=data.get("updated_at", int(time.time() * 1000)),
         )
 
-    def delete_credential(self, exchange: str, environment: str) -> bool:
+    def register_revocation_listener(self, listener: Callable[[str, str], None]) -> None:
+        """Registers a callback invoked whenever an exchange credential is deleted or revoked."""
+        if listener not in self._revocation_listeners:
+            self._revocation_listeners.append(listener)
+
+    def get_credential_capability(
+        self, exchange: str, environment: str = "PRODUCTION"
+    ) -> CredentialCapability:
         """
-        Removes an exchange credential from vault.
+        Returns cached capability profile. If unverified or missing, returns safe fail-closed capability
+        with withdrawal_allowed=True to block any unauthorized execution.
         """
         exch = exchange.upper().strip()
         env = environment.upper().strip()
+        cache_key = (exch, env)
+
+        if cache_key in self._capability_cache:
+            return self._capability_cache[cache_key]
+
+        # Check if credential exists
+        cred = self.get_credential(exch, env)
+        if not cred or not cred.api_key:
+            cap = CredentialCapability(
+                exchange=exch,
+                environment=env,
+                credential_id=f"{exch}_{env}",
+                masked_api_key="NOT_CONFIGURED",
+                trading_allowed=False,
+                withdrawal_allowed=True,  # Fail closed
+                transfer_allowed=False,
+                permissions_verified_at=0,
+                verification_status="NOT_CONFIGURED",
+                error_message=f"No credential configured for {exch} [{env}].",
+            )
+        else:
+            cap = CredentialCapability(
+                exchange=exch,
+                environment=env,
+                credential_id=f"{exch}_{env}",
+                masked_api_key=mask_secret(cred.api_key),
+                trading_allowed=False,  # Must be actively verified
+                withdrawal_allowed=True,  # Fail closed until verified
+                transfer_allowed=False,
+                permissions_verified_at=0,
+                verification_status="UNVERIFIED",
+                error_message="Credential configured in vault but permissions not yet verified via /api/vault/verify.",
+            )
+
+        self._capability_cache[cache_key] = cap
+        return cap
+
+    def get_cached_capability(
+        self, exchange: str, environment: str = "PRODUCTION"
+    ) -> CredentialCapability:
+        """Alias for get_credential_capability."""
+        return self.get_credential_capability(exchange, environment)
+
+    def delete_credential(self, exchange: str, environment: str) -> bool:
+        """
+        Removes an exchange credential from vault and executes full revocation.
+        """
+        return self.revoke_credential(exchange, environment)
+
+    def revoke_credential(self, exchange: str, environment: str) -> bool:
+        """
+        Revokes an exchange credential:
+        1. Deletes from database
+        2. Invalidates in-memory capability cache
+        3. Fires revocation listeners (invalidating connectors & gatekeeper caches)
+        4. Emits LIVE_CREDENTIAL_REVOKED audit event
+        """
+        exch = exchange.upper().strip()
+        env = environment.upper().strip()
+
         with db_manager.get_trading_conn() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -506,7 +886,601 @@ class CredentialVault:
                 (exch, env),
             )
             conn.commit()
-            return cursor.rowcount > 0
+            deleted = cursor.rowcount > 0
+
+        # Invalidate capability cache with explicit REVOKED status
+        self._capability_cache[(exch, env)] = CredentialCapability(
+            exchange=exch,
+            environment=env,
+            credential_id=f"{exch}_{env}",
+            masked_api_key="REVOKED",
+            trading_allowed=False,
+            withdrawal_allowed=True,  # Fail closed
+            transfer_allowed=False,
+            permissions_verified_at=int(time.time() * 1000),
+            verification_status="REVOKED",
+            error_message=f"Credential for {exch} [{env}] has been revoked.",
+        )
+
+        # Invalidate registered listeners (active connectors, gatekeepers, probes)
+        for listener in self._revocation_listeners:
+            try:
+                listener(exch, env)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Error notifying revocation listener for {exch} [{env}]: {exc}")
+
+        try:
+            from core.audit_bus import audit_bus
+
+            audit_bus.emit_event(
+                event_type="LIVE_CREDENTIAL_REVOKED",
+                symbol=exch,
+                severity="WARNING",
+                reason=f"Credential revoked for {exch} [{env}]. Connector sessions and capabilities invalidated.",
+                details={"exchange": exch, "environment": env},
+            )
+        except Exception as _e:  # noqa: BLE001
+            logger.debug(f"Audit bus logging error on revocation: {_e}")
+
+        logger.info(f"Credential revoked and caches invalidated for {exch} [{env}]")
+        return deleted
+
+    async def connectivity_probe(
+        self,
+        exchange: str,
+        environment: str = "PRODUCTION",
+        session: aiohttp.ClientSession | None = None,
+    ) -> tuple[bool, float, str]:
+        """
+        Unauthenticated network health ping.
+        NOTE: connectivity_probe proves ONLY network reachability. It NEVER counts as credential verification.
+        Returns: (is_reachable, latency_ms, message)
+        """
+        exch = exchange.upper().strip()
+        env = environment.upper().strip()
+
+        if exch == "BINANCE":
+            base_url = (
+                "https://api.binance.com"
+                if env == "PRODUCTION"
+                else "https://testnet.binance.vision"
+            )
+            url = f"{base_url}/api/v3/ping"
+        elif exch == "BYBIT":
+            base_url = (
+                "https://api.bybit.com" if env == "PRODUCTION" else "https://api-testnet.bybit.com"
+            )
+            url = f"{base_url}/v5/market/time"
+        else:
+            return False, 0.0, f"Unsupported exchange for ping: {exch}"
+
+        t_start = time.perf_counter()
+        own_session = session is None
+        client_session = session or aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4.0))
+
+        try:
+            async with client_session.get(url) as resp:
+                status = resp.status
+                t_end = time.perf_counter()
+                latency_ms = (t_end - t_start) * 1000.0
+                if status == 200:
+                    return True, latency_ms, f"Network reachable ({latency_ms:.1f}ms)"
+                return False, latency_ms, f"Exchange returned HTTP {status}"
+        except Exception as e:  # noqa: BLE001
+            t_end = time.perf_counter()
+            latency_ms = (t_end - t_start) * 1000.0
+            return False, latency_ms, f"Connectivity failed: {e!s}"
+        finally:
+            if own_session:
+                await client_session.close()
+
+    async def authenticated_account_probe(
+        self,
+        exchange: str,
+        environment: str = "PRODUCTION",
+        credential: ExchangeCredential | None = None,
+        session: aiohttp.ClientSession | None = None,
+    ) -> tuple[bool, float, dict[str, Any], str]:
+        """
+        Authenticated account probe proving signature generation and API key acceptance.
+        Returns: (authenticated, latency_ms, payload, message)
+        """
+        exch = exchange.upper().strip()
+        env = environment.upper().strip()
+        cred = credential or self.get_credential(exch, env)
+
+        if not cred or not cred.api_key or not cred.api_secret:
+            return False, 0.0, {}, "No credentials configured in vault."
+
+        own_session = session is None
+        client_session = session or aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5.0))
+        t_start = time.perf_counter()
+
+        try:
+            if exch == "BINANCE":
+                base_url = (
+                    "https://api.binance.com"
+                    if env == "PRODUCTION"
+                    else "https://testnet.binance.vision"
+                )
+                headers, signed_params = BinanceSigner.sign_request(
+                    api_key=cred.api_key,
+                    api_secret=cred.api_secret,
+                    params={},
+                )
+                query_str = urllib.parse.urlencode(signed_params)
+                url = f"{base_url}/api/v3/account?{query_str}"
+
+                async with client_session.get(url, headers=headers) as resp:
+                    raw_text = await resp.text()
+                    status = resp.status
+                    t_end = time.perf_counter()
+                    latency_ms = (t_end - t_start) * 1000.0
+
+                    if status == 200:
+                        data = json.loads(raw_text)
+                        return (
+                            True,
+                            latency_ms,
+                            data,
+                            f"Binance account authenticated ({latency_ms:.1f}ms)",
+                        )
+                    return False, latency_ms, {}, f"Binance authentication rejected ({status})"
+
+            elif exch == "BYBIT":
+                base_url = (
+                    "https://api.bybit.com"
+                    if env == "PRODUCTION"
+                    else "https://api-testnet.bybit.com"
+                )
+                headers, query_str = BybitV5Signer.sign_request(
+                    api_key=cred.api_key,
+                    api_secret=cred.api_secret,
+                    method="GET",
+                    params_or_body={"accountType": "UNIFIED"},
+                )
+                url = f"{base_url}/v5/account/wallet-balance?{query_str}"
+
+                async with client_session.get(url, headers=headers) as resp:
+                    raw_text = await resp.text()
+                    status = resp.status
+                    t_end = time.perf_counter()
+                    latency_ms = (t_end - t_start) * 1000.0
+
+                    if status == 200:
+                        data = json.loads(raw_text)
+                        if data.get("retCode") == 0:
+                            return (
+                                True,
+                                latency_ms,
+                                data,
+                                f"Bybit V5 authenticated ({latency_ms:.1f}ms)",
+                            )
+                        return (
+                            False,
+                            latency_ms,
+                            {},
+                            f"Bybit retCode {data.get('retCode')}: {data.get('retMsg')}",
+                        )
+                    return False, latency_ms, {}, f"Bybit authentication rejected ({status})"
+
+            else:
+                return False, 0.0, {}, f"Unsupported exchange: {exch}"
+
+        except Exception as e:  # noqa: BLE001
+            t_end = time.perf_counter()
+            latency_ms = (t_end - t_start) * 1000.0
+            return False, latency_ms, {}, f"Authentication probe error: {e!s}"
+        finally:
+            if own_session:
+                await client_session.close()
+
+    async def permission_probe(
+        self,
+        exchange: str,
+        environment: str = "PRODUCTION",
+        credential: ExchangeCredential | None = None,
+        session: aiohttp.ClientSession | None = None,
+    ) -> tuple[CredentialPermissionProfile, float, str]:
+        """
+        Queries exchange API key restrictions and normalizes permissions into standard profile.
+        Returns: (profile, latency_ms, message)
+        """
+        exch = exchange.upper().strip()
+        env = environment.upper().strip()
+        cred = credential or self.get_credential(exch, env)
+
+        if not cred or not cred.api_key or not cred.api_secret:
+            fail_profile = CredentialPermissionProfile(
+                read=False,
+                spot_trade=False,
+                derivatives_trade=False,
+                withdrawal=True,
+                internal_transfer=False,
+                universal_transfer=False,
+                subaccount_transfer=False,
+                unknown_permissions=["NO_CREDENTIAL_FOUND"],
+            )
+            return fail_profile, 0.0, "No credential configured."
+
+        own_session = session is None
+        client_session = session or aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5.0))
+        t_start = time.perf_counter()
+
+        try:
+            if exch == "BINANCE":
+                base_url = (
+                    "https://api.binance.com"
+                    if env == "PRODUCTION"
+                    else "https://testnet.binance.vision"
+                )
+                headers, signed_params = BinanceSigner.sign_request(
+                    api_key=cred.api_key,
+                    api_secret=cred.api_secret,
+                    params={},
+                )
+                query_str = urllib.parse.urlencode(signed_params)
+                url = f"{base_url}/sapi/v1/account/apiRestrictions?{query_str}"
+
+                async with client_session.get(url, headers=headers) as resp:
+                    raw_text = await resp.text()
+                    status = resp.status
+                    t_end = time.perf_counter()
+                    latency_ms = (t_end - t_start) * 1000.0
+
+                    if status == 200:
+                        data = json.loads(raw_text)
+                        profile = normalize_binance_permissions(data)
+                        return (
+                            profile,
+                            latency_ms,
+                            "Binance permissions retrieved via apiRestrictions.",
+                        )
+
+                    # Fallback to /api/v3/account if sapi is unavailable or 404
+                    acc_headers, acc_signed_params = BinanceSigner.sign_request(
+                        api_key=cred.api_key,
+                        api_secret=cred.api_secret,
+                        params={},
+                    )
+                    acc_query_str = urllib.parse.urlencode(acc_signed_params)
+                    acc_url = f"{base_url}/api/v3/account?{acc_query_str}"
+                    async with client_session.get(acc_url, headers=acc_headers) as acc_resp:
+                        acc_text = await acc_resp.text()
+                        if acc_resp.status == 200:
+                            acc_data = json.loads(acc_text)
+                            profile = normalize_binance_permissions(acc_data)
+                            return (
+                                profile,
+                                latency_ms,
+                                "Binance permissions retrieved via /api/v3/account fallback.",
+                            )
+
+                    fail_profile = CredentialPermissionProfile(
+                        read=False,
+                        spot_trade=False,
+                        derivatives_trade=False,
+                        withdrawal=True,
+                        internal_transfer=False,
+                        universal_transfer=False,
+                        subaccount_transfer=False,
+                        unknown_permissions=[f"HTTP_{status}"],
+                    )
+                    return fail_profile, latency_ms, f"Binance permission check failed ({status})"
+
+            elif exch == "BYBIT":
+                base_url = (
+                    "https://api.bybit.com"
+                    if env == "PRODUCTION"
+                    else "https://api-testnet.bybit.com"
+                )
+                headers, query_str = BybitV5Signer.sign_request(
+                    api_key=cred.api_key,
+                    api_secret=cred.api_secret,
+                    method="GET",
+                    params_or_body={},
+                )
+                url = f"{base_url}/v5/user/query-api?{query_str}"
+
+                async with client_session.get(url, headers=headers) as resp:
+                    raw_text = await resp.text()
+                    status = resp.status
+                    t_end = time.perf_counter()
+                    latency_ms = (t_end - t_start) * 1000.0
+
+                    if status == 200:
+                        data = json.loads(raw_text)
+                        if data.get("retCode") == 0:
+                            profile = normalize_bybit_permissions(data)
+                            return (
+                                profile,
+                                latency_ms,
+                                "Bybit V5 permissions retrieved successfully.",
+                            )
+                        fail_profile = CredentialPermissionProfile(
+                            read=False,
+                            spot_trade=False,
+                            derivatives_trade=False,
+                            withdrawal=True,
+                            internal_transfer=False,
+                            universal_transfer=False,
+                            subaccount_transfer=False,
+                            unknown_permissions=[f"RET_CODE_{data.get('retCode')}"],
+                        )
+                        return fail_profile, latency_ms, f"Bybit retCode {data.get('retCode')}"
+
+                    fail_profile = CredentialPermissionProfile(
+                        read=False,
+                        spot_trade=False,
+                        derivatives_trade=False,
+                        withdrawal=True,
+                        internal_transfer=False,
+                        universal_transfer=False,
+                        subaccount_transfer=False,
+                        unknown_permissions=[f"HTTP_{status}"],
+                    )
+                    return fail_profile, latency_ms, f"Bybit permission check failed ({status})"
+
+            else:
+                fail_profile = CredentialPermissionProfile(
+                    read=False,
+                    spot_trade=False,
+                    derivatives_trade=False,
+                    withdrawal=True,
+                    internal_transfer=False,
+                    universal_transfer=False,
+                    subaccount_transfer=False,
+                    unknown_permissions=[f"UNSUPPORTED_{exch}"],
+                )
+                return fail_profile, 0.0, f"Unsupported exchange: {exch}"
+
+        except Exception as e:  # noqa: BLE001
+            t_end = time.perf_counter()
+            latency_ms = (t_end - t_start) * 1000.0
+            fail_profile = CredentialPermissionProfile(
+                read=False,
+                spot_trade=False,
+                derivatives_trade=False,
+                withdrawal=True,
+                internal_transfer=False,
+                universal_transfer=False,
+                subaccount_transfer=False,
+                unknown_permissions=[f"EXCEPTION_{type(e).__name__}"],
+            )
+            return fail_profile, latency_ms, f"Permission probe error: {e!s}"
+        finally:
+            if own_session:
+                await client_session.close()
+
+    async def verify_credential_connectivity(
+        self,
+        exchange: str,
+        environment: str = "PRODUCTION",
+        credential: ExchangeCredential | None = None,
+    ) -> CredentialVerificationResult:
+        """
+        Orchestrates multi-tier credential verification:
+        1. connectivity_probe()
+        2. authenticated_account_probe()
+        3. permission_probe()
+        4. Validates positive withdrawal prohibition and safe trading profile
+        5. Caches CredentialCapability
+        6. Emits audit event
+        Returns sanitized CredentialVerificationResult (no raw response body or secrets)
+        """
+        exch = exchange.upper().strip()
+        env = environment.upper().strip()
+        now_ms = int(time.time() * 1000)
+
+        try:
+            cred = credential or self.get_credential(exch, env)
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"Failed to decrypt credential for {exch} [{env}]: {exc}")
+            return CredentialVerificationResult(
+                exchange=exch,
+                environment=env,
+                masked_api_key="CORRUPTED_CIPHERTEXT",
+                authenticated=False,
+                trading_enabled=False,
+                withdrawal_enabled=True,  # Fail closed
+                unknown_permissions=["CIPHERTEXT_DECRYPTION_FAILED"],
+                connectivity_latency_ms=0.0,
+                account_latency_ms=0.0,
+                permission_latency_ms=0.0,
+                total_latency_ms=0.0,
+                verified_at=now_ms,
+                status="FAIL_INTEGRITY",
+                message=f"Vault decryption failed for {exch} [{env}]: {exc!s}",
+            )
+
+        if not cred or not cred.api_key:
+            return CredentialVerificationResult(
+                exchange=exch,
+                environment=env,
+                masked_api_key="NOT_CONFIGURED",
+                authenticated=False,
+                trading_enabled=False,
+                withdrawal_enabled=True,
+                unknown_permissions=["NO_CREDENTIAL"],
+                connectivity_latency_ms=0.0,
+                account_latency_ms=0.0,
+                permission_latency_ms=0.0,
+                total_latency_ms=0.0,
+                verified_at=now_ms,
+                status="NOT_CONFIGURED",
+                message=f"No credential configured in vault for {exch} [{env}].",
+            )
+
+        masked_key = mask_secret(cred.api_key)
+        session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8.0))
+
+        try:
+            # 1. Connectivity Probe (ping)
+            reachable, conn_ms, conn_msg = await self.connectivity_probe(exch, env, session=session)
+            if not reachable:
+                res = CredentialVerificationResult(
+                    exchange=exch,
+                    environment=env,
+                    masked_api_key=masked_key,
+                    authenticated=False,
+                    trading_enabled=False,
+                    withdrawal_enabled=True,
+                    unknown_permissions=[],
+                    connectivity_latency_ms=conn_ms,
+                    account_latency_ms=0.0,
+                    permission_latency_ms=0.0,
+                    total_latency_ms=conn_ms,
+                    verified_at=now_ms,
+                    status="FAIL_CONNECTIVITY",
+                    message=f"Exchange unreachable: {conn_msg}",
+                )
+                self._capability_cache[(exch, env)] = CredentialCapability(
+                    exchange=exch,
+                    environment=env,
+                    credential_id=f"{exch}_{env}",
+                    masked_api_key=masked_key,
+                    trading_allowed=False,
+                    withdrawal_allowed=True,
+                    transfer_allowed=False,
+                    permissions_verified_at=now_ms,
+                    verification_status="UNVERIFIED",
+                    error_message=res.message,
+                )
+                return res
+
+            # 2. Authenticated Account Probe
+            auth_ok, acc_ms, _acc_data, auth_msg = await self.authenticated_account_probe(
+                exch, env, credential=cred, session=session
+            )
+            if not auth_ok:
+                res = CredentialVerificationResult(
+                    exchange=exch,
+                    environment=env,
+                    masked_api_key=masked_key,
+                    authenticated=False,
+                    trading_enabled=False,
+                    withdrawal_enabled=True,
+                    unknown_permissions=[],
+                    connectivity_latency_ms=conn_ms,
+                    account_latency_ms=acc_ms,
+                    permission_latency_ms=0.0,
+                    total_latency_ms=conn_ms + acc_ms,
+                    verified_at=now_ms,
+                    status="FAIL_AUTH",
+                    message=f"Authentication failed: {auth_msg}",
+                )
+                self._capability_cache[(exch, env)] = CredentialCapability(
+                    exchange=exch,
+                    environment=env,
+                    credential_id=f"{exch}_{env}",
+                    masked_api_key=masked_key,
+                    trading_allowed=False,
+                    withdrawal_allowed=True,
+                    transfer_allowed=False,
+                    permissions_verified_at=now_ms,
+                    verification_status="SECURITY_VIOLATION",
+                    error_message=res.message,
+                )
+                return res
+
+            # 3. Permission Restrictions Probe
+            profile, perm_ms, perm_msg = await self.permission_probe(
+                exch, env, credential=cred, session=session
+            )
+            total_lat = conn_ms + acc_ms + perm_ms
+
+            # 4. Strict Safety Evaluation
+            safe, reason = profile.is_strictly_safe_for_trading()
+            if not safe:
+                status_code = (
+                    "SECURITY_VIOLATION_WITHDRAWAL_ENABLED"
+                    if profile.withdrawal
+                    else "FAIL_PERMISSIONS"
+                )
+                res = CredentialVerificationResult(
+                    exchange=exch,
+                    environment=env,
+                    masked_api_key=masked_key,
+                    authenticated=True,
+                    trading_enabled=profile.spot_trade or profile.derivatives_trade,
+                    withdrawal_enabled=profile.withdrawal,
+                    unknown_permissions=profile.unknown_permissions,
+                    connectivity_latency_ms=conn_ms,
+                    account_latency_ms=acc_ms,
+                    permission_latency_ms=perm_ms,
+                    total_latency_ms=total_lat,
+                    verified_at=now_ms,
+                    status=status_code,
+                    message=reason,
+                )
+                self._capability_cache[(exch, env)] = CredentialCapability(
+                    exchange=exch,
+                    environment=env,
+                    credential_id=f"{exch}_{env}",
+                    masked_api_key=masked_key,
+                    trading_allowed=False,
+                    withdrawal_allowed=profile.withdrawal,
+                    transfer_allowed=profile.internal_transfer,
+                    permissions_verified_at=now_ms,
+                    verification_status="SECURITY_VIOLATION",
+                    profile=profile,
+                    error_message=reason,
+                )
+                return res
+
+            # 5. Passed All Gates
+            res = CredentialVerificationResult(
+                exchange=exch,
+                environment=env,
+                masked_api_key=masked_key,
+                authenticated=True,
+                trading_enabled=True,
+                withdrawal_enabled=False,
+                unknown_permissions=[],
+                connectivity_latency_ms=conn_ms,
+                account_latency_ms=acc_ms,
+                permission_latency_ms=perm_ms,
+                total_latency_ms=total_lat,
+                verified_at=now_ms,
+                status="PASS",
+                message=f"Key verified safe: trading enabled, withdrawals strictly disabled ({total_lat:.1f}ms RTT).",
+            )
+            self._capability_cache[(exch, env)] = CredentialCapability(
+                exchange=exch,
+                environment=env,
+                credential_id=f"{exch}_{env}",
+                masked_api_key=masked_key,
+                trading_allowed=True,
+                withdrawal_allowed=False,
+                transfer_allowed=profile.internal_transfer,
+                permissions_verified_at=now_ms,
+                verification_status="VERIFIED_SAFE",
+                profile=profile,
+                error_message=None,
+            )
+
+            try:
+                from core.audit_bus import audit_bus
+
+                audit_bus.emit_event(
+                    event_type="LIVE_CREDENTIAL_VERIFIED",
+                    symbol=exch,
+                    severity="INFO",
+                    reason=f"Credential verified safe for {exch} [{env}]. Withdrawals disabled.",
+                    details={
+                        "exchange": exch,
+                        "environment": env,
+                        "masked_key": masked_key,
+                        "total_latency_ms": round(total_lat, 2),
+                    },
+                )
+            except Exception as _e:  # noqa: BLE001
+                logger.debug(f"Audit logging error on verification: {_e}")
+
+            return res
+
+        finally:
+            await session.close()
 
     def list_credentials(self) -> list[dict[str, Any]]:
         """

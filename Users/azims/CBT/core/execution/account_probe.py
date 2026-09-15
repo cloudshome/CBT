@@ -82,7 +82,20 @@ class AccountReadinessProbe:
                 error_message="Credential vault is locked. Unlock vault to query live balances.",
             )
 
-        cred = credential_vault.get_credential(exchange_upper, environment=environment)
+        try:
+            cred = credential_vault.get_credential(exchange_upper, environment=environment)
+        except Exception as e:  # noqa: BLE001
+            return ExchangeAccountStatus(
+                exchange=exchange_upper,
+                environment=environment,
+                is_connected=False,
+                latency_ms=0.0,
+                total_equity_usd=0.0,
+                free_cash_usd=0.0,
+                locked_margin_usd=0.0,
+                error_message=f"Vault decryption failed for {exchange_upper}: {e!s}",
+            )
+
         if not cred or not cred.api_key:
             return ExchangeAccountStatus(
                 exchange=exchange_upper,

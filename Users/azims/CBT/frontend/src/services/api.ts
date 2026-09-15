@@ -1646,6 +1646,36 @@ export const api = {
   },
 
   /**
+   * POST /api/vault/verify
+   */
+  async verifyVaultCredential(params: {
+    exchange: string;
+    environment: string;
+  }): Promise<{ status: string; verification: any }> {
+    const res = await authFetch(`${BASE_URL}/api/vault/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; verification: any }>(res);
+  },
+
+  /**
+   * DELETE /api/vault/credential
+   */
+  async deleteVaultCredential(params: {
+    exchange: string;
+    environment: string;
+  }): Promise<{ status: string; message: string; deleted: boolean }> {
+    const res = await authFetch(`${BASE_URL}/api/vault/credential`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; message: string; deleted: boolean }>(res);
+  },
+
+  /**
    * POST /api/execution/live/order
    */
   async placeLiveOrder(req: LiveOrderRequest): Promise<{ status: string; receipt: LiveExecutionReceipt }> {
@@ -2941,7 +2971,13 @@ export interface CanaryRunResult {
     executed_price: number;
     slippage_bps: number;
     roundtrip_latency_ms: number;
+    dispatch_to_ack_latency_ms?: number;
+    ack_to_fill_latency_ms?: number;
+    total_roundtrip_ms?: number;
+    ack_latency_sla_breached?: boolean;
+    dispatch_wall_time_utc?: string;
     gatekeeper_verdict: any;
+    feasibility_details?: any;
     reconciliation_id?: string | null;
     status: string;
     message: string;

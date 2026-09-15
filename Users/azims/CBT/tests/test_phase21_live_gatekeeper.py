@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from core.auth.credential_vault import credential_vault
+from core.auth.credential_vault import CredentialCapability, credential_vault
 from core.execution.account_probe import AccountReadinessProbe, ExchangeAccountStatus, account_probe
 from core.execution.connectors.base import NormalizedBalance
 from core.execution.kill_switch import live_kill_switch
@@ -246,8 +246,20 @@ async def test_live_gatekeeper_all_checks_cleared():
         free_cash_usd=1000.0,
         locked_margin_usd=0.0,
     )
+    mock_cap = CredentialCapability(
+        exchange="BINANCE",
+        environment="PRODUCTION",
+        credential_id="BINANCE_PROD",
+        masked_api_key="key_...123",
+        trading_allowed=True,
+        withdrawal_allowed=False,
+        transfer_allowed=False,
+        permissions_verified_at=1700000000000,
+        verification_status="PASS",
+    )
     with (
         patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(credential_vault, "get_credential_capability", return_value=mock_cap),
         patch.object(live_kill_switch, "is_active", return_value=False),
         patch.object(account_probe, "probe_exchange", return_value=mock_status),
         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
@@ -287,8 +299,20 @@ async def test_live_canary_dry_run():
         free_cash_usd=2000.0,
         locked_margin_usd=0.0,
     )
+    mock_cap = CredentialCapability(
+        exchange="BINANCE",
+        environment="PRODUCTION",
+        credential_id="BINANCE_PROD",
+        masked_api_key="key_...123",
+        trading_allowed=True,
+        withdrawal_allowed=False,
+        transfer_allowed=False,
+        permissions_verified_at=1700000000000,
+        verification_status="PASS",
+    )
     with (
         patch.object(credential_vault, "is_unlocked", return_value=True),
+        patch.object(credential_vault, "get_credential_capability", return_value=mock_cap),
         patch.object(live_kill_switch, "is_active", return_value=False),
         patch.object(account_probe, "probe_exchange", return_value=mock_status),
         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),

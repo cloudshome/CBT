@@ -80,6 +80,9 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
   const [modalSecretKey, setModalSecretKey] = useState<string>('');
   const [modalPassphrase, setModalPassphrase] = useState<string>('');
   const [savingVault, setSavingVault] = useState<boolean>(false);
+  const [verifyingVaultExch, setVerifyingVaultExch] = useState<string | null>(null);
+  const [revokingVaultExch, setRevokingVaultExch] = useState<string | null>(null);
+  const [vaultVerifications, setVaultVerifications] = useState<Record<string, any>>({});
 
   // Milestone 22.3: Capital Escalation & Walk-Forward Governance State
   const [escalation, setEscalation] = useState<CapitalEscalationReport | null>(null);
@@ -316,6 +319,56 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
     }
   };
 
+  // Verify Vault Key Permissions & Probes
+  const handleVerifyVault = async (exch: 'BINANCE' | 'BYBIT', env: 'TESTNET' | 'PRODUCTION') => {
+    const key = `${exch}_${env}`;
+    setVerifyingVaultExch(key);
+    try {
+      const res = await api.verifyVaultCredential({ exchange: exch, environment: env });
+      setVaultVerifications((prev) => ({ ...prev, [key]: res.verification }));
+      if (res.verification?.is_strictly_safe) {
+        onNotifyRef.current?.(
+          'success',
+          'Vault Verification Passed',
+          `${exch} [${env}]: Trading ENABLED, Withdrawals DISABLED (SAFE). Probe RTT: ${res.verification.probe_latency_ms?.toFixed(1)}ms`
+        );
+      } else {
+        const errorDetail = res.verification?.withdrawal_allowed
+          ? 'WITHDRAWALS PERMITTED (CRITICAL HAZARD!)'
+          : res.verification?.error_message || 'Key permission verification failed';
+        onNotifyRef.current?.('error', 'Vault Verification Failed / Blocked', `${exch} [${env}]: ${errorDetail}`);
+      }
+      fetchData();
+    } catch (err: any) {
+      onNotifyRef.current?.('error', 'Verification Error', err.message || 'Could not probe vault credential.');
+    } finally {
+      setVerifyingVaultExch(null);
+    }
+  };
+
+  // Revoke Vault Key
+  const handleRevokeVault = async (exch: 'BINANCE' | 'BYBIT', env: 'TESTNET' | 'PRODUCTION') => {
+    if (!window.confirm(`Are you sure you want to revoke credentials for ${exch} [${env}]? This flushes keys, cache, and connector sessions immediately.`)) {
+      return;
+    }
+    const key = `${exch}_${env}`;
+    setRevokingVaultExch(key);
+    try {
+      const res = await api.deleteVaultCredential({ exchange: exch, environment: env });
+      onNotifyRef.current?.('info', 'Credential Revoked', res.message || `${exch} [${env}] revoked.`);
+      setVaultVerifications((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      fetchData();
+    } catch (err: any) {
+      onNotifyRef.current?.('error', 'Revocation Error', err.message || 'Could not revoke credential.');
+    } finally {
+      setRevokingVaultExch(null);
+    }
+  };
+
   // Run Canary Order
   const handleExecuteCanary = async () => {
     if (!isDryRun && !authConfirmed) {
@@ -541,25 +594,42 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
               <span className="font-bold text-sm text-white">Binance Spot & Margin</span>
               <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded text-amber-400 border border-amber-500/20 font-mono font-semibold">{envMode}</span>
             </div>
-            <div className="flex items-center space-x-2 text-xs">
+            <div className="flex items-center space-x-1.5 text-xs">
+              <button
+                onClick={() => handleVerifyVault('BINANCE', envMode)}
+                disabled={verifyingVaultExch === `BINANCE_${envMode}`}
+                title="Execute multi-tier ping, HMAC account check, and restrictions probe"
+                className="flex items-center space-x-1 px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-xs font-semibold transition"
+              >
+                <Zap className={`w-3 h-3 ${verifyingVaultExch === `BINANCE_${envMode}` ? 'animate-spin' : ''}`} />
+                <span>{verifyingVaultExch === `BINANCE_${envMode}` ? 'Probing...' : 'Verify'}</span>
+              </button>
               <button
                 onClick={() => {
                   setModalExchange('BINANCE');
                   setModalEnv(envMode);
                   setShowVaultModal(true);
                 }}
-                className="flex items-center space-x-1 px-2.5 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 rounded text-xs font-semibold transition"
+                className="flex items-center space-x-1 px-2 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 rounded text-xs font-semibold transition"
               >
                 <Key className="w-3 h-3" />
-                <span>Configure Keys</span>
+                <span>Keys</span>
+              </button>
+              <button
+                onClick={() => handleRevokeVault('BINANCE', envMode)}
+                disabled={revokingVaultExch === `BINANCE_${envMode}`}
+                title="Revoke and flush Binance credentials"
+                className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded text-xs font-semibold transition"
+              >
+                <Trash2 className="w-3 h-3" />
               </button>
               {binanceStatus?.is_connected ? (
-                <span className="flex items-center text-emerald-400 font-semibold space-x-1">
+                <span className="flex items-center text-emerald-400 font-semibold space-x-1 pl-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>ONLINE ({binanceStatus.latency_ms.toFixed(1)}ms)</span>
                 </span>
               ) : (
-                <span className="flex items-center text-rose-400 font-semibold space-x-1">
+                <span className="flex items-center text-rose-400 font-semibold space-x-1 pl-1">
                   <XCircle className="w-3.5 h-3.5" />
                   <span>DISCONNECTED</span>
                 </span>
@@ -588,6 +658,48 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
             </div>
           </div>
 
+          {/* Binance Vault Verification Capability Badge */}
+          {vaultVerifications[`BINANCE_${envMode}`] && (
+            <div className={`p-2 rounded-lg border text-xs font-mono space-y-1 ${
+              vaultVerifications[`BINANCE_${envMode}`].is_strictly_safe
+                ? 'bg-emerald-950/25 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-950/25 border-rose-500/30 text-rose-300'
+            }`}>
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="flex items-center space-x-1">
+                  {vaultVerifications[`BINANCE_${envMode}`].is_strictly_safe ? (
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                  )}
+                  <span>
+                    {vaultVerifications[`BINANCE_${envMode}`].is_strictly_safe
+                      ? 'SAFE TRADING KEY (ZERO WITHDRAWAL)'
+                      : 'FAIL-CLOSED HAZARD / REJECTED'}
+                  </span>
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  RTT: {vaultVerifications[`BINANCE_${envMode}`].probe_latency_ms?.toFixed(1) ?? '0.0'}ms
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 text-[10px] pt-1 border-t border-slate-800">
+                <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700">
+                  Trading: <strong className="text-emerald-400">{vaultVerifications[`BINANCE_${envMode}`].trading_allowed ? 'ENABLED' : 'DISABLED'}</strong>
+                </span>
+                <span className={`px-1.5 py-0.5 rounded border ${
+                  !vaultVerifications[`BINANCE_${envMode}`].withdrawal_allowed
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-rose-500/20 border-rose-500/40 text-rose-300 font-bold'
+                }`}>
+                  Withdrawals: <strong>{vaultVerifications[`BINANCE_${envMode}`].withdrawal_allowed ? 'ENABLED (HAZARD)' : 'DISABLED (SAFE)'}</strong>
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-400">
+                  Key: {vaultVerifications[`BINANCE_${envMode}`].api_key_masked}
+                </span>
+              </div>
+            </div>
+          )}
+
           {binanceStatus?.error_message && (
             <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 flex items-start space-x-2">
               <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
@@ -604,25 +716,42 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
               <span className="font-bold text-sm text-white">Bybit V5 Linear Futures</span>
               <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded text-cyan-400 border border-cyan-500/20 font-mono font-semibold">{envMode}</span>
             </div>
-            <div className="flex items-center space-x-2 text-xs">
+            <div className="flex items-center space-x-1.5 text-xs">
+              <button
+                onClick={() => handleVerifyVault('BYBIT', envMode)}
+                disabled={verifyingVaultExch === `BYBIT_${envMode}`}
+                title="Execute multi-tier ping, HMAC account check, and restrictions probe"
+                className="flex items-center space-x-1 px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-xs font-semibold transition"
+              >
+                <Zap className={`w-3 h-3 ${verifyingVaultExch === `BYBIT_${envMode}` ? 'animate-spin' : ''}`} />
+                <span>{verifyingVaultExch === `BYBIT_${envMode}` ? 'Probing...' : 'Verify'}</span>
+              </button>
               <button
                 onClick={() => {
                   setModalExchange('BYBIT');
                   setModalEnv(envMode);
                   setShowVaultModal(true);
                 }}
-                className="flex items-center space-x-1 px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded text-xs font-semibold transition"
+                className="flex items-center space-x-1 px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded text-xs font-semibold transition"
               >
                 <Key className="w-3 h-3" />
-                <span>Configure Keys</span>
+                <span>Keys</span>
+              </button>
+              <button
+                onClick={() => handleRevokeVault('BYBIT', envMode)}
+                disabled={revokingVaultExch === `BYBIT_${envMode}`}
+                title="Revoke and flush Bybit credentials"
+                className="p-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded text-xs font-semibold transition"
+              >
+                <Trash2 className="w-3 h-3" />
               </button>
               {bybitStatus?.is_connected ? (
-                <span className="flex items-center text-emerald-400 font-semibold space-x-1">
+                <span className="flex items-center text-emerald-400 font-semibold space-x-1 pl-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>ONLINE ({bybitStatus.latency_ms.toFixed(1)}ms)</span>
                 </span>
               ) : (
-                <span className="flex items-center text-rose-400 font-semibold space-x-1">
+                <span className="flex items-center text-rose-400 font-semibold space-x-1 pl-1">
                   <XCircle className="w-3.5 h-3.5" />
                   <span>DISCONNECTED</span>
                 </span>
@@ -650,6 +779,48 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
               </div>
             </div>
           </div>
+
+          {/* Bybit Vault Verification Capability Badge */}
+          {vaultVerifications[`BYBIT_${envMode}`] && (
+            <div className={`p-2 rounded-lg border text-xs font-mono space-y-1 ${
+              vaultVerifications[`BYBIT_${envMode}`].is_strictly_safe
+                ? 'bg-emerald-950/25 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-950/25 border-rose-500/30 text-rose-300'
+            }`}>
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="flex items-center space-x-1">
+                  {vaultVerifications[`BYBIT_${envMode}`].is_strictly_safe ? (
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                  )}
+                  <span>
+                    {vaultVerifications[`BYBIT_${envMode}`].is_strictly_safe
+                      ? 'SAFE TRADING KEY (ZERO WITHDRAWAL)'
+                      : 'FAIL-CLOSED HAZARD / REJECTED'}
+                  </span>
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  RTT: {vaultVerifications[`BYBIT_${envMode}`].probe_latency_ms?.toFixed(1) ?? '0.0'}ms
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 text-[10px] pt-1 border-t border-slate-800">
+                <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700">
+                  Trading: <strong className="text-emerald-400">{vaultVerifications[`BYBIT_${envMode}`].trading_allowed ? 'ENABLED' : 'DISABLED'}</strong>
+                </span>
+                <span className={`px-1.5 py-0.5 rounded border ${
+                  !vaultVerifications[`BYBIT_${envMode}`].withdrawal_allowed
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-rose-500/20 border-rose-500/40 text-rose-300 font-bold'
+                }`}>
+                  Withdrawals: <strong>{vaultVerifications[`BYBIT_${envMode}`].withdrawal_allowed ? 'ENABLED (HAZARD)' : 'DISABLED (SAFE)'}</strong>
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-400">
+                  Key: {vaultVerifications[`BYBIT_${envMode}`].api_key_masked}
+                </span>
+              </div>
+            </div>
+          )}
 
           {bybitStatus?.error_message && (
             <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300 flex items-start space-x-2">
@@ -1209,17 +1380,65 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
 
           {/* Canary Output Console */}
           {canaryResult && (
-            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono space-y-1">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-1 font-bold">
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono space-y-2">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5 font-bold">
                 <span className={canaryResult.result.success ? 'text-emerald-400' : 'text-amber-400'}>
                   STATUS: {canaryResult.result.status}
                 </span>
-                <span className="text-slate-400">{canaryResult.result.roundtrip_latency_ms.toFixed(1)}ms</span>
+                <div className="flex items-center space-x-2">
+                  {canaryResult.result.ack_latency_sla_breached ? (
+                    <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded text-[10px] font-bold">
+                      ACK SLA BREACHED (&gt;500MS)
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-bold">
+                      &lt;500MS SLA PASSED
+                    </span>
+                  )}
+                  <span className="text-slate-400">
+                    {(canaryResult.result.total_roundtrip_ms ?? canaryResult.result.roundtrip_latency_ms).toFixed(1)}ms
+                  </span>
+                </div>
               </div>
-              <div className="text-[11px] text-slate-300">
+
+              {/* Latency Telemetry Breakdown */}
+              <div className="grid grid-cols-3 gap-1.5 py-1.5 px-2 bg-slate-900/70 rounded border border-slate-800 text-[10px]">
+                <div>
+                  <span className="text-slate-500 block">Dispatch → ACK</span>
+                  <span className="text-cyan-400 font-bold font-mono">
+                    {canaryResult.result.dispatch_to_ack_latency_ms != null
+                      ? `${canaryResult.result.dispatch_to_ack_latency_ms.toFixed(1)}ms`
+                      : 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">ACK → Fill</span>
+                  <span className="text-amber-400 font-bold font-mono">
+                    {canaryResult.result.ack_to_fill_latency_ms != null
+                      ? `${canaryResult.result.ack_to_fill_latency_ms.toFixed(1)}ms`
+                      : 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Total Monotonic</span>
+                  <span className="text-white font-bold font-mono">
+                    {(canaryResult.result.total_roundtrip_ms ?? canaryResult.result.roundtrip_latency_ms).toFixed(1)}ms
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-300 space-y-0.5">
                 <div>Client ID: <span className="text-cyan-400">{canaryResult.result.client_order_id}</span></div>
                 <div>Exec Price: <span className="text-white">${canaryResult.result.executed_price.toFixed(2)}</span> ({canaryResult.result.executed_qty.toFixed(6)} {symbol.replace('USDT', '')})</div>
                 <div>Slippage: <span className="text-amber-400">{canaryResult.result.slippage_bps.toFixed(2)} bps</span></div>
+                {canaryResult.result.dispatch_wall_time_utc && (
+                  <div className="text-[10px] text-slate-500">Dispatch UTC: {canaryResult.result.dispatch_wall_time_utc}</div>
+                )}
+                {canaryResult.result.feasibility_details && (
+                  <div className="text-[10px] text-slate-400">
+                    Feasibility: Quantized Qty {canaryResult.result.feasibility_details.quantized_qty} · Step {canaryResult.result.feasibility_details.step_size} · Notional ${canaryResult.result.feasibility_details.evaluated_notional_usd?.toFixed(2)}
+                  </div>
+                )}
                 <div className="text-slate-400 mt-1">{canaryResult.result.message}</div>
               </div>
             </div>
