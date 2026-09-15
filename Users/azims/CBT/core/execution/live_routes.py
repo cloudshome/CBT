@@ -10,7 +10,7 @@ import logging
 import time
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.auth import require_api_key
@@ -325,3 +325,135 @@ async def get_execution_provenance(execution_id: str):
         "is_valid": is_valid,
         "provenance": record.to_dict(),
     }
+
+
+# =============================================================================
+# Milestone 22.3: Capital Escalation & Walk-Forward Risk Governance Endpoints
+# =============================================================================
+class EscalationEvaluateRequest(BaseModel):
+    strategy_id: str = Field(default="STRAT_SMC_INSTITUTIONAL")
+    sharpe: float = Field(default=0.0)
+    trade_count: int = Field(default=0)
+    trials_count: int = Field(default=10)
+    max_drawdown: float = Field(default=0.0)
+    slippage_bps: float = Field(default=0.0)
+    regime_count: int = Field(default=1)
+    skewness: float = Field(default=0.0)
+    kurtosis: float = Field(default=3.0)
+
+
+class ActivateEligibleRequest(BaseModel):
+    strategy_id: str = Field(default="STRAT_SMC_INSTITUTIONAL")
+    operator: str = Field(default="OPERATOR_DESK")
+
+
+class ClampTierRequest(BaseModel):
+    strategy_id: str = Field(default="STRAT_SMC_INSTITUTIONAL")
+    target_tier: str = Field(description="Target tier enum string to clamp downward to")
+    reason: str = Field(description="Mandatory justification for administrative downward clamp")
+    operator: str = Field(default="OPERATOR_DESK")
+
+
+class AuthorizeProductionRequest(BaseModel):
+    strategy_id: str = Field(default="STRAT_SMC_INSTITUTIONAL")
+    hmac_signature: str = Field(
+        description="HMAC-SHA256 signature of strategy_id:payload:timestamp"
+    )
+    auth_payload: str = Field(description="Payload token signed by cold key")
+    secret_key: str = Field(description="Verification secret")
+    timestamp_ms: int = Field(description="Token generation timestamp ms")
+
+
+@router.get("/escalation/status")
+async def get_capital_escalation_status(
+    strategy_id: str = Query("STRAT_SMC_INSTITUTIONAL", description="Strategy identifier"),
+):
+    """Returns real-time Capital Escalation status, 8-state ladder, limits, and decision audit logs."""
+    from core.execution.capital_governor import capital_governor
+
+    return {
+        "status": "SUCCESS",
+        "escalation": capital_governor.get_escalation_report(strategy_id),
+    }
+
+
+@router.post("/escalation/evaluate")
+async def evaluate_capital_escalation(req: EscalationEvaluateRequest):
+    """
+    Evaluates 6-pillar walk-forward evidence stack for promotion eligibility.
+    Advances strictly to *_ELIGIBLE (never automatic real capital).
+    """
+    from core.execution.capital_governor import capital_governor
+
+    evidence = {
+        "sharpe": req.sharpe,
+        "trade_count": req.trade_count,
+        "trials_count": req.trials_count,
+        "max_drawdown": req.max_drawdown,
+        "slippage_bps": req.slippage_bps,
+        "regime_count": req.regime_count,
+        "skewness": req.skewness,
+        "kurtosis": req.kurtosis,
+    }
+    result = capital_governor.evaluate_escalation(strategy_id=req.strategy_id, evidence=evidence)
+    return {
+        "status": "SUCCESS",
+        "evaluation": result,
+    }
+
+
+@router.post("/escalation/activate-eligible", dependencies=[Depends(require_api_key)])
+async def activate_eligible_tier(req: ActivateEligibleRequest):
+    """
+    Explicitly activates an *_ELIGIBLE state into its live execution tier counterpart.
+    """
+    from core.execution.capital_governor import capital_governor
+
+    try:
+        res = capital_governor.activate_eligible_tier(
+            strategy_id=req.strategy_id, operator=req.operator
+        )
+        return {"status": "SUCCESS", "result": res}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/escalation/clamp", dependencies=[Depends(require_api_key)])
+async def clamp_capital_tier(req: ClampTierRequest):
+    """
+    Administratively clamps a capital tier strictly DOWNWARD.
+    Rejects any upward manual promotion request with HTTP 400.
+    """
+    from core.execution.capital_governor import capital_governor
+
+    try:
+        res = capital_governor.clamp_tier_downward(
+            target_tier_str=req.target_tier,
+            reason=req.reason,
+            strategy_id=req.strategy_id,
+            operator=req.operator,
+        )
+        return {"status": "SUCCESS", "result": res}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/escalation/authorize-production", dependencies=[Depends(require_api_key)])
+async def authorize_production_tier(req: AuthorizeProductionRequest):
+    """
+    Cryptographically authorizes Tier 8 (Production) using an HMAC-SHA256 token.
+    Cannot be reached autonomously.
+    """
+    from core.execution.capital_governor import capital_governor
+
+    try:
+        res = capital_governor.authorize_production_tier(
+            strategy_id=req.strategy_id,
+            hmac_signature=req.hmac_signature,
+            auth_payload=req.auth_payload,
+            secret_key=req.secret_key,
+            timestamp_ms=req.timestamp_ms,
+        )
+        return {"status": "SUCCESS", "result": res}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

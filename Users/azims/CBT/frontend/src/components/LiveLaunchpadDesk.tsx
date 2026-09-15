@@ -21,6 +21,8 @@ import {
   Flame,
   Layers,
   Target,
+  Award,
+  TrendingUp,
 } from 'lucide-react';
 import {
   api,
@@ -29,6 +31,7 @@ import {
   CanaryRunResult,
   LiveExecutionSnapshot,
 } from '../services/api';
+import { CapitalEscalationReport, CapitalTier } from '../types';
 
 interface LiveLaunchpadDeskProps {
   onNotify?: (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => void;
@@ -78,6 +81,15 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
   const [modalPassphrase, setModalPassphrase] = useState<string>('');
   const [savingVault, setSavingVault] = useState<boolean>(false);
 
+  // Milestone 22.3: Capital Escalation & Walk-Forward Governance State
+  const [escalation, setEscalation] = useState<CapitalEscalationReport | null>(null);
+  const [clampingOpen, setClampingOpen] = useState<boolean>(false);
+  const [selectedClampTier, setSelectedClampTier] = useState<CapitalTier>('TIER_1_CANARY');
+  const [clampReason, setClampReason] = useState<string>('');
+  const [performingClamp, setPerformingClamp] = useState<boolean>(false);
+  const [activatingEligible, setActivatingEligible] = useState<boolean>(false);
+  const [evaluatingEvidence, setEvaluatingEvidence] = useState<boolean>(false);
+
   const onNotifyRef = useRef(onNotify);
   useEffect(() => {
     onNotifyRef.current = onNotify;
@@ -86,17 +98,19 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
   // Load Status Data & Live Canonical Snapshot
   const fetchData = useCallback(async () => {
     try {
-      const [readinessRes, tgRes, canaryRes, liveRes] = await Promise.all([
+      const [readinessRes, tgRes, canaryRes, liveRes, escRes] = await Promise.all([
         api.getAccountReadiness(envMode),
         api.getTelegramLiveStatus().catch(() => null),
         api.getLiveCanaryStatus().catch(() => null),
         api.getLiveExecutionState(exchange, envMode).catch(() => null),
+        api.getCapitalEscalationStatus().catch(() => null),
       ]);
 
       setReadiness(readinessRes);
       if (tgRes) setTelegramStatus(tgRes);
       if (canaryRes) setCanaryStatus(canaryRes);
       if (liveRes?.snapshot) setLiveSnapshot(liveRes.snapshot);
+      if (escRes?.escalation) setEscalation(escRes.escalation);
       setLastUpdated(new Date());
     } catch (err: any) {
       console.error('Failed fetching live launchpad data:', err);
@@ -105,6 +119,75 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
       setLoading(false);
     }
   }, [envMode, exchange]);
+
+  // Milestone 22.3: Activate Eligible Tier
+  const handleActivateEligible = async () => {
+    setActivatingEligible(true);
+    try {
+      const res = await api.activateEligibleTier('STRAT_SMC_INSTITUTIONAL', 'DESK_OPERATOR');
+      if (res.result?.status === 'ACTIVATED') {
+        onNotifyRef.current?.('success', 'Tier Activated', `Successfully promoted to ${res.result.current_tier}`);
+      }
+      fetchData();
+    } catch (err: any) {
+      onNotifyRef.current?.('error', 'Activation Error', err.message || 'Could not activate eligible tier.');
+    } finally {
+      setActivatingEligible(false);
+    }
+  };
+
+  // Milestone 22.3: Downward-Only Clamp
+  const handleClampTier = async () => {
+    if (!clampReason.trim()) {
+      onNotifyRef.current?.('warning', 'Justification Required', 'A reason is mandatory for administrative tier clamping.');
+      return;
+    }
+    setPerformingClamp(true);
+    try {
+      const res = await api.clampCapitalTier({
+        strategy_id: 'STRAT_SMC_INSTITUTIONAL',
+        target_tier: selectedClampTier,
+        reason: clampReason.trim(),
+        operator: 'DESK_OPERATOR',
+      });
+      if (res.result?.status === 'CLAMPED') {
+        onNotifyRef.current?.('success', 'Tier Clamped', `Capital tier clamped down to ${res.result.current_tier}`);
+        setClampingOpen(false);
+        setClampReason('');
+      }
+      fetchData();
+    } catch (err: any) {
+      onNotifyRef.current?.('error', 'Clamp Error', err.message || 'Downward clamp failed.');
+    } finally {
+      setPerformingClamp(false);
+    }
+  };
+
+  // Milestone 22.3: Re-evaluate Walk-Forward Evidence
+  const handleEvaluateEvidence = async () => {
+    setEvaluatingEvidence(true);
+    try {
+      const res = await api.evaluateCapitalEscalation({
+        strategy_id: 'STRAT_SMC_INSTITUTIONAL',
+        sharpe: 1.6,
+        trade_count: 40,
+        trials_count: 10,
+        max_drawdown: 0.025,
+        slippage_bps: 8.5,
+        regime_count: 2,
+      });
+      if (res.evaluation?.action === 'PROMOTED_TO_ELIGIBLE') {
+        onNotifyRef.current?.('success', 'Promotion Eligible!', `Promoted to ${res.evaluation.current_tier}. Pending operator activation.`);
+      } else {
+        onNotifyRef.current?.('info', 'Evaluation Complete', `Status: ${res.evaluation?.action}. DSR: ${res.evaluation?.dsr}`);
+      }
+      fetchData();
+    } catch (err: any) {
+      onNotifyRef.current?.('error', 'Evaluation Error', err.message || 'Evidence evaluation failed.');
+    } finally {
+      setEvaluatingEvidence(false);
+    }
+  };
 
   // Phase 22: Move SL to Break-Even
   const handleMoveToBE = async (sym: string) => {
@@ -923,6 +1006,22 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
                 DRY-RUN / PROTECTED
               </span>
             </div>
+
+            {/* Gate 7: Capital Governor Dual-Constraint Tier Clearance */}
+            <div className="p-3 bg-slate-900/50 border border-slate-800/80 rounded-lg flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-slate-200">Gate 7: Capital Governor Dual-Constraint Sizing</div>
+                  <div className="text-[11px] text-slate-400">
+                    Tier: {escalation?.tier_name || 'Paper'} · Max Notional: ${escalation?.policy?.max_notional_usd ?? 0} · Risk Budget: ${escalation?.policy?.max_risk_budget_usd ?? 0}
+                  </div>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${escalation?.is_live_capital ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                {escalation?.current_tier?.replace('TIER_', '') || 'PAPER'}
+              </span>
+            </div>
           </div>
 
           {/* Preflight Check Console */}
@@ -1127,6 +1226,277 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
           )}
         </div>
       </div>
+
+      {/* ===================================================================== */}
+      {/* MILESTONE 22.3: INSTITUTIONAL CAPITAL GOVERNANCE & WALK-FORWARD COCKPIT */}
+      {/* ===================================================================== */}
+      <div className="p-4 bg-[#10141e] border border-slate-800 rounded-xl space-y-4">
+        {/* Header & Action Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center space-x-2.5">
+            <Award className="w-5 h-5 text-amber-400" />
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-bold text-sm text-white">CAPITAL ESCALATION & WALK-FORWARD GOVERNANCE</h3>
+                <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded font-mono font-semibold">
+                  MILESTONE 22.3
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                8-State Lifecycle · Dual-Constraint Floor Invariant · Contextual DSR (N-trials) · Downward-Only Clamping
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs">
+            {escalation?.current_tier?.endsWith('_ELIGIBLE') && (
+              <button
+                onClick={handleActivateEligible}
+                disabled={activatingEligible}
+                className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg font-bold transition shadow-sm animate-pulse"
+              >
+                <Zap className={`w-3.5 h-3.5 ${activatingEligible ? 'animate-spin' : ''}`} />
+                <span>⚡ Activate Live Tier</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setClampingOpen(true)}
+              className="flex items-center space-x-1 px-2.5 py-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 rounded-lg font-semibold transition"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>Emergency Clamp</span>
+            </button>
+
+            <button
+              onClick={handleEvaluateEvidence}
+              disabled={evaluatingEvidence}
+              className="flex items-center space-x-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg font-semibold transition"
+            >
+              <TrendingUp className={`w-3.5 h-3.5 ${evaluatingEvidence ? 'animate-spin' : ''}`} />
+              <span>Evaluate Evidence</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 8-State Capital Ladder Stepper */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>CAPITAL ESCALATION LADDER (CURRENT TIER: <strong className="text-amber-400">{escalation?.tier_name || 'Paper Shadow'}</strong>)</span>
+            <span className="font-mono text-[10px] text-slate-500">Strictest Risk Floor Wins</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-1.5 text-center text-xs">
+            {[
+              { id: 'TIER_0_PAPER', label: 'Paper', notional: '$0' },
+              { id: 'TIER_1_CANARY_ELIGIBLE', label: 'Canary Elig', notional: 'Pending' },
+              { id: 'TIER_1_CANARY', label: 'Canary', notional: '$25' },
+              { id: 'TIER_2_MICRO_ELIGIBLE', label: 'Micro Elig', notional: 'Pending' },
+              { id: 'TIER_2_MICRO_LIVE', label: 'Micro Live', notional: '$100' },
+              { id: 'TIER_3_SCALED_ELIGIBLE', label: 'Scaled Elig', notional: 'Pending' },
+              { id: 'TIER_3_SCALED_LIVE', label: 'Scaled Live', notional: '$500' },
+              { id: 'TIER_4_PRODUCTION_ELIGIBLE', label: 'Prod Elig', notional: 'Pending' },
+              { id: 'TIER_4_PRODUCTION', label: 'Production', notional: '1.5% Cap' },
+            ].map((step, idx) => {
+              const isActive = escalation?.current_tier === step.id;
+              const isElig = step.id.includes('ELIGIBLE');
+              return (
+                <div
+                  key={idx}
+                  className={`p-2 rounded-lg border flex flex-col justify-between transition ${
+                    isActive
+                      ? 'bg-amber-500/20 border-amber-500/60 ring-2 ring-amber-500/30 text-white font-bold'
+                      : 'bg-slate-900/40 border-slate-800 text-slate-400'
+                  }`}
+                >
+                  <div className="text-[10px] text-slate-500 font-mono">T{idx}</div>
+                  <div className={`text-xs mt-0.5 truncate ${isActive ? 'text-amber-300' : isElig ? 'text-cyan-400' : 'text-slate-300'}`}>
+                    {step.label}
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 mt-1">{step.notional}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Dual Constraint & Governance Metrics Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
+            <div className="text-[11px] text-slate-400">Max Notional Cap</div>
+            <div className="text-base font-mono font-bold text-amber-400 mt-0.5">
+              ${escalation?.policy?.max_notional_usd?.toFixed(2) ?? '0.00'}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-1">Stricter constraint with risk budget</div>
+          </div>
+
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
+            <div className="text-[11px] text-slate-400">Max Risk Budget (Dollar Loss)</div>
+            <div className="text-base font-mono font-bold text-cyan-400 mt-0.5">
+              ${escalation?.policy?.max_risk_budget_usd?.toFixed(2) ?? '0.00'}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-1">order_risk = qty × |entry - SL|</div>
+          </div>
+
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
+            <div className="text-[11px] text-slate-400">Half-Kelly Sizing Factor</div>
+            <div className="text-base font-mono font-bold text-emerald-400 mt-0.5">
+              {(escalation?.policy?.kelly_multiplier ?? 0).toFixed(2)}x
+            </div>
+            <div className="text-[10px] text-slate-500 mt-1">Regime: 1.0x (Confluent)</div>
+          </div>
+
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
+            <div className="text-[11px] text-slate-400">Parent Constitutional Floor</div>
+            <div className="text-base font-mono font-bold text-rose-400 mt-0.5">
+              1.5% Equity Cap
+            </div>
+            <div className="text-[10px] text-slate-500 mt-1">Escalator cannot override risk gate</div>
+          </div>
+        </div>
+
+        {/* Demotion / Cooldown Alert (if active) */}
+        {escalation?.demotion_state?.is_demoted && (
+          <div className="p-3 bg-rose-950/25 border border-rose-500/40 rounded-lg text-xs space-y-1 text-rose-300">
+            <div className="flex items-center space-x-2 font-bold text-rose-400">
+              <AlertOctagon className="w-4 h-4" />
+              <span>CIRCUIT BREAKER DEMOTION ACTIVE</span>
+            </div>
+            <p className="text-[11px] text-slate-300">
+              Demoted from <strong>{escalation.demotion_state.previous_tier}</strong> to <strong>{escalation.demotion_state.target_tier}</strong> due to {escalation.demotion_state.triggering_metric}.
+              Cooldown active until {new Date(escalation.demotion_state.cooldown_until_ms).toLocaleTimeString()}.
+            </p>
+          </div>
+        )}
+
+        {/* Recent Decisions Audit Ledger Table */}
+        {escalation?.recent_decisions && escalation.recent_decisions.length > 0 && (
+          <div className="space-y-2 pt-1">
+            <div className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+              <span>GOVERNANCE DECISION AUDIT TRAIL (trading_logs.db)</span>
+              <span className="text-[10px] font-mono text-slate-500">Immutable WAL Persistence</span>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-800/80 rounded-lg">
+              <table className="w-full text-[11px] font-mono text-left">
+                <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th className="p-2">Decision ID</th>
+                    <th className="p-2">Type</th>
+                    <th className="p-2">Transition</th>
+                    <th className="p-2">DSR / Trials</th>
+                    <th className="p-2">Reason Codes</th>
+                    <th className="p-2">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 text-slate-300">
+                  {escalation.recent_decisions.slice(0, 5).map((dec, idx) => {
+                    let reasons: string[] = [];
+                    try {
+                      reasons = JSON.parse(dec.reason_codes);
+                    } catch {
+                      reasons = [dec.reason_codes];
+                    }
+                    return (
+                      <tr key={idx} className="hover:bg-slate-900/40">
+                        <td className="p-2 text-cyan-400 font-bold">{dec.decision_id}</td>
+                        <td className="p-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            dec.decision_type === 'DEMOTION'
+                              ? 'bg-rose-500/20 text-rose-300'
+                              : dec.decision_type === 'MANUAL_CLAMP'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-emerald-500/20 text-emerald-300'
+                          }`}>
+                            {dec.decision_type}
+                          </span>
+                        </td>
+                        <td className="p-2 text-slate-300 font-semibold">
+                          {dec.previous_tier.replace('TIER_', '')} → <span className="text-amber-300">{dec.approved_tier.replace('TIER_', '')}</span>
+                        </td>
+                        <td className="p-2 text-slate-400">
+                          {dec.dsr > 0 ? `${dec.dsr.toFixed(2)} (N=${dec.trials_count})` : '—'}
+                        </td>
+                        <td className="p-2 text-slate-400 max-w-xs truncate" title={reasons.join('; ')}>
+                          {reasons[0] || '—'}
+                        </td>
+                        <td className="p-2 text-slate-500">
+                          {new Date(dec.timestamp_ms).toLocaleTimeString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* DOWNWARD CLAMP MODAL */}
+      {clampingOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121624] border border-rose-500/40 rounded-xl p-5 max-w-md w-full space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center space-x-2 text-rose-400 font-bold">
+                <ShieldAlert className="w-5 h-5" />
+                <span>Emergency Downward Tier Clamp</span>
+              </div>
+              <button onClick={() => setClampingOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Constitutional Invariant: Clamping moves tier <strong>strictly downward</strong>. Upward promotion via clamp is mathematically blocked.
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1">Target Clamp Tier:</label>
+                <select
+                  value={selectedClampTier}
+                  onChange={(e) => setSelectedClampTier(e.target.value as CapitalTier)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                >
+                  <option value="TIER_0_PAPER">TIER_0_PAPER (Full Shadow — Zero Live Risk)</option>
+                  <option value="TIER_1_CANARY">TIER_1_CANARY ($25 Max Notional / $1.00 Risk)</option>
+                  <option value="TIER_2_MICRO_LIVE">TIER_2_MICRO_LIVE ($100 Max Notional / $5.00 Risk)</option>
+                  <option value="TIER_3_SCALED_LIVE">TIER_3_SCALED_LIVE ($500 Max Notional / $20.00 Risk)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1">Mandatory Justification / Reason:</label>
+                <textarea
+                  rows={3}
+                  value={clampReason}
+                  onChange={(e) => setClampReason(e.target.value)}
+                  placeholder="e.g. Unusual venue exchange latency spike or liquidity gap observed."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200 text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setClampingOpen(false)}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClampTier}
+                disabled={performingClamp}
+                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow-lg shadow-rose-950/50"
+              >
+                <ShieldAlert className={`w-3.5 h-3.5 ${performingClamp ? 'animate-spin' : ''}`} />
+                <span>Confirm Downward Clamp</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* BOTTOM SECTION: BANGLADESH TIME BRIEFINGS & MACROFLASH DISPATCH */}
       <div className="p-4 bg-[#10141e] border border-slate-800 rounded-xl space-y-3">

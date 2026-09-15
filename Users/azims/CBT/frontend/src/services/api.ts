@@ -44,6 +44,8 @@ import {
   SignalBlotterRecord,
   MacroComprehensionResult,
   DynamicTradingPlan,
+  CapitalEscalationReport,
+  CapitalTier,
 } from '../types';
 
 const BASE_URL = '';
@@ -1818,6 +1820,89 @@ export const api = {
   async getWSReconciliationRecent(limit: number = 20): Promise<{ status: string; limit: number; recent_fills: WSNormalizedFill[]; timestamp_ms: number }> {
     const res = await authFetch(`${BASE_URL}/api/execution/ws-reconciliation/recent?limit=${limit}`);
     return handleResponse<{ status: string; limit: number; recent_fills: WSNormalizedFill[]; timestamp_ms: number }>(res);
+  },
+
+  // =========================================================================
+  // Milestone 22.3: Capital Escalation & Walk-Forward Risk Governance
+  // =========================================================================
+
+  /**
+   * GET /api/execution/escalation/status
+   */
+  async getCapitalEscalationStatus(strategy_id?: string): Promise<{ status: string; escalation: CapitalEscalationReport }> {
+    const params = new URLSearchParams();
+    if (strategy_id) params.append('strategy_id', strategy_id);
+    const res = await authFetch(`${BASE_URL}/api/execution/escalation/status?${params.toString()}`);
+    return handleResponse<{ status: string; escalation: CapitalEscalationReport }>(res);
+  },
+
+  /**
+   * POST /api/execution/escalation/evaluate
+   */
+  async evaluateCapitalEscalation(req: {
+    strategy_id?: string;
+    sharpe: number;
+    trade_count: number;
+    trials_count?: number;
+    max_drawdown?: number;
+    slippage_bps?: number;
+    regime_count?: number;
+    skewness?: number;
+    kurtosis?: number;
+  }): Promise<{ status: string; evaluation: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/escalation/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ status: string; evaluation: any }>(res);
+  },
+
+  /**
+   * POST /api/execution/escalation/activate-eligible
+   */
+  async activateEligibleTier(strategy_id?: string, operator: string = 'OPERATOR_DESK'): Promise<{ status: string; result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/escalation/activate-eligible`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strategy_id, operator }),
+    });
+    return handleResponse<{ status: string; result: any }>(res);
+  },
+
+  /**
+   * POST /api/execution/escalation/clamp
+   */
+  async clampCapitalTier(req: {
+    strategy_id?: string;
+    target_tier: CapitalTier;
+    reason: string;
+    operator?: string;
+  }): Promise<{ status: string; result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/escalation/clamp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ status: string; result: any }>(res);
+  },
+
+  /**
+   * POST /api/execution/escalation/authorize-production
+   */
+  async authorizeProductionTier(req: {
+    strategy_id: string;
+    hmac_signature: string;
+    auth_payload: string;
+    secret_key: string;
+    timestamp_ms: number;
+  }): Promise<{ status: string; result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/escalation/authorize-production`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ status: string; result: any }>(res);
   },
 
   /**

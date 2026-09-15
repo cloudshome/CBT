@@ -602,8 +602,17 @@
 - [ ] **Task 22.2: First Live Exchange Micro-Notional Canary Order Verification ($10 - $25 USD)**
   - Execute first live micro-order ($10.00) on exchange matching engine.
   - Audit ACK transit latency and verify fill in `trading_logs.db`.
-- [ ] **Task 22.3: 24/7 Autonomous Paper-to-Live Capital Escalation Protocol**
-  - Continuous live PnL reconciliation, 30-day walk-forward governance, and graduated position sizing.
+- [x] **Task 22.3: Institutional Capital Governance & Walk-Forward Escalation Protocol (`core/execution/capital_governor.py`)**
+  - **Risk Ceiling Primacy**: Sizing strictly bounded by $\text{effective\_risk} = \min(\text{strat}, \text{tier}, \text{heat}, \text{DD}, \text{parent\_1.5\%})$. Escalator can lower ceilings but never override lower risk gates.
+  - **Dual-Constraint Enforcement**: Simultaneously validates $\text{order\_risk} \le \text{tier\_risk\_budget}$ and $\text{notional} \le \text{tier\_notional\_cap}$ with stricter constraint winning.
+  - **8-State Lifecycle with `*_ELIGIBLE` Gates**: `PAPER` $\to$ `CANARY_ELIGIBLE` $\to$ `CANARY` $\to$ `MICRO_ELIGIBLE` $\to$ `MICRO_LIVE` $\to$ `SCALED_ELIGIBLE` $\to$ `SCALED_LIVE` $\to$ `PRODUCTION_ELIGIBLE` $\to$ `PRODUCTION`.
+  - **Contextual DSR with Multi-Testing Trials ($M$)**: Evaluates Deflated Sharpe Ratio against maximum expected random Sharpe under $M$ trials (Bailey & López de Prado, 2014).
+  - **Demotion State Machine with Hysteresis**: 24h cooldown, recovery requirements, and fail-closed freeze states on daily drawdown or kill-switch triggers.
+  - **Downward-Only Clamping**: Administrative `/clamp` endpoint strictly rejects upward promotion attempts (`MANUAL_PROMOTION_FORBIDDEN`).
+  - **Cryptographic Production Boundary**: Tier 8 requires cold HMAC-SHA256 operator token (<60s drift SLA).
+  - **Immutable Decision Ledger**: Durable `capital_escalation_decisions` audit trail in SQLite `trading_logs.db`.
+  - **Integrated into Live Gatekeeper & UI**: Gate 7 added to `LiveExecutionGatekeeper` and Cockpit UI added to `LiveLaunchpadDesk.tsx`.
+  - **Verified with 14/14 Tests Passing**: `tests/test_phase22_capital_governor.py` 100% green.
 
 ---
 

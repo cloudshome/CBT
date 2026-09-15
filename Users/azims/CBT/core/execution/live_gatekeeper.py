@@ -69,15 +69,19 @@ class LiveExecutionGatekeeper:
         exchange: str,
         order_notional_usd: float,
         environment: str = "PRODUCTION",
+        strategy_id: str | None = None,
+        entry_price: float = 0.0,
+        stop_loss_price: float | None = None,
     ) -> GatekeeperVerdict:
         """
-        Executes exhaustive 6-point constitutional clearance evaluation:
+        Executes exhaustive 7-point constitutional clearance evaluation:
         1. Vault unlocked with valid key derivation.
         2. Master Kill Switch operational.
         3. Exchange connectivity & Clock Drift within 500ms SLA.
         4. Daily drawdown below 3.0% threshold.
         5. Sizing conforms to 1.5% single-trade equity cap.
         6. System Live Trading Authorization verified.
+        7. Capital Governor Dual-Constraint Clearance (Risk Budget & Notional Cap, when strategy_id provided).
         """
         now_ms = int(time.time() * 1000)
         exchange_upper = exchange.upper().strip()
@@ -148,6 +152,26 @@ class LiveExecutionGatekeeper:
             reasons.append(
                 "LIVE_TRADING_ENABLED environment flag is not set to true. Execution blocked."
             )
+
+        # 7. Capital Governor Dual-Constraint Check (when strategy_id is specified)
+        if strategy_id:
+            from core.execution.capital_governor import capital_governor
+
+            effective_entry = (
+                entry_price
+                if entry_price > 0
+                else (order_notional_usd / 0.001 if order_notional_usd > 0 else 100.0)
+            )
+            cap_clearance = capital_governor.evaluate_order_risk(
+                requested_notional_usd=order_notional_usd,
+                entry_price=effective_entry,
+                stop_loss_price=stop_loss_price,
+                current_equity=total_equity,
+                strategy_id=strategy_id,
+            )
+            checks["capital_governor_cleared"] = cap_clearance.passed
+            if not cap_clearance.passed:
+                reasons.extend(cap_clearance.rejection_reasons)
 
         all_passed = all(checks.values())
 

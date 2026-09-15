@@ -195,7 +195,7 @@ class UniversalIngestor:
                     if transcription:
                         metadata["transcription_provider"] = "GEMINI_MULTIMODAL"
                         return transcription, metadata
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.warning(f"Gemini media transcription failed for {file_path.name}: {e}")
 
             # Fallback for media files when API key not set or offline
@@ -309,7 +309,7 @@ class UniversalIngestor:
                     author=creator,
                     source_id=sid,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Macro cognitive analysis notice: {e}")
 
         # 2. Deconstruct into Atomic Claims, Concepts, Observations

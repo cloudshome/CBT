@@ -1831,3 +1831,87 @@ export interface ReplaySnapshotData {
   replayAlignment: number;
   whatChanged: string;
 }
+
+// =============================================================================
+// Milestone 22.3: Capital Escalation & Walk-Forward Risk Governance Types
+// =============================================================================
+export type CapitalTier =
+  | 'TIER_0_PAPER'
+  | 'TIER_1_CANARY_ELIGIBLE'
+  | 'TIER_1_CANARY'
+  | 'TIER_2_MICRO_ELIGIBLE'
+  | 'TIER_2_MICRO_LIVE'
+  | 'TIER_3_SCALED_ELIGIBLE'
+  | 'TIER_3_SCALED_LIVE'
+  | 'TIER_4_PRODUCTION_ELIGIBLE'
+  | 'TIER_4_PRODUCTION';
+
+export interface TierPolicyData {
+  tier: CapitalTier;
+  rank: number;
+  name: string;
+  max_notional_usd: number;
+  max_risk_budget_usd: number;
+  kelly_multiplier: number;
+  max_concurrent_positions: number;
+  is_live_capital: boolean;
+  requires_operator_activation: boolean;
+  description: string;
+}
+
+export interface DemotionStateData {
+  is_demoted: boolean;
+  current_tier: string;
+  previous_tier: string;
+  target_tier: string;
+  triggering_metric: string;
+  metric_value: number;
+  threshold_value: number;
+  demoted_at_ms: number;
+  cooldown_until_ms: number;
+  recovery_requirements: Record<string, any>;
+  is_promotion_frozen: boolean;
+  requires_human_reauth: boolean;
+}
+
+export interface CapitalEscalationDecisionData {
+  decision_id: string;
+  strategy_id: string;
+  previous_tier: string;
+  requested_tier: string;
+  approved_tier: string;
+  decision_type: string;
+  reason_codes: string;
+  metrics_snapshot: string;
+  dsr: number;
+  sharpe: number;
+  trade_count: number;
+  trials_count: number;
+  walk_forward_score: number;
+  max_drawdown: number;
+  slippage_bps: number;
+  regime: string;
+  portfolio_heat: number;
+  daily_drawdown: number;
+  risk_multiplier: number;
+  operator_authorization?: string | null;
+  timestamp_ms: number;
+  software_version: string;
+  policy_version: string;
+}
+
+export interface CapitalEscalationReport {
+  strategy_id: string;
+  current_tier: CapitalTier;
+  current_rank: number;
+  tier_name: string;
+  policy: TierPolicyData;
+  is_live_capital: boolean;
+  is_frozen: boolean;
+  consecutive_clean_trades: number;
+  total_live_trades: number;
+  demotion_state: DemotionStateData;
+  all_tiers: TierPolicyData[];
+  recent_decisions: CapitalEscalationDecisionData[];
+}
+
