@@ -27,6 +27,7 @@ import { VolatilitySurfaceDesk } from './components/VolatilitySurfaceDesk';
 import { ArbitrageRadar } from './components/ArbitrageRadar';
 import { MBODepthTerminal } from './components/MBODepthTerminal';
 import { LiveLaunchpadDesk } from './components/LiveLaunchpadDesk';
+import { ExecutionTCACockpit } from './components/ExecutionTCACockpit';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
@@ -103,7 +104,7 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH' | 'LIVE_LAUNCHPAD'>('DOSSIER');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH' | 'LIVE_LAUNCHPAD' | 'EXECUTION_TCA'>('DOSSIER');
   const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN' | 'ARBITRAGE_RADAR' | 'MBO_DEPTH'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
@@ -674,6 +675,17 @@ export const App: React.FC = () => {
                   <ShieldCheck size={13} className={activeBottomTab === 'LIVE_LAUNCHPAD' ? 'text-white animate-pulse' : 'text-emerald-400'} />
                   <span>🛡️ Live Launchpad</span>
                 </button>
+                <button
+                  onClick={() => setActiveBottomTab('EXECUTION_TCA')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'EXECUTION_TCA'
+                      ? 'bg-gradient-to-r from-sky-600 via-indigo-600 to-purple-600 text-white font-bold shadow-md shadow-sky-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Activity size={13} className={activeBottomTab === 'EXECUTION_TCA' ? 'text-white animate-pulse' : 'text-sky-400'} />
+                  <span>⚡ Execution & TCA</span>
+                </button>
               </div>
             </div>
 
@@ -846,6 +858,11 @@ export const App: React.FC = () => {
                 />
               ) : activeBottomTab === 'LIVE_LAUNCHPAD' ? (
                 <LiveLaunchpadDesk
+                  onNotify={addToast}
+                />
+              ) : activeBottomTab === 'EXECUTION_TCA' ? (
+                <ExecutionTCACockpit
+                  symbol={symbol}
                   onNotify={addToast}
                 />
               ) : (

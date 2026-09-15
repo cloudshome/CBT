@@ -2276,6 +2276,131 @@ export const api = {
     });
     return handleResponse<{ status: string; context: any }>(res);
   },
+
+  // ============================================================================
+  // PHASE 23: TCA, DELTA HEDGING & COLLATERAL GOVERNANCE
+  // ============================================================================
+
+  async getTCASummary(symbol?: string): Promise<{ status: string; summary: TCASummary }> {
+    let url = `${BASE_URL}/api/execution/tca/summary`;
+    if (symbol) url += `?symbol=${encodeURIComponent(symbol)}`;
+    const res = await authFetch(url);
+    return handleResponse<{ status: string; summary: TCASummary }>(res);
+  },
+
+  async getTCARecords(limit: number = 50): Promise<{ status: string; count: number; records: TCARecord[] }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/tca/records?limit=${limit}`);
+    return handleResponse<{ status: string; count: number; records: TCARecord[] }>(res);
+  },
+
+  async analyzeTCAExecution(params: {
+    execution_id: string;
+    client_order_id: string;
+    symbol?: string;
+    side?: string;
+    venue?: string;
+    strategy_id?: string;
+    provenance?: string;
+    decision_price?: number;
+    arrival_price?: number;
+    benchmark_price?: number;
+    executed_vwap: number;
+    best_bid?: number;
+    best_ask?: number;
+    requested_qty: number;
+    filled_qty: number;
+    fee_paid_usd?: number;
+    rebate_earned_usd?: number;
+    future_prices?: Record<string, number | null>;
+  }): Promise<{ status: string; tca_result: any }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/tca/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; tca_result: any }>(res);
+  },
+
+  async getDeltaExposure(asset: string = 'BTC'): Promise<{
+    status: string;
+    exposure: DeltaExposureSummary;
+    basis_metric: BasisFundingMetric;
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/delta/exposure?asset=${encodeURIComponent(asset)}`);
+    return handleResponse<{
+      status: string;
+      exposure: DeltaExposureSummary;
+      basis_metric: BasisFundingMetric;
+    }>(res);
+  },
+
+  async proposeDeltaHedge(params: {
+    asset: string;
+    reference_price: number;
+    preferred_venue?: string;
+  }): Promise<{ status: string; proposed_hedge: ProposedHedgeOrder }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/delta/propose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; proposed_hedge: ProposedHedgeOrder }>(res);
+  },
+
+  async executeAuthorizedHedge(params: {
+    hedge_id: string;
+    confirmation_phrase: string;
+    environment?: string;
+  }): Promise<{ status: string; hedge_state?: string; hedge?: any; reasons?: string[] }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/delta/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; hedge_state?: string; hedge?: any; reasons?: string[] }>(res);
+  },
+
+  async getCollateralReport(): Promise<{ status: string; collateral_report: CollateralReport }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/collateral/report`);
+    return handleResponse<{ status: string; collateral_report: CollateralReport }>(res);
+  },
+
+  async updateCollateralSnapshot(params: {
+    venue: string;
+    total_equity_usd: number;
+    available_balance_usd: number;
+    initial_margin_usd?: number;
+    maintenance_margin_usd?: number;
+    unrealized_pnl_usd?: number;
+  }): Promise<{ status: string; venue_snapshot: VenueCollateralSnapshot }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/collateral/snapshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{ status: string; venue_snapshot: VenueCollateralSnapshot }>(res);
+  },
+
+  async getSORFailoverStatus(symbol: string = 'BTCUSDT', venue: string = 'BINANCE'): Promise<SORFailoverStatus> {
+    const res = await authFetch(`${BASE_URL}/api/execution/sor/failover-status?symbol=${encodeURIComponent(symbol)}&venue=${encodeURIComponent(venue)}`);
+    return handleResponse<SORFailoverStatus>(res);
+  },
+
+  async abortActiveSlicers(): Promise<{ status: string; message: string }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/sor/abort-slicers`, {
+      method: 'POST',
+    });
+    return handleResponse<{ status: string; message: string }>(res);
+  },
+
+  async emergencyFlattenDelta(asset: string, confirmation_code: string): Promise<{ status: string; message: string }> {
+    const res = await authFetch(`${BASE_URL}/api/execution/delta/flatten`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asset, confirmation_code }),
+    });
+    return handleResponse<{ status: string; message: string }>(res);
+  },
 };
 
 export interface BurnInStatus {
@@ -3052,6 +3177,133 @@ export interface PanicCloseResponse {
   };
 }
 
+// ============================================================================
+// PHASE 23: TCA, DELTA HEDGING & COLLATERAL GOVERNANCE INTERFACES
+// ============================================================================
 
+export interface TCASummary {
+  total_executions: number;
+  total_notional_usd: number;
+  mean_slippage_bps: number;
+  mean_implementation_shortfall_bps: number;
+  mean_delay_cost_bps: number;
+  mean_spread_cost_bps: number;
+  mean_market_impact_bps: number;
+  mean_fee_bps: number;
+  markout_1s_bps: number;
+  markout_5s_bps: number;
+  markout_30s_bps: number;
+  markout_60s_bps: number;
+  markout_300s_bps: number;
+  adverse_selection_count: number;
+  price_improvement_count: number;
+}
 
+export interface TCARecord {
+  execution_id: string;
+  client_order_id: string;
+  symbol: string;
+  side: string;
+  venue: string;
+  strategy_id: string;
+  provenance: string;
+  requested_qty: number;
+  filled_qty: number;
+  executed_vwap: number;
+  decision_price: number;
+  arrival_price: number;
+  total_cost_bps: number;
+  slippage_bps: number;
+  delay_cost_bps: number;
+  spread_cost_bps: number;
+  market_impact_bps: number;
+  fee_bps: number;
+  markout_1s_bps: number | null;
+  markout_5s_bps: number | null;
+  markout_30s_bps: number | null;
+  markout_60s_bps: number | null;
+  markout_300s_bps: number | null;
+  created_at_ms: number;
+}
 
+export interface DeltaExposureSummary {
+  asset: string;
+  net_delta_qty: number;
+  net_delta_usd: number;
+  tolerance_breached: boolean;
+  dominant_venue: string;
+  total_long_usd: number;
+  total_short_usd: number;
+  legs_count: number;
+  calculated_at_ms: number;
+}
+
+export interface BasisFundingMetric {
+  venue: string;
+  spot_price: number;
+  perp_price: number;
+  basis_bps: number;
+  annualized_basis_pct: number;
+  funding_rate: number;
+  annualized_funding_pct: number;
+  net_carry_apr_pct: number;
+  spot_symbol: string;
+  perp_symbol: string;
+}
+
+export interface ProposedHedgeOrder {
+  hedge_id: string;
+  asset: string;
+  target_venue: string;
+  target_symbol: string;
+  side: 'BUY' | 'SELL';
+  hedge_qty: number;
+  reference_price: number;
+  notional_usd: number;
+  instrument_type: string;
+  urgency: string;
+  state: string;
+  created_at_ms: number;
+}
+
+export interface VenueCollateralSnapshot {
+  venue: string;
+  total_equity_usd: number;
+  available_balance_usd: number;
+  initial_margin_usd: number;
+  maintenance_margin_usd: number;
+  margin_utilization_ratio: number;
+  liquidation_buffer_ratio: number;
+  risk_state: 'NORMAL' | 'CAUTION' | 'DANGER' | 'LIQUIDATION_RISK' | 'STALE';
+  data_age_seconds: number;
+  timestamp_ms: number;
+}
+
+export interface CollateralReport {
+  venues: Record<string, VenueCollateralSnapshot>;
+  total_equity_usd: number;
+  aggregate_margin_ratio: number;
+  systemic_risk_state: 'NORMAL' | 'CAUTION' | 'DANGER' | 'LIQUIDATION_RISK' | 'STALE';
+  venues_in_danger: string[];
+  venues_at_risk: string[];
+  freshness_ok: boolean;
+  timestamp_ms: number;
+}
+
+export interface VenueHealthStatus {
+  venue: string;
+  consecutive_failures: number;
+  avg_ack_latency_ms: number;
+  is_degraded: boolean;
+  is_active: boolean;
+  last_failure_reason: string;
+}
+
+export interface SORFailoverStatus {
+  status: string;
+  venues: Record<string, VenueHealthStatus>;
+  vpin_circuit_breaker: {
+    is_paused: boolean;
+    reason: string;
+  };
+}

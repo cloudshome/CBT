@@ -64,6 +64,7 @@ from core.collective.routes import router as collective_router
 from core.arbitrage.routes import router as arbitrage_router
 from core.mbo.routes import router as mbo_router
 from core.execution.live_routes import router as live_execution_router_api
+from core.execution.phase23_routes import router as phase23_execution_router
 from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
 from core.conservative_kelly import conservative_kelly
@@ -252,6 +253,7 @@ app.include_router(volatility_router)
 app.include_router(arbitrage_router)
 app.include_router(mbo_router)
 app.include_router(live_execution_router_api)
+app.include_router(phase23_execution_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()
