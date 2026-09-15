@@ -47,8 +47,10 @@ import {
   CVDSeriesData,
   OBIData,
 } from './types';
-import { api, ApiError } from './services/api';
+import { api, ApiError, getSetupStatus } from './services/api';
 import { notificationService } from './services/notificationService';
+import { FirstRunSetupWizard } from './components/FirstRunSetupWizard';
+import { SoftwareUpdateModal } from './components/SoftwareUpdateModal';
 import {
   Layers,
   ShieldCheck,
@@ -116,6 +118,21 @@ export const App: React.FC = () => {
   // General Loading & UI State
   const [loadingMarket, setLoadingMarket] = useState<boolean>(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false);
+  const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
+
+  // Check First-Run Setup Status on App Launch
+  useEffect(() => {
+    getSetupStatus()
+      .then((res) => {
+        if (res.is_first_run) {
+          setShowSetupWizard(true);
+        }
+      })
+      .catch(() => {
+        // Silently ignore during initial dev startup
+      });
+  }, []);
 
   // Toast notification helper
   const addToast = useCallback((type: ToastMessage['type'], title: string, message: string) => {
@@ -411,6 +428,61 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#05070c] text-slate-100 flex flex-col font-sans antialiased selection:bg-sky-500/30 selection:text-sky-200">
+      {/* Windows Native Frameless Titlebar */}
+      <header
+        className="w-full h-8 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between px-3 select-none text-xs text-zinc-400 z-40 sticky top-0"
+        style={{ WebkitAppRegion: 'drag' } as any}
+      >
+        <div className="flex items-center space-x-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow shadow-amber-400/50" />
+          <span className="font-bold text-zinc-200 tracking-wider">CRYPTO BRAIN TERMINAL</span>
+          <span className="text-[10px] font-mono text-zinc-500">v3.0.0</span>
+          <span className="text-[10px] font-mono text-emerald-400/80 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/30">
+            LOCAL PORT 127.0.0.1
+          </span>
+        </div>
+
+        <div className="flex items-center space-x-2" style={{ WebkitAppRegion: 'no-drag' } as any}>
+          <button
+            onClick={() => setShowUpdateModal(true)}
+            className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-[11px] text-amber-400 border border-amber-400/20 flex items-center space-x-1 transition"
+          >
+            <span>Updates</span>
+          </button>
+          <button
+            onClick={() => setShowSetupWizard(true)}
+            className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-[11px] text-zinc-300 border border-zinc-700 transition"
+          >
+            <span>Setup Wizard</span>
+          </button>
+
+          {/* Window Controls (Electron IPC) */}
+          <div className="flex items-center ml-2 space-x-1">
+            <button
+              onClick={() => (window as any).ctb?.minimize?.()}
+              className="w-6 h-6 rounded hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition"
+              title="Minimize"
+            >
+              —
+            </button>
+            <button
+              onClick={() => (window as any).ctb?.maximize?.()}
+              className="w-6 h-6 rounded hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition"
+              title="Maximize"
+            >
+              □
+            </button>
+            <button
+              onClick={() => (window as any).ctb?.close?.()}
+              className="w-6 h-6 rounded hover:bg-rose-950/80 hover:text-rose-400 flex items-center justify-center text-zinc-400 transition"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </header>
+
       {/* Institutional Navigation Header */}
       <Header
         symbol={symbol}
@@ -982,6 +1054,16 @@ export const App: React.FC = () => {
       </main>
         </>
       )}
+      {/* First-Run Configuration Wizard */}
+      {showSetupWizard && (
+        <FirstRunSetupWizard onComplete={() => setShowSetupWizard(false)} />
+      )}
+
+      {/* Software Auto-Updater Modal */}
+      <SoftwareUpdateModal
+        isOpen={showUpdateModal}
+        onClose={() => setShowUpdateModal(false)}
+      />
 
       {/* Floating Global Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

@@ -3307,3 +3307,145 @@ export interface SORFailoverStatus {
     reason: string;
   };
 }
+
+// ===========================================================================
+// Desktop Setup & Software Auto-Updater Types & Functions
+// ===========================================================================
+
+export interface SetupStatusResponse {
+  is_first_run: boolean;
+  setup_completed: boolean;
+  has_gemini_key: boolean;
+  has_master_password: boolean;
+  configured_exchanges: Array<{
+    exchange: string;
+    environment: string;
+    masked_api_key: string;
+    is_active: boolean;
+    updated_at: number;
+  }>;
+  web3_wallets: Array<{
+    wallet_type: string;
+    chain: string;
+    address: string;
+    full_address: string;
+    rpc_url?: string;
+    is_watch_only: boolean;
+    is_active: boolean;
+  }>;
+  execution_mode: string;
+  app_version: string;
+  platform: string;
+  supported_exchanges: string[];
+}
+
+export interface SoftwareUpdateStatus {
+  update_available: boolean;
+  git_managed: boolean;
+  current_commit: string;
+  remote_commit?: string;
+  branch: string;
+  commits_behind: number;
+  changelog?: Array<{
+    hash: string;
+    author: string;
+    message: string;
+    date: string;
+  }>;
+  message: string;
+}
+
+export async function getSetupStatus(): Promise<SetupStatusResponse> {
+  const res = await authFetch('/api/system/setup-status');
+  return handleResponse<SetupStatusResponse>(res);
+}
+
+export async function verifyGeminiKey(gemini_api_key: string): Promise<{ valid: boolean; latency_ms: number; message: string; models_count?: number }> {
+  const res = await authFetch('/api/system/setup/verify-gemini', {
+    method: 'POST',
+    body: JSON.stringify({ gemini_api_key }),
+  });
+  return handleResponse(res);
+}
+
+export async function verifyExchangeCredentials(payload: {
+  exchange: string;
+  environment: string;
+  api_key: string;
+  api_secret: string;
+  passphrase?: string;
+}): Promise<any> {
+  const res = await authFetch('/api/system/setup/verify-exchange', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function verifyHyperliquidCredentials(payload: {
+  master_address: string;
+  agent_private_key: string;
+  environment: string;
+}): Promise<any> {
+  const res = await authFetch('/api/system/setup/verify-hyperliquid', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function saveWeb3Wallet(payload: {
+  wallet_type: string;
+  chain: string;
+  address: string;
+  rpc_url?: string;
+  is_watch_only?: boolean;
+}): Promise<any> {
+  const res = await authFetch('/api/system/setup/save-web3', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function deleteWeb3Wallet(chain: string, address: string): Promise<any> {
+  const res = await authFetch(`/api/system/setup/delete-web3/${chain}/${encodeURIComponent(address)}`, {
+    method: 'DELETE',
+  });
+  return handleResponse(res);
+}
+
+export async function completeFirstRunSetup(payload: {
+  master_password: string;
+  gemini_api_key?: string;
+  telegram_bot_token?: string;
+  telegram_chat_id?: string;
+  exchanges?: any[];
+  execution_mode?: string;
+}): Promise<any> {
+  const res = await authFetch('/api/system/setup/save', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function checkSoftwareUpdate(): Promise<SoftwareUpdateStatus> {
+  const res = await authFetch('/api/system/update/check');
+  return handleResponse<SoftwareUpdateStatus>(res);
+}
+
+export async function applySoftwareUpdate(target_branch: string = 'main'): Promise<any> {
+  const res = await authFetch('/api/system/update/apply', {
+    method: 'POST',
+    body: JSON.stringify({ target_branch, backup_snapshot: true }),
+  });
+  return handleResponse(res);
+}
+
+export async function rollbackSoftwareUpdate(snapshot_id: string): Promise<any> {
+  const res = await authFetch(`/api/system/update/rollback/${encodeURIComponent(snapshot_id)}`, {
+    method: 'POST',
+  });
+  return handleResponse(res);
+}

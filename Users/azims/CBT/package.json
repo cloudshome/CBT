@@ -2,7 +2,8 @@
   "name": "ctb-terminal",
   "version": "3.0.0",
   "description": "Crypto Brain Terminal quantitative paper trading & desk platform",
-  "main": "dist/server.js",
+  "main": "dist/electron/main.js",
+  "author": "Crypto Brain Terminal Team",
   "scripts": {
     "build": "tsc && npm --prefix frontend run build",
     "build:backend": "tsc",
@@ -14,7 +15,10 @@
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "test": "jest --runInBand",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "electron:build": "tsc -p electron/tsconfig.json",
+    "electron:start": "electron dist/electron/main.js",
+    "pack:windows": "python scripts/build_windows_app.py"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
@@ -31,6 +35,8 @@
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^24.13.3",
     "eslint": "^8.57.1",
     "jest": "^29.7.0",
     "prisma": "^5.22.0",

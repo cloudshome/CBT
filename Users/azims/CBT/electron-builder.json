@@ -1,0 +1,39 @@
+{
+  "appId": "com.cbt.terminal",
+  "productName": "Crypto Brain Terminal",
+  "executableName": "ctb",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/electron/**/*",
+    "frontend/dist/**/*",
+    "bin/**/*",
+    "data/templates/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "frontend/public/favicon.ico",
+    "legalTrademarks": "Copyright (C) 2026 Crypto Brain Terminal / SKY Quantitative Systems"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Crypto Brain Terminal",
+    "artifactName": "CTB_Setup_v${version}.${ext}",
+    "uninstallDisplayName": "Crypto Brain Terminal Uninstall"
+  }
+}
