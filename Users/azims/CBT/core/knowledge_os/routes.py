@@ -403,3 +403,40 @@ async def get_automation_run_log(
                 (limit,),
             ).fetchall()
     return {"log": [dict(r) for r in rows], "count": len(rows)}
+
+
+# -----------------------------------------------------------------------------
+# MACRO COGNITIVE INTELLIGENCE & TRADE PLAN SYNTHESIS ENDPOINTS
+# -----------------------------------------------------------------------------
+class TradePlanImpactRequest(BaseModel):
+    symbol: str = Field(default="BTC/USDT")
+    direction: str = Field(default="LONG")
+
+
+@router.get("/macro-state")
+async def get_macro_state() -> dict[str, Any]:
+    """Returns the latest macroeconomic intelligence state from talk shows and reels."""
+    from core.macro_cognitive_engine import macro_cognitive_engine
+
+    state = macro_cognitive_engine.get_latest_macro_state()
+    return {"macro_state": state, "status": "AVAILABLE" if state else "NOT_YET_RECORDED"}
+
+
+@router.get("/trading-plans")
+async def get_macro_trading_plans() -> dict[str, Any]:
+    """Returns live, dynamic trading plans incorporating active macro talk show intelligence."""
+    from core.macro_trade_planner import macro_trade_planner
+
+    plans = macro_trade_planner.generate_live_trading_plans()
+    return {"plans": plans, "count": len(plans)}
+
+
+@router.post("/trade-plan-impact")
+async def evaluate_trade_plan_impact(payload: TradePlanImpactRequest) -> dict[str, Any]:
+    """Evaluates the macro confluence and risk dampening of a proposed trade."""
+    from core.macro_trade_planner import macro_trade_planner
+
+    return macro_trade_planner.evaluate_macro_confluence(
+        symbol=payload.symbol,
+        technical_direction=payload.direction,
+    )

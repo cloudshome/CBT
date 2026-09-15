@@ -23,6 +23,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from core.knowledge_os.hybrid_retriever import hybrid_retriever
+from core.macro_cognitive_engine import macro_cognitive_engine
+from core.macro_trade_planner import macro_trade_planner
 
 logger = logging.getLogger("ai_quant_sentinel.knowledge_os.project_brain")
 
@@ -44,6 +46,8 @@ class ProjectKnowledgeContext:
     recommendation: str
     proposed_test_plan: list[str]
     epistemic_summary: dict[str, Any]
+    macro_intelligence: dict[str, Any] | None = None
+    trade_plans: list[dict[str, Any]] | None = None
     safety_disclaimer: str = (
         "RESEARCH KNOWLEDGE ONLY: This context is advisory and educational. "
         "It does NOT grant execution authorization or modify deterministic risk perimeters."
@@ -156,6 +160,13 @@ class ProjectBrainContextEngine:
             "has_rejection_precedent": len(autopsy_failures) > 0,
         }
 
+        macro_state = macro_cognitive_engine.get_latest_macro_state()
+        trade_plans = macro_trade_planner.generate_live_trading_plans()
+        if macro_state:
+            regime = macro_state.get("macro_regime", {}).get("regime_name", "")
+            if regime:
+                sky_assumptions.append(f"Active Macro Intelligence: {regime}")
+
         return ProjectKnowledgeContext(
             query=query,
             concepts=concepts,
@@ -170,6 +181,8 @@ class ProjectBrainContextEngine:
             recommendation=recommendation,
             proposed_test_plan=test_plan,
             epistemic_summary=epistemic_summary,
+            macro_intelligence=macro_state,
+            trade_plans=trade_plans,
         )
 
     def _get_relevant_sky_assumptions(self, query: str) -> list[str]:

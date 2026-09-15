@@ -27,6 +27,7 @@ from typing import Any
 
 from core.database import db_manager
 from core.knowledge_os.hybrid_retriever import hybrid_retriever
+from core.macro_cognitive_engine import macro_cognitive_engine
 
 logger = logging.getLogger("ai_quant_sentinel.knowledge_os.human_brain")
 
@@ -291,7 +292,9 @@ class HumanLearningEngine:
             sky_project_knowledge=sky_project_knowledge[:3]
             if sky_project_knowledge
             else [
-                "SKY currently treats this as an unverified candidate requiring walk-forward proof."
+                f"SKY Project Knowledge: Active Macro Regime '{macro_cognitive_engine.get_latest_macro_state().get('macro_regime', {}).get('regime_name', 'Calibration')}' guides trade plan risk dampeners."
+                if macro_cognitive_engine.get_latest_macro_state()
+                else "SKY currently treats this as an unverified candidate requiring walk-forward proof."
             ],
             model_inference=model_inference,
             unknown_or_unestablished=unknowns,

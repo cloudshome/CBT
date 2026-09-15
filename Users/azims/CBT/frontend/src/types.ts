@@ -186,6 +186,12 @@ export interface PaperDeskOverviewResponse {
     bullPath: string;
     bearPath: string;
     note: string;
+    macroAlignment?: 'CONFLUENT' | 'NEUTRAL' | 'CAUTION_DAMPENED';
+    macroRegime?: string;
+    macroDriver?: string;
+    riskMultiplier?: number;
+    currentPrice?: number;
+    generatedAt?: number;
   }>;
 }
 
@@ -722,6 +728,80 @@ export interface ResearchVaultsResponse {
   rejected: RejectedClaimItem[];
 }
 
+export interface MacroCausalChain {
+  cause: string;
+  mechanism: string;
+  market_impact: string;
+  crypto_consequence: string;
+  time_horizon: string;
+}
+
+export interface MacroAssetImpact {
+  asset: string;
+  sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'VOLATILE';
+  sentiment_score: number;
+  rationale: string;
+  invalidation_level?: number | null;
+}
+
+export interface MacroEconomicCatalyst {
+  event_name: string;
+  expected_impact: string;
+  urgency: 'HIGH' | 'MEDIUM' | 'LOW';
+  invalidation_notes: string;
+}
+
+export interface MacroRegimeState {
+  regime_name: string;
+  monetary_stance: 'HAWKISH' | 'DOVISH' | 'NEUTRAL' | 'PIVOTING';
+  inflation_trajectory: 'COOLING' | 'STICKY' | 'ACCELERATING';
+  liquidity_cycle: 'EXPANDING' | 'CONTRACTING' | 'NEUTRAL';
+  growth_outlook: 'EXPANSION' | 'SLOWDOWN' | 'STAGFLATION' | 'RECESSION_RISK';
+  primary_driver: string;
+}
+
+export interface MacroComprehensionResult {
+  source_title: string;
+  speaker_author: string;
+  source_worldview: string;
+  executive_macro_thesis: string;
+  macro_regime: MacroRegimeState;
+  causal_chains: MacroCausalChain[];
+  asset_matrix: Record<string, MacroAssetImpact>;
+  catalysts: MacroEconomicCatalyst[];
+  epistemic_facts: string[];
+  hypotheses_claims: string[];
+  hype_quarantined: string[];
+  trade_planning_implications: {
+    btc_bias: string;
+    eth_bias: string;
+    macro_risk_factor: string;
+    kelly_multiplier: number;
+    key_invalidation_trigger: string;
+    planning_summary: string;
+  };
+  analyzed_at_ms?: number;
+  engine_provider?: string;
+}
+
+export interface DynamicTradingPlan {
+  symbol: string;
+  bias: string;
+  currentPrice: number;
+  pdh: number;
+  pdl: number;
+  fvgZone: string;
+  orderBlock: string;
+  bullPath: string;
+  bearPath: string;
+  macroAlignment: 'CONFLUENT' | 'NEUTRAL' | 'CAUTION_DAMPENED';
+  macroRegime: string;
+  macroDriver: string;
+  riskMultiplier: number;
+  note: string;
+  generatedAt: number;
+}
+
 export interface ResearchIngestResult {
   knowledge_id: string;
   source_id?: string;
@@ -730,6 +810,8 @@ export interface ResearchIngestResult {
   executive_summary?: string;
   chapter_breakdown?: string[];
   file_metadata?: Record<string, any>;
+  macro_analysis?: MacroComprehensionResult | null;
+  dynamic_trading_plans?: DynamicTradingPlan[] | null;
   epistemic_counts?: {
     facts?: number;
     hypotheses?: number;
@@ -1260,6 +1342,8 @@ export interface ProjectKnowledgeContext {
     has_rejection_precedent: boolean;
   };
   safety_disclaimer: string;
+  macro_intelligence?: MacroComprehensionResult | null;
+  trade_plans?: DynamicTradingPlan[] | null;
   generated_at: number;
 }
 

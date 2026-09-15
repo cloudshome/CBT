@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Layers,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { ProjectKnowledgeContext } from '../../types';
@@ -223,6 +224,63 @@ export const ProjectBrainDesk: React.FC<ProjectBrainDeskProps> = ({
                 </ul>
               </div>
             </div>
+
+            {/* Active Macro Cognitive Regime & Dynamic Trade Plans */}
+            {(context.macro_intelligence || (context.trade_plans && context.trade_plans.length > 0)) && (
+              <div className="p-4 bg-[#0a101d] border border-rose-500/40 rounded-xl flex flex-col gap-3 shadow-md mt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-rose-400" />
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Macro Cognitive Memory &amp; Confluent Trading Plans
+                    </h4>
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800 rounded">
+                      ECONOMIC COGNITION
+                    </span>
+                  </div>
+                  {context.macro_intelligence?.macro_regime && (
+                    <span className="text-xs font-mono font-bold text-emerald-400">
+                      Regime: {context.macro_intelligence.macro_regime.monetary_stance} ({context.macro_intelligence.macro_regime.liquidity_cycle} Liquidity)
+                    </span>
+                  )}
+                </div>
+
+                {context.macro_intelligence?.executive_macro_thesis && (
+                  <p className="text-xs text-slate-300 font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                    <strong className="text-amber-400">Active Thesis:</strong> {context.macro_intelligence.executive_macro_thesis}
+                  </p>
+                )}
+
+                {context.trade_plans && context.trade_plans.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+                    {context.trade_plans.map((p, idx) => (
+                      <div key={idx} className="p-3 bg-slate-950 border border-slate-800 rounded-lg flex flex-col justify-between gap-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-white font-mono">{p.symbol}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
+                            p.macroAlignment === 'CONFLUENT'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : p.macroAlignment === 'CAUTION_DAMPENED'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            <Zap className="w-3 h-3" />
+                            {p.macroAlignment} ({p.riskMultiplier}x Sizing)
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-300 font-mono">
+                          <div><strong>Bias:</strong> {p.bias} | <strong>Current:</strong> ${p.currentPrice?.toLocaleString()}</div>
+                          <div><strong>FVG:</strong> {p.fvgZone} | <strong>OB:</strong> {p.orderBlock}</div>
+                        </div>
+                        <p className="text-[10px] text-slate-400 italic">
+                          <strong>Driver:</strong> {p.macroDriver}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 4-Quadrant Evidence & Autopsy Grid */}

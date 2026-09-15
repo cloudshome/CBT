@@ -42,6 +42,8 @@ import {
   ReplaySnapshotData,
   SMCGlossaryItem,
   SignalBlotterRecord,
+  MacroComprehensionResult,
+  DynamicTradingPlan,
 } from '../types';
 
 const BASE_URL = '';
@@ -1475,6 +1477,52 @@ export const api = {
   async runKnowledgeAudit(): Promise<KnowledgeAuditReport> {
     const res = await authFetch(`${BASE_URL}/api/knowledge/audit`);
     return handleResponse<KnowledgeAuditReport>(res);
+  },
+
+  /**
+   * GET /api/knowledge/macro-state (Active Macro Cognitive Intelligence State)
+   */
+  async getMacroState(): Promise<{ success: boolean; macro_state: MacroComprehensionResult | null; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/macro-state`);
+    return handleResponse<{ success: boolean; macro_state: MacroComprehensionResult | null; count: number }>(res);
+  },
+
+  /**
+   * GET /api/knowledge/trading-plans (Macro-confluent SMC Trading Plans)
+   */
+  async getMacroTradingPlans(): Promise<{ success: boolean; plans: DynamicTradingPlan[]; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/trading-plans`);
+    return handleResponse<{ success: boolean; plans: DynamicTradingPlan[]; count: number }>(res);
+  },
+
+  /**
+   * POST /api/knowledge/trade-plan-impact (Confluence & Kelly Sizing Impact Evaluation)
+   */
+  async evaluateTradePlanImpact(symbol: string, direction: string): Promise<{
+    success: boolean;
+    symbol: string;
+    direction: string;
+    macro_alignment: 'CONFLUENT' | 'NEUTRAL' | 'CAUTION_DAMPENED';
+    sizing_multiplier: number;
+    macro_regime: string;
+    macro_driver: string;
+    rationale: string;
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/trade-plan-impact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, direction }),
+    });
+    return handleResponse<{
+      success: boolean;
+      symbol: string;
+      direction: string;
+      macro_alignment: 'CONFLUENT' | 'NEUTRAL' | 'CAUTION_DAMPENED';
+      sizing_multiplier: number;
+      macro_regime: string;
+      macro_driver: string;
+      rationale: string;
+    }>(res);
   },
 
   // =========================================================================

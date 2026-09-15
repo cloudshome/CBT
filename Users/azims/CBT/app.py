@@ -1746,30 +1746,9 @@ async def get_paper_desk_overview():
         },
     ]
 
-    trading_plans = [
-        {
-            "symbol": "BTC/USDT",
-            "bias": "BULLISH",
-            "pdh": 79500.0,
-            "pdl": 76200.0,
-            "fvgZone": "$77,200 - $77,500",
-            "orderBlock": "$76,800 - $77,100",
-            "bullPath": "Sweep PDL -> Market Structure Shift on 5m -> Target PDH at $79,500",
-            "bearPath": "Rejection at H4 Fair Value Gap with volume drop -> Retest lower range at $75,800",
-            "note": "Half-Kelly sizing enforced ahead of NY opening volatility.",
-        },
-        {
-            "symbol": "ETH/USDT",
-            "bias": "ACCUMULATION",
-            "pdh": 2480.0,
-            "pdl": 2350.0,
-            "fvgZone": "$2,370 - $2,390",
-            "orderBlock": "$2,340 - $2,360",
-            "bullPath": "Re-accumulation inside H4 Order Block -> Target liquidity pool at $2,480",
-            "bearPath": "Loss of $2,340 structural swing low triggers risk-off liquidation to $2,280",
-            "note": "Funding rates neutral at +0.009%; spot accumulation dominant.",
-        },
-    ]
+    from core.macro_trade_planner import macro_trade_planner
+
+    trading_plans = macro_trade_planner.generate_live_trading_plans()
 
     base_balance = float(os.getenv("MAX_PAPER_ACCOUNT_BALANCE", "10000.0"))
     accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=base_balance)

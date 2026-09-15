@@ -32,6 +32,11 @@ import {
   Award,
   ShieldCheck,
   Cpu,
+  ArrowRight,
+  Zap,
+  Target,
+  DollarSign,
+  Radio,
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -303,6 +308,16 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           destination: 'Visual Market Graph',
         };
       }
+      if (['mp4', 'mov', 'webm', 'mp3', 'm4a', 'wav'].includes(ext)) {
+        return {
+          type: 'Macro Talk Show / Economic Video Reel',
+          badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          icon: Film,
+          hasRules: false,
+          recommendedAction: 'Cognitive Audio/Video Dissection: Extract Regimes, Causal Chains & Confluent Trade Plans',
+          destination: 'Macro Cognitive Engine + Dynamic Trade Plans',
+        };
+      }
       return {
         type: 'Research Document / Paper',
         badgeColor: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
@@ -376,6 +391,24 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           hasRules: true,
           recommendedAction: 'Extract entry/exit rules & queue candidate for backtesting',
           destination: 'Candidate Strategy Queue (Zero Alpha Assumed)',
+        };
+      }
+
+      // Check for macro / economic talk show keywords
+      const macroKeywords = [
+        'talk show', 'podcast', 'economic', 'macro', 'federal reserve', 'fed rate',
+        'jerome powell', 'interest rate', 'inflation', 'cpi', 'quantitative tightening',
+        'liquidity cycle', 'monetary policy', 'treasury yield', 'recession', 'stagflation',
+        'dollar index', 'dxy', 'fomc', 'unemployment', 'rate cut', 'rate hike',
+      ];
+      if (macroKeywords.some((kw) => lower.includes(kw))) {
+        return {
+          type: 'Economic Talk Show / Macro Intelligence Reel',
+          badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+          icon: Film,
+          hasRules: false,
+          recommendedAction: 'Macro Cognitive Transmission: Dissect monetary policy, inflation cycles & synthesize confluent trade plans',
+          destination: 'Macro Cognitive Engine + Dynamic Trade Plans',
         };
       }
 
@@ -561,6 +594,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
 
   const getSourceTypeBadge = (summary: ResearchIngestResult) => {
     const st = (summary.provenance?.source_type || (summary.file_metadata?.book_title ? 'PDF' : '')).toUpperCase();
+    if (st === 'REEL' || st === 'TALK_SHOW') return { label: 'Macro Talk Show / Video Reel', icon: Film, color: 'bg-rose-500/20 text-rose-300 border-rose-500/40' };
     if (st === 'YOUTUBE') return { label: 'YouTube Video Research', icon: Play, color: 'bg-red-500/20 text-red-400 border-red-500/40' };
     if (st === 'GITHUB') return { label: 'GitHub Repository', icon: GitBranch, color: 'bg-purple-500/20 text-purple-400 border-purple-500/40' };
     if (st === 'CODE') return { label: 'Algorithmic Code', icon: Tag, color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' };
@@ -653,7 +687,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       case 'CODE':
         return <Github className="w-4 h-4 text-purple-400" />;
       case 'REEL':
-        return <Film className="w-4 h-4 text-pink-400" />;
+      case 'TALK_SHOW':
+        return <Film className="w-4 h-4 text-rose-400" />;
       case 'PDF':
         return <FileText className="w-4 h-4 text-amber-400" />;
       default:
@@ -857,7 +892,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
             type="file"
             onChange={handleFileSelect}
             className="hidden"
-            accept=".pdf,.py,.pine,.mq4,.mq5,.json,.csv,.txt,.md,image/*"
+            accept=".pdf,.py,.pine,.mq4,.mq5,.json,.csv,.txt,.md,.mp4,.mov,.webm,.mp3,.m4a,.wav,image/*"
           />
 
           <div className="flex flex-col items-center justify-center gap-2">
@@ -873,7 +908,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               <>
                 <UploadCloud className="w-10 h-10 text-indigo-400/80" />
                 <p className="text-sm font-medium text-slate-200">
-                  Drop anything here ( <span className="text-cyan-400">PDFs / Books</span> • <span className="text-purple-400">Code / PineScript</span> • <span className="text-amber-400">Notes / Articles</span> • <span className="text-pink-400">Images</span> )
+                  Drop anything here ( <span className="text-rose-400 font-bold">🎬 Video Reels / Talk Shows</span> • <span className="text-cyan-400">PDFs / Books</span> • <span className="text-purple-400">Code / PineScript</span> • <span className="text-amber-400">Notes / Articles</span> • <span className="text-pink-400">Images</span> )
                 </p>
                 <p className="text-xs text-slate-400">or click to browse your system</p>
               </>
@@ -1436,6 +1471,273 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               {activeSummary.executive_summary || activeSummary.verdict_message}
             </p>
           </div>
+
+          {/* ========================================================================= */}
+          {/* MACRO COGNITIVE UNDERSTANDING & CONFLUENT TRADE PLANS (REELS / TALK SHOWS) */}
+          {/* ========================================================================= */}
+          {activeSummary.macro_analysis && (
+            <div className="bg-[#0b1220] border-2 border-rose-500/40 rounded-xl p-4 flex flex-col gap-4 shadow-2xl">
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-rose-500/20 text-rose-400 border border-rose-500/40 rounded-lg">
+                    <Brain className="w-5 h-5 text-rose-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-bold text-white tracking-wide">
+                        MACRO COGNITIVE COMPREHENSION &amp; TRADE PLAN SYNTHESIS
+                      </h3>
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800/60 rounded">
+                        HUMAN-LIKE COGNITION
+                      </span>
+                      {activeSummary.macro_analysis.engine_provider && (
+                        <span className="px-2 py-0.5 text-[10px] font-mono text-cyan-300 bg-cyan-950/70 border border-cyan-800/50 rounded">
+                          {activeSummary.macro_analysis.engine_provider}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Dissecting economic talk show / reel • Speaker: <strong className="text-slate-200">{activeSummary.macro_analysis.speaker_author || 'Unknown'}</strong> • Worldview: <span className="text-indigo-300">{activeSummary.macro_analysis.source_worldview}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400">Kelly Sizing Multiplier:</span>
+                  <span className={`px-2 py-1 rounded text-xs font-bold font-mono ${
+                    (activeSummary.macro_analysis.trade_planning_implications?.kelly_multiplier ?? 1) >= 1
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  }`}>
+                    {activeSummary.macro_analysis.trade_planning_implications?.kelly_multiplier ?? 1.0}x
+                  </span>
+                </div>
+              </div>
+
+              {/* Macro Thesis */}
+              <div className="p-3 bg-slate-950/80 rounded-lg border border-slate-800 flex flex-col gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  Core Executive Macro Thesis
+                </span>
+                <p className="text-xs text-slate-200 leading-relaxed font-mono">
+                  {activeSummary.macro_analysis.executive_macro_thesis}
+                </p>
+              </div>
+
+              {/* 4-Pillar Macro Regime State */}
+              {activeSummary.macro_analysis.macro_regime && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-2.5 flex flex-col">
+                    <span className="text-[10px] text-slate-500 font-semibold uppercase">Monetary Policy</span>
+                    <span className={`text-xs font-bold mt-1 ${
+                      activeSummary.macro_analysis.macro_regime.monetary_stance === 'DOVISH'
+                        ? 'text-emerald-400'
+                        : activeSummary.macro_analysis.macro_regime.monetary_stance === 'HAWKISH'
+                        ? 'text-rose-400'
+                        : 'text-amber-400'
+                    }`}>
+                      {activeSummary.macro_analysis.macro_regime.monetary_stance}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      {activeSummary.macro_analysis.macro_regime.primary_driver || 'Central Bank'}
+                    </span>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-2.5 flex flex-col">
+                    <span className="text-[10px] text-slate-500 font-semibold uppercase">Inflation Vector</span>
+                    <span className={`text-xs font-bold mt-1 ${
+                      activeSummary.macro_analysis.macro_regime.inflation_trajectory === 'COOLING'
+                        ? 'text-emerald-400'
+                        : 'text-rose-400'
+                    }`}>
+                      {activeSummary.macro_analysis.macro_regime.inflation_trajectory}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">CPI / PCE Momentum</span>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-2.5 flex flex-col">
+                    <span className="text-[10px] text-slate-500 font-semibold uppercase">Liquidity Cycle</span>
+                    <span className={`text-xs font-bold mt-1 ${
+                      activeSummary.macro_analysis.macro_regime.liquidity_cycle === 'EXPANDING'
+                        ? 'text-cyan-400'
+                        : 'text-amber-400'
+                    }`}>
+                      {activeSummary.macro_analysis.macro_regime.liquidity_cycle}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">Global M2 &amp; RRP</span>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-2.5 flex flex-col">
+                    <span className="text-[10px] text-slate-500 font-semibold uppercase">Growth Outlook</span>
+                    <span className={`text-xs font-bold mt-1 ${
+                      activeSummary.macro_analysis.macro_regime.growth_outlook === 'EXPANSION'
+                        ? 'text-emerald-400'
+                        : 'text-purple-400'
+                    }`}>
+                      {activeSummary.macro_analysis.macro_regime.growth_outlook}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">Macro Cycle Phase</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Causal Transmission Chains */}
+              {activeSummary.macro_analysis.causal_chains && activeSummary.macro_analysis.causal_chains.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                    Causal Economic Transmission Chains ({activeSummary.macro_analysis.causal_chains.length})
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2">
+                    {activeSummary.macro_analysis.causal_chains.map((chain, idx) => (
+                      <div key={idx} className="p-3 bg-slate-950/70 border border-slate-800/80 rounded-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+                        <div className="flex flex-col md:flex-row items-start md:items-center gap-2 flex-wrap">
+                          <span className="font-bold text-amber-300 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-800/40">
+                            {chain.cause}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-500 hidden md:block shrink-0" />
+                          <span className="text-slate-300 font-medium">
+                            {chain.mechanism}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-500 hidden md:block shrink-0" />
+                          <span className="text-cyan-300 font-semibold">
+                            {chain.market_impact}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-500 hidden md:block shrink-0" />
+                          <span className="text-emerald-300 font-bold bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-800/40">
+                            {chain.crypto_consequence}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400 px-2 py-0.5 rounded bg-slate-900 border border-slate-800 shrink-0">
+                          {chain.time_horizon}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Multi-Asset Sentiment Matrix */}
+              {activeSummary.macro_analysis.asset_matrix && Object.keys(activeSummary.macro_analysis.asset_matrix).length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    Multi-Asset Transmission &amp; Sentiment Matrix
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                    {Object.entries(activeSummary.macro_analysis.asset_matrix).map(([sym, item]) => {
+                      const isBull = item.sentiment === 'BULLISH';
+                      const isBear = item.sentiment === 'BEARISH';
+                      return (
+                        <div key={sym} className={`p-2.5 rounded-lg border flex flex-col justify-between gap-1 text-xs ${
+                          isBull ? 'bg-emerald-950/20 border-emerald-500/30' : isBear ? 'bg-rose-950/20 border-rose-500/30' : 'bg-slate-950 border-slate-800'
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-200">{item.asset || sym}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              isBull ? 'bg-emerald-500/20 text-emerald-300' : isBear ? 'bg-rose-500/20 text-rose-300' : 'bg-slate-800 text-slate-300'
+                            }`}>
+                              {item.sentiment}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5">
+                            {item.rationale}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Trading Plans Generated From Macro Understanding */}
+              {activeSummary.dynamic_trading_plans && activeSummary.dynamic_trading_plans.length > 0 && (
+                <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-800">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h4 className="text-xs font-bold text-sky-300 flex items-center gap-1.5 uppercase tracking-wider">
+                      <Target className="w-3.5 h-3.5 text-sky-400" />
+                      Dynamic Macro-Confluent Trading Plans ({activeSummary.dynamic_trading_plans.length})
+                    </h4>
+                    <span className="text-[10px] text-slate-400">
+                      Evaluated against live SMC liquidity structures &bull; Half-Kelly constrained
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {activeSummary.dynamic_trading_plans.map((plan, idx) => {
+                      const isConfluent = plan.macroAlignment === 'CONFLUENT';
+                      const isDampened = plan.macroAlignment === 'CAUTION_DAMPENED';
+                      return (
+                        <div key={idx} className="bg-[#070b14] border border-sky-500/30 rounded-xl p-3.5 flex flex-col justify-between gap-3 text-xs">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-white font-mono">{plan.symbol}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                                  plan.bias === 'BULLISH'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                    : plan.bias === 'BEARISH'
+                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                    : 'bg-slate-800 text-slate-300'
+                                }`}>
+                                  {plan.bias}
+                                </span>
+                              </div>
+
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
+                                isConfluent
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : isDampened
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                  : 'bg-slate-800 text-slate-300 border border-slate-700'
+                              }`}>
+                                <Zap className="w-3 h-3" />
+                                {plan.macroAlignment} ({plan.riskMultiplier}x Sizing)
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 p-2 rounded bg-slate-950/80 border border-slate-800 font-mono text-[11px]">
+                              <div>
+                                <span className="text-slate-500 block text-[10px]">CURRENT</span>
+                                <span className="text-white font-semibold">${plan.currentPrice?.toLocaleString()}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 block text-[10px]">PDH / PDL</span>
+                                <span className="text-slate-300 text-[10px]">${plan.pdh?.toLocaleString()} / ${plan.pdl?.toLocaleString()}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 block text-[10px]">FVG ZONE</span>
+                                <span className="text-amber-300 text-[10px] truncate block">{plan.fvgZone}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col gap-1 text-[11px] font-sans">
+                              <div className="text-emerald-300">
+                                <strong className="text-emerald-400">Primary Execution Path:</strong> {plan.bullPath}
+                              </div>
+                              <div className="text-rose-300">
+                                <strong className="text-rose-400">Risk Invalidation:</strong> {plan.bearPath}
+                              </div>
+                              <div className="text-slate-400 italic text-[10px] mt-0.5">
+                                <strong>Macro Driver:</strong> {plan.macroDriver}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
+                            <span>SMC Order Block: <strong className="text-slate-300">{plan.orderBlock}</strong></span>
+                            <span className="font-mono text-cyan-400">Institutional Plan Ready</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Metrics & Epistemic Typology Chips */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

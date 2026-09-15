@@ -672,28 +672,55 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
               </h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {tradingPlans.map((plan, idx) => (
-                <div key={idx} className="bg-[#070a12] border border-[#1e293b] rounded-lg p-3 text-xs font-mono flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">{plan.symbol}</span>
-                    <span className="px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/40 text-[10px] font-bold">
-                      {plan.bias}
-                    </span>
+              {tradingPlans.map((plan, idx) => {
+                const isConfluent = plan.macroAlignment === 'CONFLUENT';
+                const isDampened = plan.macroAlignment === 'CAUTION_DAMPENED';
+                return (
+                  <div key={idx} className="bg-[#070a12] border border-[#1e293b] hover:border-sky-500/40 transition-all rounded-lg p-3 text-xs font-mono flex flex-col justify-between gap-2.5 shadow-sm">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-white">{plan.symbol}</span>
+                          <span className="px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-500/40 text-[10px] font-bold">
+                            {plan.bias}
+                          </span>
+                        </div>
+                        {plan.macroAlignment && (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
+                            isConfluent
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : isDampened
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              : 'bg-slate-800 text-slate-300 border border-slate-700'
+                          }`}>
+                            <Zap className="w-3 h-3" />
+                            {plan.macroAlignment} ({plan.riskMultiplier ?? 1.0}x Sizing)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-[11px] text-slate-300">
+                        <strong>PDH:</strong> ${plan.pdh?.toLocaleString()} | <strong>PDL:</strong> ${plan.pdl?.toLocaleString()}
+                      </div>
+                      <div className="text-[11px] text-slate-300">
+                        <strong>FVG Zone:</strong> {plan.fvgZone} | <strong>Order Block:</strong> {plan.orderBlock}
+                      </div>
+                      <div className="text-[11px] text-emerald-300 mt-1">
+                        <strong>Primary Path:</strong> {plan.bullPath}
+                      </div>
+                      <div className="text-[11px] text-rose-300">
+                        <strong>Invalidation Path:</strong> {plan.bearPath}
+                      </div>
+                    </div>
+
+                    {plan.macroDriver && (
+                      <div className="pt-2 border-t border-[#1e293b] text-[10px] text-slate-400 italic">
+                        <strong className="text-amber-400 not-italic">Macro Catalyst:</strong> {plan.macroDriver}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[11px] text-slate-300">
-                    <strong>PDH:</strong> ${plan.pdh.toLocaleString()} | <strong>PDL:</strong> ${plan.pdl.toLocaleString()}
-                  </div>
-                  <div className="text-[11px] text-slate-300">
-                    <strong>FVG Zone:</strong> {plan.fvgZone} | <strong>Order Block:</strong> {plan.orderBlock}
-                  </div>
-                  <div className="text-[11px] text-emerald-300 mt-1">
-                    <strong>Primary Path:</strong> {plan.bullPath}
-                  </div>
-                  <div className="text-[11px] text-rose-300">
-                    <strong>Invalidation Path:</strong> {plan.bearPath}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
