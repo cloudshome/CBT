@@ -20,6 +20,7 @@ os.environ["TRADING_LOGS_DB_PATH"] = str(_temp_path / "trading_logs_test.db")
 os.environ["MARKET_DB_PATH"] = str(_temp_path / "market_data_test.db")
 os.environ["BRAIN_DB_PATH"] = str(_temp_path / "brain_memory_test.db")
 os.environ["EXPERIMENT_DB_PATH"] = str(_temp_path / "experiment_store_test.db")
+os.environ["SECURITY_DB_PATH"] = str(_temp_path / "security_test.db")
 
 # 3. Test credentials isolation: configure sandbox mock Telegram identity
 os.environ["TELEGRAM_CHAT_ID"] = "12345678"

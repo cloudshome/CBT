@@ -7,7 +7,6 @@ history queries, and 3-way ablation benchmarks (SKY Baseline vs Kronos vs Fusion
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
@@ -15,18 +14,17 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core.data_streamer import data_streamer
 from core.models.kronos import (
     KronosConfig,
     KronosModelAdapter,
     KronosModelVariant,
-    kronos_adapter,
 )
+from core.models.kronos.ablation_benchmark import kronos_ablation_benchmark
 from core.models.kronos.persistence import (
     freeze_kronos_forecast,
     get_kronos_forecasts,
 )
-from core.models.kronos.ablation_benchmark import kronos_ablation_benchmark
-from core.data_streamer import data_streamer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("kronos_eval")

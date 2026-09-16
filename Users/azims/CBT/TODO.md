@@ -660,7 +660,102 @@
 
 ---
 
+## 🛡️ Phase A: Human-Controlled Live Execution Clearance (WebAuthn / FIDO2 Hardware Key Gate) (COMPLETED ✅)
+
+- [x] **Task A.1: Domain-Isolated Security Store (`core/auth/security_store.py`)**
+  - High-security storage engine located exclusively in `data/security.db` with SQLite WAL mode and PRAGMA foreign keys.
+  - Complete domain isolation: leaves `core/database.py` and M18 execution ledgers (`trading_logs.db`) completely untouched.
+  - Atomic single-use challenge creation and consumption with strict TTL expiration, preventing replay attacks.
+  - Zero private keys, master passphrases, or challenge secrets in logs or AI memory.
+- [x] **Task A.2: FIDO2 / WebAuthn Hardware Security Key Manager (`core/auth/hardware_key.py`)**
+  - Official W3C Level 3 standard WebAuthn protocol validation using `webauthn>=3.0.0` library.
+  - Counter semantics: allows authenticators reporting `0` without error; detects counter rollbacks (`new_counter <= stored_counter` when `stored > 0`) as cloned token/replay attack (`HARDWARE_KEY_COUNTER_ANOMALY`).
+  - Origin and RP ID validation; User Presence (UP) enforcement.
+  - Issues time-bounded (15-minute TTL) Live Clearance Sessions (`ClearanceSession`) bound to client `session_id`.
+  - Cascading revocation: revoking a hardware credential instantly invalidates all associated active clearance sessions.
+- [x] **Task A.3: Gate 8 in Live Execution Gatekeeper (`core/execution/live_gatekeeper.py`)**
+  - Fail-closed Gate 8 (`checks["hardware_clearance_active"]`): blocks all live production order dispatch without an active, unexpired, unrevoked clearance session.
+  - Bypassed in TESTNET and PAPER mode to ensure non-blocking test workflows.
+  - **Constitutional Risk Primacy**: FIDO clearance pass NEVER bypasses quantitative risk boundaries (1.5% equity cap, daily drawdown, or Master Kill Switch).
+- [x] **Task A.4: Live Route & Canary Runner Protection (`core/execution/live_routes.py`, `core/execution/live_canary_runner.py`)**
+  - Added `session_id` parameter to `/api/live/protected-order` and `/api/live-canary/run`.
+  - Rejection with deterministic error codes: `HARDWARE_KEY_CLEARANCE_REQUIRED`, `HARDWARE_KEY_CLEARANCE_EXPIRED`, `HARDWARE_KEY_NO_CREDENTIALS`.
+- [x] **Task A.5: FastAPI REST Interface (`core/auth/hardware_key_routes.py`, `app.py`)**
+  - Endpoints mounted at `/api/auth/hardware-key`: `/status`, `/register/options`, `/register/verify`, `/authenticate/options`, `/authenticate/verify`, `/clearance/revoke`, `/credential/revoke`.
+- [x] **Task A.6: Institutional Frontend Cockpit & Modal (`frontend/src/components/HardwareKeyModal.tsx`, `LiveLaunchpadDesk.tsx`, `RiskFirstOrderDesk.tsx`, `frontend/src/services/api.ts`)**
+  - Interactive WebAuthn dialog supporting physical security key touch ceremonies via `navigator.credentials.get` and enrollment via `navigator.credentials.create`.
+  - Gate 8 card in LiveLaunchpadDesk 8-Gate Preflight Checklist.
+  - Hardware clearance status badge and toggle protection in RiskFirstOrderDesk.
+- [x] **Task A.7: Comprehensive Adversarial Verification Suite (`tests/test_phase_a_live_clearance.py`)**
+  - 22/22 tests passing covering isolated store, registration, authentication, counter anomaly defense, single-use anti-replay, Gate 8 fail-closed, and constitutional risk primacy.
+  - Full Milestone 18 Production Pass certification verified 100% active (14 gates / 149 tests green).
+  - 147/147 Jest test suites passing, frontend TypeScript build 100% green.
+
+---
+
+## 🔏 Phase B: Dual-Profile Windows Authenticode Code Signing Pipeline (COMPLETED ✅)
+
+- [x] **Task B.1: Dual-Profile Code Signing Engine (`scripts/sign_windows_binaries.py`)**
+  - Supports `DEVELOPMENT` (self-signed allowed, clearly labeled non-production) and `PRODUCTION` (commercial Authenticode or Azure Trusted Signing required).
+  - Institutional Rule: If `PRODUCTION` profile is selected without commercial Authenticode credentials, HARD STOP (`RELEASE_BLOCKED`). Never disguise self-signed as production.
+  - HTTPS RFC-3161 timestamping (`https://timestamp.digicert.com` and `http://timestamp.digicert.com` for PowerShell).
+  - Binary signature verification via `Get-AuthenticodeSignature` and `signtool.exe`.
+  - Machine-readable output: `release/CODE_SIGNING_REPORT.json`.
+  - Secret safety: zero passwords or keys in logs or repository files; `.pfx` files ignored in `.gitignore`.
+- [x] **Task B.2: Development Self-Signed Cert Generator (`scripts/generate_test_cert.ps1`)**
+  - Exports dev certificate with explicit non-production subject: `CN=Crypto Brain Terminal Development, OU=Development Only - Not For Production, O=CBT Dev`.
+
+---
+
+## 🌐 Phase C: Machine-Enforced Watch-Only Web3 & Multi-RPC Quorum Engine (COMPLETED ✅)
+
+- [x] **Task C.1: Multi-RPC Quorum Client (`core/web3/rpc_client.py`)**
+  - Redundant RPC pools across Ethereum, Arbitrum, BSC, Polygon, and Solana.
+  - Mathematical consensus: requires $\ge 2$ agreeing nodes to confirm state.
+  - Freshness monitoring: `FRESH`, `STALE`, `DEGRADED`, `DISAGREEMENT`, `UNAVAILABLE`.
+  - Read-only queries: `eth_getBalance`, `getBalance`, and ERC-20 `balanceOf`. Zero transaction signing/broadcast routines.
+- [x] **Task C.2: Watch-Only Wallet Storage with Anti-Key Invariant (`core/web3/wallet_store.py`)**
+  - Stores public addresses in SQLite `web3_watch_wallets` with hard constraint `is_watch_only = 1`.
+  - Rejects private keys (64-char hex) and seed phrase mnemonics with `Web3SecurityViolationError`.
+- [x] **Task C.3: Capital Isolation Firewall & Portfolio Aggregator (`core/web3/portfolio_aggregator.py`)**
+  - Strict separation: `OBSERVED_TOTAL_EQUITY` = `EXECUTION_AVAILABLE_CAPITAL` (exchange margin) + `WATCH_ONLY_EQUITY`.
+  - Guarantees external wallet capital cannot be used by the Capital Governor for order sizing.
+- [x] **Task C.4: FastAPI REST Router (`core/web3/web3_routes.py`, `app.py`)**
+  - `/api/web3/wallets`, `/api/web3/balances`, `/api/web3/rpc-status`, `/api/portfolio/aggregated-equity`.
+- [x] **Task C.5: Adversarial Unit & Invariant Suite (`tests/test_web3_watch_only_invariant.py`)**
+  - 15/15 tests passing: AST scan for zero signing routines, 3-of-3 consensus, 2-of-3 fault tolerance, split-brain disagreement, key rejection, and capital firewall isolation.
+
+---
+
+## ⚡ Phase D: 1,000-Slice Stress Matrix & Destructive Crash-Recovery Lab (COMPLETED ✅)
+
+- [x] **Task D.1: 1,000-Slice Fault Injection Stress Harness (`scripts/run_testnet_stress_drills.py`)**
+  - 1,000 micro-slices across Binance, Bybit, and Hyperliquid with synthetic fault matrix (jitter, packet loss, duplicate ACKs, out-of-order execution, partial fills).
+  - Verified: $\sum q_i = Q_{\text{target}}$ (100% quantity conservation), zero duplicate economic fills, zero orphaned slices, zero negative inventory.
+  - Emits `release/STRESS_DRILL_REPORT.json`.
+- [x] **Task D.2: Destructive Crash-Recovery Invariant (`tests/test_testnet_stress_drills.py`)**
+  - Tested: Order accepted on exchange $\to$ CTB process killed before ACK $\to$ CTB restarts $\to$ startup reconciliation queries exchange $\to$ zero duplicate order submitted.
+
+---
+
+## 📦 Phase E: Installer Lab, 17-Point Blocker Matrix & Release Candidate Certification (COMPLETED ✅)
+
+- [x] **Task E.1: Installer Lab Verification Engine (`scripts/verify_installer.py`)**
+  - Validates PE architecture (x64 application binary and NSIS bootstrap stub), file sizing, and Authenticode signature.
+- [x] **Task E.2: Cryptographic Checksum Generator (`scripts/generate_release_checksums.py`)**
+  - Produces standard GNU `release/SHA256SUMS.txt` for all release assets.
+- [x] **Task E.3: Master Production Release Orchestrator (`scripts/build_windows_app.py`)**
+  - Automates end-to-end release pipeline across all 17 gates.
+  - Evaluates 17-point `RELEASE_BLOCKER_MATRIX`.
+  - Produces `release/RELEASE_MANIFEST.json` and `release/RELEASE_CERTIFICATION.json`.
+  - Built binaries: `release/CTB_Setup_v3.0.0.exe` (113 MB) and `release/win-unpacked/ctb.exe` (234 MB).
+  - **Release State Machine**: Successfully advanced to `RELEASE_CANDIDATE`.
+  - **Institutional Rule Enforced**: State machine paused awaiting explicit Human Release Approval Gate before transitioning to `PRODUCTION_RELEASED`.
+
+---
+
 ## 📝 Rules for Updating This Document
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.
+
 

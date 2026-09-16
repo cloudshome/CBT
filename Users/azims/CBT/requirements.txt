@@ -19,3 +19,5 @@ youtube-transcript-api>=1.2.0
 yt-dlp>=2026.1.0
 pypdf>=6.0.0
 eth-account>=0.14.0
+webauthn>=3.0.0
+cbor2>=6.1.2

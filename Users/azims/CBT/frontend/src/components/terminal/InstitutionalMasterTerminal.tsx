@@ -54,21 +54,35 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
   // 2. Initial Full Load
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [telRes, candleRes] = await Promise.all([
-        api.getMasterTerminalTelemetry(symbol, timeframe),
-        api.getCandles(symbol, timeframe, 150).catch(() => null),
-      ]);
-      setTelemetry(telRes);
-      if (candleRes?.candles) {
-        setCandles(candleRes.candles);
+    let attempts = 0;
+    const maxAttempts = 3;
+    while (attempts < maxAttempts) {
+      try {
+        const [telRes, candleRes] = await Promise.all([
+          api.getMasterTerminalTelemetry(symbol, timeframe),
+          api.getCandles(symbol, timeframe, 150).catch(() => null),
+        ]);
+        setTelemetry(telRes);
+        if (candleRes?.candles) {
+          setCandles(candleRes.candles);
+        }
+        return;
+      } catch (err: unknown) {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          const msg = err instanceof Error ? err.message : 'Failed to load master terminal telemetry';
+          addToast('error', 'Telemetry Sync Error', msg);
+        } else {
+          // Wait 1.5s while backend completes spin-up
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      } finally {
+        if (attempts >= maxAttempts) {
+          setLoading(false);
+        }
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load master terminal telemetry';
-      addToast('error', 'Telemetry Sync Error', msg);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, [symbol, timeframe, addToast]);
 
   useEffect(() => {

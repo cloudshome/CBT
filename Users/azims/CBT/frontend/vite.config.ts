@@ -94,6 +94,7 @@ for (const prefix of PYTHON_PREFIXES) {
 proxyMap['/api'] = nodeProxy; // catch-all for Node routes
 
 export default defineConfig({
+  base: './',
   plugins: [react()],
   server: {
     port: 5173,

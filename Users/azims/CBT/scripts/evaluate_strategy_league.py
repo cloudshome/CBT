@@ -10,29 +10,25 @@ Executes:
 
 from __future__ import annotations
 
-import argparse
-import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.strategy_league import (
-    strategy_league_manager,
-    StrategyGenome,
-    QuarantineTier,
-)
-from core.strategy_selection_guard import strategy_selection_guard
-from core.monte_carlo_stress import monte_carlo_stress_tester
 from core.audit_bus import audit_bus
+from core.strategy_league import (
+    QuarantineTier,
+    StrategyGenome,
+    strategy_league_manager,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("cbt_strategy_league_eval")
 
 
-def run_strategy_league_evaluation() -> Dict[str, Any]:
+def run_strategy_league_evaluation() -> dict[str, Any]:
     """Evaluates all registered strategies through the 4-tier quarantine pipeline."""
     # Seed a candidate candidate strategy in Tier 1
     s4 = StrategyGenome(

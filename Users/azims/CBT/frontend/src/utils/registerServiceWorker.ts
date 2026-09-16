@@ -3,7 +3,7 @@
  * In development, unregisters any active service workers to prevent Vite ESM module interception.
  */
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || window.location.protocol === 'file:') {
     return null;
   }
 

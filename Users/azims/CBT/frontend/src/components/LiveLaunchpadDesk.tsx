@@ -30,7 +30,10 @@ import {
   GatekeeperCheckResult,
   CanaryRunResult,
   LiveExecutionSnapshot,
+  getHardwareKeyStatus,
+  ClearanceSessionData,
 } from '../services/api';
+import { HardwareKeyModal } from './HardwareKeyModal';
 import { CapitalEscalationReport, CapitalTier } from '../types';
 
 interface LiveLaunchpadDeskProps {
@@ -92,6 +95,8 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
   const [performingClamp, setPerformingClamp] = useState<boolean>(false);
   const [activatingEligible, setActivatingEligible] = useState<boolean>(false);
   const [evaluatingEvidence, setEvaluatingEvidence] = useState<boolean>(false);
+  const [isHardwareModalOpen, setIsHardwareModalOpen] = useState<boolean>(false);
+  const [clearanceSession, setClearanceSession] = useState<ClearanceSessionData | null>(null);
 
   const onNotifyRef = useRef(onNotify);
   useEffect(() => {
@@ -101,12 +106,13 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
   // Load Status Data & Live Canonical Snapshot
   const fetchData = useCallback(async () => {
     try {
-      const [readinessRes, tgRes, canaryRes, liveRes, escRes] = await Promise.all([
+      const [readinessRes, tgRes, canaryRes, liveRes, escRes, hwRes] = await Promise.all([
         api.getAccountReadiness(envMode),
         api.getTelegramLiveStatus().catch(() => null),
         api.getLiveCanaryStatus().catch(() => null),
         api.getLiveExecutionState(exchange, envMode).catch(() => null),
         api.getCapitalEscalationStatus().catch(() => null),
+        getHardwareKeyStatus().catch(() => null),
       ]);
 
       setReadiness(readinessRes);
@@ -114,6 +120,11 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
       if (canaryRes) setCanaryStatus(canaryRes);
       if (liveRes?.snapshot) setLiveSnapshot(liveRes.snapshot);
       if (escRes?.escalation) setEscalation(escRes.escalation);
+      if (hwRes?.posture?.clearance_session) {
+        setClearanceSession(hwRes.posture.clearance_session);
+      } else {
+        setClearanceSession(null);
+      }
       setLastUpdated(new Date());
     } catch (err: any) {
       console.error('Failed fetching live launchpad data:', err);
@@ -1193,6 +1204,28 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
                 {escalation?.current_tier?.replace('TIER_', '') || 'PAPER'}
               </span>
             </div>
+
+            {/* Gate 8: Human Live Clearance (WebAuthn / FIDO2) */}
+            <div className="p-3 bg-slate-900/50 border border-slate-800/80 rounded-lg flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Shield className={`w-5 h-5 flex-shrink-0 ${clearanceSession?.is_valid ? 'text-emerald-400' : 'text-amber-400'}`} />
+                <div>
+                  <div className="text-xs font-bold text-slate-200">Gate 8: Human Live Clearance (WebAuthn / FIDO2)</div>
+                  <div className="text-[11px] text-slate-400">
+                    {clearanceSession?.is_valid
+                      ? `Clearance Active: ${clearanceSession.remaining_seconds}s remaining (${clearanceSession.credential_id_masked})`
+                      : 'Physical security key tap required to authorize live capital execution'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHardwareModalOpen(true)}
+                className="px-2.5 py-1 text-[10px] font-bold rounded bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 transition"
+              >
+                {clearanceSession?.is_valid ? 'MANAGE KEY' : 'TAP KEY'}
+              </button>
+            </div>
           </div>
 
           {/* Preflight Check Console */}
@@ -1991,6 +2024,17 @@ export const LiveLaunchpadDesk: React.FC<LiveLaunchpadDeskProps> = ({ onNotify }
           </div>
         </div>
       )}
+
+      {/* WebAuthn / FIDO2 Hardware Security Key Clearance Modal */}
+      <HardwareKeyModal
+        isOpen={isHardwareModalOpen}
+        onClose={() => setIsHardwareModalOpen(false)}
+        onClearanceGranted={(clr) => {
+          setClearanceSession(clr);
+          setIsHardwareModalOpen(false);
+          fetchData();
+        }}
+      />
     </div>
   );
 };

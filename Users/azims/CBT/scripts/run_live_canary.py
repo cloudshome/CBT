@@ -25,7 +25,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.auth.credential_vault import credential_vault  # noqa: E402
 from core.execution.live_canary_runner import CanaryRunRequest, live_canary_runner  # noqa: E402
 from core.execution.live_gatekeeper import live_gatekeeper  # noqa: E402
 from core.execution.symbol_constraints import symbol_constraint_engine  # noqa: E402

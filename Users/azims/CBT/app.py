@@ -66,6 +66,9 @@ from core.mbo.routes import router as mbo_router
 from core.execution.live_routes import router as live_execution_router_api
 from core.execution.phase23_routes import router as phase23_execution_router
 from core.setup_service import setup_router
+from core.auth.hardware_key_routes import hardware_key_router
+from core.web3.web3_routes import router as web3_router
+from core.terminal_routes import terminal_router
 from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
 from core.conservative_kelly import conservative_kelly
@@ -256,6 +259,9 @@ app.include_router(mbo_router)
 app.include_router(live_execution_router_api)
 app.include_router(phase23_execution_router)
 app.include_router(setup_router)
+app.include_router(hardware_key_router)
+app.include_router(web3_router)
+app.include_router(terminal_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()
@@ -281,6 +287,10 @@ STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "js").mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+FRONTEND_DIST = Path(__file__).parent / "frontend" / "dist"
+if (FRONTEND_DIST / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="frontend-assets")
 
 
 # Pydantic Request Models
@@ -798,10 +808,13 @@ async def empirical_accumulator_loop():
 
 @app.get("/")
 async def root_view():
+    dist_index = FRONTEND_DIST / "index.html"
+    if dist_index.exists():
+        return FileResponse(str(dist_index))
     index_path = STATIC_DIR / "index.html"
     if index_path.exists():
         return FileResponse(str(index_path))
-    return {"message": "AI Quant Sentinel Core Backend Online. static/index.html is loading."}
+    return {"message": "AI Quant Sentinel Core Backend Online."}
 
 
 # ==============================================================================
@@ -968,16 +981,22 @@ async def get_scan_alias(
         high_price = max(highs) if highs else last_price
         low_price = min(lows) if lows else last_price
 
-    fvg_list = [
-        asdict(p)
-        for p in patterns
-        if "FVG" in getattr(p, "type", "") or "GAP" in getattr(p, "type", "")
-    ]
-    ob_list = [
-        asdict(p)
-        for p in patterns
-        if "BLOCK" in getattr(p, "type", "") or "OB" in getattr(p, "type", "")
-    ]
+    fvg_list = []
+    ob_list = []
+    for p in patterns:
+        p_dict = asdict(p) if hasattr(p, "__dataclass_fields__") else (dict(p) if isinstance(p, dict) else {})
+        raw_type = str(getattr(p, "pattern_type", p_dict.get("pattern_type", getattr(p, "type", p_dict.get("type", ""))))).upper()
+        
+        bot = float(getattr(p, "bottom_price", p_dict.get("bottom_price", 0.0)))
+        top = float(getattr(p, "top_price", p_dict.get("top_price", 0.0)))
+        p_dict["price_zone"] = [bot, top]
+        p_dict["type"] = "bullish" if "BULL" in raw_type else "bearish"
+        p_dict["mitigated"] = getattr(p, "status", p_dict.get("status", "")) == "MITIGATED"
+
+        if "FVG" in raw_type or "GAP" in raw_type:
+            fvg_list.append(p_dict)
+        elif "BLOCK" in raw_type or "OB" in raw_type:
+            ob_list.append(p_dict)
 
     return sanitize_numpy(
         {

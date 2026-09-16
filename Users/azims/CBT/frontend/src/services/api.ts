@@ -48,7 +48,16 @@ import {
   CapitalTier,
 } from '../types';
 
-const BASE_URL = '';
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    if (window.location.protocol === 'file:') {
+      return 'http://127.0.0.1:8000';
+    }
+  }
+  return '';
+};
+
+const BASE_URL = getApiBaseUrl();
 
 let _apiKey: string =
   (typeof window !== 'undefined' ? localStorage.getItem('cbt_api_key') || '' : '') ||
@@ -82,7 +91,16 @@ async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
   if (init?.body && typeof init.body === 'string' && !(headers as Headers).has('Content-Type')) {
     (headers as Headers).set('Content-Type', 'application/json');
   }
-  return fetch(input, { ...init, headers });
+  let finalInput = input;
+  if (
+    typeof input === 'string' &&
+    input.startsWith('/') &&
+    typeof window !== 'undefined' &&
+    window.location.protocol === 'file:'
+  ) {
+    finalInput = `http://127.0.0.1:8000${input}`;
+  }
+  return fetch(finalInput, { ...init, headers });
 }
 
 export class ApiError extends Error {
@@ -3449,3 +3467,162 @@ export async function rollbackSoftwareUpdate(snapshot_id: string): Promise<any> 
   });
   return handleResponse(res);
 }
+
+// ---------------------------------------------------------------------------
+// Phase A: FIDO2 / WebAuthn Hardware Security Key & Live Clearance
+// ---------------------------------------------------------------------------
+
+export interface HardwareKeyCredentialInfo {
+  credential_id: string;
+  credential_id_masked: string;
+  user_id: string;
+  label: string;
+  sign_counter: number;
+  rp_id: string;
+  aaguid?: string;
+  transports: string[];
+  is_active: boolean;
+  created_at_ms: number;
+  last_used_at_ms?: number;
+}
+
+export interface ClearanceSessionData {
+  clearance_id: string;
+  credential_id_masked: string;
+  session_id: string;
+  operator_id: string;
+  purpose: string;
+  issued_at_ms: number;
+  expires_at_ms: number;
+  remaining_seconds: number;
+  is_valid: boolean;
+  is_revoked: boolean;
+  revocation_reason?: string;
+}
+
+export interface HardwareKeyPosture {
+  webauthn_enabled: boolean;
+  registered_keys_count: number;
+  credentials: HardwareKeyCredentialInfo[];
+  live_clearance_active: boolean;
+  clearance_session?: ClearanceSessionData;
+  rejection_reason_code?: string;
+  policy: {
+    rp_id: string;
+    ttl_seconds: number;
+    user_verification_required: boolean;
+  };
+}
+
+export async function getHardwareKeyStatus(sessionId: string = 'desktop_session'): Promise<{ status: string; posture: HardwareKeyPosture }> {
+  const res = await authFetch(`/api/auth/hardware-key/status?session_id=${encodeURIComponent(sessionId)}`);
+  return handleResponse(res);
+}
+
+export async function getHardwareKeyRegisterOptions(userId: string = 'default_operator', username: string = 'operator', displayName: string = 'CBT Operator'): Promise<{ status: string; challenge_id: string; options: any }> {
+  const res = await authFetch('/api/auth/hardware-key/register/options', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, username, display_name: displayName }),
+  });
+  return handleResponse(res);
+}
+
+export async function verifyHardwareKeyRegister(challengeId: string, credential: any, label: string = 'Hardware Key', userId: string = 'default_operator'): Promise<{ status: string; message: string; credential: any }> {
+  const res = await authFetch('/api/auth/hardware-key/register/verify', {
+    method: 'POST',
+    body: JSON.stringify({ challenge_id: challengeId, credential, label, user_id: userId }),
+  });
+  return handleResponse(res);
+}
+
+export async function getHardwareKeyAuthOptions(userId?: string): Promise<{ status: string; challenge_id: string; options: any }> {
+  const res = await authFetch('/api/auth/hardware-key/authenticate/options', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId || null }),
+  });
+  return handleResponse(res);
+}
+
+export async function verifyHardwareKeyAuth(challengeId: string, credential: any, sessionId: string = 'desktop_session', operatorId: string = 'default_operator'): Promise<{ status: string; message: string; clearance: ClearanceSessionData }> {
+  const res = await authFetch('/api/auth/hardware-key/authenticate/verify', {
+    method: 'POST',
+    body: JSON.stringify({ challenge_id: challengeId, credential, session_id: sessionId, operator_id: operatorId }),
+  });
+  return handleResponse(res);
+}
+
+export async function revokeHardwareKeyClearance(sessionId?: string, clearanceId?: string, reason: string = 'OPERATOR_MANUAL_REVOCATION'): Promise<{ status: string; message: string; revoked_count: number }> {
+  const res = await authFetch('/api/auth/hardware-key/clearance/revoke', {
+    method: 'POST',
+    body: JSON.stringify({ session_id: sessionId, clearance_id: clearanceId, reason }),
+  });
+  return handleResponse(res);
+}
+
+export async function revokeHardwareKeyCredential(credentialId: string, reason: string = 'OPERATOR_REVOKED_TOKEN'): Promise<{ status: string; message: string; revoked: boolean }> {
+  const res = await authFetch('/api/auth/hardware-key/credential/revoke', {
+    method: 'POST',
+    body: JSON.stringify({ credential_id: credentialId, reason }),
+  });
+  return handleResponse(res);
+}
+
+// ---------------------------------------------------------------------------
+// Phase C: Web3 Watch-Only & Aggregated Portfolio API Functions
+// ---------------------------------------------------------------------------
+
+export interface WatchWalletItem {
+  address: string;
+  chain: string;
+  label: string;
+  is_watch_only: boolean;
+  created_at: number;
+  last_synced_at: number;
+}
+
+export interface AggregatedScorecardData {
+  timestamp_ms: number;
+  execution_available_capital_usd: number;
+  watch_only_equity_usd: number;
+  observed_total_equity_usd: number;
+  venue_breakdown: Record<string, number>;
+  currency_breakdown: Record<string, number>;
+  watch_wallets: Array<Record<string, any>>;
+  capital_firewall_verified: boolean;
+}
+
+export async function getAggregatedPortfolioEquity(): Promise<{ status: string; scorecard: AggregatedScorecardData }> {
+  const res = await authFetch('/api/portfolio/aggregated-equity');
+  return handleResponse(res);
+}
+
+export async function getWeb3Wallets(): Promise<{ status: string; mode: string; count: number; wallets: WatchWalletItem[] }> {
+  const res = await authFetch('/api/web3/wallets');
+  return handleResponse(res);
+}
+
+export async function addWeb3Wallet(chain: string, address: string, label?: string): Promise<{ status: string; message: string; wallet: WatchWalletItem }> {
+  const res = await authFetch('/api/web3/wallets', {
+    method: 'POST',
+    body: JSON.stringify({ chain, address, label: label || '' }),
+  });
+  return handleResponse(res);
+}
+
+export async function removeWatchOnlyWallet(address: string): Promise<{ status: string; message: string }> {
+  const res = await authFetch(`/api/web3/wallets/${encodeURIComponent(address)}`, {
+    method: 'DELETE',
+  });
+  return handleResponse(res);
+}
+
+export async function getWeb3Balances(): Promise<{ status: string; mode: string; count: number; total_watch_equity_usd: number; balances: any[] }> {
+  const res = await authFetch('/api/web3/balances');
+  return handleResponse(res);
+}
+
+export async function getWeb3RpcStatus(): Promise<{ status: string; quorum_results: Record<string, any> }> {
+  const res = await authFetch('/api/web3/rpc-status');
+  return handleResponse(res);
+}
+

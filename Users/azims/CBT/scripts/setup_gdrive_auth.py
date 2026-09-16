@@ -10,7 +10,6 @@ Usage:
 """
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -171,6 +170,7 @@ def test_upload() -> None:
     """Performs a test file upload to live Google Drive."""
     import tempfile
     import time
+
     from core.autonomous_research.storage.drive_backend import get_default_drive_backend
 
     backend = get_default_drive_backend()
@@ -192,7 +192,7 @@ def test_upload() -> None:
             drive_folder="SKY/00_INBOX",
             filename=f"probe_{int(time.time())}.txt",
         )
-        print(f"[+] Upload Success!")
+        print("[+] Upload Success!")
         print(f"    File Name : {meta.name}")
         print(f"    Drive ID  : {meta.drive_file_id}")
         print(f"    Drive Path: {meta.drive_path}")

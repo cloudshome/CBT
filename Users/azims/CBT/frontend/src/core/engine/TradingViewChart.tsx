@@ -876,29 +876,44 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
 
     // 2. Draw SMC Order Blocks & FVGs
     if (showSMCZones) {
-      orderBlocks.forEach((ob) => {
-        const yTop = series.priceToCoordinate(ob.price_zone[1]);
-        const yBot = series.priceToCoordinate(ob.price_zone[0]);
-        if (yTop !== null && yBot !== null) {
-          const height = Math.abs(yBot - yTop);
+      (orderBlocks || []).forEach((ob) => {
+        if (!ob) return;
+        const rawZone = ob.price_zone || ((ob as any).bottom_price != null && (ob as any).top_price != null ? [(ob as any).bottom_price, (ob as any).top_price] : null);
+        if (!rawZone || !Array.isArray(rawZone) || rawZone.length < 2) return;
+        const pBot = Number(rawZone[0]);
+        const pTop = Number(rawZone[1]);
+        if (isNaN(pBot) || isNaN(pTop)) return;
+
+        const yTop = series.priceToCoordinate(Math.max(pBot, pTop));
+        const yBot = series.priceToCoordinate(Math.min(pBot, pTop));
+        if (yTop !== null && yBot !== null && !isNaN(yTop) && !isNaN(yBot)) {
+          const height = Math.max(2, Math.abs(yBot - yTop));
+          const topCoord = Math.min(yTop, yBot);
           ctx.fillStyle = ob.type === 'bullish' ? 'rgba(8, 153, 129, 0.14)' : 'rgba(242, 54, 69, 0.14)';
           ctx.strokeStyle = ob.type === 'bullish' ? '#089981' : '#f23645';
           ctx.lineWidth = 1;
-          ctx.fillRect(0, Math.min(yTop, yBot), canvas.width, height);
-          ctx.strokeRect(0, Math.min(yTop, yBot), canvas.width, height);
+          ctx.fillRect(0, topCoord, canvas.width, height);
+          ctx.strokeRect(0, topCoord, canvas.width, height);
         }
       });
 
-      fvgs.forEach((fvg) => {
-        if (fvg.mitigated) return;
-        const yTop = series.priceToCoordinate(fvg.price_zone[1]);
-        const yBot = series.priceToCoordinate(fvg.price_zone[0]);
-        if (yTop !== null && yBot !== null) {
-          const height = Math.abs(yBot - yTop);
+      (fvgs || []).forEach((fvg) => {
+        if (!fvg || fvg.mitigated) return;
+        const rawZone = fvg.price_zone || ((fvg as any).bottom_price != null && (fvg as any).top_price != null ? [(fvg as any).bottom_price, (fvg as any).top_price] : null);
+        if (!rawZone || !Array.isArray(rawZone) || rawZone.length < 2) return;
+        const pBot = Number(rawZone[0]);
+        const pTop = Number(rawZone[1]);
+        if (isNaN(pBot) || isNaN(pTop)) return;
+
+        const yTop = series.priceToCoordinate(Math.max(pBot, pTop));
+        const yBot = series.priceToCoordinate(Math.min(pBot, pTop));
+        if (yTop !== null && yBot !== null && !isNaN(yTop) && !isNaN(yBot)) {
+          const height = Math.max(2, Math.abs(yBot - yTop));
+          const topCoord = Math.min(yTop, yBot);
           ctx.fillStyle = fvg.type === 'bullish' ? 'rgba(8, 153, 129, 0.08)' : 'rgba(242, 54, 69, 0.08)';
           ctx.strokeStyle = fvg.type === 'bullish' ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)';
-          ctx.fillRect(0, Math.min(yTop, yBot), canvas.width, height);
-          ctx.strokeRect(0, Math.min(yTop, yBot), canvas.width, height);
+          ctx.fillRect(0, topCoord, canvas.width, height);
+          ctx.strokeRect(0, topCoord, canvas.width, height);
         }
       });
     }

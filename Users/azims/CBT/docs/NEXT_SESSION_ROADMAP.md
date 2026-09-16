@@ -41,60 +41,67 @@ During this session, the Crypto Brain Terminal (CBT / SKY) was transformed into 
 
 ```mermaid
 graph TD
-    A[Start Next Session] --> B[Phase A: Hardware Security Key WebAuthn/FIDO2 Gate]
+    A[Start Next Session] --> B[Phase A: Hardware Security Key WebAuthn/FIDO2 Gate - COMPLETED]
     B --> C[Phase B: Windows Authenticode Code Signing Pipeline]
     C --> D[Phase C: Continuous Web3 RPC Balance Stream Engine]
     D --> E[Phase D: Multi-Venue Testnet Execution Stress Drills]
     E --> F[Phase E: GitHub Release Asset Publishing & SHA-256 Checksums]
 ```
 
-### Phase A: Hardware Security Key (FIDO2 / WebAuthn) for Live Mode Clearance
-* **Objective:** Ensure live real-money execution cannot be toggled without a physical hardware security key (e.g. YubiKey / Windows Hello).
-* **Tasks:**
-  1. Add WebAuthn / FIDO2 challenge-response verification endpoint in `core/auth/hardware_key.py`.
-  2. Require hardware token tap in the UI modal before switching `LIVE_TRADING_ENABLED` to true.
-  3. Emit tamper-proof audit event to `audit_bus` with the credential ID and timestamp.
+### Phase A: Hardware Security Key (FIDO2 / WebAuthn) for Live Mode Clearance (COMPLETED ✅)
+* **Status:** Complete & Certified (22/22 tests passing in `tests/test_phase_a_live_clearance.py`).
+* **Objective:** Ensure live real-money execution cannot be dispatched without a physical hardware security key (e.g. YubiKey / Windows Hello).
+* **Completed Deliverables:**
+  1. **Isolated Security Store (`core/auth/security_store.py`)**: SQLite WAL store in `data/security.db`, atomic single-use challenges, zero private keys.
+  2. **WebAuthn Manager (`core/auth/hardware_key.py`)**: W3C Level 3 validation, counter anomaly defense, 15-minute session-bound Live Clearance.
+  3. **Gate 8 Preflight Lock (`core/execution/live_gatekeeper.py`)**: Fail-closed Gate 8 requiring active clearance in production; constitutional risk primacy preserved.
+  4. **FastAPI Endpoints (`core/auth/hardware_key_routes.py`, `app.py`)**: Full registration, challenge issuance, verification, and revocation endpoints.
+  5. **Institutional Cockpit UI (`frontend/src/components/HardwareKeyModal.tsx`, `LiveLaunchpadDesk.tsx`, `RiskFirstOrderDesk.tsx`)**: Interactive WebAuthn dialog with status badge and Gate 8 card.
+  6. **Milestone 18 Invariant Certification**: 100% active (14 gates / 149 tests green).
 
-### Phase B: Windows Authenticode Code Signing Pipeline
-* **Objective:** Eliminate the Windows SmartScreen ("Unknown Publisher") warning when installing `CTB_Setup_v3.0.0.exe`.
-* **Tasks:**
-  1. Configure `win.certificateFile` and `win.certificatePassword` in `electron-builder.json`.
-  2. Implement GitHub Actions secret injection for EV/OV code signing certificates.
-  3. Automate sign-tool invocation during `scripts/build_windows_app.py`.
+### Phase B: Dual-Profile Windows Authenticode Code Signing Pipeline (COMPLETED ✅)
+* **Status:** Complete & Verified (`scripts/sign_windows_binaries.py`, `scripts/generate_test_cert.ps1`).
+* **Achievements:**
+  1. Two-profile signing: `DEVELOPMENT` (self-signed dev cert allowed) vs `PRODUCTION` (commercial Authenticode strictly required, fail-closed `RELEASE_BLOCKED`).
+  2. HTTPS RFC-3161 timestamping (`https://timestamp.digicert.com`).
+  3. Signature verified with `Get-AuthenticodeSignature` across all release binaries.
 
-### Phase C: Continuous Web3 RPC Balance & Position Stream Engine
-* **Objective:** Real-time on-chain balance updates without polling or screen jumps.
-* **Tasks:**
-  1. Create `core/web3/rpc_monitor.py` querying public/private RPCs (Arbitrum, Ethereum, BSC, Solana) for registered watch-only wallets.
-  2. Compute real-time aggregated portfolio equity (CEX balances + Hyperliquid margin + on-chain Web3 tokens).
-  3. Stream aggregated equity over WebSocket to `TradingViewChart` and `AssetDossierDock`.
+### Phase C: Machine-Enforced Watch-Only Web3 & Multi-RPC Quorum Engine (COMPLETED ✅)
+* **Status:** Complete & Certified (`core/web3/`, `tests/test_web3_watch_only_invariant.py`, 15/15 tests passing).
+* **Achievements:**
+  1. Multi-RPC quorum across EVM and Solana with 2-of-3 mathematical consensus.
+  2. AST scan proves zero transaction signing or private key code in Web3 subsystem.
+  3. Strict Capital Isolation: `OBSERVED_TOTAL_EQUITY` separates live exchange margin from watch-only external assets.
 
-### Phase D: Multi-Venue Testnet Execution Stress Drills
-* **Objective:** High-throughput calibration under live network conditions.
-* **Tasks:**
-  1. Execute 1,000 automated synthetic order slices across Binance Testnet, Bybit Testnet, and Hyperliquid Testnet.
-  2. Verify Almgren-Chriss trajectory execution, latency watchdogs, and reconciliation ledger logging under real exchange latency.
-  3. Confirm zero drift between expected and executed fill states.
+### Phase D: 1,000-Slice Stress Matrix & Destructive Crash-Recovery Lab (COMPLETED ✅)
+* **Status:** Complete & Certified (`scripts/run_testnet_stress_drills.py`, `tests/test_testnet_stress_drills.py`).
+* **Achievements:**
+  1. 1,000 micro-slices completed with exact quantity conservation ($\sum q_i = Q_{\text{target}}$).
+  2. Zero duplicate economic fills, zero orphaned slices, zero negative inventory.
+  3. Destructive crash recovery verifies order survival and idempotency across process kills.
 
-### Phase E: GitHub Release Asset Publishing
-* **Objective:** Production-ready public binary release.
-* **Tasks:**
-  1. Generate cryptographic SHA-256 checksums for `release/CTB_Setup_v3.0.0.exe` and `release/ctb.exe`.
-  2. Update `README.md` with desktop installer quick-start guide and screenshots.
-  3. Commit, tag release `v3.0.0-windows-desktop`, and push release assets.
+### Phase E: Packaging, Installer Lab, 17-Point Blocker Matrix & Release Candidate (COMPLETED ✅)
+* **Status:** Complete & Certified (`scripts/build_windows_app.py`, `scripts/verify_installer.py`, `scripts/generate_release_checksums.py`).
+* **Achievements:**
+  1. Native Windows Installer `release/CTB_Setup_v3.0.0.exe` (113 MB) and unpacked `release/win-unpacked/ctb.exe` (234 MB).
+  2. Cryptographic GNU `release/SHA256SUMS.txt`, `release/RELEASE_MANIFEST.json`, `release/RELEASE_CERTIFICATION.json`.
+  3. 17-point Blocker Matrix: **17/17 GATES GREEN**.
+  4. State machine: **`RELEASE_CANDIDATE`** (Paused awaiting explicit Human Operator Approval Gate).
 
 ---
 
-## 3. Quick-Resume Commands for Next Session
+## 3. Production Release State & Verification Commands
 
 ```powershell
-# 1. Verify repository state & Milestone 18 Certification
+# 1. Verify Milestone 18 Invariant Integrity (14 gates / 149 tests)
 .venv\Scripts\python scripts/verify_m18_certification.py
 
-# 2. Run Python & Vault Test Suites
-.venv\Scripts\pytest tests/test_setup_service.py tests/test_hyperliquid_connector.py tests/test_live_execution_and_vault.py -v
+# 2. Run Complete Phase Test Battery (Phase A, Web3, Stress)
+.venv\Scripts\pytest tests/test_phase_a_live_clearance.py tests/test_web3_watch_only_invariant.py tests/test_testnet_stress_drills.py -v
 
-# 3. Build & Launch Desktop Application
-npm run pack:windows
-npm run electron:start
+# 3. Verify Installer Packages & Signatures
+.venv\Scripts\python scripts/verify_installer.py
+
+# 4. Master Release Orchestration & Blocker Matrix
+.venv\Scripts\python scripts/build_windows_app.py
 ```

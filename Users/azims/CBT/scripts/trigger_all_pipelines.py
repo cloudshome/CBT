@@ -15,9 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import json
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -37,12 +35,10 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("cbt.master_pipeline")
 
-from core.collective.checkpoint import vector_checkpoint
 from core.collective.gdrive_mesh import gdrive_cluster_mesh
 from core.collective.identity import node_identity_manager
 from core.collective.sync_engine import sync_engine
 from core.daily_learning_reporter import daily_learning_reporter
-from core.empirical_accumulator import empirical_accumulator
 from core.hf_telemetry_pipeline import hf_telemetry_pipeline
 from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
 from scripts.run_empirical_accumulation import run_batch_accumulation
@@ -52,7 +48,7 @@ async def main():
     print("=" * 72)
     print("      CRYPTO BRAIN TERMINAL (CBT) -- MASTER PIPELINE EXECUTION      ")
     print("=" * 72)
-    now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    now_utc = datetime.datetime.now(datetime.UTC).isoformat()
     print(f"[*] Triggered At : {now_utc}")
     print(f"[*] Host Node    : {node_identity_manager.get_or_create_identity().node_id}\n")
 
@@ -118,7 +114,7 @@ async def main():
             concepts=["SMC_ORDER_BLOCK", "FVG_IMBALANCE", "VOLATILITY_EXPANSION"],
         )
         print(f"     [OK] Sample trades accumulated : {accum_res.get('samples_added')}")
-        print(f"     [OK] Target regimes covered     : 4 (BULL, BEAR, RANGE, VOL_EXPANSION)")
+        print("     [OK] Target regimes covered     : 4 (BULL, BEAR, RANGE, VOL_EXPANSION)")
     except Exception as exc:
         print(f"     [!] Empirical Accumulator Warning: {exc}")
 

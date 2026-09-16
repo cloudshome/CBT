@@ -41,7 +41,6 @@ try:
 except ImportError:
     pass
 
-from core.collective.checkpoint import vector_checkpoint
 from core.collective.gdrive_mesh import gdrive_cluster_mesh
 from core.collective.identity import node_identity_manager
 from core.collective.lease_manager import lease_manager
@@ -74,7 +73,7 @@ def show_status() -> None:
     print("\n[-] Google Drive Cloud Mesh:")
     if status.cloud_backend_live:
         print(f"    Status              : CONNECTED ({status.cloud_account})")
-        print(f"    Mesh Hub Path       : SKY/09_CLUSTER_MESH/")
+        print("    Mesh Hub Path       : SKY/09_CLUSTER_MESH/")
     else:
         print("    Status              : LOCAL SIMULATED (Connect via setup_gdrive_auth.py)")
 
@@ -97,7 +96,7 @@ def init_profile(node_id: str, role: str, epoch: int | None = None) -> None:
         role=role,
         epoch=epoch,
     )
-    print(f"[+] Local PC Profile Configured:")
+    print("[+] Local PC Profile Configured:")
     print(f"    Node ID    : {identity.node_id}")
     print(f"    Node Epoch : {identity.node_epoch}")
     print(f"    Role       : {identity.node_role}")
@@ -116,7 +115,7 @@ def run_push() -> None:
     if result.get("status") == "UP_TO_DATE":
         print("[OK] Local event ledger is already up to date on Google Drive.")
     else:
-        print(f"[+] Pushed Package to Google Drive Cloud Mesh:")
+        print("[+] Pushed Package to Google Drive Cloud Mesh:")
         print(f"    Package ID     : {result.get('package_id')}")
         print(f"    Events Pushed  : {result.get('events_exported')}")
         print(f"    Range          : [{result.get('from_sequence')}..{result.get('to_sequence')}]")
@@ -128,7 +127,7 @@ def run_pull() -> None:
     """Pulls peer packages from Google Drive and rebuilds projections."""
     print("[*] Pulling and reconciling peer events from Google Drive Cloud Mesh...")
     result = gdrive_cluster_mesh.pull_and_reconcile()
-    print(f"[+] Sync Reconcile Finished:")
+    print("[+] Sync Reconcile Finished:")
     print(f"    Packages Processed : {result.get('packages_processed')}")
     print(f"    Events Imported    : {result.get('events_imported')}")
     print(f"    Projection Rebuilt : {result.get('projection_rebuilt')}")
@@ -139,7 +138,7 @@ def manage_lease(action: str, duration: int = 300) -> None:
     if action == "acquire":
         try:
             lease = lease_manager.acquire_or_renew_lease(duration_seconds=duration)
-            print(f"[+] Acquired Primary Execution Lease:")
+            print("[+] Acquired Primary Execution Lease:")
             print(f"    Lease ID      : {lease.lease_id}")
             print(f"    Owner Node    : {lease.node_id}")
             print(f"    Node Epoch    : {lease.node_epoch}")

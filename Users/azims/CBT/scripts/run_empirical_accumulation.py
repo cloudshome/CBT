@@ -15,20 +15,16 @@ from __future__ import annotations
 import argparse
 import datetime
 import logging
-import math
-import os
 import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 # Ensure repository root is on Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.data_streamer import data_streamer
-from core.empirical_accumulator import empirical_accumulator
-from core.regime_transition import regime_transition_detector
-from core.strategy_league import strategy_league_manager
 from core.audit_bus import audit_bus
+from core.empirical_accumulator import empirical_accumulator
+from core.strategy_league import strategy_league_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("cbt_empirical_run")
@@ -51,7 +47,7 @@ def simulate_synthetic_trades_for_regime(
     base_p = win_rate_map.get(regime, 0.55)
     
     samples_added = 0
-    now = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+    now = int(datetime.datetime.now(datetime.UTC).timestamp() * 1000)
     
     for i in range(count):
         is_win = (hash(f"{symbol}_{concept}_{regime}_{i}") % 100) / 100.0 < base_p
@@ -77,7 +73,7 @@ def simulate_synthetic_trades_for_regime(
     return samples_added
 
 
-def run_batch_accumulation(symbols: List[str], concepts: List[str]) -> Dict[str, Any]:
+def run_batch_accumulation(symbols: list[str], concepts: list[str]) -> dict[str, Any]:
     """Runs batch accumulation across all combinations of symbols, concepts, and regimes."""
     regimes = empirical_accumulator.SUPPORTED_REGIMES
     total_added = 0
@@ -111,7 +107,7 @@ def run_batch_accumulation(symbols: List[str], concepts: List[str]) -> Dict[str,
     }
 
 
-def asdict_safe(obj: Any) -> Dict[str, Any]:
+def asdict_safe(obj: Any) -> dict[str, Any]:
     from dataclasses import asdict
     try:
         return asdict(obj)

@@ -177,20 +177,26 @@ export class BinanceMarketDataProvider implements IMarketDataProvider {
             const rawAsks = (data.asks || data.a || []).slice(0, 15);
 
             let cumBid = 0;
-            const bids: OrderBookEntry[] = rawBids.map((b: [string, string]) => {
-              const p = parseFloat(b[0]);
-              const s = parseFloat(b[1]);
-              cumBid += s;
-              return { price: p, size: s, total: cumBid };
-            });
+            const bids: OrderBookEntry[] = (Array.isArray(rawBids) ? rawBids : [])
+              .filter((b: any) => Array.isArray(b) && b.length >= 2)
+              .map((b: [string, string]) => {
+                const p = parseFloat(b[0]);
+                const s = parseFloat(b[1]);
+                const validS = isNaN(s) ? 0 : s;
+                cumBid += validS;
+                return { price: isNaN(p) ? 0 : p, size: validS, total: cumBid };
+              });
 
             let cumAsk = 0;
-            const asks: OrderBookEntry[] = rawAsks.map((a: [string, string]) => {
-              const p = parseFloat(a[0]);
-              const s = parseFloat(a[1]);
-              cumAsk += s;
-              return { price: p, size: s, total: cumAsk };
-            });
+            const asks: OrderBookEntry[] = (Array.isArray(rawAsks) ? rawAsks : [])
+              .filter((a: any) => Array.isArray(a) && a.length >= 2)
+              .map((a: [string, string]) => {
+                const p = parseFloat(a[0]);
+                const s = parseFloat(a[1]);
+                const validS = isNaN(s) ? 0 : s;
+                cumAsk += validS;
+                return { price: isNaN(p) ? 0 : p, size: validS, total: cumAsk };
+              });
 
             const depth: OrderBookDepth = {
               symbol,

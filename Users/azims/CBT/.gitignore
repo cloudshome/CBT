@@ -16,6 +16,10 @@ __pycache__/
 node_identity.json
 *.key
 *.pem
+*.pfx
+*.p12
+*.cer
+certs/
 credentials/
 *service_account*.json
 *token*.json

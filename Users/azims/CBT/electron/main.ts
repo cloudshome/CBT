@@ -31,6 +31,7 @@ if (!gotTheLock) {
   app.on('second-instance', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
       mainWindow.focus();
     }
   });
@@ -71,6 +72,22 @@ async function ensureBackendStarted(): Promise<void> {
 
   // Priority 1: Packaged binary in bin/cbt_backend.exe
   const packagedExe = path.join(appRoot, 'bin', 'cbt_backend.exe');
+  const repoVenv = path.resolve(__dirname, '../../.venv/Scripts/python.exe');
+  const devRepoVenv = 'C:\\Users\\azims\\CBT\\.venv\\Scripts\\python.exe';
+  const appRootVenv = path.join(appRoot, '.venv', 'Scripts', 'python.exe');
+  const venvPythonWin = fs.existsSync(appRootVenv)
+    ? appRootVenv
+    : (fs.existsSync(repoVenv)
+      ? repoVenv
+      : (fs.existsSync(devRepoVenv) ? devRepoVenv : 'python'));
+
+  const devBackendScript = 'C:\\Users\\azims\\CBT\\cbt_backend.py';
+  const backendScript = fs.existsSync(path.join(appRoot, 'cbt_backend.py'))
+    ? path.join(appRoot, 'cbt_backend.py')
+    : (fs.existsSync(path.resolve(__dirname, '../../cbt_backend.py'))
+      ? path.resolve(__dirname, '../../cbt_backend.py')
+      : devBackendScript);
+
   if (fs.existsSync(packagedExe)) {
     backendProcess = spawn(packagedExe, [], {
       cwd: appRoot,
@@ -78,10 +95,8 @@ async function ensureBackendStarted(): Promise<void> {
     });
   } else {
     // Priority 2: Local Python virtual environment
-    const venvPythonWin = path.join(appRoot, '.venv', 'Scripts', 'python.exe');
-    const pythonExe = fs.existsSync(venvPythonWin) ? venvPythonWin : 'python';
-    backendProcess = spawn(pythonExe, ['cbt_backend.py'], {
-      cwd: appRoot,
+    backendProcess = spawn(venvPythonWin, [backendScript], {
+      cwd: fs.existsSync(path.join(appRoot, 'cbt_backend.py')) ? appRoot : (fs.existsSync(devBackendScript) ? 'C:\\Users\\azims\\CBT' : path.resolve(__dirname, '../..')),
       env: { ...process.env, CBT_BACKEND_PORT: '8000' },
     });
   }
@@ -112,6 +127,14 @@ async function ensureBackendStarted(): Promise<void> {
  * Creates the primary Obsidian-themed Frameless BrowserWindow.
  */
 function createMainWindow(): void {
+  const iconCandidates = [
+    path.join(app.getAppPath(), 'frontend', 'public', 'favicon.ico'),
+    path.resolve(__dirname, '../../frontend/public/favicon.ico'),
+    path.join(appRoot, 'frontend', 'public', 'favicon.ico'),
+    'C:\\Users\\azims\\CBT\\frontend\\public\\favicon.ico',
+  ];
+  const windowIcon = iconCandidates.find((p) => fs.existsSync(p));
+
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -119,34 +142,63 @@ function createMainWindow(): void {
     minHeight: 760,
     frame: false, // Binance Desktop custom frameless style
     backgroundColor: '#05070c',
-    icon: path.join(__dirname, '../../frontend/public/favicon.ico'),
+    icon: windowIcon,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
     },
+  });
+
+  // Failsafe timer: display window within 1.5s even if ready-to-show is delayed
+  const showFallbackTimer = setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      console.log('[Electron Supervisor] Fallback: Displaying main window.');
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 1500);
+
+  mainWindow.once('ready-to-show', () => {
+    clearTimeout(showFallbackTimer);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Electron Supervisor] did-fail-load: ${errorCode} - ${errorDescription} (${validatedURL})`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (!mainWindow.isVisible()) mainWindow.show();
+      if (validatedURL !== backendUrl) {
+        console.log(`[Electron Supervisor] Falling back to backend server at ${backendUrl}`);
+        mainWindow.loadURL(backendUrl);
+      }
+    }
   });
 
   // Load URL
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    const indexPath = path.join(appRoot, 'frontend', 'dist', 'index.html');
-    if (fs.existsSync(indexPath)) {
-      mainWindow.loadFile(indexPath);
+    const candidates = [
+      path.join(app.getAppPath(), 'frontend', 'dist', 'index.html'),
+      path.resolve(__dirname, '../../frontend/dist/index.html'),
+      path.join(appRoot, 'frontend', 'dist', 'index.html'),
+      'C:\\Users\\azims\\CBT\\frontend\\dist\\index.html',
+    ];
+    const foundIndex = candidates.find((p) => fs.existsSync(p));
+    if (foundIndex) {
+      console.log(`[Electron Supervisor] Loading local UI from: ${foundIndex}`);
+      mainWindow.loadFile(foundIndex);
     } else {
+      console.log(`[Electron Supervisor] Loading remote UI from: ${backendUrl}`);
       mainWindow.loadURL(backendUrl);
     }
   }
-
-  mainWindow.once('ready-to-show', () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -157,8 +209,17 @@ function createMainWindow(): void {
  * Configures the Windows native System Tray.
  */
 function setupSystemTray(): void {
-  const iconPath = path.join(__dirname, '../../frontend/public/favicon.ico');
-  if (!fs.existsSync(iconPath)) return;
+  const iconCandidates = [
+    path.join(app.getAppPath(), 'frontend', 'public', 'favicon.ico'),
+    path.resolve(__dirname, '../../frontend/public/favicon.ico'),
+    path.join(appRoot, 'frontend', 'public', 'favicon.ico'),
+    'C:\\Users\\azims\\CBT\\frontend\\public\\favicon.ico',
+  ];
+  const iconPath = iconCandidates.find((p) => fs.existsSync(p));
+  if (!iconPath) {
+    console.warn('[Electron Supervisor] Favicon icon not found; skipping system tray setup.');
+    return;
+  }
 
   tray = new Tray(iconPath);
   const contextMenu = Menu.buildFromTemplate([
@@ -255,7 +316,14 @@ function registerIpcHandlers(): void {
 app.whenReady().then(async () => {
   powerBlockerId = powerSaveBlocker.start('prevent-app-suspension');
   registerIpcHandlers();
-  await ensureBackendStarted();
+  
+  // Await backend readiness before displaying UI to eliminate initial sync errors
+  try {
+    await ensureBackendStarted();
+  } catch (err) {
+    console.error('[Electron Supervisor] Backend initialization error:', err);
+  }
+
   createMainWindow();
   setupSystemTray();
 

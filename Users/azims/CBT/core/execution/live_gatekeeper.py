@@ -83,9 +83,10 @@ class LiveExecutionGatekeeper:
         strategy_id: str | None = None,
         entry_price: float = 0.0,
         stop_loss_price: float | None = None,
+        session_id: str | None = None,
     ) -> GatekeeperVerdict:
         """
-        Executes exhaustive 7-point constitutional clearance evaluation:
+        Executes exhaustive 8-point constitutional clearance evaluation:
         1. Vault unlocked with valid key derivation.
         1b. Credential Capability Firewall (Positive Withdrawal Prohibition).
         2. Master Kill Switch operational.
@@ -94,6 +95,7 @@ class LiveExecutionGatekeeper:
         5. Sizing conforms to 1.5% single-trade equity cap.
         6. System Live Trading Authorization verified.
         7. Capital Governor Dual-Constraint Clearance (Risk Budget & Notional Cap, when strategy_id provided).
+        8. Human Live Clearance (WebAuthn / FIDO2 physical key possession & active clearance session).
         """
         now_ms = int(time.time() * 1000)
         exchange_upper = exchange.upper().strip()
@@ -198,6 +200,22 @@ class LiveExecutionGatekeeper:
             checks["capital_governor_cleared"] = cap_clearance.passed
             if not cap_clearance.passed:
                 reasons.extend(cap_clearance.rejection_reasons)
+
+        # 8. Human Live Clearance (WebAuthn / FIDO2 physical key possession)
+        if environment.upper() == "TESTNET":
+            checks["hardware_clearance_active"] = True
+        else:
+            from core.auth.hardware_key import hardware_key_manager
+
+            is_cleared, clearance, reason_code = hardware_key_manager.check_live_clearance(
+                session_id=session_id
+            )
+            checks["hardware_clearance_active"] = is_cleared
+            if not is_cleared:
+                code_str = reason_code or "HARDWARE_KEY_CLEARANCE_REQUIRED"
+                reasons.append(
+                    f"{code_str}: Production execution requires an active WebAuthn/FIDO2 hardware security key clearance session."
+                )
 
         all_passed = all(checks.values())
 

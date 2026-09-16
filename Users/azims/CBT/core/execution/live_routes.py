@@ -28,6 +28,7 @@ class LivePreflightCheckRequest(BaseModel):
     exchange: str = Field(default="BINANCE", description="BINANCE or BYBIT")
     order_notional_usd: float = Field(default=10.0, description="Requested order notional in USD")
     environment: str = Field(default="PRODUCTION", description="PRODUCTION or TESTNET")
+    session_id: str | None = Field(default=None, description="Optional client session ID")
 
 
 class CanaryExecuteRequest(BaseModel):
@@ -45,6 +46,7 @@ class CanaryExecuteRequest(BaseModel):
     strategy_id: str = Field(
         default="STRAT_SMC_INSTITUTIONAL", description="Strategy identifier for Gate 7 clearance"
     )
+    session_id: str | None = Field(default=None, description="Optional client session ID")
 
 
 @router.get("/account-readiness")
@@ -99,6 +101,7 @@ async def evaluate_gatekeeper_clearance(req: LivePreflightCheckRequest):
         exchange=req.exchange,
         order_notional_usd=req.order_notional_usd,
         environment=req.environment,
+        session_id=req.session_id,
     )
     return {
         "status": "SUCCESS",
@@ -110,7 +113,7 @@ async def evaluate_gatekeeper_clearance(req: LivePreflightCheckRequest):
 async def run_live_canary_order(req: CanaryExecuteRequest):
     """
     Executes or dry-runs a micro-notional live canary order ($10 - $25).
-    Enforces all 6 constitutional checks and fail-closed safety.
+    Enforces all 8 constitutional checks and fail-closed safety.
     """
     canary_req = CanaryRunRequest(
         exchange=req.exchange,
@@ -123,6 +126,7 @@ async def run_live_canary_order(req: CanaryExecuteRequest):
         environment=req.environment,
         is_dry_run=req.is_dry_run,
         strategy_id=req.strategy_id,
+        session_id=req.session_id,
     )
     res = await live_canary_runner.execute_canary_order(canary_req)
     return {
@@ -231,6 +235,9 @@ class ProtectedOrderRequest(BaseModel):
     order_type: str = Field(default="LIMIT", description="LIMIT or MARKET")
     environment: str = Field(default="TESTNET", description="TESTNET or PRODUCTION")
     strategy_id: str = Field(default="MANUAL_COCKPIT", description="Originating strategy ID")
+    session_id: str | None = Field(
+        default=None, description="Optional client session ID for Gate 8 clearance"
+    )
 
 
 @router.get("/live/state")
@@ -337,7 +344,23 @@ async def submit_protected_live_order(req: ProtectedOrderRequest):
     """
     Submits a live entry order through the Protected-Entry State Machine.
     Hard fail-closed: If protection cannot be confirmed after fill, position is automatically flattened.
+    Enforces Gate 8 Human Live Clearance in PRODUCTION environment.
     """
+    if req.environment.upper() == "PRODUCTION":
+        from core.auth.hardware_key import hardware_key_manager
+
+        is_cleared, clearance, reason_code = hardware_key_manager.check_live_clearance(
+            session_id=req.session_id
+        )
+        if not is_cleared:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": reason_code or "HARDWARE_KEY_CLEARANCE_REQUIRED",
+                    "message": "Production execution requires an active WebAuthn/FIDO2 hardware security key clearance session.",
+                },
+            )
+
     from core.execution.bracket_manager import live_bracket_manager
 
     ctx = await live_bracket_manager.enter_protected_trade(

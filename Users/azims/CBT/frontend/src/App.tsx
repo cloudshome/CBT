@@ -174,55 +174,69 @@ export const App: React.FC = () => {
   // 1. Initial Market Data & Historical Candles Loading (Initial Mount / Symbol / TF Change)
   const fetchInitialMarketData = useCallback(async () => {
     setLoadingMarket(true);
-    try {
-      const [candlesRes, mtfRes, scanRes, skyRes, alphaRes, cvdRes, obiRes] = await Promise.all([
-        api.getCandles(symbol, timeframe, 1000),
-        api.getMTF(symbol, timeframe, 'ema,rsi'),
-        api.getSMCScan(symbol, timeframe, 500),
-        api.getSKYIntelligence(symbol, timeframe, 500).catch(() => null),
-        api.getInstitutionalAlpha(symbol, timeframe, 500).catch(() => null),
-        api.getInstitutionalCVD(symbol, timeframe, 1000).catch(() => null),
-        api.getOrderBookImbalance(symbol).catch(() => null),
-      ]);
+    let attempts = 0;
+    const maxAttempts = 3;
+    while (attempts < maxAttempts) {
+      try {
+        const [candlesRes, mtfRes, scanRes, skyRes, alphaRes, cvdRes, obiRes] = await Promise.all([
+          api.getCandles(symbol, timeframe, 1000),
+          api.getMTF(symbol, timeframe, 'ema,rsi'),
+          api.getSMCScan(symbol, timeframe, 500),
+          api.getSKYIntelligence(symbol, timeframe, 500).catch(() => null),
+          api.getInstitutionalAlpha(symbol, timeframe, 500).catch(() => null),
+          api.getInstitutionalCVD(symbol, timeframe, 1000).catch(() => null),
+          api.getOrderBookImbalance(symbol).catch(() => null),
+        ]);
 
-      setCandles(candlesRes?.candles || []);
-      setEMA(mtfRes?.indicators?.ema || []);
-      setRSI(mtfRes?.indicators?.rsi || []);
-      setFVGs(scanRes?.fvg || []);
-      setOrderBlocks(scanRes?.order_blocks || []);
-      setSetups(scanRes?.setup_suggestions || []);
-      if (skyRes) setSkyData(skyRes);
-      if (alphaRes) setInstitutionalAlpha(alphaRes);
-      if (cvdRes) setCvdData(cvdRes);
-      if (obiRes) setObiData(obiRes);
+        setCandles(candlesRes?.candles || []);
+        setEMA(mtfRes?.indicators?.ema || []);
+        setRSI(mtfRes?.indicators?.rsi || []);
+        setFVGs(scanRes?.fvg || []);
+        setOrderBlocks(scanRes?.order_blocks || []);
+        setSetups(scanRes?.setup_suggestions || []);
+        if (skyRes) setSkyData(skyRes);
+        if (alphaRes) setInstitutionalAlpha(alphaRes);
+        if (cvdRes) setCvdData(cvdRes);
+        if (obiRes) setObiData(obiRes);
 
-      if (scanRes?.stats) {
-        setStats({
-          lastPrice: scanRes.stats.lastPrice,
-          highPrice: scanRes.stats.highPrice,
-          lowPrice: scanRes.stats.lowPrice,
-          trend: scanRes.stats.trend,
-        });
-      } else if (candlesRes.candles && candlesRes.candles.length > 0) {
-        const lastBar = candlesRes.candles[candlesRes.candles.length - 1];
-        const recentCandles = candlesRes.candles.slice(-50);
-        setStats((prev) => ({
-          ...prev,
-          lastPrice: lastBar[4],
-          highPrice: Math.max(...recentCandles.map((c) => c[2])),
-          lowPrice: Math.min(...recentCandles.map((c) => c[3])),
-        }));
+        if (scanRes?.stats) {
+          setStats({
+            lastPrice: scanRes.stats.lastPrice,
+            highPrice: scanRes.stats.highPrice,
+            lowPrice: scanRes.stats.lowPrice,
+            trend: scanRes.stats.trend,
+          });
+        } else if (candlesRes.candles && candlesRes.candles.length > 0) {
+          const lastBar = candlesRes.candles[candlesRes.candles.length - 1];
+          const recentCandles = candlesRes.candles.slice(-50);
+          setStats((prev) => ({
+            ...prev,
+            lastPrice: lastBar[4],
+            highPrice: Math.max(...recentCandles.map((c) => c[2])),
+            lowPrice: Math.min(...recentCandles.map((c) => c[3])),
+          }));
+        }
+        return;
+      } catch (err: unknown) {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          const msg = err instanceof Error ? err.message : 'Failed to fetch market data';
+          if (err instanceof ApiError && err.statusCode === 429) {
+            addToast('warning', 'Rate Limit Exceeded (429)', 'Requests are rate-limited to 60 req/min.');
+          } else {
+            addToast('error', 'Market Data Error', msg);
+          }
+        } else {
+          // Wait 1.5s while backend finishes startup
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      } finally {
+        if (attempts >= maxAttempts) {
+          setLoadingMarket(false);
+        }
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to fetch market data';
-      if (err instanceof ApiError && err.statusCode === 429) {
-        addToast('warning', 'Rate Limit Exceeded (429)', 'Requests are rate-limited to 60 req/min.');
-      } else {
-        addToast('error', 'Market Data Error', msg);
-      }
-    } finally {
-      setLoadingMarket(false);
     }
+    setLoadingMarket(false);
   }, [symbol, timeframe, addToast]);
 
   // 1B. Silent Background Analytics Polling (Every 30s — Zero Chart Jitter / Zero Loading Flash)

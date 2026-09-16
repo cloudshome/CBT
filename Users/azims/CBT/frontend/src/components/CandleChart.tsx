@@ -240,9 +240,16 @@ export const CandleChart: React.FC<CandleChartProps> = ({
 
             {/* FVG Overlay Zones */}
             {showFVG &&
-              fvgs.map((fvg, idx) => {
-                const y1 = getY(fvg.price_zone[1]);
-                const y2 = getY(fvg.price_zone[0]);
+              (fvgs || []).map((fvg, idx) => {
+                if (!fvg) return null;
+                const rawZone = fvg.price_zone || ((fvg as any).bottom_price != null && (fvg as any).top_price != null ? [(fvg as any).bottom_price, (fvg as any).top_price] : null);
+                if (!rawZone || !Array.isArray(rawZone) || rawZone.length < 2) return null;
+                const pBot = Number(rawZone[0]);
+                const pTop = Number(rawZone[1]);
+                if (isNaN(pBot) || isNaN(pTop)) return null;
+
+                const y1 = getY(Math.max(pBot, pTop));
+                const y2 = getY(Math.min(pBot, pTop));
                 const rectHeight = Math.max(2, Math.abs(y2 - y1));
                 const topY = Math.min(y1, y2);
                 const isBullish = fvg.type === 'bullish';
@@ -269,7 +276,7 @@ export const CandleChart: React.FC<CandleChartProps> = ({
                       fontWeight="bold"
                       opacity="0.8"
                     >
-                      {fvg.type.toUpperCase()} FVG [{fvg.price_zone[0]} - {fvg.price_zone[1]}]{' '}
+                      {(fvg.type || 'fvg').toUpperCase()} FVG [{pBot} - {pTop}]{' '}
                       {fvg.mitigated ? '(MITIGATED)' : '(ACTIVE)'}
                     </text>
                   </g>
@@ -278,9 +285,16 @@ export const CandleChart: React.FC<CandleChartProps> = ({
 
             {/* Order Block Overlay Zones */}
             {showOB &&
-              orderBlocks.map((ob, idx) => {
-                const y1 = getY(ob.price_zone[1]);
-                const y2 = getY(ob.price_zone[0]);
+              (orderBlocks || []).map((ob, idx) => {
+                if (!ob) return null;
+                const rawZone = ob.price_zone || ((ob as any).bottom_price != null && (ob as any).top_price != null ? [(ob as any).bottom_price, (ob as any).top_price] : null);
+                if (!rawZone || !Array.isArray(rawZone) || rawZone.length < 2) return null;
+                const pBot = Number(rawZone[0]);
+                const pTop = Number(rawZone[1]);
+                if (isNaN(pBot) || isNaN(pTop)) return null;
+
+                const y1 = getY(Math.max(pBot, pTop));
+                const y2 = getY(Math.min(pBot, pTop));
                 const rectHeight = Math.max(2, Math.abs(y2 - y1));
                 const topY = Math.min(y1, y2);
                 const isBullish = ob.type === 'bullish';
@@ -305,7 +319,7 @@ export const CandleChart: React.FC<CandleChartProps> = ({
                       fontFamily="monospace"
                       fontWeight="bold"
                     >
-                      {ob.type.toUpperCase()} OB [{ob.price_zone[0]}]
+                      {(ob.type || 'ob').toUpperCase()} OB [{pBot}]
                     </text>
                   </g>
                 );

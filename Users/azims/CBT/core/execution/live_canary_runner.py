@@ -55,6 +55,7 @@ class CanaryRunRequest:
     is_dry_run: bool = True  # Defaults to safe dry-run
     strategy_id: str | None = None
     canary_execution_id: str | None = None
+    session_id: str | None = None
 
 
 @dataclass
@@ -287,7 +288,7 @@ class LiveCanaryRunner:
                 timestamp_ms=now_ms,
             )
 
-        # 2. Evaluate 7-Gate Constitutional Gatekeeper
+        # 2. Evaluate 8-Gate Constitutional Gatekeeper
         verdict = await live_gatekeeper.evaluate_order_clearance(
             exchange=exchange_upper,
             order_notional_usd=feasibility.final_notional_usd,
@@ -295,6 +296,7 @@ class LiveCanaryRunner:
             strategy_id=req.strategy_id,
             entry_price=feasibility.effective_price,
             stop_loss_price=req.stop_loss_price,
+            session_id=req.session_id,
         )
 
         # 3. Dry-Run Path

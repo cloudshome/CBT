@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from core.auth.credential_vault import CredentialCapability, credential_vault
+from core.auth.hardware_key import hardware_key_manager
 from core.execution.account_probe import AccountReadinessProbe, ExchangeAccountStatus, account_probe
 from core.execution.connectors.base import NormalizedBalance
 from core.execution.kill_switch import live_kill_switch
@@ -262,6 +263,7 @@ async def test_live_gatekeeper_all_checks_cleared():
         patch.object(credential_vault, "get_credential_capability", return_value=mock_cap),
         patch.object(live_kill_switch, "is_active", return_value=False),
         patch.object(account_probe, "probe_exchange", return_value=mock_status),
+        patch.object(hardware_key_manager, "check_live_clearance", return_value=(True, None, None)),
         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
     ):
         verdict = await gatekeeper.evaluate_order_clearance("BINANCE", order_notional_usd=10.0)
@@ -315,6 +317,7 @@ async def test_live_canary_dry_run():
         patch.object(credential_vault, "get_credential_capability", return_value=mock_cap),
         patch.object(live_kill_switch, "is_active", return_value=False),
         patch.object(account_probe, "probe_exchange", return_value=mock_status),
+        patch.object(hardware_key_manager, "check_live_clearance", return_value=(True, None, None)),
         patch.dict(os.environ, {"LIVE_TRADING_ENABLED": "true"}),
     ):
         req = CanaryRunRequest(

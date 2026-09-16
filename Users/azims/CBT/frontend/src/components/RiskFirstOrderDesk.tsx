@@ -24,7 +24,8 @@ import {
   WSReconciliationTelemetry,
   WSNormalizedFill,
 } from '../types';
-import { api, VaultStatus, SORRouteQuote, AlmgrenChrissSchedule } from '../services/api';
+import { api, VaultStatus, SORRouteQuote, AlmgrenChrissSchedule, getHardwareKeyStatus, ClearanceSessionData } from '../services/api';
+import { HardwareKeyModal } from './HardwareKeyModal';
 
 interface RiskFirstOrderDeskProps {
   symbol: string;
@@ -68,6 +69,8 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
   const [sorQuote, setSorQuote] = useState<SORRouteQuote | null>(null);
   const [almgrenSchedule, setAlmgrenSchedule] = useState<AlmgrenChrissSchedule | null>(null);
+  const [isHardwareModalOpen, setIsHardwareModalOpen] = useState<boolean>(false);
+  const [clearanceSession, setClearanceSession] = useState<ClearanceSessionData | null>(null);
 
   // Phase 19: KMS Enclave, Micro-Benchmarks & Real-Time WS Stream
   const [kmsStatus, setKmsStatus] = useState<KMSEnclaveStatus | null>(null);
@@ -306,12 +309,26 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              if (!isLiveMode && vaultStatus?.kill_switch.is_active) {
+            onClick={async () => {
+              if (isLiveMode) {
+                setIsLiveMode(false);
+                return;
+              }
+              if (vaultStatus?.kill_switch.is_active) {
                 alert('Cannot enable Live Execution: Kill Switch is currently ACTIVE.');
                 return;
               }
-              setIsLiveMode(!isLiveMode);
+              try {
+                const statusRes = await getHardwareKeyStatus();
+                if (statusRes.posture.live_clearance_active && statusRes.posture.clearance_session) {
+                  setClearanceSession(statusRes.posture.clearance_session);
+                  setIsLiveMode(true);
+                } else {
+                  setIsHardwareModalOpen(true);
+                }
+              } catch {
+                setIsHardwareModalOpen(true);
+              }
             }}
             className={`px-2 py-0.5 text-[10px] font-bold rounded border transition flex items-center gap-1 ${
               isLiveMode
@@ -324,6 +341,30 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
           </button>
           <span className="text-[10px] text-slate-400">Equity: ${accountEquity.toLocaleString()}</span>
         </div>
+      </div>
+
+      {/* Hardware Key Live Clearance Badge */}
+      <div className="px-2 py-1.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between text-[10px]">
+        <div className="flex items-center gap-1.5 text-slate-300">
+          <Shield className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-slate-400 font-semibold">FIDO2 / WEBAUTHN:</span>
+          <span className={`font-bold ${
+            isLiveMode && clearanceSession?.is_valid
+              ? 'text-emerald-400'
+              : 'text-slate-400'
+          }`}>
+            {isLiveMode && clearanceSession?.is_valid
+              ? `LIVE CLEARANCE ACTIVE (${clearanceSession.credential_id_masked})`
+              : 'HARDWARE CLEARANCE INACTIVE'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsHardwareModalOpen(true)}
+          className="text-amber-400 hover:text-amber-300 font-semibold underline text-[9px]"
+        >
+          {isLiveMode && clearanceSession?.is_valid ? 'MANAGE KEY' : 'REQUEST CLEARANCE'}
+        </button>
       </div>
 
       {/* Cloud KMS / HSM Enclave Security Badge */}
@@ -879,6 +920,17 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
           </div>
         </div>
       )}
+
+      {/* WebAuthn / FIDO2 Hardware Security Key Clearance Modal */}
+      <HardwareKeyModal
+        isOpen={isHardwareModalOpen}
+        onClose={() => setIsHardwareModalOpen(false)}
+        onClearanceGranted={(clr) => {
+          setClearanceSession(clr);
+          setIsLiveMode(true);
+          setIsHardwareModalOpen(false);
+        }}
+      />
     </div>
   );
 };
