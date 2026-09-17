@@ -68,6 +68,9 @@ from core.execution.phase23_routes import router as phase23_execution_router
 from core.setup_service import setup_router
 from core.auth.hardware_key_routes import hardware_key_router
 from core.web3.web3_routes import router as web3_router
+from core.heatmap_routes import heatmap_router
+from core.strategist_routes import strategist_router
+from core.arbitrage.cexdex_routes import router as cexdex_router
 from core.terminal_routes import terminal_router
 from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
@@ -262,6 +265,9 @@ app.include_router(setup_router)
 app.include_router(hardware_key_router)
 app.include_router(web3_router)
 app.include_router(terminal_router)
+app.include_router(heatmap_router)
+app.include_router(strategist_router)
+app.include_router(cexdex_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()

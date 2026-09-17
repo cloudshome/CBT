@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import aiohttp
+from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -44,6 +45,18 @@ setup_router = APIRouter(prefix="/api/system", tags=["System Setup & Updates"])
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE_PATH = REPO_ROOT / ".env"
 BACKUPS_DIR = REPO_ROOT / "backups" / "updates"
+
+
+def _load_env_if_present() -> None:
+    """Loads configuration entries from .env into process environment if file exists."""
+    if ENV_FILE_PATH.exists():
+        try:
+            load_dotenv(ENV_FILE_PATH, override=False)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Could not load .env file: {e}")
+
+
+_load_env_if_present()
 
 
 # ===========================================================================
@@ -178,7 +191,22 @@ async def get_setup_status() -> dict[str, Any]:
     Returns current system setup status, configured exchanges, Web3 wallets,
     and first-run readiness.
     """
+    _load_env_if_present()
     setup_done = os.getenv("SETUP_COMPLETED", "").lower() == "true"
+    if not setup_done and ENV_FILE_PATH.exists():
+        try:
+            with open(ENV_FILE_PATH, encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith("SETUP_COMPLETED="):
+                        val = stripped.split("=", 1)[1].strip().strip("'\"").lower()
+                        if val == "true":
+                            setup_done = True
+                            os.environ["SETUP_COMPLETED"] = "true"
+                            break
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed reading .env for setup status: %s", exc)
+
     has_gemini = bool(os.getenv("GEMINI_API_KEY", "").strip())
     vault_unlocked = credential_vault.is_unlocked()
 
@@ -203,7 +231,7 @@ async def get_setup_status() -> dict[str, Any]:
     wallets = [w.to_safe_dict() for w in credential_vault.get_web3_wallets()]
     exec_mode = os.getenv("TRADING_MODE", "PAPER_TRADING")
 
-    # If vault is not unlocked or setup is not marked complete, first-run wizard will trigger
+    # First-run wizard triggers ONLY if setup has not been completed AND no credentials exist
     is_first_run = (not setup_done) and (len(configured_exchanges) == 0 and not has_gemini)
 
     return {

@@ -3626,3 +3626,554 @@ export async function getWeb3RpcStatus(): Promise<{ status: string; quorum_resul
   return handleResponse(res);
 }
 
+// ===========================================================================
+// Institutional Order Book Heatmap, DOM Intelligence & Resting-Wall Sentinel
+// ===========================================================================
+
+export interface HeatmapWallItem {
+  wall_id: string;
+  symbol: string;
+  price: number;
+  price_band: [number, number];
+  side: 'BID' | 'ASK';
+  initial_size: number;
+  current_size: number;
+  peak_size: number;
+  notional_usd: number;
+  first_seen_ms: number;
+  last_seen_ms: number;
+  age_seconds: number;
+  frames_present: number;
+  frame_presence_ratio: number;
+  quantity_stability: number;
+  persistence_score: number;
+  distance_from_mid_bps: number;
+  cumulative_absorbed_qty: number;
+  replenishment_count: number;
+  status: 'ACTIVE' | 'SWEPT' | 'PULLED' | 'RELOAD_SUSPECTED';
+  status_reason: string;
+  is_potential_spoof: boolean;
+}
+
+export interface HeatmapLiquidationBand {
+  price: number;
+  side: 'LONG_LIQUIDATION' | 'SHORT_LIQUIDATION';
+  leverage_tier: number;
+  estimated_volume_usd: number;
+  distance_pct: number;
+  distance_bps: number;
+  confidence: number;
+  methodology: string;
+  reference_market: string;
+  is_observed_fact: boolean;
+  disclaimer: string;
+}
+
+export interface HeatmapDataGrid {
+  symbol: string;
+  window_frames: number;
+  timestamps: number[];
+  price_bins: number[];
+  density_matrix: number[][]; // [time_idx][bin_idx] intensity 0-100
+  mid_price_path: number[];
+  current_mid: number;
+  tick_size: number;
+}
+
+export interface HeatmapSnapshotResponse {
+  status: string;
+  symbol: string;
+  heatmap: HeatmapDataGrid;
+  walls: {
+    symbol: string;
+    active_walls_count: number;
+    active_walls: HeatmapWallItem[];
+    recent_historical_walls: HeatmapWallItem[];
+  };
+  liquidations: {
+    symbol: string;
+    market_type: string;
+    liquidations_available: boolean;
+    current_price?: number;
+    reason?: string;
+    disclaimer?: string;
+    bands: HeatmapLiquidationBand[];
+  };
+  metrics: Record<string, number>;
+  timestamp_ms: number;
+}
+
+export async function getHeatmapSnapshot(
+  symbol = 'BTC/USDT',
+  window_frames = 300,
+  price_bins_count = 80
+): Promise<HeatmapSnapshotResponse> {
+  const q = new URLSearchParams({
+    symbol,
+    window_frames: window_frames.toString(),
+    price_bins_count: price_bins_count.toString(),
+  });
+  const res = await authFetch(`/api/heatmap/snapshot?${q.toString()}`);
+  return handleResponse(res);
+}
+
+export async function getHeatmapWalls(
+  symbol = 'BTC/USDT'
+): Promise<{ status: string; data: { symbol: string; active_walls_count: number; active_walls: HeatmapWallItem[]; recent_historical_walls: HeatmapWallItem[] }; timestamp_ms: number }> {
+  const res = await authFetch(`/api/heatmap/walls?symbol=${encodeURIComponent(symbol)}`);
+  return handleResponse(res);
+}
+
+export async function getHeatmapLiquidations(
+  symbol = 'BTC/USDT',
+  market_type = 'PERPETUAL'
+): Promise<{ status: string; data: { symbol: string; market_type: string; liquidations_available: boolean; current_price?: number; bands: HeatmapLiquidationBand[]; disclaimer?: string }; timestamp_ms: number }> {
+  const res = await authFetch(`/api/heatmap/liquidations?symbol=${encodeURIComponent(symbol)}&market_type=${encodeURIComponent(market_type)}`);
+  return handleResponse(res);
+}
+
+export async function getHeatmapMetrics(): Promise<{ status: string; metrics: Record<string, number>; active_symbols: string[]; timestamp_ms: number }> {
+  const res = await authFetch('/api/heatmap/metrics');
+  return handleResponse(res);
+}
+
+// ============================================================================
+// Item 2: Autonomous Quant Strategist & Research Validation OS Types & API
+// ============================================================================
+
+export type ResearchClassification =
+  | 'ROBUST'
+  | 'FRAGILE'
+  | 'OVERFIT'
+  | 'INSUFFICIENT_DATA'
+  | 'INCONCLUSIVE';
+
+export interface CPCVFoldItem {
+  fold_id: number;
+  train_size: number;
+  test_size: number;
+  purged_count: number;
+  embargo_count: number;
+  is_sharpe: number;
+  oos_sharpe: number;
+  is_win_rate: number;
+  oos_win_rate: number;
+  oos_trade_count: number;
+  stability_ratio: number;
+}
+
+export interface CPCVResultItem {
+  symbol: string;
+  timeframe: string;
+  total_samples: number;
+  n_partitions: number;
+  k_test_groups: number;
+  num_paths: number;
+  embargo_bars: number;
+  folds: CPCVFoldItem[];
+  mean_is_sharpe: number;
+  mean_oos_sharpe: number;
+  median_oos_sharpe: number;
+  std_oos_sharpe: number;
+  stability_index: number;
+  total_oos_trades: number;
+  oos_win_rate: number;
+  oos_profit_factor: number;
+  oos_max_drawdown_pct: number;
+  friction_results: Record<string, {
+    sharpe: number;
+    win_rate_pct: number;
+    profit_factor: number;
+    total_trades: number;
+    max_drawdown_pct: number;
+    net_return_pct: number;
+    total_friction_bps: number;
+  }>;
+  equity_curve_oos: number[];
+}
+
+export interface DSRReportItem {
+  strategy_id: string;
+  cumulative_trials: number;
+  observed_sharpe: number;
+  expected_max_null_sharpe: number;
+  skewness: number;
+  kurtosis: number;
+  sr_standard_error: number;
+  z_score: number;
+  deflated_sharpe_ratio: number;
+  p_value: number;
+  is_tier1_eligible: boolean;
+  policy_version: string;
+}
+
+export interface WRCReportItem {
+  strategy_id: string;
+  p_value: number;
+  bootstrap_replications: number;
+  mean_block_length: number;
+  observed_mean_return: number;
+  bootstrap_null_max: number;
+  is_significant_at_5pct: boolean;
+}
+
+export interface PerturbationPointItem {
+  parameter_deltas: Record<string, number>;
+  perturbed_sharpe: number;
+  delta_sharpe_pct: number;
+  is_surviving: boolean;
+}
+
+export interface PerturbationReportItem {
+  strategy_id: string;
+  base_sharpe: number;
+  total_neighbors: number;
+  surviving_neighbors: number;
+  plateau_ratio: number;
+  is_plateau_robust: boolean;
+  grid_points: PerturbationPointItem[];
+}
+
+export interface RegimePerformanceItem {
+  regime_name: string;
+  sample_bars_count: number;
+  trade_count: number;
+  sharpe: number;
+  win_rate_pct: number;
+  net_return_pct: number;
+  max_drawdown_pct: number;
+  is_catastrophic_loss: boolean;
+}
+
+export interface RegimeDecompositionReportItem {
+  regimes: Record<string, RegimePerformanceItem>;
+  profitable_regimes_count: number;
+  worst_regime_drawdown_pct: number;
+  is_all_weather_candidate: boolean;
+}
+
+export interface ResearchGateDossierItem {
+  strategy_id: string;
+  classification: ResearchClassification;
+  rejection_reasons: string[];
+  epistemic_tags: string[];
+  cpcv_result: CPCVResultItem;
+  dsr_report: DSRReportItem;
+  wrc_report: WRCReportItem;
+  perturbation_report: PerturbationReportItem;
+  regime_report: RegimeDecompositionReportItem;
+  quarantine_eligible: boolean;
+  is_tier1_qualified: boolean;
+  confidence_score: number;
+}
+
+export interface SynthesisJobReportItem {
+  job_id: string;
+  strategy_id: string;
+  symbol: string;
+  timeframe: string;
+  timestamp_ms: number;
+  trial_number: number;
+  cumulative_trials: number;
+  hypothesis: string;
+  compilation_status: string;
+  research_dossier: ResearchGateDossierItem;
+  is_novelty_passed: boolean;
+  tier1_quarantined: boolean;
+  tear_sheet_markdown: string;
+  telegram_bulletin: string;
+}
+
+export interface StrategyLineageNodeItem {
+  node_id: string;
+  strategy_id: string;
+  parent_id?: string;
+  generation: number;
+  created_at: number;
+  mutation_type: string;
+  parameter_hash: string;
+  hypothesis: string;
+  research_classification: string;
+  tier1_admitted: boolean;
+  deflated_sharpe_ratio: number;
+  oos_sharpe: number;
+  plateau_survival_ratio: number;
+  quarantine_tier: number;
+}
+
+export interface StatisticalPolicyItem {
+  policy_version: string;
+  dsr_tier1_threshold: number;
+  dsr_caution_threshold: number;
+  wrc_pvalue_threshold: number;
+  min_oos_trades: number;
+  plateau_survival_ratio_threshold: number;
+  max_regime_drawdown_pct: number;
+  min_profitable_regimes: number;
+  daily_trial_budget: number;
+  batch_trial_budget: number;
+}
+
+export async function synthesizeStrategy(
+  symbol = 'BTC/USDT',
+  timeframe = '15m',
+  prompt_or_concept = 'SMC liquidity sweep with order block retest and resting wall confirmation',
+  base_params?: Record<string, number>,
+  parent_genome_id?: string,
+  is_mutation = false
+): Promise<{ status: string; job: SynthesisJobReportItem }> {
+  const res = await authFetch('/api/strategist/synthesize', {
+    method: 'POST',
+    body: JSON.stringify({
+      symbol,
+      timeframe,
+      prompt_or_concept,
+      base_params,
+      parent_genome_id,
+      is_mutation,
+    }),
+  });
+  return handleResponse(res);
+}
+
+export async function getStrategistJobs(
+  limit = 20
+): Promise<{ status: string; count: number; cumulative_system_trials: number; jobs: SynthesisJobReportItem[] }> {
+  const res = await authFetch(`/api/strategist/jobs?limit=${limit}`);
+  return handleResponse(res);
+}
+
+export async function getStrategistJobDetail(
+  job_id: string
+): Promise<{ status: string; job: SynthesisJobReportItem }> {
+  const res = await authFetch(`/api/strategist/jobs/${encodeURIComponent(job_id)}`);
+  return handleResponse(res);
+}
+
+export async function getStrategistLineage(
+  limit = 50
+): Promise<{ status: string; node_count: number; nodes: StrategyLineageNodeItem[] }> {
+  const res = await authFetch(`/api/strategist/lineage?limit=${limit}`);
+  return handleResponse(res);
+}
+
+export async function getStrategistAncestors(
+  genome_id: string
+): Promise<{ status: string; genome_id: string; ancestor_count: number; ancestors: StrategyLineageNodeItem[] }> {
+  const res = await authFetch(`/api/strategist/lineage/${encodeURIComponent(genome_id)}`);
+  return handleResponse(res);
+}
+
+export async function getStrategistPolicy(): Promise<{
+  status: string;
+  policy: StatisticalPolicyItem;
+  cumulative_trials: number;
+  is_daemon_active: boolean;
+}> {
+  const res = await authFetch('/api/strategist/policy');
+  return handleResponse(res);
+}
+
+export async function getStrategistLeague(): Promise<{
+  status: string;
+  tier1_smoke: Record<string, unknown>[];
+  tier2_preliminary: Record<string, unknown>[];
+  tier3_robust: Record<string, unknown>[];
+  tier4_production: Record<string, unknown>[];
+}> {
+  const res = await authFetch('/api/strategist/league');
+  return handleResponse(res);
+}
+
+export async function toggleStrategistDaemon(
+  enable: boolean
+): Promise<{ status: string; is_daemon_active: boolean }> {
+  const res = await authFetch('/api/strategist/daemon/toggle', {
+    method: 'POST',
+    body: JSON.stringify({ enable }),
+  });
+  return handleResponse(res);
+}
+
+// =============================================================================
+// ITEM 3: CEX-DEX BASIS, CLMM & CARRY ARBITRAGE
+// =============================================================================
+
+export interface CexDexQuorumInfo {
+  consensus_status: string;
+  freshness: string;
+  chain: string;
+  chain_id: number;
+  canonical_block_number: number;
+  canonical_block_hash: string;
+  canonical_state_root?: string | null;
+  canonical_slot?: number | null;
+  agreeing_node_count: number;
+  total_node_count: number;
+  state_age_ms: number;
+  observed_timestamp_ms: number;
+  local_receive_timestamp_ms: number;
+}
+
+export interface CexDexPoolState {
+  dex_name: string;
+  chain: string;
+  pool_address: string;
+  token0: string;
+  token1: string;
+  spot_price: number;
+  active_liquidity: string;
+  current_tick: number;
+  fee_pips: number;
+  quorum: CexDexQuorumInfo;
+}
+
+export interface CexDexCexExecution {
+  venue: string;
+  vwap_price: number;
+  fill_ratio: number;
+  levels_consumed: number;
+  status: string;
+}
+
+export interface CexDexSurvivalSimulation {
+  iterations: number;
+  expected_net_ev: number;
+  p05_net_ev: number;
+  p50_net_ev: number;
+  p95_net_ev: number;
+  loss_probability: number;
+  revert_probability: number;
+  break_even_hurdle_bps: number;
+  atomicity: string;
+  scenarios_summary: {
+    mean_gas_usd: number;
+    unhedged_latency_ms: number;
+    cex_fill_ratio: number;
+  };
+}
+
+export interface CexDexClassification {
+  economic: string;
+  data_freshness: string;
+  execution: string;
+  mev: string;
+  hedge: string;
+  mode: string;
+}
+
+export interface CexDexCarryMetrics {
+  symbol: string;
+  spot_price: number;
+  lp_lower_price: number;
+  lp_upper_price: number;
+  lp_notional_usd: number;
+  cex_short_notional_usd: number;
+  lp_delta_base: number;
+  cex_short_delta_base: number;
+  net_modeled_delta_base: number;
+  is_rebalance_required: boolean;
+  rebalance_recommendation_base: number;
+  realized_fee_yield_usd: number;
+  realized_funding_usd: number;
+  annualized_fee_apy_percent: number;
+  annualized_funding_apy_percent: number;
+  divergence_loss_percent: number;
+  borrow_fee_usd: number;
+  rebalance_gas_drag_usd: number;
+  net_carry_apy_percent: number;
+  cex_liquidation_price: number;
+  distance_to_liquidation_percent: number;
+  liquidation_risk_alert: boolean;
+}
+
+export interface CexDexOpportunityItem {
+  opportunity_id: string;
+  symbol: string;
+  direction: string;
+  target_notional_usd: number;
+  dex_name: string;
+  dex_chain: string;
+  pool_address: string;
+  dex_effective_price: number;
+  dex_marginal_slippage_bps: number;
+  dex_fee_usd: number;
+  cex_venue: string;
+  cex_vwap_price: number;
+  cex_slippage_bps: number;
+  cex_fee_usd: number;
+  cex_fill_ratio: number;
+  gross_basis_bps: number;
+  net_ev_base_usd: number;
+  net_ev_conservative_usd: number;
+  net_ev_stress_usd: number;
+  survival: CexDexSurvivalSimulation;
+  classification: CexDexClassification;
+  timestamp_ms: number;
+}
+
+export interface CexDexScanResponse {
+  opportunity: CexDexOpportunityItem;
+  pool_state: CexDexPoolState;
+  cex_execution: CexDexCexExecution;
+  carry_metrics: CexDexCarryMetrics;
+  survival_simulation: CexDexSurvivalSimulation;
+  classification: CexDexClassification;
+}
+
+export interface CexDexShadowRecord {
+  shadow_id: string;
+  timestamp_ns: number;
+  chain: string;
+  block_number: number;
+  block_hash: string;
+  dex_name: string;
+  pool_address: string;
+  cex_name: string;
+  symbol: string;
+  direction: string;
+  notional_usd: number;
+  gross_basis_bps: number;
+  gas_usd: number;
+  dex_fee_usd: number;
+  cex_fee_usd: number;
+  mev_hazard_bps: number;
+  survival_p50_ev: number;
+  classification_json: string;
+  rpc_consensus_status: string;
+  notes: string;
+}
+
+export async function scanCexDexPair(
+  symbol = 'ETHUSDC',
+  notional = 10000,
+  privateRpc = true
+): Promise<CexDexScanResponse> {
+  const res = await authFetch(
+    `/api/cexdex/scan?symbol=${encodeURIComponent(symbol)}&notional=${notional}&private_rpc=${privateRpc}`
+  );
+  return handleResponse<CexDexScanResponse>(res);
+}
+
+export async function getCexDexShadowHistory(limit = 50): Promise<{
+  status: string;
+  count: number;
+  shadow_records: CexDexShadowRecord[];
+}> {
+  const res = await authFetch(`/api/cexdex/shadow-history?limit=${limit}`);
+  return handleResponse(res);
+}
+
+export async function executeCexDexShadow(
+  symbol = 'ETHUSDC',
+  notional_usd = 10000
+): Promise<{ status: string; shadow_trade_id: string; entry: Record<string, unknown> }> {
+  const res = await authFetch('/api/cexdex/shadow-execute', {
+    method: 'POST',
+    body: JSON.stringify({ symbol, notional_usd }),
+  });
+  return handleResponse(res);
+}
+
+
+

@@ -17,11 +17,18 @@ import socket
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
 import uvicorn
 
 REPO_ROOT = Path(__file__).resolve().parent
 os.chdir(REPO_ROOT)
 sys.path.insert(0, str(REPO_ROOT))
+
+if (REPO_ROOT / ".env").exists():
+    try:
+        load_dotenv(REPO_ROOT / ".env", override=False)
+    except Exception:
+        pass
 
 DEFAULT_PORT = 8000
 HOST = "127.0.0.1"

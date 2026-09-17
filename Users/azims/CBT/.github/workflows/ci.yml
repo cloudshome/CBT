@@ -74,6 +74,9 @@ jobs:
           ruff check core/ tests/
           ruff format --check core/ tests/
 
+      - name: Build Frontend PWA (Required for Vite-asset pytest tests)
+        run: npm --prefix frontend run build
+
       - name: Run Python Quantitative Test Suite (Pytest)
         run: |
           pytest --tb=short

@@ -201,6 +201,12 @@ class StrategyLeagueManager:
                 else round(1.0 / len(tier_4_strats), 3)
             )
 
+    def get_active_strategies(self) -> list[StrategyGenome]:
+        return [s for s in self._strategies.values() if s.is_active]
+
+    def get_tier_strategies(self, tier: int) -> list[StrategyGenome]:
+        return [s for s in self._strategies.values() if int(s.quarantine_tier) == tier]
+
     def get_leaderboard(self) -> list[dict[str, Any]]:
         strats = list(self._strategies.values())
         strats.sort(key=lambda s: (int(s.quarantine_tier), s.rolling_sharpe_30d), reverse=True)
