@@ -99,6 +99,10 @@ def test_root_view_serves_vite_distribution(client):
     assert "<html" in res.text.lower()
 
 
+@pytest.mark.skipif(
+    not list(Path("frontend/dist/assets").glob("index-*.js")),
+    reason="frontend/dist not built — skipping static-asset serving test (run npm --prefix frontend run build first)",
+)
 def test_vite_assets_served_statically(client):
     dist_assets = list(Path("frontend/dist/assets").glob("index-*.js"))
     assert len(dist_assets) > 0, "No built index js asset found in frontend/dist/assets"
