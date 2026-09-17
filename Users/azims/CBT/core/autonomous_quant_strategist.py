@@ -589,5 +589,26 @@ class AutonomousQuantStrategist:
             logger.warning(f"Failed fetching DeFi basis alpha features for {symbol}: {e}")
             return {"symbol": symbol, "observation_count": 0}
 
+    def get_kronos_forecast_context(self, symbol: str, timeframe: str = "15m") -> dict[str, Any]:
+        """
+        Ingests calibrated Kronos foundation forecast and Brier reliability context.
+        Provides probabilistic time-series context to autonomous hypothesis synthesis.
+        Constitutional invariant: Strictly informational — zero execution or sizing authorization.
+        """
+        try:
+            from core.kronos.domain_adapter import kronos_domain_adapter
+
+            return kronos_domain_adapter.get_research_context(symbol, timeframe)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                f"Failed fetching Kronos forecast context for {symbol} ({timeframe}): {e}"
+            )
+            return {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "epistemic_status": "UNAVAILABLE",
+                "calibration_sample_size": 0,
+            }
+
 
 autonomous_quant_strategist = AutonomousQuantStrategist()

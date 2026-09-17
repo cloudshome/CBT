@@ -71,6 +71,7 @@ from core.web3.web3_routes import router as web3_router
 from core.heatmap_routes import heatmap_router
 from core.strategist_routes import strategist_router
 from core.arbitrage.cexdex_routes import router as cexdex_router
+from core.kronos.kronos_routes import kronos_router
 from core.terminal_routes import terminal_router
 from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
@@ -268,6 +269,7 @@ app.include_router(terminal_router)
 app.include_router(heatmap_router)
 app.include_router(strategist_router)
 app.include_router(cexdex_router)
+app.include_router(kronos_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()
@@ -3290,103 +3292,8 @@ async def get_gold_macro_telemetry(
 
 # ---------------------------------------------------------
 # Kronos Probabilistic Foundation Forecasting Endpoints
+# (Authoritatively mounted via core.kronos.kronos_routes.kronos_router)
 # ---------------------------------------------------------
-
-
-@app.get("/api/kronos/forecast")
-async def get_kronos_forecast(
-    symbol: str = Query("BTC/USDT"),
-    timeframe: str = Query("15m"),
-    lookback: int = Query(128),
-    horizon: int = Query(12),
-    samples: int = Query(5),
-    freeze: bool = Query(False),
-):
-    """
-    Generates multi-sample probabilistic path forecasts using the Kronos Foundation Model.
-    Includes expected return, path dispersion, directional consensus, and model uncertainty.
-    """
-    try:
-        candles = await data_streamer.fetch_external_ohlcv(symbol, timeframe, limit=lookback + 20)
-        if not candles or len(candles) < 20:
-            candles = data_streamer.generate_synthetic_candles(
-                symbol, timeframe, count=lookback + 20
-            )
-    except Exception:
-        candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=lookback + 20)
-    forecast = kronos_adapter.predict(
-        symbol=symbol,
-        timeframe=timeframe,
-        candles=candles,
-        horizon=horizon,
-        lookback=lookback,
-        sample_count=samples,
-    )
-    if freeze and forecast.status.value == "HEALTHY":
-        freeze_kronos_forecast(forecast)
-    return forecast.to_dict()
-
-
-@app.get("/api/kronos/health")
-async def get_kronos_health():
-    """Returns real-time health telemetry and latency percentiles for Kronos."""
-    return kronos_health_monitor.get_metrics()
-
-
-@app.get("/api/kronos/history")
-async def get_kronos_history(
-    symbol: str | None = Query(None),
-    timeframe: str | None = Query(None),
-    limit: int = Query(20),
-):
-    """Retrieves immutable frozen forecast records from SQLite experiment_store.db."""
-    records = get_kronos_forecasts(symbol=symbol, timeframe=timeframe, limit=limit)
-    return {"records": records, "count": len(records)}
-
-
-@app.post("/api/kronos/ablation")
-async def run_kronos_ablation(
-    symbol: str = Query("BTC/USDT"),
-    timeframe: str = Query("15m"),
-    bars: int = Query(200),
-):
-    """Executes 3-way ablation benchmark (SKY Baseline vs Kronos Standalone vs Fusion)."""
-    candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=bars)
-    result = kronos_ablation_benchmark.run_benchmark(
-        symbol=symbol,
-        timeframe=timeframe,
-        candles=candles,
-    )
-    return result.to_dict()
-
-
-@app.get("/api/kronos/calibration")
-async def get_kronos_calibration(
-    symbol: str = Query("BTC/USDT"),
-    timeframe: str = Query("15m"),
-):
-    """Returns Platt calibration curve and Brier reliability deciles for Kronos."""
-    scorecard = kronos_probability_calibrator.evaluate_scorecard(
-        [], [], symbol=symbol, timeframe=timeframe
-    )
-    return scorecard.to_dict()
-
-
-@app.get("/api/kronos/advisory")
-async def get_kronos_advisory(
-    symbol: str = Query("BTC/USDT"),
-    timeframe: str = Query("15m"),
-    sky_decision: str = Query("LONG"),
-):
-    """Evaluates Kronos advisory verdict against incoming SKY setup."""
-    candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=60)
-    verdict = kronos_advisory_engine.evaluate_advisory(
-        symbol=symbol,
-        timeframe=timeframe,
-        candles=candles,
-        sky_decision=sky_decision,
-    )
-    return verdict.to_dict()
 
 
 # =====================================================================

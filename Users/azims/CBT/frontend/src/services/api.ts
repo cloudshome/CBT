@@ -46,6 +46,8 @@ import {
   DynamicTradingPlan,
   CapitalEscalationReport,
   CapitalTier,
+  KronosDomainForecastData,
+  KronosBrierReport,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -1058,6 +1060,86 @@ export const api = {
     if (params?.sky_decision) q.set('sky_decision', params.sky_decision);
     const res = await authFetch(`${BASE_URL}/api/kronos/advisory?${q.toString()}`);
     return handleResponse<any>(res);
+  },
+
+  /**
+   * Milestone K8: GET /api/kronos/forecast (Authoritative Domain Forecast)
+   */
+  async getKronosDomainForecast(params?: {
+    symbol?: string;
+    timeframe?: string;
+    lookback?: number;
+    horizon?: number;
+    samples?: number;
+    hurdle?: number;
+    freeze?: boolean;
+  }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.lookback) q.set('lookback', params.lookback.toString());
+    if (params?.horizon) q.set('horizon', params.horizon.toString());
+    if (params?.samples) q.set('samples', params.samples.toString());
+    if (params?.hurdle !== undefined) q.set('hurdle', params.hurdle.toString());
+    if (params?.freeze !== undefined) q.set('freeze', params.freeze.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/forecast?${q.toString()}`);
+    return handleResponse<KronosDomainForecastData>(res);
+  },
+
+  /**
+   * Milestone K8: GET /api/kronos/status
+   */
+  async getKronosStatus() {
+    const res = await authFetch(`${BASE_URL}/api/kronos/status`);
+    return handleResponse<{
+      provider_type: string;
+      status: string;
+      model_family: string;
+      model_version: string;
+      device: string;
+      latency_p50_ms: number;
+      provider_mode: string;
+      error_message?: string;
+    }>(res);
+  },
+
+  /**
+   * Milestone K8: GET /api/kronos/calibration-status
+   */
+  async getKronosCalibrationStatus(params?: { symbol?: string; timeframe?: string }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    const res = await authFetch(`${BASE_URL}/api/kronos/calibration-status?${q.toString()}`);
+    return handleResponse<KronosBrierReport>(res);
+  },
+
+  /**
+   * Milestone K8: GET /api/kronos/brier-history
+   */
+  async getKronosBrierHistory(params?: { symbol?: string; timeframe?: string; limit?: number }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.limit) q.set('limit', params.limit.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/brier-history?${q.toString()}`);
+    return handleResponse<{ records: any[]; count: number; as_of_timestamp: number }>(res);
+  },
+
+  /**
+   * Milestone K8: POST /api/kronos/run-brier-audit
+   */
+  async runKronosBrierAudit(params: { symbol: string; timeframe: string; lookback_eval?: number }) {
+    const res = await authFetch(`${BASE_URL}/api/kronos/run-brier-audit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    return handleResponse<{
+      success: boolean;
+      resolved_forecasts_count: number;
+      research_context: any;
+    }>(res);
   },
 
   /**

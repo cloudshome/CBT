@@ -29,6 +29,7 @@ import { MBODepthTerminal } from './components/MBODepthTerminal';
 import { OrderBookHeatmapDesk } from './components/OrderBookHeatmapDesk';
 import { AutonomousStrategistDesk } from './components/AutonomousStrategistDesk';
 import { CexDexArbitrageDesk } from './components/CexDexArbitrageDesk';
+import { KronosDomainDesk } from './components/KronosDomainDesk';
 import { LiveLaunchpadDesk } from './components/LiveLaunchpadDesk';
 import { ExecutionTCACockpit } from './components/ExecutionTCACockpit';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
@@ -110,7 +111,7 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH' | 'HEATMAP' | 'STRATEGIST' | 'CEX_DEX' | 'LIVE_LAUNCHPAD' | 'EXECUTION_TCA'>('DOSSIER');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH' | 'HEATMAP' | 'STRATEGIST' | 'CEX_DEX' | 'KRONOS_DOMAIN' | 'LIVE_LAUNCHPAD' | 'EXECUTION_TCA'>('DOSSIER');
   const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN' | 'ARBITRAGE_RADAR' | 'MBO_DEPTH'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
@@ -788,6 +789,17 @@ export const App: React.FC = () => {
                   <span>⚡ CEX-DEX Basis</span>
                 </button>
                 <button
+                  onClick={() => setActiveBottomTab('KRONOS_DOMAIN')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'KRONOS_DOMAIN'
+                      ? 'bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-cyan-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Cpu size={13} className={activeBottomTab === 'KRONOS_DOMAIN' ? 'text-white animate-pulse' : 'text-cyan-400'} />
+                  <span>🔮 Kronos Domain</span>
+                </button>
+                <button
                   onClick={() => setActiveBottomTab('LIVE_LAUNCHPAD')}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
                     activeBottomTab === 'LIVE_LAUNCHPAD'
@@ -993,6 +1005,11 @@ export const App: React.FC = () => {
                 <CexDexArbitrageDesk
                   currentSymbol={symbol}
                   onNotify={addToast}
+                />
+              ) : activeBottomTab === 'KRONOS_DOMAIN' ? (
+                <KronosDomainDesk
+                  selectedSymbol={symbol}
+                  selectedTimeframe={timeframe}
                 />
               ) : activeBottomTab === 'LIVE_LAUNCHPAD' ? (
                 <LiveLaunchpadDesk

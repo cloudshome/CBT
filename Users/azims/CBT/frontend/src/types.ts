@@ -1915,3 +1915,100 @@ export interface CapitalEscalationReport {
   recent_decisions: CapitalEscalationDecisionData[];
 }
 
+// =====================================================================
+// Milestone K8: Kronos Probabilistic Foundation Forecasting Types
+// =====================================================================
+
+export interface KronosQuantileBands {
+  p10: number[];
+  p50: number[];
+  p90: number[];
+}
+
+export interface KronosDecileBin {
+  bin_index: number;
+  range: [number, number];
+  sample_count: number;
+  mean_prediction: number;
+  observed_frequency: number;
+  absolute_error: number;
+  status: 'SUFFICIENT_SAMPLE' | 'INSUFFICIENT_SAMPLE';
+}
+
+export interface KronosBrierReport {
+  symbol: string;
+  timeframe: string;
+  sample_size: number;
+  brier_score: number;
+  murphy_decomposition: {
+    reliability: number;
+    resolution: number;
+    uncertainty: number;
+    within_bin_variance: number;
+    reconstructed_bs: number;
+  };
+  reference_benchmark: {
+    reference_name: string;
+    base_rate: number;
+    reference_brier: number;
+    brier_skill_score: number;
+  };
+  calibration_quality: {
+    expected_calibration_error: number;
+    maximum_bin_error: number;
+    epistemic_status: 'CALIBRATED' | 'WEAKLY_CALIBRATED' | 'INSUFFICIENT_DATA' | 'UNCALIBRATED' | 'DEGRADED' | 'SURROGATE';
+  };
+  confidence_intervals_95: {
+    brier_score: [number, number];
+    brier_skill_score: [number, number];
+  };
+  deciles: KronosDecileBin[];
+  regime_breakdowns?: {
+    volatility?: Record<string, { count: number; brier_score: number }>;
+    sessions?: Record<string, { count: number; brier_score: number }>;
+  };
+}
+
+export interface KronosDomainForecastData {
+  forecast_id: string;
+  request_id: string;
+  symbol: string;
+  timeframe: string;
+  as_of_timestamp: number;
+  horizon_bars: number;
+  horizon_unit: string;
+  horizon_ms: number;
+  current_price: number;
+  provider: {
+    provider_type: 'LOCAL' | 'REMOTE' | 'SURROGATE';
+    model_family: string;
+    model_version: string;
+    checkpoint_hash: string;
+    latency_ms: number;
+  };
+  distribution: {
+    expected_return_pct: number;
+    median_return_pct: number;
+    volatility_pct: number;
+    path_dispersion_pct: number;
+    directional_consensus: number;
+    model_uncertainty: number;
+    directional_bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    quantile_bands: KronosQuantileBands;
+  };
+  probability: {
+    raw_probability: number;
+    raw_logit: number;
+    calibrated_probability: number;
+    calibration_id: string;
+  };
+  governance: {
+    epistemic_status: string;
+    brier_skill_score: number;
+    is_tradeable: boolean;
+    evidence_grade: string;
+    created_at_ms: number;
+  };
+}
+
+
