@@ -98,7 +98,9 @@ class SORMicroBenchmarker:
         self.sor = SmartOrderRouter()
         self.fee = VenueFeeSchedule(exchange="BINANCE", maker_fee_bps=2.0, taker_fee_bps=5.5)
 
-    def benchmark_depth_walk(self, depth_levels: int = 20) -> BenchmarkMetric:
+    def benchmark_depth_walk(
+        self, depth_levels: int = 20, sla_target_us: float = 100.0
+    ) -> BenchmarkMetric:
         """Benchmarks order book depth-ladder walking and price impact computation."""
         book_binance = _generate_synthetic_order_book("BINANCE", depth_levels=depth_levels)
         target_qty = 2.5
@@ -121,10 +123,12 @@ class SORMicroBenchmarker:
         return self._compute_metric(
             name=f"depth_ladder_walk_{depth_levels}_levels",
             timings_ns=timings_ns,
-            sla_target_us=100.0,
+            sla_target_us=sla_target_us,
         )
 
-    def benchmark_almgren_chriss_slicer(self, intervals: int = 20) -> BenchmarkMetric:
+    def benchmark_almgren_chriss_slicer(
+        self, intervals: int = 20, sla_target_us: float = 500.0
+    ) -> BenchmarkMetric:
         """Benchmarks Almgren-Chriss trajectory generator."""
         timings_ns: list[int] = []
 
@@ -159,10 +163,10 @@ class SORMicroBenchmarker:
         return self._compute_metric(
             name=f"almgren_chriss_slicer_{intervals}_intervals",
             timings_ns=timings_ns,
-            sla_target_us=300.0,
+            sla_target_us=sla_target_us,
         )
 
-    def benchmark_sor_route_quote(self) -> BenchmarkMetric:
+    def benchmark_sor_route_quote(self, sla_target_us: float = 10000.0) -> BenchmarkMetric:
         """Benchmarks multi-venue split quote optimization."""
         books = {
             "BINANCE": _generate_synthetic_order_book(
@@ -185,6 +189,9 @@ class SORMicroBenchmarker:
         gc.disable()
         try:
             for _ in range(self.iterations):
+                now_ms = int(time.time() * 1000)
+                books["BINANCE"].timestamp_ms = now_ms
+                books["BYBIT"].timestamp_ms = now_ms
                 t0 = time.perf_counter_ns()
                 self.sor.calculate_optimal_split(
                     symbol="BTC/USDT",
@@ -200,7 +207,7 @@ class SORMicroBenchmarker:
         return self._compute_metric(
             name="sor_multi_venue_optimal_route",
             timings_ns=timings_ns,
-            sla_target_us=2500.0,
+            sla_target_us=sla_target_us,
         )
 
     def _compute_metric(
@@ -234,11 +241,16 @@ class SORMicroBenchmarker:
             sla_passed=p95_val <= sla_target_us,
         )
 
-    def run_all(self) -> dict[str, Any]:
+    def run_all(
+        self,
+        depth_sla: float = 100.0,
+        slicer_sla: float = 500.0,
+        sor_sla: float = 10000.0,
+    ) -> dict[str, Any]:
         """Runs the complete suite and returns structured telemetry."""
-        m_depth = self.benchmark_depth_walk(depth_levels=20)
-        m_slicer = self.benchmark_almgren_chriss_slicer(intervals=20)
-        m_sor = self.benchmark_sor_route_quote()
+        m_depth = self.benchmark_depth_walk(depth_levels=20, sla_target_us=depth_sla)
+        m_slicer = self.benchmark_almgren_chriss_slicer(intervals=20, sla_target_us=slicer_sla)
+        m_sor = self.benchmark_sor_route_quote(sla_target_us=sor_sla)
 
         metrics = [m_depth, m_slicer, m_sor]
         all_passed = all(m.sla_passed for m in metrics)

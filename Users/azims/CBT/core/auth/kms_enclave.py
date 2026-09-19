@@ -57,6 +57,7 @@ class BaseKMSEnclave(ABC):
         self.key_id = key_id.strip()
         if not self.key_id:
             raise KMSEnclaveConfigurationError("KMS Key ID cannot be empty.")
+        self._active_buffers: list[bytearray] = []
 
     @property
     @abstractmethod
@@ -77,6 +78,25 @@ class BaseKMSEnclave(ABC):
         Returns mutable bytearray plaintext DEK.
         """
 
+    def register_buffer(self, buffer: bytearray) -> bytearray:
+        """Registers a mutable bytearray buffer for centralized lifecycle zeroization."""
+        if isinstance(buffer, bytearray):
+            self._active_buffers.append(buffer)
+        return buffer
+
+    def zeroize_all_active(self) -> int:
+        """
+        Zeroizes all tracked plaintext buffers in memory.
+        Best-effort application zeroization.
+        """
+        count = 0
+        for buf in self._active_buffers:
+            if buf is not None and isinstance(buf, bytearray):
+                zeroize_bytes(buf)
+                count += 1
+        self._active_buffers.clear()
+        return count
+
     def generate_dek(self) -> tuple[bytearray, bytes]:
         """
         Generates an ephemeral 256-bit DEK and its encrypted envelope ciphertext.
@@ -85,18 +105,21 @@ class BaseKMSEnclave(ABC):
         self._check_kill_switch()
         raw_key = secrets.token_bytes(DEK_LENGTH_BYTES)
         ciphertext = self.encrypt_dek(raw_key)
-        return bytearray(raw_key), ciphertext
+        dek_buf = bytearray(raw_key)
+        self.register_buffer(dek_buf)
+        return dek_buf, ciphertext
 
     def _check_kill_switch(self) -> None:
         """
         Verifies that Master Kill Switch is NOT engaged.
-        If engaged, halts fail-closed immediately.
+        If engaged, halts fail-closed immediately and zeroes all registered memory buffers.
         """
         try:
             from core.execution.kill_switch import live_kill_switch
 
             active, state = live_kill_switch.is_active()
             if active:
+                self.zeroize_all_active()
                 raise KMSEnclaveKillSwitchActiveError(
                     f"Master Kill Switch is ACTIVE ({state.reason}). KMS Key Enclave operations rejected."
                 )
@@ -108,6 +131,8 @@ class BaseKMSEnclave(ABC):
         """Safely zeroes mutable buffers."""
         if buffer is not None and isinstance(buffer, bytearray):
             zeroize_bytes(buffer)
+            if buffer in self._active_buffers:
+                self._active_buffers.remove(buffer)
 
 
 class MockKMSEnclave(BaseKMSEnclave):
@@ -157,7 +182,9 @@ class MockKMSEnclave(BaseKMSEnclave):
         try:
             plaintext = self._cipher.decrypt(nonce, ct, self.key_id.encode("utf-8"))
             self.operation_count += 1
-            return bytearray(plaintext)
+            dek_buf = bytearray(plaintext)
+            self.register_buffer(dek_buf)
+            return dek_buf
         except Exception as e:
             raise KMSEnclaveDecryptionError(f"Mock KMS decryption failed: {e}") from e
 
