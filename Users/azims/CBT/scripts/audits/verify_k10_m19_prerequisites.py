@@ -12,10 +12,13 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 import sqlite3
 import subprocess
 import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 from core.kronos.research.dataset_freeze import DatasetFreezeManager
 from scripts.verify_m18_certification import (
