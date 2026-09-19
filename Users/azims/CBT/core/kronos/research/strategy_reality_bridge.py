@@ -24,7 +24,11 @@ from typing import Any
 logger = logging.getLogger("sky.kronos.research.strategy_reality_bridge")
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
-DEFAULT_MANIFEST_PATH = ROOT_DIR / "data" / "research" / "datasets" / "manifest_k9.json"
+PRIMARY_MANIFEST_PATH = ROOT_DIR / "data" / "research" / "datasets" / "manifest_k9.json"
+FALLBACK_MANIFEST_PATH = ROOT_DIR / "core" / "kronos" / "research" / "manifest_k9.json"
+DEFAULT_MANIFEST_PATH = (
+    PRIMARY_MANIFEST_PATH if PRIMARY_MANIFEST_PATH.exists() else FALLBACK_MANIFEST_PATH
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -235,13 +239,18 @@ class ProvenanceAuthority:
     def _load_manifest(self) -> dict[str, Any]:
         if self._manifest_cache is not None:
             return self._manifest_cache
-        if not self.manifest_path.exists():
+
+        target_path = self.manifest_path
+        if not target_path.exists() and FALLBACK_MANIFEST_PATH.exists():
+            target_path = FALLBACK_MANIFEST_PATH
+
+        if not target_path.exists():
             logger.warning(
-                f"Authoritative manifest not found at {self.manifest_path}. Operating in standalone mode."
+                f"Authoritative manifest not found at {target_path}. Operating in standalone mode."
             )
             return {}
         try:
-            with open(self.manifest_path, encoding="utf-8") as f:
+            with open(target_path, encoding="utf-8") as f:
                 self._manifest_cache = json.load(f)
             return self._manifest_cache
         except (OSError, json.JSONDecodeError) as e:
