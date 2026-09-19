@@ -1,0 +1,38 @@
+{
+  "manifest_name": "GRADE_E1_PROTECTED_SURFACE_MANIFEST",
+  "version": "1.0.0",
+  "timestamp": "2026-09-19T13:48:37+06:00",
+  "governance_classification": "RESEARCH_BOUNDARY_LOCK",
+  "certified_surface_files": [
+    "core/execution/live_router.py",
+    "core/execution/smart_order_router.py",
+    "core/execution/reconciliation_ledger.py",
+    "core/execution/almgren_chriss.py",
+    "core/execution/idempotency.py",
+    "core/execution/kill_switch.py",
+    "core/execution/connectors/base.py",
+    "core/execution/connectors/binance_connector.py",
+    "core/execution/connectors/bybit_connector.py",
+    "core/database.py",
+    "app.py",
+    "tests/test_milestone18_sor_and_slicing.py",
+    "tests/test_milestone18_boss_adversarial.py",
+    "tests/test_milestone18_final_certification.py"
+  ],
+  "grade_e1_isolation_rules": {
+    "zero_modification": "Grade-E1 development strictly prohibits modifying, renaming, or deleting any certified M18 file.",
+    "zero_live_dispatch": "Grade-E1 code must never invoke live exchange endpoints, place live capital at risk, or mutate production database data/trading_logs.db.",
+    "separate_namespaces": {
+      "code": "core/research/grade_e1/",
+      "tests": "tests/research/grade_e1/",
+      "docs": "docs/grade_e1/"
+    },
+    "epistemic_grade": "GRADE-E1: OHLCV_APPROXIMATION",
+    "prohibited_claims": [
+      "EMPIRICAL_L2_REPLAY",
+      "MATCHING_ENGINE_GROUND_TRUTH",
+      "CERTIFIED_FOR_LIVE_CAPITAL"
+    ]
+  },
+  "invalidation_verification_command": ".venv\\Scripts\\python scripts/verify_m18_certification.py"
+}
