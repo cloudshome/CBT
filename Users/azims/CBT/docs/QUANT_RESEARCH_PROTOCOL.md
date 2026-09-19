@@ -108,3 +108,67 @@ When collecting or citing data, adhere to the strict 6-level hierarchy of credib
 6. **Level 6 — AI-Generated Hypotheses:** LLM ideas or unverified indicators (treated as `UNVERIFIED` until passing Stages 1–7).
 
 Lower-level sources must **NEVER** override higher-level primary data.
+
+---
+
+## 7. THE 6 INSTITUTIONAL DEPLOYMENT GATES
+
+Advancement from pure research to operational testing requires satisfying six independent, cryptographically proven deployment gates:
+
+| Gate | Name | Core Mandate & Promotion Criteria | Required Evidence Artifact |
+|:---:|:---|:---|:---|
+| **Gate 1** | **Data Fidelity** | Level 2 order book & trade ticks verified for sequence integrity, monotonic trade IDs, gapless sequence IDs (`pu == prev_u`), clock drift $\le 100\,\text{ms}$, raw SHA-256 hash locked. | `FidelityAuditReport`, Raw dataset hash in manifest |
+| **Gate 2** | **Execution Reality** | Individual empirical measurement of fill probability, queue position uncertainty intervals, standardized markouts ($\tau \in \{100\,\text{ms}, 1\,\text{s}, 5\,\text{s}, 30\,\text{s}\}$), cancel latency racing, and fee drag. | `AdverseSelectionMetrics`, `QueuePositionEstimate` |
+| **Gate 3** | **Net Positive Expectancy** | Out-of-sample positive net EV ($E[\text{Net Edge}] > 0$) with statistically rigorous confidence intervals after Tier 2/3 fees, adverse selection markout, and spread impact. | `CalibratedCostBreakdown`, DSR $\ge 0.85$, WRC $p < 0.05$ |
+| **Gate 4** | **Robustness & Reproducibility** | Cross-regime stability, parameter perturbation invariance ($\pm 20\%$), symbol/venue transferability, zero leakage under CPCV, independent reproduction from frozen artifacts. | Multi-regime walk-forward ledger, Permutation bootstrap |
+| **Gate 5** | **Extended Sandbox Burn-In** | Live-feed testnet/paper execution across $\ge 14$ consecutive operating days, full order lifecycle stress, cancel/replace racing, zero unresolved reconciliation discrepancies. | `ReconciliationLedger` audit, Zero-discrepancy signoff |
+| **Gate 6** | **Human Controlled Capital** | Multi-party cryptographic human authorization (hardware token / WebAuthn), micro-notional hard cap ($\le \$500$), daily drawdown circuit-breaker, instant fail-closed downgrade on invariant breach. | Cryptographic human token, Multi-sig clearance |
+
+---
+
+## 8. THE 8-STAGE DEPLOYMENT STATE MACHINE & DECOUPLED CAPABILITIES
+
+System state advances strictly through the 8-stage state machine managed exclusively by `core/governance/institutional_deployment.py`. Operational capabilities are **strictly decoupled** from stages:
+
+```
+[1] RESEARCH_ONLY
+      ↓ (Gate 1: Data Fidelity)
+[2] RESEARCH_VIABLE
+      ↓ (Gate 2: Execution Reality)
+[3] EXECUTION_MODEL_VALIDATED
+      ↓ (Gate 3: Net Positive Expectancy)
+[4] SANDBOX_ELIGIBLE
+      ↓ (Gate 4: Robustness + Gate 5: Sandbox Burn-In)
+[5] SANDBOX_VERIFIED
+      ↓ (Gate 5 Signoff + Formal Review Audit)
+[6] HUMAN_LIVE_REVIEW
+      ↓ (Gate 6: Human Controlled Capital Clearance)
+[7] MICRO_CAPITAL_ELIGIBLE
+      ↓ (Dual-Signoff Multi-Party Quorum)
+[8] LIVE_AUTHORIZED
+```
+
+### Decoupled Operational Capability Matrix:
+- **`RESEARCH_ONLY` / `RESEARCH_VIABLE`:** `research=True`, `historical_replay=True`, all others `False`.
+- **`EXECUTION_MODEL_VALIDATED`:** adds `paper_trading=True`.
+- **`SANDBOX_ELIGIBLE` / `SANDBOX_VERIFIED` / `HUMAN_LIVE_REVIEW`:** adds `exchange_testnet=True`, `live_market_data=True`.
+- **`MICRO_CAPITAL_ELIGIBLE`:** requires hardware token; order submission remains `False`.
+- **`LIVE_AUTHORIZED`:** under current repository invariants, `real_capital_enabled` is **permanently False**.
+
+---
+
+## 9. INSTITUTIONAL EPISTEMIC BOUNDARIES & PERMANENT CAPITAL FIREWALL
+
+1. **Adverse Selection Formulations:**
+   - *Prohibited:* "Every live maker fill loses 20 to 80 bps."
+   - *Scientifically Defensible:* "Research indicates potentially material adverse-selection exposure, but live magnitude is unverified because OHLCV models lack exchange-level L2 and trade-tick evidence."
+2. **Expectancy & Kelly Sizing:**
+   - *Prohibited:* "Every trade guarantees instant ruin."
+   - *Scientifically Defensible:* "Under tested assumptions, evaluated strategies do not demonstrate positive net expectancy. Deploying leverage before validating positive expectancy exposes capital to an unquantified negative-return process. If estimated edge is negative, Kelly allocation is strictly zero ($f^* = 0$)."
+3. **Temporal Resolution Boundary:**
+   - *Prohibited:* "Microsecond adverse selection proven from 100ms snapshots."
+   - *Scientifically Defensible:* "High-resolution discrete event simulation ($1\,\mu\text{s}$ event clock) with empirical conclusions bounded by source feed timestamp ($100\,\text{ms}$) and sequencing fidelity."
+4. **Permanent Capital Firewall:**
+   - Real exchange trading is **NOT AUTHORIZED**.
+   - `real_capital_enabled` is hardcoded to `False` in Python code and cannot be overridden by environment variables, configuration files, API requests, tests, or UI state.
+
