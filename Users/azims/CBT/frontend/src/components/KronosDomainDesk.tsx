@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
-import { KronosDomainForecastData, KronosBrierReport } from '../types';
+import {
+  KronosDomainForecastData,
+  KronosBrierReport,
+  KronosTournamentReport,
+  KronosIncrementalReport,
+  KronosRegimesReport,
+  KronosAblationReport,
+  KronosPromotionReport,
+} from '../types';
 
 interface KronosDomainDeskProps {
   selectedSymbol?: string;
@@ -16,6 +24,15 @@ export const KronosDomainDesk: React.FC<KronosDomainDeskProps> = ({
   const [forecast, setForecast] = useState<KronosDomainForecastData | null>(null);
   const [brierReport, setBrierReport] = useState<KronosBrierReport | null>(null);
   const [statusVitals, setStatusVitals] = useState<any>(null);
+
+  // Milestone K9: Predictive Validity & Incremental Alpha Research States
+  const [tournament, setTournament] = useState<KronosTournamentReport | null>(null);
+  const [incremental, setIncremental] = useState<KronosIncrementalReport | null>(null);
+  const [regimes, setRegimes] = useState<KronosRegimesReport | null>(null);
+  const [ablation, setAblation] = useState<KronosAblationReport | null>(null);
+  const [promotion, setPromotion] = useState<KronosPromotionReport | null>(null);
+  const [activeResearchTab, setActiveResearchTab] = useState<'TOURNAMENT' | 'INCREMENTAL' | 'REGIMES' | 'ABLATION' | 'PROMOTION'>('TOURNAMENT');
+
   const [loading, setLoading] = useState<boolean>(false);
   const [auditRunning, setAuditRunning] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +44,7 @@ export const KronosDomainDesk: React.FC<KronosDomainDeskProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const [fcRes, brierRes, statusRes] = await Promise.allSettled([
+      const [fcRes, brierRes, statusRes, tourRes, incRes, regRes, ablRes, promRes] = await Promise.allSettled([
         api.getKronosDomainForecast({
           symbol,
           timeframe,
@@ -38,11 +55,21 @@ export const KronosDomainDesk: React.FC<KronosDomainDeskProps> = ({
         }),
         api.getKronosCalibrationStatus({ symbol, timeframe }),
         api.getKronosStatus(),
+        api.getKronosTournament({ symbol, timeframe, horizon: 12 }),
+        api.getKronosIncremental({ symbol, timeframe, horizon: 12 }),
+        api.getKronosRegimes({ symbol, timeframe, horizon: 12 }),
+        api.getKronosAblation({ symbol, timeframe, horizon: 12 }),
+        api.getKronosPromotionStatus({ symbol, timeframe, horizon: 12 }),
       ]);
 
       if (fcRes.status === 'fulfilled') setForecast(fcRes.value);
       if (brierRes.status === 'fulfilled') setBrierReport(brierRes.value);
       if (statusRes.status === 'fulfilled') setStatusVitals(statusRes.value);
+      if (tourRes.status === 'fulfilled') setTournament(tourRes.value);
+      if (incRes.status === 'fulfilled') setIncremental(incRes.value);
+      if (regRes.status === 'fulfilled') setRegimes(regRes.value);
+      if (ablRes.status === 'fulfilled') setAblation(ablRes.value);
+      if (promRes.status === 'fulfilled') setPromotion(promRes.value);
     } catch (err: any) {
       setError(err?.message || 'Failed to load Kronos research data');
     } finally {
@@ -477,6 +504,237 @@ export const KronosDomainDesk: React.FC<KronosDomainDeskProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Milestone K9: Predictive Validity & Incremental Information Research Panel */}
+      <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-4 space-y-4 font-mono">
+        <div className="flex flex-wrap items-center justify-between border-b border-zinc-800 pb-3 gap-2">
+          <div className="flex items-center space-x-3">
+            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+              Milestone K9 Research Validity Suite
+            </span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
+                promotion?.governance_state === 'PROMOTE'
+                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-700'
+                  : promotion?.governance_state === 'QUARANTINE'
+                  ? 'bg-amber-950/80 text-amber-400 border-amber-700'
+                  : promotion?.governance_state === 'REJECT'
+                  ? 'bg-rose-950/80 text-rose-400 border-rose-700'
+                  : 'bg-zinc-900 text-zinc-400 border-zinc-700'
+              }`}
+            >
+              STATE: {promotion?.governance_state || 'EVALUATING'}
+            </span>
+          </div>
+
+          {/* Sub-tabs */}
+          <div className="flex space-x-1 text-xs">
+            {(['TOURNAMENT', 'INCREMENTAL', 'REGIMES', 'ABLATION', 'PROMOTION'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveResearchTab(tab)}
+                className={`px-3 py-1 rounded text-[11px] transition-colors ${
+                  activeResearchTab === tab
+                    ? 'bg-zinc-800 text-cyan-300 font-bold border border-cyan-500/40'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-950'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab 1: Benchmark Tournament */}
+        {activeResearchTab === 'TOURNAMENT' && (
+          <div className="space-y-3">
+            <div className="text-xs text-zinc-400 flex justify-between">
+              <span>Standardized out-of-sample tournament on identical evaluation slices (N={tournament?.sample_size || 0}):</span>
+              <span className="text-zinc-500">Ref: Climatology Base Rate</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-500 text-[10px] uppercase">
+                    <th className="py-2">Model Identity</th>
+                    <th className="py-2 text-right">Brier Score</th>
+                    <th className="py-2 text-right">Skill (BSS)</th>
+                    <th className="py-2 text-right">Log Loss</th>
+                    <th className="py-2 text-right">ROC-AUC</th>
+                    <th className="py-2 text-right">Calib (α, β)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/40 text-zinc-300">
+                  {tournament?.rankings?.map((r, i) => (
+                    <tr key={r.model_id} className={r.model_id.includes('KRONOS') ? 'bg-cyan-950/20' : ''}>
+                      <td className="py-2 font-semibold flex items-center gap-2">
+                        <span className="text-zinc-500 text-[10px]">{i + 1}.</span>
+                        <span className={r.model_id.includes('KRONOS') ? 'text-cyan-300' : 'text-zinc-300'}>
+                          {r.model_id}
+                        </span>
+                      </td>
+                      <td className="py-2 text-right">{r.brier_score.toFixed(4)}</td>
+                      <td
+                        className={`py-2 text-right font-bold ${
+                          r.brier_skill_score > 0 ? 'text-emerald-400' : 'text-rose-400'
+                        }`}
+                      >
+                        {r.brier_skill_score > 0 ? `+${r.brier_skill_score.toFixed(3)}` : r.brier_skill_score.toFixed(3)}
+                      </td>
+                      <td className="py-2 text-right">{r.log_loss.toFixed(4)}</td>
+                      <td className="py-2 text-right text-zinc-400">{r.roc_auc.toFixed(3)}</td>
+                      <td className="py-2 text-right text-zinc-400">
+                        {r.calibration_alpha.toFixed(2)}, {r.calibration_beta.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Incremental Information & Orthogonality */}
+        {activeResearchTab === 'INCREMENTAL' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+              <div className="bg-zinc-950 p-3 rounded border border-zinc-800/60">
+                <span className="text-zinc-500 text-[10px] block">Δ Brier Improvement</span>
+                <span className={`text-base font-bold ${((incremental?.delta_brier || 0) > 0) ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {incremental?.delta_brier !== undefined ? `${(incremental.delta_brier * 100).toFixed(3)}%` : 'N/A'}
+                </span>
+                <span className="text-zinc-500 text-[10px] block mt-1">Relative: {incremental?.relative_brier_improvement_pct?.toFixed(2) || '0.00'}%</span>
+              </div>
+              <div className="bg-zinc-950 p-3 rounded border border-zinc-800/60">
+                <span className="text-zinc-500 text-[10px] block">Mincer-Zarnowitz β_kronos</span>
+                <span className="text-base font-bold text-cyan-300">
+                  {incremental?.beta_kronos?.toFixed(3) || 'N/A'}
+                </span>
+                <span className="text-zinc-500 text-[10px] block mt-1">t-stat: {incremental?.beta_kronos_t_stat?.toFixed(2) || '0.00'}</span>
+              </div>
+              <div className="bg-zinc-950 p-3 rounded border border-zinc-800/60">
+                <span className="text-zinc-500 text-[10px] block">Vuong-HAC Z Statistic</span>
+                <span className="text-base font-bold text-white">
+                  {incremental?.vuong_z_stat?.toFixed(2) || 'N/A'}
+                </span>
+                <span className="text-zinc-500 text-[10px] block mt-1">p-value: {incremental?.vuong_p_value?.toFixed(4) || 'N/A'}</span>
+              </div>
+              <div className="bg-zinc-950 p-3 rounded border border-zinc-800/60">
+                <span className="text-zinc-500 text-[10px] block">Incremental Verdict</span>
+                <span className={`text-sm font-bold block ${
+                  incremental?.test_verdict === 'SIGNIFICANT_INCREMENTAL_EDGE'
+                    ? 'text-emerald-400'
+                    : incremental?.test_verdict === 'MARGINAL_IMPROVEMENT'
+                    ? 'text-amber-400'
+                    : 'text-zinc-400'
+                }`}>
+                  {incremental?.test_verdict || 'EVALUATING'}
+                </span>
+                <span className="text-zinc-500 text-[10px] block mt-1">Corr(e_base, P_k): {incremental?.residual_correlation?.toFixed(3) || '0.00'}</span>
+              </div>
+            </div>
+            <div className="text-[11px] text-zinc-500 bg-zinc-950/80 p-2 rounded">
+              Model 0 (SKY Baseline) vs Model 1 (SKY Baseline + Kronos). Evaluated with Newey-West HAC covariance (L=2*H) on strictly out-of-sample slices.
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Regime Stratification */}
+        {activeResearchTab === 'REGIMES' && (
+          <div className="space-y-2">
+            <div className="text-xs text-zinc-400">Point-in-time performance partitioned across market regimes (N &ge; 30):</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+              {regimes?.regime_slices?.map((rs) => (
+                <div key={`${rs.dimension}-${rs.regime_name}`} className="bg-zinc-950 p-2.5 rounded border border-zinc-800/60 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block">{rs.dimension}</span>
+                    <span className="font-semibold text-zinc-200">{rs.regime_name}</span>
+                  </div>
+                  <div className="text-right">
+                    {rs.status === 'VALID' ? (
+                      <>
+                        <span className={`font-bold block ${((rs.brier_skill_score || 0) > 0) ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          BSS: {rs.brier_skill_score?.toFixed(3)}
+                        </span>
+                        <span className="text-[10px] text-zinc-500">N={rs.sample_count}</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-amber-500 block">N={rs.sample_count} (INSUFFICIENT)</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: 7-Way Microstructure Ablation Matrix */}
+        {activeResearchTab === 'ABLATION' && (
+          <div className="space-y-2">
+            <div className="text-xs text-zinc-400">7-way tournament isolating foundation transformer vs order book microstructure alpha:</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-500 text-[10px] uppercase">
+                    <th className="py-2">Variant</th>
+                    <th className="py-2">Description</th>
+                    <th className="py-2 text-right">Brier Score</th>
+                    <th className="py-2 text-right">BSS</th>
+                    <th className="py-2 text-right">Δ BSS vs Raw</th>
+                    <th className="py-2 text-right">Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/40 text-zinc-300">
+                  {ablation?.ablation_variants?.map((v) => (
+                    <tr key={v.variant_id} className={v.variant_id === 'F' ? 'bg-cyan-950/20' : ''}>
+                      <td className="py-2 font-bold text-cyan-400">Variant {v.variant_id}</td>
+                      <td className="py-2 text-zinc-300">{v.name}</td>
+                      <td className="py-2 text-right">{v.brier_score.toFixed(4)}</td>
+                      <td className={`py-2 text-right font-bold ${v.brier_skill_score > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {v.brier_skill_score > 0 ? `+${v.brier_skill_score.toFixed(3)}` : v.brier_skill_score.toFixed(3)}
+                      </td>
+                      <td className={`py-2 text-right ${v.incremental_bss_vs_raw > 0 ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>
+                        {v.incremental_bss_vs_raw > 0 ? `+${v.incremental_bss_vs_raw.toFixed(4)}` : v.incremental_bss_vs_raw.toFixed(4)}
+                      </td>
+                      <td className="py-2 text-right text-zinc-400">{(v.accuracy * 100).toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 5: Research Promotion Scorecard */}
+        {activeResearchTab === 'PROMOTION' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="space-y-2">
+                <span className="text-zinc-400 font-semibold block">Constitutional Research Gate Checklist</span>
+                <div className="space-y-1 text-[11px]">
+                  {promotion?.criteria_checklist &&
+                    Object.entries(promotion.criteria_checklist).map(([k, passed]) => (
+                      <div key={k} className="flex items-center justify-between p-1.5 bg-zinc-950 rounded">
+                        <span className="text-zinc-400 font-mono">{k}</span>
+                        <span className={passed ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                          {passed ? '[PASS]' : '[FAIL]'}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <span className="text-zinc-400 font-semibold block">Governance Verdict & Disposition</span>
+                <div className="bg-zinc-950 p-3 rounded space-y-2 border border-zinc-800 text-[11px]">
+                  <div>Summary: <span className="text-zinc-200">{promotion?.summary_verdict}</span></div>
+                  <div>Destination: <span className="text-cyan-400 font-bold">{promotion?.downstream_destination}</span></div>
+                  <div>Tradeable Status: <span className="text-rose-400 font-bold">STRICTLY FALSE (Execution Firewall Active)</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Provenance & Zero-Lookahead Audit Trail Footer */}

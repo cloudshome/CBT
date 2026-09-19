@@ -16,12 +16,14 @@ from core.data_streamer import data_streamer
 from core.kronos.brier_scorer import brier_scorer
 from core.kronos.domain_adapter import kronos_domain_adapter
 from core.kronos.forecast_ledger import forecast_ledger
+from core.kronos.research.research_routes import research_router
 from core.models.kronos.ablation_benchmark import kronos_ablation_benchmark
 from core.models.kronos.advisory_engine import kronos_advisory_engine
 
 logger = logging.getLogger("ai_quant_sentinel.kronos.routes")
 
 kronos_router = APIRouter(prefix="/api/kronos", tags=["Kronos Research"])
+kronos_router.include_router(research_router, prefix="/research")
 
 
 class BrierAuditRequest(BaseModel):

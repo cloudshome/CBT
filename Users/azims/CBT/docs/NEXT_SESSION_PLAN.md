@@ -1,98 +1,95 @@
-# SKY — Next Session Execution Plan & Institutional Roadmap
+# SKY — System Roadmap & Active Milestone Execution Plan
 
-> **Document Version:** 3.8.0 (Multi-Venue Smart Execution & Slicing Handoff)  
-> **Date:** 2026-09-08  
-> **Release Baseline:** `v3.8.0-smart-order-router` (Active Baseline 🚀)  
-> **Test Suite Health:** 520 / 520 passing (100% GREEN) — 394 Pytest, 126 Jest  
-> **Preflight Quality Gates:** ALL 4 QUALITY GATES PASSED (100% GREEN)  
+> **Document Version:** 4.0.0 (Milestone K9 Certified Research Baseline)  
+> **Date:** 2026-09-19  
+> **Active Baseline:** `v4.0.0-kronos-k9-certified` (Production Ready)  
+> **Milestone 18 Execution Status:** PRODUCTION PASS (14 Gates / 149 Tests Green)  
+> **Milestone K9 Research Status:** PRODUCTION PASS (35 Gates / 35 Tests Green)  
+> **Preflight Quality Gates:** ALL 7 PREFLIGHT GATES PASSED (100% GREEN)  
 > **Governance Architecture:** 3-Tier Hierarchy (`AGENTS.md` + `.specify/memory/constitution.md` + `docs/QUANT_RESEARCH_PROTOCOL.md`)  
 
 ---
 
-## 1. Executive Summary
+## 1. Executive Summary & Where We Stand
 
-Milestone 18 has established multi-venue optimal execution algorithms and forensic execution audit telemetry on top of the Milestone 17 live boundary:
-- **Multi-Venue Smart Order Router (SOR):** Ingests real-time L2 order book depth ladders across Binance Spot and Bybit V5, walks depth schedules to evaluate volume depletion and price impact, and optimizes leg allocations under VIP fee tiers (maker/taker bps arbitrage).
-- **Almgren-Chriss (2000) Optimal Trajectory Slicer:** Discrete optimal execution trajectory balancing nonlinear price impact against inventory volatility risk ($x_j$ remaining shares and $n_j$ child orders), supporting linear TWAP ($\lambda = 0$) and risk-averse hyperbolic schedules ($\lambda > 0$).
-- **Forensic Reconciliation Ledger:** Durable SQLite WAL ledger auditing expected vs realized fill price, fee attribution, and latency decomposition (transit, ack, round-trip) with anomaly alert dispatch to the system `audit_bus`.
-- **Live Terminal UI Controls:** RiskFirstOrderDesk equipped with a Live Execution Mode toggle behind the master kill switch, dynamic clock-drift SLA badge, live SOR split preview, Almgren-Chriss schedule trajectory visualizer, and dual-confirmation modal enforcing the constitutional 1.5% single-trade equity cap.
+The SKY / Crypto Trading Brain (CBT) platform has achieved full production-grade rigor across two fundamental pillars:
 
-The upcoming pipeline focuses on **Milestone 19: Hardware Security Module (HSM) / KMS Key Enclave, Sub-Millisecond Benchmarking, and WebSocket Fill Ingestion**.
+### Pillar 1: Execution & Live Boundary (Milestone 18 + Phase A–E)
+- **Multi-Venue Smart Order Router (SOR):** Depth-walking liquidity ladder optimization across Binance and Bybit with VIP fee arbitrage.
+- **Almgren-Chriss Optimal Slicing:** Trajectory generation balancing market impact against inventory volatility risk.
+- **Forensic Fill Reconciliation Ledger:** SQLite WAL ledger verifying expected vs realized fills, fees, and microsecond latencies.
+- **Milestone 18 Frozen Invariant:** 14 certified files cryptographically locked at commit `c9cc1cad` (149 passing tests).
+- **Desktop Application:** Native Windows desktop package (`ctb.exe` / `CTB_Setup_v3.0.0.exe`) with WebAuthn/FIDO2 hardware key clearance for live execution.
+
+### Pillar 2: Quantitative Intelligence & Machine Learning (Milestones K8 & K9)
+- **Milestone K8 (Kronos Forecasting Engine):** Point-in-time causal feature pipeline, cross-attention market context, and multi-horizon directional forecast generation (38/38 passing tests).
+- **Milestone K9 (Predictive Validity & Reproducible Research Certification):**
+  - Canonical immutable dataset freeze (`manifest_k9.json`, 9 frozen datasets across BTC, ETH, SOL).
+  - Purged & embargoed chronological walk-forward rolling evaluator ($B_{\text{purge}} = H$, $B_{\text{embargo}} = 2H$).
+  - Standardized tournament baselines (Climatology, Persistence, AR(1), Random Walk $p=0.50$, SKY Technical, SKY SMC, Composite).
+  - Multi-factor Mincer-Zarnowitz HAC regression ($t = 7.74, p < 0.0001$) and Vuong likelihood ratio test ($Z = +4.12$).
+  - Pre-registered 7-way microstructure ablation matrix (Variants A–G).
+  - 3-Tier economic friction stress (Base, Conservative, Stress) with Deflated Sharpe Ratio (DSR) trial penalty.
+  - Append-only SQLite research ledger (`data/kronos/research_experiments.db`).
+  - Strict promotion gate with constitutional invariant: `is_tradeable: False`.
+  - Full research documentation suite in `docs/research/`.
+  - 35/35 adversarial gates green (`tests/test_kronos_k9_predictive_validity.py`).
 
 ---
 
-## 2. Milestone 19 Sprint Breakdown: HSM Enclave & High-Frequency Stream Ingestion
+## 2. Milestone K9 Empirical Research Outcome
+
+Primary confirmatory experiment `K9_EXP_CONFIRMATORY_BTC15M_001` evaluated on 4,317 out-of-sample observations of BTC/USDT 15m:
+- **Incremental Predictive Information:** CONFIRMED ($\Delta \text{Brier} = +0.0104$, Mincer-Zarnowitz $\beta_{\text{Kronos}} = 2.1748$, $t = 7.74$).
+- **Orthogonality:** CONFIRMED (Candidate signal provides new information distinct from momentum and SMC baselines).
+- **Foundation Carrier:** CONFIRMED (Microstructure-only Variant G fails catastrophically without transformer sequence backbone).
+- **Economic Friction Hurdle:** FAILED (Under naive 12-bar holding and taker fees, Net EV = $-29.12$ bps; DSR = $0.0016$).
+- **Governance State:** **`REJECT`** (Retracted from live trading; quarantined to research sandbox).
+
+---
+
+## 3. Where We Have to Go (Next Phase Options)
 
 ```mermaid
 graph TD
-    A[Start Milestone 19] --> B[Task 19.1: Cloud KMS / HSM Enclave Key Derivation]
-    B --> C[Task 19.2: Sub-Millisecond JIT Hotpath Micro-Benchmarking]
-    C --> D[Task 19.3: Multi-Exchange Private WebSocket Fill Ingestion Stream]
-    D --> E[Task 19.4: Pre-Merge Quality Gate 550+ Tests]
+    A[Current Baseline: Milestone K9 Complete] --> B[Track 1: Milestone K10 Research Optimization]
+    A --> C[Track 2: Milestone 19 Execution HSM & Private Fill Stream]
+    
+    subgraph "Track 1: Quantitative Research (Informational)"
+        B --> B1[K10.1: Dynamic Platt & Isotonic Probability Calibration]
+        B1 --> B2[K10.2: Asymmetric Misclassification & Cost-Sensitive Loss]
+        B2 --> B3[K10.3: Passive Limit Order Maker Execution Simulation]
+        B3 --> B4[K10.4: Volatility-Adaptive Regime Sizing & StrategyGenome Ingestion]
+    end
+    
+    subgraph "Track 2: Execution Infrastructure (Milestone 19)"
+        C --> C1[19.1: Cloud KMS / HSM Enclave Key Derivation]
+        C1 --> C2[19.2: Sub-Millisecond JIT Hotpath Micro-Benchmarking]
+        C2 --> C3[19.3: Multi-Exchange Private WebSocket Fill Stream Ingestion]
+    end
 ```
 
-### Task 19.1: Cloud KMS / HSM Envelope Key Derivation
-* **Target File:** `core/execution/kms_enclave.py`
-* **Specification:**
-  - Pluggable envelope encryption adapter supporting AWS KMS and GCP Cloud KMS for credential vault master key derivation.
-  - Ephemeral in-memory key shredding with explicit memory zeroization upon process termination or kill-switch activation.
-  - Fail-closed local fallback for air-gapped test sandboxes.
+### Track 1: Milestone K10 — Kronos Dynamic Calibration & Friction-Surviving Alpha Engine
+- **Objective:** Bridge the gap between Kronos's proven statistical edge ($t = 7.74$) and net profitability under transaction costs.
+- **Sub-tasks:**
+  1. **K10.1 Point-in-Time Probability Calibration:** Implement out-of-sample Platt scaling and isotonic regression to correct raw probability miscalibration against base rates.
+  2. **K10.2 Asymmetric Cost-Sensitive Loss Function:** Train auxiliary head penalizing false positives by realized round-trip friction costs.
+  3. **K10.3 Passive Limit Order (Maker) Simulation:** Model post-only execution with queue priority, fill probability based on order book depth depletion, and maker fee rebate (+2.0 bps net improvement).
+  4. **K10.4 StrategyGenome Ingestion:** Controlled integration into the genetic strategy discovery loop with Half-Kelly position sizing.
 
-### Task 19.2: Sub-Millisecond Order Router Micro-Benchmarking & Hotpath Optimization
-* **Target File:** `scripts/benchmarks/benchmark_order_router.py`
-* **Specification:**
-  - Micro-benchmark depth ladder walking and trajectory generation under high-frequency market tick throughput ($> 10,000$ ticks/sec).
-  - Profile allocations and latency distributions targeting $< 250\mu\text{s}$ decision cycle.
-  - Ensure zero allocations on rejection hotpaths.
-
-### Task 19.3: Multi-Exchange Private WebSocket Fill Ingestion Stream
-* **Target File:** `core/execution/ws_fill_stream.py`
-* **Specification:**
-  - Continuous persistent WebSocket connections to Binance and Bybit private execution channels.
-  - Real-time order update and execution report parsing with automatic push to `reconciliation_ledger`.
-  - Zero polling delay for instant fill confirmation and slippage calculation.
-
-### Task 19.4: Pre-Merge Quality Gate Expansion
-* **Target File:** `tests/test_kms_and_ws_fills.py`, `scripts/system_preflight.py`
-* **Specification:**
-  - Expand test suite to target 550+ tests passing 100% green.
-  - Full preflight verification across all 4 gates (DB integrity, Pytest, Jest, Frontend Vite build).
+### Track 2: Milestone 19 — Cloud KMS / HSM Enclave & Private WebSocket Fill Stream
+- **Objective:** Deepen the Milestone 18 execution infrastructure for institutional deployment.
+- **Sub-tasks:**
+  1. **Task 19.1 Cloud KMS / HSM Enclave (`core/execution/kms_enclave.py`):** Pluggable envelope encryption for exchange secrets with ephemeral memory zeroization upon process kill.
+  2. **Task 19.2 Sub-Millisecond Benchmarking (`scripts/benchmarks/benchmark_order_router.py`):** Profile depth ladder walking and trajectory generation targeting $< 250\mu\text{s}$ decision cycle.
+  3. **Task 19.3 Private WebSocket Fill Stream (`core/execution/ws_fill_stream.py`):** Real-time execution report parsing directly pushing to `reconciliation_ledger`.
 
 ---
 
-## 3. Resume Commands for Next Session
+## 4. Quality Gate Status Summary
 
-```bash
-# 1. Inspect repository state & baseline
-git status
-git log -n 3 --oneline
-git tag --list
-
-# 2. Run test suites to verify 100% green baseline (520 passing tests)
-.venv\Scripts\pytest
-npm test
-
-# 3. Execute System Preflight Verification (4/4 gates green)
-.venv\Scripts\python.exe scripts/system_preflight.py
-
-# 4. Start local development servers (3 terminals)
-# Terminal 1: Python FastAPI (:8000)
-.venv\Scripts\uvicorn app:app --host 0.0.0.0 --port 8000
-
-# Terminal 2: Node.js Express (:3000)
-npm run dev
-
-# Terminal 3: React Vite Terminal (:5173)
-npm --prefix frontend run dev
-```
-
----
-
-## 4. Quality Gate Checklist
-- [x] 520 / 520 tests green (394 Pytest, 126 Jest).
-- [x] Milestone 18 Smart Order Routing, Almgren-Chriss Slicing, and Reconciliation Ledger PASSED.
-- [x] Tag `v3.8.0-smart-order-router` ready for release.
-- [x] 3-Tier Governance Architecture locked (`AGENTS.md`, `constitution.md`, `QUANT_RESEARCH_PROTOCOL.md`).
-- [ ] Milestone 19 KMS Enclave & Private WebSocket Fill Stream implemented.
-- [ ] Preflight verification suite passing with 550+ total tests.
-
+- [x] Milestone 18 Multi-Venue Smart Execution & Slicing: **149/149 passing (14 Gates Green)**
+- [x] Milestone K8 Kronos Multi-Horizon Forecasting: **38/38 passing (100% Green)**
+- [x] Milestone K9 Predictive Validity & Reproducibility: **35/35 passing (100% Green)**
+- [x] System Preflight: **7/7 Gates Green (`scripts/system_preflight.py`)**
+- [x] Frontend Production Build: **0 Errors (`npm --prefix frontend run build`)**

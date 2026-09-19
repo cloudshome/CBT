@@ -48,6 +48,11 @@ import {
   CapitalTier,
   KronosDomainForecastData,
   KronosBrierReport,
+  KronosTournamentReport,
+  KronosIncrementalReport,
+  KronosRegimesReport,
+  KronosAblationReport,
+  KronosPromotionReport,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -1140,6 +1145,98 @@ export const api = {
       resolved_forecasts_count: number;
       research_context: any;
     }>(res);
+  },
+
+  /**
+   * Milestone K9: GET /api/kronos/research/tournament
+   */
+  async getKronosTournament(params?: { symbol?: string; timeframe?: string; horizon?: number; lookback?: number }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.horizon) q.set('horizon', params.horizon.toString());
+    if (params?.lookback) q.set('lookback', params.lookback.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/research/tournament?${q.toString()}`);
+    return handleResponse<KronosTournamentReport>(res);
+  },
+
+  /**
+   * Milestone K9: GET /api/kronos/research/incremental
+   */
+  async getKronosIncremental(params?: { symbol?: string; timeframe?: string; horizon?: number; lookback?: number }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.horizon) q.set('horizon', params.horizon.toString());
+    if (params?.lookback) q.set('lookback', params.lookback.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/research/incremental?${q.toString()}`);
+    return handleResponse<KronosIncrementalReport>(res);
+  },
+
+  /**
+   * Milestone K9: GET /api/kronos/research/regimes
+   */
+  async getKronosRegimes(params?: { symbol?: string; timeframe?: string; horizon?: number; lookback?: number }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.horizon) q.set('horizon', params.horizon.toString());
+    if (params?.lookback) q.set('lookback', params.lookback.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/research/regimes?${q.toString()}`);
+    return handleResponse<KronosRegimesReport>(res);
+  },
+
+  /**
+   * Milestone K9: GET /api/kronos/research/ablation
+   */
+  async getKronosAblation(params?: { symbol?: string; timeframe?: string; horizon?: number; lookback?: number }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.horizon) q.set('horizon', params.horizon.toString());
+    if (params?.lookback) q.set('lookback', params.lookback.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/research/ablation?${q.toString()}`);
+    return handleResponse<KronosAblationReport>(res);
+  },
+
+  /**
+   * Milestone K9: GET /api/kronos/research/promotion-status
+   */
+  async getKronosPromotionStatus(params?: { symbol?: string; timeframe?: string; horizon?: number; lookback?: number }) {
+    const q = new URLSearchParams();
+    if (params?.symbol) q.set('symbol', params.symbol);
+    if (params?.timeframe) q.set('timeframe', params.timeframe);
+    if (params?.horizon) q.set('horizon', params.horizon.toString());
+    if (params?.lookback) q.set('lookback', params.lookback.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/research/promotion-status?${q.toString()}`);
+    return handleResponse<KronosPromotionReport>(res);
+  },
+
+  /**
+   * Milestone K9: GET /api/kronos/research/experiments
+   */
+  async getKronosExperiments(params?: { limit?: number }) {
+    const q = new URLSearchParams();
+    if (params?.limit) q.set('limit', params.limit.toString());
+    const res = await authFetch(`${BASE_URL}/api/kronos/research/experiments?${q.toString()}`);
+    return handleResponse<{ count: number; cumulative_trials: number; experiments: any[] }>(res);
+  },
+
+  /**
+   * Milestone K9: GET /api/kronos/research/reproducibility
+   */
+  async getKronosReproducibility(experimentId: string) {
+    const q = new URLSearchParams({ experiment_id: experimentId });
+    const res = await authFetch(`${BASE_URL}/api/kronos/research/reproducibility?${q.toString()}`);
+    return handleResponse<any>(res);
+  },
+
+  /**
+   * Milestone K9: GET /api/kronos/research/manifests
+   */
+  async getKronosManifests() {
+    const res = await authFetch(`${BASE_URL}/api/kronos/research/manifests`);
+    return handleResponse<{ dataset_count: number; manifests: Record<string, any> }>(res);
   },
 
   /**

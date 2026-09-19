@@ -2011,4 +2011,99 @@ export interface KronosDomainForecastData {
   };
 }
 
+export interface KronosTournamentReport {
+  symbol: string;
+  timeframe: string;
+  horizon_bars: number;
+  sample_size: number;
+  rankings: Array<{
+    model_id: string;
+    sample_size: number;
+    brier_score: number;
+    brier_skill_score: number;
+    log_loss: number;
+    roc_auc: number;
+    expected_calibration_error: number;
+    calibration_alpha: number;
+    calibration_beta: number;
+    beta_t_stat: number;
+    reliability_curve?: Array<{
+      bin_index: number;
+      bin_min: number;
+      bin_max: number;
+      count: number;
+      mean_predicted: number;
+      observed_frequency: number;
+      bin_error: number;
+    }>;
+  }>;
+}
+
+export interface KronosIncrementalReport {
+  base_model_id: string;
+  composite_model_id: string;
+  sample_size: number;
+  horizon_bars: number;
+  base_brier_score: number;
+  composite_brier_score: number;
+  delta_brier: number;
+  relative_brier_improvement_pct: number;
+  base_log_loss: number;
+  composite_log_loss: number;
+  delta_log_loss: number;
+  beta_base: number;
+  beta_kronos: number;
+  beta_kronos_se: number;
+  beta_kronos_t_stat: number;
+  beta_kronos_p_value: number;
+  vuong_z_stat: number;
+  vuong_p_value: number;
+  test_verdict: string;
+  residual_correlation: number;
+}
+
+export interface KronosRegimesReport {
+  symbol: string;
+  timeframe: string;
+  sample_size: number;
+  regime_slices: Array<{
+    dimension: string;
+    regime_name: string;
+    sample_count: number;
+    brier_score: number | null;
+    brier_skill_score: number | null;
+    log_loss: number | null;
+    accuracy: number | null;
+    status: string;
+  }>;
+}
+
+export interface KronosAblationReport {
+  symbol: string;
+  timeframe: string;
+  sample_size: number;
+  ablation_variants: Array<{
+    variant_id: string;
+    name: string;
+    sample_size: number;
+    brier_score: number;
+    brier_skill_score: number;
+    log_loss: number;
+    accuracy: number;
+    incremental_bss_vs_raw: number;
+    status: string;
+  }>;
+}
+
+export interface KronosPromotionReport {
+  governance_state: 'PROMOTE' | 'QUARANTINE' | 'REJECT' | 'INCONCLUSIVE';
+  is_tradeable: boolean;
+  sample_size: number;
+  criteria_checklist: Record<string, boolean>;
+  scorecard: Record<string, any>;
+  summary_verdict: string;
+  downstream_destination: string;
+  governance_notes: string[];
+}
+
 
