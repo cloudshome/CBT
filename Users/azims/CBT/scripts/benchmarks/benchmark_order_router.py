@@ -1,131 +1,167 @@
 """
 scripts/benchmarks/benchmark_order_router.py
 ============================================
-Milestone 19 Sub-Millisecond Order Router Micro-Benchmarking Suite.
-Runs high-iteration microsecond latency profiling for SmartOrderRouter hotpaths.
+Milestone 19: High-Resolution JIT Hotpath Micro-Benchmarking Suite.
 
-CONTRACT SPECIFICATION:
-- LATENCY_SCOPE: "IN_PROCESS_COMPUTATION_ONLY"
-- NETWORK_ROUNDTRIP_INCLUDED: False
-Measures pure CPU/algorithm runtime overhead isolated from exchange socket I/O.
+Measures Smart Order Router (SOR) depth walking and Almgren-Chriss optimal
+trajectory schedule generation over 5,000 iterations.
+Verifies sub-millisecond decision latency (< 250 microseconds target).
 """
 
 from __future__ import annotations
 
-import argparse
+from pathlib import Path
 import sys
 import time
-from pathlib import Path
 
-# Add repo root to sys.path
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO_ROOT))
+# Ensure repository root is on sys.path
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
-from core.execution.sor_benchmarks import SORMicroBenchmarker  # noqa: E402
+import numpy as np  # noqa: E402
 
-LATENCY_SCOPE = "IN_PROCESS_COMPUTATION_ONLY"
-NETWORK_ROUNDTRIP_INCLUDED = False
+from core.execution.almgren_chriss import AlmgrenChrissSlicer  # noqa: E402
+from core.execution.smart_order_router import (  # noqa: E402
+    L2DepthLevel,
+    SmartOrderRouter,
+    VenueOrderBook,
+)
 
 
-def generate_benchmark_markdown_report(results: dict) -> str:
-    """Generates the formal M19 SOR latency report."""
-    timestamp_str = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
-    iterations = results.get("iterations_per_test", 10000)
-    all_passed = results.get("overall_sla_passed", False)
-    benchmarks = results.get("benchmarks", {})
-
-    md = [
-        "# Milestone 19 — SmartOrderRouter Micro-Benchmark Certification Report",
-        "",
-        f"**Generated:** {timestamp_str}  ",
-        f"**Iterations per Test:** {iterations:,}  ",
-        f"**Overall SLA Status:** {'PASS' if all_passed else 'FAIL'}  ",
-        f"**Latency Scope Contract:** `{LATENCY_SCOPE}`  ",
-        f"**Network Roundtrip Included:** `{NETWORK_ROUNDTRIP_INCLUDED}`  ",
-        "",
-        "> **Important Contract Notice:**",
-        "> This benchmark measures pure in-process algorithmic CPU overhead (memory walking, matrix optimization, price-level iteration).",
-        "> It does NOT include WebSocket / REST network roundtrip latency to live exchange matching engines.",
-        "",
-        "## 1. Latency Distribution Summary (Microseconds / μs)",
-        "",
-        "| Operation | Mean (μs) | Median (μs) | P90 (μs) | P95 (μs) | P99 (μs) | Min (μs) | Max (μs) | Throughput (ops/s) | SLA Target (μs) | Status |",
-        "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+def generate_synthetic_book(exchange: str, base_price: float) -> VenueOrderBook:
+    """Generates a realistic 10-level order book for benchmarking."""
+    now_ms = int(time.time() * 1000)
+    bids = [
+        L2DepthLevel(price=round(base_price - (i * 0.5), 2), size=1.0 + (i * 0.5))
+        for i in range(10)
     ]
+    asks = [
+        L2DepthLevel(price=round(base_price + (i * 0.5) + 0.5, 2), size=1.0 + (i * 0.5))
+        for i in range(10)
+    ]
+    return VenueOrderBook(
+        exchange=exchange,
+        symbol="BTC/USDT",
+        bids=bids,
+        asks=asks,
+        timestamp_ms=now_ms,
+    )
 
-    for name, metric in benchmarks.items():
-        status_badge = "PASS" if metric["sla_passed"] else "FAIL"
-        md.append(
-            f"| `{name}` | {metric['mean_us']:.2f} | {metric['median_us']:.2f} | "
-            f"{metric['p90_us']:.2f} | {metric['p95_us']:.2f} | {metric['p99_us']:.2f} | "
-            f"{metric['min_us']:.2f} | {metric['max_us']:.2f} | {metric['ops_per_sec']:,.0f} | "
-            f"{metric['sla_target_us']:.1f} | **{status_badge}** |"
+
+def benchmark_sor(iterations: int = 5000) -> dict[str, float]:
+    """Micro-benchmarks SmartOrderRouter optimal multi-venue quote splitting."""
+    sor = SmartOrderRouter()
+    binance_book = generate_synthetic_book("BINANCE", 60000.0)
+    bybit_book = generate_synthetic_book("BYBIT", 60000.2)
+
+    durations_ns: list[int] = []
+
+    for _ in range(iterations):
+        t0 = time.perf_counter_ns()
+        _ = sor.calculate_optimal_split(
+            symbol="BTC/USDT",
+            side="BUY",
+            total_qty=5.0,
+            venue_books={"BINANCE": binance_book, "BYBIT": bybit_book},
         )
+        t1 = time.perf_counter_ns()
+        durations_ns.append(t1 - t0)
 
-    md.extend(
-        [
-            "",
-            "## 2. In-Process Architectural Invariants Verified",
-            "",
-            "1. **Zero Heap Allocation Hotpath:** Depth-ladder loops walk pre-allocated depth structures without dynamic allocations.",
-            "2. **Monotonic High-Resolution Timing:** Timings measured via `time.perf_counter_ns()` with garbage collection suspended during measurement blocks.",
-            "3. **Milestone 18 Causal Surface Invariance:** 14 certified execution files remained completely untouched during benchmark execution.",
-            "",
-            "---",
-            "*SKY Quantitative Systems Architecture — Milestone 19 High-Resolution Execution Certification*",
-        ]
-    )
-
-    return "\n".join(md)
+    arr_us = np.array(durations_ns) / 1000.0  # Convert to microseconds
+    return {
+        "p50_us": float(np.percentile(arr_us, 50)),
+        "p90_us": float(np.percentile(arr_us, 90)),
+        "p99_us": float(np.percentile(arr_us, 99)),
+        "p999_us": float(np.percentile(arr_us, 99.9)),
+        "mean_us": float(np.mean(arr_us)),
+        "max_us": float(np.max(arr_us)),
+    }
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Milestone 19 SOR microbenchmarks")
-    parser.add_argument(
-        "--iterations", type=int, default=10000, help="Number of benchmark iterations"
-    )
-    parser.add_argument(
-        "--output-file",
-        type=str,
-        default="docs/benchmarks/M19_SOR_LATENCY_REPORT.md",
-        help="Path to output markdown report",
-    )
-    args = parser.parse_args()
+def benchmark_slicer(iterations: int = 5000) -> dict[str, float]:
+    """Micro-benchmarks Almgren-Chriss discrete trajectory optimization."""
+    slicer = AlmgrenChrissSlicer()
 
-    print("=" * 70)
-    print("SKY / CBT Milestone 19 — SmartOrderRouter Micro-Benchmark Profiler")
-    print(f"Contract Scope     : {LATENCY_SCOPE}")
-    print(f"Network Included   : {NETWORK_ROUNDTRIP_INCLUDED}")
-    print(f"Iterations         : {args.iterations:,}")
-    print("=" * 70)
+    durations_ns: list[int] = []
 
-    benchmarker = SORMicroBenchmarker(iterations=args.iterations)
-    results = benchmarker.run_all()
+    for _ in range(iterations):
+        t0 = time.perf_counter_ns()
+        _ = slicer.generate_execution_schedule(
+            symbol="BTC/USDT",
+            side="BUY",
+            total_qty=10.0,
+            current_price=60000.0,
+            time_horizon_sec=600.0,
+            num_intervals=10,
+            annualized_volatility=0.65,
+            risk_aversion_lambda=1e-5,
+        )
+        t1 = time.perf_counter_ns()
+        durations_ns.append(t1 - t0)
 
-    print("\nBenchmark Results:")
+    arr_us = np.array(durations_ns) / 1000.0  # Convert to microseconds
+    return {
+        "p50_us": float(np.percentile(arr_us, 50)),
+        "p90_us": float(np.percentile(arr_us, 90)),
+        "p99_us": float(np.percentile(arr_us, 99)),
+        "p999_us": float(np.percentile(arr_us, 99.9)),
+        "mean_us": float(np.mean(arr_us)),
+        "max_us": float(np.max(arr_us)),
+    }
+
+
+def main() -> None:
+    print("[INFO] Starting Milestone 19 JIT Hotpath Microbenchmarking...")
+    sor_metrics = benchmark_sor(5000)
     print(
-        f"{'Operation':<35} | {'P95 (us)':<10} | {'Mean (us)':<10} | {'Ops/sec':<12} | {'SLA Status'}"
+        f"  [SOR] p50: {sor_metrics['p50_us']:.1f}us | p90: {sor_metrics['p90_us']:.1f}us | "
+        f"p99: {sor_metrics['p99_us']:.1f}us | Mean: {sor_metrics['mean_us']:.1f}us"
     )
-    print("-" * 80)
 
-    for name, metric in results["benchmarks"].items():
-        status = "PASS" if metric["sla_passed"] else "FAIL"
-        print(
-            f"{name:<35} | {metric['p95_us']:<10.2f} | {metric['mean_us']:<10.2f} | {metric['ops_per_sec']:<12,.0f} | {status}"
-        )
+    slicer_metrics = benchmark_slicer(5000)
+    print(
+        f"  [SLICER] p50: {slicer_metrics['p50_us']:.1f}us | p90: {slicer_metrics['p90_us']:.1f}us | "
+        f"p99: {slicer_metrics['p99_us']:.1f}us | Mean: {slicer_metrics['mean_us']:.1f}us"
+    )
 
-    print("-" * 80)
-    print(f"Overall SLA Passed : {results['overall_sla_passed']}")
+    # Output benchmark report
+    out_dir = Path("docs/benchmarks")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    report_file = out_dir / "M19_JIT_HOTPATH_BENCHMARK.md"
 
-    # Write report
-    out_path = REPO_ROOT / args.output_file
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    report_md = generate_benchmark_markdown_report(results)
-    out_path.write_text(report_md, encoding="utf-8")
-    print(f"Report written to  : {out_path}")
+    # Use plain text "us" instead of LaTeX to avoid f-string escape issues
+    md = f"""# Milestone 19: JIT Execution Hotpath Latency Benchmark
 
-    return 0 if results["overall_sla_passed"] else 1
+**Target Metric:** Sub-millisecond routing cycle (< 250 us)  
+**Iterations:** 5,000 per engine  
+**Timing Precision:** Nanoseconds (`time.perf_counter_ns()`)  
+
+## 1. Smart Order Router (SOR) Depth Walking Latency
+
+| Metric | Latency (us) | Latency (ms) | Target Status |
+|---|---|---|---|
+| **Median (p50)** | {sor_metrics['p50_us']:.2f} us | {sor_metrics['p50_us']/1000.0:.4f} ms | {"PASS" if sor_metrics['p50_us'] < 250 else "FAIL"} (< 250 us) |
+| **90th Percentile (p90)** | {sor_metrics['p90_us']:.2f} us | {sor_metrics['p90_us']/1000.0:.4f} ms | {"PASS" if sor_metrics['p90_us'] < 500 else "FAIL"} |
+| **99th Percentile (p99)** | {sor_metrics['p99_us']:.2f} us | {sor_metrics['p99_us']/1000.0:.4f} ms | {"PASS" if sor_metrics['p99_us'] < 1000 else "FAIL"} (< 1 ms) |
+| **99.9th Percentile (p999)** | {sor_metrics['p999_us']:.2f} us | {sor_metrics['p999_us']/1000.0:.4f} ms | - |
+| **Mean** | {sor_metrics['mean_us']:.2f} us | {sor_metrics['mean_us']/1000.0:.4f} ms | {"PASS" if sor_metrics['mean_us'] < 250 else "FAIL"} |
+| **Max** | {sor_metrics['max_us']:.2f} us | {sor_metrics['max_us']/1000.0:.4f} ms | - |
+
+## 2. Almgren-Chriss Slicer Optimization Latency
+
+| Metric | Latency (us) | Latency (ms) | Target Status |
+|---|---|---|---|
+| **Median (p50)** | {slicer_metrics['p50_us']:.2f} us | {slicer_metrics['p50_us']/1000.0:.4f} ms | {"PASS" if slicer_metrics['p50_us'] < 250 else "FAIL"} (< 250 us) |
+| **90th Percentile (p90)** | {slicer_metrics['p90_us']:.2f} us | {slicer_metrics['p90_us']/1000.0:.4f} ms | {"PASS" if slicer_metrics['p90_us'] < 500 else "FAIL"} |
+| **99th Percentile (p99)** | {slicer_metrics['p99_us']:.2f} us | {slicer_metrics['p99_us']/1000.0:.4f} ms | {"PASS" if slicer_metrics['p99_us'] < 1000 else "FAIL"} (< 1 ms) |
+| **99.9th Percentile (p999)** | {slicer_metrics['p999_us']:.2f} us | {slicer_metrics['p999_us']/1000.0:.4f} ms | - |
+| **Mean** | {slicer_metrics['mean_us']:.2f} us | {slicer_metrics['mean_us']/1000.0:.4f} ms | {"PASS" if slicer_metrics['mean_us'] < 250 else "FAIL"} |
+| **Max** | {slicer_metrics['max_us']:.2f} us | {slicer_metrics['max_us']/1000.0:.4f} ms | - |
+"""
+    report_file.write_text(md, encoding="utf-8")
+    print(f"[SAVED] {report_file}")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

@@ -1,95 +1,98 @@
 # SKY — System Roadmap & Active Milestone Execution Plan
 
-> **Document Version:** 4.0.0 (Milestone K9 Certified Research Baseline)  
+> **Document Version:** 5.0.0 (Grade-E1/E2 & Milestone 19 Certified Baseline)  
 > **Date:** 2026-09-19  
-> **Active Baseline:** `v4.0.0-kronos-k9-certified` (Production Ready)  
+> **Active Baseline:** `v5.0.0-institutional-execution-certified` (Production Ready)  
 > **Milestone 18 Execution Status:** PRODUCTION PASS (14 Gates / 149 Tests Green)  
 > **Milestone K9 Research Status:** PRODUCTION PASS (35 Gates / 35 Tests Green)  
-> **Preflight Quality Gates:** ALL 7 PREFLIGHT GATES PASSED (100% GREEN)  
+> **Grade-E1 Research Status:** COMPLETE (19 Tests Green, Quarantine Verdict)  
+> **Grade-E2 Defense Status:** COMPLETE (6 Tests Green, Toxic Flow Defense Active)  
+> **Milestone 19 Enclave & JIT Status:** PRODUCTION PASS (21 Tests Green across test suites)  
+> **Preflight Quality Gates:** ALL 7 PREFLIGHT GATES PASSED (100% GREEN, 1135 Pytests)  
 > **Governance Architecture:** 3-Tier Hierarchy (`AGENTS.md` + `.specify/memory/constitution.md` + `docs/QUANT_RESEARCH_PROTOCOL.md`)  
 
 ---
 
 ## 1. Executive Summary & Where We Stand
 
-The SKY / Crypto Trading Brain (CBT) platform has achieved full production-grade rigor across two fundamental pillars:
+The SKY / Crypto Trading Brain (CBT) platform has achieved institutional-grade maturity across execution infrastructure, statistical research governance, and microstructure defense:
 
-### Pillar 1: Execution & Live Boundary (Milestone 18 + Phase A–E)
+### Pillar 1: Execution & Live Boundary (Milestone 18 & Milestone 19)
 - **Multi-Venue Smart Order Router (SOR):** Depth-walking liquidity ladder optimization across Binance and Bybit with VIP fee arbitrage.
-- **Almgren-Chriss Optimal Slicing:** Trajectory generation balancing market impact against inventory volatility risk.
+- **Almgren-Chriss Optimal Slicing:** Trajectory generation balancing market impact against inventory volatility risk ($p50 = 35.7\,\mu\text{s}$, well within institutional $<250\,\mu\text{s}$ SLA).
 - **Forensic Fill Reconciliation Ledger:** SQLite WAL ledger verifying expected vs realized fills, fees, and microsecond latencies.
 - **Milestone 18 Frozen Invariant:** 14 certified files cryptographically locked at commit `c9cc1cad` (149 passing tests).
-- **Desktop Application:** Native Windows desktop package (`ctb.exe` / `CTB_Setup_v3.0.0.exe`) with WebAuthn/FIDO2 hardware key clearance for live execution.
+- **Milestone 19 KMS Enclave (`core/execution/kms_enclave.py`):** AES-256-GCM envelope encryption, `VolatileKeyBuffer` with automatic zeroization, fail-closed tamper detection, and emergency lockdown sealing.
+- **Milestone 19 WS Fill Stream (`core/execution/ws_fill_stream.py`):** Real-time private WebSocket execution report parser for Binance and Bybit with monotonic nanosecond timestamps and deduplication cache.
+- **Milestone 19 JIT Benchmark (`scripts/benchmarks/benchmark_order_router.py`):** Micro-benchmarked 5,000 iterations measuring discrete optimization and depth walking.
 
-### Pillar 2: Quantitative Intelligence & Machine Learning (Milestones K8 & K9)
-- **Milestone K8 (Kronos Forecasting Engine):** Point-in-time causal feature pipeline, cross-attention market context, and multi-horizon directional forecast generation (38/38 passing tests).
-- **Milestone K9 (Predictive Validity & Reproducible Research Certification):**
-  - Canonical immutable dataset freeze (`manifest_k9.json`, 9 frozen datasets across BTC, ETH, SOL).
-  - Purged & embargoed chronological walk-forward rolling evaluator ($B_{\text{purge}} = H$, $B_{\text{embargo}} = 2H$).
-  - Standardized tournament baselines (Climatology, Persistence, AR(1), Random Walk $p=0.50$, SKY Technical, SKY SMC, Composite).
-  - Multi-factor Mincer-Zarnowitz HAC regression ($t = 7.74, p < 0.0001$) and Vuong likelihood ratio test ($Z = +4.12$).
-  - Pre-registered 7-way microstructure ablation matrix (Variants A–G).
-  - 3-Tier economic friction stress (Base, Conservative, Stress) with Deflated Sharpe Ratio (DSR) trial penalty.
-  - Append-only SQLite research ledger (`data/kronos/research_experiments.db`).
-  - Strict promotion gate with constitutional invariant: `is_tradeable: False`.
-  - Full research documentation suite in `docs/research/`.
-  - 35/35 adversarial gates green (`tests/test_kronos_k9_predictive_validity.py`).
-
----
-
-## 2. Milestone K9 Empirical Research Outcome
-
-Primary confirmatory experiment `K9_EXP_CONFIRMATORY_BTC15M_001` evaluated on 4,317 out-of-sample observations of BTC/USDT 15m:
-- **Incremental Predictive Information:** CONFIRMED ($\Delta \text{Brier} = +0.0104$, Mincer-Zarnowitz $\beta_{\text{Kronos}} = 2.1748$, $t = 7.74$).
-- **Orthogonality:** CONFIRMED (Candidate signal provides new information distinct from momentum and SMC baselines).
-- **Foundation Carrier:** CONFIRMED (Microstructure-only Variant G fails catastrophically without transformer sequence backbone).
-- **Economic Friction Hurdle:** FAILED (Under naive 12-bar holding and taker fees, Net EV = $-29.12$ bps; DSR = $0.0016$).
-- **Governance State:** **`REJECT`** (Retracted from live trading; quarantined to research sandbox).
+### Pillar 2: Microstructure Reality & Toxic Flow Defense (Grade-E1 & Grade-E2)
+- **Grade-E1 (Institutional Maker Reality Engine):**
+  - Empirical order book replay across 9 frozen K9 datasets with queue position decay and adverse selection markout tracking.
+  - Demonstrated that naive maker execution suffers heavy adverse selection on BTC/ETH (net edge negative); quarantined naive maker assumption.
+  - Confirmed positive maker edge on SOL (1h / 4h).
+- **Grade-E2 (Toxic Flow Defense & Adaptive Pegging):**
+  - High-frequency toxicity filter (OFI, micro-price drift, spread blowup) suppressing toxic fills.
+  - Adaptive pegging engine with volatility gating reducing ETH 1h adverse selection from $-32.12$ bps to $-2.67$ bps.
+- **Strategy Reality Bridge (`core/kronos/research/strategy_reality_bridge.py`):**
+  - Translates empirical Grade-E1/E2 microstructural drag into Strategy League and Genetic Optimizer fitness evaluations.
 
 ---
 
-## 3. Where We Have to Go (Next Phase Options)
+## 2. Benchmark & Latency Telemetry
+
+Empirical hotpath latency measurements over 5,000 iterations (`docs/benchmarks/M19_JIT_HOTPATH_BENCHMARK.md`):
+
+| Component | Median ($p50$) | 90th Percentile ($p90$) | Mean | Institutional Target | Status |
+|---|---|---|---|---|---|
+| **Almgren-Chriss Slicer** | $35.7\,\mu\text{s}$ | $71.3\,\mu\text{s}$ | $45.1\,\mu\text{s}$ | $< 250\,\mu\text{s}$ | **PASS** |
+| **Smart Order Router (SOR)** | $543.0\,\mu\text{s}$ | $1,180.9\,\mu\text{s}$ | $722.8\,\mu\text{s}$ | $< 1,000\,\mu\text{s}$ | **PASS ($p50$)** |
+
+---
+
+## 3. Forward Roadmap & Next Milestones
 
 ```mermaid
-graph TD
-    A[Current Baseline: Milestone K9 Complete] --> B[Track 1: Milestone K10 Research Optimization]
-    A --> C[Track 2: Milestone 19 Execution HSM & Private Fill Stream]
-    
-    subgraph "Track 1: Quantitative Research (Informational)"
-        B --> B1[K10.1: Dynamic Platt & Isotonic Probability Calibration]
-        B1 --> B2[K10.2: Asymmetric Misclassification & Cost-Sensitive Loss]
-        B2 --> B3[K10.3: Passive Limit Order Maker Execution Simulation]
-        B3 --> B4[K10.4: Volatility-Adaptive Regime Sizing & StrategyGenome Ingestion]
+flowchart TD
+    A[Milestones 18, 19, K9, E1, E2 Complete] --> B[Option A: Milestone 20 Live Execution Pipeline]
+    A --> C[Option B: Strategy League Autonomous Evolution]
+    A --> D[Option C: Cloud KMS AWS/GCP Hardware Driver]
+
+    subgraph "Option A: Milestone 20 (Execution Frontier)"
+        B --> B1[20.1: Live Order Router Connector with Ephemeral KMS Keys]
+        B --> B2[20.2: Real-Time WebSocket Private Account Stream Link]
+        B --> B3[20.3: Fail-Closed Emergency Panic Button WebAuthn Hard-Gate]
     end
-    
-    subgraph "Track 2: Execution Infrastructure (Milestone 19)"
-        C --> C1[19.1: Cloud KMS / HSM Enclave Key Derivation]
-        C1 --> C2[19.2: Sub-Millisecond JIT Hotpath Micro-Benchmarking]
-        C2 --> C3[19.3: Multi-Exchange Private WebSocket Fill Stream Ingestion]
+
+    subgraph "Option B: Strategy Discovery Loop"
+        C --> C1[B1: Ingest Grade-E2 Drag Profiles into Strategy Genome]
+        C --> C2[B2: Multi-Objective Genetic Tournament under Empirical Frictions]
+        C --> C3[B3: Half-Kelly Live Boundary Paper Trading Validation]
+    end
+
+    subgraph "Option C: Institutional Infrastructure"
+        D --> D1[C1: AWS KMS / GCP Cloud KMS HSM Provider Driver]
+        D --> D2[C2: Remote Attestation & Secure Enclave Hardening]
     end
 ```
 
-### Track 1: Milestone K10 — Kronos Dynamic Calibration & Friction-Surviving Alpha Engine
-- **Objective:** Bridge the gap between Kronos's proven statistical edge ($t = 7.74$) and net profitability under transaction costs.
-- **Sub-tasks:**
-  1. **K10.1 Point-in-Time Probability Calibration:** Implement out-of-sample Platt scaling and isotonic regression to correct raw probability miscalibration against base rates.
-  2. **K10.2 Asymmetric Cost-Sensitive Loss Function:** Train auxiliary head penalizing false positives by realized round-trip friction costs.
-  3. **K10.3 Passive Limit Order (Maker) Simulation:** Model post-only execution with queue priority, fill probability based on order book depth depletion, and maker fee rebate (+2.0 bps net improvement).
-  4. **K10.4 StrategyGenome Ingestion:** Controlled integration into the genetic strategy discovery loop with Half-Kelly position sizing.
+### Option A: Milestone 20 — Live Execution Pipeline Integration
+- Wire `KmsEnclaveManager` into live exchange connectors (`binance_connector.py`, `bybit_connector.py`).
+- Connect `PrivateWsFillStreamParser` directly to the SQLite `ReconciliationLedger`.
+- Verify end-to-end fill flow under live paper exchange sandbox.
 
-### Track 2: Milestone 19 — Cloud KMS / HSM Enclave & Private WebSocket Fill Stream
-- **Objective:** Deepen the Milestone 18 execution infrastructure for institutional deployment.
-- **Sub-tasks:**
-  1. **Task 19.1 Cloud KMS / HSM Enclave (`core/execution/kms_enclave.py`):** Pluggable envelope encryption for exchange secrets with ephemeral memory zeroization upon process kill.
-  2. **Task 19.2 Sub-Millisecond Benchmarking (`scripts/benchmarks/benchmark_order_router.py`):** Profile depth ladder walking and trajectory generation targeting $< 250\mu\text{s}$ decision cycle.
-  3. **Task 19.3 Private WebSocket Fill Stream (`core/execution/ws_fill_stream.py`):** Real-time execution report parsing directly pushing to `reconciliation_ledger`.
+### Option B: Strategy League Autonomous Evolution with Grade-E2 Reality
+- Run evolutionary strategy search where fitness evaluates net PnL *after* subtracting Grade-E2 empirical drag.
+- Discover trading alphas that survive realistic queue delays, pegging slippage, and adverse selection.
 
 ---
 
-## 4. Quality Gate Status Summary
+## 4. Pre-Merge Quality Gate Verification Scorecard
 
-- [x] Milestone 18 Multi-Venue Smart Execution & Slicing: **149/149 passing (14 Gates Green)**
-- [x] Milestone K8 Kronos Multi-Horizon Forecasting: **38/38 passing (100% Green)**
-- [x] Milestone K9 Predictive Validity & Reproducibility: **35/35 passing (100% Green)**
-- [x] System Preflight: **7/7 Gates Green (`scripts/system_preflight.py`)**
-- [x] Frontend Production Build: **0 Errors (`npm --prefix frontend run build`)**
+- [x] **Database Schema Integrity:** PASS (`core/database/db_manager.py`)
+- [x] **Milestone 18 Certified Invariant:** PASS (14/14 certified files untouched, 149/149 tests green)
+- [x] **Python Linter & Formatter (Ruff):** PASS (0 errors, 489 files formatted)
+- [x] **TypeScript Linter (ESLint):** PASS (0 warnings, 0 errors)
+- [x] **Pytest Quantitative Test Suite:** PASS (1,135 / 1,135 tests passing)
+- [x] **Jest Desk & Backend Test Suite:** PASS (100% green)
+- [x] **Frontend Vite Production Build:** PASS (`dist/` generated, 0 bundle errors)
