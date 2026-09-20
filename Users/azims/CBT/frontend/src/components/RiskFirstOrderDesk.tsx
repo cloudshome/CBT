@@ -26,6 +26,7 @@ import {
 } from '../types';
 import { api, VaultStatus, SORRouteQuote, AlmgrenChrissSchedule, getHardwareKeyStatus, ClearanceSessionData } from '../services/api';
 import { HardwareKeyModal } from './HardwareKeyModal';
+import { TestnetBurnInHUD } from './TestnetBurnInHUD';
 
 interface RiskFirstOrderDeskProps {
   symbol: string;
@@ -81,6 +82,7 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
   const [recentFills, setRecentFills] = useState<WSNormalizedFill[]>([]);
   const [showBenchmarkHUD, setShowBenchmarkHUD] = useState<boolean>(false);
   const [showWSFeedDrawer, setShowWSFeedDrawer] = useState<boolean>(false);
+  const [showBurnInHUD, setShowBurnInHUD] = useState<boolean>(false);
 
   // Poll KMS Enclave Status
   useEffect(() => {
@@ -398,48 +400,66 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
       </div>
 
       {/* Telemetry HUD & Feed Toggles */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         <button
           type="button"
           onClick={() => setShowBenchmarkHUD(!showBenchmarkHUD)}
-          className={`py-1 px-2 rounded text-[10px] font-bold border transition flex items-center justify-between ${
+          className={`py-1 px-1.5 rounded text-[10px] font-bold border transition flex items-center justify-between ${
             showBenchmarkHUD
               ? 'bg-cyan-950/60 border-cyan-500 text-cyan-200'
               : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
           }`}
         >
-          <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1">
             <Cpu className="w-3 h-3 text-cyan-400" />
-            <span>SOR Benchmarks</span>
+            <span>SOR Bench</span>
           </span>
           {sorBenchmarks ? (
-            <span className={`px-1 py-0.2 rounded text-[9px] ${
+            <span className={`px-1 py-0.2 rounded text-[8px] ${
               sorBenchmarks.overall_sla_passed
                 ? 'bg-emerald-500/20 text-emerald-300'
                 : 'bg-amber-500/20 text-amber-300'
             }`}>
-              {sorBenchmarks.overall_sla_passed ? '<2.5ms PASS' : 'SLA SLOW'}
+              {sorBenchmarks.overall_sla_passed ? 'PASS' : 'SLOW'}
             </span>
           ) : (
-            <span className="text-[9px] text-slate-400">P95 &mu;s</span>
+            <span className="text-[8px] text-slate-400">P95 &mu;s</span>
           )}
         </button>
 
         <button
           type="button"
           onClick={() => setShowWSFeedDrawer(!showWSFeedDrawer)}
-          className={`py-1 px-2 rounded text-[10px] font-bold border transition flex items-center justify-between ${
+          className={`py-1 px-1.5 rounded text-[10px] font-bold border transition flex items-center justify-between ${
             showWSFeedDrawer
               ? 'bg-emerald-950/60 border-emerald-500 text-emerald-200'
               : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
           }`}
         >
-          <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1">
             <Activity className="w-3 h-3 text-emerald-400" />
-            <span>WS Reconciler</span>
+            <span>WS Recon</span>
           </span>
-          <span className="px-1 py-0.2 rounded text-[9px] bg-slate-800 text-slate-300">
-            {wsTelemetry?.total_fills_recorded ?? 0} fills
+          <span className="px-1 py-0.2 rounded text-[8px] bg-slate-800 text-slate-300">
+            {wsTelemetry?.total_fills_recorded ?? 0}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowBurnInHUD(!showBurnInHUD)}
+          className={`py-1 px-1.5 rounded text-[10px] font-bold border transition flex items-center justify-between ${
+            showBurnInHUD
+              ? 'bg-purple-950/60 border-purple-500 text-purple-200'
+              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span className="flex items-center gap-1">
+            <Shield className="w-3 h-3 text-purple-400" />
+            <span>Gate 5 HUD</span>
+          </span>
+          <span className="px-1 py-0.2 rounded text-[8px] bg-slate-800 text-purple-300">
+            14D
           </span>
         </button>
       </div>
@@ -581,6 +601,11 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* Gate 5 Extended Testnet Burn-In HUD Drawer */}
+      {showBurnInHUD && (
+        <TestnetBurnInHUD onClose={() => setShowBurnInHUD(false)} />
       )}
 
       {/* Live Pre-Trade Safety Status Banner */}

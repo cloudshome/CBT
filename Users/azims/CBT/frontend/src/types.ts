@@ -2106,4 +2106,80 @@ export interface KronosPromotionReport {
   governance_notes: string[];
 }
 
+// ----------------------------------------------------------------------------
+// Milestone 20: Gate 5 Extended Testnet Reliability Qualification & Burn-In
+// ----------------------------------------------------------------------------
+
+export type TestnetBurnInState =
+  | 'NOT_STARTED'
+  | 'INITIALIZING'
+  | 'WARMING_UP'
+  | 'ACTIVE_REHEARSAL'
+  | 'DEGRADED_OPERATION'
+  | 'RECOVERY_RECONCILIATION'
+  | 'ANOMALY_HALTED'
+  | 'COMPLETED';
+
+export interface TestnetSessionDurations {
+  wallclock_elapsed_sec: number;
+  healthy_duration_sec: number;
+  invalidated_duration_sec: number;
+  healthy_ratio_pct: number;
+  target_duration_sec: number;
+  target_progress_pct: number;
+}
+
+export interface TestnetEpochSummary {
+  epoch_id: string;
+  epoch_index: number;
+  started_at_utc: string;
+  ended_at_utc: string | null;
+  status: 'ACTIVE' | 'CLOSED_HEALTHY' | 'CLOSED_INVALIDATED';
+  continuity_break_reason: string | null;
+  healthy_duration_sec: number;
+}
+
+export interface TestnetLatencyStageSummary {
+  stage_name: string;
+  p50_us: number;
+  p90_us: number;
+  p99_us: number;
+  p99_9_us: number;
+  max_us: number;
+  sample_count: number;
+}
+
+export interface TestnetInvariantStatus {
+  name: string;
+  description: string;
+  status: 'PASS' | 'WARN' | 'FAIL';
+  last_checked_utc: string;
+  details: string;
+}
+
+export interface TestnetBurnInReport {
+  session_id: string;
+  state: TestnetBurnInState;
+  durations: TestnetSessionDurations;
+  active_epoch: TestnetEpochSummary | null;
+  clock_offset_ms: number;
+  clock_healthy: boolean;
+  account_equity_usd: number;
+  peak_equity_usd: number;
+  drawdown_pct: number;
+  rehearsal_drawdown_limit_pct: number;
+  invariants: TestnetInvariantStatus[];
+  clean_latency_summary: TestnetLatencyStageSummary[];
+  fault_latency_summary: TestnetLatencyStageSummary[];
+  fault_injection_stats: {
+    injected_count: number;
+    recovered_count: number;
+    active_fault: string | null;
+  };
+  total_parent_orders: number;
+  total_slices_dispatched: number;
+  unresolved_quantity_abs: string;
+}
+
+
 
