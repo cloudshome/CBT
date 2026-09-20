@@ -6,7 +6,10 @@ bin/
 *.db-journal
 *.db-wal
 *.db-shm
-/data/
+/data/*
+!/data/research/
+/data/research/*
+!/data/research/datasets/
 .venv/
 .env
 .DS_Store
