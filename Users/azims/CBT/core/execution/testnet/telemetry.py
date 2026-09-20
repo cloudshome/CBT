@@ -54,6 +54,9 @@ class TestnetLatencyTelemetryEngine:
 
         # Clock offset tracking
         self.last_clock_offset_ms: float = 0.0
+        self.last_clock_rtt_ms: float = 0.0
+        self.last_clock_uncertainty_ms: float = 0.0
+        self.last_estimator_method: str = "ROUND_TRIP_MIDPOINT"
         self.last_clock_measurement_monotonic_ns: int = 0
         self.clock_offset_history: list[tuple[int, float]] = []
 
@@ -62,14 +65,32 @@ class TestnetLatencyTelemetryEngine:
         local_wallclock_ms: float,
         exchange_server_time_ms: float,
         local_monotonic_ns: int,
+        t0_wall_ms: float | None = None,
+        t1_wall_ms: float | None = None,
     ) -> float:
         """
-        Estimates clock offset between local wall clock and exchange server clock:
-            offset = local_wallclock_ms - exchange_server_time_ms
-        Verifies against ClockPolicy.
+        Estimates clock offset between local wall clock and exchange server clock.
+        If round-trip bounds (t0_wall_ms, t1_wall_ms) are provided, uses midpoint formula:
+            theta_hat = ((t0_wall_ms + t1_wall_ms) / 2.0) - exchange_server_time_ms
+            RTT = t1_wall_ms - t0_wall_ms
+            Uncertainty = RTT / 2.0
+        Otherwise falls back to single-point difference.
         """
-        offset_ms = local_wallclock_ms - exchange_server_time_ms
+        if t0_wall_ms is not None and t1_wall_ms is not None:
+            rtt_ms = max(0.0, t1_wall_ms - t0_wall_ms)
+            midpoint_ms = (t0_wall_ms + t1_wall_ms) / 2.0
+            offset_ms = midpoint_ms - exchange_server_time_ms
+            uncertainty_ms = rtt_ms / 2.0
+            self.last_estimator_method = "ROUND_TRIP_MIDPOINT"
+        else:
+            offset_ms = local_wallclock_ms - exchange_server_time_ms
+            rtt_ms = 0.0
+            uncertainty_ms = 0.0
+            self.last_estimator_method = "ONE_WAY_APPROX"
+
         self.last_clock_offset_ms = offset_ms
+        self.last_clock_rtt_ms = rtt_ms
+        self.last_clock_uncertainty_ms = uncertainty_ms
         self.last_clock_measurement_monotonic_ns = local_monotonic_ns
         self.clock_offset_history.append((local_monotonic_ns, offset_ms))
 
@@ -102,7 +123,19 @@ class TestnetLatencyTelemetryEngine:
                 f"Clock offset limit exceeded: {self.last_clock_offset_ms:.2f}ms > {self.clock_policy.max_estimated_offset_ms}ms",
             )
 
-        return True, f"Clock nominal: offset={self.last_clock_offset_ms:.2f}ms, age={age_ms:.1f}ms"
+        if (
+            self.clock_policy.offset_uncertainty_required
+            and self.last_clock_uncertainty_ms > self.clock_policy.max_offset_uncertainty_ms
+        ):
+            return (
+                False,
+                f"Clock uncertainty breach: {self.last_clock_uncertainty_ms:.2f}ms > {self.clock_policy.max_offset_uncertainty_ms}ms",
+            )
+
+        return (
+            True,
+            f"Clock nominal: offset={self.last_clock_offset_ms:.2f}ms, rtt={self.last_clock_rtt_ms:.2f}ms, age={age_ms:.1f}ms",
+        )
 
     def record_decomposed_latency(
         self,

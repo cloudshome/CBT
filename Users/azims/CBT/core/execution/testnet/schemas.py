@@ -84,6 +84,7 @@ class ClockPolicy:
     """
 
     max_estimated_offset_ms: float = 50.0
+    max_offset_uncertainty_ms: float = 25.0
     max_measurement_age_ms: float = 5000.0
     stale_offset_action: str = "DEGRADED"
     offset_uncertainty_required: bool = True

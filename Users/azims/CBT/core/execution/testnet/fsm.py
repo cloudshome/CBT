@@ -44,6 +44,7 @@ class RehearsalFSM:
         ],
         BurnInState.RECOVERY_RECONCILIATION: [
             BurnInState.WARMING_UP,
+            BurnInState.ACTIVE_REHEARSAL,
             BurnInState.ANOMALY_HALTED,
             BurnInState.INVALIDATED,
         ],
