@@ -77,6 +77,6 @@ flowchart TD
 - [x] **Milestone 18 Certified Invariant:** PASS (14/14 certified files untouched, 149/149 tests green)
 - [x] **Python Linter & Formatter (Ruff):** PASS (0 errors)
 - [x] **TypeScript Linter (ESLint):** PASS (0 warnings, 0 errors)
-- [x] **Pytest Quantitative Test Suite:** PASS (1,156+ tests passing)
-- [x] **Jest Desk & Backend Test Suite:** PASS (100% green)
+- [x] **Pytest Quantitative Test Suite:** PASS (1,191 tests passing; 1,338 total with Jest)
+- [x] **Jest Desk & Backend Test Suite:** PASS (147 tests 100% green)
 - [x] **Frontend Vite Production Build:** PASS (`dist/` generated, 0 bundle errors)
