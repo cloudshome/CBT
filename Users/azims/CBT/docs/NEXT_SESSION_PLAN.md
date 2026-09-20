@@ -1,14 +1,14 @@
 # SKY — System Roadmap & Active Milestone Execution Plan
 
-> **Document Version:** 5.1.0 (Hardened Provenance Authority & Grade-E3 L2 Specification)  
-> **Date:** 2026-09-19  
-> **Active Baseline:** `v5.1.0-provenance-governed` (Production Ready)  
+> **Document Version:** 5.2.0 (Grade-E3 High-Frequency L2 Reality Engine & Provenance Certified)  
+> **Date:** 2026-09-20  
+> **Active Baseline:** `v5.2.0-grade-e3-l2-empirical-engine` (Production Ready)  
 > **Milestone 18 Execution Status:** PRODUCTION PASS (14 Gates / 149 Tests Green)  
 > **Milestone 19 Enclave & JIT Status:** PRODUCTION PASS (21 Tests Green across test suites)  
-> **Strategy Reality Bridge Status:** PRODUCTION PASS (9 Provenance & Tradeability Gates Green)  
+> **Strategy Reality Bridge Status:** PRODUCTION PASS (L2_TICK_VERIFIED Adapter & 9 Provenance Gates Green)  
 > **Grade-E1 / Grade-E2 Status:** QUARANTINE ENFORCED (Constitutional Live Trading Firewall Active)  
-> **Grade-E3 Ingestion Status:** SPECIFIED (`docs/grade_e3/01_l2_tick_ingestion_specification.md`)  
-> **Preflight Quality Gates:** ALL 7 PREFLIGHT GATES PASSED (100% GREEN, 1144 Pytests)  
+> **Grade-E3 Empirical Status:** PRODUCTION PASS (`GRADE_E3_DATA_INTEGRITY_REPORT.md` & `GRADE_E3_FINAL_VERDICT.md`)  
+> **Preflight Quality Gates:** ALL 7 PREFLIGHT GATES PASSED (100% GREEN)  
 > **Governance Architecture:** 3-Tier Hierarchy (`AGENTS.md` + `.specify/memory/constitution.md` + `docs/QUANT_RESEARCH_PROTOCOL.md`)  
 
 ---
@@ -27,23 +27,18 @@ The SKY / Crypto Trading Brain (CBT) platform has achieved institutional-grade m
 - **Milestone 19 JIT Benchmark (`scripts/benchmarks/benchmark_order_router.py`):** Micro-benchmarked 5,000 iterations measuring discrete optimization and depth walking.
 
 ### Pillar 2: Microstructure Reality, Provenance & Tradeability Gateway
-- **Grade-E1 (Institutional Maker Reality Engine):**
-  - Empirical order book replay across 9 frozen K9 datasets with queue position decay and adverse selection markout tracking.
-  - Quarantined naive maker assumption due to negative net edge on BTC/ETH.
-- **Grade-E2 (Toxic Flow Defense & Adaptive Pegging):**
-  - High-frequency toxicity filter (OFI, micro-price drift, spread blowup) suppressing toxic fills.
-  - Adaptive pegging engine with volatility gating reducing ETH 1h adverse selection from $-32.12$ bps to $-2.67$ bps.
+- **Grade-E1 (Institutional Maker Reality Engine):** Empirical order book replay across 9 frozen K9 datasets with queue position decay and adverse selection markout tracking.
+- **Grade-E2 (Toxic Flow Defense & Adaptive Pegging):** High-frequency toxicity filter (OFI, micro-price drift, spread blowup) suppressing toxic fills.
+- **Grade-E3 (High-Frequency L2 Order Book & Trade Reality Engine):**
+  - High-resolution discrete event matching across Q0, Q1, Q2, and Q3 with explicit uncertainty intervals.
+  - Multi-horizon markout measurement ($\tau \in \{100\,\text{ms}, 1\,\text{s}, 5\,\text{s}, 30\,\text{s}, 5\,\text{min}\}$) and Winner's Curse bias estimation.
+  - Institutional 3-tier fee schedules (VIP0, VIP2, VIP4) confirming retail quarantine and VIP4 maker rebate viability.
+  - Cryptographic `TamperEvidentEvidenceBundle` (Amendment B) locking SHA-256 digests for BTC, ETH, and SOL.
 - **Hardened Strategy Reality Bridge (`core/kronos/research/strategy_reality_bridge.py`):**
-  - **`ProvenanceAuthority`:** Validates dataset SHA-256 hashes against `manifest_k9.json`, detects parameter tampering, and blocks epistemic grade inflation (OHLCV cannot claim `L2_TICK_VERIFIED`).
+  - **`ProvenanceAuthority`:** Validates dataset SHA-256 hashes against `manifest_k9.json`, detects parameter tampering, verifies `TamperEvidentEvidenceBundle`, and blocks epistemic grade inflation.
+  - **`GradeE3RealityAdapter`:** Enforces Phase 9 Research-Only Firewall: `is_tradeable(profile) -> False`.
   - **`ExecutionAuthorizationGateway`:** Decouples research viability from live execution permissions:
     $$\text{Tradeable} = \text{BridgeEligible} \land \text{ProvenanceValid} \land \text{EvidenceGradeSufficient} \land (\text{Verdict} \neq \text{"QUARANTINE"})$$
-    Guarantees that `is_viable: True` strictly yields `is_tradeable: False` for OHLCV or quarantined profiles.
-  - **`CalibratedExecutionResult`:** Preserves legacy 3-tuple sequence unpacking while providing rich provenance and audit metadata.
-
-### Pillar 3: Grade-E3 High-Frequency L2 Order Book Specification
-- **Document:** [`docs/grade_e3/01_l2_tick_ingestion_specification.md`](file:///c:/Users/azims/CBT/docs/grade_e3/01_l2_tick_ingestion_specification.md)
-- **Scientific Temporal Distinction:** Explicitly distinguishes *Simulation Timestamp Resolution* ($1\,\mu\text{s}$) from *Empirical Temporal Resolution* ($100\,\text{ms}$ snapshots).
-- **Dual-Venue Feasibility Matrix:** Structured evaluation of Binance Spot (`@depth@100ms`, `@trade`) vs Bybit Linear Perps (`orderbook.50`, `publicTrade`).
 
 ---
 
@@ -62,18 +57,17 @@ Empirical hotpath latency measurements over 5,000 iterations (`docs/benchmarks/M
 
 ```mermaid
 flowchart TD
-    A[M18, M19, Grade-E1/E2 Quarantined, Bridge Hardened] --> B[Phase 1: Grade-E3 L2 Order Book Downloader & Builder]
-    A --> C[Phase 2: Dual-Venue Feasibility Pilot Benchmark]
-    B --> D[Phase 3: Millisecond Queue Depletion Simulator]
+    A[M18, M19, Grade-E1/E2/E3 Certified] --> B[Phase 1: Extended 14-Day Testnet Burn-In Orchestration]
+    A --> C[Phase 2: Live Private WS Execution Telemetry Stream]
+    B --> D[Phase 3: Automated Micro-Notional Rebalancing Canary]
     C --> D
-    D --> E[Phase 4: Empirical Markout & Winner's Curse Audit]
-    E --> F[Phase 5: L2_TICK_VERIFIED Epistemic Promotion Gate]
+    D --> E[Phase 4: Hardware WebAuthn Multi-Sig Release Gate]
+    E --> F[Phase 5: Gate 6 Micro-Capital Institutional Promotion]
 ```
 
 ### Next Immediate Milestones:
-1. **Grade-E3 Step 1 (L2 Ingestor & Order Book Builder):** Build `core/research/grade_e3/` data pipeline to ingest and reconstruct Binance/Bybit Level 2 diff streams and trade ticks.
-2. **Grade-E3 Step 2 (Dual-Venue Pilot Feasibility):** Download 7 days of continuous L2 diffs and trades for BTCUSDT on Binance Spot and Bybit Perps; audit sequence gap frequency and timestamp monotonicity.
-3. **Grade-E3 Step 3 (Queue Depletion & Markout Measurement):** Measure genuine post-fill adverse selection at $t+100\text{ms}, 1\text{s}, 5\text{s}, 30\text{s}$.
+1. **Milestone 20 (Gate 5 Extended Sandbox Burn-In):** Implement continuous 14-day testnet paper-trading rehearsal and fill latency telemetry.
+2. **Milestone 21 (Hardware Authorization Gate 6):** Design multi-party WebAuthn / hardware token authorization layer for micro-notional ($\le \$500$) canary deployment.
 
 ---
 
@@ -81,8 +75,8 @@ flowchart TD
 
 - [x] **Database Schema Integrity:** PASS (`core/database/db_manager.py`)
 - [x] **Milestone 18 Certified Invariant:** PASS (14/14 certified files untouched, 149/149 tests green)
-- [x] **Python Linter & Formatter (Ruff):** PASS (0 errors, 490 files formatted)
+- [x] **Python Linter & Formatter (Ruff):** PASS (0 errors)
 - [x] **TypeScript Linter (ESLint):** PASS (0 warnings, 0 errors)
-- [x] **Pytest Quantitative Test Suite:** PASS (1,144 / 1,144 tests passing)
+- [x] **Pytest Quantitative Test Suite:** PASS (1,156+ tests passing)
 - [x] **Jest Desk & Backend Test Suite:** PASS (100% green)
 - [x] **Frontend Vite Production Build:** PASS (`dist/` generated, 0 bundle errors)

@@ -96,6 +96,39 @@ class QueuePositionEstimate:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class QueueModelMetadata:
+    """
+    Explicit model governance metadata identifying calibration status and uncertainty bounds.
+    Prohibits claiming venue calibration without verifiable empirical calibration.
+    """
+
+    model_id: str
+    model_type: QueueModelType
+    parameter_hash: str
+    calibration_dataset: str
+    calibration_status: (
+        str  # e.g. "UNCALIBRATED_SCENARIO", "SYNTHETIC_BENCHMARK", "EMPIRICALLY_CALIBRATED"
+    )
+    random_seed: int
+    fill_uncertainty_bps: float
+    wait_uncertainty_ms: float
+    sensitivity_scenario: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "model_id": self.model_id,
+            "model_type": self.model_type.value,
+            "parameter_hash": self.parameter_hash,
+            "calibration_dataset": self.calibration_dataset,
+            "calibration_status": self.calibration_status,
+            "random_seed": self.random_seed,
+            "fill_uncertainty_bps": self.fill_uncertainty_bps,
+            "wait_uncertainty_ms": self.wait_uncertainty_ms,
+            "sensitivity_scenario": self.sensitivity_scenario,
+        }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Cancellation Latency Configuration
 # ─────────────────────────────────────────────────────────────────────────────
@@ -198,6 +231,51 @@ class L2FillEvent:
 
 
 @dataclass(frozen=True)
+class MarkoutHorizonResult:
+    """Rigorous scientific markout metrics for an individual horizon."""
+
+    horizon: str
+    horizon_ms: int
+    mid_price_markout_bps: float
+    micro_price_markout_bps: float
+    executable_price_markout_bps: float
+    fee_adjusted_markout_bps: float
+    conditional_fill_markout_bps: float
+    reference_population_drift_bps: float
+    winners_curse_bias_bps: float
+    standard_error_bps: float
+    confidence_interval_95: tuple[float, float]
+    sample_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class MultiHorizonMarkoutReport:
+    """Comprehensive ex-post markout & adverse selection report across all 5 standard horizons."""
+
+    asset: str
+    venue: str
+    sample_size_fills: int
+    reference_population_size: int
+    horizons: dict[str, MarkoutHorizonResult]
+    mean_adverse_selection_5s_bps: float
+    mean_winners_curse_bias_bps: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "asset": self.asset,
+            "venue": self.venue,
+            "sample_size_fills": self.sample_size_fills,
+            "reference_population_size": self.reference_population_size,
+            "horizons": {k: v.to_dict() for k, v in self.horizons.items()},
+            "mean_adverse_selection_5s_bps": self.mean_adverse_selection_5s_bps,
+            "mean_winners_curse_bias_bps": self.mean_winners_curse_bias_bps,
+        }
+
+
+@dataclass(frozen=True)
 class FidelityAuditReport:
     """Summary of data integrity and sequence audit for an ingested dataset."""
 
@@ -211,6 +289,12 @@ class FidelityAuditReport:
     raw_data_sha256: str
     evidence_status: EvidenceStatus
     is_fidelity_certified: bool
+    duplicates_detected: int = 0
+    out_of_order_detected: int = 0
+    malformed_packets: int = 0
+    reconnect_boundaries: int = 0
+    exclusions_count: int = 0
+    audit_summary: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -224,6 +308,12 @@ class FidelityAuditReport:
             "raw_data_sha256": self.raw_data_sha256,
             "evidence_status": self.evidence_status.value,
             "is_fidelity_certified": self.is_fidelity_certified,
+            "duplicates_detected": self.duplicates_detected,
+            "out_of_order_detected": self.out_of_order_detected,
+            "malformed_packets": self.malformed_packets,
+            "reconnect_boundaries": self.reconnect_boundaries,
+            "exclusions_count": self.exclusions_count,
+            "audit_summary": self.audit_summary,
         }
 
 

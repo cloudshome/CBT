@@ -299,6 +299,17 @@ class ProvenanceAuthority:
 
         return True
 
+    def verify_l2_bundle(self, bundle: Any) -> bool:
+        """
+        Validates cryptographic integrity of a TamperEvidentEvidenceBundle.
+        Fails closed if the bundle hash does not match computed digest.
+        """
+        if not hasattr(bundle, "verify_integrity") or not bundle.verify_integrity():
+            raise ProvenanceTamperError(
+                f"TamperEvidentEvidenceBundle verification failed for experiment {getattr(bundle, 'experiment_id', 'UNKNOWN')}"
+            )
+        return True
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Execution Authorization Gateway (Independent Tradeability Boundary)
@@ -489,6 +500,64 @@ class StrategyRealityBridge:
         for key, profile in self.registry.items():
             results[key] = self.authority.verify_profile(profile)
         return results
+
+    def register_profile(
+        self,
+        key: str,
+        profile: MicrostructureDragProfile,
+        bundle: Any | None = None,
+    ) -> None:
+        """
+        Registers a verified empirical profile into the bridge instance.
+        If an evidence bundle is provided, verifies its cryptographic integrity.
+        """
+        if bundle is not None:
+            self.authority.verify_l2_bundle(bundle)
+        self.authority.verify_profile(profile)
+        self.registry[key] = profile
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Grade-E3 Reality Adapter & Structural Firewall (Phase 8 & 9)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class GradeE3RealityAdapter:
+    """
+    Narrow, isolated adapter for Grade-E3 High-Frequency L2 Engine into StrategyRealityBridge.
+    Enforces Phase 9 Research-Only Authorization Firewall: is_tradeable is strictly False.
+    """
+
+    @staticmethod
+    def is_tradeable(profile: MicrostructureDragProfile) -> bool:
+        """
+        Permanent Research Invariant (Phase 9 Directive):
+        Grade-E3 empirical research outputs strictly yield is_tradeable = False.
+        """
+        return False
+
+    @classmethod
+    def create_bridge_with_l2_profiles(
+        cls,
+        l2_profiles: dict[str, MicrostructureDragProfile],
+        bundles: dict[str, Any] | None = None,
+    ) -> StrategyRealityBridge:
+        """
+        Creates an isolated StrategyRealityBridge instance equipped with Grade-E3 L2 profiles.
+        Leaves the canonical baseline EMPIRICAL_DRAG_REGISTRY untouched.
+        """
+        authority = ProvenanceAuthority()
+        custom_registry = dict(EMPIRICAL_DRAG_REGISTRY)
+        bundles = bundles or {}
+
+        for key, profile in l2_profiles.items():
+            bundle = bundles.get(key)
+            if bundle is not None:
+                authority.verify_l2_bundle(bundle)
+            authority.verify_profile(profile)
+            custom_registry[key] = profile
+
+        return StrategyRealityBridge(provenance_authority=authority, registry=custom_registry)
 
 
 strategy_reality_bridge = StrategyRealityBridge()

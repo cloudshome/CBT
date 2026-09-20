@@ -1,15 +1,16 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-09-09  
-> **Release Tag:** `v3.9.0-kms-enclave-sor-benchmarking` (ACTIVE 🚀)  
+> **Last Updated:** 2026-09-20  
+> **Release Tag:** `v5.2.0-grade-e3-l2-reality-engine` (ACTIVE 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB.git`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 691 / 691 (565 Pytest, 126 Jest — 100% passing)  
+> **Tests Passing:** 1,338 / 1,338 (1,191 Pytest, 147 Jest — 100% passing)  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Active — 149/149 Tests)  
 > **Milestone 19 Status:** COMPLETED & VERIFIED (Cloud KMS Enclave, SOR Benchmarking & WS Reconciliation)  
-> **Preflight Status:** ALL 5 QUALITY GATES PASSED (100% GREEN)
+> **Grade-E3 Status:** COMPLETED & CERTIFIED (High-Frequency L2 Empirical Reality Engine & Tamper-Evident Provenance — 35/35 Tests)  
+> **Preflight Status:** ALL 7 QUALITY GATES PASSED (100% GREEN)
 
 ---
 
@@ -64,6 +65,14 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `adc1b2e` | feat(grade-e3): implement institutional deployment framework and L2 reality engine (35 passing tests) |
+| `7b4835f` | fix(ci): track manifest_k9.json in git and add fallback path to fix CI test discovery |
+| `15f7d47` | feat(provenance): harden StrategyRealityBridge with ProvenanceAuthority and specify Grade-E3 (9 passing tests) |
+| `518326b` | feat(m19): implement KMS enclave, WS fill stream, strategy reality bridge, and JIT benchmarks (21 passing tests) |
+| `b34fdd4` | feat(grade-e2): implement toxic flow defense, volatility gating and adaptive pegging (25 passing tests) |
+| `9b6172a` | feat(grade-e1): implement institutional maker execution reality engine and empirical matrix (19 passing tests) |
+| `d353931` | fix(audit): add REPO_ROOT to sys.path in verify_k10_m19_prerequisites |
+| `bff5b16` | feat(k10-m19): implement dynamic calibration, cost policy, maker simulation, KMS zeroization, and SOR benchmarks (37 passing gates) |
 | `c738d8f` | Merge pull request #49 from cloudshome/arena/01a07d0a-ctb (clear ruff debt in M17 execution/auth/vault) |
 | `8ecae25` | docs(pipeline): update SKY_STATUS, roadmap, and next session plan to v3.7.0 and Milestone 18 |
 | `d41fa1b` | Merge remote-tracking branch 'origin/main' into main |
@@ -231,6 +240,21 @@ Milestone 18 has been audited and remediated under the Boss-Level Adversarial Di
 3. **Task 18.3:** High-Resolution Fill Reconciliation Ledger (`execution_reconciliation_records`) with monotonic nanosecond durations (`time.monotonic_ns()`), SQLite unique composite index deduplication, out-of-order partial fill replay, and overfill circuit breaker.
 4. **Task 18.4:** Production Live-Order Terminal UI Controls in `frontend/src/components/RiskFirstOrderDesk.tsx` (Live toggle behind dual-confirmation modal).
 5. **Task 18.5:** Dedicated 10-Category Boss-Level Adversarial Test Suite (`tests/test_milestone18_boss_adversarial.py`, 83 passing tests) and Preflight Suite passing all 4 gates (603 total tests passing).
+
+---
+
+## Grade-E3: High-Frequency L2 Empirical Reality Engine — COMPLETED & CERTIFIED ✅
+
+Grade-E3 has been implemented, validated, and audited under the Master Antigravity Directive. It establishes institutional Level 2 empirical microstructure research capabilities with cryptographic tamper-evident bundles and strict capital isolation.
+
+### Completed & Hardened Deliverables:
+1. **L2 Empirical Data Reconstruction & Ingestor:** Monotonic sequence-gap detection (`pu == u_prev`), out-of-order/clock regression detection, reconnect boundary handling, and SHA-256 raw payload provenance.
+2. **Reconstructed Orderbook Invariants:** Strict bid < ask validation with `raise_on_crossed` enforcement, zero-quantity level removal, micro-price calculation, and replay determinism.
+3. **Queue & Latency Physics Simulation:** Q1 (Pessimistic FIFO), Q2 (Empirical Volume Proportion), and Q3 (Uncalibrated Queue/Fallback with uncertainty penalty); realistic cancellation latency racing with in-flight fills.
+4. **Markout & Winner's Curse Estimators:** Multi-horizon (100ms, 1s, 5s, 30s, 5m) mid/micro/executable markouts, unconditional drift benchmarking, and Winner's Curse bias quantification ($E[\Delta M_{fill}] - E[\Delta M_{all}]$).
+5. **StrategyRealityBridge & Provenance Integration:** Cryptographic evidence bundles (`bundle_btc_l2.json`, `bundle_eth_l2.json`, `bundle_sol_l2.json`) validated via `ProvenanceAuthority.verify_l2_bundle` and mounted via `GradeE3RealityAdapter`.
+6. **Permanent Research-Only Firewall:** `is_tradeable(profile)` hardcoded to `False`. Pure mathematical and empirical separation guarantees Grade-E3 profiles can never authorize live capital deployment.
+7. **Adversarial & Regression Test Coverage:** 35/35 passing Grade-E3 tests (`tests/research/grade_e3/`) covering data integrity, queue mechanics, markout science, bridge integration, and architectural isolation.
 
 ---
 

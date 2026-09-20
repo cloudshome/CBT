@@ -41,9 +41,15 @@ class DeterministicL2BookBuilder:
     Applies snapshots and diff updates to maintain a sorted, consistent market state.
     """
 
-    def __init__(self, symbol: str = "BTCUSDT", max_depth: int = 100) -> None:
+    def __init__(
+        self,
+        symbol: str = "BTCUSDT",
+        max_depth: int = 100,
+        raise_on_crossed: bool = False,
+    ) -> None:
         self.symbol = symbol.upper()
         self.max_depth = max_depth
+        self.raise_on_crossed = raise_on_crossed
         self._bids: dict[float, float] = {}  # price -> quantity
         self._asks: dict[float, float] = {}  # price -> quantity
         self._is_snapshot_applied: bool = False
@@ -76,10 +82,18 @@ class DeterministicL2BookBuilder:
         self._asks.clear()
 
         for price, qty in bids:
+            if price <= 0.0:
+                raise ValueError(f"Invalid snapshot bid price: {price} must be > 0")
+            if qty < 0.0:
+                raise ValueError(f"Invalid snapshot bid quantity: {qty} must be >= 0")
             if qty > 0.0:
                 self._bids[price] = qty
 
         for price, qty in asks:
+            if price <= 0.0:
+                raise ValueError(f"Invalid snapshot ask price: {price} must be > 0")
+            if qty < 0.0:
+                raise ValueError(f"Invalid snapshot ask quantity: {qty} must be >= 0")
             if qty > 0.0:
                 self._asks[price] = qty
 
@@ -122,14 +136,22 @@ class DeterministicL2BookBuilder:
 
         # Update bids
         for price, qty in diff.bids:
-            if qty <= 0.0:
+            if price <= 0.0:
+                raise ValueError(f"Invalid diff bid price: {price} must be > 0")
+            if qty < 0.0:
+                raise ValueError(f"Invalid diff bid quantity: {qty} must be >= 0")
+            if qty == 0.0:
                 self._bids.pop(price, None)
             else:
                 self._bids[price] = qty
 
         # Update asks
         for price, qty in diff.asks:
-            if qty <= 0.0:
+            if price <= 0.0:
+                raise ValueError(f"Invalid diff ask price: {price} must be > 0")
+            if qty < 0.0:
+                raise ValueError(f"Invalid diff ask quantity: {qty} must be >= 0")
+            if qty == 0.0:
                 self._asks.pop(price, None)
             else:
                 self._asks[price] = qty
@@ -149,9 +171,10 @@ class DeterministicL2BookBuilder:
 
         if best_bid >= best_ask:
             self._crossed_count += 1
-            logger.warning(
-                f"Crossed book detected on {self.symbol}: Best Bid {best_bid} >= Best Ask {best_ask}"
-            )
+            msg = f"Crossed book detected on {self.symbol}: Best Bid {best_bid} >= Best Ask {best_ask}"
+            logger.warning(msg)
+            if self.raise_on_crossed:
+                raise CrossedBookError(msg)
             return True
         return False
 
