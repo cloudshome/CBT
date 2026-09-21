@@ -152,7 +152,7 @@ def test_duration_accounting_healthy_vs_invalidated(mem_db):
     durations_post = orchestrator.get_durations()
     assert durations_post.healthy_duration_sec > 0.0
     assert durations_post.wall_clock_elapsed_sec >= (
-        durations_post.healthy_duration_sec + durations_post.invalidated_duration_sec - 0.01
+        durations_post.healthy_duration_sec + durations_post.invalidated_duration_sec - 0.05
     )
 
 

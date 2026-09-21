@@ -104,6 +104,22 @@ class VenueCollateralSnapshot:
 
 
 @dataclass
+class CollateralRiskScorecard:
+    """Multi-factor quantitative risk scorecard for cross-venue collateral posture."""
+
+    composite_score: float  # 0.0 to 100.0 (higher = riskier)
+    margin_utilization_score: float  # 0.0 to 100.0
+    buffer_ratio_score: float  # 0.0 to 100.0
+    liquidation_distance_score: float  # 0.0 to 100.0
+    imbalance_score: float  # 0.0 to 100.0
+    is_actionable: bool
+    recommended_actions: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class SystemCollateralReport:
     """Consolidated cross-venue collateral posture."""
 
@@ -134,6 +150,14 @@ class SystemCollateralReport:
     def venues_in_danger(self) -> list[str]:
         return [v.venue for v in self.venues.values() if v.margin_utilization_pct >= 80.0]
 
+    @property
+    def cross_venue_imbalance_pct(self) -> float:
+        """Cross-venue margin utilization differential (delta U)."""
+        if len(self.venues) < 2:
+            return 0.0
+        utils = [v.margin_utilization_pct for v in self.venues.values()]
+        return round(max(utils) - min(utils), 2)
+
     def to_dict(self) -> dict[str, Any]:
         res = asdict(self)
         res["system_state"] = self.system_state.value
@@ -142,6 +166,7 @@ class SystemCollateralReport:
         res["systemic_risk_state"] = self.systemic_risk_state.value
         res["freshness_ok"] = self.freshness_ok
         res["venues_in_danger"] = self.venues_in_danger
+        res["cross_venue_imbalance_pct"] = self.cross_venue_imbalance_pct
         return res
 
 
@@ -392,6 +417,86 @@ class CollateralGovernor:
             transfer_recommendations=recommendations,
             audit_event_id=audit_id,
             timestamp_ms=now_ms,
+        )
+
+    def compute_margin_risk_scorecard(
+        self, report: SystemCollateralReport
+    ) -> CollateralRiskScorecard:
+        """
+        Computes deterministic 4-factor risk scorecard across multi-venue collateral:
+        1. Margin Utilization Factor (35% weight)
+        2. Maintenance Buffer Ratio Factor (30% weight)
+        3. Liquidation Distance Factor (20% weight)
+        4. Cross-Venue Imbalance Factor (15% weight)
+
+        Invariant: Strictly informational, zero automated asset transfers.
+        """
+        if (
+            report.system_state in (CollateralState.UNKNOWN, CollateralState.STALE)
+            or not report.venues
+        ):
+            return CollateralRiskScorecard(
+                composite_score=100.0,
+                margin_utilization_score=100.0,
+                buffer_ratio_score=100.0,
+                liquidation_distance_score=100.0,
+                imbalance_score=100.0,
+                is_actionable=True,
+                recommended_actions=["FAIL_CLOSED: Stale or missing collateral telemetry."],
+            )
+
+        # 1. Margin utilization factor (normalized against danger threshold)
+        util_score = min(100.0, (report.system_utilization_pct / self.danger_threshold) * 100.0)
+
+        # 2. Maintenance buffer ratio factor (min buffer across active venues)
+        min_buf = min(v.maintenance_buffer_ratio for v in report.venues.values())
+        if min_buf >= 5.0:
+            buf_score = 0.0
+        elif min_buf <= 1.5:
+            buf_score = 100.0
+        else:
+            buf_score = (5.0 - min_buf) / (5.0 - 1.5) * 100.0
+
+        # 3. Liquidation distance factor (min distance across active venues)
+        min_liq_dist = min(v.liquidation_distance_pct for v in report.venues.values())
+        if min_liq_dist >= 50.0:
+            liq_score = 0.0
+        elif min_liq_dist <= 5.0:
+            liq_score = 100.0
+        else:
+            liq_score = (50.0 - min_liq_dist) / (50.0 - 5.0) * 100.0
+
+        # 4. Cross-venue imbalance factor
+        delta_u = report.cross_venue_imbalance_pct
+        imb_score = min(100.0, (delta_u / 50.0) * 100.0)
+
+        composite = round(
+            0.35 * util_score + 0.30 * buf_score + 0.20 * liq_score + 0.15 * imb_score,
+            2,
+        )
+
+        is_actionable = (
+            composite >= 50.0
+            or report.system_state
+            in (CollateralState.CAUTION, CollateralState.DANGER, CollateralState.LIQUIDATION_RISK)
+            or max(util_score, buf_score, liq_score, imb_score) >= 80.0
+        )
+
+        actions = list(report.transfer_recommendations)
+        if imb_score >= 70.0 and not any("REBALANCE ADVICE" in a for a in actions):
+            actions.append(
+                f"REBALANCE ADVICE: Elevated cross-venue margin imbalance ({delta_u:.1f}%). "
+                f"Consider rebalancing capital between venues (RECOMMENDATION ONLY)."
+            )
+
+        return CollateralRiskScorecard(
+            composite_score=composite,
+            margin_utilization_score=round(util_score, 2),
+            buffer_ratio_score=round(buf_score, 2),
+            liquidation_distance_score=round(liq_score, 2),
+            imbalance_score=round(imb_score, 2),
+            is_actionable=is_actionable,
+            recommended_actions=actions,
         )
 
     def _persist_snapshot(self, snap: VenueCollateralSnapshot) -> None:

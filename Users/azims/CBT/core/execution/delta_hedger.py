@@ -40,8 +40,17 @@ from core.database import db_manager
 from core.execution.kill_switch import live_kill_switch
 from core.execution.live_gatekeeper import live_gatekeeper
 from core.execution.symbol_constraints import symbol_constraint_engine
+from core.portfolio_risk_matrix import portfolio_risk_matrix
 
 logger = logging.getLogger("sky.execution.delta_hedger")
+
+
+class DeltaToleranceTier(str, Enum):
+    """3-tier classification of portfolio unhedged delta urgency."""
+
+    NEUTRAL = "NEUTRAL"
+    PASSIVE_TWAP = "PASSIVE_TWAP"
+    ACTIVE_TAKER = "ACTIVE_TAKER"
 
 
 class HedgeState(str, Enum):
@@ -114,9 +123,12 @@ class NetDeltaExposure:
     dominant_venue: str
     timestamp_ms: int
     legs: list[dict[str, Any]] = field(default_factory=list)
+    tolerance_tier: DeltaToleranceTier = DeltaToleranceTier.NEUTRAL
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        res = asdict(self)
+        res["tolerance_tier"] = self.tolerance_tier.value
+        return res
 
 
 @dataclass
@@ -253,6 +265,8 @@ class DeltaHedger:
         if venue_counts:
             dominant_venue = max(venue_counts.items(), key=lambda x: x[1])[0]
 
+        tolerance_tier = self.classify_delta_tolerance(asset_upper, net_delta)
+
         return NetDeltaExposure(
             asset=asset_upper,
             spot_delta=round(spot_delta, 6),
@@ -277,7 +291,25 @@ class DeltaHedger:
                 }
                 for leg_item in legs
             ],
+            tolerance_tier=tolerance_tier,
         )
+
+    def classify_delta_tolerance(self, asset: str, net_delta: float) -> DeltaToleranceTier:
+        """
+        Classifies net delta into 3-tier execution bands:
+        - NEUTRAL: |net_delta| <= tolerance
+        - PASSIVE_TWAP: tolerance < |net_delta| <= 4 * tolerance
+        - ACTIVE_TAKER: |net_delta| > 4 * tolerance
+        """
+        asset_upper = asset.upper().strip()
+        tol = self.tolerances.get(asset_upper, self.tolerances["DEFAULT"])
+        abs_delta = abs(net_delta)
+        if abs_delta <= tol:
+            return DeltaToleranceTier.NEUTRAL
+        elif abs_delta <= 4.0 * tol:
+            return DeltaToleranceTier.PASSIVE_TWAP
+        else:
+            return DeltaToleranceTier.ACTIVE_TAKER
 
     def calculate_basis_and_funding(
         self,
@@ -405,14 +437,16 @@ class DeltaHedger:
         hedge: ProposedHedgeOrder,
         current_equity: float,
         environment: str = "PRODUCTION",
+        open_positions: list[dict[str, Any]] | None = None,
     ) -> tuple[bool, list[str]]:
         """
         Validates proposed hedge strictly through the full constitutional risk perimeter:
         1. Master Kill Switch (Fail-closed)
         2. Credential Security & Positive Withdrawal Prohibition (Gate 1b)
         3. Constitutional 1.5% Single-Trade Risk Cap
-        4. Live Execution Gatekeeper clearance
-        5. Capital Governor clearance
+        4. Portfolio Heat Ceiling (<= 6.0% Total Open Risk via PortfolioRiskMatrix)
+        5. Live Execution Gatekeeper clearance
+        6. Capital Governor clearance
         """
         reasons: list[str] = []
 
@@ -436,7 +470,22 @@ class DeltaHedger:
             self._update_hedge_state(hedge.hedge_id, hedge.state, reasons)
             return False, reasons
 
-        # 3. LiveExecutionGatekeeper Complete Evaluation
+        # 3. Portfolio Heat Matrix check (6.0% Total Open Equity Risk Ceiling)
+        heat_status = portfolio_risk_matrix.evaluate_portfolio_heat(
+            account_equity=current_equity,
+            open_positions=open_positions or [],
+            proposed_risk_usd=hedge.notional_usd * 0.02,
+        )
+        if heat_status.is_heat_exceeded:
+            reasons.append(
+                f"PORTFOLIO_HEAT_BREACH: Projected portfolio risk ({heat_status.total_open_risk_pct * 100:.2f}%) "
+                f"exceeds institutional ceiling ({heat_status.max_heat_ceiling_pct * 100:.1f}%)."
+            )
+            hedge.state = HedgeState.HEDGE_RISK_BLOCKED
+            self._update_hedge_state(hedge.hedge_id, hedge.state, reasons)
+            return False, reasons
+
+        # 4. LiveExecutionGatekeeper Complete Evaluation
         verdict = await live_gatekeeper.evaluate_order_clearance(
             exchange=hedge.target_venue,
             order_notional_usd=hedge.notional_usd,

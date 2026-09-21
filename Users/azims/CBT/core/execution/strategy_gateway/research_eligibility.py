@@ -344,7 +344,7 @@ class StrategyEligibilityVerifier:
                         audit_id, strategy_id, strategy_version, deployment_stage,
                         dataset_hash, experiment_id, is_eligible, is_quarantined,
                         rejection_reason, checked_at_utc, checked_at_epoch_ms, record_hash
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """,
                     (
                         record.audit_id,
