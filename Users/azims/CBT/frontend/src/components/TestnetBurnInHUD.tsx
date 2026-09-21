@@ -103,6 +103,12 @@ export const TestnetBurnInHUD: React.FC<TestnetBurnInHUDProps> = ({
     }
   };
 
+  const isStale =
+    report.is_stale ||
+    (report.timestamp_utc
+      ? Math.abs(Date.now() - new Date(report.timestamp_utc).getTime()) > 3000
+      : false);
+
   const latencyData: TestnetLatencyStageSummary[] =
     latencyView === 'clean' ? report.clean_latency_summary : report.fault_latency_summary;
 
@@ -118,9 +124,27 @@ export const TestnetBurnInHUD: React.FC<TestnetBurnInHUDProps> = ({
           <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-900 border border-slate-700 text-slate-300">
             {report.session_id}
           </span>
+          {report.telemetry_seq !== undefined && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-900 border border-slate-700 text-cyan-400" title="Monotonic Telemetry Sequence">
+              Seq #{report.telemetry_seq}
+            </span>
+          )}
+          {report.fencing_token !== undefined && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-900 border border-slate-700 text-amber-400" title="Monotonic Lease Fencing Token">
+              Token #{report.fencing_token}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Stale Telemetry Badge */}
+          {isStale && (
+            <span className="px-2 py-0.5 rounded border border-rose-500/80 bg-rose-950/80 text-rose-300 text-[10px] font-bold flex items-center gap-1 animate-pulse">
+              <AlertTriangle className="w-3 h-3 text-rose-400" />
+              STALE (&gt;3000ms)
+            </span>
+          )}
+
           {/* FSM State Badge */}
           <span
             className={`px-2 py-0.5 rounded border text-[10px] font-bold flex items-center gap-1.5 ${getStateColor(
@@ -156,65 +180,76 @@ export const TestnetBurnInHUD: React.FC<TestnetBurnInHUDProps> = ({
         </div>
       </div>
 
+      {/* Stale Telemetry Warning Banner */}
+      {isStale && (
+        <div className="px-2.5 py-1.5 rounded bg-rose-950/60 border border-rose-600/70 text-[9px] text-rose-200 flex items-center justify-between animate-pulse">
+          <span className="flex items-center gap-1.5">
+            <AlertOctagon className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+            <span><strong>STALE FLIGHT TELEMETRY WATERMARK EXCEEDED:</strong> Heartbeat latency &gt;3,000ms. Fail-closed safety governor engaged.</span>
+          </span>
+          <span className="font-bold text-rose-300">FAIL-CLOSED</span>
+        </div>
+      )}
+
       {/* Non-Negotiable Operational Safety Disclaimer */}
       <div className="px-2 py-1.5 rounded bg-blue-950/30 border border-blue-800/40 text-[9px] text-blue-300 flex items-center justify-between">
         <span className="flex items-center gap-1">
           <Activity className="w-3 h-3 text-blue-400 flex-shrink-0" />
-          <span>RESEARCH & TESTNET REHEARSAL QUALIFICATION ONLY &mdash; REAL CAPITAL IMMUTABLY DISABLED</span>
+          <span>RESEARCH &amp; TESTNET REHEARSAL QUALIFICATION ONLY &mdash; REAL CAPITAL IMMUTABLY DISABLED</span>
         </span>
         <span className="font-bold text-blue-200">real_capital_enabled: False</span>
       </div>
 
-      {/* 3-Tier Duration & Epoch Accounting Panel */}
+      {/* 3-Tier Duration & Epoch Accounting Panel (H_elapsed = H_qualified + H_disqualified) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
         <div className="p-2 rounded bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
           <div className="text-slate-400 text-[9px] flex items-center gap-1">
             <Clock className="w-3 h-3 text-cyan-400" />
-            <span>WALLCLOCK ELAPSED</span>
+            <span>ELAPSED (H_elapsed)</span>
           </div>
           <div className="text-sm font-bold text-slate-100 mt-1">
             {formatDuration(report.durations.wallclock_elapsed_sec)}
           </div>
-          <div className="text-[9px] text-slate-500">
-            Target: {formatDuration(report.durations.target_duration_sec)} (14-Day)
+          <div className="text-[8px] text-slate-500">
+            Target: {formatDuration(report.durations.target_duration_sec)} (336h Continuous)
           </div>
         </div>
 
         <div className="p-2 rounded bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
           <div className="text-slate-400 text-[9px] flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-            <span>HEALTHY CONTINUITY</span>
+            <span>QUALIFIED (H_qualified)</span>
           </div>
           <div className="text-sm font-bold text-emerald-300 mt-1">
             {formatDuration(report.durations.healthy_duration_sec)}
           </div>
-          <div className="text-[9px] text-emerald-400/80 font-bold">
-            {report.durations.healthy_ratio_pct.toFixed(2)}% Healthy Ratio
+          <div className="text-[8px] text-emerald-400/80 font-bold">
+            {report.durations.healthy_ratio_pct.toFixed(2)}% Qualification Ratio
           </div>
         </div>
 
         <div className="p-2 rounded bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
           <div className="text-slate-400 text-[9px] flex items-center gap-1">
             <AlertTriangle className="w-3 h-3 text-amber-400" />
-            <span>INVALIDATED / INTERRUPTED</span>
+            <span>DISQUALIFIED (H_disqualified)</span>
           </div>
           <div className="text-sm font-bold text-amber-300 mt-1">
             {formatDuration(report.durations.invalidated_duration_sec)}
           </div>
-          <div className="text-[9px] text-slate-500">
-            {report.active_epoch ? `Active: ${report.active_epoch.epoch_id}` : 'No Active Epoch'}
+          <div className="text-[8px] text-slate-500">
+            {report.active_epoch ? `Epoch: ${report.active_epoch.epoch_id}` : 'No Active Epoch'}
           </div>
         </div>
 
         <div className="p-2 rounded bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
           <div className="text-slate-400 text-[9px] flex items-center gap-1">
             <Gauge className="w-3 h-3 text-purple-400" />
-            <span>SIMULATED EQUITY & DRAWDOWN</span>
+            <span>SIMULATED EQUITY &amp; DD</span>
           </div>
           <div className="text-sm font-bold text-purple-200 mt-1">
             ${report.account_equity_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="flex items-center justify-between text-[9px]">
+          <div className="flex items-center justify-between text-[8px]">
             <span
               className={
                 report.drawdown_pct >= report.rehearsal_drawdown_limit_pct

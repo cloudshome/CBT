@@ -17,6 +17,17 @@ from core.execution.testnet.authentication import (
 from core.execution.testnet.base_adapter import BaseTestnetAdapter
 from core.execution.testnet.binance_spot import BinanceSpotTestnetAdapter
 from core.execution.testnet.bybit_v5 import BybitV5TestnetAdapter
+from core.execution.testnet.campaign_orchestrator import (
+    VALID_CAMPAIGN_TRANSITIONS,
+    CampaignConfig,
+    CampaignOrchestrator,
+    CampaignPreflightError,
+    CampaignState,
+    CampaignTelemetrySnapshot,
+    CampaignTransitionError,
+    FencedLeaseCoordinator,
+    StaleLeaseFencingError,
+)
 from core.execution.testnet.credential_policy import (
     CredentialPolicy,
     CredentialScopeError,
@@ -85,6 +96,15 @@ from core.execution.testnet.qualification_gate import (
     FlightQualificationEvidence,
     QualificationGateEngine,
 )
+from core.execution.testnet.qualification_tracker import (
+    AccountingConservationBreachError,
+    CampaignQualificationState,
+    Continuous14DayQualificationTracker,
+    Gate5QualificationCertificate,
+    QualificationEventClass,
+    QualificationIntervalRecord,
+    QualificationResetRequiredError,
+)
 from core.execution.testnet.rate_limit_governor import (
     RateLimitExhaustedError,
     RateLimitGovernor,
@@ -102,6 +122,13 @@ from core.execution.testnet.recovery_state_machine import (
     RecoveryState,
     RecoveryTransitionRecord,
 )
+from core.execution.testnet.regime_coverage import (
+    CampaignCoveragePolicyEngine,
+    CoverageStressProfile,
+    MarketRegimeObservation,
+    ObservedRegimeType,
+    RegimeContaminationError,
+)
 from core.execution.testnet.rest_transport import (
     BadRequestError,
     ExchangeServerError,
@@ -110,6 +137,14 @@ from core.execution.testnet.rest_transport import (
     RestResponse,
     RestTransport,
     RestTransportError,
+)
+from core.execution.testnet.routes import (
+    CampaignActionResponse,
+    get_orchestrator,
+    set_active_orchestrator,
+)
+from core.execution.testnet.routes import (
+    router as testnet_router,
 )
 from core.execution.testnet.schemas import (
     BurnInState,
@@ -140,6 +175,8 @@ from core.execution.testnet.websocket_transport import (
 )
 
 __all__ = [
+    "VALID_CAMPAIGN_TRANSITIONS",
+    "AccountingConservationBreachError",
     "AmbiguousCancellationForbiddenError",
     "AppendOnlyEventJournal",
     "AuthenticationError",
@@ -150,12 +187,23 @@ __all__ = [
     "BridgeExecutionError",
     "BurnInState",
     "BybitV5TestnetAdapter",
+    "CampaignActionResponse",
+    "CampaignConfig",
+    "CampaignCoveragePolicyEngine",
+    "CampaignOrchestrator",
+    "CampaignPreflightError",
+    "CampaignQualificationState",
+    "CampaignState",
+    "CampaignTelemetrySnapshot",
+    "CampaignTransitionError",
     "CanonicalOrderStatus",
     "ChildOrderLifecycle",
     "ChildSliceLedgerEntry",
     "ClockPolicy",
     "ClockSkewSentinelError",
     "ConflictingEventAnomalyError",
+    "Continuous14DayQualificationTracker",
+    "CoverageStressProfile",
     "CredentialPolicy",
     "CredentialScopeError",
     "DecomposedLatencyRecord",
@@ -171,33 +219,41 @@ __all__ = [
     "ExchangeServerError",
     "FaultSeverity",
     "FaultType",
+    "FencedLeaseCoordinator",
     "FilterValidationError",
     "FlightManifest",
     "FlightPanicCanceledError",
     "FlightQualificationEvidence",
     "FlightSupervisor",
+    "Gate5QualificationCertificate",
     "IllegalRecoveryTransitionError",
     "JournaledEvent",
     "LatencyQuantileSummary",
     "LostAckRecoveryFSM",
     "M22LatencyDecomposition",
     "ManifestValidationError",
+    "MarketRegimeObservation",
     "Milestone21Verdict",
     "MultiVenueTestnetBridge",
     "NormalizedOrderInstruction",
     "NormalizedOrderResponse",
+    "ObservedRegimeType",
     "OrderSide",
     "OrderType",
     "OverfillCircuitBreakerError",
     "ParentExecutionLedger",
     "PlacementIntent",
+    "QualificationEventClass",
     "QualificationGateEngine",
+    "QualificationIntervalRecord",
+    "QualificationResetRequiredError",
     "QuantityConservationBreachError",
     "RateLimitError",
     "RateLimitExhaustedError",
     "RateLimitGovernor",
     "RecoveryState",
     "RecoveryTransitionRecord",
+    "RegimeContaminationError",
     "RequestPriority",
     "RestAuthenticationError",
     "RestResponse",
@@ -207,6 +263,7 @@ __all__ = [
     "SessionEpoch",
     "SlicingSchedulePlan",
     "SlicingStrategy",
+    "StaleLeaseFencingError",
     "StartupReconciliationError",
     "SymbolFilterConfig",
     "TestnetCredentials",
@@ -221,9 +278,12 @@ __all__ = [
     "VenueType",
     "WebSocketState",
     "WebSocketTransport",
+    "get_orchestrator",
     "get_venue_capability_profile",
     "mask_secret",
+    "set_active_orchestrator",
     "sign_binance_request",
     "sign_bybit_v5_rest",
     "sign_bybit_v5_websocket",
+    "testnet_router",
 ]

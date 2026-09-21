@@ -2127,6 +2127,10 @@ export interface TestnetSessionDurations {
   healthy_ratio_pct: number;
   target_duration_sec: number;
   target_progress_pct: number;
+  wall_clock_seconds?: number;
+  qualifying_active_seconds?: number;
+  invalidated_quarantined_seconds?: number;
+  qualifying_ratio_pct?: number;
 }
 
 export interface TestnetEpochSummary {
@@ -2179,6 +2183,10 @@ export interface TestnetBurnInReport {
   total_parent_orders: number;
   total_slices_dispatched: number;
   unresolved_quantity_abs: string;
+  telemetry_seq?: number;
+  fencing_token?: number;
+  is_stale?: boolean;
+  timestamp_utc?: string;
 }
 
 

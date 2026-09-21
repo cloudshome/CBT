@@ -60,14 +60,16 @@ flowchart TD
     A[M18, M19, Grade-E1/E2/E3 Certified] --> B[Milestone 20: 14-Day Qualification Rehearsal Engine - CERTIFIED ✅]
     B --> C[Milestone 21: External Testnet Connectors Binance & Bybit - CERTIFIED ✅]
     C --> D[Milestone 22: Live Testnet Execution Flight Runner & Lifecycle Engine - CERTIFIED ✅]
-    D --> E[Milestone 23: Continuous 14-Day Live Testnet Burn-In Qualification 🎯]
+    D --> E[Milestone 23: 14-Day Live Testnet Burn-In Campaign & Real-Time Cockpit - STAGES 1 & 2 VERIFIED ✅]
+    E --> F[Milestone 23: Stage 3 & 4 Physical 336h Burn-In Execution & Forensic Audit 🎯]
 ```
 
 ### Milestone Progress:
 1. **Milestone 20 (Gate 5 Extended 14-Day Testnet Burn-In Rehearsal Engine):** **COMPLETED & CERTIFIED ✅** (15 passing tests, persistent SQLite session recovery, fault injection matrix, qualification HUD).
 2. **Milestone 21 (External Exchange Testnet Connectors):** **COMPLETED & CERTIFIED ✅** (55 passing tests, Binance Spot & Bybit V5 REST/WS connectors, strict endpoint whitelisting, production hostname blocking, `real_capital_enabled = False` permanent firewall).
 3. **Milestone 22 (Live Testnet Execution Flight Runner & Lifecycle Engine):** **COMPLETED & CERTIFIED ✅** (32 passing tests in `tests/execution/test_milestone22_flight_runner.py`, 102 execution suite tests green, dual-venue TWAP & simulated iceberg slicing, 10-state Lost-ACK recovery FSM, rate limit governor with 20% emergency reserve, 7-stage nanosecond latency decomposition, clock skew sentinel, strictly flight-scoped panic cancellation, `real_capital_enabled = False` permanent firewall).
-4. **Milestone 23 (Continuous 14-Day Live Testnet Burn-In Qualification):** **NEXT ACTIVE MILESTONE 🎯** (Autonomous 14-day flight scheduling, multi-venue reconciliation ledger burn-in, qualification gate scorecard convergence).
+4. **Milestone 23 (Continuous 14-Day Live Testnet Burn-In Campaign & Real-Time Cockpit):** **STAGES 1 & 2 VERIFIED ✅** (20 passing tests in `tests/execution/test_milestone23_campaign_orchestrator.py`, 122 execution suite tests green, 16-state Campaign FSM, monotonic fencing token lease coordinator with SQLite WAL split-brain defense, safe pause drain & resume open-order reconciliation, 3-stream time conservation $H_{\text{elapsed}} = H_{\text{qualified}} + H_{\text{disqualified}}$, 7-tier event classification, chained SHA-256 discrete interval ledger, market regime coverage policy engine with causal firewall, real-time cockpit HUD with stale watermark banner & sequence tracking, `REAL_CAPITAL_ENABLED = False` permanent firewall).
+5. **Next Step (Stage 3 Burn-In Campaign & Stage 4 Forensic Audit):** Launch physical long-running testnet daemon over 336 qualified operating hours across Binance Spot Testnet & Bybit V5 Testnet.
 
 ---
 
