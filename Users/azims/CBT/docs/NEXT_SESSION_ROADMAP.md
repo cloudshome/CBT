@@ -105,3 +105,22 @@ graph TD
 # 4. Master Release Orchestration & Blocker Matrix
 .venv\Scripts\python scripts/build_windows_app.py
 ```
+
+---
+
+## 4. Execution Engine Evolution & Next Day Punch List
+
+### Completed Baseline:
+- **Milestone 20:** Gate 5 Extended 14-Day Testnet Burn-In Rehearsal Engine (`core/execution/testnet_qualification.py`, 15 passing tests at `a50b424`).
+- **Milestone 21:** External Exchange Testnet Connectors for Binance Spot & Bybit V5 Unified (`core/execution/testnet/`, 55 passing tests at `62fb60f` & `c26ed06`).
+- **CI / GitHub Pipeline:** 100% Green on GitHub Actions (`CI Pipeline` and `Security Scanning` passed). Total repository tests: 1,407 green (1,260 Pytest + 147 Jest).
+
+### Next Day Implementation Focus — Milestone 22:
+- **Specification:** `docs/milestone22/M22_SPECIFICATION.md` (Fully hardened & ready).
+- **Core Modules to Build:**
+  1. `core/execution/testnet/filters.py` — `ExchangeFilterRulesEngine` (tickSize / stepSize / minNotional normalizer).
+  2. `core/execution/testnet/multi_venue_bridge.py` — `MultiVenueTestnetBridge` (dual-venue dispatch & lost-ACK handling).
+  3. `core/execution/testnet/dispatcher.py` — `TestnetOrderSlicingDispatcher` (TWAP/Iceberg with exact Decimal conservation).
+  4. `core/execution/testnet/flight_runner.py` — `TestnetFlightRunnerService` (rehearsal daemon & latency decomposition).
+  5. `tests/execution/test_milestone22_flight_runner.py` — Full test battery targeting all 7 M22 acceptance gates.
+

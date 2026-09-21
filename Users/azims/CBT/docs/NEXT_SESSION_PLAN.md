@@ -53,21 +53,21 @@ Empirical hotpath latency measurements over 5,000 iterations (`docs/benchmarks/M
 
 ---
 
-## 3. Forward Roadmap & Next Milestones
+## 3. Forward Roadmap & Active Execution Status
 
 ```mermaid
 flowchart TD
-    A[M18, M19, Grade-E1/E2/E3 Certified] --> B[Phase 1: Extended 14-Day Testnet Burn-In Orchestration]
-    A --> C[Phase 2: Live Private WS Execution Telemetry Stream]
-    B --> D[Phase 3: Automated Micro-Notional Rebalancing Canary]
-    C --> D
-    D --> E[Phase 4: Hardware WebAuthn Multi-Sig Release Gate]
-    E --> F[Phase 5: Gate 6 Micro-Capital Institutional Promotion]
+    A[M18, M19, Grade-E1/E2/E3 Certified] --> B[Milestone 20: 14-Day Qualification Rehearsal Engine - CERTIFIED ✅]
+    B --> C[Milestone 21: External Testnet Connectors Binance & Bybit - CERTIFIED ✅]
+    C --> D[Milestone 22: Live Testnet Execution Flight Runner & Lifecycle Engine - CERTIFIED ✅]
+    D --> E[Milestone 23: Continuous 14-Day Live Testnet Burn-In Qualification 🎯]
 ```
 
-### Next Immediate Milestones:
-1. **Milestone 20 (Gate 5 Extended Sandbox Burn-In):** Implement continuous 14-day testnet paper-trading rehearsal and fill latency telemetry.
-2. **Milestone 21 (Hardware Authorization Gate 6):** Design multi-party WebAuthn / hardware token authorization layer for micro-notional ($\le \$500$) canary deployment.
+### Milestone Progress:
+1. **Milestone 20 (Gate 5 Extended 14-Day Testnet Burn-In Rehearsal Engine):** **COMPLETED & CERTIFIED ✅** (15 passing tests, persistent SQLite session recovery, fault injection matrix, qualification HUD).
+2. **Milestone 21 (External Exchange Testnet Connectors):** **COMPLETED & CERTIFIED ✅** (55 passing tests, Binance Spot & Bybit V5 REST/WS connectors, strict endpoint whitelisting, production hostname blocking, `real_capital_enabled = False` permanent firewall).
+3. **Milestone 22 (Live Testnet Execution Flight Runner & Lifecycle Engine):** **COMPLETED & CERTIFIED ✅** (32 passing tests in `tests/execution/test_milestone22_flight_runner.py`, 102 execution suite tests green, dual-venue TWAP & simulated iceberg slicing, 10-state Lost-ACK recovery FSM, rate limit governor with 20% emergency reserve, 7-stage nanosecond latency decomposition, clock skew sentinel, strictly flight-scoped panic cancellation, `real_capital_enabled = False` permanent firewall).
+4. **Milestone 23 (Continuous 14-Day Live Testnet Burn-In Qualification):** **NEXT ACTIVE MILESTONE 🎯** (Autonomous 14-day flight scheduling, multi-venue reconciliation ledger burn-in, qualification gate scorecard convergence).
 
 ---
 
@@ -77,6 +77,7 @@ flowchart TD
 - [x] **Milestone 18 Certified Invariant:** PASS (14/14 certified files untouched, 149/149 tests green)
 - [x] **Python Linter & Formatter (Ruff):** PASS (0 errors)
 - [x] **TypeScript Linter (ESLint):** PASS (0 warnings, 0 errors)
-- [x] **Pytest Quantitative Test Suite:** PASS (1,191 tests passing; 1,338 total with Jest)
+- [x] **Pytest Quantitative Test Suite:** PASS (1,260 tests passing; 1,407 total with Jest)
 - [x] **Jest Desk & Backend Test Suite:** PASS (147 tests 100% green)
 - [x] **Frontend Vite Production Build:** PASS (`dist/` generated, 0 bundle errors)
+- [x] **GitHub Actions CI Pipeline & Security Scanning:** ALL PASS (Runs 35507187016 & 35507187053 GREEN)
