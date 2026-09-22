@@ -32,6 +32,7 @@ import { CexDexArbitrageDesk } from './components/CexDexArbitrageDesk';
 import { KronosDomainDesk } from './components/KronosDomainDesk';
 import { LiveLaunchpadDesk } from './components/LiveLaunchpadDesk';
 import { ExecutionTCACockpit } from './components/ExecutionTCACockpit';
+import { StrategyRealityCockpit } from './components/StrategyRealityCockpit';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
@@ -111,7 +112,7 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH' | 'HEATMAP' | 'STRATEGIST' | 'CEX_DEX' | 'KRONOS_DOMAIN' | 'LIVE_LAUNCHPAD' | 'EXECUTION_TCA'>('DOSSIER');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH' | 'HEATMAP' | 'STRATEGIST' | 'CEX_DEX' | 'KRONOS_DOMAIN' | 'LIVE_LAUNCHPAD' | 'EXECUTION_TCA' | 'STRATEGY_COCKPIT'>('DOSSIER');
   const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN' | 'ARBITRAGE_RADAR' | 'MBO_DEPTH'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
@@ -821,6 +822,17 @@ export const App: React.FC = () => {
                   <Activity size={13} className={activeBottomTab === 'EXECUTION_TCA' ? 'text-white animate-pulse' : 'text-sky-400'} />
                   <span>⚡ Execution & TCA</span>
                 </button>
+                <button
+                  onClick={() => setActiveBottomTab('STRATEGY_COCKPIT')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'STRATEGY_COCKPIT'
+                      ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-bold shadow-md shadow-sky-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Cpu size={13} className={activeBottomTab === 'STRATEGY_COCKPIT' ? 'text-white animate-pulse' : 'text-sky-400'} />
+                  <span>🎯 Reality Cockpit</span>
+                </button>
               </div>
             </div>
 
@@ -1017,6 +1029,11 @@ export const App: React.FC = () => {
                 />
               ) : activeBottomTab === 'EXECUTION_TCA' ? (
                 <ExecutionTCACockpit
+                  symbol={symbol}
+                  onNotify={addToast}
+                />
+              ) : activeBottomTab === 'STRATEGY_COCKPIT' ? (
+                <StrategyRealityCockpit
                   symbol={symbol}
                   onNotify={addToast}
                 />

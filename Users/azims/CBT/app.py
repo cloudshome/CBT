@@ -65,6 +65,7 @@ from core.arbitrage.routes import router as arbitrage_router
 from core.mbo.routes import router as mbo_router
 from core.execution.live_routes import router as live_execution_router_api
 from core.execution.phase23_routes import router as phase23_execution_router
+from core.execution.strategy_gateway.routes import router as strategy_gateway_router
 from core.setup_service import setup_router
 from core.auth.hardware_key_routes import hardware_key_router
 from core.web3.web3_routes import router as web3_router
@@ -270,6 +271,7 @@ app.include_router(heatmap_router)
 app.include_router(strategist_router)
 app.include_router(cexdex_router)
 app.include_router(kronos_router)
+app.include_router(strategy_gateway_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()

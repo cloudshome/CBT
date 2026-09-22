@@ -2606,7 +2606,253 @@ export const api = {
     });
     return handleResponse<{ status: string; message: string }>(res);
   },
+
+  // ============================================================================
+  // MILESTONE 26: STRATEGY REALITY COCKPIT & QUALIFICATION TERMINAL
+  // ============================================================================
+
+  async getStrategyGatewayStatus(): Promise<GatewayStatusResponse> {
+    const res = await authFetch(`${BASE_URL}/api/v1/strategy_gateway/status`);
+    return handleResponse<GatewayStatusResponse>(res);
+  },
+
+  async compileKronosProposal(req: {
+    symbol?: string;
+    direction?: string;
+    horizon_minutes?: number;
+    forecast_return_bps?: number;
+    prediction_entropy?: number;
+    model_tier?: string;
+    reference_price?: number;
+  }): Promise<CompiledProposalResponse> {
+    const res = await authFetch(`${BASE_URL}/api/v1/strategy_gateway/compile/kronos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<CompiledProposalResponse>(res);
+  },
+
+  async compileSMCProposal(req: {
+    symbol?: string;
+    direction?: string;
+    structure_type?: string;
+    timeframe?: string;
+    fvg_depth_ticks?: number;
+    order_flow_imbalance?: number;
+    reference_price?: number;
+  }): Promise<CompiledProposalResponse> {
+    const res = await authFetch(`${BASE_URL}/api/v1/strategy_gateway/compile/smc`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    return handleResponse<CompiledProposalResponse>(res);
+  },
+
+  async submitQualificationJob(
+    req: QualificationJobSubmitRequest,
+    idempotencyKey?: string,
+  ): Promise<{ status: string; was_created: boolean; job: QualificationJob; poll_url: string; report_url: string }> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+    const res = await authFetch(`${BASE_URL}/api/v1/strategy_gateway/qualification/jobs`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(req),
+    });
+    return handleResponse<{ status: string; was_created: boolean; job: QualificationJob; poll_url: string; report_url: string }>(res);
+  },
+
+  async getQualificationJob(jobId: string): Promise<{ status: string; job: QualificationJob }> {
+    const res = await authFetch(`${BASE_URL}/api/v1/strategy_gateway/qualification/jobs/${encodeURIComponent(jobId)}`);
+    return handleResponse<{ status: string; job: QualificationJob }>(res);
+  },
+
+  async getQualificationJobReport(jobId: string): Promise<{ status: string; job_id: string; strategy_id: string; report: any }> {
+    const res = await authFetch(`${BASE_URL}/api/v1/strategy_gateway/qualification/jobs/${encodeURIComponent(jobId)}/report`);
+    return handleResponse<{ status: string; job_id: string; strategy_id: string; report: any }>(res);
+  },
+
+  async getQualificationEvidence(
+    limit: number = 20,
+    offset: number = 0,
+    strategyId?: string,
+    order: 'asc' | 'desc' = 'desc',
+  ): Promise<QualificationEvidenceResponse> {
+    let url = `${BASE_URL}/api/v1/strategy_gateway/qualification/evidence?limit=${limit}&offset=${offset}&order=${order}`;
+    if (strategyId) url += `&strategy_id=${encodeURIComponent(strategyId)}`;
+    const res = await authFetch(url);
+    return handleResponse<QualificationEvidenceResponse>(res);
+  },
+
+  async getGatewayCollateralScorecard(): Promise<GatewayCollateralScorecardResponse> {
+    const res = await authFetch(`${BASE_URL}/api/v1/strategy_gateway/risk/collateral_scorecard`);
+    return handleResponse<GatewayCollateralScorecardResponse>(res);
+  },
+
+  async getGatewayDeltaTolerance(asset: string = 'BTC'): Promise<GatewayDeltaToleranceResponse> {
+    const res = await authFetch(`${BASE_URL}/api/v1/strategy_gateway/risk/delta_tolerance?asset=${encodeURIComponent(asset)}`);
+    return handleResponse<GatewayDeltaToleranceResponse>(res);
+  },
+
+  async getMarkoutSurvivorshipSummary(symbol?: string): Promise<MarkoutSurvivorshipResponse> {
+    let url = `${BASE_URL}/api/v1/strategy_gateway/markouts/survivorship_summary`;
+    if (symbol) url += `?symbol=${encodeURIComponent(symbol)}`;
+    const res = await authFetch(url);
+    return handleResponse<MarkoutSurvivorshipResponse>(res);
+  },
 };
+
+export interface GatewayStatusResponse {
+  status: string;
+  real_capital_enabled: boolean;
+  execution_authority: string;
+  governance_mode: string;
+  gates: {
+    gate1_eligibility: { status: string; quarantined_strategies_count: number; quarantined_strategies: string[] };
+    gate2_compiler: { status: string; supported_adapters: string[] };
+    gate3_feasibility: { status: string; friction_model: string };
+    gate4_sizing: { status: string; framework: string; constitutional_parent_cap_pct: number };
+  };
+  telemetry_contract: {
+    data_freshness_ms: number;
+    snapshot_timestamp_utc: string;
+    data_quality: string;
+    clock_skew_ms: number;
+    is_stale: boolean;
+  };
+}
+
+export interface CompiledProposalResponse {
+  status: string;
+  watermark: string;
+  proposal: {
+    proposal_id: string;
+    strategy_id: string;
+    strategy_version: string;
+    instrument: string;
+    action: string;
+    intended_size_usd: number;
+    urgency_tier: string;
+    execution_status: string;
+    real_capital_enabled: boolean;
+    watermark: string;
+    sizing_breakdown?: {
+      q_risk: number;
+      q_capital: number;
+      q_liquidity: number;
+      q_strategy: number;
+      q_approved: number;
+      binding_constraint: string;
+    };
+  };
+}
+
+export interface QualificationJob {
+  job_id: string;
+  idempotency_key: string;
+  strategy_id: string;
+  strategy_version: string;
+  deployment_stage: string;
+  status: 'RECEIVED' | 'VALIDATING' | 'QUEUED' | 'RUNNING' | 'COMMITTED' | 'FAILED' | 'CANCELLED';
+  signals_count: number;
+  created_at_utc: string;
+  created_at_epoch_ms: number;
+  updated_at_epoch_ms: number;
+  error_message?: string | null;
+  report?: any | null;
+}
+
+export interface QualificationJobSubmitRequest {
+  strategy_id: string;
+  strategy_version?: string;
+  deployment_stage?: string;
+  dataset_hash?: string;
+  experiment_id?: string;
+  signals_count?: number;
+  account_equity_usd?: number;
+  simulated_spread_bps?: number;
+  simulated_depth_qty?: number;
+  mock_fill_slippage_bps?: number;
+  min_sample_size?: number;
+  max_allowable_is_bps?: number;
+}
+
+export interface QualificationEvidenceRecord {
+  campaign_id: string;
+  strategy_id: string;
+  strategy_version: string;
+  deployment_stage: string;
+  total_signals: number;
+  dispatched_flights: number;
+  aggregate_is_bps: number;
+  mean_slippage_bps: number;
+  qualification_verdict: string;
+  rejection_breakdown: Record<string, number>;
+  sizing_distribution: Record<string, number>;
+  markout_profiles: Record<string, number>;
+  report_hash: string;
+  created_at_utc: string;
+  created_at_epoch_ms: number;
+}
+
+export interface QualificationEvidenceResponse {
+  status: string;
+  total_count: number;
+  offset: number;
+  limit: number;
+  order: string;
+  records: QualificationEvidenceRecord[];
+}
+
+export interface GatewayCollateralScorecardResponse {
+  status: string;
+  collateral_report: any;
+  risk_scorecard: any;
+  cross_venue_imbalance_pct: number;
+  telemetry_contract: {
+    data_freshness_ms: number;
+    snapshot_timestamp_utc: string;
+    data_quality: string;
+    clock_skew_ms: number;
+    is_stale: boolean;
+  };
+}
+
+export interface GatewayDeltaToleranceResponse {
+  status: string;
+  exposure: any;
+  basis_metric: any;
+  urgency_tier: 'NEUTRAL' | 'PASSIVE_TWAP' | 'ACTIVE_TAKER';
+  telemetry_contract: {
+    data_freshness_ms: number;
+    snapshot_timestamp_utc: string;
+    data_quality: string;
+    clock_skew_ms: number;
+    is_stale: boolean;
+  };
+}
+
+export interface MarkoutSurvivorshipResponse {
+  status: string;
+  symbol: string;
+  fill_count: number;
+  censored_markouts_count: number;
+  censored_percentage: number;
+  horizons_s: number[];
+  mean_markout_bps: Record<string, number>;
+  confidence_intervals_bps_95: Record<string, number>;
+  is_decomposition: {
+    delay_is_bps: number;
+    spread_is_bps: number;
+    impact_is_bps: number;
+    fee_is_bps: number;
+    total_is_bps: number;
+  };
+}
 
 export interface BurnInStatus {
   status: string;
