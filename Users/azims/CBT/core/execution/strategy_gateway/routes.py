@@ -26,25 +26,21 @@ from __future__ import annotations
 import json
 import logging
 import math
-import sqlite3
 import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from core.audit_bus import audit_bus
 from core.auth import require_api_key
 from core.database import db_manager
 from core.execution.account_probe import account_probe
 from core.execution.collateral_governor import (
-    CollateralRiskScorecard,
     CollateralState,
     DataQuality,
     collateral_governor,
 )
 from core.execution.delta_hedger import (
-    DeltaToleranceTier,
     PositionDeltaLeg,
     delta_hedger,
 )
@@ -52,9 +48,6 @@ from core.execution.strategy_gateway.job_manager import (
     JobConcurrencyError,
     JobStatus,
     qualification_job_manager,
-)
-from core.execution.strategy_gateway.qualification_campaign import (
-    QualificationCampaignRunner,
 )
 from core.execution.strategy_gateway.research_eligibility import (
     StrategyEligibilityVerifier,
@@ -67,12 +60,7 @@ from core.execution.strategy_gateway.strategies.smc_adapter import (
     SMCOrderFlowSignal,
     SMCStrategyAdapter,
 )
-from core.execution.strategy_gateway.strategy_compiler import (
-    DeterministicStrategyCompiler,
-    StrategyExecutionProposal,
-)
 from core.execution.tca_engine import tca_engine
-from core.governance.institutional_deployment import DeploymentStage
 
 logger = logging.getLogger("sky.execution.strategy_gateway.routes")
 
@@ -111,7 +99,9 @@ class QualificationJobSubmitRequest(BaseModel):
     strategy_id: str = Field(..., description="Certified strategy ID (e.g. KRONOS_M15_ALPHA)")
     strategy_version: str = Field(default="1.0.0")
     deployment_stage: str = Field(default="EXECUTION_MODEL_VALIDATED")
-    dataset_hash: str = Field(default="4f8a92be6b4d32109876543210abcdef0123456789abcdef0123456789abcdef")
+    dataset_hash: str = Field(
+        default="4f8a92be6b4d32109876543210abcdef0123456789abcdef0123456789abcdef"
+    )
     experiment_id: str = Field(default="exp_reality_qualification_001")
     signals_count: int = Field(default=5, ge=1, le=50)
     account_equity_usd: float = Field(default=100000.0, ge=1000.0)
@@ -135,7 +125,7 @@ async def get_gateway_status(
     Returns 4-stage Strategy Gateway operational status, quarantine registry,
     and institutional telemetry freshness contract.
     """
-    now_ms = int(time.time() * 1000)
+    int(time.time() * 1000)
     verifier = StrategyEligibilityVerifier()
     quarantined = list(verifier._quarantined_strategies)
 
@@ -183,6 +173,7 @@ async def compile_kronos_proposal(
     STAMPED: THEORETICAL SIZING PREVIEW - EXECUTION PROHIBITED.
     """
     import uuid as _uuid
+
     adapter = KronosStrategyAdapter(
         min_probability_threshold=0.55,
         min_separation=0.10,
@@ -220,8 +211,10 @@ async def compile_kronos_proposal(
     prop_dict["watermark"] = "THEORETICAL SIZING PREVIEW - EXECUTION PROHIBITED"
     # Compute USD-denominated size for API consumers (preview only, non-executable)
     try:
-        prop_dict["intended_size_usd"] = float(proposal.requested_quantity) * float(proposal.decision_price)
-    except Exception:
+        prop_dict["intended_size_usd"] = float(proposal.requested_quantity) * float(
+            proposal.decision_price
+        )
+    except (TypeError, ValueError):
         prop_dict["intended_size_usd"] = 0.0
 
     return {
@@ -241,6 +234,7 @@ async def compile_smc_proposal(
     STAMPED: THEORETICAL SIZING PREVIEW - EXECUTION PROHIBITED.
     """
     import uuid as _uuid
+
     adapter = SMCStrategyAdapter()
     # Map request fields → canonical SMCOrderFlowSignal. Derive stop-loss from
     # reference_price using a 0.5% default distance for preview purposes.
@@ -294,6 +288,7 @@ async def submit_qualification_job(
     """
     # Generate synthetic signal cohort for replay simulation using correct dataclass fields.
     import uuid as _uuid_job
+
     signals: list[KronosForecastSignal | SMCOrderFlowSignal] = []
     if "SMC" in req.strategy_id.upper():
         for i in range(req.signals_count):
@@ -355,7 +350,7 @@ async def submit_qualification_job(
                 "active_job_id": err.active_job_id,
                 "strategy_id": err.strategy_id,
             },
-        )
+        ) from err
 
     return {
         "status": "ACCEPTED",
@@ -505,7 +500,7 @@ async def get_qualification_evidence(
             "order": order.lower(),
             "records": records,
         }
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         logger.error(f"[Routes] Error querying qualification evidence: {exc}")
         return {
             "status": "SUCCESS",
@@ -583,7 +578,7 @@ async def get_delta_tolerance(
     """
     asset_upper = asset.upper().strip()
     ref_price = account_probe.reference_prices.get(asset_upper, 65000.0)
-    now_ms = int(time.time() * 1000)
+    int(time.time() * 1000)
 
     legs: list[PositionDeltaLeg] = []
     venues_connected = []

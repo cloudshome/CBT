@@ -26,14 +26,14 @@ Validates:
 
 from __future__ import annotations
 
-import asyncio
 import time
+
 import pytest
 from fastapi.testclient import TestClient
 
 import core.auth as auth_mod
 from app import app
-from core.execution.strategy_gateway.job_manager import JobStatus, qualification_job_manager
+from core.execution.strategy_gateway.job_manager import JobStatus
 
 TEST_KEY = "sk-test-gateway-key-institutional"
 
@@ -181,9 +181,7 @@ class TestStrategyGatewayRoutes:
         assert poll_res.status_code == 200
         poll_data = poll_res.json()
         assert poll_data["job"]["strategy_id"] == unique_strat
-        assert poll_data["job"]["status"] in [
-            s.value for s in JobStatus
-        ]
+        assert poll_data["job"]["status"] in [s.value for s in JobStatus]
 
         # Step 3: Wait briefly for background task completion
         timeout = 5.0
@@ -195,7 +193,7 @@ class TestStrategyGatewayRoutes:
                 headers=_auth_headers(),
             ).json()
             if p["job"]["status"] in ("COMMITTED", "FAILED"):
-                committed = (p["job"]["status"] == "COMMITTED")
+                committed = p["job"]["status"] == "COMMITTED"
                 break
             time.sleep(0.1)
 

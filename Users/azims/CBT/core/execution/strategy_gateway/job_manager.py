@@ -260,8 +260,8 @@ class QualificationJobManager:
             self._active_strategy_jobs[strategy_id] = job_id
             self._persist_job(job)
 
-        # 4. Schedule Background Worker
-        asyncio.create_task(
+        # 4. Schedule Background Worker (task reference stored to prevent GC)
+        self._bg_task = asyncio.create_task(
             self._execute_job_lifecycle(
                 job_id=job_id,
                 strategy_id=strategy_id,
@@ -418,9 +418,7 @@ class QualificationJobManager:
             logger.error(f"[JobManager] Error querying job {job_id} from SQLite: {exc}")
         return None
 
-    def list_jobs(
-        self, limit: int = 50, strategy_id: str | None = None
-    ) -> list[dict[str, Any]]:
+    def list_jobs(self, limit: int = 50, strategy_id: str | None = None) -> list[dict[str, Any]]:
         """Lists recent qualification jobs with optional strategy filter."""
         try:
             conn = self._db_conn or db_manager.get_trading_conn()
