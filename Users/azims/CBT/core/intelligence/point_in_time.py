@@ -196,3 +196,16 @@ class PointInTimeEventContract(BaseModel):
                 f"precedes or equals event effective availability ({self.effective_availability_utc:.3f}). "
                 f"Margin: {margin:.3f}s <= 0."
             )
+
+    def record_revision(
+        self,
+        revised_metric_value: float,
+        revision_effective_utc: float,
+    ) -> None:
+        """Records a post-facto revision, rejecting retrospective revisions prior to publication."""
+        if revision_effective_utc < self.published_at_utc:
+            raise ValueError(
+                f"Revision effective time {revision_effective_utc} cannot precede publication {self.published_at_utc}"
+            )
+        self.revised_metric_value = revised_metric_value
+        self.revision_number += 1

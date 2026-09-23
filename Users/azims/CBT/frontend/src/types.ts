@@ -2406,6 +2406,167 @@ export interface FamiliesResponse {
   governance_level: string;
 }
 
+// ============================================================================
+// Milestone 29: Point-in-Time Replay, Validation & Falsification Interfaces
+// ============================================================================
+
+export type ResearchValidationStatus =
+  | 'INCONCLUSIVE'
+  | 'PRELIMINARY_SUPPORT'
+  | 'FALSIFIED'
+  | 'COST_INVALIDATED'
+  | 'REGIME_DEPENDENT'
+  | 'DATA_INVALID'
+  | 'REPLICATION_PENDING'
+  | 'OOS_VALIDATED'
+  | 'INDEPENDENTLY_REPLICATED'
+  | 'HUMAN_REVIEW_REQUIRED';
+
+export interface PreregisteredResearchContract {
+  contract_id: string;
+  hypothesis_id: string;
+  family_id: string;
+  mechanism_id: string;
+  target_symbol: string;
+  timeframe: string;
+  null_hypothesis: string;
+  alternative_hypothesis: string;
+  treatment_definition: Record<string, any>;
+  comparator_definition: Record<string, any>;
+  primary_endpoint: string;
+  secondary_endpoints: string[];
+  lookback_days: number;
+  min_event_observations: number;
+  min_independent_episodes: number;
+  required_regimes: string[];
+  holding_period_bars: number;
+  frictional_tier: string;
+  statistical_procedures: string[];
+  falsification_criteria: Record<string, any>;
+  trial_budget_allocated: number;
+  contract_hash_sha256: string;
+  is_immutable: boolean;
+  execution_authority: string;
+  real_capital_enabled: boolean;
+  preregistered_at_utc: number;
+}
+
+export interface DurableExperimentPlan {
+  plan_id: string;
+  hypothesis_id: string;
+  family_id: string;
+  target_symbol: string;
+  timeframe: string;
+  backtest_range_start_utc: number;
+  backtest_range_end_utc: number;
+  lookback_days: number;
+  frictional_tier: string;
+  min_oos_trades: number;
+  required_dsr: number;
+  execution_authority: string;
+  real_capital_enabled: boolean;
+  plan_hash_sha256: string;
+  state: 'QUEUED' | 'EXECUTING' | 'COMPLETED' | 'FALSIFIED' | 'CANCELLED';
+  created_at_utc: number;
+}
+
+export interface ReplayEpisode {
+  episode_id: string;
+  event_id: string;
+  event_effective_availability_utc: number;
+  entry_bar_time_utc: number;
+  entry_price: number;
+  exit_bar_time_utc: number;
+  exit_price: number;
+  direction: string;
+  holding_bars: number;
+  gross_pnl_usd: number;
+  gross_expectancy_r: number;
+  net_pnl_usd: number;
+  net_expectancy_r: number;
+  stress_pnl_usd: number;
+  frictions: Record<string, any>;
+  exit_reason: string;
+}
+
+export interface ReplayExecutionReport {
+  report_id: string;
+  contract_id: string;
+  manifest_id: string;
+  config_hash_sha256: string;
+  total_episodes: number;
+  independent_episodes: number;
+  gross_expectancy_r: number;
+  net_expectancy_r: number;
+  stress_expectancy_r: number;
+  win_rate: number;
+  profit_factor: number;
+  max_drawdown_pct: number;
+  cost_erosion_pct: number;
+  output_signature_sha256: string;
+  episodes: ReplayEpisode[];
+  created_at_utc: number;
+}
+
+export interface CausalValidationResult {
+  result_id: string;
+  contract_id: string;
+  hypothesis_id: string;
+  status: ResearchValidationStatus;
+  primary_endpoint_value: number;
+  benchmark_relative_alpha: number;
+  effective_sample_size: number;
+  deflated_sharpe_ratio: number;
+  whites_reality_check_pvalue: number;
+  regime_stability_ratio: number;
+  parameter_perturbation_decay: number;
+  cost_erosion_pct: number;
+  verdict_rationale: string;
+  scorecard_passes: Record<string, boolean>;
+  execution_authority: string;
+  real_capital_enabled: boolean;
+  evaluated_at_utc: number;
+}
+
+export interface CausalFailureAutopsy {
+  autopsy_id: string;
+  hypothesis_id: string;
+  contract_id: string;
+  family_id: string;
+  failure_category: string;
+  gross_expectancy_r: number;
+  net_expectancy_r: number;
+  friction_sensitivity: Record<string, number>;
+  regime_stability_ratio: number;
+  parameter_perturbation_decay: number;
+  sample_sufficiency_ratio: number;
+  data_integrity_status: string;
+  statistical_evidence: Record<string, any>;
+  failure_mechanism: string;
+  reusable_lesson: string;
+  evidence_snapshot_hash: string;
+  research_contract_hash: string;
+  replay_configuration_hash: string;
+  created_at_utc: number;
+}
+
+export interface ReplayResponse {
+  status: string;
+  validation_result: CausalValidationResult;
+  replay_report: ReplayExecutionReport;
+  manifest: Record<string, any>;
+  autopsy?: CausalFailureAutopsy | null;
+  execution_authority: string;
+  real_capital_enabled: boolean;
+}
+
+export interface PlansListResponse {
+  status: string;
+  total: number;
+  plans: DurableExperimentPlan[];
+}
+
+
 
 
 

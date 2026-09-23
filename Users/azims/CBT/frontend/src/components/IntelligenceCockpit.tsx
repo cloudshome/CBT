@@ -7,6 +7,10 @@ import {
   HypothesisStatsResponse,
   FamiliesResponse,
   CausalFirewallDecision,
+  PreregisteredResearchContract,
+  ReplayResponse,
+  CausalFailureAutopsy,
+  DurableExperimentPlan,
 } from '../types';
 import {
   getIntelligenceStatus,
@@ -24,11 +28,14 @@ import {
   getHypothesisStats,
   validateHypothesis,
   dispatchHypothesis,
+  createResearchContract,
+  getExperimentPlans,
+  runCausalReplay,
 } from '../services/api';
 
 export const IntelligenceCockpit: React.FC = () => {
-  // Subview toggle: FEED vs HYPOTHESIS_LAB
-  const [activeTab, setActiveTab] = useState<'FEED' | 'HYPOTHESIS_LAB'>('FEED');
+  // Subview toggle: FEED vs HYPOTHESIS_LAB vs REPLAY_LAB
+  const [activeTab, setActiveTab] = useState<'FEED' | 'HYPOTHESIS_LAB' | 'REPLAY_LAB'>('FEED');
 
   // Milestone 27 Feed State
   const [statusData, setStatusData] = useState<IntelligenceStatusResponse | null>(null);
@@ -60,6 +67,16 @@ export const IntelligenceCockpit: React.FC = () => {
   const [selectedHypothesisForAudit, setSelectedHypothesisForAudit] = useState<CausalHypothesis | null>(null);
   const [isValidating, setIsValidating] = useState<boolean>(false);
 
+  // Milestone 29 Replay & Falsification State
+  const [plans, setPlans] = useState<DurableExperimentPlan[]>([]);
+  const [activeContracts, setActiveContracts] = useState<PreregisteredResearchContract[]>([]);
+  const [selectedContract, setSelectedContract] = useState<PreregisteredResearchContract | null>(null);
+  const [replayReport, setReplayReport] = useState<ReplayResponse | null>(null);
+  const [isReplaying, setIsReplaying] = useState<boolean>(false);
+  const [selectedAutopsy, setSelectedAutopsy] = useState<CausalFailureAutopsy | null>(null);
+  const [replayFeedback, setReplayFeedback] = useState<string | null>(null);
+  const [selectedFrictionTier, setSelectedFrictionTier] = useState<string>('CONSERVATIVE');
+
   // =========================================================================
   // Telemetry Fetchers
   // =========================================================================
@@ -88,7 +105,7 @@ export const IntelligenceCockpit: React.FC = () => {
 
   const fetchLabData = useCallback(async () => {
     try {
-      const [hRes, sRes, fRes] = await Promise.all([
+      const [hRes, sRes, fRes, pRes] = await Promise.all([
         getHypotheses({
           family_id: selectedFamilyFilter === 'ALL' ? undefined : selectedFamilyFilter,
           status: selectedStatusFilter === 'ALL' ? undefined : selectedStatusFilter,
@@ -96,15 +113,51 @@ export const IntelligenceCockpit: React.FC = () => {
         }),
         getHypothesisStats(),
         getResearchFamilies(),
+        getExperimentPlans({ limit: 50 }),
       ]);
       setHypotheses(hRes.hypotheses || []);
       setHypoTotal(hRes.total || 0);
       setStatsData(sRes);
       setFamiliesData(fRes);
+      setPlans(pRes.plans || []);
     } catch (err) {
       console.error('Failed to refresh Causal Lab telemetry:', err);
     }
   }, [selectedFamilyFilter, selectedStatusFilter]);
+
+  const handleCreateContract = async (hypoId: string) => {
+    setActionInProgress(true);
+    setLabFeedback('Preregistering immutable research contract...');
+    try {
+      const res = await createResearchContract(hypoId, 12, 1);
+      setActiveContracts((prev) => [res.contract, ...prev.filter((c) => c.contract_id !== res.contract.contract_id)]);
+      setSelectedContract(res.contract);
+      setLabFeedback(`Contract ${res.contract.contract_id} preregistered with ${res.contract.lookback_days}d lookback.`);
+      setActiveTab('REPLAY_LAB');
+    } catch (err: any) {
+      setLabFeedback(`Preregistration failed: ${err.message || err}`);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const handleRunReplay = async (contractId: string) => {
+    setIsReplaying(true);
+    setReplayFeedback('Executing deterministic historical replay across market candles...');
+    try {
+      const res = await runCausalReplay(contractId, 10000, 200, selectedFrictionTier);
+      setReplayReport(res);
+      if (res.autopsy) {
+        setSelectedAutopsy(res.autopsy);
+      }
+      setReplayFeedback(`Replay complete. Result: ${res.validation_result.status} (Net E[R]: ${res.validation_result.primary_endpoint_value >= 0 ? '+' : ''}${res.validation_result.primary_endpoint_value.toFixed(2)}R)`);
+      fetchLabData();
+    } catch (err: any) {
+      setReplayFeedback(`Replay failed: ${err.message || err}`);
+    } finally {
+      setIsReplaying(false);
+    }
+  };
 
   useEffect(() => {
     fetchFeedTelemetry();
@@ -338,6 +391,19 @@ export const IntelligenceCockpit: React.FC = () => {
             <span>🧪 Causal Hypothesis Lab</span>
             <span className="px-1.5 py-0.2 text-[10px] font-mono bg-purple-950 text-purple-300 rounded border border-purple-700/60">
               {hypoTotal}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('REPLAY_LAB')}
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+              activeTab === 'REPLAY_LAB'
+                ? 'bg-amber-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <span>🔬 Replay & Falsification</span>
+            <span className="px-1.5 py-0.2 text-[10px] font-mono bg-amber-950 text-amber-300 rounded border border-amber-700/60">
+              M29
             </span>
           </button>
         </div>
@@ -905,13 +971,313 @@ export const IntelligenceCockpit: React.FC = () => {
                       </button>
 
                       {hypo.status === 'FIREWALL_VALIDATED' && (
-                        <button
-                          onClick={() => handleDispatchLab(hypo.hypothesis_id)}
-                          className="px-3.5 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow"
-                        >
-                          🚀 Dispatch to Research Lab
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleCreateContract(hypo.hypothesis_id)}
+                            disabled={actionInProgress}
+                            className="px-3.5 py-1.5 text-xs font-semibold bg-amber-950 hover:bg-amber-900 text-amber-200 border border-amber-700/60 rounded-lg transition"
+                          >
+                            📜 Preregister M29 Contract
+                          </button>
+                          <button
+                            onClick={() => handleDispatchLab(hypo.hypothesis_id)}
+                            className="px-3.5 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow"
+                          >
+                            🚀 Dispatch to Research Lab
+                          </button>
+                        </>
                       )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          VIEW 3: EMPIRICAL REPLAY & FALSIFICATION LAB (M29)
+          ===================================================================== */}
+      {activeTab === 'REPLAY_LAB' && (
+        <div className="flex flex-col gap-6">
+          {/* Institutional Epistemic Status Guide */}
+          <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-3">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <span>⚖️</span> Institutional Epistemic Governance Taxonomy (Level 2 Protocol)
+              </span>
+              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
+                REAL_CAPITAL_ENABLED = FALSE
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center">
+              <div className="p-2 bg-emerald-950/40 border border-emerald-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-emerald-400 font-mono">[FACT]</span>
+                <span className="text-[11px] text-slate-300 font-medium">Observed Fact</span>
+                <span className="text-[9px] text-slate-400">Verified OHLCV</span>
+              </div>
+              <div className="p-2 bg-purple-950/40 border border-purple-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-purple-400 font-mono">[MECHANISM]</span>
+                <span className="text-[11px] text-slate-300 font-medium">Mechanism</span>
+                <span className="text-[9px] text-slate-400">CVD / OBI / SMC</span>
+              </div>
+              <div className="p-2 bg-amber-950/40 border border-amber-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-amber-400 font-mono">[HYPO]</span>
+                <span className="text-[11px] text-slate-300 font-medium">Untested Hypo</span>
+                <span className="text-[9px] text-slate-400">Preregistered</span>
+              </div>
+              <div className="p-2 bg-blue-950/40 border border-blue-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-blue-400 font-mono">[REPLAY]</span>
+                <span className="text-[11px] text-slate-300 font-medium">Replay Result</span>
+                <span className="text-[9px] text-slate-400">Zero-Lookahead</span>
+              </div>
+              <div className="p-2 bg-teal-950/40 border border-teal-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-teal-400 font-mono">[SUPPORT]</span>
+                <span className="text-[11px] text-slate-300 font-medium">Prelim Support</span>
+                <span className="text-[9px] text-slate-400">Net E[R] &gt; 0</span>
+              </div>
+              <div className="p-2 bg-rose-950/40 border border-rose-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-rose-400 font-mono">[FALSIFIED]</span>
+                <span className="text-[11px] text-slate-300 font-medium">Falsified</span>
+                <span className="text-[9px] text-slate-400">H0 Confirmed</span>
+              </div>
+              <div className="p-2 bg-orange-950/40 border border-orange-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-orange-400 font-mono">[REVIEW]</span>
+                <span className="text-[11px] text-slate-300 font-medium">Human Review</span>
+                <span className="text-[9px] text-slate-400">Anomaly Check</span>
+              </div>
+              <div className="p-2 bg-red-950/60 border border-red-800 rounded-lg flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-red-300 font-mono">[BLOCKED]</span>
+                <span className="text-[11px] text-slate-200 font-medium">No Execution</span>
+                <span className="text-[9px] text-slate-400">Zero Order Auth</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Replay Controls & Contract Selector */}
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-slate-900 border border-slate-800 rounded-xl">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-xs font-bold text-slate-300">Friction Stress Model:</span>
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                {(['BASE', 'CONSERVATIVE', 'STRESS'] as const).map((tier) => (
+                  <button
+                    key={tier}
+                    onClick={() => setSelectedFrictionTier(tier)}
+                    className={`px-3 py-1 text-xs font-mono font-semibold rounded ${
+                      selectedFrictionTier === tier
+                        ? 'bg-amber-600 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {tier}
+                  </button>
+                ))}
+              </div>
+
+              {selectedContract && (
+                <div className="text-xs font-mono text-amber-300 bg-amber-950/40 border border-amber-800/60 px-3 py-1.5 rounded-lg">
+                  Contract: {selectedContract.contract_id} ({selectedContract.lookback_days}d lookback)
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              {selectedContract && (
+                <button
+                  onClick={() => handleRunReplay(selectedContract.contract_id)}
+                  disabled={isReplaying}
+                  className="px-4 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition shadow-md shadow-amber-950/50 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isReplaying ? (
+                    <>
+                      <span className="inline-block animate-spin">⟳</span> Replaying Candles...
+                    </>
+                  ) : (
+                    <>
+                      <span>⚡</span> Execute Historical Replay & Falsification
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {replayFeedback && (
+            <div className="p-3 bg-amber-950/50 border border-amber-800/80 rounded-xl text-xs font-mono text-amber-200">
+              {replayFeedback}
+            </div>
+          )}
+
+          {/* Replay Execution Report & 8-Attribute Scorecard */}
+          {replayReport && (
+            <div className="flex flex-col gap-5 p-6 bg-slate-900 border border-slate-800 rounded-xl">
+              <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-4 gap-4">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <span>📊</span> Empirical Validation Report: {replayReport.replay_report.report_id}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono mt-1">
+                    Output Signature: {replayReport.replay_report.output_signature_sha256.slice(0, 24)}... (Deterministic Bit-Level Pass)
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-lg text-xs font-bold font-mono border ${
+                    replayReport.validation_result.status === 'OOS_VALIDATED'
+                      ? 'bg-emerald-950 border-emerald-600 text-emerald-300'
+                      : replayReport.validation_result.status === 'PRELIMINARY_SUPPORT'
+                      ? 'bg-teal-950 border-teal-600 text-teal-300'
+                      : 'bg-rose-950 border-rose-700 text-rose-300'
+                  }`}>
+                    {replayReport.validation_result.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* 8-Attribute Scorecard Grid */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                  8-Attribute Empirical Falsification Scorecard
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {Object.entries(replayReport.validation_result.scorecard_passes).map(([gate, passed]) => (
+                    <div
+                      key={gate}
+                      className={`p-3 rounded-xl border flex items-center justify-between ${
+                        passed
+                          ? 'bg-slate-950 border-slate-800 text-slate-200'
+                          : 'bg-rose-950/40 border-rose-800/80 text-rose-300'
+                      }`}
+                    >
+                      <span className="text-[11px] font-mono">{gate}</span>
+                      <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded ${
+                        passed ? 'bg-emerald-950 text-emerald-300' : 'bg-rose-900 text-rose-200'
+                      }`}>
+                        {passed ? 'PASS' : 'FAIL'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3-Tier Friction Markout Breakdown */}
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex flex-col gap-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  3-Tier Execution Friction Waterfall & Expectancy
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-center">
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Gross E[R]</div>
+                    <div className="text-sm font-bold font-mono text-cyan-300">
+                      {(replayReport.replay_report.gross_expectancy_r >= 0 ? '+' : '') + replayReport.replay_report.gross_expectancy_r.toFixed(2)}R
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Net E[R] (Conservative)</div>
+                    <div className={`text-sm font-bold font-mono ${replayReport.replay_report.net_expectancy_r > 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
+                      {(replayReport.replay_report.net_expectancy_r >= 0 ? '+' : '') + replayReport.replay_report.net_expectancy_r.toFixed(2)}R
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Stress E[R]</div>
+                    <div className={`text-sm font-bold font-mono ${replayReport.replay_report.stress_expectancy_r > 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
+                      {(replayReport.replay_report.stress_expectancy_r >= 0 ? '+' : '') + replayReport.replay_report.stress_expectancy_r.toFixed(2)}R
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Cost Erosion</div>
+                    <div className="text-sm font-bold font-mono text-amber-300">
+                      {replayReport.replay_report.cost_erosion_pct}%
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">DSR Hurdle</div>
+                    <div className="text-sm font-bold font-mono text-purple-300">
+                      {replayReport.validation_result.deflated_sharpe_ratio}
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400">Win Rate / PF</div>
+                    <div className="text-sm font-bold font-mono text-slate-200">
+                      {(replayReport.replay_report.win_rate * 100).toFixed(0)}% / {replayReport.replay_report.profit_factor}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Autopsy Card if Falsified */}
+              {selectedAutopsy && (
+                <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-xl flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-rose-800/60 pb-2">
+                    <span className="text-xs font-bold font-mono text-rose-300 flex items-center gap-2">
+                      <span>💀</span> Causal Failure Autopsy [{selectedAutopsy.failure_category}]
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      Autopsy ID: {selectedAutopsy.autopsy_id}
+                    </span>
+                  </div>
+                  <div className="text-xs text-rose-200 font-mono">
+                    <div className="font-bold mb-1">Failure Mechanism:</div>
+                    <p className="text-slate-300">{selectedAutopsy.failure_mechanism}</p>
+                  </div>
+                  <div className="text-xs bg-slate-950 p-3 rounded-lg border border-rose-900 text-amber-200 font-mono">
+                    <div className="font-bold text-amber-400 mb-1">Reusable Institutional Lesson:</div>
+                    <p>{selectedAutopsy.reusable_lesson}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Preregistered Contracts & Replay Queue */}
+          <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-4">
+            <h3 className="text-sm font-bold text-white flex items-center justify-between">
+              <span>Preregistered Research Contracts ({activeContracts.length}) & Plans ({plans.length})</span>
+              <span className="text-xs text-slate-400 font-mono">Durable SQLite Ledger</span>
+            </h3>
+
+            {activeContracts.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-500 font-mono border border-dashed border-slate-800 rounded-xl">
+                No active contracts in current session. Select a validated hypothesis in "Causal Hypothesis Lab" and click "📜 Preregister M29 Contract".
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {activeContracts.map((ctr) => (
+                  <div
+                    key={ctr.contract_id}
+                    onClick={() => setSelectedContract(ctr)}
+                    className={`p-4 rounded-xl border cursor-pointer transition flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                      selectedContract?.contract_id === ctr.contract_id
+                        ? 'bg-slate-950 border-amber-600 shadow-md shadow-amber-950/40'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold font-mono text-amber-300">{ctr.contract_id}</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">
+                          {ctr.family_id}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                          {ctr.lookback_days}d Lookback
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1 line-clamp-1">{ctr.alternative_hypothesis}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedContract(ctr);
+                          handleRunReplay(ctr.contract_id);
+                        }}
+                        disabled={isReplaying}
+                        className="px-3.5 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition disabled:opacity-50"
+                      >
+                        ⚡ Run Replay
+                      </button>
                     </div>
                   </div>
                 ))}

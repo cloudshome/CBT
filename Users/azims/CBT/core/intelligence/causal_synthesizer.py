@@ -22,6 +22,7 @@ from core.intelligence.causal_mechanisms import (
     CAUSAL_MECHANISMS,
     RESEARCH_FAMILIES,
     CausalMechanism,
+    lookup_family,
     match_candidate_mechanisms,
 )
 from core.intelligence.hypothesis_schema import (
@@ -32,6 +33,11 @@ from core.intelligence.hypothesis_schema import (
     global_hypothesis_ledger,
 )
 from core.intelligence.narrative_radar import NarrativeCluster
+from core.intelligence.plan_store import (
+    DurableExperimentPlan,
+    ExperimentPlanLedger,
+    global_plan_ledger,
+)
 from core.intelligence.point_in_time import PointInTimeEventContract
 from core.intelligence.schema import IntelligenceRecord
 
@@ -48,9 +54,11 @@ class CausalHypothesisSynthesizer:
         self,
         firewall: CausalFirewallValidator | None = None,
         ledger: HypothesisLedgerManager | None = None,
+        plan_ledger: ExperimentPlanLedger | None = None,
     ):
         self.firewall = firewall or global_causal_firewall
         self.ledger = ledger or global_hypothesis_ledger
+        self.plan_ledger = plan_ledger or global_plan_ledger
 
     def synthesize_from_record(
         self,
@@ -177,11 +185,33 @@ class CausalHypothesisSynthesizer:
     ) -> SynthesizedExperimentPlan:
         """
         Packages a firewall-validated hypothesis into an experiment plan ready for backtesting.
+        Persists a DurableExperimentPlan in SQLite and updates hypothesis status to QUEUED_FOR_LAB.
         Raises ValueError if hypothesis is not found or not firewall-validated.
         """
         hypo = self.ledger.get_hypothesis(hypothesis_id)
         if not hypo:
             raise ValueError(f"Hypothesis {hypothesis_id} not found in ledger.")
+
+        existing_plan = self.plan_ledger.get_plan_by_hypothesis(hypothesis_id)
+        if hypo.status == CausalHypothesisStatus.QUEUED_FOR_LAB and existing_plan:
+            logger.info(
+                f"Hypothesis {hypothesis_id} already dispatched as plan {existing_plan.plan_id}. Returning existing plan."
+            )
+            return SynthesizedExperimentPlan(
+                plan_id=existing_plan.plan_id,
+                hypothesis_id=existing_plan.hypothesis_id,
+                family_id=existing_plan.family_id,
+                target_symbol=existing_plan.target_symbol,
+                timeframe=existing_plan.timeframe,
+                backtest_range_start_utc=existing_plan.backtest_range_start_utc,
+                backtest_range_end_utc=existing_plan.backtest_range_end_utc,
+                frictional_tier=existing_plan.frictional_tier,
+                min_oos_trades=existing_plan.min_oos_trades,
+                required_dsr=existing_plan.required_dsr,
+                execution_authority="NON_EXECUTABLE_RESEARCH_HYPOTHESIS",
+                real_capital_enabled=False,
+                created_at_utc=existing_plan.created_at_utc,
+            )
 
         if hypo.status != CausalHypothesisStatus.FIREWALL_VALIDATED:
             raise ValueError(
@@ -190,13 +220,32 @@ class CausalHypothesisSynthesizer:
             )
 
         now = time.time()
-        # Historical backtest range: 90 days leading up to event availability
+        # Look up research family for dynamic lookback requirement
+        family = lookup_family(hypo.family_id)
+        lookback_days = getattr(family, "min_lookback_days", 90) if family else 90
+
         event_avail = hypo.macro_event_contract.effective_availability_utc
-        range_start = max(0.0, event_avail - (90 * 86400))
+        range_start = max(0.0, event_avail - (lookback_days * 86400))
         range_end = event_avail
 
+        # Persist DurableExperimentPlan into SQLite
+        durable_plan = DurableExperimentPlan.create(
+            hypothesis_id=hypo.hypothesis_id,
+            family_id=hypo.family_id.value,
+            target_symbol=hypo.target_asset,
+            timeframe=hypo.timeframe,
+            backtest_range_start_utc=range_start,
+            backtest_range_end_utc=range_end,
+            lookback_days=lookback_days,
+            frictional_tier=frictional_tier,
+            min_oos_trades=30,
+            required_dsr=0.95,
+        )
+        self.plan_ledger.save_plan(durable_plan)
+
+        # Build SynthesizedExperimentPlan for backwards-compatible response
         plan = SynthesizedExperimentPlan(
-            plan_id=f"PLAN_{uuid.uuid4().hex[:12].upper()}",
+            plan_id=durable_plan.plan_id,
             hypothesis_id=hypo.hypothesis_id,
             family_id=hypo.family_id.value,
             target_symbol=hypo.target_asset,
@@ -215,7 +264,7 @@ class CausalHypothesisSynthesizer:
         self.ledger.update_status(hypo.hypothesis_id, CausalHypothesisStatus.QUEUED_FOR_LAB)
 
         logger.info(
-            f"Dispatched hypothesis {hypo.hypothesis_id} to Research Lab as plan {plan.plan_id}"
+            f"Dispatched hypothesis {hypo.hypothesis_id} to Research Lab as durable plan {durable_plan.plan_id}"
         )
         return plan
 

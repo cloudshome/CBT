@@ -55,6 +55,16 @@ class ResearchFamily(BaseModel):
     daily_trial_cap: int = 15
     base_required_sharpe: float = 1.50
     default_frictional_tier: str = "CONSERVATIVE"
+    min_lookback_days: int = Field(90, description="Dynamic lookback duration in days")
+    min_event_observations: int = Field(12, description="Minimum macro event instances")
+    min_independent_episodes: int = Field(10, description="Minimum independent trade episodes")
+    required_regimes: list[str] = Field(
+        default_factory=lambda: ["HIGH_VOL", "LOW_VOL"],
+        description="Regimes that must be covered across sample period",
+    )
+    event_clustering_window_seconds: float = Field(
+        172800.0, description="Window to cluster co-occurring events (e.g. 48 hours)"
+    )
 
 
 class CausalMechanism(BaseModel):
@@ -90,6 +100,11 @@ RESEARCH_FAMILIES: dict[ResearchFamilyId, ResearchFamily] = {
         timeframes=["5m", "15m", "1h"],
         daily_trial_cap=15,
         base_required_sharpe=1.50,
+        min_lookback_days=730,
+        min_event_observations=16,
+        min_independent_episodes=12,
+        required_regimes=["TIGHTENING", "EASING", "HIGH_VOL", "LOW_VOL"],
+        event_clustering_window_seconds=172800.0,
     ),
     ResearchFamilyId.INFLATION_GROWTH_SURPRISE: ResearchFamily(
         family_id=ResearchFamilyId.INFLATION_GROWTH_SURPRISE,
@@ -100,6 +115,11 @@ RESEARCH_FAMILIES: dict[ResearchFamilyId, ResearchFamily] = {
         timeframes=["1m", "5m", "15m"],
         daily_trial_cap=15,
         base_required_sharpe=1.60,
+        min_lookback_days=365,
+        min_event_observations=12,
+        min_independent_episodes=10,
+        required_regimes=["INFLATION_SURPRISE_UP", "INFLATION_SURPRISE_DOWN"],
+        event_clustering_window_seconds=86400.0,
     ),
     ResearchFamilyId.REGULATORY_POLICY_SHOCK: ResearchFamily(
         family_id=ResearchFamilyId.REGULATORY_POLICY_SHOCK,
@@ -110,6 +130,11 @@ RESEARCH_FAMILIES: dict[ResearchFamilyId, ResearchFamily] = {
         timeframes=["5m", "15m", "1h"],
         daily_trial_cap=10,
         base_required_sharpe=1.40,
+        min_lookback_days=365,
+        min_event_observations=10,
+        min_independent_episodes=8,
+        required_regimes=["HAWKISH_ENFORCEMENT", "DOVISH_CLARITY"],
+        event_clustering_window_seconds=172800.0,
     ),
     ResearchFamilyId.ONCHAIN_STABLECOIN_DISLOCATION: ResearchFamily(
         family_id=ResearchFamilyId.ONCHAIN_STABLECOIN_DISLOCATION,
@@ -120,6 +145,11 @@ RESEARCH_FAMILIES: dict[ResearchFamilyId, ResearchFamily] = {
         timeframes=["1m", "5m", "15m"],
         daily_trial_cap=10,
         base_required_sharpe=1.50,
+        min_lookback_days=180,
+        min_event_observations=15,
+        min_independent_episodes=12,
+        required_regimes=["INFLOW_SURGE", "OUTFLOW_DRAIN"],
+        event_clustering_window_seconds=43200.0,
     ),
     ResearchFamilyId.CROSS_ASSET_CONTAGION: ResearchFamily(
         family_id=ResearchFamilyId.CROSS_ASSET_CONTAGION,
@@ -130,6 +160,11 @@ RESEARCH_FAMILIES: dict[ResearchFamilyId, ResearchFamily] = {
         timeframes=["5m", "15m"],
         daily_trial_cap=10,
         base_required_sharpe=1.50,
+        min_lookback_days=180,
+        min_event_observations=20,
+        min_independent_episodes=15,
+        required_regimes=["EQUITIES_RISK_ON", "EQUITIES_RISK_OFF"],
+        event_clustering_window_seconds=86400.0,
     ),
 }
 

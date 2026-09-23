@@ -64,6 +64,11 @@ import {
   HypothesesListResponse,
   SynthesizeResponse,
   FamiliesResponse,
+  PreregisteredResearchContract,
+  ReplayResponse,
+  CausalValidationResult,
+  CausalFailureAutopsy,
+  PlansListResponse,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -5019,3 +5024,79 @@ export async function dispatchHypothesis(
   });
   return await handleResponse(res);
 }
+
+// ============================================================================
+// Milestone 29: Point-in-Time Replay, Validation & Falsification API Methods
+// ============================================================================
+
+export async function createResearchContract(
+  hypothesisId: string,
+  holdingPeriodBars = 12,
+  trialBudget = 1
+): Promise<{ status: string; contract: PreregisteredResearchContract }> {
+  const res = await authFetch('/api/v1/intelligence/research/contracts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      hypothesis_id: hypothesisId,
+      holding_period_bars: holdingPeriodBars,
+      trial_budget: trialBudget,
+    }),
+  });
+  return await handleResponse(res);
+}
+
+export async function getResearchContract(
+  contractId: string
+): Promise<{ status: string; contract: PreregisteredResearchContract }> {
+  const res = await authFetch(`/api/v1/intelligence/research/contracts/${encodeURIComponent(contractId)}`);
+  return await handleResponse(res);
+}
+
+export async function getExperimentPlans(params?: {
+  state?: string;
+  family_id?: string;
+  limit?: number;
+}): Promise<PlansListResponse> {
+  const query = new URLSearchParams();
+  if (params?.state) query.set('state', params.state);
+  if (params?.family_id) query.set('family_id', params.family_id);
+  if (params?.limit) query.set('limit', String(params.limit));
+
+  const res = await authFetch(`/api/v1/intelligence/research/plans?${query.toString()}`);
+  return await handleResponse(res);
+}
+
+export async function runCausalReplay(
+  contractId: string,
+  positionSizeUsd = 10000,
+  riskPerTradeUsd = 200,
+  frictionalTier = 'CONSERVATIVE'
+): Promise<ReplayResponse> {
+  const res = await authFetch('/api/v1/intelligence/research/replay', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contract_id: contractId,
+      position_size_usd: positionSizeUsd,
+      risk_per_trade_usd: riskPerTradeUsd,
+      frictional_tier: frictionalTier,
+    }),
+  });
+  return await handleResponse(res);
+}
+
+export async function getValidationResult(
+  resultId: string
+): Promise<{ status: string; result: CausalValidationResult }> {
+  const res = await authFetch(`/api/v1/intelligence/research/results/${encodeURIComponent(resultId)}`);
+  return await handleResponse(res);
+}
+
+export async function getFailureAutopsy(
+  hypothesisId: string
+): Promise<{ status: string; autopsy: CausalFailureAutopsy }> {
+  const res = await authFetch(`/api/v1/intelligence/research/autopsies/${encodeURIComponent(hypothesisId)}`);
+  return await handleResponse(res);
+}
+
