@@ -30,6 +30,7 @@ from core.intelligence.causal_mechanisms import (
     RESEARCH_FAMILIES,
 )
 from core.intelligence.causal_synthesizer import global_causal_synthesizer
+from core.intelligence.crawler.scout_controller import ScoutController
 from core.intelligence.dataset_manifest import DatasetManifest
 from core.intelligence.evidence_classifier import global_evidence_classifier
 from core.intelligence.failure_autopsy import FailureAutopsyCompiler
@@ -899,4 +900,206 @@ async def get_failure_autopsy(
     return {
         "status": "success",
         "autopsy": autopsy,
+    }
+
+
+# =====================================================================
+# Milestone 30-B: Evidence-Grade Multi-Source Ingestion & Crawler Routes
+# =====================================================================
+
+global_scout_controller = ScoutController()
+
+
+class CrawlTriggerRequest(BaseModel):
+    domains: list[str] | None = Field(default=None, description="Optional target domains to crawl")
+    requested_by: str = Field(
+        default="HUMAN_OPERATOR", description="Operator identity triggering crawl"
+    )
+
+
+@router.post("/crawler/run")
+async def trigger_crawl_run(
+    req: CrawlTriggerRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Triggers an empirical, rate-limited crawl across registered intelligence domains."""
+    run_record = await global_scout_controller.execute_crawl_run(
+        domain_keys=req.domains,
+        requested_by=req.requested_by,
+    )
+    return {
+        "status": "success",
+        "run_id": run_record.run_id,
+        "records_seen": run_record.records_seen,
+        "records_accepted": run_record.records_accepted,
+        "records_rejected": run_record.records_rejected,
+        "records_quarantined": run_record.records_quarantined,
+        "errors": run_record.errors,
+        "execution_authority": run_record.execution_authority,
+        "real_capital_enabled": run_record.real_capital_enabled,
+    }
+
+
+@router.get("/crawler/status")
+async def get_crawler_status(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves current operational status and recent run history."""
+    return {
+        "status": "success",
+        "scout_status": global_scout_controller.status.value,
+        "recent_runs": [
+            {
+                "run_id": r.run_id,
+                "requested_by": r.requested_by,
+                "start_time": r.start_time.isoformat(),
+                "records_accepted": r.records_accepted,
+                "records_rejected": r.records_rejected,
+            }
+            for r in global_scout_controller.list_runs(limit=10)
+        ],
+        "execution_authority": "NON_EXECUTABLE_RESEARCH_HYPOTHESIS",
+        "real_capital_enabled": False,
+    }
+
+
+@router.get("/crawler/sources")
+async def list_crawler_sources(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Lists registered publishers, officiality ratings, and rate limits."""
+    sources = global_scout_controller.registry.list_sources()
+    return {
+        "status": "success",
+        "total": len(sources),
+        "sources": [
+            {
+                "source_id": s.source_id,
+                "publisher": s.publisher,
+                "source_type": s.source_type.value,
+                "officiality_level": s.officiality_level,
+                "rate_limit_per_min": s.rate_limit_per_minute,
+                "revision_behavior": s.revision_behavior,
+            }
+            for s in sources
+        ],
+    }
+
+
+@router.get("/crawler/runs/{run_id}")
+async def get_crawl_run_detail(
+    run_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves detailed audit telemetry for a specific crawl run."""
+    run_record = global_scout_controller.get_run(run_id)
+    if not run_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Crawl run {run_id} not found.",
+        )
+    return {
+        "status": "success",
+        "run": {
+            "run_id": run_record.run_id,
+            "requested_by": run_record.requested_by,
+            "start_time": run_record.start_time.isoformat(),
+            "end_time": run_record.end_time.isoformat() if run_record.end_time else None,
+            "source_set": run_record.source_set,
+            "config_hash": run_record.configuration_hash,
+            "records_seen": run_record.records_seen,
+            "records_accepted": run_record.records_accepted,
+            "records_rejected": run_record.records_rejected,
+            "records_quarantined": run_record.records_quarantined,
+            "errors": run_record.errors,
+            "rate_limit_events": run_record.rate_limit_events,
+        },
+    }
+
+
+@router.get("/crawler/evidence/{evidence_id}")
+async def get_raw_evidence_record(
+    evidence_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves an unparsed raw evidence record from the vault."""
+    ev = global_scout_controller.vault.get_evidence(evidence_id)
+    if not ev:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Evidence record {evidence_id} not found in vault.",
+        )
+    return {
+        "status": "success",
+        "evidence": {
+            "evidence_id": ev.evidence_id,
+            "source_id": ev.source_id,
+            "url": ev.url,
+            "http_status": ev.http_status,
+            "content_sha256": ev.content_sha256,
+            "published_at_utc": ev.published_at_utc.isoformat(),
+            "observed_at_utc": ev.observed_at_utc.isoformat(),
+        },
+    }
+
+
+@router.get("/crawler/conflicts")
+async def list_evidence_conflicts(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Lists unresolved or recorded discrepancies across external sources."""
+    conflicts = global_scout_controller.conflict_ledger.list_all(limit=50)
+    return {
+        "status": "success",
+        "total": len(conflicts),
+        "conflicts": [
+            {
+                "conflict_id": c.conflict_id,
+                "event_id": c.event_id,
+                "conflict_type": c.conflict_type.value,
+                "status": c.status.value,
+                "source_a": c.source_a_id,
+                "source_b": c.source_b_id,
+                "detected_at": c.detected_at.isoformat(),
+                "notes": c.resolution_notes,
+            }
+            for c in conflicts
+        ],
+    }
+
+
+@router.get("/crawler/health")
+async def get_crawler_health(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Returns diagnostic health metrics for all adapters and circuit breakers."""
+    return {
+        "status": "success",
+        "health": global_scout_controller.get_health(),
+    }
+
+
+@router.post("/crawler/pause")
+async def pause_crawler(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Pauses autonomous intelligence collection."""
+    global_scout_controller.pause()
+    return {
+        "status": "success",
+        "message": "Crawler paused.",
+        "scout_status": global_scout_controller.status.value,
+    }
+
+
+@router.post("/crawler/resume")
+async def resume_crawler(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Resumes autonomous intelligence collection."""
+    global_scout_controller.resume()
+    return {
+        "status": "success",
+        "message": "Crawler resumed.",
+        "scout_status": global_scout_controller.status.value,
     }
