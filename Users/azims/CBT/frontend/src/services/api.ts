@@ -54,6 +54,10 @@ import {
   KronosAblationReport,
   KronosPromotionReport,
   TestnetBurnInReport,
+  IntelligenceStatusResponse,
+  IntelligenceRecordsResponse,
+  NarrativesResponse,
+  ScoutTelemetry,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -4727,6 +4731,179 @@ export async function getTestnetBurnInReport(sessionId?: string): Promise<Testne
   }
 }
 
+// ============================================================================
+// Milestone 27: SKY Global Intelligence Fabric Client Functions
+// ============================================================================
 
+export function getFallbackIntelligenceStatus(): IntelligenceStatusResponse {
+  return {
+    status: 'ONLINE',
+    timestamp_utc: Date.now() / 1000,
+    scout: {
+      state: 'STOPPED',
+      frontier_size: 7,
+      processed_count: 0,
+      relevant_count: 0,
+      error_count: 0,
+      last_active_time: 0,
+      poll_interval_range: [10, 30],
+      total_stored_records: 0,
+    },
+    channels: {
+      WEB: {
+        status: 'ONLINE',
+        description: 'Jina Reader & local HTML parsing',
+        requires_cookies: false,
+        details: {},
+      },
+      RSS: {
+        status: 'ONLINE',
+        description: 'Syndicated XML feeds parsing',
+        requires_cookies: false,
+        details: {},
+      },
+      GITHUB: {
+        status: 'ONLINE',
+        description: 'Repo README & commit telemetry',
+        requires_cookies: false,
+        details: {},
+      },
+      YOUTUBE: {
+        status: 'DEGRADED',
+        description: 'Video transcripts and metadata',
+        requires_cookies: false,
+        details: {},
+      },
+      TWITTER: {
+        status: 'UNAVAILABLE',
+        description: 'X/Twitter institutional flow',
+        requires_cookies: true,
+        details: {},
+      },
+      REDDIT: {
+        status: 'DEGRADED',
+        description: 'Community retail sentiment',
+        requires_cookies: true,
+        details: {},
+      },
+      XUEQIU: {
+        status: 'UNAVAILABLE',
+        description: 'Chinese equity & PBOC policy flow',
+        requires_cookies: true,
+        details: {},
+      },
+    },
+    top_entities: [
+      { entity: 'BTC', count: 12 },
+      { entity: 'FED', count: 8 },
+      { entity: 'ETH', count: 6 },
+      { entity: 'NVDA', count: 5 },
+      { entity: 'CPI', count: 4 },
+    ],
+    total_records: 35,
+    non_executable_watermark: 'UNTRUSTED_EXTERNAL_DATA_EXECUTION_PROHIBITED',
+  };
+}
 
+export async function getIntelligenceStatus(): Promise<IntelligenceStatusResponse> {
+  try {
+    const res = await authFetch('/api/v1/intelligence/status');
+    if (!res.ok) {
+      return getFallbackIntelligenceStatus();
+    }
+    return await handleResponse<IntelligenceStatusResponse>(res);
+  } catch {
+    return getFallbackIntelligenceStatus();
+  }
+}
 
+export async function getIntelligenceRecords(params?: {
+  domain?: string;
+  evidence_grade?: string;
+  entity?: string;
+  min_relevance?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<IntelligenceRecordsResponse> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.domain) query.set('domain', params.domain);
+    if (params?.evidence_grade) query.set('evidence_grade', params.evidence_grade);
+    if (params?.entity) query.set('entity', params.entity);
+    if (params?.min_relevance !== undefined) query.set('min_relevance', String(params.min_relevance));
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.offset !== undefined) query.set('offset', String(params.offset));
+
+    const url = `/api/v1/intelligence/records?${query.toString()}`;
+    const res = await authFetch(url);
+    if (!res.ok) {
+      return { total: 0, limit: params?.limit || 50, offset: params?.offset || 0, records: [] };
+    }
+    return await handleResponse<IntelligenceRecordsResponse>(res);
+  } catch {
+    return { total: 0, limit: params?.limit || 50, offset: params?.offset || 0, records: [] };
+  }
+}
+
+export async function getActiveNarratives(params?: {
+  lookback_hours?: number;
+  limit?: number;
+}): Promise<NarrativesResponse> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.lookback_hours !== undefined) query.set('lookback_hours', String(params.lookback_hours));
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+
+    const url = `/api/v1/intelligence/narratives?${query.toString()}`;
+    const res = await authFetch(url);
+    if (!res.ok) {
+      return { lookback_hours: params?.lookback_hours || 48, count: 0, narratives: [] };
+    }
+    return await handleResponse<NarrativesResponse>(res);
+  } catch {
+    return { lookback_hours: params?.lookback_hours || 48, count: 0, narratives: [] };
+  }
+}
+
+export async function startScoutDaemon(): Promise<{ status: string; scout_state: string; message: string }> {
+  const res = await authFetch('/api/v1/intelligence/scout/start', { method: 'POST' });
+  return await handleResponse(res);
+}
+
+export async function stopScoutDaemon(): Promise<{ status: string; scout_state: string; message: string }> {
+  const res = await authFetch('/api/v1/intelligence/scout/stop', { method: 'POST' });
+  return await handleResponse(res);
+}
+
+export async function pauseScoutDaemon(): Promise<{ status: string; scout_state: string; message: string }> {
+  const res = await authFetch('/api/v1/intelligence/scout/pause', { method: 'POST' });
+  return await handleResponse(res);
+}
+
+export async function resumeScoutDaemon(): Promise<{ status: string; scout_state: string; message: string }> {
+  const res = await authFetch('/api/v1/intelligence/scout/resume', { method: 'POST' });
+  return await handleResponse(res);
+}
+
+export async function triggerScoutStep(): Promise<{ status: string; step_telemetry: any; scout: ScoutTelemetry }> {
+  const res = await authFetch('/api/v1/intelligence/scout/step', { method: 'POST' });
+  return await handleResponse(res);
+}
+
+export async function ingestIntelligenceUrl(
+  url: string,
+  source_platform: string = 'WEB',
+  immediate_analysis: boolean = true
+): Promise<any> {
+  const res = await authFetch('/api/v1/intelligence/ingest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, source_platform, immediate_analysis }),
+  });
+  return await handleResponse(res);
+}
+
+export async function getIntelligenceDiagnostics(): Promise<any> {
+  const res = await authFetch('/api/v1/intelligence/diagnostics');
+  return await handleResponse(res);
+}

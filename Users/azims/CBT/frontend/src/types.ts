@@ -2189,5 +2189,98 @@ export interface TestnetBurnInReport {
   timestamp_utc?: string;
 }
 
+// ============================================================================
+// Milestone 27: SKY Global Intelligence Fabric & Autonomous Web Scout Types
+// ============================================================================
+
+export type IntelligenceDomain = 'MACRO' | 'CRYPTO' | 'EQUITIES' | 'SOCIAL' | 'QUANT_RESEARCH';
+
+export type EvidenceGrade =
+  | 'VERIFIED_PRIMARY'
+  | 'CORROBORATED_REPORT'
+  | 'UNVERIFIED_CLAIM'
+  | 'SPECULATION';
+
+export type SourcePlatform =
+  | 'WEB'
+  | 'RSS'
+  | 'YOUTUBE'
+  | 'GITHUB'
+  | 'TWITTER'
+  | 'REDDIT'
+  | 'XUEQIU';
+
+export interface IntelligenceRecord {
+  record_id: string;
+  content_hash: string;
+  source_platform: SourcePlatform | string;
+  source_url: string;
+  title: string;
+  content_markdown: string;
+  summary: string;
+  domain: IntelligenceDomain | string;
+  entities: string[];
+  evidence_grade: EvidenceGrade | string;
+  relevance_score: number;
+  security_flags: string[];
+  published_at_utc: number;
+  collected_at_utc: number;
+  metadata?: Record<string, any>;
+}
+
+export interface ScoutTelemetry {
+  state: 'STOPPED' | 'RUNNING' | 'PAUSED';
+  frontier_size: number;
+  processed_count: number;
+  relevant_count: number;
+  error_count: number;
+  last_active_time: number;
+  poll_interval_range: [number, number];
+  total_stored_records: number;
+}
+
+export interface ChannelCapabilityInfo {
+  status: 'ONLINE' | 'DEGRADED' | 'UNAVAILABLE';
+  description: string;
+  requires_cookies: boolean;
+  details: Record<string, any>;
+}
+
+export interface IntelligenceStatusResponse {
+  status: string;
+  timestamp_utc: number;
+  scout: ScoutTelemetry;
+  channels: Record<string, ChannelCapabilityInfo>;
+  top_entities: Array<{ entity: string; count: number }>;
+  total_records: number;
+  non_executable_watermark: string;
+}
+
+export interface NarrativeCluster {
+  theme: string;
+  velocity_score: number;
+  total_records: number;
+  entities: string[];
+  platforms: string[];
+  evidence_breakdown: Record<string, number>;
+  credibility_tag: 'INSTITUTIONAL_BACKED' | 'CORROBORATED' | 'HYPE_DRIVEN';
+  latest_timestamp_utc: number;
+  sample_headlines: string[];
+}
+
+export interface IntelligenceRecordsResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  records: IntelligenceRecord[];
+}
+
+export interface NarrativesResponse {
+  lookback_hours: number;
+  count: number;
+  narratives: NarrativeCluster[];
+}
+
+
 
 

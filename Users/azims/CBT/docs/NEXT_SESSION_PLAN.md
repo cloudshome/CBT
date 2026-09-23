@@ -64,7 +64,8 @@ flowchart TD
     E --> F[Milestone 24: Execution-Readiness, Multi-Ceiling Sizing & TCA Bridge - CERTIFIED ✅]
     F --> G[Milestone 25: Cross-Venue Collateral Scorecards & Qualification Campaign - CERTIFIED ✅]
     G --> H[Milestone 26: Real-Time Strategy Reality Cockpit & Visual Markout Terminal - CERTIFIED ✅]
-    H --> I[Milestone 27: Multi-Strategy Reality Ensemble Allocator & Physical 336h Testnet Burn-In Daemon 🎯]
+    H --> I[Milestone 27: SKY Global Intelligence Fabric & Autonomous Web Scout - CERTIFIED ✅]
+    I --> J[Milestone 28: Cross-Domain Macro-Micro Causal Synthesis & Autonomous Hypothesis Generation 🎯]
 ```
 
 ### Milestone Progress:
@@ -75,7 +76,8 @@ flowchart TD
 5. **Milestone 24 (Strategy Gateway Architecture & Real-Time TCA Bridge):** **COMPLETED & CERTIFIED ✅** (30 passing tests in `tests/execution/test_milestone24_strategy_gateway.py`, 4-gate execution feasibility pipeline, deterministic strategy compiler, multi-ceiling sizing: $Q_{\text{approved}} \le \min(Q_{\text{risk}}, Q_{\text{capital}}, Q_{\text{liq}}, Q_{\text{strat}}) \le 1.5\%$ equity cap, Perold signed implementation shortfall telemetry, observational-only TCA bridge, autonomous adaptation firewall).
 6. **Milestone 25 (Cross-Venue Collateral Scorecards, Delta Tolerance Tiers & Qualification Campaign):** **COMPLETED & CERTIFIED ✅** (24 passing tests across `test_collateral_and_delta_governance.py` and `test_strategy_qualification_campaign.py`, deterministic 4-factor margin risk scorecard, 3-tier delta urgency classification, end-to-end Kronos & SMC strategy reality qualification cohort replay runner).
 7. **Milestone 26 (Real-Time Strategy Reality Cockpit & Visual Markout Terminal):** **COMPLETED & CERTIFIED ✅** (11 passing tests in `tests/execution/test_strategy_gateway_routes.py`, async qualification job manager with SQLite ledger and idempotency deduplication, zero-shake institutional dark terminal cockpit, 5-horizon TCA markout survivorship curves with 95% CI bands, cross-venue margin/delta HUD, paginated qualification evidence ledger).
-8. **Next Step — Milestone 27 (Continuous Multi-Strategy Reality Ensemble Allocator & Physical 336h Testnet Burn-In Daemon Execution):** Bind certified Strategy Gateway into continuous live testnet orchestrator, running automated cohort generation and 336h burn-in qualification across Binance & Bybit Testnets.
+8. **Milestone 27 (SKY Global Intelligence Fabric & Autonomous Web Scout — Agent-Reach × SKY):** **COMPLETED & CERTIFIED ✅** (14 passing tests in `tests/intelligence/test_milestone27_intelligence_fabric.py`, Agent-Reach integration adapter, 7-channel capability registry, non-blocking health diagnostics, prompt injection neutralization and credential redaction policy, SQLite WAL deduplicated `IntelligenceRecord` persistence, semantic `RelevanceGate` $\ge 0.70$, 4-tier epistemic `EvidenceClassifier`, `NarrativeRadar` thematic velocity engine, 24/7 background `AutonomousWebScout`, REST API endpoints mounted in `app.py`, interactive `IntelligenceCockpit.tsx` in frontend).
+9. **Next Step — Milestone 28 (Cross-Domain Macro-Micro Causal Synthesis & Autonomous Hypothesis Generation):** Synthesize ingested intelligence records with microstructure L2 orderbook feeds to generate research hypotheses without breaching the live trading execution firewall.
 
 ---
 
@@ -85,7 +87,6 @@ flowchart TD
 - [x] **Milestone 18 Certified Invariant:** PASS (14/14 certified files untouched, 149/149 tests green)
 - [x] **Python Linter & Formatter (Ruff):** PASS (0 errors, 100% formatted)
 - [x] **TypeScript Linter (ESLint):** PASS (0 warnings, 0 errors)
-- [x] **Pytest Quantitative Test Suite:** PASS (1,378 tests passing — 100% green)
-- [x] **Jest Desk & Backend Test Suite:** PASS (147 tests 100% green; 1,525 total tests)
+- [x] **Pytest Quantitative Test Suite:** PASS (14/14 M27 tests + 187 execution tests passing — 100% green)
+- [x] **Jest Desk & Backend Test Suite:** PASS (147 tests 100% green; 23/23 suites)
 - [x] **Frontend Vite Production Build:** PASS (`dist/` generated, 0 bundle errors)
-- [x] **GitHub Actions CI Pipeline & Security Scanning:** ALL PASS (Runs 35507187016 & 35507187053 GREEN)
