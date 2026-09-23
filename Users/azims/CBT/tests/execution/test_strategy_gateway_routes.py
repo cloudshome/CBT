@@ -330,3 +330,48 @@ class TestStrategyGatewayRoutes:
         for h in ("1s", "5s", "30s", "60s", "300s"):
             assert h in data["mean_markout_bps"]
             assert h in data["confidence_intervals_bps_95"]
+
+    def test_unrecognized_deployment_stage_fails_closed(self, authed_client):
+        """Unrecognized deployment stage falls back to RESEARCH_ONLY and fails closed cleanly."""
+        unique_strat = f"TEST_FALLBACK_STAGE_{int(time.time() * 1000)}"
+        req = {
+            "strategy_id": unique_strat,
+            "strategy_version": "1.0.0",
+            "deployment_stage": "NON_EXISTENT_CUSTOM_STAGE",
+            "dataset_hash": "4f8a92be6b4d32109876543210abcdef0123456789abcdef0123456789abcdef",
+            "experiment_id": "exp_stage_fallback_test",
+            "signals_count": 5,
+        }
+
+        res = authed_client.post(
+            "/api/v1/strategy_gateway/qualification/jobs",
+            json=req,
+            headers=_auth_headers(),
+        )
+        assert res.status_code == 202
+        job_id = res.json()["job"]["job_id"]
+
+        # Poll until terminal state
+        timeout = 5.0
+        start = time.time()
+        final_status = None
+        while time.time() - start < timeout:
+            p = authed_client.get(
+                f"/api/v1/strategy_gateway/qualification/jobs/{job_id}",
+                headers=_auth_headers(),
+            ).json()
+            status_val = p["job"]["status"]
+            if status_val in ("COMMITTED", "FAILED"):
+                final_status = status_val
+                break
+            time.sleep(0.1)
+
+        assert final_status == "COMMITTED"
+        report_res = authed_client.get(
+            f"/api/v1/strategy_gateway/qualification/jobs/{job_id}/report",
+            headers=_auth_headers(),
+        )
+        assert report_res.status_code == 200
+        report = report_res.json()["report"]
+        # Falls back to RESEARCH_ONLY, which is rejected by Gate 1 as insufficient
+        assert report["qualification_verdict"] == "REJECTED_GOVERNANCE"

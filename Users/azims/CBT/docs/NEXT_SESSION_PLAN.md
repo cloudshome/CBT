@@ -61,7 +61,10 @@ flowchart TD
     B --> C[Milestone 21: External Testnet Connectors Binance & Bybit - CERTIFIED ✅]
     C --> D[Milestone 22: Live Testnet Execution Flight Runner & Lifecycle Engine - CERTIFIED ✅]
     D --> E[Milestone 23: 14-Day Live Testnet Burn-In Campaign & Real-Time Cockpit - STAGES 1 & 2 VERIFIED ✅]
-    E --> F[Milestone 23: Stage 3 & 4 Physical 336h Burn-In Execution & Forensic Audit 🎯]
+    E --> F[Milestone 24: Execution-Readiness, Multi-Ceiling Sizing & TCA Bridge - CERTIFIED ✅]
+    F --> G[Milestone 25: Cross-Venue Collateral Scorecards & Qualification Campaign - CERTIFIED ✅]
+    G --> H[Milestone 26: Real-Time Strategy Reality Cockpit & Visual Markout Terminal - CERTIFIED ✅]
+    H --> I[Milestone 27: Multi-Strategy Reality Ensemble Allocator & Physical 336h Testnet Burn-In Daemon 🎯]
 ```
 
 ### Milestone Progress:
@@ -69,7 +72,10 @@ flowchart TD
 2. **Milestone 21 (External Exchange Testnet Connectors):** **COMPLETED & CERTIFIED ✅** (55 passing tests, Binance Spot & Bybit V5 REST/WS connectors, strict endpoint whitelisting, production hostname blocking, `real_capital_enabled = False` permanent firewall).
 3. **Milestone 22 (Live Testnet Execution Flight Runner & Lifecycle Engine):** **COMPLETED & CERTIFIED ✅** (32 passing tests in `tests/execution/test_milestone22_flight_runner.py`, 102 execution suite tests green, dual-venue TWAP & simulated iceberg slicing, 10-state Lost-ACK recovery FSM, rate limit governor with 20% emergency reserve, 7-stage nanosecond latency decomposition, clock skew sentinel, strictly flight-scoped panic cancellation, `real_capital_enabled = False` permanent firewall).
 4. **Milestone 23 (Continuous 14-Day Live Testnet Burn-In Campaign & Real-Time Cockpit):** **STAGES 1 & 2 VERIFIED ✅** (20 passing tests in `tests/execution/test_milestone23_campaign_orchestrator.py`, 122 execution suite tests green, 16-state Campaign FSM, monotonic fencing token lease coordinator with SQLite WAL split-brain defense, safe pause drain & resume open-order reconciliation, 3-stream time conservation $H_{\text{elapsed}} = H_{\text{qualified}} + H_{\text{disqualified}}$, 7-tier event classification, chained SHA-256 discrete interval ledger, market regime coverage policy engine with causal firewall, real-time cockpit HUD with stale watermark banner & sequence tracking, `REAL_CAPITAL_ENABLED = False` permanent firewall).
-5. **Next Step (Stage 3 Burn-In Campaign & Stage 4 Forensic Audit):** Launch physical long-running testnet daemon over 336 qualified operating hours across Binance Spot Testnet & Bybit V5 Testnet.
+5. **Milestone 24 (Strategy Gateway Architecture & Real-Time TCA Bridge):** **COMPLETED & CERTIFIED ✅** (30 passing tests in `tests/execution/test_milestone24_strategy_gateway.py`, 4-gate execution feasibility pipeline, deterministic strategy compiler, multi-ceiling sizing: $Q_{\text{approved}} \le \min(Q_{\text{risk}}, Q_{\text{capital}}, Q_{\text{liq}}, Q_{\text{strat}}) \le 1.5\%$ equity cap, Perold signed implementation shortfall telemetry, observational-only TCA bridge, autonomous adaptation firewall).
+6. **Milestone 25 (Cross-Venue Collateral Scorecards, Delta Tolerance Tiers & Qualification Campaign):** **COMPLETED & CERTIFIED ✅** (24 passing tests across `test_collateral_and_delta_governance.py` and `test_strategy_qualification_campaign.py`, deterministic 4-factor margin risk scorecard, 3-tier delta urgency classification, end-to-end Kronos & SMC strategy reality qualification cohort replay runner).
+7. **Milestone 26 (Real-Time Strategy Reality Cockpit & Visual Markout Terminal):** **COMPLETED & CERTIFIED ✅** (11 passing tests in `tests/execution/test_strategy_gateway_routes.py`, async qualification job manager with SQLite ledger and idempotency deduplication, zero-shake institutional dark terminal cockpit, 5-horizon TCA markout survivorship curves with 95% CI bands, cross-venue margin/delta HUD, paginated qualification evidence ledger).
+8. **Next Step — Milestone 27 (Continuous Multi-Strategy Reality Ensemble Allocator & Physical 336h Testnet Burn-In Daemon Execution):** Bind certified Strategy Gateway into continuous live testnet orchestrator, running automated cohort generation and 336h burn-in qualification across Binance & Bybit Testnets.
 
 ---
 
@@ -77,9 +83,9 @@ flowchart TD
 
 - [x] **Database Schema Integrity:** PASS (`core/database/db_manager.py`)
 - [x] **Milestone 18 Certified Invariant:** PASS (14/14 certified files untouched, 149/149 tests green)
-- [x] **Python Linter & Formatter (Ruff):** PASS (0 errors)
+- [x] **Python Linter & Formatter (Ruff):** PASS (0 errors, 100% formatted)
 - [x] **TypeScript Linter (ESLint):** PASS (0 warnings, 0 errors)
-- [x] **Pytest Quantitative Test Suite:** PASS (1,260 tests passing; 1,407 total with Jest)
-- [x] **Jest Desk & Backend Test Suite:** PASS (147 tests 100% green)
+- [x] **Pytest Quantitative Test Suite:** PASS (1,378 tests passing — 100% green)
+- [x] **Jest Desk & Backend Test Suite:** PASS (147 tests 100% green; 1,525 total tests)
 - [x] **Frontend Vite Production Build:** PASS (`dist/` generated, 0 bundle errors)
 - [x] **GitHub Actions CI Pipeline & Security Scanning:** ALL PASS (Runs 35507187016 & 35507187053 GREEN)

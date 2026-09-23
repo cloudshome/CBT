@@ -108,6 +108,7 @@ class QualificationJobManager:
         self._jobs: dict[str, QualificationJob] = {}
         self._idempotency_map: dict[str, tuple[str, int]] = {}  # key -> (job_id, timestamp_ms)
         self._active_strategy_jobs: dict[str, str] = {}  # strategy_id -> job_id
+        self._background_tasks: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
         self._ensure_schema()
 
@@ -260,8 +261,8 @@ class QualificationJobManager:
             self._active_strategy_jobs[strategy_id] = job_id
             self._persist_job(job)
 
-        # 4. Schedule Background Worker (task reference stored to prevent GC)
-        self._bg_task = asyncio.create_task(
+        # 4. Schedule Background Worker (task reference stored in set to prevent GC)
+        task = asyncio.create_task(
             self._execute_job_lifecycle(
                 job_id=job_id,
                 strategy_id=strategy_id,
@@ -278,6 +279,8 @@ class QualificationJobManager:
                 max_allowable_is_bps=max_allowable_is_bps,
             )
         )
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
         return job, True
 
@@ -309,11 +312,10 @@ class QualificationJobManager:
             self._update_job_status(job_id, JobStatus.RUNNING)
 
             # Stage C: Execute Qualification Campaign
-            stage_enum = (
-                DeploymentStage(deployment_stage)
-                if deployment_stage in DeploymentStage.__members__.values()
-                else DeploymentStage.RESEARCH
-            )
+            try:
+                stage_enum = DeploymentStage(deployment_stage)
+            except (ValueError, KeyError):
+                stage_enum = DeploymentStage.RESEARCH_ONLY
             report: StrategyRealityQualificationReport = await runner.execute_campaign(
                 strategy_id=strategy_id,
                 strategy_version=strategy_version,

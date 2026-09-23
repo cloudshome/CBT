@@ -142,6 +142,10 @@ export const StrategyRealityCockpit: React.FC<StrategyRealityCockpitProps> = ({
     handleCompilePreview('KRONOS');
   }, [handleCompilePreview]);
 
+  // Telemetry Freshness Assessment
+  const isStale = collateralData?.telemetry_contract?.is_stale || (collateralData?.telemetry_contract?.data_freshness_ms || 0) > 30000;
+  const isDegraded = collateralData?.status === 'DEGRADED_PARTIAL' || deltaData?.status === 'DEGRADED_PARTIAL';
+
   // 4. Submit Asynchronous Qualification Job (M26-02, M26-09)
   const handleLaunchQualification = async (strategyId: string) => {
     if (isStale) {
@@ -207,10 +211,6 @@ export const StrategyRealityCockpit: React.FC<StrategyRealityCockpitProps> = ({
       if (pollingIntervalRef.current) window.clearInterval(pollingIntervalRef.current);
     };
   }, []);
-
-  // Telemetry Freshness Assessment
-  const isStale = collateralData?.telemetry_contract?.is_stale || (collateralData?.telemetry_contract?.data_freshness_ms || 0) > 30000;
-  const isDegraded = collateralData?.status === 'DEGRADED_PARTIAL' || deltaData?.status === 'DEGRADED_PARTIAL';
 
   if (loading && !gatewayStatus) {
     return (

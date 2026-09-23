@@ -305,7 +305,7 @@ async def submit_qualification_job(
                     stop_loss_price=round(sl_i, 8),
                     dataset_hash=req.dataset_hash,
                     experiment_id=req.experiment_id,
-                    strategy_version="2.1.0",
+                    strategy_version=req.strategy_version,
                 )
             )
     else:
@@ -321,7 +321,7 @@ async def submit_qualification_job(
                     decision_price=65000.0 + (i * 15.0),
                     dataset_hash=req.dataset_hash,
                     experiment_id=req.experiment_id,
-                    strategy_version="3.2.0",
+                    strategy_version=req.strategy_version,
                 )
             )
 

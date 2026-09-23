@@ -113,14 +113,18 @@ graph TD
 ### Completed Baseline:
 - **Milestone 20:** Gate 5 Extended 14-Day Testnet Burn-In Rehearsal Engine (`core/execution/testnet_qualification.py`, 15 passing tests at `a50b424`).
 - **Milestone 21:** External Exchange Testnet Connectors for Binance Spot & Bybit V5 Unified (`core/execution/testnet/`, 55 passing tests at `62fb60f` & `c26ed06`).
-- **CI / GitHub Pipeline:** 100% Green on GitHub Actions (`CI Pipeline` and `Security Scanning` passed). Total repository tests: 1,407 green (1,260 Pytest + 147 Jest).
+- **Milestone 22:** Live Testnet Execution Flight Runner & Lifecycle Engine (`core/execution/testnet/`, 32 passing tests at `d430c32`).
+- **Milestone 23:** Continuous 14-Day Live Testnet Burn-In Campaign Orchestrator & Flight Cockpit (`core/execution/testnet/`, 20 passing tests at `59bf32f`).
+- **Milestone 24:** Execution-Readiness Qualification, Multi-Ceiling Sizing & Real-Time TCA Bridge (`core/execution/strategy_gateway/`, 30 passing tests at `e680759`).
+- **Milestone 25:** Cross-Venue Collateral Scorecards, Delta Tolerance Tiers & Strategy Reality Qualification Campaign (`core/execution/`, 24 passing tests at `cda1a96`).
+- **Milestone 26:** Real-Time Strategy Reality Cockpit & Visual Markout Terminal (`core/execution/strategy_gateway/`, 11 passing tests at `9b705be`).
+- **CI / Quality Gates:** 100% Green across all gates. Total repository tests: 1,525 passing (1,378 Pytest + 147 Jest).
 
-### Next Day Implementation Focus — Milestone 22:
-- **Specification:** `docs/milestone22/M22_SPECIFICATION.md` (Fully hardened & ready).
+### Next Day Implementation Focus — Milestone 27:
+- **Objective:** Continuous Multi-Strategy Reality Ensemble Allocator & Physical 336h Testnet Burn-In Daemon Execution.
 - **Core Modules to Build:**
-  1. `core/execution/testnet/filters.py` — `ExchangeFilterRulesEngine` (tickSize / stepSize / minNotional normalizer).
-  2. `core/execution/testnet/multi_venue_bridge.py` — `MultiVenueTestnetBridge` (dual-venue dispatch & lost-ACK handling).
-  3. `core/execution/testnet/dispatcher.py` — `TestnetOrderSlicingDispatcher` (TWAP/Iceberg with exact Decimal conservation).
-  4. `core/execution/testnet/flight_runner.py` — `TestnetFlightRunnerService` (rehearsal daemon & latency decomposition).
-  5. `tests/execution/test_milestone22_flight_runner.py` — Full test battery targeting all 7 M22 acceptance gates.
+  1. `core/execution/strategy_gateway/ensemble_allocator.py` — Dynamic Multi-Strategy Reality Allocator balancing Kronos & SMC allocations based on real-time empirical markout profiles and cross-venue margin headroom.
+  2. `core/execution/testnet/daemon_orchestrator.py` — Autonomous 336h physical testnet runner integrating the M24–M26 Strategy Gateway into the M23 live testnet campaign loop.
+  3. `tests/execution/test_milestone27_ensemble_and_daemon.py` — Full adversarial test battery targeting multi-strategy contention, markout degradation, and 336-hour time conservation.
+
 
