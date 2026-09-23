@@ -24,7 +24,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from core.auth import require_api_key
+from core.intelligence.causal_firewall import global_causal_firewall
+from core.intelligence.causal_mechanisms import (
+    CAUSAL_MECHANISMS,
+    RESEARCH_FAMILIES,
+)
+from core.intelligence.causal_synthesizer import global_causal_synthesizer
 from core.intelligence.evidence_classifier import global_evidence_classifier
+from core.intelligence.hypothesis_schema import (
+    global_hypothesis_ledger,
+)
 from core.intelligence.narrative_radar import global_narrative_radar
 from core.intelligence.relevance_gate import global_relevance_gate
 from core.intelligence.schema import (
@@ -40,6 +49,19 @@ from integrations.agent_reach.health import global_agent_reach_health
 logger = logging.getLogger("ai_quant_sentinel.intelligence.routes")
 
 router = APIRouter(prefix="/api/v1/intelligence", tags=["Global Intelligence Fabric"])
+
+
+class SynthesizeRequest(BaseModel):
+    record_ids: list[str] = Field(
+        default_factory=list, description="Specific IntelligenceRecord IDs or empty for top recent"
+    )
+    target_asset: str = Field("BTC/USDT", description="Target trading asset")
+    timeframe: str = Field("5m", description="Observation timeframe")
+    auto_validate: bool = Field(True, description="Run 9-gate firewall immediately")
+
+
+class DispatchRequest(BaseModel):
+    frictional_tier: str = Field("CONSERVATIVE", description="BASE, CONSERVATIVE, or STRESS")
 
 
 class IngestRequest(BaseModel):
@@ -343,3 +365,157 @@ async def ingest_url(
                 "primary_domain": verdict.primary_domain.value,
             },
         }
+
+
+# ============================================================================
+# Milestone 28: Cross-Domain Macro-Micro Causal Hypothesis Lab Endpoints
+# ============================================================================
+
+
+@router.get("/hypotheses")
+async def get_hypotheses(
+    family_id: str | None = Query(None, description="Filter by Research Family ID"),
+    status: str | None = Query(
+        None, description="Filter by status (e.g. FIREWALL_VALIDATED, REJECTED)"
+    ),
+    target_asset: str | None = Query(None, description="Filter by asset symbol (e.g. BTC/USDT)"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Returns paginated list of synthesized quantitative hypotheses."""
+    items, total = global_hypothesis_ledger.list_hypotheses(
+        family_id=family_id,
+        status=status,
+        target_asset=target_asset,
+        limit=limit,
+        offset=offset,
+    )
+    return {
+        "status": "success",
+        "hypotheses": [h.model_dump() for h in items],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "execution_isolation": "STRICT_RESEARCH_ONLY_REAL_CAPITAL_DISABLED",
+    }
+
+
+@router.post("/hypotheses/synthesize")
+async def synthesize_hypotheses(
+    req: SynthesizeRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """
+    Synthesizes testable cross-domain causal hypotheses from intelligence records.
+    If record_ids is empty, automatically selects the most recent high-relevance records.
+    """
+    records: list[IntelligenceRecord] = []
+    if req.record_ids:
+        for rid in req.record_ids:
+            rec = global_intelligence_store.get_record(rid)
+            if rec:
+                records.append(rec)
+    else:
+        # Fetch top 5 recent high-relevance records
+        recent_records, _ = global_intelligence_store.query_records(limit=5, min_relevance=0.70)
+        records = recent_records
+
+    if not records:
+        return {
+            "status": "warning",
+            "message": "No suitable intelligence records found for causal synthesis.",
+            "count": 0,
+            "hypotheses": [],
+        }
+
+    synthesized = global_causal_synthesizer.batch_synthesize(
+        records=records,
+        target_asset=req.target_asset,
+        timeframe=req.timeframe,
+    )
+
+    return {
+        "status": "success",
+        "count": len(synthesized),
+        "hypotheses": [h.model_dump() for h in synthesized],
+        "execution_isolation": "STRICT_RESEARCH_ONLY_REAL_CAPITAL_DISABLED",
+    }
+
+
+@router.get("/hypotheses/families")
+async def get_research_families(_auth: None = Depends(require_api_key)) -> dict[str, Any]:
+    """Returns preregistered research families and institutional causal mechanisms."""
+    return {
+        "families": [f.model_dump() for f in RESEARCH_FAMILIES.values()],
+        "mechanisms": [m.model_dump() for m in CAUSAL_MECHANISMS.values()],
+        "governance_level": "LEVEL_2_RESEARCH_PROTOCOL",
+    }
+
+
+@router.get("/hypotheses/stats")
+async def get_hypothesis_stats(_auth: None = Depends(require_api_key)) -> dict[str, Any]:
+    """Returns daily trial exploration budget stats across research families."""
+    family_stats = {}
+    for fam_id, fam in RESEARCH_FAMILIES.items():
+        used = global_hypothesis_ledger.count_family_trials_today(fam_id.value)
+        family_stats[fam_id.value] = {
+            "name": fam.name,
+            "daily_cap": fam.daily_trial_cap,
+            "trials_today": used,
+            "remaining": max(0, fam.daily_trial_cap - used),
+        }
+
+    _, total_hypotheses = global_hypothesis_ledger.list_hypotheses(limit=1)
+
+    return {
+        "total_hypotheses_created": total_hypotheses,
+        "daily_family_trials": family_stats,
+        "daily_global_cap": 50,
+        "real_capital_enabled": False,
+        "execution_authority": "NON_EXECUTABLE_RESEARCH_HYPOTHESIS",
+    }
+
+
+@router.post("/hypotheses/{hypothesis_id}/validate")
+async def validate_hypothesis(
+    hypothesis_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Executes the 9-Gate Causal Firewall audit on a specific hypothesis."""
+    hypo = global_hypothesis_ledger.get_hypothesis(hypothesis_id)
+    if not hypo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Hypothesis {hypothesis_id} not found.",
+        )
+
+    decision = global_causal_firewall.validate(hypo)
+    return {
+        "status": "success",
+        "decision": decision.to_dict(),
+        "hypothesis": hypo.model_dump(),
+    }
+
+
+@router.post("/hypotheses/{hypothesis_id}/dispatch")
+async def dispatch_hypothesis(
+    hypothesis_id: str,
+    req: DispatchRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Dispatches a firewall-validated hypothesis into the Autonomous Research Lab."""
+    try:
+        plan = global_causal_synthesizer.dispatch_to_research_lab(
+            hypothesis_id=hypothesis_id,
+            frictional_tier=req.frictional_tier,
+        )
+        return {
+            "status": "success",
+            "plan": plan.model_dump(),
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e

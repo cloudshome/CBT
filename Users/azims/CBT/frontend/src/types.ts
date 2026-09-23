@@ -2281,6 +2281,131 @@ export interface NarrativesResponse {
   narratives: NarrativeCluster[];
 }
 
+// ============================================================================
+// Milestone 28: Cross-Domain Macro-Micro Causal Synthesis Interfaces
+// ============================================================================
+
+export interface PointInTimeEventContract {
+  event_id: string;
+  source_record_id: string;
+  event_type: string;
+  domain: string;
+  headline: string;
+  published_at_utc: number;
+  collected_at_utc: number;
+  effective_availability_utc: number;
+  dissemination_buffer_seconds: number;
+  initial_metric_value?: number | null;
+  revised_metric_value?: number | null;
+  revision_number: number;
+  content_hash_sha256: string;
+  epistemic_grade: string;
+  epistemic_prior_weight: number;
+  metadata?: Record<string, any>;
+}
+
+export interface ResearchFamily {
+  family_id: string;
+  name: string;
+  description: string;
+  applicable_domains: string[];
+  target_assets: string[];
+  timeframes: string[];
+  daily_trial_cap: number;
+  base_required_sharpe: number;
+  default_frictional_tier: string;
+}
+
+export interface CausalMechanism {
+  mechanism_id: string;
+  family_id: string;
+  name: string;
+  transmission_type: string;
+  primary_receptor: string;
+  secondary_receptor?: string | null;
+  direction: 'BULLISH' | 'BEARISH' | 'VOLATILITY';
+  economic_rationale: string;
+  lead_time_seconds_min: number;
+  lead_time_seconds_max: number;
+  default_micro_conditions: Record<string, any>;
+  default_falsification_criteria: Record<string, any>;
+}
+
+export type CausalHypothesisStatus =
+  | 'DRAFT'
+  | 'FIREWALL_VALIDATED'
+  | 'REJECTED'
+  | 'QUEUED_FOR_LAB'
+  | 'TESTING'
+  | 'VALIDATED'
+  | 'FALSIFIED'
+  | 'QUARANTINED';
+
+export interface CausalHypothesis {
+  hypothesis_id: string;
+  family_id: string;
+  mechanism_id: string;
+  macro_event_contract: PointInTimeEventContract;
+  target_asset: string;
+  timeframe: string;
+  null_hypothesis: string;
+  alternative_hypothesis: string;
+  microstructure_conditions: Record<string, any>;
+  falsification_criteria: Record<string, any>;
+  epistemic_prior_weight: number;
+  status: CausalHypothesisStatus;
+  rejection_reason?: string | null;
+  execution_authority: string;
+  real_capital_enabled: boolean;
+  created_at_utc: number;
+  updated_at_utc: number;
+}
+
+export interface CausalFirewallDecision {
+  passed: boolean;
+  hypothesis_id: string;
+  gate_results: Record<string, boolean>;
+  violations: string[];
+  audit_timestamp_utc: number;
+}
+
+export interface FamilyTrialBudget {
+  name: string;
+  daily_cap: number;
+  trials_today: number;
+  remaining: number;
+}
+
+export interface HypothesisStatsResponse {
+  total_hypotheses_created: number;
+  daily_family_trials: Record<string, FamilyTrialBudget>;
+  daily_global_cap: number;
+  real_capital_enabled: boolean;
+  execution_authority: string;
+}
+
+export interface HypothesesListResponse {
+  status: string;
+  hypotheses: CausalHypothesis[];
+  total: number;
+  limit: number;
+  offset: number;
+  execution_isolation: string;
+}
+
+export interface SynthesizeResponse {
+  status: string;
+  count: number;
+  hypotheses: CausalHypothesis[];
+  execution_isolation: string;
+}
+
+export interface FamiliesResponse {
+  families: ResearchFamily[];
+  mechanisms: CausalMechanism[];
+  governance_level: string;
+}
+
 
 
 

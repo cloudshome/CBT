@@ -456,4 +456,3 @@ def test_intelligence_rest_endpoints():
         assert res_narratives.status_code == 200
         narr_data = res_narratives.json()
         assert "narratives" in narr_data
-

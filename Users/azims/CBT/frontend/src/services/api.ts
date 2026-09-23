@@ -58,6 +58,12 @@ import {
   IntelligenceRecordsResponse,
   NarrativesResponse,
   ScoutTelemetry,
+  CausalHypothesis,
+  CausalFirewallDecision,
+  HypothesisStatsResponse,
+  HypothesesListResponse,
+  SynthesizeResponse,
+  FamiliesResponse,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -4905,5 +4911,111 @@ export async function ingestIntelligenceUrl(
 
 export async function getIntelligenceDiagnostics(): Promise<any> {
   const res = await authFetch('/api/v1/intelligence/diagnostics');
+  return await handleResponse(res);
+}
+
+// ============================================================================
+// Milestone 28: Cross-Domain Macro-Micro Causal Synthesis API Methods
+// ============================================================================
+
+export async function getHypotheses(params?: {
+  family_id?: string;
+  status?: string;
+  target_asset?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<HypothesesListResponse> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.family_id) query.set('family_id', params.family_id);
+    if (params?.status) query.set('status', params.status);
+    if (params?.target_asset) query.set('target_asset', params.target_asset);
+    if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.offset !== undefined) query.set('offset', String(params.offset));
+
+    const url = `/api/v1/intelligence/hypotheses?${query.toString()}`;
+    const res = await authFetch(url);
+    if (!res.ok) {
+      return { status: 'error', hypotheses: [], total: 0, limit: params?.limit || 50, offset: params?.offset || 0, execution_isolation: 'STRICT_RESEARCH_ONLY' };
+    }
+    return await handleResponse<HypothesesListResponse>(res);
+  } catch {
+    return { status: 'error', hypotheses: [], total: 0, limit: params?.limit || 50, offset: params?.offset || 0, execution_isolation: 'STRICT_RESEARCH_ONLY' };
+  }
+}
+
+export async function synthesizeHypotheses(params?: {
+  record_ids?: string[];
+  target_asset?: string;
+  timeframe?: string;
+  auto_validate?: boolean;
+}): Promise<SynthesizeResponse> {
+  const res = await authFetch('/api/v1/intelligence/hypotheses/synthesize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      record_ids: params?.record_ids || [],
+      target_asset: params?.target_asset || 'BTC/USDT',
+      timeframe: params?.timeframe || '5m',
+      auto_validate: params?.auto_validate !== undefined ? params.auto_validate : true,
+    }),
+  });
+  return await handleResponse<SynthesizeResponse>(res);
+}
+
+export async function getResearchFamilies(): Promise<FamiliesResponse> {
+  try {
+    const res = await authFetch('/api/v1/intelligence/hypotheses/families');
+    if (!res.ok) {
+      return { families: [], mechanisms: [], governance_level: 'LEVEL_2_RESEARCH_PROTOCOL' };
+    }
+    return await handleResponse<FamiliesResponse>(res);
+  } catch {
+    return { families: [], mechanisms: [], governance_level: 'LEVEL_2_RESEARCH_PROTOCOL' };
+  }
+}
+
+export async function getHypothesisStats(): Promise<HypothesisStatsResponse> {
+  try {
+    const res = await authFetch('/api/v1/intelligence/hypotheses/stats');
+    if (!res.ok) {
+      return {
+        total_hypotheses_created: 0,
+        daily_family_trials: {},
+        daily_global_cap: 50,
+        real_capital_enabled: false,
+        execution_authority: 'NON_EXECUTABLE_RESEARCH_HYPOTHESIS',
+      };
+    }
+    return await handleResponse<HypothesisStatsResponse>(res);
+  } catch {
+    return {
+      total_hypotheses_created: 0,
+      daily_family_trials: {},
+      daily_global_cap: 50,
+      real_capital_enabled: false,
+      execution_authority: 'NON_EXECUTABLE_RESEARCH_HYPOTHESIS',
+    };
+  }
+}
+
+export async function validateHypothesis(
+  hypothesisId: string
+): Promise<{ status: string; decision: CausalFirewallDecision; hypothesis: CausalHypothesis }> {
+  const res = await authFetch(`/api/v1/intelligence/hypotheses/${encodeURIComponent(hypothesisId)}/validate`, {
+    method: 'POST',
+  });
+  return await handleResponse(res);
+}
+
+export async function dispatchHypothesis(
+  hypothesisId: string,
+  frictionalTier = 'CONSERVATIVE'
+): Promise<{ status: string; plan: Record<string, any> }> {
+  const res = await authFetch(`/api/v1/intelligence/hypotheses/${encodeURIComponent(hypothesisId)}/dispatch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ frictional_tier: frictionalTier }),
+  });
   return await handleResponse(res);
 }
