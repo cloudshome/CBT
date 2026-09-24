@@ -21,7 +21,7 @@ import math
 import time
 import uuid
 from enum import Enum
-from typing import Literal
+from typing import Final, Literal
 
 from pydantic import BaseModel, Field
 
@@ -31,6 +31,21 @@ from core.intelligence.forward_validation.orderbook_tracker import (
 )
 
 logger = logging.getLogger("ai_quant_sentinel.intelligence.paper_fill")
+
+# Microstructure model classification
+QUEUE_MODEL: Final[str] = "APPROXIMATE_AGGREGATED_L2"
+CANCELLATION_SCOPE: Final[str] = "SIMULATION_ONLY_CANCEL"
+
+QUEUE_MODEL_ASSUMPTIONS: Final[tuple[str, ...]] = (
+    "Queue position initialization is proportional to visible aggregate depth",
+    "Hidden liquidity and icebergs are unobserved in aggregated L2",
+    "Order cancellations ahead of simulated order in queue are unobserved",
+    "Same-price order arrivals are assigned priority after current queue",
+    "Trade attribution ambiguity exists across multi-trade fills",
+    "Event batching on exchange WebSocket can delay fill notifications",
+    "Feed network latency can cause price slippage between decision and fill",
+    "Partial execution uncertainty is handled via depth walking up to slippage limit",
+)
 
 
 class OrderSide(str, Enum):
@@ -383,10 +398,21 @@ class RealisticPaperFillSimulator:
         return False
 
     def cancel_all_orders_for_admission(self, admission_id: str) -> list[str]:
-        """Cancels all resting limit orders for an admission ID. Returns list of cancelled order IDs."""
+        """
+        Cancels all resting simulated limit orders for an admission ID.
+        Scope: SIMULATION_ONLY_CANCEL. Zero live exchange or execution router interaction.
+        Returns list of cancelled simulated order IDs.
+        """
         cancelled_ids: list[str] = []
         for oid, order in list(self._resting_limit_orders.items()):
             if order.admission_id == admission_id:
                 del self._resting_limit_orders[oid]
                 cancelled_ids.append(oid)
+        if cancelled_ids:
+            logger.info(
+                "[%s] Cancelled %d simulated resting orders for %s",
+                CANCELLATION_SCOPE,
+                len(cancelled_ids),
+                admission_id,
+            )
         return cancelled_ids

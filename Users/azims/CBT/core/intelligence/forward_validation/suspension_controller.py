@@ -227,12 +227,12 @@ class SuspensionController:
             policy_version=self.policy.policy_version,
         )
 
-        # 3. Cancel resting limit orders in fill simulator
+        # 3. Cancel resting limit orders in simulated fill environment (SIMULATION_ONLY_CANCEL)
         if self.fill_simulator and self.policy.auto_cancel_resting_orders:
             cancelled = self.fill_simulator.cancel_all_orders_for_admission(admission_id)
             if cancelled:
                 logger.info(
-                    "Cancelled %d resting limit orders for suspended strategy %s",
+                    "[SIMULATION_ONLY_CANCEL] Cancelled %d simulated resting orders for suspended strategy %s",
                     len(cancelled),
                     admission_id,
                 )

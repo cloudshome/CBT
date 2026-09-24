@@ -11,8 +11,12 @@ Evaluates forward paper execution against historical backtest distributions acro
 4. Execution Spread & Slippage Drift: Modeled vs realized paper slippage ratio.
 5. Market Regime Shift: Forward operating regime vs backtest regime assumptions.
 
-Enforces Denominator Transparency:
-Returns INCONCLUSIVE whenever sample size N < 30.
+Epistemic & Statistical Governance:
+- Denominator Transparency: Returns INCONCLUSIVE whenever sample size N < 30.
+- Statistical vs Economic Significance: A p < 0.01 threshold is an empirical research indicator,
+  not an autonomous execution verdict. Requires sample size, effect size, and economic context.
+- Multiple-Testing Awareness: Evaluation should be contextualized against family-wise error rates
+  when monitoring large leagues of concurrent strategies.
 """
 
 from __future__ import annotations
