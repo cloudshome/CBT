@@ -11,6 +11,10 @@ import {
   ReplayResponse,
   CausalFailureAutopsy,
   DurableExperimentPlan,
+  ResearchTemplate,
+  MultipleTestingBatch,
+  EvidenceLineageResponse,
+  QualifyResponse,
 } from '../types';
 import {
   getIntelligenceStatus,
@@ -31,11 +35,21 @@ import {
   createResearchContract,
   getExperimentPlans,
   runCausalReplay,
+  getCrawlerStatus,
+  getCrawlerSources,
+  getCrawlerConflicts,
+  pauseCrawler,
+  resumeCrawler,
+  triggerCrawlRun,
+  getCrawlerTemplates,
+  getCrawlerMultipleTesting,
+  getEvidenceLineage,
+  qualifyEvent,
 } from '../services/api';
 
 export const IntelligenceCockpit: React.FC = () => {
-  // Subview toggle: FEED vs HYPOTHESIS_LAB vs REPLAY_LAB
-  const [activeTab, setActiveTab] = useState<'FEED' | 'HYPOTHESIS_LAB' | 'REPLAY_LAB'>('FEED');
+  // Subview toggle: FEED vs HYPOTHESIS_LAB vs REPLAY_LAB vs AUTONOMOUS_SCOUT
+  const [activeTab, setActiveTab] = useState<'FEED' | 'HYPOTHESIS_LAB' | 'REPLAY_LAB' | 'AUTONOMOUS_SCOUT'>('FEED');
 
   // Milestone 27 Feed State
   const [statusData, setStatusData] = useState<IntelligenceStatusResponse | null>(null);
@@ -76,6 +90,25 @@ export const IntelligenceCockpit: React.FC = () => {
   const [selectedAutopsy, setSelectedAutopsy] = useState<CausalFailureAutopsy | null>(null);
   const [replayFeedback, setReplayFeedback] = useState<string | null>(null);
   const [selectedFrictionTier, setSelectedFrictionTier] = useState<string>('CONSERVATIVE');
+
+  // Milestone 30-C Autonomous Scout & Qualification State
+  const [crawlerStatusData, setCrawlerStatusData] = useState<any>(null);
+  const [crawlerTemplates, setCrawlerTemplates] = useState<ResearchTemplate[]>([]);
+  const [crawlerBatches, setCrawlerBatches] = useState<MultipleTestingBatch[]>([]);
+  const [crawlerConflicts, setCrawlerConflicts] = useState<any[]>([]);
+  const [crawlerSources, setCrawlerSources] = useState<any[]>([]);
+  const [qualificationResult, setQualificationResult] = useState<QualifyResponse | null>(null);
+  const [lineageTrace, setLineageTrace] = useState<EvidenceLineageResponse | null>(null);
+  const [qualifyEvidenceId, setQualifyEvidenceId] = useState<string>('');
+  const [qualifyEventId, setQualifyEventId] = useState<string>('');
+  const [qualifyTemplateId, setQualifyTemplateId] = useState<string>('MACRO_INFLATION_SURPRISE_V1');
+  const [qualifyMechanismId, setQualifyMechanismId] = useState<string>('MECH_01_REAL_RATE_DISCOUNTING');
+  const [qualifyAsset, setQualifyAsset] = useState<string>('BTC/USDT');
+  const [qualifyDirection, setQualifyDirection] = useState<string>('SHORT');
+  const [qualifyHorizon, setQualifyHorizon] = useState<string>('4h');
+  const [isQualifying, setIsQualifying] = useState<boolean>(false);
+  const [scoutOpLoading, setScoutOpLoading] = useState<boolean>(false);
+  const [scoutFeedback, setScoutFeedback] = useState<string | null>(null);
 
   // =========================================================================
   // Telemetry Fetchers
@@ -159,18 +192,116 @@ export const IntelligenceCockpit: React.FC = () => {
     }
   };
 
+  const fetchCrawlerData = useCallback(async () => {
+    try {
+      const [sRes, tRes, bRes, cRes, srcRes] = await Promise.all([
+        getCrawlerStatus(),
+        getCrawlerTemplates(),
+        getCrawlerMultipleTesting(),
+        getCrawlerConflicts(),
+        getCrawlerSources(),
+      ]);
+      setCrawlerStatusData(sRes);
+      if (tRes && tRes.templates) setCrawlerTemplates(tRes.templates);
+      if (bRes && bRes.batches) setCrawlerBatches(bRes.batches);
+      if (cRes && cRes.conflicts) setCrawlerConflicts(cRes.conflicts);
+      if (srcRes && srcRes.sources) setCrawlerSources(srcRes.sources);
+    } catch (err: any) {
+      console.error('Failed to fetch autonomous scout telemetry:', err);
+    }
+  }, []);
+
+  const handleTriggerCrawl = async () => {
+    setScoutOpLoading(true);
+    setScoutFeedback('Initiating institutional crawler run across registered sources...');
+    try {
+      const res = await triggerCrawlRun();
+      setScoutFeedback(`Crawl run completed: Seen: ${res.records_seen}, Accepted: ${res.records_accepted}, Quarantined: ${res.records_quarantined}`);
+      await fetchCrawlerData();
+    } catch (err: any) {
+      setScoutFeedback(`Crawl failed: ${err.message || 'Error'}`);
+    } finally {
+      setScoutOpLoading(false);
+    }
+  };
+
+  const handlePauseCrawler = async () => {
+    setScoutOpLoading(true);
+    try {
+      await pauseCrawler();
+      setScoutFeedback('Autonomous crawler paused.');
+      await fetchCrawlerData();
+    } catch (err: any) {
+      setScoutFeedback(`Pause failed: ${err.message || 'Error'}`);
+    } finally {
+      setScoutOpLoading(false);
+    }
+  };
+
+  const handleResumeCrawler = async () => {
+    setScoutOpLoading(true);
+    try {
+      await resumeCrawler();
+      setScoutFeedback('Autonomous crawler resumed.');
+      await fetchCrawlerData();
+    } catch (err: any) {
+      setScoutFeedback(`Resume failed: ${err.message || 'Error'}`);
+    } finally {
+      setScoutOpLoading(false);
+    }
+  };
+
+  const handleQualifyEvent = async () => {
+    if (!qualifyEvidenceId || !qualifyEventId) {
+      alert('Please provide Evidence ID and Canonical Event ID.');
+      return;
+    }
+    setIsQualifying(true);
+    setScoutFeedback('Executing 5-stage qualification pipeline (Fact -> Compiler -> Firewall -> Plan)...');
+    try {
+      const res = await qualifyEvent({
+        evidence_id: qualifyEvidenceId,
+        canonical_event_id: qualifyEventId,
+        template_id: qualifyTemplateId,
+        mechanism_id: qualifyMechanismId,
+        target_asset: qualifyAsset,
+        direction: qualifyDirection,
+        horizon: qualifyHorizon,
+      });
+      setQualificationResult(res);
+      setScoutFeedback(`Qualification status: ${res.status}`);
+      await fetchCrawlerData();
+    } catch (err: any) {
+      setScoutFeedback(`Qualification failed: ${err.message || 'Error'}`);
+    } finally {
+      setIsQualifying(false);
+    }
+  };
+
+  const handleInspectLineage = async (nodeId: string) => {
+    try {
+      const res = await getEvidenceLineage(nodeId);
+      setLineageTrace(res);
+    } catch (err: any) {
+      alert(`Lineage retrieval error: ${err.message || 'Error'}`);
+    }
+  };
+
   useEffect(() => {
     fetchFeedTelemetry();
     fetchLabData();
+    fetchCrawlerData();
     const interval = setInterval(() => {
       if (activeTab === 'FEED') {
         fetchFeedTelemetry();
+      } else if (activeTab === 'AUTONOMOUS_SCOUT') {
+        fetchCrawlerData();
       } else {
         fetchLabData();
       }
     }, 15000);
     return () => clearInterval(interval);
-  }, [activeTab, fetchFeedTelemetry, fetchLabData]);
+  }, [activeTab, fetchFeedTelemetry, fetchLabData, fetchCrawlerData]);
 
   // =========================================================================
   // Feed Actions
@@ -404,6 +535,19 @@ export const IntelligenceCockpit: React.FC = () => {
             <span>🔬 Replay & Falsification</span>
             <span className="px-1.5 py-0.2 text-[10px] font-mono bg-amber-950 text-amber-300 rounded border border-amber-700/60">
               M29
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('AUTONOMOUS_SCOUT')}
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+              activeTab === 'AUTONOMOUS_SCOUT'
+                ? 'bg-emerald-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <span>🌐 Autonomous Scout</span>
+            <span className="px-1.5 py-0.2 text-[10px] font-mono bg-emerald-950 text-emerald-300 rounded border border-emerald-700/60">
+              M30
             </span>
           </button>
         </div>
@@ -1283,6 +1427,474 @@ export const IntelligenceCockpit: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          VIEW 4: AUTONOMOUS SCOUT & EVIDENCE QUALIFICATION (M30)
+          ===================================================================== */}
+      {activeTab === 'AUTONOMOUS_SCOUT' && (
+        <div className="flex flex-col gap-6">
+          {/* Scout Daemon Banner & Invariant Header */}
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-slate-900/90 border border-slate-800 rounded-xl">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Autonomous Scout Status:
+              </span>
+              <span className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg ${
+                crawlerStatusData?.scout_status === 'CRAWLING'
+                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-700 animate-pulse'
+                  : crawlerStatusData?.scout_status === 'PAUSED'
+                  ? 'bg-amber-950 text-amber-300 border border-amber-700'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700'
+              }`}>
+                {crawlerStatusData?.scout_status || 'IDLE'}
+              </span>
+              <span className="text-xs font-mono text-slate-400">
+                Sources: {crawlerSources.length} registered
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleTriggerCrawl}
+                disabled={scoutOpLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <span>🚀</span> Trigger Crawl Run
+              </button>
+              <button
+                onClick={handlePauseCrawler}
+                disabled={scoutOpLoading}
+                className="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-700/60 rounded-lg transition disabled:opacity-50"
+              >
+                ⏸ Pause
+              </button>
+              <button
+                onClick={handleResumeCrawler}
+                disabled={scoutOpLoading}
+                className="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-700/60 rounded-lg transition disabled:opacity-50"
+              >
+                ▶ Resume
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback banner */}
+          {scoutFeedback && (
+            <div className="p-3 bg-slate-900 border border-cyan-800/60 rounded-xl text-xs font-mono text-cyan-300 flex items-center justify-between">
+              <span>{scoutFeedback}</span>
+              <button onClick={() => setScoutFeedback(null)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+          )}
+
+          {/* Institutional Epistemic Architecture Banner */}
+          <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col gap-3">
+            <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <span>🛡️</span> Level 1 Causal Qualification Firewall & Epistemic Hierarchy
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700">
+                  REAL_CAPITAL_ENABLED = FALSE
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-700">
+                  NON_EXECUTABLE_RESEARCH
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+              <div className="p-3 bg-blue-950/40 border border-blue-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-xs font-bold font-mono text-blue-400">1. RAW_OBSERVATION</span>
+                <span className="text-[11px] text-slate-300">Wire Payload / Tamper Seal</span>
+                <span className="text-[10px] text-slate-500 font-mono">Immutable SQLite Vault</span>
+              </div>
+              <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-xs font-bold font-mono text-emerald-400">2. DERIVED_FACT</span>
+                <span className="text-[11px] text-slate-300">Deterministic Delta Δ</span>
+                <span className="text-[10px] text-slate-500 font-mono">Orthogonal Confidence</span>
+              </div>
+              <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-xs font-bold font-mono text-amber-400">3. CAUSAL_HYPOTHESIS</span>
+                <span className="text-[11px] text-slate-300">10-Check Compiler + Dedup</span>
+                <span className="text-[10px] text-slate-500 font-mono">Point-in-Time Contract</span>
+              </div>
+              <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-lg flex flex-col gap-1">
+                <span className="text-xs font-bold font-mono text-purple-400">4. RESEARCH_QUALIFIED</span>
+                <span className="text-[11px] text-slate-300">9-Gate Admissibility Pass</span>
+                <span className="text-[10px] text-slate-500 font-mono">Preregistered Replay Plan</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Qualification Trigger Desk */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Qualification Form */}
+            <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>⚡</span> Manual Event Qualification Desk
+              </h3>
+              <p className="text-xs text-slate-400">
+                Submit an unparsed wire evidence ID to execute the 5-stage qualification pipeline.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 font-semibold">Evidence Vault ID:</label>
+                  <input
+                    type="text"
+                    value={qualifyEvidenceId}
+                    onChange={(e) => setQualifyEvidenceId(e.target.value)}
+                    placeholder="e.g. EV-20260924-BLS-CPI"
+                    className="w-full mt-1 px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-white font-mono focus:border-cyan-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 font-semibold">Canonical Event ID:</label>
+                  <input
+                    type="text"
+                    value={qualifyEventId}
+                    onChange={(e) => setQualifyEventId(e.target.value)}
+                    placeholder="e.g. EVENT_MACRO_INFLATION_PRINT_20260924_BLS_CPI"
+                    className="w-full mt-1 px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-white font-mono focus:border-cyan-500 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">Template:</label>
+                    <select
+                      value={qualifyTemplateId}
+                      onChange={(e) => setQualifyTemplateId(e.target.value)}
+                      className="w-full mt-1 px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 outline-none"
+                    >
+                      {crawlerTemplates.map((t) => (
+                        <option key={t.template_id} value={t.template_id}>{t.template_id}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">Mechanism ID:</label>
+                    <input
+                      type="text"
+                      value={qualifyMechanismId}
+                      onChange={(e) => setQualifyMechanismId(e.target.value)}
+                      className="w-full mt-1 px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-white font-mono outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 font-semibold">Direction:</label>
+                  <select
+                    value={qualifyDirection}
+                    onChange={(e) => setQualifyDirection(e.target.value)}
+                    className="w-full mt-1 px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 outline-none"
+                  >
+                    <option value="SHORT">SHORT (Bearish)</option>
+                    <option value="LONG">LONG (Bullish)</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">Asset:</label>
+                    <input
+                      type="text"
+                      value={qualifyAsset}
+                      onChange={(e) => setQualifyAsset(e.target.value)}
+                      className="w-full mt-1 px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-white font-mono outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">Horizon:</label>
+                    <input
+                      type="text"
+                      value={qualifyHorizon}
+                      onChange={(e) => setQualifyHorizon(e.target.value)}
+                      className="w-full mt-1 px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg text-white font-mono outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleQualifyEvent}
+                  disabled={isQualifying}
+                  className="mt-2 w-full py-2.5 text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition disabled:opacity-50 shadow"
+                >
+                  {isQualifying ? 'Qualifying Evidence...' : '⚡ Run Causal Qualification'}
+                </button>
+              </div>
+            </div>
+
+            {/* Pipeline Stage Outcome Cards */}
+            <div className="lg:col-span-2 flex flex-col gap-4">
+              {qualificationResult ? (
+                <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>🔬</span> Qualification Outcome: <span className="font-mono text-cyan-400">{qualificationResult.status}</span>
+                    </h4>
+                    <span className="text-xs font-mono text-slate-400">
+                      Lineage Root: {qualificationResult.fact.fact_id}
+                    </span>
+                  </div>
+
+                  {/* Fact Details */}
+                  <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-emerald-400 font-mono">[DERIVED_FACT]</span>
+                      <span className="font-mono text-slate-400">{qualificationResult.fact.fact_id}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                      <div>
+                        <span className="text-slate-500">Metric:</span> {qualificationResult.fact.metric_name}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Value:</span> {qualificationResult.fact.metric_value} {qualificationResult.fact.unit}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Quarantine:</span> {qualificationResult.fact.is_quarantined ? 'YES' : 'NO'}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Entity:</span> {qualificationResult.fact.entity}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-800/60 text-xs font-mono">
+                      <span className="text-slate-400">Orthogonal Scores:</span>
+                      <span className="text-blue-300">Source: {qualificationResult.fact.confidence_scores.source_reliability.toFixed(2)}</span>
+                      <span className="text-emerald-300">Fact: {qualificationResult.fact.confidence_scores.fact_confidence.toFixed(2)}</span>
+                      <span className="text-purple-300">Causal Prior: {qualificationResult.fact.confidence_scores.causal_prior_strength.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Compilation & Firewall Status */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                    <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg flex flex-col gap-1.5">
+                      <span className="font-bold text-amber-400">[COMPILATION CHECK]</span>
+                      <div>Success: {qualificationResult.compilation.success ? 'PASS' : 'REJECT'}</div>
+                      {qualificationResult.compilation.hypothesis_id && (
+                        <div>Hypo ID: {qualificationResult.compilation.hypothesis_id}</div>
+                      )}
+                      {qualificationResult.compilation.rejection_reason && (
+                        <div className="text-rose-400">Reason: {qualificationResult.compilation.rejection_reason}</div>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-lg flex flex-col gap-1.5">
+                      <span className="font-bold text-purple-400">[FIREWALL ADMISSIBILITY]</span>
+                      {qualificationResult.firewall ? (
+                        <>
+                          <div>Admissible: {qualificationResult.firewall.admissible ? 'QUALIFIED_FOR_RESEARCH' : 'REJECTED'}</div>
+                          <div>Causal Truth Proven: {String(qualificationResult.firewall.causal_validity_established)}</div>
+                          <div>Replay Required: {String(qualificationResult.firewall.replay_required)}</div>
+                        </>
+                      ) : (
+                        <div className="text-slate-500">Not reached (compilation failed)</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Plan Preregistration */}
+                  {qualificationResult.plan?.plan_id && (
+                    <div className="p-3 bg-emerald-950/40 border border-emerald-700/60 rounded-lg flex items-center justify-between text-xs font-mono">
+                      <div>
+                        <span className="font-bold text-emerald-300">[PREREGISTERED REPLAY PLAN]</span>
+                        <div className="text-slate-300 mt-1">Plan ID: {qualificationResult.plan.plan_id}</div>
+                        <div className="text-slate-400">Contract ID: {qualificationResult.plan.contract_id}</div>
+                      </div>
+                      <button
+                        onClick={() => handleInspectLineage(qualificationResult.plan?.lineage_node_id || '')}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded border border-cyan-800 transition"
+                      >
+                        Inspect Lineage Graph
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 bg-slate-900/60 border border-slate-800 border-dashed rounded-xl flex flex-col items-center justify-center text-center text-slate-400 text-xs">
+                  <span className="text-2xl mb-2">📋</span>
+                  <span>No event currently submitted for qualification. Select an event from crawl runs below or submit an ID.</span>
+                </div>
+              )}
+
+              {/* Lineage Trace Modal/Display if active */}
+              {lineageTrace && (
+                <div className="p-4 bg-slate-900 border border-cyan-800 rounded-xl flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold font-mono text-cyan-300">
+                      Provenance Trace (Depth: {lineageTrace.lineage_depth})
+                    </span>
+                    <button onClick={() => setLineageTrace(null)} className="text-slate-400 hover:text-white text-xs">✕ Close</button>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {lineageTrace.trace.map((node, i) => (
+                      <div key={node.node_id} className="p-2 bg-slate-950 border border-slate-800 rounded text-xs font-mono flex items-center justify-between">
+                        <span>{i + 1}. [{node.evidence_kind}] {node.node_id}</span>
+                        <span className="text-[10px] text-slate-500">Hash: {node.content_hash_sha256.substring(0, 10)}...</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Research Templates & Multiple-Testing Telemetry Table */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Versioned Research Templates */}
+            <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <span>📜</span> Versioned Research Templates ({crawlerTemplates.length})
+              </h4>
+              <div className="overflow-x-auto max-h-60 overflow-y-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400">
+                      <th className="pb-2">Template ID</th>
+                      <th className="pb-2">Family</th>
+                      <th className="pb-2">Horizons</th>
+                      <th className="pb-2">DSR Hurdle</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {crawlerTemplates.map((t) => (
+                      <tr key={t.template_id} className="text-slate-300">
+                        <td className="py-2 text-cyan-400 font-semibold">{t.template_id}</td>
+                        <td className="py-2 text-slate-400">{t.causal_family}</td>
+                        <td className="py-2 text-amber-300">{t.allowed_horizons.join(', ')}</td>
+                        <td className="py-2 text-emerald-400">≥ {t.required_dsr}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Multiple-Testing Ledger */}
+            <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <span>📊</span> Multiple-Testing Discovery Batches ({crawlerBatches.length})
+              </h4>
+              <div className="overflow-x-auto max-h-60 overflow-y-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400">
+                      <th className="pb-2">Batch ID</th>
+                      <th className="pb-2">Family</th>
+                      <th className="pb-2">Gen / Tested</th>
+                      <th className="pb-2">Policy</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {crawlerBatches.map((b) => (
+                      <tr key={b.batch_id} className="text-slate-300">
+                        <td className="py-2 text-purple-400 font-semibold">{b.batch_id}</td>
+                        <td className="py-2 text-slate-400">{b.family_id}</td>
+                        <td className="py-2 text-emerald-400">{b.hypotheses_generated} / {b.hypotheses_tested}</td>
+                        <td className="py-2 text-slate-400">{b.multiple_testing_policy}</td>
+                      </tr>
+                    ))}
+                    {crawlerBatches.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-center text-slate-500">
+                          No discovery batches registered yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Crawl Runs & Tamper Vault Telemetry */}
+          <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <span>🗄️</span> Evidence Vault & Ingestion Runs Telemetry
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400">
+                    <th className="pb-2">Run ID</th>
+                    <th className="pb-2">Requested By</th>
+                    <th className="pb-2">Timestamp</th>
+                    <th className="pb-2">Accepted</th>
+                    <th className="pb-2">Rejected</th>
+                    <th className="pb-2">Tamper Seal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {(crawlerStatusData?.recent_runs || []).map((r: any) => (
+                    <tr key={r.run_id} className="text-slate-300">
+                      <td className="py-2 text-cyan-400 font-semibold">{r.run_id}</td>
+                      <td className="py-2 text-slate-400">{r.requested_by}</td>
+                      <td className="py-2 text-slate-400">{new Date(r.start_time).toLocaleTimeString()}</td>
+                      <td className="py-2 text-emerald-400">{r.records_accepted}</td>
+                      <td className="py-2 text-rose-400">{r.records_rejected}</td>
+                      <td className="py-2 text-emerald-400 font-bold">SHA-256 VERIFIED</td>
+                    </tr>
+                  ))}
+                  {(!crawlerStatusData?.recent_runs || crawlerStatusData.recent_runs.length === 0) && (
+                    <tr>
+                      <td colSpan={6} className="py-4 text-center text-slate-500">
+                        No recent crawl runs recorded.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Discrepancies & Contradictions Desk */}
+          <div className="p-5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <span>⚠️</span> Conflict & Discrepancies Quarantine Ledger ({crawlerConflicts.length})
+              </h4>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Unresolved contradictions block causal qualification
+              </span>
+            </div>
+            <div className="overflow-x-auto max-h-48 overflow-y-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400">
+                    <th className="pb-2">Conflict ID</th>
+                    <th className="pb-2">Event ID</th>
+                    <th className="pb-2">Type</th>
+                    <th className="pb-2">Status</th>
+                    <th className="pb-2">Sources Disagreeing</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {crawlerConflicts.map((c) => (
+                    <tr key={c.conflict_id} className="text-slate-300">
+                      <td className="py-2 text-amber-400 font-semibold">{c.conflict_id}</td>
+                      <td className="py-2 text-slate-400">{c.event_id}</td>
+                      <td className="py-2 text-slate-300">{c.conflict_type}</td>
+                      <td className="py-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] ${
+                          c.status === 'UNRESOLVED' ? 'bg-rose-950 text-rose-300' : 'bg-slate-800 text-slate-300'
+                        }`}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="py-2 text-slate-400">{c.source_a} vs {c.source_b}</td>
+                    </tr>
+                  ))}
+                  {crawlerConflicts.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-3 text-center text-slate-500">
+                        Zero contradictory discrepancies in conflict ledger.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

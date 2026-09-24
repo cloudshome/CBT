@@ -2566,6 +2566,135 @@ export interface PlansListResponse {
   plans: DurableExperimentPlan[];
 }
 
+// ============================================================================
+// Milestone 30-C: Evidence Qualification & Research Integration Interfaces
+// ============================================================================
+
+export type EvidenceKind =
+  | 'raw_observation'
+  | 'derived_fact'
+  | 'temporal_association'
+  | 'mechanistic_claim'
+  | 'causal_hypothesis'
+  | 'empirically_validated';
+
+export type CausalQualificationStatus =
+  | 'CANDIDATE_GENERATED'
+  | 'EVIDENCE_ADMISSIBLE'
+  | 'FIREWALL_EVALUATED'
+  | 'QUALIFIED_FOR_RESEARCH'
+  | 'PREREGISTERED_REPLAY_PENDING'
+  | 'OUT_OF_SAMPLE_VALIDATION'
+  | 'FALSIFIED'
+  | 'RESEARCH_CONCLUSION_RECORDED';
+
+export interface ConfidenceScores {
+  source_reliability: number;
+  fact_confidence: number;
+  causal_prior_strength: number;
+}
+
+export interface EvidenceLineageNode {
+  node_id: string;
+  parent_ids: string[];
+  evidence_kind: EvidenceKind;
+  timestamp_utc: number;
+  schema_version: string;
+  content_hash_sha256: string;
+  producer_actor: string;
+  metadata: Record<string, any>;
+}
+
+export interface ResearchTemplate {
+  template_id: string;
+  causal_family: string;
+  allowed_horizons: string[];
+  outcome_definitions: string[];
+  multiple_testing_policy: string;
+  template_version: string;
+  default_lookback_days: number;
+  min_oos_trades: number;
+  required_dsr: number;
+  frictional_tier: string;
+}
+
+export interface EmpiricalFact {
+  fact_id: string;
+  evidence_kind: EvidenceKind;
+  canonical_event_id: string;
+  parent_evidence_id: string;
+  parent_content_sha256: string;
+  event_type: string;
+  entity: string;
+  metric_name: string;
+  metric_value: number;
+  unit: string;
+  confidence_scores: ConfidenceScores;
+  is_quarantined: boolean;
+  quarantine_reason?: string | null;
+  extracted_at_utc: number;
+  metadata?: Record<string, any>;
+}
+
+export interface MultipleTestingBatch {
+  batch_id: string;
+  family_id: string;
+  hypotheses_generated: number;
+  hypotheses_tested: number;
+  multiple_testing_policy: string;
+  classification: string;
+  created_at_utc: number;
+  updated_at_utc: number;
+}
+
+export interface CrawlerTemplatesResponse {
+  status: string;
+  total: number;
+  templates: ResearchTemplate[];
+}
+
+export interface CrawlerMultipleTestingResponse {
+  status: string;
+  total_batches: number;
+  batches: MultipleTestingBatch[];
+}
+
+export interface EvidenceLineageResponse {
+  status: string;
+  root_node: EvidenceLineageNode;
+  lineage_depth: number;
+  trace: EvidenceLineageNode[];
+}
+
+export interface QualifyResponse {
+  status: string;
+  fact: EmpiricalFact;
+  compilation: {
+    success: boolean;
+    hypothesis_id?: string;
+    rejection_reason?: string | null;
+    qualification_status: string;
+  };
+  firewall?: {
+    admissible: boolean;
+    qualification_status: string;
+    causal_validity_established: boolean;
+    replay_required: boolean;
+    hypothesis_id: string;
+    violations: string[];
+    gate_results: Record<string, boolean>;
+    lineage_node_id: string;
+  } | null;
+  plan?: {
+    success: boolean;
+    plan_id?: string | null;
+    contract_id?: string | null;
+    rejection_reason?: string | null;
+    lineage_node_id?: string | null;
+  } | null;
+}
+
+
 
 
 

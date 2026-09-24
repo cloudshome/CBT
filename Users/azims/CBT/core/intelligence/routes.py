@@ -30,6 +30,24 @@ from core.intelligence.causal_mechanisms import (
     RESEARCH_FAMILIES,
 )
 from core.intelligence.causal_synthesizer import global_causal_synthesizer
+from core.intelligence.crawler.causal_compiler import (
+    CausalHypothesisCompiler,
+)
+from core.intelligence.crawler.event_identity import CanonicalEvent, EventType
+from core.intelligence.crawler.fact_extractor import (
+    FactExtractor,
+)
+from core.intelligence.crawler.firewall_adapter import (
+    ResearchFirewallAdapter,
+)
+from core.intelligence.crawler.plan_generator import (
+    PreregisteredPlanGenerator,
+)
+from core.intelligence.crawler.qualification_contracts import (
+    ResearchTemplateRegistry,
+    global_lineage_ledger,
+    global_multiple_testing_ledger,
+)
 from core.intelligence.crawler.scout_controller import ScoutController
 from core.intelligence.dataset_manifest import DatasetManifest
 from core.intelligence.evidence_classifier import global_evidence_classifier
@@ -1102,4 +1120,206 @@ async def resume_crawler(
         "status": "success",
         "message": "Crawler resumed.",
         "scout_status": global_scout_controller.status.value,
+    }
+
+
+# =====================================================================
+# Milestone 30-C: Intelligence Qualification & Research Integration Routes
+# =====================================================================
+
+global_fact_extractor = FactExtractor(
+    vault=global_scout_controller.vault,
+    conflict_ledger=global_scout_controller.conflict_ledger,
+    source_registry=global_scout_controller.registry,
+    lineage_ledger=global_lineage_ledger,
+)
+global_causal_compiler = CausalHypothesisCompiler(
+    hypothesis_ledger=global_hypothesis_ledger,
+    template_registry=ResearchTemplateRegistry,
+    lineage_ledger=global_lineage_ledger,
+)
+global_firewall_adapter = ResearchFirewallAdapter(
+    validator=global_causal_firewall,
+    ledger=global_hypothesis_ledger,
+    lineage_ledger=global_lineage_ledger,
+)
+global_plan_generator = PreregisteredPlanGenerator(
+    plan_ledger=global_plan_ledger,
+    template_registry=ResearchTemplateRegistry,
+    lineage_ledger=global_lineage_ledger,
+    multiple_testing_ledger=global_multiple_testing_ledger,
+)
+
+
+class QualifyEventRequest(BaseModel):
+    evidence_id: str = Field(..., description="Target RawEvidenceRecord ID")
+    canonical_event_id: str = Field(..., description="CanonicalEvent ID")
+    template_id: str = Field("MACRO_INFLATION_SURPRISE_V1", description="ResearchTemplate ID")
+    mechanism_id: str = Field("MECH_01_REAL_RATE_DISCOUNTING", description="Mechanism ID")
+    target_asset: str = Field("BTC/USDT", description="Target trading asset")
+    direction: str = Field("SHORT", description="LONG or SHORT")
+    horizon: str = Field("4h", description="Evaluation time horizon")
+    batch_id: str = Field("BATCH_MANUAL_SCOUT", description="Discovery batch ID")
+
+
+@router.get("/crawler/templates")
+async def list_research_templates(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Lists versioned research templates governing empirical hypothesis testing."""
+    templates = ResearchTemplateRegistry.list_templates()
+    return {
+        "status": "success",
+        "total": len(templates),
+        "templates": [
+            {
+                "template_id": t.template_id,
+                "causal_family": t.causal_family.value,
+                "allowed_horizons": t.allowed_horizons,
+                "outcome_definitions": t.outcome_definitions,
+                "multiple_testing_policy": t.multiple_testing_policy,
+                "template_version": t.template_version,
+                "default_lookback_days": t.default_lookback_days,
+                "min_oos_trades": t.min_oos_trades,
+                "required_dsr": t.required_dsr,
+                "frictional_tier": t.frictional_tier,
+            }
+            for t in templates
+        ],
+    }
+
+
+@router.get("/crawler/multiple-testing")
+async def get_multiple_testing_status(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves discovery batch trial accounting and family exploration budgets."""
+    batches = global_multiple_testing_ledger.list_batches(limit=50)
+    return {
+        "status": "success",
+        "total_batches": len(batches),
+        "batches": batches,
+    }
+
+
+@router.get("/crawler/lineage/{node_id}")
+async def get_evidence_lineage(
+    node_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves full backward provenance lineage trace for a specific node."""
+    node = global_lineage_ledger.get_node(node_id)
+    if not node:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Lineage node '{node_id}' not found.",
+        )
+    trace = global_lineage_ledger.get_full_lineage(node_id)
+    return {
+        "status": "success",
+        "root_node": node.model_dump(),
+        "lineage_depth": len(trace),
+        "trace": [n.model_dump() for n in trace],
+    }
+
+
+@router.post("/crawler/qualify")
+async def qualify_intelligence_event(
+    req: QualifyEventRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """
+    Executes the complete Milestone 30-C qualification pipeline:
+    1. Raw Evidence & Tamper Verification
+    2. Empirical Fact Extraction (DERIVED_FACT)
+    3. Causal Hypothesis Compilation (10 Institutional Checks)
+    4. 9-Gate Causal Firewall Evaluation (QUALIFIED_FOR_RESEARCH)
+    5. Preregistered Research Plan Generation
+    """
+    ev_record = global_scout_controller.vault.get_evidence(req.evidence_id)
+    if not ev_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Evidence {req.evidence_id} not found in vault.",
+        )
+
+    # 1. Extract Fact
+    canonical_event = CanonicalEvent(
+        event_id=req.canonical_event_id,
+        event_type=EventType.MACRO_INFLATION_PRINT,
+        authority_or_issuer="BLS",
+        event_timestamp_utc=ev_record.published_at_utc,
+        jurisdiction="US",
+        affected_entities=["BTC"],
+        source_family="MACRO",
+        canonical_payload_hash=ev_record.content_sha256,
+    )
+
+    try:
+        fact = global_fact_extractor.extract_macro_surprise(
+            event=canonical_event,
+            record=ev_record,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Fact extraction failed: {e}",
+        ) from e
+
+    # 2. Causal Compilation (10 Checks)
+    compilation_res = global_causal_compiler.compile(
+        fact=fact,
+        template_id=req.template_id,
+        mechanism_id=req.mechanism_id,
+        target_asset=req.target_asset,
+        horizon=req.horizon,
+        direction=req.direction,
+    )
+
+    if not compilation_res.success or not compilation_res.hypothesis:
+        return {
+            "status": "COMPILATION_REJECTED",
+            "fact": fact.to_dict(),
+            "compilation": {
+                "success": False,
+                "rejection_reason": compilation_res.rejection_reason,
+                "qualification_status": compilation_res.qualification_status.value,
+            },
+            "firewall": None,
+            "plan": None,
+        }
+
+    # 3. 9-Gate Firewall Evaluation
+    firewall_res = global_firewall_adapter.evaluate_hypothesis(compilation_res.hypothesis)
+
+    if not firewall_res.admissible:
+        return {
+            "status": "FIREWALL_REJECTED",
+            "fact": fact.to_dict(),
+            "compilation": {
+                "success": True,
+                "hypothesis_id": compilation_res.hypothesis.hypothesis_id,
+                "qualification_status": compilation_res.qualification_status.value,
+            },
+            "firewall": firewall_res.to_dict(),
+            "plan": None,
+        }
+
+    # 4. Preregistered Research Plan Generation
+    plan_res = global_plan_generator.generate_plan(
+        hypothesis=compilation_res.hypothesis,
+        template_id=req.template_id,
+        batch_id=req.batch_id,
+    )
+
+    return {
+        "status": "QUALIFIED_AND_PREREGISTERED",
+        "fact": fact.to_dict(),
+        "compilation": {
+            "success": True,
+            "hypothesis_id": compilation_res.hypothesis.hypothesis_id,
+            "qualification_status": compilation_res.qualification_status.value,
+        },
+        "firewall": firewall_res.to_dict(),
+        "plan": plan_res.to_dict(),
     }

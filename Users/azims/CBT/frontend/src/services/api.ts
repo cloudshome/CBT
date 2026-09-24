@@ -69,6 +69,10 @@ import {
   CausalValidationResult,
   CausalFailureAutopsy,
   PlansListResponse,
+  CrawlerTemplatesResponse,
+  CrawlerMultipleTestingResponse,
+  EvidenceLineageResponse,
+  QualifyResponse,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -5099,4 +5103,76 @@ export async function getFailureAutopsy(
   const res = await authFetch(`/api/v1/intelligence/research/autopsies/${encodeURIComponent(hypothesisId)}`);
   return await handleResponse(res);
 }
+
+// ============================================================================
+// Milestone 30-C: Evidence Qualification & Research Integration API Methods
+// ============================================================================
+
+export async function getCrawlerStatus(): Promise<any> {
+  const res = await authFetch('/api/v1/intelligence/crawler/status');
+  return await handleResponse(res);
+}
+
+export async function getCrawlerSources(): Promise<any> {
+  const res = await authFetch('/api/v1/intelligence/crawler/sources');
+  return await handleResponse(res);
+}
+
+export async function getCrawlerConflicts(): Promise<any> {
+  const res = await authFetch('/api/v1/intelligence/crawler/conflicts');
+  return await handleResponse(res);
+}
+
+export async function pauseCrawler(): Promise<any> {
+  const res = await authFetch('/api/v1/intelligence/crawler/pause', { method: 'POST' });
+  return await handleResponse(res);
+}
+
+export async function resumeCrawler(): Promise<any> {
+  const res = await authFetch('/api/v1/intelligence/crawler/resume', { method: 'POST' });
+  return await handleResponse(res);
+}
+
+export async function triggerCrawlRun(domains?: string[], requestedBy: string = 'HUMAN_OPERATOR'): Promise<any> {
+  const res = await authFetch('/api/v1/intelligence/crawler/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ domains, requested_by: requestedBy }),
+  });
+  return await handleResponse(res);
+}
+
+export async function getCrawlerTemplates(): Promise<CrawlerTemplatesResponse> {
+  const res = await authFetch('/api/v1/intelligence/crawler/templates');
+  return await handleResponse<CrawlerTemplatesResponse>(res);
+}
+
+export async function getCrawlerMultipleTesting(): Promise<CrawlerMultipleTestingResponse> {
+  const res = await authFetch('/api/v1/intelligence/crawler/multiple-testing');
+  return await handleResponse<CrawlerMultipleTestingResponse>(res);
+}
+
+export async function getEvidenceLineage(nodeId: string): Promise<EvidenceLineageResponse> {
+  const res = await authFetch(`/api/v1/intelligence/crawler/lineage/${encodeURIComponent(nodeId)}`);
+  return await handleResponse<EvidenceLineageResponse>(res);
+}
+
+export async function qualifyEvent(data: {
+  evidence_id: string;
+  canonical_event_id: string;
+  template_id?: string;
+  mechanism_id?: string;
+  target_asset?: string;
+  direction?: string;
+  horizon?: string;
+  batch_id?: string;
+}): Promise<QualifyResponse> {
+  const res = await authFetch('/api/v1/intelligence/crawler/qualify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return await handleResponse<QualifyResponse>(res);
+}
+
 
