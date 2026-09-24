@@ -15,6 +15,7 @@ import {
   MultipleTestingBatch,
   EvidenceLineageResponse,
   QualifyResponse,
+  DispatchReplayResponse,
 } from '../types';
 import {
   getIntelligenceStatus,
@@ -45,6 +46,8 @@ import {
   getCrawlerMultipleTesting,
   getEvidenceLineage,
   qualifyEvent,
+  dispatchReplay,
+  getResearchDossier,
 } from '../services/api';
 
 export const IntelligenceCockpit: React.FC = () => {
@@ -109,6 +112,38 @@ export const IntelligenceCockpit: React.FC = () => {
   const [isQualifying, setIsQualifying] = useState<boolean>(false);
   const [scoutOpLoading, setScoutOpLoading] = useState<boolean>(false);
   const [scoutFeedback, setScoutFeedback] = useState<string | null>(null);
+
+  // Milestone 30-D Replay Runner & Statistical Audit State
+  const [replayM30DResult, setReplayM30DResult] = useState<DispatchReplayResponse | null>(null);
+  const [isReplayingM30D, setIsReplayingM30D] = useState<boolean>(false);
+  const [dossierModalContent, setDossierModalContent] = useState<string | null>(null);
+  const [replayErrorM30D, setReplayErrorM30D] = useState<string | null>(null);
+
+  const handleDispatchReplayM30D = async (planId: string) => {
+    setIsReplayingM30D(true);
+    setReplayErrorM30D(null);
+    try {
+      const res = await dispatchReplay({
+        plan_id: planId,
+        run_all_tiers: true,
+        auto_audit: true,
+      });
+      setReplayM30DResult(res);
+    } catch (err: any) {
+      setReplayErrorM30D(err?.message || 'Failed to dispatch replay');
+    } finally {
+      setIsReplayingM30D(false);
+    }
+  };
+
+  const handleViewDossier = async (planId: string) => {
+    try {
+      const res = await getResearchDossier(planId);
+      setDossierModalContent(res.content_markdown);
+    } catch (err: any) {
+      alert(`Could not load research dossier: ${err?.message || 'Not found'}`);
+    }
+  };
 
   // =========================================================================
   // Telemetry Fetchers
@@ -1694,20 +1729,124 @@ export const IntelligenceCockpit: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Plan Preregistration */}
+                  {/* Plan Preregistration & Replay Dispatch */}
                   {qualificationResult.plan?.plan_id && (
-                    <div className="p-3 bg-emerald-950/40 border border-emerald-700/60 rounded-lg flex items-center justify-between text-xs font-mono">
-                      <div>
-                        <span className="font-bold text-emerald-300">[PREREGISTERED REPLAY PLAN]</span>
-                        <div className="text-slate-300 mt-1">Plan ID: {qualificationResult.plan.plan_id}</div>
-                        <div className="text-slate-400">Contract ID: {qualificationResult.plan.contract_id}</div>
+                    <div className="flex flex-col gap-3">
+                      <div className="p-3 bg-emerald-950/40 border border-emerald-700/60 rounded-lg flex items-center justify-between text-xs font-mono">
+                        <div>
+                          <span className="font-bold text-emerald-300">[PREREGISTERED REPLAY PLAN]</span>
+                          <div className="text-slate-300 mt-1">Plan ID: {qualificationResult.plan.plan_id}</div>
+                          <div className="text-slate-400">Contract ID: {qualificationResult.plan.contract_id}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleInspectLineage(qualificationResult.plan?.lineage_node_id || '')}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded border border-cyan-800 transition"
+                          >
+                            Inspect Lineage
+                          </button>
+                          <button
+                            onClick={() => handleDispatchReplayM30D(qualificationResult.plan?.plan_id || '')}
+                            disabled={isReplayingM30D}
+                            className="px-3.5 py-1.5 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded shadow transition disabled:opacity-50"
+                          >
+                            {isReplayingM30D ? '⏳ Replaying 3 Tiers...' : '🚀 Run Multi-Tier Replay & Audit'}
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleInspectLineage(qualificationResult.plan?.lineage_node_id || '')}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded border border-cyan-800 transition"
-                      >
-                        Inspect Lineage Graph
-                      </button>
+
+                      {/* Replay Error if any */}
+                      {replayErrorM30D && (
+                        <div className="p-2 bg-rose-950/70 border border-rose-800 rounded text-xs text-rose-300 font-mono">
+                          Replay Error: {replayErrorM30D}
+                        </div>
+                      )}
+
+                      {/* Replay & Statistical Audit Outcome */}
+                      {replayM30DResult && (
+                        <div className="p-4 bg-slate-950 border border-purple-800/80 rounded-xl flex flex-col gap-3 text-xs font-mono">
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span className="font-bold text-purple-400 flex items-center gap-2">
+                              <span>📊</span> Empirical Replay & Audit: <span className="text-cyan-300">{replayM30DResult.status}</span>
+                            </span>
+                            {replayM30DResult.audit && (
+                              <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                replayM30DResult.audit.status === 'OOS_VALIDATED' ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' :
+                                replayM30DResult.audit.status === 'PRELIMINARY_SUPPORT' ? 'bg-blue-950 text-blue-300 border border-blue-700' :
+                                'bg-rose-950 text-rose-300 border border-rose-700'
+                              }`}>
+                                {replayM30DResult.audit.status}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 3-Tier Friction Comparison */}
+                          {replayM30DResult.frictional_reports && (
+                            <div>
+                              <div className="text-[11px] text-slate-400 font-semibold mb-1">3-Tier Friction Sensitivity:</div>
+                              <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                                {Object.entries(replayM30DResult.frictional_reports).map(([tier, rep]: [string, any]) => (
+                                  <div key={tier} className="p-2 bg-slate-900 border border-slate-800 rounded">
+                                    <div className="font-bold text-slate-300">{tier}</div>
+                                    <div className="text-emerald-400 mt-1">E[R]: {rep.net_expectancy_r > 0 ? `+${rep.net_expectancy_r}` : rep.net_expectancy_r}R</div>
+                                    <div className="text-slate-500 text-[10px]">Win: {(rep.win_rate * 100).toFixed(1)}% | DD: {rep.max_drawdown_pct}%</div>
+                                    <div className="text-slate-500 text-[10px]">Erosion: {rep.cost_erosion_pct}%</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Statistical Scorecard & DSR */}
+                          {replayM30DResult.audit && (
+                            <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col gap-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                                <div>
+                                  <span className="text-slate-500">DSR:</span> {replayM30DResult.audit.dsr_result.deflated_sharpe.toFixed(4)}
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Holm-Bonf:</span>{' '}
+                                  <span className={replayM30DResult.audit.holm_bonferroni_passed ? 'text-emerald-400' : 'text-rose-400'}>
+                                    {replayM30DResult.audit.holm_bonferroni_passed ? 'PASS' : 'REJECT'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Trials (N):</span> {replayM30DResult.audit.family_trial_count}
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Stress Survival:</span>{' '}
+                                  <span className={replayM30DResult.audit.stress_survival ? 'text-emerald-400' : 'text-rose-400'}>
+                                    {replayM30DResult.audit.stress_survival ? 'PASS' : 'FAIL'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-[11px] text-slate-400 border-t border-slate-800/60 pt-1">
+                                {replayM30DResult.audit.verdict_rationale}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Autopsy or Dossier Actions */}
+                          <div className="flex items-center justify-between pt-1">
+                            {replayM30DResult.autopsy ? (
+                              <div className="text-[11px] text-amber-300">
+                                ⚠️ Falsified: Indexed into Failure Memory ({replayM30DResult.autopsy.failure_category})
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-emerald-400">
+                                ✅ Passed audit. Preregistered research dossier sealed.
+                              </div>
+                            )}
+
+                            <button
+                              onClick={() => handleViewDossier(qualificationResult.plan?.plan_id || '')}
+                              className="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white rounded text-[11px] font-bold shadow"
+                            >
+                              📄 View Sealed Dossier
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1735,6 +1874,26 @@ export const IntelligenceCockpit: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Research Dossier Modal if active */}
+              {dossierModalContent && (
+                <div className="p-4 bg-slate-900 border border-cyan-700 rounded-xl flex flex-col gap-3 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold font-mono text-cyan-300 flex items-center gap-2">
+                      <span>📄</span> Sealed Institutional Research Dossier (Markdown)
+                    </span>
+                    <button
+                      onClick={() => setDossierModalContent(null)}
+                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                  <pre className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 font-mono text-xs overflow-x-auto max-h-80 whitespace-pre-wrap select-all">
+                    {dossierModalContent}
+                  </pre>
                 </div>
               )}
             </div>

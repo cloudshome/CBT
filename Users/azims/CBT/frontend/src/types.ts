@@ -2694,6 +2694,106 @@ export interface QualifyResponse {
   } | null;
 }
 
+// ==============================================================================
+// MILESTONE 30-D: REPLAY RUNNER & STATISTICAL AUDIT TYPES
+// ==============================================================================
+
+export interface ReplayJobItem {
+  job_id: string;
+  plan_id: string;
+  hypothesis_id: string;
+  research_contract_hash: string;
+  dataset_manifest_hash: string;
+  replay_engine_version: string;
+  friction_model_version: string;
+  statistical_protocol_version: string;
+  frictional_tier: string;
+  status: 'PENDING' | 'VALIDATING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  requested_at_utc: number;
+  completed_at_utc?: number | null;
+  idempotency_key: string;
+  research_only: boolean;
+  execution_authority: string;
+  real_capital_enabled: boolean;
+  output_signature_sha256?: string | null;
+  error_message?: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface ReplayJobsResponse {
+  status: string;
+  total_jobs: number;
+  jobs: ReplayJobItem[];
+}
+
+export interface AuditReportData {
+  audit_id: string;
+  plan_id: string;
+  hypothesis_id: string;
+  family_id: string;
+  status: string;
+  primary_net_expectancy_r: number;
+  gross_expectancy_r: number;
+  stress_expectancy_r: number;
+  cost_erosion_pct: number;
+  dsr_result: {
+    raw_sharpe: number;
+    deflated_sharpe: number;
+    sample_length: number;
+    skewness: number;
+    kurtosis: number;
+    trial_count: number;
+    expected_max_sharpe: number;
+    z_stat: number;
+    p_value: number;
+    is_statistically_significant: boolean;
+  };
+  multiple_testing_policy: string;
+  family_trial_count: number;
+  holm_bonferroni_passed: boolean;
+  stress_survival: boolean;
+  scorecard_passes: Record<string, boolean>;
+  verdict_rationale: string;
+  human_review_required: boolean;
+  execution_authority: string;
+  real_capital_enabled: boolean;
+  audit_hash_sha256: string;
+  created_at_utc: number;
+}
+
+export interface DispatchReplayResponse {
+  status: string;
+  plan_id: string;
+  job?: ReplayJobItem | null;
+  frictional_reports?: Record<string, any>;
+  audit?: AuditReportData | null;
+  autopsy?: any | null;
+  dossier_hash?: string | null;
+}
+
+export interface PlanAuditResponse {
+  status: string;
+  audit: AuditReportData;
+}
+
+export interface ResearchDossierResponse {
+  status: string;
+  plan_id: string;
+  dossier_hash: string;
+  content_markdown: string;
+}
+
+export interface QuarantineStatusResponse {
+  status: string;
+  quarantine: {
+    mechanism_id: string;
+    failure_count: number;
+    level: string;
+    last_failure_at_utc?: number | null;
+    advisory_message: string;
+  };
+}
+
 
 
 

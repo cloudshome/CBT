@@ -1,9 +1,18 @@
 """
 core/intelligence/crawler/__init__.py
 =====================================
-Milestone 30-B: Evidence-Grade Multi-Source Ingestion & Crawler Subsystem.
+Milestone 30-B / 30-C / 30-D: Evidence-Grade Ingestion, Qualification,
+Replay Orchestration & Statistical Audit Subsystem.
 """
 
+from core.intelligence.crawler.autonomous_replay_runner import (
+    AutonomousReplayRunner,
+    ReplayJob,
+    ReplayJobLedger,
+    ReplayJobStatus,
+    global_autonomous_replay_runner,
+    global_replay_job_ledger,
+)
 from core.intelligence.crawler.base_adapter import (
     INSTITUTIONAL_USER_AGENT,
     BaseDomainAdapter,
@@ -18,6 +27,10 @@ from core.intelligence.crawler.conflict_ledger import (
     ConflictStatus,
     ConflictType,
     EvidenceConflict,
+)
+from core.intelligence.crawler.dossier_generator import (
+    ResearchDossierGenerator,
+    global_research_dossier_generator,
 )
 from core.intelligence.crawler.entity_resolver import (
     EntityResolver,
@@ -68,6 +81,12 @@ from core.intelligence.crawler.raw_evidence_vault import (
     RawEvidenceRecord,
     RawEvidenceVault,
 )
+from core.intelligence.crawler.replay_autopsy_bridge import (
+    QuarantineLevel,
+    QuarantineStatus,
+    ReplayAutopsyBridge,
+    global_replay_autopsy_bridge,
+)
 from core.intelligence.crawler.scout_controller import (
     CrawlRunRecord,
     ScoutController,
@@ -78,9 +97,17 @@ from core.intelligence.crawler.source_registry import (
     SourceRegistry,
     SourceType,
 )
+from core.intelligence.crawler.statistical_auditor import (
+    AuditReport,
+    DSRResult,
+    StatisticalAuditor,
+    global_statistical_auditor,
+)
 
 __all__ = [
     "INSTITUTIONAL_USER_AGENT",
+    "AuditReport",
+    "AutonomousReplayRunner",
     "BaseDomainAdapter",
     "CanonicalEvent",
     "CausalCompilationResult",
@@ -92,6 +119,7 @@ __all__ = [
     "ConflictStatus",
     "ConflictType",
     "CrawlRunRecord",
+    "DSRResult",
     "EmpiricalFact",
     "EntityResolver",
     "EntityType",
@@ -113,8 +141,15 @@ __all__ = [
     "PointInTimeFirewall",
     "PreregisteredPlanGenerator",
     "QualityFirewallDecision",
+    "QuarantineLevel",
+    "QuarantineStatus",
     "RawEvidenceRecord",
     "RawEvidenceVault",
+    "ReplayAutopsyBridge",
+    "ReplayJob",
+    "ReplayJobLedger",
+    "ReplayJobStatus",
+    "ResearchDossierGenerator",
     "ResearchFirewallAdapter",
     "ResearchTemplate",
     "ResearchTemplateRegistry",
@@ -125,7 +160,13 @@ __all__ = [
     "SourceRecord",
     "SourceRegistry",
     "SourceType",
+    "StatisticalAuditor",
+    "global_autonomous_replay_runner",
     "global_lineage_ledger",
     "global_multiple_testing_ledger",
+    "global_replay_autopsy_bridge",
+    "global_replay_job_ledger",
+    "global_research_dossier_generator",
     "global_research_template_registry",
+    "global_statistical_auditor",
 ]

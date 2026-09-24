@@ -16,8 +16,10 @@ Exposes:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -30,8 +32,16 @@ from core.intelligence.causal_mechanisms import (
     RESEARCH_FAMILIES,
 )
 from core.intelligence.causal_synthesizer import global_causal_synthesizer
+from core.intelligence.crawler.autonomous_replay_runner import (
+    ReplayJobStatus,
+    global_autonomous_replay_runner,
+    global_replay_job_ledger,
+)
 from core.intelligence.crawler.causal_compiler import (
     CausalHypothesisCompiler,
+)
+from core.intelligence.crawler.dossier_generator import (
+    global_research_dossier_generator,
 )
 from core.intelligence.crawler.event_identity import CanonicalEvent, EventType
 from core.intelligence.crawler.fact_extractor import (
@@ -48,7 +58,13 @@ from core.intelligence.crawler.qualification_contracts import (
     global_lineage_ledger,
     global_multiple_testing_ledger,
 )
+from core.intelligence.crawler.replay_autopsy_bridge import (
+    global_replay_autopsy_bridge,
+)
 from core.intelligence.crawler.scout_controller import ScoutController
+from core.intelligence.crawler.statistical_auditor import (
+    global_statistical_auditor,
+)
 from core.intelligence.dataset_manifest import DatasetManifest
 from core.intelligence.evidence_classifier import global_evidence_classifier
 from core.intelligence.failure_autopsy import FailureAutopsyCompiler
@@ -1322,4 +1338,224 @@ async def qualify_intelligence_event(
         },
         "firewall": firewall_res.to_dict(),
         "plan": plan_res.to_dict(),
+    }
+
+
+# =====================================================================
+# Milestone 30-D: Autonomous Research Replay Runner & Statistical Audit Routes
+# =====================================================================
+
+
+class ReplayDispatchRequest(BaseModel):
+    plan_id: str = Field(..., description="Target DurableExperimentPlan ID")
+    frictional_tier: str = Field("CONSERVATIVE", description="BASE, CONSERVATIVE, or STRESS")
+    run_all_tiers: bool = Field(True, description="Execute BASE, CONSERVATIVE, and STRESS")
+    auto_audit: bool = Field(True, description="Run statistical audit immediately")
+
+
+@router.post("/crawler/replay/dispatch")
+async def dispatch_research_replay(
+    req: ReplayDispatchRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """
+    Dispatches a preregistered DurableExperimentPlan into the autonomous replay runner,
+    executes 3-tier friction simulation, runs statistical audit (DSR / Holm-Bonferroni),
+    and triggers autopsy or research dossier generation.
+    """
+    plan = global_plan_ledger.get_plan(req.plan_id)
+    if not plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Experiment plan '{req.plan_id}' not found.",
+        )
+
+    hypo = global_hypothesis_ledger.get_hypothesis(plan.hypothesis_id)
+    if not hypo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Hypothesis '{plan.hypothesis_id}' not found.",
+        )
+
+    try:
+        contract = PreregisteredResearchContract.from_hypothesis(
+            hypothesis=hypo,
+            holding_period_bars=12,
+            trial_budget=1,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to compile research contract from hypothesis: {e}",
+        ) from e
+
+    # 1. Execute Replay (Single tier or all 3 tiers)
+    if req.run_all_tiers:
+        tier_results = global_autonomous_replay_runner.run_multi_tier_replay(plan=plan)
+        reports_by_tier = {
+            tier: rep for tier, (_job, rep) in tier_results.items() if rep is not None
+        }
+        primary_job, primary_report = tier_results.get("CONSERVATIVE", (None, None))
+    else:
+        primary_job, primary_report = global_autonomous_replay_runner.dispatch_plan(
+            plan=plan,
+            frictional_tier=req.frictional_tier,
+        )
+        reports_by_tier = (
+            {req.frictional_tier.upper(): primary_report} if primary_report is not None else {}
+        )
+
+    if not reports_by_tier:
+        return {
+            "status": "REPLAY_FAILED",
+            "plan_id": plan.plan_id,
+            "job": primary_job.to_dict() if primary_job else None,
+            "error": primary_job.error_message if primary_job else "Execution failed",
+            "audit": None,
+            "dossier": None,
+        }
+
+    # 2. Statistical Audit
+    audit_report = None
+    dossier_hash = None
+    autopsy = None
+
+    if req.auto_audit and "CONSERVATIVE" in reports_by_tier:
+        audit_report = global_statistical_auditor.audit_replay(
+            plan=plan,
+            contract=contract,
+            reports_by_tier=reports_by_tier,
+        )
+
+        # Build manifest for downstream artifacts
+        sample_candles = global_autonomous_replay_runner._generate_pit_candles(plan)
+        manifest = DatasetManifest.create(
+            asset=plan.target_asset if hasattr(plan, "target_asset") else plan.target_symbol,
+            timeframe=plan.timeframe,
+            start_time_utc=plan.backtest_range_start_utc,
+            end_time_utc=plan.backtest_range_end_utc,
+            candle_count=len(sample_candles),
+            candles=sample_candles,
+        )
+
+        # 3. Autopsy or Dossier Generation
+        if audit_report.status in (
+            ResearchValidationStatus.OOS_VALIDATED,
+            ResearchValidationStatus.PRELIMINARY_SUPPORT,
+        ):
+            _path, dossier_hash = global_research_dossier_generator.generate_dossier(
+                plan=plan,
+                contract=contract,
+                manifest=manifest,
+                audit_report=audit_report,
+                reports_by_tier=reports_by_tier,
+            )
+        else:
+            autopsy = global_replay_autopsy_bridge.process_audit_outcome(
+                plan=plan,
+                contract=contract,
+                manifest=manifest,
+                audit_report=audit_report,
+                reports_by_tier=reports_by_tier,
+            )
+
+    return {
+        "status": "COMPLETED",
+        "plan_id": plan.plan_id,
+        "job": primary_job.to_dict() if primary_job else None,
+        "frictional_reports": {tier: rep.to_dict() for tier, rep in reports_by_tier.items()},
+        "audit": audit_report.to_dict() if audit_report else None,
+        "autopsy": autopsy.model_dump() if autopsy else None,
+        "dossier_hash": dossier_hash,
+    }
+
+
+@router.get("/crawler/replay/jobs")
+async def list_replay_jobs(
+    limit: int = Query(50, ge=1, le=200),
+    plan_id: str | None = Query(None),
+    status_filter: str | None = Query(None),
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Lists research replay jobs with optional status or plan filtering."""
+    st = ReplayJobStatus(status_filter) if status_filter else None
+    jobs = global_replay_job_ledger.list_jobs(limit=limit, status=st, plan_id=plan_id)
+    return {
+        "status": "success",
+        "total_jobs": len(jobs),
+        "jobs": [j.to_dict() for j in jobs],
+    }
+
+
+@router.get("/crawler/replay/jobs/{job_id}")
+async def get_replay_job(
+    job_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves full detail of a replay job and its matching execution report."""
+    job = global_replay_job_ledger.get_job(job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Replay job '{job_id}' not found.",
+        )
+    reports = global_replay_job_ledger.get_reports_for_plan(job.plan_id)
+    matching_rep = next((r for r in reports if r.get("job_id") == job_id), None)
+    return {
+        "status": "success",
+        "job": job.to_dict(),
+        "report": matching_rep,
+    }
+
+
+@router.get("/crawler/replay/audit/{plan_id}")
+async def get_plan_audit_report(
+    plan_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves latest statistical audit report for an experiment plan."""
+    report = global_statistical_auditor.get_audit_report_by_plan(plan_id)
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No audit report found for plan '{plan_id}'.",
+        )
+    return {
+        "status": "success",
+        "audit": report.to_dict(),
+    }
+
+
+@router.get("/crawler/replay/dossier/{plan_id}")
+async def get_research_dossier(
+    plan_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves sealed Markdown research dossier content for human review."""
+    dossier_path = Path("data/research_dossiers") / f"{plan_id}.md"
+    if not dossier_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Research dossier for plan '{plan_id}' does not exist.",
+        )
+    content = dossier_path.read_text(encoding="utf-8")
+    dossier_hash = hashlib.sha256(content.encode()).hexdigest()
+    return {
+        "status": "success",
+        "plan_id": plan_id,
+        "dossier_hash": dossier_hash,
+        "content_markdown": content,
+    }
+
+
+@router.get("/crawler/replay/quarantine/{mechanism_id}")
+async def get_mechanism_quarantine(
+    mechanism_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves Graduated Quarantine status and failure count for a mechanism."""
+    st = global_replay_autopsy_bridge.get_quarantine_status(mechanism_id)
+    return {
+        "status": "success",
+        "quarantine": st.to_dict(),
     }

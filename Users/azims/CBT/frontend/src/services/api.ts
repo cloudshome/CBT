@@ -73,6 +73,11 @@ import {
   CrawlerMultipleTestingResponse,
   EvidenceLineageResponse,
   QualifyResponse,
+  ReplayJobsResponse,
+  DispatchReplayResponse,
+  PlanAuditResponse,
+  ResearchDossierResponse,
+  QuarantineStatusResponse,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -5173,6 +5178,54 @@ export async function qualifyEvent(data: {
     body: JSON.stringify(data),
   });
   return await handleResponse<QualifyResponse>(res);
+}
+
+export async function dispatchReplay(data: {
+  plan_id: string;
+  frictional_tier?: string;
+  run_all_tiers?: boolean;
+  auto_audit?: boolean;
+}): Promise<DispatchReplayResponse> {
+  const res = await authFetch('/api/v1/intelligence/crawler/replay/dispatch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return await handleResponse<DispatchReplayResponse>(res);
+}
+
+export async function getReplayJobs(params?: {
+  limit?: number;
+  plan_id?: string;
+  status_filter?: string;
+}): Promise<ReplayJobsResponse> {
+  const query = new URLSearchParams();
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.plan_id) query.set('plan_id', params.plan_id);
+  if (params?.status_filter) query.set('status_filter', params.status_filter);
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const res = await authFetch(`/api/v1/intelligence/crawler/replay/jobs${qs}`);
+  return await handleResponse<ReplayJobsResponse>(res);
+}
+
+export async function getReplayJob(jobId: string): Promise<any> {
+  const res = await authFetch(`/api/v1/intelligence/crawler/replay/jobs/${encodeURIComponent(jobId)}`);
+  return await handleResponse<any>(res);
+}
+
+export async function getPlanAuditReport(planId: string): Promise<PlanAuditResponse> {
+  const res = await authFetch(`/api/v1/intelligence/crawler/replay/audit/${encodeURIComponent(planId)}`);
+  return await handleResponse<PlanAuditResponse>(res);
+}
+
+export async function getResearchDossier(planId: string): Promise<ResearchDossierResponse> {
+  const res = await authFetch(`/api/v1/intelligence/crawler/replay/dossier/${encodeURIComponent(planId)}`);
+  return await handleResponse<ResearchDossierResponse>(res);
+}
+
+export async function getMechanismQuarantine(mechanismId: string): Promise<QuarantineStatusResponse> {
+  const res = await authFetch(`/api/v1/intelligence/crawler/replay/quarantine/${encodeURIComponent(mechanismId)}`);
+  return await handleResponse<QuarantineStatusResponse>(res);
 }
 
 
