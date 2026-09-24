@@ -78,6 +78,10 @@ import {
   PlanAuditResponse,
   ResearchDossierResponse,
   QuarantineStatusResponse,
+  ForwardStrategiesResponse,
+  ForwardScorecardResponse,
+  ForwardDriftResponse,
+  ForwardSuspensionLogsResponse,
 } from '../types';
 
 const getApiBaseUrl = (): string => {
@@ -5227,5 +5231,62 @@ export async function getMechanismQuarantine(mechanismId: string): Promise<Quara
   const res = await authFetch(`/api/v1/intelligence/crawler/replay/quarantine/${encodeURIComponent(mechanismId)}`);
   return await handleResponse<QuarantineStatusResponse>(res);
 }
+
+// =====================================================================
+// Milestone 31: Continuous Forward Validation League & Markout Desk
+// =====================================================================
+
+export async function getForwardStrategies(
+  statusFilter?: string,
+  includeHistorical: boolean = true
+): Promise<ForwardStrategiesResponse> {
+  const query = new URLSearchParams();
+  if (statusFilter && statusFilter !== 'ALL') query.set('status', statusFilter);
+  query.set('include_historical', String(includeHistorical));
+  const res = await authFetch(`/api/v1/intelligence/forward/strategies?${query.toString()}`);
+  return await handleResponse<ForwardStrategiesResponse>(res);
+}
+
+export async function getForwardScorecard(admissionId: string): Promise<ForwardScorecardResponse> {
+  const res = await authFetch(`/api/v1/intelligence/forward/scorecard/${encodeURIComponent(admissionId)}`);
+  return await handleResponse<ForwardScorecardResponse>(res);
+}
+
+export async function getForwardDriftReport(admissionId: string): Promise<ForwardDriftResponse> {
+  const res = await authFetch(`/api/v1/intelligence/forward/drift/${encodeURIComponent(admissionId)}`);
+  return await handleResponse<ForwardDriftResponse>(res);
+}
+
+export async function getForwardSuspensionLogs(admissionId: string): Promise<ForwardSuspensionLogsResponse> {
+  const res = await authFetch(`/api/v1/intelligence/forward/suspension_logs/${encodeURIComponent(admissionId)}`);
+  return await handleResponse<ForwardSuspensionLogsResponse>(res);
+}
+
+export async function haltForwardStrategy(data: {
+  admission_id: string;
+  reason: string;
+  operator_id: string;
+}): Promise<{ status: string; message: string }> {
+  const res = await authFetch('/api/v1/intelligence/forward/halt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return await handleResponse<{ status: string; message: string }>(res);
+}
+
+export async function resumeForwardStrategy(data: {
+  admission_id: string;
+  reason: string;
+  operator_id: string;
+}): Promise<{ status: string; message: string }> {
+  const res = await authFetch('/api/v1/intelligence/forward/resume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return await handleResponse<{ status: string; message: string }>(res);
+}
+
 
 

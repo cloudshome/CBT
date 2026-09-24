@@ -16,6 +16,10 @@ import {
   EvidenceLineageResponse,
   QualifyResponse,
   DispatchReplayResponse,
+  LeagueStrategyRecord,
+  StrategyForwardScorecard,
+  MultiDimensionalDriftReport,
+  SuspensionLogRecord,
 } from '../types';
 import {
   getIntelligenceStatus,
@@ -48,11 +52,17 @@ import {
   qualifyEvent,
   dispatchReplay,
   getResearchDossier,
+  getForwardStrategies,
+  getForwardScorecard,
+  getForwardDriftReport,
+  getForwardSuspensionLogs,
+  haltForwardStrategy,
+  resumeForwardStrategy,
 } from '../services/api';
 
 export const IntelligenceCockpit: React.FC = () => {
-  // Subview toggle: FEED vs HYPOTHESIS_LAB vs REPLAY_LAB vs AUTONOMOUS_SCOUT
-  const [activeTab, setActiveTab] = useState<'FEED' | 'HYPOTHESIS_LAB' | 'REPLAY_LAB' | 'AUTONOMOUS_SCOUT'>('FEED');
+  // Subview toggle: FEED vs HYPOTHESIS_LAB vs REPLAY_LAB vs AUTONOMOUS_SCOUT vs FORWARD_LEAGUE
+  const [activeTab, setActiveTab] = useState<'FEED' | 'HYPOTHESIS_LAB' | 'REPLAY_LAB' | 'AUTONOMOUS_SCOUT' | 'FORWARD_LEAGUE'>('FEED');
 
   // Milestone 27 Feed State
   const [statusData, setStatusData] = useState<IntelligenceStatusResponse | null>(null);
@@ -118,6 +128,19 @@ export const IntelligenceCockpit: React.FC = () => {
   const [isReplayingM30D, setIsReplayingM30D] = useState<boolean>(false);
   const [dossierModalContent, setDossierModalContent] = useState<string | null>(null);
   const [replayErrorM30D, setReplayErrorM30D] = useState<string | null>(null);
+
+  // Milestone 31 Continuous Forward Validation League State
+  const [forwardStrategies, setForwardStrategies] = useState<LeagueStrategyRecord[]>([]);
+  const [selectedForwardStatus, setSelectedForwardStatus] = useState<string>('ALL');
+  const [selectedStrategy, setSelectedStrategy] = useState<LeagueStrategyRecord | null>(null);
+  const [scorecard, setScorecard] = useState<StrategyForwardScorecard | null>(null);
+  const [driftReport, setDriftReport] = useState<MultiDimensionalDriftReport | null>(null);
+  const [suspensionLogs, setSuspensionLogs] = useState<SuspensionLogRecord[]>([]);
+  const [forwardLoading, setForwardLoading] = useState<boolean>(false);
+  const [forwardFeedback, setForwardFeedback] = useState<string | null>(null);
+  const [showHaltModal, setShowHaltModal] = useState<boolean>(false);
+  const [haltReason, setHaltReason] = useState<string>('');
+  const [operatorId, setOperatorId] = useState<string>('OPERATOR-HUMAN-DESK');
 
   const handleDispatchReplayM30D = async (planId: string) => {
     setIsReplayingM30D(true);
@@ -322,6 +345,89 @@ export const IntelligenceCockpit: React.FC = () => {
     }
   };
 
+  const fetchForwardData = useCallback(async () => {
+    try {
+      setForwardLoading(true);
+      const res = await getForwardStrategies(selectedForwardStatus, true);
+      setForwardStrategies(res.strategies || []);
+      if (res.strategies?.length > 0 && !selectedStrategy) {
+        setSelectedStrategy(res.strategies[0]);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch forward strategies:', err);
+    } finally {
+      setForwardLoading(false);
+    }
+  }, [selectedForwardStatus, selectedStrategy]);
+
+  const fetchStrategyDetails = useCallback(async (admId: string) => {
+    try {
+      setForwardFeedback(null);
+      const [scRes, driftRes, suspRes] = await Promise.all([
+        getForwardScorecard(admId).catch(() => null),
+        getForwardDriftReport(admId).catch(() => null),
+        getForwardSuspensionLogs(admId).catch(() => null),
+      ]);
+      setScorecard(scRes?.scorecard || null);
+      setDriftReport(driftRes?.drift || null);
+      setSuspensionLogs(suspRes?.logs || []);
+    } catch (err: any) {
+      console.error('Error fetching strategy details:', err);
+    }
+  }, []);
+
+  const handleManualHalt = async () => {
+    if (!selectedStrategy || !haltReason.trim()) return;
+    try {
+      setForwardLoading(true);
+      await haltForwardStrategy({
+        admission_id: selectedStrategy.admission_id,
+        reason: haltReason,
+        operator_id: operatorId,
+      });
+      setForwardFeedback(`Strategy ${selectedStrategy.admission_id} suspended successfully.`);
+      setShowHaltModal(false);
+      setHaltReason('');
+      await fetchForwardData();
+      await fetchStrategyDetails(selectedStrategy.admission_id);
+    } catch (err: any) {
+      setForwardFeedback(`Halt failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setForwardLoading(false);
+    }
+  };
+
+  const handleManualResume = async () => {
+    if (!selectedStrategy) return;
+    try {
+      setForwardLoading(true);
+      await resumeForwardStrategy({
+        admission_id: selectedStrategy.admission_id,
+        reason: 'Operator manual clearance and resumption',
+        operator_id: operatorId,
+      });
+      setForwardFeedback(`Strategy ${selectedStrategy.admission_id} resumed active status.`);
+      await fetchForwardData();
+      await fetchStrategyDetails(selectedStrategy.admission_id);
+    } catch (err: any) {
+      setForwardFeedback(`Resume failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setForwardLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'FORWARD_LEAGUE') {
+      fetchForwardData();
+    }
+  }, [activeTab, fetchForwardData]);
+
+  useEffect(() => {
+    if (selectedStrategy) {
+      fetchStrategyDetails(selectedStrategy.admission_id);
+    }
+  }, [selectedStrategy, fetchStrategyDetails]);
+
   useEffect(() => {
     fetchFeedTelemetry();
     fetchLabData();
@@ -331,12 +437,14 @@ export const IntelligenceCockpit: React.FC = () => {
         fetchFeedTelemetry();
       } else if (activeTab === 'AUTONOMOUS_SCOUT') {
         fetchCrawlerData();
+      } else if (activeTab === 'FORWARD_LEAGUE') {
+        fetchForwardData();
       } else {
         fetchLabData();
       }
     }, 15000);
     return () => clearInterval(interval);
-  }, [activeTab, fetchFeedTelemetry, fetchLabData, fetchCrawlerData]);
+  }, [activeTab, fetchFeedTelemetry, fetchLabData, fetchCrawlerData, fetchForwardData]);
 
   // =========================================================================
   // Feed Actions
@@ -583,6 +691,19 @@ export const IntelligenceCockpit: React.FC = () => {
             <span>🌐 Autonomous Scout</span>
             <span className="px-1.5 py-0.2 text-[10px] font-mono bg-emerald-950 text-emerald-300 rounded border border-emerald-700/60">
               M30
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('FORWARD_LEAGUE')}
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
+              activeTab === 'FORWARD_LEAGUE'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <span>⚡ Forward League</span>
+            <span className="px-1.5 py-0.2 text-[10px] font-mono bg-blue-950 text-blue-300 rounded border border-blue-700/60">
+              M31
             </span>
           </button>
         </div>
@@ -2055,6 +2176,496 @@ export const IntelligenceCockpit: React.FC = () => {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          VIEW 5: FORWARD VALIDATION LEAGUE & MARKOUT DESK (M31)
+          ===================================================================== */}
+      {activeTab === 'FORWARD_LEAGUE' && (
+        <div className="flex flex-col gap-6">
+          {/* Top Banner & Control Strip */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">⚡</span>
+                <h2 className="text-lg font-bold text-white tracking-wide">
+                  Continuous Forward Validation & Microstructure Markout Desk
+                </h2>
+                <span className="px-2 py-0.5 text-[10px] font-mono bg-blue-950 text-blue-300 rounded border border-blue-700/60 font-semibold">
+                  M31 RESEARCH LEAGUE
+                </span>
+                <span className="px-2 py-0.5 text-[10px] font-mono bg-emerald-950 text-emerald-300 rounded border border-emerald-700/60 font-semibold">
+                  ANTI-SURVIVORSHIP BIAS: ON
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Rigorous forward paper execution of preregistered strategies. Real-time microstructure markouts across 100ms, 1s, 5s, 30s horizons with 5-axis statistical drift detection.
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[11px] font-mono text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/80">
+                  PERMANENT CAPITAL FIREWALL: real_capital_enabled = False (Research-Only Instrument)
+                </span>
+              </div>
+            </div>
+
+            {/* Filter and Refresh Controls */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                <span className="text-slate-400">Status:</span>
+                <select
+                  value={selectedForwardStatus}
+                  onChange={(e) => setSelectedForwardStatus(e.target.value)}
+                  className="bg-transparent text-white font-medium focus:outline-none"
+                >
+                  <option value="ALL">ALL (Anti-Survivorship)</option>
+                  <option value="ACTIVE">ACTIVE Only</option>
+                  <option value="QUARANTINED">QUARANTINED</option>
+                  <option value="SUSPENDED">SUSPENDED</option>
+                  <option value="GRADUATED">GRADUATED</option>
+                </select>
+              </div>
+
+              <button
+                onClick={fetchForwardData}
+                disabled={forwardLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl transition flex items-center gap-1.5 shadow"
+              >
+                <span>↻</span>
+                <span>Refresh Desk</span>
+              </button>
+            </div>
+          </div>
+
+          {forwardFeedback && (
+            <div className="p-3 bg-blue-950/70 border border-blue-800 rounded-xl text-xs text-blue-200 font-mono flex items-center justify-between">
+              <span>{forwardFeedback}</span>
+              <button onClick={() => setForwardFeedback(null)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+          )}
+
+          {/* Main 2-Column Split Desk */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column: League Roster (5 cols) */}
+            <div className="lg:col-span-5 flex flex-col gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3 shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <span>🏆</span> Admitted Strategies League ({forwardStrategies.length})
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Zero Discretion Archive
+                  </span>
+                </div>
+
+                <div className="max-h-[600px] overflow-y-auto space-y-2 pr-1">
+                  {forwardStrategies.map((strat) => {
+                    const isSelected = selectedStrategy?.admission_id === strat.admission_id;
+                    const statusColor =
+                      strat.status === 'ACTIVE'
+                        ? 'bg-emerald-950 text-emerald-300 border-emerald-700/60'
+                        : strat.status === 'QUARANTINED'
+                        ? 'bg-amber-950 text-amber-300 border-amber-700/60'
+                        : strat.status === 'SUSPENDED'
+                        ? 'bg-rose-950 text-rose-300 border-rose-700/60'
+                        : strat.status === 'GRADUATED'
+                        ? 'bg-purple-950 text-purple-300 border-purple-700/60'
+                        : 'bg-slate-800 text-slate-300 border-slate-700';
+
+                    return (
+                      <div
+                        key={strat.admission_id}
+                        onClick={() => setSelectedStrategy(strat)}
+                        className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col gap-2 ${
+                          isSelected
+                            ? 'bg-slate-800/90 border-blue-500 shadow-md ring-1 ring-blue-500/50'
+                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white font-mono">
+                            {strat.strategy_genome_id}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${statusColor}`}>
+                            {strat.status}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] font-mono text-slate-400 truncate">
+                          ID: {strat.admission_id}
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-1.5 pt-1 text-[11px] font-mono text-center border-t border-slate-800/60">
+                          <div>
+                            <div className="text-slate-500 text-[9px] uppercase">Trades N</div>
+                            <div className="font-semibold text-slate-200">{strat.total_observations}</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 text-[9px] uppercase">Net PnL</div>
+                            <div className={`font-semibold ${strat.net_pnl_bps >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {strat.net_pnl_bps > 0 ? `+${strat.net_pnl_bps.toFixed(1)}` : strat.net_pnl_bps.toFixed(1)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 text-[9px] uppercase">5s Markout</div>
+                            <div className={`font-semibold ${strat.avg_markout_5s_bps >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {strat.avg_markout_5s_bps.toFixed(1)} bps
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 text-[9px] uppercase">Max DD</div>
+                            <div className="font-semibold text-rose-400">
+                              {strat.max_drawdown_bps.toFixed(1)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {strat.suspension_reason && (
+                          <div className="text-[10px] font-mono text-rose-300 bg-rose-950/40 p-1.5 rounded border border-rose-900/60 truncate">
+                            Autopsy: {strat.suspension_reason}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {forwardStrategies.length === 0 && !forwardLoading && (
+                    <div className="py-8 text-center text-slate-500 text-xs">
+                      No strategies admitted to forward league under filter '{selectedForwardStatus}'.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Deep Inspection & Markout Analytics (7 cols) */}
+            <div className="lg:col-span-7 flex flex-col gap-4">
+              {selectedStrategy ? (
+                <>
+                  {/* Selected Strategy Header & Operational Controls */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-white font-mono">
+                            {selectedStrategy.strategy_genome_id}
+                          </h3>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${
+                            selectedStrategy.status === 'ACTIVE'
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-700/60'
+                              : 'bg-rose-950 text-rose-300 border-rose-700/60'
+                          }`}>
+                            {selectedStrategy.status}
+                          </span>
+                        </div>
+                        <div className="text-xs font-mono text-slate-400 mt-1">
+                          Admission: {selectedStrategy.admission_id} | Plan: {selectedStrategy.plan_id}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {selectedStrategy.status === 'ACTIVE' && (
+                          <button
+                            onClick={() => setShowHaltModal(true)}
+                            className="px-3 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition shadow"
+                          >
+                            ⚠️ Emergency Halt
+                          </button>
+                        )}
+                        {(selectedStrategy.status === 'SUSPENDED' || selectedStrategy.status === 'QUARANTINED') && (
+                          <button
+                            onClick={handleManualResume}
+                            className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition shadow"
+                          >
+                            ✓ Clear & Resume
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Denominator Transparency & Scorecard Banner */}
+                    {scorecard ? (
+                      <div className="flex flex-col gap-3">
+                        {/* Statistical Significance Assessment */}
+                        <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                          scorecard.is_statistically_significant_positive
+                            ? 'bg-emerald-950/60 border-emerald-700 text-emerald-200'
+                            : scorecard.total_trades < 30
+                            ? 'bg-slate-950/60 border-slate-800 text-slate-400'
+                            : 'bg-amber-950/50 border-amber-800 text-amber-200'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {scorecard.is_statistically_significant_positive ? '✓' : scorecard.total_trades < 30 ? '⏳' : 'ℹ️'}
+                            </span>
+                            <span className="text-xs font-bold font-mono">
+                              {scorecard.is_statistically_significant_positive
+                                ? 'STATISTICALLY SIGNIFICANT POSITIVE ALPHA (95% CI > 0)'
+                                : scorecard.total_trades < 30
+                                ? `INSUFFICIENT SAMPLE SIZE (N=${scorecard.total_trades} < 30) - HYPOTHESIS UNVERIFIED`
+                                : 'NULL HYPOTHESIS NOT REJECTED (Uncertainty spans zero)'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-mono">
+                            Age: {scorecard.observation_age_days.toFixed(1)} days
+                          </span>
+                        </div>
+
+                        {/* Metric Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-center">
+                            <div className="text-[10px] text-slate-400 uppercase font-mono">Trades Sample N</div>
+                            <div className="text-base font-bold font-mono text-white mt-0.5">{scorecard.total_trades}</div>
+                            <div className="text-[10px] text-slate-500">Wins: {scorecard.winning_trades} ({(scorecard.win_rate * 100).toFixed(1)}%)</div>
+                          </div>
+
+                          <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-center">
+                            <div className="text-[10px] text-slate-400 uppercase font-mono">Net Return (bps)</div>
+                            <div className={`text-base font-bold font-mono mt-0.5 ${scorecard.net_pnl_bps >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {scorecard.net_pnl_bps > 0 ? `+${scorecard.net_pnl_bps.toFixed(1)}` : scorecard.net_pnl_bps.toFixed(1)}
+                            </div>
+                            <div className="text-[10px] text-slate-500">Gross: {scorecard.gross_pnl_bps.toFixed(1)} bps</div>
+                          </div>
+
+                          <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-center">
+                            <div className="text-[10px] text-slate-400 uppercase font-mono">95% Uncertainty CI</div>
+                            <div className="text-xs font-bold font-mono text-purple-300 mt-1">
+                              [{scorecard.ci_95_lower_bps.toFixed(1)}, {scorecard.ci_95_upper_bps.toFixed(1)}]
+                            </div>
+                            <div className="text-[10px] text-slate-500">SE: ±{scorecard.standard_error_bps.toFixed(2)} bps</div>
+                          </div>
+
+                          <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-center">
+                            <div className="text-[10px] text-slate-400 uppercase font-mono">Max Drawdown</div>
+                            <div className="text-base font-bold font-mono text-rose-400 mt-0.5">
+                              {scorecard.max_drawdown_bps.toFixed(1)} bps
+                            </div>
+                            <div className="text-[10px] text-slate-500">HWM: {scorecard.high_water_mark_bps.toFixed(1)} bps</div>
+                          </div>
+                        </div>
+
+                        {/* Friction & Slippage Disclosure */}
+                        <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs font-mono text-slate-400">
+                          <span>Realized Friction Attribution:</span>
+                          <div className="flex items-center gap-4">
+                            <span>Avg Slippage: <strong className="text-slate-200">{scorecard.avg_slippage_bps.toFixed(2)} bps</strong></span>
+                            <span>Avg Fee: <strong className="text-slate-200">{scorecard.avg_fee_bps.toFixed(2)} bps</strong></span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center text-slate-500 text-xs">
+                        No trade fills recorded in forward ledger yet.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Multi-Horizon Microstructure Markout Curve */}
+                  {scorecard && scorecard.markout_curve_bps && Object.keys(scorecard.markout_curve_bps).length > 0 && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                          <span>📈</span> Microstructure Markout Decay Curve (M_net)
+                        </h4>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          Executable Price Horizon Markouts
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-3 pt-1">
+                        {[
+                          { key: '100', label: '100 ms' },
+                          { key: '1000', label: '1.0 s' },
+                          { key: '5000', label: '5.0 s' },
+                          { key: '30000', label: '30.0 s' },
+                        ].map(({ key, label }) => {
+                          const val = scorecard.markout_curve_bps[key] ?? scorecard.markout_curve_bps[Number(key)];
+                          const valFormatted = val !== undefined ? `${val > 0 ? '+' : ''}${val.toFixed(2)}` : 'N/A';
+                          const isPos = val !== undefined && val >= 0;
+
+                          return (
+                            <div key={key} className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                              <div className="text-[10px] text-slate-400 uppercase font-mono">{label}</div>
+                              <div className={`text-sm font-bold font-mono mt-1 ${val === undefined ? 'text-slate-500' : isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {valFormatted} bps
+                              </div>
+                              <div className="text-[9px] text-slate-500 mt-0.5">
+                                {val === undefined ? 'Pending' : isPos ? 'Positive Edge' : 'Adverse Selection'}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 5-Axis Statistical Drift Matrix */}
+                  {driftReport && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">🧭</span>
+                          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                            5-Axis Statistical Drift Detector
+                          </h4>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                          driftReport.overall_status === 'NORMAL'
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/60'
+                            : driftReport.overall_status === 'WATCH'
+                            ? 'bg-amber-950 text-amber-300 border border-amber-700/60'
+                            : driftReport.overall_status === 'INCONCLUSIVE'
+                            ? 'bg-slate-800 text-slate-400'
+                            : 'bg-rose-950 text-rose-300 border border-rose-700/60'
+                        }`}>
+                          OVERALL: {driftReport.overall_status}
+                        </span>
+                      </div>
+
+                      <p className="text-xs font-mono text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                        {driftReport.drift_summary}
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                        {Object.entries(driftReport.axes).map(([axisKey, axisRes]) => {
+                          const statusColor =
+                            axisRes.status === 'NORMAL'
+                              ? 'text-emerald-400'
+                              : axisRes.status === 'WATCH'
+                              ? 'text-amber-400'
+                              : axisRes.status === 'INCONCLUSIVE'
+                              ? 'text-slate-400'
+                              : 'text-rose-400 font-bold';
+
+                          return (
+                            <div key={axisKey} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-slate-400 uppercase font-mono font-semibold">
+                                  {axisKey.replace('_', ' ')}
+                                </span>
+                                <span className={`text-[10px] font-mono ${statusColor}`}>
+                                  {axisRes.status}
+                                </span>
+                              </div>
+                              {axisRes.statistic !== undefined && axisRes.statistic !== null && (
+                                <div className="text-[11px] font-mono text-slate-300">
+                                  Stat: {axisRes.statistic} {axisRes.p_value !== undefined && axisRes.p_value !== null ? `(p=${axisRes.p_value})` : ''}
+                                </div>
+                              )}
+                              {axisRes.warning_message && (
+                                <div className="text-[9px] font-mono text-rose-400 truncate">
+                                  {axisRes.warning_message}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Circuit Breaker Autopsy Drawer */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <span>🛡️</span> Predefined Circuit Breakers & Autopsy Lineage
+                      </h4>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {suspensionLogs.length} events logged
+                      </span>
+                    </div>
+
+                    {suspensionLogs.length > 0 ? (
+                      <div className="space-y-2">
+                        {suspensionLogs.map((log) => (
+                          <div
+                            key={log.suspension_id}
+                            className="bg-rose-950/30 border border-rose-900/60 p-3 rounded-xl flex flex-col gap-1 text-xs font-mono text-rose-200"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-rose-400">{log.trigger_name}</span>
+                              <span className="text-[10px] text-slate-400">
+                                {new Date(log.timestamp_utc * 1000).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-300">
+                              Observed: <strong className="text-white">{log.observed_val}</strong> vs Limit: <strong className="text-white">{log.threshold_val}</strong>
+                            </div>
+                            <div className="text-[10px] text-slate-400 break-words">
+                              Details: {log.details}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-4 text-center text-slate-500 text-xs">
+                        Zero circuit-breaker breaches logged. Strategy operating normally.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 text-xs">
+                  Select a strategy from the league roster on the left to inspect its real-time scorecard and markout decay curves.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Emergency Halt Modal */}
+          {showHaltModal && selectedStrategy && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 flex flex-col gap-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>⚠️</span> Operator Emergency Halt
+                  </h3>
+                  <button onClick={() => setShowHaltModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                </div>
+
+                <p className="text-xs text-slate-400">
+                  Suspends strategy <strong className="text-white font-mono">{selectedStrategy.admission_id}</strong> immediately and cancels all pending resting limit orders.
+                </p>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] text-slate-400">Operator ID / Signature:</label>
+                  <input
+                    type="text"
+                    value={operatorId}
+                    onChange={(e) => setOperatorId(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] text-slate-400">Halt Rationale / Failure Notes:</label>
+                  <textarea
+                    value={haltReason}
+                    onChange={(e) => setHaltReason(e.target.value)}
+                    placeholder="Enter reason for manual suspension..."
+                    rows={3}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    onClick={() => setShowHaltModal(false)}
+                    className="px-3.5 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleManualHalt}
+                    disabled={!haltReason.trim() || forwardLoading}
+                    className="px-4 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg shadow"
+                  >
+                    Confirm Halt
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

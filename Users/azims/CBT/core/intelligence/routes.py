@@ -68,6 +68,13 @@ from core.intelligence.crawler.statistical_auditor import (
 from core.intelligence.dataset_manifest import DatasetManifest
 from core.intelligence.evidence_classifier import global_evidence_classifier
 from core.intelligence.failure_autopsy import FailureAutopsyCompiler
+from core.intelligence.forward_validation import (
+    AdmissionStatus,
+    ForwardPerformanceLedger,
+    MultiDimensionalDriftDetector,
+    StrategyLeagueRegistry,
+    SuspensionController,
+)
 from core.intelligence.friction_model import FrictionTier, RealisticFrictionEngine
 from core.intelligence.hypothesis_schema import (
     global_hypothesis_ledger,
@@ -102,6 +109,11 @@ from integrations.agent_reach.health import global_agent_reach_health
 logger = logging.getLogger("ai_quant_sentinel.intelligence.routes")
 
 router = APIRouter(prefix="/api/v1/intelligence", tags=["Global Intelligence Fabric"])
+
+global_forward_league_registry = StrategyLeagueRegistry()
+global_forward_performance_ledger = ForwardPerformanceLedger()
+global_forward_drift_detector = MultiDimensionalDriftDetector()
+global_forward_suspension_controller = SuspensionController(global_forward_league_registry)
 
 
 class SynthesizeRequest(BaseModel):
@@ -1558,4 +1570,136 @@ async def get_mechanism_quarantine(
     return {
         "status": "success",
         "quarantine": st.to_dict(),
+    }
+
+
+# =====================================================================
+# Milestone 31: Continuous Forward Validation League & Markout Desk
+# =====================================================================
+
+
+class ForwardHaltRequest(BaseModel):
+    admission_id: str = Field(..., description="Target strategy admission ID")
+    reason: str = Field(..., description="Detailed rationale for operator halt")
+    operator_id: str = Field(..., description="Operator identifier or signature")
+
+
+class ForwardResumeRequest(BaseModel):
+    admission_id: str = Field(..., description="Target strategy admission ID")
+    reason: str = Field(..., description="Detailed rationale for operator resumption")
+    operator_id: str = Field(..., description="Operator identifier or signature")
+
+
+@router.get("/forward/strategies")
+async def list_forward_strategies(
+    status: str | None = Query(
+        None,
+        description="Optional status filter: ADMITTED, ACTIVE, QUARANTINED, SUSPENDED, GRADUATED",
+    ),
+    include_historical: bool = Query(
+        True,
+        description="Zero survivorship bias: include failed and suspended strategies",
+    ),
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Lists all forward league strategies with anti-survivorship bias guarantee."""
+    st_enum = AdmissionStatus(status.upper()) if status else None
+    strategies = global_forward_league_registry.list_strategies(
+        status=st_enum,
+        include_historical=include_historical,
+    )
+    return {
+        "status": "success",
+        "strategies": [s.model_dump() for s in strategies],
+        "total": len(strategies),
+        "survivorship_bias_firewall": "STRICT_ALL_HISTORICAL_INCLUDED",
+    }
+
+
+@router.get("/forward/scorecard/{admission_id}")
+async def get_forward_scorecard(
+    admission_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves denominator-transparent scorecard including standard error and 95% CI."""
+    scorecard = global_forward_performance_ledger.get_strategy_scorecard(admission_id)
+    if not scorecard:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No forward execution data found for admission '{admission_id}'.",
+        )
+    return {
+        "status": "success",
+        "scorecard": scorecard.model_dump(),
+    }
+
+
+@router.get("/forward/drift/{admission_id}")
+async def get_forward_drift_report(
+    admission_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves 5-axis statistical drift report for an active forward strategy."""
+    scorecard = global_forward_performance_ledger.get_strategy_scorecard(admission_id)
+    if not scorecard:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No forward execution data found for admission '{admission_id}'.",
+        )
+    trades = global_forward_performance_ledger.get_strategy_trades(admission_id, limit=200)
+    report = global_forward_drift_detector.evaluate_drift(
+        scorecard=scorecard,
+        raw_trades=trades,
+    )
+    return {
+        "status": "success",
+        "drift": report.model_dump(),
+    }
+
+
+@router.get("/forward/suspension_logs/{admission_id}")
+async def get_forward_suspension_logs(
+    admission_id: str,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves immutable circuit-breaker event logs and autopsy notes."""
+    logs = global_forward_league_registry.get_suspension_logs(admission_id)
+    return {
+        "status": "success",
+        "admission_id": admission_id,
+        "logs": logs,
+    }
+
+
+@router.post("/forward/halt")
+async def manual_halt_forward_strategy(
+    req: ForwardHaltRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Operator manual emergency suspension of an active forward strategy."""
+    global_forward_suspension_controller.manual_halt(
+        admission_id=req.admission_id,
+        reason=req.reason,
+        operator_id=req.operator_id,
+    )
+    return {
+        "status": "success",
+        "message": f"Strategy {req.admission_id} suspended by operator {req.operator_id}.",
+    }
+
+
+@router.post("/forward/resume")
+async def manual_resume_forward_strategy(
+    req: ForwardResumeRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Operator manual resumption of a suspended forward strategy."""
+    global_forward_suspension_controller.manual_resume(
+        admission_id=req.admission_id,
+        reason=req.reason,
+        operator_id=req.operator_id,
+    )
+    return {
+        "status": "success",
+        "message": f"Strategy {req.admission_id} resumed by operator {req.operator_id}.",
     }

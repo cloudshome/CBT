@@ -2794,6 +2794,124 @@ export interface QuarantineStatusResponse {
   };
 }
 
+// =====================================================================
+// Milestone 31: Continuous Forward Validation League & Markout Desk
+// =====================================================================
+
+export type ForwardAdmissionStatus =
+  | 'ADMITTED'
+  | 'ACTIVE'
+  | 'QUARANTINED'
+  | 'SUSPENDED'
+  | 'GRADUATED'
+  | 'EVALUATION_FAILED'
+  | 'RETIRED';
+
+export type DriftStatusType = 'NORMAL' | 'WATCH' | 'DEGRADED' | 'SEVERE' | 'INCONCLUSIVE';
+
+export interface LeagueStrategyRecord {
+  admission_id: string;
+  strategy_genome_id: string;
+  dossier_id: string;
+  hypothesis_id: string;
+  plan_id: string;
+  parameter_hash: string;
+  status: ForwardAdmissionStatus;
+  evaluation_mode: string;
+  market_universe: string[];
+  timeframe: string;
+  admission_timestamp_utc: number;
+  evaluation_start_utc?: number | null;
+  evaluation_end_utc?: number | null;
+  total_observations: number;
+  winning_observations: number;
+  losing_observations: number;
+  gross_pnl_bps: number;
+  net_pnl_bps: number;
+  max_drawdown_bps: number;
+  high_water_mark_bps: number;
+  avg_markout_5s_bps: number;
+  last_observation_utc?: number | null;
+  suspension_reason?: string | null;
+}
+
+export interface ForwardStrategiesResponse {
+  status: string;
+  strategies: LeagueStrategyRecord[];
+  total: number;
+  survivorship_bias_firewall: string;
+}
+
+export interface StrategyForwardScorecard {
+  admission_id: string;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  win_rate: number;
+  gross_pnl_bps: number;
+  net_pnl_bps: number;
+  mean_trade_net_bps: number;
+  std_dev_bps: number;
+  standard_error_bps: number;
+  ci_95_lower_bps: number;
+  ci_95_upper_bps: number;
+  max_drawdown_bps: number;
+  high_water_mark_bps: number;
+  avg_slippage_bps: number;
+  avg_fee_bps: number;
+  markout_curve_bps: Record<string, number>;
+  first_trade_utc?: number | null;
+  last_trade_utc?: number | null;
+  observation_age_days: number;
+  is_statistically_significant_positive?: boolean;
+}
+
+export interface ForwardScorecardResponse {
+  status: string;
+  scorecard: StrategyForwardScorecard;
+}
+
+export interface AxisDriftResult {
+  axis_name: string;
+  status: DriftStatusType;
+  statistic?: number | null;
+  p_value?: number | null;
+  details?: Record<string, any>;
+  warning_message?: string | null;
+}
+
+export interface MultiDimensionalDriftReport {
+  admission_id: string;
+  sample_size_n: number;
+  overall_status: DriftStatusType;
+  axes: Record<string, AxisDriftResult>;
+  drift_summary: string;
+  timestamp_utc: number;
+}
+
+export interface ForwardDriftResponse {
+  status: string;
+  drift: MultiDimensionalDriftReport;
+}
+
+export interface SuspensionLogRecord {
+  suspension_id: string;
+  admission_id: string;
+  trigger_name: string;
+  threshold_val: number;
+  observed_val: number;
+  policy_version: string;
+  details: string;
+  timestamp_utc: number;
+}
+
+export interface ForwardSuspensionLogsResponse {
+  status: string;
+  admission_id: string;
+  logs: SuspensionLogRecord[];
+}
+
+
 
 
 
