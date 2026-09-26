@@ -289,10 +289,10 @@ def test_07_constitutional_6_percent_in_flight_exposure_ceiling(
 ):
     """Verifies that cumulative in-flight bridge notional cannot exceed 6.0% equity."""
     equity = 100_000.0  # 6.0% = $6,000 max in-flight
-    quote = SolverQuote(
+    quote_batch = SolverQuote(
         solver_id="solver_1",
         protocol=BridgeProtocol.ACROSS_V3,
-        quoted_output_amount=999.0,
+        quoted_output_amount=1399.0,
         estimated_latency_sec=30.0,
         protocol_fee_bps=5.0,
         gas_subsidy_usd=0.0,
@@ -313,11 +313,22 @@ def test_07_constitutional_6_percent_in_flight_exposure_ceiling(
             ideal_output_amount=1400.0,
             now_sec=1000.0,
         )
-        dec = sentinel.evaluate_and_route_intent(equity, i_obj, [quote], now_sec=1000.0)
+        dec = sentinel.evaluate_and_route_intent(equity, i_obj, [quote_batch], now_sec=1000.0)
         assert dec.is_approved is True
         assert dec.status == IntentStatus.SOLVER_ASSIGNED
 
     # 5th intent of $1,000: 5600 + 1000 = $6,600 > $6,000 -> Must be rejected by ceiling
+    quote_breach = SolverQuote(
+        solver_id="solver_1",
+        protocol=BridgeProtocol.ACROSS_V3,
+        quoted_output_amount=999.0,
+        estimated_latency_sec=30.0,
+        protocol_fee_bps=5.0,
+        gas_subsidy_usd=0.0,
+        verification_mechanism=VerificationMechanism.OPTIMISTIC_CHALLENGE,
+        historical_reliability_score=0.98,
+        total_effective_fee_usd=1.0,
+    )
     intent_breach = sentinel.create_intent(
         intent_id="intent_breach",
         source_chain=ChainId.ARBITRUM_ONE,
@@ -328,7 +339,7 @@ def test_07_constitutional_6_percent_in_flight_exposure_ceiling(
         ideal_output_amount=1000.0,
         now_sec=1000.0,
     )
-    dec_breach = sentinel.evaluate_and_route_intent(equity, intent_breach, [quote], now_sec=1000.0)
+    dec_breach = sentinel.evaluate_and_route_intent(equity, intent_breach, [quote_breach], now_sec=1000.0)
     assert dec_breach.is_approved is False
     assert dec_breach.is_in_flight_heat_capped is True
     assert "6.0% ceiling" in dec_breach.rejection_reason
