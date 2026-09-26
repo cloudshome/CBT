@@ -58,6 +58,14 @@ from core.execution.concentrated_amm.tick_bitmap import (
     TickInfo,
     TickTable,
 )
+from core.execution.concentrated_amm.v4_hooks import (
+    BaseV4Hook,
+    DynamicFeeHook,
+    HookPermissions,
+    HookResult,
+    HookSandbox,
+    VolatilityCircuitBreakerHook,
+)
 
 __all__ = [
     "REAL_CAPITAL_ENABLED",
@@ -96,4 +104,11 @@ __all__ = [
     "ConcentratedLPAnalytics",
     "HedgeRecommendation",
     "LPPositionMetrics",
+    "HookPermissions",
+    "HookResult",
+    "BaseV4Hook",
+    "VolatilityCircuitBreakerHook",
+    "DynamicFeeHook",
+    "HookSandbox",
 ]
+

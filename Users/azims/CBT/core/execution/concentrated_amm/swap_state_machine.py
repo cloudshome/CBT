@@ -37,6 +37,12 @@ from core.execution.concentrated_amm.tick_math import (
     get_tick_at_sqrt_ratio,
     sqrt_ratio_x96_to_price,
 )
+from core.execution.concentrated_amm.v4_hooks import (
+    BaseV4Hook,
+    HookResult,
+    HookSandbox,
+)
+
 
 
 @dataclass
@@ -95,6 +101,9 @@ class SwapExecutionReport:
 
     step_ledger: List[SwapStepRecord] = field(default_factory=list)
     real_capital_enabled: bool = False
+    hook_result: Optional[HookResult] = None
+    is_halted: bool = False
+    halt_reason: Optional[str] = None
 
     @property
     def step_count(self) -> int:
@@ -132,6 +141,8 @@ class ConcentratedPoolState:
     ) -> None:
         self.token0 = token0_symbol
         self.token1 = token1_symbol
+        self.token0_symbol = token0_symbol
+        self.token1_symbol = token1_symbol
         self.decimals0 = decimals0
         self.decimals1 = decimals1
         self.fee_pips = fee_pips
@@ -177,6 +188,10 @@ class ConcentratedSwapEngine:
         zero_for_one: bool,
         amount_specified: int,
         sqrt_price_limit_x96: int | None = None,
+        hook: Optional[BaseV4Hook] = None,
+        timestamp_sec: float | None = None,
+        sender: str = "0x0000000000000000000000000000000000000000",
+        **hook_kwargs,
     ) -> SwapExecutionReport:
         """
         Executes an exact multi-tick swap traversal across discrete tick boundaries.
@@ -186,6 +201,9 @@ class ConcentratedSwapEngine:
             zero_for_one: True if token0 -> token1 (price down), False if token1 -> token0 (price up).
             amount_specified: Positive integer for exact-in.
             sqrt_price_limit_x96: Optional slippage limit price in Q64.96.
+            hook: Optional Uniswap v4 hook instance.
+            timestamp_sec: Optional timestamp for hook evaluations.
+            sender: Simulated sender address.
             
         Returns:
             SwapExecutionReport containing complete replay ledger and qualification status.
@@ -217,6 +235,51 @@ class ConcentratedSwapEngine:
         initial_price_dec = sqrt_ratio_x96_to_price(
             initial_sqrt_p, decimals_base=pool.decimals0, decimals_quote=pool.decimals1
         )
+
+        # Pre-swap hook invocation
+        hook_res: Optional[HookResult] = None
+        effective_fee_pips = pool.fee_pips
+        if hook is not None:
+            hook_res = HookSandbox.execute_before_swap_safely(
+                hook=hook,
+                sender=sender,
+                pool_id=f"{pool.token0_symbol}/{pool.token1_symbol}/{pool.fee_pips}",
+                zero_for_one=zero_for_one,
+                amount_specified=amount_specified,
+                current_tick=pool.tick,
+                current_sqrt_price_x96=pool.sqrt_price_x96,
+                timestamp_sec=timestamp_sec,
+                **hook_kwargs,
+            )
+            if not hook_res.is_success:
+                return SwapExecutionReport(
+                    zero_for_one=zero_for_one,
+                    amount_specified=amount_specified,
+                    exact_in=True,
+                    initial_tick=initial_tick,
+                    final_tick=initial_tick,
+                    initial_sqrt_price_x96=initial_sqrt_p,
+                    final_sqrt_price_x96=initial_sqrt_p,
+                    initial_liquidity=initial_liquidity,
+                    final_liquidity=initial_liquidity,
+                    total_amount_in=0,
+                    total_amount_out=0,
+                    total_fee_amount=0,
+                    amount_unconsumed=amount_specified,
+                    initial_price_decimal=initial_price_dec,
+                    final_price_decimal=initial_price_dec,
+                    effective_execution_price=initial_price_dec,
+                    price_impact_bps=0.0,
+                    is_price_impact_qualified=False,
+                    price_impact_narrative=f"Swap halted by hook: {hook_res.revert_reason}",
+                    step_ledger=[],
+                    real_capital_enabled=False,
+                    hook_result=hook_res,
+                    is_halted=True,
+                    halt_reason=hook_res.revert_reason,
+                )
+            if hook_res.override_fee_pips is not None:
+                effective_fee_pips = hook_res.override_fee_pips
 
         amount_remaining = amount_specified
         total_amount_in = 0
@@ -254,7 +317,7 @@ class ConcentratedSwapEngine:
                 sqrt_ratio_target_x96=target_sqrt_p,
                 liquidity=pool.liquidity,
                 amount_remaining=amount_remaining,
-                fee_pips=pool.fee_pips,
+                fee_pips=effective_fee_pips,
             )
 
             # Update amounts
@@ -314,6 +377,26 @@ class ConcentratedSwapEngine:
             pool.sqrt_price_x96, decimals_base=pool.decimals0, decimals_quote=pool.decimals1
         )
 
+        # Post-swap hook invocation
+        if hook is not None:
+            after_hook_res = HookSandbox.execute_after_swap_safely(
+                hook=hook,
+                sender=sender,
+                pool_id=f"{pool.token0_symbol}/{pool.token1_symbol}/{pool.fee_pips}",
+                zero_for_one=zero_for_one,
+                amount_in=total_amount_in,
+                amount_out=total_amount_out,
+                fee_amount=total_fee_amount,
+                final_tick=pool.tick,
+                final_sqrt_price_x96=pool.sqrt_price_x96,
+                timestamp_sec=timestamp_sec,
+                price_decimal=final_price_dec,
+                **hook_kwargs,
+            )
+            if hook_res is None or not after_hook_res.is_success:
+                hook_res = after_hook_res
+
+
         # Effective execution price
         if total_amount_in > 0 and total_amount_out > 0:
             if zero_for_one:
@@ -358,4 +441,7 @@ class ConcentratedSwapEngine:
             price_impact_narrative=narrative,
             step_ledger=step_ledger,
             real_capital_enabled=False,
+            hook_result=hook_res,
+            is_halted=False,
+            halt_reason=None,
         )
