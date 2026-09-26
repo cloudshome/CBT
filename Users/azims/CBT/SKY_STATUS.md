@@ -14,8 +14,8 @@
 > **Milestone 34 Status:** COMPLETED & CERTIFIED (Cross-Venue Collateral Telemetry & Rebalancing Advisor — 9/9 Tests)  
 > **Milestone 35 Status:** COMPLETED & CERTIFIED (Generation 6 Institutional Platform Release & Packaging v4.0.0 — 21/21 Gates PASS)  
 > **Milestone 35-R Status:** COMPLETED & CERTIFIED (Generation 6 Independent Release & Evidence Audit — 15/15 Obligations PASS, 100% Green 🏛️)  
-> **Gate G-21 Status:** CLEARED & CERTIFIED (Cryptographic Operator Release Authorization Dossier Emitted)  
-> **Next Frontier:** Generation 7 — Autonomous Multi-Asset Portfolio Optimization (Milestones 36–40)  
+> **Milestone 36 Status:** COMPLETED & CERTIFIED (Hierarchical Risk Parity & Ledoit-Wolf Shrinkage — 10/10 Tests 🟢)  
+> **Next Milestone:** Milestone 37 — Avellaneda-Stoikov Microstructure Market Making & Inventory Skew Reality Engine  
 > **Preflight Status:** ALL 21 RELEASE GATES + ALL 15 AUDIT OBLIGATIONS + GATE G-21 PASSED (100% GREEN)
 
 ---
@@ -71,6 +71,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `7c208be` | feat(risk): implement Milestone 36 Hierarchical Risk Parity and Ledoit-Wolf covariance shrinkage (10 passing tests) |
 | `37946ea` | feat(release): execute Gate G-21 human operator clearance ceremony and promote to v4.0.0 |
 | `986f9bf` | feat(audit): implement Milestone 35-R Generation 6 independent release & evidence audit (15 obligations PASS) |
 | `91f198b` | docs(status): document Milestone 35 completion and Generation 6 v4.0.0-rc certification |
