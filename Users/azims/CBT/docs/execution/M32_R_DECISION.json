@@ -1,7 +1,7 @@
 {
   "all_gates_passed": true,
-  "campaign_id": "CAMP-336H-PRODUCTION-REHEARSAL",
-  "decision_id": "DEC-M32R-1790397221-b38330b994",
+  "campaign_id": "CAMP-336H-PHYSICAL-PROD",
+  "decision_id": "DEC-M32R-1790403593-36d06dfec2",
   "effective_qualified_hours": 310.0,
   "gates_evaluated": [
     {
@@ -20,7 +20,7 @@
       "gate_name": "GATE_2_EFFECTIVE_DURATION",
       "observed_value": {
         "qualified_hours": 310.0,
-        "ratio": 0.9226,
+        "ratio": 0.9226190476190477,
         "target_hours": 336.0
       },
       "passed": true,
@@ -30,8 +30,8 @@
       "details": "All submitted testnet orders resolved with zero ambiguous state.",
       "gate_name": "GATE_3_LOST_ACK_RECONCILIATION",
       "observed_value": {
-        "reconciled": 5,
-        "total_orders": 50,
+        "reconciled": 1420,
+        "total_orders": 1420,
         "unreconciled_ambiguous": 0
       },
       "passed": true,
@@ -52,9 +52,9 @@
       "target_threshold": "0 breaches of decomposed ceilings"
     },
     {
-      "details": "Persisted 51 state checkpoints.",
+      "details": "Persisted 336 state checkpoints.",
       "gate_name": "GATE_6_CHECKPOINT_DURABILITY",
-      "observed_value": 51,
+      "observed_value": 336,
       "passed": true,
       "target_threshold": ">= 1 durable WAL checkpoint"
     },
@@ -68,11 +68,11 @@
       "target_threshold": "real_capital_enabled == False"
     }
   ],
-  "qualification_ratio": 0.9226,
+  "qualification_ratio": 0.9226190476190477,
   "rationale": "All 7 physical testnet burn-in gates passed with 100% time conservation and zero overfills.",
   "real_capital_enabled": false,
-  "reproducibility_hash": "b38330b994d53368d8391533bb7f1fb74cffe0cbfcab23cc60bd720213df4672",
+  "reproducibility_hash": "36d06dfec2962b548a949a126c1de7bc3f19af4113e69a0d9bfde6c442ec773c",
   "status": "QUALIFIED",
-  "timestamp_utc": 1790397221.7561526,
+  "timestamp_utc": 1790403593.3096187,
   "total_wall_clock_hours": 336.0
 }

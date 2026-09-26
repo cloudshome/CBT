@@ -55,6 +55,12 @@ class CampaignRunTelemetry(BaseModel):
     wall_clock_elapsed_hours: float
     effective_qualified_hours: float
     disqualified_hours: float
+    feed_unhealthy_hours: float = 0.0
+    execution_unhealthy_hours: float = 0.0
+    risk_gate_unhealthy_hours: float = 0.0
+    reconciliation_unhealthy_hours: float = 0.0
+    strategy_unhealthy_hours: float = 0.0
+    pause_hours: float = 0.0
     qualification_ratio: float = Field(..., ge=0.0, le=1.0)
     time_conservation_verified: bool
     total_allocations: int
@@ -210,6 +216,12 @@ class CampaignDaemonIntegrator:
             wall_clock_elapsed_hours=round(wall_hours, 4),
             effective_qualified_hours=round(qual_hours, 4),
             disqualified_hours=round(disqual_hours, 4),
+            feed_unhealthy_hours=round(clock.feed_unhealthy_sec / 3600.0, 4),
+            execution_unhealthy_hours=round(clock.execution_unhealthy_sec / 3600.0, 4),
+            risk_gate_unhealthy_hours=round(clock.risk_gate_unhealthy_sec / 3600.0, 4),
+            reconciliation_unhealthy_hours=round(clock.reconciliation_unhealthy_sec / 3600.0, 4),
+            strategy_unhealthy_hours=round(clock.strategy_unhealthy_sec / 3600.0, 4),
+            pause_hours=round(clock.pause_sec / 3600.0, 4),
             qualification_ratio=round(qual_ratio, 4),
             time_conservation_verified=conserved,
             total_allocations=len(self.allocations),

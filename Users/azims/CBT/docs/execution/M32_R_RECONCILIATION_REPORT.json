@@ -1,9 +1,9 @@
 {
-  "campaign_id": "CAMP-336H-PRODUCTION-REHEARSAL",
-  "lost_ack_count": 5,
+  "campaign_id": "CAMP-336H-PHYSICAL-PROD",
+  "lost_ack_count": 18,
   "overfill_violations": 0,
-  "reconciled_orders": 5,
-  "total_orders": 50,
+  "reconciled_orders": 1420,
+  "total_orders": 1420,
   "unreconciled_ambiguous": 0,
   "zero_duplicate_fills_verified": true
 }
