@@ -1,6 +1,12 @@
 # ARCHITECTURE.md — System Architecture & Design
 
+> 💡 **Looking for the Full Project Tree & Modular "Keyboard Key" Decoupling Guide?**  
+> See the authoritative documents:  
+> - [`ARCHITECTURE_TREE.md`](ARCHITECTURE_TREE.md) (Root Project Hierarchy Summary)  
+> - [`docs/PROJECT_TOPOLOGY_AND_MODULAR_TREE.md`](docs/PROJECT_TOPOLOGY_AND_MODULAR_TREE.md) (Complete Topology & Zero-Blast-Radius Decoupling Standard)
+
 ## 1. Executive Summary
+
 
 **Crypto Brain Terminal (CTB)** is an institutional-grade quantitative paper trading, Smart Money Concepts (SMC) scanning, and desk intelligence platform for crypto markets. The architecture is engineered for deterministic execution, high resilience, multi-tier fallback redundancy, and strict capital risk preservation.
 
