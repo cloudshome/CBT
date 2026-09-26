@@ -1,7 +1,7 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-09-26  
-> **Release Tag:** `v5.3.0-m32-testnet-burn-in-qualified` (ACTIVE 🚀)  
+> **Release Tag:** `v5.4.0-m33-synthetic-basis-engine` (ACTIVE 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB.git`  
 > **Lead Agent:** Antigravity  
@@ -10,7 +10,8 @@
 > **Milestone 31 & 31-R Status:** COMPLETED & CERTIFIED (Forward Reality League & 5-State Evidence Qualification — 52/52 Tests)  
 > **Milestone 31.5 Status:** COMPLETED & CERTIFIED (Strategy Constitution & Parameter Freeze Registry)  
 > **Milestone 32 Status:** COMPLETED & CERTIFIED (Autonomous 336h Testnet Burn-In & Ensemble Allocator — 32/32 Tests, 🟢 QUALIFIED)  
-> **Next Target:** Milestone 33 (Multi-Venue Synthetic Cross-Arbitrage & Basis Dispersion Engine)  
+> **Milestone 33 Status:** COMPLETED & CERTIFIED (Multi-Venue Synthetic Basis & Leg-Risk Fail-Safe — 12/12 Tests)  
+> **Next Target:** Milestone 34 (Cross-Venue Collateral Telemetry & Dynamic Liquidity Topology)  
 > **Preflight Status:** ALL QUALITY GATES PASSED (100% GREEN)
 
 ---
@@ -285,6 +286,28 @@ Milestone 32 successfully executed the physical testnet burn-in phase, ensuring 
 4. **Physical Burn-In Review & Dossiers:** `core/execution/testnet/burn_in_evaluator.py` verifies all 7 proof obligations and emits `docs/execution/M32_R_BURN_IN_DOSSIER.md` (`🟢 QUALIFIED`, 310h/336h qualified uptime, zero lost ACK ambiguity, zero overfills, 100% time conservation).
 5. **Test Coverage:** 32/32 dedicated tests passing (`test_milestone32_a_daemon.py`, `test_milestone32_b_allocator.py`, `test_milestone32_c_campaign.py`, `test_milestone32_r_burn_in_review.py`).
 6. **Milestone 18 Protection:** Certified surface area untouched; 149/149 tests 100% active and green.
+
+---
+
+## Milestone 33: Multi-Venue Synthetic Cross-Arbitrage & Basis Dispersion Engine — COMPLETED & CERTIFIED ✅
+
+Milestone 33 implements the Generation 6 synthetic basis cross-arbitrage and dispersion engine across Binance Spot/Perp, Bybit Spot/Perp, and Hyperliquid L1 Perpetual Futures.
+
+### Completed & Hardened Deliverables:
+1. **Synthetic Basis & Spread Model:** `core/intelligence/synthetic_basis_engine.py` provides real-time basis analytics, annualized carry yields, Engle-Granger two-step cointegration testing ($p < 0.01$), and calibrated Ornstein-Uhlenbeck mean-reversion speed ($\kappa$) and half-life ($\tau = \ln(2)/\kappa$).
+2. **Deterministic Basis Risk Governor:** `core/risk_engine/basis_governor.py` enforces 5 strict risk gates:
+   - Basis Dislocation Breaker ($|\text{basis}| \le 300\text{ bps}$).
+   - Toxic Funding Inversion Alert.
+   - Collateral Imbalance Shield (prevents asymmetric venue margin depletion).
+   - Monotonic 1.5% equity risk cap clamping.
+   - Cointegration & Half-life convergence verification.
+3. **Atomic Dual-Leg Synthetic Router:** `core/execution/strategy_gateway/synthetic_router.py` implements a two-phase commit protocol with automated Leg-Risk Fail-Safe:
+   - If Leg 1 fills and Leg 2 rejects or times out, immediately triggers an automated protective unwind of Leg 1.
+   - High-resolution fill reconciliation, slippage attribution, and strict 4-denominator accounting.
+   - SQLite WAL persistence in `synthetic_execution_ledger`.
+4. **Permanent Constitutional Firewall:** `real_capital_enabled = False` permanently locked across all models and execution routers.
+5. **Test Coverage:** 12/12 dedicated adversarial tests passing (`tests/execution/test_milestone33_synthetic_basis.py`).
+6. **Milestone 18 Protection:** Certified surface area untouched; 149/149 tests active and green.
 
 ---
 

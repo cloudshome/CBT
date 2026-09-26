@@ -123,14 +123,15 @@ graph TD
 - **Milestone 31-R:** Forward Evidence Hardening & 5-State Institutional Qualification Engine (`core/intelligence/forward_validation/`, 12 passing tests, 186/186 intelligence suite green).
 - **Milestone 31.5:** Strategy Constitution & Parameter Freeze Gate (`M31_5_FREEZE_MANIFEST.json`).
 - **Milestone 32 (32-A, 32-B, 32-C, 32-R):** Autonomous 336h Testnet Burn-In Campaign & Multi-Strategy Ensemble Allocator (32 passing tests, `M32_R_BURN_IN_DOSSIER.md` 🟢 QUALIFIED).
+- **Milestone 33:** Multi-Venue Synthetic Cross-Arbitrage, Basis Dispersion & Leg-Risk Fail-Safe Router (`core/intelligence/synthetic_basis_engine.py`, `core/execution/strategy_gateway/synthetic_router.py`, `core/risk_engine/basis_governor.py`, 12 passing tests).
 - **CI / Quality Gates:** 100% Green across all gates. Milestone 18 Production Pass remains certified and untouched (149/149 tests).
 
-### Next Implementation Focus — Milestone 33:
-- **Objective:** Multi-Venue Synthetic Cross-Arbitrage & Basis Dispersion Engine (`core/intelligence/synthetic_basis_engine.py`, `core/execution/synthetic_router.py`).
+### Next Implementation Focus — Milestone 34:
+- **Objective:** Cross-Venue Collateral Telemetry, Dynamic Liquidity Topology & Automated Capital Rebalancing.
 - **Core Modules to Build:**
-  1. `core/intelligence/synthetic_basis_engine.py` — Spot vs Perpetual basis modeling, funding carry dispersion, and cointegration testing across Binance, Bybit, and Hyperliquid.
-  2. `core/execution/synthetic_router.py` — 2-phase atomic dual-leg routing with leg-risk fail-safe.
-  3. `core/risk_engine/basis_governor.py` — Basis dislocation kill switches and collateral exhaustion protection.
-  4. Platform Release Gating (`v4.0.0`).
+  1. `core/risk_engine/collateral_monitor.py` — Sub-second margin level polling and liquidation distance buffer estimation across Binance, Bybit, and Hyperliquid.
+  2. `core/risk_engine/rebalancing_advisor.py` — Optimal off-chain / cross-venue transfer trajectory calculator minimizing funding drag and transfer fees.
+  3. Platform Release Gating (`v4.0.0`).
+
 
 

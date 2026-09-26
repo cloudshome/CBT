@@ -836,18 +836,39 @@
 
 ---
 
-## ⚡ Milestone 33: Multi-Venue Synthetic Cross-Arbitrage & Basis Dispersion Engine (PLANNED 🚀)
+## ⚡ Milestone 33: Multi-Venue Synthetic Cross-Arbitrage & Basis Dispersion Engine (COMPLETED ✅)
 
-- [ ] **Task 33.1: Cross-Venue Synthetic Basis & Spread Model (`core/intelligence/synthetic_basis_engine.py`)**
+- [x] **Task 33.1: Cross-Venue Synthetic Basis & Spread Model (`core/intelligence/synthetic_basis_engine.py`)**
   - Spot vs Perpetual basis modeling across Binance, Bybit, and Hyperliquid L1.
   - Real-time funding rate carry dispersion, borrow rate surface estimation, and cointegration testing ($p < 0.01$).
-- [ ] **Task 33.2: Dual-Leg Execution & Synthetic Fill Reconciliation (`core/execution/synthetic_router.py`)**
-  - Two-phase commit atomic dual-leg execution with leg-risk fail-safe.
-  - Slippage and adverse selection attribution on simultaneously routed pairs.
-- [ ] **Task 33.3: Basis Risk Governor & Dynamic Delta Neutralizer (`core/risk_engine/basis_governor.py`)**
-  - Basis dislocation kill switches, cross-margin collateral exhaustion shields, and funding payment divergence alarms.
-- [ ] **Task 33.4: Platform Release Gate (`v4.0.0`)**
-  - Final packaging and release gating following M33 validation.
+  - Ornstein-Uhlenbeck mean-reversion speed ($\kappa$) and half-life estimation ($\tau = \ln(2)/\kappa$).
+  - Epistemic taxonomy tagging (`[FACT]`, `[INFERENCE]`, `[HYPOTHESIS]`).
+- [x] **Task 33.2: Dual-Leg Execution & Synthetic Fill Reconciliation (`core/execution/strategy_gateway/synthetic_router.py`)**
+  - Two-phase commit atomic dual-leg execution with Leg-Risk Fail-Safe.
+  - Immediate automated protective unwind of Leg 1 if Leg 2 fails/times out.
+  - High-resolution synthetic fill reconciliation, basis slippage attribution, and 4-denominator accounting.
+  - SQLite WAL persistence in `synthetic_execution_ledger`.
+- [x] **Task 33.3: Basis Risk Governor & Dynamic Delta Neutralizer (`core/risk_engine/basis_governor.py`)**
+  - Basis dislocation shock breaker ($|\text{basis}| \le 300\text{ bps}$).
+  - Toxic funding inversion alert (blocks negative carry entry).
+  - Collateral imbalance shield preventing asymmetric margin depletion.
+  - Monotonic 1.5% equity risk cap clamping ($Q_{\text{approved}} \le Q_{\text{risk\_cap}}$).
+- [x] **Task 33.4: Adversarial Test Suite (`tests/execution/test_milestone33_synthetic_basis.py`)**
+  - 12/12 dedicated adversarial tests passing green; full 56-test regression suite green.
+  - Milestone 18 Production Pass certified untouched and active (149/149 tests).
+
+---
+
+## 🌊 Milestone 34: Cross-Venue Collateral Telemetry & Dynamic Liquidity Topology (PLANNED 🚀)
+
+- [ ] **Task 34.1: High-Frequency Margin & Collateral Heartbeat Monitor (`core/risk_engine/collateral_monitor.py`)**
+  - Sub-second margin level polling and liquidation distance buffer estimation across all venues.
+  - Asymmetric liquidation hazard warning when delta-hedged position approaches margin call on one venue.
+- [ ] **Task 34.2: Automated Internal Rebalancing Advisory (`core/risk_engine/rebalancing_advisor.py`)**
+  - Optimal off-chain / cross-venue transfer trajectory calculator minimizing funding drag and transfer fees.
+- [ ] **Task 34.3: Platform Packaging & Production Release Candidate (`v4.0.0`)**
+  - Platform packaging, Authenticode verification, and 17-point release blocker audit.
+
 
 ---
 
