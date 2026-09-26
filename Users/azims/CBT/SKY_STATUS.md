@@ -13,8 +13,9 @@
 > **Milestone 33 Status:** COMPLETED & CERTIFIED (Multi-Venue Synthetic Basis & Leg-Risk Fail-Safe — 12/12 Tests)  
 > **Milestone 34 Status:** COMPLETED & CERTIFIED (Cross-Venue Collateral Telemetry & Rebalancing Advisor — 9/9 Tests)  
 > **Milestone 35 Status:** COMPLETED & CERTIFIED (Generation 6 Institutional Platform Release & Packaging v4.0.0-rc — 21/21 Gates PASS)  
+> **Milestone 35-R Status:** COMPLETED & CERTIFIED (Generation 6 Independent Release & Evidence Audit — 15/15 Obligations PASS, 100% Green 🏛️)  
 > **Next Target:** Final Operator Release Gate G-21 Approval  
-> **Preflight Status:** ALL 21 QUALITY GATES PASSED (100% GREEN)
+> **Preflight Status:** ALL 21 RELEASE GATES + ALL 15 AUDIT OBLIGATIONS PASSED (100% GREEN)
 
 ---
 
@@ -69,6 +70,12 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `986f9bf` | feat(audit): implement Milestone 35-R Generation 6 independent release & evidence audit (15 obligations PASS) |
+| `91f198b` | docs(status): document Milestone 35 completion and Generation 6 v4.0.0-rc certification |
+| `8016359` | feat(release): upgrade platform to Generation 6 v4.0.0 release candidate with 21-gate release blocker matrix |
+| `1c96677` | feat(risk): implement Milestone 34 cross-venue collateral telemetry and rebalancing advisor (9 passing tests) |
+| `bc8bad7` | feat(arbitrage): implement Milestone 33 synthetic basis engine and leg-risk fail-safe router (12 passing tests) |
+| `27933d7` | feat(testnet): implement M31-R evidence hardening, M31.5 parameter freeze, and M32 autonomous burn-in (44 passing tests) |
 | `adc1b2e` | feat(grade-e3): implement institutional deployment framework and L2 reality engine (35 passing tests) |
 | `7b4835f` | fix(ci): track manifest_k9.json in git and add fallback path to fix CI test discovery |
 | `15f7d47` | feat(provenance): harden StrategyRealityBridge with ProvenanceAuthority and specify Grade-E3 (9 passing tests) |
