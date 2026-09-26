@@ -36,6 +36,11 @@ from core.execution.concentrated_amm.tick_math import (
     tick_to_price,
 )
 
+from core.execution.concentrated_amm.lp_analytics import (
+    ConcentratedLPAnalytics,
+    HedgeRecommendation,
+    LPPositionMetrics,
+)
 from core.execution.concentrated_amm.swap_math import (
     compute_swap_step,
     get_next_sqrt_price_from_input,
@@ -88,4 +93,7 @@ __all__ = [
     "SwapExecutionReport",
     "ConcentratedPoolState",
     "ConcentratedSwapEngine",
+    "ConcentratedLPAnalytics",
+    "HedgeRecommendation",
+    "LPPositionMetrics",
 ]
