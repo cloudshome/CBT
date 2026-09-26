@@ -253,7 +253,7 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="AI Quant Sentinel / Crypto Brain Terminal (CBT)",
     description="Institutional-Grade Quantitative Research, Paper Trading & Scientific Governance Platform",
-    version="3.0.0",
+    version="4.0.0",
     lifespan=lifespan_ctx,
 )
 

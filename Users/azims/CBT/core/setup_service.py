@@ -242,7 +242,7 @@ async def get_setup_status() -> dict[str, Any]:
         "configured_exchanges": configured_exchanges,
         "web3_wallets": wallets,
         "execution_mode": exec_mode,
-        "app_version": "3.0.0",
+        "app_version": "4.0.0",
         "platform": sys.platform,
         "supported_exchanges": list(SUPPORTED_EXCHANGES),
     }

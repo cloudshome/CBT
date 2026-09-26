@@ -3,20 +3,24 @@ scripts/build_windows_app.py
 ============================
 Master Production Release & Desktop Software Packaging Orchestrator for CBT / SKY.
 
-Orchestrates the complete institutional release pipeline:
+Generation 6 Institutional Platform Release (v4.0.0):
 1. Release Gate 0: Pre-Implementation Architectural & Security Audit
 2. Milestone 18 Invariant Integrity Check (14 certified files, 149 tests)
 3. Gate G-02: Phase A FIDO2 Hardware Key Clearance Suite (22 tests)
 4. Gate G-07/G-08/G-09: Web3 Watch-Only AST & Multi-RPC Quorum Engine (15 tests)
 5. Gate G-10/G-11: 1,000-Slice Stress Matrix & Destructive Crash Recovery
 6. Gate G-12/G-13: Live Execution Gatekeeper & Kill Switch Invariants
-7. Gate G-15: React + Vite Frontend Bundle (`frontend/dist/`)
-8. Gate G-15: Electron Supervisor TypeScript Compilation (`dist/electron/`)
+7. Gate G-14: Zero-Secret Leakage Git & Log Audit
+8. Gate G-15: React + Vite Frontend Bundle (`frontend/dist/`) & Electron Supervisor (`dist/electron/`)
 9. Gate G-16: Native Windows Installer & Portable Executable (`release/`)
 10. Gate G-04/G-05/G-06: Dual-Profile Authenticode Signing & HTTPS RFC-3161 Timestamping
-11. Gate G-16: Cryptographic SHA-256 Release Manifest (`release/SHA256SUMS.txt`)
-12. 17-Point Release Blocker Matrix: Emits `RELEASE_MANIFEST.json` and `RELEASE_CERTIFICATION.json`
-13. Halts at `RELEASE_CANDIDATE` awaiting explicit Human Release Approval Gate.
+11. Gate G-17: Milestone 31-R Evidence Hardening & Strategy Qualification Gate (12 tests, N=120)
+12. Gate G-18: Milestone 32-R Physical Testnet Burn-In Proof Obligations (32 tests, 336h loop)
+13. Gate G-19: Milestone 33 Synthetic Basis Dispersion Engine & Leg-Risk Fail-Safe Router (12 tests)
+14. Gate G-20: Milestone 34 Cross-Venue Collateral Telemetry & Rebalancing Advisor (9 tests)
+15. Gate G-21: Human Release Approval Gate (Pending Operator Signature)
+16. 21-Point Release Blocker Matrix: Emits `RELEASE_MANIFEST.json` and `RELEASE_CERTIFICATION.json`
+17. Halts at `RELEASE_CANDIDATE` awaiting explicit Human Release Approval Gate.
 """
 
 from __future__ import annotations
@@ -62,7 +66,7 @@ def evaluate_blocker_matrix(
     status = "RELEASE_CANDIDATE" if all_passed else "RELEASE_BLOCKED"
 
     matrix_report = {
-        "release_version": "v3.0.0",
+        "release_version": "v4.0.0",
         "release_profile": profile,
         "release_state": status,
         "is_production_ready": all_passed,
@@ -132,9 +136,25 @@ def evaluate_blocker_matrix(
                 "name": "Native Installer & Checksums Packaging",
                 "passed": gates.get("G-16", False),
             },
-            "G-17_human_approval_gate": {
+            "G-17_m31r_evidence_qualification": {
+                "name": "Milestone 31-R Evidence Ledger & Strategy Qualification Gate",
+                "passed": gates.get("G-17", False),
+            },
+            "G-18_m32r_physical_burn_in": {
+                "name": "Milestone 32-R Physical Testnet Burn-In Proof Obligations",
+                "passed": gates.get("G-18", False),
+            },
+            "G-19_m33_synthetic_basis_arbitrage": {
+                "name": "Milestone 33 Synthetic Basis Dispersion & Leg-Risk Fail-Safe Router",
+                "passed": gates.get("G-19", False),
+            },
+            "G-20_m34_collateral_topology": {
+                "name": "Milestone 34 Cross-Venue Collateral Telemetry & Rebalancing Advisor",
+                "passed": gates.get("G-20", False),
+            },
+            "G-21_human_approval_gate": {
                 "name": "Human Release Approval Gate (Pending Operator Signature)",
-                "passed": True,  # Ready for human review
+                "passed": gates.get("G-21", True),  # Ready for human review
             },
         },
         "artifacts": artifacts,
@@ -149,11 +169,11 @@ def evaluate_blocker_matrix(
     with open(cert_file, "w") as f:
         json.dump(
             {
-                "certification_version": "v3.0.0",
+                "certification_version": "v4.0.0",
                 "status": status,
                 "profile": profile,
                 "timestamp": matrix_report["evaluated_at"],
-                "17_gates_summary": {k: v["passed"] for k, v in matrix_report["gates"].items()},
+                "21_gates_summary": {k: v["passed"] for k, v in matrix_report["gates"].items()},
             },
             f,
             indent=2,
@@ -170,7 +190,7 @@ def main() -> None:
     print("=" * 75)
     print(" CRYPTO BRAIN TERMINAL (CBT / SKY) -- MASTER PRODUCTION RELEASE ENGINE")
     print(f" Target Release Profile : {profile_str}")
-    print(" Release State Machine  : G-01 -> G-17 -> RELEASE_CANDIDATE -> HUMAN_GATE")
+    print(" Release State Machine  : G-01 -> G-21 -> RELEASE_CANDIDATE -> HUMAN_GATE")
     print("=" * 75)
 
     py_exe = str(REPO_ROOT / ".venv" / "Scripts" / "python.exe")
@@ -217,6 +237,55 @@ def main() -> None:
     )
     gates["G-13"] = gates["G-12"]
 
+    # G-17: Milestone 31-R Strategy Evidence Hardening & Statistical Qualification Gate
+    m31_test_ok = run_step(
+        [py_exe, "-m", "pytest", "tests/intelligence/test_milestone31_r_evidence_hardening.py", "-q"],
+        "G-17: Milestone 31-R Evidence Ledger & Strategy Qualification Gate",
+    )
+    m31_decision_file = REPO_ROOT / "docs" / "research" / "M31_R_DECISION.json"
+    m31_qualified = False
+    if m31_decision_file.exists():
+        try:
+            with open(m31_decision_file, "r") as f:
+                dec = json.load(f)
+                m31_qualified = dec.get("status") == "QUALIFIED"
+        except Exception:
+            pass
+    gates["G-17"] = m31_test_ok and m31_qualified
+
+    # G-18: Milestone 32-R Physical Testnet Burn-In Proof Obligations
+    m32_test_ok = run_step(
+        [
+            py_exe,
+            "-m",
+            "pytest",
+            "tests/execution/test_milestone32_a_daemon.py",
+            "tests/execution/test_milestone32_b_allocator.py",
+            "tests/execution/test_milestone32_c_campaign.py",
+            "tests/execution/test_milestone32_r_burn_in_review.py",
+            "-q",
+        ],
+        "G-18: Milestone 32-R 336h Autonomous Testnet Burn-In Proof Obligations",
+    )
+    m32_dossier_file = REPO_ROOT / "docs" / "execution" / "M32_R_BURN_IN_DOSSIER.md"
+    m32_qualified = m32_dossier_file.exists() and "QUALIFIED" in m32_dossier_file.read_text(encoding="utf-8")
+    gates["G-18"] = m32_test_ok and m32_qualified
+
+    # G-19: Milestone 33 Synthetic Basis Dispersion Engine & Leg-Risk Fail-Safe Router
+    gates["G-19"] = run_step(
+        [py_exe, "-m", "pytest", "tests/execution/test_milestone33_synthetic_basis.py", "-q"],
+        "G-19: Milestone 33 Synthetic Cross-Arbitrage & Dual-Leg Fail-Safe Router",
+    )
+
+    # G-20: Milestone 34 Cross-Venue Collateral Telemetry & Dynamic Liquidity Topology
+    gates["G-20"] = run_step(
+        [py_exe, "-m", "pytest", "tests/execution/test_milestone34_collateral_topology.py", "-q"],
+        "G-20: Milestone 34 Cross-Venue Collateral Telemetry & Rebalancing Advisor",
+    )
+
+    # G-21: Human Release Approval Gate (Pending Operator Signature)
+    gates["G-21"] = True
+
     # G-14: Secret Leakage Audit
     log("G-14: Running Secret Leakage Audit...")
     git_diff_pfx = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
@@ -237,7 +306,7 @@ def main() -> None:
 
     # G-16: Packaging Native Windows Binaries
     log("G-16: Executing electron-builder packaging...")
-    builder_res = subprocess.run(["npx", "electron-builder", "--win", "--x64", "--dir"], shell=True)
+    builder_res = subprocess.run(["npx", "electron-builder", "--win", "--x64"], shell=True)
     if builder_res.returncode != 0:
         print(f"[WARN] electron-builder returned non-zero code ({builder_res.returncode})")
 
@@ -275,7 +344,7 @@ def main() -> None:
     installer_ok = run_step([py_exe, "scripts/verify_installer.py"], "G-16: Installer Lab Verification")
     gates["G-16"] = installer_ok and (RELEASE_DIR.exists() and len(checksums) > 0)
 
-    # Compile 17-Point Blocker Matrix Report
+    # Compile 21-Point Blocker Matrix Report
     report = evaluate_blocker_matrix(
         profile=profile_str,
         gates=gates,
@@ -283,7 +352,7 @@ def main() -> None:
     )
 
     print("\n" + "=" * 75)
-    print(" 17-POINT RELEASE BLOCKER MATRIX EVALUATION REPORT")
+    print(" 21-POINT RELEASE BLOCKER MATRIX EVALUATION REPORT")
     print("=" * 75)
     for gid, gdata in report["gates"].items():
         verdict = "PASS [OK]" if gdata["passed"] else "BLOCKED [FAIL]"
@@ -292,7 +361,7 @@ def main() -> None:
 
     if report["release_state"] == "RELEASE_CANDIDATE":
         print("\n" + "*" * 75)
-        print(" [RELEASE GATE REACHED] ALL 17 AUTOMATED GATES PASSED")
+        print(" [RELEASE GATE REACHED] ALL 21 AUTOMATED GATES PASSED")
         print(" State Transition: -> RELEASE_CANDIDATE")
         print(" Institutional Invariant:")
         print(" 'The presence of an installer on disk is NEVER proof of production readiness.'")

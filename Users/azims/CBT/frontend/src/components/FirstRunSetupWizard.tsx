@@ -240,7 +240,7 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
             </div>
             <div>
               <h1 className="text-lg font-bold text-zinc-100 tracking-wide">
-                CRYPTO BRAIN TERMINAL <span className="text-amber-400 font-mono text-xs px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">v3.0.0</span>
+                CRYPTO BRAIN TERMINAL <span className="text-amber-400 font-mono text-xs px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">v4.0.0</span>
               </h1>
               <p className="text-xs text-zinc-400">Institutional First-Run Security & Venue Configuration</p>
             </div>

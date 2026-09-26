@@ -59,7 +59,7 @@ export function createApp(): Express {
     res.json({
       name: 'Crypto Brain Terminal (CTB) API',
       status: 'online',
-      version: '3.0.0',
+      version: '4.0.0',
     });
   });
 

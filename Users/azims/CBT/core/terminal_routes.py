@@ -410,7 +410,7 @@ async def get_master_terminal_telemetry(
     # 1. Level 0: System & Health Telemetry
     system = {
         "service": "CTB-INSTITUTIONAL-COCKPIT",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "timestamp": int(time.time() * 1000),
         "serverClockUtc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "activeSession": "LONDON_NEWYORK_OVERLAP",

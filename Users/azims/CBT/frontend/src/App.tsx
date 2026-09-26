@@ -457,7 +457,7 @@ export const App: React.FC = () => {
         <div className="flex items-center space-x-2">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow shadow-amber-400/50" />
           <span className="font-bold text-zinc-200 tracking-wider">CRYPTO BRAIN TERMINAL</span>
-          <span className="text-[10px] font-mono text-zinc-500">v3.0.0</span>
+          <span className="text-[10px] font-mono text-zinc-500">v4.0.0</span>
           <span className="text-[10px] font-mono text-emerald-400/80 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/30">
             LOCAL PORT 127.0.0.1
           </span>

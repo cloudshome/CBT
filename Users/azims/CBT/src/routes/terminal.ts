@@ -378,7 +378,7 @@ terminalRouter.get('/telemetry', async (req: Request, res: Response): Promise<vo
     // 1. Level 0: System & Health Telemetry
     const system = {
       service: 'CTB-INSTITUTIONAL-COCKPIT',
-      version: '3.0.0',
+      version: '4.0.0',
       timestamp: Date.now(),
       serverClockUtc: new Date().toISOString(),
       activeSession: 'LONDON_NEWYORK_OVERLAP',
