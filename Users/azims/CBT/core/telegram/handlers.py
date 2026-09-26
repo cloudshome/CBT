@@ -368,6 +368,128 @@ async def handle_summary(
     return res
 
 
+async def handle_wiki(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    SKY Institutional Research Wikipedia & Living Journal.
+    Usage:
+      /wiki - List recent research journal entries
+      /wiki search <query> - Search journal by keywords or tags
+      /wiki <article_id> - View full research article dossier
+      /wiki <url> - Ingest, fact-check & permanently archive a research link
+    """
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+    from core.telegram_bot import telegram_bot
+
+    clean_args = args.strip()
+    user_name = identity.username or identity.user_id if identity else "Telegram Analyst"
+
+    # Case 1: Empty or 'list' -> Show catalog
+    if not clean_args or clean_args.lower() in ("list", "recent", "all"):
+        articles = research_wikipedia_engine.list_articles(limit=5)
+        if not articles:
+            msg = (
+                "ℹ️ **No Research Wikipedia articles currently filed.**\n"
+                "Send `/wiki <url>` to ingest and fact-check any link or note."
+            )
+        else:
+            lines = [
+                "📚 **SKY RESEARCH WIKIPEDIA JOURNAL**",
+                "━━━━━━━━━━━━━━━━━━━━━━",
+                "Active living encyclopedia of cross-verified intelligence.\n",
+            ]
+            for a in articles:
+                score = a.get("verification_score", 0.0)
+                badge = "🟢" if score >= 80 else ("🟡" if score >= 60 else "🔴")
+                lines.append(
+                    f"{badge} **{a['title']}**\n"
+                    f"• ID: `{a['article_id']}` | Category: `{a['category']}`\n"
+                    f"• Rigor: `{score:.1f}%` | Claims: `{a.get('claims_count', 0)}` | Source: `{a.get('source_type', 'LINK')}`\n"
+                    f"• View: `/wiki {a['article_id']}`\n"
+                )
+            lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+            lines.append(
+                "💡 **Actions:**\n"
+                "• Search: `/wiki search <query>`\n"
+                "• Ingest: `/wiki <url>`\n"
+                "• Read: `/wiki <article_id>`"
+            )
+            msg = "\n".join(lines)
+
+        if chat_id:
+            await telegram_bot.send_message(msg, chat_id=chat_id)
+        return msg
+
+    # Case 2: URL Ingestion
+    if clean_args.startswith("http://") or clean_args.startswith("https://"):
+        if chat_id:
+            await telegram_bot.send_message(
+                f"🔬 **Ingesting into Research Wikipedia...**\n`{clean_args[:60]}...`\nCross-verifying claims against macroeconomic ledgers...",
+                chat_id=chat_id,
+            )
+        article = research_wikipedia_engine.ingest_url_or_content(
+            url_or_text=clean_args,
+            custom_author=str(user_name),
+        )
+        msg = telegram_bot._format_wikipedia_telegram_card(article)
+        if chat_id:
+            await telegram_bot.send_message(msg, chat_id=chat_id)
+        return msg
+
+    # Case 3: Direct Article ID Lookup
+    existing_article = research_wikipedia_engine.get_article(clean_args)
+    if existing_article:
+        msg = telegram_bot._format_wikipedia_telegram_card(existing_article)
+        if chat_id:
+            await telegram_bot.send_message(msg, chat_id=chat_id)
+        return msg
+
+    # Case 4: Search Query
+    query = clean_args[7:].strip() if clean_args.lower().startswith("search ") else clean_args
+    results = research_wikipedia_engine.list_articles(search_query=query, limit=5)
+    if results:
+        lines = [
+            f"🔍 **WIKIPEDIA SEARCH RESULTS FOR: '{query}'**",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+        ]
+        for a in results:
+            score = a.get("verification_score", 0.0)
+            badge = "🟢" if score >= 80 else ("🟡" if score >= 60 else "🔴")
+            lines.append(
+                f"{badge} **{a['title']}**\n"
+                f"• ID: `{a['article_id']}` | Rigor: `{score:.1f}%`\n"
+                f"• Summary: _{a.get('executive_summary', '')[:120]}..._\n"
+                f"• View: `/wiki {a['article_id']}`\n"
+            )
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append(f"💡 _Total matches: {len(results)}_")
+        msg = "\n".join(lines)
+    else:
+        # If no search results and user typed a substantive thought/note, ingest as research note
+        if len(clean_args) > 25:
+            if chat_id:
+                await telegram_bot.send_message(
+                    "📝 No matching articles found. Ingesting as a new Research Journal Note...",
+                    chat_id=chat_id,
+                )
+            article = research_wikipedia_engine.ingest_url_or_content(
+                url_or_text=clean_args,
+                custom_title=clean_args[:40],
+                custom_author=str(user_name),
+            )
+            msg = telegram_bot._format_wikipedia_telegram_card(article)
+        else:
+            msg = (
+                f"ℹ️ No Research Wikipedia entries found matching `{query}`.\n"
+                "Try `/wiki` to see all recent entries or `/wiki <url>` to ingest."
+            )
+
+    if chat_id:
+        await telegram_bot.send_message(msg, chat_id=chat_id)
+    return msg
+
+
 async def handle_risk(
     args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
 ) -> str:
@@ -1051,6 +1173,14 @@ def register_all_v5_commands() -> None:
             required_role=TelegramRole.ANALYST,
             aliases=[],
             argument_schema="",
+        ),
+        TelegramCommand(
+            name="/wiki",
+            description="SKY Research Wikipedia & Journal: Fact-checked macro & strategy encyclopedia",
+            handler=handle_wiki,
+            required_role=TelegramRole.ANALYST,
+            aliases=["/wikipedia", "/journal", "/encyclopedia"],
+            argument_schema="[url | search query | article_id]",
         ),
         TelegramCommand(
             name="/risk",

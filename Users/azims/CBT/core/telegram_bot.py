@@ -1872,6 +1872,81 @@ class TelegramBotDispatcher:
         lines.append("🔬 _Dispatched from SKY / CBT Research Lab_")
         return "\n".join(lines)
 
+    @staticmethod
+    def _format_wikipedia_telegram_card(article: Any) -> str:
+        """Formats a Research Wikipedia article into an institutional Telegram research card."""
+        if hasattr(article, "to_dict"):
+            d = article.to_dict()
+        elif isinstance(article, dict):
+            d = article
+        else:
+            return "📚 **Research Wikipedia Entry Filed** (Metadata format error)"
+
+        title = str(d.get("title", "Research Article")).replace("*", "")
+        category = d.get("category", "General Research")
+        score = float(d.get("verification_score", 0.0))
+        prov_id = d.get("provenance_id", "N/A")
+        art_id = d.get("article_id", "")
+        author = str(d.get("author_or_speaker", "Open Intelligence")).replace("*", "")
+        summary = str(d.get("executive_summary", "")).replace("*", "").strip()
+        wikilinks = d.get("wikilinks", [])
+        contradictions = d.get("contradictions_detected", [])
+        claims = d.get("key_claims", [])
+        macro_imp = str(d.get("macro_regime_implications", "")).replace("*", "").strip()
+
+        badge = "🟢" if score >= 80 else ("🟡" if score >= 60 else "🔴")
+        tier = (
+            "Tier A (Empirical High)"
+            if score >= 80
+            else ("Tier B (Moderate)" if score >= 60 else "Tier C (Quarantined)")
+        )
+
+        lines = [
+            "📚 **RESEARCH WIKIPEDIA ENTRY FILED** | `[VERIFIED]`",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            f"📖 **Title:** {title}",
+            f"🏷️ **Category:** `{category}`",
+            f"👤 **Source/Speaker:** {author}",
+            f"{badge} **Epistemic Rigor:** `{score:.1f}%` ({tier})",
+            f"🆔 **Provenance ID:** `{prov_id}`",
+            "",
+            "📝 **Executive Summary:**",
+            f"_{summary[:450]}{'...' if len(summary) > 450 else ''}_",
+        ]
+
+        if claims:
+            lines.append("")
+            lines.append("🔍 **Key Verified Epistemic Claims:**")
+            for c in claims[:4]:
+                if isinstance(c, dict):
+                    status = c.get("epistemic_status", "UNVERIFIED")
+                    claim_text = str(c.get("speaker_claim", "")).replace("*", "")
+                else:
+                    status = getattr(c, "epistemic_status", "UNVERIFIED")
+                    claim_text = str(getattr(c, "speaker_claim", "")).replace("*", "")
+                lines.append(f"• `[{status}]` {claim_text[:130]}")
+
+        if contradictions:
+            lines.append("")
+            lines.append("⚠️ **Flagged Contradictions / Nuances:**")
+            for con in contradictions[:2]:
+                safe_con = str(con).replace("*", "")
+                lines.append(f"• {safe_con[:130]}")
+
+        if macro_imp:
+            lines.append("")
+            lines.append("🌐 **Macroeconomic Implication:**")
+            lines.append(f"_{macro_imp[:250]}{'...' if len(macro_imp) > 250 else ''}_")
+
+        if wikilinks:
+            lines.append("")
+            lines.append(f"🔗 **Cross-Links:** {', '.join(f'`{w}`' for w in wikilinks[:5])}")
+
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append(f"📂 **Stored In:** `data/research_wiki/articles/{art_id}.md`")
+        lines.append(f"💡 _Inspect full article anytime via `/wiki {art_id}`_")
+        return "\n".join(lines)
+
     async def handle_telegram_research_ingest(
         self,
         chat_id: int | str,
@@ -1883,8 +1958,9 @@ class TelegramBotDispatcher:
     ) -> dict[str, Any]:
         """
         Two-Way Reverse Flow: Ingests links, images, or documents dropped in Telegram
-        directly into the SKY / CBT Research Lab Provenance Ledger & Graph.
+        directly into the SKY / CBT Research Lab Provenance Ledger & Research Wikipedia.
         """
+        from core.knowledge_os.research_wikipedia import research_wikipedia_engine
         from core.pdf_extractor import pdf_book_extractor
         from core.universal_ingestor import universal_ingestor
 
@@ -1941,7 +2017,7 @@ class TelegramBotDispatcher:
         if document:
             doc_name = document.get("file_name", "document.pdf")
             await self.send_message(
-                f"📄 *Document received (`{doc_name}`)*! Ingesting into Research Lab...",
+                f"📄 *Document received (`{doc_name}`)*! Ingesting into Research Lab & Wikipedia Journal...",
                 chat_id=chat_id,
             )
             file_id = document.get("file_id")
@@ -1962,6 +2038,23 @@ class TelegramBotDispatcher:
                 f.write(doc_bytes)
 
             text_content, metadata = universal_ingestor.extract_text_from_file(save_path)
+
+            # Ingest into Research Wikipedia Journal
+            wiki_article = None
+            try:
+                wiki_article = research_wikipedia_engine.ingest_url_or_content(
+                    url_or_text=text_content[:3000],
+                    custom_title=metadata.get("book_title") or doc_name,
+                    custom_category=(
+                        "Monetary & Debt" if "macro" in doc_name.lower() else "Market Structure"
+                    ),
+                    custom_author=from_user,
+                )
+                wiki_card = self._format_wikipedia_telegram_card(wiki_article)
+                await self.send_message(wiki_card, chat_id=chat_id)
+            except Exception as e:
+                logger.warning(f"PDF Research Wikipedia entry creation failed: {e}")
+
             res = await universal_ingestor.ingest(
                 content=text_content,
                 mode="RESEARCH",
@@ -1971,36 +2064,74 @@ class TelegramBotDispatcher:
                 title=metadata.get("book_title") or doc_name,
                 pdf_payload=metadata.get("pdf_research_payload"),
             )
-            reply = self._format_research_summary_telegram(res)
-            await self.send_message(reply, chat_id=chat_id)
+            if res.get("strategy_candidates"):
+                reply = self._format_research_summary_telegram(res)
+                await self.send_message(reply, chat_id=chat_id)
+
             return {
                 "status": "RESEARCH_INGESTED",
                 "type": "DOCUMENT",
-                "knowledge_id": res.get("knowledge_id"),
+                "knowledge_id": wiki_article.provenance_id if wiki_article else res.get("knowledge_id"),
+                "article_id": wiki_article.article_id if wiki_article else None,
             }
 
-        # 3. Handle Link / URL / /research Command Ingestion
+        # 3. Handle Link / URL / /research / /wiki Command Ingestion
         url_match = re.search(r"https?://\S+", text or caption)
-        if url_match or text.lower().startswith("/research") or text.lower().startswith("/ingest"):
+        clean_text_lower = (text or caption).strip().lower()
+
+        # Let /wiki commands without URLs fall through to handle_wiki command router
+        if not url_match and any(
+            clean_text_lower.startswith(p)
+            for p in ("/wiki", "/wikipedia", "/journal", "/encyclopedia")
+        ):
+            return {"status": "SKIPPED"}
+
+        if (
+            url_match
+            or clean_text_lower.startswith("/research")
+            or clean_text_lower.startswith("/ingest")
+            or clean_text_lower.startswith("/wiki")
+        ):
             raw_url = (
                 url_match.group(0).rstrip(".,)>]") if url_match else text.split(maxsplit=1)[-1]
             )
             await self.send_message(
-                f"🔬 *Research Ingestion Triggered!*\n`{raw_url[:60]}...`\nDeconstructing market structure & extracting rules...",
+                f"🔬 **Research Wikipedia Ingestion Triggered!**\n`{raw_url[:60]}...`\nCross-verifying claims against macroeconomic ledgers & generating permanent journal article...",
                 chat_id=chat_id,
             )
-            res = await universal_ingestor.ingest(
-                content=raw_url,
-                mode="RESEARCH",
-                author_creator=from_user,
-                source_uri=raw_url,
-            )
-            reply = self._format_research_summary_telegram(res)
-            await self.send_message(reply, chat_id=chat_id)
+
+            # Ingest into permanent Research Wikipedia
+            wiki_article = None
+            try:
+                wiki_article = research_wikipedia_engine.ingest_url_or_content(
+                    url_or_text=raw_url,
+                    custom_author=from_user,
+                )
+                wiki_card = self._format_wikipedia_telegram_card(wiki_article)
+                await self.send_message(wiki_card, chat_id=chat_id)
+            except Exception as e:
+                logger.error(f"Error in research_wikipedia_engine Telegram ingest: {e}")
+
+            # Also pass to universal_ingestor for potential trading candidate extraction
+            res = {}
+            try:
+                res = await universal_ingestor.ingest(
+                    content=raw_url,
+                    mode="RESEARCH",
+                    author_creator=from_user,
+                    source_uri=raw_url,
+                )
+                if res.get("strategy_candidates"):
+                    reply = self._format_research_summary_telegram(res)
+                    await self.send_message(reply, chat_id=chat_id)
+            except Exception as e:
+                logger.warning(f"Universal ingestor secondary pass skipped/failed: {e}")
+
             return {
                 "status": "RESEARCH_INGESTED",
                 "type": "LINK",
-                "knowledge_id": res.get("knowledge_id"),
+                "knowledge_id": wiki_article.provenance_id if wiki_article else res.get("knowledge_id"),
+                "article_id": wiki_article.article_id if wiki_article else None,
             }
 
         return {"status": "SKIPPED"}
