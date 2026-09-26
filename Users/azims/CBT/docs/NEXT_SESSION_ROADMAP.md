@@ -124,14 +124,16 @@ graph TD
 - **Milestone 31.5:** Strategy Constitution & Parameter Freeze Gate (`M31_5_FREEZE_MANIFEST.json`).
 - **Milestone 32 (32-A, 32-B, 32-C, 32-R):** Autonomous 336h Testnet Burn-In Campaign & Multi-Strategy Ensemble Allocator (32 passing tests, `M32_R_BURN_IN_DOSSIER.md` 🟢 QUALIFIED).
 - **Milestone 33:** Multi-Venue Synthetic Cross-Arbitrage, Basis Dispersion & Leg-Risk Fail-Safe Router (`core/intelligence/synthetic_basis_engine.py`, `core/execution/strategy_gateway/synthetic_router.py`, `core/risk_engine/basis_governor.py`, 12 passing tests).
+- **Milestone 34:** Cross-Venue Collateral Telemetry, Liquidation Distance Buffer & Rebalancing Advisor (`core/risk_engine/collateral_monitor.py`, `core/risk_engine/rebalancing_advisor.py`, 9 passing tests).
 - **CI / Quality Gates:** 100% Green across all gates. Milestone 18 Production Pass remains certified and untouched (149/149 tests).
 
-### Next Implementation Focus — Milestone 34:
-- **Objective:** Cross-Venue Collateral Telemetry, Dynamic Liquidity Topology & Automated Capital Rebalancing.
-- **Core Modules to Build:**
-  1. `core/risk_engine/collateral_monitor.py` — Sub-second margin level polling and liquidation distance buffer estimation across Binance, Bybit, and Hyperliquid.
-  2. `core/risk_engine/rebalancing_advisor.py` — Optimal off-chain / cross-venue transfer trajectory calculator minimizing funding drag and transfer fees.
-  3. Platform Release Gating (`v4.0.0`).
+### Next Implementation Focus — Milestone 35:
+- **Objective:** Generation 6 Institutional Platform Release & Packaging (`v4.0.0`).
+- **Core Modules & Actions:**
+  1. `scripts/build_windows_app.py` — Run 17-point production release blocker matrix.
+  2. `scripts/sign_windows_binaries.py` — Authenticode dual-profile code signing & RFC-3161 timestamping.
+  3. `release/CTB_Setup_v4.0.0.exe` — Compile production desktop application binary and GNU `release/SHA256SUMS.txt`.
+
 
 
 

@@ -12,10 +12,27 @@ from core.risk_engine.basis_governor import (
     RiskCheckResult,
     VenueMarginSnapshot,
 )
+from core.risk_engine.collateral_monitor import (
+    AsymmetricHazardReport,
+    CollateralHeartbeatMonitor,
+    LiquidationRiskTier,
+    VenueCollateralTelemetry,
+)
+from core.risk_engine.rebalancing_advisor import (
+    RebalancingAdvisor,
+    RebalancingInstruction,
+)
 
 __all__ = [
+    "AsymmetricHazardReport",
     "BasisRiskGovernor",
     "BasisRiskVerdict",
+    "CollateralHeartbeatMonitor",
+    "LiquidationRiskTier",
+    "RebalancingAdvisor",
+    "RebalancingInstruction",
     "RiskCheckResult",
+    "VenueCollateralTelemetry",
     "VenueMarginSnapshot",
 ]
+

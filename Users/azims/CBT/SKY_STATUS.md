@@ -1,7 +1,7 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-09-26  
-> **Release Tag:** `v5.4.0-m33-synthetic-basis-engine` (ACTIVE 🚀)  
+> **Release Tag:** `v5.5.0-m34-collateral-telemetry-engine` (ACTIVE 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB.git`  
 > **Lead Agent:** Antigravity  
@@ -11,7 +11,8 @@
 > **Milestone 31.5 Status:** COMPLETED & CERTIFIED (Strategy Constitution & Parameter Freeze Registry)  
 > **Milestone 32 Status:** COMPLETED & CERTIFIED (Autonomous 336h Testnet Burn-In & Ensemble Allocator — 32/32 Tests, 🟢 QUALIFIED)  
 > **Milestone 33 Status:** COMPLETED & CERTIFIED (Multi-Venue Synthetic Basis & Leg-Risk Fail-Safe — 12/12 Tests)  
-> **Next Target:** Milestone 34 (Cross-Venue Collateral Telemetry & Dynamic Liquidity Topology)  
+> **Milestone 34 Status:** COMPLETED & CERTIFIED (Cross-Venue Collateral Telemetry & Rebalancing Advisor — 9/9 Tests)  
+> **Next Target:** Milestone 35 (Generation 6 Institutional Platform Release & Packaging v4.0.0)  
 > **Preflight Status:** ALL QUALITY GATES PASSED (100% GREEN)
 
 ---
@@ -308,6 +309,21 @@ Milestone 33 implements the Generation 6 synthetic basis cross-arbitrage and dis
 4. **Permanent Constitutional Firewall:** `real_capital_enabled = False` permanently locked across all models and execution routers.
 5. **Test Coverage:** 12/12 dedicated adversarial tests passing (`tests/execution/test_milestone33_synthetic_basis.py`).
 6. **Milestone 18 Protection:** Certified surface area untouched; 149/149 tests active and green.
+
+---
+
+## Milestone 34: Cross-Venue Collateral Telemetry & Dynamic Liquidity Topology — COMPLETED & CERTIFIED ✅
+
+Milestone 34 delivers real-time multi-venue margin and collateral telemetry alongside automated internal rebalancing trajectories to prevent asymmetric liquidation hazards across multi-leg synthetic basis strategies.
+
+### Completed & Hardened Deliverables:
+1. **Collateral Heartbeat Monitor:** `core/risk_engine/collateral_monitor.py` tracks sub-second margin utilization and calculates Liquidation Distance Buffer (LDB) in basis points ($|P_{\text{mark}} - P_{\text{liq}}| / P_{\text{mark}} \times 10^4$).
+2. **Multi-Tier Risk State Machine:** Evaluates `NORMAL`, `ELEVATED_RISK`, `MARGIN_CALL_WARNING`, and `CRITICAL_EMERGENCY` tiers.
+3. **Asymmetric Liquidation Hazard Detection:** Detects and flags dangerous margin asymmetry between venues (e.g. Binance Spot vs Hyperliquid Perp) to avoid one-sided margin calls.
+4. **Automated Internal Rebalancing Advisor:** `core/risk_engine/rebalancing_advisor.py` generates optimal transfer trajectories to restore margin utilization to target levels (50%), factoring in bridge fees, network transfer delays, and safe source venue release capacity.
+5. **Permanent Constitutional Firewall:** `real_capital_enabled = False` permanently locked; all outputs remain strictly advisory.
+6. **Test Coverage:** 9/9 dedicated adversarial tests passing (`tests/execution/test_milestone34_collateral_topology.py`). Full 65-test combined regression suite green.
+7. **Milestone 18 Protection:** Certified surface area untouched; 149/149 tests active and green.
 
 ---
 

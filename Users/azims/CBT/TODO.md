@@ -859,15 +859,32 @@
 
 ---
 
-## 🌊 Milestone 34: Cross-Venue Collateral Telemetry & Dynamic Liquidity Topology (PLANNED 🚀)
+## 🌊 Milestone 34: Cross-Venue Collateral Telemetry & Dynamic Liquidity Topology (COMPLETED ✅)
 
-- [ ] **Task 34.1: High-Frequency Margin & Collateral Heartbeat Monitor (`core/risk_engine/collateral_monitor.py`)**
-  - Sub-second margin level polling and liquidation distance buffer estimation across all venues.
-  - Asymmetric liquidation hazard warning when delta-hedged position approaches margin call on one venue.
-- [ ] **Task 34.2: Automated Internal Rebalancing Advisory (`core/risk_engine/rebalancing_advisor.py`)**
+- [x] **Task 34.1: High-Frequency Margin & Collateral Heartbeat Monitor (`core/risk_engine/collateral_monitor.py`)**
+  - Sub-second margin level polling and Liquidation Distance Buffer (LDB) estimation across all venues:
+    $$\text{LDB} = \frac{|P_{\text{mark}} - P_{\text{liq}}|}{P_{\text{mark}}} \times 10^4$$
+  - Multi-tier alert state machine: `NORMAL` $\to$ `ELEVATED_RISK` $\to$ `MARGIN_CALL_WARNING` $\to$ `CRITICAL_EMERGENCY`.
+  - Asymmetric liquidation hazard warning when delta-hedged position approaches margin call on one venue while profitable on counter-leg.
+- [x] **Task 34.2: Automated Internal Rebalancing Advisory (`core/risk_engine/rebalancing_advisor.py`)**
   - Optimal off-chain / cross-venue transfer trajectory calculator minimizing funding drag and transfer fees.
-- [ ] **Task 34.3: Platform Packaging & Production Release Candidate (`v4.0.0`)**
-  - Platform packaging, Authenticode verification, and 17-point release blocker audit.
+  - Safe source capacity constraints and projected post-rebalance margin utilization simulation.
+  - Constitutional permanent firewall (`real_capital_enabled = False`) emitting advisory plans only.
+- [x] **Task 34.3: Dedicated Adversarial Test Suite (`tests/execution/test_milestone34_collateral_topology.py`)**
+  - 9/9 tests passing green covering exact LDB math, hazard alerts, rebalancing plans, and M18 isolation.
+  - Full 65-test regression suite green (M31-R through M34).
+
+---
+
+## 🚀 Milestone 35: Generation 6 Institutional Platform Release & Packaging (v4.0.0) (PLANNED 🚀)
+
+- [ ] **Task 35.1: 17-Point Production Release Blocker Matrix Audit (`scripts/build_windows_app.py`)**
+  - Comprehensive pre-flight check across all 17 release blockers.
+- [ ] **Task 35.2: Dual-Profile Authenticode Signing & Timestamping (`scripts/sign_windows_binaries.py`)**
+  - Development self-signed vs production Authenticode certificate validation.
+- [ ] **Task 35.3: Native Windows Installer Compilation (`release/CTB_Setup_v4.0.0.exe`)**
+  - Generate production binary assets and GNU `release/SHA256SUMS.txt`.
+
 
 
 ---
