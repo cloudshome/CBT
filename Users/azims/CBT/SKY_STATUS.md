@@ -18,7 +18,8 @@
 > **Milestone 37 Status:** COMPLETED & CERTIFIED (Avellaneda-Stoikov Market Making & Hawkes Flow Toxicity — 8/8 Tests 🟢)  
 > **Milestone 38 Status:** COMPLETED & CERTIFIED (CEX-DEX Latency Arb & MEV Bundle Simulator — 10/10 Tests 🟢)  
 > **Milestone 39 Status:** COMPLETED & CERTIFIED (Deep RL Execution & Slippage Minimization — 11/11 Tests 🟢)  
-> **Next Milestone:** Milestone 40 — Multi-Strategy Portfolio Ensemble & Institutional Real-Time Margin/VaR Stress Engine (Gen 7 Capstone)  
+> **Milestone 40 Status:** COMPLETED & CERTIFIED (Multi-Strategy Portfolio Ensemble & Stress Engine — 11/11 Tests 🟢)  
+> **Next Milestone:** Milestone 40-R — Generation 7 Independent Multi-Strategy & Execution Integrity Audit  
 > **Preflight Status:** ALL 21 RELEASE GATES + ALL 15 AUDIT OBLIGATIONS + GATE G-21 PASSED (100% GREEN)
 
 ---
