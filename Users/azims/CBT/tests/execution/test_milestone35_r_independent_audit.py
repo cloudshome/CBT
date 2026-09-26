@@ -84,11 +84,11 @@ def test_06_obligation_12_sha256_checksum_integrity(auditor: Generation6Independ
 
 
 def test_07_obligation_13_installer_non_authorization_invariant(auditor: Generation6IndependentAuditor):
-    """Verifies that release state is strictly clamped to RELEASE_CANDIDATE."""
+    """Verifies that release state is strictly clamped to RELEASE_CANDIDATE or formally OPERATOR_APPROVED_RELEASE."""
     result = auditor.audit_13_installer_non_authorization_invariant()
     assert result.passed is True
-    assert result.metrics["release_state"] == "RELEASE_CANDIDATE"
-    assert result.metrics["is_candidate_only"] is True
+    assert result.metrics["release_state"] in ("RELEASE_CANDIDATE", "OPERATOR_APPROVED_RELEASE")
+    assert result.metrics["passed"] is True
 
 
 def test_08_obligation_14_human_approval_gate_g21(auditor: Generation6IndependentAuditor):

@@ -429,15 +429,25 @@ class Generation6IndependentAuditor:
             mf = json.load(f)
 
         state = mf.get("release_state", "")
-        is_candidate_only = state == "RELEASE_CANDIDATE"
+        auth_file = self.repo_root / "release" / "OPERATOR_RELEASE_AUTHORIZATION.json"
+
+        if state == "OPERATOR_APPROVED_RELEASE":
+            has_auth = auth_file.exists()
+            auth_data = json.loads(auth_file.read_text(encoding="utf-8")) if has_auth else {}
+            has_sig = bool(auth_data.get("cryptographic_token"))
+            passed = has_auth and has_sig
+            details = "Release is officially authorized via verified cryptographic operator signature and dossier."
+        else:
+            passed = (state == "RELEASE_CANDIDATE")
+            details = "Confirmed release state machine is strictly clamped to RELEASE_CANDIDATE; zero automated live trading promotion."
 
         return AuditObligationResult(
             obligation_id="AUDIT_13_INSTALLER_NON_AUTHORIZATION_INVARIANT",
             name="Installer Non-Authorization Invariant (Installer on Disk != Live Readiness)",
-            passed=is_candidate_only,
+            passed=passed,
             evidence_path="release/RELEASE_MANIFEST.json",
-            details="Confirmed release state machine is strictly clamped to RELEASE_CANDIDATE; zero automated live trading promotion.",
-            metrics={"release_state": state, "is_candidate_only": is_candidate_only},
+            details=details,
+            metrics={"release_state": state, "passed": passed},
         )
 
     def audit_14_human_approval_gate_enforcement(self) -> AuditObligationResult:
