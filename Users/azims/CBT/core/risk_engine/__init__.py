@@ -18,6 +18,16 @@ from core.risk_engine.collateral_monitor import (
     LiquidationRiskTier,
     VenueCollateralTelemetry,
 )
+from core.risk_engine.hierarchical_risk_parity import (
+    AssetAllocation,
+    CovarianceShrinkageReport,
+    HierarchicalRiskParityEngine,
+    HRPPortfolioPlan,
+    LedoitWolfCovarianceEstimator,
+    MarketRegime,
+    MultiAssetPortfolioOptimizer,
+    portfolio_optimizer,
+)
 from core.risk_engine.rebalancing_advisor import (
     RebalancingAdvisor,
     RebalancingInstruction,
@@ -25,14 +35,22 @@ from core.risk_engine.rebalancing_advisor import (
 
 __all__ = [
     "AsymmetricHazardReport",
+    "AssetAllocation",
     "BasisRiskGovernor",
     "BasisRiskVerdict",
     "CollateralHeartbeatMonitor",
+    "CovarianceShrinkageReport",
+    "HierarchicalRiskParityEngine",
+    "HRPPortfolioPlan",
+    "LedoitWolfCovarianceEstimator",
     "LiquidationRiskTier",
+    "MarketRegime",
+    "MultiAssetPortfolioOptimizer",
     "RebalancingAdvisor",
     "RebalancingInstruction",
     "RiskCheckResult",
     "VenueCollateralTelemetry",
     "VenueMarginSnapshot",
+    "portfolio_optimizer",
 ]
 
