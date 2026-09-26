@@ -347,20 +347,67 @@ class FeatureSandbox:
   - Graceful sandbox containment when exceptions are simulated.
   - Invariant assertion: `assert report.real_capital_enabled is False`.
 
-### Step 5: Execute Institutional Evidence Qualification
-- Run the full test suite:
+### Step 5: Execute Institutional Evidence & Architecture Verification
+- Run the modular test suite:
   ```bash
   .venv\Scripts\pytest tests/<domain>/test_<feature>.py -v
+  ```
+- Run the AST architecture boundary verifier:
+  ```bash
+  .venv\Scripts\python scripts/verify_architecture_boundaries.py
+  .venv\Scripts\pytest tests/governance/test_architecture_boundaries.py -v
   ```
 - Run the Milestone 18 verification gate to guarantee the certified execution core was untouched:
   ```bash
   .venv\Scripts\python scripts/verify_m18_certification.py
   ```
 
-### Step 6: Non-Invasive Registration
+### Step 6: Non-Invasive Registration & Optional Adapter Wiring
 - Export the new leaf from its parent package `__init__.py`.
-- Wire into gateway router (`app.py` or `src/routes/`) if an HTTP/WS endpoint is required.
-- Update `SKY_STATUS.md` recording the milestone status and test pass count.
+- **API Wiring Decoupling:** Leaves are private research libraries by default. Wiring into gateway routers (`app.py` or `src/routes/`) is an **optional adapter step**, never a mandatory prerequisite for quantitative discovery modules.
+- Update `SKY_STATUS.md` recording the milestone status, pass count, and test identity hash.
+
+---
+
+## 5. THE MACHINE-ENFORCED 4-REGISTRY ARCHITECTURE CONTRACT
+
+SKY treats architectural boundaries as machine-checked safety invariants, enforced at commit time via static AST import analysis (`scripts/verify_architecture_boundaries.py` and `tests/governance/test_architecture_boundaries.py`):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 1. LAYER REGISTRY (core/governance/architecture_registry.py)                │
+│    Explicitly stratifies every module into Layers 0 to 4.                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 2. DEPENDENCY ALLOWLIST MATRIX                                              │
+│    Strictly enforces directional import flow: Layer N -> Layer <= N.         │
+│    Documented exceptions (EXPLICIT_ALLOWED_EDGES) reserved for emergency    │
+│    kill-switch auto-halt coordination and async alerting.                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 3. MODULE AUTHORITY REGISTRY                                                │
+│    Classifies modules into CERTIFIED_EXECUTION_AUTHORITY,                   │
+│    GOVERNANCE_RISK_AUTHORITY, SIMULATION_RESEARCH_ONLY, etc.                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 4. FROZEN SURFACE REGISTRY (M18 MANIFEST)                                   │
+│    Cryptographically locks the 14 Milestone 18 certified execution files     │
+│    (SHA-256 test identity, 149/149 tests green, ancestral commit check).    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.1 Execution Surface Split: Certified Live Authority vs. Simulation & Research
+A critical safety boundary exists inside `core/execution/`:
+- **Certified Live Execution Authority Surface:**
+  - Modules: `live_router.py`, `smart_order_router.py`, `reconciliation_ledger.py`, `kill_switch.py`, `idempotency.py`, `connectors/`
+  - Authority: `CERTIFIED_EXECUTION_AUTHORITY` / `GOVERNANCE_RISK_AUTHORITY` (Layer 0)
+  - Freeze State: Cryptographically locked by M18 manifest (`c9cc1cad`, 149 tests).
+- **Simulation & Research Surface:**
+  - Modules: `concentrated_amm/` (M42), `cross_chain/` (M41), `market_making/` (M37), `latency_arb/` (M38), `rl_execution/` (M39)
+  - Authority: `SIMULATION_RESEARCH_ONLY` (Layer 2)
+  - Invariant: Strictly zero order dispatch capability (`real_capital_enabled = False`). Forbidden from importing live venue connectors or `live_router.py`.
+
+### 5.2 Centralized Capital Firewall
+While each leaf declares `real_capital_enabled = False` on its models and DTOs, safety is structurally guaranteed by the **Centralized Capital Firewall**:
+- Simulation and research modules lack the network credentials, cryptographic signer authority, and order dispatch hooks to touch venue endpoints.
+- Any attempt by a simulation or research module to import live execution connectors triggers immediate AST linter failure and build halt.
 
 ---
 

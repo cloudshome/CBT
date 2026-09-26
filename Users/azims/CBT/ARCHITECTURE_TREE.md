@@ -67,11 +67,30 @@ c:\Users\azims\CBT\
 
 ---
 
-## 3. HOW TO MODIFY OR ADD ANY COMPONENT SAFELY
+## 3. THE MACHINE-ENFORCED 4-REGISTRY ARCHITECTURE CONTRACT
+
+Architecture is not merely documentation; it is mechanically enforced at commit time via static AST import parsing:
+1. **Layer Registry (`core/governance/architecture_registry.py`):** Explicitly maps every Python module to its designated Layer (0 to 4).
+2. **Dependency Allowlist:** Mechanically enforces directional imports ($\text{Layer } N \to \text{Layer } \le N$). Simulation and research cannot import Gateways or UI.
+3. **Authority Registry:** Explicitly separates the **Certified Live Execution Authority Surface** (M18 frozen live router, venue connectors, hardware kill-switch) from the **Simulation & Research Surface** (`concentrated_amm`, `cross_chain`, `market_making`, `latency_arb`, `rl_execution` which have strictly zero live capital authority).
+4. **Frozen Surface Registry:** Cryptographically locks the 14 Milestone 18 execution files (`c9cc1cad`, 149 passing tests).
+
+---
+
+## 4. HOW TO MODIFY OR ADD ANY COMPONENT SAFELY
 
 To change or add any leaf without risking regressions:
 1. **Define Contract First:** Create immutable Input/Output dataclasses in the module.
 2. **Anchor Invariants:** Set `real_capital_enabled = False`.
 3. **Wrap in Sandbox:** Ensure unhandled exceptions fail closed safely.
 4. **Build Isolated Pytest:** Create `tests/<domain>/test_<feature>.py` in sandbox environment.
-5. **Verify Certification:** Run `python scripts/verify_m18_certification.py` to ensure the M18 execution path remains 100% untouched.
+5. **Verify Architecture Boundaries:**
+   ```bash
+   .venv\Scripts\python scripts/verify_architecture_boundaries.py
+   .venv\Scripts\pytest tests/governance/test_architecture_boundaries.py -v
+   ```
+6. **Verify Frozen Execution Core:**
+   ```bash
+   .venv\Scripts\python scripts/verify_m18_certification.py
+   ```
+
