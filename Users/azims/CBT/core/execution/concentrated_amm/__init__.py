@@ -36,6 +36,24 @@ from core.execution.concentrated_amm.tick_math import (
     tick_to_price,
 )
 
+from core.execution.concentrated_amm.swap_math import (
+    compute_swap_step,
+    get_next_sqrt_price_from_input,
+    get_next_sqrt_price_from_output,
+    mul_div,
+    mul_div_rounding_up,
+)
+from core.execution.concentrated_amm.swap_state_machine import (
+    ConcentratedPoolState,
+    ConcentratedSwapEngine,
+    SwapExecutionReport,
+    SwapStepRecord,
+)
+from core.execution.concentrated_amm.tick_bitmap import (
+    TickInfo,
+    TickTable,
+)
+
 __all__ = [
     "REAL_CAPITAL_ENABLED",
     "QUALIFICATION_MAX_PRICE_IMPACT_BPS",
@@ -59,4 +77,15 @@ __all__ = [
     "get_next_sqrt_price_from_amount0_rounding_up",
     "get_next_sqrt_price_from_amount1_rounding_down",
     "evaluate_price_impact_constraint",
+    "TickInfo",
+    "TickTable",
+    "mul_div",
+    "mul_div_rounding_up",
+    "compute_swap_step",
+    "get_next_sqrt_price_from_input",
+    "get_next_sqrt_price_from_output",
+    "SwapStepRecord",
+    "SwapExecutionReport",
+    "ConcentratedPoolState",
+    "ConcentratedSwapEngine",
 ]
