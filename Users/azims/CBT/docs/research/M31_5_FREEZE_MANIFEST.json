@@ -1,0 +1,37 @@
+{
+  "codebase_git_hash": "0d18b1a",
+  "freeze_manifest_id": "FRZ-MANIFEST-M31.5-1790396750-48f7f06a46",
+  "freeze_timestamp_utc": 1790396750.1835084,
+  "frozen_strategies": [
+    {
+      "dataset_hash": "7a38e8749d211f4d92eb9192bb3b2ef425572bb2a9d8d64821a71927e1f4d1e2",
+      "decision_hash": "bfa9709a5e2d36cf5be97323015886ed695eccfe9291536b35fc56f2a874b227",
+      "evidence_hash": "9ea949bf6a0ac50fce4ae38b37d4867d2cf656d29debc8fd145cdf35cb1eb901",
+      "execution_authority": "NON_EXECUTABLE_RESEARCH_HYPOTHESIS",
+      "execution_model": "APPROXIMATE_AGGREGATED_L2",
+      "feature_schema_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "fee_model": "VIP0_MAKER_TAKER",
+      "freeze_timestamp_utc": 1790396750.1820798,
+      "freeze_token": "FRZ-M31.5-1790396750-dee07edceadb",
+      "frozen_parameters": {
+        "fast_period": 12,
+        "signal_period": 9,
+        "slow_period": 26
+      },
+      "manifest_hash": "833dc4ae9fa9200df4e9cefcb2b34bc8134b3319437486c0d68a0c34457c548f",
+      "max_drawdown_limit": 0.05,
+      "max_position_notional_usd": 10000.0,
+      "quarantine_conditions": [
+        "MAX_DRAWDOWN_BREACH",
+        "CONSECUTIVE_NEGATIVE_MARKOUTS",
+        "PERSISTENT_FEED_DEGRADATION",
+        "SEVERE_STATISTICAL_DRIFT"
+      ],
+      "real_capital_enabled": false,
+      "slippage_model": "VWAP_DEPTH_WALK",
+      "strategy_id": "STRAT_K9_MOMENTUM_L2_V1",
+      "strategy_version": "1.0.0"
+    }
+  ],
+  "master_freeze_digest": "48f7f06a46c2233076aa0e6fe4639f72ab10cd7e6b6beee3fba19480a6199e1a"
+}

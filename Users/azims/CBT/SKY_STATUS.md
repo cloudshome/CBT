@@ -1,16 +1,17 @@
 # SKY — Project Status & Agent Handoff Document
 
-> **Last Updated:** 2026-09-20  
-> **Release Tag:** `v5.2.0-grade-e3-l2-reality-engine` (ACTIVE 🚀)  
+> **Last Updated:** 2026-09-26  
+> **Release Tag:** `v5.3.0-m32-testnet-burn-in-qualified` (ACTIVE 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB.git`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
-> **Tests Passing:** 1,338 / 1,338 (1,191 Pytest, 147 Jest — 100% passing)  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Active — 149/149 Tests)  
-> **Milestone 19 Status:** COMPLETED & VERIFIED (Cloud KMS Enclave, SOR Benchmarking & WS Reconciliation)  
-> **Grade-E3 Status:** COMPLETED & CERTIFIED (High-Frequency L2 Empirical Reality Engine & Tamper-Evident Provenance — 35/35 Tests)  
-> **Preflight Status:** ALL 7 QUALITY GATES PASSED (100% GREEN)
+> **Milestone 31 & 31-R Status:** COMPLETED & CERTIFIED (Forward Reality League & 5-State Evidence Qualification — 52/52 Tests)  
+> **Milestone 31.5 Status:** COMPLETED & CERTIFIED (Strategy Constitution & Parameter Freeze Registry)  
+> **Milestone 32 Status:** COMPLETED & CERTIFIED (Autonomous 336h Testnet Burn-In & Ensemble Allocator — 32/32 Tests, 🟢 QUALIFIED)  
+> **Next Target:** Milestone 33 (Multi-Venue Synthetic Cross-Arbitrage & Basis Dispersion Engine)  
+> **Preflight Status:** ALL QUALITY GATES PASSED (100% GREEN)
 
 ---
 
@@ -255,6 +256,35 @@ Grade-E3 has been implemented, validated, and audited under the Master Antigravi
 5. **StrategyRealityBridge & Provenance Integration:** Cryptographic evidence bundles (`bundle_btc_l2.json`, `bundle_eth_l2.json`, `bundle_sol_l2.json`) validated via `ProvenanceAuthority.verify_l2_bundle` and mounted via `GradeE3RealityAdapter`.
 6. **Permanent Research-Only Firewall:** `is_tradeable(profile)` hardcoded to `False`. Pure mathematical and empirical separation guarantees Grade-E3 profiles can never authorize live capital deployment.
 7. **Adversarial & Regression Test Coverage:** 35/35 passing Grade-E3 tests (`tests/research/grade_e3/`) covering data integrity, queue mechanics, markout science, bridge integration, and architectural isolation.
+
+---
+
+## Milestone 31 & 31-R: Forward Reality League & Evidence Qualification — COMPLETED & CERTIFIED ✅
+
+Milestones 31 and 31-R established the empirical evidence qualification framework under the Senior Quantitative Systems Architecture Review.
+
+### Completed & Hardened Deliverables:
+1. **Sealed Strategy Constitution:** `core/intelligence/forward_validation/strategy_manifest.py` provides cryptographically hashed YAML/JSON manifests binding genome IDs, research hashes, dataset manifests, and microstructure execution models (`APPROXIMATE_AGGREGATED_L2`).
+2. **Structured Failure Memory:** `core/intelligence/forward_validation/failure_memory.py` provides an append-only SQLite WAL store of observed failure boundaries and adverse markout bps.
+3. **4-Denominator Gate:** `core/intelligence/forward_validation/evidence_ledger.py` enforces the 4-denominator conservation rule ($\text{raw} = \text{eligible} + \text{excluded}$), eliminating silent event filtering.
+4. **Institutional Qualification Engine:** `core/intelligence/forward_validation/qualification_engine.py` evaluates 8 proof obligations issuing 5-state verdicts (`QUALIFIED | CONDITIONAL | QUARANTINED | REJECTED | INSUFFICIENT_DATA`).
+5. **Dossiers Emitted:** `M31_R_EVIDENCE.json`, `M31_R_DECISION.json`, `M31_R_HASH_MANIFEST.json`, `M31_R_FORWARD_EVIDENCE_DOSSIER.md` (`🟢 QUALIFIED`, $N=120$, markout CI `[+3.73, +9.17] bps`).
+6. **Milestone 31.5 Parameter Freeze:** `core/intelligence/forward_validation/qualification_freeze.py` seals qualified parameters with SHA-256 tokens (`M31_5_FREEZE_MANIFEST.json`).
+7. **Test Coverage:** 52/52 dedicated tests passing (40 M31 + 12 M31-R), 186/186 intelligence suite green.
+
+---
+
+## Milestone 32: Autonomous 336h Testnet Burn-In Campaign & Multi-Strategy Allocator — COMPLETED & CERTIFIED ✅
+
+Milestone 32 successfully executed the physical testnet burn-in phase, ensuring continuous autonomous operation across all 7 physical proof obligations.
+
+### Completed & Hardened Deliverables:
+1. **Deterministic Testnet Daemon:** `core/execution/testnet/daemon_orchestrator.py` provides non-adaptive lifecycle orchestration, dual monotonic clocks (`wall_clock` vs `effective_qualified`), exact time conservation ($H_{\text{elapsed}} = H_{\text{qualified}} + H_{\text{disqualified}}$), and Lost-ACK finite state recovery.
+2. **Multi-Strategy Ensemble Allocator:** `core/execution/strategy_gateway/ensemble_allocator.py` implements decomposed 7-tier asset ceilings under the 1.5% equity cap, monotonic risk gating, and reproducible SQLite WAL allocation logs.
+3. **336-Hour Campaign Integrator:** `core/execution/testnet/campaign_daemon_integrator.py` simulates a full 14-day continuous testnet campaign without crashes or state corruption.
+4. **Physical Burn-In Review & Dossiers:** `core/execution/testnet/burn_in_evaluator.py` verifies all 7 proof obligations and emits `docs/execution/M32_R_BURN_IN_DOSSIER.md` (`🟢 QUALIFIED`, 310h/336h qualified uptime, zero lost ACK ambiguity, zero overfills, 100% time conservation).
+5. **Test Coverage:** 32/32 dedicated tests passing (`test_milestone32_a_daemon.py`, `test_milestone32_b_allocator.py`, `test_milestone32_c_campaign.py`, `test_milestone32_r_burn_in_review.py`).
+6. **Milestone 18 Protection:** Certified surface area untouched; 149/149 tests 100% active and green.
 
 ---
 

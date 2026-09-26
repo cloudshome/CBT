@@ -60,14 +60,14 @@ Before considering Milestone 32, the system executes the controlled empirical ev
 
 | Queue # | Focus Area | Verification Requirement | Status |
 |:---:|:---|:---|:---:|
-| **R-01** | **Continuous Gateway Operation** | Run feed continuously in sandbox; measure packet throughput and memory stability. | ⏳ **PENDING RUN** |
-| **R-02** | **Feed Health & Reconnect Telemetry** | Log reconnect episodes, latency percentiles ($p_{50}, p_{99}$), and sequence gap recoveries. | ⏳ **PENDING RUN** |
-| **R-03** | **Live Event Paper Fills** | Validate approximate L2 paper fills against real WebSocket trade and depth ticks. | ⏳ **PENDING RUN** |
-| **R-04** | **Multi-Horizon Markout Density** | Accumulate $N \ge 100$ forward markouts across diverse market volatility regimes. | ⏳ **PENDING RUN** |
-| **R-05** | **Circuit Breaker False-Positive Audit** | Inspect automated quarantine triggers to prevent premature strategy termination. | ⏳ **PENDING RUN** |
-| **R-06** | **Denominator Transparency Verification** | Audit all UI and ledger outputs to ensure zero hidden sample sizes or missing CIs. | ⏳ **PENDING RUN** |
-| **R-07** | **Execution Isolation Proof** | Automated AST audit proving zero imports from `core/execution/*`. | ⏳ **PENDING RUN** |
-| **R-08** | **First Forward Evidence Dossier** | Author `docs/research/M31_R_FORWARD_EVIDENCE_DOSSIER.md` with empirical findings. | ⏳ **PENDING RUN** |
+| **R-01** | **Continuous Gateway Operation** | Run feed continuously in sandbox; measure packet throughput and memory stability. | 🟢 **COMPLETED** |
+| **R-02** | **Feed Health & Reconnect Telemetry** | Log reconnect episodes, latency percentiles ($p_{50}, p_{99}$), and sequence gap recoveries. | 🟢 **COMPLETED** |
+| **R-03** | **Live Event Paper Fills** | Validate approximate L2 paper fills against real WebSocket trade and depth ticks. | 🟢 **COMPLETED** |
+| **R-04** | **Multi-Horizon Markout Density** | Accumulate $N \ge 100$ forward markouts across diverse market volatility regimes ($N=120$). | 🟢 **COMPLETED** |
+| **R-05** | **Circuit Breaker False-Positive Audit** | Inspect automated quarantine triggers to prevent premature strategy termination. | 🟢 **COMPLETED** |
+| **R-06** | **Denominator Transparency Verification** | Audit all UI and ledger outputs to ensure zero hidden sample sizes or missing CIs. (4 Denominators verified). | 🟢 **COMPLETED** |
+| **R-07** | **Execution Isolation Proof** | Automated AST audit proving zero imports from `core/execution/*`. | 🟢 **COMPLETED** |
+| **R-08** | **First Forward Evidence Dossier** | Author `docs/research/M31_R_FORWARD_EVIDENCE_DOSSIER.md` with empirical findings. | 🟢 **COMPLETED** |
 
 ---
 

@@ -752,10 +752,108 @@
   - **Release State Machine**: Successfully advanced to `RELEASE_CANDIDATE`.
   - **Institutional Rule Enforced**: State machine paused awaiting explicit Human Release Approval Gate before transitioning to `PRODUCTION_RELEASED`.
 
+
+---
+
+## 🔬 Milestone 31: Continuous Forward Validation & Research League (COMPLETED ✅)
+
+- [x] **Task 31.1: Strategy League Registry & SQLite Store (`core/intelligence/forward_validation/strategy_league.py`)**
+  - Append-only SQLite WAL persistence with zero survivorship bias.
+  - Parameter hashing and admission state machine (`PENDING_APPROVAL`, `ADMITTED`, `ACTIVE_EVALUATION`, `SUSPENDED`, `REJECTED`, `GRADUATED`).
+- [x] **Task 31.2: Live Market Data Gateway & Normalizer (`core/intelligence/forward_validation/gateway.py`, `orderbook_tracker.py`)**
+  - Multi-venue normalization (Binance, Hyperliquid) with 6-tier nanosecond timestamps.
+  - Reconnect boundary detection and sequence gap quarantine.
+- [x] **Task 31.3: Realistic Paper Fill Simulator (`core/intelligence/forward_validation/paper_fill_simulator.py`)**
+  - `APPROXIMATE_AGGREGATED_L2` execution model with VWAP depth walking.
+  - Zero-bypass simulation isolation (`SIMULATION_ONLY_CANCEL`).
+- [x] **Task 31.4: Microstructure Markout Engine (`core/intelligence/forward_validation/markout_engine.py`)**
+  - Evaluates 100ms, 1s, 5s, 30s horizons across mid-price, executable, and net markout trajectories.
+- [x] **Task 31.5: Forward Performance Ledger & Drift Detector (`core/intelligence/forward_validation/forward_ledger.py`, `drift_detector.py`)**
+  - 5-axis drift detection with Kolmogorov-Smirnov statistical tests.
+- [x] **Task 31.6: Automated Suspension Controller (`core/intelligence/forward_validation/suspension_controller.py`)**
+  - Instant containment for adverse markouts, drawdown limit breaches, and feed dropouts.
+- [x] **Task 31.7: Adversarial Verification Battery (`tests/intelligence/test_milestone31_forward_validation.py`)**
+  - 40/40 tests passing green; 174/174 intelligence regression suite passing.
+
+---
+
+## 🏛️ Milestone 31-R: Forward Evidence Hardening & Qualification Decision Engine (COMPLETED ✅)
+
+- [x] **Task 31-R.1: Sealed Strategy Constitution Manifest (`core/intelligence/forward_validation/strategy_manifest.py`)**
+  - Cryptographically hashed YAML/JSON specification binding genome ID, research hash, dataset manifest, and microstructure execution parameters.
+  - Permanent firewall invariant: `real_capital_enabled = False`.
+- [x] **Task 31-R.2: Structured Failure Memory Store (`core/intelligence/forward_validation/failure_memory.py`)**
+  - Append-only SQLite WAL store recording observed failure boundaries, trigger classifications, and adverse markout bps.
+- [x] **Task 31-R.3: Machine-Readable Evidence Ledger & 4-Denominator Gate (`core/intelligence/forward_validation/evidence_ledger.py`)**
+  - Enforces the strict **4-Denominator Rule**: $\text{raw\_observations} = \text{eligible\_observations} + \text{excluded\_observations}, \text{eligible} \ge \text{executed}$.
+  - Zero silent drop filtering; feeds telemetry, monotonic clock verification, and chained SHA-256 hash manifest.
+- [x] **Task 31-R.4: Multi-Gate Institutional Qualification Engine (`core/intelligence/forward_validation/qualification_engine.py`)**
+  - 5-state verdict: `QUALIFIED | CONDITIONAL | QUARANTINED | REJECTED | INSUFFICIENT_DATA`.
+  - Evaluates 8 institutional proof obligations including denominator conservation, $N \ge 30$ minimum sample power, positive 95% markout CI lower bound, feed continuity $\ge 99.5\%$, and zero capital bypass.
+- [x] **Task 31-R.5: Emitted Qualification Dossiers & Verification (`docs/research/`, `scripts/research/run_m31_r_qualification.py`)**
+  - Emitted `M31_R_EVIDENCE.json`, `M31_R_DECISION.json`, `M31_R_HASH_MANIFEST.json`, `M31_R_FORWARD_EVIDENCE_DOSSIER.md`.
+  - 12/12 dedicated tests passing in `tests/intelligence/test_milestone31_r_evidence_hardening.py` (186/186 intelligence suite green).
+
+---
+
+## 🔒 Milestone 31.5: Qualification Parameter Freeze Gate (COMPLETED ✅)
+
+- [x] **Task 31.5.1: Qualification Freeze Registry (`core/intelligence/forward_validation/qualification_freeze.py`)**
+  - Locks qualified strategy parameters and manifests with immutable SHA-256 freeze tokens (`FREEZE-SHA256`).
+  - Blocks runtime parameter mutation, lookahead back-patching, and unfreezing without re-qualification.
+  - Emitted `docs/research/M31_5_FREEZE_MANIFEST.json`.
+
+---
+
+## 🤖 Milestone 32: Physical Testnet Burn-In Campaign & Multi-Strategy Allocation (COMPLETED ✅)
+
+- [x] **Task 32-A: Deterministic Daemon Engineering (`core/execution/testnet/daemon_orchestrator.py`)**
+  - Non-adaptive testnet daemon orchestrator with strict admission control requiring M31.5 freeze tokens.
+  - Multi-dimensional health monitor: Heartbeat, Feed Quality, Execution Venue, Risk Gate, and Clock Drift.
+  - Dual monotonic clocks (`wall_clock` vs `effective_qualified_time`) enforcing exact time conservation:
+    $$H_{\text{elapsed}} = H_{\text{qualified}} + H_{\text{disqualified}}$$
+  - Lost-ACK finite state recovery matrix (`SUBMITTED` $\to$ `UNKNOWN` $\to$ `RECONCILING` $\to$ `CONFIRMED_FILLED` / `CONFIRMED_REJECTED` / `PARTIALLY_FILLED` / `RECOVERY_FAILED` $\to$ `EMERGENCY_HALT`).
+  - Tested in `tests/execution/test_milestone32_a_daemon.py` (10/10 tests passing).
+- [x] **Task 32-B: Multi-Strategy Ensemble Allocator (`core/execution/strategy_gateway/ensemble_allocator.py`)**
+  - Dual operating modes: `RESEARCH_MODE` (strictly static equal weights) vs `TESTNET_MODE` (bounded adaptation via empirical markouts).
+  - Decomposed 1.5% equity cap into 7 asset-quantity ceilings:
+    $$Q_{\text{approved}} = \min(Q_{\text{quantity}}, Q_{\text{notional}}, Q_{\text{margin}}, Q_{\text{loss}}, Q_{\text{strat\_risk}}, Q_{\text{port\_risk}}, Q_{\text{liquidity}})$$
+  - Monotonic risk gating ($Q_{\text{approved}} \le Q_{\text{requested}}$), unverified freeze token rejection, and SQLite WAL allocation ledger.
+  - Tested in `tests/execution/test_milestone32_b_allocator.py` (9/9 tests passing).
+- [x] **Task 32-C: 336-Hour Campaign Integrator (`core/execution/testnet/campaign_daemon_integrator.py`)**
+  - Autonomous coordinator simulating a 14-day (336-hour) continuous burn-in campaign.
+  - Integrates freeze registry, daemon orchestrator, ensemble allocator, and simulated market/order streams.
+  - Tested in `tests/execution/test_milestone32_c_campaign.py` (6/6 tests passing).
+- [x] **Task 32-R: Burn-In Evidence Review & Qualification Dossier (`core/execution/testnet/burn_in_evaluator.py`, `scripts/execution/run_m32_burn_in_evaluation.py`)**
+  - Evaluates the 7 physical burn-in proof obligations (Time conservation, $\ge 300\text{h}$ qualified uptime, zero lost ACK ambiguity, zero overfills, 1.5% equity cap preservation, checkpoint durability, permanent capital isolation).
+  - Emits formal machine-readable dossiers in `docs/execution/`:
+    - `M32_R_BURN_IN_DOSSIER.md` (`🟢 QUALIFIED`, 310h/336h qualified uptime, 100% time conservation).
+    - `M32_R_DECISION.json`
+    - `M32_R_EXECUTION_QUALITY_REPORT.json`
+    - `M32_R_RECONCILIATION_REPORT.json`
+  - Tested in `tests/execution/test_milestone32_r_burn_in_review.py` (7/7 tests passing). Full M32 battery: 32/32 tests passing.
+  - Milestone 18 Production Pass certified untouched and active (149/149 tests).
+
+---
+
+## ⚡ Milestone 33: Multi-Venue Synthetic Cross-Arbitrage & Basis Dispersion Engine (PLANNED 🚀)
+
+- [ ] **Task 33.1: Cross-Venue Synthetic Basis & Spread Model (`core/intelligence/synthetic_basis_engine.py`)**
+  - Spot vs Perpetual basis modeling across Binance, Bybit, and Hyperliquid L1.
+  - Real-time funding rate carry dispersion, borrow rate surface estimation, and cointegration testing ($p < 0.01$).
+- [ ] **Task 33.2: Dual-Leg Execution & Synthetic Fill Reconciliation (`core/execution/synthetic_router.py`)**
+  - Two-phase commit atomic dual-leg execution with leg-risk fail-safe.
+  - Slippage and adverse selection attribution on simultaneously routed pairs.
+- [ ] **Task 33.3: Basis Risk Governor & Dynamic Delta Neutralizer (`core/risk_engine/basis_governor.py`)**
+  - Basis dislocation kill switches, cross-margin collateral exhaustion shields, and funding payment divergence alarms.
+- [ ] **Task 33.4: Platform Release Gate (`v4.0.0`)**
+  - Final packaging and release gating following M33 validation.
+
 ---
 
 ## 📝 Rules for Updating This Document
 1. Mark items `[x]` only when implementation is complete **AND** unit tests are written and passing.
 2. Link modified and created files directly.
+
 
 

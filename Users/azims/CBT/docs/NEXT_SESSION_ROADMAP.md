@@ -118,13 +118,19 @@ graph TD
 - **Milestone 24:** Execution-Readiness Qualification, Multi-Ceiling Sizing & Real-Time TCA Bridge (`core/execution/strategy_gateway/`, 30 passing tests at `e680759`).
 - **Milestone 25:** Cross-Venue Collateral Scorecards, Delta Tolerance Tiers & Strategy Reality Qualification Campaign (`core/execution/`, 24 passing tests at `cda1a96`).
 - **Milestone 26:** Real-Time Strategy Reality Cockpit & Visual Markout Terminal (`core/execution/strategy_gateway/`, 11 passing tests at `9b705be`).
-- **CI / Quality Gates:** 100% Green across all gates. Total repository tests: 1,525 passing (1,378 Pytest + 147 Jest).
+- **Milestone 27–30:** Continuous Ingestion, Lineage, Scientific Hypothesis Qualification & Autonomous Replay (`core/intelligence/`, 121 passing tests).
+- **Milestone 31:** Forward Reality League & Real-Time Microstructure Paper Simulator (`core/intelligence/forward_validation/`, 40 passing tests).
+- **Milestone 31-R:** Forward Evidence Hardening & 5-State Institutional Qualification Engine (`core/intelligence/forward_validation/`, 12 passing tests, 186/186 intelligence suite green).
+- **Milestone 31.5:** Strategy Constitution & Parameter Freeze Gate (`M31_5_FREEZE_MANIFEST.json`).
+- **Milestone 32 (32-A, 32-B, 32-C, 32-R):** Autonomous 336h Testnet Burn-In Campaign & Multi-Strategy Ensemble Allocator (32 passing tests, `M32_R_BURN_IN_DOSSIER.md` 🟢 QUALIFIED).
+- **CI / Quality Gates:** 100% Green across all gates. Milestone 18 Production Pass remains certified and untouched (149/149 tests).
 
-### Next Day Implementation Focus — Milestone 27:
-- **Objective:** Continuous Multi-Strategy Reality Ensemble Allocator & Physical 336h Testnet Burn-In Daemon Execution.
+### Next Implementation Focus — Milestone 33:
+- **Objective:** Multi-Venue Synthetic Cross-Arbitrage & Basis Dispersion Engine (`core/intelligence/synthetic_basis_engine.py`, `core/execution/synthetic_router.py`).
 - **Core Modules to Build:**
-  1. `core/execution/strategy_gateway/ensemble_allocator.py` — Dynamic Multi-Strategy Reality Allocator balancing Kronos & SMC allocations based on real-time empirical markout profiles and cross-venue margin headroom.
-  2. `core/execution/testnet/daemon_orchestrator.py` — Autonomous 336h physical testnet runner integrating the M24–M26 Strategy Gateway into the M23 live testnet campaign loop.
-  3. `tests/execution/test_milestone27_ensemble_and_daemon.py` — Full adversarial test battery targeting multi-strategy contention, markout degradation, and 336-hour time conservation.
+  1. `core/intelligence/synthetic_basis_engine.py` — Spot vs Perpetual basis modeling, funding carry dispersion, and cointegration testing across Binance, Bybit, and Hyperliquid.
+  2. `core/execution/synthetic_router.py` — 2-phase atomic dual-leg routing with leg-risk fail-safe.
+  3. `core/risk_engine/basis_governor.py` — Basis dislocation kill switches and collateral exhaustion protection.
+  4. Platform Release Gating (`v4.0.0`).
 
 
