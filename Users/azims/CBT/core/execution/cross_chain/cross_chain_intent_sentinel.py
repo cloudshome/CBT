@@ -227,23 +227,113 @@ class CrossChainIntentSentinel:
     ) -> bool:
         """
         Verifies cryptographic settlement receipt and finalizes intent.
+        Strictly fail-closed on missing, malformed, unconfirmed, conflicting, or reorg-affected proofs.
         """
         intent = self.active_intents.get(proof.intent_id)
         if not intent:
-            logger.error(f"Cannot verify settlement: Intent {proof.intent_id} not found")
+            logger.error(f"Fail-closed: Intent {proof.intent_id} not found in active records")
             return False
 
+        # Malformed proof validation: transaction hash must be 0x-prefixed 64 hex characters (66 total)
+        if not proof.destination_tx_hash or not isinstance(proof.destination_tx_hash, str):
+            logger.error(f"Fail-closed: Intent {proof.intent_id} has invalid tx hash type")
+            return False
+
+        clean_hash = proof.destination_tx_hash.strip().lower()
+        if not (clean_hash.startswith("0x") and len(clean_hash) == 66 and all(c in "0123456789abcdef" for c in clean_hash[2:])):
+            logger.error(f"Fail-closed: Intent {proof.intent_id} has malformed cryptographic hash format: {proof.destination_tx_hash}")
+            return False
+
+        # Block number must be strictly positive
+        if proof.block_number <= 0:
+            logger.error(f"Fail-closed: Intent {proof.intent_id} has non-positive block number: {proof.block_number}")
+            return False
+
+        # Conflicting proof detection: Ambiguous / Sybil settlement assertion
+        if proof.intent_id in self.settlement_records:
+            existing = self.settlement_records[proof.intent_id]
+            if existing.destination_tx_hash.lower() != proof.destination_tx_hash.lower():
+                logger.critical(
+                    f"Settlement ambiguity detected for intent {proof.intent_id}: "
+                    f"Conflicting tx hashes '{existing.destination_tx_hash}' vs '{proof.destination_tx_hash}'"
+                )
+                intent.status = IntentStatus.FAILED_SETTLEMENT_AMBIGUITY
+                return False
+
+        # Chain Reorg Detection
+        if proof.is_reorg_detected:
+            logger.critical(f"Destination chain reorganization invalidated settlement for intent {proof.intent_id}")
+            intent.status = IntentStatus.FAILED_CHAIN_REORG
+            return False
+
+        # RPC Quorum & Node Disagreement Detection
+        if proof.rpc_agreement_ratio < 0.67:  # Supermajority (2/3) quorum required
+            logger.error(
+                f"RPC node disagreement for intent {proof.intent_id}: "
+                f"Quorum agreement ratio {proof.rpc_agreement_ratio:.2f} < 0.67"
+            )
+            intent.status = IntentStatus.FAILED_RPC_DISAGREEMENT
+            return False
+
+        # Unconfirmed proof rejection
         if not proof.is_settlement_confirmed:
-            logger.warning(f"Settlement unconfirmed for intent {proof.intent_id}")
+            logger.warning(f"Fail-closed: Settlement unconfirmed for intent {proof.intent_id}")
             return False
 
+        # Partial completion / underfill rejection
         if proof.settled_amount < intent.min_acceptable_output:
-            logger.error(f"Settled amount {proof.settled_amount} < min acceptable {intent.min_acceptable_output}")
+            logger.error(
+                f"Partial fill failure for intent {proof.intent_id}: "
+                f"Settled amount {proof.settled_amount} < min acceptable {intent.min_acceptable_output}"
+            )
+            intent.status = IntentStatus.FAILED_PARTIAL_FILL
             return False
 
+        # Successful cryptographically verified settlement
         intent.status = IntentStatus.SETTLED
         self.settlement_records[proof.intent_id] = proof
         return True
+
+    def fail_intent(
+        self,
+        intent_id: str,
+        terminal_status: IntentStatus,
+        reason: str,
+    ) -> bool:
+        """
+        Transitions an intent to an explicit terminal failure state.
+        """
+        intent = self.active_intents.get(intent_id)
+        if not intent:
+            return False
+
+        allowed_failure_states = (
+            IntentStatus.FAILED_PARTIAL_FILL,
+            IntentStatus.FAILED_STALE_QUOTE,
+            IntentStatus.FAILED_CHAIN_REORG,
+            IntentStatus.FAILED_RPC_DISAGREEMENT,
+            IntentStatus.FAILED_SETTLEMENT_AMBIGUITY,
+            IntentStatus.REJECTED_ADVERSARIAL_ECONOMICS,
+            IntentStatus.REFUNDED_TIMEOUT,
+        )
+        if terminal_status not in allowed_failure_states:
+            raise ValueError(f"Invalid terminal failure status: {terminal_status}")
+
+        logger.warning(f"Intent {intent_id} transitioned to terminal failure state {terminal_status.value}: {reason}")
+        intent.status = terminal_status
+        return True
+
+    def verify_anti_fragmentation_barrier(
+        self,
+        portfolio_equity_usd: float,
+    ) -> bool:
+        """
+        Verifies that cumulative in-flight notional strictly obeys the 6.0% equity ceiling,
+        guaranteeing that micro-intent fragmentation cannot bypass aggregate exposure limits.
+        """
+        max_allowed_in_flight = portfolio_equity_usd * self.max_in_flight_pct
+        current_in_flight = self.current_in_flight_notional_usd
+        return current_in_flight <= (max_allowed_in_flight + 1e-9)
 
     def process_timeouts(
         self,

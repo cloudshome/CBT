@@ -78,6 +78,10 @@ class BridgeRouteOptimizer:
         """
         current_time = now_sec if now_sec is not None else time.time()
 
+        # Hard Constraint 0: Quote deadline validity
+        if not quote.is_valid_deadline:
+            return -1.0, False, "Quote expired or marked invalid by market feed"
+
         # Hard Constraint 1: Minimum acceptable output
         if quote.quoted_output_amount < intent.min_acceptable_output:
             return -1.0, False, f"Output {quote.quoted_output_amount:.4f} < min required {intent.min_acceptable_output:.4f}"
@@ -90,9 +94,13 @@ class BridgeRouteOptimizer:
         if quote.historical_reliability_score < self.min_reliability:
             return -1.0, False, f"Reliability {quote.historical_reliability_score:.2f} < threshold {self.min_reliability:.2f}"
 
+        # Hard Constraint 4: Adversarial Economics & Toxic Fee Drag
+        notional = max(1.0, intent.notional_usd)
+        if quote.total_effective_fee_usd > (notional * 0.05):  # 500 bps economic ceiling
+            return -1.0, False, f"Total effective fee ${quote.total_effective_fee_usd:.2f} exceeds adversarial economic limit (500 bps)"
+
         # Multi-Objective Score Computation
         ideal_out = max(1e-6, intent.ideal_output_amount)
-        notional = max(1.0, intent.notional_usd)
 
         norm_output = quote.quoted_output_amount / ideal_out
         norm_fee = quote.total_effective_fee_usd / notional
@@ -106,7 +114,7 @@ class BridgeRouteOptimizer:
             + self.w_rel * norm_reliability
         )
 
-        return utility, True, None
+        return round(utility, 8), True, None
 
     def run_solver_auction(
         self,
@@ -116,6 +124,7 @@ class BridgeRouteOptimizer:
     ) -> SolverAuctionResult:
         """
         Conducts a competitive Dutch/English auction among candidate solver quotes.
+        Guarantees 100% deterministic replay ordering.
         """
         if not candidate_quotes:
             return SolverAuctionResult(
@@ -149,8 +158,8 @@ class BridgeRouteOptimizer:
                 real_capital_enabled=False,
             )
 
-        # Sort descending by utility score
-        scored_quotes.sort(key=lambda x: x[1], reverse=True)
+        # Deterministic Sort: descending by utility score, tie-break by solver_id lexicographically
+        scored_quotes.sort(key=lambda x: (-x[1], x[0].solver_id))
         winning_quote, winning_score = scored_quotes[0]
         ranked_quotes = [q for q, _ in scored_quotes]
 

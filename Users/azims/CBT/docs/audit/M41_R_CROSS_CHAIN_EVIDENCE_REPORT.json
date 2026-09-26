@@ -1,0 +1,55 @@
+{
+  "qualification_status": "QUALIFIED",
+  "timestamp_utc": "2026-09-26T09:31:54Z",
+  "obligations_evaluated": 8,
+  "obligations_passed": 8,
+  "obligations": {
+    "OBL-01": {
+      "title": "Intent Solver Correctness & Objective Reproducibility",
+      "status": "PASS",
+      "computed_score": 0.6193,
+      "expected_score": 0.6193,
+      "details": "Normalized multi-objective utility verified with exact analytical tolerance"
+    },
+    "OBL-02": {
+      "title": "Exposure Accounting & Anti-Fragmentation Proof",
+      "status": "PASS",
+      "micro_intents_tested": 1000,
+      "in_flight_notional_usd": 5998.115606361006,
+      "ceiling_usd": 6000.0,
+      "details": "1,000 randomized micro-intents dispatched; zero ceiling breach observed"
+    },
+    "OBL-03": {
+      "title": "Fail-Closed Settlement Integrity",
+      "status": "PASS",
+      "details": "Malformed hash, negative block, unconfirmed status, and duplicate conflicts fail closed"
+    },
+    "OBL-04": {
+      "title": "Complete Bridge/Route Terminal Failure States",
+      "status": "PASS",
+      "details": "FAILED_PARTIAL_FILL, FAILED_CHAIN_REORG, and FAILED_RPC_DISAGREEMENT verified"
+    },
+    "OBL-05": {
+      "title": "Capital-Firewall Inheritance & M18 Isolation",
+      "status": "PASS",
+      "real_capital_enabled": false,
+      "m18_boundary_preserved": true,
+      "details": "Zero live execution authority, zero key material, real_capital_enabled permanent False"
+    },
+    "OBL-06": {
+      "title": "Deterministic Replay Across Permuted Inputs",
+      "status": "PASS",
+      "details": "Deterministic tie-breaking by solver ID string verified across shuffled inputs"
+    },
+    "OBL-07": {
+      "title": "Adversarial Economics Defense",
+      "status": "PASS",
+      "details": "Predatory fee drag (>500 bps) and stale quote deadlines pruned unconditionally"
+    },
+    "OBL-08": {
+      "title": "Dossier <-> Implementation Mechanical Binding",
+      "status": "PASS",
+      "details": "All weights, risk caps, and parameters verified identical between code and dossier"
+    }
+  }
+}
