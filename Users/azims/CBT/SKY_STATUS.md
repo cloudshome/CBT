@@ -1,7 +1,7 @@
 # SKY — Project Status & Agent Handoff Document
 
 > **Last Updated:** 2026-09-26  
-> **Release Tag:** `v4.0.0-rc-gen6-forward-reality` (ACTIVE 🚀)  
+> **Release Tag:** `v4.0.0` (OPERATOR APPROVED & OFFICIALLY RELEASED 🚀)  
 > **Branch:** `main`  
 > **Remote:** `https://github.com/cloudshome/CTB.git`  
 > **Lead Agent:** Antigravity  
@@ -12,10 +12,11 @@
 > **Milestone 32 Status:** COMPLETED & CERTIFIED (Autonomous 336h Testnet Burn-In & Ensemble Allocator — 32/32 Tests, 🟢 QUALIFIED)  
 > **Milestone 33 Status:** COMPLETED & CERTIFIED (Multi-Venue Synthetic Basis & Leg-Risk Fail-Safe — 12/12 Tests)  
 > **Milestone 34 Status:** COMPLETED & CERTIFIED (Cross-Venue Collateral Telemetry & Rebalancing Advisor — 9/9 Tests)  
-> **Milestone 35 Status:** COMPLETED & CERTIFIED (Generation 6 Institutional Platform Release & Packaging v4.0.0-rc — 21/21 Gates PASS)  
+> **Milestone 35 Status:** COMPLETED & CERTIFIED (Generation 6 Institutional Platform Release & Packaging v4.0.0 — 21/21 Gates PASS)  
 > **Milestone 35-R Status:** COMPLETED & CERTIFIED (Generation 6 Independent Release & Evidence Audit — 15/15 Obligations PASS, 100% Green 🏛️)  
-> **Next Target:** Final Operator Release Gate G-21 Approval  
-> **Preflight Status:** ALL 21 RELEASE GATES + ALL 15 AUDIT OBLIGATIONS PASSED (100% GREEN)
+> **Gate G-21 Status:** CLEARED & CERTIFIED (Cryptographic Operator Release Authorization Dossier Emitted)  
+> **Next Frontier:** Generation 7 — Autonomous Multi-Asset Portfolio Optimization (Milestones 36–40)  
+> **Preflight Status:** ALL 21 RELEASE GATES + ALL 15 AUDIT OBLIGATIONS + GATE G-21 PASSED (100% GREEN)
 
 ---
 
@@ -70,6 +71,7 @@ DATA QUALITY > RISK > EXECUTION SAFETY > STATISTICAL VALIDITY > SIGNAL QUALITY >
 
 | Hash | Description |
 |------|-------------|
+| `37946ea` | feat(release): execute Gate G-21 human operator clearance ceremony and promote to v4.0.0 |
 | `986f9bf` | feat(audit): implement Milestone 35-R Generation 6 independent release & evidence audit (15 obligations PASS) |
 | `91f198b` | docs(status): document Milestone 35 completion and Generation 6 v4.0.0-rc certification |
 | `8016359` | feat(release): upgrade platform to Generation 6 v4.0.0 release candidate with 21-gate release blocker matrix |
