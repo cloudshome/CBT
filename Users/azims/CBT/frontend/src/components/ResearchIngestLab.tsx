@@ -53,9 +53,11 @@ import {
   KnowledgeMapAndGaps,
   LearningPathDesk,
   KnowledgeAuditDesk,
+  ResearchWikipediaDesk,
 } from './knowledge_os';
 
 export type KosNavigationTab =
+  | 'RESEARCH_WIKI'
   | 'RESEARCH_LAB'
   | 'PROJECT_BRAIN'
   | 'HUMAN_BRAIN'
@@ -74,8 +76,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   selectedSymbol = 'BTC/USDT',
   selectedTimeframe = '15m',
 }) => {
-  // Knowledge Operating System Active Workspace Tab
-  const [activeKosTab, setActiveKosTab] = useState<KosNavigationTab>('RESEARCH_LAB');
+  // Knowledge Operating System Active Workspace Tab (Default to Research Wikipedia)
+  const [activeKosTab, setActiveKosTab] = useState<KosNavigationTab>('RESEARCH_WIKI');
 
   // Ingest Form State
   const [inputText, setInputText] = useState<string>('');
@@ -769,6 +771,18 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       {/* SKY Knowledge Operating System Navigation Bar */}
       <div className="flex items-center gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl overflow-x-auto">
         <button
+          onClick={() => setActiveKosTab('RESEARCH_WIKI')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
+            activeKosTab === 'RESEARCH_WIKI'
+              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 text-indigo-300" />
+          <span>Research Wikipedia</span>
+        </button>
+
+        <button
           onClick={() => setActiveKosTab('RESEARCH_LAB')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
             activeKosTab === 'RESEARCH_LAB'
@@ -842,6 +856,10 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       </div>
 
       {/* Sub-Desks */}
+      {activeKosTab === 'RESEARCH_WIKI' && (
+        <ResearchWikipediaDesk onNotify={onNotify} />
+      )}
+
       {activeKosTab === 'PROJECT_BRAIN' && (
         <ProjectBrainDesk
           selectedSymbol={selectedSymbol}

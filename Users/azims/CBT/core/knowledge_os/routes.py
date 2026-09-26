@@ -440,3 +440,84 @@ async def evaluate_trade_plan_impact(payload: TradePlanImpactRequest) -> dict[st
         symbol=payload.symbol,
         technical_direction=payload.direction,
     )
+
+
+# -----------------------------------------------------------------------------
+# RESEARCH WIKIPEDIA & LIVING JOURNAL ENDPOINTS
+# -----------------------------------------------------------------------------
+class WikiIngestRequest(BaseModel):
+    url_or_text: str = Field(..., min_length=2, description="URL (Facebook, YouTube, X, web) or raw text note")
+    title: str | None = Field(default=None, description="Optional custom title")
+    category: str | None = Field(default=None, description="Optional category")
+    author: str | None = Field(default=None, description="Optional author or speaker attribution")
+
+
+@router.get("/wiki/articles")
+async def list_wiki_articles(
+    category: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    """Lists all Research Wikipedia articles with metadata and verification status."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    articles = research_wikipedia_engine.list_articles(category=category, search_query=search, limit=limit)
+    return {"articles": articles, "count": len(articles)}
+
+
+@router.get("/wiki/article/{article_id}")
+async def get_wiki_article(article_id: str) -> dict[str, Any]:
+    """Retrieves full Wikipedia research article details and markdown content."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    article = research_wikipedia_engine.get_article(article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail=f"Wiki article '{article_id}' not found.")
+    return {"article": article.to_dict()}
+
+
+@router.post("/wiki/ingest")
+async def ingest_wiki_article(payload: WikiIngestRequest) -> dict[str, Any]:
+    """
+    Ingests any URL or text into a permanent, cross-verified Wikipedia entry.
+    Extracts claims, tags with epistemic taxonomy, links concepts, and formats Markdown.
+    """
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    article = research_wikipedia_engine.ingest_url_or_content(
+        url_or_text=payload.url_or_text,
+        custom_title=payload.title,
+        custom_category=payload.category,
+        custom_author=payload.author,
+    )
+    return {"status": "SUCCESS", "article": article.to_dict()}
+
+
+@router.post("/wiki/reverify/{article_id}")
+async def reverify_wiki_article(article_id: str) -> dict[str, Any]:
+    """Re-runs epistemic cross-verification against latest macroeconomic benchmarks."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    article = research_wikipedia_engine.get_article(article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail=f"Wiki article '{article_id}' not found.")
+
+    reverified = research_wikipedia_engine.ingest_url_or_content(
+        url_or_text=article.source_url or article.executive_summary,
+        custom_title=article.title,
+        custom_category=article.category,
+        custom_author=article.author_or_speaker,
+    )
+    return {"status": "REVERIFIED", "article": reverified.to_dict()}
+
+
+@router.delete("/wiki/article/{article_id}")
+async def delete_wiki_article(article_id: str) -> dict[str, Any]:
+    """Deletes or archives a research article."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    success = research_wikipedia_engine.delete_article(article_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Wiki article '{article_id}' not found.")
+    return {"status": "DELETED", "article_id": article_id}
+

@@ -2911,6 +2911,62 @@ export interface ForwardSuspensionLogsResponse {
   logs: SuspensionLogRecord[];
 }
 
+// =========================================================================
+// SKY RESEARCH WIKIPEDIA & LIVING KNOWLEDGE JOURNAL
+// =========================================================================
+
+export type EpistemicStatus = 'FACT' | 'HYPOTHESIS' | 'NARRATIVE' | 'CONTRADICTION' | 'UNVERIFIED';
+
+export interface WikiEpistemicClaim {
+  claim_id: string;
+  speaker_claim: string;
+  epistemic_status: EpistemicStatus;
+  cross_verification_evidence: string;
+  confidence_score: number;
+  empirical_dataset_reference: string;
+}
+
+export interface WikiArticleSummary {
+  article_id: string;
+  title: string;
+  category: string;
+  source_url: string;
+  source_type: string;
+  provenance_id: string;
+  author_or_speaker: string;
+  executive_summary: string;
+  verification_score: number;
+  claims_count: number;
+  wikilinks: string[];
+  tags: string[];
+  created_at: number;
+  updated_at: number;
+}
+
+export interface WikiArticleDetail extends WikiArticleSummary {
+  key_claims: WikiEpistemicClaim[];
+  contradictions_detected: string[];
+  macro_regime_implications: string;
+  full_markdown_content: string;
+}
+
+export interface WikiArticlesResponse {
+  articles: WikiArticleSummary[];
+  count: number;
+}
+
+export interface WikiArticleDetailResponse {
+  article: WikiArticleDetail;
+}
+
+export interface WikiIngestRequestPayload {
+  url_or_text: string;
+  title?: string;
+  category?: string;
+  author?: string;
+}
+
+
 
 
 

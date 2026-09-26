@@ -58,6 +58,10 @@ import {
   IntelligenceRecordsResponse,
   NarrativesResponse,
   ScoutTelemetry,
+  WikiArticleDetail,
+  WikiArticlesResponse,
+  WikiArticleDetailResponse,
+  WikiIngestRequestPayload,
   CausalHypothesis,
   CausalFirewallDecision,
   HypothesisStatsResponse,
@@ -1758,6 +1762,61 @@ export const api = {
       macro_driver: string;
       rationale: string;
     }>(res);
+  },
+
+  // =========================================================================
+  // RESEARCH WIKIPEDIA & LIVING KNOWLEDGE JOURNAL APIS
+  // =========================================================================
+  /**
+   * GET /api/knowledge/wiki/articles (List all Wikipedia research articles)
+   */
+  async getWikiArticles(category?: string, search?: string, limit: number = 50): Promise<WikiArticlesResponse> {
+    const params = new URLSearchParams();
+    if (category && category !== 'ALL') params.append('category', category);
+    if (search) params.append('search', search);
+    params.append('limit', String(limit));
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/articles?${params.toString()}`);
+    return handleResponse<WikiArticlesResponse>(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/article/{article_id} (Full article details & Markdown)
+   */
+  async getWikiArticle(articleId: string): Promise<WikiArticleDetailResponse> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/article/${encodeURIComponent(articleId)}`);
+    return handleResponse<WikiArticleDetailResponse>(res);
+  },
+
+  /**
+   * POST /api/knowledge/wiki/ingest (Ingest URL, Facebook reel, YouTube, or note)
+   */
+  async ingestWikiArticle(payload: WikiIngestRequestPayload): Promise<{ status: string; article: WikiArticleDetail }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<{ status: string; article: WikiArticleDetail }>(res);
+  },
+
+  /**
+   * POST /api/knowledge/wiki/reverify/{article_id} (Re-verify against latest datasets)
+   */
+  async reverifyWikiArticle(articleId: string): Promise<{ status: string; article: WikiArticleDetail }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/reverify/${encodeURIComponent(articleId)}`, {
+      method: 'POST',
+    });
+    return handleResponse<{ status: string; article: WikiArticleDetail }>(res);
+  },
+
+  /**
+   * DELETE /api/knowledge/wiki/article/{article_id} (Delete/archive article)
+   */
+  async deleteWikiArticle(articleId: string): Promise<{ status: string; article_id: string }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/article/${encodeURIComponent(articleId)}`, {
+      method: 'DELETE',
+    });
+    return handleResponse<{ status: string; article_id: string }>(res);
   },
 
   // =========================================================================
