@@ -305,6 +305,21 @@ async def run_stress_test(total_slices: int = 1000) -> StressDrillSummary:
         json.dump(summary.to_dict(), f, indent=2)
     print(f"[OK] Wrote stress report to: {report_path}")
 
+    # Keep SHA256SUMS.txt in sync: recompute the STRESS_DRILL_REPORT.json hash
+    import hashlib as _hashlib
+    sums_path = out_dir / "SHA256SUMS.txt"
+    if sums_path.exists():
+        new_hash = _hashlib.sha256(report_path.read_bytes()).hexdigest()
+        lines = sums_path.read_text(encoding="utf-8").splitlines()
+        updated = []
+        for ln in lines:
+            if ln.strip().endswith("STRESS_DRILL_REPORT.json"):
+                updated.append(f"{new_hash}  STRESS_DRILL_REPORT.json")
+            else:
+                updated.append(ln)
+        sums_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
+        print(f"[OK] Updated SHA256SUMS.txt with new STRESS_DRILL_REPORT.json digest: {new_hash[:16]}...")
+
     return summary
 
 
