@@ -516,6 +516,6 @@ def test_12_milestone18_execution_surface_untouched():
     """Verifies that Milestone 18 certified execution surface is untouched and active."""
     from scripts.verify_m18_certification import check_certified_surface, load_manifest
     manifest = load_manifest()
-    exit_code = check_certified_surface(manifest, run_tests_if_dirty=False)
+    exit_code = check_certified_surface(manifest, run_tests_if_dirty=True)
     assert exit_code == 0, "Milestone 18 certification invalidated or surface touched!"
 

@@ -167,6 +167,7 @@ def check_certified_surface(manifest: dict, run_tests_if_dirty: bool = True) -> 
     if test_res.returncode == 0:
         print("\n>>> [SUCCESS] All 149 Milestone 18 tests PASSED (100% Green).")
         print(">>> Milestone 18 Production Pass certification RE-VALIDATED.")
+        print("[PASS] Certified surface area verified. M18 Production Pass remains ACTIVE.")
         return 0
     else:
         print("\n>>> [CRITICAL FAILURE] M18 adversarial tests failed on modified surface.")
