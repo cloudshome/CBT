@@ -207,6 +207,26 @@ def get_collective_knowledge() -> dict[str, Any]:
     }
 
 
+@router.get("/signals")
+def get_collective_signals() -> dict[str, Any]:
+    """Returns all synchronized trading signals across the cluster collective."""
+    state = collective_reconciler.reconcile_state()
+    return {
+        "signals": state.signals.signals,
+        "count": len(state.signals.signals),
+    }
+
+
+@router.get("/projects")
+def get_collective_projects() -> dict[str, Any]:
+    """Returns all synchronized test projects & benchmark runs across all cluster nodes."""
+    state = collective_reconciler.reconcile_state()
+    return {
+        "projects": state.test_projects.projects,
+        "count": len(state.test_projects.projects),
+    }
+
+
 @router.post("/rebuild")
 def trigger_rebuild() -> dict[str, Any]:
     """Triggers deterministic replay to reconstruct local SQLite projections."""

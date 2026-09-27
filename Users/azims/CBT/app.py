@@ -61,6 +61,7 @@ from core.autonomous_research.storage.storage_manifest import storage_manifest
 from core.knowledge_os.routes import router as knowledge_os_router
 from core.volatility import volatility_router
 from core.collective.routes import router as collective_router
+from core.collective.sync_daemon import cluster_sync_daemon
 from core.arbitrage.routes import router as arbitrage_router
 from core.mbo.routes import router as mbo_router
 from core.execution.live_routes import router as live_execution_router_api
@@ -233,14 +234,16 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
         asyncio.create_task(hf_telemetry_pipeline.start_flush_loop()),
         asyncio.create_task(research_automation_orchestrator.start_loop()),
+        asyncio.create_task(cluster_sync_daemon.start()),
     ]
     logger.info(
         "AI Quant Sentinel FastAPI online with Autonomous Trader, Burn-In Orchestrator, "
-        "Telemetry Pipeline & Zero-Touch Research Automation Orchestrator."
+        "Telemetry Pipeline, Research Automation Orchestrator & Cluster Sync Daemon."
     )
     try:
         yield
     finally:
+        await cluster_sync_daemon.stop()
         shadow_burn_in_orchestrator.stop()
         research_automation_orchestrator.stop()
         hf_telemetry_pipeline.flush_to_sqlite()

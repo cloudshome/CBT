@@ -70,23 +70,28 @@ async function ensureBackendStarted(): Promise<void> {
   }
   const logStream = fs.createWriteStream(path.join(logsDir, 'cbt_backend.log'), { flags: 'a' });
 
-  // Priority 1: Packaged binary in bin/cbt_backend.exe
-  const packagedExe = path.join(appRoot, 'bin', 'cbt_backend.exe');
-  const repoVenv = path.resolve(__dirname, '../../.venv/Scripts/python.exe');
-  const devRepoVenv = 'C:\\Users\\azims\\CBT\\.venv\\Scripts\\python.exe';
-  const appRootVenv = path.join(appRoot, '.venv', 'Scripts', 'python.exe');
-  const venvPythonWin = fs.existsSync(appRootVenv)
+  // Priority 1: Packaged binary in bin/cbt_backend.exe (Win) or bin/cbt_backend (Linux)
+  const isWin = process.platform === 'win32';
+  const packagedExe = path.join(appRoot, 'bin', isWin ? 'cbt_backend.exe' : 'cbt_backend');
+  const repoVenv = isWin
+    ? path.resolve(__dirname, '../../.venv/Scripts/python.exe')
+    : path.resolve(__dirname, '../../.venv/bin/python3');
+  const appRootVenv = isWin
+    ? path.join(appRoot, '.venv', 'Scripts', 'python.exe')
+    : path.join(appRoot, '.venv', 'bin', 'python3');
+  const venvPython = fs.existsSync(appRootVenv)
     ? appRootVenv
     : (fs.existsSync(repoVenv)
       ? repoVenv
-      : (fs.existsSync(devRepoVenv) ? devRepoVenv : 'python'));
+      : (isWin ? 'python' : 'python3'));
 
-  const devBackendScript = 'C:\\Users\\azims\\CBT\\cbt_backend.py';
-  const backendScript = fs.existsSync(path.join(appRoot, 'cbt_backend.py'))
-    ? path.join(appRoot, 'cbt_backend.py')
-    : (fs.existsSync(path.resolve(__dirname, '../../cbt_backend.py'))
-      ? path.resolve(__dirname, '../../cbt_backend.py')
-      : devBackendScript);
+  const scriptCandidates = [
+    path.join(appRoot, 'cbt_backend.py'),
+    path.resolve(__dirname, '../../cbt_backend.py'),
+    path.join(app.getAppPath(), 'cbt_backend.py'),
+  ];
+  const backendScript = scriptCandidates.find((p) => fs.existsSync(p)) || path.join(appRoot, 'cbt_backend.py');
+  const backendCwd = fs.existsSync(backendScript) ? path.dirname(backendScript) : appRoot;
 
   if (fs.existsSync(packagedExe)) {
     backendProcess = spawn(packagedExe, [], {
@@ -95,8 +100,8 @@ async function ensureBackendStarted(): Promise<void> {
     });
   } else {
     // Priority 2: Local Python virtual environment
-    backendProcess = spawn(venvPythonWin, [backendScript], {
-      cwd: fs.existsSync(path.join(appRoot, 'cbt_backend.py')) ? appRoot : (fs.existsSync(devBackendScript) ? 'C:\\Users\\azims\\CBT' : path.resolve(__dirname, '../..')),
+    backendProcess = spawn(venvPython, [backendScript], {
+      cwd: backendCwd,
       env: { ...process.env, CBT_BACKEND_PORT: '8000' },
     });
   }
@@ -123,17 +128,27 @@ async function ensureBackendStarted(): Promise<void> {
   console.warn('[Electron Supervisor] Backend probe timed out; proceeding to render UI.');
 }
 
+function resolveAppIcon(): string | undefined {
+  const iconNames = ['favicon.png', 'icon.png', 'favicon.ico'];
+  const baseDirs = [
+    path.join(appRoot, 'frontend', 'public'),
+    path.join(app.getAppPath(), 'frontend', 'public'),
+    path.resolve(__dirname, '../../frontend/public'),
+  ];
+  for (const base of baseDirs) {
+    for (const name of iconNames) {
+      const p = path.join(base, name);
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  return undefined;
+}
+
 /**
  * Creates the primary Obsidian-themed Frameless BrowserWindow.
  */
 function createMainWindow(): void {
-  const iconCandidates = [
-    path.join(app.getAppPath(), 'frontend', 'public', 'favicon.ico'),
-    path.resolve(__dirname, '../../frontend/public/favicon.ico'),
-    path.join(appRoot, 'frontend', 'public', 'favicon.ico'),
-    'C:\\Users\\azims\\CBT\\frontend\\public\\favicon.ico',
-  ];
-  const windowIcon = iconCandidates.find((p) => fs.existsSync(p));
+  const windowIcon = resolveAppIcon();
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -185,10 +200,9 @@ function createMainWindow(): void {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
     const candidates = [
+      path.join(appRoot, 'frontend', 'dist', 'index.html'),
       path.join(app.getAppPath(), 'frontend', 'dist', 'index.html'),
       path.resolve(__dirname, '../../frontend/dist/index.html'),
-      path.join(appRoot, 'frontend', 'dist', 'index.html'),
-      'C:\\Users\\azims\\CBT\\frontend\\dist\\index.html',
     ];
     const foundIndex = candidates.find((p) => fs.existsSync(p));
     if (foundIndex) {
@@ -206,18 +220,12 @@ function createMainWindow(): void {
 }
 
 /**
- * Configures the Windows native System Tray.
+ * Configures the native System Tray.
  */
 function setupSystemTray(): void {
-  const iconCandidates = [
-    path.join(app.getAppPath(), 'frontend', 'public', 'favicon.ico'),
-    path.resolve(__dirname, '../../frontend/public/favicon.ico'),
-    path.join(appRoot, 'frontend', 'public', 'favicon.ico'),
-    'C:\\Users\\azims\\CBT\\frontend\\public\\favicon.ico',
-  ];
-  const iconPath = iconCandidates.find((p) => fs.existsSync(p));
+  const iconPath = resolveAppIcon();
   if (!iconPath) {
-    console.warn('[Electron Supervisor] Favicon icon not found; skipping system tray setup.');
+    console.warn('[Electron Supervisor] App icon not found; skipping system tray setup.');
     return;
   }
 

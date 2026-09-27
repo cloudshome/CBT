@@ -144,11 +144,15 @@ class NodeIdentityManager:
             return existing
 
         # Create new identity
-        effective_node_id = (
-            node_id
-            or os.getenv("SKY_NODE_ID")
-            or ("OFFICE-01" if platform.system() == "Windows" else "HOME-01")
-        )
+        if node_id:
+            effective_node_id = node_id
+        elif os.getenv("SKY_NODE_ID"):
+            effective_node_id = os.getenv("SKY_NODE_ID")
+        else:
+            sys_prefix = "WIN" if platform.system() == "Windows" else ("UBU" if platform.system() == "Linux" else "MAC")
+            raw_node = platform.node().upper().replace(" ", "").replace("-", "")[:8]
+            rand_suffix = uuid.uuid4().hex[:4].upper()
+            effective_node_id = f"NODE-{sys_prefix}-{raw_node or 'BOX'}-{rand_suffix}"
         return self.create_identity(effective_node_id)
 
     def create_identity(

@@ -18,7 +18,10 @@
     "prisma:push": "prisma db push",
     "electron:build": "tsc -p electron/tsconfig.json",
     "electron:start": "electron dist/electron/main.js",
-    "pack:windows": "python scripts/build_windows_app.py"
+    "pack:windows": "python scripts/build_windows_app.py",
+    "pack:linux": "python scripts/build_linux_app.py",
+    "package:win": "electron-builder --win --x64",
+    "package:linux": "electron-builder --linux --x64 AppImage deb"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

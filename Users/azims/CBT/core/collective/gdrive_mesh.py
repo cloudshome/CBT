@@ -145,9 +145,7 @@ class GDriveClusterMesh:
                             .execute()
                         )
                         for item in res.get("files", []):
-                            if item["name"].endswith(".json") and not item["name"].startswith(
-                                local_ident.node_id
-                            ):
+                            if item["name"].endswith(".json") and item["name"] != f"{local_ident.node_id}.json":
                                 peer_id = item["name"].replace(".json", "")
                                 peer_node = nodes.get(
                                     peer_id,

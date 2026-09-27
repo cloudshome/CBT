@@ -196,6 +196,8 @@ class CollectiveReconciler:
             "closed_trades": len(state.paper_trading.closed_trades),
             "sources_rebuilt": len(state.knowledge.sources),
             "evidence_rebuilt": len(state.knowledge.evidence),
+            "signals_rebuilt": len(state.signals.signals),
+            "test_projects_rebuilt": len(state.test_projects.projects),
         }
 
 

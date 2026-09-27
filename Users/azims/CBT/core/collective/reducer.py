@@ -154,12 +154,40 @@ class StrategyLeagueState:
 
 
 @dataclass
+class TradeSignalState:
+    """Materialized projection of cluster-wide trading signals."""
+
+    signals: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "signals_count": len(self.signals),
+            "signals": self.signals,
+        }
+
+
+@dataclass
+class TestProjectState:
+    """Materialized projection of backtest & benchmark test projects."""
+
+    projects: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "projects_count": len(self.projects),
+            "projects": self.projects,
+        }
+
+
+@dataclass
 class CollectiveState:
     """Full deterministic materialized collective state."""
 
     paper_trading: PaperTradingState = field(default_factory=PaperTradingState)
     knowledge: KnowledgeVaultState = field(default_factory=KnowledgeVaultState)
     strategy_league: StrategyLeagueState = field(default_factory=StrategyLeagueState)
+    signals: TradeSignalState = field(default_factory=TradeSignalState)
+    test_projects: TestProjectState = field(default_factory=TestProjectState)
     total_events_reduced: int = 0
     state_sha256: str = ""
 
@@ -168,6 +196,8 @@ class CollectiveState:
             "paper_trading": self.paper_trading.to_dict(),
             "knowledge": self.knowledge.to_dict(),
             "strategy_league": self.strategy_league.to_dict(),
+            "signals": self.signals.to_dict(),
+            "test_projects": self.test_projects.to_dict(),
             "total_events_reduced": self.total_events_reduced,
         }
         return hashlib.sha256(canonical_json_bytes(data)).hexdigest()
@@ -333,6 +363,50 @@ class CollectiveReducer:
                 s["forward_trades"] = payload.get("forward_trades", s.get("forward_trades", 0))
                 s["expectancy"] = payload.get("expectancy")
                 s["sharpe"] = payload.get("sharpe")
+
+        # --- Trading Signals & Alpha Streams ---
+        elif etype == CollectiveEventType.TRADE_SIGNAL_GENERATED:
+            sig_id = ev.entity_id
+            state.signals.signals[sig_id] = {
+                "signal_id": sig_id,
+                "symbol": payload.get("symbol", "BTCUSDT"),
+                "direction": payload.get("direction", "LONG"),
+                "entry_price": float(payload.get("entry_price", 0.0)),
+                "stop_loss": float(payload.get("stop_loss", 0.0)),
+                "take_profit": float(payload.get("take_profit", 0.0)),
+                "confidence": float(payload.get("confidence", 1.0)),
+                "strategy": payload.get("strategy", "SMC_QUANT"),
+                "node_id": node_id,
+                "created_at": ev.created_at,
+                "status": payload.get("status", "ACTIVE"),
+            }
+
+        elif etype == CollectiveEventType.TRADE_SIGNAL_UPDATED:
+            sig_id = ev.entity_id
+            if sig_id in state.signals.signals:
+                state.signals.signals[sig_id].update(payload)
+
+        # --- Test Projects & Experimentation ---
+        elif etype == CollectiveEventType.TEST_PROJECT_REGISTERED:
+            proj_id = ev.entity_id
+            state.test_projects.projects[proj_id] = {
+                "project_id": proj_id,
+                "name": payload.get("name", "Quant Backtest Run"),
+                "symbol": payload.get("symbol", "BTCUSDT"),
+                "timeframe": payload.get("timeframe", "1h"),
+                "dataset": payload.get("dataset", "BINANCE_HISTORICAL_2026"),
+                "status": payload.get("status", "PENDING"),
+                "node_id": node_id,
+                "registered_at": ev.created_at,
+                "metrics": payload.get("metrics", {}),
+            }
+
+        elif etype == CollectiveEventType.TEST_PROJECT_COMPLETED:
+            proj_id = ev.entity_id
+            if proj_id in state.test_projects.projects:
+                state.test_projects.projects[proj_id]["status"] = "COMPLETED"
+                state.test_projects.projects[proj_id]["completed_at"] = ev.created_at
+                state.test_projects.projects[proj_id]["metrics"] = payload.get("metrics", {})
 
 
 collective_reducer = CollectiveReducer()

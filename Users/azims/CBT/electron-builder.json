@@ -36,5 +36,41 @@
     "shortcutName": "Crypto Brain Terminal",
     "artifactName": "CTB_Setup_v${version}.${ext}",
     "uninstallDisplayName": "Crypto Brain Terminal Uninstall"
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64"]
+      },
+      {
+        "target": "deb",
+        "arch": ["x64"]
+      }
+    ],
+    "category": "Finance",
+    "executableName": "ctb",
+    "maintainer": "Crypto Brain Terminal Team <info@cbt-sky.org>",
+    "synopsis": "Crypto Brain Terminal quantitative paper trading & desk platform",
+    "description": "Autonomous institutional quantitative crypto research, execution simulation, and cluster collective intelligence terminal.",
+    "icon": "frontend/public/icon.png",
+    "artifactName": "Crypto_Brain_Terminal_v${version}.${ext}"
+  },
+  "deb": {
+    "priority": "optional",
+    "packageCategory": "finance",
+    "depends": [
+      "gconf2",
+      "gconf-service",
+      "libnotify4",
+      "libappindicator1",
+      "libxtst6",
+      "libnss3",
+      "libasound2"
+    ],
+    "artifactName": "ctb_${version}_amd64.${ext}"
+  },
+  "appImage": {
+    "artifactName": "Crypto_Brain_Terminal_v${version}.${ext}"
   }
 }
