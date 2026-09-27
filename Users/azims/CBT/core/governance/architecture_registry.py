@@ -105,6 +105,7 @@ MODULE_LAYER_RULES: Final[List[Tuple[str, ArchitectureLayer]]] = [
     ("core.execution.market_making", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     ("core.execution.latency_arb", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     ("core.execution.rl_execution", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
+    ("core.execution.cross_venue", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     ("core.execution.testnet", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     ("core.execution.strategy_gateway", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     ("core.research", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
@@ -169,6 +170,7 @@ MODULE_AUTHORITY_RULES: Final[List[Tuple[str, ModuleAuthority]]] = [
     ("core.execution.market_making", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.execution.latency_arb", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.execution.rl_execution", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
+    ("core.execution.cross_venue", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.execution.testnet", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.execution.strategy_gateway", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.research", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
@@ -228,6 +230,8 @@ FORBIDDEN_IMPORT_PATTERNS: Final[List[Tuple[str, str, str]]] = [
     ("core.execution.concentrated_amm", "core.execution.live_router", "M42 Simulation cannot import Live Execution Router"),
     ("core.execution.concentrated_amm", "core.execution.connectors", "M42 Simulation cannot import Live Venue Connectors"),
     ("core.execution.cross_chain", "core.execution.connectors", "M41 Intent Solvers cannot import Live Venue Connectors"),
+    ("core.execution.cross_venue", "core.execution.live_router", "M43 Cross-Venue Routing cannot import Live Execution Router"),
+    ("core.execution.cross_venue", "core.execution.connectors", "M43 Cross-Venue Routing cannot import Live Venue Connectors"),
     ("core", "frontend", "Backend Core modules cannot import Frontend UI components"),
 ]
 
