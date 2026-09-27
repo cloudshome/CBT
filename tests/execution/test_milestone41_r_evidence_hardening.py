@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import math
 import random
-import re
 from pathlib import Path
 
 import pytest
@@ -28,15 +27,12 @@ from core.execution.cross_chain.bridge_route_optimizer import (
 )
 from core.execution.cross_chain.cross_chain_intent_sentinel import (
     CrossChainIntentSentinel,
-    IntentExecutionDecision,
 )
 from core.execution.cross_chain.intent_models import (
     BridgeProtocol,
     ChainId,
-    CrossChainIntent,
     IntentStatus,
     SettlementProof,
-    SolverAuctionResult,
     SolverQuote,
     VerificationMechanism,
 )
@@ -58,7 +54,7 @@ def optimizer() -> BridgeRouteOptimizer:
 def sentinel(optimizer: BridgeRouteOptimizer) -> CrossChainIntentSentinel:
     return CrossChainIntentSentinel(
         max_single_intent_equity_pct=0.015,  # 1.5% single intent cap
-        max_total_in_flight_pct=0.060,       # 6.0% in-flight ceiling
+        max_total_in_flight_pct=0.060,  # 6.0% in-flight ceiling
         optimizer=optimizer,
     )
 
@@ -67,7 +63,10 @@ def sentinel(optimizer: BridgeRouteOptimizer) -> CrossChainIntentSentinel:
 # OBL-1: Intent Solver Correctness & Mathematical Reproducibility
 # ==============================================================================
 
-def test_obl01_intent_solver_objective_reproducibility(optimizer: BridgeRouteOptimizer, sentinel: CrossChainIntentSentinel):
+
+def test_obl01_intent_solver_objective_reproducibility(
+    optimizer: BridgeRouteOptimizer, sentinel: CrossChainIntentSentinel
+):
     """
     OBL-1: Verifies the multi-objective utility function follows exact normalized KaTeX formulation:
     Score = w_out * (Output / Ideal) - w_fee * (Fee / Notional) - w_lat * (Lat / MaxLat) + w_rel * Rel
@@ -107,12 +106,7 @@ def test_obl01_intent_solver_objective_reproducibility(optimizer: BridgeRouteOpt
     # norm_fee = 1.0 / 1000.0 = 0.0010
     # norm_lat = 60.0 / 600.0 = 0.1000
     # norm_rel = 0.9000
-    expected_score = (
-        0.50 * 0.9990
-        - 0.20 * 0.0010
-        - 0.15 * 0.1000
-        + 0.15 * 0.9000
-    )
+    expected_score = 0.50 * 0.9990 - 0.20 * 0.0010 - 0.15 * 0.1000 + 0.15 * 0.9000
     # 0.4995 - 0.0002 - 0.0150 + 0.1350 = 0.6193
     assert math.isclose(score, expected_score, abs_tol=1e-6)
 
@@ -120,6 +114,7 @@ def test_obl01_intent_solver_objective_reproducibility(optimizer: BridgeRouteOpt
 # ==============================================================================
 # OBL-2: Exposure Accounting & Anti-Fragmentation Proof
 # ==============================================================================
+
 
 def test_obl02_exposure_accounting_anti_fragmentation_proof(sentinel: CrossChainIntentSentinel):
     """
@@ -129,10 +124,10 @@ def test_obl02_exposure_accounting_anti_fragmentation_proof(sentinel: CrossChain
     that total in-flight notional NEVER exceeds the 6.0% ceiling.
     """
     equity = 100_000.0
-    single_cap = equity * 0.015  # $1,500
+    _single_cap = equity * 0.015  # $1,500
     aggregate_ceiling = equity * 0.060  # $6,000
 
-    quote = SolverQuote(
+    _quote = SolverQuote(
         solver_id="fast_filler",
         protocol=BridgeProtocol.ACROSS_V3,
         quoted_output_amount=0.0,  # Dynamically set
@@ -196,6 +191,7 @@ def test_obl02_exposure_accounting_anti_fragmentation_proof(sentinel: CrossChain
 # ==============================================================================
 # OBL-3: Fail-Closed Settlement Integrity
 # ==============================================================================
+
 
 def test_obl03_fail_closed_settlement_integrity(sentinel: CrossChainIntentSentinel):
     """
@@ -291,6 +287,7 @@ def test_obl03_fail_closed_settlement_integrity(sentinel: CrossChainIntentSentin
 # ==============================================================================
 # OBL-4: Bridge/Route Failure States
 # ==============================================================================
+
 
 def test_obl04_terminal_bridge_route_failure_states(sentinel: CrossChainIntentSentinel):
     """
@@ -392,7 +389,10 @@ def test_obl04_terminal_bridge_route_failure_states(sentinel: CrossChainIntentSe
 # OBL-5: Capital-Firewall Inheritance & M18 Boundary Isolation
 # ==============================================================================
 
-def test_obl05_capital_firewall_inheritance_and_m18_isolation(sentinel: CrossChainIntentSentinel, optimizer: BridgeRouteOptimizer):
+
+def test_obl05_capital_firewall_inheritance_and_m18_isolation(
+    sentinel: CrossChainIntentSentinel, optimizer: BridgeRouteOptimizer
+):
     """
     OBL-5: Proves M41 has zero capability to mutate live execution authority
     or bypass the M18 boundary.
@@ -430,7 +430,9 @@ def test_obl05_capital_firewall_inheritance_and_m18_isolation(sentinel: CrossCha
     assert dec.auction_result.real_capital_enabled is False
 
     # 2. Strict independence from M18 files
-    cross_chain_dir = Path(__file__).resolve().parent.parent.parent / "core" / "execution" / "cross_chain"
+    cross_chain_dir = (
+        Path(__file__).resolve().parent.parent.parent / "core" / "execution" / "cross_chain"
+    )
     for py_file in cross_chain_dir.glob("*.py"):
         content = py_file.read_text(encoding="utf-8")
         assert "core.execution.order_router" not in content
@@ -444,7 +446,10 @@ def test_obl05_capital_firewall_inheritance_and_m18_isolation(sentinel: CrossCha
 # OBL-6: Deterministic Replay Across Permuted Runs
 # ==============================================================================
 
-def test_obl06_deterministic_replay_across_runs(optimizer: BridgeRouteOptimizer, sentinel: CrossChainIntentSentinel):
+
+def test_obl06_deterministic_replay_across_runs(
+    optimizer: BridgeRouteOptimizer, sentinel: CrossChainIntentSentinel
+):
     """
     OBL-6: Identical market/quote/chain inputs produce bit-identical solver decisions
     across 100 runs, regardless of candidate quote presentation order.
@@ -517,7 +522,10 @@ def test_obl06_deterministic_replay_across_runs(optimizer: BridgeRouteOptimizer,
 # OBL-7: Adversarial Economics Defense
 # ==============================================================================
 
-def test_obl07_adversarial_economic_defense(optimizer: BridgeRouteOptimizer, sentinel: CrossChainIntentSentinel):
+
+def test_obl07_adversarial_economic_defense(
+    optimizer: BridgeRouteOptimizer, sentinel: CrossChainIntentSentinel
+):
     """
     OBL-7: Verifies the optimizer rejects routes whose nominal output is superficially
     attractive but whose latency, fee drag, or expired deadline make them predatory.
@@ -541,13 +549,15 @@ def test_obl07_adversarial_economic_defense(optimizer: BridgeRouteOptimizer, sen
         protocol=BridgeProtocol.ACROSS_V3,
         quoted_output_amount=1000.0,  # Offers 100% output nominally!
         estimated_latency_sec=30.0,
-        protocol_fee_bps=600.0,       # 600 bps > 500 bps
+        protocol_fee_bps=600.0,  # 600 bps > 500 bps
         gas_subsidy_usd=0.0,
         verification_mechanism=VerificationMechanism.OPTIMISTIC_CHALLENGE,
         historical_reliability_score=0.98,
-        total_effective_fee_usd=60.0, # $60 on $1,000 = 6% fee!
+        total_effective_fee_usd=60.0,  # $60 on $1,000 = 6% fee!
     )
-    score, valid, reason = optimizer.compute_quote_utility_score(intent, toxic_fee_quote, now_sec=1000.0)
+    score, valid, reason = optimizer.compute_quote_utility_score(
+        intent, toxic_fee_quote, now_sec=1000.0
+    )
     assert valid is False
     assert "exceeds adversarial" in reason.lower()
 
@@ -564,7 +574,9 @@ def test_obl07_adversarial_economic_defense(optimizer: BridgeRouteOptimizer, sen
         total_effective_fee_usd=1.0,
         is_valid_deadline=False,  # Quote invalidated by liquidity provider
     )
-    score, valid, reason = optimizer.compute_quote_utility_score(intent, stale_quote, now_sec=1000.0)
+    score, valid, reason = optimizer.compute_quote_utility_score(
+        intent, stale_quote, now_sec=1000.0
+    )
     assert valid is False
     assert "expired" in reason.lower()
 
@@ -573,12 +585,20 @@ def test_obl07_adversarial_economic_defense(optimizer: BridgeRouteOptimizer, sen
 # OBL-8: Dossier <-> Implementation Mechanical Traceability
 # ==============================================================================
 
-def test_obl08_dossier_implementation_mechanical_binding(sentinel: CrossChainIntentSentinel, optimizer: BridgeRouteOptimizer):
+
+def test_obl08_dossier_implementation_mechanical_binding(
+    sentinel: CrossChainIntentSentinel, optimizer: BridgeRouteOptimizer
+):
     """
     OBL-8: Asserts that parameters claimed in M41_CROSS_CHAIN_INTENTS_DOSSIER.md
     are mechanically bound and identical to active code constants.
     """
-    dossier_path = Path(__file__).resolve().parent.parent.parent / "docs" / "execution" / "M41_CROSS_CHAIN_INTENTS_DOSSIER.md"
+    dossier_path = (
+        Path(__file__).resolve().parent.parent.parent
+        / "docs"
+        / "execution"
+        / "M41_CROSS_CHAIN_INTENTS_DOSSIER.md"
+    )
     assert dossier_path.exists(), "Milestone 41 Dossier must exist on disk"
     dossier_text = dossier_path.read_text(encoding="utf-8")
 

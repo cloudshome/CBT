@@ -411,12 +411,17 @@ class GoogleDriveAPIBackend:
                         with open(token_file, "w", encoding="utf-8") as f:
                             f.write(creds.to_json())
                     except Exception as ref_err:  # noqa: BLE001
-                        logger.warning("OAuth token refresh failed (%s); falling back to simulated storage.", ref_err)
+                        logger.warning(
+                            "OAuth token refresh failed (%s); falling back to simulated storage.",
+                            ref_err,
+                        )
                         GoogleDriveAPIBackend._oauth_refresh_failed = True
                         self._initialized = False
                         return
                 if not creds.valid:
-                    logger.info("Google Drive OAuth credentials are not valid; using sandboxed simulated storage.")
+                    logger.info(
+                        "Google Drive OAuth credentials are not valid; using sandboxed simulated storage."
+                    )
                     GoogleDriveAPIBackend._oauth_refresh_failed = True
                     self._initialized = False
                     return

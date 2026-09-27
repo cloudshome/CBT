@@ -10,8 +10,8 @@ from core.execution.rl_execution.execution_environment import (
     MicrostructureExecutionState,
 )
 from core.execution.rl_execution.ppo_execution_policy import (
-    PPOActorCriticPolicy,
     PolicyAction,
+    PPOActorCriticPolicy,
 )
 from core.execution.rl_execution.rl_execution_sentinel import (
     ExecutionStrategyMode,
@@ -20,12 +20,12 @@ from core.execution.rl_execution.rl_execution_sentinel import (
 )
 
 __all__ = [
-    "MicrostructureExecutionState",
     "ExecutionStepResult",
-    "MicrostructureExecutionEnvironment",
-    "PolicyAction",
-    "PPOActorCriticPolicy",
     "ExecutionStrategyMode",
-    "RLExecutionTrancheDecision",
+    "MicrostructureExecutionEnvironment",
+    "MicrostructureExecutionState",
+    "PPOActorCriticPolicy",
+    "PolicyAction",
     "RLExecutionSentinel",
+    "RLExecutionTrancheDecision",
 ]

@@ -22,12 +22,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
 
 @dataclass
 class LatencyDecayAssessment:
     """Quantitative report on latency decay and fill survivability."""
+
     total_latency_ms: float
     hazard_rate_hz: float
     fill_probability: float
@@ -36,7 +37,7 @@ class LatencyDecayAssessment:
     adverse_selection_cost_usd: float
     is_favorable: bool
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_latency_ms": self.total_latency_ms,
             "hazard_rate_hz": self.hazard_rate_hz,

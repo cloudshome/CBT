@@ -23,7 +23,6 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
 
 from core.execution.cross_venue.models import (
     ArbitrageLeg,
@@ -36,14 +35,15 @@ from core.execution.cross_venue.models import (
 @dataclass
 class RateEdge:
     """Directed exchange rate edge between two assets on a specific venue."""
+
     source_asset: str
     target_asset: str
     venue: str
     venue_type: VenueType
-    rate: float            # Units of target_asset obtained per unit of source_asset
-    fee_bps: float         # Trading fee in basis points (e.g. 10.0 for 0.10%)
+    rate: float  # Units of target_asset obtained per unit of source_asset
+    fee_bps: float  # Trading fee in basis points (e.g. 10.0 for 0.10%)
     latency_ms: float
-    depth_available: float # Max quantity of source_asset executable at this rate
+    depth_available: float  # Max quantity of source_asset executable at this rate
 
     @property
     def log_weight(self) -> float:
@@ -62,7 +62,7 @@ class TriangularArbitrageEngine:
     def __init__(self, min_profit_threshold_bps: float = 2.0):
         self.min_profit_threshold_bps = min_profit_threshold_bps
 
-    def build_rate_graph(self, edges: List[RateEdge]) -> Tuple[List[str], List[RateEdge]]:
+    def build_rate_graph(self, edges: list[RateEdge]) -> tuple[list[str], list[RateEdge]]:
         """Extracts unique asset vertices and validated rate edges."""
         vertices = set()
         valid_edges = []
@@ -75,10 +75,10 @@ class TriangularArbitrageEngine:
 
     def find_arbitrage_cycles(
         self,
-        edges: List[RateEdge],
+        edges: list[RateEdge],
         source_currency: str = "USDT",
         max_hops: int = 4,
-    ) -> List[CrossVenueOpportunity]:
+    ) -> list[CrossVenueOpportunity]:
         """
         Executes Bellman-Ford negative cycle detection starting from source_currency.
         Returns all discovered profitable cycles exceeding min_profit_threshold_bps.
@@ -88,9 +88,9 @@ class TriangularArbitrageEngine:
             return []
 
         # Distance array initialization: dist[v] represents min sum of negative log weights
-        dist: Dict[str, float] = {v: float("inf") for v in vertices}
+        dist: dict[str, float] = {v: float("inf") for v in vertices}
         dist[source_currency] = 0.0
-        predecessor_edge: Dict[str, Optional[RateEdge]] = {v: None for v in vertices}
+        predecessor_edge: dict[str, RateEdge | None] = {v: None for v in vertices}
 
         # Relax edges |V| - 1 times
         for _ in range(len(vertices) - 1):
@@ -106,7 +106,7 @@ class TriangularArbitrageEngine:
                 break
 
         # Check for negative-weight cycles (relaxation on the |V|-th iteration)
-        detected_opportunities: List[CrossVenueOpportunity] = []
+        detected_opportunities: list[CrossVenueOpportunity] = []
         seen_cycle_keys = set()
 
         for edge in valid_edges:
@@ -116,7 +116,9 @@ class TriangularArbitrageEngine:
                 # Negative cycle detected! Trace back to find cycle nodes
                 cycle = self._extract_cycle(v, predecessor_edge)
                 if cycle and len(cycle) >= 3 and len(cycle) <= max_hops:
-                    cycle_key = tuple(f"{e.source_asset}->{e.target_asset}@{e.venue}" for e in cycle)
+                    cycle_key = tuple(
+                        f"{e.source_asset}->{e.target_asset}@{e.venue}" for e in cycle
+                    )
                     if cycle_key not in seen_cycle_keys:
                         seen_cycle_keys.add(cycle_key)
                         opp = self._build_opportunity(cycle)
@@ -130,15 +132,15 @@ class TriangularArbitrageEngine:
     def _extract_cycle(
         self,
         start_vertex: str,
-        predecessor_edge: Dict[str, Optional[RateEdge]],
-    ) -> Optional[List[RateEdge]]:
+        predecessor_edge: dict[str, RateEdge | None],
+    ) -> list[RateEdge] | None:
         """Traces back predecessor pointers to extract the exact closed cycle."""
-        visited: Dict[str, int] = {}
+        visited: dict[str, int] = {}
         curr = start_vertex
-        path: List[RateEdge] = []
+        path: list[RateEdge] = []
 
         # Walk backwards until a loop is encountered
-        for step in range(len(predecessor_edge) * 2):
+        for _step in range(len(predecessor_edge) * 2):
             edge = predecessor_edge.get(curr)
             if not edge:
                 return None
@@ -154,23 +156,23 @@ class TriangularArbitrageEngine:
 
         return None
 
-    def _build_opportunity(self, cycle_edges: List[RateEdge]) -> Optional[CrossVenueOpportunity]:
+    def _build_opportunity(self, cycle_edges: list[RateEdge]) -> CrossVenueOpportunity | None:
         """Calculates exact gross return, fee drag, net spread, and optimal capacity."""
         if not cycle_edges:
             return None
 
         gross_multiplier = 1.0
         net_multiplier = 1.0
-        legs: List[ArbitrageLeg] = []
+        legs: list[ArbitrageLeg] = []
         max_notional_capacity = float("inf")
 
         for idx, edge in enumerate(cycle_edges):
             gross_multiplier *= edge.rate
             fee_factor = 1.0 - (edge.fee_bps / 10000.0)
-            net_multiplier *= (edge.rate * fee_factor)
+            net_multiplier *= edge.rate * fee_factor
 
             leg = ArbitrageLeg(
-                leg_id=f"leg_{idx+1}",
+                leg_id=f"leg_{idx + 1}",
                 venue=edge.venue,
                 venue_type=edge.venue_type,
                 action="BUY" if idx == 0 else "CONVERT",
@@ -198,8 +200,10 @@ class TriangularArbitrageEngine:
         decay_prob = min(0.95, 1.0 - math.exp(-0.01 * (total_latency / 10.0)))
 
         return CrossVenueOpportunity(
-            opportunity_id=f"tri_{int(time.time()*1000)}_{len(cycle_edges)}hop",
-            arb_type=ArbitrageType.TRIANGULAR_THREE_WAY if len(cycle_edges) == 3 else ArbitrageType.HYBRID_CEX_DEX,
+            opportunity_id=f"tri_{int(time.time() * 1000)}_{len(cycle_edges)}hop",
+            arb_type=ArbitrageType.TRIANGULAR_THREE_WAY
+            if len(cycle_edges) == 3
+            else ArbitrageType.HYBRID_CEX_DEX,
             legs=legs,
             gross_spread_bps=round(gross_spread_bps, 2),
             net_spread_bps=round(net_spread_bps, 2),

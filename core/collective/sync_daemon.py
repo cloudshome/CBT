@@ -19,7 +19,6 @@ from typing import Any
 from core.collective.gdrive_mesh import gdrive_cluster_mesh
 from core.collective.identity import node_identity_manager
 from core.collective.node import node_registry
-from core.collective.reconciler import collective_reconciler
 from core.collective.sync_engine import sync_engine
 
 logger = logging.getLogger("sky.collective.sync_daemon")

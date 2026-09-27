@@ -30,6 +30,7 @@ logger = logging.getLogger("ai_quant_sentinel.risk_engine.rebalancing_advisor")
 
 class RebalancingInstruction(BaseModel):
     """Actionable cross-venue collateral rebalancing advisory plan."""
+
     plan_id: str
     source_venue: str
     destination_venue: str
@@ -92,14 +93,17 @@ class RebalancingAdvisor:
         # Calculate target equity for dest to achieve target margin utilization:
         # dest_used_margin / target_equity = target_utilization
         # target_equity = dest_used_margin / target_utilization
-        required_dest_equity = dest_telemetry.used_margin_usd / max(0.01, self.target_margin_utilization)
+        required_dest_equity = dest_telemetry.used_margin_usd / max(
+            0.01, self.target_margin_utilization
+        )
         transfer_needed = max(0.0, required_dest_equity - dest_telemetry.total_equity_usd)
 
         # Check source capacity: source must not exceed max utilization after transfer
         # max_transfer_from_source = source_available_margin - safety_buffer
         source_max_safe_transfer = max(
             0.0,
-            source_telemetry.total_equity_usd - (source_telemetry.used_margin_usd / max(0.01, self.target_margin_utilization)),
+            source_telemetry.total_equity_usd
+            - (source_telemetry.used_margin_usd / max(0.01, self.target_margin_utilization)),
         )
 
         recommended_transfer = min(transfer_needed, source_max_safe_transfer)
@@ -116,7 +120,9 @@ class RebalancingAdvisor:
 
         # Calculate projected values
         post_source_equity = source_telemetry.total_equity_usd - recommended_transfer
-        post_dest_equity = dest_telemetry.total_equity_usd + recommended_transfer - self.flat_transfer_fee_usd
+        post_dest_equity = (
+            dest_telemetry.total_equity_usd + recommended_transfer - self.flat_transfer_fee_usd
+        )
 
         post_source_util = (
             min(1.0, source_telemetry.used_margin_usd / post_source_equity)

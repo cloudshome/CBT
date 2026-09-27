@@ -16,29 +16,28 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, List, Optional
 
 
 class ChainId(str, Enum):
     ETHEREUM_MAINNET = "ETHEREUM_MAINNET"  # Chain ID 1
-    ARBITRUM_ONE = "ARBITRUM_ONE"          # Chain ID 42161
-    OPTIMISM = "OPTIMISM"                  # Chain ID 10
-    POLYGON = "POLYGON"                    # Chain ID 137
-    BASE = "BASE"                          # Chain ID 8453
+    ARBITRUM_ONE = "ARBITRUM_ONE"  # Chain ID 42161
+    OPTIMISM = "OPTIMISM"  # Chain ID 10
+    POLYGON = "POLYGON"  # Chain ID 137
+    BASE = "BASE"  # Chain ID 8453
 
 
 class BridgeProtocol(str, Enum):
-    ACROSS_V3 = "ACROSS_V3"                # Optimistic intent filler network
-    STARGATE_V2 = "STARGATE_V2"            # LayerZero unified liquidity pool
-    CHAINLINK_CCIP = "CHAINLINK_CCIP"      # Decentralized oracle network relay
-    HOP_PROTOCOL = "HOP_PROTOCOL"          # AMM-based bonder network
-    DIRECT_SOLVER_INVENTORY = "DIRECT"     # Instant filler balance rebalancing
+    ACROSS_V3 = "ACROSS_V3"  # Optimistic intent filler network
+    STARGATE_V2 = "STARGATE_V2"  # LayerZero unified liquidity pool
+    CHAINLINK_CCIP = "CHAINLINK_CCIP"  # Decentralized oracle network relay
+    HOP_PROTOCOL = "HOP_PROTOCOL"  # AMM-based bonder network
+    DIRECT_SOLVER_INVENTORY = "DIRECT"  # Instant filler balance rebalancing
 
 
 class VerificationMechanism(str, Enum):
     OPTIMISTIC_CHALLENGE = "OPTIMISTIC_CHALLENGE"  # 90s challenge window
-    MULTISIG_QUORUM = "MULTISIG_QUORUM"            # CCIP / Axelar threshold
-    LIGHT_CLIENT_ZK = "LIGHT_CLIENT_ZK"            # ZK / DVN proof
+    MULTISIG_QUORUM = "MULTISIG_QUORUM"  # CCIP / Axelar threshold
+    LIGHT_CLIENT_ZK = "LIGHT_CLIENT_ZK"  # ZK / DVN proof
 
 
 class IntentStatus(str, Enum):
@@ -60,6 +59,7 @@ class IntentStatus(str, Enum):
 @dataclass
 class CrossChainIntent:
     """Declarative user or strategy intent specifying required output on destination chain."""
+
     intent_id: str
     source_chain: ChainId
     destination_chain: ChainId
@@ -93,6 +93,7 @@ class CrossChainIntent:
 @dataclass
 class SolverQuote:
     """Competitive quote submitted by an intent solver or bridge aggregator."""
+
     solver_id: str
     protocol: BridgeProtocol
     quoted_output_amount: float
@@ -109,18 +110,20 @@ class SolverQuote:
 @dataclass
 class SolverAuctionResult:
     """Result of competitive solver auction for an intent."""
+
     intent_id: str
-    winning_quote: Optional[SolverQuote]
+    winning_quote: SolverQuote | None
     competing_quotes_count: int
     winning_score: float
-    all_quotes_ranked: List[SolverQuote] = field(default_factory=list)
-    rejection_reason: Optional[str] = None
+    all_quotes_ranked: list[SolverQuote] = field(default_factory=list)
+    rejection_reason: str | None = None
     real_capital_enabled: bool = False
 
 
 @dataclass
 class SettlementProof:
     """Cryptographic receipt confirming destination chain fill."""
+
     intent_id: str
     destination_tx_hash: str
     settled_amount: float
@@ -129,7 +132,7 @@ class SettlementProof:
     is_settlement_confirmed: bool
     proof_timestamp_sec: float = field(default_factory=time.time)
     source_rpc_node: str = "primary_rpc"
-    destination_chain_id: Optional[ChainId] = None
+    destination_chain_id: ChainId | None = None
     is_reorg_detected: bool = False
     rpc_agreement_ratio: float = 1.0  # 1.0 = 100% RPC quorum consensus
     real_capital_enabled: bool = False

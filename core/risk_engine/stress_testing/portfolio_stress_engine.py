@@ -32,7 +32,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List
 
 
 class StressScenarioId(str, Enum):
@@ -44,13 +43,14 @@ class StressScenarioId(str, Enum):
 @dataclass
 class AssetPosition:
     """Represents a live open position in the multi-asset portfolio."""
+
     symbol: str
-    quantity: float             # > 0 for Long, < 0 for Short
+    quantity: float  # > 0 for Long, < 0 for Short
     entry_price: float
     current_mark_price: float
-    initial_margin_rate: float = 0.05       # 5% (20x max leverage)
+    initial_margin_rate: float = 0.05  # 5% (20x max leverage)
     maintenance_margin_rate: float = 0.025  # 2.5% maintenance margin requirement
-    asset_volatility: float = 0.03          # Daily volatility
+    asset_volatility: float = 0.03  # Daily volatility
 
     @property
     def notional_usd(self) -> float:
@@ -68,6 +68,7 @@ class AssetPosition:
 @dataclass
 class ScenarioStressImpact:
     """Impact of an extreme historical/synthetic shock on the portfolio."""
+
     scenario_id: StressScenarioId
     price_shock_pct: float
     volatility_multiplier: float
@@ -83,6 +84,7 @@ class ScenarioStressImpact:
 @dataclass
 class PortfolioRiskProfile:
     """Comprehensive institutional risk and stress profile."""
+
     total_equity_usd: float
     total_notional_usd: float
     effective_leverage: float
@@ -95,7 +97,7 @@ class PortfolioRiskProfile:
     total_portfolio_heat_pct: float
     is_within_heat_ceiling: bool
     all_stress_scenarios_passed: bool
-    scenario_results: List[ScenarioStressImpact] = field(default_factory=list)
+    scenario_results: list[ScenarioStressImpact] = field(default_factory=list)
     real_capital_enabled: bool = False
 
 
@@ -107,8 +109,8 @@ class PortfolioStressEngine:
     def __init__(
         self,
         min_post_stress_margin_buffer_pct: float = 0.20,  # Must retain >= 20% margin buffer in stress
-        max_portfolio_heat_ceiling_pct: float = 0.06,     # Constitutional 6.0% portfolio heat ceiling
-        max_single_asset_cap_pct: float = 0.015,          # Constitutional 1.5% single asset cap
+        max_portfolio_heat_ceiling_pct: float = 0.06,  # Constitutional 6.0% portfolio heat ceiling
+        max_single_asset_cap_pct: float = 0.015,  # Constitutional 1.5% single asset cap
     ) -> None:
         self.min_buffer_pct = min_post_stress_margin_buffer_pct
         self.max_heat_pct = max_portfolio_heat_ceiling_pct
@@ -127,7 +129,7 @@ class PortfolioStressEngine:
         """
         z_99 = 2.326348
         # Standard normal PDF at z_99: (1/sqrt(2*pi)) * exp(-z^2 / 2)
-        pdf_z = (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-(z_99 ** 2) / 2.0)
+        pdf_z = (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-(z_99**2) / 2.0)
         cvar_multiplier = pdf_z / 0.01  # ~2.6652
 
         var_usd = portfolio_equity_usd * portfolio_volatility * z_99
@@ -139,7 +141,7 @@ class PortfolioStressEngine:
 
     def simulate_scenario_stress(
         self,
-        positions: List[AssetPosition],
+        positions: list[AssetPosition],
         collateral_cash_usd: float,
         scenario_id: StressScenarioId,
     ) -> ScenarioStressImpact:
@@ -210,7 +212,7 @@ class PortfolioStressEngine:
     def evaluate_portfolio(
         self,
         collateral_cash_usd: float,
-        positions: List[AssetPosition],
+        positions: list[AssetPosition],
         estimated_portfolio_volatility: float = 0.025,
     ) -> PortfolioRiskProfile:
         """
@@ -229,7 +231,9 @@ class PortfolioStressEngine:
             total_mm += pos.maintenance_margin_usd
 
         effective_leverage = total_notional / max(1.0, current_equity)
-        current_margin_buffer = (current_equity - total_mm) / current_equity if current_equity > 0 else 0.0
+        current_margin_buffer = (
+            (current_equity - total_mm) / current_equity if current_equity > 0 else 0.0
+        )
 
         # VaR and CVaR calculations
         var_usd, cvar_usd, var_pct, cvar_pct = self.calculate_var_cvar(
@@ -243,9 +247,15 @@ class PortfolioStressEngine:
 
         # Run 3 Canonical Stress Scenarios
         scenario_results = [
-            self.simulate_scenario_stress(positions, collateral_cash_usd, StressScenarioId.BLACK_THURSDAY_2020),
-            self.simulate_scenario_stress(positions, collateral_cash_usd, StressScenarioId.FTX_CONTAGION_2022),
-            self.simulate_scenario_stress(positions, collateral_cash_usd, StressScenarioId.FLASH_CRASH_CASCADE),
+            self.simulate_scenario_stress(
+                positions, collateral_cash_usd, StressScenarioId.BLACK_THURSDAY_2020
+            ),
+            self.simulate_scenario_stress(
+                positions, collateral_cash_usd, StressScenarioId.FTX_CONTAGION_2022
+            ),
+            self.simulate_scenario_stress(
+                positions, collateral_cash_usd, StressScenarioId.FLASH_CRASH_CASCADE
+            ),
         ]
 
         all_passed = all(sc.survives_stress_gate for sc in scenario_results) and is_within_heat

@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import collections
 import math
-import time
-from typing import Deque, List, Optional, Tuple
 
 from core.execution.liquidity_surface.models import (
     ToxicFlowAssessment,
@@ -35,11 +33,11 @@ class HighFrequencyToxicFlowDetector:
 
     def __init__(
         self,
-        bucket_volume: float = 10.0,      # Fixed volume per bucket (e.g., 10 BTC)
-        num_buckets: int = 50,             # Rolling window N
-        hawkes_alpha: float = 0.8,         # Branching ratio
-        hawkes_beta: float = 1.2,          # Decay rate
-        hawkes_mu: float = 0.5,            # Baseline intensity
+        bucket_volume: float = 10.0,  # Fixed volume per bucket (e.g., 10 BTC)
+        num_buckets: int = 50,  # Rolling window N
+        hawkes_alpha: float = 0.8,  # Branching ratio
+        hawkes_beta: float = 1.2,  # Decay rate
+        hawkes_mu: float = 0.5,  # Baseline intensity
     ):
         self.bucket_volume = bucket_volume
         self.num_buckets = num_buckets
@@ -52,8 +50,10 @@ class HighFrequencyToxicFlowDetector:
         self._current_bucket_buy_vol: float = 0.0
         self._current_bucket_sell_vol: float = 0.0
         self._current_bucket_total: float = 0.0
-        self._completed_bucket_imbalances: Deque[float] = collections.deque(maxlen=self.num_buckets)
-        self._recent_trade_timestamps: Deque[float] = collections.deque(maxlen=200)
+        self._completed_bucket_imbalances: collections.deque[float] = collections.deque(
+            maxlen=self.num_buckets
+        )
+        self._recent_trade_timestamps: collections.deque[float] = collections.deque(maxlen=200)
 
     def process_trade(
         self,
@@ -61,7 +61,7 @@ class HighFrequencyToxicFlowDetector:
         size: float,
         timestamp_ms: int,
         is_buyer_maker: bool,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Ingests a single trade tick, updates Hawkes arrival history, and fills VPIN volume buckets.
         Returns latest VPIN value if at least 1 bucket has completed, else None.
@@ -77,7 +77,7 @@ class HighFrequencyToxicFlowDetector:
         while remaining_size > 0:
             space_in_bucket = self.bucket_volume - self._current_bucket_total
             fill_amount = min(remaining_size, space_in_bucket)
-            
+
             frac = fill_amount / size if size > 0 else 0.0
             self._current_bucket_buy_vol += buy_vol * frac
             self._current_bucket_sell_vol += sell_vol * frac

@@ -14,11 +14,12 @@ from __future__ import annotations
 import enum
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class VenueType(str, enum.Enum):
     """Classification of execution venues across centralized and decentralized finance."""
+
     CEX_SPOT = "CEX_SPOT"
     CEX_PERPETUAL = "CEX_PERPETUAL"
     DEX_CLMM = "DEX_CLMM"
@@ -27,6 +28,7 @@ class VenueType(str, enum.Enum):
 
 class ArbitrageType(str, enum.Enum):
     """Topology classification of cross-venue arbitrage paths."""
+
     SPATIAL_TWO_WAY = "SPATIAL_TWO_WAY"
     TRIANGULAR_THREE_WAY = "TRIANGULAR_THREE_WAY"
     HYBRID_CEX_DEX = "HYBRID_CEX_DEX"
@@ -36,6 +38,7 @@ class ArbitrageType(str, enum.Enum):
 @dataclass(frozen=True)
 class OrderBookLevel:
     """Single level in an order book depth ladder."""
+
     price: float
     size: float
 
@@ -43,11 +46,12 @@ class OrderBookLevel:
 @dataclass
 class VenueDepthSnapshot:
     """Normalized order book or CLMM tick depth snapshot for a single venue."""
+
     venue: str
     symbol: str
     venue_type: VenueType
-    bids: List[OrderBookLevel]
-    asks: List[OrderBookLevel]
+    bids: list[OrderBookLevel]
+    asks: list[OrderBookLevel]
     fee_bps: float
     latency_ms: float
     timestamp_ms: int = field(default_factory=lambda: int(time.time() * 1000))
@@ -65,7 +69,7 @@ class VenueDepthSnapshot:
             return (bid + ask) / 2.0
         return bid if bid > 0.0 else (ask if ask < float("inf") else 0.0)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "venue": self.venue,
             "symbol": self.symbol,
@@ -81,6 +85,7 @@ class VenueDepthSnapshot:
 @dataclass
 class ArbitrageLeg:
     """An individual execution leg within a multi-leg or spatial arbitrage path."""
+
     leg_id: str
     venue: str
     venue_type: VenueType
@@ -98,16 +103,17 @@ class ArbitrageLeg:
     def fee_usd(self) -> float:
         return self.notional_usd() * (self.fee_bps / 10000.0)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 @dataclass
 class CrossVenueOpportunity:
     """A fully quantified spatial or triangular arbitrage opportunity across venues."""
+
     opportunity_id: str
     arb_type: ArbitrageType
-    legs: List[ArbitrageLeg]
+    legs: list[ArbitrageLeg]
     gross_spread_bps: float
     net_spread_bps: float
     optimal_notional_usd: float
@@ -118,12 +124,12 @@ class CrossVenueOpportunity:
     real_capital_enabled: bool = False
     timestamp_ms: int = field(default_factory=lambda: int(time.time() * 1000))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "opportunity_id": self.opportunity_id,
             "arb_type": self.arb_type.value,
             "legs_count": len(self.legs),
-            "legs": [l.to_dict() for l in self.legs],
+            "legs": [leg.to_dict() for leg in self.legs],
             "gross_spread_bps": self.gross_spread_bps,
             "net_spread_bps": self.net_spread_bps,
             "optimal_notional_usd": self.optimal_notional_usd,
@@ -139,6 +145,7 @@ class CrossVenueOpportunity:
 @dataclass
 class RoutingSplit:
     """Portion of an order routed to a specific venue in an optimal execution plan."""
+
     venue: str
     venue_type: VenueType
     allocated_notional_usd: float
@@ -148,7 +155,7 @@ class RoutingSplit:
     slippage_bps: float
     fee_usd: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "venue": self.venue,
             "venue_type": self.venue_type.value,
@@ -164,11 +171,12 @@ class RoutingSplit:
 @dataclass
 class ExecutionPlan:
     """Synthesized multi-venue execution and order slicing plan."""
+
     plan_id: str
     symbol: str
     action: str  # "BUY" or "SELL"
     total_notional_usd: float
-    splits: List[RoutingSplit]
+    splits: list[RoutingSplit]
     volume_weighted_price: float
     total_slippage_bps: float
     total_fee_usd: float
@@ -176,11 +184,11 @@ class ExecutionPlan:
     net_effective_cost_bps: float
     risk_gate_passed: bool = False
     real_capital_enabled: bool = False
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
     narrative: str = ""
     timestamp_ms: int = field(default_factory=lambda: int(time.time() * 1000))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plan_id": self.plan_id,
             "symbol": self.symbol,

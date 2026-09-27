@@ -19,23 +19,19 @@ from __future__ import annotations
 import math
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
 
 from core.execution.market_making.avellaneda_stoikov import (
     AvellanedaStoikovModel,
-    AvellanedaStoikovQuotes,
 )
 from core.execution.market_making.hawkes_intensity import (
     FlowToxicityTier,
-    HawkesIntensityState,
     HawkesTradeArrivalEstimator,
 )
 from core.execution.market_making.market_maker_sentinel import (
     ASMarketMakerSentinel,
-    MarketMakingDecision,
 )
 
 
@@ -101,8 +97,12 @@ def test_02_optimal_spreads_and_quote_asymmetry(as_model: AvellanedaStoikovModel
     mid = 60_000.0
     vol = 0.02
 
-    quotes_long = as_model.compute_optimal_quotes("BTC/USDT", mid, current_inventory=2.0, volatility_sigma=vol)
-    quotes_short = as_model.compute_optimal_quotes("BTC/USDT", mid, current_inventory=-2.0, volatility_sigma=vol)
+    quotes_long = as_model.compute_optimal_quotes(
+        "BTC/USDT", mid, current_inventory=2.0, volatility_sigma=vol
+    )
+    quotes_short = as_model.compute_optimal_quotes(
+        "BTC/USDT", mid, current_inventory=-2.0, volatility_sigma=vol
+    )
 
     # Long inventory: Ask half-spread is tighter to mid than bid
     assert quotes_long.optimal_half_spread_ask < quotes_long.optimal_half_spread_bid
@@ -117,11 +117,17 @@ def test_03_discrete_quotes_tick_grid_and_non_crossing(as_model: AvellanedaStoik
     mid = 65_432.17
     vol = 0.015
 
-    quotes = as_model.compute_optimal_quotes("BTC/USDT", mid, current_inventory=0.5, volatility_sigma=vol)
+    quotes = as_model.compute_optimal_quotes(
+        "BTC/USDT", mid, current_inventory=0.5, volatility_sigma=vol
+    )
 
     # Must be integer multiple of tick_size (0.10)
-    assert math.isclose(quotes.discrete_ask_price % 0.10, 0.0, abs_tol=1e-5) or math.isclose(quotes.discrete_ask_price % 0.10, 0.10, abs_tol=1e-5)
-    assert math.isclose(quotes.discrete_bid_price % 0.10, 0.0, abs_tol=1e-5) or math.isclose(quotes.discrete_bid_price % 0.10, 0.10, abs_tol=1e-5)
+    assert math.isclose(quotes.discrete_ask_price % 0.10, 0.0, abs_tol=1e-5) or math.isclose(
+        quotes.discrete_ask_price % 0.10, 0.10, abs_tol=1e-5
+    )
+    assert math.isclose(quotes.discrete_bid_price % 0.10, 0.0, abs_tol=1e-5) or math.isclose(
+        quotes.discrete_bid_price % 0.10, 0.10, abs_tol=1e-5
+    )
 
     # Must have positive spread >= 2 ticks
     spread = quotes.discrete_ask_price - quotes.discrete_bid_price
@@ -152,7 +158,9 @@ def test_04_hawkes_exponential_decay_and_half_life(hawkes_estimator: HawkesTrade
     assert math.isclose(excess_decayed, excess_initial * 0.5, rel_tol=1e-3)
 
 
-def test_05_hawkes_clustering_triggers_spread_widening(hawkes_estimator: HawkesTradeArrivalEstimator):
+def test_05_hawkes_clustering_triggers_spread_widening(
+    hawkes_estimator: HawkesTradeArrivalEstimator,
+):
     """
     Verifies that rapid trade cascades cause Hawkes intensity to surge into
     ELEVATED_TOXICITY or CRITICAL_TOXIC_SURGE, triggering spread widening.
@@ -165,11 +173,16 @@ def test_05_hawkes_clustering_triggers_spread_widening(hawkes_estimator: HawkesT
         state = hawkes_estimator.record_trade_event(timestamp_ns=t_ns)
 
     assert state.current_intensity > (hawkes_estimator.mu * hawkes_estimator.moderate_ratio)
-    assert state.toxicity_tier in (FlowToxicityTier.ELEVATED_TOXICITY, FlowToxicityTier.CRITICAL_TOXIC_SURGE)
+    assert state.toxicity_tier in (
+        FlowToxicityTier.ELEVATED_TOXICITY,
+        FlowToxicityTier.CRITICAL_TOXIC_SURGE,
+    )
     assert state.spread_widening_multiplier > 1.0
 
 
-def test_06_inventory_at_1_5_percent_cap_disables_accumulating_side(mm_sentinel: ASMarketMakerSentinel):
+def test_06_inventory_at_1_5_percent_cap_disables_accumulating_side(
+    mm_sentinel: ASMarketMakerSentinel,
+):
     """
     Verifies that when inventory reaches the 1.5% equity cap,
     the sentinel suppresses quotes on the accumulating side.
@@ -217,6 +230,11 @@ def test_08_milestone18_execution_surface_untouched():
     if not Path(py_exe).exists():
         py_exe = sys.executable
 
-    res = subprocess.run([py_exe, "scripts/verify_m18_certification.py"], cwd=str(repo_root), capture_output=True, text=True)
+    res = subprocess.run(
+        [py_exe, "scripts/verify_m18_certification.py"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
     assert res.returncode == 0, f"Milestone 18 certification invalid:\n{res.stdout}\n{res.stderr}"
     assert "M18 Production Pass remains ACTIVE" in res.stdout

@@ -28,14 +28,16 @@ logger = logging.getLogger("ai_quant_sentinel.risk_engine.collateral_monitor")
 
 class LiquidationRiskTier(str, Enum):
     """Categorical risk state based on liquidation distance buffer."""
-    NORMAL = "NORMAL"                                # LDB > 1500 bps (>15%)
-    ELEVATED_RISK = "ELEVATED_RISK"                  # 800 < LDB <= 1500 bps (8-15%)
-    MARGIN_CALL_WARNING = "MARGIN_CALL_WARNING"      # 300 < LDB <= 800 bps (3-8%)
-    CRITICAL_EMERGENCY = "CRITICAL_EMERGENCY"        # LDB <= 300 bps (<=3%)
+
+    NORMAL = "NORMAL"  # LDB > 1500 bps (>15%)
+    ELEVATED_RISK = "ELEVATED_RISK"  # 800 < LDB <= 1500 bps (8-15%)
+    MARGIN_CALL_WARNING = "MARGIN_CALL_WARNING"  # 300 < LDB <= 800 bps (3-8%)
+    CRITICAL_EMERGENCY = "CRITICAL_EMERGENCY"  # LDB <= 300 bps (<=3%)
 
 
 class VenueCollateralTelemetry(BaseModel):
     """Real-time collateral health report for a specific venue."""
+
     venue: str
     symbol: str
     position_size: float
@@ -54,6 +56,7 @@ class VenueCollateralTelemetry(BaseModel):
 
 class AsymmetricHazardReport(BaseModel):
     """Diagnostic outcome when cross-venue margin parity is dangerously misaligned."""
+
     synthetic_pair_id: str
     symbol: str
     leg_1_venue: str
@@ -200,7 +203,10 @@ class CollateralHeartbeatMonitor:
             hazard_detected = True
             vulnerable_venue = leg_1_venue if ldb_1 < ldb_2 else leg_2_venue
             action = f"EMERGENCY_DELEVERAGE_OR_REBALANCE: Venue {vulnerable_venue} LDB <= {self.critical_ldb_threshold_bps:.0f} bps"
-        elif min_ldb <= self.warning_ldb_threshold_bps and delta_ldb >= self.max_asymmetric_hazard_delta_bps:
+        elif (
+            min_ldb <= self.warning_ldb_threshold_bps
+            and delta_ldb >= self.max_asymmetric_hazard_delta_bps
+        ):
             hazard_detected = True
             vulnerable_venue = leg_1_venue if ldb_1 < ldb_2 else leg_2_venue
             action = f"REBALANCE_ADVISORY: Asymmetry delta {delta_ldb:.0f} bps exceeds tolerance {self.max_asymmetric_hazard_delta_bps:.0f} bps"

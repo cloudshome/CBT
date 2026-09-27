@@ -21,22 +21,17 @@ Hook Lifecycle:
 from __future__ import annotations
 
 import logging
-import math
 import time
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from abc import ABC
+from dataclasses import dataclass
 from enum import IntFlag
-from typing import Dict, Final, List, Optional, Tuple
-
-from core.execution.concentrated_amm.tick_math import (
-    REAL_CAPITAL_ENABLED,
-)
 
 logger = logging.getLogger("concentrated_amm.v4_hooks")
 
 
 class HookPermissions(IntFlag):
     """Uniswap v4 14-bit permission flags encoded in hook address."""
+
     NONE = 0
     BEFORE_INITIALIZE = 1 << 13
     AFTER_INITIALIZE = 1 << 12
@@ -57,15 +52,16 @@ class HookPermissions(IntFlag):
 @dataclass
 class HookResult:
     """Outcome of a hook execution."""
+
     is_success: bool
-    revert_reason: Optional[str] = None
-    override_fee_pips: Optional[int] = None
+    revert_reason: str | None = None
+    override_fee_pips: int | None = None
     is_circuit_breaker_tripped: bool = False
     action_narrative: str = "Hook execution passed"
     real_capital_enabled: bool = False
 
 
-class BaseV4Hook(ABC):
+class BaseV4Hook(ABC):  # noqa: B024
     """Abstract Base Class for Uniswap v4 Simulation Hooks."""
 
     def __init__(self, permissions: HookPermissions) -> None:
@@ -99,7 +95,6 @@ class BaseV4Hook(ABC):
     ) -> HookResult:
         """Invoked immediately after swap completion."""
         return HookResult(is_success=True)
-
 
     def before_add_liquidity(
         self,
@@ -163,19 +158,19 @@ class VolatilityCircuitBreakerHook(BaseV4Hook):
 
     def __init__(
         self,
-        max_drift_bps: float = 150.0,       # 150 bps max price drift
-        window_sec: float = 60.0,           # 60s observation window
-        cool_off_sec: float = 300.0,        # 5 minutes cool-off when tripped
+        max_drift_bps: float = 150.0,  # 150 bps max price drift
+        window_sec: float = 60.0,  # 60s observation window
+        cool_off_sec: float = 300.0,  # 5 minutes cool-off when tripped
     ) -> None:
         super().__init__(HookPermissions.BEFORE_SWAP | HookPermissions.AFTER_SWAP)
         self.max_drift_bps = max_drift_bps
         self.window_sec = window_sec
         self.cool_off_sec = cool_off_sec
 
-        self.observations: List[Tuple[float, float]] = []  # (timestamp_sec, price)
+        self.observations: list[tuple[float, float]] = []  # (timestamp_sec, price)
         self.is_tripped: bool = False
         self.tripped_timestamp_sec: float = 0.0
-        self.trip_reason: Optional[str] = None
+        self.trip_reason: str | None = None
 
     def record_price(self, price: float, timestamp_sec: float | None = None) -> None:
         """Records an external or pool price tick."""
@@ -230,10 +225,10 @@ class VolatilityCircuitBreakerHook(BaseV4Hook):
                 if drift_bps > self.max_drift_bps:
                     self.is_tripped = True
                     self.tripped_timestamp_sec = now
-                    self.trip_reason = (
-                        f"Price drift {drift_bps:.1f} bps exceeded max threshold {self.max_drift_bps:.1f} bps in {self.window_sec:.0f}s"
+                    self.trip_reason = f"Price drift {drift_bps:.1f} bps exceeded max threshold {self.max_drift_bps:.1f} bps in {self.window_sec:.0f}s"
+                    logger.critical(
+                        f"Circuit Breaker Tripped on Pool {pool_id}: {self.trip_reason}"
                     )
-                    logger.critical(f"Circuit Breaker Tripped on Pool {pool_id}: {self.trip_reason}")
                     return HookResult(
                         is_success=False,
                         revert_reason=f"Volatility Circuit Breaker Tripped: {self.trip_reason}",
@@ -267,7 +262,6 @@ class VolatilityCircuitBreakerHook(BaseV4Hook):
         return HookResult(is_success=True)
 
 
-
 class DynamicFeeHook(BaseV4Hook):
     """
     Uniswap v4 Dynamic Fee Adaptation Hook.
@@ -277,9 +271,9 @@ class DynamicFeeHook(BaseV4Hook):
 
     def __init__(
         self,
-        base_fee_pips: int = 500,     # 5 bps (0.05%) default
-        min_fee_pips: int = 100,      # 1 bps (0.01%) minimum floor
-        max_fee_pips: int = 10000,    # 100 bps (1.00%) maximum ceiling
+        base_fee_pips: int = 500,  # 5 bps (0.05%) default
+        min_fee_pips: int = 100,  # 1 bps (0.01%) minimum floor
+        max_fee_pips: int = 10000,  # 100 bps (1.00%) maximum ceiling
         volatility_scaling_factor: float = 2.0,
     ) -> None:
         super().__init__(HookPermissions.BEFORE_SWAP)
@@ -327,7 +321,7 @@ class HookSandbox:
 
     @staticmethod
     def execute_before_swap_safely(
-        hook: Optional[BaseV4Hook],
+        hook: BaseV4Hook | None,
         sender: str,
         pool_id: str,
         zero_for_one: bool,
@@ -362,16 +356,15 @@ class HookSandbox:
             logger.error(f"Hook Sandbox Intercepted Exception in before_swap: {e}", exc_info=True)
             return HookResult(
                 is_success=False,
-                revert_reason=f"Hook failure intercepted by sandbox ({e.__class__.__name__}): {str(e)}",
+                revert_reason=f"Hook failure intercepted by sandbox ({e.__class__.__name__}): {e!s}",
                 is_circuit_breaker_tripped=False,
                 action_narrative="Hook threw unhandled exception; failed closed safely",
                 real_capital_enabled=False,
             )
 
-
     @staticmethod
     def execute_after_swap_safely(
-        hook: Optional[BaseV4Hook],
+        hook: BaseV4Hook | None,
         sender: str,
         pool_id: str,
         zero_for_one: bool,
@@ -410,8 +403,7 @@ class HookSandbox:
             logger.error(f"Hook Sandbox Intercepted Exception in after_swap: {e}", exc_info=True)
             return HookResult(
                 is_success=False,
-                revert_reason=f"After-swap hook failure intercepted: {str(e)}",
+                revert_reason=f"After-swap hook failure intercepted: {e!s}",
                 action_narrative="After-swap hook failed safely in sandbox",
                 real_capital_enabled=False,
             )
-

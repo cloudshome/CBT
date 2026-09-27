@@ -32,9 +32,6 @@ import logging
 import math
 import time
 from dataclasses import dataclass
-from typing import Any
-
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger("ai_quant_sentinel.market_making.avellaneda_stoikov")
 
@@ -42,6 +39,7 @@ logger = logging.getLogger("ai_quant_sentinel.market_making.avellaneda_stoikov")
 @dataclass
 class AvellanedaStoikovQuotes:
     """Optimal reservation price, half-spreads, and discrete limit quotes."""
+
     symbol: str
     mid_price: float
     reservation_price: float
@@ -72,10 +70,10 @@ class AvellanedaStoikovModel:
 
     def __init__(
         self,
-        risk_aversion_gamma: float = 0.1,         # gamma: Risk aversion coefficient
-        book_liquidity_density_kappa: float = 1.5, # kappa: Order flow arrival density decay
-        holding_horizon_sec: float = 10.0,         # T - t: Terminal inventory target horizon
-        tick_size: float = 0.1,                    # Exchange tick size (e.g. 0.1 for BTC/USDT)
+        risk_aversion_gamma: float = 0.1,  # gamma: Risk aversion coefficient
+        book_liquidity_density_kappa: float = 1.5,  # kappa: Order flow arrival density decay
+        holding_horizon_sec: float = 10.0,  # T - t: Terminal inventory target horizon
+        tick_size: float = 0.1,  # Exchange tick size (e.g. 0.1 for BTC/USDT)
     ) -> None:
         if risk_aversion_gamma <= 0:
             raise ValueError("risk_aversion_gamma must be > 0")
@@ -101,8 +99,12 @@ class AvellanedaStoikovModel:
         Calculates the indifference reservation price:
         r(s, q, t) = s - q * gamma * sigma^2 * (T - t)
         """
-        q = inventory_q if inventory_q is not None else (current_inventory if current_inventory is not None else 0.0)
-        var = volatility_sigma ** 2
+        q = (
+            inventory_q
+            if inventory_q is not None
+            else (current_inventory if current_inventory is not None else 0.0)
+        )
+        var = volatility_sigma**2
         skew = q * self.gamma * var * self.T_minus_t
         return mid_price - skew
 
@@ -131,7 +133,7 @@ class AvellanedaStoikovModel:
         )
 
         # 2. Optimal Spread Components
-        var = volatility_sigma ** 2
+        var = volatility_sigma**2
         horizon_var_term = self.gamma * var * self.T_minus_t
         liquidity_term = (2.0 / self.gamma) * math.log(1.0 + (self.gamma / self.kappa))
 

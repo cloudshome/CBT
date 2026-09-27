@@ -22,9 +22,6 @@ Constitutional Invariant:
 
 from __future__ import annotations
 
-import math
-from typing import Optional
-
 from core.execution.mev_mitigation.models import (
     MEVRiskLevel,
     SandwichVulnerabilityReport,
@@ -47,8 +44,8 @@ class SandwichAttackEvaluator:
 
     def estimate_gas_cost_usd(
         self,
-        base_fee_gwei: Optional[float] = None,
-        eth_price_usd: Optional[float] = None,
+        base_fee_gwei: float | None = None,
+        eth_price_usd: float | None = None,
     ) -> float:
         """Calculates 2x swap transaction gas cost in USD (frontrun + backrun)."""
         fee_gwei = base_fee_gwei or self.default_base_fee_gwei
@@ -56,7 +53,7 @@ class SandwichAttackEvaluator:
 
         # 2 transactions for frontrun and backrun
         total_gas = self.standard_swap_gas * 2
-        cost_eth = (total_gas * fee_gwei * 1e-9)
+        cost_eth = total_gas * fee_gwei * 1e-9
         return cost_eth * eth_price
 
     def evaluate_sandwich_risk(
@@ -65,8 +62,8 @@ class SandwichAttackEvaluator:
         target_notional_usd: float,
         user_slippage_tolerance_bps: float,
         pool_liquidity_usd: float,
-        base_fee_gwei: Optional[float] = None,
-        eth_price_usd: Optional[float] = None,
+        base_fee_gwei: float | None = None,
+        eth_price_usd: float | None = None,
     ) -> SandwichVulnerabilityReport:
         """
         Analyzes whether a trade in the public mempool can be profitably sandwiched.
@@ -98,7 +95,11 @@ class SandwichAttackEvaluator:
 
         # Compute safe protective slippage threshold s* where gross profit < gas_cost
         # s* = gas_cost / (target_notional * 0.85) * 10000
-        safe_slippage_bps = (gas_cost_usd / (target_notional_usd * 0.85)) * 10_000.0 if target_notional_usd > 0 else 5.0
+        safe_slippage_bps = (
+            (gas_cost_usd / (target_notional_usd * 0.85)) * 10_000.0
+            if target_notional_usd > 0
+            else 5.0
+        )
         safe_slippage_bps = max(1.0, min(user_slippage_tolerance_bps, safe_slippage_bps * 0.9))
 
         # Risk classification

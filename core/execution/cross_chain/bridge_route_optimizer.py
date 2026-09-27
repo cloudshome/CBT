@@ -25,13 +25,10 @@ Mathematical Specifications:
 from __future__ import annotations
 
 import logging
-import math
 import time
-from typing import List, Optional
 
 from core.execution.cross_chain.intent_models import (
     CrossChainIntent,
-    IntentStatus,
     SolverAuctionResult,
     SolverQuote,
 )
@@ -71,7 +68,7 @@ class BridgeRouteOptimizer:
         intent: CrossChainIntent,
         quote: SolverQuote,
         now_sec: float | None = None,
-    ) -> tuple[float, bool, Optional[str]]:
+    ) -> tuple[float, bool, str | None]:
         """
         Evaluates a solver quote against hard constraints and computes multi-objective utility.
         Returns: (utility_score, is_valid, rejection_reason)
@@ -84,20 +81,36 @@ class BridgeRouteOptimizer:
 
         # Hard Constraint 1: Minimum acceptable output
         if quote.quoted_output_amount < intent.min_acceptable_output:
-            return -1.0, False, f"Output {quote.quoted_output_amount:.4f} < min required {intent.min_acceptable_output:.4f}"
+            return (
+                -1.0,
+                False,
+                f"Output {quote.quoted_output_amount:.4f} < min required {intent.min_acceptable_output:.4f}",
+            )
 
         # Hard Constraint 2: Deadline compliance
         if (current_time + quote.estimated_latency_sec) > intent.deadline_timestamp_sec:
-            return -1.0, False, f"Estimated completion exceeds deadline ({quote.estimated_latency_sec:.0f}s)"
+            return (
+                -1.0,
+                False,
+                f"Estimated completion exceeds deadline ({quote.estimated_latency_sec:.0f}s)",
+            )
 
         # Hard Constraint 3: Reliability threshold
         if quote.historical_reliability_score < self.min_reliability:
-            return -1.0, False, f"Reliability {quote.historical_reliability_score:.2f} < threshold {self.min_reliability:.2f}"
+            return (
+                -1.0,
+                False,
+                f"Reliability {quote.historical_reliability_score:.2f} < threshold {self.min_reliability:.2f}",
+            )
 
         # Hard Constraint 4: Adversarial Economics & Toxic Fee Drag
         notional = max(1.0, intent.notional_usd)
         if quote.total_effective_fee_usd > (notional * 0.05):  # 500 bps economic ceiling
-            return -1.0, False, f"Total effective fee ${quote.total_effective_fee_usd:.2f} exceeds adversarial economic limit (500 bps)"
+            return (
+                -1.0,
+                False,
+                f"Total effective fee ${quote.total_effective_fee_usd:.2f} exceeds adversarial economic limit (500 bps)",
+            )
 
         # Multi-Objective Score Computation
         ideal_out = max(1e-6, intent.ideal_output_amount)
@@ -119,7 +132,7 @@ class BridgeRouteOptimizer:
     def run_solver_auction(
         self,
         intent: CrossChainIntent,
-        candidate_quotes: List[SolverQuote],
+        candidate_quotes: list[SolverQuote],
         now_sec: float | None = None,
     ) -> SolverAuctionResult:
         """
@@ -137,8 +150,8 @@ class BridgeRouteOptimizer:
                 real_capital_enabled=False,
             )
 
-        scored_quotes: List[tuple[SolverQuote, float]] = []
-        rejections: List[str] = []
+        scored_quotes: list[tuple[SolverQuote, float]] = []
+        rejections: list[str] = []
 
         for q in candidate_quotes:
             score, valid, reason = self.compute_quote_utility_score(intent, q, now_sec)

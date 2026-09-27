@@ -26,8 +26,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from core.execution.cross_chain.bridge_route_optimizer import (
     BridgeRouteOptimizer,
@@ -47,6 +46,7 @@ logger = logging.getLogger("ai_quant_sentinel.cross_chain.sentinel")
 @dataclass
 class IntentExecutionDecision:
     """Decision record for routing and dispatching a cross-chain intent."""
+
     intent_id: str
     is_approved: bool
     status: IntentStatus
@@ -54,8 +54,8 @@ class IntentExecutionDecision:
     portfolio_equity_usd: float
     is_equity_capped: bool
     is_in_flight_heat_capped: bool
-    auction_result: Optional[SolverAuctionResult]
-    rejection_reason: Optional[str]
+    auction_result: SolverAuctionResult | None
+    rejection_reason: str | None
     action_narrative: str
     real_capital_enabled: bool = False
 
@@ -68,14 +68,14 @@ class CrossChainIntentSentinel:
     def __init__(
         self,
         max_single_intent_equity_pct: float = 0.015,  # 1.5% single intent cap
-        max_total_in_flight_pct: float = 0.060,       # 6.0% in-flight bridge exposure ceiling
+        max_total_in_flight_pct: float = 0.060,  # 6.0% in-flight bridge exposure ceiling
         optimizer: BridgeRouteOptimizer | None = None,
     ) -> None:
         self.max_equity_pct = max_single_intent_equity_pct
         self.max_in_flight_pct = max_total_in_flight_pct
         self.optimizer = optimizer or BridgeRouteOptimizer()
-        self.active_intents: Dict[str, CrossChainIntent] = {}
-        self.settlement_records: Dict[str, SettlementProof] = {}
+        self.active_intents: dict[str, CrossChainIntent] = {}
+        self.settlement_records: dict[str, SettlementProof] = {}
         self.real_capital_enabled: bool = False
 
     @property
@@ -97,7 +97,7 @@ class CrossChainIntentSentinel:
         input_amount: float,
         ideal_output_amount: float,
         max_slippage_bps: float = 15.0,  # 15 bps default bridge slippage
-        duration_sec: float = 300.0,     # 5 minutes default deadline
+        duration_sec: float = 300.0,  # 5 minutes default deadline
         now_sec: float | None = None,
     ) -> CrossChainIntent:
         """
@@ -129,7 +129,7 @@ class CrossChainIntentSentinel:
         self,
         portfolio_equity_usd: float,
         intent: CrossChainIntent,
-        candidate_quotes: List[SolverQuote],
+        candidate_quotes: list[SolverQuote],
         now_sec: float | None = None,
     ) -> IntentExecutionDecision:
         """
@@ -140,9 +140,6 @@ class CrossChainIntentSentinel:
 
         max_allowed_single = portfolio_equity_usd * self.max_equity_pct
         max_allowed_in_flight = portfolio_equity_usd * self.max_in_flight_pct
-
-        is_equity_capped = False
-        is_heat_capped = False
 
         # 1. Single Intent 1.5% Equity Cap Check
         if intent.notional_usd > max_allowed_single:
@@ -193,7 +190,8 @@ class CrossChainIntentSentinel:
                 is_equity_capped=False,
                 is_in_flight_heat_capped=False,
                 auction_result=auction_res,
-                rejection_reason=auction_res.rejection_reason or "No valid solver quotes satisfied auction constraints",
+                rejection_reason=auction_res.rejection_reason
+                or "No valid solver quotes satisfied auction constraints",
                 action_narrative="Auction failed to discover viable solver quote",
                 real_capital_enabled=False,
             )
@@ -240,13 +238,21 @@ class CrossChainIntentSentinel:
             return False
 
         clean_hash = proof.destination_tx_hash.strip().lower()
-        if not (clean_hash.startswith("0x") and len(clean_hash) == 66 and all(c in "0123456789abcdef" for c in clean_hash[2:])):
-            logger.error(f"Fail-closed: Intent {proof.intent_id} has malformed cryptographic hash format: {proof.destination_tx_hash}")
+        if not (
+            clean_hash.startswith("0x")
+            and len(clean_hash) == 66
+            and all(c in "0123456789abcdef" for c in clean_hash[2:])
+        ):
+            logger.error(
+                f"Fail-closed: Intent {proof.intent_id} has malformed cryptographic hash format: {proof.destination_tx_hash}"
+            )
             return False
 
         # Block number must be strictly positive
         if proof.block_number <= 0:
-            logger.error(f"Fail-closed: Intent {proof.intent_id} has non-positive block number: {proof.block_number}")
+            logger.error(
+                f"Fail-closed: Intent {proof.intent_id} has non-positive block number: {proof.block_number}"
+            )
             return False
 
         # Conflicting proof detection: Ambiguous / Sybil settlement assertion
@@ -262,7 +268,9 @@ class CrossChainIntentSentinel:
 
         # Chain Reorg Detection
         if proof.is_reorg_detected:
-            logger.critical(f"Destination chain reorganization invalidated settlement for intent {proof.intent_id}")
+            logger.critical(
+                f"Destination chain reorganization invalidated settlement for intent {proof.intent_id}"
+            )
             intent.status = IntentStatus.FAILED_CHAIN_REORG
             return False
 
@@ -319,7 +327,9 @@ class CrossChainIntentSentinel:
         if terminal_status not in allowed_failure_states:
             raise ValueError(f"Invalid terminal failure status: {terminal_status}")
 
-        logger.warning(f"Intent {intent_id} transitioned to terminal failure state {terminal_status.value}: {reason}")
+        logger.warning(
+            f"Intent {intent_id} transitioned to terminal failure state {terminal_status.value}: {reason}"
+        )
         intent.status = terminal_status
         return True
 
@@ -338,7 +348,7 @@ class CrossChainIntentSentinel:
     def process_timeouts(
         self,
         current_time_sec: float | None = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Scans active intents for deadline expirations and triggers escrow refund state.
         """
@@ -346,7 +356,11 @@ class CrossChainIntentSentinel:
         refunded = []
 
         for i_id, intent in list(self.active_intents.items()):
-            if intent.status in (IntentStatus.AUCTION_OPEN, IntentStatus.SOLVER_ASSIGNED, IntentStatus.IN_FLIGHT):
+            if intent.status in (
+                IntentStatus.AUCTION_OPEN,
+                IntentStatus.SOLVER_ASSIGNED,
+                IntentStatus.IN_FLIGHT,
+            ):
                 if now > intent.deadline_timestamp_sec:
                     intent.status = IntentStatus.REFUNDED_TIMEOUT
                     refunded.append(i_id)

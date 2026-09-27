@@ -15,9 +15,7 @@ Architectural Declarations:
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
-from typing import Final, List, Optional, Tuple
 
 from core.execution.concentrated_amm.swap_math import (
     compute_swap_step,
@@ -31,7 +29,6 @@ from core.execution.concentrated_amm.tick_math import (
     MIN_SQRT_RATIO,
     MIN_TICK,
     QUALIFICATION_MAX_PRICE_IMPACT_BPS,
-    REAL_CAPITAL_ENABLED,
     evaluate_price_impact_constraint,
     get_sqrt_ratio_at_tick,
     get_tick_at_sqrt_ratio,
@@ -44,13 +41,13 @@ from core.execution.concentrated_amm.v4_hooks import (
 )
 
 
-
 @dataclass
 class SwapStepRecord:
     """
     Replayable microstructure ledger entry capturing exact state transitions
     for every discrete tick boundary traversal during a multi-tick swap.
     """
+
     step_index: int
     tick_before: int
     sqrt_price_before: int
@@ -76,6 +73,7 @@ class SwapExecutionReport:
     """
     Comprehensive analytical report of a simulated concentrated liquidity swap.
     """
+
     zero_for_one: bool
     amount_specified: int
     exact_in: bool
@@ -99,11 +97,11 @@ class SwapExecutionReport:
     is_price_impact_qualified: bool
     price_impact_narrative: str
 
-    step_ledger: List[SwapStepRecord] = field(default_factory=list)
+    step_ledger: list[SwapStepRecord] = field(default_factory=list)
     real_capital_enabled: bool = False
-    hook_result: Optional[HookResult] = None
+    hook_result: HookResult | None = None
     is_halted: bool = False
-    halt_reason: Optional[str] = None
+    halt_reason: str | None = None
 
     @property
     def step_count(self) -> int:
@@ -134,7 +132,7 @@ class ConcentratedPoolState:
         token1_symbol: str = "USDC",
         decimals0: int = 18,
         decimals1: int = 6,
-        fee_pips: int = 500,       # 500 = 5 bps = 0.05%
+        fee_pips: int = 500,  # 500 = 5 bps = 0.05%
         tick_spacing: int = 10,
         initial_tick: int = 0,
         initial_liquidity: int = 0,
@@ -188,14 +186,14 @@ class ConcentratedSwapEngine:
         zero_for_one: bool,
         amount_specified: int,
         sqrt_price_limit_x96: int | None = None,
-        hook: Optional[BaseV4Hook] = None,
+        hook: BaseV4Hook | None = None,
         timestamp_sec: float | None = None,
         sender: str = "0x0000000000000000000000000000000000000000",
         **hook_kwargs,
     ) -> SwapExecutionReport:
         """
         Executes an exact multi-tick swap traversal across discrete tick boundaries.
-        
+
         Args:
             pool: Active concentrated pool state.
             zero_for_one: True if token0 -> token1 (price down), False if token1 -> token0 (price up).
@@ -204,7 +202,7 @@ class ConcentratedSwapEngine:
             hook: Optional Uniswap v4 hook instance.
             timestamp_sec: Optional timestamp for hook evaluations.
             sender: Simulated sender address.
-            
+
         Returns:
             SwapExecutionReport containing complete replay ledger and qualification status.
         """
@@ -213,9 +211,7 @@ class ConcentratedSwapEngine:
 
         # Resolve price limits
         if sqrt_price_limit_x96 is None:
-            sqrt_price_limit_x96 = (
-                MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
-            )
+            sqrt_price_limit_x96 = MIN_SQRT_RATIO + 1 if zero_for_one else MAX_SQRT_RATIO - 1
         else:
             if zero_for_one:
                 if not (MIN_SQRT_RATIO < sqrt_price_limit_x96 < pool.sqrt_price_x96):
@@ -237,7 +233,7 @@ class ConcentratedSwapEngine:
         )
 
         # Pre-swap hook invocation
-        hook_res: Optional[HookResult] = None
+        hook_res: HookResult | None = None
         effective_fee_pips = pool.fee_pips
         if hook is not None:
             hook_res = HookSandbox.execute_before_swap_safely(
@@ -285,7 +281,7 @@ class ConcentratedSwapEngine:
         total_amount_in = 0
         total_amount_out = 0
         total_fee_amount = 0
-        step_ledger: List[SwapStepRecord] = []
+        step_ledger: list[SwapStepRecord] = []
         step_idx = 0
 
         # Iterative Multi-Tick Traversal
@@ -395,7 +391,6 @@ class ConcentratedSwapEngine:
             )
             if hook_res is None or not after_hook_res.is_success:
                 hook_res = after_hook_res
-
 
         # Effective execution price
         if total_amount_in > 0 and total_amount_out > 0:

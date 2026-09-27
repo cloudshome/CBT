@@ -158,7 +158,7 @@ def test_03_engle_granger_cointegration_and_ou_half_life(basis_engine: Synthetic
     kappa = 0.2
     spread = np.zeros(n)
     for i in range(1, n):
-        spread[i] = spread[i-1] + kappa * (50.0 - spread[i-1]) * dt + np.random.normal(0, 5)
+        spread[i] = spread[i - 1] + kappa * (50.0 - spread[i - 1]) * dt + np.random.normal(0, 5)
 
     perp_series = spot_base + spread
 
@@ -228,8 +228,20 @@ def test_05_basis_dislocation_breaker_trips(risk_governor: BasisRiskGovernor):
         regime=BasisRegime.CONTANGO,
         timestamp_ns=1000,
     )
-    spot_margin = VenueMarginSnapshot(venue="BINANCE_SPOT", total_equity_usd=50000.0, used_margin_usd=10000.0, available_margin_usd=40000.0, maintenance_margin_req_usd=5000.0)
-    perp_margin = VenueMarginSnapshot(venue="HYPERLIQUID_L1", total_equity_usd=50000.0, used_margin_usd=10000.0, available_margin_usd=40000.0, maintenance_margin_req_usd=5000.0)
+    spot_margin = VenueMarginSnapshot(
+        venue="BINANCE_SPOT",
+        total_equity_usd=50000.0,
+        used_margin_usd=10000.0,
+        available_margin_usd=40000.0,
+        maintenance_margin_req_usd=5000.0,
+    )
+    perp_margin = VenueMarginSnapshot(
+        venue="HYPERLIQUID_L1",
+        total_equity_usd=50000.0,
+        used_margin_usd=10000.0,
+        available_margin_usd=40000.0,
+        maintenance_margin_req_usd=5000.0,
+    )
 
     verdict = risk_governor.evaluate_synthetic_trade(
         strategy_id="STRAT_SYNTH_BTC",
@@ -268,8 +280,20 @@ def test_06_funding_inversion_rejection(risk_governor: BasisRiskGovernor):
         regime=BasisRegime.CONTANGO,
         timestamp_ns=1000,
     )
-    spot_margin = VenueMarginSnapshot(venue="BINANCE_SPOT", total_equity_usd=50000.0, used_margin_usd=10000.0, available_margin_usd=40000.0, maintenance_margin_req_usd=5000.0)
-    perp_margin = VenueMarginSnapshot(venue="HYPERLIQUID_L1", total_equity_usd=50000.0, used_margin_usd=10000.0, available_margin_usd=40000.0, maintenance_margin_req_usd=5000.0)
+    spot_margin = VenueMarginSnapshot(
+        venue="BINANCE_SPOT",
+        total_equity_usd=50000.0,
+        used_margin_usd=10000.0,
+        available_margin_usd=40000.0,
+        maintenance_margin_req_usd=5000.0,
+    )
+    perp_margin = VenueMarginSnapshot(
+        venue="HYPERLIQUID_L1",
+        total_equity_usd=50000.0,
+        used_margin_usd=10000.0,
+        available_margin_usd=40000.0,
+        maintenance_margin_req_usd=5000.0,
+    )
 
     verdict = risk_governor.evaluate_synthetic_trade(
         strategy_id="STRAT_SYNTH_BTC",
@@ -308,8 +332,20 @@ def test_07_collateral_imbalance_shield(risk_governor: BasisRiskGovernor):
         timestamp_ns=1000,
     )
     # Spot utilization is 85% (>80% max) and asymmetry is 85% - 20% = 65% (>50% max)
-    spot_margin = VenueMarginSnapshot(venue="BINANCE_SPOT", total_equity_usd=50000.0, used_margin_usd=42500.0, available_margin_usd=7500.0, maintenance_margin_req_usd=20000.0)
-    perp_margin = VenueMarginSnapshot(venue="HYPERLIQUID_L1", total_equity_usd=50000.0, used_margin_usd=10000.0, available_margin_usd=40000.0, maintenance_margin_req_usd=5000.0)
+    spot_margin = VenueMarginSnapshot(
+        venue="BINANCE_SPOT",
+        total_equity_usd=50000.0,
+        used_margin_usd=42500.0,
+        available_margin_usd=7500.0,
+        maintenance_margin_req_usd=20000.0,
+    )
+    perp_margin = VenueMarginSnapshot(
+        venue="HYPERLIQUID_L1",
+        total_equity_usd=50000.0,
+        used_margin_usd=10000.0,
+        available_margin_usd=40000.0,
+        maintenance_margin_req_usd=5000.0,
+    )
 
     verdict = risk_governor.evaluate_synthetic_trade(
         strategy_id="STRAT_SYNTH_BTC",
@@ -346,8 +382,20 @@ def test_08_equity_cap_1_5_percent_monotonic_clamping(risk_governor: BasisRiskGo
         regime=BasisRegime.CONTANGO,
         timestamp_ns=1000,
     )
-    spot_margin = VenueMarginSnapshot(venue="BINANCE_SPOT", total_equity_usd=50000.0, used_margin_usd=5000.0, available_margin_usd=45000.0, maintenance_margin_req_usd=2500.0)
-    perp_margin = VenueMarginSnapshot(venue="HYPERLIQUID_L1", total_equity_usd=50000.0, used_margin_usd=5000.0, available_margin_usd=45000.0, maintenance_margin_req_usd=2500.0)
+    spot_margin = VenueMarginSnapshot(
+        venue="BINANCE_SPOT",
+        total_equity_usd=50000.0,
+        used_margin_usd=5000.0,
+        available_margin_usd=45000.0,
+        maintenance_margin_req_usd=2500.0,
+    )
+    perp_margin = VenueMarginSnapshot(
+        venue="HYPERLIQUID_L1",
+        total_equity_usd=50000.0,
+        used_margin_usd=5000.0,
+        available_margin_usd=45000.0,
+        maintenance_margin_req_usd=2500.0,
+    )
 
     # Portfolio Equity = $100,000. Max risk (1.5%) = $1,500.
     # Spot price = $100,000. SL distance = 50 bps (0.0050). Loss per BTC = $500.
@@ -390,8 +438,20 @@ def test_09_two_phase_commit_atomic_dual_leg_fill(synthetic_router: SyntheticRou
         regime=BasisRegime.CONTANGO,
         timestamp_ns=1000,
     )
-    spot_margin = VenueMarginSnapshot(venue="BINANCE_SPOT", total_equity_usd=50000.0, used_margin_usd=5000.0, available_margin_usd=45000.0, maintenance_margin_req_usd=2500.0)
-    perp_margin = VenueMarginSnapshot(venue="HYPERLIQUID_L1", total_equity_usd=50000.0, used_margin_usd=5000.0, available_margin_usd=45000.0, maintenance_margin_req_usd=2500.0)
+    spot_margin = VenueMarginSnapshot(
+        venue="BINANCE_SPOT",
+        total_equity_usd=50000.0,
+        used_margin_usd=5000.0,
+        available_margin_usd=45000.0,
+        maintenance_margin_req_usd=2500.0,
+    )
+    perp_margin = VenueMarginSnapshot(
+        venue="HYPERLIQUID_L1",
+        total_equity_usd=50000.0,
+        used_margin_usd=5000.0,
+        available_margin_usd=45000.0,
+        maintenance_margin_req_usd=2500.0,
+    )
 
     request = SyntheticOrderRequest(
         synthetic_order_id="SYNTH_ORD_001",
@@ -452,8 +512,20 @@ def test_10_leg_risk_failsafe_protective_unwind(synthetic_router: SyntheticRoute
         regime=BasisRegime.CONTANGO,
         timestamp_ns=1000,
     )
-    spot_margin = VenueMarginSnapshot(venue="BINANCE_SPOT", total_equity_usd=50000.0, used_margin_usd=5000.0, available_margin_usd=45000.0, maintenance_margin_req_usd=2500.0)
-    perp_margin = VenueMarginSnapshot(venue="HYPERLIQUID_L1", total_equity_usd=50000.0, used_margin_usd=5000.0, available_margin_usd=45000.0, maintenance_margin_req_usd=2500.0)
+    spot_margin = VenueMarginSnapshot(
+        venue="BINANCE_SPOT",
+        total_equity_usd=50000.0,
+        used_margin_usd=5000.0,
+        available_margin_usd=45000.0,
+        maintenance_margin_req_usd=2500.0,
+    )
+    perp_margin = VenueMarginSnapshot(
+        venue="HYPERLIQUID_L1",
+        total_equity_usd=50000.0,
+        used_margin_usd=5000.0,
+        available_margin_usd=45000.0,
+        maintenance_margin_req_usd=2500.0,
+    )
 
     request = SyntheticOrderRequest(
         synthetic_order_id="SYNTH_ORD_FAILSAFE",
@@ -515,7 +587,7 @@ def test_11_permanent_constitutional_capital_isolation(risk_governor: BasisRiskG
 def test_12_milestone18_execution_surface_untouched():
     """Verifies that Milestone 18 certified execution surface is untouched and active."""
     from scripts.verify_m18_certification import check_certified_surface, load_manifest
+
     manifest = load_manifest()
     exit_code = check_certified_surface(manifest, run_tests_if_dirty=True)
     assert exit_code == 0, "Milestone 18 certification invalidated or surface touched!"
-

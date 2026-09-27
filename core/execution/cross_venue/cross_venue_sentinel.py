@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.execution.cross_venue.latency_penalty import latency_penalty_modeler
 from core.execution.cross_venue.models import (
@@ -27,15 +27,9 @@ from core.execution.cross_venue.models import (
     ArbitrageType,
     CrossVenueOpportunity,
     ExecutionPlan,
-    RoutingSplit,
     VenueDepthSnapshot,
-    VenueType,
 )
 from core.execution.cross_venue.optimal_router import optimal_router
-from core.execution.cross_venue.triangular_arb import (
-    RateEdge,
-    triangular_arbitrage_engine,
-)
 
 logger = logging.getLogger("sky.execution.cross_venue")
 
@@ -43,17 +37,18 @@ logger = logging.getLogger("sky.execution.cross_venue")
 @dataclass
 class SentinelEvaluationResult:
     """Consolidated assessment emitted by CrossVenueSentinel."""
+
     is_approved: bool
-    opportunity: Optional[CrossVenueOpportunity]
-    execution_plan: Optional[ExecutionPlan]
+    opportunity: CrossVenueOpportunity | None
+    execution_plan: ExecutionPlan | None
     portfolio_equity_usd: float
     allocated_notional_usd: float
     is_equity_capped: bool
     kelly_fraction: float
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
     real_capital_enabled: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "is_approved": self.is_approved,
             "opportunity": self.opportunity.to_dict() if self.opportunity else None,
@@ -75,7 +70,7 @@ class CrossVenueSentinel:
     def __init__(
         self,
         max_equity_cap_pct: float = 0.015,  # 1.5% maximum single-path equity cap
-        min_net_spread_bps: float = 2.0,    # 2.0 bps minimum hurdle
+        min_net_spread_bps: float = 2.0,  # 2.0 bps minimum hurdle
         leg_risk_abort_threshold_bps: float = 15.0,
     ):
         self.max_equity_cap_pct = max_equity_cap_pct
@@ -86,15 +81,15 @@ class CrossVenueSentinel:
     def detect_spatial_arbitrage(
         self,
         symbol: str,
-        venues: List[VenueDepthSnapshot],
+        venues: list[VenueDepthSnapshot],
         portfolio_equity_usd: float = 100_000.0,
         win_rate: float = 0.65,
         win_loss_ratio: float = 1.8,
-    ) -> List[CrossVenueOpportunity]:
+    ) -> list[CrossVenueOpportunity]:
         """
         Scans pairs of venues for spatial two-way price dislocations (Buy on venue A, Sell on venue B).
         """
-        opportunities: List[CrossVenueOpportunity] = []
+        opportunities: list[CrossVenueOpportunity] = []
         if len(venues) < 2:
             return []
 
@@ -132,7 +127,9 @@ class CrossVenueSentinel:
                     half_kelly = full_kelly / 2.0
 
                     equity_cap_usd = portfolio_equity_usd * self.max_equity_cap_pct
-                    optimal_notional = min(max_notional, equity_cap_usd, portfolio_equity_usd * half_kelly)
+                    optimal_notional = min(
+                        max_notional, equity_cap_usd, portfolio_equity_usd * half_kelly
+                    )
 
                     total_latency = buy_venue.latency_ms + sell_venue.latency_ms
                     latency_eval = latency_penalty_modeler.evaluate_opportunity_survivability(
@@ -167,7 +164,7 @@ class CrossVenueSentinel:
                     ]
 
                     opp = CrossVenueOpportunity(
-                        opportunity_id=f"spatial_{buy_venue.venue}_{sell_venue.venue}_{int(time.time()*1000)}",
+                        opportunity_id=f"spatial_{buy_venue.venue}_{sell_venue.venue}_{int(time.time() * 1000)}",
                         arb_type=ArbitrageType.SPATIAL_TWO_WAY,
                         legs=legs,
                         gross_spread_bps=round(gross_spread_bps, 2),
@@ -188,9 +185,9 @@ class CrossVenueSentinel:
         self,
         symbol: str,
         total_notional_usd: float,
-        venue_snapshots: List[VenueDepthSnapshot],
+        venue_snapshots: list[VenueDepthSnapshot],
         portfolio_equity_usd: float = 100_000.0,
-        opportunity: Optional[CrossVenueOpportunity] = None,
+        opportunity: CrossVenueOpportunity | None = None,
     ) -> SentinelEvaluationResult:
         """
         Synthesizes an optimal execution plan and validates against constitutional risk limits.

@@ -27,17 +27,17 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 
 class RouteChannel(str, Enum):
     PRIVATE_RPC_BUNDLE = "PRIVATE_RPC_BUNDLE"  # Flashbots, MEV-Share, Titan, Beaver
-    PUBLIC_MEMPOOL = "PUBLIC_MEMPOOL"          # Standard public mempool (toxic)
+    PUBLIC_MEMPOOL = "PUBLIC_MEMPOOL"  # Standard public mempool (toxic)
 
 
 @dataclass
 class GasQuote:
     """EIP-1559 gas fee quote and USD conversion."""
+
     base_fee_gwei: float
     priority_fee_gwei: float
     estimated_gas_units: int
@@ -50,6 +50,7 @@ class GasQuote:
 @dataclass
 class BundleSimulationResult:
     """Analytical MEV bundle simulation result."""
+
     channel: RouteChannel
     latency_ms: float
     tip_gwei: float
@@ -68,11 +69,11 @@ class MEVBundleSimulator:
 
     def __init__(
         self,
-        baseline_latency_ms: float = 45.0,     # Fiber / co-located direct node latency
-        median_tip_gwei: float = 3.0,          # Median competitive priority tip
-        tip_sensitivity_k: float = 0.5,        # Sensitivity coefficient k_tip
-        latency_penalty_k: float = 1.2,        # Sensitivity coefficient k_lat
-        default_swap_gas_units: int = 150_000, # Standard Uniswap v3 single-hop gas
+        baseline_latency_ms: float = 45.0,  # Fiber / co-located direct node latency
+        median_tip_gwei: float = 3.0,  # Median competitive priority tip
+        tip_sensitivity_k: float = 0.5,  # Sensitivity coefficient k_tip
+        latency_penalty_k: float = 1.2,  # Sensitivity coefficient k_lat
+        default_swap_gas_units: int = 150_000,  # Standard Uniswap v3 single-hop gas
     ) -> None:
         self.baseline_latency_ms = baseline_latency_ms
         self.median_tip_gwei = median_tip_gwei

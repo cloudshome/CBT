@@ -12,12 +12,16 @@ Constitutional Guarantee:
 - real_capital_enabled = False invariant strictly maintained across all modules.
 """
 
+from core.execution.mev_mitigation.mev_sentinel import (
+    MEVMitigationSentinel,
+    mev_mitigation_sentinel,
+)
 from core.execution.mev_mitigation.models import (
     BuilderBundleBid,
     FairSequencingBatch,
+    MempoolRouteType,
     MEVProtectedOrderPlan,
     MEVRiskLevel,
-    MempoolRouteType,
     SandwichVulnerabilityReport,
 )
 from core.execution.mev_mitigation.pbs_simulator import (
@@ -28,14 +32,11 @@ from core.execution.mev_mitigation.sandwich_detector import (
     SandwichAttackEvaluator,
     sandwich_attack_evaluator,
 )
-from core.execution.mev_mitigation.mev_sentinel import (
-    MEVMitigationSentinel,
-    mev_mitigation_sentinel,
-)
 
 REAL_CAPITAL_ENABLED: bool = False
 
 __all__ = [
+    "REAL_CAPITAL_ENABLED",
     "BuilderBundleBid",
     "FairSequencingBatch",
     "MEVMitigationSentinel",
@@ -43,7 +44,6 @@ __all__ = [
     "MEVRiskLevel",
     "MempoolRouteType",
     "PBSSimulator",
-    "REAL_CAPITAL_ENABLED",
     "SandwichAttackEvaluator",
     "SandwichVulnerabilityReport",
     "mev_mitigation_sentinel",

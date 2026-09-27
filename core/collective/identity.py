@@ -149,7 +149,11 @@ class NodeIdentityManager:
         elif os.getenv("SKY_NODE_ID"):
             effective_node_id = os.getenv("SKY_NODE_ID")
         else:
-            sys_prefix = "WIN" if platform.system() == "Windows" else ("UBU" if platform.system() == "Linux" else "MAC")
+            sys_prefix = (
+                "WIN"
+                if platform.system() == "Windows"
+                else ("UBU" if platform.system() == "Linux" else "MAC")
+            )
             raw_node = platform.node().upper().replace(" ", "").replace("-", "")[:8]
             rand_suffix = uuid.uuid4().hex[:4].upper()
             effective_node_id = f"NODE-{sys_prefix}-{raw_node or 'BOX'}-{rand_suffix}"

@@ -25,12 +25,10 @@ from pathlib import Path
 import pytest
 
 from core.execution.concentrated_amm import (
-    ConcentratedLPAnalytics,
-    HedgeRecommendation,
-    LPPositionMetrics,
     REAL_CAPITAL_ENABLED,
+    ConcentratedLPAnalytics,
+    LPPositionMetrics,
     price_to_tick,
-    tick_to_price,
 )
 
 
@@ -64,7 +62,9 @@ def test_01_capital_efficiency_multiplier_closed_form(eth_usdc_analytics: Concen
     assert 11.0 < m < 14.0
 
 
-def test_02_piecewise_valuation_and_boundary_continuity(eth_usdc_analytics: ConcentratedLPAnalytics):
+def test_02_piecewise_valuation_and_boundary_continuity(
+    eth_usdc_analytics: ConcentratedLPAnalytics,
+):
     """Verifies V(P) continuity across lower and upper tick boundaries."""
     p_a = eth_usdc_analytics.lower_price
     p_b = eth_usdc_analytics.upper_price
@@ -154,8 +154,8 @@ def test_06_delta_neutral_hedge_recommendation(eth_usdc_analytics: ConcentratedL
 def test_07_fee_apy_and_out_of_range_cutoff(eth_usdc_analytics: ConcentratedLPAnalytics):
     """Verifies that fee APY accrues when in-range and drops strictly to 0 out-of-range."""
     vol_24h = 100_000_000.0  # $100M daily volume
-    fee_pips = 500           # 5 bps fee tier
-    pool_liq = 10**20        # Deep pool
+    fee_pips = 500  # 5 bps fee tier
+    pool_liq = 10**20  # Deep pool
 
     # In-range ($3,000): APY > 0
     apy_in = eth_usdc_analytics.estimate_fee_apy(
@@ -215,7 +215,13 @@ def test_09_capital_firewall_permanence(eth_usdc_analytics: ConcentratedLPAnalyt
     assert snap.real_capital_enabled is False
 
     # Check source file directly
-    lp_file = Path(__file__).resolve().parent.parent.parent / "core" / "execution" / "concentrated_amm" / "lp_analytics.py"
+    lp_file = (
+        Path(__file__).resolve().parent.parent.parent
+        / "core"
+        / "execution"
+        / "concentrated_amm"
+        / "lp_analytics.py"
+    )
     assert lp_file.exists()
     content = lp_file.read_text(encoding="utf-8")
 

@@ -18,9 +18,7 @@ dependency direction, execution authority, and certification status cannot silen
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, Final, List, Optional, Set, Tuple
+from typing import Final
 
 
 class ArchitectureLayer(enum.IntEnum):
@@ -29,11 +27,12 @@ class ArchitectureLayer(enum.IntEnum):
     Strict Rule: Layer N may only import Layer <= N.
     Lower layers NEVER import higher layers.
     """
+
     LAYER_0_CONSTITUTION_RISK = 0  # Constitution, Risk desk, M18 certified execution freeze
-    LAYER_1_MARKET_TELEMETRY = 1   # Order book feeds, bitwise tick math, VPIN, funding telemetry
-    LAYER_2_QUANT_SIMULATION = 2   # Research, AMM simulation, cross-chain solvers, MM, RL, HRP
-    LAYER_3_GATEWAY_API = 3        # FastAPI (app.py), Express server (src/), middleware, auth
-    LAYER_4_PRESENTATION_UI = 4    # React Vite frontend, Electron desktop shell
+    LAYER_1_MARKET_TELEMETRY = 1  # Order book feeds, bitwise tick math, VPIN, funding telemetry
+    LAYER_2_QUANT_SIMULATION = 2  # Research, AMM simulation, cross-chain solvers, MM, RL, HRP
+    LAYER_3_GATEWAY_API = 3  # FastAPI (app.py), Express server (src/), middleware, auth
+    LAYER_4_PRESENTATION_UI = 4  # React Vite frontend, Electron desktop shell
 
 
 class ModuleAuthority(enum.Enum):
@@ -41,18 +40,27 @@ class ModuleAuthority(enum.Enum):
     Authoritative classification of what capability a module possesses.
     Guarantees research/simulation modules cannot gain execution authority.
     """
-    CERTIFIED_EXECUTION_AUTHORITY = "CERTIFIED_EXECUTION_AUTHORITY"  # May dispatch orders via live connectors (M18 only)
-    GOVERNANCE_RISK_AUTHORITY = "GOVERNANCE_RISK_AUTHORITY"          # Holds unbypassable risk sizing / kill-switch authority
-    SIMULATION_RESEARCH_ONLY = "SIMULATION_RESEARCH_ONLY"            # Strictly zero capital authority (real_capital_enabled = False)
-    READ_ONLY_TELEMETRY = "READ_ONLY_TELEMETRY"                      # Ingests market state, computes analytics, zero side-effects
-    GATEWAY_ADAPTER = "GATEWAY_ADAPTER"                              # Optional network adapter / serialization bridge
-    PRESENTATION_CLIENT = "PRESENTATION_CLIENT"                      # UI widgets, chart canvas, Electron shell
+
+    CERTIFIED_EXECUTION_AUTHORITY = (
+        "CERTIFIED_EXECUTION_AUTHORITY"  # May dispatch orders via live connectors (M18 only)
+    )
+    GOVERNANCE_RISK_AUTHORITY = (
+        "GOVERNANCE_RISK_AUTHORITY"  # Holds unbypassable risk sizing / kill-switch authority
+    )
+    SIMULATION_RESEARCH_ONLY = (
+        "SIMULATION_RESEARCH_ONLY"  # Strictly zero capital authority (real_capital_enabled = False)
+    )
+    READ_ONLY_TELEMETRY = (
+        "READ_ONLY_TELEMETRY"  # Ingests market state, computes analytics, zero side-effects
+    )
+    GATEWAY_ADAPTER = "GATEWAY_ADAPTER"  # Optional network adapter / serialization bridge
+    PRESENTATION_CLIENT = "PRESENTATION_CLIENT"  # UI widgets, chart canvas, Electron shell
 
 
 # ------------------------------------------------------------------------------
 # 1. LAYER REGISTRY: Authoritative Mapping of Modules to Architecture Layers
 # ------------------------------------------------------------------------------
-MODULE_LAYER_RULES: Final[List[Tuple[str, ArchitectureLayer]]] = [
+MODULE_LAYER_RULES: Final[list[tuple[str, ArchitectureLayer]]] = [
     # Layer 0: Constitution & Risk Primacy & M18 Certified Freeze & Core Invariants
     ("core.risk_engine", ArchitectureLayer.LAYER_0_CONSTITUTION_RISK),
     ("core.database", ArchitectureLayer.LAYER_0_CONSTITUTION_RISK),
@@ -83,7 +91,6 @@ MODULE_LAYER_RULES: Final[List[Tuple[str, ArchitectureLayer]]] = [
     ("core.research_firewall", ArchitectureLayer.LAYER_0_CONSTITUTION_RISK),
     ("core.data_quality_gate", ArchitectureLayer.LAYER_0_CONSTITUTION_RISK),
     ("core.provenance_engine", ArchitectureLayer.LAYER_0_CONSTITUTION_RISK),
-
     # Layer 1: Market Telemetry & Microstructure Feeds
     ("core.market_providers", ArchitectureLayer.LAYER_1_MARKET_TELEMETRY),
     ("core.mbo", ArchitectureLayer.LAYER_1_MARKET_TELEMETRY),
@@ -92,7 +99,6 @@ MODULE_LAYER_RULES: Final[List[Tuple[str, ArchitectureLayer]]] = [
     ("core.execution.concentrated_amm.tick_math", ArchitectureLayer.LAYER_1_MARKET_TELEMETRY),
     ("core.execution.concentrated_amm.swap_math", ArchitectureLayer.LAYER_1_MARKET_TELEMETRY),
     ("core.execution.concentrated_amm.tick_bitmap", ArchitectureLayer.LAYER_1_MARKET_TELEMETRY),
-
     # Layer 2: Quantitative Intelligence & Research Simulation (Zero Execution Authority)
     ("core.autonomous_auditor", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     ("core.autonomous_trader", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
@@ -115,7 +121,6 @@ MODULE_LAYER_RULES: Final[List[Tuple[str, ArchitectureLayer]]] = [
     ("core.sky_intelligence", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     ("core.kronos", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
     ("core.arbitrage", ArchitectureLayer.LAYER_2_QUANT_SIMULATION),
-
     # Layer 3: Application APIs & Gateways & Alert Bots
     ("app", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("cbt_backend", ArchitectureLayer.LAYER_3_GATEWAY_API),
@@ -128,10 +133,6 @@ MODULE_LAYER_RULES: Final[List[Tuple[str, ArchitectureLayer]]] = [
     ("core.telegram_bot", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.telegram_live_desk", ArchitectureLayer.LAYER_3_GATEWAY_API),
     ("core.whatsapp_bot", ArchitectureLayer.LAYER_3_GATEWAY_API),
-
-
-
-
     # Layer 4: Presentation & UI
     ("frontend", ArchitectureLayer.LAYER_4_PRESENTATION_UI),
     ("electron", ArchitectureLayer.LAYER_4_PRESENTATION_UI),
@@ -141,7 +142,7 @@ MODULE_LAYER_RULES: Final[List[Tuple[str, ArchitectureLayer]]] = [
 # ------------------------------------------------------------------------------
 # 2. AUTHORITY REGISTRY: Modules Authorized to Influence Live Execution
 # ------------------------------------------------------------------------------
-MODULE_AUTHORITY_RULES: Final[List[Tuple[str, ModuleAuthority]]] = [
+MODULE_AUTHORITY_RULES: Final[list[tuple[str, ModuleAuthority]]] = [
     # M18 Certified Live Execution Path & Live Connectors
     ("core.execution.live_router", ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY),
     ("core.execution.smart_order_router", ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY),
@@ -157,7 +158,6 @@ MODULE_AUTHORITY_RULES: Final[List[Tuple[str, ModuleAuthority]]] = [
     ("core.execution.account_probe", ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY),
     ("core.execution.almgren_chriss", ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY),
     ("core.execution", ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY),
-
     # Risk Primacy & Governance
     ("core.risk_engine", ModuleAuthority.GOVERNANCE_RISK_AUTHORITY),
     ("core.risk_manager", ModuleAuthority.GOVERNANCE_RISK_AUTHORITY),
@@ -165,7 +165,6 @@ MODULE_AUTHORITY_RULES: Final[List[Tuple[str, ModuleAuthority]]] = [
     ("core.audit_bus", ModuleAuthority.GOVERNANCE_RISK_AUTHORITY),
     ("core.governance", ModuleAuthority.GOVERNANCE_RISK_AUTHORITY),
     ("core.auth", ModuleAuthority.GOVERNANCE_RISK_AUTHORITY),
-
     # Simulation & Research (Strictly ZERO live capital authority)
     ("core.execution.concentrated_amm", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.execution.cross_chain", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
@@ -179,7 +178,6 @@ MODULE_AUTHORITY_RULES: Final[List[Tuple[str, ModuleAuthority]]] = [
     ("core.execution.strategy_gateway", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.research", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
     ("core.collective", ModuleAuthority.SIMULATION_RESEARCH_ONLY),
-
     # Read-Only Telemetry
     ("core.mbo", ModuleAuthority.READ_ONLY_TELEMETRY),
     ("core.volatility", ModuleAuthority.READ_ONLY_TELEMETRY),
@@ -192,7 +190,7 @@ MODULE_AUTHORITY_RULES: Final[List[Tuple[str, ModuleAuthority]]] = [
 # 3. DEPENDENCY ALLOWLIST: Strict Layer Import Directionality
 # ------------------------------------------------------------------------------
 # Layer N may only import layers listed in its allowlist.
-LAYER_DEPENDENCY_ALLOWLIST: Final[Dict[ArchitectureLayer, Set[ArchitectureLayer]]] = {
+LAYER_DEPENDENCY_ALLOWLIST: Final[dict[ArchitectureLayer, set[ArchitectureLayer]]] = {
     ArchitectureLayer.LAYER_0_CONSTITUTION_RISK: {
         ArchitectureLayer.LAYER_0_CONSTITUTION_RISK,
         ArchitectureLayer.LAYER_1_MARKET_TELEMETRY,
@@ -219,23 +217,46 @@ LAYER_DEPENDENCY_ALLOWLIST: Final[Dict[ArchitectureLayer, Set[ArchitectureLayer]
 }
 
 
-
 # ------------------------------------------------------------------------------
 # 4. EXPLICIT FORBIDDEN IMPORT COMBINATIONS (Architectural Firewall)
 # ------------------------------------------------------------------------------
-FORBIDDEN_IMPORT_PATTERNS: Final[List[Tuple[str, str, str]]] = [
+FORBIDDEN_IMPORT_PATTERNS: Final[list[tuple[str, str, str]]] = [
     # (Source Module Pattern, Forbidden Target Pattern, Reason)
     ("core.risk_engine", "app", "Layer 0 Risk Desk cannot import Layer 3 Application Gateway"),
     ("core.risk_engine", "src", "Layer 0 Risk Desk cannot import Layer 3 Node Server"),
     ("core.risk_engine", "frontend", "Layer 0 Risk Desk cannot import Layer 4 Frontend"),
     ("core.research", "app", "Layer 2 Research cannot import Layer 3 Application Gateway"),
     ("core.research", "src", "Layer 2 Research cannot import Layer 3 Node Server"),
-    ("core.execution.concentrated_amm", "app", "M42 Simulation cannot import Layer 3 Application Gateway"),
-    ("core.execution.concentrated_amm", "core.execution.live_router", "M42 Simulation cannot import Live Execution Router"),
-    ("core.execution.concentrated_amm", "core.execution.connectors", "M42 Simulation cannot import Live Venue Connectors"),
-    ("core.execution.cross_chain", "core.execution.connectors", "M41 Intent Solvers cannot import Live Venue Connectors"),
-    ("core.execution.cross_venue", "core.execution.live_router", "M43 Cross-Venue Routing cannot import Live Execution Router"),
-    ("core.execution.cross_venue", "core.execution.connectors", "M43 Cross-Venue Routing cannot import Live Venue Connectors"),
+    (
+        "core.execution.concentrated_amm",
+        "app",
+        "M42 Simulation cannot import Layer 3 Application Gateway",
+    ),
+    (
+        "core.execution.concentrated_amm",
+        "core.execution.live_router",
+        "M42 Simulation cannot import Live Execution Router",
+    ),
+    (
+        "core.execution.concentrated_amm",
+        "core.execution.connectors",
+        "M42 Simulation cannot import Live Venue Connectors",
+    ),
+    (
+        "core.execution.cross_chain",
+        "core.execution.connectors",
+        "M41 Intent Solvers cannot import Live Venue Connectors",
+    ),
+    (
+        "core.execution.cross_venue",
+        "core.execution.live_router",
+        "M43 Cross-Venue Routing cannot import Live Execution Router",
+    ),
+    (
+        "core.execution.cross_venue",
+        "core.execution.connectors",
+        "M43 Cross-Venue Routing cannot import Live Venue Connectors",
+    ),
     ("core", "frontend", "Backend Core modules cannot import Frontend UI components"),
 ]
 
@@ -245,7 +266,7 @@ FORBIDDEN_IMPORT_PATTERNS: Final[List[Tuple[str, str, str]]] = [
 # ------------------------------------------------------------------------------
 # Strictly documented cross-layer edges permitted for emergency circuit-breaking
 # or asynchronous operational alerting without breaking architectural guarantees.
-EXPLICIT_ALLOWED_EDGES: Final[Set[Tuple[str, str]]] = {
+EXPLICIT_ALLOWED_EDGES: Final[set[tuple[str, str]]] = {
     # Layer 0 Emergency Auto-Halt: Incident escalation engine coordinates fail-closed halts
     # across live & paper trading loops upon critical risk breach
     ("core.incident_escalation", "core.autonomous_auditor"),
@@ -288,7 +309,7 @@ def resolve_module_authority(module_name: str) -> ModuleAuthority:
     return matched_auth
 
 
-def validate_import_direction(source_module: str, target_module: str) -> Tuple[bool, Optional[str]]:
+def validate_import_direction(source_module: str, target_module: str) -> tuple[bool, str | None]:
     """
     Mechanically validates whether source_module is permitted to import target_module.
     Returns (is_valid, violation_reason).
@@ -298,7 +319,10 @@ def validate_import_direction(source_module: str, target_module: str) -> Tuple[b
         if (source_module == src_pat or source_module.startswith(src_pat + ".")) and (
             target_module == tgt_pat or target_module.startswith(tgt_pat + ".")
         ):
-            return False, f"ARCHITECTURAL FIREWALL VIOLATION: {reason} ({source_module} -> {target_module})"
+            return (
+                False,
+                f"ARCHITECTURAL FIREWALL VIOLATION: {reason} ({source_module} -> {target_module})",
+            )
 
     # 2. Check explicit authorized cross-layer edges (emergency circuit-breakers / alerting)
     if (source_module, target_module) in EXPLICIT_ALLOWED_EDGES:
@@ -307,7 +331,6 @@ def validate_import_direction(source_module: str, target_module: str) -> Tuple[b
     # 3. Check Layer allowlist
     source_layer = resolve_module_layer(source_module)
     target_layer = resolve_module_layer(target_module)
-
 
     allowed_target_layers = LAYER_DEPENDENCY_ALLOWLIST.get(source_layer, set())
     if target_layer not in allowed_target_layers:
@@ -322,7 +345,10 @@ def validate_import_direction(source_module: str, target_module: str) -> Tuple[b
     source_auth = resolve_module_authority(source_module)
     target_auth = resolve_module_authority(target_module)
 
-    if source_auth == ModuleAuthority.SIMULATION_RESEARCH_ONLY and target_auth == ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY:
+    if (
+        source_auth == ModuleAuthority.SIMULATION_RESEARCH_ONLY
+        and target_auth == ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY
+    ):
         # Simulation modules may only access read-only constants or DTOs, never live connector execution
         if "connectors" in target_module or "live_router" in target_module:
             return (

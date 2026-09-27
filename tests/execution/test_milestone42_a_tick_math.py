@@ -37,13 +37,10 @@ from core.execution.concentrated_amm import (
     evaluate_price_impact_constraint,
     get_amount0_delta,
     get_amount1_delta,
-    get_next_sqrt_price_from_amount0_rounding_up,
-    get_next_sqrt_price_from_amount1_rounding_down,
     get_sqrt_ratio_at_tick,
     get_tick_at_sqrt_ratio,
     is_valid_tick_for_spacing,
     nearest_valid_tick,
-    price_to_sqrt_ratio_x96,
     price_to_tick,
     sqrt_ratio_x96_to_price,
     tick_to_price,
@@ -220,7 +217,13 @@ def test_10_capital_firewall_and_m18_surface_isolation():
     assert REAL_CAPITAL_ENABLED is False
 
     # Inspect source file directly
-    amm_file = Path(__file__).resolve().parent.parent.parent / "core" / "execution" / "concentrated_amm" / "tick_math.py"
+    amm_file = (
+        Path(__file__).resolve().parent.parent.parent
+        / "core"
+        / "execution"
+        / "concentrated_amm"
+        / "tick_math.py"
+    )
     assert amm_file.exists()
     content = amm_file.read_text(encoding="utf-8")
 
@@ -228,4 +231,7 @@ def test_10_capital_firewall_and_m18_surface_isolation():
     assert "exchange_connectors" not in content
     assert "private_key" not in content
     assert "api_secret" not in content
-    assert "real_capital_enabled = False" in content or "REAL_CAPITAL_ENABLED: Final[bool] = False" in content
+    assert (
+        "real_capital_enabled = False" in content
+        or "REAL_CAPITAL_ENABLED: Final[bool] = False" in content
+    )

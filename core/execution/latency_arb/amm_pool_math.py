@@ -32,7 +32,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 
 class PoolType(str, Enum):
@@ -41,13 +40,14 @@ class PoolType(str, Enum):
 
 
 class SwapDirection(str, Enum):
-    BUY_BASE_WITH_QUOTE = "BUY_BASE_WITH_QUOTE"   # e.g., Swap USDT -> Buy ETH (In: Quote, Out: Base)
-    SELL_BASE_FOR_QUOTE = "SELL_BASE_FOR_QUOTE"   # e.g., Swap ETH -> Get USDT (In: Base, Out: Quote)
+    BUY_BASE_WITH_QUOTE = "BUY_BASE_WITH_QUOTE"  # e.g., Swap USDT -> Buy ETH (In: Quote, Out: Base)
+    SELL_BASE_FOR_QUOTE = "SELL_BASE_FOR_QUOTE"  # e.g., Swap ETH -> Get USDT (In: Base, Out: Quote)
 
 
 @dataclass
 class SwapSimulationResult:
     """Detailed analytical output of an AMM swap."""
+
     pool_type: PoolType
     direction: SwapDirection
     amount_in: float
@@ -180,7 +180,7 @@ class ConcentratedLiquidityPool:
     @staticmethod
     def tick_to_price(tick: int) -> float:
         """P = 1.0001^tick."""
-        return 1.0001 ** tick
+        return 1.0001**tick
 
     @staticmethod
     def price_to_tick(price: float) -> int:
@@ -217,7 +217,7 @@ class ConcentratedLiquidityPool:
             # Trader inputs quote (amount_in), pushing price UP
             # sqrt_p_next = sqrt_p_init + dy / L
             sqrt_p_next = sqrt_p_init + (net_amount_in / L)
-            p_final = sqrt_p_next ** 2
+            p_final = sqrt_p_next**2
             # Base received: dx = L * (1 / sqrt_p_init - 1 / sqrt_p_next)
             amt_out = L * (1.0 / sqrt_p_init - 1.0 / sqrt_p_next)
             effective_p = amount_in / amt_out
@@ -229,7 +229,7 @@ class ConcentratedLiquidityPool:
             # 1 / sqrt_p_next = 1 / sqrt_p_init + dx / L
             inv_sqrt_p_next = (1.0 / sqrt_p_init) + (net_amount_in / L)
             sqrt_p_next = 1.0 / inv_sqrt_p_next
-            p_final = sqrt_p_next ** 2
+            p_final = sqrt_p_next**2
             # Quote received: dy = L * (sqrt_p_init - sqrt_p_next)
             amt_out = L * (sqrt_p_init - sqrt_p_next)
             effective_p = amt_out / amount_in

@@ -30,6 +30,7 @@ logger = logging.getLogger("ai_quant_sentinel.risk_engine.basis_governor")
 
 class VenueMarginSnapshot(BaseModel):
     """Real-time margin utilization status for a specific venue."""
+
     venue: str
     total_equity_usd: float = Field(gt=0.0)
     used_margin_usd: float = Field(ge=0.0)
@@ -46,6 +47,7 @@ class VenueMarginSnapshot(BaseModel):
 
 class RiskCheckResult(BaseModel):
     """Detailed diagnostic outcome of a specific risk invariant evaluation."""
+
     check_name: str
     passed: bool
     observed_value: Any
@@ -55,6 +57,7 @@ class RiskCheckResult(BaseModel):
 
 class BasisRiskVerdict(BaseModel):
     """Machine-readable gate verdict from the BasisRiskGovernor."""
+
     is_approved: bool
     requested_quantity: float
     approved_quantity: float
@@ -161,7 +164,9 @@ class BasisRiskGovernor:
             # Trip master breaker on extreme dislocation shock
             self._circuit_breaker_tripped = True
             self._circuit_breaker_trip_timestamp = now
-            self._trip_reason = f"BASIS_DISLOCATION_SHOCK: {abs_basis:.2f} bps > {self.max_dislocation_bps:.2f} bps"
+            self._trip_reason = (
+                f"BASIS_DISLOCATION_SHOCK: {abs_basis:.2f} bps > {self.max_dislocation_bps:.2f} bps"
+            )
             reasons.append(self._trip_reason)
 
         # Gate 2: Funding Inversion Breaker
@@ -196,7 +201,9 @@ class BasisRiskGovernor:
         perp_util = perp_margin.margin_utilization
         asymmetry = abs(spot_util - perp_util)
 
-        gate_3a_pass = spot_util <= self.max_margin_utilization and perp_util <= self.max_margin_utilization
+        gate_3a_pass = (
+            spot_util <= self.max_margin_utilization and perp_util <= self.max_margin_utilization
+        )
         gate_3b_pass = asymmetry <= self.max_margin_asymmetry
         gate_3_pass = gate_3a_pass and gate_3b_pass
 
@@ -219,14 +226,18 @@ class BasisRiskGovernor:
             )
         )
         if not gate_3_pass:
-            reasons.append(f"COLLATERAL_IMBALANCE_BREACH: spot={spot_util:.2%}, perp={perp_util:.2%}, asym={asymmetry:.2%}")
+            reasons.append(
+                f"COLLATERAL_IMBALANCE_BREACH: spot={spot_util:.2%}, perp={perp_util:.2%}, asym={asymmetry:.2%}"
+            )
 
         # Gate 4: Cointegration & Half-Life Gate (for statistical mean-reversion)
         gate_4_pass = True
         if cointegration is not None:
             if not cointegration.is_cointegrated:
                 gate_4_pass = False
-                reasons.append(f"NON_COINTEGRATED_SERIES: ADF t-stat {cointegration.adf_t_stat:.2f} >= -2.86")
+                reasons.append(
+                    f"NON_COINTEGRATED_SERIES: ADF t-stat {cointegration.adf_t_stat:.2f} >= -2.86"
+                )
             elif cointegration.ou_half_life_hours > self.max_ou_half_life_hours:
                 gate_4_pass = False
                 reasons.append(
@@ -241,7 +252,10 @@ class BasisRiskGovernor:
                         "is_cointegrated": cointegration.is_cointegrated,
                         "half_life_h": cointegration.ou_half_life_hours,
                     },
-                    threshold={"critical_val": -2.86, "max_half_life_h": self.max_ou_half_life_hours},
+                    threshold={
+                        "critical_val": -2.86,
+                        "max_half_life_h": self.max_ou_half_life_hours,
+                    },
                     details=f"Cointegrated={cointegration.is_cointegrated}, Half-life={cointegration.ou_half_life_hours:.1f}h",
                 )
             )
@@ -301,7 +315,9 @@ class BasisRiskGovernor:
             risk_checks=checks,
             rejection_reasons=reasons,
             circuit_breaker_active=self._circuit_breaker_tripped,
-            circuit_breaker_lockout_remaining_s=self.circuit_breaker_lockout_duration_s if self._circuit_breaker_tripped else 0.0,
+            circuit_breaker_lockout_remaining_s=self.circuit_breaker_lockout_duration_s
+            if self._circuit_breaker_tripped
+            else 0.0,
             real_capital_enabled=False,
             timestamp_ns=time.monotonic_ns(),
         )

@@ -27,13 +27,10 @@ import numpy as np
 import pytest
 
 from core.risk_engine.hierarchical_risk_parity import (
-    AssetAllocation,
     HierarchicalRiskParityEngine,
-    HRPPortfolioPlan,
     LedoitWolfCovarianceEstimator,
     MarketRegime,
     MultiAssetPortfolioOptimizer,
-    portfolio_optimizer,
 )
 
 
@@ -75,11 +72,13 @@ def test_01_ledoit_wolf_condition_number_improvement(synthetic_asset_returns):
     assert report.sample_observations_t == returns.shape[0]
 
     # Test on ill-conditioned / collinear returns to prove dramatic condition number improvement
-    collinear_returns = np.column_stack([
-        returns[:, 0],
-        returns[:, 0] + np.random.normal(0, 1e-6, returns.shape[0]),
-        returns[:, 1],
-    ])
+    collinear_returns = np.column_stack(
+        [
+            returns[:, 0],
+            returns[:, 0] + np.random.normal(0, 1e-6, returns.shape[0]),
+            returns[:, 1],
+        ]
+    )
     _, ill_report = LedoitWolfCovarianceEstimator.fit(collinear_returns)
     assert ill_report.shrunk_condition_number < ill_report.sample_condition_number
 
@@ -113,7 +112,7 @@ def test_04_hrp_risk_parity_weighting_structure(synthetic_asset_returns):
     shrunk_cov, _ = LedoitWolfCovarianceEstimator.fit(returns)
     weights = HierarchicalRiskParityEngine.compute_hrp_weights(shrunk_cov)
 
-    weight_map = dict(zip(symbols, weights))
+    weight_map = dict(zip(symbols, weights, strict=False))
     # PAXG (Gold) has much lower variance, so inverse-variance cluster weighting gives it substantial weight
     assert weight_map["PAXG/USDT"] > weight_map["SOL/USDT"]
     # SOL should have the lowest weight due to highest variance
@@ -123,12 +122,14 @@ def test_04_hrp_risk_parity_weighting_structure(synthetic_asset_returns):
 def test_05_quasi_diagonal_preserves_cluster_proximity():
     """Verifies that quasi-diagonalization clusters highly correlated assets adjacent to each other."""
     # 4 assets: A & B are 0.99 correlated, C & D are 0.99 correlated, AB vs CD is 0.05
-    corr = np.array([
-        [1.0, 0.95, 0.05, 0.02],
-        [0.95, 1.0, 0.04, 0.03],
-        [0.05, 0.04, 1.0, 0.96],
-        [0.02, 0.03, 0.96, 1.0],
-    ])
+    corr = np.array(
+        [
+            [1.0, 0.95, 0.05, 0.02],
+            [0.95, 1.0, 0.04, 0.03],
+            [0.05, 0.04, 1.0, 0.96],
+            [0.02, 0.03, 0.96, 1.0],
+        ]
+    )
     dist = HierarchicalRiskParityEngine.compute_correlation_distance(corr)
     from scipy.cluster.hierarchy import linkage
     from scipy.spatial.distance import squareform
@@ -152,7 +153,9 @@ def test_06_single_asset_1_5_percent_risk_cap_enforcement(synthetic_asset_return
     1.5% equity cap under any market volatility.
     """
     symbols, returns = synthetic_asset_returns
-    optimizer = MultiAssetPortfolioOptimizer(max_single_asset_risk_pct=0.015, max_total_portfolio_heat_pct=0.060)
+    optimizer = MultiAssetPortfolioOptimizer(
+        max_single_asset_risk_pct=0.015, max_total_portfolio_heat_pct=0.060
+    )
 
     equity = 100_000.0  # $100k equity
     invalidation_distances = {
@@ -182,10 +185,17 @@ def test_07_total_portfolio_heat_6_percent_cap_enforcement(synthetic_asset_retur
     Verifies that total portfolio open risk does not breach the 6.0% account heat ceiling.
     """
     symbols, returns = synthetic_asset_returns
-    optimizer = MultiAssetPortfolioOptimizer(max_single_asset_risk_pct=0.015, max_total_portfolio_heat_pct=0.060)
+    optimizer = MultiAssetPortfolioOptimizer(
+        max_single_asset_risk_pct=0.015, max_total_portfolio_heat_pct=0.060
+    )
 
     equity = 50_000.0
-    invalidation_distances = {"BTC/USDT": 0.02, "ETH/USDT": 0.02, "SOL/USDT": 0.02, "PAXG/USDT": 0.01}
+    invalidation_distances = {
+        "BTC/USDT": 0.02,
+        "ETH/USDT": 0.02,
+        "SOL/USDT": 0.02,
+        "PAXG/USDT": 0.01,
+    }
 
     plan = optimizer.optimize_portfolio(
         account_equity_usd=equity,
@@ -210,7 +220,12 @@ def test_08_regime_volatility_scaling_protection(synthetic_asset_returns):
     symbols, returns = synthetic_asset_returns
     optimizer = MultiAssetPortfolioOptimizer()
     equity = 100_000.0
-    invalidation_distances = {"BTC/USDT": 0.04, "ETH/USDT": 0.05, "SOL/USDT": 0.07, "PAXG/USDT": 0.02}
+    invalidation_distances = {
+        "BTC/USDT": 0.04,
+        "ETH/USDT": 0.05,
+        "SOL/USDT": 0.07,
+        "PAXG/USDT": 0.02,
+    }
 
     plan_bull = optimizer.optimize_portfolio(
         account_equity_usd=equity,
@@ -244,7 +259,12 @@ def test_09_permanent_constitutional_capital_isolation(synthetic_asset_returns):
         account_equity_usd=10_000.0,
         symbols=symbols,
         returns_matrix=returns,
-        invalidation_distances={"BTC/USDT": 0.05, "ETH/USDT": 0.05, "SOL/USDT": 0.05, "PAXG/USDT": 0.02},
+        invalidation_distances={
+            "BTC/USDT": 0.05,
+            "ETH/USDT": 0.05,
+            "SOL/USDT": 0.05,
+            "PAXG/USDT": 0.02,
+        },
     )
 
     assert plan.real_capital_enabled is False
@@ -261,6 +281,11 @@ def test_10_milestone18_execution_surface_untouched():
     if not Path(py_exe).exists():
         py_exe = sys.executable
 
-    res = subprocess.run([py_exe, "scripts/verify_m18_certification.py"], cwd=str(repo_root), capture_output=True, text=True)
+    res = subprocess.run(
+        [py_exe, "scripts/verify_m18_certification.py"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
     assert res.returncode == 0, f"Milestone 18 certification invalid:\n{res.stdout}\n{res.stderr}"
     assert "M18 Production Pass remains ACTIVE" in res.stdout

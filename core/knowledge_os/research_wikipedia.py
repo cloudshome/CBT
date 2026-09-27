@@ -25,7 +25,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("sky.research_wikipedia")
 
@@ -37,6 +37,7 @@ WIKI_ARTICLES_DIR = DATA_DIR / "research_wiki" / "articles"
 @dataclass
 class EpistemicClaim:
     """An individual factual claim extracted from a research source."""
+
     claim_id: str
     speaker_claim: str
     epistemic_status: str  # FACT, HYPOTHESIS, NARRATIVE, CONTRADICTION, UNVERIFIED
@@ -44,13 +45,14 @@ class EpistemicClaim:
     confidence_score: float  # 0.0 to 1.0
     empirical_dataset_reference: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 @dataclass
 class WikiArticle:
     """A comprehensive, Wikipedia-style research journal entry."""
+
     article_id: str
     title: str
     category: str  # Macro Geopolitics, Monetary & Debt, Crypto Liquidity, Market Structure, Tech/AI
@@ -59,19 +61,23 @@ class WikiArticle:
     provenance_id: str  # e.g. [S-2026-USCN-01]
     author_or_speaker: str
     executive_summary: str
-    key_claims: List[EpistemicClaim]
-    wikilinks: List[str]  # e.g. ["[[US Treasury Liquidity]]", "[[De-Dollarization]]"]
-    tags: List[str]
-    contradictions_detected: List[str]
+    key_claims: list[EpistemicClaim]
+    wikilinks: list[str]  # e.g. ["[[US Treasury Liquidity]]", "[[De-Dollarization]]"]
+    tags: list[str]
+    contradictions_detected: list[str]
     macro_regime_implications: str
     full_markdown_content: str
-    verification_score: float  # Percentage of claims verified as FACT or high-probability HYPOTHESIS (0-100)
+    verification_score: (
+        float  # Percentage of claims verified as FACT or high-probability HYPOTHESIS (0-100)
+    )
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
     updated_at: int = field(default_factory=lambda: int(time.time() * 1000))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
-        d["key_claims"] = [c.to_dict() if isinstance(c, EpistemicClaim) else c for c in self.key_claims]
+        d["key_claims"] = [
+            c.to_dict() if isinstance(c, EpistemicClaim) else c for c in self.key_claims
+        ]
         return d
 
 
@@ -125,21 +131,19 @@ class ResearchWikipediaEngine:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_wiki_created ON wiki_articles(created_at DESC);"
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_wiki_category ON wiki_articles(category);"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_category ON wiki_articles(category);")
             conn.commit()
 
     def list_articles(
         self,
-        category: Optional[str] = None,
-        search_query: Optional[str] = None,
+        category: str | None = None,
+        search_query: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Lists articles with metadata summaries."""
         query = "SELECT * FROM wiki_articles"
-        params: List[Any] = []
-        conditions: List[str] = []
+        params: list[Any] = []
+        conditions: list[str] = []
 
         if category and category.upper() != "ALL":
             conditions.append("category = ?")
@@ -181,7 +185,7 @@ class ResearchWikipediaEngine:
             )
         return results
 
-    def get_article(self, article_id: str) -> Optional[WikiArticle]:
+    def get_article(self, article_id: str) -> WikiArticle | None:
         """Retrieves a single complete Wikipedia article."""
         with self._get_connection() as conn:
             row = conn.execute(
@@ -194,7 +198,7 @@ class ResearchWikipediaEngine:
         raw_claims = json.loads(row["key_claims_json"])
         claims = [
             EpistemicClaim(
-                claim_id=c.get("claim_id", f"C-{i+1:02d}"),
+                claim_id=c.get("claim_id", f"C-{i + 1:02d}"),
                 speaker_claim=c.get("speaker_claim", ""),
                 epistemic_status=c.get("epistemic_status", "UNVERIFIED"),
                 cross_verification_evidence=c.get("cross_verification_evidence", ""),
@@ -297,9 +301,9 @@ class ResearchWikipediaEngine:
     def ingest_url_or_content(
         self,
         url_or_text: str,
-        custom_title: Optional[str] = None,
-        custom_category: Optional[str] = None,
-        custom_author: Optional[str] = None,
+        custom_title: str | None = None,
+        custom_category: str | None = None,
+        custom_author: str | None = None,
     ) -> WikiArticle:
         """
         Universal Ingestion Pipeline:
@@ -325,7 +329,9 @@ class ResearchWikipediaEngine:
             source_type = "WEB_ARTICLE"
 
         # Unique identifier
-        slug = re.sub(r"[^a-zA-Z0-9]+", "_", (custom_title or "research_entry").lower()).strip("_")[:32]
+        slug = re.sub(r"[^a-zA-Z0-9]+", "_", (custom_title or "research_entry").lower()).strip("_")[
+            :32
+        ]
         article_id = f"wiki_{int(time.time())}_{slug or uuid.uuid4().hex[:8]}"
         provenance_id = f"[S-{time.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}]"
 
@@ -346,7 +352,9 @@ class ResearchWikipediaEngine:
             )
 
         # General Ingestion & Epistemic Synthesis
-        title = custom_title or f"Macro Intelligence Ingest: {source_type.replace('_', ' ').title()}"
+        title = (
+            custom_title or f"Macro Intelligence Ingest: {source_type.replace('_', ' ').title()}"
+        )
         category = custom_category or "Macro Geopolitics"
         author = custom_author or "Online Analyst / Open Intelligence"
 
@@ -433,11 +441,14 @@ class ResearchWikipediaEngine:
         provenance_id: str,
         source_url: str,
         source_type: str,
-        custom_title: Optional[str] = None,
-        custom_author: Optional[str] = None,
+        custom_title: str | None = None,
+        custom_author: str | None = None,
     ) -> WikiArticle:
         """Constructs the deep, institutional Wikipedia article for the US-China economic discussion."""
-        title = custom_title or "US & China Future Economic Trajectory: Hegemony, Industrial Power & Debt Spiral"
+        title = (
+            custom_title
+            or "US & China Future Economic Trajectory: Hegemony, Industrial Power & Debt Spiral"
+        )
         category = "Macro Geopolitics & Hegemony"
         author = custom_author or "Macro Intelligence Desk / Geopolitical Analysis"
         summary = (
@@ -570,10 +581,10 @@ class ResearchWikipediaEngine:
         source_type: str,
         author: str,
         summary: str,
-        claims: List[EpistemicClaim],
-        wikilinks: List[str],
-        tags: List[str],
-        contradictions: List[str],
+        claims: list[EpistemicClaim],
+        wikilinks: list[str],
+        tags: list[str],
+        contradictions: list[str],
         implications: str,
         score: float,
     ) -> str:
@@ -602,7 +613,7 @@ class ResearchWikipediaEngine:
 > **SKY Institutional Research Journal & Encyclopedia**  
 > **Article ID:** `{article_id}` | **Provenance Citation:** `{provenance_id}`  
 > **Category:** `{category}` | **Source Type:** `{source_type}`  
-> **Original Source:** [{source_url or 'Manual Ingest'}]({source_url or '#'})  
+> **Original Source:** [{source_url or "Manual Ingest"}]({source_url or "#"})  
 > **Analyst / Speaker Attribution:** `{author}`  
 > **Last Cross-Verified:** `{date_str}` | **Epistemic Rigor Score:** `{score:.1f}%`
 
@@ -650,7 +661,9 @@ Every assertion made in the source material is extracted and subjected to zero-b
             count = conn.execute("SELECT COUNT(*) as cnt FROM wiki_articles").fetchone()["cnt"]
 
         if count == 0:
-            logger.info("Seeding Research Wikipedia with foundational macro & quantitative articles...")
+            logger.info(
+                "Seeding Research Wikipedia with foundational macro & quantitative articles..."
+            )
 
             # 1. User's Facebook Reel link on US & China Future Economy
             self._build_us_china_article(

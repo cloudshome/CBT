@@ -33,7 +33,6 @@ from core.execution.latency_arb.amm_pool_math import (
     SwapDirection,
 )
 from core.execution.latency_arb.cex_dex_arb_sentinel import (
-    ArbitrageEvaluationDecision,
     ArbOpportunityDirection,
     CEXDEXLatencyArbSentinel,
     CEXOrderBookSnapshot,
@@ -142,16 +141,22 @@ def test_03_eip1559_gas_and_inclusion_probability(bundle_simulator: MEVBundleSim
     assert math.isclose(quote.total_gas_usd, 9.90, rel_tol=1e-5)
 
     # High speed (30ms), good tip (4 gwei) -> High inclusion probability
-    p_fast = bundle_simulator.calculate_inclusion_probability(priority_tip_gwei=4.0, measured_latency_ms=30.0)
+    p_fast = bundle_simulator.calculate_inclusion_probability(
+        priority_tip_gwei=4.0, measured_latency_ms=30.0
+    )
     assert p_fast > 0.70
 
     # Slow latency (300ms), low tip (0.5 gwei) -> Low inclusion probability
-    p_slow = bundle_simulator.calculate_inclusion_probability(priority_tip_gwei=0.5, measured_latency_ms=300.0)
+    p_slow = bundle_simulator.calculate_inclusion_probability(
+        priority_tip_gwei=0.5, measured_latency_ms=300.0
+    )
     assert p_slow < 0.20
     assert p_fast > p_slow
 
 
-def test_04_private_rpc_vs_public_mempool_sandwich_vulnerability(bundle_simulator: MEVBundleSimulator):
+def test_04_private_rpc_vs_public_mempool_sandwich_vulnerability(
+    bundle_simulator: MEVBundleSimulator,
+):
     """Verifies that private RPC provides sandwich protection while public mempool carries penalty."""
     sim_private = bundle_simulator.simulate_bundle_execution(
         channel=RouteChannel.PRIVATE_RPC_BUNDLE,
@@ -326,7 +331,9 @@ def test_09_permanent_capital_isolation_firewall(
     swap_res = v2_pool.simulate_swap(SwapDirection.BUY_BASE_WITH_QUOTE, 1000.0)
     assert swap_res.real_capital_enabled is False
 
-    book = CEXOrderBookSnapshot(best_bid=2900.0, best_ask=2910.0, bid_depth_usd=10_000.0, ask_depth_usd=10_000.0)
+    book = CEXOrderBookSnapshot(
+        best_bid=2900.0, best_ask=2910.0, bid_depth_usd=10_000.0, ask_depth_usd=10_000.0
+    )
     decision = arb_sentinel.evaluate_arbitrage(50_000.0, book, v2_pool)
     assert decision.real_capital_enabled is False
 
@@ -338,6 +345,11 @@ def test_10_milestone18_execution_surface_untouched():
     if not Path(py_exe).exists():
         py_exe = sys.executable
 
-    res = subprocess.run([py_exe, "scripts/verify_m18_certification.py"], cwd=str(repo_root), capture_output=True, text=True)
+    res = subprocess.run(
+        [py_exe, "scripts/verify_m18_certification.py"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
     assert res.returncode == 0, f"Milestone 18 certification invalid:\n{res.stdout}\n{res.stderr}"
     assert "M18 Production Pass remains ACTIVE" in res.stdout

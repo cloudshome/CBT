@@ -20,13 +20,10 @@ Verifies:
 
 from __future__ import annotations
 
-import pytest
-
 from core.execution.mev_mitigation import (
-    MEVRiskLevel,
-    MempoolRouteType,
-    PBSSimulator,
     REAL_CAPITAL_ENABLED,
+    MempoolRouteType,
+    MEVRiskLevel,
     SandwichAttackEvaluator,
     mev_mitigation_sentinel,
     pbs_simulator,
@@ -93,7 +90,9 @@ def test_03_dynamic_slippage_boundary_tightening():
         user_slippage_tolerance_bps=safe_slip,
         pool_liquidity_usd=2_000_000.0,
     )
-    assert re_report.net_searcher_edge_usd <= 0.0 or re_report.risk_level != MEVRiskLevel.HIGH_HAZARD
+    assert (
+        re_report.net_searcher_edge_usd <= 0.0 or re_report.risk_level != MEVRiskLevel.HIGH_HAZARD
+    )
 
 
 # ------------------------------------------------------------------------------
@@ -111,8 +110,8 @@ def test_04_pbs_bundle_auction_priority_sorting():
     assert len(bundles) == 3
     assert bundles[0].builder_id == "builder_beta"  # 0.12 ETH bid
     assert bundles[0].inclusion_priority == 1
-    assert bundles[1].builder_id == "builder_gamma" # 0.08 ETH bid
-    assert bundles[2].builder_id == "builder_alpha" # 0.05 ETH bid
+    assert bundles[1].builder_id == "builder_gamma"  # 0.08 ETH bid
+    assert bundles[2].builder_id == "builder_alpha"  # 0.05 ETH bid
 
 
 # ------------------------------------------------------------------------------
@@ -193,8 +192,8 @@ def test_09_mev_sentinel_public_mempool_when_safe():
         symbol="ETH/USDT",
         requested_notional_usd=100.0,
         portfolio_equity_usd=100_000.0,
-        user_slippage_tolerance_bps=5.0,     # Tight 5 bps
-        pool_liquidity_usd=10_000_000.0,    # Deep pool
+        user_slippage_tolerance_bps=5.0,  # Tight 5 bps
+        pool_liquidity_usd=10_000_000.0,  # Deep pool
     )
 
     assert plan.route_type == MempoolRouteType.PUBLIC_MEMPOOL

@@ -33,28 +33,20 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-import pytest
-
 from core.execution.concentrated_amm import (
+    REAL_CAPITAL_ENABLED,
     ConcentratedPoolState,
     ConcentratedSwapEngine,
-    REAL_CAPITAL_ENABLED,
-    SwapExecutionReport,
     SwapStepRecord,
     TickTable,
     compute_swap_step,
-    get_amount0_delta,
-    get_amount1_delta,
     get_sqrt_ratio_at_tick,
-    get_tick_at_sqrt_ratio,
-    mul_div,
-    mul_div_rounding_up,
 )
-
 
 # ==============================================================================
 # M42-B1: Tick Bitmap / Initialized-Tick Traversal
 # ==============================================================================
+
 
 def test_b1_initialized_tick_traversal():
     """M42-B1: Verifies sparse tick insertion and ordered next-tick queries in both directions."""
@@ -84,6 +76,7 @@ def test_b1_initialized_tick_traversal():
 # ==============================================================================
 # M42-B2: Liquidity-Net Crossing State Machine
 # ==============================================================================
+
 
 def test_b2_liquidity_net_crossing_transitions():
     """M42-B2: Verifies exact L -> L +/- delta_L transitions across tick boundaries."""
@@ -117,13 +110,14 @@ def test_b2_liquidity_net_crossing_transitions():
 # M42-B3: Single Swap-Step Accounting & Conservation
 # ==============================================================================
 
+
 def test_b3_single_swap_step_conservation():
     """M42-B3: Verifies exact integer accounting and conservation for a single step."""
     sqrt_curr = get_sqrt_ratio_at_tick(0)
     sqrt_target = get_sqrt_ratio_at_tick(-10)
     liquidity = 10**18
     amount_remaining = 10**16  # 0.01 token0
-    fee_pips = 500             # 5 bps (0.05%)
+    fee_pips = 500  # 5 bps (0.05%)
 
     next_sqrt_p, amount_in, amount_out, fee_amount = compute_swap_step(
         sqrt_ratio_current_x96=sqrt_curr,
@@ -149,6 +143,7 @@ def test_b3_single_swap_step_conservation():
 # ==============================================================================
 # M42-B4: Multi-Tick Aggregation & Replay Step Ledger
 # ==============================================================================
+
 
 def test_b4_multi_tick_aggregation_and_step_ledger():
     """
@@ -200,6 +195,7 @@ def test_b4_multi_tick_aggregation_and_step_ledger():
 # M42-B5: Directional Symmetry & Fee Accounting
 # ==============================================================================
 
+
 def test_b5_directional_symmetry_and_fee_tiers():
     """M42-B5: Verifies both zero_for_one and one_for_zero directions across fee tiers."""
     for fee_pips in [100, 500, 3000, 10000]:
@@ -220,7 +216,9 @@ def test_b5_directional_symmetry_and_fee_tiers():
 
         # Fee ratio should match fee_pips within 1 bps rounding
         expected_fee_pct = fee_pips / 1_000_000.0
-        actual_fee_pct = rep_0to1.total_fee_amount / (rep_0to1.total_amount_in + rep_0to1.total_fee_amount)
+        actual_fee_pct = rep_0to1.total_fee_amount / (
+            rep_0to1.total_amount_in + rep_0to1.total_fee_amount
+        )
         assert math.isclose(actual_fee_pct, expected_fee_pct, rel_tol=0.05)
 
         # 2. One for Zero (token1 in, token0 out, price up)
@@ -239,6 +237,7 @@ def test_b5_directional_symmetry_and_fee_tiers():
 # ==============================================================================
 # M42-B6: Price-Impact Qualification Constraint (5 bps ceiling)
 # ==============================================================================
+
 
 def test_b6_price_impact_qualification_constraint():
     """
@@ -270,6 +269,7 @@ def test_b6_price_impact_qualification_constraint():
 # Mandatory Test 1: Conservation Verification
 # ==============================================================================
 
+
 def test_mandatory_01_conservation_invariant():
     """
     Mandatory Test 1: input_before == input_consumed + input_remaining + fee_amount
@@ -292,6 +292,7 @@ def test_mandatory_01_conservation_invariant():
 # ==============================================================================
 # Mandatory Test 2: Tick-Crossing Determinism
 # ==============================================================================
+
 
 def test_mandatory_02_tick_crossing_determinism():
     """
@@ -333,6 +334,7 @@ def test_mandatory_02_tick_crossing_determinism():
 # ==============================================================================
 # Mandatory Test 3: Boundary Adversarial Suite
 # ==============================================================================
+
 
 def test_mandatory_03_boundary_adversarial_suite():
     """
@@ -384,7 +386,13 @@ def test_capital_firewall_and_m18_preservation():
     """Verifies real_capital_enabled = False invariant and zero coupling to live routers."""
     assert REAL_CAPITAL_ENABLED is False
 
-    swap_file = Path(__file__).resolve().parent.parent.parent / "core" / "execution" / "concentrated_amm" / "swap_state_machine.py"
+    swap_file = (
+        Path(__file__).resolve().parent.parent.parent
+        / "core"
+        / "execution"
+        / "concentrated_amm"
+        / "swap_state_machine.py"
+    )
     assert swap_file.exists()
     content = swap_file.read_text(encoding="utf-8")
 

@@ -40,6 +40,7 @@ logger = logging.getLogger("ai_quant_sentinel.execution.strategy_gateway.synthet
 
 class DualLegState(str, Enum):
     """Finite state machine for atomic dual-leg synthetic execution."""
+
     INITIATED = "INITIATED"
     PREFLIGHT_APPROVED = "PREFLIGHT_APPROVED"
     PREFLIGHT_REJECTED = "PREFLIGHT_REJECTED"
@@ -60,6 +61,7 @@ class LegSide(str, Enum):
 
 class SyntheticLegOrder(BaseModel):
     """Single leg order specification within a synthetic pair."""
+
     leg_id: str
     venue: str
     symbol: str
@@ -76,6 +78,7 @@ class SyntheticLegOrder(BaseModel):
 
 class SyntheticOrderRequest(BaseModel):
     """Specification for a dual-leg synthetic cross-venue order."""
+
     synthetic_order_id: str
     strategy_id: str
     symbol: str
@@ -91,6 +94,7 @@ class SyntheticOrderRequest(BaseModel):
 
 class FourDenominatorAccounting(BaseModel):
     """Strict 4-denominator observation counts enforcing zero silent drops."""
+
     raw_observations: int
     eligible_observations: int
     executed_observations: int
@@ -106,6 +110,7 @@ class FourDenominatorAccounting(BaseModel):
 
 class SyntheticExecutionReport(BaseModel):
     """Machine-readable reconciliation output for a dual-leg synthetic execution."""
+
     synthetic_order_id: str
     strategy_id: str
     symbol: str
@@ -206,7 +211,6 @@ class SyntheticRouterLedger:
                 conn.close()
 
 
-
 class SyntheticRouter:
     """
     Two-Phase Atomic Dual-Leg Synthetic Router.
@@ -223,7 +227,9 @@ class SyntheticRouter:
         real_capital_enabled: bool = False,
     ) -> None:
         if real_capital_enabled:
-            raise ValueError("CONSTITUTIONAL VIOLATION: real_capital_enabled must remain False permanently.")
+            raise ValueError(
+                "CONSTITUTIONAL VIOLATION: real_capital_enabled must remain False permanently."
+            )
 
         self.risk_governor = risk_governor
         self.ledger = ledger or SyntheticRouterLedger(":memory:")
@@ -305,6 +311,7 @@ class SyntheticRouter:
         # Phase 2: Atomic Order Dispatch
         # Default mock executors if None provided (simulate perfect fills)
         if leg_1_executor is None:
+
             def _default_leg1_exec(leg: SyntheticLegOrder) -> tuple[bool, float, float]:
                 return True, spot_price, 0.0005 * spot_price * leg.target_quantity
 

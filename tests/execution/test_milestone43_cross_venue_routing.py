@@ -23,7 +23,6 @@ from __future__ import annotations
 import pytest
 
 from core.execution.cross_venue.cross_venue_sentinel import (
-    CrossVenueSentinel,
     cross_venue_sentinel,
 )
 from core.execution.cross_venue.latency_penalty import latency_penalty_modeler
@@ -36,7 +35,6 @@ from core.execution.cross_venue.models import (
     VenueType,
 )
 from core.execution.cross_venue.optimal_router import (
-    OptimalCrossVenueRouter,
     optimal_router,
 )
 from core.execution.cross_venue.triangular_arb import (
@@ -82,8 +80,12 @@ def _build_mock_snapshot(
 def test_01_spatial_arbitrage_discovery_and_spread_math():
     """Verify detection of spatial price dislocations between two venues."""
     # Buy on Binance at 88,000, Sell on Bybit at 88,300 (34.09 bps gross)
-    v1 = _build_mock_snapshot("binance", VenueType.CEX_SPOT, best_bid=87980.0, best_ask=88000.0, fee_bps=5.0)
-    v2 = _build_mock_snapshot("bybit", VenueType.CEX_PERPETUAL, best_bid=88300.0, best_ask=88320.0, fee_bps=5.0)
+    v1 = _build_mock_snapshot(
+        "binance", VenueType.CEX_SPOT, best_bid=87980.0, best_ask=88000.0, fee_bps=5.0
+    )
+    v2 = _build_mock_snapshot(
+        "bybit", VenueType.CEX_PERPETUAL, best_bid=88300.0, best_ask=88320.0, fee_bps=5.0
+    )
 
     opps = cross_venue_sentinel.detect_spatial_arbitrage(
         symbol="BTC/USDT",
@@ -111,9 +113,36 @@ def test_02_triangular_arbitrage_negative_cycle_detection():
     # 3. Sell ETH for USDT: 1 ETH = 2,750 USDT (Rate = 2750.0)
     # Product = (1 / 88000) * 32.5 * 2750 = 89375 / 88000 = 1.0156 (+1.56% return!)
     edges = [
-        RateEdge("USDT", "BTC", "binance", VenueType.CEX_SPOT, rate=1.0 / 88000.0, fee_bps=5.0, latency_ms=15.0, depth_available=100000.0),
-        RateEdge("BTC", "ETH", "binance", VenueType.CEX_SPOT, rate=32.5, fee_bps=5.0, latency_ms=15.0, depth_available=100000.0),
-        RateEdge("ETH", "USDT", "bybit", VenueType.CEX_PERPETUAL, rate=2750.0, fee_bps=5.0, latency_ms=20.0, depth_available=100000.0),
+        RateEdge(
+            "USDT",
+            "BTC",
+            "binance",
+            VenueType.CEX_SPOT,
+            rate=1.0 / 88000.0,
+            fee_bps=5.0,
+            latency_ms=15.0,
+            depth_available=100000.0,
+        ),
+        RateEdge(
+            "BTC",
+            "ETH",
+            "binance",
+            VenueType.CEX_SPOT,
+            rate=32.5,
+            fee_bps=5.0,
+            latency_ms=15.0,
+            depth_available=100000.0,
+        ),
+        RateEdge(
+            "ETH",
+            "USDT",
+            "bybit",
+            VenueType.CEX_PERPETUAL,
+            rate=2750.0,
+            fee_bps=5.0,
+            latency_ms=20.0,
+            depth_available=100000.0,
+        ),
     ]
 
     cycles = triangular_arbitrage_engine.find_arbitrage_cycles(edges, source_currency="USDT")
@@ -122,7 +151,7 @@ def test_02_triangular_arbitrage_negative_cycle_detection():
     best_cycle = cycles[0]
     assert len(best_cycle.legs) == 3
     assert best_cycle.gross_spread_bps > 100.0  # ~156 bps gross
-    assert best_cycle.net_spread_bps > 90.0    # Net after 15 bps total fees
+    assert best_cycle.net_spread_bps > 90.0  # Net after 15 bps total fees
     assert best_cycle.real_capital_enabled is False
 
 
@@ -133,9 +162,36 @@ def test_03_triangular_arbitrage_unprofitable_cycle_rejection():
     """Verify efficient market cycle without arbitrage is cleanly rejected."""
     # Efficient triangular loop: Product < 1.0 after fees
     edges = [
-        RateEdge("USDT", "BTC", "binance", VenueType.CEX_SPOT, rate=1.0 / 88000.0, fee_bps=10.0, latency_ms=15.0, depth_available=100000.0),
-        RateEdge("BTC", "ETH", "binance", VenueType.CEX_SPOT, rate=31.8, fee_bps=10.0, latency_ms=15.0, depth_available=100000.0),
-        RateEdge("ETH", "USDT", "bybit", VenueType.CEX_PERPETUAL, rate=2760.0, fee_bps=10.0, latency_ms=20.0, depth_available=100000.0),
+        RateEdge(
+            "USDT",
+            "BTC",
+            "binance",
+            VenueType.CEX_SPOT,
+            rate=1.0 / 88000.0,
+            fee_bps=10.0,
+            latency_ms=15.0,
+            depth_available=100000.0,
+        ),
+        RateEdge(
+            "BTC",
+            "ETH",
+            "binance",
+            VenueType.CEX_SPOT,
+            rate=31.8,
+            fee_bps=10.0,
+            latency_ms=15.0,
+            depth_available=100000.0,
+        ),
+        RateEdge(
+            "ETH",
+            "USDT",
+            "bybit",
+            VenueType.CEX_PERPETUAL,
+            rate=2760.0,
+            fee_bps=10.0,
+            latency_ms=20.0,
+            depth_available=100000.0,
+        ),
     ]
 
     cycles = triangular_arbitrage_engine.find_arbitrage_cycles(edges, source_currency="USDT")
@@ -147,7 +203,9 @@ def test_03_triangular_arbitrage_unprofitable_cycle_rejection():
 # ------------------------------------------------------------------------------
 def test_04_optimal_router_single_venue_capacity():
     """Verify depth-walking cost computation on single venue."""
-    v1 = _build_mock_snapshot("binance", VenueType.CEX_SPOT, best_bid=88000.0, best_ask=88100.0, fee_bps=7.5)
+    v1 = _build_mock_snapshot(
+        "binance", VenueType.CEX_SPOT, best_bid=88000.0, best_ask=88100.0, fee_bps=7.5
+    )
 
     m_cost, eff_price, slip = optimal_router.calculate_marginal_buy_cost(
         v1, already_allocated_usd=0.0, incremental_usd=1000.0
@@ -165,8 +223,22 @@ def test_05_optimal_router_convex_multi_venue_waterfilling():
     """Verify convex order splitting routes across multiple venues to minimize impact."""
     # Venue 1 has lower initial ask but smaller depth
     # Venue 2 has slightly higher ask but lower fee
-    v1 = _build_mock_snapshot("binance", VenueType.CEX_SPOT, best_bid=88000.0, best_ask=88050.0, fee_bps=10.0, depth_size=0.1)
-    v2 = _build_mock_snapshot("bybit", VenueType.CEX_PERPETUAL, best_bid=88040.0, best_ask=88060.0, fee_bps=5.0, depth_size=2.0)
+    v1 = _build_mock_snapshot(
+        "binance",
+        VenueType.CEX_SPOT,
+        best_bid=88000.0,
+        best_ask=88050.0,
+        fee_bps=10.0,
+        depth_size=0.1,
+    )
+    v2 = _build_mock_snapshot(
+        "bybit",
+        VenueType.CEX_PERPETUAL,
+        best_bid=88040.0,
+        best_ask=88060.0,
+        fee_bps=5.0,
+        depth_size=2.0,
+    )
 
     plan = optimal_router.generate_execution_plan(
         symbol="BTC/USDT",
@@ -188,8 +260,12 @@ def test_05_optimal_router_convex_multi_venue_waterfilling():
 # ------------------------------------------------------------------------------
 def test_06_hybrid_cex_and_dex_clmm_routing():
     """Verify execution plan incorporates DEX CLMM continuous liquidity pools."""
-    v_cex = _build_mock_snapshot("binance", VenueType.CEX_SPOT, best_bid=88000.0, best_ask=88080.0, fee_bps=7.5)
-    v_dex = _build_mock_snapshot("uniswap_v3", VenueType.DEX_CLMM, best_bid=88010.0, best_ask=88075.0, fee_bps=5.0)
+    v_cex = _build_mock_snapshot(
+        "binance", VenueType.CEX_SPOT, best_bid=88000.0, best_ask=88080.0, fee_bps=7.5
+    )
+    v_dex = _build_mock_snapshot(
+        "uniswap_v3", VenueType.DEX_CLMM, best_bid=88010.0, best_ask=88075.0, fee_bps=5.0
+    )
 
     plan = optimal_router.generate_execution_plan(
         symbol="BTC/USDT",
@@ -266,8 +342,30 @@ def test_09_leg_risk_fail_safe_abort_on_excessive_slippage():
         opportunity_id="opp_bad_slippage",
         arb_type=ArbitrageType.SPATIAL_TWO_WAY,
         legs=[
-            ArbitrageLeg("l1", "binance", VenueType.CEX_SPOT, "BUY", "BTC/USDT", 88000.0, 0.1, 5.0, 10.0, slippage_bps=2.0),
-            ArbitrageLeg("l2", "bybit", VenueType.CEX_PERPETUAL, "SELL", "BTC/USDT", 88200.0, 0.1, 5.0, 10.0, slippage_bps=22.5),
+            ArbitrageLeg(
+                "l1",
+                "binance",
+                VenueType.CEX_SPOT,
+                "BUY",
+                "BTC/USDT",
+                88000.0,
+                0.1,
+                5.0,
+                10.0,
+                slippage_bps=2.0,
+            ),
+            ArbitrageLeg(
+                "l2",
+                "bybit",
+                VenueType.CEX_PERPETUAL,
+                "SELL",
+                "BTC/USDT",
+                88200.0,
+                0.1,
+                5.0,
+                10.0,
+                slippage_bps=22.5,
+            ),
         ],
         gross_spread_bps=25.0,
         net_spread_bps=15.0,

@@ -11,29 +11,35 @@ under simulation constraints (real_capital_enabled = False).
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass, field
-from typing import List, Optional
+from dataclasses import dataclass
 
 
 class MempoolRouteType(str, enum.Enum):
     """Mempool submission channel."""
-    PUBLIC_MEMPOOL = "PUBLIC_MEMPOOL"        # Standard P2P gossip mempool (vulnerable to sandwich attacks)
-    PRIVATE_RPC = "PRIVATE_RPC"              # Flashbots Protect / MEV-Blocker direct builder RPC
-    SUAVE_CONFIDENTIAL = "SUAVE_CONFIDENTIAL"# Confidential execution environment / encrypted intent pool
-    FAIR_SEQUENCING = "FAIR_SEQUENCING"      # Order-fairness consensus (Aequitas / batch auction)
+
+    PUBLIC_MEMPOOL = (
+        "PUBLIC_MEMPOOL"  # Standard P2P gossip mempool (vulnerable to sandwich attacks)
+    )
+    PRIVATE_RPC = "PRIVATE_RPC"  # Flashbots Protect / MEV-Blocker direct builder RPC
+    SUAVE_CONFIDENTIAL = (
+        "SUAVE_CONFIDENTIAL"  # Confidential execution environment / encrypted intent pool
+    )
+    FAIR_SEQUENCING = "FAIR_SEQUENCING"  # Order-fairness consensus (Aequitas / batch auction)
 
 
 class MEVRiskLevel(str, enum.Enum):
     """Classified risk of predatory searcher extraction."""
-    NEGLIGIBLE = "NEGLIGIBLE"                # Searcher profit < gas cost (immune to sandwiching)
-    ELEVATED = "ELEVATED"                    # Marginal vulnerability if gas prices drop
-    VULNERABLE = "VULNERABLE"                # Profitable frontrun/backrun opportunity exists
-    HIGH_HAZARD = "HIGH_HAZARD"              # Severe sandwich hazard; immediate private routing required
+
+    NEGLIGIBLE = "NEGLIGIBLE"  # Searcher profit < gas cost (immune to sandwiching)
+    ELEVATED = "ELEVATED"  # Marginal vulnerability if gas prices drop
+    VULNERABLE = "VULNERABLE"  # Profitable frontrun/backrun opportunity exists
+    HIGH_HAZARD = "HIGH_HAZARD"  # Severe sandwich hazard; immediate private routing required
 
 
 @dataclass(frozen=True)
 class SandwichVulnerabilityReport:
     """Quantitative evaluation of sandwich attack profitability against a target order."""
+
     symbol: str
     target_notional_usd: float
     user_slippage_tolerance_bps: float
@@ -50,9 +56,10 @@ class SandwichVulnerabilityReport:
 @dataclass(frozen=True)
 class BuilderBundleBid:
     """Proposer-Builder Separation (PBS) bundle auction bid."""
+
     bundle_id: str
     builder_id: str
-    transactions: List[str]
+    transactions: list[str]
     bid_value_eth: float
     gas_used: int
     inclusion_priority: int
@@ -62,6 +69,7 @@ class BuilderBundleBid:
 @dataclass(frozen=True)
 class FairSequencingBatch:
     """Batch auction grouping orders for uniform clearing price execution."""
+
     batch_id: str
     symbol: str
     orders_count: int
@@ -74,6 +82,7 @@ class FairSequencingBatch:
 @dataclass(frozen=True)
 class MEVProtectedOrderPlan:
     """Comprehensive protective routing plan for an order to neutralize MEV."""
+
     order_id: str
     symbol: str
     original_notional_usd: float

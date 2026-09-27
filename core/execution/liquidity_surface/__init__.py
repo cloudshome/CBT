@@ -37,6 +37,7 @@ from core.execution.liquidity_surface.toxic_flow import (
 REAL_CAPITAL_ENABLED: bool = False
 
 __all__ = [
+    "REAL_CAPITAL_ENABLED",
     "ExecutionUrgency",
     "HighFrequencyToxicFlowDetector",
     "LiquiditySurfaceGeometryEngine",
@@ -44,7 +45,6 @@ __all__ = [
     "LiquiditySurfaceSentinel",
     "OrderBookSurfaceSnapshot",
     "ProtectiveExecutionAdjustment",
-    "REAL_CAPITAL_ENABLED",
     "SurfaceCurveParams",
     "ToxicFlowAssessment",
     "ToxicityRegime",

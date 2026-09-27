@@ -11,15 +11,12 @@ Validates:
 5. Invariant: Research Knowledge != Live Execution Authority.
 """
 
-import os
-import time
 from pathlib import Path
+
 import pytest
 
 from core.knowledge_os.research_wikipedia import (
     ResearchWikipediaEngine,
-    WikiArticle,
-    EpistemicClaim,
 )
 
 
@@ -37,9 +34,13 @@ def test_wiki_initialization_and_seeding(temp_wiki_engine: ResearchWikipediaEngi
     assert len(articles) >= 3, "Expected at least 3 seed articles on initial startup"
 
     titles = [a["title"] for a in articles]
-    assert any("US & China" in t for t in titles), "US & China economic trajectory article must be seeded"
+    assert any("US & China" in t for t in titles), (
+        "US & China economic trajectory article must be seeded"
+    )
     assert any("De-Dollarization" in t for t in titles), "De-Dollarization article must be seeded"
-    assert any("Concentrated Liquidity" in t for t in titles), "Concentrated AMM article must be seeded"
+    assert any("Concentrated Liquidity" in t for t in titles), (
+        "Concentrated AMM article must be seeded"
+    )
 
 
 def test_us_china_article_structure(temp_wiki_engine: ResearchWikipediaEngine):
@@ -52,7 +53,9 @@ def test_us_china_article_structure(temp_wiki_engine: ResearchWikipediaEngine):
 
     statuses = [c.epistemic_status for c in article.key_claims]
     assert "FACT" in statuses, "Must contain verified factual claims"
-    assert "CONTRADICTION" in statuses, "Must flag narrative contradictions (e.g. instant dollar crash)"
+    assert "CONTRADICTION" in statuses, (
+        "Must flag narrative contradictions (e.g. instant dollar crash)"
+    )
     assert "HYPOTHESIS" in statuses, "Must tag probabilistic macro trends"
 
     # Verify Markdown persistence

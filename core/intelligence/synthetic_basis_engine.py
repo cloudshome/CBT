@@ -33,20 +33,23 @@ logger = logging.getLogger("ai_quant_sentinel.intelligence.synthetic_basis_engin
 
 class BasisRegime(str, Enum):
     """Regime classification for spot-perpetual basis."""
-    CONTANGO = "CONTANGO"          # Perp > Spot (positive basis)
-    BACKWARDATION = "BACKWARDATION"# Perp < Spot (negative basis)
-    FLAT = "FLAT"                  # |Basis| < 1.0 bps
+
+    CONTANGO = "CONTANGO"  # Perp > Spot (positive basis)
+    BACKWARDATION = "BACKWARDATION"  # Perp < Spot (negative basis)
+    FLAT = "FLAT"  # |Basis| < 1.0 bps
 
 
 class EpistemicTag(str, Enum):
     """Epistemic taxonomy classification per QUANT_RESEARCH_PROTOCOL.md."""
-    FACT = "[FACT]"              # Empirically measured observable data
-    INFERENCE = "[INFERENCE]"    # Derived metrics, rolling statistics, carry yield
+
+    FACT = "[FACT]"  # Empirically measured observable data
+    INFERENCE = "[INFERENCE]"  # Derived metrics, rolling statistics, carry yield
     HYPOTHESIS = "[HYPOTHESIS]"  # Statistical forecasting, cointegration, OU half-life
 
 
 class BasisObservation(BaseModel):
     """Immutable market observation for a synthetic instrument pair."""
+
     symbol: str = Field(description="Canonical asset symbol (e.g. BTC, ETH, SOL)")
     spot_venue: str = Field(description="Venue for spot leg (e.g. BINANCE_SPOT, BYBIT_SPOT)")
     perp_venue: str = Field(description="Venue for perp leg (e.g. BINANCE_PERP, HYPERLIQUID_L1)")
@@ -54,14 +57,23 @@ class BasisObservation(BaseModel):
     spot_ask: float = Field(gt=0.0, description="Best ask on spot venue")
     perp_bid: float = Field(gt=0.0, description="Best bid on perp venue")
     perp_ask: float = Field(gt=0.0, description="Best ask on perp venue")
-    funding_rate: float = Field(default=0.0001, description="8h or 1h periodic funding rate (e.g. 0.0001 = 0.01%)")
-    funding_interval_hours: float = Field(default=8.0, gt=0.0, description="Funding interval in hours (8.0 or 1.0)")
-    borrow_rate_annual: float = Field(default=0.05, ge=0.0, description="Annualized borrow fee rate for shorting spot")
-    timestamp_ns: int = Field(default_factory=time.monotonic_ns, description="Monotonic timestamp in nanoseconds")
+    funding_rate: float = Field(
+        default=0.0001, description="8h or 1h periodic funding rate (e.g. 0.0001 = 0.01%)"
+    )
+    funding_interval_hours: float = Field(
+        default=8.0, gt=0.0, description="Funding interval in hours (8.0 or 1.0)"
+    )
+    borrow_rate_annual: float = Field(
+        default=0.05, ge=0.0, description="Annualized borrow fee rate for shorting spot"
+    )
+    timestamp_ns: int = Field(
+        default_factory=time.monotonic_ns, description="Monotonic timestamp in nanoseconds"
+    )
 
 
 class BasisMetrics(BaseModel):
     """Derived quantitative metrics for a single synthetic basis observation."""
+
     symbol: str
     spot_venue: str
     perp_venue: str
@@ -83,6 +95,7 @@ class BasisMetrics(BaseModel):
 
 class CointegrationResult(BaseModel):
     """Statistical outcome of Engle-Granger cointegration & OU half-life calibration."""
+
     symbol: str
     spot_venue: str
     perp_venue: str
@@ -102,6 +115,7 @@ class CointegrationResult(BaseModel):
 @dataclass
 class RollingBasisSeries:
     """Internal rolling memory buffer for statistical estimation."""
+
     max_window: int = 500
     timestamps: list[int] = field(default_factory=list)
     spot_mids: list[float] = field(default_factory=list)
@@ -146,9 +160,13 @@ class SyntheticBasisEngine:
         Ingests a multi-venue market observation and computes full basis analytics.
         """
         if obs.spot_ask < obs.spot_bid:
-            raise ValueError(f"Crossed spot orderbook on {obs.spot_venue}: bid={obs.spot_bid} > ask={obs.spot_ask}")
+            raise ValueError(
+                f"Crossed spot orderbook on {obs.spot_venue}: bid={obs.spot_bid} > ask={obs.spot_ask}"
+            )
         if obs.perp_ask < obs.perp_bid:
-            raise ValueError(f"Crossed perp orderbook on {obs.perp_venue}: bid={obs.perp_bid} > ask={obs.perp_ask}")
+            raise ValueError(
+                f"Crossed perp orderbook on {obs.perp_venue}: bid={obs.perp_bid} > ask={obs.perp_ask}"
+            )
 
         spot_mid = (obs.spot_bid + obs.spot_ask) / 2.0
         perp_mid = (obs.perp_bid + obs.perp_ask) / 2.0
@@ -170,7 +188,9 @@ class SyntheticBasisEngine:
         # Cash and Carry collects funding yield:
         net_cash_carry_apr = annualized_funding_yield + (raw_basis_bps / 10000.0)
         # Reverse Cash and Carry pays funding yield and pays spot borrow fee:
-        net_reverse_carry_apr = -annualized_funding_yield - obs.borrow_rate_annual - (raw_basis_bps / 10000.0)
+        net_reverse_carry_apr = (
+            -annualized_funding_yield - obs.borrow_rate_annual - (raw_basis_bps / 10000.0)
+        )
 
         # Update rolling series
         key = (obs.symbol, obs.spot_venue, obs.perp_venue)
@@ -237,7 +257,10 @@ class SyntheticBasisEngine:
                 tau = ln(2) / kappa, where kappa = -gamma / dt_hours
         """
         key = (symbol, spot_venue, perp_venue)
-        if key not in self._series or len(self._series[key].spot_mids) < self.min_cointegration_samples:
+        if (
+            key not in self._series
+            or len(self._series[key].spot_mids) < self.min_cointegration_samples
+        ):
             sample_size = len(self._series[key].spot_mids) if key in self._series else 0
             return CointegrationResult(
                 symbol=symbol,
@@ -265,7 +288,7 @@ class SyntheticBasisEngine:
         ols_res = stats.linregress(spot_arr, perp_arr)
         beta = float(ols_res.slope)
         alpha = float(ols_res.intercept)
-        r_squared = float(ols_res.rvalue ** 2)
+        r_squared = float(ols_res.rvalue**2)
 
         residuals = perp_arr - (alpha + beta * spot_arr)
 

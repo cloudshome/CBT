@@ -29,10 +29,8 @@ Mathematical Specifications:
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Union
 
 from core.execution.latency_arb.amm_pool_math import (
     ConcentratedLiquidityPool,
@@ -41,7 +39,6 @@ from core.execution.latency_arb.amm_pool_math import (
     SwapSimulationResult,
 )
 from core.execution.latency_arb.mev_bundle_simulator import (
-    BundleSimulationResult,
     MEVBundleSimulator,
     RouteChannel,
 )
@@ -58,6 +55,7 @@ class ArbOpportunityDirection(str, Enum):
 @dataclass
 class CEXOrderBookSnapshot:
     """Real-time CEX Top of Book snapshot."""
+
     best_bid: float
     best_ask: float
     bid_depth_usd: float
@@ -70,6 +68,7 @@ class CEXOrderBookSnapshot:
 @dataclass
 class ArbitrageEvaluationDecision:
     """Complete analytical decision for a CEX-DEX latency arbitrage opportunity."""
+
     symbol: str
     direction: ArbOpportunityDirection
     is_actionable: bool
@@ -97,11 +96,11 @@ class CEXDEXLatencyArbSentinel:
     def __init__(
         self,
         symbol: str = "ETH/USDT",
-        min_hurdle_bps: float = 5.0,            # Minimum net profit margin (5 bps)
-        min_hurdle_usd: float = 2.0,            # Minimum net absolute profit ($2.00)
-        min_inclusion_prob: float = 0.50,       # Minimum required inclusion probability
+        min_hurdle_bps: float = 5.0,  # Minimum net profit margin (5 bps)
+        min_hurdle_usd: float = 2.0,  # Minimum net absolute profit ($2.00)
+        min_inclusion_prob: float = 0.50,  # Minimum required inclusion probability
         max_single_position_equity_pct: float = 0.015,  # Constitutional 1.5% equity cap
-        adverse_selection_buffer_bps: float = 3.0,      # Conservative buffer for re-org/microstructure noise
+        adverse_selection_buffer_bps: float = 3.0,  # Conservative buffer for re-org/microstructure noise
         bundle_simulator: MEVBundleSimulator | None = None,
     ) -> None:
         self.symbol = symbol
@@ -117,7 +116,7 @@ class CEXDEXLatencyArbSentinel:
         self,
         portfolio_equity_usd: float,
         cex_book: CEXOrderBookSnapshot,
-        dex_pool: Union[ConstantProductPool, ConcentratedLiquidityPool],
+        dex_pool: ConstantProductPool | ConcentratedLiquidityPool,
         measured_latency_ms: float = 45.0,
         base_fee_gwei: float = 15.0,
         priority_fee_gwei: float = 2.0,
@@ -222,7 +221,9 @@ class CEXDEXLatencyArbSentinel:
 
         # 5. Transaction Frictions & Adverse Selection
         cex_fee = notional * (cex_book.taker_fee_bps / 10_000.0)
-        dex_fee = dex_swap.fee_paid_quote if dex_swap else (notional * (dex_pool.fee_bps / 10_000.0))
+        dex_fee = (
+            dex_swap.fee_paid_quote if dex_swap else (notional * (dex_pool.fee_bps / 10_000.0))
+        )
         adverse_selection = notional * (self.adverse_selection_buffer_bps / 10_000.0)
 
         # Public mempool sandwich vulnerability surcharge
@@ -243,9 +244,13 @@ class CEXDEXLatencyArbSentinel:
         # 6. Actionability Checks
         rejections = []
         if net_margin_bps < self.min_hurdle_bps:
-            rejections.append(f"Net margin {net_margin_bps:.2f} bps < hurdle {self.min_hurdle_bps:.2f} bps")
+            rejections.append(
+                f"Net margin {net_margin_bps:.2f} bps < hurdle {self.min_hurdle_bps:.2f} bps"
+            )
         if net_profit_usd < self.min_hurdle_usd:
-            rejections.append(f"Net profit ${net_profit_usd:.2f} < hurdle ${self.min_hurdle_usd:.2f}")
+            rejections.append(
+                f"Net profit ${net_profit_usd:.2f} < hurdle ${self.min_hurdle_usd:.2f}"
+            )
         if p_inc < self.min_inclusion_prob:
             rejections.append(f"Inclusion prob {p_inc:.1%} < minimum {self.min_inclusion_prob:.1%}")
         if expected_edge_usd <= 0.0:

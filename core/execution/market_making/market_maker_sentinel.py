@@ -20,7 +20,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any
 
 from core.execution.market_making.avellaneda_stoikov import (
     AvellanedaStoikovModel,
@@ -38,6 +37,7 @@ logger = logging.getLogger("ai_quant_sentinel.market_making.sentinel")
 @dataclass
 class MarketMakingDecision:
     """Decision output emitted by the Market Making Sentinel."""
+
     symbol: str
     quotes: AvellanedaStoikovQuotes
     hawkes_state: HawkesIntensityState
@@ -115,7 +115,6 @@ class ASMarketMakerSentinel:
         # 3. Inventory & Constitutional 1.5% Risk Cap Evaluation
         inventory_notional = abs(current_inventory) * mid_price
         inventory_pct = inventory_notional / account_equity_usd
-        max_allowed_notional = account_equity_usd * self.max_cap_pct
 
         is_within_cap = inventory_pct <= self.max_cap_pct + 1e-6
 
@@ -130,11 +129,11 @@ class ASMarketMakerSentinel:
             if current_inventory > 0:
                 # Long inventory: Quote SELL only (shed inventory)
                 allowed_sides = ["SELL"]
-                action = f"DEFENSIVE_INVENTORY_SHED: Long inventory ({inventory_pct*100:.2f}%) at 1.5% cap. Bids disabled."
+                action = f"DEFENSIVE_INVENTORY_SHED: Long inventory ({inventory_pct * 100:.2f}%) at 1.5% cap. Bids disabled."
             else:
                 # Short inventory: Quote BUY only (cover inventory)
                 allowed_sides = ["BUY"]
-                action = f"DEFENSIVE_INVENTORY_COVER: Short inventory ({inventory_pct*100:.2f}%) at 1.5% cap. Asks disabled."
+                action = f"DEFENSIVE_INVENTORY_COVER: Short inventory ({inventory_pct * 100:.2f}%) at 1.5% cap. Asks disabled."
         elif hawkes_state.toxicity_tier == FlowToxicityTier.CRITICAL_TOXIC_SURGE:
             action = f"TOXIC_FLOW_DEFENSE: Quoting spread widened by {spread_mult:.2f}x to protect against adverse selection."
 

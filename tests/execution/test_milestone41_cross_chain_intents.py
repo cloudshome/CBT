@@ -20,10 +20,8 @@ Validates:
 
 from __future__ import annotations
 
-import math
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -33,15 +31,12 @@ from core.execution.cross_chain.bridge_route_optimizer import (
 )
 from core.execution.cross_chain.cross_chain_intent_sentinel import (
     CrossChainIntentSentinel,
-    IntentExecutionDecision,
 )
 from core.execution.cross_chain.intent_models import (
     BridgeProtocol,
     ChainId,
-    CrossChainIntent,
     IntentStatus,
     SettlementProof,
-    SolverAuctionResult,
     SolverQuote,
     VerificationMechanism,
 )
@@ -63,7 +58,7 @@ def optimizer() -> BridgeRouteOptimizer:
 def sentinel(optimizer: BridgeRouteOptimizer) -> CrossChainIntentSentinel:
     return CrossChainIntentSentinel(
         max_single_intent_equity_pct=0.015,  # 1.5% equity cap
-        max_total_in_flight_pct=0.060,       # 6.0% in-flight ceiling
+        max_total_in_flight_pct=0.060,  # 6.0% in-flight ceiling
         optimizer=optimizer,
     )
 
@@ -113,7 +108,7 @@ def test_02_solver_auction_utility_ranking(
             solver_id="across_solver_1",
             protocol=BridgeProtocol.ACROSS_V3,
             quoted_output_amount=0.9995,  # Very high output
-            estimated_latency_sec=45.0,    # Very fast
+            estimated_latency_sec=45.0,  # Very fast
             protocol_fee_bps=5.0,
             gas_subsidy_usd=1.5,
             verification_mechanism=VerificationMechanism.OPTIMISTIC_CHALLENGE,
@@ -168,7 +163,9 @@ def test_03_min_output_constraint_rejection(
         total_effective_fee_usd=5.0,
     )
 
-    score, valid, reason = optimizer.compute_quote_utility_score(intent, insufficient_quote, now_sec=1000.0)
+    score, valid, reason = optimizer.compute_quote_utility_score(
+        intent, insufficient_quote, now_sec=1000.0
+    )
     assert valid is False
     assert reason is not None
     assert "min required" in reason
@@ -237,7 +234,9 @@ def test_05_reliability_threshold_rejection(
         total_effective_fee_usd=0.0,
     )
 
-    score, valid, reason = optimizer.compute_quote_utility_score(intent, unreliable_quote, now_sec=1000.0)
+    score, valid, reason = optimizer.compute_quote_utility_score(
+        intent, unreliable_quote, now_sec=1000.0
+    )
     assert valid is False
     assert reason is not None
     assert "Reliability" in reason
@@ -339,7 +338,9 @@ def test_07_constitutional_6_percent_in_flight_exposure_ceiling(
         ideal_output_amount=1000.0,
         now_sec=1000.0,
     )
-    dec_breach = sentinel.evaluate_and_route_intent(equity, intent_breach, [quote_breach], now_sec=1000.0)
+    dec_breach = sentinel.evaluate_and_route_intent(
+        equity, intent_breach, [quote_breach], now_sec=1000.0
+    )
     assert dec_breach.is_approved is False
     assert dec_breach.is_in_flight_heat_capped is True
     assert "6.0% ceiling" in dec_breach.rejection_reason
@@ -373,7 +374,9 @@ def test_08_cryptographic_settlement_receipt_verification(
     verified = sentinel.verify_settlement(proof)
     assert verified is True
     assert intent.status == IntentStatus.SETTLED
-    assert sentinel.settlement_records["intent_settle_01"].destination_tx_hash.startswith("0xabcdef")
+    assert sentinel.settlement_records["intent_settle_01"].destination_tx_hash.startswith(
+        "0xabcdef"
+    )
 
 
 def test_09_deadline_expiration_and_escrow_refund(
@@ -417,15 +420,24 @@ def test_10_permanent_capital_isolation_firewall(
     assert intent.real_capital_enabled is False
 
     quote = SolverQuote(
-        "s1", BridgeProtocol.ACROSS_V3, 100.0, 30.0, 0.0, 0.0,
-        VerificationMechanism.OPTIMISTIC_CHALLENGE, 0.99, 0.0
+        "s1",
+        BridgeProtocol.ACROSS_V3,
+        100.0,
+        30.0,
+        0.0,
+        0.0,
+        VerificationMechanism.OPTIMISTIC_CHALLENGE,
+        0.99,
+        0.0,
     )
     assert quote.real_capital_enabled is False
 
     auction = optimizer.run_solver_auction(intent, [quote])
     assert auction.real_capital_enabled is False
 
-    proof = SettlementProof("intent_safe", "0x123", 100.0, 100, VerificationMechanism.OPTIMISTIC_CHALLENGE, True)
+    proof = SettlementProof(
+        "intent_safe", "0x123", 100.0, 100, VerificationMechanism.OPTIMISTIC_CHALLENGE, True
+    )
     assert proof.real_capital_enabled is False
 
 
@@ -436,6 +448,11 @@ def test_11_milestone18_execution_surface_untouched():
     if not Path(py_exe).exists():
         py_exe = sys.executable
 
-    res = subprocess.run([py_exe, "scripts/verify_m18_certification.py"], cwd=str(repo_root), capture_output=True, text=True)
+    res = subprocess.run(
+        [py_exe, "scripts/verify_m18_certification.py"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
     assert res.returncode == 0, f"Milestone 18 certification invalid:\n{res.stdout}\n{res.stderr}"
     assert "M18 Production Pass remains ACTIVE" in res.stdout

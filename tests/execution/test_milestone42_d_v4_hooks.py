@@ -14,31 +14,26 @@ Verification Objectives:
 8. Permanent capital firewall: real_capital_enabled == False.
 """
 
-import time
-import pytest
-
 from core.execution.concentrated_amm.swap_state_machine import (
     ConcentratedPoolState,
     ConcentratedSwapEngine,
-    SwapExecutionReport,
 )
 from core.execution.concentrated_amm.tick_math import (
     REAL_CAPITAL_ENABLED,
-    price_to_sqrt_ratio_x96,
     price_to_tick,
-    sqrt_ratio_x96_to_price,
 )
 from core.execution.concentrated_amm.v4_hooks import (
     BaseV4Hook,
     DynamicFeeHook,
     HookPermissions,
     HookResult,
-    HookSandbox,
     VolatilityCircuitBreakerHook,
 )
 
 
-def _setup_test_pool(price: float = 3000.0, liquidity: int = 10_000_000_000_000_000_000) -> ConcentratedPoolState:
+def _setup_test_pool(
+    price: float = 3000.0, liquidity: int = 10_000_000_000_000_000_000
+) -> ConcentratedPoolState:
     """Helper to initialize a deep test pool."""
     tick = price_to_tick(price, decimals_base=18, decimals_quote=6)
     # Align tick to spacing
@@ -59,8 +54,6 @@ def _setup_test_pool(price: float = 3000.0, liquidity: int = 10_000_000_000_000_
     return pool
 
 
-
-
 class FaultyHook(BaseV4Hook):
     """Faulty test hook designed to simulate crashes or malicious reverts."""
 
@@ -69,12 +62,34 @@ class FaultyHook(BaseV4Hook):
         self.crash_in_before = crash_in_before
         self.crash_in_after = crash_in_after
 
-    def before_swap(self, sender: str, pool_id: str, zero_for_one: bool, amount_specified: int, current_tick: int, current_sqrt_price_x96: int, timestamp_sec: float | None = None, **kwargs) -> HookResult:
+    def before_swap(
+        self,
+        sender: str,
+        pool_id: str,
+        zero_for_one: bool,
+        amount_specified: int,
+        current_tick: int,
+        current_sqrt_price_x96: int,
+        timestamp_sec: float | None = None,
+        **kwargs,
+    ) -> HookResult:
         if self.crash_in_before:
             raise ZeroDivisionError("Simulated division by zero in custom hook!")
         return HookResult(is_success=True)
 
-    def after_swap(self, sender: str, pool_id: str, zero_for_one: bool, amount_in: int, amount_out: int, fee_amount: int, final_tick: int, final_sqrt_price_x96: int, timestamp_sec: float | None = None, **kwargs) -> HookResult:
+    def after_swap(
+        self,
+        sender: str,
+        pool_id: str,
+        zero_for_one: bool,
+        amount_in: int,
+        amount_out: int,
+        fee_amount: int,
+        final_tick: int,
+        final_sqrt_price_x96: int,
+        timestamp_sec: float | None = None,
+        **kwargs,
+    ) -> HookResult:
         if self.crash_in_after:
             raise RuntimeError("Simulated runtime memory error in after_swap hook!")
         return HookResult(is_success=True)
@@ -212,9 +227,9 @@ class TestMilestone42DV4Hooks:
     def test_m42_d_dynamic_fee_hook_scaling(self):
         """Verifies dynamic fee scaling under varying realized volatility."""
         hook = DynamicFeeHook(
-            base_fee_pips=500,     # 5 bps
-            min_fee_pips=100,      # 1 bps
-            max_fee_pips=10_000,   # 100 bps
+            base_fee_pips=500,  # 5 bps
+            min_fee_pips=100,  # 1 bps
+            max_fee_pips=10_000,  # 100 bps
             volatility_scaling_factor=2.0,
         )
 
@@ -296,7 +311,7 @@ class TestMilestone42DV4Hooks:
         now = 2000.0
 
         engine = ConcentratedSwapEngine()
-        report = engine.execute_swap(
+        _report = engine.execute_swap(
             pool=pool,
             zero_for_one=True,
             amount_specified=10**18,

@@ -27,11 +27,9 @@ Uniswap v3 / v4 SwapMath.sol:
 
 from __future__ import annotations
 
-from typing import Final, Tuple
+from typing import Final
 
 from core.execution.concentrated_amm.tick_math import (
-    Q96,
-    REAL_CAPITAL_ENABLED,
     get_amount0_delta,
     get_amount1_delta,
     get_next_sqrt_price_from_amount0_rounding_up,
@@ -114,17 +112,17 @@ def compute_swap_step(
     liquidity: int,
     amount_remaining: int,
     fee_pips: int,
-) -> Tuple[int, int, int, int]:
+) -> tuple[int, int, int, int]:
     """
     Computes exact state transitions and quantities for a single swap step.
-    
+
     Args:
         sqrt_ratio_current_x96: Active pool sqrtPriceX96.
         sqrt_ratio_target_x96: Target sqrtPriceX96 (e.g. next initialized tick or limit price).
         liquidity: Active in-range virtual liquidity.
         amount_remaining: Remaining swap amount (positive for exact-in, negative for exact-out).
         fee_pips: Pool fee in hundredths of a pip (e.g. 500 = 5 bps = 0.05%, 3000 = 30 bps = 0.3%).
-        
+
     Returns:
         (sqrt_ratio_next_x96, amount_in, amount_out, fee_amount)
     """
@@ -140,9 +138,13 @@ def compute_swap_step(
             amount_remaining, FEE_DENOMINATOR - fee_pips, FEE_DENOMINATOR
         )
         amount_in = (
-            get_amount0_delta(sqrt_ratio_target_x96, sqrt_ratio_current_x96, liquidity, round_up=True)
+            get_amount0_delta(
+                sqrt_ratio_target_x96, sqrt_ratio_current_x96, liquidity, round_up=True
+            )
             if zero_for_one
-            else get_amount1_delta(sqrt_ratio_current_x96, sqrt_ratio_target_x96, liquidity, round_up=True)
+            else get_amount1_delta(
+                sqrt_ratio_current_x96, sqrt_ratio_target_x96, liquidity, round_up=True
+            )
         )
 
         if amount_remaining_less_fee >= amount_in:
@@ -157,9 +159,13 @@ def compute_swap_step(
     else:
         abs_remaining = abs(amount_remaining)
         amount_out = (
-            get_amount1_delta(sqrt_ratio_target_x96, sqrt_ratio_current_x96, liquidity, round_up=False)
+            get_amount1_delta(
+                sqrt_ratio_target_x96, sqrt_ratio_current_x96, liquidity, round_up=False
+            )
             if zero_for_one
-            else get_amount0_delta(sqrt_ratio_current_x96, sqrt_ratio_target_x96, liquidity, round_up=False)
+            else get_amount0_delta(
+                sqrt_ratio_current_x96, sqrt_ratio_target_x96, liquidity, round_up=False
+            )
         )
 
         if abs_remaining >= amount_out:
@@ -178,23 +184,31 @@ def compute_swap_step(
         amount_in = (
             amount_in
             if (reached_target and exact_in)
-            else get_amount0_delta(sqrt_ratio_next_x96, sqrt_ratio_current_x96, liquidity, round_up=True)
+            else get_amount0_delta(
+                sqrt_ratio_next_x96, sqrt_ratio_current_x96, liquidity, round_up=True
+            )
         )
         amount_out = (
             amount_out
             if (reached_target and not exact_in)
-            else get_amount1_delta(sqrt_ratio_next_x96, sqrt_ratio_current_x96, liquidity, round_up=False)
+            else get_amount1_delta(
+                sqrt_ratio_next_x96, sqrt_ratio_current_x96, liquidity, round_up=False
+            )
         )
     else:
         amount_in = (
             amount_in
             if (reached_target and exact_in)
-            else get_amount1_delta(sqrt_ratio_current_x96, sqrt_ratio_next_x96, liquidity, round_up=True)
+            else get_amount1_delta(
+                sqrt_ratio_current_x96, sqrt_ratio_next_x96, liquidity, round_up=True
+            )
         )
         amount_out = (
             amount_out
             if (reached_target and not exact_in)
-            else get_amount0_delta(sqrt_ratio_current_x96, sqrt_ratio_next_x96, liquidity, round_up=False)
+            else get_amount0_delta(
+                sqrt_ratio_current_x96, sqrt_ratio_next_x96, liquidity, round_up=False
+            )
         )
 
     # Cap amountOut if exact-out
@@ -206,8 +220,6 @@ def compute_swap_step(
         # Did not reach target: fee is exact remainder of available input
         fee_amount = amount_remaining - amount_in
     else:
-        fee_amount = mul_div_rounding_up(
-            amount_in, fee_pips, FEE_DENOMINATOR - fee_pips
-        )
+        fee_amount = mul_div_rounding_up(amount_in, fee_pips, FEE_DENOMINATOR - fee_pips)
 
     return sqrt_ratio_next_x96, amount_in, amount_out, fee_amount

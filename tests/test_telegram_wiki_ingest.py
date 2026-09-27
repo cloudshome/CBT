@@ -19,15 +19,13 @@ Validates:
 
 from __future__ import annotations
 
-import asyncio
-from typing import Any
 import pytest
 
+from core.knowledge_os.research_wikipedia import research_wikipedia_engine
 from core.telegram.commands import command_registry
 from core.telegram.handlers import handle_wiki
 from core.telegram.rbac import TelegramRole, TelegramUserIdentity
 from core.telegram_bot import telegram_bot
-from core.knowledge_os.research_wikipedia import research_wikipedia_engine
 
 
 @pytest.fixture
@@ -118,7 +116,9 @@ async def test_telegram_reverse_flow_link_ingest_facebook():
     # Verify article is present in Wikipedia engine
     article = research_wikipedia_engine.get_article(res["article_id"])
     assert article is not None
-    assert article.author_or_speaker == "LeadMacroOperator" or "LeadMacroOperator" in str(article.author_or_speaker)
+    assert article.author_or_speaker == "LeadMacroOperator" or "LeadMacroOperator" in str(
+        article.author_or_speaker
+    )
     assert len(article.key_claims) >= 3
 
 

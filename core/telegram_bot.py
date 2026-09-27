@@ -2052,9 +2052,8 @@ class TelegramBotDispatcher:
                 )
                 wiki_card = self._format_wikipedia_telegram_card(wiki_article)
                 await self.send_message(wiki_card, chat_id=chat_id)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"PDF Research Wikipedia entry creation failed: {e}")
-
             res = await universal_ingestor.ingest(
                 content=text_content,
                 mode="RESEARCH",
@@ -2071,7 +2070,9 @@ class TelegramBotDispatcher:
             return {
                 "status": "RESEARCH_INGESTED",
                 "type": "DOCUMENT",
-                "knowledge_id": wiki_article.provenance_id if wiki_article else res.get("knowledge_id"),
+                "knowledge_id": wiki_article.provenance_id
+                if wiki_article
+                else res.get("knowledge_id"),
                 "article_id": wiki_article.article_id if wiki_article else None,
             }
 
@@ -2109,7 +2110,7 @@ class TelegramBotDispatcher:
                 )
                 wiki_card = self._format_wikipedia_telegram_card(wiki_article)
                 await self.send_message(wiki_card, chat_id=chat_id)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Error in research_wikipedia_engine Telegram ingest: {e}")
 
             # Also pass to universal_ingestor for potential trading candidate extraction
@@ -2124,13 +2125,15 @@ class TelegramBotDispatcher:
                 if res.get("strategy_candidates"):
                     reply = self._format_research_summary_telegram(res)
                     await self.send_message(reply, chat_id=chat_id)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Universal ingestor secondary pass skipped/failed: {e}")
 
             return {
                 "status": "RESEARCH_INGESTED",
                 "type": "LINK",
-                "knowledge_id": wiki_article.provenance_id if wiki_article else res.get("knowledge_id"),
+                "knowledge_id": wiki_article.provenance_id
+                if wiki_article
+                else res.get("knowledge_id"),
                 "article_id": wiki_article.article_id if wiki_article else None,
             }
 

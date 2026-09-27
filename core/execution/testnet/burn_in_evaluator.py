@@ -125,7 +125,7 @@ class M32RBurnInEvaluator:
                     "ratio": telemetry.qualification_ratio,
                 },
                 target_threshold=">= 300h qualified of 336h (>= 89.2% ratio)",
-                details=f"Achieved {telemetry.effective_qualified_hours:.1f}h qualified ({telemetry.qualification_ratio*100:.1f}%).",
+                details=f"Achieved {telemetry.effective_qualified_hours:.1f}h qualified ({telemetry.qualification_ratio * 100:.1f}%).",
             )
         )
 
@@ -245,7 +245,9 @@ class M32RBurnInEvaluator:
         reconciliation_path = out / "M32_R_RECONCILIATION_REPORT.json"
 
         # 1. Decision JSON
-        decision_path.write_text(json.dumps(decision.model_dump(mode="json"), indent=2, sort_keys=True), encoding="utf-8")
+        decision_path.write_text(
+            json.dumps(decision.model_dump(mode="json"), indent=2, sort_keys=True), encoding="utf-8"
+        )
 
         # 2. Execution Quality Report
         quality_data = {
@@ -269,7 +271,9 @@ class M32RBurnInEvaluator:
             "checkpoint_count": telemetry.checkpoint_count,
             "codebase_git_hash": codebase_git_hash,
         }
-        quality_path.write_text(json.dumps(quality_data, indent=2, sort_keys=True), encoding="utf-8")
+        quality_path.write_text(
+            json.dumps(quality_data, indent=2, sort_keys=True), encoding="utf-8"
+        )
 
         # 3. Reconciliation Report
         rec_data = {
@@ -281,7 +285,9 @@ class M32RBurnInEvaluator:
             "overfill_violations": 0,
             "zero_duplicate_fills_verified": True,
         }
-        reconciliation_path.write_text(json.dumps(rec_data, indent=2, sort_keys=True), encoding="utf-8")
+        reconciliation_path.write_text(
+            json.dumps(rec_data, indent=2, sort_keys=True), encoding="utf-8"
+        )
 
         # 4. Markdown Dossier
         md_text = cls._generate_markdown_dossier(telemetry, decision, codebase_git_hash)
@@ -344,7 +350,9 @@ class M32RBurnInEvaluator:
 
         for g in decision.gates_evaluated:
             badge = "🟢 PASS" if g.passed else "🔴 FAIL"
-            lines.append(f"| `{g.gate_name}` | {badge} | `{g.observed_value}` | `{g.target_threshold}` | {g.details} |")
+            lines.append(
+                f"| `{g.gate_name}` | {badge} | `{g.observed_value}` | `{g.target_threshold}` | {g.details} |"
+            )
 
         lines.extend(
             [

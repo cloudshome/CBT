@@ -20,13 +20,10 @@ Constitutional Invariants:
 
 from __future__ import annotations
 
-import math
 import time
-from typing import Any, Dict, List, Optional, Tuple
 
 from core.execution.cross_venue.models import (
     ExecutionPlan,
-    OrderBookLevel,
     RoutingSplit,
     VenueDepthSnapshot,
     VenueType,
@@ -46,7 +43,7 @@ class OptimalCrossVenueRouter:
         snapshot: VenueDepthSnapshot,
         already_allocated_usd: float,
         incremental_usd: float,
-    ) -> Tuple[float, float, float]:
+    ) -> tuple[float, float, float]:
         """
         Calculates (marginal_cost_bps, effective_price, slippage_bps) for buying
         incremental_usd of asset given already_allocated_usd on this venue.
@@ -55,7 +52,6 @@ class OptimalCrossVenueRouter:
             return float("inf"), float("inf"), float("inf")
 
         best_ask = snapshot.best_ask()
-        fee_factor = snapshot.fee_bps / 10000.0
 
         if snapshot.venue_type == VenueType.DEX_CLMM:
             # Concentrated Liquidity model: Price impact scales quadratically with depth
@@ -71,7 +67,6 @@ class OptimalCrossVenueRouter:
             target_spend = already_allocated_usd + incremental_usd
 
             sim_spent = 0.0
-            sim_shares = 0.0
             for level in snapshot.asks:
                 level_usd = level.price * level.size
                 if sim_spent + level_usd < already_allocated_usd:
@@ -105,7 +100,7 @@ class OptimalCrossVenueRouter:
         symbol: str,
         action: str,  # "BUY" or "SELL"
         total_notional_usd: float,
-        venue_snapshots: List[VenueDepthSnapshot],
+        venue_snapshots: list[VenueDepthSnapshot],
         max_single_venue_share: float = 0.85,
     ) -> ExecutionPlan:
         """
@@ -113,7 +108,7 @@ class OptimalCrossVenueRouter:
         """
         if not venue_snapshots or total_notional_usd <= 0.0:
             return ExecutionPlan(
-                plan_id=f"plan_{int(time.time()*1000)}",
+                plan_id=f"plan_{int(time.time() * 1000)}",
                 symbol=symbol,
                 action=action,
                 total_notional_usd=total_notional_usd,
@@ -130,7 +125,7 @@ class OptimalCrossVenueRouter:
             )
 
         # Track allocated notional per venue
-        allocations: Dict[str, float] = {v.venue: 0.0 for v in venue_snapshots}
+        allocations: dict[str, float] = {v.venue: 0.0 for v in venue_snapshots}
         remaining_usd = total_notional_usd
         step = min(self.step_size_usd, total_notional_usd / 10.0)
 
@@ -143,7 +138,9 @@ class OptimalCrossVenueRouter:
             for v in venue_snapshots:
                 curr_alloc = allocations[v.venue]
                 # Enforce venue capacity ceiling
-                if (curr_alloc + current_chunk) / total_notional_usd > max_single_venue_share and len(venue_snapshots) > 1:
+                if (
+                    curr_alloc + current_chunk
+                ) / total_notional_usd > max_single_venue_share and len(venue_snapshots) > 1:
                     continue
 
                 m_cost, _, _ = self.calculate_marginal_buy_cost(
@@ -161,7 +158,7 @@ class OptimalCrossVenueRouter:
             remaining_usd -= current_chunk
 
         # Synthesize final RoutingSplits and metrics
-        splits: List[RoutingSplit] = []
+        splits: list[RoutingSplit] = []
         total_spent_weighted = 0.0
         total_fee_usd = 0.0
         total_latency_penalty = 0.0
@@ -198,10 +195,12 @@ class OptimalCrossVenueRouter:
             )
 
         vwp = total_spent_weighted / total_notional_usd if total_notional_usd > 0 else 0.0
-        net_effective_cost_bps = total_slippage_weighted + (total_fee_usd / total_notional_usd * 10000.0)
+        net_effective_cost_bps = total_slippage_weighted + (
+            total_fee_usd / total_notional_usd * 10000.0
+        )
 
         return ExecutionPlan(
-            plan_id=f"exec_{int(time.time()*1000)}_{len(splits)}v",
+            plan_id=f"exec_{int(time.time() * 1000)}_{len(splits)}v",
             symbol=symbol,
             action=action,
             total_notional_usd=round(total_notional_usd, 2),

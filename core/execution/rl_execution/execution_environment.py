@@ -15,20 +15,20 @@ Formulates optimal trade execution as an MDP:
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import Any, List, Tuple
+from typing import Any
 
 
 @dataclass
 class MicrostructureExecutionState:
     """State observation vector for RL execution agent."""
+
     remaining_inventory_ratio: float  # q_t / Q_0 in [0.0, 1.0]
     normalized_time_remaining: float  # (T - t) / T in [0.0, 1.0]
-    obi_l2: float                     # Order Book Imbalance in [-1.0, 1.0]
-    spread_bps: float                 # Bid-Ask spread in bps
-    volatility_sigma: float           # Instantaneous volatility estimate
-    hawkes_toxicity_ratio: float      # lambda(t) / mu flow intensity ratio
+    obi_l2: float  # Order Book Imbalance in [-1.0, 1.0]
+    spread_bps: float  # Bid-Ask spread in bps
+    volatility_sigma: float  # Instantaneous volatility estimate
+    hawkes_toxicity_ratio: float  # lambda(t) / mu flow intensity ratio
     current_mid_price: float
     target_inventory: float
     remaining_inventory: float
@@ -36,7 +36,7 @@ class MicrostructureExecutionState:
     max_steps: int
     real_capital_enabled: bool = False
 
-    def to_vector(self) -> List[float]:
+    def to_vector(self) -> list[float]:
         """Returns 6-dimensional normalized observation vector."""
         return [
             float(max(0.0, min(1.0, self.remaining_inventory_ratio))),
@@ -51,6 +51,7 @@ class MicrostructureExecutionState:
 @dataclass
 class ExecutionStepResult:
     """Result of taking an execution action in the MDP environment."""
+
     next_state: MicrostructureExecutionState
     reward: float
     done: bool
@@ -152,7 +153,7 @@ class MicrostructureExecutionEnvironment:
         action_clamped = max(0.0, min(1.0, float(action_fraction)))
 
         # Terminal step forces complete liquidation
-        is_last_step = (self.current_step == self.max_steps - 1)
+        is_last_step = self.current_step == self.max_steps - 1
         if is_last_step:
             shares_to_execute = self.remaining_inventory
         else:
@@ -179,15 +180,19 @@ class MicrostructureExecutionEnvironment:
         self.current_step += 1
 
         # Calculate Slippage and Implementation Shortfall
-        step_slippage_usd = (fill_price - self.arrival_price) * shares_to_execute
-        step_slippage_bps = ((fill_price - self.arrival_price) / self.arrival_price) * 10_000.0 if shares_to_execute > 0 else 0.0
+        _step_slippage_usd = (fill_price - self.arrival_price) * shares_to_execute
+        step_slippage_bps = (
+            ((fill_price - self.arrival_price) / self.arrival_price) * 10_000.0
+            if shares_to_execute > 0
+            else 0.0
+        )
 
         # Cumulative Implementation Shortfall (IS)
         avg_cost = self.total_cost_usd / max(1e-6, self.total_executed_shares)
         total_is_bps = ((avg_cost - self.arrival_price) / self.arrival_price) * 10_000.0
 
         # Inventory variance penalty (CARA utility term)
-        var_penalty = self.phi * (self.remaining_inventory ** 2) * (self.volatility ** 2)
+        var_penalty = self.phi * (self.remaining_inventory**2) * (self.volatility**2)
 
         # Reward = negative slippage cost minus inventory risk
         step_cost_penalty = step_slippage_bps * 0.1

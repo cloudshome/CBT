@@ -21,7 +21,6 @@ Constitutional Invariant:
 from __future__ import annotations
 
 import uuid
-from typing import List, Tuple
 
 from core.execution.mev_mitigation.models import (
     BuilderBundleBid,
@@ -37,8 +36,8 @@ class PBSSimulator:
 
     def simulate_bundle_auction(
         self,
-        bids: List[Tuple[str, float, int]],  # (builder_id, bid_value_eth, gas_used)
-    ) -> List[BuilderBundleBid]:
+        bids: list[tuple[str, float, int]],  # (builder_id, bid_value_eth, gas_used)
+    ) -> list[BuilderBundleBid]:
         """
         Simulates PBS MEV-Boost relay bundle ordering. Highest bids receive top-of-block priority.
         """
@@ -47,7 +46,7 @@ class PBSSimulator:
 
         # Sort descending by bid_value_eth
         sorted_bids = sorted(bids, key=lambda b: b[1], reverse=True)
-        results: List[BuilderBundleBid] = []
+        results: list[BuilderBundleBid] = []
 
         for rank, (builder_id, bid_val, gas) in enumerate(sorted_bids, start=1):
             results.append(
@@ -67,8 +66,8 @@ class PBSSimulator:
     def compute_fair_sequencing_clearing(
         self,
         symbol: str,
-        buy_orders: List[Tuple[float, float]],   # (limit_price, size)
-        sell_orders: List[Tuple[float, float]],  # (limit_price, size)
+        buy_orders: list[tuple[float, float]],  # (limit_price, size)
+        sell_orders: list[tuple[float, float]],  # (limit_price, size)
     ) -> FairSequencingBatch:
         """
         Executes a discrete fair batch auction.
@@ -94,9 +93,15 @@ class PBSSimulator:
 
         # Average buy price and sell price
         avg_buy_p = sum(p * s for p, s in buy_orders) / total_buy_vol if total_buy_vol > 0 else 0.0
-        avg_sell_p = sum(p * s for p, s in sell_orders) / total_sell_vol if total_sell_vol > 0 else 0.0
+        avg_sell_p = (
+            sum(p * s for p, s in sell_orders) / total_sell_vol if total_sell_vol > 0 else 0.0
+        )
 
-        uniform_clearing_price = (avg_buy_p + avg_sell_p) / 2.0 if (avg_buy_p > 0 and avg_sell_p > 0) else max(avg_buy_p, avg_sell_p)
+        uniform_clearing_price = (
+            (avg_buy_p + avg_sell_p) / 2.0
+            if (avg_buy_p > 0 and avg_sell_p > 0)
+            else max(avg_buy_p, avg_sell_p)
+        )
 
         total_buy_usd = sum(p * s for p, s in buy_orders)
         total_sell_usd = sum(p * s for p, s in sell_orders)

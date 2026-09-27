@@ -83,7 +83,9 @@ def test_06_obligation_12_sha256_checksum_integrity(auditor: Generation6Independ
     assert result.metrics["artifacts_audited"] >= 3
 
 
-def test_07_obligation_13_installer_non_authorization_invariant(auditor: Generation6IndependentAuditor):
+def test_07_obligation_13_installer_non_authorization_invariant(
+    auditor: Generation6IndependentAuditor,
+):
     """Verifies that release state is strictly clamped to RELEASE_CANDIDATE or formally OPERATOR_APPROVED_RELEASE."""
     result = auditor.audit_13_installer_non_authorization_invariant()
     assert result.passed is True
@@ -108,7 +110,7 @@ def test_09_audit_dossiers_exist_and_consistent():
     assert manifest_path.exists()
     assert report_path.exists()
 
-    with open(manifest_path, "r", encoding="utf-8") as f:
+    with open(manifest_path, encoding="utf-8") as f:
         data = json.load(f)
 
     assert data["audit_milestone"] == "M35-R"

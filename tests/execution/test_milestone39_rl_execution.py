@@ -28,18 +28,14 @@ from pathlib import Path
 import pytest
 
 from core.execution.rl_execution.execution_environment import (
-    ExecutionStepResult,
     MicrostructureExecutionEnvironment,
-    MicrostructureExecutionState,
 )
 from core.execution.rl_execution.ppo_execution_policy import (
     PPOActorCriticPolicy,
-    PolicyAction,
 )
 from core.execution.rl_execution.rl_execution_sentinel import (
     ExecutionStrategyMode,
     RLExecutionSentinel,
-    RLExecutionTrancheDecision,
 )
 
 
@@ -73,12 +69,14 @@ def rl_sentinel(ppo_policy: PPOActorCriticPolicy) -> RLExecutionSentinel:
     return RLExecutionSentinel(
         symbol="BTC/USDT",
         max_single_position_equity_pct=0.015,  # 1.5% equity cap
-        max_depth_participation_pct=0.10,     # 10% book depth cap
+        max_depth_participation_pct=0.10,  # 10% book depth cap
         policy=ppo_policy,
     )
 
 
-def test_01_environment_initialization_and_observation_vector(exec_env: MicrostructureExecutionEnvironment):
+def test_01_environment_initialization_and_observation_vector(
+    exec_env: MicrostructureExecutionEnvironment,
+):
     """Verifies that the MDP environment initializes properly with valid observation vectors."""
     state = exec_env.reset(initial_obi=0.25, initial_hawkes_ratio=1.2)
     assert state.remaining_inventory == 10.0
@@ -94,7 +92,9 @@ def test_01_environment_initialization_and_observation_vector(exec_env: Microstr
         assert not math.isinf(val)
 
 
-def test_02_environment_step_price_impact_and_inventory_depletion(exec_env: MicrostructureExecutionEnvironment):
+def test_02_environment_step_price_impact_and_inventory_depletion(
+    exec_env: MicrostructureExecutionEnvironment,
+):
     """Verifies that taking an action depletes inventory and applies price impact."""
     exec_env.reset()
     # Step with 20% of inventory (2.0 shares)
@@ -194,7 +194,7 @@ def test_08_order_book_depth_participation_capping(rl_sentinel: RLExecutionSenti
 def test_09_constitutional_1_5_percent_equity_risk_cap(rl_sentinel: RLExecutionSentinel):
     """Verifies that execution tranche notional is capped strictly at 1.5% portfolio equity."""
     equity = 50_000.0  # 1.5% = $750 max
-    mid = 50_000.0     # 0.015 shares = $750
+    mid = 50_000.0  # 0.015 shares = $750
 
     decision = rl_sentinel.evaluate_execution_tranche(
         portfolio_equity_usd=equity,
@@ -241,6 +241,11 @@ def test_11_milestone18_execution_surface_untouched():
     if not Path(py_exe).exists():
         py_exe = sys.executable
 
-    res = subprocess.run([py_exe, "scripts/verify_m18_certification.py"], cwd=str(repo_root), capture_output=True, text=True)
+    res = subprocess.run(
+        [py_exe, "scripts/verify_m18_certification.py"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
     assert res.returncode == 0, f"Milestone 18 certification invalid:\n{res.stdout}\n{res.stderr}"
     assert "M18 Production Pass remains ACTIVE" in res.stdout

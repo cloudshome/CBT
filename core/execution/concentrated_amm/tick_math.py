@@ -33,7 +33,7 @@ Uniswap v3 / v4 Q64.96 Fixed-Point Tick Mathematics:
 from __future__ import annotations
 
 import math
-from typing import Final, Tuple
+from typing import Final
 
 # Permanent capital firewall
 REAL_CAPITAL_ENABLED: Final[bool] = False
@@ -55,10 +55,10 @@ MAX_SQRT_RATIO: Final[int] = 1461446710490008141670467426030517762106949432527
 
 # Fee Tier to Tick Spacing Mapping
 FEE_TICK_SPACING_MAP: Final[dict[int, int]] = {
-    100: 1,     # 1 bps (0.01%) -> spacing 1
-    500: 10,    # 5 bps (0.05%) -> spacing 10
-    3000: 60,   # 30 bps (0.30%) -> spacing 60
-    10000: 200, # 100 bps (1.00%) -> spacing 200
+    100: 1,  # 1 bps (0.01%) -> spacing 1
+    500: 10,  # 5 bps (0.05%) -> spacing 10
+    3000: 60,  # 30 bps (0.30%) -> spacing 60
+    10000: 200,  # 100 bps (1.00%) -> spacing 200
 }
 
 
@@ -66,7 +66,7 @@ def get_sqrt_ratio_at_tick(tick: int) -> int:
     """
     Computes exact Q64.96 sqrt(price) for a given discrete tick index.
     Implements the bitwise expansion polynomial from Uniswap v3/v4 TickMath.sol.
-    
+
     Returns:
         sqrtPriceX96 as uint160 integer (represented as Python int).
     Raises:
@@ -133,7 +133,7 @@ def get_tick_at_sqrt_ratio(sqrt_ratio_x96: int) -> int:
     """
     Computes exact discrete tick index for a given Q64.96 sqrt(price).
     Guarantees that get_sqrt_ratio_at_tick(tick) <= sqrt_ratio_x96 < get_sqrt_ratio_at_tick(tick + 1).
-    
+
     Returns:
         tick as int in range [MIN_TICK, MAX_TICK].
     Raises:
@@ -248,8 +248,8 @@ def get_amount0_delta(
 
     if round_up:
         # div_round_up(numerator1 * numerator2 / sqrt_ratio_b_x96, sqrt_ratio_a_x96)
-        num = (numerator1 * numerator2)
-        den = (sqrt_ratio_b_x96 * sqrt_ratio_a_x96)
+        num = numerator1 * numerator2
+        den = sqrt_ratio_b_x96 * sqrt_ratio_a_x96
         return (num + den - 1) // den
     else:
         return (numerator1 * numerator2) // (sqrt_ratio_b_x96 * sqrt_ratio_a_x96)
@@ -296,7 +296,9 @@ def get_next_sqrt_price_from_amount0_rounding_up(
             denominator = numerator1 + product
             if denominator >= numerator1:
                 return (numerator1 * sqrt_p_x96 + denominator - 1) // denominator
-        return (numerator1 + (numerator1 // sqrt_p_x96) + amount - 1) // ((numerator1 // sqrt_p_x96) + amount)
+        return (numerator1 + (numerator1 // sqrt_p_x96) + amount - 1) // (
+            (numerator1 // sqrt_p_x96) + amount
+        )
     else:
         product = amount * sqrt_p_x96
         denominator = numerator1 - product
@@ -324,7 +326,7 @@ def evaluate_price_impact_constraint(
     initial_price: float,
     execution_price: float,
     max_allowed_impact_bps: float = QUALIFICATION_MAX_PRICE_IMPACT_BPS,
-) -> Tuple[bool, float, str]:
+) -> tuple[bool, float, str]:
     """
     Evaluates whether simulated trade satisfies the qualification price-impact constraint.
     Returns: (is_compliant, impact_bps, rejection_narrative)

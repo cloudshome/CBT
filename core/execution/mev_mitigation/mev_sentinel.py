@@ -18,13 +18,10 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional
 
 from core.execution.mev_mitigation.models import (
-    MEVProtectedOrderPlan,
-    MEVRiskLevel,
     MempoolRouteType,
-    SandwichVulnerabilityReport,
+    MEVProtectedOrderPlan,
 )
 from core.execution.mev_mitigation.pbs_simulator import PBSSimulator, pbs_simulator
 from core.execution.mev_mitigation.sandwich_detector import (
@@ -42,8 +39,8 @@ class MEVMitigationSentinel:
 
     def __init__(
         self,
-        sandwich_evaluator: Optional[SandwichAttackEvaluator] = None,
-        pbs_sim: Optional[PBSSimulator] = None,
+        sandwich_evaluator: SandwichAttackEvaluator | None = None,
+        pbs_sim: PBSSimulator | None = None,
     ):
         self.sandwich_evaluator = sandwich_evaluator or sandwich_attack_evaluator
         self.pbs_sim = pbs_sim or pbs_simulator
@@ -57,8 +54,8 @@ class MEVMitigationSentinel:
         user_slippage_tolerance_bps: float,
         pool_liquidity_usd: float,
         prefer_fair_sequencing: bool = False,
-        base_fee_gwei: Optional[float] = None,
-        eth_price_usd: Optional[float] = None,
+        base_fee_gwei: float | None = None,
+        eth_price_usd: float | None = None,
     ) -> MEVProtectedOrderPlan:
         """
         Evaluates sandwich risk and generates an MEV-protected routing plan with constitutional sizing.
@@ -111,7 +108,9 @@ class MEVMitigationSentinel:
                 notes = f"Shielded via Private RPC: Neutralized {report.risk_level.name} sandwich hazard"
             else:
                 route_type = MempoolRouteType.PUBLIC_MEMPOOL
-                enforced_slippage = min(user_slippage_tolerance_bps, report.recommended_max_slippage_bps)
+                enforced_slippage = min(
+                    user_slippage_tolerance_bps, report.recommended_max_slippage_bps
+                )
                 builder_tip = 0.0
                 notes = "Public mempool cleared: Net searcher profit is negative (immune to sandwiching)"
 

@@ -9,12 +9,11 @@ Tests:
 3. Milestone 18 certified surface area remains 100% untouched.
 """
 
-from pathlib import Path
 import json
-import pytest
+from pathlib import Path
 
-from scripts.research.run_m42_r_qualification import evaluate_m42_r_obligations
 from core.execution.concentrated_amm.tick_math import REAL_CAPITAL_ENABLED
+from scripts.research.run_m42_r_qualification import evaluate_m42_r_obligations
 
 
 def test_m42_r_all_eight_obligations_pass():
@@ -58,7 +57,6 @@ def test_m42_r_capital_firewall_and_m18_isolation():
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     certified_files = manifest.get("M18_CERTIFIED_FILES", [])
     assert len(certified_files) == 14
-
 
     for rel_path in certified_files:
         full_path = repo_root / rel_path

@@ -111,12 +111,17 @@ def test_02_strategy_manifest_constitutional_firewalls(
     """Verifies that setting real_capital_enabled=True or live execution authority raises ValidationError."""
     d = sample_manifest.model_dump()
     d["real_capital_enabled"] = True
-    with pytest.raises((ValueError, Exception), match=r"(real_capital_enabled MUST be False|Input should be False)"):
+    with pytest.raises(
+        (ValueError, Exception), match=r"(real_capital_enabled MUST be False|Input should be False)"
+    ):
         StrategyConstitutionManifest(**d)
 
     d2 = sample_manifest.model_dump()
     d2["execution_authority"] = "LIVE_CAPITAL_DESK"
-    with pytest.raises((ValueError, Exception), match=r"(execution_authority MUST be|Input should be 'NON_EXECUTABLE_RESEARCH_HYPOTHESIS')"):
+    with pytest.raises(
+        (ValueError, Exception),
+        match=r"(execution_authority MUST be|Input should be 'NON_EXECUTABLE_RESEARCH_HYPOTHESIS')",
+    ):
         StrategyConstitutionManifest(**d2)
 
 
@@ -439,7 +444,9 @@ def test_11_real_capital_bypass_forces_rejection(
     )
 
     # Violate real_capital_enabled on bundle
-    with pytest.raises((ValueError, Exception), match=r"(real_capital_enabled MUST be False|Input should be False)"):
+    with pytest.raises(
+        (ValueError, Exception), match=r"(real_capital_enabled MUST be False|Input should be False)"
+    ):
         M31REvidenceBundle(
             evidence_id="EVID-BYPASS",
             strategy_manifest=sample_manifest,

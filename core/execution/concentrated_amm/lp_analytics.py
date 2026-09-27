@@ -37,13 +37,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Final, Optional, Tuple
 
 from core.execution.concentrated_amm.tick_math import (
-    REAL_CAPITAL_ENABLED,
-    get_sqrt_ratio_at_tick,
-    price_to_tick,
-    sqrt_ratio_x96_to_price,
     tick_to_price,
 )
 
@@ -51,6 +46,7 @@ from core.execution.concentrated_amm.tick_math import (
 @dataclass
 class HedgeRecommendation:
     """Quantitative recommendation for delta-neutral perpetual futures hedging."""
+
     current_price: float
     current_position_delta: float
     current_position_gamma: float
@@ -65,6 +61,7 @@ class HedgeRecommendation:
 @dataclass
 class LPPositionMetrics:
     """Analytical snapshot of a concentrated liquidity position."""
+
     lower_price: float
     upper_price: float
     current_price: float
@@ -125,9 +122,9 @@ class ConcentratedLPAnalytics:
         M = 1 / (1 - (P_a / P_b)^0.25)
         """
         ratio = self.lower_price / self.upper_price
-        return 1.0 / (1.0 - (ratio ** 0.25))
+        return 1.0 / (1.0 - (ratio**0.25))
 
-    def get_token_amounts(self, price: float) -> Tuple[float, float]:
+    def get_token_amounts(self, price: float) -> tuple[float, float]:
         """
         Computes base (token0) and quote (token1) amounts at a given spot price.
         """
@@ -182,10 +179,10 @@ class ConcentratedLPAnalytics:
         """
         if self.lower_price < price < self.upper_price:
             l_float = self.liquidity / (10 ** ((self.decimals_base + self.decimals_quote) / 2.0))
-            return -l_float / (2.0 * (price ** 1.5))
+            return -l_float / (2.0 * (price**1.5))
         return 0.0
 
-    def impermanent_loss(self, price: float) -> Tuple[float, float]:
+    def impermanent_loss(self, price: float) -> tuple[float, float]:
         """
         Computes impermanent loss relative to HODL:
         Returns: (il_pct, il_bps) where il_pct <= 0
@@ -270,7 +267,9 @@ class ConcentratedLPAnalytics:
         il_pct, il_bps = self.impermanent_loss(current_price)
         pos_delta = self.delta(current_price)
         pos_gamma = self.gamma(current_price)
-        fee_apy = self.estimate_fee_apy(volume_24h_usd, fee_pips, total_pool_liquidity, current_price)
+        fee_apy = self.estimate_fee_apy(
+            volume_24h_usd, fee_pips, total_pool_liquidity, current_price
+        )
 
         return LPPositionMetrics(
             lower_price=self.lower_price,

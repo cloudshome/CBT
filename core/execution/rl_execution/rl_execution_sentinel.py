@@ -25,17 +25,14 @@ Mathematical Specifications:
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, List
 
 from core.execution.rl_execution.execution_environment import (
     MicrostructureExecutionState,
 )
 from core.execution.rl_execution.ppo_execution_policy import (
     PPOActorCriticPolicy,
-    PolicyAction,
 )
 
 logger = logging.getLogger("ai_quant_sentinel.rl_execution.sentinel")
@@ -50,6 +47,7 @@ class ExecutionStrategyMode(str, Enum):
 @dataclass
 class RLExecutionTrancheDecision:
     """Analytical order slicing decision for current microstructure step."""
+
     symbol: str
     strategy_mode: ExecutionStrategyMode
     target_shares_remaining: float
@@ -76,7 +74,7 @@ class RLExecutionSentinel:
         self,
         symbol: str = "BTC/USDT",
         max_single_position_equity_pct: float = 0.015,  # 1.5% constitutional equity cap
-        max_depth_participation_pct: float = 0.10,     # Max 10% of visible order book depth
+        max_depth_participation_pct: float = 0.10,  # Max 10% of visible order book depth
         policy: PPOActorCriticPolicy | None = None,
     ) -> None:
         self.symbol = symbol
@@ -186,7 +184,7 @@ class RLExecutionSentinel:
         # If L2 OBI is favorable (> 0.30 for buy), accelerate slightly
         modulated_fraction = raw_fraction
         if l2_obi > 0.30:
-            modulated_fraction *= (1.0 + min(0.20, l2_obi * 0.20))
+            modulated_fraction *= 1.0 + min(0.20, l2_obi * 0.20)
         elif l2_obi < -0.30:
             # Adverse book imbalance, taper participation
             modulated_fraction *= max(0.50, 1.0 + l2_obi * 0.30)
@@ -215,7 +213,10 @@ class RLExecutionSentinel:
 
         final_fraction = shares_proposed / max(1e-6, remaining_shares)
 
-        narrative_parts = [f"Mode: {mode.value}", f"Proposed: {shares_proposed:.4f} shares (${proposed_notional_usd:,.2f})"]
+        narrative_parts = [
+            f"Mode: {mode.value}",
+            f"Proposed: {shares_proposed:.4f} shares (${proposed_notional_usd:,.2f})",
+        ]
         if is_depth_capped:
             narrative_parts.append(f"Capped at {self.max_depth_pct:.0%} book depth")
         if is_equity_capped:

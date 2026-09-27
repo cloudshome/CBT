@@ -23,15 +23,12 @@ from __future__ import annotations
 import pytest
 
 from core.execution.liquidity_surface import (
-    ExecutionUrgency,
-    HighFrequencyToxicFlowDetector,
-    LiquiditySurfaceGeometryEngine,
-    LiquiditySurfaceSentinel,
     REAL_CAPITAL_ENABLED,
+    HighFrequencyToxicFlowDetector,
+    LiquiditySurfaceSentinel,
     ToxicityRegime,
     liquidity_surface_geometry_engine,
     surface_sentinel,
-    toxic_flow_detector,
 )
 
 
@@ -103,7 +100,9 @@ def test_02_kyles_lambda_and_sqrt_law_curve_fitting():
 def test_03_non_linear_order_impact_scaling():
     """Verify market impact scales sub-linearly (sqrt law) rather than linearly for large sizes."""
     bids, asks = _build_test_book()
-    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot("BTC/USDT", 1700000000000, bids, asks)
+    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot(
+        "BTC/USDT", 1700000000000, bids, asks
+    )
     params = liquidity_surface_geometry_engine.fit_impact_curves(snapshot)
 
     impact_small = liquidity_surface_geometry_engine.estimate_order_impact_bps(10_000.0, params)
@@ -125,8 +124,10 @@ def test_04_vpin_balanced_volume_buckets():
     # Ingest 10 buckets alternating buy and sell
     t = 1700000000000
     for i in range(20):
-        is_maker = (i % 2 == 0)
-        detector.process_trade(price=60000.0, size=1.0, timestamp_ms=t + i * 100, is_buyer_maker=is_maker)
+        is_maker = i % 2 == 0
+        detector.process_trade(
+            price=60000.0, size=1.0, timestamp_ms=t + i * 100, is_buyer_maker=is_maker
+        )
 
     vpin = detector.compute_vpin()
     assert vpin < 0.35
@@ -142,7 +143,9 @@ def test_05_vpin_informed_toxic_sweep():
     # Ingest 20 trades strictly buying (taker buy -> is_buyer_maker = False)
     t = 1700000000000
     for i in range(25):
-        detector.process_trade(price=60000.0 + i, size=1.0, timestamp_ms=t + i * 50, is_buyer_maker=False)
+        detector.process_trade(
+            price=60000.0 + i, size=1.0, timestamp_ms=t + i * 50, is_buyer_maker=False
+        )
 
     vpin = detector.compute_vpin()
     assert vpin > 0.75
@@ -158,7 +161,9 @@ def test_06_hawkes_process_arrival_burst_clustering():
     now_ms = 1700000000000
     # Ingest burst of 30 trades in 500ms
     for i in range(30):
-        detector.process_trade(price=60000.0, size=0.1, timestamp_ms=now_ms - 500 + i * 15, is_buyer_maker=False)
+        detector.process_trade(
+            price=60000.0, size=0.1, timestamp_ms=now_ms - 500 + i * 15, is_buyer_maker=False
+        )
 
     intensity_burst = detector.compute_hawkes_intensity(now_ms)
     # Hawkes intensity should be well above baseline mu (0.5)
@@ -178,7 +183,9 @@ def test_07_toxic_flow_regime_classification():
 
     # Create toxic state
     for i in range(15):
-        detector.process_trade(price=60000.0, size=1.0, timestamp_ms=1700000000000 + i * 10, is_buyer_maker=False)
+        detector.process_trade(
+            price=60000.0, size=1.0, timestamp_ms=1700000000000 + i * 10, is_buyer_maker=False
+        )
 
     assessment_toxic = detector.assess_toxicity("BTC/USDT", 1700000000000 + 200)
     assert assessment_toxic.is_toxic is True
@@ -191,7 +198,9 @@ def test_07_toxic_flow_regime_classification():
 def test_08_surface_sentinel_1_5_percent_equity_cap():
     """Verify Surface Sentinel enforces the 1.5% single-event equity cap."""
     bids, asks = _build_test_book()
-    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot("BTC/USDT", 1700000000000, bids, asks)
+    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot(
+        "BTC/USDT", 1700000000000, bids, asks
+    )
 
     # Request $50,000 notional on $100,000 equity (50% requested)
     adj = surface_sentinel.evaluate_and_adjust(
@@ -212,12 +221,16 @@ def test_08_surface_sentinel_1_5_percent_equity_cap():
 def test_09_surface_sentinel_circuit_breaker_on_extreme_vpin():
     """Verify Surface Sentinel halts execution when VPIN reaches extreme adverse level (>= 0.85)."""
     bids, asks = _build_test_book()
-    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot("BTC/USDT", 1700000000000, bids, asks)
+    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot(
+        "BTC/USDT", 1700000000000, bids, asks
+    )
 
     # Mock detector with 0.90 VPIN
     detector = HighFrequencyToxicFlowDetector(bucket_volume=1.0, num_buckets=5)
     for i in range(20):
-        detector.process_trade(price=60000.0, size=1.0, timestamp_ms=1700000000000 + i * 5, is_buyer_maker=False)
+        detector.process_trade(
+            price=60000.0, size=1.0, timestamp_ms=1700000000000 + i * 5, is_buyer_maker=False
+        )
 
     toxic_sentinel = LiquiditySurfaceSentinel(flow_detector=detector)
     adj = toxic_sentinel.evaluate_and_adjust(
@@ -238,14 +251,20 @@ def test_09_surface_sentinel_circuit_breaker_on_extreme_vpin():
 def test_10_surface_sentinel_passive_dark_pool_routing_under_toxic_regime():
     """Verify that when flow is toxic, urgency shifts to maker and dark pool allocation increases."""
     bids, asks = _build_test_book()
-    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot("BTC/USDT", 1700000000000, bids, asks)
+    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot(
+        "BTC/USDT", 1700000000000, bids, asks
+    )
 
     # Ingest moderately toxic trades
     detector = HighFrequencyToxicFlowDetector(bucket_volume=2.0, num_buckets=5)
     for i in range(10):
         # 80% buy, 20% sell
-        detector.process_trade(price=60000.0, size=1.6, timestamp_ms=1700000000000 + i * 20, is_buyer_maker=False)
-        detector.process_trade(price=60000.0, size=0.4, timestamp_ms=1700000000000 + i * 20 + 5, is_buyer_maker=True)
+        detector.process_trade(
+            price=60000.0, size=1.6, timestamp_ms=1700000000000 + i * 20, is_buyer_maker=False
+        )
+        detector.process_trade(
+            price=60000.0, size=0.4, timestamp_ms=1700000000000 + i * 20 + 5, is_buyer_maker=True
+        )
 
     sentinel_instance = LiquiditySurfaceSentinel(flow_detector=detector)
     adj = sentinel_instance.evaluate_and_adjust(
@@ -266,7 +285,9 @@ def test_10_surface_sentinel_passive_dark_pool_routing_under_toxic_regime():
 def test_11_permanent_capital_firewall_and_fail_closed():
     """Verify real_capital_enabled = False and fail-closed handling of malformed inputs."""
     bids, asks = _build_test_book()
-    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot("BTC/USDT", 1700000000000, bids, asks)
+    snapshot = liquidity_surface_geometry_engine.build_surface_snapshot(
+        "BTC/USDT", 1700000000000, bids, asks
+    )
 
     assert REAL_CAPITAL_ENABLED is False
     assert surface_sentinel.real_capital_enabled is False
@@ -282,7 +303,9 @@ def test_11_permanent_capital_firewall_and_fail_closed():
     assert adj_neg.adjusted_notional_usd == 0.0
 
     # Empty book snapshot
-    empty_snap = liquidity_surface_geometry_engine.build_surface_snapshot("BTC/USDT", 1700000000000, [], [])
+    empty_snap = liquidity_surface_geometry_engine.build_surface_snapshot(
+        "BTC/USDT", 1700000000000, [], []
+    )
     adj_empty = surface_sentinel.evaluate_and_adjust(
         symbol="BTC/USDT",
         requested_notional_usd=1000.0,

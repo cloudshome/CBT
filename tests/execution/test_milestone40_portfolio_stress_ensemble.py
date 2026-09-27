@@ -30,13 +30,10 @@ import pytest
 from core.risk_engine.stress_testing.multi_strategy_ensemble import (
     MarketRegimeClassification,
     MultiStrategyEnsembleCoordinator,
-    MultiStrategyEnsembleDecision,
 )
 from core.risk_engine.stress_testing.portfolio_stress_engine import (
     AssetPosition,
-    PortfolioRiskProfile,
     PortfolioStressEngine,
-    ScenarioStressImpact,
     StressScenarioId,
 )
 
@@ -45,8 +42,8 @@ from core.risk_engine.stress_testing.portfolio_stress_engine import (
 def stress_engine() -> PortfolioStressEngine:
     return PortfolioStressEngine(
         min_post_stress_margin_buffer_pct=0.20,  # 20% margin buffer required post-stress
-        max_portfolio_heat_ceiling_pct=0.06,     # 6.0% heat ceiling
-        max_single_asset_cap_pct=0.015,          # 1.5% single asset cap
+        max_portfolio_heat_ceiling_pct=0.06,  # 6.0% heat ceiling
+        max_single_asset_cap_pct=0.015,  # 1.5% single asset cap
     )
 
 
@@ -75,7 +72,7 @@ def conservative_positions() -> list[AssetPosition]:
             symbol="ETH/USDT",
             quantity=0.4,
             entry_price=3000.0,
-            current_mark_price=3050.0,    # $1,220 notional (1.22% equity)
+            current_mark_price=3050.0,  # $1,220 notional (1.22% equity)
             maintenance_margin_rate=0.03,
             asset_volatility=0.035,
         ),
@@ -83,7 +80,7 @@ def conservative_positions() -> list[AssetPosition]:
             symbol="SOL/USDT",
             quantity=8.0,
             entry_price=140.0,
-            current_mark_price=145.0,     # $1,160 notional (1.16% equity)
+            current_mark_price=145.0,  # $1,160 notional (1.16% equity)
             maintenance_margin_rate=0.04,
             asset_volatility=0.05,
         ),
@@ -202,8 +199,12 @@ def test_07_regime_weight_adaptation_trend_vs_ranging(
     ensemble_coordinator: MultiStrategyEnsembleCoordinator,
 ):
     """Verifies that regime shifts adaptively adjust strategy allocations."""
-    trend_weights = ensemble_coordinator.compute_regime_weights(MarketRegimeClassification.TRENDING_HIGH_VOL)
-    range_weights = ensemble_coordinator.compute_regime_weights(MarketRegimeClassification.RANGING_LOW_VOL)
+    trend_weights = ensemble_coordinator.compute_regime_weights(
+        MarketRegimeClassification.TRENDING_HIGH_VOL
+    )
+    range_weights = ensemble_coordinator.compute_regime_weights(
+        MarketRegimeClassification.RANGING_LOW_VOL
+    )
 
     # In trending: Trend and HRP dominate
     assert trend_weights["DIRECTIONAL_TREND"] > range_weights["DIRECTIONAL_TREND"]
@@ -299,6 +300,11 @@ def test_11_milestone18_execution_surface_untouched():
     if not Path(py_exe).exists():
         py_exe = sys.executable
 
-    res = subprocess.run([py_exe, "scripts/verify_m18_certification.py"], cwd=str(repo_root), capture_output=True, text=True)
+    res = subprocess.run(
+        [py_exe, "scripts/verify_m18_certification.py"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+    )
     assert res.returncode == 0, f"Milestone 18 certification invalid:\n{res.stdout}\n{res.stderr}"
     assert "M18 Production Pass remains ACTIVE" in res.stdout

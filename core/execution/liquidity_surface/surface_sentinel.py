@@ -17,7 +17,6 @@ Enforces:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from core.execution.liquidity_surface.models import (
     ExecutionUrgency,
@@ -47,8 +46,8 @@ class LiquiditySurfaceSentinel:
 
     def __init__(
         self,
-        geometry_engine: Optional[LiquiditySurfaceGeometryEngine] = None,
-        flow_detector: Optional[HighFrequencyToxicFlowDetector] = None,
+        geometry_engine: LiquiditySurfaceGeometryEngine | None = None,
+        flow_detector: HighFrequencyToxicFlowDetector | None = None,
     ):
         self.geometry_engine = geometry_engine or liquidity_surface_geometry_engine
         self.flow_detector = flow_detector or toxic_flow_detector
@@ -60,8 +59,8 @@ class LiquiditySurfaceSentinel:
         requested_notional_usd: float,
         portfolio_equity_usd: float,
         snapshot: OrderBookSurfaceSnapshot,
-        toxicity: Optional[ToxicFlowAssessment] = None,
-        curve_params: Optional[SurfaceCurveParams] = None,
+        toxicity: ToxicFlowAssessment | None = None,
+        curve_params: SurfaceCurveParams | None = None,
     ) -> ProtectiveExecutionAdjustment:
         """
         Evaluates incoming order request against liquidity geometry and flow toxicity.
@@ -88,7 +87,9 @@ class LiquiditySurfaceSentinel:
             capped_notional = min(requested_notional_usd, max_constitutional_notional)
 
             # 3. Assess toxicity regime if not pre-computed
-            assessment = toxicity or self.flow_detector.assess_toxicity(symbol, snapshot.timestamp_ms)
+            assessment = toxicity or self.flow_detector.assess_toxicity(
+                symbol, snapshot.timestamp_ms
+            )
 
             # 4. Toxicity Circuit Breakers
             if assessment.regime == ToxicityRegime.EXTREME_ADVERSE:
@@ -132,12 +133,16 @@ class LiquiditySurfaceSentinel:
 
             # 5. Fit curves and verify market impact
             params = curve_params or self.geometry_engine.fit_impact_curves(snapshot)
-            expected_impact_bps = self.geometry_engine.estimate_order_impact_bps(tentative_notional, params)
+            expected_impact_bps = self.geometry_engine.estimate_order_impact_bps(
+                tentative_notional, params
+            )
 
             # Clamping notional if expected impact exceeds ceiling
             if expected_impact_bps > max_slip_bps:
                 # Scale down notional proportionally
-                impact_ratio = max_slip_bps / expected_impact_bps if expected_impact_bps > 0 else 1.0
+                impact_ratio = (
+                    max_slip_bps / expected_impact_bps if expected_impact_bps > 0 else 1.0
+                )
                 tentative_notional *= max(0.1, impact_ratio)
                 logger.info(
                     "Scaled down order on %s to $%.2f to respect impact ceiling of %.1f bps.",

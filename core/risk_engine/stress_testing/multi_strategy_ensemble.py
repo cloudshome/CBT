@@ -21,9 +21,8 @@ Constitutional Risk Invariants:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List
 
 from core.risk_engine.stress_testing.portfolio_stress_engine import (
     AssetPosition,
@@ -44,6 +43,7 @@ class MarketRegimeClassification(str, Enum):
 @dataclass
 class StrategyAllocationWeight:
     """Strategy allocation weight and risk budget."""
+
     strategy_name: str
     target_weight_pct: float
     allocated_capital_usd: float
@@ -56,9 +56,10 @@ class StrategyAllocationWeight:
 @dataclass
 class MultiStrategyEnsembleDecision:
     """Master allocation decision across all trading strategies."""
+
     regime: MarketRegimeClassification
     total_portfolio_equity_usd: float
-    strategy_allocations: Dict[str, StrategyAllocationWeight]
+    strategy_allocations: dict[str, StrategyAllocationWeight]
     total_portfolio_heat_pct: float
     is_constitutionally_compliant: bool
     stress_testing_profile: PortfolioRiskProfile
@@ -74,7 +75,7 @@ class MultiStrategyEnsembleCoordinator:
     def __init__(
         self,
         max_portfolio_heat_pct: float = 0.06,  # 6.0% heat ceiling
-        max_single_asset_pct: float = 0.015,   # 1.5% single asset cap
+        max_single_asset_pct: float = 0.015,  # 1.5% single asset cap
         stress_engine: PortfolioStressEngine | None = None,
     ) -> None:
         self.max_heat_pct = max_portfolio_heat_pct
@@ -88,7 +89,7 @@ class MultiStrategyEnsembleCoordinator:
     def compute_regime_weights(
         self,
         regime: MarketRegimeClassification,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Determines dynamic strategy weighting based on macro/micro regime.
         """
@@ -132,7 +133,7 @@ class MultiStrategyEnsembleCoordinator:
         self,
         portfolio_equity_usd: float,
         regime: MarketRegimeClassification,
-        current_positions: List[AssetPosition],
+        current_positions: list[AssetPosition],
         estimated_portfolio_volatility: float = 0.02,
     ) -> MultiStrategyEnsembleDecision:
         """
@@ -145,7 +146,7 @@ class MultiStrategyEnsembleCoordinator:
         weights = self.compute_regime_weights(regime)
 
         # Build StrategyAllocationWeight records
-        allocations: Dict[str, StrategyAllocationWeight] = {}
+        allocations: dict[str, StrategyAllocationWeight] = {}
         for strat, w in weights.items():
             cap = portfolio_equity_usd * w
             heat_budget = self.max_heat_pct * w

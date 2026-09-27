@@ -25,16 +25,15 @@ from __future__ import annotations
 import logging
 import math
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger("ai_quant_sentinel.market_making.hawkes")
 
 
 class FlowToxicityTier(str, Enum):
     """Categorical classification of incoming order flow toxicity."""
+
     BENIGN = "BENIGN"
     MODERATE_CLUSTERING = "MODERATE_CLUSTERING"
     ELEVATED_TOXICITY = "ELEVATED_TOXICITY"
@@ -44,6 +43,7 @@ class FlowToxicityTier(str, Enum):
 @dataclass
 class HawkesIntensityState:
     """Real-time diagnostic state of the Hawkes point process."""
+
     current_intensity: float
     baseline_rate_mu: float
     excitation_alpha: float
@@ -65,9 +65,9 @@ class HawkesTradeArrivalEstimator:
 
     def __init__(
         self,
-        baseline_rate_mu: float = 2.0,      # 2 trades/sec baseline
-        excitation_alpha: float = 1.2,      # Jump intensity per fill
-        decay_beta: float = 2.0,            # Decay rate (half-life ~ 0.35s)
+        baseline_rate_mu: float = 2.0,  # 2 trades/sec baseline
+        excitation_alpha: float = 1.2,  # Jump intensity per fill
+        decay_beta: float = 2.0,  # Decay rate (half-life ~ 0.35s)
         moderate_intensity_ratio: float = 2.5,
         elevated_intensity_ratio: float = 5.0,
         critical_intensity_ratio: float = 10.0,

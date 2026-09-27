@@ -20,7 +20,6 @@ Constitutional Invariant:
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Tuple
 
 from core.execution.liquidity_surface.models import (
     LiquiditySurfacePoint,
@@ -32,7 +31,11 @@ from core.execution.liquidity_surface.models import (
 class LiquiditySurfaceGeometryEngine:
     """Reconstructs order book liquidity surfaces and estimates non-linear price impact curves."""
 
-    def __init__(self, default_daily_volume_usd: float = 100_000_000.0, default_volatility_daily: float = 0.04):
+    def __init__(
+        self,
+        default_daily_volume_usd: float = 100_000_000.0,
+        default_volatility_daily: float = 0.04,
+    ):
         self.default_daily_volume_usd = default_daily_volume_usd
         self.default_volatility_daily = default_volatility_daily
         self.real_capital_enabled: bool = False
@@ -41,8 +44,8 @@ class LiquiditySurfaceGeometryEngine:
         self,
         symbol: str,
         timestamp_ms: int,
-        bids: List[Tuple[float, float]],  # (price, size) sorted descending
-        asks: List[Tuple[float, float]],  # (price, size) sorted ascending
+        bids: list[tuple[float, float]],  # (price, size) sorted descending
+        asks: list[tuple[float, float]],  # (price, size) sorted ascending
     ) -> OrderBookSurfaceSnapshot:
         """
         Reconstructs discrete liquidity coordinates across bid and ask surfaces.
@@ -64,7 +67,7 @@ class LiquiditySurfaceGeometryEngine:
         mid_price = (best_bid + best_ask) / 2.0
         spread_bps = ((best_ask - best_bid) / mid_price) * 10_000.0 if mid_price > 0 else 0.0
 
-        bid_surface: List[LiquiditySurfacePoint] = []
+        bid_surface: list[LiquiditySurfacePoint] = []
         cum_vol_bid = 0.0
         total_depth_usd = 0.0
 
@@ -81,7 +84,7 @@ class LiquiditySurfaceGeometryEngine:
             )
             total_depth_usd += price * size
 
-        ask_surface: List[LiquiditySurfacePoint] = []
+        ask_surface: list[LiquiditySurfacePoint] = []
         cum_vol_ask = 0.0
         for price, size in asks:
             cum_vol_ask += size
@@ -110,8 +113,8 @@ class LiquiditySurfaceGeometryEngine:
     def fit_impact_curves(
         self,
         snapshot: OrderBookSurfaceSnapshot,
-        daily_volume_usd: Optional[float] = None,
-        daily_volatility: Optional[float] = None,
+        daily_volume_usd: float | None = None,
+        daily_volatility: float | None = None,
     ) -> SurfaceCurveParams:
         """
         Fits empirical Kyle's Lambda and Square-Root Law parameters to the order book.
@@ -133,7 +136,7 @@ class LiquiditySurfaceGeometryEngine:
         y_impact = [p.marginal_impact_bps for p in points]
 
         # Kyle's lambda = sum(x*y) / sum(x^2) in bps per USD
-        sum_xy = sum(x * y for x, y in zip(x_linear, y_impact))
+        sum_xy = sum(x * y for x, y in zip(x_linear, y_impact, strict=False))
         sum_xx = sum(x * x for x in x_linear)
         kyles_lambda = sum_xy / sum_xx if sum_xx > 0 else 1e-6
 
@@ -141,12 +144,12 @@ class LiquiditySurfaceGeometryEngine:
         # Y = mean( y / (sigma_bps * sqrt(Q / V)) )
         sigma_bps = sigma * 10_000.0
         y_ratios = []
-        for x, y in zip(x_linear, y_impact):
+        for x, y in zip(x_linear, y_impact, strict=False):
             if x > 0 and v_daily > 0:
                 frac = math.sqrt(x / v_daily)
                 if frac > 0:
                     y_ratios.append(y / (sigma_bps * frac))
-        
+
         square_root_alpha = sum(y_ratios) / len(y_ratios) if y_ratios else 0.5
 
         # Calculate R-squared for square root model
@@ -154,7 +157,7 @@ class LiquiditySurfaceGeometryEngine:
         ss_tot = sum((y - mean_y) ** 2 for y in y_impact)
         ss_res = sum(
             (y - (square_root_alpha * sigma_bps * math.sqrt(max(1e-9, x / v_daily)))) ** 2
-            for x, y in zip(x_linear, y_impact)
+            for x, y in zip(x_linear, y_impact, strict=False)
         )
         r_squared = max(0.0, min(1.0, 1.0 - (ss_res / ss_tot))) if ss_tot > 0 else 0.0
 
@@ -169,8 +172,8 @@ class LiquiditySurfaceGeometryEngine:
         self,
         notional_usd: float,
         params: SurfaceCurveParams,
-        daily_volume_usd: Optional[float] = None,
-        daily_volatility: Optional[float] = None,
+        daily_volume_usd: float | None = None,
+        daily_volatility: float | None = None,
     ) -> float:
         """
         Estimates total expected market impact in basis points for an order of size `notional_usd`.

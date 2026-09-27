@@ -21,21 +21,19 @@ When crossing an initialized tick t:
 from __future__ import annotations
 
 import bisect
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
 from core.execution.concentrated_amm.tick_math import (
     MAX_TICK,
     MIN_TICK,
-    REAL_CAPITAL_ENABLED,
     is_valid_tick_for_spacing,
-    nearest_valid_tick,
 )
 
 
 @dataclass
 class TickInfo:
     """Microstructure state stored at an initialized tick."""
+
     tick: int
     liquidity_gross: int = 0
     liquidity_net: int = 0
@@ -65,8 +63,8 @@ class TickTable:
         if tick_spacing <= 0:
             raise ValueError("tick_spacing must be strictly positive")
         self.tick_spacing = tick_spacing
-        self.ticks: Dict[int, TickInfo] = {}
-        self._sorted_initialized_ticks: List[int] = []
+        self.ticks: dict[int, TickInfo] = {}
+        self._sorted_initialized_ticks: list[int] = []
         self.real_capital_enabled: bool = False
 
     @property
@@ -86,13 +84,19 @@ class TickTable:
         Inserts or modifies a concentrated liquidity position [tick_lower, tick_upper].
         """
         if tick_lower >= tick_upper:
-            raise ValueError(f"tick_lower ({tick_lower}) must be strictly less than tick_upper ({tick_upper})")
+            raise ValueError(
+                f"tick_lower ({tick_lower}) must be strictly less than tick_upper ({tick_upper})"
+            )
         if not (MIN_TICK <= tick_lower <= MAX_TICK and MIN_TICK <= tick_upper <= MAX_TICK):
             raise ValueError(f"Ticks out of allowable bounds [{MIN_TICK}, {MAX_TICK}]")
         if not is_valid_tick_for_spacing(tick_lower, self.tick_spacing):
-            raise ValueError(f"tick_lower {tick_lower} must align to tick_spacing {self.tick_spacing}")
+            raise ValueError(
+                f"tick_lower {tick_lower} must align to tick_spacing {self.tick_spacing}"
+            )
         if not is_valid_tick_for_spacing(tick_upper, self.tick_spacing):
-            raise ValueError(f"tick_upper {tick_upper} must align to tick_spacing {self.tick_spacing}")
+            raise ValueError(
+                f"tick_upper {tick_upper} must align to tick_spacing {self.tick_spacing}"
+            )
 
         # Update lower tick
         if tick_lower not in self.ticks:
@@ -116,14 +120,14 @@ class TickTable:
         self,
         current_tick: int,
         zero_for_one: bool,
-    ) -> Tuple[int, bool]:
+    ) -> tuple[int, bool]:
         """
         Finds the next initialized tick in the swap direction.
-        
+
         Args:
             current_tick: active pool tick.
             zero_for_one: True if price decreasing (moving down/left), False if price increasing (moving up/right).
-            
+
         Returns:
             (next_tick, is_initialized):
             - If found: (next_tick, True)

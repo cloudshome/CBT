@@ -17,8 +17,6 @@ Verifies the 8 institutional proof obligations:
 
 from __future__ import annotations
 
-import pytest
-
 from scripts.research.run_m44_r_qualification import evaluate_m44_r_obligations
 
 

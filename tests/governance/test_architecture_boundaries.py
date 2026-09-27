@@ -13,15 +13,14 @@ Validates:
 """
 
 from pathlib import Path
+
 import pytest
 
 from core.governance.architecture_registry import (
+    EXPLICIT_ALLOWED_EDGES,
+    LAYER_DEPENDENCY_ALLOWLIST,
     ArchitectureLayer,
     ModuleAuthority,
-    LAYER_DEPENDENCY_ALLOWLIST,
-    FORBIDDEN_IMPORT_PATTERNS,
-    EXPLICIT_ALLOWED_EDGES,
-    resolve_module_layer,
     resolve_module_authority,
     validate_import_direction,
 )
@@ -38,14 +37,18 @@ def test_entire_codebase_boundary_compliance(repo_root: Path):
     Verifies that all Python modules across the repository adhere strictly to
     the 4-Registry Architecture Contract with zero AST import violations.
     """
-    is_compliant, violations, scanned_files, scanned_imports = run_architecture_boundary_verification(repo_root)
+    is_compliant, violations, scanned_files, scanned_imports = (
+        run_architecture_boundary_verification(repo_root)
+    )
 
     violation_report = "\n".join(
         f"  - [{v.file_path}:{v.line_number}] {v.source_module} -> {v.target_module}: {v.reason}"
         for v in violations
     )
 
-    assert is_compliant, f"Detected {len(violations)} architectural boundary violations across {scanned_files} files:\n{violation_report}"
+    assert is_compliant, (
+        f"Detected {len(violations)} architectural boundary violations across {scanned_files} files:\n{violation_report}"
+    )
     assert len(violations) == 0
     assert scanned_files >= 500
     assert scanned_imports >= 4000
@@ -72,17 +75,35 @@ def test_layer_stratification_rules():
 def test_authority_isolation_resolution():
     """Verifies authority classification resolution for key modules."""
     # M18 Certified Live Router has Certified Execution Authority
-    assert resolve_module_authority("core.execution.live_router") == ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY
-    assert resolve_module_authority("core.execution.connectors.binance_connector") == ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY
+    assert (
+        resolve_module_authority("core.execution.live_router")
+        == ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY
+    )
+    assert (
+        resolve_module_authority("core.execution.connectors.binance_connector")
+        == ModuleAuthority.CERTIFIED_EXECUTION_AUTHORITY
+    )
 
     # Risk Engine has Governance Risk Authority
     assert resolve_module_authority("core.risk_engine") == ModuleAuthority.GOVERNANCE_RISK_AUTHORITY
-    assert resolve_module_authority("core.half_kelly_sizer") == ModuleAuthority.GOVERNANCE_RISK_AUTHORITY
+    assert (
+        resolve_module_authority("core.half_kelly_sizer")
+        == ModuleAuthority.GOVERNANCE_RISK_AUTHORITY
+    )
 
     # M42 Concentrated AMM & M41 Cross Chain are strictly Simulation/Research Only
-    assert resolve_module_authority("core.execution.concentrated_amm") == ModuleAuthority.SIMULATION_RESEARCH_ONLY
-    assert resolve_module_authority("core.execution.cross_chain") == ModuleAuthority.SIMULATION_RESEARCH_ONLY
-    assert resolve_module_authority("core.research.walk_forward") == ModuleAuthority.SIMULATION_RESEARCH_ONLY
+    assert (
+        resolve_module_authority("core.execution.concentrated_amm")
+        == ModuleAuthority.SIMULATION_RESEARCH_ONLY
+    )
+    assert (
+        resolve_module_authority("core.execution.cross_chain")
+        == ModuleAuthority.SIMULATION_RESEARCH_ONLY
+    )
+    assert (
+        resolve_module_authority("core.research.walk_forward")
+        == ModuleAuthority.SIMULATION_RESEARCH_ONLY
+    )
 
 
 def test_forbidden_import_rejection():
@@ -115,10 +136,15 @@ def test_forbidden_import_rejection():
 def test_explicit_allowed_edges():
     """Verifies explicit authorized cross-layer edges (emergency circuit breaker & alerts)."""
     assert ("core.incident_escalation", "core.autonomous_trader") in EXPLICIT_ALLOWED_EDGES
-    assert ("core.incident_escalation", "core.shadow_burn_in_orchestrator") in EXPLICIT_ALLOWED_EDGES
+    assert (
+        "core.incident_escalation",
+        "core.shadow_burn_in_orchestrator",
+    ) in EXPLICIT_ALLOWED_EDGES
     assert ("core.incident_escalation", "core.autonomous_auditor") in EXPLICIT_ALLOWED_EDGES
 
     # Validate that these edges pass validation
-    is_valid, reason = validate_import_direction("core.incident_escalation", "core.autonomous_trader")
+    is_valid, reason = validate_import_direction(
+        "core.incident_escalation", "core.autonomous_trader"
+    )
     assert is_valid
     assert reason is None

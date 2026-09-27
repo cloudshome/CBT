@@ -446,7 +446,9 @@ async def evaluate_trade_plan_impact(payload: TradePlanImpactRequest) -> dict[st
 # RESEARCH WIKIPEDIA & LIVING JOURNAL ENDPOINTS
 # -----------------------------------------------------------------------------
 class WikiIngestRequest(BaseModel):
-    url_or_text: str = Field(..., min_length=2, description="URL (Facebook, YouTube, X, web) or raw text note")
+    url_or_text: str = Field(
+        ..., min_length=2, description="URL (Facebook, YouTube, X, web) or raw text note"
+    )
     title: str | None = Field(default=None, description="Optional custom title")
     category: str | None = Field(default=None, description="Optional category")
     author: str | None = Field(default=None, description="Optional author or speaker attribution")
@@ -461,7 +463,9 @@ async def list_wiki_articles(
     """Lists all Research Wikipedia articles with metadata and verification status."""
     from core.knowledge_os.research_wikipedia import research_wikipedia_engine
 
-    articles = research_wikipedia_engine.list_articles(category=category, search_query=search, limit=limit)
+    articles = research_wikipedia_engine.list_articles(
+        category=category, search_query=search, limit=limit
+    )
     return {"articles": articles, "count": len(articles)}
 
 
@@ -520,4 +524,3 @@ async def delete_wiki_article(article_id: str) -> dict[str, Any]:
     if not success:
         raise HTTPException(status_code=404, detail=f"Wiki article '{article_id}' not found.")
     return {"status": "DELETED", "article_id": article_id}
-
