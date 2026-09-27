@@ -363,6 +363,8 @@ class GoogleDriveAPIBackend:
     Falls back gracefully to Simulated backend if credentials are not configured.
     """
 
+    _oauth_refresh_failed: ClassVar[bool] = False
+
     def __init__(self):
         self.service = None
         self._initialized = False
@@ -370,6 +372,9 @@ class GoogleDriveAPIBackend:
         self._init_client()
 
     def _init_client(self) -> None:
+        if GoogleDriveAPIBackend._oauth_refresh_failed:
+            self._initialized = False
+            return
         creds_json = os.getenv("GDRIVE_SERVICE_ACCOUNT_JSON")
         creds_file = (
             os.getenv("GDRIVE_SERVICE_ACCOUNT_FILE")
@@ -406,7 +411,15 @@ class GoogleDriveAPIBackend:
                         with open(token_file, "w", encoding="utf-8") as f:
                             f.write(creds.to_json())
                     except Exception as ref_err:  # noqa: BLE001
-                        logger.warning("OAuth token refresh failed: %s", ref_err)
+                        logger.warning("OAuth token refresh failed (%s); falling back to simulated storage.", ref_err)
+                        GoogleDriveAPIBackend._oauth_refresh_failed = True
+                        self._initialized = False
+                        return
+                if not creds.valid:
+                    logger.info("Google Drive OAuth credentials are not valid; using sandboxed simulated storage.")
+                    GoogleDriveAPIBackend._oauth_refresh_failed = True
+                    self._initialized = False
+                    return
             elif creds_json:
                 from google.oauth2 import service_account
 
