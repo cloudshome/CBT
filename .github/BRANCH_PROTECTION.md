@@ -35,11 +35,11 @@ To protect the institutional quantitative models, M18 certification invariants, 
 ## Automated Configuration
 To automatically apply these rules, run:
 ```bash
-python scripts/setup_branch_protection.py cloudshome/CTB main
+python scripts/setup_branch_protection.py cloudshome/CBT main
 ```
 Or via GitHub CLI:
 ```bash
-gh api --method PUT repos/cloudshome/CTB/branches/main/protection --input - << 'EOF'
+gh api --method PUT repos/cloudshome/CBT/branches/main/protection --input - << 'EOF'
 {
   "required_status_checks": {
     "strict": true,

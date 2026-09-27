@@ -27,7 +27,7 @@ from core.intelligence.crawler.source_registry import SourceRecord
 logger = logging.getLogger("ai_quant_sentinel.intelligence.crawler.base_adapter")
 
 # Institutional User-Agent header providing transparent attribution
-INSTITUTIONAL_USER_AGENT = "CBT-Research-Scout/3.0 (+https://github.com/cloudshome/CTB; contact: security@cloudshome.local)"
+INSTITUTIONAL_USER_AGENT = "CBT-Research-Scout/3.0 (+https://github.com/cloudshome/CBT; contact: security@cloudshome.local)"
 
 
 @dataclass

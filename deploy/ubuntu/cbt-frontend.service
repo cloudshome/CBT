@@ -2,23 +2,23 @@
 # substituted with this machine's real user/app-root paths at install time.
 # Do not copy this file to /etc/systemd/system by hand; run the setup script.
 [Unit]
-Description=CBT Express API Backend
-Documentation=https://github.com/cloudshome/CTB
-After=network-online.target cbt-fastapi.service
+Description=CBT React Frontend (Vite Preview)
+Documentation=https://github.com/cloudshome/CBT
+After=network-online.target cbt-express.service
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=__CBT_USER__
 Group=__CBT_USER__
-WorkingDirectory=__CBT_PROJECT_DIR__
+WorkingDirectory=__CBT_PROJECT_DIR__/frontend
 EnvironmentFile=__CBT_PROJECT_DIR__/.env
-ExecStart=__NODE_BIN__ __CBT_PROJECT_DIR__/dist/server.js
+ExecStart=__NPX_BIN__ vite preview --host 0.0.0.0 --port 5173
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=cbt-express
+SyslogIdentifier=cbt-frontend
 
 # Crash recovery
 StartLimitIntervalSec=120

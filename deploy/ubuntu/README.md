@@ -118,7 +118,7 @@ The script handles everything:
 
 ### Step 2b — Private repo: credentials for unattended sync
 
-`cloudshome/CTB` is private, so the clone prompts for a username and password.
+`cloudshome/CBT` is private, so the clone prompts for a username and password.
 A systemd timer has **no keyboard**, so the sync would fail (or hang) unless
 credentials are stored. `ubuntu-setup.sh` therefore:
 
@@ -132,7 +132,7 @@ When prompted, enter your GitHub username and a **Personal Access Token**
 Prefer SSH instead?
 ```bash
 sudo -u cbt ssh-keygen -t ed25519          # add the .pub key to GitHub
-sudo -u cbt git -C /home/cbt/CBT remote set-url origin git@github.com:cloudshome/CTB.git
+sudo -u cbt git -C /home/cbt/CBT remote set-url origin git@github.com:cloudshome/CBT.git
 sudo cbt-deploy                            # verify it fetches cleanly
 ```
 

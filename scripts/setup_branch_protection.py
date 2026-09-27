@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 
-def setup_branch_protection(repo: str = "cloudshome/CTB", branch: str = "main") -> None:
+def setup_branch_protection(repo: str = "cloudshome/CBT", branch: str = "main") -> None:
     print(f"[*] Configuring Branch Protection for repository: {repo} (branch: {branch})")
 
     protection_payload = {
@@ -91,6 +91,6 @@ def setup_branch_protection(repo: str = "cloudshome/CTB", branch: str = "main") 
 
 
 if __name__ == "__main__":
-    repo_name = sys.argv[1] if len(sys.argv) > 1 else "cloudshome/CTB"
+    repo_name = sys.argv[1] if len(sys.argv) > 1 else "cloudshome/CBT"
     branch_name = sys.argv[2] if len(sys.argv) > 2 else "main"
     setup_branch_protection(repo_name, branch_name)

@@ -49,7 +49,7 @@ elif id "$CBT_USER" &>/dev/null; then
 else
     CBT_HOME="/home/$CBT_USER"
 fi
-REPO_URL="${REPO_URL:-https://github.com/cloudshome/CTB.git}"
+REPO_URL="${REPO_URL:-https://github.com/cloudshome/CBT.git}"
 REPO_DIR="${REPO_DIR:-$CBT_HOME/CBT}"
 SYNC_SCRIPT="/usr/local/bin/cbt-sync.sh"
 HEALTH_SCRIPT="/usr/local/bin/cbt-health"
@@ -208,7 +208,7 @@ else
     warn "Git could NOT authenticate non-interactively (private repo)."
     warn "The nightly auto-sync would fail until this is fixed. Two options:"
     warn "  A) Store a Personal Access Token (repo scope) now — enter it below."
-    warn "  B) Switch the remote to SSH:  sudo -u $CBT_USER -H git -C $REPO_DIR remote set-url origin git@github.com:cloudshome/CTB.git"
+    warn "  B) Switch the remote to SSH:  sudo -u $CBT_USER -H git -C $REPO_DIR remote set-url origin git@github.com:cloudshome/CBT.git"
     echo ""
     read -rp "   Press ENTER to enter credentials now (Ctrl-C to skip and fix later) ..." || true
     sudo -u "$CBT_USER" -H git -C "$REPO_DIR" fetch origin \

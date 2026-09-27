@@ -1,6 +1,6 @@
 [Unit]
 Description=CBT / SKY 24/7 Crypto Brain Terminal Stack
-Documentation=https://github.com/cloudshome/CTB
+Documentation=https://github.com/cloudshome/CBT
 After=docker.service network-online.target
 Requires=docker.service
 Wants=network-online.target

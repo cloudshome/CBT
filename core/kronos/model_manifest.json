@@ -1,6 +1,6 @@
 {
   "model_family": "kronos-time-series-foundation",
-  "upstream_repository": "https://github.com/cloudshome/CTB/tree/main/core/models/kronos",
+  "upstream_repository": "https://github.com/cloudshome/CBT/tree/main/core/models/kronos",
   "model_variants": {
     "kronos-mini": {
       "context_length": 256,

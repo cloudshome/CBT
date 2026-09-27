@@ -136,7 +136,7 @@ Tracks multi-source contradictions and empirical data revisions:
 
 ### 3.6 Domain Adapters & Institutional Politeness (`base_adapter.py` & `adapters/`)
 * **Single User-Agent Header:**
-  `CBT-Research-Scout/3.0 (+https://github.com/cloudshome/CTB; contact: security@cloudshome.local)`
+  `CBT-Research-Scout/3.0 (+https://github.com/cloudshome/CBT; contact: security@cloudshome.local)`
 * **Zero Evasion:** Strictly no user-agent rotation, proxy cycling, or anti-scraping bypass techniques.
 * **Circuit Breakers:** Automatically trips upon 3 consecutive connection or HTTP errors; enforces minimum 300s cooldown.
 * **Token-Bucket Throttling:** Restricts request frequency according to publisher terms and robots.txt.

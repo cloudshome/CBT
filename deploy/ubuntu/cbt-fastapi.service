@@ -4,7 +4,7 @@
 # (it also works for a flattened checkout where app root == repo root).
 [Unit]
 Description=CBT FastAPI Quantitative Backend
-Documentation=https://github.com/cloudshome/CTB
+Documentation=https://github.com/cloudshome/CBT
 After=network-online.target
 Wants=network-online.target
 

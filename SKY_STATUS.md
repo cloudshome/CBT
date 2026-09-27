@@ -3,7 +3,7 @@
 > **Last Updated:** 2026-09-26  
 > **Release Tag:** `v4.0.0` (OPERATOR APPROVED & OFFICIALLY RELEASED 🚀)  
 > **Branch:** `main`  
-> **Remote:** `https://github.com/cloudshome/CTB.git`  
+> **Remote:** `https://github.com/cloudshome/CBT.git`  
 > **Lead Agent:** Antigravity  
 > **Repo local path:** `c:\Users\azims\CBT`  
 > **Milestone 18 Status:** PRODUCTION PASS (Certified & Active — 149/149 Tests)  

@@ -1,9 +1,9 @@
 # CTB Repository — Complete Review & Future Roadmap
 
-**Date:** 2026-09-04 · **Repo:** cloudshome/CTB · **Commit reviewed:** `46c0c87` (main HEAD)
+**Date:** 2026-09-04 · **Repo:** cloudshome/CBT · **Commit reviewed:** `46c0c87` (main HEAD)
 **Scope:** All 19 remote branches + 2 tags, PR/issue/Actions state, full CI-equivalent local run (pytest, ruff, eslint, jest, tsc), security, architecture, and deployment audit.
 
-> Note: the actual project root is `Users/azims/CBT/`. Everything below refers to that tree unless noted.
+> Note: the actual project root is `/`. Everything below refers to that tree unless noted.
 
 ---
 
@@ -23,7 +23,7 @@ This section supersedes the "CI never ran / must be proven in CI" caveats above.
 **Branch protection on `main` (requires `Lint, Test & Build`) — NOT ENABLED.** The bot token is not a repo admin (`403 Resource not accessible by integration` for branch-protection endpoints); it *can* push/delete branches/PRs but **cannot** set protection. A human repo admin must run (recommended: require the status check, PRs, linear history):
 
 ```bash
-gh api -X PUT repos/cloudshome/CTB/branches/main/protection \
+gh api -X PUT repos/cloudshome/CBT/branches/main/protection \
   --input - <<'JSON'
 {
   "required_status_checks": { "strict": true, "contexts": ["Lint, Test & Build"] },
@@ -112,8 +112,8 @@ Environment: Python 3.11.2 (venv), Node 22 / npm 10, fresh `npm ci` (root + fron
 
 ### 3.1 GitHub Actions — never ran
 ```
-gh api repos/cloudshome/CTB/actions/runs      → total_count: 0
-gh api repos/cloudshome/CTB/actions/workflows → total_count: 0
+gh api repos/cloudshome/CBT/actions/runs      → total_count: 0
+gh api repos/cloudshome/CBT/actions/workflows → total_count: 0
 ```
 The workflow files exist (`.github/workflows/ci.yml` etc.) but are **not registered/enabled on the repo**. Consequence: every commit message claiming "N passing tests / all 4 preflight gates green / 100% green" has never been validated by CI. This is the single most important process finding.
 

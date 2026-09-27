@@ -4,7 +4,7 @@
 **Repository:** SKY / Crypto Brain Terminal (CBT)  
 **Auditor:** Principal Quant Architect & Independent Systems Reviewer  
 **Audit Commit:** 6e4d8effff3b4ad395e5af7f971a09d74eb58149  
-**Remote Target:** origin/main (https://github.com/cloudshome/CTB.git)  
+**Remote Target:** origin/main (https://github.com/cloudshome/CBT.git)  
 **Audit Date:** 2026-09-17  
 **Verdict:** FORENSIC AUDIT PASSED — EPISTEMIC BOUNDARY CERTIFIED  
 
