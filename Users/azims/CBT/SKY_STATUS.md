@@ -28,8 +28,9 @@
 > **Milestone 42-D Status:** COMPLETED & CERTIFIED (Uniswap v4 Hook Safety, Dynamic Fee & Volatility Circuit Breaker — 8/8 Tests 🟢)  
 > **Milestone 42-R Status:** COMPLETED & CERTIFIED (AMM Microstructure Evidence Qualification — 8/8 Obligations PASS, 40/40 Tests Green 🏛️)  
 > **Milestone 43 Status:** COMPLETED & CERTIFIED (Advanced Execution Routing & Cross-Venue Arbitrage Analytics — 11/11 Tests 🟢)  
-> **Next Generation / Milestone:** Generation 8 — Milestone 43-R: Cross-Venue Execution Adversarial Qualification & Evidence Hardening  
-> **Preflight Status:** ALL 21 RELEASE GATES + ALL 15 AUDIT OBLIGATIONS + GATE G-21 + GEN 7 AUDIT + M41 + M41-R + M42 (A, B, C, D, R) + M43 PASSED (100% GREEN)  
+> **Milestone 43-R Status:** COMPLETED & CERTIFIED (Cross-Venue Execution Adversarial Qualification & Evidence Hardening — 8/8 Obligations PASS, 12/12 Tests Green 🏛️)  
+> **Next Generation / Milestone:** Generation 8 — Milestone 44: Liquidity Surface Geometry & High-Frequency Toxic Flow Analytics  
+> **Preflight Status:** ALL 21 RELEASE GATES + ALL 15 AUDIT OBLIGATIONS + GATE G-21 + GEN 7 AUDIT + M41 + M41-R + M42 (A, B, C, D, R) + M43 + M43-R PASSED (100% GREEN)  
 
 
 ---
@@ -385,6 +386,26 @@ Milestone 42 delivers a comprehensive, institutional-grade Concentrated Liquidit
 5. **M42-R (Evidence Hardening & Qualification Dossier):** `scripts/research/run_m42_r_qualification.py` verified 8/8 institutional obligations (100% PASS), emitting `docs/audit/M42_R_AMM_MICROSTRUCTURE_DOSSIER.md` and report JSON.
 6. **Milestone 18 Protection:** All 14 certified files untouched; 149/149 tests green and verified via `scripts/verify_m18_certification.py`.
 7. **Total Milestone 42 Test Suite:** 40 / 40 tests green across 5 dedicated test modules.
+
+---
+
+## Milestone 43 & 43-R: Advanced Cross-Venue Execution Routing & Arbitrage Analytics — COMPLETED & CERTIFIED 🟢
+
+Milestone 43 and 43-R deliver a high-throughput, institutional cross-venue smart execution and arbitrage analytics engine isolated for research and simulation (`real_capital_enabled = False`).
+
+### Completed & Hardened Deliverables:
+1. **M43 Core Engine (`core/execution/cross_venue`):**
+   - `models.py`: Immutable DTOs (`VenueType`, `ArbitrageType`, `OrderBookLevel`, `VenueDepthSnapshot`, `ArbitrageLeg`, `CrossVenueOpportunity`, `RoutingSplit`, `ExecutionPlan`).
+   - `triangular_arb.py`: Bellman-Ford negative log-weight cycle detection ($w = -\ln(R \cdot (1 - f))$) across multi-asset cross-currency graphs.
+   - `optimal_router.py`: Discrete waterfilling convex order slicing across CEX books and DEX CLMM continuous liquidity, minimizing aggregate slippage, fees, and latency penalties.
+   - `latency_penalty.py`: Hawkes-calibrated exponential dislocation half-life ($P_{\text{fill}} = e^{-\lambda \Delta t}$) and adverse selection hurdle modeling.
+   - `cross_venue_sentinel.py`: Master risk orchestrator with Half-Kelly sizing, 1.5% single-path equity cap, Leg-Risk Fail-Safe (aborts on $>15\text{ bps}$ leg slippage), and fail-closed sandbox.
+2. **M43-R (Adversarial Evidence Hardening):**
+   - Automated qualification harness in `scripts/research/run_m43_r_qualification.py` verifying 8/8 institutional obligations (100% PASS).
+   - Emits `docs/audit/M43_R_CROSS_VENUE_ROUTING_REPORT.json` and `docs/audit/M43_R_CROSS_VENUE_ROUTING_DOSSIER.md`.
+   - Comprehensive test suite in `tests/execution/test_milestone43_cross_venue_routing.py` (11 tests) and `tests/execution/test_milestone43_r_evidence_hardening.py` (1 test covering all 8 obligations).
+3. **Milestone 18 Protection:** Certified surface area untouched; 149/149 tests green and verified via `scripts/verify_m18_certification.py`.
+4. **Total Milestone 43 & 43-R Test Suite:** 12 / 12 tests green (100% PASS).
 
 ---
 
