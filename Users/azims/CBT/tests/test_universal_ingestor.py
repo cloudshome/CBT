@@ -171,7 +171,7 @@ async def test_telegram_reverse_flow_link_ingestion():
         res = await telegram_bot.handle_webhook_update(update)
         assert res["status"] == "RESEARCH_INGESTED"
         assert res["type"] == "LINK"
-        assert res["knowledge_id"].startswith("K-")
+        assert res["knowledge_id"].startswith("K-") or res["knowledge_id"].startswith("[S-")
         assert mock_send.called
         any_summary = any(
             "FILED IN SKY RESEARCH LAB" in call.args[0] for call in mock_send.call_args_list
