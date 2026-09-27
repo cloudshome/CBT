@@ -19,9 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    defaults:
-      run:
-        working-directory: Users/azims/CBT
 
     env:
       DATABASE_URL: "file:./dev.db"
@@ -38,7 +35,7 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: Users/azims/CBT/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install Backend & Tooling Dependencies
         run: npm ci
@@ -61,7 +58,7 @@ jobs:
         with:
           python-version: '3.13'
           cache: 'pip'
-          cache-dependency-path: Users/azims/CBT/requirements*.txt
+          cache-dependency-path: requirements*.txt
 
       - name: Install Python Quantitative Dependencies
         run: |
