@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "ctb-terminal": "file:..",
+
     "decimal.js": "^10.6.0",
     "idb": "^8.0.3",
     "lightweight-charts": "^5.2.1",
