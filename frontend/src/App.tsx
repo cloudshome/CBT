@@ -143,7 +143,7 @@ export const App: React.FC = () => {
 
   // Toast notification helper
   const addToast = useCallback((type: ToastMessage['type'], title: string, message: string) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = crypto.randomUUID();
     setToasts((prev) => [...prev, { id, type, title, message }]);
 
     // Auto-dismiss after 6 seconds
@@ -391,7 +391,7 @@ export const App: React.FC = () => {
     fetchInitialMarketData();
     fetchPositions();
     fetchDeskBrief();
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, fetchInitialMarketData, fetchPositions, fetchDeskBrief]);
 
   // Synchronize Live Watchlist Ticks directly into Header and Stats
   const handleWatchlistPriceTick = useCallback((tickSymbol: string, price: number, high?: number, low?: number) => {
