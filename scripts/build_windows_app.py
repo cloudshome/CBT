@@ -48,7 +48,7 @@ def log(msg: str) -> None:
 def run_step(cmd: list[str], desc: str, cwd: Path = REPO_ROOT) -> bool:
     log(f"--> [GATE CHECK] {desc}...")
     t0 = time.perf_counter()
-    res = subprocess.run(cmd, cwd=str(cwd), shell=True)
+    res = subprocess.run(cmd, cwd=str(cwd))
     dt = time.perf_counter() - t0
     if res.returncode != 0:
         print(f"\n[BLOCKER TRIGGERED] Step '{desc}' FAILED with exit code {res.returncode}")
@@ -446,7 +446,7 @@ def main() -> None:
 
     # G-16: Packaging Native Windows Binaries
     log("G-16: Executing electron-builder packaging...")
-    builder_res = subprocess.run(["npx", "electron-builder", "--win", "--x64"], shell=True)
+    builder_res = subprocess.run(["npx", "electron-builder", "--win", "--x64"])
     if builder_res.returncode != 0:
         print(f"[WARN] electron-builder returned non-zero code ({builder_res.returncode})")
 
