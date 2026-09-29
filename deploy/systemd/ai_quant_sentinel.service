@@ -1,0 +1,48 @@
+# =============================================================================
+# AI Quant Sentinel 24/7 Production Quantitative Engine — bare-metal systemd unit
+#
+# ⚠️  TEMPLATE — this file contains __CBT_USER__ and __CBT_WORKDIR__
+#     placeholders. DO NOT `cp` it into /etc/systemd/system/ directly (a raw
+#     copy produces a unit pointing at /root/CBT that fails with
+#     `Result: resources`). Install it with:
+#
+#         bash deploy/install_bare_metal.sh
+#
+# Conflict guard: this unit runs uvicorn directly on port 8000 and is
+# MUTUALLY EXCLUSIVE with the Docker Compose stack
+# (deploy/systemd/cbt-stack@.service, whose Python backend also binds 8000).
+# Enable EXACTLY ONE of the two deployment modes.
+# =============================================================================
+
+[Unit]
+Description=AI Quant Sentinel 24/7 Production Quantitative Engine
+Documentation=https://github.com/cloudshome/CBT
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__CBT_USER__
+WorkingDirectory=__CBT_WORKDIR__
+# Single process BY DESIGN: the app starts background loops per process
+# (autonomous trader, Telegram poller, cache sweeper); extra uvicorn workers
+# would duplicate those loops against the same SQLite WAL databases.
+ExecStart=__CBT_WORKDIR__/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 30
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+
+# Resource hardening — caps a runaway backtest/stress-test instead of
+# starving the whole machine. Tune to your hardware if needed.
+MemoryHigh=3G
+MemoryMax=3.5G
+CPUQuota=200%
+
+# Logs go to the journal (view with: journalctl -u ai_quant_sentinel -f).
+# Do not append to /var/log/*.log — the service runs as an unprivileged user.
+StandardOutput=journal
+StandardError=journal
+EnvironmentFile=__CBT_WORKDIR__/.env
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["node_modules", "dist", ".venv"]
+
+[tool.ruff.lint]
+# Curated quality gate: critical syntax + pyflakes, imports, bugbear,
+# pyupgrade, blind-except, bandit-lite and simplification rules.
+select = ["E", "F", "I", "B", "UP", "BLE", "S110", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Deliberate typographic characters (→, ×, ⚡, ℹ️) used in prose strings,
+# docstrings and tests — not code issues.
+"*.py" = ["RUF001", "RUF002", "RUF003"]

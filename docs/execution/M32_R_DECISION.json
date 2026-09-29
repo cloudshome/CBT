@@ -1,0 +1,78 @@
+{
+  "all_gates_passed": true,
+  "campaign_id": "CAMP-336H-PHYSICAL-PROD",
+  "decision_id": "DEC-M32R-1790403593-36d06dfec2",
+  "effective_qualified_hours": 310.0,
+  "gates_evaluated": [
+    {
+      "details": "Mathematical time conservation audited across two-clock telemetry.",
+      "gate_name": "GATE_1_TIME_CONSERVATION",
+      "observed_value": {
+        "disqualified": 26.0,
+        "qualified": 310.0,
+        "wall_clock": 336.0
+      },
+      "passed": true,
+      "target_threshold": "wall_clock == qualified + disqualified"
+    },
+    {
+      "details": "Achieved 310.0h qualified (92.3%).",
+      "gate_name": "GATE_2_EFFECTIVE_DURATION",
+      "observed_value": {
+        "qualified_hours": 310.0,
+        "ratio": 0.9226190476190477,
+        "target_hours": 336.0
+      },
+      "passed": true,
+      "target_threshold": ">= 300h qualified of 336h (>= 89.2% ratio)"
+    },
+    {
+      "details": "All submitted testnet orders resolved with zero ambiguous state.",
+      "gate_name": "GATE_3_LOST_ACK_RECONCILIATION",
+      "observed_value": {
+        "reconciled": 1420,
+        "total_orders": 1420,
+        "unreconciled_ambiguous": 0
+      },
+      "passed": true,
+      "target_threshold": "0 unreconciled ambiguous orders"
+    },
+    {
+      "details": "Zero quantity overfills or negative inventory episodes.",
+      "gate_name": "GATE_4_ZERO_OVERFILL_INVARIANT",
+      "observed_value": 0,
+      "passed": true,
+      "target_threshold": "0 overfill events"
+    },
+    {
+      "details": "All allocations strictly bounded by min(notional, margin, loss, liquidity).",
+      "gate_name": "GATE_5_EQUITY_CAP_COMPLIANCE",
+      "observed_value": 0,
+      "passed": true,
+      "target_threshold": "0 breaches of decomposed ceilings"
+    },
+    {
+      "details": "Persisted 336 state checkpoints.",
+      "gate_name": "GATE_6_CHECKPOINT_DURABILITY",
+      "observed_value": 336,
+      "passed": true,
+      "target_threshold": ">= 1 durable WAL checkpoint"
+    },
+    {
+      "details": "Permanent capital firewall active. Zero live exchange orders.",
+      "gate_name": "GATE_7_CAPITAL_ISOLATION_FIREWALL",
+      "observed_value": {
+        "real_capital_enabled": false
+      },
+      "passed": true,
+      "target_threshold": "real_capital_enabled == False"
+    }
+  ],
+  "qualification_ratio": 0.9226190476190477,
+  "rationale": "All 7 physical testnet burn-in gates passed with 100% time conservation and zero overfills.",
+  "real_capital_enabled": false,
+  "reproducibility_hash": "36d06dfec2962b548a949a126c1de7bc3f19af4113e69a0d9bfde6c442ec773c",
+  "status": "QUALIFIED",
+  "timestamp_utc": 1790403593.3096187,
+  "total_wall_clock_hours": 336.0
+}

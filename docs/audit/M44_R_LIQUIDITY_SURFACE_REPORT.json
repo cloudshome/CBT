@@ -1,0 +1,95 @@
+{
+  "milestone": "44-R",
+  "title": "Liquidity Surface Geometry & Toxic Flow Qualification",
+  "timestamp_utc": "2026-09-27T05:17:30Z",
+  "status": "QUALIFIED",
+  "passed_obligations": 8,
+  "total_obligations": 8,
+  "elapsed_seconds": 14.528,
+  "obligations": {
+    "OBL-1": {
+      "title": "Continuous Order Book Surface Reconstruction & Geometry Invariants",
+      "passed": true,
+      "details": {
+        "mid_price": 60000.0,
+        "spread_bps": 3.33,
+        "depth_points": 20,
+        "total_depth_usd": 7800000.0,
+        "monotonic_volume_verified": true
+      }
+    },
+    "OBL-2": {
+      "title": "Non-Linear Market Impact Curvature (Kyle's Lambda & Square-Root Law)",
+      "passed": true,
+      "details": {
+        "kyles_lambda": 4.9463709257523695e-06,
+        "square_root_alpha": 0.1837,
+        "impact_10k_usd_bps": 0.735,
+        "impact_1m_usd_bps": 7.347,
+        "scaling_ratio": 10.0,
+        "concavity_verified": true
+      }
+    },
+    "OBL-3": {
+      "title": "Volume-Synchronized Probability of Toxicity (VPIN) Mathematical Precision",
+      "passed": true,
+      "details": {
+        "vpin_balanced": 0.0,
+        "vpin_toxic": 1.0,
+        "bounds_verified": true,
+        "sensitivity_verified": true
+      }
+    },
+    "OBL-4": {
+      "title": "Hawkes Self-Excitation Intensity & Flow Clustering Dynamics",
+      "passed": true,
+      "details": {
+        "baseline_intensity_mu": 0.5,
+        "burst_intensity": 14.3602,
+        "decayed_intensity_15s": 0.5,
+        "reversion_verified": true
+      }
+    },
+    "OBL-5": {
+      "title": "Constitutional Half-Kelly & 1.5% Single-Path Equity Cap",
+      "passed": true,
+      "details": {
+        "requested_notional_usd": 25000.0,
+        "constitutional_cap_usd": 1500.0,
+        "adjusted_notional_usd": 1500.0,
+        "kelly_fraction": 0.015,
+        "cap_strictly_enforced": true
+      }
+    },
+    "OBL-6": {
+      "title": "Microstructure Toxicity Circuit Breaker (VPIN >= 0.85 Immediate Halt)",
+      "passed": true,
+      "details": {
+        "is_halted": true,
+        "adjusted_notional_usd": 0.0,
+        "reason": "Protective Circuit Breaker: Extreme toxic flow (VPIN 1.00 >= 0.85)",
+        "circuit_breaker_tripped": true
+      }
+    },
+    "OBL-7": {
+      "title": "Dynamic Urgency Adaptation & Dark Pool Liquidity Allocation",
+      "passed": true,
+      "details": {
+        "urgency": "NORMAL_SCHEDULED",
+        "dark_pool_allocation_pct": 0.2,
+        "max_slippage_ceiling_bps": 18.0,
+        "adaptation_verified": true
+      }
+    },
+    "OBL-8": {
+      "title": "Permanent Capital Firewall & Milestone 18 Certified Surface Area Isolation",
+      "passed": true,
+      "details": {
+        "real_capital_enabled": false,
+        "architecture_layer": "LAYER_2_QUANT_SIMULATION",
+        "architecture_authority": "SIMULATION_RESEARCH_ONLY",
+        "m18_certification_intact": true
+      }
+    }
+  }
+}

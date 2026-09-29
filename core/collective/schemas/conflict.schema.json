@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SDCCConflictRecord",
+  "type": "object",
+  "required": [
+    "conflict_id",
+    "conflict_type",
+    "detected_at",
+    "source_node",
+    "details"
+  ],
+  "properties": {
+    "conflict_id": { "type": "string" },
+    "conflict_type": { "type": "string" },
+    "detected_at": { "type": "string", "format": "date-time" },
+    "source_node": { "type": "string" },
+    "target_entity_id": { "type": ["string", "null"] },
+    "details": { "type": "object" },
+    "resolved": { "type": "boolean" },
+    "resolved_at": { "type": ["string", "null"] }
+  }
+}

@@ -1,0 +1,210 @@
+version: '3.8'
+
+# =============================================================================
+# SKY / Crypto Brain Terminal — Production-Hardened Docker Compose
+#
+# Services:
+#   python-backend  → FastAPI + uvicorn (port 8000) — Core intelligence engine
+#   backend         → Node/Express + Prisma (port 3000) — Paper trading + candles
+#   frontend        → Nginx + React build (port 80, internal only) — Terminal UI
+#   caddy           → HTTPS reverse proxy (ports 80/443) — Public access gateway
+#
+# All services use restart: always — survive crashes, daemon restarts, reboots.
+# data/ is volume-mounted on Ubuntu disk — databases never live inside containers.
+#
+# Remote access (Windows PC + Android):
+#   Set CBT_DOMAIN=your.domain.com in .env → Caddy auto-provisions Let's Encrypt
+#   No domain? Set CBT_DOMAIN to your Ubuntu local IP (e.g. 192.168.1.50)
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Python FastAPI — Market Intelligence Engine (12-stage SKY pipeline)
+  # Strategy evolution, signals, risk engine, Telegram bot
+  # ---------------------------------------------------------------------------
+  python-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sky_python_backend
+    restart: always
+    expose:
+      - "8000"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - APP_ENV=production
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATA_DIR=/app/data
+      # Behind the Caddy proxy → allow trusted X-Forwarded-For for rate limiting
+      - TRUST_PROXY_XFF=true
+      # Paper-trading risk gate (FastAPI) — deterministic limits
+      - MAX_PAPER_OPEN_POSITIONS=3
+      - MAX_PAPER_ACCOUNT_BALANCE=100000
+      - MAX_PAPER_RISK_PCT=0.02
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3000M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # Node/Express — Paper Trading, Candles, Desk, Tickers (Prisma + SQLite)
+  # Continuous paper trading from historical → live candles
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: sky_node_backend
+    restart: always
+    expose:
+      - "3000"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=file:/app/data/dev.db
+      # Behind the Caddy proxy → allow trusted X-Forwarded-For for rate limiting
+      - TRUST_PROXY_XFF=true
+    depends_on:
+      python-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1500M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # Nginx — React terminal UI (internal only, served via Caddy)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: sky_frontend
+    restart: always
+    expose:
+      - "80"
+    depends_on:
+      python-backend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Caddy — Automatic HTTPS reverse proxy (Windows PC + Android access)
+  #
+  # HTTP/80 and HTTPS/443 are the only ports exposed to the outside.
+  # Caddy auto-provisions Let's Encrypt TLS when CBT_DOMAIN is a real domain.
+  # For local network access only, set CBT_DOMAIN to your Ubuntu local IP.
+  #
+  # Routing (see deploy/Caddyfile):
+  #   /api/sky/*, /ws/*, /api/health/* → python-backend:8000
+  #   /api/candles, /api/paper, /api/desk → backend:3000
+  #   /* → frontend:80 (React terminal UI)
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: sky_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 QUIC
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./data/logs:/data/logs
+    environment:
+      - CBT_DOMAIN=${CBT_DOMAIN:-localhost}
+    depends_on:
+      python-backend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      # Probe through nginx → Python backend so the check actually verifies the
+      # full API path (SPA fallback would otherwise always answer 200 on /health).
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Named volumes — Caddy TLS certificates (persistent across container restarts)
+# All CBT data lives in ./data on Ubuntu disk (bind-mounted above)
+# =============================================================================
+volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local

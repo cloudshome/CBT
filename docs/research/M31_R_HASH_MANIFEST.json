@@ -1,0 +1,10 @@
+{
+  "codebase_git_hash": "0d18b1a",
+  "dataset_hash": "7a38e8749d211f4d92eb9192bb3b2ef425572bb2a9d8d64821a71927e1f4d1e2",
+  "decision_hash": "de4b8f617a5cd0f593e445fc7c7807ecc719235631cfeae79a2f3a77a494b76b",
+  "evidence_bundle_hash": "bc54454ce6f1babde09ee8e59f7d381e327fa760aefca9fab4049ac797545d25",
+  "manifest_id": "MANIFEST-M31R-1790396750-a13daeeffd",
+  "master_integrity_hash": "a13daeeffd2761cff468c5c983ed48f9e72220740eb8af3ef614ae0eb6546b09",
+  "strategy_manifest_hash": "833dc4ae9fa9200df4e9cefcb2b34bc8134b3319437486c0d68a0c34457c548f",
+  "timestamp_utc": 1790396750.1782188
+}

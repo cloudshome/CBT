@@ -1,0 +1,47 @@
+{
+  "model_family": "kronos-time-series-foundation",
+  "upstream_repository": "https://github.com/cloudshome/CBT/tree/main/core/models/kronos",
+  "model_variants": {
+    "kronos-mini": {
+      "context_length": 256,
+      "hidden_dim": 128,
+      "num_layers": 4,
+      "num_heads": 4
+    },
+    "kronos-small": {
+      "context_length": 512,
+      "hidden_dim": 256,
+      "num_layers": 6,
+      "num_heads": 8
+    },
+    "kronos-base": {
+      "context_length": 1024,
+      "hidden_dim": 512,
+      "num_layers": 12,
+      "num_heads": 8
+    }
+  },
+  "supported_providers": ["LOCAL", "SURROGATE"],
+  "tokenizer_type": "continuous_causal_ohlcv_tokenizer",
+  "input_schema": {
+    "primary_sequence": "OHLCV (Open, High, Low, Close, Volume, Timestamp_ms)",
+    "context_vector": "Microstructure 8-Vector (OFI, VPIN, MidReturn, SpreadBps, DepthImb, TradeSign, VolClock, RestingWall)",
+    "causality": "strictly_causal_t_minus_lookback_to_t",
+    "normalization": "point_in_time_rolling_zscore_no_lookahead"
+  },
+  "output_schema": {
+    "trajectory_paths": "M Monte Carlo paths of H forward steps (Predicted OHLCV)",
+    "distribution_moments": "Mean, Median, Volatility, Consensus [0.5, 1.0], Uncertainty [0.0, 1.0]",
+    "directional_bias": "BULLISH | BEARISH | NEUTRAL"
+  },
+  "license": "Apache-2.0",
+  "version": "8.0.0",
+  "retrieved_at": "2026-09-17T09:00:00Z",
+  "sha256": "4b97a2283e5898864f1c1fcf2167d4f3b17c6e6118318db9e09d5718dfd048fa",
+  "verification_status": "VERIFIED",
+  "limitations": [
+    "Native inference requires PyTorch weights on local GPU/CPU; falls back automatically to SURROGATE provider if weights unavailable.",
+    "Forecasts represent conditional probability density over future return horizons, NOT trade execution signals.",
+    "Must be calibrated against realized forward outcomes using Platt scaling and verified by Brier Score before inclusion in research context."
+  ]
+}

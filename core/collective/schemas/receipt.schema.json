@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SDCCSyncReceipt",
+  "type": "object",
+  "required": [
+    "receipt_id",
+    "node_id",
+    "received_from",
+    "events_received",
+    "events_imported",
+    "events_duplicate",
+    "events_quarantined",
+    "completed_at"
+  ],
+  "properties": {
+    "receipt_id": { "type": "string" },
+    "node_id": { "type": "string" },
+    "received_from": { "type": "string" },
+    "events_received": { "type": "integer", "minimum": 0 },
+    "events_imported": { "type": "integer", "minimum": 0 },
+    "events_duplicate": { "type": "integer", "minimum": 0 },
+    "events_quarantined": { "type": "integer", "minimum": 0 },
+    "artifacts_received": { "type": "integer", "minimum": 0 },
+    "conflicts_created": { "type": "integer", "minimum": 0 },
+    "projection_rebuilt": { "type": "boolean" },
+    "completed_at": { "type": "string", "format": "date-time" }
+  }
+}
