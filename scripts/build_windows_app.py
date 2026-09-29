@@ -424,7 +424,13 @@ def main() -> None:
     )
 
     # G-21: Human Release Approval Gate (Pending Operator Signature)
-    gates["G-21"] = True
+    human_approved = (
+        os.getenv("RELEASE_APPROVED", "").lower() in ("true", "1")
+        or (RELEASE_DIR / "HUMAN_APPROVAL.json").exists()
+    )
+    if not human_approved:
+        log("G-21: WAITING — Set RELEASE_APPROVED=true or place release/HUMAN_APPROVAL.json to proceed.")
+    gates["G-21"] = human_approved
 
     # G-14: Secret Leakage Audit
     log("G-14: Running Secret Leakage Audit...")
@@ -478,7 +484,9 @@ def main() -> None:
         from scripts.generate_release_checksums import generate_checksums
         checksums = generate_checksums()
     except Exception as e:
-        log(f"Checksum generation error: {e}")
+        log(f"[FAIL] Checksum generation error: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Installer Verification
     installer_ok = run_step([py_exe, "scripts/verify_installer.py"], "G-16: Installer Lab Verification")
