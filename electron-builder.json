@@ -11,7 +11,14 @@
     "frontend/public/**/*",
     "bin/**/*",
     "data/templates/**/*",
-    "package.json"
+    "package.json",
+    "cbt_backend.py",
+    "app.py",
+    "main.py",
+    "core/**/*.py",
+    "integrations/**/*.py",
+    "requirements.txt",
+    ".env.example"
   ],
   "win": {
     "target": [
