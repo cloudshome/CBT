@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, shell } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
 export interface CtbDesktopAPI {
   minimize: () => void;
@@ -16,7 +16,7 @@ const ctbAPI: CtbDesktopAPI = {
   close: () => ipcRenderer.send('window:close'),
   isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
   getAppVersion: () => ipcRenderer.invoke('system:getAppVersion'),
-  openExternal: (url: string) => shell.openExternal(url),
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   getBackendUrl: () => ipcRenderer.invoke('system:getBackendUrl'),
 };
 
