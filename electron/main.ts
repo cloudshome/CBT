@@ -6,6 +6,7 @@ import {
   Tray,
   powerSaveBlocker,
   dialog,
+  shell,
 } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -107,7 +108,16 @@ async function ensureBackendStarted(): Promise<void> {
   }
 
   if (backendProcess) {
-    backendProcess.stdout?.pipe(logStream);
+    // Parse stdout to discover dynamic backend port (CBT_BACKEND_READY:http://...)
+    backendProcess.stdout?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString();
+      logStream.write(text);
+      const match = text.match(/CBT_BACKEND_READY:(http:\/\/[\d.]+:\d+)/);
+      if (match) {
+        backendUrl = match[1];
+        console.log(`[Electron Supervisor] Backend announced at ${backendUrl}`);
+      }
+    });
     backendProcess.stderr?.pipe(logStream);
 
     backendProcess.on('exit', (code, signal) => {
@@ -127,6 +137,7 @@ async function ensureBackendStarted(): Promise<void> {
   }
   console.warn('[Electron Supervisor] Backend probe timed out; proceeding to render UI.');
 }
+
 
 function resolveAppIcon(): string | undefined {
   const iconNames = ['favicon.png', 'icon.png', 'favicon.ico'];
@@ -318,6 +329,15 @@ function registerIpcHandlers(): void {
   ipcMain.handle('system:getBackendUrl', () => {
     return backendUrl;
   });
+
+  // Secure shell:openExternal — only allow http/https URLs (prevents RCE via preload)
+  ipcMain.handle('shell:openExternal', (_event, url: string) => {
+    if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
+      return shell.openExternal(url);
+    }
+    console.warn(`[Electron Supervisor] Blocked openExternal for unsafe URL: ${url}`);
+    return Promise.resolve();
+  });
 }
 
 // Application Lifecycle
@@ -354,7 +374,12 @@ app.on('before-quit', () => {
   }
   if (backendProcess) {
     console.log('[Electron Supervisor] Terminating backend process...');
-    backendProcess.kill('SIGTERM');
+    if (process.platform === 'win32' && backendProcess.pid) {
+      // SIGTERM is a no-op on Windows — use taskkill for reliable cleanup
+      spawn('taskkill', ['/pid', String(backendProcess.pid), '/f', '/t'], { stdio: 'ignore' });
+    } else {
+      backendProcess.kill('SIGTERM');
+    }
     backendProcess = null;
   }
 });
