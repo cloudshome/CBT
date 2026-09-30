@@ -182,7 +182,7 @@ services:
     healthcheck:
       # Probe through nginx → Python backend so the check actually verifies the
       # full API path (SPA fallback would otherwise always answer 200 on /health).
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:2019/reverse_proxy/upstreams"]
       interval: 30s
       timeout: 10s
       retries: 3

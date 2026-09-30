@@ -31,7 +31,7 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "frontend/public/favicon.ico",
+    "icon": "frontend/public/icon.png",
     "legalTrademarks": "Copyright (C) 2026 Crypto Brain Terminal / SKY Quantitative Systems"
   },
   "nsis": {
