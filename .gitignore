@@ -1,6 +1,8 @@
 node_modules/
 dist/
 release/
+build/
+*.spec
 bin/
 *.db
 *.db-journal

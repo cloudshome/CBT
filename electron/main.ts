@@ -73,7 +73,14 @@ async function ensureBackendStarted(): Promise<void> {
 
   // Priority 1: Packaged binary in bin/cbt_backend.exe (Win) or bin/cbt_backend (Linux)
   const isWin = process.platform === 'win32';
-  const packagedExe = path.join(appRoot, 'bin', isWin ? 'cbt_backend.exe' : 'cbt_backend');
+  const binaryName = isWin ? 'cbt_backend.exe' : 'cbt_backend';
+  const packagedExeCandidates = [
+    path.join(appRoot, 'bin', binaryName),
+    path.join(process.resourcesPath, 'bin', binaryName),
+    path.join(process.resourcesPath, 'app.asar.unpacked', 'bin', binaryName),
+    path.join(app.getAppPath(), 'bin', binaryName),
+  ];
+  const packagedExe = packagedExeCandidates.find((p) => fs.existsSync(p));
   const repoVenv = isWin
     ? path.resolve(__dirname, '../../.venv/Scripts/python.exe')
     : path.resolve(__dirname, '../../.venv/bin/python3');
@@ -94,9 +101,10 @@ async function ensureBackendStarted(): Promise<void> {
   const backendScript = scriptCandidates.find((p) => fs.existsSync(p)) || path.join(appRoot, 'cbt_backend.py');
   const backendCwd = fs.existsSync(backendScript) ? path.dirname(backendScript) : appRoot;
 
-  if (fs.existsSync(packagedExe)) {
+  if (packagedExe) {
+    console.log(`[Electron Supervisor] Launching packaged backend: ${packagedExe}`);
     backendProcess = spawn(packagedExe, [], {
-      cwd: appRoot,
+      cwd: path.dirname(packagedExe),
       env: { ...process.env, CBT_BACKEND_PORT: '8000' },
     });
   } else {

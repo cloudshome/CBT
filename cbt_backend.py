@@ -74,9 +74,11 @@ def main() -> None:
     except Exception:
         pass
 
+    import app as fastapi_app
+
     # Run Uvicorn strictly on loopback
     uvicorn.run(
-        "app:app",
+        fastapi_app.app,
         host=HOST,
         port=port,
         log_level="info",

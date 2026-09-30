@@ -20,6 +20,15 @@
     "requirements.txt",
     ".env.example"
   ],
+  "asarUnpack": [
+    "bin/**/*"
+  ],
+  "extraFiles": [
+    {
+      "from": "bin",
+      "to": "bin"
+    }
+  ],
   "win": {
     "target": [
       {

@@ -67,6 +67,11 @@ jobs:
       - name: Compile Electron TypeScript Supervisor
         run: npm run electron:build
 
+      - name: Compile Standalone Python Backend (PyInstaller)
+        run: |
+          pip install pyinstaller
+          python -m PyInstaller --noconfirm --clean --onefile --distpath bin --name cbt_backend --add-data "static;static" --collect-all core --hidden-import uvicorn --hidden-import uvicorn.logging --hidden-import uvicorn.loops --hidden-import uvicorn.loops.auto --hidden-import uvicorn.protocols --hidden-import uvicorn.protocols.http --hidden-import uvicorn.protocols.http.auto --hidden-import uvicorn.protocols.websockets --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan --hidden-import uvicorn.lifespan.on cbt_backend.py
+
       - name: Package Windows Installers (NSIS + Portable)
         run: npx electron-builder --win --x64
 
@@ -134,6 +139,11 @@ jobs:
 
       - name: Compile Electron TypeScript Supervisor
         run: npm run electron:build
+
+      - name: Compile Standalone Python Backend (PyInstaller)
+        run: |
+          pip install pyinstaller
+          python -m PyInstaller --noconfirm --clean --onefile --distpath bin --name cbt_backend --add-data "static:static" --collect-all core --hidden-import uvicorn --hidden-import uvicorn.logging --hidden-import uvicorn.loops --hidden-import uvicorn.loops.auto --hidden-import uvicorn.protocols --hidden-import uvicorn.protocols.http --hidden-import uvicorn.protocols.http.auto --hidden-import uvicorn.protocols.websockets --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan --hidden-import uvicorn.lifespan.on cbt_backend.py
 
       - name: Package Linux Desktop App (AppImage + DEB)
         run: npx electron-builder --linux --x64 AppImage deb

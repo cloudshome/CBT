@@ -98,11 +98,54 @@ def main() -> None:
     # 3. Generate High-Res Icons
     run_step([py_exe, "scripts/generate_app_icons.py"], "Compiling High-Resolution App Icons")
 
-    # 4. Clean Production Builds (Frontend + Electron TS)
+    # 4. Clean Production Builds (Frontend + Electron TS + Standalone Python Backend)
     frontend_ok = run_step(["npm", "run", "build"], "Compiling Frontend PWA Bundle", cwd=REPO_ROOT / "frontend")
     electron_ts = REPO_ROOT / "electron" / "tsconfig.json"
     electron_ok = run_step(["npx", "tsc", "-p", str(electron_ts)], "Compiling Electron Supervisor TypeScript")
-    gates["G-15_clean_production_builds"] = frontend_ok and electron_ok
+
+    # Compile Standalone Python Backend Binary via PyInstaller
+    log("Compiling Standalone Python Backend (bin/cbt_backend)...")
+    pyinstaller_cmd = [
+        py_exe,
+        "-m",
+        "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--onefile",
+        "--distpath",
+        "bin",
+        "--name",
+        "cbt_backend",
+        "--add-data",
+        "static:static",
+        "--collect-all",
+        "core",
+        "--hidden-import",
+        "uvicorn",
+        "--hidden-import",
+        "uvicorn.logging",
+        "--hidden-import",
+        "uvicorn.loops",
+        "--hidden-import",
+        "uvicorn.loops.auto",
+        "--hidden-import",
+        "uvicorn.protocols",
+        "--hidden-import",
+        "uvicorn.protocols.http",
+        "--hidden-import",
+        "uvicorn.protocols.http.auto",
+        "--hidden-import",
+        "uvicorn.protocols.websockets",
+        "--hidden-import",
+        "uvicorn.protocols.websockets.auto",
+        "--hidden-import",
+        "uvicorn.lifespan",
+        "--hidden-import",
+        "uvicorn.lifespan.on",
+        "cbt_backend.py",
+    ]
+    pyinstaller_ok = run_step(pyinstaller_cmd, "Compiling Standalone Python Backend via PyInstaller")
+    gates["G-15_clean_production_builds"] = frontend_ok and electron_ok and pyinstaller_ok
 
     # 5. Packaging Linux Binaries (AppImage & deb)
     log("G-16: Executing electron-builder Linux packaging...")

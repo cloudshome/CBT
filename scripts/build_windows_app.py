@@ -444,11 +444,54 @@ def main() -> None:
     else:
         print("[PASS] G-14: Zero credentials or private keys detected.")
 
-    # G-15: Clean Production Builds (Frontend + Electron TS)
+    # G-15: Clean Production Builds (Frontend + Electron TS + Standalone Python Backend)
     frontend_ok = run_step(["npm", "run", "build"], "Compiling Frontend", cwd=REPO_ROOT / "frontend")
     electron_ts = REPO_ROOT / "electron" / "tsconfig.json"
     electron_ok = run_step(["npx", "tsc", "-p", str(electron_ts)], "Compiling Electron Supervisor TypeScript")
-    gates["G-15"] = frontend_ok and electron_ok
+
+    # Compile Standalone Python Backend Binary via PyInstaller
+    log("Compiling Standalone Python Backend (bin/cbt_backend.exe)...")
+    pyinstaller_cmd = [
+        py_exe,
+        "-m",
+        "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--onefile",
+        "--distpath",
+        "bin",
+        "--name",
+        "cbt_backend",
+        "--add-data",
+        "static;static" if os.name == "nt" else "static:static",
+        "--collect-all",
+        "core",
+        "--hidden-import",
+        "uvicorn",
+        "--hidden-import",
+        "uvicorn.logging",
+        "--hidden-import",
+        "uvicorn.loops",
+        "--hidden-import",
+        "uvicorn.loops.auto",
+        "--hidden-import",
+        "uvicorn.protocols",
+        "--hidden-import",
+        "uvicorn.protocols.http",
+        "--hidden-import",
+        "uvicorn.protocols.http.auto",
+        "--hidden-import",
+        "uvicorn.protocols.websockets",
+        "--hidden-import",
+        "uvicorn.protocols.websockets.auto",
+        "--hidden-import",
+        "uvicorn.lifespan",
+        "--hidden-import",
+        "uvicorn.lifespan.on",
+        "cbt_backend.py",
+    ]
+    pyinstaller_ok = run_step(pyinstaller_cmd, "Compiling Standalone Python Backend via PyInstaller")
+    gates["G-15"] = frontend_ok and electron_ok and pyinstaller_ok
 
     # G-16: Packaging Native Windows Binaries
     log("G-16: Executing electron-builder packaging...")
