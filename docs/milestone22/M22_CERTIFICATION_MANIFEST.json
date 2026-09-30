@@ -1,0 +1,58 @@
+{
+  "M22_CERTIFIED_COMMIT": "HEAD",
+  "M22_CERTIFIED_TIMESTAMP": "2026-09-21T11:45:00+06:00",
+  "M22_CERTIFICATION_VERDICT": "TECHNICAL GATES PASSED / REAL CAPITAL STRICTLY DENIED",
+  "M22_CERTIFIED_TEST_COUNT": {
+    "test_milestone22_flight_runner": 32,
+    "total_execution_tests": 102,
+    "total_milestone18_tests": 149
+  },
+  "M22_CERTIFIED_FILES": {
+    "core/execution/testnet/__init__.py": "5cea838a1e9a600fd8b359ba8e5eb28c7e4ab740cdc5650acb174a2d14a0f455",
+    "core/execution/testnet/dispatcher.py": "e692f116250319d08a790750889a2ad9699248b20a3e8db9f0bf9efc2f803273",
+    "core/execution/testnet/event_journal.py": "a2938be10f62531589d4bcf1acf17d8dcc3da84169a83c19c4d6f03cb3dc7173",
+    "core/execution/testnet/execution_ledger.py": "d3863a778cbd640f6af3eaf5011e948417953af6aa30dbcb026080b8e8d4aa53",
+    "core/execution/testnet/filters.py": "6333777b72509524f3b4282efcf3481fa5634aab67a2ed2782d1be5526433d07",
+    "core/execution/testnet/flight_manifest.py": "ac17c3024d021c60b70dfa0bdc79da10f7015e306f0424c05dc420928a140d1a",
+    "core/execution/testnet/flight_runner.py": "d2a54ef0dad259fa9eb310e42d7544d39655ca95be7c5e1621b637039210a78e",
+    "core/execution/testnet/models.py": "d74631f25b81949d79745a723cfc1dedd092dc50c6c9c7dda020bd21bbe728cd",
+    "core/execution/testnet/multi_venue_bridge.py": "6b2f28adcf8b2731887d31caf6b94459dbfd6c1c359e291b6633e62264805d6d",
+    "core/execution/testnet/placement_intent.py": "508014c9d296dc297a085f1b9f5875279d03aa01052e2ca262e27fe38cb96c2b",
+    "core/execution/testnet/qualification_gate.py": "146b85a4e15b82b285a9f54ffb6999ab721bc83c82f2045d3689715a36583feb",
+    "core/execution/testnet/rate_limit_governor.py": "314a86a29be904cab7d8b06a2f2655361fc590b83c19c4d7dc76ddca41de3dfb",
+    "core/execution/testnet/recovery_state_machine.py": "86cc8005157cd979d72fb4b75d2665c67e237aac180f5a9e4e73e21cbda9e7f2",
+    "core/execution/testnet/supervisor.py": "51dd2ae463926bd7459525269538678b469ae07d6a60d52ad825e5854c5242c0",
+    "core/execution/testnet/venue_capabilities.py": "258e89eb320effddc9bc20a35be55ef044e5781ae374ab2ea68ae6116a146b09",
+    "tests/execution/test_milestone22_flight_runner.py": "cce352715eb67528b3727e7f6c5866575a57007a54d9f6af6293b11970f0a4a7"
+  },
+  "M22_CERTIFIED_EXECUTION_INVARIANTS": {
+    "capital_firewall": {
+      "rule": "REAL_CAPITAL_ENABLED = False enforced by metaclass. Attempted live execution raises FatalConstitutionalViolationError.",
+      "guarantee": "Real capital deployment call count strictly 0."
+    },
+    "m18_surface_isolation": {
+      "rule": "14 certified Milestone 18 execution files remain strictly frozen at commit c9cc1cad.",
+      "guarantee": "M18 verification script passes 149/149 adversarial gates without failure."
+    },
+    "lost_ack_recovery_integrity": {
+      "rule": "ORDER_NOT_FOUND != ORDER_CANCELED. Ambiguous cancellations strictly forbidden without positive exchange confirmation.",
+      "guarantee": "Zero duplicate orders submitted under network drops or lost-ACK conditions."
+    },
+    "exact_quantity_conservation": {
+      "rule": "Parent order quantity strictly conserved: Q_target = Q_filled + Q_open + Q_canceled + Q_unresolved.",
+      "guarantee": "Overfill circuit breaker trips fail-closed if Q_filled > Q_target; non-zero unresolved quantity blocks completion."
+    },
+    "emergency_rate_limit_reserve": {
+      "rule": "20% token bucket reserve dedicated exclusively to RequestPriority.EMERGENCY_CANCEL.",
+      "guarantee": "Emergency cancellations succeed even during 100% saturation of normal trading requests."
+    },
+    "strictly_flight_scoped_panic": {
+      "rule": "Panic cancel cancels only child orders tagged with the active flight_id.",
+      "guarantee": "Zero disruption or cancellation of foreign flights or parallel execution tasks."
+    },
+    "clock_skew_sentinel": {
+      "rule": "Local clock offset evaluated against exchange time: |theta_hat| <= 1000ms.",
+      "guarantee": "Engine halts immediately fail-closed if system clock drifts beyond 1000ms."
+    }
+  }
+}

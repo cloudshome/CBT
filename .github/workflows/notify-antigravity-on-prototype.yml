@@ -1,0 +1,18 @@
+# NOTE: This workflow is an intentionally non-operative template stub.
+# It does not perform active automation until maintainers configure authorized Slack / webhook secrets.
+name: 'Notify Antigravity on Prototype PR (Non-Operative Stub)'
+
+on:
+  pull_request:
+    types: [opened, labeled]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check labels
+        run: |
+          echo "labels=${{ toJSON(github.event.pull_request.labels) }}"
+      - name: Notice
+        run: |
+          echo "[STUB] Prototype PR notification is currently non-operative. Maintainer webhook configuration required."

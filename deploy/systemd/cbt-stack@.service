@@ -1,0 +1,33 @@
+[Unit]
+Description=CBT / SKY 24/7 Crypto Brain Terminal Stack
+Documentation=https://github.com/cloudshome/CBT
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Auto-detected from the user who runs the install script
+User=%i
+Group=%i
+# Replaced with the resolved project root by deploy/ubuntu_install.sh
+WorkingDirectory=__CBT_WORKDIR__
+
+# Start the full 3-tier + Caddy stack in background
+ExecStartPre=-/usr/bin/docker compose down --remove-orphans
+ExecStart=/usr/bin/docker compose up -d --remove-orphans --build
+ExecStop=/usr/bin/docker compose down
+
+# Allow up to 2 minutes for containers to build on first boot
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+# Log to systemd journal (readable via: journalctl -u cbt-stack@<user> -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-stack
+
+[Install]
+WantedBy=multi-user.target

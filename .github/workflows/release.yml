@@ -1,0 +1,216 @@
+name: Production Release Pipeline (Windows & Ubuntu)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release Tag (e.g. v4.0.0)'
+        required: false
+        default: 'v4.0.0'
+      draft:
+        description: 'Create Draft Release'
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as Pre-release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows Desktop Installer (.exe)
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Initialize Prisma Schema & Local Database
+        run: |
+          npx prisma generate
+          npx prisma db push --skip-generate
+
+      - name: Generate High-Resolution Application Icons
+        run: python scripts/generate_app_icons.py
+
+      - name: Build Frontend Production PWA
+        run: npm --prefix frontend run build
+
+      - name: Compile Electron TypeScript Supervisor
+        run: npm run electron:build
+
+      - name: Package Windows Installers (NSIS + Portable)
+        run: npx electron-builder --win --x64
+
+      - name: Generate Checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release/artifacts
+          Get-ChildItem -Path release -Filter *.exe | ForEach-Object {
+            $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Out-File -FilePath release/artifacts/SHA256SUMS_WIN.txt -Append -Encoding ascii
+            Copy-Item $_.FullName -Destination release/artifacts/
+          }
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binaries
+          path: release/artifacts/*
+
+  build-linux:
+    name: Build Ubuntu / Linux Packages (.AppImage & .deb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install System Dependencies for AppImage & Deb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools fakeroot desktop-file-utils
+
+      - name: Install Dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Initialize Prisma Schema & Local Database
+        run: |
+          npx prisma generate
+          npx prisma db push --skip-generate
+
+      - name: Generate High-Resolution Application Icons
+        run: python scripts/generate_app_icons.py
+
+      - name: Build Frontend Production PWA
+        run: npm --prefix frontend run build
+
+      - name: Compile Electron TypeScript Supervisor
+        run: npm run electron:build
+
+      - name: Package Linux Desktop App (AppImage + DEB)
+        run: npx electron-builder --linux --x64 AppImage deb
+
+      - name: Generate Linux Checksums
+        run: |
+          mkdir -p release/artifacts
+          cd release
+          for f in *.AppImage *.deb; do
+            if [ -f "$f" ]; then
+              sha256sum "$f" >> artifacts/SHA256SUMS_LINUX.txt
+              cp "$f" artifacts/
+            fi
+          done
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-binaries
+          path: release/artifacts/*
+
+  publish-release:
+    name: Publish Release with Cross-Platform Installers
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download Windows Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-binaries
+          path: release-dist/
+
+      - name: Download Linux Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binaries
+          path: release-dist/
+
+      - name: Generate Master Checksum Ledger
+        run: |
+          cd release-dist
+          rm -f SHA256SUMS*.txt
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Determine Release Tag
+        id: release_info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: "Crypto Brain Terminal ${{ steps.release_info.outputs.tag }}"
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          generate_release_notes: true
+          files: release-dist/*
+          body: |
+            ## Crypto Brain Terminal (CBT / SKY) Enterprise Release
+            
+            ### Cross-Platform Desktop Installers
+            - **Windows**: `CTB_Setup_v4.0.0.exe` (NSIS Installer) & Portable Executable
+            - **Ubuntu / Debian**: `Crypto_Brain_Terminal_v4.0.0.AppImage` (Universal Linux) & `ctb_4.0.0_amd64.deb` (Native Debian/Ubuntu package)
+            
+            ### Unified Multi-PC Cluster Architecture
+            No matter how many PCs (Windows or Ubuntu) install CBT, all machines join the unified cluster collective:
+            - **Identical Intelligence & Brain Memory**: Shared research provenance, knowledge graph, and evidence vault (`brain_memory.db`).
+            - **Mirrored Paper Trading**: Synchronized order state, open positions, and closed trades across all nodes (`collective.db`).
+            - **Shared Trading Signals**: Alpha streams and market regime assessments broadcast in real time across the mesh.
+            - **Synchronized Test Projects**: Strategy genome evaluations, backtesting leagues, and benchmark datasets.
+            - **Automatic Peer Discovery**: Automatic node identification (`NODE-WIN-*`, `NODE-UBU-*`) preventing collisions, with zero-conflict deterministic projection reconstruction.

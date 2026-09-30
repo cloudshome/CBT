@@ -1,0 +1,321 @@
+{
+  "K9_BTCUSDT_15m_464d2ff4": {
+    "asset": "BTC",
+    "content_hash": "464d2ff49c68ddf1be418ef7a56f937a46ee9a82c6cbed2e663016aa4e026fd3",
+    "dataset_id": "K9_BTCUSDT_15m_464d2ff4",
+    "end_timestamp": 1789794900000,
+    "generation_timestamp": 1789794900000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [],
+    "missing_intervals_count": 0,
+    "quality_notes": [],
+    "row_count": 9008,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "BINANCE_REST_CANDLES_DB",
+    "start_timestamp": 1787430600000,
+    "status": "VALID",
+    "symbol": "BTC/USDT",
+    "timeframe": "15m",
+    "venue": "BINANCE"
+  },
+  "K9_BTCUSDT_1h_17250393": {
+    "asset": "BTC",
+    "content_hash": "17250393debc51befff643df3190383cfcc26b4a79ca7b0b8484a86bae42cb8a",
+    "dataset_id": "K9_BTCUSDT_1h_17250393",
+    "end_timestamp": 1789794000000,
+    "generation_timestamp": 1789794000000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [],
+    "missing_intervals_count": 0,
+    "quality_notes": [],
+    "row_count": 658,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "RESAMPLED_BINANCE_15M",
+    "start_timestamp": 1787428800000,
+    "status": "VALID",
+    "symbol": "BTC/USDT",
+    "timeframe": "1h",
+    "venue": "BINANCE"
+  },
+  "K9_BTCUSDT_4h_5ee3b6a8": {
+    "asset": "BTC",
+    "content_hash": "5ee3b6a826f039cc02474efb3f8eff2032a54218324bdac74827521dd00ff100",
+    "dataset_id": "K9_BTCUSDT_4h_5ee3b6a8",
+    "end_timestamp": 1789790400000,
+    "generation_timestamp": 1789790400000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [],
+    "missing_intervals_count": 0,
+    "quality_notes": [],
+    "row_count": 165,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "RESAMPLED_BINANCE_15M",
+    "start_timestamp": 1787428800000,
+    "status": "VALID",
+    "symbol": "BTC/USDT",
+    "timeframe": "4h",
+    "venue": "BINANCE"
+  },
+  "K9_ETHUSDT_15m_1fb09fb3": {
+    "asset": "ETH",
+    "content_hash": "1fb09fb3e9376df8fb6cf927257a58361f1320e186c6f9834996698007d4c7ba",
+    "dataset_id": "K9_ETHUSDT_15m_1fb09fb3",
+    "end_timestamp": 1789794900000,
+    "generation_timestamp": 1789794900000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [
+      {
+        "from_ts": 1787821372641,
+        "missing_bars": 583,
+        "to_ts": 1788347700000
+      },
+      {
+        "from_ts": 1788436800000,
+        "missing_bars": 230,
+        "to_ts": 1788644700000
+      },
+      {
+        "from_ts": 1788698700000,
+        "missing_bars": 1,
+        "to_ts": 1788700500000
+      },
+      {
+        "from_ts": 1788784200000,
+        "missing_bars": 13,
+        "to_ts": 1788796800000
+      },
+      {
+        "from_ts": 1788864300000,
+        "missing_bars": 39,
+        "to_ts": 1788900300000
+      },
+      {
+        "from_ts": 1788958800000,
+        "missing_bars": 6,
+        "to_ts": 1788965100000
+      },
+      {
+        "from_ts": 1789044300000,
+        "missing_bars": 97,
+        "to_ts": 1789132500000
+      },
+      {
+        "from_ts": 1789217100000,
+        "missing_bars": 9,
+        "to_ts": 1789226100000
+      },
+      {
+        "from_ts": 1789303500000,
+        "missing_bars": 2,
+        "to_ts": 1789306200000
+      },
+      {
+        "from_ts": 1789389900000,
+        "missing_bars": 112,
+        "to_ts": 1789491600000
+      },
+      {
+        "from_ts": 1789561800000,
+        "missing_bars": 2,
+        "to_ts": 1789564500000
+      },
+      {
+        "from_ts": 1789648200000,
+        "missing_bars": 99,
+        "to_ts": 1789738200000
+      }
+    ],
+    "missing_intervals_count": 12,
+    "quality_notes": [
+      "Missing 1193 intervals across 12 gaps (missing ratio 14.25%)"
+    ],
+    "row_count": 7179,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "BINANCE_REST_CANDLES_DB",
+    "start_timestamp": 1787790134561,
+    "status": "DEGRADED",
+    "symbol": "ETH/USDT",
+    "timeframe": "15m",
+    "venue": "BINANCE"
+  },
+  "K9_ETHUSDT_1h_41c0c757": {
+    "asset": "ETH",
+    "content_hash": "41c0c757bc42ebdbe4e2307e69117d99a021411fc0dd56fc2d0edafe7fbedf99",
+    "dataset_id": "K9_ETHUSDT_1h_41c0c757",
+    "end_timestamp": 1789794000000,
+    "generation_timestamp": 1789794000000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [
+      {
+        "from_ts": 1787821200000,
+        "missing_bars": 145,
+        "to_ts": 1788346800000
+      },
+      {
+        "from_ts": 1788436800000,
+        "missing_bars": 56,
+        "to_ts": 1788642000000
+      },
+      {
+        "from_ts": 1788782400000,
+        "missing_bars": 3,
+        "to_ts": 1788796800000
+      },
+      {
+        "from_ts": 1788861600000,
+        "missing_bars": 9,
+        "to_ts": 1788897600000
+      },
+      {
+        "from_ts": 1789041600000,
+        "missing_bars": 24,
+        "to_ts": 1789131600000
+      },
+      {
+        "from_ts": 1789214400000,
+        "missing_bars": 2,
+        "to_ts": 1789225200000
+      },
+      {
+        "from_ts": 1789387200000,
+        "missing_bars": 28,
+        "to_ts": 1789491600000
+      },
+      {
+        "from_ts": 1789646400000,
+        "missing_bars": 24,
+        "to_ts": 1789736400000
+      }
+    ],
+    "missing_intervals_count": 8,
+    "quality_notes": [
+      "Missing 291 intervals across 8 gaps (missing ratio 52.15%)"
+    ],
+    "row_count": 267,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "RESAMPLED_BINANCE_15M",
+    "start_timestamp": 1787788800000,
+    "status": "DEGRADED",
+    "symbol": "ETH/USDT",
+    "timeframe": "1h",
+    "venue": "BINANCE"
+  },
+  "K9_ETHUSDT_4h_8e1a6bb7": {
+    "asset": "ETH",
+    "content_hash": "8e1a6bb74d4ebb71f100774e4bb836ab0342e62c32523fdd1425295682545a62",
+    "dataset_id": "K9_ETHUSDT_4h_8e1a6bb7",
+    "end_timestamp": 1789790400000,
+    "generation_timestamp": 1789790400000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [
+      {
+        "from_ts": 1787817600000,
+        "missing_bars": 35,
+        "to_ts": 1788336000000
+      },
+      {
+        "from_ts": 1788436800000,
+        "missing_bars": 13,
+        "to_ts": 1788638400000
+      },
+      {
+        "from_ts": 1788854400000,
+        "missing_bars": 2,
+        "to_ts": 1788897600000
+      },
+      {
+        "from_ts": 1789041600000,
+        "missing_bars": 5,
+        "to_ts": 1789128000000
+      },
+      {
+        "from_ts": 1789387200000,
+        "missing_bars": 6,
+        "to_ts": 1789488000000
+      },
+      {
+        "from_ts": 1789646400000,
+        "missing_bars": 5,
+        "to_ts": 1789732800000
+      }
+    ],
+    "missing_intervals_count": 6,
+    "quality_notes": [
+      "Missing 66 intervals across 6 gaps (missing ratio 47.14%)"
+    ],
+    "row_count": 74,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "RESAMPLED_BINANCE_15M",
+    "start_timestamp": 1787788800000,
+    "status": "DEGRADED",
+    "symbol": "ETH/USDT",
+    "timeframe": "4h",
+    "venue": "BINANCE"
+  },
+  "K9_SOLUSDT_15m_a016fbed": {
+    "asset": "SOL",
+    "content_hash": "a016fbed193916adfa5aafcbbc0d43bbc6105baa1c73cf6d7da188f73d956da9",
+    "dataset_id": "K9_SOLUSDT_15m_a016fbed",
+    "end_timestamp": 1789794900000,
+    "generation_timestamp": 1789794900000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [],
+    "missing_intervals_count": 0,
+    "quality_notes": [],
+    "row_count": 9008,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "CALIBRATED_BETA_SYNTHESIS",
+    "start_timestamp": 1787430600000,
+    "status": "VALID",
+    "symbol": "SOL/USDT",
+    "timeframe": "15m",
+    "venue": "BINANCE"
+  },
+  "K9_SOLUSDT_1h_942a3153": {
+    "asset": "SOL",
+    "content_hash": "942a3153863ffc8e7d3f4a2f94f36a5ec2445c1f82c304e10a5cbf0d9904352a",
+    "dataset_id": "K9_SOLUSDT_1h_942a3153",
+    "end_timestamp": 1789794000000,
+    "generation_timestamp": 1789794000000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [],
+    "missing_intervals_count": 0,
+    "quality_notes": [],
+    "row_count": 658,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "RESAMPLED_CALIBRATED_SYNTHESIS",
+    "start_timestamp": 1787428800000,
+    "status": "VALID",
+    "symbol": "SOL/USDT",
+    "timeframe": "1h",
+    "venue": "BINANCE"
+  },
+  "K9_SOLUSDT_4h_a09673a1": {
+    "asset": "SOL",
+    "content_hash": "a09673a198354383e427018ee652f9d4e536eed69570fbb7e717e4f081a063bc",
+    "dataset_id": "K9_SOLUSDT_4h_a09673a1",
+    "end_timestamp": 1789790400000,
+    "generation_timestamp": 1789790400000,
+    "market_type": "SPOT",
+    "methodology_version": "K9_DATASET_V1.0",
+    "missing_intervals": [],
+    "missing_intervals_count": 0,
+    "quality_notes": [],
+    "row_count": 165,
+    "schema_hash": "f3e6322b86147a25a98f8cf384abe683cd6edbe19717b91666a48ab0bdc23370",
+    "source": "RESAMPLED_CALIBRATED_SYNTHESIS",
+    "start_timestamp": 1787428800000,
+    "status": "VALID",
+    "symbol": "SOL/USDT",
+    "timeframe": "4h",
+    "venue": "BINANCE"
+  }
+}

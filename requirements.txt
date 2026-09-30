@@ -1,26 +1,23 @@
-# Core
-numpy>=1.26
-pandas>=2.0
-requests>=2.31
-
-# P10 data store (Parquet candle history) — data/store.py
-pyarrow>=15.0
-
-# CLI + web dashboard
-flask>=3.0
-python-dotenv>=1.0
-gunicorn>=22.0  # hardened Linux/VPS dashboard service
-
-# MCP server (`python main.py mcp` — Claude Desktop / Cursor integration)
-mcp>=1.0
-
-# Testing
-pytest>=8.0
-
-# Optional (CryptoDada website scraping) — install only if you want the scraper:
-# playwright>=1.40
-# then run:  playwright install chromium
-
-# Optional (LLM narrative in the AI Brain) — pick the provider you use:
-# openai>=1.30            # OpenAI-compatible endpoints (also works with Groq)
-# google-generativeai     # Gemini fallback
+fastapi==0.115.6
+uvicorn[standard]>=0.53.0
+pydantic==2.10.4
+numpy>=1.26.0,<2.2.0
+pandas>=2.2.0,<2.3.0
+scipy>=1.13.0,<1.15.0
+scikit-learn>=1.9.1,<1.10.0
+ccxt>=4.5.78
+yfinance>=0.2.40
+aiohttp>=3.10.0
+websockets>=13.0
+python-dotenv>=1.0.1
+cryptography>=43.0.0
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+python-multipart>=0.0.9
+httpx>=0.27.0,<0.29.0
+youtube-transcript-api>=1.2.4
+yt-dlp>=2026.8.19
+pypdf>=6.18.1
+eth-account>=0.14.0
+webauthn>=3.0.0
+cbor2>=6.1.4

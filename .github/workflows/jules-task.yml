@@ -1,0 +1,17 @@
+# NOTE: This workflow is an intentionally non-operative template stub.
+# It does not perform active automation until maintainers configure authorized webhook secrets.
+name: 'Run Jules Task (Non-Operative Stub)'
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  run_jules:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'agent:jules')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Jules Action Stub Notice
+        run: echo "[STUB] Jules task automation is currently non-operative. Maintainer webhook configuration required."

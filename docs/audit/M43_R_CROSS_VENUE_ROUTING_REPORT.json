@@ -1,0 +1,95 @@
+{
+  "milestone": "43-R",
+  "title": "Cross-Venue Execution Adversarial Qualification & Evidence Hardening",
+  "timestamp_utc": "2026-09-27T05:06:19Z",
+  "status": "QUALIFIED",
+  "passed_obligations": 8,
+  "total_obligations": 8,
+  "elapsed_seconds": 18.526,
+  "obligations": {
+    "OBL-1": {
+      "title": "Spatial Arbitrage Discovery & Spread Mathematical Rigor",
+      "passed": true,
+      "details": {
+        "opportunities_detected": 1,
+        "gross_spread_bps": 34.09,
+        "net_spread_bps": 24.09,
+        "optimal_notional_usd": 1500.0,
+        "real_capital_enabled": false
+      }
+    },
+    "OBL-2": {
+      "title": "Negative-Weight Cycle Detection Determinism (Bellman-Ford / Triangular Arb)",
+      "passed": true,
+      "details": {
+        "profitable_cycles_found": 1,
+        "profitable_cycle_gross_bps": 156.25,
+        "profitable_cycle_net_bps": 141.02,
+        "unprofitable_cycles_count": 0
+      }
+    },
+    "OBL-3": {
+      "title": "Convex Slicing & Hybrid CEX-DEX CLMM Allocation",
+      "passed": true,
+      "details": {
+        "dex_splits": 1,
+        "cex_splits": 1,
+        "total_notional_allocated": 15000.0,
+        "volume_weighted_price": 88080.4206,
+        "total_slippage_bps": 0.52
+      }
+    },
+    "OBL-4": {
+      "title": "Latency Degradation & Hawkes Adverse Selection Hurdle",
+      "passed": true,
+      "details": {
+        "fast_fill_prob_20ms": 0.9998,
+        "fast_is_favorable": true,
+        "slow_fill_prob_2000ms": 0.9661,
+        "slow_decay_prob": 0.0339,
+        "hurdle_escalation_verified": true
+      }
+    },
+    "OBL-5": {
+      "title": "Constitutional Half-Kelly & 1.5% Equity Cap Enforcement",
+      "passed": true,
+      "details": {
+        "is_approved": true,
+        "is_equity_capped": true,
+        "allocated_notional_usd": 1500.0,
+        "constitutional_limit_usd": 1500.0,
+        "kelly_fraction": 0.015
+      }
+    },
+    "OBL-6": {
+      "title": "Leg-Risk Fail-Safe & Partial Fill Unwind Invariant",
+      "passed": true,
+      "details": {
+        "is_approved": false,
+        "rejection_reason": "Leg-Risk Fail-Safe Tripped: Leg l2 slippage 22.50 bps exceeds abort threshold 15.00 bps.",
+        "allocated_notional_usd": 0.0,
+        "execution_plan_is_none": true
+      }
+    },
+    "OBL-7": {
+      "title": "Adversarial Network Jitter & Malformed Snapshot Containment",
+      "passed": true,
+      "details": {
+        "handled_gracefully": true,
+        "is_approved": false,
+        "allocated_notional_usd": 0.0,
+        "rejection_reason": "Invalid notional <= 0 or empty venue snapshots set."
+      }
+    },
+    "OBL-8": {
+      "title": "Permanent Capital Firewall & Milestone 18 Surface Area Isolation",
+      "passed": true,
+      "details": {
+        "real_capital_enabled": false,
+        "architecture_layer": "LAYER_2_QUANT_SIMULATION",
+        "architecture_authority": "SIMULATION_RESEARCH_ONLY",
+        "m18_certification_intact": true
+      }
+    }
+  }
+}

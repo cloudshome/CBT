@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  cbt-deploy  —  CBT Manual Deploy Command
+#
+#  Run this on Ubuntu anytime after you push from Windows and want the
+#  server to pick it up immediately (don't wait for midnight).
+#
+#  Install: sudo cp cbt-deploy /usr/local/bin/cbt-deploy && sudo chmod +x /usr/local/bin/cbt-deploy
+#  Usage:   sudo cbt-deploy
+# =============================================================================
+set -euo pipefail
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[1;33m'; NC='\033[0m'
+
+echo ""
+echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║       CBT Manual Deploy              ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
+echo -e "  Time: $(date '+%Y-%m-%d %H:%M:%S')"
+
+# Show which checkout we are about to deploy from. The CTB repo nests the app
+# below the repo root (Users/<name>/CBT), so printing both avoids the classic
+# "wrong directory" confusion. Paths come from /etc/cbt/cbt.env when present.
+CBT_CONFIG="${CBT_CONFIG:-/etc/cbt/cbt.env}"
+# shellcheck disable=SC1090
+[ -f "$CBT_CONFIG" ] && . "$CBT_CONFIG"
+if [ -n "${CBT_PROJECT_DIR:-}" ]; then
+    echo -e "  Repo: ${CBT_REPO_DIR:-unknown}"
+    echo -e "  App : ${CBT_PROJECT_DIR}"
+else
+    echo -e "  ${YELLOW}(/etc/cbt/cbt.env not found — cbt-sync.sh will fall back to its own location)${NC}"
+fi
+echo ""
+
+# Run the sync script
+SYNC_BIN="/usr/local/bin/cbt-sync.sh"
+if [ ! -x "$SYNC_BIN" ]; then
+    # Not installed system-wide yet — fall back to the copy beside this script
+    # (i.e. when cbt-deploy is run straight from the repo checkout).
+    HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -x "$HERE/cbt-sync.sh" ]; then
+        SYNC_BIN="$HERE/cbt-sync.sh"
+    else
+        echo -e "  ${RED}$SYNC_BIN not found.${NC}"
+        echo -e "  Install it first:  sudo bash <app-root>/deploy/ubuntu/ubuntu-setup.sh"
+        exit 1
+    fi
+fi
+"$SYNC_BIN"
+
+# Show final service status
+echo ""
+echo -e "${CYAN}Service Status:${NC}"
+for svc in cbt-fastapi cbt-express cbt-frontend; do
+    STATUS=$(systemctl is-active "$svc" 2>/dev/null || echo "unknown")
+    if [ "$STATUS" = "active" ]; then
+        echo -e "  ${GREEN}●${NC} $svc — ${GREEN}running${NC}"
+    else
+        echo -e "  ${RED}●${NC} $svc — ${RED}$STATUS${NC}"
+    fi
+done
+
+echo ""
+echo -e "  ${YELLOW}Next auto-sync: tonight at midnight${NC}"
+echo ""

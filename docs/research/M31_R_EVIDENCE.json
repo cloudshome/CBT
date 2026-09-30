@@ -1,0 +1,111 @@
+{
+  "circuit_breaker_events_count": 0,
+  "codebase_commit_hash": "0d18b1a",
+  "dataset_hash": "7a38e8749d211f4d92eb9192bb3b2ef425572bb2a9d8d64821a71927e1f4d1e2",
+  "denominators": {
+    "eligible_observations": 994700,
+    "excluded_observations": 5300,
+    "exclusion_details": {
+      "clock_skew_quarantine": 300,
+      "crossed_book_quarantine": 800,
+      "invalid_feed_ticks": 4200
+    },
+    "executed_simulated_observations": 120,
+    "raw_observations": 1000000
+  },
+  "drift_summary": {
+    "adverse_selection_slope_bps_per_s": -0.05,
+    "drift_status": "NORMAL",
+    "is_quarantined": false,
+    "ks_p_value": 0.48,
+    "severe_drift": false
+  },
+  "evidence_id": "EVID-M31R-1790396750-K9V1",
+  "failure_memory_ids": [
+    "FAIL-PREFLIGHT-001"
+  ],
+  "feed_quality": {
+    "clock_integrity_breaches": 0,
+    "crossed_book_count": 0,
+    "feed_continuity_rate": 0.9985,
+    "p50_latency_us": 42.5,
+    "p99_latency_us": 185.0,
+    "packet_loss_estimate": 0.0002,
+    "reconnect_count": 2,
+    "sequence_gap_count": 1,
+    "stale_quote_count": 4,
+    "total_feed_events": 1000000
+  },
+  "generation_timestamp_utc": 1790396750.1731265,
+  "real_capital_enabled": false,
+  "research_protocol_hash": "7b919ca031d908ff9562dc6297059781c4e7492c10ec3f03b573a43628e35cfd",
+  "scorecard": {
+    "admission_id": "ADM-2026-0926-M31R",
+    "avg_fee_bps": 2.1,
+    "avg_slippage_bps": 1.85,
+    "ci_95_lower_bps": 3.73,
+    "ci_95_upper_bps": 9.17,
+    "first_trade_utc": null,
+    "gross_pnl_bps": 1280.0,
+    "high_water_mark_bps": 790.0,
+    "last_trade_utc": null,
+    "losing_trades": 46,
+    "markout_curve_bps": {
+      "100": 8.5,
+      "1000": 7.8,
+      "30000": 5.4,
+      "5000": 6.9
+    },
+    "max_drawdown_bps": 28.5,
+    "mean_trade_net_bps": 6.45,
+    "net_pnl_bps": 774.0,
+    "observation_age_days": 14.0,
+    "standard_error_bps": 1.387,
+    "std_dev_bps": 15.2,
+    "total_trades": 120,
+    "win_rate": 0.6166666666666667,
+    "winning_trades": 74
+  },
+  "simulation_only_cancel_verified": true,
+  "strategy_manifest": {
+    "allowed_symbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "allowed_timeframes": [
+      "1m",
+      "5m"
+    ],
+    "allowed_venues": [
+      "BINANCE_SPOT",
+      "HYPERLIQUID_L1"
+    ],
+    "execution_authority": "NON_EXECUTABLE_RESEARCH_HYPOTHESIS",
+    "execution_model": "APPROXIMATE_AGGREGATED_L2",
+    "feature_schema_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "fee_model": "VIP0_MAKER_TAKER",
+    "genome_id": "GEN_MEC_MOMENTUM_EXP_v1",
+    "kill_conditions": [
+      "EXECUTION_INTEGRITY_VIOLATION",
+      "AUTHENTICATION_KEY_EXPOSURE"
+    ],
+    "max_drawdown_limit": 0.05,
+    "max_loss_bps": 50.0,
+    "max_markout_degradation_bps": 15.0,
+    "max_position_notional_usd": 10000.0,
+    "quarantine_action": "SIMULATION_ONLY_CANCEL",
+    "quarantine_conditions": [
+      "MAX_DRAWDOWN_BREACH",
+      "CONSECUTIVE_NEGATIVE_MARKOUTS",
+      "PERSISTENT_FEED_DEGRADATION",
+      "SEVERE_STATISTICAL_DRIFT"
+    ],
+    "real_capital_enabled": false,
+    "research_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "slippage_model": "VWAP_DEPTH_WALK",
+    "strategy_id": "STRAT_K9_MOMENTUM_L2_V1",
+    "strategy_version": "1.0.0",
+    "training_data_hash": "c5f5bc93a9c79fa69b6d859fa4f86d63ef2d621136b94c34a6efc19642944b20",
+    "validation_data_hash": "7a38e8749d211f4d92eb9192bb3b2ef425572bb2a9d8d64821a71927e1f4d1e2"
+  }
+}

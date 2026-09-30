@@ -1,0 +1,29 @@
+# Rendered by deploy/ubuntu/ubuntu-setup.sh — the path placeholders below are
+# substituted with this machine's real user/app-root paths at install time.
+# Do not copy this file to /etc/systemd/system by hand; run the setup script
+# (it also works for a flattened checkout where app root == repo root).
+[Unit]
+Description=CBT FastAPI Quantitative Backend
+Documentation=https://github.com/cloudshome/CBT
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__CBT_USER__
+Group=__CBT_USER__
+WorkingDirectory=__CBT_PROJECT_DIR__
+EnvironmentFile=__CBT_PROJECT_DIR__/.env
+ExecStart=__CBT_PROJECT_DIR__/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cbt-fastapi
+
+# Crash recovery
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

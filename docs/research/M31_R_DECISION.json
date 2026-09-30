@@ -1,0 +1,99 @@
+{
+  "active_quarantines_count": 0,
+  "all_mandatory_passed": true,
+  "clock_integrity_breaches": 0,
+  "decision_id": "DEC-M31R-1790396750-bfa9709a5e",
+  "decision_timestamp_utc": 1790396750.1732051,
+  "effective_sample_size": 120,
+  "feed_continuity_rate": 0.9985,
+  "gates_evaluated": [
+    {
+      "details": "Observation counts satisfy strict conservation without hidden filtering.",
+      "gate_name": "GATE_1_DENOMINATOR_INTEGRITY",
+      "observed_value": {
+        "eligible": 994700,
+        "excluded": 5300,
+        "executed": 120,
+        "raw": 1000000
+      },
+      "passed": true,
+      "severity": "ERROR",
+      "target_threshold": "raw == eligible + excluded and eligible >= executed"
+    },
+    {
+      "details": "Sample size N = 120. Sufficient for conclusive power.",
+      "gate_name": "GATE_2_SAMPLE_SIZE_POWER",
+      "observed_value": 120,
+      "passed": true,
+      "severity": "INFO",
+      "target_threshold": ">= 30 (min power), >= 100 (full qualification)"
+    },
+    {
+      "details": "95% CI lower bound: 3.73 bps, net PnL: 774.00 bps.",
+      "gate_name": "GATE_3_MARKOUT_EXPECTANCY",
+      "observed_value": {
+        "ci_95_lower_bps": 3.73,
+        "net_pnl_bps": 774.0
+      },
+      "passed": true,
+      "severity": "ERROR",
+      "target_threshold": "ci_95_lower_bps > 0 or (net_pnl > 0 and N >= 30)"
+    },
+    {
+      "details": "Feed continuity rate 99.85%, 0 crossed books.",
+      "gate_name": "GATE_4_FEED_CONTINUITY",
+      "observed_value": {
+        "continuity": 0.9985,
+        "crossed_books": 0,
+        "reconnects": 2
+      },
+      "passed": true,
+      "severity": "ERROR",
+      "target_threshold": "continuity >= 0.995 and crossed_books == 0"
+    },
+    {
+      "details": "Zero timestamp regressions or unhandled clock skew detected.",
+      "gate_name": "GATE_5_CLOCK_INTEGRITY",
+      "observed_value": 0,
+      "passed": true,
+      "severity": "ERROR",
+      "target_threshold": "0 clock breaches"
+    },
+    {
+      "details": "Drift status: NORMAL.",
+      "gate_name": "GATE_6_DRIFT_STABILITY",
+      "observed_value": "NORMAL",
+      "passed": true,
+      "severity": "ERROR",
+      "target_threshold": "No severe KS divergence or adverse selection slope collapse"
+    },
+    {
+      "details": "0 active quarantines, 0 circuit breakers.",
+      "gate_name": "GATE_7_FAILURE_CONTAINMENT",
+      "observed_value": {
+        "active_quarantines": 0,
+        "circuit_breaker_events": 0
+      },
+      "passed": true,
+      "severity": "ERROR",
+      "target_threshold": "0 active quarantines and 0 uncontained circuit breakers"
+    },
+    {
+      "details": "Permanent capital firewall and simulation isolation 100% verified.",
+      "gate_name": "GATE_8_EXECUTION_BOUNDARY_ISOLATION",
+      "observed_value": {
+        "cancellation": "SIMULATION_ONLY_CANCEL",
+        "real_capital_enabled": false
+      },
+      "passed": true,
+      "severity": "ERROR",
+      "target_threshold": "real_capital_enabled == False and cancellation == SIMULATION_ONLY_CANCEL"
+    }
+  ],
+  "net_markout_t30s_lower_ci_bps": 3.73,
+  "rationale": "All 8 empirical qualification gates passed with conclusive sample power and positive net expectancy.",
+  "reproducibility_hash": "bfa9709a5e2d36cf5be97323015886ed695eccfe9291536b35fc56f2a874b227",
+  "status": "QUALIFIED",
+  "strategy_id": "STRAT_K9_MOMENTUM_L2_V1",
+  "strategy_version": "1.0.0"
+}

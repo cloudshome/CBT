@@ -1,0 +1,13 @@
+[Unit]
+Description=CBT GitHub Auto-Sync Timer (daily at midnight)
+Requires=cbt-sync.service
+
+[Timer]
+# Fires once per day at local midnight
+OnCalendar=*-*-* 00:00:00
+# Also fire once 60s after boot (catches post-powerout missed syncs)
+OnBootSec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target
