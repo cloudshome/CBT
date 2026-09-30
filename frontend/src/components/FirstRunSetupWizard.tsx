@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   Cpu,
@@ -14,6 +14,8 @@ import {
   EyeOff,
   RefreshCw,
   ExternalLink,
+  Cloud,
+  HardDrive,
 } from 'lucide-react';
 import {
   verifyGeminiKey,
@@ -21,6 +23,10 @@ import {
   verifyHyperliquidCredentials,
   saveWeb3Wallet,
   completeFirstRunSetup,
+  getGDriveSetupStatus,
+  saveGDriveSetupCredentials,
+  startGDriveOAuthFlow,
+  GDriveStatusResponse,
 } from '../services/api';
 
 interface FirstRunSetupWizardProps {
@@ -29,7 +35,7 @@ interface FirstRunSetupWizardProps {
 
 export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComplete }) => {
   const [step, setStep] = useState<number>(1);
-  const totalSteps = 6;
+  const totalSteps = 7;
 
   // Step 1: Master Password
   const [masterPassword, setMasterPassword] = useState('');
@@ -41,6 +47,15 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
   const [geminiKey, setGeminiKey] = useState('');
   const [geminiVerifying, setGeminiVerifying] = useState(false);
   const [geminiStatus, setGeminiStatus] = useState<{ valid: boolean; message: string } | null>(null);
+
+  // Step 3: Google Drive 5TB Cloud Mesh
+  const [gdriveEmail, setGdriveEmail] = useState('ypelectronics11@gmail.com');
+  const [gdriveRootFolderId, setGdriveRootFolderId] = useState('');
+  const [gdriveCredentialsJson, setGdriveCredentialsJson] = useState('');
+  const [gdriveStatus, setGdriveStatus] = useState<GDriveStatusResponse | null>(null);
+  const [gdriveSaving, setGdriveSaving] = useState(false);
+  const [gdriveOAuthBusy, setGdriveOAuthBusy] = useState(false);
+  const [gdriveFeedback, setGdriveFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
   // Step 3: Centralized Exchanges
   const [selectedExch, setSelectedExch] = useState<'BINANCE' | 'BYBIT' | 'KRAKEN' | 'KUCOIN' | 'MEXC'>('BINANCE');
@@ -88,6 +103,21 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
     setStep(2);
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    getGDriveSetupStatus()
+      .then(res => {
+        if (isMounted) {
+          setGdriveStatus(res);
+          if (res.target_email) setGdriveEmail(res.target_email);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Handle Gemini Verification
   const handleVerifyGemini = async () => {
     if (!geminiKey.trim()) return;
@@ -100,6 +130,75 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
       setGeminiStatus({ valid: false, message: err.message || 'Gemini verification failed.' });
     } finally {
       setGeminiVerifying(false);
+    }
+  };
+
+  // Handle Google Drive Mesh Test & Save
+  const handleTestAndSaveGDrive = async () => {
+    if (!gdriveCredentialsJson.trim()) {
+      setGdriveFeedback({
+        success: false,
+        message: 'Please paste your Service Account JSON or OAuth credentials.',
+      });
+      return;
+    }
+    setGdriveSaving(true);
+    setGdriveFeedback(null);
+    try {
+      const res = await saveGDriveSetupCredentials({
+        credentials_json: gdriveCredentialsJson.trim(),
+        root_folder_id: gdriveRootFolderId.trim() || undefined,
+        target_email: gdriveEmail.trim() || undefined,
+      });
+      setGdriveStatus(res);
+      if (res.is_live) {
+        setGdriveFeedback({
+          success: true,
+          message: `Live 5TB Cloud Mesh Active! (${res.connected_email}). Storage: ${res.used_gb} GB used.`,
+        });
+      } else {
+        setGdriveFeedback({
+          success: false,
+          message: res.message || 'Credentials saved, but could not connect live. Using local simulated storage.',
+        });
+      }
+    } catch (err: any) {
+      setGdriveFeedback({
+        success: false,
+        message: err.message || 'Failed to save Google Drive credentials.',
+      });
+    } finally {
+      setGdriveSaving(false);
+    }
+  };
+
+  // Handle Google Drive OAuth Login Flow
+  const handleStartOAuthLogin = async () => {
+    setGdriveOAuthBusy(true);
+    setGdriveFeedback(null);
+    try {
+      const res = await startGDriveOAuthFlow();
+      setGdriveStatus(res);
+      if (res.is_live) {
+        setGdriveFeedback({
+          success: true,
+          message: `OAuth login successful! Connected to ${res.connected_email}.`,
+        });
+      } else {
+        setGdriveFeedback({
+          success: false,
+          message: res.message || 'OAuth finished but connection could not be verified.',
+        });
+      }
+    } catch (err: any) {
+      setGdriveFeedback({
+        success: false,
+        message:
+          err.message ||
+          'OAuth login requires Client Secret JSON. You can paste Service Account JSON directly instead.',
+      });
+    } finally {
+      setGdriveOAuthBusy(false);
     }
   };
 
@@ -124,7 +223,7 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
         setExchTestResult({ success: true, message: `Connected! ${res.message}` });
         setExchangeCreds(prev => ({
           ...prev,
-          [selectedExch]: { ...prev[selectedExch], verified: true }
+          [selectedExch]: { ...prev[selectedExch], verified: true },
         }));
       } else {
         setExchTestResult({ success: false, message: res.message || 'Verification failed.' });
@@ -220,6 +319,9 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
         telegram_chat_id: telegramChatId.trim() || undefined,
         exchanges: formattedExchanges,
         execution_mode: executionMode,
+        gdrive_credentials_json: gdriveCredentialsJson.trim() || undefined,
+        gdrive_root_folder_id: gdriveRootFolderId.trim() || undefined,
+        gdrive_user_email: gdriveEmail.trim() || undefined,
       });
       onComplete();
     } catch (err: any) {
@@ -228,6 +330,7 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
       setSaving(false);
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
@@ -391,8 +494,121 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
             </div>
           )}
 
-          {/* STEP 3: CENTRALIZED EXCHANGES */}
+          {/* STEP 3: GOOGLE DRIVE 5TB CLOUD MESH */}
           {step === 3 && (
+            <div className="space-y-6 max-w-2xl mx-auto">
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mx-auto text-amber-400">
+                  <Cloud className="w-6 h-6" />
+                </div>
+                <h2 className="text-xl font-bold text-zinc-100">Google Drive 5TB Cloud Mesh</h2>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Autonomous Multi-PC Synchronization for Windows &amp; Ubuntu. Syncs AI memory, research databases, SMC indicators, backtests, and trading records seamlessly.
+                </p>
+              </div>
+
+              {/* Status Header Badge */}
+              <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-amber-400">
+                    <HardDrive className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-zinc-200">
+                      Cloud Mesh Target: <span className="font-mono text-amber-400">{gdriveEmail}</span>
+                    </div>
+                    <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                      Dedicated 5,000 GB High-Throughput Secure Storage
+                    </div>
+                  </div>
+                </div>
+                <span
+                  className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold border ${
+                    gdriveStatus?.status === 'ONLINE' || gdriveStatus?.is_live
+                      ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40'
+                      : 'bg-zinc-800/50 text-zinc-400 border-zinc-700/50'
+                  }`}
+                >
+                  {gdriveStatus?.status === 'ONLINE' || gdriveStatus?.is_live ? 'LIVE SYNC ACTIVE' : 'LOCAL SANDBOX'}
+                </span>
+              </div>
+
+              {/* Connection Box */}
+              <div className="space-y-4 bg-zinc-900/50 p-5 rounded-xl border border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-zinc-300">
+                    Service Account JSON / OAuth Client Secret
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-mono">Encrypted with Master Password</span>
+                </div>
+                <textarea
+                  value={gdriveCredentialsJson}
+                  onChange={e => {
+                    setGdriveCredentialsJson(e.target.value);
+                    setGdriveFeedback(null);
+                  }}
+                  rows={4}
+                  placeholder='Paste {"type": "service_account", "project_id": "...", ...} or client_secret.json here...'
+                  className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-100 font-mono focus:outline-none focus:border-amber-400"
+                />
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1">
+                    Google Drive Root Folder ID (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={gdriveRootFolderId}
+                    onChange={e => setGdriveRootFolderId(e.target.value)}
+                    placeholder="e.g. 1A2b3C4d5E6f... (or leave empty to create 'SKY_CBT_VAULT' in root)"
+                    className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-100 font-mono focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      type="button"
+                      onClick={handleTestAndSaveGDrive}
+                      disabled={gdriveSaving || !gdriveCredentialsJson.trim()}
+                      className="px-4 py-2 bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-zinc-950 rounded-lg text-xs font-bold flex items-center space-x-2 transition shadow-md shadow-amber-400/20"
+                    >
+                      {gdriveSaving && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                      <span>Save &amp; Test Connection</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleStartOAuthLogin}
+                      disabled={gdriveOAuthBusy}
+                      className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-200 rounded-lg text-xs font-medium flex items-center space-x-2 transition"
+                    >
+                      {gdriveOAuthBusy && <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />}
+                      <span>Browser Sign-In (OAuth2)</span>
+                    </button>
+                  </div>
+
+                  {gdriveFeedback && (
+                    <div
+                      className={`text-xs flex items-center space-x-1.5 ${
+                        gdriveFeedback.success ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
+                      {gdriveFeedback.success ? (
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                      )}
+                      <span>{gdriveFeedback.message}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: CENTRALIZED EXCHANGES */}
+          {step === 4 && (
             <div className="space-y-6 max-w-2xl mx-auto">
               <div className="text-center space-y-2">
                 <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
@@ -519,8 +735,8 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
             </div>
           )}
 
-          {/* STEP 4: HYPERLIQUID & WEB3 */}
-          {step === 4 && (
+          {/* STEP 5: HYPERLIQUID & WEB3 */}
+          {step === 5 && (
             <div className="space-y-6 max-w-2xl mx-auto">
               <div className="text-center space-y-2">
                 <div className="w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto text-cyan-400">
@@ -680,8 +896,8 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
             </div>
           )}
 
-          {/* STEP 5: TELEGRAM SENTINEL */}
-          {step === 5 && (
+          {/* STEP 6: TELEGRAM SENTINEL */}
+          {step === 6 && (
             <div className="space-y-6 max-w-xl mx-auto">
               <div className="text-center space-y-2">
                 <div className="w-12 h-12 rounded-full bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mx-auto text-sky-400">
@@ -723,8 +939,8 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
             </div>
           )}
 
-          {/* STEP 6: CONFIRMATION & LAUNCH */}
-          {step === 6 && (
+          {/* STEP 7: CONFIRMATION & LAUNCH */}
+          {step === 7 && (
             <div className="space-y-6 max-w-xl mx-auto">
               <div className="text-center space-y-2">
                 <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mx-auto text-amber-400">
@@ -745,6 +961,20 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
                   <span className="text-zinc-400">Gemini Intelligence</span>
                   <span className="font-mono text-zinc-200">
                     {geminiKey ? 'Configured' : 'Skipped'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-zinc-800/80">
+                  <span className="text-zinc-400">Google Drive Cloud Mesh</span>
+                  <span
+                    className={`font-mono ${
+                      gdriveStatus?.status === 'ONLINE' || gdriveStatus?.is_live || gdriveCredentialsJson
+                        ? 'text-emerald-400 font-semibold'
+                        : 'text-zinc-500'
+                    }`}
+                  >
+                    {gdriveStatus?.status === 'ONLINE' || gdriveStatus?.is_live || gdriveCredentialsJson
+                      ? '5TB Cloud Mesh Configured'
+                      : 'Local Sandbox Mode'}
                   </span>
                 </div>
                 <div className="flex justify-between py-1.5 border-b border-zinc-800/80">

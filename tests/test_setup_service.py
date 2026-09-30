@@ -129,3 +129,29 @@ def test_update_check_endpoint(client):
     assert "git_managed" in data
     assert "current_commit" in data
     assert "branch" in data
+
+
+def test_gdrive_status_endpoint(client):
+    """Verifies that /api/system/setup/gdrive-status returns expected fields."""
+    resp = client.get("/api/system/setup/gdrive-status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "status" in data
+    assert "target_email" in data
+    assert "total_gb" in data
+    assert data["target_email"] == "ypelectronics11@gmail.com"
+    assert data["total_gb"] == 5000.0
+
+
+def test_save_gdrive_invalid_json(client):
+    """Rejects invalid JSON payload for GDrive credentials."""
+    resp = client.post(
+        "/api/system/setup/save-gdrive",
+        json={
+            "credentials_json": "not-valid-json-string",
+            "target_email": "ypelectronics11@gmail.com",
+        },
+    )
+    assert resp.status_code == 400
+    assert "valid JSON" in resp.json()["detail"]
+

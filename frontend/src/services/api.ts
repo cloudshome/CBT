@@ -3960,6 +3960,9 @@ export async function completeFirstRunSetup(payload: {
   telegram_chat_id?: string;
   exchanges?: any[];
   execution_mode?: string;
+  gdrive_credentials_json?: string;
+  gdrive_root_folder_id?: string;
+  gdrive_user_email?: string;
 }): Promise<any> {
   const res = await authFetch('/api/system/setup/save', {
     method: 'POST',
@@ -3967,6 +3970,47 @@ export async function completeFirstRunSetup(payload: {
   });
   return handleResponse(res);
 }
+
+export interface GDriveStatusResponse {
+  is_live: boolean;
+  status: 'ONLINE' | 'SIMULATED' | 'ERROR';
+  connected_email: string | null;
+  target_email: string;
+  display_name: string;
+  used_gb: number;
+  total_gb: number;
+  root_folder_id: string;
+  service_account_exists: boolean;
+  oauth_token_exists: boolean;
+  client_secret_exists: boolean;
+  message: string;
+  saved_type?: string;
+}
+
+export async function getGDriveSetupStatus(): Promise<GDriveStatusResponse> {
+  const res = await authFetch('/api/system/setup/gdrive-status');
+  return handleResponse<GDriveStatusResponse>(res);
+}
+
+export async function saveGDriveSetupCredentials(payload: {
+  credentials_json: string;
+  root_folder_id?: string;
+  target_email?: string;
+}): Promise<GDriveStatusResponse> {
+  const res = await authFetch('/api/system/setup/save-gdrive', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<GDriveStatusResponse>(res);
+}
+
+export async function startGDriveOAuthFlow(): Promise<GDriveStatusResponse> {
+  const res = await authFetch('/api/system/setup/start-gdrive-oauth', {
+    method: 'POST',
+  });
+  return handleResponse<GDriveStatusResponse>(res);
+}
+
 
 export async function checkSoftwareUpdate(): Promise<SoftwareUpdateStatus> {
   const res = await authFetch('/api/system/update/check');

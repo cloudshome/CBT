@@ -100,6 +100,12 @@ class SingleExchangeConfig(BaseModel):
     passphrase: str | None = None
 
 
+class GDriveSaveRequest(BaseModel):
+    credentials_json: str = Field(..., description="Raw Service Account JSON or OAuth Client Secret or Token JSON")
+    root_folder_id: str | None = Field(default=None, description="Optional Google Drive Root Folder ID")
+    target_email: str = Field(default="ypelectronics11@gmail.com", description="Target user email")
+
+
 class FirstRunSaveRequest(BaseModel):
     master_password: str = Field(..., min_length=8, description="Master Encryption Password")
     gemini_api_key: str | None = Field(default=None, description="Google Gemini API Key")
@@ -111,6 +117,16 @@ class FirstRunSaveRequest(BaseModel):
     execution_mode: str = Field(
         default="PAPER_TRADING", description="Default execution mode: PAPER_TRADING or SHADOW"
     )
+    gdrive_credentials_json: str | None = Field(
+        default=None, description="Google Drive Credentials or Token JSON"
+    )
+    gdrive_root_folder_id: str | None = Field(
+        default=None, description="Google Drive Root Folder ID"
+    )
+    gdrive_user_email: str | None = Field(
+        default=None, description="Target Google Drive Email"
+    )
+
 
 
 class ApplyUpdateRequest(BaseModel):
@@ -177,6 +193,141 @@ def _write_env_safely(new_entries: dict[str, str]) -> None:
                 temp_env.unlink()
             except Exception:  # noqa: BLE001, S110
                 pass
+
+
+def _save_gdrive_credentials(
+    creds_raw: str,
+    root_folder_id: str | None = None,
+    target_email: str = "ypelectronics11@gmail.com",
+) -> dict[str, Any]:
+    creds_dir = REPO_ROOT / "credentials"
+    creds_dir.mkdir(parents=True, exist_ok=True)
+
+    clean_json_str = creds_raw.strip()
+    try:
+        parsed = json.loads(clean_json_str)
+    except Exception as exc:
+        raise ValueError(f"Invalid JSON format: {exc}") from exc
+
+    saved_type = "UNKNOWN"
+    env_updates: dict[str, str] = {
+        "GDRIVE_USER_EMAIL": target_email.strip(),
+    }
+    if root_folder_id and root_folder_id.strip():
+        clean_fid = root_folder_id.strip()
+        if "folders/" in clean_fid:
+            clean_fid = clean_fid.split("folders/")[-1].split("?")[0].split("/")[0]
+        env_updates["GDRIVE_ROOT_FOLDER_ID"] = clean_fid
+
+    if isinstance(parsed, dict) and parsed.get("type") == "service_account":
+        target_file = creds_dir / "gdrive_service_account.json"
+        with open(target_file, "w", encoding="utf-8") as f:
+            json.dump(parsed, f, indent=2)
+        env_updates["GDRIVE_SERVICE_ACCOUNT_FILE"] = "credentials/gdrive_service_account.json"
+        saved_type = "SERVICE_ACCOUNT"
+    elif isinstance(parsed, dict) and (
+        "client_id" in parsed or "installed" in parsed or "web" in parsed
+    ):
+        target_file = creds_dir / "gdrive_client_secret.json"
+        with open(target_file, "w", encoding="utf-8") as f:
+            json.dump(parsed, f, indent=2)
+        env_updates["GDRIVE_CLIENT_SECRET_FILE"] = "credentials/gdrive_client_secret.json"
+        saved_type = "CLIENT_SECRET"
+    elif isinstance(parsed, dict) and ("token" in parsed or "refresh_token" in parsed):
+        target_file = creds_dir / "gdrive_token.json"
+        with open(target_file, "w", encoding="utf-8") as f:
+            json.dump(parsed, f, indent=2)
+        env_updates["GDRIVE_OAUTH_TOKEN_FILE"] = "credentials/gdrive_token.json"
+        saved_type = "OAUTH_TOKEN"
+    elif isinstance(parsed, dict) and "client_email" in parsed:
+        target_file = creds_dir / "gdrive_service_account.json"
+        with open(target_file, "w", encoding="utf-8") as f:
+            json.dump(parsed, f, indent=2)
+        env_updates["GDRIVE_SERVICE_ACCOUNT_FILE"] = "credentials/gdrive_service_account.json"
+        saved_type = "SERVICE_ACCOUNT"
+    else:
+        target_file = creds_dir / "gdrive_token.json"
+        with open(target_file, "w", encoding="utf-8") as f:
+            json.dump(parsed, f, indent=2)
+        env_updates["GDRIVE_OAUTH_TOKEN_FILE"] = "credentials/gdrive_token.json"
+        saved_type = "OAUTH_TOKEN"
+
+    _write_env_safely(env_updates)
+    for k, v in env_updates.items():
+        os.environ[k] = v
+
+    return {
+        "saved_type": saved_type,
+        "env_updates": env_updates,
+    }
+
+
+def _probe_gdrive_status() -> dict[str, Any]:
+    from core.autonomous_research.storage.drive_backend import GoogleDriveAPIBackend
+
+    GoogleDriveAPIBackend._oauth_refresh_failed = False
+    backend = GoogleDriveAPIBackend()
+
+    target_email = os.getenv("GDRIVE_USER_EMAIL", "ypelectronics11@gmail.com")
+    root_folder = os.getenv("GDRIVE_ROOT_FOLDER_ID") or "SKY/09_CLUSTER_MESH/"
+    sa_exists = (REPO_ROOT / "credentials" / "gdrive_service_account.json").exists()
+    token_exists = (REPO_ROOT / "credentials" / "gdrive_token.json").exists()
+    client_secret_exists = (REPO_ROOT / "credentials" / "gdrive_client_secret.json").exists()
+
+    if backend.is_live and backend.service:
+        try:
+            about = backend.service.about().get(fields="user,storageQuota").execute()
+            user = about.get("user", {})
+            quota = about.get("storageQuota", {})
+            used_gb = int(quota.get("usage", 0)) / (1024**3)
+            total_gb = int(quota.get("limit", 0)) / (1024**3) if "limit" in quota else 0
+            email = user.get("emailAddress", target_email)
+            name = user.get("displayName", "")
+            return {
+                "is_live": True,
+                "status": "ONLINE",
+                "connected_email": email,
+                "target_email": target_email,
+                "display_name": name,
+                "used_gb": round(used_gb, 2),
+                "total_gb": round(total_gb, 2),
+                "root_folder_id": root_folder,
+                "service_account_exists": sa_exists,
+                "oauth_token_exists": token_exists,
+                "client_secret_exists": client_secret_exists,
+                "message": f"Connected to Google Drive ({email}). Storage: {round(used_gb, 2)} GB used.",
+            }
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "is_live": False,
+                "status": "ERROR",
+                "connected_email": None,
+                "target_email": target_email,
+                "display_name": "",
+                "used_gb": 0.0,
+                "total_gb": 5000.0,
+                "root_folder_id": root_folder,
+                "service_account_exists": sa_exists,
+                "oauth_token_exists": token_exists,
+                "client_secret_exists": client_secret_exists,
+                "message": f"Drive API query error: {exc}",
+            }
+    else:
+        return {
+            "is_live": False,
+            "status": "SIMULATED",
+            "connected_email": None,
+            "target_email": target_email,
+            "display_name": "Local Sandbox Archive",
+            "used_gb": 0.0,
+            "total_gb": 5000.0,
+            "root_folder_id": root_folder,
+            "service_account_exists": sa_exists,
+            "oauth_token_exists": token_exists,
+            "client_secret_exists": client_secret_exists,
+            "message": "Local simulated cloud archive active (data/gdrive_simulated_archive/SKY).",
+        }
+
 
 
 # ===========================================================================
@@ -481,6 +632,29 @@ async def complete_first_run_setup(req: FirstRunSaveRequest) -> dict[str, Any]:
         os.environ["TELEGRAM_CHAT_ID"] = clean_chat_id
         env_updates["TELEGRAM_CHAT_ID"] = clean_chat_id
 
+    if req.gdrive_user_email:
+        clean_email = req.gdrive_user_email.strip()
+        os.environ["GDRIVE_USER_EMAIL"] = clean_email
+        env_updates["GDRIVE_USER_EMAIL"] = clean_email
+
+    if req.gdrive_root_folder_id:
+        clean_fid = req.gdrive_root_folder_id.strip()
+        os.environ["GDRIVE_ROOT_FOLDER_ID"] = clean_fid
+        env_updates["GDRIVE_ROOT_FOLDER_ID"] = clean_fid
+
+    # Save Google Drive credentials JSON if provided
+    gdrive_saved = False
+    if req.gdrive_credentials_json and req.gdrive_credentials_json.strip():
+        try:
+            _save_gdrive_credentials(
+                creds_raw=req.gdrive_credentials_json,
+                root_folder_id=req.gdrive_root_folder_id,
+                target_email=req.gdrive_user_email or "ypelectronics11@gmail.com",
+            )
+            gdrive_saved = True
+        except Exception as g_err:  # noqa: BLE001
+            logger.warning("Could not persist Google Drive credentials: %s", g_err)
+
     # Persist all provided exchange credentials into encrypted vault
     saved_exchanges: list[str] = []
     if req.exchanges:
@@ -509,6 +683,7 @@ async def complete_first_run_setup(req: FirstRunSaveRequest) -> dict[str, Any]:
             "execution_mode": req.execution_mode,
             "has_gemini": bool(req.gemini_api_key),
             "configured_exchanges": saved_exchanges,
+            "gdrive_configured": gdrive_saved,
         },
     )
 
@@ -516,8 +691,76 @@ async def complete_first_run_setup(req: FirstRunSaveRequest) -> dict[str, Any]:
         "success": True,
         "execution_mode": req.execution_mode,
         "saved_exchanges": saved_exchanges,
+        "gdrive_configured": gdrive_saved,
         "message": "First-run setup successfully saved. Crypto Brain Terminal is ready.",
     }
+
+
+@setup_router.get("/setup/gdrive-status")
+async def get_gdrive_setup_status() -> dict[str, Any]:
+    """Returns Google Drive Cloud Mesh status and quota diagnostics."""
+    return _probe_gdrive_status()
+
+
+@setup_router.post("/setup/save-gdrive")
+async def save_gdrive_setup_credentials(req: GDriveSaveRequest) -> dict[str, Any]:
+    """Saves Google Drive credentials JSON and immediately verifies cloud connectivity."""
+    if not req.credentials_json or not req.credentials_json.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Credentials JSON cannot be empty.",
+        )
+    try:
+        save_info = _save_gdrive_credentials(
+            creds_raw=req.credentials_json,
+            root_folder_id=req.root_folder_id,
+            target_email=req.target_email or "ypelectronics11@gmail.com",
+        )
+        probe = _probe_gdrive_status()
+        probe["saved_type"] = save_info["saved_type"]
+        return probe
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to save Google Drive credentials: {exc}",
+        ) from exc
+
+
+@setup_router.post("/setup/start-gdrive-oauth")
+async def start_gdrive_oauth_flow() -> dict[str, Any]:
+    """Initiates local OAuth2 desktop login flow if client secret is configured."""
+    try:
+        from google_auth_oauthlib.flow import InstalledAppFlow
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="google-auth-oauthlib is not installed.",
+        )
+
+    client_secret_file = REPO_ROOT / "credentials" / "gdrive_client_secret.json"
+    if not client_secret_file.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OAuth Client Secret file (credentials/gdrive_client_secret.json) not found. Please paste your OAuth client credentials or Service Account JSON.",
+        )
+
+    scopes = [
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/drive.file",
+    ]
+    token_file = REPO_ROOT / "credentials" / "gdrive_token.json"
+    try:
+        flow = InstalledAppFlow.from_client_secrets_file(str(client_secret_file), scopes)
+        creds = flow.run_local_server(port=0)
+        with open(token_file, "w", encoding="utf-8") as tf:
+            tf.write(creds.to_json())
+        return _probe_gdrive_status()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"OAuth authorization failed: {exc}",
+        ) from exc
+
 
 
 # ===========================================================================
