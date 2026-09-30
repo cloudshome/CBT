@@ -452,7 +452,7 @@ export const App: React.FC = () => {
       {/* Windows Native Frameless Titlebar */}
       <header
         className="w-full h-8 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between px-3 select-none text-xs text-zinc-400 z-40 sticky top-0"
-        style={{ WebkitAppRegion: 'drag' } as any}
+        style={{ appRegion: 'drag' } as React.CSSProperties}
       >
         <div className="flex items-center space-x-2">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow shadow-amber-400/50" />
