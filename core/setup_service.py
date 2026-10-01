@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import subprocess
 import sys
 import time
@@ -127,6 +128,10 @@ class FirstRunSaveRequest(BaseModel):
         default=None, description="Target Google Drive Email"
     )
 
+
+
+class MasterPasswordVerifyRequest(BaseModel):
+    password: str = Field(..., min_length=1, description="Master Vault Password")
 
 
 class ApplyUpdateRequest(BaseModel):
@@ -694,6 +699,38 @@ async def complete_first_run_setup(req: FirstRunSaveRequest) -> dict[str, Any]:
         "gdrive_configured": gdrive_saved,
         "message": "First-run setup successfully saved. Crypto Brain Terminal is ready.",
     }
+
+
+@setup_router.post("/vault/verify-password")
+async def verify_master_password(req: MasterPasswordVerifyRequest) -> dict[str, Any]:
+    """
+    Verifies entered master password against the configured vault passphrase.
+    Used for single-password institutional entry/unlock.
+    """
+    _load_env_if_present()
+    stored = os.getenv("VAULT_PASSPHRASE", "").strip()
+    if not stored and ENV_FILE_PATH.exists():
+        try:
+            with open(ENV_FILE_PATH, encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith("VAULT_PASSPHRASE="):
+                        stored = stripped.split("=", 1)[1].strip().strip("'\"")
+                        os.environ["VAULT_PASSPHRASE"] = stored
+                        break
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed reading .env for vault passphrase: %s", exc)
+
+    if not stored:
+        return {"valid": True, "message": "No vault password set."}
+
+    if secrets.compare_digest(req.password.strip(), stored):
+        return {"valid": True, "message": "Master vault password verified."}
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect master password.",
+    )
 
 
 @setup_router.get("/setup/gdrive-status")

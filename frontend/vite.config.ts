@@ -71,7 +71,15 @@ const PYTHON_PREFIXES = [
   '/api/volatility',
   '/api/arbitrage',
   '/api/mbo',
+  '/api/system',
   '/api/health',
+  '/api/auth',
+  '/api/cexdex',
+  '/api/heatmap',
+  '/api/portfolio',
+  '/api/strategist',
+  '/api/v1',
+  '/api/web3',
   '/ws',
 ];
 

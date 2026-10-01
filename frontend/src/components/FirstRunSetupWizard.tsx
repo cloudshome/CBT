@@ -103,6 +103,20 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
     setStep(2);
   };
 
+  // Quick launch directly from Step 1 without stepping through 6 screens
+  const handleQuickFinish = async () => {
+    if (masterPassword.length < 8) {
+      setPasswordError('Master password must be at least 8 characters long.');
+      return;
+    }
+    if (masterPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+    setPasswordError('');
+    await handleFinalLaunch();
+  };
+
   useEffect(() => {
     let isMounted = true;
     getGDriveSetupStatus()
@@ -1024,6 +1038,18 @@ export const FirstRunSetupWizard: React.FC<FirstRunSetupWizardProps> = ({ onComp
           </button>
 
           <div className="flex items-center space-x-3">
+            {step === 1 && (
+              <button
+                type="button"
+                onClick={handleQuickFinish}
+                disabled={saving}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-amber-400/30 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition"
+              >
+                {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                <span>Save & Launch (Skip Remaining Steps)</span>
+              </button>
+            )}
+
             {step > 1 && step < totalSteps && (
               <button
                 type="button"

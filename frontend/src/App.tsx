@@ -56,6 +56,7 @@ import {
 import { api, ApiError, getSetupStatus } from './services/api';
 import { notificationService } from './services/notificationService';
 import { FirstRunSetupWizard } from './components/FirstRunSetupWizard';
+import { MasterPasswordUnlockModal } from './components/MasterPasswordUnlockModal';
 import { SoftwareUpdateModal } from './components/SoftwareUpdateModal';
 import {
   Layers,
@@ -126,14 +127,20 @@ export const App: React.FC = () => {
   const [loadingMarket, setLoadingMarket] = useState<boolean>(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false);
+  const [isVaultLocked, setIsVaultLocked] = useState<boolean>(false);
   const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
 
-  // Check First-Run Setup Status on App Launch
+  // Check First-Run Setup & Session Unlock Status on App Launch
   useEffect(() => {
     getSetupStatus()
       .then((res) => {
         if (res.is_first_run) {
           setShowSetupWizard(true);
+        } else if (res.setup_completed && res.has_master_password) {
+          const unlocked = sessionStorage.getItem('cbt_vault_unlocked');
+          if (unlocked !== 'true') {
+            setIsVaultLocked(true);
+          }
         }
       })
       .catch(() => {
@@ -1170,7 +1177,23 @@ export const App: React.FC = () => {
       )}
       {/* First-Run Configuration Wizard */}
       {showSetupWizard && (
-        <FirstRunSetupWizard onComplete={() => setShowSetupWizard(false)} />
+        <FirstRunSetupWizard
+          onComplete={() => {
+            setShowSetupWizard(false);
+            sessionStorage.setItem('cbt_vault_unlocked', 'true');
+            setIsVaultLocked(false);
+          }}
+        />
+      )}
+
+      {/* Returning User Single-Password Institutional Unlock Modal */}
+      {isVaultLocked && !showSetupWizard && (
+        <MasterPasswordUnlockModal
+          onUnlock={() => {
+            sessionStorage.setItem('cbt_vault_unlocked', 'true');
+            setIsVaultLocked(false);
+          }}
+        />
       )}
 
       {/* Software Auto-Updater Modal */}

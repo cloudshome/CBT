@@ -13,6 +13,7 @@ from data.push_notifications import (
     create_vapid_jwt,
     get_or_create_vapid_keys,
 )
+pytest.importorskip("flask")
 from web.app import make_app
 
 

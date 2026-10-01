@@ -3971,6 +3971,14 @@ export async function completeFirstRunSetup(payload: {
   return handleResponse(res);
 }
 
+export async function verifyMasterPassword(password: string): Promise<{ valid: boolean; message: string }> {
+  const res = await authFetch('/api/system/vault/verify-password', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+  return handleResponse(res);
+}
+
 export interface GDriveStatusResponse {
   is_live: boolean;
   status: 'ONLINE' | 'SIMULATED' | 'ERROR';

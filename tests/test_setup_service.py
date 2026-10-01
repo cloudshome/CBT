@@ -155,3 +155,24 @@ def test_save_gdrive_invalid_json(client):
     assert resp.status_code == 400
     assert "valid JSON" in resp.json()["detail"]
 
+
+def test_verify_master_password(client, monkeypatch):
+    """Verifies that /api/system/vault/verify-password accepts correct password and rejects incorrect."""
+    monkeypatch.setenv("VAULT_PASSPHRASE", "CorrectSuperSecurePass123!")
+
+    # Incorrect password -> 401
+    bad_resp = client.post(
+        "/api/system/vault/verify-password",
+        json={"password": "WrongPassword999!"},
+    )
+    assert bad_resp.status_code == 401
+
+    # Correct password -> 200
+    good_resp = client.post(
+        "/api/system/vault/verify-password",
+        json={"password": "CorrectSuperSecurePass123!"},
+    )
+    assert good_resp.status_code == 200
+    assert good_resp.json()["valid"] is True
+
+
