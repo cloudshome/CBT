@@ -26,6 +26,7 @@ from core.macro_cognitive_engine import macro_cognitive_engine
 from core.macro_trade_planner import macro_trade_planner
 from core.pdf_extractor import pdf_book_extractor
 from core.provenance_engine import provenance_engine
+from core.url_extractor import url_extractor
 from core.youtube_extractor import youtube_extractor
 
 logger = logging.getLogger("ai_quant_sentinel.universal_ingestor")
@@ -287,6 +288,25 @@ class UniversalIngestor:
                 uri = source_uri or (
                     content if content.startswith("http") else file_name or "Direct Input"
                 )
+        # Intercept General Web URLs (Articles, GitHub, ArXiv, TradingView, Blogs, Substack)
+        elif content.strip().startswith(("http://", "https://")):
+            url_res = url_extractor.extract(content.strip())
+            if url_res.get("success") and url_res.get("text_content"):
+                source_type = url_res.get("source_type", source_type)
+                inferred_title = (
+                    title
+                    or url_res.get("title")
+                    or f"Research [{url_res.get('domain')}]: {content[:40]}..."
+                )
+                creator = author_creator or url_res.get("author_creator") or "Web Author"
+                uri = url_res.get("url") or content.strip()
+                content = url_res["text_content"]
+            else:
+                inferred_title = title or (
+                    file_name if file_name else f"Research: {source_type} ({content[:40]}...)"
+                )
+                creator = author_creator or "External Contributor"
+                uri = source_uri or content.strip()
         else:
             inferred_title = title or (
                 file_name if file_name else f"Research: {source_type} ({content[:40]}...)"
@@ -936,6 +956,113 @@ class UniversalIngestor:
                 "observations": observations,
                 "concepts": concepts,
             }
+
+        # Case 3: Rich Multi-Paragraph Literature / Web Article Extraction
+        paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) >= 35]
+        if not paragraphs:
+            paragraphs = [p.strip() for p in text.split("\n") if len(p.strip()) >= 35]
+
+        if len(paragraphs) > 1:
+            extracted_claim_count = 0
+            for idx, para in enumerate(paragraphs[:35]):
+                if para.startswith(("#", "Author:", "Source:", "Title:")):
+                    continue
+                p_lower = para.lower()
+                is_causal = any(
+                    kw in p_lower
+                    for kw in [
+                        "because",
+                        "causes",
+                        "leads to",
+                        "resulting in",
+                        "correlated with",
+                        "indicates",
+                        "signals",
+                        "predicts",
+                        "increases",
+                        "decreases",
+                        "higher probability",
+                        "risk",
+                        "drawdown",
+                        "liquidity",
+                        "momentum",
+                        "volatility",
+                        "fvg",
+                        "order block",
+                        "reversal",
+                        "breakout",
+                        "strategy",
+                        "trend",
+                        "algorithm",
+                        "execution",
+                        "model",
+                        "parameter",
+                        "sharpe",
+                        "imbalance",
+                        "yield",
+                        "inflation",
+                        "macro",
+                        "support",
+                        "resistance",
+                    ]
+                )
+                if is_causal or idx < 3:
+                    first_sentence = para.split(".")[0].strip()
+                    subj = (
+                        first_sentence
+                        if (10 < len(first_sentence) < 80)
+                        else f"{inferred_title or 'Research'}: Proposition {extracted_claim_count + 1}"
+                    )
+                    claims.append(
+                        {
+                            "verbatim": para[:400].strip(),
+                            "subject": subj[:60],
+                            "direction": f"{subj[:30]} ──► Market Dynamics",
+                            "object_domain": (
+                                "FINANCIAL"
+                                if any(
+                                    w in p_lower
+                                    for w in ["price", "market", "trade", "crypto", "vol", "asset"]
+                                )
+                                else "METHODOLOGY"
+                            ),
+                            "evidence_type": (
+                                "STATISTICAL"
+                                if any(
+                                    w in p_lower
+                                    for w in ["%", "data", "test", "metric", "sample", "p-value"]
+                                )
+                                else "THEORETICAL"
+                            ),
+                            "confidence": 0.0,  # Zero-Fabrication Epistemic Firewall
+                            "author_creator": author_creator,
+                        }
+                    )
+                    extracted_claim_count += 1
+                    if extracted_claim_count >= 12:
+                        break
+
+            if claims:
+                observations.append(
+                    {
+                        "text": f"Extracted {len(claims)} analytical propositions from '{inferred_title or 'Research'}' across {len(paragraphs)} paragraphs.",
+                        "period": "Literature / Web Analysis",
+                        "variables": ["VAR_BTC_RETURNS", "VAR_BTC_REALIZED_VOL"],
+                    }
+                )
+                concepts.append(
+                    {
+                        "title": f"Literature Core: {inferred_title or 'Research Synthesis'}",
+                        "domain": "QUANTITATIVE_RESEARCH",
+                        "description": f"Extracted from {author_creator or 'External Literature'} comprising {len(claims)} auditable claims.",
+                        "tags": ["Research", worldview, "Literature"],
+                    }
+                )
+                return {
+                    "claims": claims,
+                    "observations": observations,
+                    "concepts": concepts,
+                }
 
         # Fallback if no transcript segments available
         if worldview == "ASTROLOGICAL":

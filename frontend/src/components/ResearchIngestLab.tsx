@@ -142,23 +142,29 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     fetchAllData();
   }, [fetchAllData]);
 
-  // Restore latest active YouTube job on mount
+  // Restore latest active YouTube job on mount if still pending/processing
   useEffect(() => {
-    const saved = localStorage.getItem('cbt_active_yt_job') || 'YT-EXP-0086081D';
-    if (saved && !ytActiveJobId) {
-      setYtActiveJobId(saved);
+    const saved = localStorage.getItem('cbt_active_yt_job');
+    if (saved) {
       api.getYouTubeJob(saved).then((job) => {
         setYtJobData(job);
         if (job.status === 'COMPLETED') {
           setShowYtResults(true);
+          // Do NOT poll or notify for past completed job
+        } else if (job.status === 'PROCESSING' || job.status === 'PENDING') {
+          // Genuinely running job: resume polling
+          setYtActiveJobId(saved);
+          setYtExploreLoading(true);
         }
-      }).catch(() => {});
+      }).catch(() => {
+        localStorage.removeItem('cbt_active_yt_job');
+      });
     }
   }, []);
 
-  // YouTube Exploration Job Polling
+  // YouTube Exploration Job Polling (ONLY active when ytExploreLoading is true)
   useEffect(() => {
-    if (!ytActiveJobId) return;
+    if (!ytActiveJobId || !ytExploreLoading) return;
     const interval = setInterval(async () => {
       try {
         const job = await api.getYouTubeJob(ytActiveJobId);
@@ -166,6 +172,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         if (job.status === 'COMPLETED' || job.status === 'FAILED') {
           clearInterval(interval);
           setYtExploreLoading(false);
+          setYtActiveJobId(null);
+          localStorage.removeItem('cbt_active_yt_job');
           if (job.status === 'COMPLETED') {
             setShowYtResults(true);
             fetchAllData();
@@ -181,7 +189,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [ytActiveJobId, fetchAllData, onNotify]);
+  }, [ytActiveJobId, ytExploreLoading, fetchAllData, onNotify]);
 
   const handleStartYouTubeExplore = async () => {
     const clean = ytExploreInput.trim();
@@ -210,12 +218,14 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
 
   const handleSelectPastJob = async (jobId: string) => {
     try {
-      setYtActiveJobId(jobId);
-      localStorage.setItem('cbt_active_yt_job', jobId);
       const job = await api.getYouTubeJob(jobId);
       setYtJobData(job);
       if (job.status === 'COMPLETED') {
         setShowYtResults(true);
+        setYtExploreLoading(false);
+      } else if (job.status === 'PROCESSING' || job.status === 'PENDING') {
+        setYtActiveJobId(jobId);
+        setYtExploreLoading(true);
       }
     } catch (err: any) {
       console.error('Failed to load past YouTube job:', err);
