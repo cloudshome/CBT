@@ -40,10 +40,18 @@ def set_active_orchestrator(orchestrator: CampaignOrchestrator | None) -> None:
 
 
 def get_orchestrator() -> CampaignOrchestrator:
+    global _active_campaign_orchestrator
     if _active_campaign_orchestrator is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Testnet campaign orchestrator has not been initialized",
+        from core.execution.testnet.campaign_orchestrator import CampaignConfig
+        from core.execution.testnet.multi_venue_bridge import MultiVenueTestnetBridge
+        default_config = CampaignConfig(
+            campaign_id="CAMP-REHEARSAL-01",
+            venues=["binance_spot", "bybit_v5"],
+            allowed_symbols=["BTCUSDT", "ETHUSDT"],
+        )
+        _active_campaign_orchestrator = CampaignOrchestrator(
+            config=default_config,
+            bridge=MultiVenueTestnetBridge(),
         )
     return _active_campaign_orchestrator
 

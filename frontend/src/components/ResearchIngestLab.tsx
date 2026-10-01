@@ -142,6 +142,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     fetchAllData();
   }, [fetchAllData]);
 
+  const isUserInitiatedYtJobRef = useRef<boolean>(false);
+
   // Restore latest active YouTube job on mount if still pending/processing
   useEffect(() => {
     const saved = localStorage.getItem('cbt_active_yt_job');
@@ -150,9 +152,11 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         setYtJobData(job);
         if (job.status === 'COMPLETED') {
           setShowYtResults(true);
-          // Do NOT poll or notify for past completed job
+          localStorage.removeItem('cbt_active_yt_job');
+        } else if (job.status === 'FAILED') {
+          localStorage.removeItem('cbt_active_yt_job');
         } else if (job.status === 'PROCESSING' || job.status === 'PENDING') {
-          // Genuinely running job: resume polling
+          // Genuinely running job: resume tracking silently without toast spam
           setYtActiveJobId(saved);
           setYtExploreLoading(true);
         }
@@ -177,12 +181,15 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           if (job.status === 'COMPLETED') {
             setShowYtResults(true);
             fetchAllData();
-            if (onNotify) {
+            if (isUserInitiatedYtJobRef.current && onNotify) {
               onNotify('success', 'YouTube Synthesis Complete', `Processed ${job.result?.videos_processed || 0} videos.`);
             }
           } else if (job.status === 'FAILED' && onNotify) {
-            onNotify('error', 'YouTube Exploration Failed', job.error_message || 'Task terminated unexpectedly.');
+            if (isUserInitiatedYtJobRef.current) {
+              onNotify('error', 'YouTube Exploration Failed', job.error_message || 'Task terminated unexpectedly.');
+            }
           }
+          isUserInitiatedYtJobRef.current = false;
         }
       } catch (err) {
         console.error('Failed to poll YouTube job:', err);
@@ -195,6 +202,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     const clean = ytExploreInput.trim();
     if (!clean) return;
     try {
+      isUserInitiatedYtJobRef.current = true;
       setYtExploreLoading(true);
       setYtJobData(null);
       setShowYtResults(false);
@@ -209,6 +217,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
         onNotify('info', 'Exploration Dispatched', `Job ${res.job_id} launched for ${clean}`);
       }
     } catch (err: any) {
+      isUserInitiatedYtJobRef.current = false;
       setYtExploreLoading(false);
       if (onNotify) {
         onNotify('error', 'Exploration Failed', err?.message || 'Could not dispatch exploration job.');

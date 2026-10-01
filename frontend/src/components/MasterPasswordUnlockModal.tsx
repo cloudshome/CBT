@@ -103,16 +103,27 @@ export const MasterPasswordUnlockModal: React.FC<MasterPasswordUnlockModalProps>
           </div>
 
           {error && (
-            <div className="flex items-center space-x-2 text-rose-400 text-xs bg-rose-950/30 p-2.5 rounded-lg border border-rose-900/50">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2 text-rose-400 text-xs bg-rose-950/30 p-2.5 rounded-lg border border-rose-900/50">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+              {onReset && (
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="w-full text-center text-xs text-amber-400 hover:text-amber-300 font-medium py-1.5 px-2 bg-amber-400/10 hover:bg-amber-400/20 rounded-md border border-amber-400/30 transition flex items-center justify-center space-x-1"
+                >
+                  <span>Forgot or lost password? Click to Reset Password & Re-run Setup</span>
+                </button>
+              )}
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading || !password.trim()}
-            className="w-full py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-zinc-950 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 shadow-md shadow-amber-400/20 transition"
+            className="w-full py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-40 text-zinc-950 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 shadow-md shadow-amber-400/20 transition cursor-pointer"
           >
             {loading ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -129,9 +140,9 @@ export const MasterPasswordUnlockModal: React.FC<MasterPasswordUnlockModalProps>
               <button
                 type="button"
                 onClick={onReset}
-                className="text-[11px] text-zinc-400 hover:text-amber-400 underline underline-offset-4 transition"
+                className="text-xs text-zinc-400 hover:text-amber-400 font-medium underline underline-offset-4 transition cursor-pointer"
               >
-                Forgot Password / Re-run Configuration Wizard
+                Forgot Password? Re-run First-Time Configuration Wizard
               </button>
             </div>
           )}

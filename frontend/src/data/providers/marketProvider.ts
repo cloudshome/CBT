@@ -1,5 +1,6 @@
 import { OHLCVCandle } from '../../types';
 import { WSStateMachine, WSConnectionState } from './wsStateMachine';
+import { authFetch } from '../../services/api';
 
 export interface OrderBookEntry {
   price: number;
@@ -59,7 +60,7 @@ export class BinanceMarketDataProvider implements IMarketDataProvider {
   private activeTimeframe = '';
 
   async fetchHistoricalOHLCV(symbol: string, timeframe: string, limit = 100): Promise<OHLCVCandle[]> {
-    const res = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`);
+    const res = await authFetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&limit=${limit}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch historical candles`);
     const data = await res.json();
     return data.candles || [];

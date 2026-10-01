@@ -371,14 +371,22 @@ export const App: React.FC = () => {
     takeProfit?: number;
   }) => {
     try {
-      const entry = order.type === 'LIMIT' && order.price ? order.price : stats.lastPrice;
+      const entry = order.type === 'LIMIT' && order.price ? order.price : (stats.lastPrice > 0 ? stats.lastPrice : 65000.0);
+      const isLong = order.side === 'BUY';
+      const safeSl = order.stopLoss && order.stopLoss > 0
+        ? (isLong && order.stopLoss < entry ? order.stopLoss : (!isLong && order.stopLoss > entry ? order.stopLoss : (isLong ? Number((entry * 0.985).toFixed(2)) : Number((entry * 1.015).toFixed(2)))))
+        : (isLong ? Number((entry * 0.985).toFixed(2)) : Number((entry * 1.015).toFixed(2)));
+      const safeTp = order.takeProfit && order.takeProfit > 0
+        ? (isLong && order.takeProfit > entry ? order.takeProfit : (!isLong && order.takeProfit < entry ? order.takeProfit : (isLong ? Number((entry * 1.045).toFixed(2)) : Number((entry * 0.955).toFixed(2)))))
+        : (isLong ? Number((entry * 1.045).toFixed(2)) : Number((entry * 0.955).toFixed(2)));
+
       await api.placePaperTrade({
         symbol: order.symbol,
         side: order.side,
         entryPrice: entry,
-        sl: order.stopLoss || 0,
-        tp: order.takeProfit || 0,
-        size: order.amount,
+        sl: safeSl,
+        tp: safeTp,
+        size: order.amount > 0 ? order.amount : 1.0,
       });
 
       addToast(

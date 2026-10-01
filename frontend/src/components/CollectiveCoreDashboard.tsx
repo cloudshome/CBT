@@ -8,6 +8,7 @@ import {
   GitMerge,
   CheckCircle2,
 } from 'lucide-react';
+import { authFetch } from '../services/api';
 
 interface NodeInfo {
   node_id: string;
@@ -51,10 +52,10 @@ export const CollectiveCoreDashboard: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       const [resStatus, resNodes, resConflicts, resKnowledge] = await Promise.all([
-        fetch('/api/collective/status').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-        fetch('/api/collective/nodes').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-        fetch('/api/collective/conflicts').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-        fetch('/api/collective/knowledge').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        authFetch('/api/collective/status').then((r: Response) => (r.ok ? r.json() : null)).catch(() => null),
+        authFetch('/api/collective/nodes').then((r: Response) => (r.ok ? r.json() : null)).catch(() => null),
+        authFetch('/api/collective/conflicts').then((r: Response) => (r.ok ? r.json() : null)).catch(() => null),
+        authFetch('/api/collective/knowledge').then((r: Response) => (r.ok ? r.json() : null)).catch(() => null),
       ]);
 
       if (resStatus && !resStatus.message) setStatus(resStatus);
@@ -85,7 +86,7 @@ export const CollectiveCoreDashboard: React.FC = () => {
     setLoading(true);
     setActionMessage('Initiating cluster synchronization...');
     try {
-      const res = await fetch('/api/collective/sync', { method: 'POST' });
+      const res = await authFetch('/api/collective/sync', { method: 'POST' });
       const data = await res.json();
       setActionMessage(`Sync complete: ${data.receipts?.length || 0} receipts generated.`);
       await fetchData();
@@ -101,7 +102,7 @@ export const CollectiveCoreDashboard: React.FC = () => {
     setLoading(true);
     setActionMessage('Verifying cryptographic event hashes...');
     try {
-      const res = await fetch('/api/collective/verify', { method: 'POST' });
+      const res = await authFetch('/api/collective/verify', { method: 'POST' });
       const data = await res.json();
       setActionMessage(`Verification ${data.status}: ${data.total_events_checked} checked, ${data.corrupt_events_count} corrupt.`);
     } catch (err: any) {
@@ -116,7 +117,7 @@ export const CollectiveCoreDashboard: React.FC = () => {
     setLoading(true);
     setActionMessage('Rebuilding local projections from canonical events...');
     try {
-      const res = await fetch('/api/collective/rebuild', { method: 'POST' });
+      const res = await authFetch('/api/collective/rebuild', { method: 'POST' });
       const data = await res.json();
       setActionMessage(`Rebuild complete: State hash ${data.state_hash?.slice(0, 12)} (${data.events_reduced} events reduced).`);
       await fetchData();

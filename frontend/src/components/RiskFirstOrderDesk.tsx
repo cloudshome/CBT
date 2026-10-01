@@ -166,6 +166,20 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
     return () => { isMounted = false; };
   }, [symbol, side]);
 
+  const handleSelectSide = (newSide: 'BUY' | 'SELL') => {
+    setSide(newSide);
+    const p = entryPrice > 0 ? entryPrice : lastPrice;
+    if (p > 0) {
+      if (newSide === 'BUY' && (stopLoss === 0 || stopLoss >= p)) {
+        setStopLoss(Number((p * 0.985).toFixed(2)));
+        setTakeProfit(Number((p * 1.045).toFixed(2)));
+      } else if (newSide === 'SELL' && (stopLoss === 0 || stopLoss <= p)) {
+        setStopLoss(Number((p * 1.015).toFixed(2)));
+        setTakeProfit(Number((p * 0.955).toFixed(2)));
+      }
+    }
+  };
+
   // Sync with selected setup if provided
   useEffect(() => {
     if (selectedSetup) {
@@ -175,8 +189,8 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
       setTakeProfit(selectedSetup.takeProfit || 0);
     } else if (lastPrice > 0 && entryPrice === 0) {
       setEntryPrice(lastPrice);
-      setStopLoss(side === 'BUY' ? lastPrice * 0.985 : lastPrice * 1.015);
-      setTakeProfit(side === 'BUY' ? lastPrice * 1.045 : lastPrice * 0.955);
+      setStopLoss(Number((side === 'BUY' ? lastPrice * 0.985 : lastPrice * 1.015).toFixed(2)));
+      setTakeProfit(Number((side === 'BUY' ? lastPrice * 1.045 : lastPrice * 0.955).toFixed(2)));
     }
   }, [selectedSetup, lastPrice]);
 
@@ -660,7 +674,7 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
         <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-slate-900 rounded border border-border">
           <button
             type="button"
-            onClick={() => setSide('BUY')}
+            onClick={() => handleSelectSide('BUY')}
             className={`py-1.5 text-xs font-bold rounded transition flex items-center justify-center gap-1 ${
               side === 'BUY' ? 'bg-terminal-green text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -671,7 +685,7 @@ export const RiskFirstOrderDesk: React.FC<RiskFirstOrderDeskProps> = ({
 
           <button
             type="button"
-            onClick={() => setSide('SELL')}
+            onClick={() => handleSelectSide('SELL')}
             className={`py-1.5 text-xs font-bold rounded transition flex items-center justify-center gap-1 ${
               side === 'SELL' ? 'bg-terminal-red text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
             }`}

@@ -76,6 +76,8 @@ from core.arbitrage.cexdex_routes import router as cexdex_router
 from core.kronos.kronos_routes import kronos_router
 from core.terminal_routes import terminal_router
 from core.intelligence.routes import router as intelligence_router
+from core.institutional_routes import router as institutional_suite_router
+from core.execution.testnet.routes import router as testnet_router
 from core.autonomous_trader import autonomous_trader
 from core.command_executor import command_executor
 from core.conservative_kelly import conservative_kelly
@@ -277,6 +279,8 @@ app.include_router(cexdex_router)
 app.include_router(kronos_router)
 app.include_router(strategy_gateway_router)
 app.include_router(intelligence_router)
+app.include_router(institutional_suite_router)
+app.include_router(testnet_router)
 
 # CORS — fail closed in production: CORS_ORIGIN must be an explicit allowlist.
 _cors_origin = os.getenv("CORS_ORIGIN", "").strip()

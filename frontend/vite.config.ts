@@ -80,6 +80,7 @@ const PYTHON_PREFIXES = [
   '/api/strategist',
   '/api/v1',
   '/api/web3',
+  '/api/testnet',
   '/ws',
 ];
 

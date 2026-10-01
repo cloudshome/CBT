@@ -126,7 +126,7 @@ function authHeaders(extraHeaders?: HeadersInit): HeadersInit {
   return headers;
 }
 
-async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = authHeaders(init?.headers);
   if (init?.body && typeof init.body === 'string' && !(headers as Headers).has('Content-Type')) {
     (headers as Headers).set('Content-Type', 'application/json');

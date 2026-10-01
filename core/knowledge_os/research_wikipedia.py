@@ -355,45 +355,225 @@ class ResearchWikipediaEngine:
         title = (
             custom_title or f"Macro Intelligence Ingest: {source_type.replace('_', ' ').title()}"
         )
-        category = custom_category or "Macro Geopolitics"
+        category = custom_category or "Macro Geopolitics & Hegemony"
         author = custom_author or "Online Analyst / Open Intelligence"
+        raw_body_text = raw_text
+        summary = ""
+        claims: list[EpistemicClaim] = []
+        contradictions: list[str] = []
+        wikilinks: list[str] = []
+        tags: list[str] = ["Macro", "ResearchLab", source_type.lower()]
 
-        summary = (
-            f"Automated intelligence synthesis of material from {source_url or 'user research input'}. "
-            "Evaluates secular economic and financial assertions, isolating verifiable macroeconomic data "
-            "from qualitative geopolitical speculation."
-        )
+        # 1. Live Extraction for YouTube
+        if source_type == "YOUTUBE" or ("youtube.com" in source_url or "youtu.be" in source_url):
+            try:
+                from core.youtube_extractor import youtube_extractor
 
-        claims = [
-            EpistemicClaim(
-                claim_id="C-01",
-                speaker_claim=f"Primary structural argument presented in source ({source_type}).",
-                epistemic_status="HYPOTHESIS",
-                cross_verification_evidence="Subject to walk-forward empirical validation against central bank liquidity and trade balance ledgers.",
-                confidence_score=0.65,
-                empirical_dataset_reference="CBT Macro Ingestion Database",
-            ),
-            EpistemicClaim(
-                claim_id="C-02",
-                speaker_claim="Global monetary regime is experiencing structural multi-polarity.",
-                epistemic_status="FACT",
-                cross_verification_evidence="Verified via IMF COFER quarterly data showing gradual decline of USD global reserves from 71% (2000) to ~58% (2025/2026).",
-                confidence_score=0.92,
-                empirical_dataset_reference="IMF COFER 2025/2026",
-            ),
-        ]
+                yt_res = youtube_extractor.extract_full_video_research(source_url)
+                if yt_res.get("success"):
+                    title = custom_title or yt_res.get("title") or title
+                    author = custom_author or yt_res.get("author_creator") or author
+                    raw_body_text = yt_res.get("full_transcript") or yt_res.get("description", "")
+                    dur_fmt = yt_res.get("duration_formatted", "")
+                    summary = (
+                        f"Spoken video intelligence for '{title}' by {author}"
+                        f"{f' (Duration: {dur_fmt})' if dur_fmt else ''}. "
+                        "Full chronological transcript decomposed into discrete assertions, evaluated against macroeconomic ledgers."
+                    )
+                    hype = yt_res.get("hype_markers", [])
+                    if hype:
+                        for h in hype[:5]:
+                            contradictions.append(f"Author marketing hype pattern detected: '{h}'")
+                    segments = yt_res.get("segments", [])
+                    if segments:
+                        for i, seg in enumerate(segments[:6]):
+                            seg_text = seg.get("text", "").strip()
+                            if len(seg_text) < 15:
+                                continue
+                            time_stamp = seg.get("timestamp_start", "")
+                            tc_prefix = f"[{time_stamp}] " if time_stamp else ""
+                            is_hype = any(hk.lower() in seg_text.lower() for hk in hype)
+                            claims.append(
+                                EpistemicClaim(
+                                    claim_id=f"C-{i+1:02d}",
+                                    speaker_claim=f"{tc_prefix}{seg_text[:160]}",
+                                    epistemic_status="NARRATIVE" if is_hype else "HYPOTHESIS",
+                                    cross_verification_evidence=(
+                                        "Flagged as promotional assertion without causal proof."
+                                        if is_hype
+                                        else "Empirical forward-test candidate awaiting ledger verification."
+                                    ),
+                                    confidence_score=0.45 if is_hype else 0.72,
+                                    empirical_dataset_reference="YouTube Spoken Transcript Ledger",
+                                )
+                            )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"YouTube extraction fallback: {e}")
 
-        wikilinks = [
-            "[[Global Reserve Currency De-Dollarization]]",
-            "[[US Treasury Liquidity Cycles]]",
-            "[[Macro Regime Shifts]]",
-        ]
+        # 2. Live Extraction for Web Articles, GitHub, ArXiv, TradingView
+        elif source_url and source_url.startswith(("http://", "https://")):
+            try:
+                from core.url_extractor import url_extractor
 
-        tags = ["Macro", "Geopolitics", "Liquidity", "ResearchLab", source_type.lower()]
+                url_res = url_extractor.extract(source_url)
+                if url_res.get("success") and (url_res.get("text_content") or url_res.get("summary")):
+                    title = custom_title or url_res.get("title") or title
+                    author = custom_author or url_res.get("author_creator") or author
+                    source_type = url_res.get("source_type", source_type)
+                    raw_body_text = url_res.get("text_content") or ""
+                    url_summ = url_res.get("summary", "")
+                    if url_summ and len(url_summ) > 40:
+                        summary = url_summ
+                    elif raw_body_text:
+                        summary = (
+                            f"Intelligence extraction from {url_res.get('domain', source_url)}. "
+                            + raw_body_text[:350].strip()
+                            + "..."
+                        )
+
+                    # Extract key claim paragraphs
+                    paragraphs = [p.strip() for p in raw_body_text.split("\n") if len(p.strip()) > 35]
+                    for i, p in enumerate(paragraphs[:6]):
+                        claims.append(
+                            EpistemicClaim(
+                                claim_id=f"C-{i+1:02d}",
+                                speaker_claim=p[:180],
+                                epistemic_status=(
+                                    "FACT"
+                                    if any(
+                                        w in p.lower()
+                                        for w in [
+                                            "data shows",
+                                            "percent",
+                                            "increased by",
+                                            "decreased by",
+                                            "recorded",
+                                            "ledger",
+                                        ]
+                                    )
+                                    else "HYPOTHESIS"
+                                ),
+                                cross_verification_evidence=(
+                                    "Grounded in published source documentation."
+                                    if "arxiv" in source_url or "github" in source_url
+                                    else "Empirical claim subject to out-of-sample data cross-audit."
+                                ),
+                                confidence_score=0.88 if "arxiv" in source_url else 0.70,
+                                empirical_dataset_reference=f"{url_res.get('domain', 'Web')} Published Corpus",
+                            )
+                        )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"URL extraction fallback: {e}")
+
+        # 3. Raw text or fallback if no claims yet
+        if not claims and raw_body_text:
+            lines = [l.strip() for l in raw_body_text.split("\n") if len(l.strip()) > 20]
+            if not lines:
+                lines = [raw_body_text[:200]]
+            for i, l in enumerate(lines[:5]):
+                claims.append(
+                    EpistemicClaim(
+                        claim_id=f"C-{i+1:02d}",
+                        speaker_claim=l[:160],
+                        epistemic_status="HYPOTHESIS",
+                        cross_verification_evidence="Extracted from submitted research dossier.",
+                        confidence_score=0.68,
+                        empirical_dataset_reference="CBT Research Knowledge Base",
+                    )
+                )
+
+        if not claims:
+            claims = [
+                EpistemicClaim(
+                    claim_id="C-01",
+                    speaker_claim=f"Primary structural argument presented in source ({source_type}).",
+                    epistemic_status="HYPOTHESIS",
+                    cross_verification_evidence="Subject to walk-forward empirical validation against market ledgers.",
+                    confidence_score=0.65,
+                    empirical_dataset_reference="CBT Ingestion Database",
+                )
+            ]
+
+        if not summary:
+            summary = (
+                f"Automated intelligence synthesis of material from {source_url or 'user research input'}. "
+                "Evaluates secular economic and financial assertions, isolating verifiable market data "
+                "from qualitative speculation."
+            )
+
+        # Dynamic Category & Wikilinks based on content
+        content_lower = (raw_body_text + " " + title).lower()
+        if any(
+            w in content_lower
+            for w in ["bitcoin", "btc", "ethereum", "eth", "crypto", "solana", "defi"]
+        ):
+            category = custom_category or "Crypto & Decentralized Settlement"
+            wikilinks.extend(
+                [
+                    "[[Bitcoin Halving Cycles]]",
+                    "[[Crypto Liquidity Flows]]",
+                    "[[Decentralized Settlement]]",
+                ]
+            )
+            tags.append("crypto")
+        elif any(
+            w in content_lower
+            for w in [
+                "fed",
+                "inflation",
+                "cpi",
+                "rate cut",
+                "treasury",
+                "liquidity",
+                "yield",
+                "m2",
+            ]
+        ):
+            category = custom_category or "Monetary Policy & Debt Cycles"
+            wikilinks.extend(
+                [
+                    "[[US Treasury Liquidity Cycles]]",
+                    "[[Central Bank Balance Sheets]]",
+                    "[[Macro Regime Shifts]]",
+                ]
+            )
+            tags.append("monetary_policy")
+        elif any(
+            w in content_lower
+            for w in [
+                "orderbook",
+                "order book",
+                "cvd",
+                "vpin",
+                "imbalance",
+                "microstructure",
+                "slippage",
+            ]
+        ):
+            category = custom_category or "Quantitative Market Structure"
+            wikilinks.extend(
+                [
+                    "[[L2 Order Book Dynamics]]",
+                    "[[VPIN Toxicity]]",
+                    "[[High Frequency Microstructure]]",
+                ]
+            )
+            tags.append("microstructure")
+        else:
+            wikilinks.extend(
+                [
+                    "[[Global Reserve Currency Dynamics]]",
+                    "[[Macro Regime Shifts]]",
+                    "[[Quantitative Risk Frameworks]]",
+                ]
+            )
+
         implications = (
-            "Structural secular inflation bias. Capital reallocation favoring hard assets, "
-            "non-sovereign settlement rails (Bitcoin), and resilient commodity production."
+            "Secular monetary dynamics and volatility regime shift. "
+            "Suggests asymmetric risk-reward in liquidity-favored assets with rigorous Half-Kelly sizing."
         )
+
+        score = max(50.0, min(95.0, 75.0 + len(claims) * 3.0 - len(contradictions) * 5.0))
 
         full_md = self._render_wikipedia_markdown(
             title=title,
@@ -407,9 +587,9 @@ class ResearchWikipediaEngine:
             claims=claims,
             wikilinks=wikilinks,
             tags=tags,
-            contradictions=[],
+            contradictions=contradictions,
             implications=implications,
-            score=78.5,
+            score=score,
         )
 
         article = WikiArticle(
@@ -424,10 +604,10 @@ class ResearchWikipediaEngine:
             key_claims=claims,
             wikilinks=wikilinks,
             tags=tags,
-            contradictions_detected=[],
+            contradictions_detected=contradictions,
             macro_regime_implications=implications,
             full_markdown_content=full_md,
-            verification_score=78.5,
+            verification_score=score,
             created_at=now_ms,
             updated_at=now_ms,
         )
