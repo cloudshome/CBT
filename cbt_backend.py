@@ -20,7 +20,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 import uvicorn
 
-REPO_ROOT = Path(__file__).resolve().parent
+def _resolve_repo_root() -> Path:
+    env_root = os.getenv("CBT_APP_ROOT")
+    if env_root and Path(env_root).exists():
+        return Path(env_root).resolve()
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent.parent
+    return Path(__file__).resolve().parent
+
+
+REPO_ROOT = _resolve_repo_root()
 os.chdir(REPO_ROOT)
 sys.path.insert(0, str(REPO_ROOT))
 

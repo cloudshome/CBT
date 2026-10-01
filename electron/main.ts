@@ -44,7 +44,7 @@ if (!gotTheLock) {
 function isBackendReachable(urlStr: string): Promise<boolean> {
   return new Promise((resolve) => {
     const req = http.get(`${urlStr}/api/system/setup-status`, (res) => {
-      resolve(res.statusCode === 200 || res.statusCode === 404);
+      resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));
     req.setTimeout(1500, () => {
@@ -104,14 +104,24 @@ async function ensureBackendStarted(): Promise<void> {
   if (packagedExe) {
     console.log(`[Electron Supervisor] Launching packaged backend: ${packagedExe}`);
     backendProcess = spawn(packagedExe, [], {
-      cwd: path.dirname(packagedExe),
-      env: { ...process.env, CBT_BACKEND_PORT: '8000' },
+      cwd: appRoot,
+      env: {
+        ...process.env,
+        CBT_BACKEND_PORT: '8000',
+        CBT_APP_ROOT: appRoot,
+        DATA_DIR: path.join(appRoot, 'data'),
+      },
     });
   } else {
     // Priority 2: Local Python virtual environment
     backendProcess = spawn(venvPython, [backendScript], {
       cwd: backendCwd,
-      env: { ...process.env, CBT_BACKEND_PORT: '8000' },
+      env: {
+        ...process.env,
+        CBT_BACKEND_PORT: '8000',
+        CBT_APP_ROOT: appRoot,
+        DATA_DIR: path.join(appRoot, 'data'),
+      },
     });
   }
 

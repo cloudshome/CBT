@@ -4,9 +4,10 @@ import { verifyMasterPassword } from '../services/api';
 
 interface MasterPasswordUnlockModalProps {
   onUnlock: () => void;
+  onReset?: () => void;
 }
 
-export const MasterPasswordUnlockModal: React.FC<MasterPasswordUnlockModalProps> = ({ onUnlock }) => {
+export const MasterPasswordUnlockModal: React.FC<MasterPasswordUnlockModalProps> = ({ onUnlock, onReset }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,7 +31,11 @@ export const MasterPasswordUnlockModal: React.FC<MasterPasswordUnlockModalProps>
         setError(res.message || 'Incorrect password.');
       }
     } catch (err: any) {
-      setError(err.message || 'Incorrect master password. Please try again.');
+      if (err.message?.includes('Not Found') || err.message?.includes('404')) {
+        setError('Backend route error (404). Please use the option below to reset or re-run setup.');
+      } else {
+        setError(err.message || 'Incorrect master password. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -118,6 +123,18 @@ export const MasterPasswordUnlockModal: React.FC<MasterPasswordUnlockModalProps>
               </>
             )}
           </button>
+
+          {onReset && (
+            <div className="pt-2 text-center border-t border-zinc-900 mt-4">
+              <button
+                type="button"
+                onClick={onReset}
+                className="text-[11px] text-zinc-400 hover:text-amber-400 underline underline-offset-4 transition"
+              >
+                Forgot Password / Re-run Configuration Wizard
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

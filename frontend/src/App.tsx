@@ -1193,6 +1193,10 @@ export const App: React.FC = () => {
             sessionStorage.setItem('cbt_vault_unlocked', 'true');
             setIsVaultLocked(false);
           }}
+          onReset={() => {
+            setIsVaultLocked(false);
+            setShowSetupWizard(true);
+          }}
         />
       )}
 

@@ -16,8 +16,22 @@ from typing import Any
 
 logger = logging.getLogger("ai_quant_sentinel.database")
 
+import sys
+
 # Ensure data directory exists
-DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
+def _resolve_data_dir() -> Path:
+    env_dir = os.getenv("DATA_DIR")
+    if env_dir:
+        return Path(env_dir).resolve()
+    app_root = os.getenv("CBT_APP_ROOT")
+    if app_root and Path(app_root).exists():
+        return (Path(app_root) / "data").resolve()
+    if getattr(sys, "frozen", False):
+        return (Path(sys.executable).resolve().parent.parent / "data").resolve()
+    return Path("data").resolve()
+
+
+DATA_DIR = _resolve_data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 (DATA_DIR / "vector_store").mkdir(parents=True, exist_ok=True)
 (DATA_DIR / "github_sandbox").mkdir(parents=True, exist_ok=True)

@@ -43,7 +43,16 @@ logger = logging.getLogger("sky.setup_service")
 
 setup_router = APIRouter(prefix="/api/system", tags=["System Setup & Updates"])
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+def _resolve_repo_root() -> Path:
+    env_root = os.getenv("CBT_APP_ROOT")
+    if env_root and Path(env_root).exists():
+        return Path(env_root).resolve()
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent.parent
+    return Path(__file__).resolve().parent.parent
+
+
+REPO_ROOT = _resolve_repo_root()
 ENV_FILE_PATH = REPO_ROOT / ".env"
 BACKUPS_DIR = REPO_ROOT / "backups" / "updates"
 
@@ -364,7 +373,21 @@ async def get_setup_status() -> dict[str, Any]:
             logger.debug("Failed reading .env for setup status: %s", exc)
 
     has_gemini = bool(os.getenv("GEMINI_API_KEY", "").strip())
-    vault_unlocked = credential_vault.is_unlocked()
+    
+    # Check if master vault passphrase is actually configured by user
+    has_master_pwd = bool(os.getenv("VAULT_PASSPHRASE", "").strip())
+    if not has_master_pwd and ENV_FILE_PATH.exists():
+        try:
+            with open(ENV_FILE_PATH, encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith("VAULT_PASSPHRASE="):
+                        val = stripped.split("=", 1)[1].strip().strip("'\"")
+                        if val:
+                            has_master_pwd = True
+                            break
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed reading .env for vault passphrase: %s", exc)
 
     configured_exchanges: list[dict[str, Any]] = []
     for exch in SUPPORTED_EXCHANGES:
@@ -379,7 +402,7 @@ async def get_setup_status() -> dict[str, Any]:
                             "masked_api_key": mask_secret(cred.api_key),
                             "is_active": cred.is_active,
                             "updated_at": cred.updated_at,
-                        }
+                            }
                     )
             except Exception:  # noqa: BLE001, S110
                 pass
@@ -387,14 +410,14 @@ async def get_setup_status() -> dict[str, Any]:
     wallets = [w.to_safe_dict() for w in credential_vault.get_web3_wallets()]
     exec_mode = os.getenv("TRADING_MODE", "PAPER_TRADING")
 
-    # First-run wizard triggers ONLY if setup has not been completed AND no credentials exist
-    is_first_run = (not setup_done) and (len(configured_exchanges) == 0 and not has_gemini)
+    # First-run wizard triggers if setup has not been completed OR no master password has been configured
+    is_first_run = (not setup_done) or (not has_master_pwd)
 
     return {
         "is_first_run": is_first_run,
         "setup_completed": setup_done,
         "has_gemini_key": has_gemini,
-        "has_master_password": vault_unlocked,
+        "has_master_password": has_master_pwd,
         "configured_exchanges": configured_exchanges,
         "web3_wallets": wallets,
         "execution_mode": exec_mode,
