@@ -7,6 +7,8 @@ import {
   X,
   GitBranch,
   ShieldCheck,
+  Package,
+  ExternalLink,
 } from 'lucide-react';
 import {
   checkSoftwareUpdate,
@@ -99,13 +101,23 @@ export const SoftwareUpdateModal: React.FC<SoftwareUpdateModalProps> = ({ isOpen
               {/* Status Header */}
               <div className="flex items-center justify-between p-3.5 bg-zinc-900/50 rounded-lg border border-zinc-800">
                 <div className="flex items-center space-x-2">
-                  <GitBranch className="w-4 h-4 text-zinc-400" />
+                  {updateStatus.git_managed ? (
+                    <GitBranch className="w-4 h-4 text-zinc-400" />
+                  ) : (
+                    <Package className="w-4 h-4 text-amber-400" />
+                  )}
                   <span className="font-mono text-zinc-200">
-                    Branch: {updateStatus.branch}
+                    {updateStatus.git_managed
+                      ? `Branch: ${updateStatus.branch}`
+                      : 'Environment: Standalone Desktop Binary'}
                   </span>
                 </div>
                 <div className="font-mono text-[11px] text-zinc-400">
-                  HEAD: <span className="text-amber-400">{updateStatus.current_commit}</span>
+                  {updateStatus.git_managed ? (
+                    <>HEAD: <span className="text-amber-400">{updateStatus.current_commit}</span></>
+                  ) : (
+                    <span className="text-emerald-400 font-semibold">{updateStatus.current_commit || 'v4.0.0'}</span>
+                  )}
                 </div>
               </div>
 
@@ -145,6 +157,29 @@ export const SoftwareUpdateModal: React.FC<SoftwareUpdateModalProps> = ({ isOpen
                     <span>
                       Automatic pre-update snapshot backup will be created in <code className="text-zinc-300">backups/updates/</code> before pull.
                     </span>
+                  </div>
+                </div>
+              ) : !updateStatus.git_managed ? (
+                <div className="py-4 text-center space-y-2.5">
+                  <Package className="w-8 h-8 text-amber-400 mx-auto" />
+                  <p className="text-zinc-200 font-medium text-sm">Standalone Desktop Installation</p>
+                  <p className="text-zinc-400 text-[11px] max-w-sm mx-auto leading-relaxed">
+                    {updateStatus.message ||
+                      'This installation runs as a compiled standalone desktop binary. Git-based auto-pull applies when running directly from the source repository.'}
+                  </p>
+                  <p className="text-zinc-500 text-[11px] font-mono">
+                    Build: {updateStatus.current_commit || 'v4.0.0 (Production)'}
+                  </p>
+                  <div className="pt-2">
+                    <a
+                      href="https://github.com/Azimshawon/SKY/releases"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs transition"
+                    >
+                      <span>Check GitHub Releases</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
                   </div>
                 </div>
               ) : (

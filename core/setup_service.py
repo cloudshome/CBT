@@ -48,7 +48,14 @@ def _resolve_repo_root() -> Path:
     if env_root and Path(env_root).exists():
         return Path(env_root).resolve()
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent.parent
+        candidate = Path(sys.executable).resolve().parent.parent
+        if (candidate / ".git").exists():
+            return candidate
+        # Developer workspace fallback if running on host with cloned repo
+        dev_repo = Path.home() / "CBT"
+        if (dev_repo / ".git").exists():
+            return dev_repo
+        return candidate
     return Path(__file__).resolve().parent.parent
 
 
@@ -857,9 +864,9 @@ async def check_software_update() -> dict[str, Any]:
         return {
             "update_available": False,
             "git_managed": False,
-            "current_commit": "N/A",
-            "branch": "N/A",
-            "message": "Repository is running from compiled binary or git is unavailable.",
+            "current_commit": "v4.0.0-standalone",
+            "branch": "Desktop Binary",
+            "message": "CBT is running as a compiled standalone desktop binary. Git-based auto-pull applies to source installations. To update standalone builds, download the latest release installer.",
         }
 
     # Fetch latest remote references in background
