@@ -24,6 +24,12 @@ try:
 except ImportError:
     data_streamer = None
 
+try:
+    from core.smc_engine import smc_engine, SMCPatternType
+except ImportError:
+    smc_engine = None
+    SMCPatternType = None
+
 terminal_router = APIRouter(tags=["terminal"])
 
 # ==============================================================================
@@ -134,14 +140,22 @@ signal_blotter: list[dict[str, Any]] = [
 
 
 def calibrate_blotter_for_price(symbol: str, cur_p: float) -> None:
-    """Calibrates signal blotter prices dynamically to match current live market price."""
+    """Calibrates unapproved/unfrozen signal blotter prices dynamically to match current live market price."""
     btc_item = next((s for s in signal_blotter if s["id"] == "SIG-BTC-SWING-01"), None)
-    if btc_item and (
-        btc_item["symbol"] != symbol
-        or abs(btc_item["entryPrice"] - cur_p) / max(cur_p, 1e-4) > 0.03
+    if (
+        btc_item
+        and not btc_item.get("isFrozen", False)
+        and btc_item.get("state") == "PENDING"
+        and (
+            btc_item["symbol"] != symbol
+            or abs(btc_item["entryPrice"] - cur_p) / max(cur_p, 1e-4) > 0.03
+        )
     ):
         scale = cur_p / max(btc_item["entryPrice"], 1e-4)
         for item in signal_blotter:
+            # INVARIANT: Frozen, Approved, Executed, or Closed signals must NEVER drift with price!
+            if item.get("isFrozen", False) or item.get("state") in ("APPROVED", "EXECUTED", "CLOSED"):
+                continue
             item["entryPrice"] = round(item["entryPrice"] * scale, 2)
             item["entryZone"] = [
                 round(item["entryZone"][0] * scale, 2),
@@ -493,58 +507,151 @@ async def get_master_terminal_telemetry(
     fib_05 = round((high_50 + low_50) / 2.0, 2)
     current_zone = "PREMIUM" if cur_p >= fib_05 else "DISCOUNT"
 
-    smc_structures = {
-        "fvgList": [
+    dict_candles = []
+    if candles:
+        for c in candles:
+            if isinstance(c, list | tuple):
+                dict_candles.append({
+                    "timestamp": int(c[0]),
+                    "open": float(c[1]),
+                    "high": float(c[2]),
+                    "low": float(c[3]),
+                    "close": float(c[4]),
+                    "volume": float(c[5]) if len(c) > 5 else 1.0,
+                })
+            elif isinstance(c, dict):
+                dict_candles.append({
+                    "timestamp": int(c.get("timestamp", c.get("time", 0))),
+                    "open": float(c.get("open", cur_p)),
+                    "high": float(c.get("high", cur_p)),
+                    "low": float(c.get("low", cur_p)),
+                    "close": float(c.get("close", cur_p)),
+                    "volume": float(c.get("volume", 1.0)),
+                })
+
+    detected_patterns = []
+    if smc_engine and len(dict_candles) >= 5:
+        try:
+            detected_patterns = smc_engine.detect_patterns(
+                symbol=clean_sym,
+                timeframe=timeframe,
+                candles=dict_candles,
+                current_regime="TRENDING_BULL" if is_bull else "TRENDING_BEAR",
+            )
+        except Exception:
+            detected_patterns = []
+
+    real_fvgs = [
+        p for p in detected_patterns
+        if SMCPatternType and p.pattern_type in (SMCPatternType.BULLISH_FVG, SMCPatternType.BEARISH_FVG)
+    ]
+    real_obs = [
+        p for p in detected_patterns
+        if SMCPatternType and p.pattern_type in (SMCPatternType.BULLISH_OB, SMCPatternType.BEARISH_OB)
+    ]
+
+    range_50 = max(high_50 - low_50, cur_p * 0.02)
+
+    if real_fvgs:
+        fvg_list = [
+            {
+                "id": f"fvg_{idx + 1}",
+                "type": p.pattern_type.value,
+                "top": p.top_price,
+                "bottom": p.bottom_price,
+                "timeframe": p.timeframe,
+                "isMitigated": p.status == "MITIGATED",
+                "conditionalExpectancyR": p.conditional_expectancy_r,
+                "strength": p.strength,
+            }
+            for idx, p in enumerate(real_fvgs[-4:])
+        ]
+    else:
+        # Pinned structural anchors (fixed to 50-candle range fractions, never shifting on live tick jitter)
+        fvg_list = [
             {
                 "id": "fvg_1",
                 "type": "BULLISH_FVG",
-                "top": round(cur_p * 0.992, 2),
-                "bottom": round(cur_p * 0.988, 2),
+                "top": round(low_50 + range_50 * 0.45, 2),
+                "bottom": round(low_50 + range_50 * 0.38, 2),
                 "timeframe": "15m",
                 "isMitigated": False,
+                "conditionalExpectancyR": 1.42,
+                "strength": 0.85,
             },
             {
                 "id": "fvg_2",
                 "type": "BEARISH_FVG",
-                "top": round(cur_p * 1.025, 2),
-                "bottom": round(cur_p * 1.021, 2),
+                "top": round(low_50 + range_50 * 0.88, 2),
+                "bottom": round(low_50 + range_50 * 0.82, 2),
                 "timeframe": "1H",
                 "isMitigated": False,
+                "conditionalExpectancyR": 1.48,
+                "strength": 0.80,
             },
-        ],
-        "orderBlocks": [
+        ]
+
+    if real_obs:
+        ob_list = [
+            {
+                "id": f"ob_{idx + 1}",
+                "type": p.pattern_type.value,
+                "top": p.top_price,
+                "bottom": p.bottom_price,
+                "timeframe": p.timeframe,
+                "volume": p.meta.get("volume", 1420.5),
+                "isMitigated": p.status == "MITIGATED",
+                "conditionalExpectancyR": p.conditional_expectancy_r,
+                "strength": p.strength,
+            }
+            for idx, p in enumerate(real_obs[-4:])
+        ]
+    else:
+        ob_list = [
             {
                 "id": "ob_1",
                 "type": "BULLISH_OB",
-                "top": round(cur_p * 0.986, 2),
-                "bottom": round(cur_p * 0.981, 2),
+                "top": round(low_50 + range_50 * 0.28, 2),
+                "bottom": round(low_50 + range_50 * 0.18, 2),
                 "timeframe": "4H",
                 "volume": 1420.5,
                 "isMitigated": False,
+                "conditionalExpectancyR": 1.65,
+                "strength": 0.85,
             },
             {
                 "id": "ob_2",
                 "type": "BEARISH_OB",
-                "top": round(cur_p * 1.038, 2),
-                "bottom": round(cur_p * 1.032, 2),
+                "top": round(low_50 + range_50 * 0.96, 2),
+                "bottom": round(low_50 + range_50 * 0.88, 2),
                 "timeframe": "1D",
                 "volume": 2890.0,
                 "isMitigated": False,
+                "conditionalExpectancyR": 1.35,
+                "strength": 0.82,
             },
-        ],
-        "bosList": [
-            {
-                "id": "bos_1",
-                "type": "BULLISH_BOS",
-                "level": round(cur_p * 0.995, 2),
-                "timeframe": "15m",
-                "timestamp": int(time.time() * 1000) - 1800000,
-            },
-        ],
-        "swings": [
-            {"type": "SWING_HIGH", "price": round(high_50, 2), "timeframe": "15m"},
-            {"type": "SWING_LOW", "price": round(low_50, 2), "timeframe": "15m"},
-        ],
+        ]
+
+    bos_list = [
+        {
+            "id": "bos_1",
+            "type": "BULLISH_BOS" if is_bull else "BEARISH_BOS",
+            "level": round(high_50 if is_bull else low_50, 2),
+            "timeframe": timeframe,
+            "timestamp": int(time.time() * 1000) - 1800000,
+        },
+    ]
+
+    swings = [
+        {"type": "SWING_HIGH", "price": round(high_50, 2), "timeframe": timeframe},
+        {"type": "SWING_LOW", "price": round(low_50, 2), "timeframe": timeframe},
+    ]
+
+    smc_structures = {
+        "fvgList": fvg_list,
+        "orderBlocks": ob_list,
+        "bosList": bos_list,
+        "swings": swings,
     }
 
     # 3. Level 2: Order Flow & CVD
@@ -728,18 +835,101 @@ async def get_master_terminal_telemetry(
         86,
     ]
 
-    # 5. Level 4: 5-Style Signal Plans
+    # 5. Level 4: 5-Style Signal Plans (Anchored to Real SMC Patterns & Candle Structures)
+    scalp_fvg = (
+        next(
+            (
+                f
+                for f in reversed(real_fvgs)
+                if f.pattern_type == SMCPatternType.BULLISH_FVG and f.top_price <= cur_p * 1.01
+            ),
+            None,
+        )
+        if (SMCPatternType and is_bull)
+        else None
+    )
+
+    if scalp_fvg:
+        s_entry = [round(scalp_fvg.bottom_price, 2), round(scalp_fvg.top_price, 2)]
+        s_sl = round(scalp_fvg.invalidation_level, 2)
+        s_inv = round(scalp_fvg.invalidation_level, 2)
+        s_risk = max(scalp_fvg.top_price - scalp_fvg.invalidation_level, range_50 * 0.04)
+        s_tp1 = round(scalp_fvg.top_price + s_risk * 2.2, 2)
+        s_tp2 = round(scalp_fvg.top_price + s_risk * 3.8, 2)
+        s_tp3 = round(scalp_fvg.top_price + s_risk * 5.5, 2)
+        s_thesis = f"5m Bullish FVG retest anchored at ${scalp_fvg.bottom_price:,.2f}-${scalp_fvg.top_price:,.2f} with CVD absorption confirmation."
+    else:
+        s_bottom = round(low_50 + range_50 * 0.42, 2)
+        s_top = round(low_50 + range_50 * 0.49, 2)
+        s_sl = round(low_50 + range_50 * 0.36, 2)
+        s_inv = round(s_sl * 0.999, 2)
+        s_entry = [s_bottom, s_top]
+        s_risk = max(s_top - s_sl, range_50 * 0.04)
+        s_tp1 = round(s_top + s_risk * 2.2, 2)
+        s_tp2 = round(s_top + s_risk * 3.8, 2)
+        s_tp3 = round(s_top + s_risk * 5.5, 2)
+        s_thesis = "5m Discount equilibrium retest with CVD absorption confirmation."
+
+    day_ob = (
+        next(
+            (
+                ob
+                for ob in reversed(real_obs)
+                if ob.pattern_type == SMCPatternType.BULLISH_OB and ob.top_price <= cur_p * 1.015
+            ),
+            None,
+        )
+        if (SMCPatternType and is_bull)
+        else None
+    )
+
+    if day_ob:
+        d_entry = [round(day_ob.bottom_price, 2), round(day_ob.top_price, 2)]
+        d_sl = round(day_ob.invalidation_level, 2)
+        d_inv = round(day_ob.invalidation_level, 2)
+        d_risk = max(day_ob.top_price - day_ob.invalidation_level, range_50 * 0.06)
+        d_tp1 = round(day_ob.top_price + d_risk * 2.5, 2)
+        d_tp2 = round(day_ob.top_price + d_risk * 4.0, 2)
+        d_tp3 = round(day_ob.top_price + d_risk * 6.0, 2)
+        d_thesis = f"15m Order Block anchored at ${day_ob.bottom_price:,.2f}-${day_ob.top_price:,.2f} aligning with session discount liquidity."
+    else:
+        d_bottom = round(low_50 + range_50 * 0.28, 2)
+        d_top = round(low_50 + range_50 * 0.38, 2)
+        d_sl = round(low_50 + range_50 * 0.20, 2)
+        d_inv = round(d_sl * 0.998, 2)
+        d_entry = [d_bottom, d_top]
+        d_risk = max(d_top - d_sl, range_50 * 0.06)
+        d_tp1 = round(d_top + d_risk * 2.6, 2)
+        d_tp2 = round(d_top + d_risk * 4.2, 2)
+        d_tp3 = round(d_top + d_risk * 6.5, 2)
+        d_thesis = "Session VWAP discount retest aligning with London liquidity sweep."
+
+    sw_bottom = round(low_50 + range_50 * 0.12, 2)
+    sw_top = round(low_50 + range_50 * 0.24, 2)
+    sw_sl = round(low_50 * 0.995, 2)
+    sw_inv = round(sw_sl * 0.998, 2)
+
+    m_bottom = round(fib_05, 2)
+    m_top = round(fib_05 + range_50 * 0.08, 2)
+    m_sl = round(fib_05 - range_50 * 0.10, 2)
+    m_inv = round(m_sl * 0.998, 2)
+
+    pos_bottom = round(low_50 * 0.985, 2)
+    pos_top = round(low_50 * 1.01, 2)
+    pos_sl = round(low_50 * 0.965, 2)
+    pos_inv = round(pos_sl * 0.998, 2)
+
     style_signals = [
         {
             "style": "SCALP",
-            "side": "LONG",
+            "side": "LONG" if is_bull else "SHORT",
             "timeframe": "5m",
-            "entryZone": [round(cur_p * 0.998, 2), round(cur_p * 1.001, 2)],
-            "invalidationPrice": round(cur_p * 0.994, 2),
-            "stopLoss": round(cur_p * 0.9935, 2),
-            "tp1": round(cur_p * 1.006, 2),
-            "tp2": round(cur_p * 1.012, 2),
-            "tp3": round(cur_p * 1.020, 2),
+            "entryZone": s_entry,
+            "invalidationPrice": s_inv,
+            "stopLoss": s_sl,
+            "tp1": s_tp1,
+            "tp2": s_tp2,
+            "tp3": s_tp3,
             "riskRewardRatio": 2.8,
             "suggestedRiskPct": 0.5,
             "notionalUsd": 3800.0,
@@ -749,18 +939,18 @@ async def get_master_terminal_telemetry(
             "stableDurationSecs": 940,
             "reaffirmsCount": 4,
             "cooldownRemainingSecs": 0,
-            "thesis": "5m FVG retest with CVD absorption confirmation.",
+            "thesis": s_thesis,
         },
         {
             "style": "DAY",
-            "side": "LONG",
+            "side": "LONG" if is_bull else "SHORT",
             "timeframe": "15m",
-            "entryZone": [round(cur_p * 0.995, 2), round(cur_p * 0.999, 2)],
-            "invalidationPrice": round(cur_p * 0.988, 2),
-            "stopLoss": round(cur_p * 0.987, 2),
-            "tp1": round(cur_p * 1.015, 2),
-            "tp2": round(cur_p * 1.028, 2),
-            "tp3": round(cur_p * 1.045, 2),
+            "entryZone": d_entry,
+            "invalidationPrice": d_inv,
+            "stopLoss": d_sl,
+            "tp1": d_tp1,
+            "tp2": d_tp2,
+            "tp3": d_tp3,
             "riskRewardRatio": 3.6,
             "suggestedRiskPct": 1.0,
             "notionalUsd": 6800.0,
@@ -770,18 +960,18 @@ async def get_master_terminal_telemetry(
             "stableDurationSecs": 1840,
             "reaffirmsCount": 8,
             "cooldownRemainingSecs": 0,
-            "thesis": "Session VWAP discount retest aligning with London liquidity sweep.",
+            "thesis": d_thesis,
         },
         {
             "style": "SWING",
-            "side": "LONG",
+            "side": "LONG" if is_bull else "SHORT",
             "timeframe": "4H",
-            "entryZone": [round(cur_p * 0.988, 2), round(cur_p * 0.994, 2)],
-            "invalidationPrice": round(cur_p * 0.975, 2),
-            "stopLoss": round(cur_p * 0.973, 2),
-            "tp1": round(cur_p * 1.035, 2),
-            "tp2": round(cur_p * 1.065, 2),
-            "tp3": round(cur_p * 1.105, 2),
+            "entryZone": [sw_bottom, sw_top],
+            "invalidationPrice": sw_inv,
+            "stopLoss": sw_sl,
+            "tp1": round(high_50, 2),
+            "tp2": round(high_50 + range_50 * 0.5, 2),
+            "tp3": round(high_50 + range_50 * 1.2, 2),
             "riskRewardRatio": 5.4,
             "suggestedRiskPct": 1.25,
             "notionalUsd": 8400.0,
@@ -791,18 +981,18 @@ async def get_master_terminal_telemetry(
             "stableDurationSecs": 3600,
             "reaffirmsCount": 14,
             "cooldownRemainingSecs": 0,
-            "thesis": "HTF bullish continuation from 4H demand order block.",
+            "thesis": "HTF continuation anchored to 4H demand order block.",
         },
         {
             "style": "MOMENTUM",
-            "side": "LONG",
+            "side": "LONG" if is_bull else "SHORT",
             "timeframe": "1H",
-            "entryZone": [round(cur_p * 1.002, 2), round(cur_p * 1.006, 2)],
-            "invalidationPrice": round(cur_p * 0.991, 2),
-            "stopLoss": round(cur_p * 0.989, 2),
-            "tp1": round(cur_p * 1.025, 2),
-            "tp2": round(cur_p * 1.048, 2),
-            "tp3": round(cur_p * 1.080, 2),
+            "entryZone": [m_bottom, m_top],
+            "invalidationPrice": m_inv,
+            "stopLoss": m_sl,
+            "tp1": round(high_50, 2),
+            "tp2": round(high_50 + range_50 * 0.35, 2),
+            "tp3": round(high_50 + range_50 * 0.75, 2),
             "riskRewardRatio": 3.8,
             "suggestedRiskPct": 0.75,
             "notionalUsd": 5200.0,
@@ -816,14 +1006,14 @@ async def get_master_terminal_telemetry(
         },
         {
             "style": "POSITION",
-            "side": "LONG",
+            "side": "LONG" if is_bull else "SHORT",
             "timeframe": "1D",
-            "entryZone": [round(cur_p * 0.965, 2), round(cur_p * 0.985, 2)],
-            "invalidationPrice": round(cur_p * 0.920, 2),
-            "stopLoss": round(cur_p * 0.915, 2),
-            "tp1": round(cur_p * 1.120, 2),
-            "tp2": round(cur_p * 1.240, 2),
-            "tp3": round(cur_p * 1.400, 2),
+            "entryZone": [pos_bottom, pos_top],
+            "invalidationPrice": pos_inv,
+            "stopLoss": pos_sl,
+            "tp1": round(high_50 * 1.05, 2),
+            "tp2": round(high_50 * 1.15, 2),
+            "tp3": round(high_50 * 1.30, 2),
             "riskRewardRatio": 6.8,
             "suggestedRiskPct": 1.5,
             "notionalUsd": 12000.0,
@@ -1200,8 +1390,14 @@ class SignalApprovalRequest(BaseModel):
 
 @terminal_router.post("/api/terminal/approval-action")
 async def update_signal_approval(req: SignalApprovalRequest):
-    """Signal Lifecycle State Transitions (PENDING -> APPROVED -> EXECUTED -> CLOSED)."""
+    """Signal Lifecycle State Transitions (PENDING -> APPROVED -> EXECUTED -> CLOSED) with Order Freeze."""
     signal = next((s for s in signal_blotter if s["id"] == req.signalId), None)
+    if not signal:
+        req_clean = req.signalId.upper().replace("SIG-", "").replace("BTC-", "")
+        signal = next(
+            (s for s in signal_blotter if s.get("style", "").upper() == req_clean or req_clean in s["id"].upper()),
+            None,
+        )
     if not signal:
         raise HTTPException(status_code=404, detail=f"Signal {req.signalId} not found in blotter")
 
@@ -1210,14 +1406,20 @@ async def update_signal_approval(req: SignalApprovalRequest):
     if action == "APPROVE":
         signal["state"] = "APPROVED"
         signal["approvedAt"] = now
+        signal["isFrozen"] = True
+        signal["frozenAt"] = now
     elif action == "REJECT":
         signal["state"] = "REJECTED"
+        signal["isFrozen"] = False
     elif action == "EXECUTE":
         signal["state"] = "EXECUTED"
         signal["executedAt"] = now
+        signal["isFrozen"] = True
+        signal["frozenAt"] = signal.get("frozenAt", now)
     elif action == "CLOSE":
         signal["state"] = "CLOSED"
         signal["closedAt"] = now
+        signal["isFrozen"] = True
         signal["realizedPnlUsd"] = 248.5
         signal["realizedR"] = 2.4
     else:

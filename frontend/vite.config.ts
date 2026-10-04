@@ -37,6 +37,7 @@ const PYTHON_PREFIXES = [
   '/api/desk',
   '/api/paper',
   '/api/institutional',
+  '/api/terminal',
   '/api/sky',
   '/api/decision',
   '/api/prediction',
