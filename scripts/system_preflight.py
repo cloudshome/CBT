@@ -50,6 +50,9 @@ def check_db_integrity():
 
 
 def check_pytest():
+    env = os.environ.copy()
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     res = subprocess.run(
         [sys.executable, "-m", "pytest", "-q"],
         cwd=PROJECT_ROOT,
@@ -57,6 +60,7 @@ def check_pytest():
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
     assert res.returncode == 0, f"Pytest failed:\n{res.stdout}\n{res.stderr}"
 

@@ -234,7 +234,7 @@ def test_systemd_unit_exists():
 
 def test_discovery_doc_exists():
     assert Path("docs/DISCOVERY_2026-08-19_AGENT.md").exists()
-    txt = Path("docs/DISCOVERY_2026-08-19_AGENT.md").read_text()
+    txt = Path("docs/DISCOVERY_2026-08-19_AGENT.md").read_text(encoding="utf-8")
     assert "24/7" in txt
     assert "SEC EDGAR" in txt
     assert "Hermes" in txt

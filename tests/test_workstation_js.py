@@ -95,6 +95,8 @@ def _run(api: dict, body: str) -> dict:
       CHARTS.push(chart); return chart;
     }} }};
     global.window = {{ addEventListener: ()=>{{}}, LightweightCharts: global.LightweightCharts }};
+    global.navigator = {{ onLine: true, serviceWorker: {{ ready: Promise.resolve({{ pushManager: {{ getSubscription: () => Promise.resolve(null), subscribe: () => Promise.resolve({{ toJSON: () => ({{}}) }}) }} }}), register: () => Promise.resolve({{ addEventListener: () => {{}} }}), addEventListener: () => {{}} }} }};
+    global.window.navigator = global.navigator;
     global.document = {{ getElementById: el, addEventListener: ()=>{{}},
       querySelectorAll: ()=>[],
       createElement: (tag)=>{{ const e = mkEl(tag || 'tmp'); CREATED.push(e); return e; }},
@@ -136,11 +138,11 @@ def _run(api: dict, body: str) -> dict:
       catch (e) {{ console.error('HARNESS ERROR: ' + (e && e.stack || e)); process.exit(1); }}
     }})();
     """
-    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
         f.write(harness)
         path = f.name
     try:
-        r = subprocess.run([NODE, path], capture_output=True, text=True, timeout=90)
+        r = subprocess.run([NODE, path], capture_output=True, text=True, encoding="utf-8", timeout=90)
         assert r.returncode == 0, f"harness failed:\n{r.stdout}\n{r.stderr}"
         return json.loads(r.stdout.strip().splitlines()[-1])
     finally:

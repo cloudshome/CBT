@@ -121,7 +121,7 @@ def test_sw_never_caches_private_payloads():
 
 def test_offline_html_exists_and_safe():
     assert OFFLINE.exists(), "offline.html missing"
-    html = OFFLINE.read_text()
+    html = OFFLINE.read_text(encoding="utf-8")
     assert "Offline" in html, "offline page should mention Offline"
     assert "cached shell" in html or "OFFLINE SHELL" in html, (
         "offline shell marker missing"
@@ -228,7 +228,7 @@ def test_release_versions_and_pwa_cache_stay_in_lockstep():
     """
     import config
 
-    txt = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
+    txt = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text(encoding="utf-8")
     project_match = re.search(r'^version = "([^"]+)"', txt, re.MULTILINE)
     assert project_match, "pyproject.toml version missing"
     assert config.VERSION == project_match.group(1), (
@@ -237,7 +237,7 @@ def test_release_versions_and_pwa_cache_stay_in_lockstep():
 
     sw_match = re.search(
         r"const CACHE_NAME\s*=\s*['\"]sky-shell-v([^'\"]+)['\"]",
-        SW.read_text(),
+        SW.read_text(encoding="utf-8"),
     )
     assert sw_match, "sw.js versioned sky-shell cache name missing"
     assert sw_match.group(1) == config.VERSION, (
@@ -262,11 +262,11 @@ def test_html_still_valid_js():
     if NODE is None:
         return
     for i, js in enumerate(scripts):
-        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
             f.write(js)
             path = f.name
         try:
-            r = subprocess.run([NODE, "--check", path], capture_output=True, text=True)
+            r = subprocess.run([NODE, "--check", path], capture_output=True, text=True, encoding="utf-8")
             assert r.returncode == 0, (
                 f"served script #{i} invalid JS after PWA edit:\n{r.stderr}"
             )

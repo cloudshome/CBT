@@ -5500,7 +5500,7 @@ if(authLocked()){
     showToast('SKY installed — open from home screen','ok');
   });
   // Service worker registration — scope / so it can control the whole desk
-  if('serviceWorker' in navigator){
+  if(typeof navigator !== 'undefined' && 'serviceWorker' in navigator){
     window.addEventListener('load', function(){
       navigator.serviceWorker.register('/sw.js', {scope:'/'})
         .then(function(reg){
@@ -5538,7 +5538,7 @@ if(authLocked()){
 
   // P18.4 PWA Web Push (VAPID) UI Integration
   window.SKY_push = {
-    supported: !!('PushManager' in window) && !!('serviceWorker' in navigator) && !!('Notification' in window),
+    supported: typeof window !== 'undefined' && !!('PushManager' in window) && typeof navigator !== 'undefined' && !!('serviceWorker' in navigator) && !!('Notification' in window),
     permission: function(){ try{ return Notification.permission; }catch(e){ return 'unknown'; } },
     request: function(){
       if(!('Notification' in window)) return Promise.resolve('unsupported');
@@ -5578,7 +5578,7 @@ if(authLocked()){
       }
     },
     unsubscribe: async function(){
-      if(!('serviceWorker' in navigator)) return {ok:false};
+      if(typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return {ok:false};
       try {
         var reg = await navigator.serviceWorker.ready;
         var sub = await reg.pushManager.getSubscription();

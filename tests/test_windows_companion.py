@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 from pathlib import Path
 
@@ -57,6 +58,7 @@ def test_pairing_payload_qr():
 
 def test_token_store_refuses_without_flag(tmp_path, monkeypatch):
     monkeypatch.delenv("SKY_COMPANION_ALLOW_FILE_TOKEN", raising=False)
+    monkeypatch.setattr(TokenStore, "_win_cred_write", lambda self, token: False)
     store = TokenStore(tmp_path / "c.json")
     with pytest.raises(CompanionError):
         store.save(
@@ -69,6 +71,7 @@ def test_token_store_refuses_without_flag(tmp_path, monkeypatch):
 
 def test_token_store_private_file(tmp_path, monkeypatch):
     monkeypatch.setenv("SKY_COMPANION_ALLOW_FILE_TOKEN", "1")
+    monkeypatch.setattr(TokenStore, "_win_cred_write", lambda self, token: False)
     store = TokenStore(tmp_path / "c.json")
     rec = store.save(
         hub_url="https://hub.local",
@@ -77,8 +80,9 @@ def test_token_store_private_file(tmp_path, monkeypatch):
         name="pc",
     )
     assert rec["stored"] == "file"
-    mode = store.path.stat().st_mode
-    assert not (mode & stat.S_IROTH)
+    if os.name != "nt":
+        mode = store.path.stat().st_mode
+        assert not (mode & stat.S_IROTH)
     loaded = store.load()
     assert loaded["token"] == "secret-token-value"
     assert "secret-token-value" not in json.dumps(

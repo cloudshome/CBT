@@ -304,7 +304,7 @@ class TokenStore:
         except OSError:
             pass
         mode = self.path.stat().st_mode
-        if mode & stat.S_IROTH:
+        if os.name != "nt" and (mode & stat.S_IROTH):
             self.path.unlink(missing_ok=True)
             raise CompanionError("refusing a world-readable token file")
         return record
@@ -316,7 +316,7 @@ class TokenStore:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return None
-        if data.get("token") and (self.path.stat().st_mode & stat.S_IROTH):
+        if os.name != "nt" and data.get("token") and (self.path.stat().st_mode & stat.S_IROTH):
             raise CompanionError("token file is world-readable — revoke the device")
         return data
 
