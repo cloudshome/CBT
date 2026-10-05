@@ -34,6 +34,7 @@ import { LiveLaunchpadDesk } from './components/LiveLaunchpadDesk';
 import { ExecutionTCACockpit } from './components/ExecutionTCACockpit';
 import { StrategyRealityCockpit } from './components/StrategyRealityCockpit';
 import { IntelligenceCockpit } from './components/IntelligenceCockpit';
+import { RiskEnsembleDesk } from './components/RiskEnsembleDesk';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
@@ -114,7 +115,7 @@ export const App: React.FC = () => {
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
-  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH' | 'HEATMAP' | 'STRATEGIST' | 'CEX_DEX' | 'KRONOS_DOMAIN' | 'LIVE_LAUNCHPAD' | 'EXECUTION_TCA' | 'STRATEGY_COCKPIT' | 'INTELLIGENCE_COCKPIT'>('DOSSIER');
+  const [activeBottomTab, setActiveBottomTab] = useState<'DOSSIER' | 'HEDGE_FUND' | 'QUANT' | 'MTF_SMC' | 'FRONTIERS' | 'RESEARCH_LAB' | 'COLLECTIVE' | 'VOLATILITY_SURFACE' | 'ARBITRAGE' | 'MBO_DEPTH' | 'HEATMAP' | 'STRATEGIST' | 'CEX_DEX' | 'KRONOS_DOMAIN' | 'LIVE_LAUNCHPAD' | 'EXECUTION_TCA' | 'STRATEGY_COCKPIT' | 'INTELLIGENCE_COCKPIT' | 'RISK_ENSEMBLE'>('DOSSIER');
   const [activeFrontierTab, setActiveFrontierTab] = useState<'MICROSTRUCTURE' | 'MACRO' | 'GENETIC' | 'AUDITOR' | 'BURN_IN' | 'ARBITRAGE_RADAR' | 'MBO_DEPTH'>('MICROSTRUCTURE');
   const [activeHudMode, setActiveHudMode] = useState<'INSTITUTIONAL' | 'SKY' | 'BOTH'>('INSTITUTIONAL');
 
@@ -860,6 +861,17 @@ export const App: React.FC = () => {
                   <Sparkles size={13} className={activeBottomTab === 'INTELLIGENCE_COCKPIT' ? 'text-white animate-pulse' : 'text-cyan-400'} />
                   <span>🌐 Global Intelligence</span>
                 </button>
+                <button
+                  onClick={() => setActiveBottomTab('RISK_ENSEMBLE')}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
+                    activeBottomTab === 'RISK_ENSEMBLE'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-bold shadow-md shadow-emerald-500/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <ShieldCheck size={13} className={activeBottomTab === 'RISK_ENSEMBLE' ? 'text-slate-950' : 'text-emerald-400'} />
+                  <span>🛡️ Risk Ensemble</span>
+                </button>
               </div>
             </div>
 
@@ -1066,6 +1078,8 @@ export const App: React.FC = () => {
                 />
               ) : activeBottomTab === 'INTELLIGENCE_COCKPIT' ? (
                 <IntelligenceCockpit />
+              ) : activeBottomTab === 'RISK_ENSEMBLE' ? (
+                <RiskEnsembleDesk />
               ) : (
                 <CollectiveCoreDashboard />
               )}
