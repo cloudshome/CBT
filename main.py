@@ -123,7 +123,9 @@ def main(argv: list[str] | None = None) -> int:
         parser.add_argument("--tf", default="15m")
         parser.add_argument("--max-ticks", type=int, default=None)
         parsed, _ = parser.parse_known_args(args[1:])
-        return cmd_sky_agent(parsed)
+    if args and args[0] == "mcp":
+        from cli.system import cmd_mcp
+        return cmd_mcp(args[1:])
 
     print("SKY Quantitative Platform / Crypto Brain Terminal (CBT)")
     print("Available entry points:")

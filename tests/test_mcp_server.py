@@ -125,6 +125,10 @@ class RawMcpClient:
             self.proc.wait()
 
 
+@pytest.mark.skipif(
+    not importlib.util.find_spec("mcp"),
+    reason="mcp package not installed (optional integration)",
+)
 def test_mcp_raw_protocol_handshake(server_env):
     """Raw JSON-RPC client: initialize → tools/list → tools/call."""
     client = RawMcpClient(server_env)
@@ -157,6 +161,10 @@ def test_mcp_raw_protocol_handshake(server_env):
         client.close()
 
 
+@pytest.mark.skipif(
+    not importlib.util.find_spec("mcp"),
+    reason="mcp package not installed (optional integration)",
+)
 def test_mcp_unknown_tool_returns_error(server_env):
     client = RawMcpClient(server_env)
     try:

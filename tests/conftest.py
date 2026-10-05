@@ -30,26 +30,94 @@ os.environ["TELEGRAM_TRADER_IDS"] = "12345678"
 os.environ["RATE_LIMIT_MAX"] = "100000"
 os.environ["RATE_LIMIT_AUTH_MAX"] = "100000"
 
-# Force re-init of db_manager paths if already imported
-try:
-    from core.database import db_manager
+def _init_test_subsystem_schemas() -> None:
+    """Initializes base database schemas and all subsystem tables in test sandboxes."""
+    try:
+        from core.database import db_manager
 
-    db_manager.trading_db_path = Path(os.environ["TRADING_LOGS_DB_PATH"])
-    db_manager.market_db_path = Path(os.environ["MARKET_DB_PATH"])
-    db_manager.brain_db_path = Path(os.environ["BRAIN_DB_PATH"])
-    db_manager.experiment_db_path = Path(os.environ["EXPERIMENT_DB_PATH"])
-    db_manager.init_all_schemas()
+        db_manager.trading_db_path = Path(os.environ["TRADING_LOGS_DB_PATH"])
+        db_manager.market_db_path = Path(os.environ["MARKET_DB_PATH"])
+        db_manager.brain_db_path = Path(os.environ["BRAIN_DB_PATH"])
+        db_manager.experiment_db_path = Path(os.environ["EXPERIMENT_DB_PATH"])
+        db_manager.init_all_schemas()
 
-    from core.telegram.rbac import rbac_registry
+        # 1. Execution Idempotency & Reconciliation
+        try:
+            from core.execution.idempotency import LiveOrderIdempotencyStore
+            LiveOrderIdempotencyStore()._init_table()
+        except Exception:
+            pass
 
-    rbac_registry.reset()
-except Exception:  # noqa: BLE001, S110 — best-effort fallback, never raise
-    pass
+        # 2. Intelligence Store
+        try:
+            from core.intelligence.schema import IntelligenceStore
+            IntelligenceStore().init_schema()
+        except Exception:
+            pass
+
+        # 3. Web3 Watch-Only Wallets & Security Store
+        try:
+            from core.auth.security_store import security_store
+            from core.web3.wallet_store import web3_wallet_store
+            security_store._ensure_schema()
+            web3_wallet_store._init_db()
+        except Exception:
+            pass
+
+        # 4. Autonomous Research Storage & Manifest
+        try:
+            from core.autonomous_research.storage.research_storage import ResearchStorage
+            ResearchStorage().init_schemas()
+        except Exception:
+            pass
+
+        try:
+            from core.autonomous_research.storage.storage_manifest import StorageManifest
+            StorageManifest().init_schema()
+        except Exception:
+            pass
+
+        # 5. Telegram & YouTube Subsystems
+        try:
+            from core.telegram.jobs import JobManager
+            JobManager().init_table()
+        except Exception:
+            pass
+
+        try:
+            from core.telegram.callbacks import ActionTokenManager
+            ActionTokenManager().init_table()
+        except Exception:
+            pass
+
+        try:
+            from core.telegram.idempotency import IdempotencyManager
+            IdempotencyManager().init_table()
+        except Exception:
+            pass
+
+        try:
+            from core.youtube.discovery import YouTubeDiscoveryStore
+            YouTubeDiscoveryStore().init_table()
+        except Exception:
+            pass
+
+        try:
+            from core.telegram.rbac import rbac_registry
+            rbac_registry.reset()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+_init_test_subsystem_schemas()
 
 
 @pytest.fixture(scope="session", autouse=True)
 def isolate_test_databases():
     """Session-wide fixture ensuring complete test isolation from production data."""
+    _init_test_subsystem_schemas()
     yield
     # Cleanup temporary directory after test session
     try:
