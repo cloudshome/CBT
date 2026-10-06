@@ -52,6 +52,10 @@ from core.intelligence.forward_validation.orderbook_tracker import (
     OrderBookLevel,
     OrderBookSnapshot,
 )
+from core.intelligence.forward_validation.paper_ingestion_engine import (
+    ForwardPaperIngestionEngine,
+    global_paper_ingestion_engine,
+)
 from core.intelligence.forward_validation.paper_fill_simulator import (
     FeedIntegrityError,
     InsufficientLiquidityError,
@@ -102,8 +106,10 @@ __all__ = [
     "FeedIntegrityError",
     "FeedQualityEvidence",
     "FeedQualityState",
+    "ForwardPaperIngestionEngine",
     "ForwardPerformanceLedger",
     "FrozenStrategyDossier",
+    "global_paper_ingestion_engine",
     "HumanApprovalRequiredError",
     "InsufficientLiquidityError",
     "LeagueStrategyRecord",

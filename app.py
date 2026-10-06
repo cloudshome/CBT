@@ -154,6 +154,7 @@ from core.patch_governor import patch_governor
 from core.path_simulator import path_simulator
 from core.pattern_engine import pattern_engine
 from core.portfolio_shadow import portfolio_shadow
+from core.intelligence.forward_validation import global_paper_ingestion_engine
 from core.prediction_ladder import prediction_ladder_engine
 from core.prediction_ledger import prediction_ledger
 from core.probability_calibrator import probability_calibrator
@@ -779,6 +780,15 @@ async def telemetry_broadcaster_loop():
             for sym in ["BTC/USDT", "ETH/USDT", "XAU/USD"]:
                 cur_price = await data_streamer.get_live_ticker(sym)
 
+                # Feed tick into forward validation paper ingestion engine
+                try:
+                    clean_sym = sym.replace("/", "")
+                    global_paper_ingestion_engine.ingest_tick(
+                        clean_sym, venue="BINANCE", price=cur_price, timestamp_utc=now_ms / 1000.0
+                    )
+                except Exception as ex:
+                    logger.debug(f"Paper ingestion tick skipped: {ex}")
+
                 # Update shadow positions
                 events = portfolio_shadow.update_live_price(sym, cur_price)
                 for ev in events:
@@ -807,6 +817,14 @@ async def telemetry_broadcaster_loop():
                     "macro_vitals": macro.__dict__,
                 }
                 await ws_manager.broadcast(payload)
+
+                # Broadcast real-time TICK for direct UI series consumption (Zero-Shake)
+                await ws_manager.broadcast({
+                    "type": "TICK",
+                    "symbol": sym,
+                    "price": cur_price,
+                    "timestamp": now_ms,
+                })
         except Exception as e:
             logger.debug(f"Telemetry loop error: {e}")
         await asyncio.sleep(1.0)
@@ -4333,14 +4351,60 @@ async def get_ws_reconciliation_recent(
 async def websocket_terminal_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     try:
+        # Send initial connected greeting with forward paper telemetry
+        await websocket.send_json({
+            "type": "CONNECTED",
+            "message": "Connected to CBT Real-Time Terminal Stream",
+            "telemetry": global_paper_ingestion_engine.get_telemetry(),
+            "timestamp": int(time.time() * 1000),
+        })
         while True:
             data = await websocket.receive_text()
             ws_manager.record_activity(websocket)
             msg = json.loads(data) if data else {}
-            if msg.get("action") == "PING":
+            action = msg.get("action", "").upper()
+
+            if action == "PING":
                 await websocket.send_json(
                     {"type": "PONG", "timestamp": int(asyncio.get_event_loop().time() * 1000)}
                 )
+            elif action == "SUBSCRIBE":
+                sym = msg.get("symbol", "BTC/USDT")
+                cur_p = await data_streamer.get_live_ticker(sym)
+                await websocket.send_json({
+                    "type": "SUBSCRIBED",
+                    "symbol": sym,
+                    "price": cur_p,
+                    "orderbook": global_paper_ingestion_engine.get_orderbook(sym),
+                })
+            elif action == "FORWARD_TELEMETRY":
+                await websocket.send_json({
+                    "type": "FORWARD_TELEMETRY",
+                    "data": global_paper_ingestion_engine.get_telemetry(),
+                })
+            elif action == "PAPER_ORDER":
+                adm_id = msg.get("admission_id", "DEFAULT_FORWARD_LEAGUE")
+                sym = msg.get("symbol", "BTCUSDT")
+                side = msg.get("side", "BUY")
+                qty = float(msg.get("quantity", 0.01))
+                price = float(msg.get("price")) if msg.get("price") else None
+                fill = global_paper_ingestion_engine.place_paper_order(
+                    admission_id=adm_id,
+                    symbol=sym,
+                    side=side,
+                    order_type=msg.get("order_type", "MARKET"),
+                    quantity=qty,
+                    price=price,
+                )
+                await websocket.send_json({
+                    "type": "PAPER_FILL",
+                    "data": fill.model_dump(),
+                })
+                # Broadcast fill notification to other connected clients
+                await ws_manager.broadcast({
+                    "type": "PAPER_FILL_BROADCAST",
+                    "data": fill.model_dump(),
+                })
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
     except Exception:

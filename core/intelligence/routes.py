@@ -74,6 +74,7 @@ from core.intelligence.forward_validation import (
     MultiDimensionalDriftDetector,
     StrategyLeagueRegistry,
     SuspensionController,
+    global_paper_ingestion_engine,
 )
 from core.intelligence.friction_model import FrictionTier, RealisticFrictionEngine
 from core.intelligence.hypothesis_schema import (
@@ -1703,3 +1704,113 @@ async def manual_resume_forward_strategy(
         "status": "success",
         "message": f"Strategy {req.admission_id} resumed by operator {req.operator_id}.",
     }
+
+
+class ForwardPaperOrderRequest(BaseModel):
+    admission_id: str = Field(..., description="Target forward league strategy admission ID")
+    symbol: str = Field("BTCUSDT", description="Trading asset symbol (e.g. BTCUSDT)")
+    side: str = Field("BUY", description="Trade side: BUY or SELL")
+    order_type: str = Field("MARKET", description="Order type: MARKET or LIMIT")
+    quantity: float = Field(0.01, gt=0, description="Order quantity")
+    price: float | None = Field(None, description="Limit price if order_type is LIMIT")
+    venue: str = Field("BINANCE", description="Exchange venue")
+    slippage_tolerance_bps: float = Field(50.0, description="Max acceptable slippage in bps")
+
+
+class ForwardTickIngestRequest(BaseModel):
+    symbol: str = Field("BTCUSDT", description="Asset symbol")
+    venue: str = Field("BINANCE", description="Exchange venue")
+    price: float = Field(..., gt=0, description="Latest market price")
+    high: float | None = Field(None, description="24h high")
+    low: float | None = Field(None, description="24h low")
+    volume: float = Field(1.0, description="Trade or 24h volume")
+    timestamp_utc: float | None = Field(None, description="Timestamp UTC")
+
+
+@router.post("/forward/paper/order")
+async def place_forward_paper_order(
+    req: ForwardPaperOrderRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """
+    Submits a realistic microstructure paper order for forward validation.
+    Computes depth-walking VWAP, fee attribution, and adverse selection slippage.
+    """
+    fill = global_paper_ingestion_engine.place_paper_order(
+        admission_id=req.admission_id,
+        symbol=req.symbol,
+        side=req.side,
+        order_type=req.order_type,
+        quantity=req.quantity,
+        price=req.price,
+        venue=req.venue,
+        slippage_tolerance_bps=req.slippage_tolerance_bps,
+    )
+    return {
+        "status": "success",
+        "fill": fill.model_dump(),
+    }
+
+
+@router.get("/forward/paper/fills")
+async def get_forward_paper_fills(
+    admission_id: str | None = Query(None, description="Optional admission filter"),
+    limit: int = Query(50, ge=1, le=500, description="Maximum fills to return"),
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves recent forward paper execution fills with denominator transparency."""
+    fills = global_paper_ingestion_engine.get_recent_fills(admission_id=admission_id, limit=limit)
+    return {
+        "status": "success",
+        "fills": fills,
+        "total": len(fills),
+        "capital_firewall": "STRICT_SIMULATION_ONLY",
+    }
+
+
+@router.get("/forward/paper/book")
+async def get_forward_orderbook(
+    symbol: str = Query("BTCUSDT", description="Asset symbol"),
+    venue: str = Query("BINANCE", description="Exchange venue"),
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Retrieves the local order book snapshot for forward validation."""
+    book = global_paper_ingestion_engine.get_orderbook(symbol=symbol, venue=venue)
+    return {
+        "status": "success",
+        "orderbook": book,
+    }
+
+
+@router.post("/forward/paper/ingest")
+async def ingest_forward_market_tick(
+    req: ForwardTickIngestRequest,
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Ingests a live market tick and updates the local order book and markouts."""
+    snapshot = global_paper_ingestion_engine.ingest_tick(
+        symbol=req.symbol,
+        venue=req.venue,
+        price=req.price,
+        high=req.high,
+        low=req.low,
+        volume=req.volume,
+        timestamp_utc=req.timestamp_utc,
+    )
+    return {
+        "status": "success",
+        "snapshot": snapshot.model_dump(),
+    }
+
+
+@router.get("/forward/paper/telemetry")
+async def get_forward_paper_telemetry(
+    _auth: None = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Returns real-time forward paper data ingestion and markout telemetry."""
+    telemetry = global_paper_ingestion_engine.get_telemetry()
+    return {
+        "status": "success",
+        "telemetry": telemetry,
+    }
+
