@@ -176,25 +176,67 @@ class DeskStateMind:
         lines.append("💡 _Send /close <symbol> to close an active position._")
         return "\n".join(lines)
 
-    def close_position_by_symbol(self, symbol: str) -> str:
+    def close_position_by_symbol(self, identifier: str = "") -> str:
         """
-        Closes an active paper trade directly from Telegram.
+        Closes an active paper trade directly from Telegram by Position ID or Symbol.
         """
         from core.portfolio_shadow import portfolio_shadow
 
-        sym = symbol.strip().upper()
-        if "/" not in sym and sym:
-            sym = f"{sym}/USDT"
-
+        raw_id = identifier.strip()
         open_positions = portfolio_shadow.get_open_positions()
-        target = next((p for p in open_positions if p["symbol"] == sym), None)
 
-        if not target:
-            return f"⚠️ No active open paper position found for `{sym}`."
+        if not open_positions:
+            return "⚠️ No active open paper positions currently found on the Desk."
+
+        target = None
+        if raw_id:
+            raw_upper = raw_id.upper()
+            # 1. Match by exact position_id or partial match
+            target = next((p for p in open_positions if p["position_id"].upper() == raw_upper), None)
+            if not target:
+                target = next((p for p in open_positions if raw_upper in p["position_id"].upper()), None)
+
+            # 2. Match by symbol
+            if not target:
+                sym = raw_upper
+                if "/" not in sym and not sym.endswith("USDT"):
+                    sym = f"{sym}/USDT"
+                target = next(
+                    (
+                        p
+                        for p in open_positions
+                        if p["symbol"].upper() == sym or p["symbol"].replace("/", "").upper() == raw_upper
+                    ),
+                    None,
+                )
+
+            if not target:
+                pos_list = "\n".join(
+                    [f"• `{p['position_id']}` ({p['symbol']} {p['direction']})" for p in open_positions]
+                )
+                return (
+                    f"⚠️ Position or symbol `{identifier}` not found.\n\n"
+                    f"**Active Positions:**\n{pos_list}\n\n"
+                    f"💡 _Use `/close <position_id>` or `/close <symbol>`_"
+                )
+        else:
+            if len(open_positions) == 1:
+                target = open_positions[0]
+            else:
+                pos_list = "\n".join(
+                    [f"• `/close {p['position_id']}` ({p['symbol']} {p['direction']})" for p in open_positions]
+                )
+                return (
+                    f"⚠️ Multiple active positions open. Please specify which one to close:\n\n"
+                    f"{pos_list}"
+                )
 
         pos_id = target["position_id"]
+        sym = target["symbol"]
         cur_price = target["current_price"]
-        ok = portfolio_shadow.close_position(pos_id, exit_price=cur_price)
+        ok = portfolio_shadow.close_position(
+            pos_id, exit_price=cur_price, exit_reason="TELEGRAM_MANUAL_CLOSE"
+        )
 
         if ok:
             is_long = target["direction"] == "LONG"
@@ -212,6 +254,7 @@ class DeskStateMind:
                 f"• **Position ID:** `{pos_id}`\n"
                 f"• **Exit Price:** `${cur_price:,.2f}`\n"
                 f"• **Realized PnL:** `{sign}${pnl:,.2f}`\n"
+                f"• **Exit Reason:** `TELEGRAM_MANUAL_CLOSE`\n"
                 f"• **Audit Log:** Saved in SQLite trading logs"
             )
         return f"❌ Failed to close position `{pos_id}`."
@@ -2125,7 +2168,7 @@ class TelegramBotDispatcher:
                 "Extract all price levels, indicators, SMC market structures, Fair Value Gaps, "
                 "Order Blocks, and quantitative trading directives verbatim."
             )
-            ocr_text, provider = pdf_book_extractor.extract_page_with_vision(
+            ocr_text, _provider = pdf_book_extractor.extract_page_with_vision(
                 image_bytes=img_bytes,
                 mime_type="image/jpeg",
                 custom_prompt=prompt,

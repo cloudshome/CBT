@@ -671,8 +671,8 @@ def _telegram_positions_cmd(args: str, chat_id=None) -> str:
 
 
 def _telegram_close_cmd(args: str, chat_id=None) -> str:
-    sym = args.strip() if args.strip() else "BTC/USDT"
-    return telegram_bot.state_mind.close_position_by_symbol(sym)
+    target = args.strip()
+    return telegram_bot.state_mind.close_position_by_symbol(target)
 
 
 async def _telegram_debate_cmd(args: str, chat_id=None) -> str:

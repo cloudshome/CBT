@@ -178,3 +178,48 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
             past_pos[0]["entryReason"], "Key Support bounce + Bullish Divergence"
         )
         self.assertEqual(past_pos[0]["exitReason"], "TP2 TARGET REACHED")
+
+    def test_telegram_close_by_position_id_and_symbol(self):
+        # 1. Open two positions
+        pos1 = portfolio_shadow.open_position(
+            symbol="BTC/USDT",
+            direction="LONG",
+            size=0.1,
+            entry_price=65000.0,
+            stop_loss=64000.0,
+            take_profit=68000.0,
+            entry_reason="Breakout test 1",
+        )
+        pos2 = portfolio_shadow.open_position(
+            symbol="ETH/USDT",
+            direction="SHORT",
+            size=1.0,
+            entry_price=3500.0,
+            stop_loss=3600.0,
+            take_profit=3200.0,
+            entry_reason="Breakout test 2",
+        )
+
+        # 2. Close by exact Position ID
+        res_id = telegram_bot.state_mind.close_position_by_symbol(pos1)
+        self.assertIn("POSITION CLOSED FROM TELEGRAM", res_id)
+        self.assertIn(pos1, res_id)
+        self.assertIn("TELEGRAM_MANUAL_CLOSE", res_id)
+
+        # Verify only pos2 remains open
+        remaining = portfolio_shadow.get_open_positions()
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0]["position_id"], pos2)
+
+        # 3. Close by Symbol "ETH"
+        res_sym = telegram_bot.state_mind.close_position_by_symbol("ETH")
+        self.assertIn("POSITION CLOSED FROM TELEGRAM", res_sym)
+        self.assertIn("ETH/USDT", res_sym)
+        self.assertIn(pos2, res_sym)
+
+        # Verify all positions closed
+        self.assertEqual(len(portfolio_shadow.get_open_positions()), 0)
+
+        # 4. Attempt close when no positions are open
+        res_empty = telegram_bot.state_mind.close_position_by_symbol()
+        self.assertIn("No active open paper positions", res_empty)

@@ -140,6 +140,8 @@ export interface PaperDeskOverviewResponse {
     agentManager?: string;
     strategyName?: string;
     thesis?: string;
+    openedAtFormatted?: string | null;
+    entryReason?: string | null;
   }>;
   past: Array<{
     id: string;
@@ -154,6 +156,10 @@ export interface PaperDeskOverviewResponse {
     realizedPnlPct: number;
     openedAt?: number | string;
     closedAt?: number | string;
+    openedAtFormatted?: string | null;
+    closedAtFormatted?: string | null;
+    entryReason?: string | null;
+    exitReason?: string | null;
     autopsyCategory: string;
     autopsyCause: string;
     autopsyRecommendation: string;

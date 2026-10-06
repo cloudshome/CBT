@@ -534,16 +534,25 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                             </button>
                           </td>
                         </tr>
-                        {(pos.thesis || pos.strategyName) && (
+                        {(pos.entryReason || pos.thesis || pos.strategyName) && (
                           <tr className="bg-[#0b101d]/80 border-b border-[#1e293b]/70">
                             <td colSpan={12} className="py-2 px-3 text-[11px] font-mono">
                               <div className="flex flex-wrap items-center gap-2 text-slate-300">
                                 <span className="px-2 py-0.5 rounded bg-sky-950/80 text-sky-300 border border-sky-800/40 font-bold text-[10px]">
-                                  STRATEGY &amp; THESIS
+                                  ENTRY REASON / THESIS
                                 </span>
                                 <span className="text-slate-200 font-semibold">{pos.strategyName || 'SMC Liquidity Engine'}</span>
                                 <span className="text-slate-500">•</span>
-                                <span className="text-slate-300 text-[11px] leading-tight">{pos.thesis}</span>
+                                <span className="text-emerald-300 text-[11px] leading-tight font-medium">{pos.entryReason || pos.thesis}</span>
+                                {pos.openedAtFormatted && (
+                                  <>
+                                    <span className="text-slate-500">•</span>
+                                    <span className="text-slate-400 text-[10px] flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-slate-400" />
+                                      {pos.openedAtFormatted}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -750,16 +759,31 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                   <th className="py-2.5 px-3">TRADE ID</th>
                   <th className="py-2.5 px-3">ASSET</th>
                   <th className="py-2.5 px-3">SIDE</th>
+                  <th className="py-2.5 px-3">TIMESTAMPS (UTC)</th>
                   <th className="py-2.5 px-3">ENTRY / EXIT</th>
                   <th className="py-2.5 px-3 text-right">REALIZED P&amp;L</th>
-                  <th className="py-2.5 px-3">AUTOPSY CLASSIFICATION</th>
-                  <th className="py-2.5 px-3">PRIMARY ROOT CAUSE &amp; RECOMMENDATION</th>
+                  <th className="py-2.5 px-3">ENTRY &amp; EXIT REASONS</th>
+                  <th className="py-2.5 px-3">AUTOPSY &amp; RECOMMENDATION</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1e293b]">
                 {pastHistory.map((trade) => {
                   const isProfit = trade.realizedPnlUsd >= 0;
                   const sign = isProfit ? '+' : '';
+                  const exitReasonBadge = (() => {
+                    const r = trade.exitReason || 'MANUAL_CLOSE';
+                    if (r === 'TAKE_PROFIT_HIT') {
+                      return { text: '🎯 Take-Profit Hit', style: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40' };
+                    }
+                    if (r === 'STOP_LOSS_HIT') {
+                      return { text: '🛑 Stop-Loss Hit', style: 'bg-rose-950/80 text-rose-300 border-rose-500/40' };
+                    }
+                    if (r === 'BREAKEVEN_TRIGGERED') {
+                      return { text: '⚖️ Breakeven Exit', style: 'bg-sky-950/80 text-sky-300 border-sky-500/40' };
+                    }
+                    return { text: '✋ Manual Close', style: 'bg-slate-800 text-slate-300 border-slate-700' };
+                  })();
+
                   return (
                     <tr key={trade.id} className="hover:bg-[#0d1424]/60 transition-colors">
                       <td className="py-3 px-3 text-slate-400 font-bold">
@@ -779,6 +803,16 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                           {trade.side}
                         </span>
                       </td>
+                      <td className="py-3 px-3 text-[11px] text-slate-300">
+                        <div className="flex items-center gap-1 text-slate-400 text-[10px]">
+                          <span className="text-emerald-400 font-bold">IN:</span>
+                          <span>{trade.openedAtFormatted || (trade.openedAt ? new Date(Number(trade.openedAt)).toLocaleString() : 'N/A')}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-slate-400 text-[10px] mt-0.5">
+                          <span className="text-rose-400 font-bold">OUT:</span>
+                          <span>{trade.closedAtFormatted || (trade.closedAt ? new Date(Number(trade.closedAt)).toLocaleString() : 'N/A')}</span>
+                        </div>
+                      </td>
                       <td className="py-3 px-3 text-slate-300">
                         ${trade.entryPrice.toLocaleString()} &rarr; ${trade.exitPrice.toLocaleString()}
                       </td>
@@ -787,19 +821,30 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
                           {sign}${trade.realizedPnlUsd.toFixed(2)} ({sign}{trade.realizedPnlPct.toFixed(2)}%)
                         </span>
                       </td>
-                      <td className="py-3 px-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            isProfit
-                              ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
-                              : 'bg-rose-950 text-rose-300 border-rose-500/40'
-                          }`}
-                        >
-                          {trade.autopsyCategory}
-                        </span>
+                      <td className="py-3 px-3 max-w-xs">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${exitReasonBadge.style}`}>
+                            {exitReasonBadge.text}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-200 line-clamp-2" title={trade.entryReason || 'SMC Setup'}>
+                          <span className="text-slate-400 font-semibold">Entry: </span>
+                          <span className="italic text-sky-200">{trade.entryReason || 'SMC Order Flow Mitigation'}</span>
+                        </div>
                       </td>
-                      <td className="py-3 px-3 max-w-md">
-                        <div className="text-slate-200 text-[11px]">{trade.autopsyCause}</div>
+                      <td className="py-3 px-3 max-w-sm">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                              isProfit
+                                ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
+                                : 'bg-rose-950 text-rose-300 border-rose-500/40'
+                            }`}
+                          >
+                            {trade.autopsyCategory}
+                          </span>
+                        </div>
+                        <div className="text-slate-300 text-[11px] leading-tight">{trade.autopsyCause}</div>
                         <div className="text-sky-300 text-[10px] mt-0.5 italic">
                           &rarr; {trade.autopsyRecommendation}
                         </div>
