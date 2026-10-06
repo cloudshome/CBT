@@ -6,6 +6,7 @@ Multiplexes real-time WebSocket streams and comprehensive REST APIs across all 1
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import hmac
 import json
 import logging
@@ -336,6 +337,7 @@ class TradeOrderRequest(BaseModel):
     entry_price: float
     stop_loss: float
     take_profit: float
+    reason: str | None = None
 
 
 class ParameterApprovalRequest(BaseModel):
@@ -346,6 +348,7 @@ class ParameterApprovalRequest(BaseModel):
 class PositionCloseRequest(BaseModel):
     position_id: str
     exit_price: float | None = None
+    reason: str | None = "MANUAL_CLOSE"
 
 
 class ChartMemorySaveRequest(BaseModel):
@@ -397,6 +400,7 @@ class PaperTradeRequest(BaseModel):
     sl: float = Field(gt=0)
     tp: float = Field(gt=0)
     size: float | None = Field(default=1.0, gt=0, le=1_000_000)
+    reason: str | None = Field(default=None, description="Trade setup reason / thesis")
 
     @field_validator("symbol")
     @classmethod
@@ -428,6 +432,7 @@ class PaperTradeRequest(BaseModel):
 class PaperCloseRequest(BaseModel):
     positionId: str = Field(min_length=1, max_length=128)
     exitPrice: float | None = Field(default=None, gt=0)
+    reason: str | None = Field(default="MANUAL_CLOSE", description="Exit reason")
 
 
 class HalfKellyCalcRequest(BaseModel):
@@ -1570,13 +1575,16 @@ async def open_shadow_trade(order: TradeOrderRequest):
         entry_price=order.entry_price,
         stop_loss=order.stop_loss,
         take_profit=order.take_profit,
+        entry_reason=order.reason,
     )
     return {"status": "SUCCESS", "position_id": pos_id}
 
 
 @app.post("/api/shadow/close", dependencies=[Depends(require_api_key)])
 async def close_shadow_position(req: PositionCloseRequest):
-    success = portfolio_shadow.close_position(req.position_id, req.exit_price)
+    success = portfolio_shadow.close_position(
+        req.position_id, req.exit_price, exit_reason=req.reason or "MANUAL_CLOSE"
+    )
     if not success:
         raise HTTPException(status_code=404, detail="Position not found or already closed.")
     return {"status": "SUCCESS", "message": f"Position {req.position_id} closed."}
@@ -1659,6 +1667,16 @@ async def get_paper_desk_overview():
             strat_name = "Multi-Timeframe SMC Breakout"
             thesis = f"Momentum continuation targeting ${tp_val:,.2f}."
 
+        opened_at_ts = p.get("opened_at")
+        opened_at_fmt = (
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+            if opened_at_ts
+            else None
+        )
+        entry_reason_val = p.get("entry_reason") or thesis
+
         current.append(
             {
                 "id": p.get("position_id", ""),
@@ -1674,7 +1692,9 @@ async def get_paper_desk_overview():
                 "status": "OPEN",
                 "breakevenTriggered": bool(p.get("breakeven_triggered", 0)),
                 "trailingStop": p.get("trailing_stop"),
-                "openedAt": p.get("opened_at"),
+                "openedAt": opened_at_ts,
+                "openedAtFormatted": opened_at_fmt,
+                "entryReason": entry_reason_val,
                 "notionalUsd": notional_usd,
                 "effectiveLeverage": effective_leverage,
                 "capitalAtRiskUsd": capital_at_risk,
@@ -1709,6 +1729,27 @@ async def get_paper_desk_overview():
                 "Widen invalidation boundary below swing low; await 15m displacement candle close."
             )
 
+        opened_at_ts = p.get("opened_at")
+        closed_at_ts = p.get("closed_at")
+        opened_at_fmt = (
+            datetime.fromtimestamp(opened_at_ts / 1000.0, tz=timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+            if opened_at_ts
+            else None
+        )
+        closed_at_fmt = (
+            datetime.fromtimestamp(closed_at_ts / 1000.0, tz=timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+            if closed_at_ts
+            else None
+        )
+        entry_reason_val = p.get("entry_reason") or "SMC Setup"
+        exit_reason_val = p.get("exit_reason") or (
+            "TAKE_PROFIT_HIT" if pnl > 0 else "STOP_LOSS_HIT" if pnl < 0 else "MANUAL_CLOSE"
+        )
+
         past.append(
             {
                 "id": p.get("position_id", ""),
@@ -1721,8 +1762,12 @@ async def get_paper_desk_overview():
                 "tp": float(p.get("take_profit", 0.0)),
                 "realizedPnlUsd": round(pnl, 2),
                 "realizedPnlPct": round(pnl_pct, 2),
-                "openedAt": p.get("opened_at"),
-                "closedAt": p.get("closed_at"),
+                "openedAt": opened_at_ts,
+                "closedAt": closed_at_ts,
+                "openedAtFormatted": opened_at_fmt,
+                "closedAtFormatted": closed_at_fmt,
+                "entryReason": entry_reason_val,
+                "exitReason": exit_reason_val,
                 "autopsyCategory": autopsy_cat,
                 "autopsyCause": autopsy_cause,
                 "autopsyRecommendation": autopsy_rec,
@@ -1745,6 +1790,10 @@ async def get_paper_desk_overview():
                     "realizedPnlPct": 2.22,
                     "openedAt": int(time.time() * 1000) - 86400000,
                     "closedAt": int(time.time() * 1000) - 43200000,
+                    "openedAtFormatted": "2026-10-05 12:00:00 UTC",
+                    "closedAtFormatted": "2026-10-05 23:59:00 UTC",
+                    "entryReason": "Fair Value Gap fill with continuous bullish CVD delta",
+                    "exitReason": "TAKE_PROFIT_HIT",
                     "autopsyCategory": "VALIDATED_PROFIT",
                     "autopsyCause": "Fair Value Gap fill with continuous bullish CVD delta.",
                     "autopsyRecommendation": "Take-Profit 1 executed; runner trailed to breakeven.",
@@ -1762,6 +1811,10 @@ async def get_paper_desk_overview():
                     "realizedPnlPct": -1.45,
                     "openedAt": int(time.time() * 1000) - 172800000,
                     "closedAt": int(time.time() * 1000) - 129600000,
+                    "openedAtFormatted": "2026-10-04 12:00:00 UTC",
+                    "closedAtFormatted": "2026-10-04 23:59:00 UTC",
+                    "entryReason": "Asian session range expansion attempt",
+                    "exitReason": "STOP_LOSS_HIT",
                     "autopsyCategory": "LIQUIDITY_FAILURE",
                     "autopsyCause": "Asian session high sweep triggered sudden mean-reversion selloff.",
                     "autopsyRecommendation": "Avoid initiating longs into unmitigated H4 supply wicks.",
@@ -1940,6 +1993,7 @@ async def place_paper_trade(order: PaperTradeRequest):
         entry_price=order.entryPrice,
         stop_loss=order.sl,
         take_profit=order.tp,
+        entry_reason=order.reason,
     )
     return {
         "message": "Simulated order filled successfully",
@@ -1954,6 +2008,7 @@ async def place_paper_trade(order: PaperTradeRequest):
             "status": "OPEN",
             "pnl": 0.0,
             "createdAt": str(int(time.time() * 1000)),
+            "reason": order.reason,
         },
     }
 
@@ -1963,7 +2018,9 @@ async def close_paper_trade(req: PaperCloseRequest):
     """
     Closes an active paper position directly from the Web UI.
     """
-    success = portfolio_shadow.close_position(req.positionId, req.exitPrice)
+    success = portfolio_shadow.close_position(
+        req.positionId, req.exitPrice, exit_reason=req.reason or "MANUAL_CLOSE"
+    )
     if not success:
         raise HTTPException(status_code=404, detail="Position not found or already closed.")
     return {"status": "SUCCESS", "message": f"Position {req.positionId} closed."}

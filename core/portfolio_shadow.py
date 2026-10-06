@@ -37,6 +37,8 @@ class ShadowPosition:
     status: str = "OPEN"  # "OPEN", "CLOSED", "LIQUIDATED"
     trailing_stop: float | None = None
     breakeven_triggered: bool = False
+    entry_reason: str | None = None
+    exit_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -44,6 +46,20 @@ class ShadowPosition:
 
 class PortfolioShadowManager:
     """Manages active shadow positions and live trailing stop automation."""
+
+    def _ensure_columns_exist(self) -> None:
+        """Defensively migrates shadow_positions schema if columns are absent."""
+        try:
+            with db_manager.get_trading_conn() as conn:
+                cursor = conn.execute("PRAGMA table_info(shadow_positions);")
+                cols = [r[1] for r in cursor.fetchall()]
+                if "entry_reason" not in cols:
+                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN entry_reason TEXT;")
+                if "exit_reason" not in cols:
+                    conn.execute("ALTER TABLE shadow_positions ADD COLUMN exit_reason TEXT;")
+                conn.commit()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Shadow positions column verification check: {e}")
 
     def open_position(
         self,
@@ -53,12 +69,20 @@ class PortfolioShadowManager:
         entry_price: float,
         stop_loss: float,
         take_profit: float,
+        entry_reason: str | None = None,
     ) -> str:
+        self._ensure_columns_exist()
         now = int(time.time() * 1000)
         # Millisecond timestamp alone collides when two same-symbol positions are
         # opened within 1 ms (e.g. autonomous-trader retries) → UNIQUE violation
         # and a lost trade. UUID suffix makes the ID collision-proof.
         pos_id = f"POS_{symbol.replace('/', '_')}_{now}_{uuid.uuid4().hex[:8]}"
+
+        reason_text = (
+            entry_reason
+            if entry_reason
+            else f"SMC Order Flow Structure ({direction.upper()} Confluence)"
+        )
 
         with db_manager.get_trading_conn() as conn:
             conn.execute(
@@ -66,9 +90,10 @@ class PortfolioShadowManager:
                 INSERT INTO shadow_positions (
                     position_id, opened_at, closed_at, symbol, direction, size,
                     entry_price, current_price, stop_loss, take_profit,
-                    unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered
+                    unrealized_pnl, realized_pnl, status, trailing_stop, breakeven_triggered,
+                    entry_reason, exit_reason
                 )
-                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0);
+                VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 'OPEN', NULL, 0, ?, NULL);
                 """,
                 (
                     pos_id,
@@ -80,11 +105,35 @@ class PortfolioShadowManager:
                     float(entry_price),
                     float(stop_loss),
                     float(take_profit),
+                    reason_text,
                 ),
             )
             conn.commit()
 
-        logger.info(f"Opened shadow position {pos_id}: {direction} {size} {symbol} @ {entry_price}")
+        logger.info(
+            f"Opened shadow position {pos_id}: {direction} {size} {symbol} @ {entry_price} | Reason: {reason_text}"
+        )
+
+        # Dispatch real-time Telegram Trade Entry Alert with date, time, and entry reason
+        try:
+            from core.telegram_bot import telegram_bot
+
+            telegram_bot.notify_trade_entry_sync(
+                {
+                    "position_id": pos_id,
+                    "symbol": symbol,
+                    "direction": direction,
+                    "size": float(size),
+                    "entry_price": float(entry_price),
+                    "stop_loss": float(stop_loss),
+                    "take_profit": float(take_profit),
+                    "opened_at": now,
+                    "entry_reason": reason_text,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Telegram entry alert dispatch error: {exc}")
+
         try:
             from core.collective.adapters.paper_trade_adapter import paper_trade_adapter
 
@@ -207,12 +256,36 @@ class PortfolioShadowManager:
                             current_price = ?,
                             unrealized_pnl = 0.0,
                             realized_pnl = ?,
-                            status = 'CLOSED'
+                            status = 'CLOSED',
+                            exit_reason = ?
                         WHERE position_id = ?;
                         """,
-                        (now, exit_fill_price, final_pnl, pos_id),
+                        (now, exit_fill_price, final_pnl, close_reason, pos_id),
                     )
                     conn.commit()
+
+                    # Dispatch real-time Telegram Trade Exit Alert
+                    try:
+                        from core.telegram_bot import telegram_bot
+
+                        telegram_bot.notify_trade_exit_sync(
+                            {
+                                "position_id": pos_id,
+                                "symbol": symbol,
+                                "direction": direction,
+                                "entry_price": float(entry_p),
+                                "exit_price": float(exit_fill_price),
+                                "realized_pnl": float(final_pnl),
+                                "exit_reason": close_reason,
+                                "entry_reason": r["entry_reason"]
+                                if "entry_reason" in r.keys()
+                                else "SMC Setup",
+                                "opened_at": r["opened_at"] if "opened_at" in r.keys() else 0,
+                                "closed_at": now,
+                            }
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug(f"Telegram exit alert dispatch error: {exc}")
 
                     # Audit Event & Loss Autopsy Integration
                     autopsy_report = None
@@ -277,7 +350,12 @@ class PortfolioShadowManager:
 
         return events
 
-    def close_position(self, position_id: str, exit_price: float | None = None) -> bool:
+    def close_position(
+        self,
+        position_id: str,
+        exit_price: float | None = None,
+        exit_reason: str = "MANUAL_CLOSE",
+    ) -> bool:
         """Closes a specific open position immediately at the given or current price."""
         now = int(time.time() * 1000)
         with db_manager.get_trading_conn() as conn:
@@ -304,12 +382,36 @@ class PortfolioShadowManager:
                     current_price = ?,
                     unrealized_pnl = 0.0,
                     realized_pnl = ?,
-                    status = 'CLOSED'
+                    status = 'CLOSED',
+                    exit_reason = ?
                 WHERE position_id = ?;
                 """,
-                (now, p_price, pnl, position_id),
+                (now, p_price, pnl, exit_reason, position_id),
             )
             conn.commit()
+
+            # Dispatch real-time Telegram Trade Exit Alert
+            try:
+                from core.telegram_bot import telegram_bot
+
+                telegram_bot.notify_trade_exit_sync(
+                    {
+                        "position_id": position_id,
+                        "symbol": row["symbol"],
+                        "direction": row["direction"],
+                        "entry_price": float(row["entry_price"]),
+                        "exit_price": float(p_price),
+                        "realized_pnl": float(pnl),
+                        "exit_reason": exit_reason,
+                        "entry_reason": row["entry_reason"]
+                        if "entry_reason" in row.keys()
+                        else "SMC Setup",
+                        "opened_at": row["opened_at"] if "opened_at" in row.keys() else 0,
+                        "closed_at": now,
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"Telegram exit alert dispatch error: {exc}")
 
             # Trigger Autopsy on Manual/API Loss Close
             autopsy_report = None

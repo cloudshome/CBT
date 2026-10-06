@@ -347,10 +347,20 @@ class DatabaseManager:
                     realized_pnl REAL DEFAULT 0.0,
                     status TEXT NOT NULL,
                     trailing_stop REAL,
-                    breakeven_triggered INTEGER DEFAULT 0
+                    breakeven_triggered INTEGER DEFAULT 0,
+                    entry_reason TEXT,
+                    exit_reason TEXT
                 );
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pos_status ON shadow_positions (status);")
+
+            # Ensure entry_reason and exit_reason columns exist for backwards-compatibility migrations
+            cursor = conn.execute("PRAGMA table_info(shadow_positions);")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "entry_reason" not in cols:
+                conn.execute("ALTER TABLE shadow_positions ADD COLUMN entry_reason TEXT;")
+            if "exit_reason" not in cols:
+                conn.execute("ALTER TABLE shadow_positions ADD COLUMN exit_reason TEXT;")
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS execution_audits (

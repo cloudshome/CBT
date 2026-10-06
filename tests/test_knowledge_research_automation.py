@@ -287,6 +287,7 @@ async def test_pipeline_quiz_reminder_sends_due_quizzes(orch):
         "explanation": "Market makers sweep liquidity pools to accumulate positions.",
     }
 
+    orch.quiz_reminders_enabled = True
     with patch(
         "core.knowledge_os.human_brain.HumanLearningEngine.generate_quiz",
         return_value=mock_quiz,
@@ -299,6 +300,17 @@ async def test_pipeline_quiz_reminder_sends_due_quizzes(orch):
     mock_notify.assert_called()
     notify_text = mock_notify.call_args[0][0]
     assert "Smart Money Concepts" in notify_text or "liquidity" in notify_text.lower()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_quiz_reminder_disabled_by_default(orch):
+    """By default, quiz reminders are disabled per user preference."""
+    assert orch.quiz_reminders_enabled is False
+    with patch.object(orch, "_notify", new_callable=AsyncMock) as mock_notify:
+        result = await orch._run_quiz_reminder()
+    assert result["status"] == "DISABLED"
+    assert result["reminders_sent"] == 0
+    mock_notify.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

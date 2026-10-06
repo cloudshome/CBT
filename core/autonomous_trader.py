@@ -185,6 +185,10 @@ class AutonomousTrader:
                     direction_str = decision_out.decision.value
 
                     # 5. Open Position in Shadow Portfolio
+                    reason_desc = (
+                        f"Autonomous SMC ({direction_str}) | Net-EV: {decision_out.net_ev_r:.2f}R | "
+                        f"Kelly: {decision_out.kelly_fraction:.1%}"
+                    )
                     pos_id = portfolio_shadow.open_position(
                         symbol=sym,
                         direction=direction_str,
@@ -192,6 +196,7 @@ class AutonomousTrader:
                         entry_price=entry_price,
                         stop_loss=sl,
                         take_profit=tp,
+                        entry_reason=reason_desc,
                     )
                     self.total_trades_executed += 1
                     self._last_traded_candle_ts[sym] = latest_candle_ts

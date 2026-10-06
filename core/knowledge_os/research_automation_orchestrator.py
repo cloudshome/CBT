@@ -36,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -54,6 +55,9 @@ INTERVAL_QUIZ_REMINDER = 60 * 60  # 1 hour
 INTERVAL_YOUTUBE_CRAWLER = 6 * 60 * 60  # 6 hours
 INTERVAL_KNOWLEDGE_AUDIT = 24 * 60 * 60  # 24 hours
 INTERVAL_DRIVE_SYNC = 6 * 60 * 60  # 6 hours
+
+# User preference: Quiz reminders to Telegram disabled by default (play in Research Lab)
+ENABLE_TELEGRAM_QUIZ_REMINDERS = os.getenv("ENABLE_TELEGRAM_QUIZ_REMINDERS", "false").lower() in ("true", "1")
 
 # How many queued hypotheses to process per run (avoid thundering-herd)
 MAX_HYPOTHESES_PER_RUN = 5
@@ -85,6 +89,7 @@ class ResearchAutomationOrchestrator:
     def __init__(self) -> None:
         self._running = False
         self._tasks: list[asyncio.Task] = []
+        self.quiz_reminders_enabled: bool = ENABLE_TELEGRAM_QUIZ_REMINDERS
         self.pipeline_status: dict[str, PipelineStatus] = {
             "hypothesis_backtest": PipelineStatus("hypothesis_backtest"),
             "quiz_reminder": PipelineStatus("quiz_reminder"),
@@ -100,7 +105,7 @@ class ResearchAutomationOrchestrator:
     async def start_loop(self) -> None:
         """Launches all 5 pipeline loops concurrently. Called from lifespan_ctx."""
         self._running = True
-        logger.info("ResearchAutomationOrchestrator: All 5 zero-touch pipelines starting.")
+        logger.info("ResearchAutomationOrchestrator: Zero-touch research pipelines starting.")
         self._tasks = [
             asyncio.create_task(
                 self._loop(
@@ -108,9 +113,6 @@ class ResearchAutomationOrchestrator:
                     INTERVAL_HYPOTHESIS_BACKTEST,
                     self._run_hypothesis_backtest,
                 )
-            ),
-            asyncio.create_task(
-                self._loop("quiz_reminder", INTERVAL_QUIZ_REMINDER, self._run_quiz_reminder)
             ),
             asyncio.create_task(
                 self._loop("youtube_crawler", INTERVAL_YOUTUBE_CRAWLER, self._run_youtube_crawler)
@@ -122,6 +124,17 @@ class ResearchAutomationOrchestrator:
                 self._loop("drive_sync", INTERVAL_DRIVE_SYNC, self._run_drive_sync)
             ),
         ]
+        if self.quiz_reminders_enabled:
+            logger.info("ResearchAutomationOrchestrator: Spaced repetition quiz reminder pipeline active.")
+            self._tasks.append(
+                asyncio.create_task(
+                    self._loop("quiz_reminder", INTERVAL_QUIZ_REMINDER, self._run_quiz_reminder)
+                )
+            )
+        else:
+            logger.info(
+                "ResearchAutomationOrchestrator: Spaced repetition quiz reminder disabled by user preference (play in Research Lab)."
+            )
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
     def stop(self) -> None:
@@ -414,11 +427,21 @@ class ResearchAutomationOrchestrator:
     # Pipeline 2: Spaced Repetition Quiz Reminder
     # ------------------------------------------------------------------
 
-    async def _run_quiz_reminder(self) -> dict[str, Any]:
+    async def _run_quiz_reminder(self, force: bool = False) -> dict[str, Any]:
         """
         Finds concepts due for review (next_review <= now_ms),
         generates a quiz, and sends it via Telegram.
+        Disabled by default per user preference (quizzes played directly in Research Lab).
         """
+        if not self.quiz_reminders_enabled and not force:
+            logger.info("Spaced repetition quiz Telegram reminders are disabled by user preference.")
+            return {
+                "items_processed": 0,
+                "reminders_sent": 0,
+                "status": "DISABLED",
+                "message": "Telegram quiz reminders disabled. Play directly in Knowledge OS / Research Lab.",
+            }
+
         from core.knowledge_os.human_brain import human_brain
 
         now_ms = int(time.time() * 1000)

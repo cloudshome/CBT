@@ -1203,6 +1203,143 @@ class TelegramBotDispatcher:
         )
         return await self.send_message(msg)
 
+    async def send_trade_entry_alert(self, trade: dict[str, Any]) -> bool:
+        """
+        Dispatches real-time Trade Entry Notification to Telegram with:
+        - Date & Time (UTC & local format)
+        - Symbol & Direction
+        - Entry Price, Size, Notional USD
+        - Stop Loss (Invalidation), Take Profit (Targets), Risk/Reward
+        - Trade Reason / Setup thesis
+        - Position ID
+        """
+        sym = trade.get("symbol", "BTC/USDT")
+        direction = str(trade.get("direction", "LONG")).upper()
+        entry = float(trade.get("entry_price", 0.0))
+        size = float(trade.get("size", 1.0))
+        sl = float(trade.get("stop_loss", 0.0))
+        tp = float(trade.get("take_profit", 0.0))
+        pos_id = trade.get("position_id", "N/A")
+        reason = trade.get("entry_reason") or "SMC Order Flow & Liquidity Mitigation"
+        opened_at = trade.get("opened_at", int(time.time() * 1000))
+        dt_str = datetime.datetime.fromtimestamp(
+            opened_at / 1000.0, tz=datetime.UTC
+        ).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        notional_usd = entry * size
+        sl_dist = abs(entry - sl) if sl > 0 else 0.0
+        risk_usd = sl_dist * size
+        sl_pct = (sl_dist / entry * 100.0) if entry > 0 else 0.0
+        tp_dist = abs(tp - entry) if tp > 0 else 0.0
+        reward_usd = tp_dist * size
+        tp_pct = (tp_dist / entry * 100.0) if entry > 0 else 0.0
+        rr = round(tp_dist / max(1e-4, sl_dist), 2)
+
+        emoji_dir = "🟢 *LONG / BUY*" if direction in ("LONG", "BUY") else "🔴 *SHORT / SELL*"
+
+        msg = (
+            f"🚀 **NEW TRADE ENTERED | {sym}**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⚡ **Direction:** {emoji_dir}\n"
+            f"📍 **Entry Price:** `${entry:,.2f}`\n"
+            f"📦 **Size:** `{size:g}` units (~`${notional_usd:,.2f}`)\n"
+            f"🛑 **Stop Loss (Invalidation):** `${sl:,.2f}` (`-{sl_pct:.2f}%`, `${risk_usd:,.2f}` risk)\n"
+            f"🎯 **Take Profit (Target):** `${tp:,.2f}` (`+{tp_pct:.2f}%`, `${reward_usd:,.2f}` target)\n"
+            f"⚖️ **Risk / Reward:** `1:{rr}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 **Entry Reason (ট্রেড নেওয়ার কারণ):**\n"
+            f"_{reason}_\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 **Date & Time (তারিখ ও সময়):** `{dt_str}`\n"
+            f"🆔 **Position ID:** `{pos_id}`\n"
+            f"🛡️ **Desk:** `Paper Trading Desk (Live Shadow Ledger)`"
+        )
+        return await self.send_message(msg)
+
+    async def send_trade_exit_alert(self, trade: dict[str, Any]) -> bool:
+        """
+        Dispatches Trade Exit Notification to Telegram with:
+        - Date & Time (Entry & Exit)
+        - Symbol & Direction
+        - Realized PnL & Return %
+        - Exit Reason
+        """
+        sym = trade.get("symbol", "BTC/USDT")
+        direction = str(trade.get("direction", "LONG")).upper()
+        entry = float(trade.get("entry_price", 0.0))
+        exit_p = float(trade.get("exit_price", 0.0))
+        pnl = float(trade.get("realized_pnl", 0.0))
+        pos_id = trade.get("position_id", "N/A")
+        exit_reason = trade.get("exit_reason", "MANUAL_CLOSE")
+        entry_reason = trade.get("entry_reason", "SMC Setup")
+        opened_at = trade.get("opened_at", 0)
+        closed_at = trade.get("closed_at", int(time.time() * 1000))
+
+        opened_str = (
+            datetime.datetime.fromtimestamp(
+                opened_at / 1000.0, tz=datetime.UTC
+            ).strftime("%Y-%m-%d %H:%M:%S UTC")
+            if opened_at
+            else "N/A"
+        )
+        closed_str = datetime.datetime.fromtimestamp(
+            closed_at / 1000.0, tz=datetime.UTC
+        ).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        pnl_pct = ((exit_p - entry) / entry * 100.0) if entry > 0 else 0.0
+        if direction in ("SHORT", "SELL"):
+            pnl_pct = -pnl_pct
+
+        pnl_emoji = "🎉 PROFIT" if pnl >= 0 else "🛑 LOSS"
+        pnl_sign = "+" if pnl >= 0 else ""
+
+        reason_display = {
+            "TAKE_PROFIT_HIT": "🎯 Take-Profit Target Hit",
+            "STOP_LOSS_HIT": "🛑 Stop-Loss Invalidation Triggered",
+            "BREAKEVEN_TRIGGERED": "⚖️ Breakeven Exit Triggered",
+            "MANUAL_CLOSE": "✋ Manual Desk Close",
+        }.get(exit_reason, exit_reason)
+
+        msg = (
+            f"🏁 **TRADE CLOSED | {sym} ({pnl_emoji})**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 **Realized PnL:** `{pnl_sign}${pnl:,.2f} ({pnl_sign}{pnl_pct:.2f}%)`\n"
+            f"📍 **Entry Price:** `${entry:,.2f}`\n"
+            f"🏁 **Exit Price:** `${exit_p:,.2f}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎯 **Exit Reason (প্রস্থান কারণ):** `{reason_display}`\n"
+            f"💡 **Entry Reason:** _{entry_reason}_\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 **Entry Time (প্রবেশ সময়):** `{opened_str}`\n"
+            f"📅 **Exit Time (প্রস্থান সময়):** `{closed_str}`\n"
+            f"🆔 **Position ID:** `{pos_id}`"
+        )
+        return await self.send_message(msg)
+
+    def notify_trade_entry_sync(self, trade: dict[str, Any]) -> None:
+        """Synchronously schedules async trade entry notification."""
+        try:
+            loop = asyncio.get_running_loop()
+            _task = loop.create_task(self.send_trade_entry_alert(trade))
+            _ = _task
+        except RuntimeError:
+            try:
+                asyncio.run(self.send_trade_entry_alert(trade))
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"Could not dispatch trade entry alert: {e}")
+
+    def notify_trade_exit_sync(self, trade: dict[str, Any]) -> None:
+        """Synchronously schedules async trade exit notification."""
+        try:
+            loop = asyncio.get_running_loop()
+            _task = loop.create_task(self.send_trade_exit_alert(trade))
+            _ = _task
+        except RuntimeError:
+            try:
+                asyncio.run(self.send_trade_exit_alert(trade))
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"Could not dispatch trade exit alert: {e}")
+
     async def send_market_update(self, data: dict[str, Any]) -> bool:
         """
         Dispatches a comprehensive live market state and order flow snapshot.
