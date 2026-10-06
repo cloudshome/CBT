@@ -98,10 +98,16 @@ class TelegramAuditLogger:
         details: dict[str, Any] | None = None,
     ) -> AuditEvent:
         """Records an interactive callback button event."""
+        uid = getattr(identity, "user_id", None) or (identity.get("user_id", "") if isinstance(identity, dict) else "")
+        cid = getattr(identity, "chat_id", None) or (identity.get("chat_id", "") if isinstance(identity, dict) else "")
+        role_val = getattr(getattr(identity, "role", None), "value", None) or (
+            identity.get("role", "TRADER") if isinstance(identity, dict) else "TRADER"
+        )
+
         payload = {
-            "telegram_user_id": str(identity.user_id),
-            "chat_id": str(identity.chat_id),
-            "role": identity.role.value,
+            "telegram_user_id": str(uid),
+            "chat_id": str(cid),
+            "role": str(role_val),
             "action": action,
             "token_id": token_id,
             "status": status,
@@ -111,7 +117,7 @@ class TelegramAuditLogger:
         ev = audit_bus.emit_event(
             event_type="TELEGRAM_CALLBACK",
             symbol=(details or {}).get("symbol", "TRADE"),
-            reason=f"Callback action {action} status={status} by {identity.user_id}",
+            reason=f"Callback action {action} status={status} by {uid}",
             severity="INFO" if status == "EXECUTED" else "WARNING",
             details=payload,
         )

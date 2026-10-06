@@ -1297,7 +1297,17 @@ class TelegramBotDispatcher:
             f"🆔 **Position ID:** `{pos_id}`\n"
             f"🛡️ **Desk:** `Paper Trading Desk (Live Shadow Ledger)`"
         )
-        return await self.send_message(msg)
+        reply_markup = None
+        if pos_id and pos_id != "N/A":
+            reply_markup = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🛑 Close Trade Now", "callback_data": f"close:{pos_id}"},
+                        {"text": "⚖️ Move SL to Breakeven", "callback_data": f"be:{pos_id}"},
+                    ]
+                ]
+            }
+        return await self.send_message(msg, reply_markup=reply_markup)
 
     async def send_trade_exit_alert(self, trade: dict[str, Any]) -> bool:
         """
@@ -2342,6 +2352,50 @@ class TelegramBotDispatcher:
             )
             return {"status": "AUTH_DENIED", "user_id": user_id}
 
+        # Direct 1-Click Action Handlers: Close and Breakeven
+        if data.startswith("close:"):
+            pos_id = data.split(":", 1)[1].strip()
+            telegram_audit.log_callback_action(
+                identity, "CLOSE_TRADE_1CLICK", pos_id, "EXECUTED", details={"position_id": pos_id}
+            )
+            close_text = self.state_mind.close_position_by_symbol(pos_id)
+            await self.send_message(close_text, chat_id=chat_id)
+            await self.answer_callback_query(cb_id, "Trade closed.")
+            return {"status": "POSITION_CLOSED", "position_id": pos_id}
+
+        if data.startswith("be:"):
+            pos_id = data.split(":", 1)[1].strip()
+            from core.portfolio_shadow import portfolio_shadow
+
+            open_pos = portfolio_shadow.get_open_positions()
+            target = next((p for p in open_pos if p["position_id"] == pos_id or p["symbol"] == pos_id), None)
+            if target:
+                portfolio_shadow.update_stop_loss(target["position_id"], target["entry_price"])
+                telegram_audit.log_callback_action(
+                    identity,
+                    "MOVE_TO_BE_1CLICK",
+                    target["position_id"],
+                    "EXECUTED",
+                    details={"position_id": target["position_id"], "entry_price": target["entry_price"]},
+                )
+                be_msg = (
+                    f"🛡️ **BREAKEVEN SHIELD APPLIED**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• **Asset:** `{target['symbol']}`\n"
+                    f"• **Position ID:** `{target['position_id']}`\n"
+                    f"• **New Stop Loss:** `${target['entry_price']:,.2f}` (Entry Price)\n"
+                    f"• **Risk State:** `Risk-Free (0R Loss Protection)`\n"
+                    f"• **Audit:** Updated in SQLite & Shadow Portfolio"
+                )
+                await self.send_message(be_msg, chat_id=chat_id)
+                await self.answer_callback_query(cb_id, "SL moved to breakeven.")
+                return {"status": "BREAKEVEN_APPLIED", "position_id": target["position_id"]}
+            else:
+                be_msg = f"⚠️ No active position found for `{pos_id}` to adjust."
+                await self.send_message(be_msg, chat_id=chat_id)
+                await self.answer_callback_query(cb_id, "Position not found.")
+                return {"status": "NOT_FOUND", "position_id": pos_id}
+
         if not data.startswith("act:"):
             await self.answer_callback_query(cb_id, "Unknown callback action.")
             return {"status": "UNKNOWN_CALLBACK"}
@@ -2460,28 +2514,42 @@ class TelegramBotDispatcher:
             await self.answer_callback_query(cb_id, "Structural Plan Dispatched.")
             return {"status": "PLAN_EXECUTED"}
 
-        elif act == "STAGE_CLOSE_CONFIRM":
+        elif act in ("STAGE_CLOSE_CONFIRM", "CLOSE_POSITION"):
             sym = token.payload.get("symbol", "BTC/USDT")
-            close_text = self.state_mind.close_position_by_symbol(sym)
+            pos_id = token.payload.get("position_id")
+            close_text = self.state_mind.close_position_by_symbol(pos_id or sym)
             callback_router.invalidate_token(token_id)
             telegram_audit.log_callback_action(
-                identity, "CLOSE_POSITION", token_id, "EXECUTED", details={"symbol": sym}
+                identity, "CLOSE_POSITION", token_id, "EXECUTED", details={"symbol": sym, "position_id": pos_id}
             )
             await self.send_message(close_text, chat_id=chat_id)
             await self.answer_callback_query(cb_id, "Position closed.")
             return {"status": "POSITION_CLOSED"}
 
-        elif act == "STAGE_BE_ADJUST":
+        elif act in ("STAGE_BE_ADJUST", "MOVE_TO_BE"):
             sym = token.payload.get("symbol", "BTC/USDT")
+            pos_id = token.payload.get("position_id")
             from core.portfolio_shadow import portfolio_shadow
 
-            open_pos = [p for p in portfolio_shadow.get_open_positions() if p.get("symbol") == sym]
+            open_pos = [
+                p
+                for p in portfolio_shadow.get_open_positions()
+                if (pos_id and p.get("position_id") == pos_id) or p.get("symbol") == sym
+            ]
             if open_pos:
                 p = open_pos[0]
                 portfolio_shadow.update_stop_loss(p["position_id"], p["entry_price"])
-                be_msg = f"🛡️ **BREAKEVEN APPLIED:** SL adjusted to entry price (${p['entry_price']:,.2f}) for `{sym}`. Position is now risk-free."
+                be_msg = (
+                    f"🛡️ **BREAKEVEN SHIELD APPLIED**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"• **Asset:** `{p['symbol']}`\n"
+                    f"• **Position ID:** `{p['position_id']}`\n"
+                    f"• **New Stop Loss:** `${p['entry_price']:,.2f}` (Entry Price)\n"
+                    f"• **Risk State:** `Risk-Free (0R Loss Protection)`\n"
+                    f"• **Audit:** Updated in SQLite & Shadow Portfolio"
+                )
             else:
-                be_msg = f"⚠️ No active position found for `{sym}` to adjust."
+                be_msg = f"⚠️ No active position found for `{pos_id or sym}` to adjust."
             await self.send_message(be_msg, chat_id=chat_id)
             await self.answer_callback_query(cb_id, "Breakeven applied.")
             return {"status": "BREAKEVEN_APPLIED"}

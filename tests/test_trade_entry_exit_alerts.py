@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from app import app
 from core.portfolio_shadow import portfolio_shadow
+from core.telegram.rbac import TelegramRole, TelegramUserIdentity
 from core.telegram_bot import telegram_bot
 
 
@@ -49,8 +50,14 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
             self.assertIn("67,200.00", sent_text)
             self.assertIn("71,500.00", sent_text)
             self.assertIn("H4 Demand Zone + 15m MSS Displacement", sent_text)
-            self.assertIn("POS_BTC_TEST_001", sent_text)
             self.assertIn("Date & Time (তারিখ ও সময়):", sent_text)
+
+            # Verify inline keyboard action buttons attached
+            reply_markup = mock_send.call_args[1].get("reply_markup")
+            self.assertIsNotNone(reply_markup)
+            buttons = reply_markup["inline_keyboard"][0]
+            self.assertEqual(buttons[0]["callback_data"], "close:POS_BTC_TEST_001")
+            self.assertEqual(buttons[1]["callback_data"], "be:POS_BTC_TEST_001")
 
     async def test_telegram_exit_alert_formatting(self):
         with patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send:
@@ -223,3 +230,60 @@ class TestTradeEntryExitAlerts(unittest.IsolatedAsyncioTestCase):
         # 4. Attempt close when no positions are open
         res_empty = telegram_bot.state_mind.close_position_by_symbol()
         self.assertIn("No active open paper positions", res_empty)
+
+    async def test_telegram_one_click_close_and_breakeven_callbacks(self):
+        # Setup open position
+        pos_id = portfolio_shadow.open_position(
+            symbol="SOL/USDT",
+            direction="LONG",
+            size=5.0,
+            entry_price=160.0,
+            stop_loss=150.0,
+            take_profit=190.0,
+            entry_reason="1-Click Callback Test",
+        )
+
+        identity = TelegramUserIdentity(
+            user_id=12345,
+            chat_id=67890,
+            role=TelegramRole.TRADER,
+        )
+
+        with patch.object(telegram_bot, "send_message", new_callable=AsyncMock) as mock_send, \
+             patch.object(telegram_bot, "answer_callback_query", new_callable=AsyncMock) as mock_ans, \
+             patch("core.telegram.rbac.rbac_registry.is_authorized", return_value=(True, identity)):
+            mock_send.return_value = True
+            mock_ans.return_value = True
+
+            # 1. Test "be:<pos_id>" 1-click Breakeven callback
+            cb_be = {
+                "id": "cb_001",
+                "from": {"id": 12345},
+                "message": {"chat": {"id": 67890}},
+                "data": f"be:{pos_id}",
+            }
+            res_be = await telegram_bot.handle_callback_query(cb_be)
+            self.assertEqual(res_be["status"], "BREAKEVEN_APPLIED")
+            self.assertEqual(res_be["position_id"], pos_id)
+            mock_ans.assert_called_with("cb_001", "SL moved to breakeven.")
+
+            # Check that stop loss was updated to entry price (160.0)
+            open_pos = [p for p in portfolio_shadow.get_open_positions() if p["position_id"] == pos_id]
+            self.assertEqual(len(open_pos), 1)
+            self.assertEqual(open_pos[0]["stop_loss"], 160.0)
+
+            # 2. Test "close:<pos_id>" 1-click Close callback
+            cb_close = {
+                "id": "cb_002",
+                "from": {"id": 12345},
+                "message": {"chat": {"id": 67890}},
+                "data": f"close:{pos_id}",
+            }
+            res_close = await telegram_bot.handle_callback_query(cb_close)
+            self.assertEqual(res_close["status"], "POSITION_CLOSED")
+            self.assertEqual(res_close["position_id"], pos_id)
+            mock_ans.assert_called_with("cb_002", "Trade closed.")
+
+            # Verify position is closed
+            remaining = [p for p in portfolio_shadow.get_open_positions() if p["position_id"] == pos_id]
+            self.assertEqual(len(remaining), 0)

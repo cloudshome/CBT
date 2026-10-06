@@ -110,6 +110,10 @@ async def test_autonomous_trader_scan_and_status():
     assert "is_running" in status
     assert "active_symbols" in status
     assert "BTC/USDT" in status["active_symbols"]
+    assert "ETH/USDT" in status["active_symbols"]
+    assert "SOL/USDT" in status["active_symbols"]
+    assert "BNB/USDT" in status["active_symbols"]
+    assert "XAU/USD" in status["active_symbols"]
 
     # Execute a single market scan
     executed = await autonomous_trader.scan_and_execute()

@@ -455,6 +455,40 @@ class PortfolioShadowManager:
                 logger.debug(f"SDCC close event emission deferred: {exc}")
             return True
 
+    def update_stop_loss(self, position_id: str, new_stop_loss: float) -> bool:
+        """
+        Updates the stop loss price for an open position and marks breakeven triggered
+        if moved to or beyond entry price.
+        """
+        with db_manager.get_trading_conn() as conn:
+            cursor = conn.execute(
+                "SELECT * FROM shadow_positions WHERE position_id = ? AND status = 'OPEN';",
+                (position_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            is_long = row["direction"] == "LONG"
+            entry_p = float(row["entry_price"])
+            new_sl = float(new_stop_loss)
+            be_trig = (new_sl >= entry_p) if is_long else (new_sl <= entry_p)
+
+            conn.execute(
+                """
+                UPDATE shadow_positions SET
+                    stop_loss = ?,
+                    breakeven_triggered = CASE WHEN ? THEN 1 ELSE breakeven_triggered END
+                WHERE position_id = ?;
+                """,
+                (new_sl, 1 if be_trig else 0, position_id),
+            )
+            conn.commit()
+            logger.info(
+                f"Updated stop loss for position {position_id} ({row['symbol']}) to {new_sl} (BE triggered: {be_trig})"
+            )
+            return True
+
     def reset_all_positions(self) -> None:
         """Resets all shadow positions for clean benchmarking."""
         with db_manager.get_trading_conn() as conn:
