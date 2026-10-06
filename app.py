@@ -312,7 +312,9 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 FRONTEND_DIST = Path(__file__).parent / "frontend" / "dist"
 if (FRONTEND_DIST / "assets").exists():
-    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="frontend-assets")
+    app.mount(
+        "/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="frontend-assets"
+    )
 
 
 # Pydantic Request Models
@@ -745,13 +747,15 @@ telegram_bot.register_command(
 )
 telegram_bot.register_command(
     "/status",
-    lambda args,
-    chat_id=None: f"✅ **SKY Terminal Operational**\n• Health: OK\n• Active WS: {len(ws_manager.active_connections)}\n• Mode: Zero-Lookahead Empirical",
+    lambda args, chat_id=None: (
+        f"✅ **SKY Terminal Operational**\n• Health: OK\n• Active WS: {len(ws_manager.active_connections)}\n• Mode: Zero-Lookahead Empirical"
+    ),
 )
 telegram_bot.register_command(
     "/risk",
-    lambda args,
-    chat_id=None: "🛡️ **Risk Gate Status**\n• Circuit Breaker: NORMAL\n• Max Drawdown Limit: 2.50%\n• Active Exposure: Controlled\n• Half-Kelly Cap: 2.50%",
+    lambda args, chat_id=None: (
+        "🛡️ **Risk Gate Status**\n• Circuit Breaker: NORMAL\n• Max Drawdown Limit: 2.50%\n• Active Exposure: Controlled\n• Half-Kelly Cap: 2.50%"
+    ),
 )
 telegram_bot.register_command("/brief", _telegram_market_cmd)
 telegram_bot.register_command("/market", _telegram_market_cmd)
@@ -819,12 +823,14 @@ async def telemetry_broadcaster_loop():
                 await ws_manager.broadcast(payload)
 
                 # Broadcast real-time TICK for direct UI series consumption (Zero-Shake)
-                await ws_manager.broadcast({
-                    "type": "TICK",
-                    "symbol": sym,
-                    "price": cur_price,
-                    "timestamp": now_ms,
-                })
+                await ws_manager.broadcast(
+                    {
+                        "type": "TICK",
+                        "symbol": sym,
+                        "price": cur_price,
+                        "timestamp": now_ms,
+                    }
+                )
         except Exception as e:
             logger.debug(f"Telemetry loop error: {e}")
         await asyncio.sleep(1.0)
@@ -917,7 +923,9 @@ async def get_tickers_alias():
             "tickers": [
                 {
                     "symbol": "BTCUSDT",
-                    "price": t_btc.get("price", data_streamer._last_known_prices.get("BTC/USDT", 79000.0)),
+                    "price": t_btc.get(
+                        "price", data_streamer._last_known_prices.get("BTC/USDT", 79000.0)
+                    ),
                     "change24h": t_btc.get("change24h", 1.2),
                     "volume24h": 14280.0,
                 },
@@ -1023,9 +1031,19 @@ async def get_scan_alias(
     fvg_list = []
     ob_list = []
     for p in patterns:
-        p_dict = asdict(p) if hasattr(p, "__dataclass_fields__") else (dict(p) if isinstance(p, dict) else {})
-        raw_type = str(getattr(p, "pattern_type", p_dict.get("pattern_type", getattr(p, "type", p_dict.get("type", ""))))).upper()
-        
+        p_dict = (
+            asdict(p)
+            if hasattr(p, "__dataclass_fields__")
+            else (dict(p) if isinstance(p, dict) else {})
+        )
+        raw_type = str(
+            getattr(
+                p,
+                "pattern_type",
+                p_dict.get("pattern_type", getattr(p, "type", p_dict.get("type", ""))),
+            )
+        ).upper()
+
         bot = float(getattr(p, "bottom_price", p_dict.get("bottom_price", 0.0)))
         top = float(getattr(p, "top_price", p_dict.get("top_price", 0.0)))
         p_dict["price_zone"] = [bot, top]
@@ -3152,6 +3170,7 @@ async def get_telegram_live_status():
     """Returns Telegram Live Trading Commander operational status and schedule."""
     from core.daily_learning_reporter import daily_learning_reporter
     from core.execution.account_probe import account_probe
+
     readiness = await account_probe.get_portfolio_readiness()
     return {
         "status": "OPERATIONAL",
@@ -3165,10 +3184,13 @@ async def get_telegram_live_status():
 
 @app.post("/api/telegram/trigger-briefing", dependencies=[Depends(require_api_key)])
 async def trigger_telegram_briefing(
-    briefing_type: str = Query("WHAT_AI_LEARNED", description="WHAT_AI_LEARNED, MORNING, MIDDAY, US_SESSION, MACRO_FLASH")
+    briefing_type: str = Query(
+        "WHAT_AI_LEARNED", description="WHAT_AI_LEARNED, MORNING, MIDDAY, US_SESSION, MACRO_FLASH"
+    ),
 ):
     """Manually triggers any of the 4 daily briefings or macro flash to Telegram."""
     from core.telegram_live_desk import telegram_live_desk
+
     b_type = briefing_type.upper().strip()
     if b_type in ("WHAT_AI_LEARNED", "LEARNED"):
         text = telegram_live_desk.get_what_ai_learned_today_report()
@@ -3189,7 +3211,6 @@ async def trigger_telegram_briefing(
         "briefing_type": b_type,
         "text_preview": text[:200] + "...",
     }
-
 
 
 # ==============================================================================
@@ -4296,7 +4317,9 @@ async def get_reconciliation_records(
 
 @app.get("/api/execution/sor/benchmark")
 async def get_sor_benchmarks(
-    iterations: int = Query(100, ge=10, le=1000, description="Benchmark iterations per test (10 to 1000)"),
+    iterations: int = Query(
+        100, ge=10, le=1000, description="Benchmark iterations per test (10 to 1000)"
+    ),
 ):
     """
     Runs sub-millisecond execution micro-benchmarks across:
@@ -4352,12 +4375,14 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     try:
         # Send initial connected greeting with forward paper telemetry
-        await websocket.send_json({
-            "type": "CONNECTED",
-            "message": "Connected to CBT Real-Time Terminal Stream",
-            "telemetry": global_paper_ingestion_engine.get_telemetry(),
-            "timestamp": int(time.time() * 1000),
-        })
+        await websocket.send_json(
+            {
+                "type": "CONNECTED",
+                "message": "Connected to CBT Real-Time Terminal Stream",
+                "telemetry": global_paper_ingestion_engine.get_telemetry(),
+                "timestamp": int(time.time() * 1000),
+            }
+        )
         while True:
             data = await websocket.receive_text()
             ws_manager.record_activity(websocket)
@@ -4371,17 +4396,21 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
             elif action == "SUBSCRIBE":
                 sym = msg.get("symbol", "BTC/USDT")
                 cur_p = await data_streamer.get_live_ticker(sym)
-                await websocket.send_json({
-                    "type": "SUBSCRIBED",
-                    "symbol": sym,
-                    "price": cur_p,
-                    "orderbook": global_paper_ingestion_engine.get_orderbook(sym),
-                })
+                await websocket.send_json(
+                    {
+                        "type": "SUBSCRIBED",
+                        "symbol": sym,
+                        "price": cur_p,
+                        "orderbook": global_paper_ingestion_engine.get_orderbook(sym),
+                    }
+                )
             elif action == "FORWARD_TELEMETRY":
-                await websocket.send_json({
-                    "type": "FORWARD_TELEMETRY",
-                    "data": global_paper_ingestion_engine.get_telemetry(),
-                })
+                await websocket.send_json(
+                    {
+                        "type": "FORWARD_TELEMETRY",
+                        "data": global_paper_ingestion_engine.get_telemetry(),
+                    }
+                )
             elif action == "PAPER_ORDER":
                 adm_id = msg.get("admission_id", "DEFAULT_FORWARD_LEAGUE")
                 sym = msg.get("symbol", "BTCUSDT")
@@ -4396,15 +4425,19 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
                     quantity=qty,
                     price=price,
                 )
-                await websocket.send_json({
-                    "type": "PAPER_FILL",
-                    "data": fill.model_dump(),
-                })
+                await websocket.send_json(
+                    {
+                        "type": "PAPER_FILL",
+                        "data": fill.model_dump(),
+                    }
+                )
                 # Broadcast fill notification to other connected clients
-                await ws_manager.broadcast({
-                    "type": "PAPER_FILL_BROADCAST",
-                    "data": fill.model_dump(),
-                })
+                await ws_manager.broadcast(
+                    {
+                        "type": "PAPER_FILL_BROADCAST",
+                        "data": fill.model_dump(),
+                    }
+                )
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
     except Exception:

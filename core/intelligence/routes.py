@@ -1813,4 +1813,3 @@ async def get_forward_paper_telemetry(
         "status": "success",
         "telemetry": telemetry,
     }
-

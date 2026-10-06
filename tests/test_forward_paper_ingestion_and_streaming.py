@@ -14,8 +14,6 @@ Verifies:
 
 from __future__ import annotations
 
-import time
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -28,7 +26,6 @@ from core.intelligence.forward_validation import (
     OrderSide,
     OrderType,
     PaperFill,
-    global_paper_ingestion_engine,
 )
 
 
@@ -38,7 +35,9 @@ def clean_engine(tmp_path):
     from core.intelligence.forward_validation.forward_ledger import ForwardPerformanceLedger
     from core.intelligence.forward_validation.gateway import LiveMarketDataGateway
     from core.intelligence.forward_validation.markout_engine import MicrostructureMarkoutEngine
-    from core.intelligence.forward_validation.paper_fill_simulator import RealisticPaperFillSimulator
+    from core.intelligence.forward_validation.paper_fill_simulator import (
+        RealisticPaperFillSimulator,
+    )
 
     ledger_db = tmp_path / "test_forward_ledger.db"
     engine = ForwardPaperIngestionEngine(
@@ -248,7 +247,9 @@ def recv_matching_type(ws, target_type: str, max_attempts: int = 50) -> dict:
         msg = ws.receive_json()
         if msg.get("type") == target_type:
             return msg
-    raise TimeoutError(f"Expected frame type '{target_type}' not received within {max_attempts} messages")
+    raise TimeoutError(
+        f"Expected frame type '{target_type}' not received within {max_attempts} messages"
+    )
 
 
 def test_websocket_terminal_handshake_and_actions():
@@ -280,14 +281,16 @@ def test_websocket_terminal_handshake_and_actions():
         assert telem["data"]["status"] == "ONLINE"
 
         # 5. PAPER_ORDER
-        websocket.send_json({
-            "action": "PAPER_ORDER",
-            "admission_id": "ADM-WS-01",
-            "symbol": "BTCUSDT",
-            "side": "BUY",
-            "order_type": "MARKET",
-            "quantity": 0.02,
-        })
+        websocket.send_json(
+            {
+                "action": "PAPER_ORDER",
+                "admission_id": "ADM-WS-01",
+                "symbol": "BTCUSDT",
+                "side": "BUY",
+                "order_type": "MARKET",
+                "quantity": 0.02,
+            }
+        )
         fill_res = recv_matching_type(websocket, "PAPER_FILL")
         assert fill_res["type"] == "PAPER_FILL"
         assert fill_res["data"]["admission_id"] == "ADM-WS-01"

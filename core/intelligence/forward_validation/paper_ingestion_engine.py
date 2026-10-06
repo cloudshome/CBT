@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import time
-import uuid
 from typing import Any
 
 from core.intelligence.forward_validation.forward_ledger import (
@@ -178,8 +177,10 @@ class ForwardPaperIngestionEngine:
             )
         else:
             # Limit order
-            limit_price = price if price is not None and price > 0 else (
-                snapshot.best_bid if norm_side == OrderSide.BUY else snapshot.best_ask
+            limit_price = (
+                price
+                if price is not None and price > 0
+                else (snapshot.best_bid if norm_side == OrderSide.BUY else snapshot.best_ask)
             )
             fill = self.fill_simulator.simulate_market_order(
                 admission_id=admission_id,
@@ -251,7 +252,9 @@ class ForwardPaperIngestionEngine:
         snap = book.get_snapshot()
         return snap.model_dump()
 
-    def get_recent_fills(self, admission_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    def get_recent_fills(
+        self, admission_id: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
         """Returns recent paper execution fills formatted for API response."""
         if admission_id:
             trades = self.ledger.get_strategy_trades(admission_id, limit=limit)
