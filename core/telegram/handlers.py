@@ -421,18 +421,36 @@ async def handle_wiki(
             await telegram_bot.send_message(msg, chat_id=chat_id)
         return msg
 
-    # Case 2: URL Ingestion
+    # Case 2: URL Ingestion with Link Persistence Invariant
     if clean_args.startswith("http://") or clean_args.startswith("https://"):
         if chat_id:
             await telegram_bot.send_message(
-                f"🔬 **Ingesting into Research Wikipedia...**\n`{clean_args[:60]}...`\nCross-verifying claims against macroeconomic ledgers...",
+                f"🔬 **Registering into Evidence Research OS...**\n`{clean_args[:60]}...`\nGuaranteeing source persistence and cross-verifying claims...",
                 chat_id=chat_id,
             )
-        article = research_wikipedia_engine.ingest_url_or_content(
-            url_or_text=clean_args,
-            custom_author=str(user_name),
+        from core.knowledge_os.universal_ingestor import universal_ingestor
+
+        result = universal_ingestor.ingest_url(
+            url=clean_args,
+            options={"author": str(user_name)},
         )
-        msg = telegram_bot._format_wikipedia_telegram_card(article)
+        if result.wiki_article:
+            status_prefix = "🟢 **SUCCESS**" if result.status == "SUCCESS" else (
+                "🟡 **PARTIAL EXTRACTION**" if result.status == "PARTIAL" else "⚠️ **ACCESS BLOCKED**"
+            )
+            msg = (
+                f"{status_prefix} | Source: `{result.source.source_id}`\n"
+                f"• Type: `{result.source.source_type}` | Status: `{result.status}`\n"
+                f"{telegram_bot._format_wikipedia_telegram_card(result.wiki_article)}"
+            )
+        else:
+            msg = (
+                f"⚠️ **Source Registered Under Link Guarantee**\n"
+                f"• Source ID: `{result.source.source_id}`\n"
+                f"• Access Status: `{result.status}`\n"
+                f"• Diagnostics: `{result.source.failure_reason or 'No additional details'}`\n"
+                f"Record preserved in `research_sources`."
+            )
         if chat_id:
             await telegram_bot.send_message(msg, chat_id=chat_id)
         return msg

@@ -484,17 +484,106 @@ async def get_wiki_article(article_id: str) -> dict[str, Any]:
 async def ingest_wiki_article(payload: WikiIngestRequest) -> dict[str, Any]:
     """
     Ingests any URL or text into a permanent, cross-verified Wikipedia entry.
-    Extracts claims, tags with epistemic taxonomy, links concepts, and formats Markdown.
+    Implements the Link Persistence Invariant via universal_ingestor.
     """
+    clean_input = payload.url_or_text.strip()
+    if clean_input.startswith(("http://", "https://")):
+        from core.knowledge_os.universal_ingestor import universal_ingestor
+
+        result = universal_ingestor.ingest_url(
+            url=clean_input,
+            options={
+                "title": payload.title,
+                "category": payload.category,
+                "author": payload.author,
+            },
+        )
+        return {
+            "status": result.status,
+            "source": result.source.to_dict(),
+            "article": result.wiki_article.to_dict() if result.wiki_article else None,
+            "message": result.message,
+        }
+
     from core.knowledge_os.research_wikipedia import research_wikipedia_engine
 
     article = research_wikipedia_engine.ingest_url_or_content(
-        url_or_text=payload.url_or_text,
+        url_or_text=clean_input,
         custom_title=payload.title,
         custom_category=payload.category,
         custom_author=payload.author,
     )
     return {"status": "SUCCESS", "article": article.to_dict()}
+
+
+@router.post("/universal-ingest")
+async def universal_ingest_endpoint(payload: WikiIngestRequest) -> dict[str, Any]:
+    """
+    Full Evidence-Grade Ingestion API returning source, artifacts, claims, and wiki entry.
+    """
+    from core.knowledge_os.universal_ingestor import universal_ingestor
+
+    clean_input = payload.url_or_text.strip()
+    result = universal_ingestor.ingest_url(
+        url=clean_input,
+        options={
+            "title": payload.title,
+            "category": payload.category,
+            "author": payload.author,
+        },
+    )
+    return result.to_dict()
+
+
+@router.get("/sources")
+async def list_research_sources(
+    limit: int = Query(default=50, ge=1, le=200),
+    access_status: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Lists all registered research sources and their lifecycle status."""
+    from core.knowledge_os.universal_ingestor import universal_ingestor
+
+    with universal_ingestor._get_connection() as conn:
+        if access_status:
+            rows = conn.execute(
+                "SELECT * FROM research_sources WHERE access_status = ? ORDER BY created_at DESC LIMIT ?;",
+                (access_status.upper(), limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM research_sources ORDER BY created_at DESC LIMIT ?;",
+                (limit,),
+            ).fetchall()
+    sources = [dict(r) for r in rows]
+    return {"sources": sources, "count": len(sources)}
+
+
+@router.get("/sources/{source_id}")
+async def get_research_source_dossier(source_id: str) -> dict[str, Any]:
+    """Returns full source dossier including raw artifacts and claims."""
+    from core.knowledge_os.universal_ingestor import universal_ingestor
+
+    with universal_ingestor._get_connection() as conn:
+        src_row = conn.execute(
+            "SELECT * FROM research_sources WHERE source_id = ?;", (source_id,)
+        ).fetchone()
+        if not src_row:
+            raise HTTPException(status_code=404, detail=f"Source '{source_id}' not found.")
+
+        art_rows = conn.execute(
+            "SELECT * FROM research_artifacts WHERE source_id = ? ORDER BY created_at ASC;",
+            (source_id,),
+        ).fetchall()
+        claim_rows = conn.execute(
+            "SELECT * FROM research_claims WHERE source_id = ? ORDER BY created_at ASC;",
+            (source_id,),
+        ).fetchall()
+
+    return {
+        "source": dict(src_row),
+        "artifacts": [dict(r) for r in art_rows],
+        "claims": [dict(r) for r in claim_rows],
+    }
 
 
 @router.post("/wiki/reverify/{article_id}")
