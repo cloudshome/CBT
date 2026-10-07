@@ -142,6 +142,13 @@ class QuantMentor:
         ob_low = round(price * 0.985, 2)
 
         # --------------------------------------------------------------------------
+        # INTENT -1: RESEARCH / EVIDENCE DOSSIER GROUNDED REQUEST
+        # --------------------------------------------------------------------------
+        if any(w in msg_lower for w in ["research", "evidence", "findings", "রিসার্চ", "গবেষণা", "নলেজ", "প্রজেক্টের ডাটা"]):
+            if telemetry.get("research_grounding"):
+                return telemetry["research_grounding"]
+
+        # --------------------------------------------------------------------------
         # INTENT 0: STANDALONE ASSET NAME / ASSET DOSSIER REQUEST
         # (e.g. "gold", "btc", "eth", "sol", "tell me about gold", "gold analysis", "gold update")
         # --------------------------------------------------------------------------

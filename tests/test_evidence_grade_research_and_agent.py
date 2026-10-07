@@ -764,5 +764,63 @@ async def test_telegram_agent_routing_for_strategy_and_backtest():
     assert "WALK-FORWARD STRATEGY VALIDATION REPORT" in resp2
 
 
+def test_project_rag_multi_index_retrieval():
+    """
+    Verifies that UnifiedProjectKnowledgeRAG retrieves across all 5 ledgers:
+    Wiki articles, claims, theses, strategy candidates, and market vitals,
+    and formats them into the 4 Institutional Grounding Pillars.
+    """
+    from core.knowledge_os.project_rag import project_rag
+
+    dossier = project_rag.compile_grounded_dossier(
+        query="Bitcoin liquidity FVG inflation",
+        market_vitals={
+            "btc_price": 78500.0,
+            "eth_price": 2450.0,
+            "virtual_equity": 105000.0,
+            "open_positions_count": 1,
+        },
+    )
+
+    assert dossier is not None
+    assert dossier.query == "Bitcoin liquidity FVG inflation"
+    assert "CURRENT MARKET VITALS" in dossier.summary_grounding
+    assert "78,500.00" in dossier.summary_grounding
+    assert "RELEVANT CBT RESEARCH" in dossier.summary_grounding
+    assert "EMPIRICAL CLAIMS" in dossier.summary_grounding
+    assert "DERIVED STRATEGIES" in dossier.summary_grounding
+    assert len(dossier.theses) > 0 or len(dossier.wiki_articles) > 0
+
+
+@pytest.mark.asyncio
+async def test_telegram_agent_routing_for_project_rag():
+    """
+    Verifies that Telegram Agent planner routes natural language queries
+    for research dossiers and answers with grounded knowledge.
+    """
+    from core.telegram.agent_planner import telegram_agent_planner
+
+    identity = TelegramUserIdentity(
+        user_id=777,
+        chat_id=777,
+        username="quant_lead",
+        role=TelegramRole.SUPER_ADMIN,
+    )
+
+    # 1. Direct RAG / Dossier request
+    d = telegram_agent_planner.resolve_intent("বিটকয়েন রিসার্চ ডসিয়ার দেখাও", user_id=777)
+    assert d.intent == "QUERY_RAG"
+    assert d.tool_name == "query_project_rag"
+
+    resp = await telegram_agent_planner.handle_user_message("রিসার্চ ডসিয়ার দেখাও", 777, identity)
+    assert "CBT INSTITUTIONAL GROUNDED RESEARCH DOSSIER" in resp
+    assert "CURRENT MARKET VITALS" in resp
+
+    # 2. Conversational grounded answer via QuantMentor
+    resp_mentor = await telegram_agent_planner.handle_user_message("আমাদের রিসার্চে কী আছে?", 777, identity)
+    assert "CBT INSTITUTIONAL GROUNDED RESEARCH DOSSIER" in resp_mentor or "রিসার্চ" in resp_mentor
+
+
+
 
 

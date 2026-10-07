@@ -174,7 +174,16 @@ class TelegramAgentPlanner:
                 tool_args={"event_name": ev},
             )
 
-        # 12. Research Wiki Search
+        # 12. Unified Project RAG & Evidence Dossier
+        if any(w in lower for w in ("ডসিয়ার", "dossier", "প্রজেক্ট নলেজ", "project knowledge", "rag", "এভিডেন্স সামারি", "রিসার্চ রিপোর্ট")):
+            q = clean.replace("ডসিয়ার", "").replace("dossier", "").strip()
+            return PlannerDecision(
+                intent="QUERY_RAG",
+                tool_name="query_project_rag",
+                tool_args={"query": q},
+            )
+
+        # 13. Research Wiki Search
         if any(w in lower for w in ("উইকি", "রিসার্চ ল্যাব", "wiki", "research", "আর্টিকেল", "পেপার")):
             q = clean.replace("উইকি", "").replace("wiki", "").strip()
             return PlannerDecision(
@@ -281,7 +290,14 @@ class TelegramAgentPlanner:
             "capital_mode": "REAL_CAPITAL_ENABLED = False (Paper Simulation Locked)",
         }
 
-        # 2. Invoke QuantMentor with project context
+        # 2. Compile Grounded Project RAG Dossier across the 5 ledgers
+        from core.knowledge_os.project_rag import project_rag
+
+        dossier = project_rag.compile_grounded_dossier(query=query, market_vitals=telemetry_ctx)
+        telemetry_ctx["rag_dossier"] = dossier.to_dict()
+        telemetry_ctx["research_grounding"] = dossier.summary_grounding
+
+        # 3. Invoke QuantMentor with project context
         response = await quant_mentor.generate_response(
             user_message=query,
             market_telemetry=telemetry_ctx,

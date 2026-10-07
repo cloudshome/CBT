@@ -838,3 +838,20 @@ async def run_backtest_endpoint(
     return {"status": "COMPLETED", "result": res.to_dict()}
 
 
+# -----------------------------------------------------------------------------
+# MILESTONE 7: UNIFIED PROJECT KNOWLEDGE RAG ENDPOINTS
+# -----------------------------------------------------------------------------
+class RagQueryPayload(BaseModel):
+    query: str
+    limit: int = 5
+
+
+@router.post("/rag/query")
+async def rag_query_endpoint(payload: RagQueryPayload) -> dict[str, Any]:
+    """Retrieves unified multi-index project knowledge dossier across all 5 ledgers."""
+    from core.knowledge_os.project_rag import project_rag
+
+    dossier = project_rag.compile_grounded_dossier(payload.query)
+    return dossier.to_dict()
+
+

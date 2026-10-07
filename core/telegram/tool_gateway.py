@@ -214,6 +214,10 @@ class TelegramToolGateway:
             entity = arguments.get("entity", "Bitcoin")
             return await self._tool_query_knowledge_graph(entity, identity)
 
+        elif tool_name == "query_project_rag":
+            query = arguments.get("query", "")
+            return await self._tool_query_project_rag(query, identity)
+
         # ---------------------------------------------------------------------
         # CLASS B: RESEARCH & ANALYSIS
         # -------------------------------------------------------------------------
@@ -553,6 +557,31 @@ class TelegramToolGateway:
             tool_class=ToolClass.CLASS_A_READONLY,
             output_text=text,
             data=subgraph,
+        )
+
+    async def _tool_query_project_rag(self, query: str, identity: TelegramUserIdentity) -> ToolResult:
+        from core.knowledge_os.project_rag import project_rag
+        from core.market_providers import market_gateway
+        from core.portfolio_shadow import portfolio_shadow
+
+        btc_ticker = await market_gateway.get_ticker("BTC/USDT")
+        eth_ticker = await market_gateway.get_ticker("ETH/USDT")
+        accounting = portfolio_shadow.get_portfolio_accounting()
+
+        vitals = {
+            "btc_price": btc_ticker.get("price", 0.0),
+            "eth_price": eth_ticker.get("price", 0.0),
+            "virtual_equity": accounting.get("virtual_equity", 100000.0),
+            "open_positions_count": accounting.get("open_positions_count", 0),
+        }
+
+        dossier = project_rag.compile_grounded_dossier(query=query, market_vitals=vitals)
+        return ToolResult(
+            success=True,
+            tool_name="query_project_rag",
+            tool_class=ToolClass.CLASS_A_READONLY,
+            output_text=dossier.summary_grounding,
+            data=dossier.to_dict(),
         )
 
     # -------------------------------------------------------------------------
