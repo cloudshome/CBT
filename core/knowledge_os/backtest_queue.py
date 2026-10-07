@@ -13,17 +13,15 @@ Constitutional Mandates:
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 from core.data_streamer import data_streamer
 from core.database import db_manager
-from core.knowledge_os.claim_verifier import EvidenceRecord
 from core.knowledge_os.epistemic_system import EpistemicStatus
 from core.knowledge_os.research_wikipedia import WIKI_DB_PATH, research_wikipedia_engine
 from core.sandbox_lab import sandbox_lab
@@ -261,7 +259,7 @@ class BacktestQueueManager:
                     ).fetchall()
                     for tr in t_rows:
                         thesis_engine.evaluate_thesis(tr["thesis_id"])
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.debug(f"Thesis re-evaluation skipped: {e}")
 
         badge = "PASSED ✅ (Qualified for Paper Desk)" if passed else "REJECTED ❌ (Failed Expectancy Hurdle)"

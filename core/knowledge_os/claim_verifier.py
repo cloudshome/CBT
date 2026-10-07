@@ -15,7 +15,6 @@ Constitutional Mandates:
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import sqlite3
@@ -25,7 +24,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from core.database import db_manager
 from core.knowledge_os.epistemic_system import EpistemicStatus
 from core.knowledge_os.research_wikipedia import WIKI_DB_PATH, research_wikipedia_engine
 
@@ -109,7 +107,7 @@ class ClaimVerifier:
             from core.macro_event_reporter import macro_event_reporter
             recs = macro_event_reporter.list_recent_releases(limit=50)
             return [r.to_dict() for r in recs]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Could not fetch macro releases from macro_event_reporter: {e}")
             return []
 

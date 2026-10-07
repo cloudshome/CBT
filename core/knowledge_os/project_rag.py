@@ -16,7 +16,6 @@ Constitutional Mandates:
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import time
@@ -25,7 +24,6 @@ from pathlib import Path
 from typing import Any
 
 from core.database import db_manager
-from core.knowledge_os.epistemic_system import EpistemicStatus
 from core.knowledge_os.research_wikipedia import WIKI_DB_PATH, research_wikipedia_engine
 
 logger = logging.getLogger("sky.knowledge_os.project_rag")

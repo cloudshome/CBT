@@ -467,14 +467,14 @@ class ResearchWikipediaEngine:
 
         # 3. Raw text or fallback if no claims yet
         if not claims and raw_body_text:
-            lines = [l.strip() for l in raw_body_text.split("\n") if len(l.strip()) > 20]
+            lines = [line.strip() for line in raw_body_text.split("\n") if len(line.strip()) > 20]
             if not lines:
                 lines = [raw_body_text[:200]]
-            for i, l in enumerate(lines[:5]):
+            for i, line in enumerate(lines[:5]):
                 claims.append(
                     EpistemicClaim(
                         claim_id=f"C-{i+1:02d}",
-                        speaker_claim=l[:160],
+                        speaker_claim=line[:160],
                         epistemic_status="HYPOTHESIS",
                         cross_verification_evidence="Extracted from submitted research dossier.",
                         confidence_score=0.68,

@@ -254,8 +254,8 @@ class ThesisEngine:
                 (thesis_id,),
             ).fetchall()
 
-            supporting = [l for l in links if l["relationship"] == "SUPPORTS"]
-            contradicting = [l for l in links if l["relationship"] == "CONTRADICTS"]
+            supporting = [lnk for lnk in links if lnk["relationship"] == "SUPPORTS"]
+            contradicting = [lnk for lnk in links if lnk["relationship"] == "CONTRADICTS"]
 
             sup_count = len(supporting)
             con_count = len(contradicting)
@@ -263,8 +263,8 @@ class ThesisEngine:
             # Score computation
             base_score = 0.50
             if sup_count + con_count > 0:
-                sup_weight = sum(float(l["confidence_score"]) * float(l["weight"]) for l in supporting)
-                con_weight = sum(float(l["confidence_score"]) * float(l["weight"]) for l in contradicting)
+                sup_weight = sum(float(lnk["confidence_score"]) * float(lnk["weight"]) for lnk in supporting)
+                con_weight = sum(float(lnk["confidence_score"]) * float(lnk["weight"]) for lnk in contradicting)
                 net = sup_weight - con_weight
                 base_score = max(0.10, min(0.95, 0.50 + (net * 0.12)))
 

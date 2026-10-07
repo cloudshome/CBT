@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 logger = logging.getLogger("ai_quant_sentinel.telegram.rbac")
 
 
-class TelegramRole(str, enum.Enum):
+class TelegramRole(enum.StrEnum):
     """Hierarchical roles for Telegram V5 command execution."""
 
     UNAUTHORIZED = "UNAUTHORIZED"

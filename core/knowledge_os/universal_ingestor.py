@@ -24,11 +24,10 @@ import time
 import urllib.parse
 import uuid
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from core.database import DATA_DIR
 from core.knowledge_os.research_wikipedia import (
     WIKI_DB_PATH,
     EpistemicClaim,
@@ -67,7 +66,7 @@ class RealLifeSummary:
         )
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     WEB_ARTICLE = "WEB_ARTICLE"
     PDF = "PDF"
     JOURNAL_PAPER = "JOURNAL_PAPER"
@@ -90,14 +89,14 @@ class SourceType(str, Enum):
     UNKNOWN_URL = "UNKNOWN_URL"
 
 
-class AccessStatus(str, Enum):
+class AccessStatus(StrEnum):
     SUCCESS = "SUCCESS"
     PARTIAL = "PARTIAL"
     ACCESS_BLOCKED = "ACCESS_BLOCKED"
     FAILED = "FAILED"
 
 
-class ExtractionStatus(str, Enum):
+class ExtractionStatus(StrEnum):
     PENDING = "PENDING"
     EXTRACTED = "EXTRACTED"
     PARTIAL = "PARTIAL"
@@ -422,7 +421,6 @@ class UniversalIngestor:
         """
         opts = options or {}
         custom_title = opts.get("title", "")
-        custom_category = opts.get("category", "")
         custom_author = opts.get("author", "")
 
         canonical_url, domain = self.canonicalize_url(url)
@@ -480,13 +478,13 @@ class UniversalIngestor:
             logger.error(f"Ingestion pipeline failure for {canonical_url}: {exc}", exc_info=True)
             source_rec.access_status = AccessStatus.FAILED.value
             source_rec.extraction_status = ExtractionStatus.FAILED.value
-            source_rec.failure_reason = f"Internal ingestion error: {str(exc)}"
+            source_rec.failure_reason = f"Internal ingestion error: {exc!s}"
             source_rec.updated_at = int(time.time() * 1000)
 
             # Guarantee Wiki Placeholder exists even on hard exception
             wiki_article, real_life_summary = self._create_or_update_wiki_record(
                 source_rec=source_rec,
-                executive_summary=f"Automated ingestion encountered an unhandled exception: {str(exc)}. Source record preserved under Link Guarantee.",
+                executive_summary=f"Automated ingestion encountered an unhandled exception: {exc!s}. Source record preserved under Link Guarantee.",
                 claims=[],
                 raw_text="",
             )
@@ -608,7 +606,7 @@ class UniversalIngestor:
             else:
                 is_blocked = True
                 block_reason = fetch_res.get("error", "Access restricted / login wall")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             is_blocked = True
             block_reason = str(e)
 
@@ -933,7 +931,7 @@ class UniversalIngestor:
                                 hype_vs_reality=parsed["hype_vs_reality"].strip(),
                                 risk_warning=parsed["risk_warning"].strip(),
                             )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.debug(f"Gemini RealLifeSummary synthesis fallback: {e}")
 
         # Step 2: High-Quality Deterministic Domain-Aware Synthesis Fallback
@@ -1099,7 +1097,7 @@ class UniversalIngestor:
         if source_rec.failure_reason:
             markdown_content += f"\n## Ingestion Diagnostics & Access Limitations\n- **Diagnostic Details:** {source_rec.failure_reason}\n- **Resolution:** Attach clean transcript or audio payload directly to `{source_rec.source_id}`.\n"
 
-        markdown_content += f"\n## Related Concepts\n- [[Macro Geopolitics]]\n- [[CBT Intelligence]]\n- [[Liquidity Analysis]]\n"
+        markdown_content += "\n## Related Concepts\n- [[Macro Geopolitics]]\n- [[CBT Intelligence]]\n- [[Liquidity Analysis]]\n"
 
         article = WikiArticle(
             article_id=article_id,
@@ -1184,7 +1182,7 @@ class UniversalIngestor:
                 full_cid = f"{source_rec.source_id}_{c.claim_id}"
                 claim_verifier.verify_claim(full_cid)
                 thesis_engine.auto_cluster_claim_to_theses(full_cid, c.speaker_claim)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Post-ingestion epistemic graph hook error (non-fatal): {e}")
 
         return article, real_life_summary

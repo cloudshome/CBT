@@ -7,6 +7,7 @@ Prefix: /api/knowledge
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 import time
@@ -492,10 +493,10 @@ async def get_wiki_article(article_id: str) -> dict[str, Any]:
                 if s_dict.get("real_life_summary"):
                     try:
                         s_dict["real_life_summary"] = json.loads(s_dict["real_life_summary"])
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110
                         pass
                 res_dict["source"] = s_dict
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.debug(f"Source lookup skipped: {e}")
 
     return res_dict

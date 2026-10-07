@@ -14,21 +14,20 @@ Constitutional Governance:
 from __future__ import annotations
 
 import enum
-import hashlib
 import json
 import logging
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Coroutine
+from dataclasses import dataclass, field
+from typing import Any
 
 from core.telegram.audit import TelegramAuditLogger
-from core.telegram.rbac import TelegramRole, TelegramUserIdentity
+from core.telegram.rbac import TelegramUserIdentity
 
 logger = logging.getLogger("sky.telegram.tool_gateway")
 
 
-class ToolClass(str, enum.Enum):
+class ToolClass(enum.StrEnum):
     CLASS_A_READONLY = "CLASS_A_READONLY"
     CLASS_B_ANALYSIS = "CLASS_B_ANALYSIS"
     CLASS_C_ACTION = "CLASS_C_ACTION"

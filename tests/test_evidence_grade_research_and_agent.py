@@ -5,10 +5,10 @@ Comprehensive test suite verifying the Evidence-Grade Research OS,
 Link Persistence Invariant, and Governed Telegram Agent.
 """
 
-import pytest
-import sqlite3
 import time
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from core.knowledge_os.universal_ingestor import (
     AccessStatus,
@@ -114,7 +114,7 @@ async def test_telegram_wiki_handler_link_guarantee():
     test_identity = TelegramUserIdentity(user_id=123456, chat_id=999, username="quant_architect", role=TelegramRole.SUPER_ADMIN)
     test_url = "https://www.facebook.com/share/v/1EkkpUZaDe/"
 
-    with patch("core.telegram_bot.telegram_bot.send_message", new_callable=AsyncMock) as mock_send:
+    with patch("core.telegram_bot.telegram_bot.send_message", new_callable=AsyncMock):
         reply = await handle_wiki(args=test_url, chat_id=999, identity=test_identity)
         assert "Source:" in reply
         assert "src_" in reply
@@ -168,7 +168,6 @@ def test_phase3_audio_extraction_and_transcription_pipeline(tmp_path):
     Verifies Phase 3 audio extraction and Gemini transcription integration.
     When yt-dlp yields audio and Gemini transcribes, status transitions to SUCCESS.
     """
-    from pathlib import Path
     from core.knowledge_os.transcription import TranscriptResult
 
     fake_audio_file = tmp_path / "test_audio.m4a"
@@ -243,8 +242,7 @@ async def test_tool_gateway_two_phase_confirmation_lifecycle():
     1. Plan trade -> Generates pending confirmation token.
     2. Confirm action -> Commits paper position atomically into portfolio.
     """
-    from core.telegram.tool_gateway import ToolClass, telegram_tool_gateway
-    from core.portfolio_shadow import portfolio_shadow
+    from core.telegram.tool_gateway import telegram_tool_gateway
 
     identity = TelegramUserIdentity(
         user_id=789,
@@ -350,8 +348,8 @@ def test_claim_verifier_corroboration_and_contradiction():
     from core.knowledge_os.universal_ingestor import universal_ingestor
 
     now_ms = int(time.time() * 1000)
-    cid_cool = f"src_test_cpi_cool_C-01"
-    cid_surge = f"src_test_cpi_surge_C-02"
+    cid_cool = "src_test_cpi_cool_C-01"
+    cid_surge = "src_test_cpi_surge_C-02"
 
     with universal_ingestor._get_connection() as conn:
         conn.execute(
@@ -708,7 +706,6 @@ async def test_telegram_agent_routing_for_strategy_and_backtest():
     """
     from core.knowledge_os.research_wikipedia import research_wikipedia_engine
     from core.telegram.agent_planner import telegram_agent_planner
-    from core.telegram.tool_gateway import telegram_tool_gateway
 
     identity = TelegramUserIdentity(
         user_id=777,

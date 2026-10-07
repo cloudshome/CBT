@@ -16,12 +16,10 @@ from __future__ import annotations
 import datetime
 import logging
 import sqlite3
-import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from core.database import db_manager
 from core.knowledge_os.research_wikipedia import WIKI_DB_PATH, research_wikipedia_engine
 
 logger = logging.getLogger("sky.knowledge_os.evidence_timeline")
@@ -137,13 +135,13 @@ class EvidenceTimelineEngine:
             from core.macro_event_reporter import macro_event_reporter
             recs = macro_event_reporter.list_recent_releases(limit=limit)
             macro_releases = [r.to_dict() for r in recs]
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.debug(f"Macro releases query fallback in timeline: {exc}")
 
         # Assemble Claim events
         for r in claim_rows:
             ts = r["created_at"]
-            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
             events.append(
                 TimelineEvent(
                     timestamp_ms=ts,
@@ -164,7 +162,7 @@ class EvidenceTimelineEngine:
             if filter_str and filter_str not in ev["citation_text"].lower() and filter_str not in (ev["speaker_claim"] or "").lower():
                 continue
             ts = ev["created_at"]
-            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
             ev_type = "CONTRADICTION_FLAGGED" if ev["evidence_type"] == "CONTRADICTION" else "EVIDENCE_CORROBORATED"
             events.append(
                 TimelineEvent(
@@ -186,7 +184,7 @@ class EvidenceTimelineEngine:
             if filter_str and filter_str not in mr["title"].lower() and filter_str not in mr["category"].lower():
                 continue
             ts = mr["scheduled_timestamp_ms"]
-            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+            dt_str = datetime.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M")
             events.append(
                 TimelineEvent(
                     timestamp_ms=ts,

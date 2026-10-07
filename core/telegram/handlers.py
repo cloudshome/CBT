@@ -15,7 +15,6 @@ from core.database import db_manager
 from core.event_shock_engine import event_shock_engine
 from core.portfolio_shadow import portfolio_shadow
 from core.provenance_engine import provenance_engine
-from core.sandbox_lab import sandbox_lab
 from core.sky_intelligence import sky_orchestrator
 from core.telegram.callbacks import callback_router
 from core.telegram.charts import telegram_charts
@@ -632,8 +631,8 @@ async def handle_test(
     Evaluates statistical expectancy, 3-tier frictions, updates validation stage,
     and applies bidirectional feedback into research_claims and research_evidence.
     """
-    from core.telegram_bot import telegram_bot
     from core.knowledge_os.backtest_queue import backtest_queue_manager
+    from core.telegram_bot import telegram_bot
 
     cand_id = args.strip()
     if not cand_id:

@@ -13,12 +13,9 @@ Providers:
 from __future__ import annotations
 
 import base64
-import json
 import logging
 import os
-import shutil
 import tempfile
-import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -155,7 +152,7 @@ class GeminiAudioProvider(BaseTranscriptionProvider):
                 provider="GEMINI_CLOUD",
                 error=f"Gemini API returned status {resp.status_code}: {resp.text[:200]}",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return TranscriptResult(
                 success=False,
                 text="",
@@ -219,7 +216,7 @@ class SocialVideoAudioExtractor:
                     return True, expected_file, metadata
 
                 return False, None, {"error": "Downloaded media file empty or not located on disk."}
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.debug(f"yt-dlp audio download failed for {url}: {exc}")
             return False, None, {"error": str(exc)}
 
@@ -241,7 +238,7 @@ class SocialVideoAudioExtractor:
                         "description": info.get("description", "")[:500],
                         "duration": info.get("duration", 0),
                     }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {"error": str(e)}
         return {}
 

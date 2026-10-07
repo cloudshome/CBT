@@ -19,10 +19,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from core.telegram.rbac import TelegramRole, TelegramUserIdentity
+from core.telegram.rbac import TelegramUserIdentity
 from core.telegram.tool_gateway import (
-    ToolClass,
-    ToolResult,
     telegram_tool_gateway,
 )
 
