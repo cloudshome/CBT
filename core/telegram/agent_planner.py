@@ -183,7 +183,27 @@ class TelegramAgentPlanner:
                 tool_args={"query": q},
             )
 
-        # 13. Strategy Candidates
+        # 13. Strategy Candidate Backtest Execution
+        if any(w in lower for w in ("ব্যাকটেস্ট", "backtest", "test candidate", "ক্যান্ডিডেট টেস্ট", "ভ্যালিডেট")):
+            cand_match = re.search(r"\b(CAND_[A-Za-z0-9_-]+)\b", clean)
+            cand_id = cand_match.group(0) if cand_match else ""
+            return PlannerDecision(
+                intent="RUN_BACKTEST",
+                tool_name="run_candidate_backtest",
+                tool_args={"candidate_id": cand_id},
+            )
+
+        # 14. Strategy Candidate Synthesis from Claim
+        if any(w in lower for w in ("সিন্থেসাইজ", "synthesize", "স্ট্র্যাটেজি বানাও", "ক্যান্ডিডেট বানাও", "create strategy")):
+            cid_match = re.search(r"\b[A-Za-z0-9_-]+_C-\d+\b|\bC-\d+\b", clean)
+            cid = cid_match.group(0) if cid_match else ""
+            return PlannerDecision(
+                intent="SYNTHESIZE_STRATEGY",
+                tool_name="synthesize_strategy_from_claim",
+                tool_args={"claim_id": cid},
+            )
+
+        # 15. Strategy Candidates Listing
         if any(w in lower for w in ("ক্যান্ডিডেট", "স্ট্র্যাটেজি", "candidate", "strategy", "পরীক্ষা")):
             return PlannerDecision(
                 intent="GET_CANDIDATES",
@@ -191,7 +211,7 @@ class TelegramAgentPlanner:
                 tool_args={},
             )
 
-        # 14. Project Status / Terminal Health
+        # 16. Project Status / Terminal Health
         if any(w in lower for w in ("টার্মিনাল অবস্থা", "প্রজেক্টের অবস্থা", "স্ট্যাটাস", "status", "health", "mode")):
             return PlannerDecision(
                 intent="GET_STATUS",
@@ -199,7 +219,7 @@ class TelegramAgentPlanner:
                 tool_args={},
             )
 
-        # 11. General Conversational / Quantitative Advisory
+        # 17. General Conversational / Quantitative Advisory
         return PlannerDecision(
             intent="CONVERSATIONAL",
         )

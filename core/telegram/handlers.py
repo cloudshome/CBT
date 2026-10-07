@@ -629,11 +629,11 @@ async def handle_test(
 ) -> str:
     """
     Executes walk-forward backtest validation on a Strategy Candidate.
-    Evaluates statistical expectancy, 3-tier frictions, and updates validation stage
-    to WALK_FORWARD_TESTED or REJECTED.
+    Evaluates statistical expectancy, 3-tier frictions, updates validation stage,
+    and applies bidirectional feedback into research_claims and research_evidence.
     """
-    from core.data_streamer import data_streamer
     from core.telegram_bot import telegram_bot
+    from core.knowledge_os.backtest_queue import backtest_queue_manager
 
     cand_id = args.strip()
     if not cand_id:
@@ -649,72 +649,11 @@ async def handle_test(
             chat_id=chat_id,
         )
 
-    # Fetch candidate name
-    cand_name = "Strategy Candidate"
-    with db_manager.get_brain_conn() as conn:
-        row = conn.execute(
-            "SELECT strategy_name FROM strategy_candidates WHERE candidate_id = ? LIMIT 1;",
-            (cand_id,),
-        ).fetchone()
-        if row:
-            cand_name = row["strategy_name"]
-
-    # Run backtest via sandbox lab
-    symbol = "BTC/USDT"
-    timeframe = "15m"
-    candles = data_streamer.get_candles(symbol, timeframe, limit=300)
-    if not candles:
-        candles = data_streamer.generate_synthetic_candles(symbol, timeframe, count=300)
-
-    rep = sandbox_lab.run_backtest(symbol, timeframe, candles)
-
-    # Statistical verification
-    if rep.trades:
-        expectancy_r = round(sum(t.rr_ratio for t in rep.trades) / len(rep.trades), 2)
+    res = backtest_queue_manager.execute_backtest(candidate_id=cand_id)
+    if not res:
+        report = f"⚠️ Candidate `{cand_id}` not found in Research Lab database."
     else:
-        expectancy_r = round((rep.win_rate * 2.0) - ((1.0 - rep.win_rate) * 1.0), 2)
-
-    is_positive_ev = expectancy_r > 0.15
-    is_stable = rep.win_rate >= 0.45 and rep.sharpe_ratio >= 1.0
-    passed = is_positive_ev and is_stable
-    new_stage = "WALK_FORWARD_TESTED" if passed else "REJECTED"
-
-    # Update candidate in provenance ledger
-    provenance_engine.update_candidate_backtest_result(
-        candidate_id=cand_id,
-        expectancy=expectancy_r,
-        sharpe=rep.sharpe_ratio,
-        win_rate=rep.win_rate,
-        validation_stage=new_stage,
-    )
-
-    result_badge = (
-        "PASSED ✅ (Qualified for Paper Desk)"
-        if passed
-        else "REJECTED ❌ (Failed Expectancy Hurdle)"
-    )
-
-    report = (
-        f"🧪 **WALK-FORWARD STRATEGY VALIDATION REPORT**\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🆔 **Candidate ID:** `{cand_id}`\n"
-        f"🏷️ **Name:** `{cand_name}`\n"
-        f"📊 **Sample Window:** `{symbol}` ({timeframe}, 300 bars)\n"
-        f"⚖️ **Validation Result:** `{result_badge}`\n"
-        f"📈 **New Governance Stage:** `[{new_stage}]`\n\n"
-        f"🎯 **Performance Metrics (3-Tier Cost Modeled):**\n"
-        f"• **Net Expectancy:** `{expectancy_r:+.2f}R` per trade\n"
-        f"• **Win Rate:** `{rep.win_rate * 100:.1f}%` ({rep.total_trades} trades)\n"
-        f"• **Sharpe Ratio:** `{rep.sharpe_ratio:.2f}`\n"
-        f"• **Max Drawdown:** `{rep.max_drawdown_pct:.2f}%`\n"
-        f"• **Profit Factor:** `{rep.profit_factor:.2f}`\n\n"
-        f"🛡️ **Epistemic Invariant:**\n"
-        f"• **Deflated Sharpe (DSR):** `0.812` (Overfitting Discount Applied)\n"
-        f"• **White's Reality Check (WRC):** `p = 0.021 (Statistically Significant)`\n"
-        f"• **Ledger Status:** Recorded atomically in SQLite Experiment Store\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔬 _Dispatched from SKY Empirical Validation Engine_"
-    )
+        report = res.summary_report
 
     if chat_id:
         await telegram_bot.send_message(report, chat_id=chat_id)

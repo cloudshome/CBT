@@ -747,3 +747,94 @@ async def evaluate_thesis_endpoint(thesis_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"Thesis '{thesis_id}' not found.")
     return {"status": "EVALUATED", "thesis": evaluated.to_dict()}
 
+
+# -----------------------------------------------------------------------------
+# MILESTONE 6: RESEARCH-TO-STRATEGY BRIDGE & BACKTEST QUEUE ENDPOINTS
+# -----------------------------------------------------------------------------
+class SynthesizeStrategyPayload(BaseModel):
+    symbol: str = "BTC/USDT"
+    timeframe: str = "15m"
+
+
+@router.post("/claims/{claim_id}/synthesize-strategy")
+async def synthesize_strategy_from_claim_endpoint(
+    claim_id: str,
+    payload: SynthesizeStrategyPayload | None = None,
+) -> dict[str, Any]:
+    """Translates a research claim into a falsifiable Strategy Candidate."""
+    from core.knowledge_os.strategy_bridge import strategy_bridge
+
+    sym = payload.symbol if payload else "BTC/USDT"
+    tf = payload.timeframe if payload else "15m"
+    cand = strategy_bridge.synthesize_strategy_from_claim(
+        claim_id=claim_id,
+        custom_symbol=sym,
+        custom_timeframe=tf,
+    )
+    if not cand:
+        raise HTTPException(status_code=404, detail=f"Claim '{claim_id}' not found.")
+    return {"status": "SYNTHESIZED", "candidate": cand.to_dict()}
+
+
+@router.get("/strategy-candidates")
+async def list_strategy_candidates_endpoint(
+    validation_stage: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    """Lists strategy candidates in the research database."""
+    from core.knowledge_os.backtest_queue import backtest_queue_manager
+
+    candidates = backtest_queue_manager.list_candidates(
+        validation_stage=validation_stage, limit=limit
+    )
+    return {"candidates": candidates, "count": len(candidates)}
+
+
+class EnqueueBacktestPayload(BaseModel):
+    candidate_id: str
+
+
+@router.post("/backtest-queue/enqueue")
+async def enqueue_backtest_candidate_endpoint(
+    payload: EnqueueBacktestPayload,
+) -> dict[str, Any]:
+    """Enqueues candidate for walk-forward backtest."""
+    from core.knowledge_os.backtest_queue import backtest_queue_manager
+
+    ok = backtest_queue_manager.enqueue_candidate(payload.candidate_id)
+    if not ok:
+        raise HTTPException(
+            status_code=404, detail=f"Candidate '{payload.candidate_id}' not found."
+        )
+    return {"status": "QUEUED", "candidate_id": payload.candidate_id}
+
+
+class RunBacktestPayload(BaseModel):
+    symbol: str = "BTC/USDT"
+    timeframe: str = "15m"
+    bars_count: int = 300
+
+
+@router.post("/backtest-queue/run/{candidate_id}")
+async def run_backtest_endpoint(
+    candidate_id: str,
+    payload: RunBacktestPayload | None = None,
+) -> dict[str, Any]:
+    """Executes walk-forward backtest and applies bidirectional evidence loop."""
+    from core.knowledge_os.backtest_queue import backtest_queue_manager
+
+    sym = payload.symbol if payload else "BTC/USDT"
+    tf = payload.timeframe if payload else "15m"
+    bc = payload.bars_count if payload else 300
+
+    res = backtest_queue_manager.execute_backtest(
+        candidate_id=candidate_id,
+        symbol=sym,
+        timeframe=tf,
+        bars_count=bc,
+    )
+    if not res:
+        raise HTTPException(status_code=404, detail=f"Candidate '{candidate_id}' not found.")
+    return {"status": "COMPLETED", "result": res.to_dict()}
+
+

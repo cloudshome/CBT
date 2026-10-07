@@ -229,6 +229,10 @@ class TelegramToolGateway:
             candidate_id = arguments.get("candidate_id", "")
             return await self._tool_run_candidate_backtest(candidate_id, identity)
 
+        elif tool_name == "synthesize_strategy_from_claim":
+            claim_id = arguments.get("claim_id", "")
+            return await self._tool_synthesize_strategy(claim_id, identity)
+
         # ---------------------------------------------------------------------
         # CLASS C: SIMULATION / PAPER TRADES (TWO-PHASE CONFIRMATION)
         # -------------------------------------------------------------------------
@@ -649,6 +653,58 @@ class TelegramToolGateway:
             tool_class=ToolClass.CLASS_B_ANALYSIS,
             output_text=text,
             data={"verified_count": len(results)},
+        )
+
+    async def _tool_synthesize_strategy(self, claim_id: str, identity: TelegramUserIdentity) -> ToolResult:
+        from core.knowledge_os.strategy_bridge import strategy_bridge
+
+        target_cid = claim_id
+        if not target_cid:
+            with strategy_bridge._get_wiki_connection() as conn:
+                row = conn.execute(
+                    "SELECT claim_id FROM research_claims ORDER BY created_at DESC LIMIT 1;"
+                ).fetchone()
+                if row:
+                    target_cid = row["claim_id"]
+
+        if not target_cid:
+            return ToolResult(
+                success=False,
+                tool_name="synthesize_strategy_from_claim",
+                tool_class=ToolClass.CLASS_B_ANALYSIS,
+                output_text="⚠️ No claim ID provided and no research claims found in database.",
+                error="Claim ID required",
+            )
+
+        cand = strategy_bridge.synthesize_strategy_from_claim(target_cid)
+        if not cand:
+            return ToolResult(
+                success=False,
+                tool_name="synthesize_strategy_from_claim",
+                tool_class=ToolClass.CLASS_B_ANALYSIS,
+                output_text=f"⚠️ Could not synthesize strategy: Claim `{target_cid}` not found.",
+                error="Claim not found",
+            )
+
+        text = (
+            f"🔬 **SYNTHESIZED STRATEGY CANDIDATE**\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🆔 **Candidate ID:** `{cand.candidate_id}`\n"
+            f"🏷️ **Strategy Name:** `{cand.strategy_name}`\n"
+            f"📖 **Source Claim:** `{cand.knowledge_id}`\n"
+            f"⏱️ **Timeframe:** `{cand.timeframe}`\n"
+            f"🎯 **Required Indicators:** `{', '.join(cand.required_indicators) if cand.required_indicators else 'Price Action'}`\n"
+            f"⚖️ **Governance Stage:** `[{cand.validation_stage}]`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📋 **Hypothesis:**\n_{cand.hypothesis}_\n\n"
+            f"⚡ **Execute Walk-Forward Backtest:** `/test {cand.candidate_id}`"
+        )
+        return ToolResult(
+            success=True,
+            tool_name="synthesize_strategy_from_claim",
+            tool_class=ToolClass.CLASS_B_ANALYSIS,
+            output_text=text,
+            data=cand.to_dict(),
         )
 
     # -------------------------------------------------------------------------

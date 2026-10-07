@@ -598,4 +598,171 @@ async def test_telegram_agent_routing_for_theses_timeline_graph():
     assert d4.tool_name == "verify_claims"
 
 
+def test_strategy_bridge_synthesis():
+    """
+    Verifies that StrategyBridge compiles falsifiable StrategyCandidateRecord
+    with causal firewalls, parameter completeness, and registers into both
+    strategy_candidates and hypothesis_queue.
+    """
+    from core.knowledge_os.strategy_bridge import strategy_bridge
+
+    # 1. Synthesize from raw hypothesis text
+    cand = strategy_bridge.synthesize_from_text(
+        claim_text="When RSI drops below 30 and MACD histogram crosses above zero, buy BTC with 1.5% Half-Kelly risk.",
+        claim_id="claim_test_99",
+        source_id="src_test_99",
+        symbol="BTC/USDT",
+        timeframe="15m",
+    )
+
+    assert cand.candidate_id.startswith("CAND_")
+    assert cand.knowledge_id == "claim_test_99"
+    assert "RSI" in cand.required_indicators or "MACD" in cand.required_indicators
+    assert cand.validation_stage == "QUEUED_FOR_BACKTEST"
+    assert "invalidation" in cand.exit_rules
+    assert "risk_budget" in cand.parameter_bounds
+    assert cand.parameter_bounds["risk_budget"]["max_kelly_fraction"] <= 0.025
+
+    # 2. Check DB persistence in strategy_candidates
+    from core.database import db_manager
+
+    with db_manager.get_brain_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM strategy_candidates WHERE candidate_id = ?;", (cand.candidate_id,)
+        ).fetchone()
+        assert row is not None
+        assert row["strategy_name"] == cand.strategy_name
+
+        hyp_row = conn.execute(
+            "SELECT * FROM hypothesis_queue WHERE claim_id = ?;", (cand.knowledge_id,)
+        ).fetchone()
+        assert hyp_row is not None
+
+
+def test_backtest_queue_bidirectional_feedback():
+    """
+    Verifies that BacktestQueue executes simulation on closed bars, evaluates 3-tier costs,
+    and updates both strategy_candidates AND research_evidence / research_claims (bidirectional feedback).
+    """
+    from core.knowledge_os.backtest_queue import backtest_queue_manager
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+    from core.knowledge_os.strategy_bridge import strategy_bridge
+
+    # 1. Seed a claim in research_claims
+    cid = "claim_bt_test_1"
+    now_ms = int(time.time() * 1000)
+    with research_wikipedia_engine._get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO research_claims (
+                claim_id, source_id, wiki_article_id, speaker_claim, claim_type,
+                speaker, confidence_score, verification_status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                cid,
+                "src_test",
+                "wiki_test",
+                "RSI oversold bounces yield positive alpha on 15m timeframes.",
+                "STRATEGY_CLAIM",
+                "Test Analyst",
+                0.50,
+                "UNVERIFIED",
+                now_ms,
+            ),
+        )
+        conn.commit()
+
+    # 2. Synthesize candidate from this claim
+    cand = strategy_bridge.synthesize_strategy_from_claim(cid)
+    assert cand is not None
+    assert cand.knowledge_id == cid
+
+    # 3. Execute backtest
+    result = backtest_queue_manager.execute_backtest(cand.candidate_id, bars_count=100)
+    assert result is not None
+    assert result.candidate_id == cand.candidate_id
+    assert result.validation_stage in ("WALK_FORWARD_TESTED", "REJECTED")
+    assert result.evidence_recorded is True
+
+    # 4. Verify bidirectional update in research_claims & research_evidence
+    with research_wikipedia_engine._get_connection() as conn:
+        claim_after = conn.execute(
+            "SELECT verification_status, confidence_score FROM research_claims WHERE claim_id = ?;",
+            (cid,),
+        ).fetchone()
+        assert claim_after["verification_status"] in ("EMPIRICALLY_SUPPORTED", "CONTRADICTED", "REFUTED")
+
+        ev_row = conn.execute(
+            "SELECT * FROM research_evidence WHERE claim_id = ?;", (cid,)
+        ).fetchone()
+        assert ev_row is not None
+        assert "Walk-forward backtest" in ev_row["citation_text"]
+
+
+@pytest.mark.asyncio
+async def test_telegram_agent_routing_for_strategy_and_backtest():
+    """
+    Verifies that Telegram Agent planner and tool gateway correctly route
+    natural language requests for strategy synthesis and candidate backtests.
+    """
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+    from core.telegram.agent_planner import telegram_agent_planner
+    from core.telegram.tool_gateway import telegram_tool_gateway
+
+    identity = TelegramUserIdentity(
+        user_id=777,
+        chat_id=777,
+        username="quant_lead",
+        role=TelegramRole.SUPER_ADMIN,
+    )
+
+    # 1. Strategy Synthesis Intent
+    d1 = telegram_agent_planner.resolve_intent("এই ক্লেইম থেকে স্ট্র্যাটেজি বানাও C-05", user_id=777)
+    assert d1.intent == "SYNTHESIZE_STRATEGY"
+    assert d1.tool_name == "synthesize_strategy_from_claim"
+    assert d1.tool_args["claim_id"] == "C-05"
+
+    # Seed claim for tool execution
+    now_ms = int(time.time() * 1000)
+    with research_wikipedia_engine._get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO research_claims (
+                claim_id, source_id, wiki_article_id, speaker_claim, claim_type,
+                speaker, confidence_score, verification_status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                "C-05",
+                "src_test",
+                "wiki_test",
+                "Buy when price sweeps previous day low and forms a 15m bullish FVG.",
+                "STRATEGY_CLAIM",
+                "ICT Analyst",
+                0.80,
+                "UNVERIFIED",
+                now_ms,
+            ),
+        )
+        conn.commit()
+
+    resp1 = await telegram_agent_planner.handle_user_message("এই ক্লেইম থেকে স্ট্র্যাটেজি বানাও C-05", 777, identity)
+    assert "SYNTHESIZED STRATEGY CANDIDATE" in resp1
+
+    # 2. Backtest Intent
+    # Find candidate id
+    cand_match = resp1.split("`CAND_")[1].split("`")[0]
+    cand_id = f"CAND_{cand_match}"
+
+    d2 = telegram_agent_planner.resolve_intent(f"এই ক্যান্ডিডেট ব্যাকটেস্ট করো {cand_id}", user_id=777)
+    assert d2.intent == "RUN_BACKTEST"
+    assert d2.tool_name == "run_candidate_backtest"
+    assert d2.tool_args["candidate_id"] == cand_id
+
+    resp2 = await telegram_agent_planner.handle_user_message(f"এই ক্যান্ডিডেট ব্যাকটেস্ট করো {cand_id}", 777, identity)
+    assert "WALK-FORWARD STRATEGY VALIDATION REPORT" in resp2
+
+
+
 
