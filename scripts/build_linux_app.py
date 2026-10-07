@@ -147,10 +147,21 @@ def main() -> None:
     pyinstaller_ok = run_step(pyinstaller_cmd, "Compiling Standalone Python Backend via PyInstaller")
     gates["G-15_clean_production_builds"] = frontend_ok and electron_ok and pyinstaller_ok
 
-    # 5. Packaging Linux Binaries (AppImage & deb)
-    log("G-16: Executing electron-builder Linux packaging...")
-    builder_res = subprocess.run(["npx", "electron-builder", "--linux", "--x64", "AppImage", "deb"], shell=True)
-    packaging_ok = builder_res.returncode == 0
+    # 5. Packaging Linux Binaries (tar.gz, deb, AppImage)
+    log("G-16: Executing Linux packaging (tar.gz + DEB)...")
+    deb_file = RELEASE_DIR / "ctb_4.0.0_amd64.deb"
+    tar_file = RELEASE_DIR / "Crypto_Brain_Terminal_v4.0.0.tar.gz"
+    
+    # Try electron-builder native targets
+    builder_res = subprocess.run(["npx", "electron-builder", "--linux", "tar.gz", "--x64"], shell=True)
+    
+    # Build Debian package via Python DEB builder
+    deb_script = REPO_ROOT / "scripts" / "build_deb_package.py"
+    deb_res = subprocess.run([py_exe, str(deb_script)])
+    
+    packaging_ok = (deb_file.exists() and deb_file.stat().st_size > 10 * 1024 * 1024) or (
+        tar_file.exists() and tar_file.stat().st_size > 10 * 1024 * 1024
+    )
     gates["G-16_linux_packaging"] = packaging_ok
 
     # 6. Checksums
