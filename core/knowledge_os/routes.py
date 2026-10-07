@@ -614,3 +614,136 @@ async def delete_wiki_article(article_id: str) -> dict[str, Any]:
     if not success:
         raise HTTPException(status_code=404, detail=f"Wiki article '{article_id}' not found.")
     return {"status": "DELETED", "article_id": article_id}
+
+
+# -----------------------------------------------------------------------------
+# MILESTONE 4: CLAIM VERIFICATION & EVIDENCE TIMELINE ENDPOINTS
+# -----------------------------------------------------------------------------
+@router.post("/claims/{claim_id}/verify")
+async def verify_claim_endpoint(claim_id: str) -> dict[str, Any]:
+    """Runs deterministic epistemic verification and contradiction audit on a claim."""
+    from core.knowledge_os.claim_verifier import claim_verifier
+
+    res = claim_verifier.verify_claim(claim_id)
+    if not res:
+        raise HTTPException(status_code=404, detail=f"Claim '{claim_id}' not found.")
+    return res.to_dict()
+
+
+@router.post("/claims/verify-all")
+async def verify_all_claims_endpoint(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, Any]:
+    """Batch verifies pending unverified claims across research sources."""
+    from core.knowledge_os.claim_verifier import claim_verifier
+
+    results = claim_verifier.verify_all_unverified_claims(limit=limit)
+    return {
+        "status": "COMPLETED",
+        "verified_count": len(results),
+        "results": [r.to_dict() for r in results],
+    }
+
+
+@router.get("/evidence/timeline")
+async def get_evidence_timeline_endpoint(
+    topic: str | None = Query(default=None),
+    entity: str | None = Query(default=None),
+    source_id: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    """Retrieves chronological evidence timeline and narrative drift analysis."""
+    from core.knowledge_os.evidence_timeline import evidence_timeline_engine
+
+    timeline = evidence_timeline_engine.build_timeline(
+        entity=entity, topic=topic, source_id=source_id, limit=limit
+    )
+    return timeline.to_dict()
+
+
+# -----------------------------------------------------------------------------
+# MILESTONE 5: KNOWLEDGE GRAPH & THESIS LAYER ENDPOINTS
+# -----------------------------------------------------------------------------
+@router.get("/graph/entities")
+async def list_graph_entities(limit: int = Query(default=100, ge=1, le=500)) -> dict[str, Any]:
+    """Lists entities in the CBT Knowledge Graph."""
+    from core.knowledge_os.knowledge_graph import knowledge_graph_engine
+
+    entities = knowledge_graph_engine.list_all_entities(limit=limit)
+    return {"entities": entities, "count": len(entities)}
+
+
+@router.get("/graph/relations")
+async def list_graph_relations(limit: int = Query(default=100, ge=1, le=500)) -> dict[str, Any]:
+    """Lists relations in the CBT Knowledge Graph."""
+    from core.knowledge_os.knowledge_graph import knowledge_graph_engine
+
+    relations = knowledge_graph_engine.list_all_relations(limit=limit)
+    return {"relations": relations, "count": len(relations)}
+
+
+@router.get("/graph/subgraph")
+async def get_graph_subgraph(
+    entity: str = Query(..., min_length=1),
+    max_depth: int = Query(default=1, ge=1, le=3),
+) -> dict[str, Any]:
+    """Extracts node-edge subgraph around an entity."""
+    from core.knowledge_os.knowledge_graph import knowledge_graph_engine
+
+    subgraph = knowledge_graph_engine.get_subgraph(entity, max_depth=max_depth)
+    return subgraph
+
+
+class ThesisCreatePayload(BaseModel):
+    thesis_id: str
+    title: str
+    description: str
+    asset_class: str = "CRYPTO"
+
+
+@router.get("/theses")
+async def list_theses_endpoint(
+    asset_class: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    """Lists active institutional macro and quantitative theses."""
+    from core.knowledge_os.thesis_engine import thesis_engine
+
+    theses = thesis_engine.list_theses(asset_class=asset_class, status=status, limit=limit)
+    return {"theses": theses, "count": len(theses)}
+
+
+@router.post("/theses")
+async def create_thesis_endpoint(payload: ThesisCreatePayload) -> dict[str, Any]:
+    """Registers a new research hypothesis."""
+    from core.knowledge_os.thesis_engine import thesis_engine
+
+    thesis = thesis_engine.create_thesis(
+        thesis_id=payload.thesis_id,
+        title=payload.title,
+        description=payload.description,
+        asset_class=payload.asset_class,
+    )
+    return {"status": "CREATED", "thesis": thesis.to_dict()}
+
+
+@router.get("/theses/{thesis_id}")
+async def get_thesis_dossier_endpoint(thesis_id: str) -> dict[str, Any]:
+    """Returns complete thesis dossier with supporting and contradicting claims."""
+    from core.knowledge_os.thesis_engine import thesis_engine
+
+    dossier = thesis_engine.get_thesis_dossier(thesis_id)
+    if not dossier:
+        raise HTTPException(status_code=404, detail=f"Thesis '{thesis_id}' not found.")
+    return dossier
+
+
+@router.post("/theses/{thesis_id}/evaluate")
+async def evaluate_thesis_endpoint(thesis_id: str) -> dict[str, Any]:
+    """Recomputes confidence and epistemic lifecycle status for a thesis."""
+    from core.knowledge_os.thesis_engine import thesis_engine
+
+    evaluated = thesis_engine.evaluate_thesis(thesis_id)
+    if not evaluated:
+        raise HTTPException(status_code=404, detail=f"Thesis '{thesis_id}' not found.")
+    return {"status": "EVALUATED", "thesis": evaluated.to_dict()}
+

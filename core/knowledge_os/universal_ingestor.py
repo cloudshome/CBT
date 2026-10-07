@@ -1157,6 +1157,36 @@ class UniversalIngestor:
                 )
             conn.commit()
 
+        # 3. Post-Ingestion Epistemic Verification & Knowledge Graph Extraction
+        try:
+            from core.knowledge_os.claim_verifier import claim_verifier
+            from core.knowledge_os.knowledge_graph import knowledge_graph_engine
+            from core.knowledge_os.thesis_engine import thesis_engine
+
+            # Extract entities from source text & summary
+            entities = knowledge_graph_engine.extract_entities_from_text(
+                f"{source_rec.title} {executive_summary} {raw_text[:1000]}"
+            )
+            # Create co-occurrence relations between detected entities
+            if len(entities) >= 2:
+                for i in range(len(entities) - 1):
+                    knowledge_graph_engine.add_relation(
+                        source_name_or_id=entities[i].entity_id,
+                        target_name_or_id=entities[i + 1].entity_id,
+                        relation_type="INFLUENCES",
+                        weight=0.75,
+                        source_id=source_rec.source_id,
+                        description=f"Co-occurred in {source_rec.title}",
+                    )
+
+            # Verify claims and cluster to institutional theses
+            for c in claims:
+                full_cid = f"{source_rec.source_id}_{c.claim_id}"
+                claim_verifier.verify_claim(full_cid)
+                thesis_engine.auto_cluster_claim_to_theses(full_cid, c.speaker_claim)
+        except Exception as e:
+            logger.debug(f"Post-ingestion epistemic graph hook error (non-fatal): {e}")
+
         return article, real_life_summary
 
 

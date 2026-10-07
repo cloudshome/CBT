@@ -119,7 +119,53 @@ class TelegramAgentPlanner:
                 tool_args={},
             )
 
-        # 7. Macro Catalysts / CPI / FOMC
+        # 7. Research Theses & Institutional Hypotheses
+        if any(w in lower for w in ("থিসিস", "হাইপোথিসিস", "thesis", "theses", "ম্যাক্রো থিসিস")):
+            return PlannerDecision(
+                intent="QUERY_THESES",
+                tool_name="query_theses",
+                tool_args={"asset_class": None, "status": None},
+            )
+
+        # 8. Evidence Timeline & Narrative Evolution
+        if any(w in lower for w in ("টাইমলাইন", "timeline", "এভিডেন্স টাইমলাইন", "ঘটনাপঞ্জি")):
+            topic_match = clean.replace("টাইমলাইন", "").replace("timeline", "").strip()
+            return PlannerDecision(
+                intent="GET_TIMELINE",
+                tool_name="get_evidence_timeline",
+                tool_args={"topic": topic_match},
+            )
+
+        # 9. Knowledge Graph & Causal Networks
+        if any(w in lower for w in ("গ্রাফ", "নলেজ গ্রাফ", "সম্পর্ক", "knowledge graph", "graph", "কানেকশন", "network")):
+            ent = "Bitcoin"
+            if "eth" in lower or "ইথেরিয়াম" in lower:
+                ent = "Ethereum"
+            elif "fed" in lower or "ফেড" in lower:
+                ent = "Federal Reserve"
+            elif "cpi" in lower or "মুদ্রাস্ফীতি" in lower:
+                ent = "CPI Inflation"
+            elif "dxy" in lower or "ডলার" in lower:
+                ent = "US Dollar Index"
+            elif "fvg" in lower:
+                ent = "Fair Value Gap"
+            return PlannerDecision(
+                intent="QUERY_GRAPH",
+                tool_name="query_knowledge_graph",
+                tool_args={"entity": ent},
+            )
+
+        # 10. Epistemic Claim Verification
+        if any(w in lower for w in ("ভেরিফাই", "যাচাই", "দাবি পরীক্ষা", "claim", "verify")):
+            cid_match = re.search(r"\b[A-Za-z0-9_-]+_C-\d+\b|\bC-\d+\b", clean)
+            cid = cid_match.group(0) if cid_match else None
+            return PlannerDecision(
+                intent="VERIFY_CLAIMS",
+                tool_name="verify_claims",
+                tool_args={"claim_id": cid},
+            )
+
+        # 11. Macro Catalysts / CPI / FOMC
         if any(w in lower for w in ("ম্যাক্রো", "সিপিআই", "এফওএমসি", "ইনফ্লেশন", "সুদের হার", "macro", "cpi", "fomc", "nfp", "fed", "interest rate")):
             ev = "CPI" if "cpi" in lower else ("FOMC" if "fomc" in lower else ("NFP" if "nfp" in lower else ""))
             return PlannerDecision(
@@ -128,7 +174,7 @@ class TelegramAgentPlanner:
                 tool_args={"event_name": ev},
             )
 
-        # 8. Research Wiki Search
+        # 12. Research Wiki Search
         if any(w in lower for w in ("উইকি", "রিসার্চ ল্যাব", "wiki", "research", "আর্টিকেল", "পেপার")):
             q = clean.replace("উইকি", "").replace("wiki", "").strip()
             return PlannerDecision(
@@ -137,7 +183,7 @@ class TelegramAgentPlanner:
                 tool_args={"query": q},
             )
 
-        # 9. Strategy Candidates
+        # 13. Strategy Candidates
         if any(w in lower for w in ("ক্যান্ডিডেট", "স্ট্র্যাটেজি", "candidate", "strategy", "পরীক্ষা")):
             return PlannerDecision(
                 intent="GET_CANDIDATES",
@@ -145,7 +191,7 @@ class TelegramAgentPlanner:
                 tool_args={},
             )
 
-        # 10. Project Status / Terminal Health
+        # 14. Project Status / Terminal Health
         if any(w in lower for w in ("টার্মিনাল অবস্থা", "প্রজেক্টের অবস্থা", "স্ট্যাটাস", "status", "health", "mode")):
             return PlannerDecision(
                 intent="GET_STATUS",

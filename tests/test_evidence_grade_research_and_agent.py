@@ -7,6 +7,7 @@ Link Persistence Invariant, and Governed Telegram Agent.
 
 import pytest
 import sqlite3
+import time
 from unittest.mock import AsyncMock, patch
 
 from core.knowledge_os.universal_ingestor import (
@@ -338,5 +339,263 @@ async def test_agent_planner_end_to_end_user_message():
     )
     assert "CBT / SKY QUANTITATIVE DESK STATUS" in status_reply
     assert "Virtual Equity" in status_reply
+
+
+def test_claim_verifier_corroboration_and_contradiction():
+    """
+    Milestone 4 Test: Verifies that ClaimVerifier detects empirical corroboration
+    and contradiction against macro event releases and writes to research_evidence.
+    """
+    from core.knowledge_os.claim_verifier import claim_verifier
+    from core.knowledge_os.universal_ingestor import universal_ingestor
+
+    now_ms = int(time.time() * 1000)
+    cid_cool = f"src_test_cpi_cool_C-01"
+    cid_surge = f"src_test_cpi_surge_C-02"
+
+    with universal_ingestor._get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO research_claims (
+                claim_id, source_id, wiki_article_id, speaker_claim,
+                claim_type, speaker, timestamp_marker, time_period,
+                confidence_score, verification_status, cross_verification_evidence,
+                empirical_dataset_reference, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                cid_cool,
+                "src_test_cpi_cool",
+                "wiki_test_cpi_cool",
+                "US CPI inflation is cooling rapidly below forecast levels, triggering market liquidity expansion.",
+                "HYPOTHESIS",
+                "Macro Analyst",
+                "",
+                "",
+                0.60,
+                "HYPOTHESIS",
+                "",
+                "US BLS",
+                now_ms,
+            ),
+        )
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO research_claims (
+                claim_id, source_id, wiki_article_id, speaker_claim,
+                claim_type, speaker, timestamp_marker, time_period,
+                confidence_score, verification_status, cross_verification_evidence,
+                empirical_dataset_reference, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                cid_surge,
+                "src_test_cpi_surge",
+                "wiki_test_cpi_surge",
+                "Inflation is surging out of control with a 100% chance guarantee of fed rate hikes.",
+                "HYPOTHESIS",
+                "Permabear Blogger",
+                "",
+                "",
+                0.70,
+                "HYPOTHESIS",
+                "",
+                "Blog Post",
+                now_ms,
+            ),
+        )
+        conn.commit()
+
+    # 1. Verify cooling claim
+    res_cool = claim_verifier.verify_claim(cid_cool)
+    assert res_cool is not None
+    assert res_cool.claim_id == cid_cool
+    assert res_cool.confidence_score >= 0.70
+    assert len(res_cool.corroborating_evidence) >= 1
+    assert any(e.evidence_type == "EMPIRICAL_BENCHMARK" for e in res_cool.corroborating_evidence)
+
+    # 2. Verify surge claim (should detect contradiction / constitutional violation)
+    res_surge = claim_verifier.verify_claim(cid_surge)
+    assert res_surge is not None
+    assert res_surge.claim_id == cid_surge
+    assert len(res_surge.contradictions_detected) >= 1
+    assert res_surge.new_status in ("CONTRADICTED", "REFUTED")
+
+    # 3. Verify durable persistence in research_evidence
+    with universal_ingestor._get_connection() as conn:
+        ev_count = conn.execute(
+            "SELECT count(*) FROM research_evidence WHERE claim_id IN (?, ?);",
+            (cid_cool, cid_surge),
+        ).fetchone()[0]
+        assert ev_count >= 2
+
+
+def test_evidence_timeline_generation_and_narrative_drift():
+    """
+    Milestone 4 Test: Verifies chronological timeline assembly and narrative drift detection.
+    """
+    from core.knowledge_os.evidence_timeline import evidence_timeline_engine
+    from core.knowledge_os.universal_ingestor import universal_ingestor
+
+    now_ms = int(time.time() * 1000)
+    with universal_ingestor._get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO research_claims (
+                claim_id, source_id, wiki_article_id, speaker_claim,
+                claim_type, speaker, timestamp_marker, time_period,
+                confidence_score, verification_status, cross_verification_evidence,
+                empirical_dataset_reference, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                "claim_timeline_cpi_01",
+                "src_timeline_cpi",
+                "wiki_timeline_cpi",
+                "CPI headline inflation print confirms structural disinflation trajectory.",
+                "FACT",
+                "Chief Economist",
+                "",
+                "",
+                0.88,
+                "EMPIRICALLY_SUPPORTED",
+                "Confirmed by Bureau of Labor Statistics",
+                "BLS CPI",
+                now_ms,
+            ),
+        )
+        conn.commit()
+
+    timeline = evidence_timeline_engine.build_timeline(topic="CPI", limit=20)
+    assert timeline is not None
+    assert timeline.total_events >= 1
+    assert timeline.narrative_trend in ("STABLE_CONSENSUS", "SHIFTING_BULLISH", "SHIFTING_BEARISH", "HIGHLY_CONTESTED", "INSUFFICIENT_DATA")
+
+    # Verify Markdown export
+    md = timeline.to_markdown()
+    assert "# Evidence Timeline:" in md
+    assert "Chronological Evolution" in md
+
+
+def test_knowledge_graph_entities_and_relations():
+    """
+    Milestone 5 Test: Verifies entity retrieval, text extraction, and subgraph expansion.
+    """
+    from core.knowledge_os.knowledge_graph import knowledge_graph_engine
+
+    # 1. Canonical entity grounding
+    btc_ent = knowledge_graph_engine.get_entity("Bitcoin")
+    assert btc_ent is not None
+    assert btc_ent.entity_id == "ent_btc"
+    assert "btc" in btc_ent.aliases
+
+    dxy_ent = knowledge_graph_engine.get_entity("dxy")
+    assert dxy_ent is not None
+    assert dxy_ent.entity_id == "ent_dxy"
+
+    # 2. Subgraph expansion
+    subgraph = knowledge_graph_engine.get_subgraph("Bitcoin")
+    assert len(subgraph["nodes"]) >= 2
+    assert len(subgraph["edges"]) >= 1
+
+    # 3. Free-text entity extraction
+    sample_text = "The Federal Reserve decision on interest rates pushed DXY higher while Bitcoin reacted to FVG."
+    extracted = knowledge_graph_engine.extract_entities_from_text(sample_text)
+    extracted_names = [e.name for e in extracted]
+    assert "Federal Reserve" in extracted_names
+    assert "US Dollar Index" in extracted_names
+    assert "Bitcoin" in extracted_names
+    assert "Fair Value Gap" in extracted_names
+
+    # 4. Add dynamic relation
+    rel = knowledge_graph_engine.add_relation(
+        source_name_or_id="Bitcoin",
+        target_name_or_id="Ethereum",
+        relation_type="CORRELATED_WITH",
+        weight=0.91,
+        description="High daily rolling beta correlation",
+    )
+    assert rel is not None
+    assert rel.relation_type == "CORRELATED_WITH"
+
+
+def test_thesis_engine_lifecycle_and_auto_clustering():
+    """
+    Milestone 5 Test: Verifies institutional thesis creation, claim linking,
+    confidence re-weighting, and auto-clustering.
+    """
+    from core.knowledge_os.thesis_engine import thesis_engine
+
+    # 1. Verify pre-seeded canonical theses
+    theses = thesis_engine.list_theses(asset_class="CRYPTO")
+    assert len(theses) >= 1
+    m2_thesis = next(t for t in theses if t["thesis_id"] == "thesis_liquidity_m2")
+    assert m2_thesis["status"] in ("SUPPORTED", "EMERGING")
+
+    # 2. Dynamic creation
+    t_new = thesis_engine.create_thesis(
+        thesis_id="thesis_test_sol_momentum",
+        title="Solana High-Throughput DEX Momentum",
+        description="DEX velocity on Solana drives structural spot demand.",
+        asset_class="CRYPTO",
+    )
+    assert t_new.status == "NEW"
+    assert t_new.confidence_score == 0.50
+
+    # 3. Auto-clustering
+    clusters = thesis_engine.auto_cluster_claim_to_theses(
+        claim_id="src_test_cpi_cool_C-01",
+        claim_text="Global liquidity M2 expansion is accelerating Bitcoin inflows.",
+    )
+    assert "thesis_liquidity_m2" in clusters
+
+    # 4. Dossier retrieval
+    dossier = thesis_engine.get_thesis_dossier("thesis_liquidity_m2")
+    assert dossier is not None
+    assert "thesis" in dossier
+    assert "supporting_claims" in dossier
+
+
+@pytest.mark.asyncio
+async def test_telegram_agent_routing_for_theses_timeline_graph():
+    """
+    Verifies that Telegram Agent correctly identifies and executes intents
+    for Theses, Evidence Timeline, Knowledge Graph, and Claim Verification.
+    """
+    from core.telegram.agent_planner import telegram_agent_planner
+
+    identity = TelegramUserIdentity(
+        user_id=777,
+        chat_id=777,
+        username="quant_lead",
+        role=TelegramRole.SUPER_ADMIN,
+    )
+
+    # 1. Theses Query in Bengali
+    d1 = telegram_agent_planner.resolve_intent("আমাদের কী কী ম্যাক্রো থিসিস আছে?", user_id=777)
+    assert d1.intent == "QUERY_THESES"
+    assert d1.tool_name == "query_theses"
+    resp1 = await telegram_agent_planner.handle_user_message("কী কী থিসিস আছে?", 777, identity)
+    assert "INSTITUTIONAL MACRO & QUANTITATIVE THESES" in resp1
+
+    # 2. Evidence Timeline in Bengali
+    d2 = telegram_agent_planner.resolve_intent("সিপিআই এভিডেন্স টাইমলাইন দেখাও", user_id=777)
+    assert d2.intent == "GET_TIMELINE"
+    assert d2.tool_name == "get_evidence_timeline"
+    resp2 = await telegram_agent_planner.handle_user_message("এভিডেন্স টাইমলাইন দেখাও", 777, identity)
+    assert "EVIDENCE TIMELINE" in resp2
+
+    # 3. Knowledge Graph in Bengali
+    d3 = telegram_agent_planner.resolve_intent("বিটকয়েনের সাথে কিসের সম্পর্ক? নলেজ গ্রাফ দেখাও", user_id=777)
+    assert d3.intent == "QUERY_GRAPH"
+    assert d3.tool_name == "query_knowledge_graph"
+    resp3 = await telegram_agent_planner.handle_user_message("বিটকয়েনের গ্রাফ দেখাও", 777, identity)
+    assert "KNOWLEDGE GRAPH SUBGRAPH" in resp3
+
+    # 4. Claim Verification
+    d4 = telegram_agent_planner.resolve_intent("দাবিগুলো ভেরিফাই করো", user_id=777)
+    assert d4.intent == "VERIFY_CLAIMS"
+    assert d4.tool_name == "verify_claims"
+
 
 

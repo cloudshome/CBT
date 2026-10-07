@@ -201,12 +201,29 @@ class TelegramToolGateway:
         elif tool_name == "get_strategy_candidates":
             return await self._tool_get_strategy_candidates(identity)
 
+        elif tool_name == "query_theses":
+            asset_class = arguments.get("asset_class")
+            status = arguments.get("status")
+            return await self._tool_query_theses(asset_class, status, identity)
+
+        elif tool_name == "get_evidence_timeline":
+            topic = arguments.get("topic") or arguments.get("entity") or ""
+            return await self._tool_get_evidence_timeline(topic, identity)
+
+        elif tool_name == "query_knowledge_graph":
+            entity = arguments.get("entity", "Bitcoin")
+            return await self._tool_query_knowledge_graph(entity, identity)
+
         # ---------------------------------------------------------------------
         # CLASS B: RESEARCH & ANALYSIS
         # -------------------------------------------------------------------------
         elif tool_name == "ingest_research_url":
             url = arguments.get("url", "")
             return await self._tool_ingest_research_url(url, identity)
+
+        elif tool_name == "verify_claims":
+            claim_id = arguments.get("claim_id")
+            return await self._tool_verify_claims(claim_id, identity)
 
         elif tool_name == "run_candidate_backtest":
             candidate_id = arguments.get("candidate_id", "")
@@ -426,6 +443,114 @@ class TelegramToolGateway:
             output_text=text,
         )
 
+    async def _tool_query_theses(
+        self,
+        asset_class: str | None,
+        status: str | None,
+        identity: TelegramUserIdentity,
+    ) -> ToolResult:
+        from core.knowledge_os.thesis_engine import thesis_engine
+
+        theses = thesis_engine.list_theses(asset_class=asset_class, status=status)
+        if not theses:
+            text = "ℹ️ No research theses found matching criteria."
+        else:
+            lines = [
+                "🏛️ **INSTITUTIONAL MACRO & QUANTITATIVE THESES**",
+                "━━━━━━━━━━━━━━━━━━━━━━",
+            ]
+            for t in theses:
+                lines.append(
+                    f"• **{t['title']}**\n"
+                    f"  Status: `[{t['status']}]` | Class: `{t['asset_class']}`\n"
+                    f"  Confidence: `{t['confidence_score']:.2f}` | Supporting: `{t['supporting_claims_count']}` | Contradicting: `{t['contradicting_claims_count']}`\n"
+                    f"  _{t['description'][:110]}..._\n"
+                )
+            lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+            lines.append("🔒 _Evolving institutional theses grounded in empirical claims._")
+            text = "\n".join(lines)
+
+        return ToolResult(
+            success=True,
+            tool_name="query_theses",
+            tool_class=ToolClass.CLASS_A_READONLY,
+            output_text=text,
+            data={"theses": theses},
+        )
+
+    async def _tool_get_evidence_timeline(
+        self,
+        topic: str,
+        identity: TelegramUserIdentity,
+    ) -> ToolResult:
+        from core.knowledge_os.evidence_timeline import evidence_timeline_engine
+
+        timeline = evidence_timeline_engine.build_timeline(topic=topic or None, limit=10)
+        lines = [
+            f"⏱️ **EVIDENCE TIMELINE: {timeline.topic_or_entity.upper()}**",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            f"• **Narrative Trend:** `{timeline.narrative_trend}`",
+            f"• **Net Confidence:** `{timeline.net_confidence_score:.2f}`",
+            f"• **Supporting Records:** `{timeline.supporting_evidence_count}` | **Contradictions:** `{timeline.contradiction_count}`",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            "📅 **Recent Chronological Events:**",
+        ]
+        for e in timeline.events[-6:]:
+            lines.append(
+                f"• `[{e.date_formatted}]` **{e.event_type}** ({e.entity_or_topic}):\n"
+                f"  {e.headline[:110]}... (Conf: {e.confidence_score:.2f})"
+            )
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("🔬 _Zero-leakage chronological empirical provenance._")
+        text = "\n".join(lines)
+
+        return ToolResult(
+            success=True,
+            tool_name="get_evidence_timeline",
+            tool_class=ToolClass.CLASS_A_READONLY,
+            output_text=text,
+            data=timeline.to_dict(),
+        )
+
+    async def _tool_query_knowledge_graph(
+        self,
+        entity: str,
+        identity: TelegramUserIdentity,
+    ) -> ToolResult:
+        from core.knowledge_os.knowledge_graph import knowledge_graph_engine
+
+        subgraph = knowledge_graph_engine.get_subgraph(entity)
+        nodes = subgraph.get("nodes", [])
+        edges = subgraph.get("edges", [])
+
+        if not nodes:
+            text = f"ℹ️ Entity `{entity}` not found in CBT Knowledge Graph."
+        else:
+            lines = [
+                f"🕸️ **KNOWLEDGE GRAPH SUBGRAPH: {entity.upper()}**",
+                "━━━━━━━━━━━━━━━━━━━━━━",
+                f"• **Mapped Nodes:** `{len(nodes)}` | **Active Relations:** `{len(edges)}`",
+                "━━━━━━━━━━━━━━━━━━━━━━",
+                "🔗 **Key Relationships:**",
+            ]
+            for edge in edges[:8]:
+                lines.append(
+                    f"• `{edge['source']}` ➔ **{edge['type']}** ➔ `{edge['target']}` "
+                    f"(weight: `{edge['weight']:.2f}`)\n"
+                    f"  _{edge.get('description', '')[:90]}_"
+                )
+            lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+            lines.append("💡 _Relational causal network across assets, macro indicators, and SMC concepts._")
+            text = "\n".join(lines)
+
+        return ToolResult(
+            success=True,
+            tool_name="query_knowledge_graph",
+            tool_class=ToolClass.CLASS_A_READONLY,
+            output_text=text,
+            data=subgraph,
+        )
+
     # -------------------------------------------------------------------------
     # IMPLEMENTATIONS: CLASS B (RESEARCH & ANALYSIS)
     # -------------------------------------------------------------------------
@@ -470,6 +595,60 @@ class TelegramToolGateway:
             tool_name="run_candidate_backtest",
             tool_class=ToolClass.CLASS_B_ANALYSIS,
             output_text=out,
+        )
+
+    async def _tool_verify_claims(self, claim_id: str | None, identity: TelegramUserIdentity) -> ToolResult:
+        from core.knowledge_os.claim_verifier import claim_verifier
+
+        if claim_id:
+            res = claim_verifier.verify_claim(claim_id)
+            if not res:
+                text = f"⚠️ Claim `{claim_id}` not found for verification."
+            else:
+                lines = [
+                    f"🔍 **EPISTEMIC CLAIM VERIFICATION: `{claim_id}`**",
+                    "━━━━━━━━━━━━━━━━━━━━━━",
+                    f"• **Claim:** _{res.original_claim_text}_\n",
+                    f"• **Status:** `{res.previous_status}` ➔ **`{res.new_status}`**",
+                    f"• **Confidence:** `{res.confidence_score:.2f}`",
+                    f"• **Rationale:** {res.verification_rationale}",
+                ]
+                if res.corroborating_evidence:
+                    lines.append("\n✅ **Corroborating Evidence:**")
+                    for c in res.corroborating_evidence:
+                        lines.append(f"• `{c.evidence_type}` ({c.source_reference}): {c.citation_text}")
+                if res.contradictions_detected:
+                    lines.append("\n❌ **Contradictions Flagged:**")
+                    for c in res.contradictions_detected:
+                        lines.append(f"• `{c.evidence_type}` ({c.source_reference}): {c.citation_text}")
+                lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+                text = "\n".join(lines)
+            return ToolResult(
+                success=True,
+                tool_name="verify_claims",
+                tool_class=ToolClass.CLASS_B_ANALYSIS,
+                output_text=text,
+                data=res.to_dict() if res else None,
+            )
+
+        results = claim_verifier.verify_all_unverified_claims(limit=10)
+        lines = [
+            "🔍 **BATCH EPISTEMIC CLAIM VERIFICATION**",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            f"• Verified `{len(results)}` pending research claims.",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+        ]
+        for r in results[:5]:
+            lines.append(f"• `{r.claim_id}`: **[{r.new_status}]** (Conf: {r.confidence_score:.2f}) — {r.original_claim_text[:80]}...")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        text = "\n".join(lines)
+
+        return ToolResult(
+            success=True,
+            tool_name="verify_claims",
+            tool_class=ToolClass.CLASS_B_ANALYSIS,
+            output_text=text,
+            data={"verified_count": len(results)},
         )
 
     # -------------------------------------------------------------------------
