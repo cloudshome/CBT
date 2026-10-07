@@ -502,6 +502,7 @@ async def ingest_wiki_article(payload: WikiIngestRequest) -> dict[str, Any]:
             "status": result.status,
             "source": result.source.to_dict(),
             "article": result.wiki_article.to_dict() if result.wiki_article else None,
+            "real_life_summary": result.real_life_summary.to_dict() if result.real_life_summary else None,
             "message": result.message,
         }
 

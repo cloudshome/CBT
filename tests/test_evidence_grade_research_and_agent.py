@@ -109,7 +109,7 @@ def test_source_idempotency_and_no_duplication():
 
 @pytest.mark.asyncio
 async def test_telegram_wiki_handler_link_guarantee():
-    """Verifies Telegram /wiki <url> returns the Source ID badge and Wiki summary."""
+    """Verifies Telegram /wiki <url> returns the Source ID badge, Wiki summary, and RealLifeSummary."""
     test_identity = TelegramUserIdentity(user_id=123456, chat_id=999, username="quant_architect", role=TelegramRole.SUPER_ADMIN)
     test_url = "https://www.facebook.com/share/v/1EkkpUZaDe/"
 
@@ -118,3 +118,94 @@ async def test_telegram_wiki_handler_link_guarantee():
         assert "Source:" in reply
         assert "src_" in reply
         assert ("PARTIAL" in reply or "SUCCESS" in reply or "ACCESS BLOCKED" in reply)
+        assert "বাস্তব জীবনের সারসংক্ষেপ" in reply
+        assert "সহজ বাংলায় মূল কথা" in reply
+
+
+def test_real_life_summary_present_on_every_input():
+    """
+    Constitutional Requirement: Every accepted research input MUST generate
+    and persist an actionable Real-Life Summary in Bengali with all 5 points.
+    """
+    # 1. Test Web URL
+    web_url = "https://arxiv.org/abs/1706.03762"
+    web_res = universal_ingestor.ingest_url(web_url, options={"title": "Attention Is All You Need"})
+    assert web_res.real_life_summary is not None
+    rl = web_res.real_life_summary
+    assert len(rl.core_concept_bn) > 10
+    assert len(rl.practical_market_impact) > 10
+    assert len(rl.actionable_guidance) > 10
+    assert len(rl.hype_vs_reality) > 10
+    assert len(rl.risk_warning) > 10
+
+    # Verify embedded in Wiki markdown
+    assert "বাস্তব জীবনের বাস্তবসম্মত সারসংক্ষেপ" in web_res.wiki_article.full_markdown_content
+
+    # Verify persisted in research_artifacts table
+    with universal_ingestor._get_connection() as conn:
+        rl_art = conn.execute(
+            "SELECT * FROM research_artifacts WHERE source_id = ? AND artifact_type = 'REAL_LIFE_SUMMARY';",
+            (web_res.source.source_id,),
+        ).fetchone()
+        assert rl_art is not None
+        assert "সহজ বাংলায় মূল কথা" in rl_art["content_text"]
+
+    # 2. Test Social Video URL (Facebook)
+    fb_url = "https://www.facebook.com/share/v/1EkkpUZaDe/"
+    fb_res = universal_ingestor.ingest_url(fb_url)
+    assert fb_res.real_life_summary is not None
+    assert len(fb_res.real_life_summary.core_concept_bn) > 10
+    assert len(fb_res.real_life_summary.practical_market_impact) > 10
+    assert len(fb_res.real_life_summary.actionable_guidance) > 10
+    assert len(fb_res.real_life_summary.hype_vs_reality) > 10
+    assert len(fb_res.real_life_summary.risk_warning) > 10
+    assert "বাস্তব জীবনের বাস্তবসম্মত সারসংক্ষেপ" in fb_res.wiki_article.full_markdown_content
+
+
+def test_phase3_audio_extraction_and_transcription_pipeline(tmp_path):
+    """
+    Verifies Phase 3 audio extraction and Gemini transcription integration.
+    When yt-dlp yields audio and Gemini transcribes, status transitions to SUCCESS.
+    """
+    from pathlib import Path
+    from core.knowledge_os.transcription import TranscriptResult
+
+    fake_audio_file = tmp_path / "test_audio.m4a"
+    fake_audio_file.write_bytes(b"FAKE_AUDIO_DATA_BYTES_FOR_TESTING_123456789")
+
+    mock_meta = {
+        "title": "Crypto Macro Market Liquidity Analysis",
+        "uploader": "Macro Trader",
+        "duration": 180,
+    }
+
+    mock_transcript = TranscriptResult(
+        success=True,
+        text="Bitcoin order book shows massive bid liquidity at 65000. Federal Reserve interest rate cut expected.",
+        language="en",
+        provider="GEMINI_CLOUD",
+    )
+
+    with patch("core.knowledge_os.transcription.social_video_extractor.extract_audio", return_value=(True, fake_audio_file, mock_meta)):
+        with patch("core.knowledge_os.transcription.gemini_audio_provider.transcribe_audio", return_value=mock_transcript):
+            test_url = "https://www.facebook.com/watch/?v=9876543210"
+            res = universal_ingestor.ingest_url(test_url)
+
+            assert res.source.access_status == AccessStatus.SUCCESS.value
+            assert res.source.extraction_status == ExtractionStatus.EXTRACTED.value
+            assert len(res.claims) >= 1
+            assert res.real_life_summary is not None
+            assert len(res.real_life_summary.core_concept_bn) > 5
+
+            # Verify both AUDIO and TRANSCRIPT artifacts exist
+            with universal_ingestor._get_connection() as conn:
+                types = [
+                    r[0] for r in conn.execute(
+                        "SELECT artifact_type FROM research_artifacts WHERE source_id = ?;",
+                        (res.source.source_id,),
+                    ).fetchall()
+                ]
+                assert "AUDIO" in types
+                assert "TRANSCRIPT" in types
+                assert "REAL_LIFE_SUMMARY" in types
+

@@ -443,6 +443,15 @@ async def handle_wiki(
                 f"• Type: `{result.source.source_type}` | Status: `{result.status}`\n"
                 f"{telegram_bot._format_wikipedia_telegram_card(result.wiki_article)}"
             )
+            if result.real_life_summary:
+                msg += (
+                    f"\n\n🎯 **বাস্তব জীবনের সারসংক্ষেপ (Real-Life Takeaway):**\n"
+                    f"• **সহজ বাংলায় মূল কথা:** {result.real_life_summary.core_concept_bn}\n"
+                    f"• **মার্কেট প্রভাব:** {result.real_life_summary.practical_market_impact}\n"
+                    f"• **ট্রেডারের করণীয়:** {result.real_life_summary.actionable_guidance}\n"
+                    f"• **হাইপ বনাম বাস্তবতা:** {result.real_life_summary.hype_vs_reality}\n"
+                    f"• **ঝুঁকি ও সতর্কতা:** {result.real_life_summary.risk_warning}"
+                )
         else:
             msg = (
                 f"⚠️ **Source Registered Under Link Guarantee**\n"
