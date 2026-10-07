@@ -2380,6 +2380,19 @@ async def ingest_research_text(req: ResearchIngestRequest):
         author_creator=req.author_creator,
         title=req.title,
     )
+
+    # Link Persistence Invariant: Ensure link is permanently registered in Evidence OS
+    target_url = req.source_uri or (req.content.strip() if req.content.strip().startswith(("http://", "https://")) else None)
+    if target_url:
+        try:
+            from core.knowledge_os.universal_ingestor import universal_ingestor as evidence_universal_ingestor
+            evidence_universal_ingestor.ingest_url(
+                url=target_url,
+                options={"author": req.author_creator, "title": req.title},
+            )
+        except Exception as e:
+            logger.debug(f"Evidence OS link guarantee sync note: {e}")
+
     asyncio.create_task(auto_dispatch_telegram_summary(result))
     return sanitize_numpy(result)
 

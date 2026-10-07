@@ -2961,8 +2961,32 @@ export interface WikiArticlesResponse {
   count: number;
 }
 
+export interface RealLifeSummaryData {
+  core_concept_bn: string;
+  practical_market_impact: string;
+  actionable_guidance: string;
+  risk_warning: string;
+  real_world_analogy: string;
+  language?: string;
+  confidence?: number;
+}
+
+export interface ResearchSourceData {
+  source_id: string;
+  original_url: string;
+  canonical_url: string;
+  source_domain: string;
+  source_type: string;
+  access_status: string;
+  extraction_status: string;
+  failure_reason?: string;
+  real_life_summary?: RealLifeSummaryData;
+  created_at: number;
+}
+
 export interface WikiArticleDetailResponse {
   article: WikiArticleDetail;
+  source?: ResearchSourceData;
 }
 
 export interface WikiIngestRequestPayload {

@@ -473,11 +473,32 @@ async def list_wiki_articles(
 async def get_wiki_article(article_id: str) -> dict[str, Any]:
     """Retrieves full Wikipedia research article details and markdown content."""
     from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+    from core.knowledge_os.universal_ingestor import universal_ingestor
 
     article = research_wikipedia_engine.get_article(article_id)
     if not article:
         raise HTTPException(status_code=404, detail=f"Wiki article '{article_id}' not found.")
-    return {"article": article.to_dict()}
+
+    res_dict = {"article": article.to_dict()}
+
+    try:
+        with universal_ingestor._get_connection() as conn:
+            s_row = conn.execute(
+                "SELECT * FROM research_sources WHERE canonical_url = ? OR original_url = ? OR source_id = ? LIMIT 1;",
+                (article.source_url, article.source_url, article.provenance_id),
+            ).fetchone()
+            if s_row:
+                s_dict = dict(s_row)
+                if s_dict.get("real_life_summary"):
+                    try:
+                        s_dict["real_life_summary"] = json.loads(s_dict["real_life_summary"])
+                    except Exception:
+                        pass
+                res_dict["source"] = s_dict
+    except Exception as e:
+        logger.debug(f"Source lookup skipped: {e}")
+
+    return res_dict
 
 
 @router.post("/wiki/ingest")

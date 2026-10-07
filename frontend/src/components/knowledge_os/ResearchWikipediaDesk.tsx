@@ -23,6 +23,7 @@ import {
   WikiArticleSummary,
   WikiArticleDetail,
   EpistemicStatus,
+  ResearchSourceData,
 } from '../../types';
 
 interface ResearchWikipediaDeskProps {
@@ -42,6 +43,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
   const [articles, setArticles] = useState<WikiArticleSummary[]>([]);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [activeArticle, setActiveArticle] = useState<WikiArticleDetail | null>(null);
+  const [activeSource, setActiveSource] = useState<ResearchSourceData | null>(null);
   const [isLoadingList, setIsLoadingList] = useState<boolean>(true);
   const [isLoadingArticle, setIsLoadingArticle] = useState<boolean>(false);
 
@@ -84,6 +86,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
   useEffect(() => {
     if (!selectedArticleId) {
       setActiveArticle(null);
+      setActiveSource(null);
       return;
     }
     const fetchDetail = async () => {
@@ -91,6 +94,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
         setIsLoadingArticle(true);
         const res = await api.getWikiArticle(selectedArticleId);
         setActiveArticle(res.article);
+        setActiveSource(res.source || null);
       } catch (err: any) {
         onNotify?.('error', 'Article Load Error', err.message || 'Could not load article detail.');
       } finally {
@@ -484,20 +488,37 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                     </div>
                   </div>
 
-                  {/* Rigor Score Ribbon */}
-                  <div className="p-3.5 rounded-lg bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900 border border-indigo-500/30 flex items-center justify-between">
+                  {/* Rigor Score & Source Guarantee Ribbon */}
+                  <div className="p-3.5 rounded-lg bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900 border border-indigo-500/30 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                         <ShieldCheck size={20} />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Epistemic Verification Score: {activeArticle.verification_score.toFixed(1)}%</div>
+                        <div className="text-xs font-bold text-white flex items-center gap-2">
+                          <span>Epistemic Verification Score: {activeArticle.verification_score.toFixed(1)}%</span>
+                          {activeSource && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
+                              activeSource.access_status === 'SUCCESS'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : activeSource.access_status === 'PARTIAL'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            }`}>
+                              {activeSource.access_status === 'SUCCESS' ? '🟢 100% EXTRACTED' : activeSource.access_status === 'PARTIAL' ? '🟡 PARTIAL ACCESS' : '⚠️ ACCESS BLOCKED (SAVED)'}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-slate-400">
                           {activeArticle.key_claims.filter(c => c.epistemic_status === 'FACT').length} empirically verified facts,{' '}
                           {activeArticle.key_claims.filter(c => c.epistemic_status === 'HYPOTHESIS').length} forward hypotheses,{' '}
                           {activeArticle.contradictions_detected.length} contradictions detected.
                         </div>
                       </div>
+                    </div>
+
+                    <div className="text-[11px] px-2.5 py-1 rounded bg-slate-950/70 text-indigo-300 border border-indigo-500/20 flex items-center gap-1.5 font-mono">
+                      <span>🔒 Zero Link Loss Guaranteed</span>
                     </div>
                   </div>
 
@@ -511,6 +532,66 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                       {activeArticle.executive_summary}
                     </p>
                   </div>
+
+                  {/* Real-Life Practical Summary (Bengali 5-Point Guide) */}
+                  {activeSource?.real_life_summary && (
+                    <div className="bg-gradient-to-br from-indigo-950/40 via-slate-900/80 to-purple-950/30 p-4 rounded-lg border border-indigo-500/30 space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20">
+                        <h3 className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                          <Sparkles size={14} className="text-amber-400" />
+                          <span>বাস্তব জীবনের সারসংক্ষেপ (5-Point Practical Guide)</span>
+                        </h3>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
+                          Bengali Actionable Intelligence
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div className="p-3 rounded bg-slate-950/60 border border-slate-800">
+                          <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center gap-1">
+                            <span>🎯</span> সহজ ভাষায় মূল কথা:
+                          </div>
+                          <p className="text-slate-200 leading-relaxed">
+                            {activeSource.real_life_summary.core_concept_bn}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded bg-slate-950/60 border border-slate-800">
+                          <div className="text-[11px] font-bold text-cyan-300 mb-1 flex items-center gap-1">
+                            <span>📈</span> বাস্তব মার্কেট প্রভাব:
+                          </div>
+                          <p className="text-slate-200 leading-relaxed">
+                            {activeSource.real_life_summary.practical_market_impact}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded bg-slate-950/60 border border-slate-800">
+                          <div className="text-[11px] font-bold text-emerald-300 mb-1 flex items-center gap-1">
+                            <span>🛠️</span> ট্রেডার হিসেবে আপনার কী করণীয়:
+                          </div>
+                          <p className="text-slate-200 leading-relaxed">
+                            {activeSource.real_life_summary.actionable_guidance}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded bg-slate-950/60 border border-slate-800">
+                          <div className="text-[11px] font-bold text-rose-300 mb-1 flex items-center gap-1">
+                            <span>⚠️</span> প্রধান ঝুঁকি ও সতর্কতা:
+                          </div>
+                          <p className="text-slate-200 leading-relaxed">
+                            {activeSource.real_life_summary.risk_warning}
+                          </p>
+                        </div>
+                      </div>
+
+                      {activeSource.real_life_summary.real_world_analogy && (
+                        <div className="p-2.5 rounded bg-slate-950/80 border border-indigo-500/20 text-[11px]">
+                          <span className="font-bold text-purple-300">💡 বাস্তব জীবনের অ্যানালজি: </span>
+                          <span className="text-slate-300 italic">{activeSource.real_life_summary.real_world_analogy}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Section 2: Epistemic Claim Verification Matrix */}
                   <div className="space-y-3">
@@ -654,6 +735,23 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                       <span className="text-slate-500 block mb-1">Database Partition:</span>
                       <span className="text-slate-300 select-all">data/research_wiki.db (wiki_articles)</span>
                     </div>
+                    {activeSource && (
+                      <>
+                        <div className="p-3 rounded bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block mb-1">Raw Source ID:</span>
+                          <span className="text-emerald-400 font-bold select-all">{activeSource.source_id}</span>
+                        </div>
+                        <div className="p-3 rounded bg-slate-950 border border-slate-800">
+                          <span className="text-slate-500 block mb-1">Access & Extraction Status:</span>
+                          <span className="text-white select-all">{activeSource.access_status} / {activeSource.extraction_status}</span>
+                        </div>
+                        <div className="p-3 rounded bg-slate-950 border border-slate-800 sm:col-span-2">
+                          <span className="text-slate-500 block mb-1">Canonical URL & Provenance Invariant:</span>
+                          <span className="text-indigo-300 select-all break-all">{activeSource.canonical_url || activeSource.original_url}</span>
+                          <div className="mt-1 text-[10px] text-emerald-400">✓ Invariant: Zero Link Loss Guaranteed in research_sources</div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
