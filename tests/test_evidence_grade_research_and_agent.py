@@ -209,3 +209,134 @@ def test_phase3_audio_extraction_and_transcription_pipeline(tmp_path):
                 assert "TRANSCRIPT" in types
                 assert "REAL_LIFE_SUMMARY" in types
 
+
+@pytest.mark.asyncio
+async def test_tool_gateway_class_d_permanently_blocked():
+    """
+    Constitutional Invariant: Class D (Live Capital / Real Execution)
+    MUST be permanently blocked with zero bypass.
+    """
+    from core.telegram.tool_gateway import ToolClass, telegram_tool_gateway
+
+    identity = TelegramUserIdentity(
+        user_id=123,
+        chat_id=456,
+        username="admin",
+        role=TelegramRole.SUPER_ADMIN,
+    )
+    res = await telegram_tool_gateway.execute_tool(
+        tool_name="execute_live_order",
+        arguments={"symbol": "BTC/USDT", "size": 1.0},
+        identity=identity,
+    )
+    assert res.success is False
+    assert res.tool_class == ToolClass.CLASS_D_LIVE_BLOCKED
+    assert "CONSTITUTIONAL VIOLATION" in res.output_text
+    assert "REAL_CAPITAL_ENABLED = False" in res.output_text
+
+
+@pytest.mark.asyncio
+async def test_tool_gateway_two_phase_confirmation_lifecycle():
+    """
+    Verifies Class C simulation action lifecycle:
+    1. Plan trade -> Generates pending confirmation token.
+    2. Confirm action -> Commits paper position atomically into portfolio.
+    """
+    from core.telegram.tool_gateway import ToolClass, telegram_tool_gateway
+    from core.portfolio_shadow import portfolio_shadow
+
+    identity = TelegramUserIdentity(
+        user_id=789,
+        chat_id=101,
+        username="trader",
+        role=TelegramRole.TRADER,
+    )
+
+    # Phase 1: Plan
+    plan_res = await telegram_tool_gateway.execute_tool(
+        tool_name="plan_trade_signal",
+        arguments={"symbol": "BTC/USDT"},
+        identity=identity,
+    )
+    assert plan_res.success is True
+    assert plan_res.requires_confirmation is True
+    assert plan_res.confirmation_token.startswith("CONF_")
+    assert "PROPOSED PAPER TRADE PLAN" in plan_res.output_text
+
+    # Phase 2: Confirm
+    confirm_res = await telegram_tool_gateway.execute_tool(
+        tool_name="confirm_action",
+        arguments={"token": plan_res.confirmation_token},
+        identity=identity,
+    )
+    assert confirm_res.success is True
+    assert "PAPER POSITION OPENED" in confirm_res.output_text
+    assert "Position ID" in confirm_res.output_text
+
+
+@pytest.mark.asyncio
+async def test_agent_planner_intent_resolution_and_bengali_routing():
+    """
+    Verifies natural language intent resolution in Bengali, English, and Banglish.
+    """
+    from core.telegram.agent_planner import telegram_agent_planner
+
+    # 1. Ask positions in Bengali
+    d1 = telegram_agent_planner.resolve_intent("আমার খোলা পজিশন কি আছে?", user_id=999)
+    assert d1.intent == "GET_POSITIONS"
+    assert d1.tool_name == "get_open_positions"
+
+    # 2. Ask signal in Bengali
+    d2 = telegram_agent_planner.resolve_intent("বিটিসির জন্য সিগন্যাল দাও", user_id=999)
+    assert d2.intent == "PLAN_SIGNAL"
+    assert d2.tool_name == "plan_trade_signal"
+
+    # 3. What AI learned today in Bengali
+    d3 = telegram_agent_planner.resolve_intent("আজকে কি শিখলে?", user_id=999)
+    assert d3.intent == "GET_LEARNED"
+    assert d3.tool_name == "get_ai_learned_today"
+
+    # 4. Ingest Link
+    d4 = telegram_agent_planner.resolve_intent("এই লিংকটা রিসার্চ ল্যাবে রাখো https://arxiv.org/abs/1706.03762", user_id=999)
+    assert d4.intent == "INGEST_URL"
+    assert d4.tool_name == "ingest_research_url"
+
+    # 5. Project status in English
+    d5 = telegram_agent_planner.resolve_intent("what is terminal status?", user_id=999)
+    assert d5.intent == "GET_STATUS"
+    assert d5.tool_name == "get_project_status"
+
+
+@pytest.mark.asyncio
+async def test_agent_planner_end_to_end_user_message():
+    """
+    Verifies that calling handle_user_message on conversational inputs
+    dispatches tools cleanly and returns rich, grounded replies.
+    """
+    from core.telegram.agent_planner import telegram_agent_planner
+
+    identity = TelegramUserIdentity(
+        user_id=888,
+        chat_id=888,
+        username="quant_analyst",
+        role=TelegramRole.SUPER_ADMIN,
+    )
+
+    # Position query
+    pos_reply = await telegram_agent_planner.handle_user_message(
+        message="আমার পজিশন কি আছে?",
+        chat_id=888,
+        identity=identity,
+    )
+    assert "PAPER DESK" in pos_reply or "ACTIVE PAPER" in pos_reply
+
+    # Terminal status query
+    status_reply = await telegram_agent_planner.handle_user_message(
+        message="টার্মিনাল অবস্থা কি?",
+        chat_id=888,
+        identity=identity,
+    )
+    assert "CBT / SKY QUANTITATIVE DESK STATUS" in status_reply
+    assert "Virtual Equity" in status_reply
+
+

@@ -1085,6 +1085,34 @@ async def handle_schedule(
     return schedule_text
 
 
+async def handle_confirm(
+    args: str, chat_id: Any = None, identity: TelegramUserIdentity | None = None
+) -> str:
+    """
+    Executes a pending Two-Phase Confirmation paper action (Class C).
+    Usage: /confirm [token]
+    """
+    from core.telegram.tool_gateway import telegram_tool_gateway
+    from core.telegram_bot import telegram_bot
+
+    user_ident = identity or TelegramUserIdentity(
+        user_id=chat_id or "default_user",
+        chat_id=chat_id or "default_chat",
+        username="Telegram User",
+        role=TelegramRole.TRADER,
+    )
+
+    token = args.strip()
+    res = await telegram_tool_gateway.execute_tool(
+        tool_name="confirm_action",
+        arguments={"token": token},
+        identity=user_ident,
+    )
+    if chat_id:
+        await telegram_bot.send_message(res.output_text, chat_id=chat_id)
+    return res.output_text
+
+
 # ==============================================================================
 # CENTRAL V5 COMMAND REGISTRATION
 # ==============================================================================
@@ -1324,6 +1352,15 @@ def register_all_v5_commands() -> None:
             aliases=["/canary", "/microtrade"],
             argument_schema="<exchange> <symbol> <notional> [--live]",
             risk_level="HIGH",
+        ),
+        TelegramCommand(
+            name="/confirm",
+            description="Execute pending Two-Phase Confirmation paper action",
+            handler=handle_confirm,
+            required_role=TelegramRole.TRADER,
+            aliases=["/yes", "/approve"],
+            argument_schema="[token]",
+            risk_level="MEDIUM",
         ),
     ]
 
