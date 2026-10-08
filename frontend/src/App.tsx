@@ -231,6 +231,7 @@ export const App: React.FC = () => {
             lowPrice: Math.min(...recentCandles.map((c) => c[3])),
           }));
         }
+        setLoadingMarket(false);
         return;
       } catch (err: unknown) {
         attempts++;
@@ -312,7 +313,7 @@ export const App: React.FC = () => {
   // 4. Handle Desk Copilot Question
   const handleAskDesk = async (question: string) => {
     const res = await api.askDesk(question, { symbol, timeframe });
-    return res.answer;
+    return res.answer || (res as any)?.reply || 'No response received from desk.';
   };
 
   // 5. Handle Paper Trade Execution

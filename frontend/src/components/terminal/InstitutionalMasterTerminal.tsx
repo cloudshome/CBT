@@ -66,6 +66,7 @@ export const InstitutionalMasterTerminal: React.FC<InstitutionalMasterTerminalPr
         if (candleRes?.candles) {
           setCandles(candleRes.candles);
         }
+        setLoading(false);
         return;
       } catch (err: unknown) {
         attempts++;

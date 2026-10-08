@@ -70,8 +70,29 @@ async def get_kronos_forecast(
         )
         res = domain_fc.to_dict()
         # Backwards compatibility fields for legacy UI and tests
+        tf_seconds = {
+            "1m": 60,
+            "3m": 180,
+            "5m": 300,
+            "15m": 900,
+            "30m": 1800,
+            "1h": 3600,
+            "4h": 14400,
+            "1d": 86400,
+        }.get(timeframe, 900)
+        last_candle_ts = candles[-1][0] if candles else int(time.time() * 1000)
+        p50 = domain_fc.quantile_bands.get("p50", [])
+        horizon_count = len(p50) if p50 else horizon
+        pred_timestamps = [
+            last_candle_ts + (i + 1) * tf_seconds * 1000 for i in range(horizon_count)
+        ]
+        res["predicted_timestamps"] = pred_timestamps
         res["paths"] = [
-            {"sample_id": i, "predicted_closes": domain_fc.quantile_bands["p50"]}
+            {
+                "sample_id": i,
+                "predicted_closes": p50,
+                "predicted_timestamps": pred_timestamps,
+            }
             for i in range(samples)
         ]
         res["sky_derived_metrics"] = {

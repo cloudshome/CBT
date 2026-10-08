@@ -380,10 +380,18 @@ export const api = {
    * POST /api/desk/ask
    */
   async askDesk(query: string, context?: Record<string, unknown>): Promise<DeskAskResponse> {
+    const sym = (context?.symbol as string) || undefined;
+    const tf = (context?.timeframe as string) || undefined;
     const res = await authFetch(`${BASE_URL}/api/desk/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, context }),
+      body: JSON.stringify({
+        message: query,
+        query,
+        symbol: sym,
+        timeframe: tf,
+        context,
+      }),
     });
     return handleResponse<DeskAskResponse>(res);
   },

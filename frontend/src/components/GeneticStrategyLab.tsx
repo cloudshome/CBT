@@ -205,7 +205,7 @@ export const GeneticStrategyLab: React.FC<GeneticStrategyLabProps> = ({
                           <div
                             className="w-full bg-purple-500 hover:bg-purple-400 rounded-t transition-all"
                             style={{ height: `${heightPercent}%` }}
-                            title={`Gen ${idx + 1}: ${fit.toFixed(3)}`}
+                            title={`Gen ${idx + 1}: ${fit != null ? fit.toFixed(3) : '--'}`}
                           />
                           <span className="text-[8px] text-slate-500">G{idx + 1}</span>
                         </div>
@@ -257,28 +257,28 @@ export const GeneticStrategyLab: React.FC<GeneticStrategyLabProps> = ({
                   <div className="p-1.5 bg-slate-900/50 rounded border border-slate-800">
                     <span className="text-slate-400">ATR Stop Multiplier:</span>
                     <div className="font-bold text-slate-200">
-                      {result.best_genome.atr_multiplier_stop.toFixed(2)}x
+                      {result.best_genome.atr_multiplier_stop != null ? `${result.best_genome.atr_multiplier_stop.toFixed(2)}x` : '--'}
                     </div>
                   </div>
 
                   <div className="p-1.5 bg-slate-900/50 rounded border border-slate-800">
                     <span className="text-slate-400">Target Risk:Reward:</span>
                     <div className="font-bold text-emerald-400">
-                      1:{result.best_genome.target_rr_ratio.toFixed(2)}
+                      {result.best_genome.target_rr_ratio != null ? `1:${result.best_genome.target_rr_ratio.toFixed(2)}` : '--'}
                     </div>
                   </div>
 
                   <div className="p-1.5 bg-slate-900/50 rounded border border-slate-800">
                     <span className="text-slate-400">Half-Kelly Fraction:</span>
                     <div className="font-bold text-amber-400">
-                      {(result.best_genome.half_kelly_fraction * 100).toFixed(1)}%
+                      {result.best_genome.half_kelly_fraction != null ? `${(result.best_genome.half_kelly_fraction * 100).toFixed(1)}%` : '--'}
                     </div>
                   </div>
 
                   <div className="p-1.5 bg-slate-900/50 rounded border border-slate-800">
                     <span className="text-slate-400">Bull/Bear Bias:</span>
                     <div className="font-bold text-slate-200">
-                      {result.best_genome.bull_regime_weight.toFixed(1)} / {result.best_genome.bear_regime_weight.toFixed(1)}
+                      {result.best_genome.bull_regime_weight != null ? result.best_genome.bull_regime_weight.toFixed(1) : '--'} / {result.best_genome.bear_regime_weight != null ? result.best_genome.bear_regime_weight.toFixed(1) : '--'}
                     </div>
                   </div>
                 </div>

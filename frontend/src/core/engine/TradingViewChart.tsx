@@ -36,6 +36,7 @@ import {
   LineChart as LineChartIcon,
   LucideIcon,
   Clock,
+  RotateCcw,
 } from 'lucide-react';
 import { OHLCVCandle, FVGItem, OrderBlockItem, SKYSetupData, SupportedTimeframe } from '../../types';
 import { DrawingObject, WorkspacePersistence } from '../persistence/workspaceDB';
@@ -326,13 +327,15 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       visible: false,
     });
 
-    // Volume Histogram Series
+    // Volume Histogram Series (Isolated on dedicated overlay scale)
     const volumeSeries = chart.addSeries(HistogramSeries, {
       color: 'rgba(56, 189, 248, 0.35)',
       priceFormat: { type: 'volume' },
-      priceScaleId: '',
+      priceScaleId: 'volume',
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
-    volumeSeries.priceScale().applyOptions({
+    chart.priceScale('volume').applyOptions({
       scaleMargins: {
         top: 0.82,
         bottom: 0,
@@ -532,6 +535,15 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     }
   }, []);
 
+  // Handle Manual Scale Reset / Auto-Fit View
+  const handleResetChartScale = useCallback(() => {
+    if (chartRef.current) {
+      chartRef.current.priceScale('right').applyOptions({ autoScale: true });
+      chartRef.current.timeScale().resetTimeScale();
+      chartRef.current.timeScale().fitContent();
+    }
+  }, []);
+
   // Listen for fullscreen change event
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -613,11 +625,29 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
       }
 
       if (formattedCandles.length > 0) {
+        // Clear previous symbol's indicators so right price scale doesn't stretch across both price ranges!
+        if (lastLoadedContextRef.current.symbol !== symbol) {
+          emaSeriesRef.current?.setData([]);
+          vwapSeriesRef.current?.setData([]);
+          upper1sRef.current?.setData([]);
+          lower1sRef.current?.setData([]);
+          upper2sRef.current?.setData([]);
+          lower2sRef.current?.setData([]);
+          kronosMedianRef.current?.setData([]);
+          kronosUpperConeRef.current?.setData([]);
+          kronosLowerConeRef.current?.setData([]);
+        }
+
         candleSeriesRef.current.setData(formattedCandles);
         lineSeriesRef.current?.setData(formattedLine);
         areaSeriesRef.current?.setData(formattedArea);
         volumeSeriesRef.current?.setData(formattedVolume);
+
+        // Snap both time scale and price scale immediately to new asset range
+        chartRef.current?.priceScale('right').applyOptions({ autoScale: true });
+        chartRef.current?.timeScale().resetTimeScale();
         chartRef.current?.timeScale().fitContent();
+
         lastLoadedContextRef.current = {
           symbol,
           timeframe,
@@ -698,11 +728,22 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
     const cleanSym = symbol.replace('/', '').toUpperCase();
     api.getKronosForecast({ symbol: cleanSym, timeframe, samples: 5, horizon: 12 })
       .then((res) => {
-        if (!isMounted || !res || !res.paths || res.paths.length === 0) return;
+        if (!isMounted || !res) return;
         setKronosData(res);
 
-        const sampleCount = res.paths.length;
-        const horizon = res.paths[0].predicted_timestamps.length;
+        const p10 = res.distribution?.quantile_bands?.p10 || [];
+        const p50 = res.distribution?.quantile_bands?.p50 || [];
+        const p90 = res.distribution?.quantile_bands?.p90 || [];
+        const sampleCount = Array.isArray(res.paths) ? res.paths.length : 0;
+
+        const horizon = p50.length > 0
+          ? p50.length
+          : (res.paths?.[0]?.predicted_timestamps?.length
+             || res.predicted_timestamps?.length
+             || res.paths?.[0]?.predicted_closes?.length
+             || 12);
+
+        if (horizon === 0) return;
 
         const medianPoints: LineData[] = [];
         const upperPoints: LineData[] = [];
@@ -725,27 +766,42 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
         const stepSec = tfSeconds[timeframe] || 900;
 
         for (let step = 0; step < horizon; step++) {
-          const rawT = Math.floor(res.paths[0].predicted_timestamps[step] / 1000);
+          const rawT = res.paths?.[0]?.predicted_timestamps?.[step]
+            ? Math.floor(res.paths[0].predicted_timestamps[step] / 1000)
+            : (res.predicted_timestamps?.[step] ? Math.floor(res.predicted_timestamps[step] / 1000) : 0);
           const t = (rawT > lastT ? rawT : lastT + stepSec) as Time;
           lastT = t as number;
 
-          const stepCloses = res.paths.map((p: any) => p.predicted_closes[step]).sort((a: number, b: number) => a - b);
-          const medianVal = stepCloses[Math.floor(sampleCount / 2)];
-          const lowerVal = stepCloses[0];
-          const upperVal = stepCloses[sampleCount - 1];
+          let medianVal = p50[step];
+          let lowerVal = p10[step];
+          let upperVal = p90[step];
 
-          medianPoints.push({ time: t, value: medianVal });
-          upperPoints.push({ time: t, value: upperVal });
-          lowerPoints.push({ time: t, value: lowerVal });
+          if (medianVal == null && sampleCount > 0) {
+            const stepCloses = res.paths
+              .map((p: any) => p.predicted_closes?.[step])
+              .filter((v: any) => typeof v === 'number')
+              .sort((a: number, b: number) => a - b);
+            if (stepCloses.length > 0) {
+              medianVal = stepCloses[Math.floor(stepCloses.length / 2)];
+              lowerVal = stepCloses[0];
+              upperVal = stepCloses[stepCloses.length - 1];
+            }
+          }
+
+          if (medianVal != null) medianPoints.push({ time: t, value: medianVal });
+          if (upperVal != null) upperPoints.push({ time: t, value: upperVal });
+          if (lowerVal != null) lowerPoints.push({ time: t, value: lowerVal });
         }
 
-        kronosMedianRef.current?.setData(medianPoints);
-        kronosUpperConeRef.current?.setData(upperPoints);
-        kronosLowerConeRef.current?.setData(lowerPoints);
+        if (medianPoints.length > 0) {
+          kronosMedianRef.current?.setData(medianPoints);
+          kronosUpperConeRef.current?.setData(upperPoints);
+          kronosLowerConeRef.current?.setData(lowerPoints);
 
-        kronosMedianRef.current?.applyOptions({ visible: true });
-        kronosUpperConeRef.current?.applyOptions({ visible: true });
-        kronosLowerConeRef.current?.applyOptions({ visible: true });
+          kronosMedianRef.current?.applyOptions({ visible: true });
+          kronosUpperConeRef.current?.applyOptions({ visible: true });
+          kronosLowerConeRef.current?.applyOptions({ visible: true });
+        }
       })
       .catch((err) => {
         console.warn('Kronos forecast fetch failed:', err);
@@ -1487,6 +1543,16 @@ const TradingViewChartComponent: React.FC<TradingViewChartProps> = ({
           )}
 
           <div className="h-4 w-[1px] bg-[#2a2e39]" />
+
+          {/* Reset Chart Scale / Auto-Fit Button */}
+          <button
+            onClick={handleResetChartScale}
+            className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-[#242936] rounded transition-colors flex items-center gap-1 text-[11px] font-mono"
+            title="Reset Chart Scale / Auto-Fit View"
+          >
+            <RotateCcw size={13} />
+            <span className="hidden xl:inline text-[10px]">Reset</span>
+          </button>
 
           {/* Snapshot Button */}
           <button

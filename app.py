@@ -320,10 +320,12 @@ if (FRONTEND_DIST / "assets").exists():
 
 # Pydantic Request Models
 class AskDeskRequest(BaseModel):
-    message: str
+    message: str | None = None
+    query: str | None = None
     symbol: str | None = "BTC/USDT"
     timeframe: str | None = "15m"
     language: str | None = "auto"
+    context: dict[str, Any] | None = None
 
 
 class CommandParseRequest(BaseModel):
@@ -2068,8 +2070,9 @@ async def parse_trade_command(req: CommandParseRequest):
 
 @app.post("/api/desk/ask", dependencies=[Depends(require_api_key)])
 async def ask_desk_copilot(req: AskDeskRequest):
-    sym = req.symbol or "BTC/USDT"
-    tf = req.timeframe or "15m"
+    ctx = req.context or {}
+    sym = req.symbol or ctx.get("symbol") or "BTC/USDT"
+    tf = req.timeframe or ctx.get("timeframe") or "15m"
     candles = data_streamer.get_candles(sym, tf, limit=60)
     cur_p = (
         candles[-1]["close"]
@@ -2119,8 +2122,15 @@ async def ask_desk_copilot(req: AskDeskRequest):
         "regime": regime_label,
     }
 
-    reply = await quant_mentor.generate_response(req.message, telemetry, req.language or "auto")
-    return {"reply": reply, "telemetry": telemetry}
+    msg = req.message or req.query or ""
+    reply = await quant_mentor.generate_response(msg, telemetry, req.language or "auto")
+    return {
+        "reply": reply,
+        "answer": reply,
+        "query": msg,
+        "timestamp": int(time.time() * 1000),
+        "telemetry": telemetry,
+    }
 
 
 def _canonical_symbol(symbol: str) -> str:

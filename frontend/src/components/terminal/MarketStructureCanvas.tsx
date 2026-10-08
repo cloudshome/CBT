@@ -69,6 +69,13 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
   const buySideLiquidityPrice = Number((currentPrice * 1.018).toFixed(2));
   const sellSideLiquidityPrice = Number((currentPrice * 0.982).toFixed(2));
 
+  // Determine effective trade direction mathematically: if TP1 is above entry, it's LONG; if below, it's SHORT
+  const entryMid = selectedSignalPlan && Array.isArray(selectedSignalPlan.entryZone) && selectedSignalPlan.entryZone.length > 0
+    ? (selectedSignalPlan.entryZone[0] + (selectedSignalPlan.entryZone[1] ?? selectedSignalPlan.entryZone[0])) / 2
+    : (selectedSignalPlan?.tp1 ?? 0);
+  const effectiveSide = selectedSignalPlan ? (selectedSignalPlan.tp1 >= entryMid ? 'LONG' : 'SHORT') : 'NEUTRAL';
+  const isPlanLong = effectiveSide === 'LONG';
+
   // Shared Execution Ladder Component (used in both floating HUD and docked sidebar)
   const renderLadderContent = (docked: boolean) => {
     if (!selectedSignalPlan) return null;
@@ -76,9 +83,9 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
       <div className={`text-xs font-mono select-none ${docked ? 'p-2 border-b border-[#1e293b] bg-[#090e1c]/70' : ''}`}>
         <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-indigo-500/30">
           <div className="flex items-center gap-1.5">
-            <Target size={12} className="text-indigo-400" />
-            <span className="font-bold text-white text-[10px] tracking-wider">
-              {selectedSignalPlan.style} {selectedSignalPlan.side}
+            <Target size={12} className={isPlanLong ? 'text-emerald-400' : 'text-rose-400'} />
+            <span className={`font-bold text-[10px] tracking-wider ${isPlanLong ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {selectedSignalPlan.style} {effectiveSide}
             </span>
           </div>
           <div className="flex items-center gap-1">
@@ -111,34 +118,67 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
           </div>
         </div>
 
-        {/* Vertical Execution Ladder */}
+        {/* Vertical Execution Ladder (Price-ordered top-to-bottom) */}
         <div className="space-y-1 text-[10px]">
-          <div className="flex justify-between items-center text-emerald-400">
-            <span>TP3 (+6.2R):</span>
-            <span className="font-bold">${selectedSignalPlan.tp3.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between items-center text-emerald-400">
-            <span>TP2 (+3.1R):</span>
-            <span className="font-bold">${selectedSignalPlan.tp2.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between items-center text-emerald-300">
-            <span>TP1 (+1.5R):</span>
-            <span className="font-bold">${selectedSignalPlan.tp1.toLocaleString()}</span>
-          </div>
+          {isPlanLong ? (
+            <>
+              <div className="flex justify-between items-center text-emerald-400">
+                <span>TP3 (+6.2R):</span>
+                <span className="font-bold">${selectedSignalPlan.tp3.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-emerald-400">
+                <span>TP2 (+3.1R):</span>
+                <span className="font-bold">${selectedSignalPlan.tp2.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-emerald-300">
+                <span>TP1 (+1.5R):</span>
+                <span className="font-bold">${selectedSignalPlan.tp1.toLocaleString()}</span>
+              </div>
 
-          <div className="my-1 py-0.5 px-1.5 bg-indigo-950/80 border border-indigo-500/50 rounded flex justify-between items-center text-white font-bold">
-            <span>ENTRY:</span>
-            <span className="text-[9px]">${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}</span>
-          </div>
+              <div className="my-1 py-0.5 px-1.5 bg-indigo-950/80 border border-indigo-500/50 rounded flex justify-between items-center text-white font-bold">
+                <span>ENTRY:</span>
+                <span className="text-[9px]">${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}</span>
+              </div>
 
-          <div className="flex justify-between items-center text-rose-400">
-            <span>STOP LOSS:</span>
-            <span className="font-bold">${selectedSignalPlan.stopLoss.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between items-center text-rose-500 text-[9px]">
-            <span>INVALIDATION:</span>
-            <span className="font-bold">${selectedSignalPlan.invalidationPrice.toLocaleString()}</span>
-          </div>
+              <div className="flex justify-between items-center text-rose-400">
+                <span>STOP LOSS:</span>
+                <span className="font-bold">${selectedSignalPlan.stopLoss.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-rose-500 text-[9px]">
+                <span>INVALIDATION:</span>
+                <span className="font-bold">${selectedSignalPlan.invalidationPrice.toLocaleString()}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between items-center text-rose-500 text-[9px]">
+                <span>INVALIDATION:</span>
+                <span className="font-bold">${selectedSignalPlan.invalidationPrice.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-rose-400">
+                <span>STOP LOSS:</span>
+                <span className="font-bold">${selectedSignalPlan.stopLoss.toLocaleString()}</span>
+              </div>
+
+              <div className="my-1 py-0.5 px-1.5 bg-indigo-950/80 border border-indigo-500/50 rounded flex justify-between items-center text-white font-bold">
+                <span>ENTRY:</span>
+                <span className="text-[9px]">${selectedSignalPlan.entryZone[0].toLocaleString()} – ${selectedSignalPlan.entryZone[1].toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-between items-center text-emerald-300">
+                <span>TP1 (+1.5R):</span>
+                <span className="font-bold">${selectedSignalPlan.tp1.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-emerald-400">
+                <span>TP2 (+3.1R):</span>
+                <span className="font-bold">${selectedSignalPlan.tp2.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-emerald-400">
+                <span>TP3 (+6.2R):</span>
+                <span className="font-bold">${selectedSignalPlan.tp3.toLocaleString()}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -285,9 +325,9 @@ export const MarketStructureCanvas: React.FC<MarketStructureCanvasProps> = ({
                 className="absolute bottom-4 left-14 bg-[#0a0f1e]/90 border border-indigo-500/40 backdrop-blur-md rounded-lg px-2.5 py-1 text-xs font-mono shadow-xl z-20 flex items-center gap-2 select-none hover:border-indigo-400 transition-all cursor-pointer group"
                 title="Click to expand Execution Ladder"
               >
-                <Target size={12} className="text-indigo-400" />
-                <span className="font-bold text-white text-[10px]">
-                  {selectedSignalPlan.style} {selectedSignalPlan.side}
+                <Target size={12} className={isPlanLong ? 'text-emerald-400' : 'text-rose-400'} />
+                <span className={`font-bold text-[10px] ${isPlanLong ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {selectedSignalPlan.style} {effectiveSide}
                 </span>
                 <span className="text-emerald-400 font-bold text-[10px]">
                   R:R {selectedSignalPlan.riskRewardRatio}:1

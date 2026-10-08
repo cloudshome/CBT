@@ -124,7 +124,16 @@ export const GeminiDeskCopilot: React.FC<GeminiDeskCopilotProps> = ({
       setChatLog((prev) => [
         {
           query: userQ,
-          answer,
+          answer: answer || 'No response received from desk.',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        },
+        ...prev,
+      ]);
+    } catch (err: any) {
+      setChatLog((prev) => [
+        {
+          query: userQ,
+          answer: `Desk note: ${err?.message || 'Desk query error. Check network or retry.'}`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         },
         ...prev,

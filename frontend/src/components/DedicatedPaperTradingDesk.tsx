@@ -71,7 +71,7 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
         entryPrice: entry,
         sl: sl,
         tp: tp,
-        equity: data?.summary?.virtualEquity || 100000.0,
+        equity: data?.summary?.virtualEquity || 10000.0,
       });
       setKellyResult(res);
       if (res.hurdle_passed && res.position_size_base > 0) {
