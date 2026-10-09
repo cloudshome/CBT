@@ -90,7 +90,7 @@ jobs:
           }
 
       - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-binaries
           path: release/artifacts/*
@@ -164,7 +164,7 @@ jobs:
           done
 
       - name: Upload Linux Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: linux-binaries
           path: release/artifacts/*
