@@ -1028,17 +1028,41 @@ async def get_master_terminal_telemetry(
     ]
 
     # 6. Level 5: Human Approval Queue, Paper Portfolio & Calibration
+    # Calculate live realized PnL from closed positions in blotter
+    closed_signals = [s for s in signal_blotter if s.get("state") == "CLOSED"]
+    total_realized_pnl = sum(float(s.get("realizedPnlUsd", 0.0)) for s in closed_signals)
+    win_trades_count = sum(1 for s in closed_signals if float(s.get("realizedPnlUsd", 0.0)) > 0)
+    win_rate_calc = round((win_trades_count / max(len(closed_signals), 1)) * 100.0, 1)
+
+    # Calculate live unrealized PnL from currently EXECUTED positions against current live price (cur_p)
+    open_signals = [s for s in signal_blotter if s.get("state") == "EXECUTED"]
+    total_unrealized_pnl = 0.0
+    for s in open_signals:
+        entry_p = float(s.get("entryPrice", cur_p))
+        notional = float(s.get("notionalUsd", 5000.0))
+        qty = notional / max(entry_p, 1e-4)
+        if s.get("side") == "LONG":
+            pos_unrealized = (cur_p - entry_p) * qty
+        else:
+            pos_unrealized = (entry_p - cur_p) * qty
+        total_unrealized_pnl += pos_unrealized
+
+    base_initial_equity = 10000.0
+    dynamic_equity = round(base_initial_equity + total_realized_pnl + total_unrealized_pnl, 2)
+    dynamic_today_pnl = round(total_realized_pnl + total_unrealized_pnl, 2)
+    dynamic_today_pct = round((dynamic_today_pnl / max(base_initial_equity, 1.0)) * 100.0, 2)
+
     paper_portfolio = {
-        "equityUsd": 10842.5,
-        "todayPnlUsd": 184.2,
-        "todayPnlPct": 1.73,
-        "realizedPnlUsd": 721.4,
-        "unrealizedPnlUsd": 121.8,
-        "winRatePct": 61.8,
+        "equityUsd": dynamic_equity,
+        "todayPnlUsd": dynamic_today_pnl,
+        "todayPnlPct": dynamic_today_pct,
+        "realizedPnlUsd": round(total_realized_pnl, 2),
+        "unrealizedPnlUsd": round(total_unrealized_pnl, 2),
+        "winRatePct": win_rate_calc,
         "profitFactor": 1.84,
         "expectancyR": 0.43,
         "maxDrawdownPct": -4.2,
-        "openPositionsCount": sum(1 for s in signal_blotter if s.get("state") == "EXECUTED"),
+        "openPositionsCount": len(open_signals),
         "blotter": signal_blotter,
         "equityCurve": [
             {"time": "T-10d", "equity": 10000},

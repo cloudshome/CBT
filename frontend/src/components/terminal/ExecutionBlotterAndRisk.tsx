@@ -87,7 +87,7 @@ export const ExecutionBlotterAndRisk: React.FC<ExecutionBlotterAndRiskProps> = (
           <div>
             <span className="text-slate-500">TODAY: </span>
             <span className={`font-bold ${todayPnlUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              +${todayPnlUsd.toFixed(2)} (+{todayPnlPct}%)
+              {todayPnlUsd >= 0 ? `+$${todayPnlUsd.toFixed(2)}` : `-$${Math.abs(todayPnlUsd).toFixed(2)}`} ({todayPnlPct >= 0 ? `+${todayPnlPct.toFixed(2)}` : `${todayPnlPct.toFixed(2)}`}%)
             </span>
           </div>
           <span className="text-slate-700">|</span>
