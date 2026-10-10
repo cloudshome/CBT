@@ -1048,4 +1048,28 @@ async def web_search_auto_ingest_endpoint(payload: WebSearchAutoIngestPayload) -
     return result
 
 
+class WebSearchCyclePayload(BaseModel):
+    topic: str = Field(..., min_length=2, max_length=500)
+    query: str | None = None
+    limit: int = Field(default=3, ge=1, le=10)
+
+
+@router.post("/web-search/cycle")
+async def web_search_cycle_endpoint(payload: WebSearchCyclePayload) -> dict[str, Any]:
+    """
+    Executes the 5-worker bounded autonomous research pipeline:
+    1. QueryPlanner -> 2. SecureFetcher -> 3. Extractor -> 4. ClaimExtractor -> 5. ResearchCritic
+    Stages candidate findings into the Human-in-the-Loop Triage Inbox without touching live trading logic.
+    """
+    from core.knowledge_os.web_search_agent import web_search_agent
+
+    result = await web_search_agent.execute_bounded_research_cycle(
+        topic=payload.topic,
+        query=payload.query,
+        limit=payload.limit,
+    )
+    return result.to_dict()
+
+
+
 
