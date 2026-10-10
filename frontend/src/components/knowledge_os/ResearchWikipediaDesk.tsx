@@ -14,7 +14,6 @@ import {
   Copy,
   Check,
   Link2,
-  Layers,
   TrendingUp,
   Bookmark,
   Compass,
@@ -391,23 +390,26 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-slate-100 rounded-lg border border-slate-800/80 overflow-hidden shadow-2xl">
-      {/* 1. Master Top Header & Quick Ingest Bar */}
-      <div className="bg-slate-900/90 border-b border-slate-800 p-4">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 mb-4">
+    <div className="flex flex-col h-full bg-[#f8f9fa] dark:bg-[#0e131d] text-[#202122] dark:text-[#eaecf0] rounded-lg border border-[#a2a9b1] dark:border-[#222e42] overflow-hidden shadow-2xl font-sans">
+      {/* 1. Wikipedia Top Utility Header & Ingest Strip */}
+      <div className="bg-[#eaecf0] dark:bg-[#141b29] border-b border-[#a2a9b1] dark:border-[#222e42] px-4 py-3">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-400 shadow-inner">
-              <BookOpen size={24} />
+            {/* Wikipedia Globe Icon Badge */}
+            <div className="w-10 h-10 rounded border border-[#a2a9b1] dark:border-[#384252] bg-white dark:bg-[#18202e] flex items-center justify-center text-[#202122] dark:text-white shadow-xs font-serif font-black text-xl">
+              W
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold tracking-tight text-white">SKY Research Wikipedia</h2>
-                <span className="px-2 py-0.5 text-[10px] font-mono tracking-wider font-semibold rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  LIVING JOURNAL
+                <h2 className="text-xl font-serif font-normal text-[#000000] dark:text-white tracking-normal flex items-center gap-2">
+                  <span>SKY Research Wikipedia</span>
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 font-sans font-semibold rounded bg-[#eaf3ff] dark:bg-blue-950/60 text-[#3366cc] dark:text-[#6fa8dc] border border-[#a2a9b1] dark:border-[#2b3c58]">
+                  The Free Quantitative Knowledge Base
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Permanent cross-verified repository for macro reels, YouTube talks, PDFs, and intelligence feeds. Every claim fact-checked and preserved.
+              <p className="text-[11px] text-[#54595d] dark:text-[#9aa0a6] font-sans mt-0.5">
+                From CBT, the free institutional knowledge repository. All claims cross-verified with causal firewalls.
               </p>
             </div>
           </div>
@@ -418,7 +420,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                 setShowTriageDrawer(true);
                 loadTriageInbox();
               }}
-              className="px-3 py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-xs text-amber-300 flex items-center gap-1.5 border border-amber-500/30 transition cursor-pointer shadow-sm"
+              className="px-3 py-1.5 rounded border border-[#f0c36d] bg-[#fef7e0] hover:bg-[#feefc3] text-[#7c4a00] dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-700/60 text-xs font-sans font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs"
               title="Review staged web intelligence candidates"
             >
               <Inbox size={13} />
@@ -426,7 +428,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
             </button>
             <button
               onClick={loadArticles}
-              className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 flex items-center gap-1.5 border border-slate-700 transition"
+              className="px-3 py-1.5 rounded border border-[#c8ccd1] dark:border-[#384252] bg-white dark:bg-[#1e2738] hover:bg-[#f8f9fa] dark:hover:bg-[#253043] text-xs text-[#202122] dark:text-slate-200 flex items-center gap-1.5 transition font-sans shadow-xs"
               title="Refresh articles"
             >
               <RefreshCw size={13} className={isLoadingList ? 'animate-spin' : ''} />
@@ -435,41 +437,41 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
           </div>
         </div>
 
-        {/* Quick-Drop URL Ingestion Input */}
-        <form onSubmit={handleIngest} className="flex flex-col sm:flex-row gap-2 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 shadow-inner">
+        {/* Quick-Drop URL Ingestion Input (Wikipedia Search Bar Style) */}
+        <form onSubmit={handleIngest} className="flex flex-col sm:flex-row gap-2 bg-white dark:bg-[#0c111a] p-2 rounded border border-[#a2a9b1] dark:border-[#28354b] shadow-inner">
           <div className="relative flex-1">
-            <Link2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400" />
+            <Link2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#3366cc] dark:text-[#6fa8dc]" />
             <input
               type="text"
               value={inputUrlOrText}
               onChange={(e) => setInputUrlOrText(e.target.value)}
-              placeholder="Paste any link (Facebook Reel, YouTube, X, web article, PDF) or paste research text..."
-              className="w-full bg-slate-900 border border-slate-700/80 rounded pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono transition"
+              placeholder="Paste any URL (YouTube, PDF, Substack, Bloomberg, X) or raw text to create or update an encyclopedia article..."
+              className="w-full bg-[#f8f9fa] dark:bg-[#151c28] border border-[#c8ccd1] dark:border-[#38455c] rounded pl-9 pr-3 py-1.5 text-xs text-[#202122] dark:text-white placeholder-[#72777d] dark:placeholder-slate-500 focus:outline-none focus:border-[#3366cc] dark:focus:border-blue-400 font-sans transition"
             />
           </div>
-          <div className="w-full sm:w-64">
+          <div className="w-full sm:w-60">
             <input
               type="text"
               value={inputTitle}
               onChange={(e) => setInputTitle(e.target.value)}
-              placeholder="Custom title (optional)..."
-              className="w-full bg-slate-900 border border-slate-700/80 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+              placeholder="Article title (optional)..."
+              className="w-full bg-[#f8f9fa] dark:bg-[#151c28] border border-[#c8ccd1] dark:border-[#38455c] rounded px-3 py-1.5 text-xs text-[#202122] dark:text-white placeholder-[#72777d] dark:placeholder-slate-500 focus:outline-none focus:border-[#3366cc] font-sans transition"
             />
           </div>
           <button
             type="submit"
             disabled={isIngesting || !inputUrlOrText.trim()}
-            className="px-4 py-2 rounded bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 transition cursor-pointer"
+            className="px-4 py-1.5 rounded bg-[#3366cc] hover:bg-[#2a4b8d] disabled:opacity-50 text-white text-xs font-sans font-medium flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
           >
             {isIngesting ? (
               <>
                 <RefreshCw size={13} className="animate-spin" />
-                <span>Cross-Verifying...</span>
+                <span>Verifying...</span>
               </>
             ) : (
               <>
                 <Plus size={14} />
-                <span>Ingest & Store in Wiki</span>
+                <span>Publish to Wikipedia</span>
               </>
             )}
           </button>
@@ -478,61 +480,60 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
 
       {/* 2. Main Split View: Left Articles Index vs Right Article Reader */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-        {/* Left Column: Article Browser */}
-        <div className="w-full md:w-80 lg:w-96 border-r border-slate-800 bg-slate-950 flex flex-col min-h-0">
+        {/* Left Column: Article Browser (Wikipedia Navigation Sidebar style) */}
+        <div className="w-full md:w-80 lg:w-96 border-r border-[#a2a9b1] dark:border-[#222e42] bg-[#f8f9fa] dark:bg-[#111722] flex flex-col min-h-0">
           {/* Category selector */}
-          <div className="p-3 border-b border-slate-800/80 flex gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="p-2.5 border-b border-[#c8ccd1] dark:border-[#222e42] flex gap-1.5 overflow-x-auto no-scrollbar bg-[#eaecf0]/50 dark:bg-[#141b28]">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 rounded text-[11px] font-medium whitespace-nowrap transition ${
+                className={`px-2.5 py-1 rounded text-[11px] font-sans whitespace-nowrap transition ${
                   selectedCategory === cat
-                    ? 'bg-indigo-600 text-white font-semibold shadow-sm'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
+                    ? 'bg-[#3366cc] text-white font-semibold shadow-xs'
+                    : 'bg-white dark:bg-[#1a2332] text-[#54595d] dark:text-slate-300 hover:text-[#202122] dark:hover:text-white hover:bg-[#f1f3f5] border border-[#c8ccd1] dark:border-[#2c394d]'
                 }`}
               >
-                {cat === 'ALL' ? 'All Entries' : cat.split(' ')[0]}
+                {cat === 'ALL' ? 'All Portals' : cat.split(' ')[0]}
               </button>
             ))}
           </div>
 
           {/* Search box & Open Web Search Action */}
-          <div className="p-3 border-b border-slate-800/80 space-y-2">
+          <div className="p-3 border-b border-[#c8ccd1] dark:border-[#222e42] space-y-2 bg-white dark:bg-[#0f141e]">
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#72777d]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleCommandBarKeyDown}
-                placeholder="Search entries or command: /wiki, /cycle, /triage, /help..."
-                className="w-full bg-slate-900 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition"
+                placeholder="Search Wikipedia (or: /wiki, /cycle, /triage)..."
+                className="w-full bg-[#f8f9fa] dark:bg-[#151c28] border border-[#a2a9b1] dark:border-[#2e3b50] rounded pl-8 pr-3 py-1.5 text-xs text-[#202122] dark:text-white placeholder-[#72777d] focus:outline-none focus:border-[#3366cc] transition font-sans"
               />
             </div>
             <button
               onClick={handleOpenWebSearch}
               disabled={isWebSearching}
-              className="w-full py-1.5 px-2 rounded bg-gradient-to-r from-cyan-950 to-indigo-950 hover:from-cyan-900 hover:to-indigo-900 border border-cyan-500/30 text-cyan-300 hover:text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+              className="w-full py-1.5 px-2 rounded bg-[#eaf3ff] dark:bg-[#15233c] hover:bg-[#d5e7ff] dark:hover:bg-[#1d3154] border border-[#a2a9b1] dark:border-[#2d436b] text-[#3366cc] dark:text-[#7bb3ef] hover:text-[#0b0080] text-[11px] font-sans font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
             >
-              <Compass size={13} className={isWebSearching ? 'animate-spin text-cyan-400' : 'text-cyan-400'} />
-              <span>{isWebSearching ? 'Searching Open Web...' : 'Search Open Web (AI Agent)'}</span>
+              <Compass size={13} className={isWebSearching ? 'animate-spin text-[#3366cc]' : 'text-[#3366cc] dark:text-[#7bb3ef]'} />
+              <span>{isWebSearching ? 'Agent Searching Web...' : 'Open Web Search Agent'}</span>
             </button>
           </div>
 
-
           {/* Articles list */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {isLoadingList ? (
-              <div className="p-8 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-                <RefreshCw size={18} className="animate-spin text-indigo-400" />
+              <div className="p-8 text-center text-xs text-[#54595d] dark:text-slate-400 flex flex-col items-center gap-2">
+                <RefreshCw size={18} className="animate-spin text-[#3366cc]" />
                 <span>Loading Wikipedia index...</span>
               </div>
             ) : articles.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                <BookOpen size={24} className="mx-auto mb-2 text-slate-600" />
-                <p>No articles match your search.</p>
-                <p className="text-[11px] text-slate-600 mt-1">Paste a link above to create the first entry!</p>
+              <div className="p-8 text-center text-xs text-[#54595d] dark:text-slate-400">
+                <BookOpen size={24} className="mx-auto mb-2 text-[#72777d]" />
+                <p>No encyclopedia articles found.</p>
+                <p className="text-[11px] text-[#72777d] mt-1">Paste a link above to publish the first article!</p>
               </div>
             ) : (
               articles.map((item) => {
@@ -541,35 +542,35 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                   <div
                     key={item.article_id}
                     onClick={() => setSelectedArticleId(item.article_id)}
-                    className={`p-3 rounded-lg border cursor-pointer transition flex flex-col gap-1.5 ${
+                    className={`p-2.5 rounded border cursor-pointer transition flex flex-col gap-1 ${
                       isSelected
-                        ? 'bg-slate-900/90 border-indigo-500/60 shadow-lg shadow-indigo-950/50'
-                        : 'bg-slate-900/40 border-slate-800/80 hover:bg-slate-900/80 hover:border-slate-700'
+                        ? 'bg-white dark:bg-[#192334] border-[#3366cc] dark:border-blue-500 shadow-sm ring-1 ring-[#3366cc]/30'
+                        : 'bg-white/80 dark:bg-[#131a26] border-[#c8ccd1] dark:border-[#243044] hover:bg-white dark:hover:bg-[#18202d] hover:border-[#a2a9b1]'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-1.5">
                         {getSourceIcon(item.source_type)}
-                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                        <span className="text-[10px] font-mono text-[#54595d] dark:text-slate-400 uppercase tracking-wider">
                           {item.source_type.replace('_', ' ')}
                         </span>
                       </div>
-                      <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="px-1.5 py-0.2 text-[10px] font-mono font-bold rounded bg-[#e6f4ea] text-[#137333] border border-[#ceead6] dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700/40">
                         {item.verification_score.toFixed(0)}% Rigor
                       </span>
                     </div>
 
-                    <h4 className={`text-xs font-semibold line-clamp-2 leading-relaxed ${isSelected ? 'text-indigo-200' : 'text-slate-200'}`}>
+                    <h4 className={`text-xs font-serif font-bold line-clamp-2 leading-tight ${isSelected ? 'text-[#0b0080] dark:text-blue-300' : 'text-[#202122] dark:text-slate-100'}`}>
                       {item.title}
                     </h4>
 
-                    <p className="text-[11px] text-slate-400 line-clamp-2 leading-normal">
+                    <p className="text-[11px] text-[#54595d] dark:text-slate-400 line-clamp-2 leading-normal font-sans">
                       {item.executive_summary}
                     </p>
 
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/60">
-                      <span className="font-mono text-slate-400">{item.provenance_id}</span>
-                      <span>{item.claims_count} claims verified</span>
+                    <div className="flex items-center justify-between text-[10px] text-[#72777d] dark:text-slate-500 pt-1 border-t border-[#eaecf0] dark:border-[#222e40] font-mono">
+                      <span>{item.provenance_id}</span>
+                      <span>{item.claims_count} claims</span>
                     </div>
                   </div>
                 );
@@ -579,61 +580,61 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
         </div>
 
         {/* Right Column: Wikipedia Article Reader */}
-        <div className="flex-1 bg-slate-950 flex flex-col min-h-0 overflow-y-auto">
+        <div className="flex-1 bg-white dark:bg-[#0c1018] text-[#202122] dark:text-[#eaecf0] flex flex-col min-h-0 overflow-y-auto">
           {isLoadingArticle ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500 gap-3">
-              <RefreshCw size={24} className="animate-spin text-indigo-400" />
-              <span className="text-xs">Fetching cross-verified research dossier...</span>
+            <div className="flex-1 flex flex-col items-center justify-center p-12 text-[#54595d] dark:text-slate-400 gap-3">
+              <RefreshCw size={24} className="animate-spin text-[#3366cc]" />
+              <span className="text-xs font-sans">Fetching encyclopedia article...</span>
             </div>
           ) : !activeArticle ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500 gap-2">
-              <BookOpen size={36} className="text-slate-700 mb-1" />
-              <h3 className="text-sm font-bold text-slate-300">Select an Encyclopedia Entry</h3>
-              <p className="text-xs text-slate-500 max-w-sm text-center">
-                Click any research dossier from the left sidebar or paste a new link above to view verified claims, contradictions, and macro implications.
+            <div className="flex-1 flex flex-col items-center justify-center p-12 text-[#54595d] dark:text-slate-400 gap-2">
+              <BookOpen size={36} className="text-[#a2a9b1] mb-1" />
+              <h3 className="text-base font-serif font-bold text-[#202122] dark:text-white">Welcome to SKY Research Wikipedia</h3>
+              <p className="text-xs text-[#54595d] dark:text-slate-400 max-w-sm text-center font-sans">
+                Select an article from the left directory or enter a URL above to explore verified claims, macro regimes, and dialectical contradictions.
               </p>
             </div>
           ) : (
-            <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
-              {/* Article Top Navigation / Action Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
-                <div className="flex items-center gap-2">
+            <div className="p-6 max-w-5xl mx-auto w-full space-y-5 font-sans">
+              {/* Wikipedia Tab Navigation Bar (Article / Talk / Read / Edit / View history) */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-[#a2a9b1] dark:border-[#2d3a4e]">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => setActiveTab('ARTICLE')}
-                    className={`px-3 py-1 rounded text-xs font-medium transition ${
+                    className={`px-3 py-1.5 border-b-2 text-xs font-sans font-medium transition ${
                       activeTab === 'ARTICLE'
-                        ? 'bg-indigo-600 text-white font-semibold shadow'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        ? 'border-[#3366cc] text-[#0b0080] dark:text-blue-300 font-bold'
+                        : 'border-transparent text-[#54595d] dark:text-slate-400 hover:text-[#202122] dark:hover:text-white'
                     }`}
                   >
-                    Wikipedia Reader
+                    Article
                   </button>
                   <button
                     onClick={() => setActiveTab('MARKDOWN')}
-                    className={`px-3 py-1 rounded text-xs font-medium transition ${
+                    className={`px-3 py-1.5 border-b-2 text-xs font-sans font-medium transition ${
                       activeTab === 'MARKDOWN'
-                        ? 'bg-indigo-600 text-white font-semibold shadow'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        ? 'border-[#3366cc] text-[#0b0080] dark:text-blue-300 font-bold'
+                        : 'border-transparent text-[#54595d] dark:text-slate-400 hover:text-[#202122] dark:hover:text-white'
                     }`}
                   >
-                    Raw Markdown
+                    Raw Source / Wikitext
                   </button>
                   <button
                     onClick={() => setActiveTab('PROVENANCE')}
-                    className={`px-3 py-1 rounded text-xs font-medium transition ${
+                    className={`px-3 py-1.5 border-b-2 text-xs font-sans font-medium transition ${
                       activeTab === 'PROVENANCE'
-                        ? 'bg-indigo-600 text-white font-semibold shadow'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        ? 'border-[#3366cc] text-[#0b0080] dark:text-blue-300 font-bold'
+                        : 'border-transparent text-[#54595d] dark:text-slate-400 hover:text-[#202122] dark:hover:text-white'
                     }`}
                   >
-                    Provenance & Citations
+                    View History & Provenance
                   </button>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleReverify}
-                    className="px-2.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs border border-slate-800 flex items-center gap-1.5 transition"
+                    className="px-2.5 py-1 rounded bg-[#f8f9fa] dark:bg-[#182130] hover:bg-[#eaecf0] dark:hover:bg-[#202b3d] text-[#202122] dark:text-slate-300 text-xs border border-[#c8ccd1] dark:border-[#38455c] flex items-center gap-1.5 transition shadow-xs"
                     title="Re-run fact checking audit against latest datasets"
                   >
                     <RefreshCw size={12} />
@@ -642,11 +643,11 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
 
                   <button
                     onClick={handleCopyMarkdown}
-                    className="px-2.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs border border-slate-800 flex items-center gap-1.5 transition"
-                    title="Copy full article Markdown for Obsidian / Notion"
+                    className="px-2.5 py-1 rounded bg-[#f8f9fa] dark:bg-[#182130] hover:bg-[#eaecf0] dark:hover:bg-[#202b3d] text-[#202122] dark:text-slate-300 text-xs border border-[#c8ccd1] dark:border-[#38455c] flex items-center gap-1.5 transition shadow-xs"
+                    title="Export article wikitext"
                   >
-                    {isCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                    <span>{isCopied ? 'Copied' : 'Export MD'}</span>
+                    {isCopied ? <Check size={12} className="text-[#137333]" /> : <Copy size={12} />}
+                    <span>{isCopied ? 'Copied' : 'Download Wikitext'}</span>
                   </button>
 
                   {activeArticle.source_url && (
@@ -723,306 +724,298 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
               )}
 
               {activeTab === 'ARTICLE' && (
-                <div className="flex flex-col-reverse lg:flex-row gap-6 items-start">
+                <div className="flex flex-col-reverse lg:flex-row gap-6 items-start font-sans">
                   {/* Left Column: Encyclopedic Content & Claims */}
-                  <div className="flex-1 w-full space-y-6">
-                    {/* Article Title & Provenance Block */}
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
-                        <span className="px-2 py-0.5 rounded font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                          {activeArticle.provenance_id}
+                  <div className="flex-1 w-full space-y-5">
+                    {/* Wikipedia Main Article Header */}
+                    <div className="border-b border-[#a2a9b1] dark:border-[#2d3a4e] pb-2">
+                      <div className="flex flex-wrap items-center gap-2 mb-1 text-[11px] font-sans">
+                        <span className="font-mono text-[#54595d] dark:text-[#9aa0a6]">
+                          Article provenance: <strong className="text-[#3366cc] dark:text-[#6fa8dc]">{activeArticle.provenance_id}</strong>
                         </span>
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
-                          {activeArticle.category}
+                        <span>•</span>
+                        <span className="text-[#54595d] dark:text-[#9aa0a6]">
+                          Portal: <strong>{activeArticle.category}</strong>
                         </span>
-                        <span className="text-slate-500 text-[11px]">
-                          Last Verified: {new Date(activeArticle.updated_at).toLocaleString()}
+                        <span>•</span>
+                        <span className="text-[#54595d] dark:text-[#9aa0a6]">
+                          Last edited: {new Date(activeArticle.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                         </span>
                       </div>
 
-                      <h1 className="text-2xl font-bold text-white tracking-tight leading-snug">
+                      <h1 className="text-3xl font-serif font-normal text-[#000000] dark:text-white tracking-normal leading-tight">
                         {activeArticle.title}
                       </h1>
 
-                      <div className="mt-2 text-xs text-slate-400 flex items-center gap-2">
-                        <span>Attributed to: <strong className="text-slate-200">{activeArticle.author_or_speaker}</strong></span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          {getSourceIcon(activeArticle.source_type)}
-                          <span>{activeArticle.source_type.replace('_', ' ')}</span>
-                        </span>
+                      <div className="text-xs text-[#54595d] dark:text-[#9aa0a6] mt-1 italic font-serif">
+                        From CBT Research Wikipedia, the free institutional quantitative encyclopedia
                       </div>
                     </div>
 
-
-                  {/* Rigor Score & Source Guarantee Ribbon */}
-                  <div className="p-3.5 rounded-lg bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900 border border-indigo-500/30 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                        <ShieldCheck size={20} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white flex items-center gap-2">
-                          <span>Epistemic Verification Score: {activeArticle.verification_score.toFixed(1)}%</span>
-                          {activeSource && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
-                              activeSource.access_status === 'SUCCESS'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : activeSource.access_status === 'PARTIAL'
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                            }`}>
-                              {activeSource.access_status === 'SUCCESS' ? '🟢 100% EXTRACTED' : activeSource.access_status === 'PARTIAL' ? '🟡 PARTIAL ACCESS' : '⚠️ ACCESS BLOCKED (SAVED)'}
-                            </span>
-                          )}
+                    {/* Wikipedia Lead / Epistemic Notice Hatnote */}
+                    <div className="p-3 rounded border border-[#c8ccd1] dark:border-[#2c3a50] bg-[#f8f9fa] dark:bg-[#131b26] flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded bg-[#e6f4ea] dark:bg-emerald-950/40 text-[#137333] dark:text-emerald-300 border border-[#ceead6] dark:border-emerald-700/40">
+                          <ShieldCheck size={16} />
                         </div>
-                        <div className="text-[11px] text-slate-400">
-                          {activeArticle.key_claims.filter(c => c.epistemic_status === 'FACT').length} empirically verified facts,{' '}
-                          {activeArticle.key_claims.filter(c => c.epistemic_status === 'HYPOTHESIS').length} forward hypotheses,{' '}
-                          {activeArticle.contradictions_detected.length} contradictions detected.
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] px-2.5 py-1 rounded bg-slate-950/70 text-indigo-300 border border-indigo-500/20 flex items-center gap-1.5 font-mono">
-                      <span>🔒 Zero Link Loss Guaranteed</span>
-                    </div>
-                  </div>
-
-                  {/* Section 1: Executive Abstract */}
-                  <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800 space-y-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-                      <BookOpen size={14} />
-                      <span>I. Executive Abstract</span>
-                    </h3>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      {activeArticle.executive_summary}
-                    </p>
-                  </div>
-
-                  {/* Real-Life Practical Summary (Bengali 5-Point Guide) */}
-                  {activeSource?.real_life_summary && (
-                    <div className="bg-gradient-to-br from-indigo-950/40 via-slate-900/80 to-purple-950/30 p-4 rounded-lg border border-indigo-500/30 space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20">
-                        <h3 className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-                          <Sparkles size={14} className="text-amber-400" />
-                          <span>বাস্তব জীবনের সারসংক্ষেপ (5-Point Practical Guide)</span>
-                        </h3>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
-                          Bengali Actionable Intelligence
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        <div className="p-3 rounded bg-slate-950/60 border border-slate-800">
-                          <div className="text-[11px] font-bold text-amber-300 mb-1 flex items-center gap-1">
-                            <span>🎯</span> সহজ ভাষায় মূল কথা:
-                          </div>
-                          <p className="text-slate-200 leading-relaxed">
-                            {activeSource.real_life_summary.core_concept_bn}
-                          </p>
-                        </div>
-
-                        <div className="p-3 rounded bg-slate-950/60 border border-slate-800">
-                          <div className="text-[11px] font-bold text-cyan-300 mb-1 flex items-center gap-1">
-                            <span>📈</span> বাস্তব মার্কেট প্রভাব:
-                          </div>
-                          <p className="text-slate-200 leading-relaxed">
-                            {activeSource.real_life_summary.practical_market_impact}
-                          </p>
-                        </div>
-
-                        <div className="p-3 rounded bg-slate-950/60 border border-slate-800">
-                          <div className="text-[11px] font-bold text-emerald-300 mb-1 flex items-center gap-1">
-                            <span>🛠️</span> ট্রেডার হিসেবে আপনার কী করণীয়:
-                          </div>
-                          <p className="text-slate-200 leading-relaxed">
-                            {activeSource.real_life_summary.actionable_guidance}
-                          </p>
-                        </div>
-
-                        <div className="p-3 rounded bg-slate-950/60 border border-slate-800">
-                          <div className="text-[11px] font-bold text-rose-300 mb-1 flex items-center gap-1">
-                            <span>⚠️</span> প্রধান ঝুঁকি ও সতর্কতা:
-                          </div>
-                          <p className="text-slate-200 leading-relaxed">
-                            {activeSource.real_life_summary.risk_warning}
-                          </p>
-                        </div>
-                      </div>
-
-                      {activeSource.real_life_summary.real_world_analogy && (
-                        <div className="p-2.5 rounded bg-slate-950/80 border border-indigo-500/20 text-[11px]">
-                          <span className="font-bold text-purple-300">💡 বাস্তব জীবনের অ্যানালজি: </span>
-                          <span className="text-slate-300 italic">{activeSource.real_life_summary.real_world_analogy}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Section 2: Epistemic Claim Verification Matrix */}
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-                      <ShieldCheck size={14} />
-                      <span>II. Epistemic Claim Verification Matrix</span>
-                    </h3>
-
-                    <div className="border border-slate-800 rounded-lg overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-900 text-slate-400 text-[11px] uppercase font-mono border-b border-slate-800">
-                          <tr>
-                            <th className="py-2.5 px-3 w-16">ID</th>
-                            <th className="py-2.5 px-3">Speaker / Source Claim</th>
-                            <th className="py-2.5 px-3 w-32">Status</th>
-                            <th className="py-2.5 px-3">Empirical Findings & Cross-Verification</th>
-                            <th className="py-2.5 px-3 w-28 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/80 bg-slate-950/60">
-                          {activeArticle.key_claims.map((claim) => (
-                            <tr key={claim.claim_id} className="hover:bg-slate-900/40 transition">
-                              <td className="py-3 px-3 font-mono font-bold text-slate-400 align-top">
-                                {claim.claim_id}
-                              </td>
-                              <td className="py-3 px-3 text-slate-200 align-top font-medium leading-relaxed">
-                                "{claim.speaker_claim}"
-                              </td>
-                              <td className="py-3 px-3 align-top">
-                                {getStatusBadge(claim.epistemic_status)}
-                              </td>
-                              <td className="py-3 px-3 text-slate-300 align-top leading-relaxed">
-                                <p>{claim.cross_verification_evidence}</p>
-                                {claim.empirical_dataset_reference && (
-                                  <span className="block mt-1 text-[10px] text-slate-500 font-mono">
-                                    Ref: {claim.empirical_dataset_reference}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-3 px-3 align-top text-right">
-                                {claim.epistemic_status === 'HYPOTHESIS' && (
-                                  <button
-                                    onClick={() => handleBridgeToStrategy(claim.claim_id)}
-                                    disabled={isBridgingClaim === claim.claim_id}
-                                    className="px-2 py-1 rounded bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 hover:text-white border border-indigo-500/40 text-[10px] font-mono flex items-center gap-1 transition ml-auto disabled:opacity-50"
-                                    title="Bridge falsifiable thesis into Strategy Desk"
-                                  >
-                                    <TrendingUp size={11} />
-                                    <span>{isBridgingClaim === claim.claim_id ? 'Bridging...' : 'Bridge Alpha'}</span>
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Section 3: Dialectical Contradictions & Filters */}
-                  {(activeArticle.contradictions_detected.length > 0 || contradictions.length > 0) && (
-                    <div className="bg-rose-950/20 border border-rose-500/30 p-4 rounded-lg space-y-3">
-                      <div className="flex items-center justify-between pb-1 border-b border-rose-500/20">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
-                          <AlertTriangle size={14} />
-                          <span>III. Dialectical Contradictions & Hype Filters ({activeArticle.contradictions_detected.length + contradictions.length})</span>
-                        </h3>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                          Dialectical Tracking Active
-                        </span>
-                      </div>
-                      
-                      {activeArticle.contradictions_detected.length > 0 && (
-                        <ul className="space-y-1.5 text-xs text-rose-200">
-                          {activeArticle.contradictions_detected.map((c, i) => (
-                            <li key={i} className="flex items-start gap-2 bg-rose-950/30 p-2 rounded border border-rose-500/20">
-                              <span className="text-rose-400 font-bold">•</span>
-                              <span className="leading-relaxed">{c}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-
-                      {contradictions.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
-                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
-                            Cross-Article Contradiction Ledger:
-                          </span>
-                          {contradictions.map((ct) => (
-                            <div key={ct.contradiction_id} className="p-2 rounded bg-slate-900/60 border border-rose-500/30 text-xs flex items-start justify-between gap-2">
-                              <div>
-                                <div className="text-[10px] text-slate-400 font-mono">
-                                  {ct.claim_a_id} vs {ct.claim_b_id}
-                                </div>
-                                <p className="text-slate-200 mt-0.5">{ct.contradiction_nature}</p>
-                              </div>
-                              <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold shrink-0 ${
-                                ct.resolution_status === 'RESOLVED'
-                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        <div>
+                          <div className="font-semibold text-[#202122] dark:text-white flex items-center gap-2">
+                            <span>Epistemic Reliability Index: {activeArticle.verification_score.toFixed(1)}%</span>
+                            {activeSource && (
+                              <span className={`text-[10px] px-2 py-0.2 rounded font-mono font-bold ${
+                                activeSource.access_status === 'SUCCESS'
+                                  ? 'bg-[#e6f4ea] text-[#137333] border border-[#ceead6] dark:bg-emerald-950/40 dark:text-emerald-300'
+                                  : 'bg-[#fef7e0] text-[#b06000] border border-[#feefc3]'
                               }`}>
-                                {ct.resolution_status}
+                                {activeSource.access_status === 'SUCCESS' ? 'Verified Extraction' : 'Partial Archive'}
                               </span>
-                            </div>
-                          ))}
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[#54595d] dark:text-slate-400 mt-0.5">
+                            Causal firewall active: {activeArticle.key_claims.filter(c => c.epistemic_status === 'FACT').length} empirical facts,{' '}
+                            {activeArticle.key_claims.filter(c => c.epistemic_status === 'HYPOTHESIS').length} falsifiable hypotheses,{' '}
+                            {activeArticle.contradictions_detected.length} contradictions logged.
+                          </div>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="text-[10px] text-[#54595d] dark:text-slate-400 font-mono">
+                        Invariant: Zero Link Loss
+                      </div>
                     </div>
-                  )}
 
-                  {/* Section 4: Macro Implications */}
-                  <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800 space-y-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-                      <TrendingUp size={14} />
-                      <span>IV. Macro Regime & Capital Allocation Implications</span>
-                    </h3>
-                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
-                      {activeArticle.macro_regime_implications}
-                    </p>
-                  </div>
+                    {/* Section 1: Abstract & Lead Paragraph */}
+                    <section className="space-y-2">
+                      <h2 className="text-lg font-serif font-bold text-[#000000] dark:text-white border-b border-[#a2a9b1] dark:border-[#2d3a4e] pb-1 flex items-center gap-2">
+                        <span>1. Abstract &amp; Background</span>
+                      </h2>
+                      <p className="text-xs text-[#202122] dark:text-[#eaecf0] leading-relaxed font-sans text-justify">
+                        {activeArticle.executive_summary}
+                      </p>
+                    </section>
 
-                  {/* Section 5: Connected Wiki Topics with Bidirectional WikiLink */}
-                  <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-800 space-y-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-                      <Layers size={14} />
-                      <span>V. Connected Wiki Dossiers ([[WikiLinks]])</span>
-                    </h3>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {activeArticle.wikilinks.map((wl, i) => {
-                        const cleanTerm = wl.replace(/\[\[|\]\]/g, '').split('|')[0].trim();
-                        const matched = articles.find(
-                          (a) =>
-                            a.title.toLowerCase().includes(cleanTerm.toLowerCase()) ||
-                            cleanTerm.toLowerCase().includes(a.title.toLowerCase())
-                        );
-                        return (
-                          <span
-                            key={i}
-                            className="px-2.5 py-1 rounded bg-indigo-500/10 border border-indigo-500/30 text-xs font-mono flex items-center gap-1.5"
-                          >
-                            <Bookmark size={11} className="text-indigo-400" />
-                            <WikiLink
-                              term={wl}
-                              articleId={matched?.article_id}
-                              summary={matched?.executive_summary}
-                              onNavigate={(artId) => setSelectedArticleId(artId)}
-                            />
+                    {/* Bengali Practical Guide Notice Box (Wikipedia Callout style) */}
+                    {activeSource?.real_life_summary && (
+                      <div className="border border-[#a2a9b1] dark:border-[#2f3e54] bg-[#f8f9fa] dark:bg-[#121924] p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-[#c8ccd1] dark:border-[#243044]">
+                          <h3 className="text-xs font-serif font-bold text-[#0b0080] dark:text-blue-300 flex items-center gap-1.5">
+                            <Sparkles size={14} className="text-[#b06000] dark:text-amber-400" />
+                            <span>ব্যবহারিক প্রয়োগ নির্দেশিকা (Bengali 5-Point Practical Guide)</span>
+                          </h3>
+                          <span className="text-[10px] text-[#54595d] dark:text-slate-400 font-mono">
+                            Human Intelligence Bridge
                           </span>
-                        );
-                      })}
-                    </div>
-                  </div>
+                        </div>
 
-                    {/* Tags */}
-                    <div className="flex flex-wrap gap-1.5 pt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+                          <div className="p-2.5 bg-white dark:bg-[#18212e] border border-[#eaecf0] dark:border-[#253246]">
+                            <div className="text-[11px] font-bold text-[#b06000] dark:text-amber-300 mb-0.5">
+                              🎯 সহজ ভাষায় মূল কথা:
+                            </div>
+                            <p className="text-[#202122] dark:text-[#eaecf0] leading-relaxed text-[11px]">
+                              {activeSource.real_life_summary.core_concept_bn}
+                            </p>
+                          </div>
+
+                          <div className="p-2.5 bg-white dark:bg-[#18212e] border border-[#eaecf0] dark:border-[#253246]">
+                            <div className="text-[11px] font-bold text-[#137333] dark:text-emerald-300 mb-0.5">
+                              📈 মার্কেট প্রভাব:
+                            </div>
+                            <p className="text-[#202122] dark:text-[#eaecf0] leading-relaxed text-[11px]">
+                              {activeSource.real_life_summary.practical_market_impact}
+                            </p>
+                          </div>
+
+                          <div className="p-2.5 bg-white dark:bg-[#18212e] border border-[#eaecf0] dark:border-[#253246]">
+                            <div className="text-[11px] font-bold text-[#3366cc] dark:text-blue-300 mb-0.5">
+                              🛠️ ট্রেডার হিসেবে করণীয়:
+                            </div>
+                            <p className="text-[#202122] dark:text-[#eaecf0] leading-relaxed text-[11px]">
+                              {activeSource.real_life_summary.actionable_guidance}
+                            </p>
+                          </div>
+
+                          <div className="p-2.5 bg-white dark:bg-[#18212e] border border-[#eaecf0] dark:border-[#253246]">
+                            <div className="text-[11px] font-bold text-[#b3261e] dark:text-rose-300 mb-0.5">
+                              ⚠️ প্রধান ঝুঁকি ও সতর্কতা:
+                            </div>
+                            <p className="text-[#202122] dark:text-[#eaecf0] leading-relaxed text-[11px]">
+                              {activeSource.real_life_summary.risk_warning}
+                            </p>
+                          </div>
+                        </div>
+
+                        {activeSource.real_life_summary.real_world_analogy && (
+                          <div className="p-2 bg-white dark:bg-[#18212e] border border-[#eaecf0] dark:border-[#253246] text-[11px]">
+                            <span className="font-bold text-[#54595d] dark:text-slate-300">বাস্তব অ্যানালজি: </span>
+                            <span className="italic text-[#202122] dark:text-slate-200">{activeSource.real_life_summary.real_world_analogy}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Section 2: Epistemic Claim Verification Matrix */}
+                    <section className="space-y-2">
+                      <h2 className="text-lg font-serif font-bold text-[#000000] dark:text-white border-b border-[#a2a9b1] dark:border-[#2d3a4e] pb-1 flex items-center justify-between">
+                        <span>2. Epistemic Claim Verification Matrix</span>
+                        <span className="text-xs font-sans font-normal text-[#54595d] dark:text-slate-400">
+                          Section 2.0
+                        </span>
+                      </h2>
+
+                      <div className="border border-[#a2a9b1] dark:border-[#2d3a4e] overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="bg-[#eaecf0] dark:bg-[#17212f] text-[#202122] dark:text-slate-200 border-b border-[#a2a9b1] dark:border-[#2d3a4e]">
+                            <tr>
+                              <th className="py-2 px-3 w-16 border-r border-[#c8ccd1] dark:border-[#2a374a] font-semibold">ID</th>
+                              <th className="py-2 px-3 border-r border-[#c8ccd1] dark:border-[#2a374a] font-semibold">Source Assertion</th>
+                              <th className="py-2 px-3 w-28 border-r border-[#c8ccd1] dark:border-[#2a374a] font-semibold">Taxonomy</th>
+                              <th className="py-2 px-3 border-r border-[#c8ccd1] dark:border-[#2a374a] font-semibold">Empirical Finding</th>
+                              <th className="py-2 px-3 w-24 text-right font-semibold">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#eaecf0] dark:divide-[#202a3a] bg-white dark:bg-[#0f141e]">
+                            {activeArticle.key_claims.map((claim) => (
+                              <tr key={claim.claim_id} className="hover:bg-[#f8f9fa] dark:hover:bg-[#161f2c] transition">
+                                <td className="py-2.5 px-3 font-mono text-[11px] text-[#54595d] dark:text-slate-400 border-r border-[#eaecf0] dark:border-[#202a3a] align-top">
+                                  {claim.claim_id}
+                                </td>
+                                <td className="py-2.5 px-3 text-[#202122] dark:text-[#eaecf0] border-r border-[#eaecf0] dark:border-[#202a3a] align-top font-serif leading-relaxed">
+                                  "{claim.speaker_claim}"
+                                </td>
+                                <td className="py-2.5 px-3 border-r border-[#eaecf0] dark:border-[#202a3a] align-top">
+                                  {getStatusBadge(claim.epistemic_status)}
+                                </td>
+                                <td className="py-2.5 px-3 text-[#333] dark:text-slate-300 border-r border-[#eaecf0] dark:border-[#202a3a] align-top leading-relaxed text-[11px]">
+                                  <p>{claim.cross_verification_evidence}</p>
+                                  {claim.empirical_dataset_reference && (
+                                    <span className="block mt-1 text-[10px] text-[#54595d] dark:text-slate-400 font-mono">
+                                      Ref: {claim.empirical_dataset_reference}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 align-top text-right">
+                                  {claim.epistemic_status === 'HYPOTHESIS' && (
+                                    <button
+                                      onClick={() => handleBridgeToStrategy(claim.claim_id)}
+                                      disabled={isBridgingClaim === claim.claim_id}
+                                      className="px-2 py-1 rounded bg-[#eaf3ff] dark:bg-blue-950/60 hover:bg-[#d5e7ff] text-[#3366cc] dark:text-blue-300 border border-[#a2a9b1] dark:border-blue-700/50 text-[10px] font-sans font-medium flex items-center gap-1 transition ml-auto disabled:opacity-50"
+                                      title="Bridge falsifiable thesis into Strategy Desk"
+                                    >
+                                      <TrendingUp size={11} />
+                                      <span>{isBridgingClaim === claim.claim_id ? 'Bridging...' : 'Bridge Alpha'}</span>
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+
+                    {/* Section 3: Dialectical Contradictions & Filters */}
+                    {(activeArticle.contradictions_detected.length > 0 || contradictions.length > 0) && (
+                      <section className="space-y-2">
+                        <h2 className="text-lg font-serif font-bold text-[#b3261e] dark:text-rose-400 border-b border-[#a2a9b1] dark:border-[#2d3a4e] pb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <AlertTriangle size={16} />
+                            <span>3. Dialectical Contradictions &amp; Dispute Ledger</span>
+                          </span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#fce8e6] text-[#b3261e] border border-[#fad2cf] dark:bg-rose-950/40 dark:text-rose-300">
+                            Active Dialectic
+                          </span>
+                        </h2>
+                        
+                        {activeArticle.contradictions_detected.length > 0 && (
+                          <ul className="space-y-1.5 text-xs text-[#202122] dark:text-rose-200">
+                            {activeArticle.contradictions_detected.map((c, i) => (
+                              <li key={i} className="flex items-start gap-2 bg-[#fdf2f2] dark:bg-rose-950/30 p-2.5 border border-[#fad2cf] dark:border-rose-900/50">
+                                <span className="text-[#b3261e] dark:text-rose-400 font-bold">•</span>
+                                <span className="leading-relaxed">{c}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {contradictions.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[10px] font-mono text-[#54595d] dark:text-slate-400 uppercase tracking-wider block">
+                              Cross-Article Discrepancies:
+                            </span>
+                            {contradictions.map((ct) => (
+                              <div key={ct.contradiction_id} className="p-2 bg-white dark:bg-[#151c27] border border-[#c8ccd1] dark:border-[#2a3648] text-xs flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="text-[10px] text-[#54595d] dark:text-slate-400 font-mono">
+                                    {ct.claim_a_id} vs {ct.claim_b_id}
+                                  </div>
+                                  <p className="text-[#202122] dark:text-slate-200 mt-0.5">{ct.contradiction_nature}</p>
+                                </div>
+                                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold shrink-0 bg-[#e6f4ea] text-[#137333] border border-[#ceead6] dark:bg-emerald-950/40 dark:text-emerald-300">
+                                  {ct.resolution_status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    )}
+
+                    {/* Section 4: Macro Regime & Capital Allocation Implications */}
+                    <section className="space-y-2">
+                      <h2 className="text-lg font-serif font-bold text-[#000000] dark:text-white border-b border-[#a2a9b1] dark:border-[#2d3a4e] pb-1 flex items-center gap-2">
+                        <span>4. Macro Regime &amp; Market Implications</span>
+                      </h2>
+                      <p className="text-xs text-[#202122] dark:text-[#eaecf0] leading-relaxed whitespace-pre-line font-sans">
+                        {activeArticle.macro_regime_implications}
+                      </p>
+                    </section>
+
+                    {/* Section 5: See also / Connected Wiki Topics */}
+                    <section className="space-y-2">
+                      <h2 className="text-lg font-serif font-bold text-[#000000] dark:text-white border-b border-[#a2a9b1] dark:border-[#2d3a4e] pb-1 flex items-center gap-2">
+                        <span>5. See also ([[WikiLinks]])</span>
+                      </h2>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {activeArticle.wikilinks.map((wl, i) => {
+                          const cleanTerm = wl.replace(/\[\[|\]\]/g, '').split('|')[0].trim();
+                          const matched = articles.find(
+                            (a) =>
+                              a.title.toLowerCase().includes(cleanTerm.toLowerCase()) ||
+                              cleanTerm.toLowerCase().includes(a.title.toLowerCase())
+                          );
+                          return (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded bg-[#eaecf0] dark:bg-[#1a2332] border border-[#c8ccd1] dark:border-[#2a3648] text-xs font-sans flex items-center gap-1.5"
+                            >
+                              <Bookmark size={11} className="text-[#3366cc] dark:text-[#6fa8dc]" />
+                              <WikiLink
+                                term={wl}
+                                articleId={matched?.article_id}
+                                summary={matched?.executive_summary}
+                                onNavigate={(artId) => setSelectedArticleId(artId)}
+                              />
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    {/* Wikipedia Category & Portal Footer Bar */}
+                    <div className="p-2.5 border border-[#a2a9b1] dark:border-[#2c3a50] bg-[#f8f9fa] dark:bg-[#131b26] text-[11px] font-sans flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-[#54595d] dark:text-slate-400">Categories:</span>
+                      <span className="text-[#3366cc] dark:text-[#6fa8dc] hover:underline cursor-pointer">{activeArticle.category}</span>
+                      <span>•</span>
                       {activeArticle.tags.map((tag, i) => (
-                        <span key={i} className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 text-[10px] font-mono border border-slate-800">
-                          #{tag}
+                        <span key={i} className="text-[#3366cc] dark:text-[#6fa8dc] hover:underline cursor-pointer">
+                          {tag}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  {/* Right Column: Wikipedia Infobox */}
+                  {/* Right Column: Authentic Wikipedia Infobox */}
                   <WikiInfobox article={activeArticle} source={activeSource} />
                 </div>
               )}

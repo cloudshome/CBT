@@ -16,8 +16,8 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
-  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK';
-  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK') => void;
+  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB';
+  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB') => void;
   openPositionsCount?: number;
 }
 
@@ -80,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Primary Screen View Switcher: Terminal vs Shadow Paper Desk */}
+        {/* Primary Screen View Switcher: Terminal vs Master Cockpit vs Shadow Paper Desk vs Research Lab */}
         <div className="flex items-center bg-[#090d16] border border-[#1e293b] rounded-lg p-0.5 text-xs font-mono">
           <button
             onClick={() => onViewChange?.('TERMINAL')}
@@ -119,6 +119,17 @@ export const Header: React.FC<HeaderProps> = ({
                 {openPositionsCount}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => onViewChange?.('RESEARCH_LAB')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'RESEARCH_LAB'
+                ? 'bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-600 text-white shadow-sm shadow-indigo-500/30 ring-1 ring-indigo-400/50'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <span className="text-sm">🧠</span>
+            <span>Research Lab</span>
           </button>
         </div>
 

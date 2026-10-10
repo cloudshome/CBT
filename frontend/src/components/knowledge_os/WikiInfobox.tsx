@@ -1,11 +1,6 @@
 import React from 'react';
 import {
   ShieldCheck,
-  User,
-  Globe,
-  Calendar,
-  Layers,
-  FileCheck,
   ExternalLink,
 } from 'lucide-react';
 import { WikiArticleDetail, ResearchSourceData } from '../../types';
@@ -18,110 +13,129 @@ interface WikiInfoboxProps {
 export const WikiInfobox: React.FC<WikiInfoboxProps> = ({ article, source }) => {
   const domain = source?.source_domain || 'External Intelligence';
   const author = article.author_or_speaker || 'Quantitative Analyst';
-  const pubDate = new Date(article.created_at).toLocaleDateString();
+  const pubDate = new Date(article.created_at).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
   const rigorScore = article.verification_score || 0;
   const claimsCount = article.key_claims?.length || article.claims_count || 0;
 
   return (
-    <div className="w-full lg:w-72 bg-[#0c1322] border border-[#1e293b] rounded-lg overflow-hidden text-xs font-mono text-slate-300 shadow-xl flex flex-col mb-4 lg:mb-0">
-      {/* Infobox Header */}
-      <div className="bg-[#131d33] border-b border-[#1e293b] p-3 text-center">
-        <h4 className="font-bold text-white text-sm tracking-wide leading-tight">
+    <aside className="w-full lg:w-80 border border-[#a2a9b1] dark:border-[#384252] bg-[#f8f9fa] dark:bg-[#18202e] text-[#202122] dark:text-[#eaecf0] shadow-sm rounded-none text-xs font-sans leading-normal mb-4 lg:mb-0 shrink-0">
+      {/* Wikipedia Infobox Title Banner */}
+      <div className="bg-[#eaecf0] dark:bg-[#202b3d] border-b border-[#a2a9b1] dark:border-[#384252] px-3 py-2 text-center">
+        <h4 className="font-serif font-bold text-sm tracking-normal text-[#101418] dark:text-white">
           {article.title}
         </h4>
-        <span className="text-[10px] text-cyan-400 font-semibold uppercase tracking-wider block mt-1">
+        <div className="text-[10px] text-[#54595d] dark:text-[#9aa0a6] uppercase tracking-wider font-mono mt-0.5">
           {article.category}
-        </span>
+        </div>
       </div>
 
-      {/* Primary Verification Badge */}
-      <div className="p-3 border-b border-[#1e293b] bg-slate-900/40 flex flex-col items-center gap-1.5 text-center">
-        <span className="text-[10px] text-slate-400 uppercase font-semibold">Epistemic Status</span>
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+      {/* Epistemic Status Ribbon */}
+      <div className="p-2.5 border-b border-[#c8ccd1] dark:border-[#2e3846] bg-[#f1f3f5] dark:bg-[#1b2434] text-center">
+        <div className="text-[10px] uppercase font-semibold text-[#54595d] dark:text-[#9aa0a6] mb-1">
+          Epistemic Verification
+        </div>
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-bold border ${
+            rigorScore >= 70
+              ? 'bg-[#e6f4ea] text-[#137333] border-[#ceead6] dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700/50'
+              : 'bg-[#fef7e0] text-[#b06000] border-[#feefc3] dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700/50'
+          }`}
+        >
           <ShieldCheck size={13} />
           {rigorScore >= 70 ? 'EVIDENCE VERIFIED' : 'HYPOTHESIS QUALIFIED'}
         </span>
       </div>
 
-      {/* Structured Metadata Fields */}
-      <div className="p-3 space-y-2 text-[11px]">
-        <div className="flex justify-between items-start border-b border-[#1e293b]/60 pb-1.5">
-          <span className="text-slate-500 flex items-center gap-1">
-            <User size={12} className="text-slate-400" /> Attributed:
-          </span>
-          <span className="font-semibold text-slate-200 text-right truncate max-w-[130px]">
-            {author}
-          </span>
-        </div>
+      {/* Wikipedia Key-Value Metadata Table */}
+      <table className="w-full border-collapse text-[11px]">
+        <tbody>
+          <tr className="border-b border-[#eaecf0] dark:border-[#253041]">
+            <th className="w-1/3 py-2 px-3 text-left font-semibold text-[#54595d] dark:text-[#9aa0a6] bg-[#f8f9fa] dark:bg-[#151c28] border-r border-[#eaecf0] dark:border-[#253041] align-top">
+              Attributed to
+            </th>
+            <td className="py-2 px-3 text-[#202122] dark:text-[#e2e8f0] font-medium align-top">
+              {author}
+            </td>
+          </tr>
 
-        <div className="flex justify-between items-start border-b border-[#1e293b]/60 pb-1.5">
-          <span className="text-slate-500 flex items-center gap-1">
-            <Globe size={12} className="text-slate-400" /> Domain:
-          </span>
-          <span className="font-semibold text-slate-200 text-right truncate max-w-[130px]">
-            {domain}
-          </span>
-        </div>
+          <tr className="border-b border-[#eaecf0] dark:border-[#253041]">
+            <th className="py-2 px-3 text-left font-semibold text-[#54595d] dark:text-[#9aa0a6] bg-[#f8f9fa] dark:bg-[#151c28] border-r border-[#eaecf0] dark:border-[#253041] align-top">
+              Domain
+            </th>
+            <td className="py-2 px-3 text-[#202122] dark:text-[#e2e8f0] font-mono text-[10px] align-top">
+              {domain}
+            </td>
+          </tr>
 
-        <div className="flex justify-between items-start border-b border-[#1e293b]/60 pb-1.5">
-          <span className="text-slate-500 flex items-center gap-1">
-            <Calendar size={12} className="text-slate-400" /> Recorded:
-          </span>
-          <span className="font-semibold text-slate-200 text-right">
-            {pubDate}
-          </span>
-        </div>
+          <tr className="border-b border-[#eaecf0] dark:border-[#253041]">
+            <th className="py-2 px-3 text-left font-semibold text-[#54595d] dark:text-[#9aa0a6] bg-[#f8f9fa] dark:bg-[#151c28] border-r border-[#eaecf0] dark:border-[#253041] align-top">
+              Recorded
+            </th>
+            <td className="py-2 px-3 text-[#202122] dark:text-[#e2e8f0] align-top">
+              {pubDate}
+            </td>
+          </tr>
 
-        <div className="flex justify-between items-start border-b border-[#1e293b]/60 pb-1.5">
-          <span className="text-slate-500 flex items-center gap-1">
-            <FileCheck size={12} className="text-slate-400" /> Evidence Rigor:
-          </span>
-          <span className={`font-bold ${rigorScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {rigorScore.toFixed(0)}%
-          </span>
-        </div>
+          <tr className="border-b border-[#eaecf0] dark:border-[#253041]">
+            <th className="py-2 px-3 text-left font-semibold text-[#54595d] dark:text-[#9aa0a6] bg-[#f8f9fa] dark:bg-[#151c28] border-r border-[#eaecf0] dark:border-[#253041] align-top">
+              Evidence Rigor
+            </th>
+            <td className="py-2 px-3 font-bold align-top">
+              <span className={rigorScore >= 70 ? 'text-[#188038] dark:text-emerald-400' : 'text-[#b06000] dark:text-amber-400'}>
+                {rigorScore.toFixed(0)}%
+              </span>
+            </td>
+          </tr>
 
-        <div className="flex justify-between items-start border-b border-[#1e293b]/60 pb-1.5">
-          <span className="text-slate-500 flex items-center gap-1">
-            <Layers size={12} className="text-slate-400" /> Claims Extracted:
-          </span>
-          <span className="font-bold text-cyan-300">
-            {claimsCount}
-          </span>
-        </div>
+          <tr className="border-b border-[#eaecf0] dark:border-[#253041]">
+            <th className="py-2 px-3 text-left font-semibold text-[#54595d] dark:text-[#9aa0a6] bg-[#f8f9fa] dark:bg-[#151c28] border-r border-[#eaecf0] dark:border-[#253041] align-top">
+              Claims Extracted
+            </th>
+            <td className="py-2 px-3 text-[#3366cc] dark:text-cyan-400 font-bold align-top">
+              {claimsCount}
+            </td>
+          </tr>
 
-        {source?.source_id && (
-          <div className="flex flex-col gap-0.5 border-b border-[#1e293b]/60 pb-1.5">
-            <span className="text-slate-500 text-[10px]">Source Ledger ID:</span>
-            <span className="font-mono text-[9px] text-slate-400 break-all select-all">
-              {source.source_id}
-            </span>
-          </div>
-        )}
-      </div>
+          {source?.source_id && (
+            <tr className="border-b border-[#eaecf0] dark:border-[#253041]">
+              <th className="py-2 px-3 text-left font-semibold text-[#54595d] dark:text-[#9aa0a6] bg-[#f8f9fa] dark:bg-[#151c28] border-r border-[#eaecf0] dark:border-[#253041] align-top">
+                Ledger ID
+              </th>
+              <td className="py-2 px-3 font-mono text-[9px] text-[#54595d] dark:text-slate-400 select-all break-all align-top">
+                {source.source_id}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
 
-      {/* Specialized Category Infobox Schema */}
+      {/* Specialized Category Schema Section */}
       {(() => {
         const catUpper = (article.category || '').toUpperCase();
         const tagsUpper = (article.tags || []).map((t) => t.toUpperCase()).join(' ');
 
         if (catUpper.includes('REGIME') || catUpper.includes('MACRO') || tagsUpper.includes('REGIME') || catUpper.includes('GEOPOLITICS')) {
           return (
-            <div className="p-3 border-t border-[#1e293b]/60 bg-indigo-950/20 space-y-1.5 text-[11px]">
-              <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block mb-1">
-                🏛️ Macro Regime Schema
-              </span>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Regime Class:</span>
-                <span className="text-indigo-300 font-semibold">Expansionary / Hegemonic</span>
+            <div className="border-t border-[#a2a9b1] dark:border-[#384252] bg-[#f1f3f5] dark:bg-[#172233] p-2.5 space-y-1 text-[11px]">
+              <div className="font-semibold text-[#202122] dark:text-[#c4d1e2] border-b border-[#c8ccd1] dark:border-[#2e3b4e] pb-1 mb-1.5 flex items-center gap-1">
+                <span>🏛️</span>
+                <span>Macro Regime Specification</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Volatility Cluster:</span>
-                <span className="text-slate-300">Clustered Vol (GARCH)</span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Regime Class:</span>
+                <span className="font-semibold text-[#0b0080] dark:text-indigo-300">Expansionary / Hegemonic</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Liquidity State:</span>
-                <span className="text-emerald-400 font-semibold">Accommodative</span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Volatility Cluster:</span>
+                <span className="text-[#202122] dark:text-slate-200">Clustered Vol (GARCH)</span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Liquidity State:</span>
+                <span className="text-[#137333] dark:text-emerald-400 font-semibold">Accommodative</span>
               </div>
             </div>
           );
@@ -129,21 +143,22 @@ export const WikiInfobox: React.FC<WikiInfoboxProps> = ({ article, source }) => 
 
         if (catUpper.includes('STRUCTURE') || catUpper.includes('FACTOR') || tagsUpper.includes('FACTOR') || tagsUpper.includes('ALPHA')) {
           return (
-            <div className="p-3 border-t border-[#1e293b]/60 bg-cyan-950/20 space-y-1.5 text-[11px]">
-              <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider block mb-1">
-                📐 Alpha Factor Schema
-              </span>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Factor Family:</span>
-                <span className="text-cyan-300 font-semibold">Microstructure / Orderflow</span>
+            <div className="border-t border-[#a2a9b1] dark:border-[#384252] bg-[#f1f3f5] dark:bg-[#172233] p-2.5 space-y-1 text-[11px]">
+              <div className="font-semibold text-[#202122] dark:text-[#c4d1e2] border-b border-[#c8ccd1] dark:border-[#2e3b4e] pb-1 mb-1.5 flex items-center gap-1">
+                <span>📐</span>
+                <span>Alpha Factor Specification</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Decay Half-Life:</span>
-                <span className="text-slate-300">~15m - 4h</span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Factor Family:</span>
+                <span className="font-semibold text-[#0b0080] dark:text-cyan-300">Microstructure / Orderflow</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Capacity Tier:</span>
-                <span className="text-emerald-400 font-semibold">Institutional ($50M+)</span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Decay Half-Life:</span>
+                <span className="text-[#202122] dark:text-slate-200">~15m - 4h</span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Capacity Tier:</span>
+                <span className="text-[#137333] dark:text-emerald-400 font-semibold">Institutional ($50M+)</span>
               </div>
             </div>
           );
@@ -151,38 +166,40 @@ export const WikiInfobox: React.FC<WikiInfoboxProps> = ({ article, source }) => 
 
         if (catUpper.includes('CRYPTO') || catUpper.includes('SETTLEMENT') || tagsUpper.includes('PROTOCOL')) {
           return (
-            <div className="p-3 border-t border-[#1e293b]/60 bg-purple-950/20 space-y-1.5 text-[11px]">
-              <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider block mb-1">
-                ⚡ Protocol & Settlement Schema
-              </span>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Settlement Layer:</span>
-                <span className="text-purple-300 font-semibold">L1 / L2 Rollup</span>
+            <div className="border-t border-[#a2a9b1] dark:border-[#384252] bg-[#f1f3f5] dark:bg-[#172233] p-2.5 space-y-1 text-[11px]">
+              <div className="font-semibold text-[#202122] dark:text-[#c4d1e2] border-b border-[#c8ccd1] dark:border-[#2e3b4e] pb-1 mb-1.5 flex items-center gap-1">
+                <span>⚡</span>
+                <span>Protocol & Settlement Specification</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Finality Class:</span>
-                <span className="text-slate-300">Deterministic</span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Settlement Layer:</span>
+                <span className="font-semibold text-[#0b0080] dark:text-purple-300">L1 / L2 Rollup</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Custody Audit:</span>
-                <span className="text-emerald-400 font-semibold">Zero-Rehypothecation</span>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Finality Class:</span>
+                <span className="text-[#202122] dark:text-slate-200">Deterministic</span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#54595d] dark:text-slate-400 font-medium">Custody Audit:</span>
+                <span className="text-[#137333] dark:text-emerald-400 font-semibold">Zero-Rehypothecation</span>
               </div>
             </div>
           );
         }
 
         return (
-          <div className="p-3 border-t border-[#1e293b]/60 bg-slate-900/40 space-y-1.5 text-[11px]">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
-              📊 Quantitative Profile
-            </span>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Audit Framework:</span>
-              <span className="text-slate-300">Epistemic Taxonomy (L2)</span>
+          <div className="border-t border-[#a2a9b1] dark:border-[#384252] bg-[#f1f3f5] dark:bg-[#172233] p-2.5 space-y-1 text-[11px]">
+            <div className="font-semibold text-[#202122] dark:text-[#c4d1e2] border-b border-[#c8ccd1] dark:border-[#2e3b4e] pb-1 mb-1.5 flex items-center gap-1">
+              <span>📊</span>
+              <span>Quantitative Profile</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Falsifiability:</span>
-              <span className="text-emerald-400 font-semibold">CPCV Testable</span>
+            <div className="flex justify-between py-0.5">
+              <span className="text-[#54595d] dark:text-slate-400 font-medium">Audit Framework:</span>
+              <span className="text-[#202122] dark:text-slate-200">Epistemic Taxonomy (L2)</span>
+            </div>
+            <div className="flex justify-between py-0.5">
+              <span className="text-[#54595d] dark:text-slate-400 font-medium">Falsifiability:</span>
+              <span className="text-[#137333] dark:text-emerald-400 font-semibold">CPCV Testable</span>
             </div>
           </div>
         );
@@ -190,17 +207,17 @@ export const WikiInfobox: React.FC<WikiInfoboxProps> = ({ article, source }) => 
 
       {/* External Original Link */}
       {article.source_url && (
-        <div className="p-2.5 bg-[#0a0f1d] border-t border-[#1e293b] text-center">
+        <div className="p-2 border-t border-[#c8ccd1] dark:border-[#2e3846] bg-[#eaecf0] dark:bg-[#1b2536] text-center">
           <a
             href={article.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-[11px] text-cyan-400 hover:text-cyan-300 transition hover:underline"
+            className="inline-flex items-center gap-1 text-[11px] text-[#3366cc] dark:text-[#6fa8dc] hover:underline font-medium"
           >
-            <ExternalLink size={12} /> View Primary Source
+            <ExternalLink size={11} /> View Primary Source
           </a>
         </div>
       )}
-    </div>
+    </aside>
   );
 };

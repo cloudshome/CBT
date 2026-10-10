@@ -110,8 +110,8 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
-  // Main Screen View Switcher: Terminal Cockpit vs Master Cockpit vs Dedicated Shadow Paper Trading Desk
-  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK'>('MASTER_COCKPIT');
+  // Main Screen View Switcher: Terminal Cockpit vs Master Cockpit vs Dedicated Shadow Paper Trading Desk vs Top-Level Research Lab
+  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB'>('MASTER_COCKPIT');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -550,7 +550,7 @@ export const App: React.FC = () => {
         openPositionsCount={positions.length}
       />
 
-      {/* Primary View Routing: Dedicated Shadow Paper Desk vs Master Cockpit vs Classic Terminal */}
+      {/* Primary View Routing: Dedicated Shadow Paper Desk vs Master Cockpit vs Top-Level Research Lab vs Classic Terminal */}
       {activeMainView === 'PAPER_DESK' ? (
         <DedicatedPaperTradingDesk
           onClosePosition={handleClosePosition}
@@ -565,6 +565,14 @@ export const App: React.FC = () => {
           }}
           addToast={addToast}
         />
+      ) : activeMainView === 'RESEARCH_LAB' ? (
+        <div className="max-w-[1920px] w-full mx-auto p-4 flex-1">
+          <ResearchIngestLab
+            onNotify={addToast}
+            selectedSymbol={symbol}
+            selectedTimeframe={timeframe}
+          />
+        </div>
       ) : (
         <>
           {/* Institutional Quantitative HUD Control Bar */}
