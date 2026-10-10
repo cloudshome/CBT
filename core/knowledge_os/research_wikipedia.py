@@ -436,6 +436,23 @@ class ResearchWikipediaEngine:
                     ),
                 )
 
+            # Phase 3: Automatic Contradiction Recording
+            if article.contradictions_detected:
+                claims = [c if isinstance(c, EpistemicClaim) else EpistemicClaim(**c) for c in article.key_claims]
+                c_a = claims[0].claim_id if claims else "CLM_01"
+                c_b = claims[1].claim_id if len(claims) > 1 else "CLM_EXT"
+                for contra_text in article.contradictions_detected:
+                    cid = f"contra_{uuid.uuid4().hex[:12]}"
+                    conn.execute(
+                        """
+                        INSERT OR IGNORE INTO wiki_contradictions (
+                            contradiction_id, article_id, claim_a_id, claim_b_id,
+                            contradiction_nature, resolution_status, resolution_notes, created_at
+                        ) VALUES (?, ?, ?, ?, ?, 'OPEN', '', ?);
+                        """,
+                        (cid, article.article_id, c_a, c_b, contra_text, int(time.time() * 1000)),
+                    )
+
             conn.commit()
 
         # Write permanent Markdown file
@@ -467,6 +484,22 @@ class ResearchWikipediaEngine:
             rows = conn.execute(
                 "SELECT * FROM wiki_links WHERE source_article_id = ? ORDER BY created_at ASC;",
                 (article_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_backlinks(self, target_title_or_slug: str) -> list[dict[str, Any]]:
+        """Returns articles linking to this target title or slug (bidirectional graph edge lookup)."""
+        slug = re.sub(r"[^a-z0-9]+", "-", target_title_or_slug.lower()).strip("-")
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT l.*, a.title as source_title, a.category as source_category
+                FROM wiki_links l
+                JOIN wiki_articles a ON l.source_article_id = a.article_id
+                WHERE l.target_slug = ? OR LOWER(l.target_title) = LOWER(?)
+                ORDER BY l.created_at DESC;
+                """,
+                (slug, target_title_or_slug),
             ).fetchall()
         return [dict(r) for r in rows]
 
@@ -585,6 +618,34 @@ class ResearchWikipediaEngine:
             )
             conn.commit()
             return cursor.rowcount > 0
+
+    def merge_triage_item(self, item_id: str) -> dict[str, Any] | None:
+        """
+        Promotes a candidate in the triage inbox to a fully stored Research Wikipedia article.
+        Translates candidate into a verified WikiArticle, records versions, links, and citations,
+        and marks the triage item status as 'MERGED'.
+        """
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM wiki_triage_inbox WHERE item_id = ?;", (item_id,)).fetchone()
+            if not row:
+                return None
+            data = dict(row)
+
+        content = data.get("source_url") or data.get("candidate_summary", "")
+        article = self.ingest_url_or_content(
+            url_or_text=content,
+            custom_title=data.get("candidate_title"),
+            custom_category=data.get("proposed_category", "Macro Geopolitics & Hegemony"),
+        )
+
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE wiki_triage_inbox SET status = 'MERGED', reviewed_at = ? WHERE item_id = ?;",
+                (int(time.time() * 1000), item_id),
+            )
+            conn.commit()
+
+        return article.to_dict()
 
     def delete_article(self, article_id: str) -> bool:
         """Removes an article from database and disk."""

@@ -1879,6 +1879,115 @@ export const api = {
     return handleResponse(res);
   },
 
+  /**
+   * GET /api/knowledge/wiki/article/{article_id}/versions
+   */
+  async getWikiArticleVersions(articleId: string): Promise<{ article_id: string; versions: Array<any>; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/article/${encodeURIComponent(articleId)}/versions`);
+    return handleResponse(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/article/{article_id}/citations
+   */
+  async getWikiArticleCitations(articleId: string): Promise<{ article_id: string; citations: Array<any>; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/article/${encodeURIComponent(articleId)}/citations`);
+    return handleResponse(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/article/{article_id}/links
+   */
+  async getWikiArticleLinks(articleId: string): Promise<{ article_id: string; links: Array<any>; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/article/${encodeURIComponent(articleId)}/links`);
+    return handleResponse(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/article/{article_id}/backlinks
+   */
+  async getWikiArticleBacklinks(articleId: string): Promise<{ article_id: string; target: string; backlinks: Array<any>; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/article/${encodeURIComponent(articleId)}/backlinks`);
+    return handleResponse(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/contradictions
+   */
+  async getWikiContradictions(articleId?: string): Promise<{ contradictions: Array<any>; count: number }> {
+    const q = articleId ? `?article_id=${encodeURIComponent(articleId)}` : '';
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/contradictions${q}`);
+    return handleResponse(res);
+  },
+
+  /**
+   * GET /api/knowledge/wiki/triage
+   */
+  async getWikiTriageInbox(status: string = 'STAGING', limit: number = 50): Promise<{ items: Array<any>; count: number }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/triage?status=${encodeURIComponent(status)}&limit=${limit}`);
+    return handleResponse(res);
+  },
+
+  /**
+   * PATCH /api/knowledge/wiki/triage/{item_id}
+   */
+  async updateWikiTriageStatus(itemId: string, status: string): Promise<{ status: string; item_id: string; new_status: string }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/triage/${encodeURIComponent(itemId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /api/knowledge/wiki/triage/{item_id}/merge
+   */
+  async mergeWikiTriageItem(itemId: string): Promise<{ status: string; item_id: string; article: WikiArticleDetail }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/wiki/triage/${encodeURIComponent(itemId)}/merge`, {
+      method: 'POST',
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /api/knowledge/web-search/cycle
+   */
+  async executeResearchCycle(topic: string, query?: string, limit: number = 3): Promise<{
+    cycle_id: string;
+    topic: string;
+    query: string;
+    duration_ms: number;
+    worker_audit_trail: Array<any>;
+    triage_item_id: string;
+    claims_count: number;
+    staged_claims: Array<any>;
+    critic_verdict: string;
+    timestamp_utc: number;
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/web-search/cycle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, query, limit }),
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /api/knowledge/claims/{claim_id}/synthesize-strategy
+   */
+  async synthesizeStrategyFromClaim(claimId: string, symbol: string = 'BTC/USDT', timeframe: string = '15m'): Promise<{
+    status: string;
+    candidate: any;
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/claims/${encodeURIComponent(claimId)}/synthesize-strategy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, timeframe }),
+    });
+    return handleResponse(res);
+  },
+
 
   // =========================================================================
   // Phase 16: Live Canary / Shadow Deployment & Telemetry Burn-In

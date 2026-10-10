@@ -691,6 +691,17 @@ async def get_wiki_article_links_endpoint(article_id: str) -> dict[str, Any]:
     return {"article_id": article_id, "links": links, "count": len(links)}
 
 
+@router.get("/wiki/article/{article_id}/backlinks")
+async def get_wiki_article_backlinks_endpoint(article_id: str) -> dict[str, Any]:
+    """Returns incoming backlinks connecting to this article (bidirectional graph edges)."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    art = research_wikipedia_engine.get_article(article_id)
+    target = art.title if art else article_id
+    backlinks = research_wikipedia_engine.get_backlinks(target)
+    return {"article_id": article_id, "target": target, "backlinks": backlinks, "count": len(backlinks)}
+
+
 @router.get("/wiki/contradictions")
 async def list_wiki_contradictions_endpoint(
     article_id: str | None = Query(default=None),
@@ -759,6 +770,17 @@ async def update_wiki_triage_status_endpoint(
     if not success:
         raise HTTPException(status_code=404, detail=f"Triage candidate '{item_id}' not found.")
     return {"status": "UPDATED", "item_id": item_id, "new_status": payload.status.upper()}
+
+
+@router.post("/wiki/triage/{item_id}/merge")
+async def merge_wiki_triage_item_endpoint(item_id: str) -> dict[str, Any]:
+    """Approves and merges a triage candidate into a fully verified Research Wikipedia article."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    merged = research_wikipedia_engine.merge_triage_item(item_id)
+    if not merged:
+        raise HTTPException(status_code=404, detail=f"Triage candidate '{item_id}' not found.")
+    return {"status": "MERGED", "item_id": item_id, "article": merged}
 
 
 # -----------------------------------------------------------------------------

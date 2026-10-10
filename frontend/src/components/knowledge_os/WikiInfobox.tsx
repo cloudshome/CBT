@@ -100,6 +100,94 @@ export const WikiInfobox: React.FC<WikiInfoboxProps> = ({ article, source }) => 
         )}
       </div>
 
+      {/* Specialized Category Infobox Schema */}
+      {(() => {
+        const catUpper = (article.category || '').toUpperCase();
+        const tagsUpper = (article.tags || []).map((t) => t.toUpperCase()).join(' ');
+
+        if (catUpper.includes('REGIME') || catUpper.includes('MACRO') || tagsUpper.includes('REGIME') || catUpper.includes('GEOPOLITICS')) {
+          return (
+            <div className="p-3 border-t border-[#1e293b]/60 bg-indigo-950/20 space-y-1.5 text-[11px]">
+              <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block mb-1">
+                🏛️ Macro Regime Schema
+              </span>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Regime Class:</span>
+                <span className="text-indigo-300 font-semibold">Expansionary / Hegemonic</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Volatility Cluster:</span>
+                <span className="text-slate-300">Clustered Vol (GARCH)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Liquidity State:</span>
+                <span className="text-emerald-400 font-semibold">Accommodative</span>
+              </div>
+            </div>
+          );
+        }
+
+        if (catUpper.includes('STRUCTURE') || catUpper.includes('FACTOR') || tagsUpper.includes('FACTOR') || tagsUpper.includes('ALPHA')) {
+          return (
+            <div className="p-3 border-t border-[#1e293b]/60 bg-cyan-950/20 space-y-1.5 text-[11px]">
+              <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider block mb-1">
+                📐 Alpha Factor Schema
+              </span>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Factor Family:</span>
+                <span className="text-cyan-300 font-semibold">Microstructure / Orderflow</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Decay Half-Life:</span>
+                <span className="text-slate-300">~15m - 4h</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Capacity Tier:</span>
+                <span className="text-emerald-400 font-semibold">Institutional ($50M+)</span>
+              </div>
+            </div>
+          );
+        }
+
+        if (catUpper.includes('CRYPTO') || catUpper.includes('SETTLEMENT') || tagsUpper.includes('PROTOCOL')) {
+          return (
+            <div className="p-3 border-t border-[#1e293b]/60 bg-purple-950/20 space-y-1.5 text-[11px]">
+              <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider block mb-1">
+                ⚡ Protocol & Settlement Schema
+              </span>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Settlement Layer:</span>
+                <span className="text-purple-300 font-semibold">L1 / L2 Rollup</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Finality Class:</span>
+                <span className="text-slate-300">Deterministic</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Custody Audit:</span>
+                <span className="text-emerald-400 font-semibold">Zero-Rehypothecation</span>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="p-3 border-t border-[#1e293b]/60 bg-slate-900/40 space-y-1.5 text-[11px]">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+              📊 Quantitative Profile
+            </span>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Audit Framework:</span>
+              <span className="text-slate-300">Epistemic Taxonomy (L2)</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Falsifiability:</span>
+              <span className="text-emerald-400 font-semibold">CPCV Testable</span>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* External Original Link */}
       {article.source_url && (
         <div className="p-2.5 bg-[#0a0f1d] border-t border-[#1e293b] text-center">

@@ -19,6 +19,9 @@ import {
   Bookmark,
   Compass,
   Download,
+  Inbox,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import {
@@ -27,6 +30,7 @@ import {
   ResearchSourceData,
 } from '../../types';
 import { WikiInfobox } from './WikiInfobox';
+import { WikiLink } from './WikiLinkHover';
 
 
 interface ResearchWikipediaDeskProps {
@@ -68,6 +72,41 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'ARTICLE' | 'MARKDOWN' | 'PROVENANCE'>('ARTICLE');
 
+  // Human-in-the-Loop Triage Inbox State (Phase 4)
+  const [showTriageDrawer, setShowTriageDrawer] = useState<boolean>(false);
+  const [triageItems, setTriageItems] = useState<Array<any>>([]);
+  const [isLoadingTriage, setIsLoadingTriage] = useState<boolean>(false);
+  const [isProcessingTriage, setIsProcessingTriage] = useState<string | null>(null);
+
+  // Strategy Bridge State (Phase 4)
+  const [isBridgingClaim, setIsBridgingClaim] = useState<string | null>(null);
+
+  // Dialectical Contradictions State (Phase 3)
+  const [contradictions, setContradictions] = useState<Array<any>>([]);
+
+  // Load triage inbox
+  const loadTriageInbox = useCallback(async () => {
+    try {
+      setIsLoadingTriage(true);
+      const res = await api.getWikiTriageInbox('STAGING');
+      setTriageItems(res.items || []);
+    } catch (err: any) {
+      console.warn('Could not load triage inbox:', err);
+    } finally {
+      setIsLoadingTriage(false);
+    }
+  }, []);
+
+  // Load tracked contradictions
+  const loadContradictions = useCallback(async () => {
+    try {
+      const res = await api.getWikiContradictions(selectedArticleId || undefined);
+      setContradictions(res.contradictions || []);
+    } catch (err: any) {
+      console.warn('Could not load contradictions:', err);
+    }
+  }, [selectedArticleId]);
+
   // Load article list
   const loadArticles = useCallback(async () => {
     try {
@@ -90,9 +129,10 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
   // Initial load
   useEffect(() => {
     loadArticles();
-  }, [loadArticles]);
+    loadTriageInbox();
+  }, [loadArticles, loadTriageInbox]);
 
-  // Load selected article details
+  // Load selected article details & contradictions
   useEffect(() => {
     if (!selectedArticleId) {
       setActiveArticle(null);
@@ -105,6 +145,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
         const res = await api.getWikiArticle(selectedArticleId);
         setActiveArticle(res.article);
         setActiveSource(res.source || null);
+        loadContradictions();
       } catch (err: any) {
         onNotify?.('error', 'Article Load Error', err.message || 'Could not load article detail.');
       } finally {
@@ -112,7 +153,97 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
       }
     };
     fetchDetail();
-  }, [selectedArticleId, onNotify]);
+  }, [selectedArticleId, loadContradictions, onNotify]);
+
+  // Handle Triage candidate approval and merge
+  const handleMergeTriageItem = async (itemId: string) => {
+    try {
+      setIsProcessingTriage(itemId);
+      const res = await api.mergeWikiTriageItem(itemId);
+      onNotify?.('success', 'Candidate Approved & Merged', `"${res.article.title}" published to Research Wikipedia.`);
+      await loadArticles();
+      await loadTriageInbox();
+      if (res.article?.article_id) {
+        setSelectedArticleId(res.article.article_id);
+        setShowTriageDrawer(false);
+      }
+    } catch (err: any) {
+      onNotify?.('error', 'Merge Failed', err.message || 'Could not merge candidate.');
+    } finally {
+      setIsProcessingTriage(null);
+    }
+  };
+
+  // Handle Triage candidate rejection
+  const handleRejectTriageItem = async (itemId: string) => {
+    try {
+      setIsProcessingTriage(itemId);
+      await api.updateWikiTriageStatus(itemId, 'REJECTED');
+      onNotify?.('info', 'Candidate Rejected', 'Candidate marked as rejected in triage ledger.');
+      await loadTriageInbox();
+    } catch (err: any) {
+      onNotify?.('error', 'Update Failed', err.message || 'Could not reject candidate.');
+    } finally {
+      setIsProcessingTriage(null);
+    }
+  };
+
+  // Handle Bridging Hypothesis to Strategy Desk (Phase 4)
+  const handleBridgeToStrategy = async (claimId: string) => {
+    try {
+      setIsBridgingClaim(claimId);
+      const res = await api.synthesizeStrategyFromClaim(claimId, 'BTC/USDT', '15m');
+      onNotify?.(
+        'success',
+        'Hypothesis Staged to Backtest Queue',
+        `Strategy candidate "${res.candidate?.strategy_name || claimId}" synthesized for closed-bar CPCV walk-forward validation.`
+      );
+    } catch (err: any) {
+      onNotify?.('error', 'Bridge Synthesis Failed', err.message || 'Could not synthesize strategy candidate.');
+    } finally {
+      setIsBridgingClaim(null);
+    }
+  };
+
+  // Handle Command Bar input (Phase 5)
+  const handleCommandBarKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    const val = searchQuery.trim();
+    if (!val.startsWith('/')) return;
+
+    e.preventDefault();
+    const parts = val.split(' ');
+    const cmd = parts[0].toLowerCase();
+    const param = parts.slice(1).join(' ').trim();
+
+    if (cmd === '/triage') {
+      setShowTriageDrawer(true);
+      await loadTriageInbox();
+      setSearchQuery('');
+    } else if (cmd === '/cycle') {
+      const topic = param || 'Quantitative Market Structure';
+      setSearchQuery('');
+      try {
+        setIsWebSearching(true);
+        onNotify?.('info', 'Research Cycle Launched', `5-Worker bounded cycle started for "${topic}"...`);
+        const res = await api.executeResearchCycle(topic, undefined, 3);
+        onNotify?.('success', 'Research Cycle Finished', `Extracted ${res.claims_count} claims (${res.duration_ms}ms). Verdict: ${res.critic_verdict}. Staged to Triage Inbox.`);
+        await loadTriageInbox();
+        setShowTriageDrawer(true);
+      } catch (err: any) {
+        onNotify?.('error', 'Research Cycle Failed', err.message || 'Error executing cycle.');
+      } finally {
+        setIsWebSearching(false);
+      }
+    } else if (cmd === '/wiki') {
+      setSearchQuery(param);
+    } else if (cmd === '/clear') {
+      setSearchQuery('');
+      setSelectedCategory('ALL');
+    } else if (cmd === '/help') {
+      onNotify?.('info', 'Command Bar Shortcuts', 'Available commands: /wiki <term>, /cycle <topic>, /triage, /clear, /help');
+    }
+  };
 
   // Handle ingestion of a link or note
   const handleIngest = async (e?: React.FormEvent) => {
@@ -283,6 +414,17 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => {
+                setShowTriageDrawer(true);
+                loadTriageInbox();
+              }}
+              className="px-3 py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-xs text-amber-300 flex items-center gap-1.5 border border-amber-500/30 transition cursor-pointer shadow-sm"
+              title="Review staged web intelligence candidates"
+            >
+              <Inbox size={13} />
+              <span>Triage Inbox ({triageItems.length})</span>
+            </button>
+            <button
               onClick={loadArticles}
               className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 flex items-center gap-1.5 border border-slate-700 transition"
               title="Refresh articles"
@@ -363,7 +505,8 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search encyclopedia entries, claims..."
+                onKeyDown={handleCommandBarKeyDown}
+                placeholder="Search entries or command: /wiki, /cycle, /triage, /help..."
                 className="w-full bg-slate-900 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition"
               />
             </div>
@@ -732,6 +875,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                             <th className="py-2.5 px-3">Speaker / Source Claim</th>
                             <th className="py-2.5 px-3 w-32">Status</th>
                             <th className="py-2.5 px-3">Empirical Findings & Cross-Verification</th>
+                            <th className="py-2.5 px-3 w-28 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/80 bg-slate-950/60">
@@ -754,6 +898,19 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                                   </span>
                                 )}
                               </td>
+                              <td className="py-3 px-3 align-top text-right">
+                                {claim.epistemic_status === 'HYPOTHESIS' && (
+                                  <button
+                                    onClick={() => handleBridgeToStrategy(claim.claim_id)}
+                                    disabled={isBridgingClaim === claim.claim_id}
+                                    className="px-2 py-1 rounded bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 hover:text-white border border-indigo-500/40 text-[10px] font-mono flex items-center gap-1 transition ml-auto disabled:opacity-50"
+                                    title="Bridge falsifiable thesis into Strategy Desk"
+                                  >
+                                    <TrendingUp size={11} />
+                                    <span>{isBridgingClaim === claim.claim_id ? 'Bridging...' : 'Bridge Alpha'}</span>
+                                  </button>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -761,21 +918,54 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                     </div>
                   </div>
 
-                  {/* Section 3: Contradictions & Filters */}
-                  {activeArticle.contradictions_detected.length > 0 && (
-                    <div className="bg-rose-950/20 border border-rose-500/30 p-4 rounded-lg space-y-2">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
-                        <AlertTriangle size={14} />
-                        <span>III. Epistemic Contradictions & Hype Filters</span>
-                      </h3>
-                      <ul className="space-y-1 text-xs text-rose-200">
-                        {activeArticle.contradictions_detected.map((c, i) => (
-                          <li key={i} className="flex items-start gap-2">
-                            <span className="text-rose-400">•</span>
-                            <span>{c}</span>
-                          </li>
-                        ))}
-                      </ul>
+                  {/* Section 3: Dialectical Contradictions & Filters */}
+                  {(activeArticle.contradictions_detected.length > 0 || contradictions.length > 0) && (
+                    <div className="bg-rose-950/20 border border-rose-500/30 p-4 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between pb-1 border-b border-rose-500/20">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                          <AlertTriangle size={14} />
+                          <span>III. Dialectical Contradictions & Hype Filters ({activeArticle.contradictions_detected.length + contradictions.length})</span>
+                        </h3>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                          Dialectical Tracking Active
+                        </span>
+                      </div>
+                      
+                      {activeArticle.contradictions_detected.length > 0 && (
+                        <ul className="space-y-1.5 text-xs text-rose-200">
+                          {activeArticle.contradictions_detected.map((c, i) => (
+                            <li key={i} className="flex items-start gap-2 bg-rose-950/30 p-2 rounded border border-rose-500/20">
+                              <span className="text-rose-400 font-bold">•</span>
+                              <span className="leading-relaxed">{c}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {contradictions.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                            Cross-Article Contradiction Ledger:
+                          </span>
+                          {contradictions.map((ct) => (
+                            <div key={ct.contradiction_id} className="p-2 rounded bg-slate-900/60 border border-rose-500/30 text-xs flex items-start justify-between gap-2">
+                              <div>
+                                <div className="text-[10px] text-slate-400 font-mono">
+                                  {ct.claim_a_id} vs {ct.claim_b_id}
+                                </div>
+                                <p className="text-slate-200 mt-0.5">{ct.contradiction_nature}</p>
+                              </div>
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold shrink-0 ${
+                                ct.resolution_status === 'RESOLVED'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                              }`}>
+                                {ct.resolution_status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -790,23 +980,35 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                     </p>
                   </div>
 
-                  {/* Section 5: Connected Wiki Topics */}
+                  {/* Section 5: Connected Wiki Topics with Bidirectional WikiLink */}
                   <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-800 space-y-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
                       <Layers size={14} />
                       <span>V. Connected Wiki Dossiers ([[WikiLinks]])</span>
                     </h3>
                     <div className="flex flex-wrap gap-2 pt-1">
-                      {activeArticle.wikilinks.map((wl, i) => (
-                        <span
-                          key={i}
-                          onClick={() => setSearchQuery(wl.replace(/\[\[|\]\]/g, ''))}
-                          className="px-2.5 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-mono cursor-pointer transition flex items-center gap-1"
-                        >
-                          <Bookmark size={11} />
-                          {wl}
-                        </span>
-                      ))}
+                      {activeArticle.wikilinks.map((wl, i) => {
+                        const cleanTerm = wl.replace(/\[\[|\]\]/g, '').split('|')[0].trim();
+                        const matched = articles.find(
+                          (a) =>
+                            a.title.toLowerCase().includes(cleanTerm.toLowerCase()) ||
+                            cleanTerm.toLowerCase().includes(a.title.toLowerCase())
+                        );
+                        return (
+                          <span
+                            key={i}
+                            className="px-2.5 py-1 rounded bg-indigo-500/10 border border-indigo-500/30 text-xs font-mono flex items-center gap-1.5"
+                          >
+                            <Bookmark size={11} className="text-indigo-400" />
+                            <WikiLink
+                              term={wl}
+                              articleId={matched?.article_id}
+                              summary={matched?.executive_summary}
+                              onNavigate={(artId) => setSelectedArticleId(artId)}
+                            />
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -889,6 +1091,132 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
           )}
         </div>
       </div>
+
+      {/* 3. Human-in-the-Loop Triage Inbox Drawer (Phase 4) */}
+      {showTriageDrawer && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-end animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl bg-[#0b1220] border-l border-slate-800 h-full flex flex-col shadow-2xl">
+            {/* Triage Drawer Header */}
+            <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Inbox size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                    <span>Research Triage Inbox</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      STAGING ({triageItems.length})
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Human-in-the-loop gate: Inspect extracted candidates before publishing into permanent Research Wikipedia.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTriageDrawer(false)}
+                className="text-slate-400 hover:text-white text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 transition"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Triage Candidates List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {isLoadingTriage ? (
+                <div className="flex flex-col items-center justify-center p-12 text-slate-500 gap-2">
+                  <RefreshCw size={20} className="animate-spin text-amber-400" />
+                  <span className="text-xs">Loading triage candidates...</span>
+                </div>
+              ) : triageItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 text-slate-500 gap-2 text-center">
+                  <CheckCircle2 size={32} className="text-emerald-500 mb-1" />
+                  <h4 className="text-sm font-bold text-slate-300">Triage Inbox is Clear</h4>
+                  <p className="text-xs text-slate-500 max-w-xs">
+                    All candidates have been reviewed or merged. Run a new research cycle with <code className="text-cyan-400 font-mono">/cycle &lt;topic&gt;</code> to discover more.
+                  </p>
+                </div>
+              ) : (
+                triageItems.map((item) => (
+                  <div
+                    key={item.item_id}
+                    className="p-4 rounded-lg bg-slate-900/80 border border-slate-800 space-y-3 hover:border-amber-500/40 transition"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2 text-[10px] font-mono text-cyan-400 mb-1">
+                          <span className="uppercase font-semibold">{item.source_domain}</span>
+                          <span>•</span>
+                          <span className="text-slate-400">{item.proposed_category}</span>
+                        </div>
+                        <h4 className="font-bold text-white text-sm leading-snug">
+                          {item.candidate_title}
+                        </h4>
+                      </div>
+                      <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                        {item.status}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-2.5 rounded border border-slate-800/80">
+                      {item.candidate_summary}
+                    </p>
+
+                    {item.extracted_claims && item.extracted_claims.length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-mono uppercase text-slate-400">
+                          Extracted Claims ({item.extracted_claims.length}):
+                        </span>
+                        <div className="space-y-1">
+                          {item.extracted_claims.slice(0, 3).map((cl: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="text-[11px] p-1.5 rounded bg-slate-950/40 border border-slate-800/60 flex items-start gap-1.5 text-slate-300"
+                            >
+                              <span className="text-amber-400 font-bold">•</span>
+                              <span className="line-clamp-2">{cl.claim || cl.speaker_claim}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                      <a
+                        href={item.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono"
+                      >
+                        <ExternalLink size={12} /> Inspect Source
+                      </a>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRejectTriageItem(item.item_id)}
+                          disabled={isProcessingTriage === item.item_id}
+                          className="px-3 py-1.5 rounded bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                        >
+                          <XCircle size={13} />
+                          <span>Reject</span>
+                        </button>
+                        <button
+                          onClick={() => handleMergeTriageItem(item.item_id)}
+                          disabled={isProcessingTriage === item.item_id}
+                          className="px-3 py-1.5 rounded bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-md shadow-emerald-900/40"
+                        >
+                          <CheckCircle2 size={13} />
+                          <span>{isProcessingTriage === item.item_id ? 'Merging...' : 'Approve & Merge'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
