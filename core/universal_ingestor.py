@@ -538,9 +538,27 @@ class UniversalIngestor:
         # Generate macro-informed live trading plans
         dynamic_plans = macro_trade_planner.generate_live_trading_plans()
 
+        # 11. Auto-Bridge to Research Wikipedia (Automatic Encyclopedic Article Synthesis)
+        wiki_article_id = None
+        try:
+            from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+            # Automatically compile into an encyclopedia article
+            wiki_art = research_wikipedia_engine.ingest_url_or_content(
+                url_or_text=content[:25000] if not uri.startswith("http") else uri,
+                custom_title=inferred_title,
+                custom_author=creator,
+                custom_category="Quantitative Market Structure" if has_trading_rules else ("Crypto & Decentralized Settlement" if "btc" in content.lower() else "Monetary Policy & Debt Cycles"),
+            )
+            wiki_article_id = wiki_art.article_id
+            logger.info(f"Auto-published research ingest {sid} into Wikipedia article: {wiki_article_id}")
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Wikipedia auto-publish note for {sid}: {e}")
+
         return {
             "source_id": sid,
             "knowledge_id": prov.knowledge_id,
+            "wiki_article_id": wiki_article_id,
             "archive": archive_info,
             "mode": mode,
             "worldview": worldview,
