@@ -17,18 +17,22 @@ import {
   Layers,
   TrendingUp,
   Bookmark,
+  Compass,
+  Download,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import {
   WikiArticleSummary,
   WikiArticleDetail,
-  EpistemicStatus,
   ResearchSourceData,
 } from '../../types';
+import { WikiInfobox } from './WikiInfobox';
+
 
 interface ResearchWikipediaDeskProps {
   onNotify?: (type: 'success' | 'error' | 'info' | 'warning', title: string, msg: string) => void;
 }
+
 
 const CATEGORIES = [
   'ALL',
@@ -50,6 +54,12 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
   // Filter & Search state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+
+  // Open Web Search Agent State
+  const [isWebSearching, setIsWebSearching] = useState<boolean>(false);
+  const [webCandidates, setWebCandidates] = useState<Array<any>>([]);
+  const [showWebResults, setShowWebResults] = useState<boolean>(false);
+  const [isIngestingCandidate, setIsIngestingCandidate] = useState<string | null>(null);
 
   // Ingest Form state
   const [inputUrlOrText, setInputUrlOrText] = useState<string>('');
@@ -131,6 +141,48 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
     }
   };
 
+  // Handle Open Web Discovery
+  const handleOpenWebSearch = async () => {
+    const q = searchQuery.trim() || inputUrlOrText.trim();
+    if (!q) {
+      onNotify?.('warning', 'Search Query Required', 'Please enter a search topic in the search box.');
+      return;
+    }
+    try {
+      setIsWebSearching(true);
+      setShowWebResults(true);
+      const res = await api.discoverWebIntelligence(q, selectedCategory === 'ALL' ? 'Quantitative Market Structure' : selectedCategory, 5);
+      setWebCandidates(res.candidates || []);
+      onNotify?.('info', 'Web Intelligence Discovered', `Found ${res.total_found} research candidates across open web.`);
+    } catch (err: any) {
+      onNotify?.('error', 'Web Search Failed', err.message || 'Could not query search providers.');
+    } finally {
+      setIsWebSearching(false);
+    }
+  };
+
+  // Handle Candidate Auto-Ingest into Wiki
+  const handleAutoIngestCandidate = async (candidateUrl: string, title?: string) => {
+    try {
+      setIsIngestingCandidate(candidateUrl);
+      const res = await api.autoIngestWebCandidate(candidateUrl, selectedCategory === 'ALL' ? 'Macro Geopolitics & Hegemony' : selectedCategory, title);
+      if (res.status === 'REJECTED_SECURITY_OR_NETWORK') {
+        onNotify?.('error', 'Security Blocked', res.error || 'URL violates SSRF boundaries.');
+      } else {
+        onNotify?.('success', 'Candidate Ingested', `"${res.title || 'Source'}" safely added to Research Wikipedia.`);
+        await loadArticles();
+        if (res.wiki_article_id) {
+          setSelectedArticleId(res.wiki_article_id);
+          setShowWebResults(false);
+        }
+      }
+    } catch (err: any) {
+      onNotify?.('error', 'Ingest Failed', err.message || 'Failed to ingest web source.');
+    } finally {
+      setIsIngestingCandidate(null);
+    }
+  };
+
   // Handle re-verification
   const handleReverify = async () => {
     if (!selectedArticleId) return;
@@ -149,6 +201,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
 
   // Copy markdown to clipboard
   const handleCopyMarkdown = () => {
+
     if (!activeArticle) return;
     navigator.clipboard.writeText(activeArticle.full_markdown_content);
     setIsCopied(true);
@@ -157,7 +210,7 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
   };
 
   // Status badge styling
-  const getStatusBadge = (status: EpistemicStatus) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'FACT':
         return (
@@ -302,8 +355,8 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
             ))}
           </div>
 
-          {/* Search box */}
-          <div className="p-3 border-b border-slate-800/80">
+          {/* Search box & Open Web Search Action */}
+          <div className="p-3 border-b border-slate-800/80 space-y-2">
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
@@ -314,7 +367,16 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                 className="w-full bg-slate-900 border border-slate-800 rounded pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition"
               />
             </div>
+            <button
+              onClick={handleOpenWebSearch}
+              disabled={isWebSearching}
+              className="w-full py-1.5 px-2 rounded bg-gradient-to-r from-cyan-950 to-indigo-950 hover:from-cyan-900 hover:to-indigo-900 border border-cyan-500/30 text-cyan-300 hover:text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+            >
+              <Compass size={13} className={isWebSearching ? 'animate-spin text-cyan-400' : 'text-cyan-400'} />
+              <span>{isWebSearching ? 'Searching Open Web...' : 'Search Open Web (AI Agent)'}</span>
+            </button>
           </div>
+
 
           {/* Articles list */}
           <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -458,35 +520,97 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                 </div>
               </div>
 
-              {activeTab === 'ARTICLE' && (
-                <>
-                  {/* Article Title & Provenance Block */}
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
-                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                        {activeArticle.provenance_id}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
-                        {activeArticle.category}
-                      </span>
-                      <span className="text-slate-500 text-[11px]">
-                        Last Verified: {new Date(activeArticle.updated_at).toLocaleString()}
-                      </span>
+              {/* Open Web Search Discovery Drawer */}
+              {showWebResults && (
+                <div className="bg-[#0b1220] border border-cyan-500/40 rounded-lg p-4 space-y-3 mb-6 shadow-2xl animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between pb-2 border-b border-cyan-500/20">
+                    <div className="flex items-center gap-2">
+                      <Compass size={18} className="text-cyan-400" />
+                      <h3 className="font-bold text-white text-xs tracking-wider">
+                        AUTONOMOUS WEB INTELLIGENCE CANDIDATES ({webCandidates.length})
+                      </h3>
                     </div>
-
-                    <h1 className="text-2xl font-bold text-white tracking-tight leading-snug">
-                      {activeArticle.title}
-                    </h1>
-
-                    <div className="mt-2 text-xs text-slate-400 flex items-center gap-2">
-                      <span>Attributed to: <strong className="text-slate-200">{activeArticle.author_or_speaker}</strong></span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        {getSourceIcon(activeArticle.source_type)}
-                        <span>{activeArticle.source_type.replace('_', ' ')}</span>
-                      </span>
-                    </div>
+                    <button
+                      onClick={() => setShowWebResults(false)}
+                      className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded hover:bg-slate-800 transition"
+                    >
+                      Close
+                    </button>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {webCandidates.map((cand) => (
+                      <div
+                        key={cand.candidate_id}
+                        className="bg-slate-900/80 border border-slate-800 p-3 rounded-lg flex flex-col justify-between gap-2 hover:border-cyan-500/40 transition"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] text-cyan-400 mb-1">
+                            <span className="font-semibold uppercase truncate max-w-[150px]">{cand.source_domain}</span>
+                            <span className="text-slate-500">{cand.provider}</span>
+                          </div>
+                          <h4 className="font-bold text-slate-100 text-xs line-clamp-2 leading-relaxed">
+                            {cand.title}
+                          </h4>
+                          <p className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                            {cand.snippet}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                          <a
+                            href={cand.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-slate-400 hover:text-cyan-300 flex items-center gap-1"
+                          >
+                            <ExternalLink size={11} /> Open
+                          </a>
+                          <button
+                            onClick={() => handleAutoIngestCandidate(cand.url, cand.title)}
+                            disabled={isIngestingCandidate === cand.url}
+                            className="px-2.5 py-1 rounded bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                          >
+                            <Download size={11} />
+                            <span>{isIngestingCandidate === cand.url ? 'Ingesting...' : 'Ingest to Wiki'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'ARTICLE' && (
+                <div className="flex flex-col-reverse lg:flex-row gap-6 items-start">
+                  {/* Left Column: Encyclopedic Content & Claims */}
+                  <div className="flex-1 w-full space-y-6">
+                    {/* Article Title & Provenance Block */}
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-2 text-xs">
+                        <span className="px-2 py-0.5 rounded font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          {activeArticle.provenance_id}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
+                          {activeArticle.category}
+                        </span>
+                        <span className="text-slate-500 text-[11px]">
+                          Last Verified: {new Date(activeArticle.updated_at).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <h1 className="text-2xl font-bold text-white tracking-tight leading-snug">
+                        {activeArticle.title}
+                      </h1>
+
+                      <div className="mt-2 text-xs text-slate-400 flex items-center gap-2">
+                        <span>Attributed to: <strong className="text-slate-200">{activeArticle.author_or_speaker}</strong></span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          {getSourceIcon(activeArticle.source_type)}
+                          <span>{activeArticle.source_type.replace('_', ' ')}</span>
+                        </span>
+                      </div>
+                    </div>
+
 
                   {/* Rigor Score & Source Guarantee Ribbon */}
                   <div className="p-3.5 rounded-lg bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900 border border-indigo-500/30 flex flex-wrap items-center justify-between gap-3">
@@ -686,16 +810,22 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
                     </div>
                   </div>
 
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-1.5 pt-2">
-                    {activeArticle.tags.map((tag, i) => (
-                      <span key={i} className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 text-[10px] font-mono border border-slate-800">
-                        #{tag}
-                      </span>
-                    ))}
+                    {/* Tags */}
+                    <div className="flex flex-wrap gap-1.5 pt-2">
+                      {activeArticle.tags.map((tag, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 text-[10px] font-mono border border-slate-800">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </>
+
+                  {/* Right Column: Wikipedia Infobox */}
+                  <WikiInfobox article={activeArticle} source={activeSource} />
+                </div>
               )}
+
+
 
               {activeTab === 'MARKDOWN' && (
                 <div className="space-y-2">

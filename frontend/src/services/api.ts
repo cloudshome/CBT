@@ -1827,6 +1827,59 @@ export const api = {
     return handleResponse<{ status: string; article_id: string }>(res);
   },
 
+  /**
+   * POST /api/knowledge/web-search/discover
+   * Open intelligence discovery across external web sources
+   */
+  async discoverWebIntelligence(query: string, topic: string = 'Quantitative Market Structure', limit: number = 5): Promise<{
+    search_id: string;
+    query: string;
+    topic: string;
+    timestamp_utc: number;
+    candidates: Array<{
+      candidate_id: string;
+      title: string;
+      url: string;
+      snippet: string;
+      source_domain: string;
+      provider: string;
+      is_safe: boolean;
+      rejection_reason?: string;
+    }>;
+    total_found: number;
+    provider_status: Record<string, string>;
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/web-search/discover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, topic, limit }),
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * POST /api/knowledge/web-search/auto-ingest
+   * Ingests an evaluated web candidate into the canonical universal ingestor
+   */
+  async autoIngestWebCandidate(url: string, topic: string = 'Macro Geopolitics & Hegemony', title?: string): Promise<{
+    status: string;
+    source_id?: string;
+    wiki_article_id?: string;
+    content_hash?: string;
+    claims_extracted?: number;
+    title?: string;
+    url: string;
+    error?: string;
+  }> {
+    const res = await authFetch(`${BASE_URL}/api/knowledge/web-search/auto-ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, topic, title }),
+    });
+    return handleResponse(res);
+  },
+
+
   // =========================================================================
   // Phase 16: Live Canary / Shadow Deployment & Telemetry Burn-In
   // =========================================================================

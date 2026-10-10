@@ -877,3 +877,52 @@ async def rag_query_endpoint(payload: RagQueryPayload) -> dict[str, Any]:
     return dossier.to_dict()
 
 
+# -----------------------------------------------------------------------------
+# AUTONOMOUS WEB SEARCH & INTELLIGENCE DISCOVERY ENDPOINTS
+# -----------------------------------------------------------------------------
+class WebSearchDiscoverPayload(BaseModel):
+    query: str = Field(..., min_length=2, max_length=500)
+    topic: str = Field(default="Quantitative Market Structure")
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class WebSearchAutoIngestPayload(BaseModel):
+    url: str = Field(..., min_length=5, max_length=1000)
+    topic: str = Field(default="Macro Geopolitics & Hegemony")
+    title: str | None = None
+
+
+@router.post("/web-search/discover")
+async def web_search_discover_endpoint(payload: WebSearchDiscoverPayload) -> dict[str, Any]:
+    """
+    Executes bounded open-web research discovery across external sources.
+    Returns evaluated, deduplicated candidates under strict SSRF protection.
+    Does NOT automatically publish or alter live trading logic.
+    """
+    from core.knowledge_os.web_search_agent import web_search_agent
+
+    discovery = await web_search_agent.discover_and_evaluate(
+        query=payload.query,
+        topic=payload.topic,
+        limit=payload.limit,
+    )
+    return discovery.to_dict()
+
+
+@router.post("/web-search/auto-ingest")
+async def web_search_auto_ingest_endpoint(payload: WebSearchAutoIngestPayload) -> dict[str, Any]:
+    """
+    Fetches an approved web discovery candidate safely, parses plain text,
+    and registers it into the canonical universal_ingestor and research_wikipedia_engine.
+    """
+    from core.knowledge_os.web_search_agent import web_search_agent
+
+    result = web_search_agent.auto_ingest_candidate_to_wiki(
+        candidate_url=payload.url,
+        custom_topic=payload.topic,
+        custom_title=payload.title,
+    )
+    return result
+
+
+
