@@ -132,6 +132,98 @@ class ResearchWikipediaEngine:
                 "CREATE INDEX IF NOT EXISTS idx_wiki_created ON wiki_articles(created_at DESC);"
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_category ON wiki_articles(category);")
+
+            # Phase 1: Institutional Relational Ledger Extensions
+            # 1. wiki_article_versions (Immutable version ledger)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS wiki_article_versions (
+                    version_id TEXT PRIMARY KEY,
+                    article_id TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    content_markdown TEXT NOT NULL,
+                    diff_summary TEXT,
+                    author_type TEXT NOT NULL,
+                    author_id TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY(article_id) REFERENCES wiki_articles(article_id)
+                );
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_wiki_versions_art ON wiki_article_versions(article_id, version DESC);"
+            )
+
+            # 2. wiki_links (Bidirectional knowledge graph edges)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS wiki_links (
+                    link_id TEXT PRIMARY KEY,
+                    source_article_id TEXT NOT NULL,
+                    target_title TEXT NOT NULL,
+                    target_slug TEXT NOT NULL,
+                    anchor_text TEXT,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY(source_article_id) REFERENCES wiki_articles(article_id)
+                );
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_links_src ON wiki_links(source_article_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_links_slug ON wiki_links(target_slug);")
+
+            # 3. wiki_source_citations (Provenance traceability)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS wiki_source_citations (
+                    citation_id TEXT PRIMARY KEY,
+                    article_id TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    claim_id TEXT,
+                    exact_quote TEXT,
+                    epistemic_level TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY(article_id) REFERENCES wiki_articles(article_id)
+                );
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_citations_art ON wiki_source_citations(article_id);")
+
+            # 4. wiki_contradictions (Dialectical consensus tracking)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS wiki_contradictions (
+                    contradiction_id TEXT PRIMARY KEY,
+                    article_id TEXT NOT NULL,
+                    claim_a_id TEXT NOT NULL,
+                    claim_b_id TEXT NOT NULL,
+                    contradiction_nature TEXT NOT NULL,
+                    resolution_status TEXT DEFAULT 'OPEN',
+                    resolution_notes TEXT,
+                    created_at INTEGER NOT NULL
+                );
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_contradictions_art ON wiki_contradictions(article_id);")
+
+            # 5. wiki_triage_inbox (Human-in-the-loop candidate queue)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS wiki_triage_inbox (
+                    item_id TEXT PRIMARY KEY,
+                    candidate_title TEXT NOT NULL,
+                    candidate_summary TEXT NOT NULL,
+                    source_url TEXT NOT NULL,
+                    source_domain TEXT NOT NULL,
+                    source_id TEXT,
+                    proposed_category TEXT NOT NULL,
+                    extracted_claims_json TEXT NOT NULL,
+                    status TEXT DEFAULT 'STAGING',
+                    created_at INTEGER NOT NULL,
+                    reviewed_at INTEGER
+                );
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_triage_status ON wiki_triage_inbox(status);")
             conn.commit()
 
     def list_articles(
@@ -278,12 +370,221 @@ class ResearchWikipediaEngine:
                     article.updated_at,
                 ),
             )
+
+            # Phase 1: Automatic Immutable Versioning
+            ver_row = conn.execute(
+                "SELECT MAX(version) as max_v FROM wiki_article_versions WHERE article_id = ?",
+                (article.article_id,),
+            ).fetchone()
+            next_version = (ver_row["max_v"] or 0) + 1 if ver_row else 1
+            version_id = f"v_{article.article_id}_{next_version}_{int(time.time())}"
+            conn.execute(
+                """
+                INSERT INTO wiki_article_versions (
+                    version_id, article_id, version, content_markdown,
+                    diff_summary, author_type, author_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    version_id,
+                    article.article_id,
+                    next_version,
+                    article.full_markdown_content,
+                    f"Version {next_version} snapshot",
+                    "AUTONOMOUS_AGENT" if not article.author_or_speaker else "HUMAN_RESEARCHER",
+                    article.author_or_speaker or "SKY_AGENT",
+                    int(time.time() * 1000),
+                ),
+            )
+
+            # Phase 1: Bidirectional WikiLinks Extraction & Indexing
+            conn.execute("DELETE FROM wiki_links WHERE source_article_id = ?", (article.article_id,))
+            link_matches = re.findall(r"\[\[([^\]\|]+)(?:\|([^\]]+))?\]\]", article.full_markdown_content)
+            for target_title_raw, anchor_raw in link_matches:
+                t_title = target_title_raw.strip()
+                t_slug = re.sub(r"[^a-z0-9]+", "-", t_title.lower()).strip("-")
+                anchor = anchor_raw.strip() if anchor_raw else t_title
+                link_id = f"lnk_{uuid.uuid4().hex[:12]}"
+                conn.execute(
+                    """
+                    INSERT INTO wiki_links (link_id, source_article_id, target_title, target_slug, anchor_text, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?);
+                    """,
+                    (link_id, article.article_id, t_title, t_slug, anchor, int(time.time() * 1000)),
+                )
+
+            # Phase 1: Provenance Citations
+            for claim in article.key_claims:
+                c_id = claim.claim_id if isinstance(claim, EpistemicClaim) else claim.get("claim_id", "")
+                c_status = claim.epistemic_status if isinstance(claim, EpistemicClaim) else claim.get("epistemic_status", "UNVERIFIED")
+                c_text = claim.speaker_claim if isinstance(claim, EpistemicClaim) else claim.get("speaker_claim", "")
+                citation_id = f"cit_{article.article_id}_{c_id}"
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO wiki_source_citations (
+                        citation_id, article_id, source_id, claim_id, exact_quote, epistemic_level, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        citation_id,
+                        article.article_id,
+                        article.provenance_id or "PROV_UNKNOWN",
+                        c_id,
+                        c_text,
+                        c_status,
+                        int(time.time() * 1000),
+                    ),
+                )
+
             conn.commit()
 
         # Write permanent Markdown file
         md_file = self.articles_dir / f"{article.article_id}.md"
         md_file.write_text(article.full_markdown_content, encoding="utf-8")
-        logger.info(f"Saved Research Wikipedia article: {article.article_id} -> {md_file}")
+        logger.info(f"Saved Research Wikipedia article: {article.article_id} (v{next_version}) -> {md_file}")
+
+    def get_article_versions(self, article_id: str) -> list[dict[str, Any]]:
+        """Returns chronological version history for an article."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM wiki_article_versions WHERE article_id = ? ORDER BY version DESC;",
+                (article_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_article_citations(self, article_id: str) -> list[dict[str, Any]]:
+        """Returns provenance source citations attached to an article."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM wiki_source_citations WHERE article_id = ? ORDER BY created_at ASC;",
+                (article_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_article_links(self, article_id: str) -> list[dict[str, Any]]:
+        """Returns outgoing WikiLinks from an article."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM wiki_links WHERE source_article_id = ? ORDER BY created_at ASC;",
+                (article_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def record_contradiction(
+        self,
+        article_id: str,
+        claim_a_id: str,
+        claim_b_id: str,
+        contradiction_nature: str,
+        resolution_status: str = "OPEN",
+        resolution_notes: str = "",
+    ) -> str:
+        """Registers a dialectical contradiction between two claims."""
+        contradiction_id = f"contra_{uuid.uuid4().hex[:12]}"
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO wiki_contradictions (
+                    contradiction_id, article_id, claim_a_id, claim_b_id,
+                    contradiction_nature, resolution_status, resolution_notes, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    contradiction_id,
+                    article_id,
+                    claim_a_id,
+                    claim_b_id,
+                    contradiction_nature,
+                    resolution_status,
+                    resolution_notes,
+                    int(time.time() * 1000),
+                ),
+            )
+            conn.commit()
+        return contradiction_id
+
+    def get_contradictions(self, article_id: str | None = None) -> list[dict[str, Any]]:
+        """Retrieves tracked contradictions across articles."""
+        with self._get_connection() as conn:
+            if article_id:
+                rows = conn.execute(
+                    "SELECT * FROM wiki_contradictions WHERE article_id = ? ORDER BY created_at DESC;",
+                    (article_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM wiki_contradictions ORDER BY created_at DESC;",
+                ).fetchall()
+        return [dict(r) for r in rows]
+
+    def add_to_triage_inbox(
+        self,
+        candidate_title: str,
+        candidate_summary: str,
+        source_url: str,
+        source_domain: str,
+        proposed_category: str,
+        extracted_claims: list[dict[str, Any]],
+        source_id: str = "",
+    ) -> str:
+        """Adds an autonomous discovery candidate to the human-in-the-loop review inbox."""
+        item_id = f"tri_{uuid.uuid4().hex[:12]}"
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO wiki_triage_inbox (
+                    item_id, candidate_title, candidate_summary, source_url,
+                    source_domain, source_id, proposed_category,
+                    extracted_claims_json, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'STAGING', ?);
+                """,
+                (
+                    item_id,
+                    candidate_title,
+                    candidate_summary,
+                    source_url,
+                    source_domain,
+                    source_id,
+                    proposed_category,
+                    json.dumps(extracted_claims),
+                    int(time.time() * 1000),
+                ),
+            )
+            conn.commit()
+        return item_id
+
+    def list_triage_inbox(self, status: str | None = "STAGING", limit: int = 50) -> list[dict[str, Any]]:
+        """Lists candidate articles awaiting human review."""
+        with self._get_connection() as conn:
+            if status:
+                rows = conn.execute(
+                    "SELECT * FROM wiki_triage_inbox WHERE status = ? ORDER BY created_at DESC LIMIT ?;",
+                    (status.upper(), limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM wiki_triage_inbox ORDER BY created_at DESC LIMIT ?;",
+                    (limit,),
+                ).fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["extracted_claims"] = json.loads(d.get("extracted_claims_json", "[]"))
+            except Exception:
+                d["extracted_claims"] = []
+            results.append(d)
+        return results
+
+    def update_triage_status(self, item_id: str, status: str) -> bool:
+        """Approves, rejects, or merges a candidate item in the triage inbox."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE wiki_triage_inbox SET status = ?, reviewed_at = ? WHERE item_id = ?;",
+                (status.upper(), int(time.time() * 1000), item_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
 
     def delete_article(self, article_id: str) -> bool:
         """Removes an article from database and disk."""

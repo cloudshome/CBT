@@ -639,6 +639,129 @@ async def delete_wiki_article(article_id: str) -> dict[str, Any]:
 
 
 # -----------------------------------------------------------------------------
+# PHASE 1: RESEARCH WIKIPEDIA LEDGER, VERSIONING, CITATIONS & TRIAGE
+# -----------------------------------------------------------------------------
+class WikiContradictionCreatePayload(BaseModel):
+    article_id: str
+    claim_a_id: str
+    claim_b_id: str
+    contradiction_nature: str
+    resolution_status: str = "OPEN"
+    resolution_notes: str = ""
+
+
+class WikiTriageCreatePayload(BaseModel):
+    candidate_title: str
+    candidate_summary: str
+    source_url: str
+    source_domain: str
+    proposed_category: str = "Macro Geopolitics & Hegemony"
+    extracted_claims: list[dict[str, Any]] = Field(default_factory=list)
+    source_id: str = ""
+
+
+class WikiTriageStatusUpdatePayload(BaseModel):
+    status: str = Field(..., description="APPROVED, REJECTED, or STAGING")
+
+
+@router.get("/wiki/article/{article_id}/versions")
+async def get_wiki_article_versions_endpoint(article_id: str) -> dict[str, Any]:
+    """Returns chronological immutable version snapshots for a research article."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    versions = research_wikipedia_engine.get_article_versions(article_id)
+    return {"article_id": article_id, "versions": versions, "count": len(versions)}
+
+
+@router.get("/wiki/article/{article_id}/citations")
+async def get_wiki_article_citations_endpoint(article_id: str) -> dict[str, Any]:
+    """Returns provenance citations linking article claims to source hashes."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    citations = research_wikipedia_engine.get_article_citations(article_id)
+    return {"article_id": article_id, "citations": citations, "count": len(citations)}
+
+
+@router.get("/wiki/article/{article_id}/links")
+async def get_wiki_article_links_endpoint(article_id: str) -> dict[str, Any]:
+    """Returns indexed outgoing WikiLinks connecting into the knowledge graph."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    links = research_wikipedia_engine.get_article_links(article_id)
+    return {"article_id": article_id, "links": links, "count": len(links)}
+
+
+@router.get("/wiki/contradictions")
+async def list_wiki_contradictions_endpoint(
+    article_id: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Lists tracked dialectical contradictions across research articles."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    contradictions = research_wikipedia_engine.get_contradictions(article_id)
+    return {"contradictions": contradictions, "count": len(contradictions)}
+
+
+@router.post("/wiki/contradictions")
+async def create_wiki_contradiction_endpoint(payload: WikiContradictionCreatePayload) -> dict[str, Any]:
+    """Registers a newly discovered empirical contradiction between two claims."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    cid = research_wikipedia_engine.record_contradiction(
+        article_id=payload.article_id,
+        claim_a_id=payload.claim_a_id,
+        claim_b_id=payload.claim_b_id,
+        contradiction_nature=payload.contradiction_nature,
+        resolution_status=payload.resolution_status,
+        resolution_notes=payload.resolution_notes,
+    )
+    return {"status": "RECORDED", "contradiction_id": cid}
+
+
+@router.get("/wiki/triage")
+async def list_wiki_triage_inbox_endpoint(
+    status: str | None = Query(default="STAGING"),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    """Lists autonomous research discovery candidates in the human-in-the-loop review inbox."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    items = research_wikipedia_engine.list_triage_inbox(status=status, limit=limit)
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/wiki/triage")
+async def add_to_wiki_triage_inbox_endpoint(payload: WikiTriageCreatePayload) -> dict[str, Any]:
+    """Stages a discovered article candidate into the human-in-the-loop review queue."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    item_id = research_wikipedia_engine.add_to_triage_inbox(
+        candidate_title=payload.candidate_title,
+        candidate_summary=payload.candidate_summary,
+        source_url=payload.source_url,
+        source_domain=payload.source_domain,
+        proposed_category=payload.proposed_category,
+        extracted_claims=payload.extracted_claims,
+        source_id=payload.source_id,
+    )
+    return {"status": "STAGED", "item_id": item_id}
+
+
+@router.patch("/wiki/triage/{item_id}")
+async def update_wiki_triage_status_endpoint(
+    item_id: str,
+    payload: WikiTriageStatusUpdatePayload,
+) -> dict[str, Any]:
+    """Updates review status of a triage inbox candidate (APPROVED, REJECTED, STAGING)."""
+    from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+    success = research_wikipedia_engine.update_triage_status(item_id, payload.status)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Triage candidate '{item_id}' not found.")
+    return {"status": "UPDATED", "item_id": item_id, "new_status": payload.status.upper()}
+
+
+# -----------------------------------------------------------------------------
 # MILESTONE 4: CLAIM VERIFICATION & EVIDENCE TIMELINE ENDPOINTS
 # -----------------------------------------------------------------------------
 @router.post("/claims/{claim_id}/verify")

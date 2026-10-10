@@ -39,12 +39,17 @@ MAX_RESPONSE_BYTES = 2 * 1024 * 1024  # 2MB strict content payload limit
 DEFAULT_TIMEOUT_SECS = 8.0
 
 BLOCKED_IP_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),        # This host on this network (RFC 1122)
     ipaddress.ip_network("127.0.0.0/8"),      # Loopback
     ipaddress.ip_network("10.0.0.0/8"),       # RFC 1918 Private
     ipaddress.ip_network("172.16.0.0/12"),    # RFC 1918 Private
     ipaddress.ip_network("192.168.0.0/16"),   # RFC 1918 Private
     ipaddress.ip_network("169.254.0.0/16"),   # Link-Local / Cloud Metadata (AWS/GCP)
     ipaddress.ip_network("100.64.0.0/10"),    # Carrier-grade NAT
+    ipaddress.ip_network("198.18.0.0/15"),    # Benchmark testing (RFC 2544)
+    ipaddress.ip_network("224.0.0.0/4"),      # Multicast (RFC 5771)
+    ipaddress.ip_network("240.0.0.0/4"),      # Reserved for future use (RFC 1112)
+    ipaddress.ip_network("::/128"),           # IPv6 Unspecified
     ipaddress.ip_network("::1/128"),          # IPv6 Loopback
     ipaddress.ip_network("fc00::/7"),         # IPv6 Unique Local
     ipaddress.ip_network("fe80::/10"),        # IPv6 Link-Local
@@ -448,10 +453,25 @@ class AutonomousWebSearchAgent:
 
         # Leverage existing universal_ingestor to guarantee provenance, hashes, and relational schemas
         res = universal_ingestor.ingest_url(url=candidate_url, options=ingest_options)
+
+        # Phase 1: Stage candidate into Human-in-the-Loop Triage Inbox
+        from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+        triage_id = research_wikipedia_engine.add_to_triage_inbox(
+            candidate_title=ingest_options["title"],
+            candidate_summary=(fetch_res.text_content[:300] if fetch_res.text_content else "Autonomous web research candidate."),
+            source_url=candidate_url,
+            source_domain=fetch_res.source_domain,
+            proposed_category=custom_topic,
+            extracted_claims=[c.to_dict() for c in res.claims] if res.claims else [],
+            source_id=res.source.source_id,
+        )
+
         return {
             "status": res.status,
             "source_id": res.source.source_id,
             "wiki_article_id": res.source.wiki_article_id,
+            "triage_id": triage_id,
             "content_hash": fetch_res.content_hash,
             "claims_extracted": len(res.claims),
             "title": ingest_options["title"],

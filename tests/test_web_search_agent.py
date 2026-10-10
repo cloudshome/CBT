@@ -28,9 +28,14 @@ def test_ssrf_blocks_loopback_and_private_ips():
     blocked_targets = [
         "http://localhost:8000/api/health",
         "http://127.0.0.1:8000/api/orders",
+        "http://0.0.0.0:80/status",                   # RFC 1122
         "http://10.0.0.1/admin",
+        "http://172.16.0.10:8080/metrics",
         "http://192.168.1.1:8080/router",
         "http://169.254.169.254/latest/meta-data/",  # Cloud Metadata endpoint
+        "http://100.64.0.1/cgnat",                   # Carrier-grade NAT
+        "http://224.0.0.1/multicast",                # Multicast
+        "http://240.0.0.1/reserved",                 # Reserved Future Use
         "http://metadata.google.internal/computeMetadata/v1/",
     ]
     for url in blocked_targets:
