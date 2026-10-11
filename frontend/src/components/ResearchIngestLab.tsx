@@ -83,9 +83,10 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
   const [inputText, setInputText] = useState<string>('');
   const [inputTitle, setInputTitle] = useState<string>('');
   const [inputAuthor, setInputAuthor] = useState<string>('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [selectedMode, setSelectedMode] = useState<ResearchIngestMode>('AUTO');
 
   // Dedicated Ingestion Summary State
@@ -258,37 +259,70 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-        if (onNotify) {
-          onNotify('error', 'File Too Large', `File is ${sizeMb} MB. Maximum allowed upload size is ${MAX_FILE_SIZE_MB} MB.`);
+      const incoming = Array.from(e.dataTransfer.files);
+      const validFiles: File[] = [];
+      for (const file of incoming) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+          if (onNotify) {
+            onNotify('error', 'File Too Large', `${file.name} is ${sizeMb} MB. Max size is ${MAX_FILE_SIZE_MB} MB.`);
+          }
+        } else {
+          validFiles.push(file);
         }
-        return;
       }
-      setSelectedFile(file);
+      if (validFiles.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...validFiles]);
+      }
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-        if (onNotify) {
-          onNotify('error', 'File Too Large', `File is ${sizeMb} MB. Maximum allowed upload size is ${MAX_FILE_SIZE_MB} MB.`);
+      const incoming = Array.from(e.target.files);
+      const validFiles: File[] = [];
+      for (const file of incoming) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+          if (onNotify) {
+            onNotify('error', 'File Too Large', `${file.name} is ${sizeMb} MB. Max size is ${MAX_FILE_SIZE_MB} MB.`);
+          }
+        } else {
+          validFiles.push(file);
         }
-        e.target.value = '';
-        return;
       }
-      setSelectedFile(file);
+      if (validFiles.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...validFiles]);
+      }
+      e.target.value = '';
     }
+  };
+
+  const handleRemoveFile = (index: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearAllFiles = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedFiles([]);
   };
 
   // Real-time Content & Intent Auto-Detection
   const autoDetectContent = useCallback(() => {
-    if (selectedFile) {
-      const ext = selectedFile.name.split('.').pop()?.toLowerCase() || '';
+    if (selectedFiles.length > 0) {
+      if (selectedFiles.length > 1) {
+        return {
+          type: `Batch Ingestion (${selectedFiles.length} files & images)`,
+          badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
+          icon: Layers,
+          hasRules: false,
+          recommendedAction: `Process and catalog ${selectedFiles.length} files into Knowledge & Vault systems concurrently`,
+          destination: 'Knowledge Vaults + Multi-File Archive',
+        };
+      }
+      const firstFile = selectedFiles[0];
+      const ext = firstFile.name.split('.').pop()?.toLowerCase() || '';
       if (['pdf'].includes(ext)) {
         return {
           type: 'PDF Quantitative Monograph / Book',
@@ -319,7 +353,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           destination: 'Observation Vault + Market Variables',
         };
       }
-      if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+      if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'].includes(ext)) {
         return {
           type: 'Market Chart / Technical Diagram',
           badgeColor: 'bg-pink-500/20 text-pink-400 border-pink-500/40',
@@ -444,48 +478,54 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
     }
 
     return null;
-  }, [selectedFile, inputText]);
+  }, [selectedFiles, inputText]);
 
   const detected = autoDetectContent();
 
   // Submit Ingestion (Modes: AUTO, ANALYZE, RESEARCH, SAVE_KNOWLEDGE)
   const handleIngest = async (mode: ResearchIngestMode = selectedMode) => {
-    if (!selectedFile && !inputText.trim()) {
-      if (onNotify) onNotify('warning', 'Empty Input', 'Please drag a file or paste a URL / text to ingest.');
-      return;
-    }
-
-    if (selectedFile && selectedFile.size > MAX_FILE_SIZE_BYTES) {
-      const sizeMb = (selectedFile.size / (1024 * 1024)).toFixed(1);
-      if (onNotify) {
-        onNotify('error', 'File Too Large', `File is ${sizeMb} MB. Maximum allowed upload size is ${MAX_FILE_SIZE_MB} MB.`);
-      }
+    if (selectedFiles.length === 0 && !inputText.trim()) {
+      if (onNotify) onNotify('warning', 'Empty Input', 'Please select or drag files/images, or paste a URL / text to ingest.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      let res: ResearchIngestResult;
+      let lastResult: ResearchIngestResult | null = null;
 
-      if (selectedFile) {
-        res = await api.ingestResearchFile({
-          file: selectedFile,
-          mode,
-          author_creator: inputAuthor.trim() || undefined,
-          title: inputTitle.trim() || undefined,
-        });
-      } else {
-        res = await api.ingestResearchText({
+      // 1. If files are queued, ingest them sequentially with progress tracking
+      if (selectedFiles.length > 0) {
+        setUploadProgress({ current: 0, total: selectedFiles.length });
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          setUploadProgress({ current: i + 1, total: selectedFiles.length });
+          const res = await api.ingestResearchFile({
+            file,
+            mode,
+            author_creator: inputAuthor.trim() || undefined,
+            title: inputTitle.trim() || (selectedFiles.length === 1 ? undefined : file.name),
+          });
+          lastResult = res;
+        }
+        setUploadProgress(null);
+      }
+
+      // 2. If text/URL is also provided, ingest it
+      if (inputText.trim()) {
+        const textRes = await api.ingestResearchText({
           content: inputText.trim(),
           mode,
           source_uri: inputText.startsWith('http') ? inputText.trim() : undefined,
           author_creator: inputAuthor.trim() || undefined,
           title: inputTitle.trim() || undefined,
         });
+        lastResult = textRes;
       }
 
-      setActiveSummary(res);
-      setSelectedFile(null);
+      if (lastResult) {
+        setActiveSummary(lastResult);
+      }
+      setSelectedFiles([]);
       setInputText('');
       setInputTitle('');
       setInputAuthor('');
@@ -493,8 +533,8 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       if (onNotify) {
         onNotify(
           'success',
-          `Knowledge Ingested (${res.knowledge_id})`,
-          res.verdict_message
+          selectedFiles.length > 1 ? `Batch Upload Finished (${selectedFiles.length} files)` : `Knowledge Ingested (${lastResult?.knowledge_id || 'OK'})`,
+          lastResult?.verdict_message || 'All items cataloged successfully.'
         );
       }
 
@@ -504,6 +544,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
       if (onNotify) onNotify('error', 'Ingestion Failed', err?.message || 'Failed to parse research input.');
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(null);
     }
   };
 
@@ -919,7 +960,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
             isDragging
               ? 'border-indigo-400 bg-indigo-950/40 scale-[0.99]'
-              : selectedFile
+              : selectedFiles.length > 0
               ? 'border-emerald-500/80 bg-emerald-950/20'
               : 'border-slate-700 hover:border-indigo-500/60 bg-slate-950/60 hover:bg-slate-950'
           }`}
@@ -927,27 +968,69 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             onChange={handleFileSelect}
             className="hidden"
             accept=".pdf,.py,.pine,.mq4,.mq5,.json,.csv,.txt,.md,.mp4,.mov,.webm,.mp3,.m4a,.wav,image/*"
           />
 
           <div className="flex flex-col items-center justify-center gap-2">
-            {selectedFile ? (
+            {selectedFiles.length > 0 ? (
               <>
                 <FileText className="w-10 h-10 text-emerald-400 animate-bounce" />
                 <p className="text-sm font-semibold text-emerald-300">
-                  Selected File: {selectedFile.name} ({selectedFile.size >= 1024 * 1024 ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : `${(selectedFile.size / 1024).toFixed(1)} KB`})
+                  {selectedFiles.length === 1
+                    ? `Selected File: ${selectedFiles[0].name} (${selectedFiles[0].size >= 1024 * 1024 ? `${(selectedFiles[0].size / (1024 * 1024)).toFixed(1)} MB` : `${(selectedFiles[0].size / 1024).toFixed(1)} KB`})`
+                    : `${selectedFiles.length} Files Selected for Batch Ingest`}
                 </p>
-                <p className="text-xs text-slate-400">Click or drag another file to replace</p>
+
+                {/* Multi-File Preview List */}
+                <div
+                  className="mt-2 w-full max-w-xl max-h-36 overflow-y-auto space-y-1.5 p-2 bg-slate-950/80 rounded-lg border border-slate-800 text-left"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {selectedFiles.map((f, idx) => (
+                    <div
+                      key={`${f.name}-${idx}`}
+                      className="flex items-center justify-between gap-2 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-xs text-slate-200"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                        <span className="truncate font-mono">{f.name}</span>
+                        <span className="text-[10px] text-slate-400 shrink-0">
+                          ({f.size >= 1024 * 1024 ? `${(f.size / (1024 * 1024)).toFixed(1)} MB` : `${(f.size / 1024).toFixed(1)} KB`})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => handleRemoveFile(idx, e)}
+                        className="text-slate-400 hover:text-rose-400 p-0.5 rounded transition cursor-pointer"
+                        title="Remove file"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-3 mt-1">
+                  <p className="text-xs text-slate-400">Click or drag more files to add to batch</p>
+                  <button
+                    type="button"
+                    onClick={handleClearAllFiles}
+                    className="text-xs text-rose-400 hover:underline cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                </div>
               </>
             ) : (
               <>
                 <UploadCloud className="w-10 h-10 text-indigo-400/80" />
                 <p className="text-sm font-medium text-slate-200">
-                  Drop anything here ( <span className="text-rose-400 font-bold">🎬 Video Reels / Talk Shows</span> • <span className="text-cyan-400">PDFs / Books</span> • <span className="text-purple-400">Code / PineScript</span> • <span className="text-amber-400">Notes / Articles</span> • <span className="text-pink-400">Images</span> )
+                  Drop anything here ( <span className="text-rose-400 font-bold">🎬 Video Reels / Talk Shows</span> • <span className="text-cyan-400">PDFs / Books</span> • <span className="text-purple-400">Code / PineScript</span> • <span className="text-amber-400">Notes / Articles</span> • <span className="text-pink-400 font-bold">📸 Multiple Images</span> )
                 </p>
-                <p className="text-xs text-slate-400">or click to browse your system</p>
+                <p className="text-xs text-slate-400">or click to browse your system (Multi-file select enabled)</p>
               </>
             )}
           </div>
@@ -1092,7 +1175,7 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
             {/* Single Unified Primary Action Button */}
             <button
               onClick={() => handleIngest(selectedMode)}
-              disabled={isSubmitting || (!selectedFile && !inputText.trim())}
+              disabled={isSubmitting || (selectedFiles.length === 0 && !inputText.trim())}
               className="px-5 py-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               title={
                 selectedMode === 'AUTO'
@@ -1103,12 +1186,20 @@ export const ResearchIngestLab: React.FC<ResearchIngestLabProps> = ({
               {isSubmitting ? (
                 <>
                   <RotateCcw className="w-4 h-4 animate-spin text-indigo-300" />
-                  <span>DECOMPOSING & INGESTING...</span>
+                  <span>
+                    {uploadProgress
+                      ? `INGESTING ${uploadProgress.current}/${uploadProgress.total}...`
+                      : 'DECOMPOSING & INGESTING...'}
+                  </span>
                 </>
               ) : selectedMode === 'AUTO' ? (
                 <>
                   <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>⚡ AUTO INGEST & DECONSTRUCT</span>
+                  <span>
+                    {selectedFiles.length > 1
+                      ? `⚡ BATCH INGEST ${selectedFiles.length} FILES`
+                      : '⚡ AUTO INGEST & DECONSTRUCT'}
+                  </span>
                 </>
               ) : selectedMode === 'ANALYZE' ? (
                 <>

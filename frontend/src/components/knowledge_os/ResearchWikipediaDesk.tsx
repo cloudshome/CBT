@@ -30,6 +30,7 @@ import {
 } from '../../types';
 import { WikiInfobox } from './WikiInfobox';
 import { WikiLink } from './WikiLinkHover';
+import { WikiPortalHome } from './WikiPortalHome';
 
 
 interface ResearchWikipediaDeskProps {
@@ -115,9 +116,6 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
         searchQuery || undefined
       );
       setArticles(res.articles || []);
-      if (res.articles && res.articles.length > 0 && !selectedArticleId) {
-        setSelectedArticleId(res.articles[0].article_id);
-      }
     } catch (err: any) {
       onNotify?.('error', 'Wikipedia Load Failed', err.message || 'Could not load articles.');
     } finally {
@@ -417,6 +415,21 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
+                setSelectedArticleId(null);
+                setActiveArticle(null);
+              }}
+              className={`px-3 py-1.5 rounded border text-xs font-sans font-medium flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
+                !selectedArticleId
+                  ? 'border-[#3366cc] bg-[#eaf3ff] dark:bg-blue-950/60 text-[#3366cc] dark:text-blue-300 font-bold'
+                  : 'border-[#c8ccd1] dark:border-[#384252] bg-white dark:bg-[#1e2738] hover:bg-[#f8f9fa] dark:hover:bg-[#253043] text-[#202122] dark:text-slate-200'
+              }`}
+              title="Return to Wikipedia Main Page Portal"
+            >
+              <BookOpen size={13} />
+              <span>Main Page</span>
+            </button>
+            <button
+              onClick={() => {
                 setShowTriageDrawer(true);
                 loadTriageInbox();
               }}
@@ -587,13 +600,12 @@ export const ResearchWikipediaDesk: React.FC<ResearchWikipediaDeskProps> = ({ on
               <span className="text-xs font-sans">Fetching encyclopedia article...</span>
             </div>
           ) : !activeArticle ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-12 text-[#54595d] dark:text-slate-400 gap-2">
-              <BookOpen size={36} className="text-[#a2a9b1] mb-1" />
-              <h3 className="text-base font-serif font-bold text-[#202122] dark:text-white">Welcome to SKY Research Wikipedia</h3>
-              <p className="text-xs text-[#54595d] dark:text-slate-400 max-w-sm text-center font-sans">
-                Select an article from the left directory or enter a URL above to explore verified claims, macro regimes, and dialectical contradictions.
-              </p>
-            </div>
+            <WikiPortalHome
+              articles={articles}
+              onSelectArticle={(id) => setSelectedArticleId(id)}
+              onOpenWebSearch={handleOpenWebSearch}
+              onExploreCategory={(cat) => setSelectedCategory(cat)}
+            />
           ) : (
             <div className="p-6 max-w-5xl mx-auto w-full space-y-5 font-sans">
               {/* Wikipedia Tab Navigation Bar (Article / Talk / Read / Edit / View history) */}
