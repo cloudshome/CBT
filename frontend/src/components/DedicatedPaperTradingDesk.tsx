@@ -112,6 +112,9 @@ export const DedicatedPaperTradingDesk: React.FC<DedicatedPaperTradingDeskProps>
 
   const handleClose = async (posId: string) => {
     if (closingId) return;
+    if (!window.confirm(`Are you sure you want to CLOSE position #${posId.slice(-8)}?`)) {
+      return;
+    }
     setClosingId(posId);
     try {
       await onClosePosition(posId);

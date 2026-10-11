@@ -36,6 +36,7 @@ import { StrategyRealityCockpit } from './components/StrategyRealityCockpit';
 import { IntelligenceCockpit } from './components/IntelligenceCockpit';
 import { RiskEnsembleDesk } from './components/RiskEnsembleDesk';
 import { InstitutionalMasterTerminal } from './components/terminal/InstitutionalMasterTerminal';
+import { MastermindSwarmDesk } from './components/MastermindSwarmDesk';
 import { ToastContainer } from './components/ToastContainer';
 import { marketProvider, TickerData } from './data/providers/marketProvider';
 import {
@@ -110,8 +111,8 @@ export const App: React.FC = () => {
   const [brief, setBrief] = useState<DeskBriefResponse | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<boolean>(false);
 
-  // Main Screen View Switcher: Terminal Cockpit vs Master Cockpit vs Dedicated Shadow Paper Trading Desk vs Top-Level Research Lab
-  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB'>('MASTER_COCKPIT');
+  // Main Screen View Switcher: Terminal Cockpit vs Master Cockpit vs Dedicated Shadow Paper Trading Desk vs Top-Level Research Lab vs Mastermind Swarm
+  const [activeMainView, setActiveMainView] = useState<'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM'>('MASTER_COCKPIT');
 
   // Tab State for Single-Screen Compact Cockpit
   const [activeRightTab, setActiveRightTab] = useState<'ORDER_DESK' | 'ORDER_BOOK' | 'PAPER' | 'AI_DESK'>('ORDER_DESK');
@@ -130,6 +131,14 @@ export const App: React.FC = () => {
   const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false);
   const [isVaultLocked, setIsVaultLocked] = useState<boolean>(false);
   const [showUpdateModal, setShowUpdateModal] = useState<boolean>(false);
+  const [wsState, setWsState] = useState<'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE'>('IDLE');
+
+  useEffect(() => {
+    const unsub = marketProvider.onConnectionStateChange((state) => {
+      setWsState(state);
+    });
+    return () => unsub();
+  }, []);
 
   // Check First-Run Setup & Session Unlock Status on App Launch
   useEffect(() => {
@@ -371,8 +380,18 @@ export const App: React.FC = () => {
     amount: number;
     stopLoss?: number;
     takeProfit?: number;
+    isLiveExecution?: boolean;
   }) => {
     try {
+      if (order.isLiveExecution) {
+        addToast(
+          'error',
+          'Live Capital Blocked (Safety Lockout)',
+          'REAL_CAPITAL_ENABLED is False by system constitution. Live exchange dispatch is locked.'
+        );
+        return;
+      }
+
       const entry = order.type === 'LIMIT' && order.price ? order.price : (stats.lastPrice > 0 ? stats.lastPrice : 65000.0);
       const isLong = order.side === 'BUY';
       const safeSl = order.stopLoss && order.stopLoss > 0
@@ -393,8 +412,8 @@ export const App: React.FC = () => {
 
       addToast(
         'success',
-        `${order.type} Order Routed`,
-        `Executed ${order.side} ${order.amount.toFixed(4)} ${order.symbol} @ $${entry.toFixed(2)}`
+        `Paper ${order.type} Order Routed`,
+        `[SIMULATED] Executed ${order.side} ${order.amount.toFixed(4)} ${order.symbol} @ $${entry.toFixed(2)}`
       );
       fetchPositions();
     } catch (err: unknown) {
@@ -548,6 +567,7 @@ export const App: React.FC = () => {
         activeView={activeMainView}
         onViewChange={setActiveMainView}
         openPositionsCount={positions.length}
+        wsState={wsState}
       />
 
       {/* Primary View Routing: Dedicated Shadow Paper Desk vs Master Cockpit vs Top-Level Research Lab vs Classic Terminal */}
@@ -573,6 +593,8 @@ export const App: React.FC = () => {
             selectedTimeframe={timeframe}
           />
         </div>
+      ) : activeMainView === 'MASTERMIND_SWARM' ? (
+        <MastermindSwarmDesk />
       ) : (
         <>
           {/* Institutional Quantitative HUD Control Bar */}

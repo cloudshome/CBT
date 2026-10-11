@@ -346,6 +346,9 @@ export const PaperTradingPanel: React.FC<PaperTradingPanelProps> = ({
                                 type="button"
                                 onClick={async () => {
                                   if (closingId) return;
+                                  if (!window.confirm(`Are you sure you want to CLOSE position #${idStr.slice(-8)} on ${pos.symbol}?`)) {
+                                    return;
+                                  }
                                   setClosingId(idStr);
                                   try {
                                     await onClosePosition(idStr);

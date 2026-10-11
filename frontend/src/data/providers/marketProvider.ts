@@ -85,7 +85,7 @@ export class BinanceMarketDataProvider implements IMarketDataProvider {
     onDepth: (depth: OrderBookDepth) => void
   ): Unsubscribe {
     this.depthSubscribers.add(onDepth);
-    this.ensureWebSocket(symbol, '15m');
+    this.ensureWebSocket(symbol, this.activeTimeframe || '15m');
 
     return () => {
       this.depthSubscribers.delete(onDepth);
@@ -98,7 +98,7 @@ export class BinanceMarketDataProvider implements IMarketDataProvider {
     onTicker: (ticker: TickerData) => void
   ): Unsubscribe {
     this.tickerSubscribers.add(onTicker);
-    this.ensureWebSocket(symbol, '15m');
+    this.ensureWebSocket(symbol, this.activeTimeframe || '15m');
 
     return () => {
       this.tickerSubscribers.delete(onTicker);

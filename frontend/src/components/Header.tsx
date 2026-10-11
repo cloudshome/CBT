@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers } from 'lucide-react';
+import { RefreshCw, Activity, Zap, TrendingUp, TrendingDown, BellOff, BellRing, Send, Layers, Cpu } from 'lucide-react';
 import { SupportedTimeframe } from '../types';
 import { api } from '../services/api';
 
@@ -16,9 +16,10 @@ interface HeaderProps {
   onRefresh: () => void;
   notificationsEnabled: boolean;
   onToggleNotifications: () => void;
-  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB';
-  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB') => void;
+  activeView?: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM';
+  onViewChange?: (view: 'TERMINAL' | 'MASTER_COCKPIT' | 'PAPER_DESK' | 'RESEARCH_LAB' | 'MASTERMIND_SWARM') => void;
   openPositionsCount?: number;
+  wsState?: 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR' | 'IDLE';
 }
 
 const POPULAR_SYMBOLS = [
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeView = 'TERMINAL',
   onViewChange,
   openPositionsCount = 0,
+  wsState = 'CONNECTED',
 }) => {
   const safeTrend = String(trend || 'Consolidation');
   const isBullish = safeTrend.toLowerCase().includes('bullish');
@@ -74,9 +76,17 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0D1520] border border-terminal-cyan/20 text-terminal-cyan text-xs font-mono">
-            <Activity className="w-3.5 h-3.5 animate-pulse text-terminal-cyan" />
-            <span>DESK ENGINE ACTIVE</span>
+          <div className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono border ${
+            wsState === 'CONNECTED'
+              ? 'bg-[#0D1520] border-emerald-500/30 text-emerald-400'
+              : wsState === 'CONNECTING' || wsState === 'RECONNECTING'
+              ? 'bg-[#1a1508] border-amber-500/30 text-amber-400'
+              : 'bg-[#1f0f0f] border-rose-500/30 text-rose-400'
+          }`}>
+            <Activity className={`w-3.5 h-3.5 ${wsState === 'CONNECTED' ? 'animate-pulse text-emerald-400' : 'text-current'}`} />
+            <span>
+              {wsState === 'CONNECTED' ? 'DESK STREAM ACTIVE' : wsState === 'RECONNECTING' ? 'RECONNECTING STREAM...' : wsState === 'CONNECTING' ? 'CONNECTING...' : 'STREAM OFFLINE'}
+            </span>
           </div>
         </div>
 
@@ -130,6 +140,17 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <span className="text-sm">🧠</span>
             <span>Research Lab</span>
+          </button>
+          <button
+            onClick={() => onViewChange?.('MASTERMIND_SWARM')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded transition-all font-bold ${
+              activeView === 'MASTERMIND_SWARM'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-sm shadow-purple-500/30 ring-1 ring-purple-400/50'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Cpu size={14} className={activeView === 'MASTERMIND_SWARM' ? 'text-white' : 'text-purple-400'} />
+            <span>Mastermind Swarm</span>
           </button>
         </div>
 
