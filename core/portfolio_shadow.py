@@ -239,12 +239,14 @@ class PortfolioShadowManager:
                     exit_fill_price = tp_p
                     final_pnl = ((tp_p - entry_p) * size) if is_long else ((entry_p - tp_p) * size)
                 elif close_reason == "STOP_LOSS_HIT":
-                    exit_fill_price = active_sl
-                    final_pnl = (
-                        ((active_sl - entry_p) * size)
-                        if is_long
-                        else ((entry_p - active_sl) * size)
-                    )
+                    # Adverse Market Gap & Slippage Model: If market gaps below SL on Long,
+                    # fill price is the worse of active_sl and current_price (not guaranteed active_sl).
+                    if is_long:
+                        exit_fill_price = min(active_sl, current_price) if current_price > 0 else active_sl
+                        final_pnl = (exit_fill_price - entry_p) * size
+                    else:
+                        exit_fill_price = max(active_sl, current_price) if current_price > 0 else active_sl
+                        final_pnl = (entry_p - exit_fill_price) * size
 
             # Update database
             with db_manager.get_trading_conn() as conn:

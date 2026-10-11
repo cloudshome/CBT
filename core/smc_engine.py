@@ -44,11 +44,13 @@ class SMCPattern:
 
 class SMCEngine:
     """
-    Algorithmic Smart Money Concepts detector with empirical expectancy calibration.
+    Algorithmic Smart Money Concepts detector with heuristic prior expectancy mapping.
+    NOTE: Default baseline table contains static heuristic priors, not live calibrated empirical distributions.
     """
 
     def __init__(self):
-        # Historical empirical baseline expectancy tables: (Pattern, Regime) -> mean R-multiple
+        # Heuristic baseline prior expectancy tables: (Pattern, Regime) -> mean R-multiple prior
+        # [HEURISTIC] These values are initial research priors and must be calibrated against historical databases.
         self._expectancy_table: dict[tuple[str, str], float] = {
             (SMCPatternType.BULLISH_FVG.value, "TRENDING_BULL"): 1.42,
             (SMCPatternType.BULLISH_FVG.value, "RANGING_CONSOLIDATION"): 0.85,

@@ -17,9 +17,10 @@ fi
 # Run pre-flight verification tests
 echo "Running Pre-Flight Verification Gates..."
 if [ -d ".venv" ]; then
-    ./.venv/bin/pytest tests/ -q || echo "⚠️ Warning: Some pre-flight tests emitted warnings."
+    ./.venv/bin/pytest tests/ -q
     echo "Starting Uvicorn Server on http://0.0.0.0:8000..."
     exec ./.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
 else
-    python3 -m uvicorn app:app --host 0.0.0.0 --port 8000
+    python3 -m pytest tests/ -q
+    exec python3 -m uvicorn app:app --host 0.0.0.0 --port 8000
 fi

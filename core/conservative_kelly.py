@@ -44,8 +44,15 @@ class KellyAllocationResult:
 class ConservativeKellyAllocator:
     """Calculates dynamically discounted institutional position sizing."""
 
-    def __init__(self, max_risk_cap_pct: float = 0.015):  # 1.5% max risk cap
+    def __init__(
+        self,
+        max_risk_cap_pct: float = 0.015,
+        max_leverage_ceiling: float = 3.0,
+        max_notional_pct: float = 2.0,
+    ):  # 1.5% max risk cap, 3.0x max leverage ceiling, 200% max equity notional
         self.max_risk_cap_pct = max_risk_cap_pct
+        self.max_leverage_ceiling = max_leverage_ceiling
+        self.max_notional_pct = max_notional_pct
 
     def calculate_allocation(
         self,
@@ -123,6 +130,14 @@ class ConservativeKellyAllocator:
         risk_per_unit = abs(entry_price - stop_loss_price)
         allocated_risk_usd = account_equity * f_final
         position_units = allocated_risk_usd / (risk_per_unit + 1e-5)
+
+        # Invariant: Leverage and notional ceiling to guard against ultra-tight stops
+        max_notional_by_leverage = account_equity * self.max_leverage_ceiling
+        max_notional_by_budget = account_equity * self.max_notional_pct
+        effective_notional_ceiling = min(max_notional_by_leverage, max_notional_by_budget)
+        max_units_allowed = effective_notional_ceiling / (entry_price + 1e-5)
+        
+        position_units = min(position_units, max_units_allowed)
         notional_usd = position_units * entry_price
         effective_lev = notional_usd / account_equity if account_equity > 0 else 1.0
 

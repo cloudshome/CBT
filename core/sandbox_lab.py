@@ -117,23 +117,37 @@ class SandboxLab:
                 reason = "TIME_STOP"
 
                 if is_long:
-                    if c["high"] >= tp_p:
-                        exit_price = tp_p * (1.0 - slippage_bps / 10000.0)
+                    # Risk Primacy & Anti-Lookahead: If both SL and TP are touched in the same bar,
+                    # conservative institutional standard dictates assuming Stop Loss hit first.
+                    sl_hit = c["low"] <= sl_p
+                    tp_hit = c["high"] >= tp_p
+                    if sl_hit and tp_hit:
+                        exit_price = sl_p * (1.0 - slippage_bps / 10000.0)
                         exit_trade = True
-                        reason = "TAKE_PROFIT"
-                    elif c["low"] <= sl_p:
+                        reason = "STOP_LOSS_AMBIGUOUS_DUAL_HIT"
+                    elif sl_hit:
                         exit_price = sl_p * (1.0 - slippage_bps / 10000.0)
                         exit_trade = True
                         reason = "STOP_LOSS"
-                else:
-                    if c["low"] <= tp_p:
-                        exit_price = tp_p * (1.0 + slippage_bps / 10000.0)
+                    elif tp_hit:
+                        exit_price = tp_p * (1.0 - slippage_bps / 10000.0)
                         exit_trade = True
                         reason = "TAKE_PROFIT"
-                    elif c["high"] >= sl_p:
+                else:
+                    sl_hit = c["high"] >= sl_p
+                    tp_hit = c["low"] <= tp_p
+                    if sl_hit and tp_hit:
+                        exit_price = sl_p * (1.0 + slippage_bps / 10000.0)
+                        exit_trade = True
+                        reason = "STOP_LOSS_AMBIGUOUS_DUAL_HIT"
+                    elif sl_hit:
                         exit_price = sl_p * (1.0 + slippage_bps / 10000.0)
                         exit_trade = True
                         reason = "STOP_LOSS"
+                    elif tp_hit:
+                        exit_price = tp_p * (1.0 + slippage_bps / 10000.0)
+                        exit_trade = True
+                        reason = "TAKE_PROFIT"
 
                 if exit_trade or (i - active_pos["entry_bar"] >= 20):
                     pnl_pct = (
@@ -236,8 +250,11 @@ class SandboxLab:
         profit_factor = gross_profit / max(0.01, gross_loss)
 
         ret_arr = np.array(returns) if returns else np.zeros(1)
+        # Note: ret_arr contains per-trade returns, not daily returns.
+        # Computing unannualized per-trade Sharpe / return-to-volatility ratio
+        # to avoid severe statistical overinflation.
         sr = (
-            (np.mean(ret_arr) / (np.std(ret_arr) + 1e-6)) * np.sqrt(252)
+            float(np.mean(ret_arr) / (np.std(ret_arr) + 1e-6))
             if len(ret_arr) > 1
             else 0.0
         )

@@ -106,3 +106,48 @@ def test_portfolio_heat_cap_ceiling():
     assert round(matrix.total_open_risk_pct * 100, 1) == 3.7
     assert not matrix.is_heat_exceeded
     assert matrix.can_open_new_position
+
+
+def test_kelly_ultra_tight_stop_loss_leverage_ceiling():
+    """Verify CBT-CRIT-001: Ultra-tight stop cannot produce unbounded leverage or notional exposure."""
+    u_budget = UncertaintyBudget(
+        composite_uncertainty_u=0.1,
+        data_quality_uncertainty=0.02,
+        analogue_sample_uncertainty=0.03,
+        model_disagreement_entropy=0.02,
+        regime_transition_uncertainty=0.01,
+        event_shock_uncertainty=0.0,
+        penalty_factor=0.05,
+        uncertainty_level="LOW",
+    )
+    ev_high = ev_engine.calculate_net_ev(
+        entry_price=88000.0,
+        take_profit_price=90000.0,
+        stop_loss_price=87950.0,  # Ultra-tight $50 stop distance
+        calibrated_win_prob=0.70,
+        uncertainty=u_budget,
+    )
+
+    alloc = conservative_kelly.calculate_allocation(
+        account_equity=100000.0,
+        entry_price=88000.0,
+        stop_loss_price=87950.0,  # $50 stop distance
+        ev_result=ev_high,
+        uncertainty=u_budget,
+    )
+
+    # Invariant: Effective leverage must not exceed max_leverage_ceiling (3.0x)
+    assert alloc.effective_leverage <= conservative_kelly.max_leverage_ceiling
+    # Invariant: Position notional must not exceed max_notional_pct (50% = $50,000)
+    assert alloc.recommended_position_notional_usd <= 100000.0 * conservative_kelly.max_notional_pct
+
+    # Also verify HalfKellyPositionSizer directly
+    from core.half_kelly_sizer import half_kelly_position_sizer
+    res = half_kelly_position_sizer.calculate_sizing(
+        account_equity=100000.0,
+        entry_price=88000.0,
+        stop_loss=87950.0,
+        take_profit=90000.0,
+    )
+    assert res.position_size_usd <= 100000.0 * half_kelly_position_sizer.max_notional_pct
+

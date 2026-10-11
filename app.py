@@ -198,6 +198,7 @@ from core.voice_interface import voice_interface
 from core.walk_forward_engine import walk_forward_engine
 from core.youtube.agent import youtube_agent
 from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
+from core.mastermind.mastermind_arbiter import mastermind_arbiter
 
 log_dir = Path(os.getenv("DATA_DIR", "data")) / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
@@ -239,11 +240,12 @@ async def lifespan_ctx(_app: FastAPI) -> AsyncIterator[None]:
         asyncio.create_task(shadow_burn_in_orchestrator.start_loop()),
         asyncio.create_task(hf_telemetry_pipeline.start_flush_loop()),
         asyncio.create_task(research_automation_orchestrator.start_loop()),
+        asyncio.create_task(mastermind_arbiter.start_loop(interval_sec=60.0)),
         asyncio.create_task(cluster_sync_daemon.start()),
     ]
     logger.info(
-        "AI Quant Sentinel FastAPI online with Autonomous Trader, Burn-In Orchestrator, "
-        "Telemetry Pipeline, Research Automation Orchestrator & Cluster Sync Daemon."
+        "AI Quant Sentinel FastAPI online with Autonomous Trader, Mastermind Swarm, "
+        "Burn-In Orchestrator, Telemetry Pipeline, Research Automation Orchestrator & Cluster Sync Daemon."
     )
     try:
         yield
@@ -1570,6 +1572,11 @@ async def get_shadow_positions():
 
 @app.post("/api/shadow/trade", dependencies=[Depends(require_api_key)])
 async def open_shadow_trade(order: TradeOrderRequest):
+    if order.size <= 0 or order.entry_price <= 0 or order.stop_loss <= 0 or not order.symbol:
+        raise HTTPException(
+            status_code=400,
+            detail="INVALID_ORDER_PARAMS: size, entry_price, and stop_loss must be positive non-zero numbers, and symbol must be specified.",
+        )
     pos_id = portfolio_shadow.open_position(
         symbol=order.symbol,
         direction=order.direction,
@@ -4524,7 +4531,48 @@ async def websocket_terminal_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
 
 
+# -----------------------------------------------------------------------------
+# MASTERMIND MULTI-AGENT SWARM REST ENDPOINTS
+# -----------------------------------------------------------------------------
+@app.get("/api/mastermind/status")
+async def get_mastermind_swarm_status() -> dict[str, Any]:
+    """Returns live status of all active Mastermind specialists and arbitration state."""
+    from core.mastermind.mastermind_arbiter import mastermind_arbiter
+    from core.portfolio_shadow import portfolio_shadow
+
+    accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=mastermind_arbiter.account_equity_usd)
+    specialist_cards = [
+        {
+            "specialist_id": s.specialist_id,
+            "symbol": s.target_symbol,
+            "archetype": s.archetype.value,
+        }
+        for s in mastermind_arbiter.specialists
+    ]
+
+    return {
+        "status": "ONLINE",
+        "account_equity_usd": accounting.get("virtual_equity", mastermind_arbiter.account_equity_usd),
+        "total_realized_pnl": accounting.get("total_realized_pnl", 0.0),
+        "open_positions_count": len(portfolio_shadow.get_open_positions()),
+        "specialists_count": len(specialist_cards),
+        "specialists": specialist_cards,
+    }
+
+
+@app.get("/api/mastermind/decisions")
+async def get_mastermind_recent_decisions(
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    """Retrieves immutable audit trail of recent mastermind candidate decisions."""
+    from core.mastermind.mastermind_arbiter import mastermind_arbiter
+
+    decisions = mastermind_arbiter.get_recent_decisions(limit=limit)
+    return {"decisions": decisions, "count": len(decisions)}
+
+
 if __name__ == "__main__":
     import uvicorn
+
 
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)

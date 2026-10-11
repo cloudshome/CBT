@@ -61,6 +61,11 @@ class PortfolioRiskMatrix:
             sl = pos.get("stop_loss", 0.0)
             if entry > 0 and sl > 0:
                 current_risk_usd += size * abs(entry - sl)
+            elif entry > 0 and (sl is None or sl <= 0):
+                # Conservative Institutional Exposure: Positions without defined stop losses
+                # must not be treated as $0 risk. Estimate minimum adverse gap risk at 5.0% notional.
+                notional = size * entry
+                current_risk_usd += notional * 0.05
 
         total_projected_risk_usd = current_risk_usd + proposed_risk_usd
         total_risk_pct = total_projected_risk_usd / account_equity

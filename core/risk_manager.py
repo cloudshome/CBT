@@ -31,6 +31,53 @@ class RiskManager:
         self._lockout_until_ms: int | None = None
         self._daily_starting_equity: float | None = None
         self._last_day_timestamp: int = 0
+        self._restore_persisted_state()
+
+    def _restore_persisted_state(self) -> None:
+        """Restores persisted lockout and daily equity state from the database."""
+        try:
+            from core.database import db_manager
+            with db_manager.get_brain_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT param_key, param_value_json FROM system_parameters WHERE param_key IN ('risk_lockout_until_ms', 'risk_daily_starting_equity', 'risk_last_day_timestamp')"
+                )
+                for row in cursor.fetchall():
+                    key = row["param_key"]
+                    import json
+                    val = json.loads(row["param_value_json"])
+                    if key == "risk_lockout_until_ms" and val is not None:
+                        self._lockout_until_ms = int(val)
+                    elif key == "risk_daily_starting_equity" and val is not None:
+                        self._daily_starting_equity = float(val)
+                    elif key == "risk_last_day_timestamp" and val is not None:
+                        self._last_day_timestamp = int(val)
+            if self._lockout_until_ms is not None:
+                logger.warning(f"Restored persisted risk lockout active until {self._lockout_until_ms}")
+        except Exception as e:
+            logger.debug(f"Risk state persistence table not yet initialized or unreadable: {e}")
+
+    def _persist_state(self, key: str, value: Any) -> None:
+        """Persists risk state atomically to SQLite."""
+        try:
+            from core.database import db_manager
+            import json
+            now_ms = int(time.time() * 1000)
+            val_json = json.dumps(value)
+            with db_manager.get_brain_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO system_parameters (param_key, param_value_json, updated_at, version)
+                    VALUES (?, ?, ?, 1)
+                    ON CONFLICT(param_key) DO UPDATE SET
+                        param_value_json = excluded.param_value_json,
+                        updated_at = excluded.updated_at,
+                        version = version + 1
+                    """,
+                    (key, val_json, now_ms),
+                )
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to persist risk state {key}: {e}")
 
     def reset_daily_equity_if_needed(
         self, current_equity: float, now_ms: int | None = None
@@ -40,12 +87,16 @@ class RiskManager:
         if day_epoch != self._last_day_timestamp or self._daily_starting_equity is None:
             self._daily_starting_equity = current_equity
             self._last_day_timestamp = day_epoch
+            self._persist_state("risk_daily_starting_equity", current_equity)
+            self._persist_state("risk_last_day_timestamp", day_epoch)
             logger.info(f"Daily starting equity benchmarked at ${current_equity:,.2f}")
 
     def reset_lockout(self) -> None:
         """Resets active drawdown lockout (used for testing or authorized manual recovery)."""
         self._lockout_until_ms = None
         self._daily_starting_equity = None
+        self._persist_state("risk_lockout_until_ms", None)
+        self._persist_state("risk_daily_starting_equity", None)
 
     def evaluate_risk_gate(
         self,
@@ -74,6 +125,7 @@ class RiskManager:
                 )
             else:
                 self._lockout_until_ms = None
+                self._persist_state("risk_lockout_until_ms", None)
                 logger.info("Daily drawdown lockout expired. System returning to active status.")
 
         starting_eq = self._daily_starting_equity or current_equity
@@ -86,6 +138,7 @@ class RiskManager:
         if drawdown_pct >= self.max_daily_drawdown_pct:
             # Trigger 24-hour lockout
             self._lockout_until_ms = now + (24 * 3600 * 1000)
+            self._persist_state("risk_lockout_until_ms", self._lockout_until_ms)
             reason = (
                 f"KILL_SWITCH_ENGAGED: Daily drawdown ({drawdown_pct * 100:.2f}%) reached 3.0% threshold. "
                 "All new trading locked for 24 hours."

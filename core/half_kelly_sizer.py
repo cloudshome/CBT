@@ -38,6 +38,14 @@ class HalfKellyPositionSizer:
     Computes Bayesian Half-Kelly capital sizing with invalidation protection.
     """
 
+    def __init__(
+        self,
+        max_leverage_ceiling: float = 3.0,
+        max_notional_pct: float = 2.0,
+    ):
+        self.max_leverage_ceiling = max_leverage_ceiling
+        self.max_notional_pct = max_notional_pct
+
     def calculate_sizing(
         self,
         account_equity: float,
@@ -138,6 +146,14 @@ class HalfKellyPositionSizer:
         # Sizing calculations
         risk_dollar_cap = account_equity * final_risk_pct
         size_base = risk_dollar_cap / risk_dist
+
+        # Invariant: Leverage and notional ceiling to guard against ultra-tight stops
+        max_notional_by_leverage = account_equity * self.max_leverage_ceiling
+        max_notional_by_budget = account_equity * self.max_notional_pct
+        effective_notional_ceiling = min(max_notional_by_leverage, max_notional_by_budget)
+        max_units_allowed = effective_notional_ceiling / (entry_price + 1e-5)
+
+        size_base = min(size_base, max_units_allowed)
         size_usd = size_base * entry_price
         inv_pct = (risk_dist / entry_price) * 100.0
 

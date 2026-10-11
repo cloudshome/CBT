@@ -124,7 +124,13 @@ class CausalFirewall:
 
         filtered = []
         for r in records:
-            t = r.get("decision_available_time") or r.get(timestamp_field)
+            # Zero Lookahead Invariant: Prefer explicit decision_available_time.
+            # If unavailable, check close_time or fallback to open timestamp.
+            t = (
+                r.get("decision_available_time")
+                or r.get("close_time")
+                or r.get(timestamp_field)
+            )
             if t is not None and t <= self._simulation_time_ms:
                 filtered.append(r)
         return filtered

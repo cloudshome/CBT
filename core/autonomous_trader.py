@@ -64,6 +64,22 @@ class AutonomousTrader:
             logger.warning("AutonomousTrader: Ingestion paused due to low disk space.")
             return []
 
+        # Master Risk Gate Guard: Check 3.0% daily drawdown circuit breaker
+        from core.risk_manager import risk_manager
+        accounting = portfolio_shadow.get_portfolio_accounting(starting_capital=self.account_equity_usd)
+        realized_pnl = float(accounting.get("total_realized_pnl", 0.0))
+        unrealized_pnl = float(accounting.get("total_unrealized_pnl", 0.0))
+        current_eq = float(accounting.get("virtual_equity", self.account_equity_usd))
+
+        gate_status = risk_manager.evaluate_risk_gate(
+            current_equity=current_eq,
+            daily_realized_pnl=realized_pnl,
+            daily_unrealized_pnl=unrealized_pnl,
+        )
+        if not gate_status.is_trading_allowed:
+            logger.warning(f"AutonomousTrader halted by Risk Gate: {gate_status.reason}")
+            return []
+
         executed_actions: list[dict[str, Any]] = []
         self.last_scan_time = time.time()
 
