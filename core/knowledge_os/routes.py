@@ -609,6 +609,31 @@ async def get_research_source_dossier(source_id: str) -> dict[str, Any]:
     }
 
 
+# -----------------------------------------------------------------------------
+# AUTONOMOUS RESEARCH SOURCE REGISTRY & TRIGGER ENDPOINTS
+# -----------------------------------------------------------------------------
+@router.get("/sources/registry")
+async def list_registered_feed_sources(
+    active_only: bool = Query(default=True),
+) -> dict[str, Any]:
+    """Lists registered intelligence feeds (RSS/APIs/YouTube) and crawl health."""
+    from core.knowledge_os.research_source_registry import research_source_registry
+
+    sources = research_source_registry.list_sources(is_active_only=active_only)
+    return {"sources": sources, "count": len(sources)}
+
+
+@router.post("/sources/trigger-crawl")
+async def trigger_research_crawl(
+    pipeline: str = Query(default="research_feed_crawler"),
+) -> dict[str, Any]:
+    """Manually triggers an immediate crawl cycle for autonomous research feeds."""
+    from core.knowledge_os.research_automation_orchestrator import research_automation_orchestrator
+
+    result = await research_automation_orchestrator.trigger_pipeline(pipeline)
+    return result
+
+
 @router.post("/wiki/reverify/{article_id}")
 async def reverify_wiki_article(article_id: str) -> dict[str, Any]:
     """Re-runs epistemic cross-verification against latest macroeconomic benchmarks."""

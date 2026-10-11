@@ -53,6 +53,7 @@ logger = logging.getLogger("ai_quant_sentinel.knowledge_os.automation")
 INTERVAL_HYPOTHESIS_BACKTEST = 30 * 60  # 30 minutes
 INTERVAL_QUIZ_REMINDER = 60 * 60  # 1 hour
 INTERVAL_YOUTUBE_CRAWLER = 6 * 60 * 60  # 6 hours
+INTERVAL_RESEARCH_FEED_CRAWLER = 2 * 60 * 60  # 2 hours
 INTERVAL_KNOWLEDGE_AUDIT = 24 * 60 * 60  # 24 hours
 INTERVAL_DRIVE_SYNC = 6 * 60 * 60  # 6 hours
 
@@ -94,6 +95,7 @@ class ResearchAutomationOrchestrator:
             "hypothesis_backtest": PipelineStatus("hypothesis_backtest"),
             "quiz_reminder": PipelineStatus("quiz_reminder"),
             "youtube_crawler": PipelineStatus("youtube_crawler"),
+            "research_feed_crawler": PipelineStatus("research_feed_crawler"),
             "knowledge_audit": PipelineStatus("knowledge_audit"),
             "drive_sync": PipelineStatus("drive_sync"),
         }
@@ -103,7 +105,7 @@ class ResearchAutomationOrchestrator:
     # ------------------------------------------------------------------
 
     async def start_loop(self) -> None:
-        """Launches all 5 pipeline loops concurrently. Called from lifespan_ctx."""
+        """Launches all pipeline loops concurrently. Called from lifespan_ctx."""
         self._running = True
         logger.info("ResearchAutomationOrchestrator: Zero-touch research pipelines starting.")
         self._tasks = [
@@ -116,6 +118,13 @@ class ResearchAutomationOrchestrator:
             ),
             asyncio.create_task(
                 self._loop("youtube_crawler", INTERVAL_YOUTUBE_CRAWLER, self._run_youtube_crawler)
+            ),
+            asyncio.create_task(
+                self._loop(
+                    "research_feed_crawler",
+                    INTERVAL_RESEARCH_FEED_CRAWLER,
+                    self._run_research_feed_crawler,
+                )
             ),
             asyncio.create_task(
                 self._loop("knowledge_audit", INTERVAL_KNOWLEDGE_AUDIT, self._run_knowledge_audit)
@@ -149,6 +158,7 @@ class ResearchAutomationOrchestrator:
             "hypothesis_backtest": self._run_hypothesis_backtest,
             "quiz_reminder": self._run_quiz_reminder,
             "youtube_crawler": self._run_youtube_crawler,
+            "research_feed_crawler": self._run_research_feed_crawler,
             "knowledge_audit": self._run_knowledge_audit,
             "drive_sync": self._run_drive_sync,
         }
@@ -171,6 +181,7 @@ class ResearchAutomationOrchestrator:
             "hypothesis_backtest": 10,
             "quiz_reminder": 25,
             "youtube_crawler": 40,
+            "research_feed_crawler": 45,
             "knowledge_audit": 60,
             "drive_sync": 80,
         }.get(name, 30)
@@ -563,6 +574,79 @@ class ResearchAutomationOrchestrator:
             "items_processed": len(channels),
             "channels_crawled": channels_crawled,
             "videos_queued": videos_found,
+        }
+
+    # ------------------------------------------------------------------
+    # Pipeline 3b: Curated Research Feeds Auto-Crawler (RSS / Macro / Protocol)
+    # ------------------------------------------------------------------
+
+    async def _run_research_feed_crawler(self) -> dict[str, Any]:
+        """
+        Crawls registered feeds from research_source_registry due for update,
+        parses items via FeedExtractor, synthesizes articles into research_wiki.db,
+        and stages novel claims into triage inbox.
+        """
+        from core.knowledge_os.feed_extractor import feed_extractor
+        from core.knowledge_os.research_source_registry import research_source_registry
+        from core.knowledge_os.research_wikipedia import research_wikipedia_engine
+
+        sources = research_source_registry.get_sources_due_for_crawl()
+        sources_crawled = 0
+        articles_created = 0
+
+        for src in sources:
+            src_type = src.get("source_type")
+            if src_type != "RSS_FEED":
+                continue
+
+            feed_url = src.get("url", "")
+            feed_name = src.get("name", "")
+            category = src.get("category", "Macro Geopolitics & Hegemony")
+            source_id = src.get("source_id", "")
+
+            try:
+                logger.info("Auto-crawling research feed: %s (%s)", feed_name, feed_url)
+                items = await asyncio.get_event_loop().run_in_executor(
+                    None, feed_extractor.fetch_feed_items, feed_url, 5
+                )
+
+                items_ingested_for_src = 0
+                for item in items:
+                    if not item.link and not item.summary:
+                        continue
+
+                    # Ingest feed item into Research Wikipedia
+                    content_to_ingest = f"Title: {item.title}\nSource: {item.link}\nSummary: {item.summary}\nDate: {item.published_at}"
+                    try:
+                        art = research_wikipedia_engine.ingest_url_or_content(
+                            url_or_text=content_to_ingest,
+                            custom_title=item.title,
+                            custom_category=category,
+                            custom_author=item.author or feed_name,
+                        )
+                        articles_created += 1
+                        items_ingested_for_src += 1
+                    except Exception as in_err:  # noqa: BLE001
+                        logger.warning("Error ingesting item '%s' from %s: %s", item.title, feed_name, in_err)
+
+                research_source_registry.record_crawl_success(source_id, items_ingested_for_src)
+                sources_crawled += 1
+
+                if items_ingested_for_src > 0:
+                    await self._notify(
+                        f"📰 *Research Feed Ingested*\n"
+                        f"• Source: *{feed_name}*\n"
+                        f"• New Articles: {items_ingested_for_src}\n"
+                        f"• Category: `{category}`"
+                    )
+
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Feed crawler error for %s: %s", feed_name, exc)
+
+        return {
+            "items_processed": len(sources),
+            "sources_crawled": sources_crawled,
+            "articles_created": articles_created,
         }
 
     # ------------------------------------------------------------------
