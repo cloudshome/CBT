@@ -203,6 +203,14 @@ export function normalizeCandle(c: unknown): OHLCVCandle {
 }
 
 export const api = {
+  async getMastermindStatus(): Promise<any> {
+    return getMastermindStatus();
+  },
+
+  async getMastermindDecisions(limit = 30): Promise<any> {
+    return getMastermindDecisions(limit);
+  },
+
   /**
    * GET /api/testnet/burnin/report - Gate 5 Extended Testnet Burn-In telemetry
    */
@@ -5568,6 +5576,17 @@ export async function resumeForwardStrategy(data: {
   });
   return await handleResponse<{ status: string; message: string }>(res);
 }
+
+export async function getMastermindStatus(): Promise<any> {
+  const res = await authFetch('/api/mastermind/status');
+  return await handleResponse<any>(res);
+}
+
+export async function getMastermindDecisions(limit: number = 30): Promise<any> {
+  const res = await authFetch(`/api/mastermind/decisions?limit=${limit}`);
+  return await handleResponse<any>(res);
+}
+
 
 
 

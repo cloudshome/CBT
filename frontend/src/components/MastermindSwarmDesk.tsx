@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu, RefreshCw, AlertTriangle, CheckCircle2, XCircle, TrendingUp, TrendingDown, Layers, Terminal } from 'lucide-react';
+import { api } from '../services/api';
 
 interface SpecialistInfo {
   specialist_id: string;
@@ -41,18 +42,16 @@ export const MastermindSwarmDesk: React.FC = () => {
   const fetchData = async () => {
     try {
       setRefreshing(true);
-      const [statusRes, decisionsRes] = await Promise.all([
-        fetch('/api/mastermind/status'),
-        fetch('/api/mastermind/decisions?limit=30'),
+      const [sData, dData] = await Promise.all([
+        api.getMastermindStatus(),
+        api.getMastermindDecisions(30),
       ]);
 
-      if (statusRes.ok) {
-        const sData = await statusRes.json();
+      if (sData) {
         setStatus(sData);
       }
-      if (decisionsRes.ok) {
-        const dData = await decisionsRes.json();
-        setDecisions(dData.decisions || []);
+      if (dData && dData.decisions) {
+        setDecisions(dData.decisions);
       }
       setError(null);
     } catch (err: unknown) {
